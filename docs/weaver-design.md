@@ -160,7 +160,7 @@ The following examples demonstrate how the composable command set enables resili
 
 - **Task:** The agent receives the high-level instruction: "In the Python project, rename the function `calculate_total_price` found in `app/logic.py` to `compute_final_price`."
 
-```
+```shell
 # 1. Orient - Locate the canonical symbol
 DEF=$(weaver get-definition app/logic.py 15 8)
 
@@ -181,21 +181,19 @@ cat edits.jsonl | weaver apply-edits --atomic
 # 5. Decide (Verify) - Run tests against the changed files
 # The agent checks for any objects with severity "Error" in the output stream
 weaver test --changed-files | jq -e 'select(.severity=="Error")' || echo "All good!"
-
 ```
 
 ### 4.2 First-Time Project Onboarding
 
 - **Task:** An agent is encountering a new codebase for the first time.
 
-```
+```shell
 # 1. Observe & Orient - Run onboarding and capture the output
 weaver onboard-project | tee onboarding.jsonl
 
 # 2. Ingest - The agent parses onboarding.jsonl
 # It extracts key conventions, test commands, and architectural notes
 # to use in the context for all subsequent interactions with this project.
-
 ```
 
 ## V. Future Directions
@@ -216,7 +214,7 @@ A command like `weaver request-user-input <prompt>` could enable hybrid human-in
 
 The following Pydantic types are the single source of truth for all JSONL I/O. Each has a `type` discriminator for effortless streaming introspection.
 
-```
+```python
 from typing import Literal, Optional
 from pydantic import BaseModel
 
