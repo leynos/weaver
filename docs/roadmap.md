@@ -9,8 +9,8 @@ This document provides a detailed, task-oriented development roadmap for buildin
 
 - [ ] **Finalise Project Structure & Dependencies:**
 
-  - [ ] Decide on a monorepo and use [uv](./docs/monorepo-development-with-astral-uv.md) for package and environment management.
-  - [ ] Initialise the project with [uv](./docs/monorepo-development-with-astral-uv.md) and add core dependencies: `msgspec`, `typer` (for the CLI), `anyio` (for async socket communication), and `multilspy`.
+  - [ ] Decide on a monorepo and use [uv](monorepo-development-with-astral-uv.md) for package and environment management.
+  - [ ] Initialise the project with [uv](monorepo-development-with-astral-uv.md) and add core dependencies: `msgspec`, `typer` (for the CLI), `anyio` (for async socket communication), and `multilspy`.
 
 - [ ] **Define the API Contract with msgspec:**
 
@@ -168,7 +168,7 @@ This document provides a detailed, task-oriented development roadmap for buildin
 
 - [ ] **Implement Schema Generation:**
 
-  - [ ] Add the `weaver --json-schema` command. This will iterate through all msgspec models and use their `.schema_json()` method to print a complete JSON Schema for the entire API.
+  - [ ] Add the `weaver --json-schema` command. This will iterate through all msgspec models and call `msgspec.json.schema(Model)` to generate a complete JSON Schema for the entire API, emitting it via `json.dumps`.
 
 - [ ] **Package for Distribution:**
 

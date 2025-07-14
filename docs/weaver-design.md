@@ -114,7 +114,7 @@ The command suite is the heart of `weaver`, providing the agent with the tools n
 1. **Phase 0 – Scaffolding**:
 
    - Define all I/O schemas as msgspec models (see Appendix A).
-   - Use [uv](./docs/monorepo-development-with-astral-uv.md) for environment and dependency management.
+   - Use [uv](monorepo-development-with-astral-uv.md) for environment and dependency management.
 
    - Implement the `asyncio` JSON-RPC router for `weaverd`.
 
