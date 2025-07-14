@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD013 MD033 MD001 -->
 # weaver: A Composable, Semantics‑Aware Interface for AI Coding Agents
 
 *Tag‑line: Bridging the semantic gap between text‑only agents and real codebases, one thread at a time.*
@@ -32,7 +33,7 @@ To address the prohibitive startup latency of language servers, `weaver` employs
 
   - It starts and supervises language servers via `multilspy`.
 
-  - It holds an in-memory semantic index, a file-content overlay cache for transient edits, and a Pydantic-validated RPC dispatcher.
+  - It holds an in-memory semantic index, a file-content overlay cache for transient edits, and a msgspec-validated RPC dispatcher.
 
   - It enforces resource caps (e.g., `SERANA_MAX_RAM_MB`, `SERANA_MAX_CPUS`), returning structured errors when limits are reached.
 
@@ -112,7 +113,8 @@ The command suite is the heart of `weaver`, providing the agent with the tools n
 
 1. **Phase 0 – Scaffolding**:
 
-   - Define all I/O schemas as Pydantic models (see Appendix A).
+   - Define all I/O schemas as msgspec models (see Appendix A).
+   - Use [uv](./docs/monorepo-development-with-astral-uv.md) for environment and dependency management.
 
    - Implement the `asyncio` JSON-RPC router for `weaverd`.
 
@@ -150,7 +152,7 @@ The command suite is the heart of `weaver`, providing the agent with the tools n
 
    - Add cancellation support for long-running jobs.
 
-   - Add a `weaver --json-schema` command to print the Pydantic definitions, for embedding in agent prompts.
+   - Add a `weaver --json-schema` command to print the msgspec definitions, for embedding in agent prompts.
 
 ## IV. Advanced Workflows
 
@@ -212,25 +214,25 @@ A command like `weaver request-user-input <prompt>` could enable hybrid human-in
 
 ## Appendix A. Data Schemas (Excerpt)
 
-The following Pydantic types are the single source of truth for all JSONL I/O. Each has a `type` discriminator for effortless streaming introspection.
+The following msgspec types are the single source of truth for all JSONL I/O. Each has a `type` discriminator for effortless streaming introspection.
 
 ```python
 from typing import Literal, Optional
-from pydantic import BaseModel
+from msgspec import Struct
 
-class Position(BaseModel):
+class Position(Struct):
     line: int  # 0-indexed
     character: int  # UTF-16 code units, 0-indexed
 
-class Range(BaseModel):
+class Range(Struct):
     start: Position
     end: Position
 
-class Location(BaseModel):
+class Location(Struct):
     file: str  # Absolute or workspace-relative path
     range: Range
 
-class Diagnostic(BaseModel):
+class Diagnostic(Struct):
     type: Literal['diagnostic'] = 'diagnostic'
     location: Location
     severity: Literal['Error', 'Warning', 'Info', 'Hint']
