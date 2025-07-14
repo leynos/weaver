@@ -237,9 +237,9 @@ The canonical command for managing these dependencies is `uv add`. To add a depe
 # CWD: Monorepo root.
 uv add --package my-api fastapi
 
-# ACTION: Add the 'pydantic' library as a dependency to the 'shared-utils' package.
+# ACTION: Add the 'msgspec' library as a dependency to the 'shared-utils' package.
 # CWD: Monorepo root.
-uv add --package shared-utils pydantic
+uv add --package shared-utils msgspec
 ```
 
 This workflow maintains a clean separation of concerns: each package explicitly states what it needs, and the workspace manager (`uv`) ensures that all these needs are met in a consistent and conflict-free manner across the entire repository.

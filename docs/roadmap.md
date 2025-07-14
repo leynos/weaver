@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD013 MD033 MD001 -->
 # Weaver: Development Roadmap
 
 This document provides a detailed, task-oriented development roadmap for building the `weaver` CLI and its associated `weaverd` daemon, based on the established design specification. It is intended for the implementation team to track progress and coordinate efforts.
@@ -8,13 +9,12 @@ This document provides a detailed, task-oriented development roadmap for buildin
 
 - [ ] **Finalise Project Structure & Dependencies:**
 
-  - [ ] Decide on a monorepo (e.g., using `poetry` or `pdm` with workspace support) to house both `weaver` and `weaverd` packages, simplifying dependency management and versioning.
+  - [ ] Decide on a monorepo and use [uv](monorepo-development-with-astral-uv.md) for package and environment management.
+  - [ ] Initialise the project with [uv](monorepo-development-with-astral-uv.md) and add core dependencies: `msgspec`, `typer` (for the CLI), `anyio` (for async socket communication), and `multilspy`.
 
-  - [ ] Initialise the project with `poetry` or `pdm` and add core dependencies: `pydantic`, `typer` (for the CLI), `anyio` (for async socket communication), and `multilspy`.
+- [ ] **Define the API Contract with msgspec:**
 
-- [ ] **Define the API Contract with Pydantic:**
-
-  - [ ] Create a shared internal package (`weaver-schemas` or similar) containing Pydantic `BaseModel` definitions for every JSON object specified in Appendix A of the design document (`Location`, `Diagnostic`, `CodeEdit`, `ImpactReport`, etc.).
+  - [ ] Create a shared internal package (`weaver-schemas` or similar) containing msgspec `Struct` definitions for every JSON object specified in Appendix A of the design document (`Location`, `Diagnostic`, `CodeEdit`, `ImpactReport`, etc.).
 
   - [ ] Ensure all models include the `type` discriminator field (`type: Literal['diagnostic'] = 'diagnostic'`) to facilitate easy parsing of the JSONL stream on the client side. These models are the single source of truth for the API.
 
@@ -24,7 +24,7 @@ This document provides a detailed, task-oriented development roadmap for buildin
 
   - [ ] Implement an RPC router that listens on a UNIX domain socket (e.g., `$XDG_RUNTIME_DIR/weaverd-$USER.sock`). Use a library like `jsonrpc-py` or build a simple dispatcher that maps method names to handler functions.
 
-  - [ ] The dispatcher should accept JSON requests, validate them against the Pydantic models, call the corresponding (stubbed) handler, and serialize the Pydantic response model back to JSONL.
+  - [ ] The dispatcher should accept JSON requests, validate them against the msgspec models, call the corresponding (stubbed) handler, and serialize the msgspec response model back to JSONL.
 
   - [ ] Implement a basic `ping` or `project-status` RPC endpoint that returns a hardcoded success response.
 
@@ -36,7 +36,7 @@ This document provides a detailed, task-oriented development roadmap for buildin
 
   - [ ] Implement the daemon auto-start logic. If the client cannot connect to the socket, it should attempt to spawn the `weaverd` process in the background (`subprocess.Popen` with appropriate flags to detach it).
 
-  - [ ] Implement the core RPC client function that connects to the socket, sends a Pydantic-serialised request, and streams the JSONL response directly to `stdout`.
+  - [ ] Implement the core RPC client function that connects to the socket, sends a msgspec-serialised request, and streams the JSONL response directly to `stdout`.
 
   - [ ] Implement the `weaver project-status` command to call the `ping` endpoint on the daemon. A successful run of this command validates the entire communication pipeline.
 
@@ -56,7 +56,7 @@ This document provides a detailed, task-oriented development roadmap for buildin
 
   - [ ] `project-status`: Enhance the stub to query the `LanguageServerManager` for the actual status of each language server (PID, memory, readiness state).
 
-  - [ ] `list-diagnostics`: Implement the handler to call `multilspy`'s `get_diagnostics` method and stream the results, converting them to the `weaver` `Diagnostic` Pydantic model.
+  - [ ] `list-diagnostics`: Implement the handler to call `multilspy`'s `get_diagnostics` method and stream the results, converting them to the `weaver` `Diagnostic` msgspec model.
 
 - [ ] **Implement Orient Commands:**
 
@@ -168,7 +168,7 @@ This document provides a detailed, task-oriented development roadmap for buildin
 
 - [ ] **Implement Schema Generation:**
 
-  - [ ] Add the `weaver --json-schema` command. This will iterate through all Pydantic models and use their `.schema_json()` method to print a complete JSON Schema for the entire API.
+  - [ ] Add the `weaver --json-schema` command. This will iterate through all msgspec models and call `msgspec.json.schema(Model)` to generate a complete JSON Schema for the entire API, emitting it via `json.dumps`.
 
 - [ ] **Package for Distribution:**
 
