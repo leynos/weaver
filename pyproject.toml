@@ -5,7 +5,14 @@ description = "weaver package"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-dependencies = []
+dependencies = [
+    "anyio>=4.9.0",
+    "msgspec>=0.19.0",
+    "typer>=0.16.0",
+]
+
+[project.scripts]
+weaver = "weaver.cli:app"
 
 [dependency-groups]
 dev = [
@@ -73,7 +80,7 @@ seaborn = "sns"
 scipy = "sp"
 "collections.abc" = "cabc"
 datetime = "dt"
-unittest.mock = "mock"
+"unittest.mock" = "mock"
 
 [tool.pytest.ini_options]
 # Ensure asyncio fixtures create a new event loop for each test
