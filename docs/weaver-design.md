@@ -162,6 +162,9 @@ because it offers a clean API and automatic help text generation. Communication
 between the client and daemon will use `anyio` for async socket operations.
 `msgspec` is employed for fast, schema‑validated JSON serialization.
 
+**Security Note:** `anyio` 4.9.0 currently has a high‑severity vulnerability. We will
+monitor upstream releases and upgrade once a patched version is available.
+
 ## IV. Advanced Workflows
 
 The following examples demonstrate how the composable command set enables resilient, multi-step agentic workflows.
