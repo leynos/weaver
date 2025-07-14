@@ -154,6 +154,22 @@ The command suite is the heart of `weaver`, providing the agent with the tools n
 
    - Add a `weaver --json-schema` command to print the msgspec definitions, for embedding in agent prompts.
 
+## Design Decisions
+
+The project uses [uv](monorepo-development-with-astral-uv.md) for dependency
+management and virtual environment creation. The CLI is built with `typer`
+because it offers a clean API and automatic help text generation. Communication
+
+between the client and daemon will use `anyio` for async socket operations.
+`msgspec` is employed for fast, schema‑validated JSON serialization.
+
+`can_connect` uses `anyio.fail_after` to avoid hanging on unresponsive sockets,
+handling common connection errors. The CLI's `check-socket` command reports
+availability of a specified path.
+
+**Security Note:** `anyio` 4.9.0 currently has a high‑severity vulnerability. We will
+monitor upstream releases and upgrade once a patched version is available.
+
 ## IV. Advanced Workflows
 
 The following examples demonstrate how the composable command set enables resilient, multi-step agentic workflows.
