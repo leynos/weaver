@@ -163,6 +163,11 @@ because it offers a clean API and automatic help text generation. Communication
 between the client and daemon will use `anyio` for async socket operations.
 `msgspec` is employed for fast, schema‑validated JSON serialization.
 
+All schemas reside in a dedicated `weaver_schemas` package. Each model defines a
+`type` discriminator field so that JSONL streams can be parsed incrementally
+without external context. This package is the single source of truth for the
+daemon and client API.
+
 `can_connect` uses `anyio.fail_after` to avoid hanging on unresponsive sockets,
 handling common connection errors. The CLI's `check-socket` command reports
 availability of a specified path.
