@@ -12,11 +12,11 @@ This document provides a detailed, task-oriented development roadmap for buildin
   - [x] Decide on a monorepo and use [uv](monorepo-development-with-astral-uv.md) for package and environment management.
   - [x] Initialise the project with [uv](monorepo-development-with-astral-uv.md) and add core dependencies: `msgspec`, `typer` (for the CLI), `anyio` (for async socket communication), and `multilspy`.
 
-- [ ] **Define the API Contract with msgspec:**
+- [x] **Define the API Contract with msgspec:**
 
-  - [ ] Create a shared internal package (`weaver-schemas` or similar) containing msgspec `Struct` definitions for every JSON object specified in Appendix A of the design document (`Location`, `Diagnostic`, `CodeEdit`, `ImpactReport`, etc.).
+  - [x] Create a shared internal package (`weaver-schemas` or similar) containing msgspec `Struct` definitions for every JSON object specified in Appendix A of the design document (`Location`, `Diagnostic`, `CodeEdit`, `ImpactReport`, etc.).
 
-  - [ ] Ensure all models include the `type` discriminator field (`type: Literal['diagnostic'] = 'diagnostic'`) to facilitate easy parsing of the JSONL stream on the client side. These models are the single source of truth for the API.
+  - [x] Ensure all models include the `type` discriminator field (`type: Literal['diagnostic'] = 'diagnostic'`) to facilitate easy parsing of the JSONL stream on the client side. These models are the single source of truth for the API.
 
 - [ ] **Implement the** `weaverd` **Daemon Skeleton:**
 
