@@ -25,7 +25,7 @@ async def test_server_echoes_status(tmp_path: Path) -> None:
     dispatcher = RPCDispatcher()
 
     @dispatcher.register("project-status")
-    async def handler() -> ProjectStatus:
+    async def handler() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
         return ProjectStatus(message="ok")
 
     sock = tmp_path / "d.sock"
@@ -49,7 +49,7 @@ async def test_server_handles_multiple_requests(tmp_path: Path) -> None:
     dispatcher = RPCDispatcher()
 
     @dispatcher.register("echo")
-    async def echo(value: int) -> ProjectStatus:
+    async def echo(value: int) -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
         return ProjectStatus(message=str(value))
 
     sock = tmp_path / "e.sock"

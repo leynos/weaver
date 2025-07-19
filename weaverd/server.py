@@ -50,7 +50,7 @@ async def main(socket_path: Path | None = None) -> None:
     dispatcher = RPCDispatcher()
 
     @dispatcher.register("project-status")
-    async def project_status() -> ProjectStatus:
+    async def project_status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
         return ProjectStatus(message="ok")
 
     path = socket_path or default_socket_path()

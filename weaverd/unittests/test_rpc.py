@@ -18,7 +18,7 @@ async def test_dispatcher_handles_registered_method() -> None:
     dispatcher = RPCDispatcher()
 
     @dispatcher.register("project-status")
-    async def handler() -> ProjectStatus:
+    async def handler() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
         return ProjectStatus(message="ok")
 
     request = json.encode({"method": "project-status"})
@@ -31,7 +31,7 @@ async def test_dispatcher_passes_parameters() -> None:
     dispatcher = RPCDispatcher()
 
     @dispatcher.register("echo")
-    async def echo(value: int) -> ProjectStatus:
+    async def echo(value: int) -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
         return ProjectStatus(message=str(value))
 
     request = json.encode({"method": "echo", "params": {"value": 42}})

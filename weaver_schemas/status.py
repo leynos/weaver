@@ -5,7 +5,7 @@ import typing as t
 from msgspec import Struct
 
 
-class ProjectStatus(Struct):
+class ProjectStatus(Struct, frozen=True):
     """Basic daemon health indicator."""
 
     message: str

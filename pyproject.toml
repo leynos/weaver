@@ -28,7 +28,7 @@ dev = [
 [tool.pyright]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
-include = ["weaver", "weaver_schemas"]
+include = ["weaver", "weaver_schemas", "weaverd"]
 
 [tool.ruff]
 line-length = 88
