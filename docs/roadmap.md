@@ -18,15 +18,15 @@ This document provides a detailed, task-oriented development roadmap for buildin
 
   - [x] Ensure all models include the `type` discriminator field (`type: Literal['diagnostic'] = 'diagnostic'`) to facilitate easy parsing of the JSONL stream on the client side. These models are the single source of truth for the API.
 
-- [ ] **Implement the** `weaverd` **Daemon Skeleton:**
+- [x] **Implement the** `weaverd` **Daemon Skeleton:**
 
-  - [ ] Create the main `asyncio` entry point for the daemon.
+  - [x] Create the main `asyncio` entry point for the daemon.
 
-  - [ ] Implement an RPC router that listens on a UNIX domain socket (e.g., `$XDG_RUNTIME_DIR/weaverd-$USER.sock`). Use a library like `jsonrpc-py` or build a simple dispatcher that maps method names to handler functions.
+  - [x] Implement an RPC router that listens on a UNIX domain socket (e.g., `$XDG_RUNTIME_DIR/weaverd-$USER.sock`). Use a library like `jsonrpc-py` or build a simple dispatcher that maps method names to handler functions.
 
-  - [ ] The dispatcher should accept JSON requests, validate them against the msgspec models, call the corresponding (stubbed) handler, and serialize the msgspec response model back to JSONL.
+  - [x] The dispatcher should accept JSON requests, validate them against the msgspec models, call the corresponding (stubbed) handler, and serialize the msgspec response model back to JSONL.
 
-  - [ ] Implement a basic `ping` or `project-status` RPC endpoint that returns a hardcoded success response.
+  - [x] Implement a basic `ping` or `project-status` RPC endpoint that returns a hardcoded success response.
 
 - [ ] **Implement the** `weaver` **Client Skeleton:**
 
