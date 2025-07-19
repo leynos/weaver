@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 weaver = "weaver.cli:app"
+weaverd = "weaverd.server:main"
 
 [dependency-groups]
 dev = [
@@ -27,7 +28,7 @@ dev = [
 [tool.pyright]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
-include = ["weaver", "weaver_schemas"]
+include = ["weaver", "weaver_schemas", "weaverd"]
 
 [tool.ruff]
 line-length = 88
@@ -99,5 +100,5 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["weaver", "weaver.*", "weaver_schemas", "weaver_schemas.*"]
+include = ["weaver", "weaver.*", "weaver_schemas", "weaver_schemas.*", "weaverd", "weaverd.*"]
 

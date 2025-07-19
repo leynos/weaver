@@ -173,8 +173,17 @@ single source of truth for the daemon and client API.
 handling common connection errors. The CLI's `check-socket` command reports
 availability of a specified path.
 
-**Security Note:** `anyio` 4.9.0 currently has a high‑severity vulnerability. We will
-monitor upstream releases and upgrade once a patched version is available.
+`weaverd` exposes a lightweight RPC interface over a UNIX domain socket. A
+custom `RPCDispatcher` maps method names to coroutine handlers and uses
+`msgspec` to validate requests and serialise responses. The default socket path
+is `$XDG_RUNTIME_DIR/weaverd-$USER.sock`, falling back to the system temporary
+directory if the environment variable is unset. Each connection reads requests
+in a loop, returning structured `SchemaError` objects if JSON decoding or a
+handler fails, so malformed input does not crash the daemon.
+
+**Security Note:** `anyio` 4.9.0 currently has a high‑severity vulnerability.
+Upstream releases will be monitored and an upgrade will be performed once a
+patched version is available.
 
 ## IV. Advanced Workflows
 

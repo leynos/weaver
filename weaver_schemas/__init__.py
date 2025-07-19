@@ -8,6 +8,7 @@ from .error import SchemaError
 from .primitives import Location, Position, Range
 from .references import Reference, Symbol
 from .reports import ImpactReport, OnboardingReport, TestResult
+from .status import ProjectStatus
 
 __all__ = [
     "CodeEdit",
@@ -16,6 +17,7 @@ __all__ = [
     "Location",
     "OnboardingReport",
     "Position",
+    "ProjectStatus",
     "Range",
     "Reference",
     "SchemaError",
