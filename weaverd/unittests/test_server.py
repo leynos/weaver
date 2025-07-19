@@ -42,3 +42,30 @@ async def test_server_echoes_status(tmp_path: Path) -> None:
         await writer.wait_closed()
     server.close()
     await server.wait_closed()
+
+
+@pytest.mark.anyio
+async def test_server_handles_multiple_requests(tmp_path: Path) -> None:
+    dispatcher = RPCDispatcher()
+
+    @dispatcher.register("echo")
+    async def echo(value: int) -> ProjectStatus:
+        return ProjectStatus(message=str(value))
+
+    sock = tmp_path / "e.sock"
+    server = await start_server(sock, dispatcher)
+    async with server:
+        reader, writer = await asyncio.open_unix_connection(str(sock))
+        for i in (1, 2):
+            writer.write(
+                json.encode({"method": "echo", "params": {"value": i}}) + b"\n"
+            )
+            await writer.drain()
+            data = await reader.readline()
+            assert json.decode(data.rstrip(), type=ProjectStatus) == ProjectStatus(
+                message=str(i)
+            )
+        writer.close()
+        await writer.wait_closed()
+    server.close()
+    await server.wait_closed()

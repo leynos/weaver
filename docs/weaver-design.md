@@ -179,8 +179,9 @@ custom `RPCDispatcher` maps method names to coroutine handlers and uses
 is `$XDG_RUNTIME_DIR/weaverd-$USER.sock`, falling back to the system temporary
 directory if the environment variable is unset.
 
-**Security Note:** `anyio` 4.9.0 currently has a high‑severity vulnerability. We will
-monitor upstream releases and upgrade once a patched version is available.
+**Security Note:** `anyio` 4.9.0 currently has a high‑severity vulnerability.
+Upstream releases will be monitored and an upgrade will be performed once a
+patched version is available.
 
 ## IV. Advanced Workflows
 

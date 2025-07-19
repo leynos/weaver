@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import getpass
 import os
 import tempfile
 from pathlib import Path
 
+from msgspec import json
+
+from weaver_schemas.error import SchemaError
 from weaver_schemas.status import ProjectStatus
 
 from .rpc import RPCDispatcher
@@ -12,7 +16,7 @@ from .rpc import RPCDispatcher
 
 def default_socket_path() -> Path:
     runtime_dir = os.environ.get("XDG_RUNTIME_DIR", tempfile.gettempdir())
-    user = os.environ.get("USER", "unknown")
+    user = getpass.getuser()
     return Path(runtime_dir) / f"weaverd-{user}.sock"
 
 
@@ -22,12 +26,13 @@ async def handle_client(
     dispatcher: RPCDispatcher,
 ) -> None:
     try:
-        data = await reader.readline()
-        if not data:
-            return
-        response = await dispatcher.handle(data.rstrip())
-        writer.write(response + b"\n")
-        await writer.drain()
+        while data := await reader.readline():
+            try:
+                response = await dispatcher.handle(data.rstrip())
+            except Exception as exc:  # noqa: BLE001 pragma: no cover - fallback
+                response = json.encode(SchemaError(message=str(exc)))
+            writer.write(response + b"\n")
+            await writer.drain()
     finally:
         writer.close()
         await writer.wait_closed()
