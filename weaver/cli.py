@@ -42,118 +42,122 @@ async def _project_status() -> None:
     await call_rpc(sock, "project-status")
 
 
+def _stub(command: str) -> None:
+    typer.echo(f"The '{command}' command is not yet implemented.")
+
+
 # --- Command Stubs ---------------------------------------------------------
 
 
 @app.command("list-diagnostics")
 def list_diagnostics() -> None:  # pragma: no cover - stub
     """Stream diagnostics for workspace."""
-    raise NotImplementedError
+    _stub("list-diagnostics")
 
 
 @app.command("onboard-project")
 def onboard_project() -> None:  # pragma: no cover - stub
     """Perform first-run analysis."""
-    raise NotImplementedError
+    _stub("onboard-project")
 
 
 @app.command("find-symbol")
 def find_symbol() -> None:  # pragma: no cover - stub
     """Search workspace symbols."""
-    raise NotImplementedError
+    _stub("find-symbol")
 
 
 @app.command("get-definition")
 def get_definition() -> None:  # pragma: no cover - stub
     """Locate the definitive declaration."""
-    raise NotImplementedError
+    _stub("get-definition")
 
 
 @app.command("list-references")
 def list_references() -> None:  # pragma: no cover - stub
     """List all references of a symbol."""
-    raise NotImplementedError
+    _stub("list-references")
 
 
 @app.command("summarise-symbol")
 def summarise_symbol() -> None:  # pragma: no cover - stub
     """Aggregate hover, docstring, and type info."""
-    raise NotImplementedError
+    _stub("summarise-symbol")
 
 
 @app.command("get-call-graph")
 def get_call_graph() -> None:  # pragma: no cover - stub
     """Retrieve the call graph."""
-    raise NotImplementedError
+    _stub("get-call-graph")
 
 
 @app.command("get-type-hierarchy")
 def get_type_hierarchy() -> None:  # pragma: no cover - stub
     """Retrieve the type hierarchy."""
-    raise NotImplementedError
+    _stub("get-type-hierarchy")
 
 
 @app.command("list-memories")
 def list_memories() -> None:  # pragma: no cover - stub
     """List stored memory snippets."""
-    raise NotImplementedError
+    _stub("list-memories")
 
 
 @app.command("analyse-impact")
 def analyse_impact() -> None:  # pragma: no cover - stub
     """Analyse potential impact of an edit."""
-    raise NotImplementedError
+    _stub("analyse-impact")
 
 
 @app.command("get-code-actions")
 def get_code_actions() -> None:  # pragma: no cover - stub
     """Retrieve available code actions."""
-    raise NotImplementedError
+    _stub("get-code-actions")
 
 
 @app.command()
 def test() -> None:  # pragma: no cover - stub
     """Run project tests."""
-    raise NotImplementedError
+    _stub("test")
 
 
 @app.command()
 def build() -> None:  # pragma: no cover - stub
     """Run project build."""
-    raise NotImplementedError
+    _stub("build")
 
 
 @app.command("with-transient-edit")
 def with_transient_edit() -> None:  # pragma: no cover - stub
     """Run command with in-memory overlay."""
-    raise NotImplementedError
+    _stub("with-transient-edit")
 
 
 @app.command("rename-symbol")
 def rename_symbol() -> None:  # pragma: no cover - stub
     """Rename a symbol across the project."""
-    raise NotImplementedError
+    _stub("rename-symbol")
 
 
 @app.command("apply-edits")
 def apply_edits() -> None:  # pragma: no cover - stub
     """Apply a stream of code edits."""
-    raise NotImplementedError
+    _stub("apply-edits")
 
 
 @app.command("format-code")
 def format_code() -> None:  # pragma: no cover - stub
     """Format source files."""
-    raise NotImplementedError
+    _stub("format-code")
 
 
 @app.command("set-active-project")
 def set_active_project() -> None:  # pragma: no cover - stub
     """Switch the active project."""
-    raise NotImplementedError
+    _stub("set-active-project")
 
 
 @app.command("reload-workspace")
 def reload_workspace() -> None:  # pragma: no cover - stub
     """Force reindex of the active project."""
-    raise NotImplementedError
+    _stub("reload-workspace")
