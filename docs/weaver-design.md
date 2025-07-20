@@ -64,7 +64,7 @@ employs a client-server model.
   - Enforces resource caps (e.g., `WEAVER_MAX_RAM_MB`, `WEAVER_MAX_CPUS`),
     returning structured errors when limits are reached.
 
-  - Serialises concurrent requests using `asyncio` tasks, supporting
+  - Serializes concurrent requests using `asyncio` tasks, supporting
     cancellation of long-running jobs.
 
 - **The** `weaver` **Client:** This is a lightweight, stateless, and
