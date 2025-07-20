@@ -255,7 +255,9 @@ availability of a specified path.
 
 The client auto-starts `weaverd` when the socket is missing. It forks the
 daemon in a detached `subprocess.Popen` call and waits for the socket to
-become available before issuing the request.
+become available before issuing the request. Set the environment variable
+`WEAVER_DEBUG=1` to inherit the daemon's output streams when debugging startup
+failures.
 
 `weaverd` exposes a lightweight RPC interface over a UNIX domain socket. A
 custom `RPCDispatcher` maps method names to coroutine handlers and uses

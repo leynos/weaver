@@ -7,6 +7,7 @@ import pytest
 from msgspec import json
 
 from weaver import client
+from weaver_schemas.error import SchemaError
 from weaver_schemas.status import ProjectStatus
 from weaverd.rpc import RPCDispatcher
 from weaverd.server import start_server
@@ -46,7 +47,13 @@ async def test_rpc_call_autostart(
     def spawn(path: Path) -> mp.Process:
         def _run() -> None:
             async def _serve() -> None:
-                server = await start_server(path, RPCDispatcher())
+                dispatcher = RPCDispatcher()
+
+                @dispatcher.register("project-status")
+                async def status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
+                    return ProjectStatus(message="ok")
+
+                server = await start_server(path, dispatcher)
                 async with server:
                     await server.serve_forever()
 
@@ -68,5 +75,22 @@ async def test_rpc_call_autostart(
     buf = StringIO()
     await client.rpc_call("project-status", socket_path=sock, stdout=buf)
     assert started is not None
+    assert json.decode(
+        buf.getvalue().encode(), type=ProjectStatus
+    ) == ProjectStatus(message="ok")
     started.terminate()
     started.join()
+
+
+@pytest.mark.anyio
+async def test_rpc_call_unknown_method(tmp_path: Path) -> None:
+    dispatcher = RPCDispatcher()
+    sock = tmp_path / "unk.sock"
+    server = await start_server(sock, dispatcher)
+    async with server:
+        buf = StringIO()
+        await client.rpc_call("nope", socket_path=sock, stdout=buf)
+        err = json.decode(buf.getvalue().encode(), type=SchemaError)
+        assert err.message == "unknown method: nope"
+    server.close()
+    await server.wait_closed()

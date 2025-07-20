@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import typing as t
 from pathlib import Path  # noqa: TC003 -- Typer evaluates this at runtime
 
 import anyio
@@ -34,102 +35,44 @@ def _todo(name: str) -> None:
     raise typer.Exit(1)
 
 
+def _make_stub(name: str) -> t.Callable[[], None]:
+    def command() -> None:  # pragma: no cover - stub
+        _todo(name)
+
+    return command
+
+
 @app.command("project-status")
 def project_status() -> None:
     """Check daemon and language server health."""
-    anyio.run(rpc_call, "project-status")
+    try:
+        anyio.run(rpc_call, "project-status")
+    except Exception as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
 
 
-@app.command("list-diagnostics")
-def list_diagnostics() -> None:  # pragma: no cover - stub
-    _todo("list-diagnostics")
+STUBS = [
+    "list-diagnostics",
+    "onboard-project",
+    "find-symbol",
+    "get-definition",
+    "list-references",
+    "summarise-symbol",
+    "get-call-graph",
+    "get-type-hierarchy",
+    "list-memories",
+    "analyse-impact",
+    "get-code-actions",
+    "test",
+    "build",
+    "with-transient-edit",
+    "rename-symbol",
+    "apply-edits",
+    "format-code",
+    "set-active-project",
+    "reload-workspace",
+]
 
-
-@app.command("onboard-project")
-def onboard_project() -> None:  # pragma: no cover - stub
-    _todo("onboard-project")
-
-
-@app.command("find-symbol")
-def find_symbol() -> None:  # pragma: no cover - stub
-    _todo("find-symbol")
-
-
-@app.command("get-definition")
-def get_definition() -> None:  # pragma: no cover - stub
-    _todo("get-definition")
-
-
-@app.command("list-references")
-def list_references() -> None:  # pragma: no cover - stub
-    _todo("list-references")
-
-
-@app.command("summarise-symbol")
-def summarise_symbol() -> None:  # pragma: no cover - stub
-    _todo("summarise-symbol")
-
-
-@app.command("get-call-graph")
-def get_call_graph() -> None:  # pragma: no cover - stub
-    _todo("get-call-graph")
-
-
-@app.command("get-type-hierarchy")
-def get_type_hierarchy() -> None:  # pragma: no cover - stub
-    _todo("get-type-hierarchy")
-
-
-@app.command("list-memories")
-def list_memories() -> None:  # pragma: no cover - stub
-    _todo("list-memories")
-
-
-@app.command("analyse-impact")
-def analyse_impact() -> None:  # pragma: no cover - stub
-    _todo("analyse-impact")
-
-
-@app.command("get-code-actions")
-def get_code_actions() -> None:  # pragma: no cover - stub
-    _todo("get-code-actions")
-
-
-@app.command("test")
-def cmd_test() -> None:  # pragma: no cover - stub
-    _todo("test")
-
-
-@app.command("build")
-def cmd_build() -> None:  # pragma: no cover - stub
-    _todo("build")
-
-
-@app.command("with-transient-edit")
-def with_transient_edit() -> None:  # pragma: no cover - stub
-    _todo("with-transient-edit")
-
-
-@app.command("rename-symbol")
-def rename_symbol() -> None:  # pragma: no cover - stub
-    _todo("rename-symbol")
-
-
-@app.command("apply-edits")
-def apply_edits() -> None:  # pragma: no cover - stub
-    _todo("apply-edits")
-
-
-@app.command("format-code")
-def format_code() -> None:  # pragma: no cover - stub
-    _todo("format-code")
-
-
-@app.command("set-active-project")
-def set_active_project() -> None:  # pragma: no cover - stub
-    _todo("set-active-project")
-
-
-@app.command("reload-workspace")
-def reload_workspace() -> None:  # pragma: no cover - stub
-    _todo("reload-workspace")
+for name in STUBS:
+    app.command(name)(_make_stub(name))
