@@ -166,19 +166,19 @@ objects conforming to the schemas defined in Appendix A.
 
 | Command             | Synopsis                                                                              |
 | ------------------- | ------------------------------------------------------------------------------------- |
-| analyse-impact      | --edit <json> Dry-run a single CodeEdit; returns ImpactReport.                        |
+| analyse-impact      | `--edit <json>` Dry-run a single CodeEdit; returns ImpactReport.                       |
 | get-code-actions    | <file> <line> <char> Available quick-fixes/refactors.                                 |
 | test                | `[--changed-files \| --all]` Wrapper for project test command; same output contract.   |
 | build               | Wrapper for project build command; same output contract.                              |
-| with-transient-edit | --file <f> --stdin <cmd …> Overlay speculative content, run another weaver command.   |
+| with-transient-edit | `--file <f> --stdin <cmd …>` Overlay speculative content, run another weaver command.  |
 
 ### 2.4 Act
 
 | Command            | Synopsis                                                          |
 | ------------------ | ----------------------------------------------------------------- |
 | rename-symbol      | <file> <line> <char> <new> Generate safe rename plan.             |
-| apply-edits        | [--atomic] Read CodeEdit stream from stdin, write to disk.        |
-| format-code        | [--stdin] [<files…>] Emit formatting edits via language server.   |
+| apply-edits        | `[--atomic]` Read CodeEdit stream from stdin, write to disk.       |
+| format-code        | `[--stdin] [<files…>]` Emit formatting edits via language server.  |
 | set-active-project | <name> Point daemon at another registered project.                |
 | reload-workspace   | Force re-index after dependency file change.                      |
 
