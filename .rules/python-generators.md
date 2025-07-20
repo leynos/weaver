@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD041 -->
 ## Prefer Generators Over Complex Loop Logic
 
 Using generators improves readability, composability, and memory efficiency.
@@ -89,6 +90,6 @@ def iter_even_doubles():
 ______________________________________________________________________
 
 **Rule of thumb:** If your `for` loop has multiple branches, mutations, or is
-hard to explain in one sentence—try rewriting it as a generator.
+hard to explain quickly—try rewriting it as a generator.
 
 Prefer clear, linear data flows over deeply nested conditionals and loop bodies.

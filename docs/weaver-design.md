@@ -56,29 +56,29 @@ employs a client-server model.
   per user, listening on a UNIX socket (e.g.,
   `$XDG_RUNTIME_DIR/weaverd-$USER.sock`).
 
-  - It starts and supervises language servers via `multilspy`.
+  - Starts and supervises language servers via `multilspy`.
 
-  - It holds an in-memory semantic index, a file-content overlay cache for
+  - Maintains an in-memory semantic index, a file-content overlay cache for
     transient edits, and a msgspec-validated RPC dispatcher.
 
-  - It enforces resource caps (e.g., `SERANA_MAX_RAM_MB`, `SERANA_MAX_CPUS`),
+  - Enforces resource caps (e.g., `SERANA_MAX_RAM_MB`, `SERANA_MAX_CPUS`),
     returning structured errors when limits are reached.
 
-  - It serialises concurrent requests using `asyncio` tasks, with support for
-    cancelling long-running jobs.
+  - Serialises concurrent requests using `asyncio` tasks, supporting
+    cancellation of long-running jobs.
 
 - **The** `weaver` **Client:** This is a lightweight, stateless, and
   fast-executing binary (e.g., a static executable built with PyOxidiser for a
   &lt;50ms cold start).
 
-  - It discovers the daemon's socket, automatically launching `weaverd` if it
-    is not already running.
+  - Discovers the daemon's socket, automatically launching `weaverd` if it is
+    not already running.
 
-  - It performs a version-handshake RPC to ensure compatibility.
+  - Performs a version-handshake RPC to ensure compatibility.
 
-  - It streams JSONL responses from the daemon directly to `stdout`.
+  - Streams JSONL responses from the daemon directly to `stdout`.
 
-  - It exits with a code of `0` on success, or a non-zero code plus a final
+  - Exits with a code of `0` on success, or a non-zero code plus a final
     `Error` JSON object on controlled failure.
 
 ### 1.2 Atomicity & Safety
@@ -152,25 +152,25 @@ objects conforming to the schemas defined in Appendix A.
 
 ### 2.2 Orient
 
-| Command            | Synopsis                                                                  |
-| ------------------ | ------------------------------------------------------------------------- |
-| find-symbol        | [--kind K] <pattern> Search workspace symbols.                            |
-| get-definition     | <file> <line> <char> Locate definitive declaration.                       |
-| list-references    | [--include-definition] <file> <line> <char> All uses of symbol at cursor. |
-| summarise-symbol   | <file> <line> <char> Aggregate hover, docstring, type info.               |
+| Command            | Synopsis                                                                               |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| find-symbol        | [--kind K] <pattern> Search workspace symbols.                                         |
+| get-definition     | <file> <line> <char> Locate definitive declaration.                                    |
+| list-references    | [--include-definition] <file> <line> <char> All uses of symbol at cursor.              |
+| summarise-symbol   | <file> <line> <char> Aggregate hover, docstring, type info.                            |
 | get-call-graph     | `--direction <in\|out>` <file> <line> <char> Show call graph with the chosen direction. |
-| get-type-hierarchy | `--direction <super\|sub>` <file> <line> <char> Show type hierarchy for the symbol. |
-| list-memories      | Stream previously stored memory snippets.                                 |
+| get-type-hierarchy | `--direction <super\|sub>` <file> <line> <char> Show type hierarchy for the symbol.     |
+| list-memories      | Stream previously stored memory snippets.                                              |
 
 ### 2.3 Decide
 
-| Command | Synopsis |
-| --- | --- |
-| analyse-impact | --edit <json> Dry-run a single CodeEdit; returns ImpactReport. |
-| get-code-actions | <file> <line> <char> Available quick-fixes/refactors. |
-| test | [--changed-files \| --all] Wrapper for project test command; same output contract. |
-| build | Wrapper for project build command; same output contract. |
-| with-transient-edit | --file <f> --stdin <cmd …> Overlay speculative content, run another weaver command. |
+| Command             | Synopsis                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| analyse-impact      | --edit <json> Dry-run a single CodeEdit; returns ImpactReport.                        |
+| get-code-actions    | <file> <line> <char> Available quick-fixes/refactors.                                 |
+| test                | [--changed-files \| --all] Wrapper for project test command; same output contract.     |
+| build               | Wrapper for project build command; same output contract.                              |
+| with-transient-edit | --file <f> --stdin <cmd …> Overlay speculative content, run another weaver command.   |
 
 ### 2.4 Act
 
