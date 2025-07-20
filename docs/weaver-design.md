@@ -152,35 +152,35 @@ objects conforming to the schemas defined in Appendix A.
 
 ### 2.2 Orient
 
-| Command            | Synopsis                                                                               |
-| ------------------ | -------------------------------------------------------------------------------------- |
-| find-symbol        | `[--kind K] <pattern>` Search workspace symbols.                                         |
-| get-definition     | `<file> <line> <char>` Locate definitive declaration.                                    |
-| list-references    | `[--include-definition] <file> <line> <char>` All uses of symbol at cursor.              |
-| summarise-symbol   | `<file> <line> <char>` Aggregate hover, docstring, type info.                            |
-| get-call-graph     | `--direction <in\|out>` `<file> <line> <char>` Show call graph with the chosen direction. |
-| get-type-hierarchy | `--direction <super\|sub>` `<file> <line> <char>` Show type hierarchy for the symbol.     |
-| list-memories      | Stream previously stored memory snippets.                                              |
+| Command            | Synopsis                                                                                  |
+| ------------------ | ----------------------------------------------------------------------------------------- |
+| find-symbol        | `[--kind K] <pattern>` Search workspace symbols.                                          |
+| get-definition     | `<file> <line> <char>` Locate definitive declaration.                                     |
+| list-references    | `[--include-definition] <file> <line> <char>` All uses of symbol at cursor.               |
+| summarise-symbol   | `<file> <line> <char>` Aggregate hover, docstring, type info.                             |
+| get-call-graph     | `--direction <in|out> <file> <line> <char>` Show call graph with the chosen direction.    |
+| get-type-hierarchy | `--direction <super|sub> <file> <line> <char>` Show type hierarchy for the symbol.        |
+| list-memories      | Stream previously stored memory snippets.                                                 |
 
 ### 2.3 Decide
 
-| Command             | Synopsis                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------- |
-| analyse-impact      | `--edit <json>` Dry-run a single CodeEdit; returns ImpactReport.                       |
+| Command             | Synopsis                                                                                |
+| ------------------- | --------------------------------------------------------------------------------------- |
+| analyse-impact      | `--edit <json>` Dry-run a single CodeEdit; returns ImpactReport.                        |
 | get-code-actions    | `<file> <line> <char>` Available quick-fixes/refactors.                                 |
-| test                | `[--changed-files \| --all]` Wrapper for project test command; same output contract.   |
-| build               | Wrapper for project build command; same output contract.                              |
-| with-transient-edit | `--file <f> --stdin <cmd …>` Overlay speculative content, run another weaver command.  |
+| test                | `[--changed-files | --all]` Wrapper for project test command; same output contract.     |
+| build               | Wrapper for project build command; same output contract.                                |
+| with-transient-edit | `--file <f> --stdin <cmd …>` Overlay speculative content, run another weaver command.   |
 
 ### 2.4 Act
 
-| Command            | Synopsis                                                          |
-| ------------------ | ----------------------------------------------------------------- |
+| Command            | Synopsis                                                            |
+| ------------------ | ------------------------------------------------------------------- |
 | rename-symbol      | `<file> <line> <char> <new>` Generate safe rename plan.             |
-| apply-edits        | `[--atomic]` Read CodeEdit stream from stdin, write to disk.       |
-| format-code        | `[--stdin] [<files…>]` Emit formatting edits via language server.  |
+| apply-edits        | `[--atomic]` Read CodeEdit stream from stdin, write to disk.        |
+| format-code        | `[--stdin] [<files…>]` Emit formatting edits via language server.   |
 | set-active-project | `<name>` Point daemon at another registered project.                |
-| reload-workspace   | Force re-index after dependency file change.                      |
+| reload-workspace   | Force re-index after dependency file change.                        |
 
 ## III. Implementation Roadmap
 
@@ -252,6 +252,12 @@ single source of truth for the daemon and client API.
 `can_connect` uses `anyio.fail_after` to avoid hanging on unresponsive sockets,
 handling common connection errors. The CLI's `check-socket` command reports
 availability of a specified path.
+
+The client auto-starts `weaverd` when the socket is missing. It forks the
+daemon in a detached `subprocess.Popen` call and waits for the socket to become
+available before issuing the request. Set the environment variable
+`WEAVER_DEBUG=1` to inherit the daemon's output streams when debugging startup
+failures.
 
 `weaverd` exposes a lightweight RPC interface over a UNIX domain socket. A
 custom `RPCDispatcher` maps method names to coroutine handlers and uses
