@@ -245,7 +245,7 @@ the agent to adapt to local conventions.*
   - [ ] Add logic to monitor the memory and CPU usage of the daemon and its
     child LSP processes.
 
-  - [ ] If the limits defined by `SERANA_MAX_RAM_MB` or `SERANA_MAX_CPUS` are
+  - [ ] If the limits defined by `WEAVER_MAX_RAM_MB` or `WEAVER_MAX_CPUS` are
     exceeded, the daemon should gracefully reject new requests with a
     structured `Error` object.
 
