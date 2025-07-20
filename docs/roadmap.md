@@ -50,23 +50,23 @@ will be implemented yet.*
   - [x] Implement a basic `ping` or `project-status` RPC endpoint that returns
     a hardcoded success response.
 
-- [ ] **Implement the** `weaver` **Client Skeleton:**
+- [x] **Implement the** `weaver` **Client Skeleton:**
 
-  - [ ] Set up the CLI using `typer`. Create a stub for each command defined in
+  - [x] Set up the CLI using `typer`. Create a stub for each command defined in
     the design document.
 
-  - [ ] Implement the socket discovery logic. The client must locate the
+  - [x] Implement the socket discovery logic. The client must locate the
     `weaverd` socket at its well-known path.
 
-  - [ ] Implement the daemon auto-start logic. If the client cannot connect to
+  - [x] Implement the daemon auto-start logic. If the client cannot connect to
     the socket, it should attempt to spawn the `weaverd` process in the
     background (`subprocess.Popen` with appropriate flags to detach it).
 
-  - [ ] Implement the core RPC client function that connects to the socket,
+  - [x] Implement the core RPC client function that connects to the socket,
     sends a msgspec-serialised request, and streams the JSONL response directly
     to `stdout`.
 
-  - [ ] Implement the `weaver project-status` command to call the `ping`
+  - [x] Implement the `weaver project-status` command to call the `ping`
     endpoint on the daemon. A successful run of this command validates the
     entire communication pipeline.
 

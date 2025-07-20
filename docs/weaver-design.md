@@ -253,6 +253,10 @@ single source of truth for the daemon and client API.
 handling common connection errors. The CLI's `check-socket` command reports
 availability of a specified path.
 
+The client auto-starts `weaverd` when the socket is missing. It forks the
+daemon in a detached `subprocess.Popen` call and waits for the socket to
+become available before issuing the request.
+
 `weaverd` exposes a lightweight RPC interface over a UNIX domain socket. A
 custom `RPCDispatcher` maps method names to coroutine handlers and uses
 `msgspec` to validate requests and serialise responses. The default socket path
