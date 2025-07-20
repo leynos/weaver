@@ -1,4 +1,4 @@
-<!-- markdownlint-disable MD013 MD033 MD001 MD056 -->
+<!-- markdownlint-disable MD013 MD033 MD001 MD056 MD007 MD029 -->
 # weaver: A Composable, Semantics‑Aware Interface for AI Coding Agents
 
 *Tag‑line: Bridging the semantic gap between text‑only agents and real
@@ -14,7 +14,7 @@ pieces.
 
 `weaver` is a command‑line interface (CLI) and long‑running daemon that lets an
 agent work at the level of semantics instead of bytes. It sits on top of the
-Serana toolkit and its multi‑language LSP bridge, turning LSP spaghetti into a
+serena toolkit and its multi‑language LSP bridge, turning LSP spaghetti into a
 crisp, UNIX-native interface.
 
 This document synthesizes the original design sketch with subsequent reviews to
@@ -61,10 +61,10 @@ employs a client-server model.
   - Maintains an in-memory semantic index, a file-content overlay cache for
     transient edits, and a msgspec-validated RPC dispatcher.
 
-  - Enforces resource caps (e.g., `SERANA_MAX_RAM_MB`, `SERANA_MAX_CPUS`),
+  - Enforces resource caps (e.g., `WEAVER_MAX_RAM_MB`, `WEAVER_MAX_CPUS`),
     returning structured errors when limits are reached.
 
-  - Serialises concurrent requests using `asyncio` tasks, supporting
+  - Serializes concurrent requests using `asyncio` tasks, supporting
     cancellation of long-running jobs.
 
 - **The** `weaver` **Client:** This is a lightweight, stateless, and
@@ -147,96 +147,96 @@ objects conforming to the schemas defined in Appendix A.
 | Command          | Synopsis                                                                      |
 | ---------------- | ----------------------------------------------------------------------------- |
 | project-status   | Health of daemon & language servers; RAM/CPU usage; protocol version.         |
-| list-diagnostics | [--severity S] [<files…>] Stream Diagnostics for whole workspace or subset.   |
+| list-diagnostics | `[--severity S] [<files…>]` Stream Diagnostics for whole workspace or subset.   |
 | onboard-project  | First-run analysis, populates memories & returns OnboardingReport.            |
 
 ### 2.2 Orient
 
-| Command            | Synopsis                                                                               |
-| ------------------ | -------------------------------------------------------------------------------------- |
-| find-symbol        | [--kind K] <pattern> Search workspace symbols.                                         |
-| get-definition     | <file> <line> <char> Locate definitive declaration.                                    |
-| list-references    | [--include-definition] <file> <line> <char> All uses of symbol at cursor.              |
-| summarise-symbol   | <file> <line> <char> Aggregate hover, docstring, type info.                            |
-| get-call-graph     | `--direction <in|out>` <file> <line> <char> Show call graph with the chosen direction. |
-| get-type-hierarchy | `--direction <super|sub>` <file> <line> <char> Show type hierarchy for the symbol.     |
-| list-memories      | Stream previously stored memory snippets.                                              |
+| Command            | Synopsis                                                                                  |
+| ------------------ | ----------------------------------------------------------------------------------------- |
+| find-symbol        | `[--kind K] <pattern>` Search workspace symbols.                                          |
+| get-definition     | `<file> <line> <char>` Locate definitive declaration.                                     |
+| list-references    | `[--include-definition] <file> <line> <char>` All uses of symbol at cursor.               |
+| summarise-symbol   | `<file> <line> <char>` Aggregate hover, docstring, type info.                             |
+| get-call-graph     | `--direction <in|out> <file> <line> <char>` Show call graph with the chosen direction.    |
+| get-type-hierarchy | `--direction <super|sub> <file> <line> <char>` Show type hierarchy for the symbol.        |
+| list-memories      | Stream previously stored memory snippets.                                                 |
 
 ### 2.3 Decide
 
-| Command             | Synopsis                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------- |
-| analyse-impact      | --edit <json> Dry-run a single CodeEdit; returns ImpactReport.                        |
-| get-code-actions    | <file> <line> <char> Available quick-fixes/refactors.                                 |
-| test                | `[--changed-files | --all]` Wrapper for project test command; same output contract.   |
-| build               | Wrapper for project build command; same output contract.                              |
-| with-transient-edit | --file <f> --stdin <cmd …> Overlay speculative content, run another weaver command.   |
+| Command             | Synopsis                                                                                |
+| ------------------- | --------------------------------------------------------------------------------------- |
+| analyse-impact      | `--edit <json>` Dry-run a single CodeEdit; returns ImpactReport.                        |
+| get-code-actions    | `<file> <line> <char>` Available quick-fixes/refactors.                                 |
+| test                | `[--changed-files | --all]` Wrapper for project test command; same output contract.     |
+| build               | Wrapper for project build command; same output contract.                                |
+| with-transient-edit | `--file <f> --stdin <cmd …>` Overlay speculative content, run another weaver command.   |
 
 ### 2.4 Act
 
-| Command            | Synopsis                                                          |
-| ------------------ | ----------------------------------------------------------------- |
-| rename-symbol      | <file> <line> <char> <new> Generate safe rename plan.             |
-| apply-edits        | [--atomic] Read CodeEdit stream from stdin, write to disk.        |
-| format-code        | [--stdin] [<files…>] Emit formatting edits via language server.   |
-| set-active-project | <name> Point daemon at another registered project.                |
-| reload-workspace   | Force re-index after dependency file change.                      |
+| Command            | Synopsis                                                            |
+| ------------------ | ------------------------------------------------------------------- |
+| rename-symbol      | `<file> <line> <char> <new>` Generate safe rename plan.             |
+| apply-edits        | `[--atomic]` Read CodeEdit stream from stdin, write to disk.        |
+| format-code        | `[--stdin] [<files…>]` Emit formatting edits via language server.   |
+| set-active-project | `<name>` Point daemon at another registered project.                |
+| reload-workspace   | Force re-index after dependency file change.                        |
 
 ## III. Implementation Roadmap
 
 1. **Phase 0 – Scaffolding**:
 
-   - Define all I/O schemas as msgspec models (see Appendix A).
-   - Use [uv](monorepo-development-with-astral-uv.md) for environment and
+  - Define all I/O schemas as msgspec models (see Appendix A).
+  - Use [uv](./monorepo-development-with-astral-uv.md) for environment and
      dependency management.
 
-   - Implement the `asyncio` JSON-RPC router for `weaverd`.
+  - Implement the `asyncio` JSON-RPC router for `weaverd`.
 
-   - Build the socket discovery and daemon auto-start logic in the `weaver`
+  - Build the socket discovery and daemon auto-start logic in the `weaver`
      client.
 
 2. **Phase 1 – Observe/Orient Verbs**:
 
-   - Map commands directly onto existing `serena.tools` wrappers.
+  - Map commands directly onto existing `serena.tools` wrappers.
 
-   - Validate functionality with a large, polyglot smoke-test repository.
+  - Validate functionality with a large, polyglot smoke-test repository.
 
 3. **Phase 2 – Decide Verbs**:
 
-   - Implement `analyse-impact` by replaying transient edits into the LSP and
+  - Implement `analyse-impact` by replaying transient edits into the LSP and
      diffing the resulting diagnostics.
 
-   - Implement `build` and `test` wrappers that parse tool output into the
+  - Implement `build` and `test` wrappers that parse tool output into the
      standard `Diagnostic` schema via regex patterns defined in `project.yml`.
 
 4. **Phase 3 – Act Verbs**:
 
-   - Implement atomised file writes for `apply-edits`.
+  - Implement atomized file writes for `apply-edits`.
 
-   - Integrate with Git to ensure operations do not corrupt the work-tree.
+  - Integrate with Git to ensure operations do not corrupt the work-tree.
 
-   - Use the LSP `workspace/applyEdit` request to obtain the refactoring plan
+  - Use the LSP `workspace/applyEdit` request to obtain the refactoring plan
      for `rename-symbol`.
 
 5. **Phase 4 – Memories & Onboarding**:
 
-   - Implement the persistence layer for memories as JSONL files under
+  - Implement the persistence layer for memories as JSONL files under
      `.weaver/memories/`.
 
-   - Develop the static analysis logic for `onboard-project`.
+  - Develop the static analysis logic for `onboard-project`.
 
 6. **Phase 5 – Polishing**:
 
-   - Implement resource limit guardrails in `weaverd`.
+  - Implement resource limit guardrails in `weaverd`.
 
-   - Add cancellation support for long-running jobs.
+  - Add cancellation support for long-running jobs.
 
-   - Add a `weaver --json-schema` command to print the msgspec definitions, for
+  - Add a `weaver --json-schema` command to print the msgspec definitions, for
      embedding in agent prompts.
 
 ## Design Decisions
 
-The project uses [uv](monorepo-development-with-astral-uv.md) for dependency
+The project uses [uv](./monorepo-development-with-astral-uv.md) for dependency
 management and virtual environment creation. The CLI is built with `typer`
 because it offers a clean API and automatic help text generation. Communication
 
