@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD041 MD052 MD029 -->
 ## 1. Overview of `uv` and `pyproject.toml`
 
 Astral's `uv` is a Rust-based project and package manager that uses

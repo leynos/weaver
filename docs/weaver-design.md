@@ -1,4 +1,4 @@
-<!-- markdownlint-disable MD013 MD033 MD001 -->
+<!-- markdownlint-disable MD013 MD033 MD001 MD056 -->
 # weaver: A Composable, Semantics‑Aware Interface for AI Coding Agents
 
 *Tag‑line: Bridging the semantic gap between text‑only agents and real
@@ -168,7 +168,7 @@ objects conforming to the schemas defined in Appendix A.
 | ------------------- | ------------------------------------------------------------------------------------- |
 | analyse-impact      | --edit <json> Dry-run a single CodeEdit; returns ImpactReport.                        |
 | get-code-actions    | <file> <line> <char> Available quick-fixes/refactors.                                 |
-| test                | [--changed-files \| --all] Wrapper for project test command; same output contract.     |
+| test                | `[--changed-files \| --all]` Wrapper for project test command; same output contract.   |
 | build               | Wrapper for project build command; same output contract.                              |
 | with-transient-edit | --file <f> --stdin <cmd …> Overlay speculative content, run another weaver command.   |
 

@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD041 -->
 ## flake8-return Style Guide (Python 3.13)
 
 The `flake8-return` rules ensure consistent and explicit return behaviour,

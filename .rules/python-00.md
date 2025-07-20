@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD041 MD040 -->
 ## Python 3.13 Code Style Guidelines (with Ruff, Pyright, and pytest)
 
 ### Naming Conventions
@@ -78,8 +79,8 @@ def scale(values: list[float], factor: float) -> list[float]:
 * **Colocate unit tests with code** using a unittests subdirectory and a
   `test_` prefix. This keeps logic and its tests together:
 
-  ```
-  user_auth/
+```text
+user_auth/
     models.py
     login_flow.py
     unittests/
@@ -90,12 +91,12 @@ def scale(values: list[float], factor: float) -> list[float]:
 * **Structure integration tests separately.** When tests span multiple
   components, use `tests/integration/`:
 
-  ```
-  tests/
-    integration/
-      test_login_flow.py
-      test_user_onboarding.py
-  ```
+```text
+tests/
+  integration/
+    test_login_flow.py
+    test_user_onboarding.py
+```
 
 * **Use `pytest` idioms.** Prefer fixtures over setup/teardown methods.
   Parametrize broadly. Avoid unnecessary mocks.

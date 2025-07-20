@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD041 -->
 ## Using Context Managers for Cleanup and Resource Management
 
 Use context managers to encapsulate setup and teardown logic cleanly and

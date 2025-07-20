@@ -1,4 +1,4 @@
-<!-- markdownlint-disable MD041 -->
+<!-- markdownlint-disable MD041 MD026 -->
 ## Prefer Generators Over Complex Loop Logic
 
 Using generators improves readability, composability, and memory efficiency.
@@ -60,13 +60,13 @@ def top_active_emails(users):
     return list(islice(emails, 10))
 ```
 
-### Use Generators When
+### Use Generators When:
 
 * You're iterating and filtering/mapping data.
 * You want to make early returns or short-circuit behaviour clearer.
 * The function logically produces a sequence over time.
 
-### Avoid Overcomplicating
+### Avoid Overcomplicating:
 
 Don't convert everything into generators unnecessarily. Use them to simplify
 logic—not obscure it.
@@ -90,6 +90,6 @@ def iter_even_doubles():
 ______________________________________________________________________
 
 **Rule of thumb:** If your `for` loop has multiple branches, mutations, or is
-hard to explain quickly—try rewriting it as a generator.
+hard to explain briefly—try rewriting it as a generator.
 
 Prefer clear, linear data flows over deeply nested conditionals and loop bodies.

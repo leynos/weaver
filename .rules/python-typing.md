@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD041 -->
 ### Advanced Typing and Language Features (Python 3.13)
 
 > This section documents forward-looking Python 3.13 typing features and best
