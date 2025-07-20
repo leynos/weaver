@@ -147,19 +147,19 @@ objects conforming to the schemas defined in Appendix A.
 | Command          | Synopsis                                                                      |
 | ---------------- | ----------------------------------------------------------------------------- |
 | project-status   | Health of daemon & language servers; RAM/CPU usage; protocol version.         |
-| list-diagnostics | [--severity S] [<files…>] Stream Diagnostics for whole workspace or subset.   |
+| list-diagnostics | `[--severity S] [<files…>]` Stream Diagnostics for whole workspace or subset.   |
 | onboard-project  | First-run analysis, populates memories & returns OnboardingReport.            |
 
 ### 2.2 Orient
 
 | Command            | Synopsis                                                                               |
 | ------------------ | -------------------------------------------------------------------------------------- |
-| find-symbol        | [--kind K] <pattern> Search workspace symbols.                                         |
-| get-definition     | <file> <line> <char> Locate definitive declaration.                                    |
-| list-references    | [--include-definition] <file> <line> <char> All uses of symbol at cursor.              |
-| summarise-symbol   | <file> <line> <char> Aggregate hover, docstring, type info.                            |
-| get-call-graph     | `--direction <in\|out>` <file> <line> <char> Show call graph with the chosen direction. |
-| get-type-hierarchy | `--direction <super\|sub>` <file> <line> <char> Show type hierarchy for the symbol.     |
+| find-symbol        | `[--kind K] <pattern>` Search workspace symbols.                                         |
+| get-definition     | `<file> <line> <char>` Locate definitive declaration.                                    |
+| list-references    | [--include-definition] `<file> <line> <char>` All uses of symbol at cursor.              |
+| summarise-symbol   | `<file> <line> <char>` Aggregate hover, docstring, type info.                            |
+| get-call-graph     | `--direction <in\|out>` `<file> <line> <char>` Show call graph with the chosen direction. |
+| get-type-hierarchy | `--direction <super\|sub>` `<file> <line> <char>` Show type hierarchy for the symbol.     |
 | list-memories      | Stream previously stored memory snippets.                                              |
 
 ### 2.3 Decide
@@ -167,7 +167,7 @@ objects conforming to the schemas defined in Appendix A.
 | Command             | Synopsis                                                                              |
 | ------------------- | ------------------------------------------------------------------------------------- |
 | analyse-impact      | `--edit <json>` Dry-run a single CodeEdit; returns ImpactReport.                       |
-| get-code-actions    | <file> <line> <char> Available quick-fixes/refactors.                                 |
+| get-code-actions    | `<file> <line> <char>` Available quick-fixes/refactors.                                 |
 | test                | `[--changed-files \| --all]` Wrapper for project test command; same output contract.   |
 | build               | Wrapper for project build command; same output contract.                              |
 | with-transient-edit | `--file <f> --stdin <cmd …>` Overlay speculative content, run another weaver command.  |
@@ -176,10 +176,10 @@ objects conforming to the schemas defined in Appendix A.
 
 | Command            | Synopsis                                                          |
 | ------------------ | ----------------------------------------------------------------- |
-| rename-symbol      | <file> <line> <char> <new> Generate safe rename plan.             |
+| rename-symbol      | `<file> <line> <char> <new>` Generate safe rename plan.             |
 | apply-edits        | `[--atomic]` Read CodeEdit stream from stdin, write to disk.       |
 | format-code        | `[--stdin] [<files…>]` Emit formatting edits via language server.  |
-| set-active-project | <name> Point daemon at another registered project.                |
+| set-active-project | `<name>` Point daemon at another registered project.                |
 | reload-workspace   | Force re-index after dependency file change.                      |
 
 ## III. Implementation Roadmap
