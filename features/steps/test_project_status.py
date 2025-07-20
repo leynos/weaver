@@ -61,4 +61,6 @@ def check(runtime_dir: dict):
     proc = runtime_dir["proc"].get("proc")
     if proc:
         proc.terminate()
-        proc.join()
+        proc.join(timeout=5.0)
+        if proc.is_alive():
+            proc.kill()

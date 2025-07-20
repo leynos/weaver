@@ -78,8 +78,14 @@ async def test_rpc_call_autostart(
     assert json.decode(buf.getvalue().encode(), type=ProjectStatus) == ProjectStatus(
         message="ok"
     )
-    started.terminate()
-    started.join()
+    try:
+        started.terminate()
+        started.join(timeout=5.0)
+        if started.is_alive():
+            started.kill()
+    finally:
+        if started.is_alive():
+            started.kill()
 
 
 @pytest.mark.anyio
