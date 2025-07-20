@@ -23,6 +23,7 @@ dev = [
     "ruff",
     "pyright",
     "pytest-timeout",
+    "pytest-bdd>=8.1.0",
 ]
 
 [tool.pyright]
