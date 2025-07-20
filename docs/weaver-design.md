@@ -196,9 +196,30 @@ objects conforming to the schemas defined in Appendix A.
    - Build the socket discovery and daemon auto-start logic in the `weaver`
      client.
 
-   - Implemented as of version 0.1.0: the client locates the daemon
-     socket via `weaverd.server.default_socket_path()` and spawns the daemon
-     with `subprocess.Popen` if the socket is unavailable.
+  - Implemented as of version 0.1.0: the client locates the daemon
+    socket via `weaverd.server.default_socket_path()` and spawns the daemon
+    with `subprocess.Popen` if the socket is unavailable.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant WeaverCLI as weaver CLI
+    participant Daemon as weaverd daemon
+    participant Socket as UNIX Socket
+
+    User->>WeaverCLI: Run `weaver project-status`
+    WeaverCLI->>Socket: Check if socket exists
+    alt Daemon not running
+        WeaverCLI->>Daemon: Start weaverd via subprocess.Popen
+        loop Wait for socket
+            WeaverCLI->>Socket: Check if socket exists
+        end
+    end
+    WeaverCLI->>Daemon: Connect to socket
+    WeaverCLI->>Daemon: Send RPC request ("project-status")
+    Daemon-->>WeaverCLI: Stream JSONL response
+    WeaverCLI-->>User: Output status to stdout
+```
 
 1. **Phase 1 – Observe/Orient Verbs**:
 
