@@ -20,30 +20,37 @@ def runtime_dir(tmp_path: Path, monkeypatch):
     os.environ["XDG_RUNTIME_DIR"] = str(tmp_path)
     sock = client.discover_socket()
 
-    started: dict[str, mp.Process] = {}
+    processes: list[mp.Process] = []
 
     def wrapper(p: Path) -> mp.Process:
         def _run() -> None:
-            async def _serve() -> None:
-                dispatcher = RPCDispatcher()
+            # Use a dedicated event loop for the subprocess
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
 
-                @dispatcher.register("project-status")
-                async def status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
-                    return ProjectStatus(message="ok")
+                async def _serve() -> None:
+                    dispatcher = RPCDispatcher()
 
-                server = await start_server(p, dispatcher)
-                async with server:
-                    await server.serve_forever()
+                    @dispatcher.register("project-status")
+                    async def status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
+                        return ProjectStatus(message="ok")
 
-            asyncio.run(_serve())
+                    server = await start_server(p, dispatcher)
+                    async with server:
+                        await server.serve_forever()
+
+                loop.run_until_complete(_serve())
+            finally:
+                loop.close()
 
         proc = mp.Process(target=_run)
         proc.start()
-        started["proc"] = proc
+        processes.append(proc)
         return proc
 
     monkeypatch.setattr(client, "spawn_daemon", wrapper)
-    return {"sock": sock, "proc": started}
+    return {"sock": sock, "processes": processes}
 
 
 @when("I invoke the project-status command")
@@ -57,10 +64,13 @@ def invoke(runtime_dir: dict):
 def check(runtime_dir: dict):
     result = runtime_dir["result"]
     assert result.exit_code == 0
-    assert "project-status" in result.stdout
-    proc = runtime_dir["proc"].get("proc")
-    if proc:
-        proc.terminate()
-        proc.join(timeout=5.0)
-        if proc.is_alive():
-            proc.kill()
+    assert '"message":"ok"' in result.stdout
+    processes = runtime_dir.get("processes", [])
+    for proc in processes:
+        if proc and proc.is_alive():
+            proc.terminate()
+            try:
+                proc.join(timeout=5)
+            finally:
+                if proc.is_alive():
+                    proc.kill()

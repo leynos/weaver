@@ -46,18 +46,25 @@ async def test_rpc_call_autostart(
 
     def spawn(path: Path) -> mp.Process:
         def _run() -> None:
-            async def _serve() -> None:
-                dispatcher = RPCDispatcher()
+            # Avoid event loop conflicts in subprocesses
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
 
-                @dispatcher.register("project-status")
-                async def status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
-                    return ProjectStatus(message="ok")
+                async def _serve() -> None:
+                    dispatcher = RPCDispatcher()
 
-                server = await start_server(path, dispatcher)
-                async with server:
-                    await server.serve_forever()
+                    @dispatcher.register("project-status")
+                    async def status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
+                        return ProjectStatus(message="ok")
 
-            asyncio.run(_serve())
+                    server = await start_server(path, dispatcher)
+                    async with server:
+                        await server.serve_forever()
+
+                loop.run_until_complete(_serve())
+            finally:
+                loop.close()
 
         proc = mp.Process(target=_run)
         proc.start()
@@ -78,14 +85,13 @@ async def test_rpc_call_autostart(
     assert json.decode(buf.getvalue().encode(), type=ProjectStatus) == ProjectStatus(
         message="ok"
     )
-    try:
+    if started and started.is_alive():
         started.terminate()
-        started.join(timeout=5.0)
-        if started.is_alive():
-            started.kill()
-    finally:
-        if started.is_alive():
-            started.kill()
+        try:
+            started.join(timeout=5.0)
+        finally:
+            if started.is_alive():
+                started.kill()
 
 
 @pytest.mark.anyio
