@@ -61,16 +61,12 @@ async def rpc_call(
     try:
         await ensure_daemon_running(path)
     except Exception as exc:
-        print(
-            f"Error: Could not ensure daemon is running: {exc}", file=sys.stderr
-        )
+        print(f"Error: Could not ensure daemon is running: {exc}", file=sys.stderr)
         raise typer.Exit(1) from exc
 
     reader, writer = await asyncio.open_unix_connection(str(path))
     try:
-        writer.write(
-            json.encode({"method": method, "params": params or {}}) + b"\n"
-        )
+        writer.write(json.encode({"method": method, "params": params or {}}) + b"\n")
         await writer.drain()
         writer.write_eof()
         while data := await reader.readline():

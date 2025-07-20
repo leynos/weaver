@@ -75,9 +75,9 @@ async def test_rpc_call_autostart(
     buf = StringIO()
     await client.rpc_call("project-status", socket_path=sock, stdout=buf)
     assert started is not None
-    assert json.decode(
-        buf.getvalue().encode(), type=ProjectStatus
-    ) == ProjectStatus(message="ok")
+    assert json.decode(buf.getvalue().encode(), type=ProjectStatus) == ProjectStatus(
+        message="ok"
+    )
     started.terminate()
     started.join()
 

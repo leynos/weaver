@@ -158,8 +158,8 @@ objects conforming to the schemas defined in Appendix A.
 | get-definition     | <file> <line> <char> Locate definitive declaration.                                    |
 | list-references    | [--include-definition] <file> <line> <char> All uses of symbol at cursor.              |
 | summarise-symbol   | <file> <line> <char> Aggregate hover, docstring, type info.                            |
-| get-call-graph     | `--direction <in\|out>` <file> <line> <char> Show call graph with the chosen direction. |
-| get-type-hierarchy | `--direction <super\|sub>` <file> <line> <char> Show type hierarchy for the symbol.     |
+| get-call-graph     | `--direction <in|out>` <file> <line> <char> Show call graph with the chosen direction. |
+| get-type-hierarchy | `--direction <super|sub>` <file> <line> <char> Show type hierarchy for the symbol.     |
 | list-memories      | Stream previously stored memory snippets.                                              |
 
 ### 2.3 Decide
@@ -168,7 +168,7 @@ objects conforming to the schemas defined in Appendix A.
 | ------------------- | ------------------------------------------------------------------------------------- |
 | analyse-impact      | --edit <json> Dry-run a single CodeEdit; returns ImpactReport.                        |
 | get-code-actions    | <file> <line> <char> Available quick-fixes/refactors.                                 |
-| test                | `[--changed-files \| --all]` Wrapper for project test command; same output contract.   |
+| test                | `[--changed-files | --all]` Wrapper for project test command; same output contract.   |
 | build               | Wrapper for project build command; same output contract.                              |
 | with-transient-edit | --file <f> --stdin <cmd …> Overlay speculative content, run another weaver command.   |
 
@@ -254,8 +254,8 @@ handling common connection errors. The CLI's `check-socket` command reports
 availability of a specified path.
 
 The client auto-starts `weaverd` when the socket is missing. It forks the
-daemon in a detached `subprocess.Popen` call and waits for the socket to
-become available before issuing the request. Set the environment variable
+daemon in a detached `subprocess.Popen` call and waits for the socket to become
+available before issuing the request. Set the environment variable
 `WEAVER_DEBUG=1` to inherit the daemon's output streams when debugging startup
 failures.
 
