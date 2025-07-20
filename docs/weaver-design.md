@@ -156,7 +156,7 @@ objects conforming to the schemas defined in Appendix A.
 | ------------------ | -------------------------------------------------------------------------------------- |
 | find-symbol        | `[--kind K] <pattern>` Search workspace symbols.                                         |
 | get-definition     | `<file> <line> <char>` Locate definitive declaration.                                    |
-| list-references    | [--include-definition] `<file> <line> <char>` All uses of symbol at cursor.              |
+| list-references    | `[--include-definition] <file> <line> <char>` All uses of symbol at cursor.              |
 | summarise-symbol   | `<file> <line> <char>` Aggregate hover, docstring, type info.                            |
 | get-call-graph     | `--direction <in\|out>` `<file> <line> <char>` Show call graph with the chosen direction. |
 | get-type-hierarchy | `--direction <super\|sub>` `<file> <line> <char>` Show type hierarchy for the symbol.     |
