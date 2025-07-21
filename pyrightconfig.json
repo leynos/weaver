@@ -1,7 +1,0 @@
-{
-    "include": ["weaver", "weaver_schemas", "weaverd"],
-    "pythonVersion": "3.11",
-    "typeCheckingMode": "strict",
-    "reportMissingImports": false,
-    "reportMissingModuleSource": false
-}

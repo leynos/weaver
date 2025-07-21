@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
@@ -26,6 +27,14 @@ def runtime_dir(runtime_dir: dict) -> dict:
     return runtime_dir
 
 
+@given("an invalid project structure")
+def invalid_project(context: dict, monkeypatch) -> None:
+    def fail_spawn(_: Path) -> None:  # pragma: no cover - stub
+        pass
+
+    monkeypatch.setattr("weaver.client.spawn_daemon", fail_spawn)
+
+
 @when("I invoke the onboard-project command")
 def invoke(context: dict) -> None:
     runner = CliRunner()
@@ -38,3 +47,10 @@ def check(context: dict) -> None:
     result = context["result"]
     assert result.exit_code == 0
     assert "You are viewing the project" in result.stdout
+
+
+@then("the command fails with an error message")
+def check_error(context: dict) -> None:
+    result = context["result"]
+    assert result.exit_code != 0
+    assert "Could not ensure daemon" in result.stderr

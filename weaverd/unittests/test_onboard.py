@@ -34,13 +34,18 @@ async def test_onboard_project(tmp_path: Path) -> None:
     sock = tmp_path / "o.sock"
     server = await start_server(sock, dispatcher)
     async with server:
-        reader, writer = await asyncio.open_unix_connection(str(sock))
-        writer.write(json.encode({"method": "onboard-project"}) + b"\n")
-        await writer.drain()
-        data = await reader.readline()
-        report = json.decode(data.rstrip(), type=OnboardingReport)
-        assert report.details.startswith("You are viewing the project")
-        writer.close()
-        await writer.wait_closed()
+        try:
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_unix_connection(str(sock)), timeout=5.0
+            )
+            writer.write(json.encode({"method": "onboard-project"}) + b"\n")
+            await writer.drain()
+            data = await asyncio.wait_for(reader.readline(), timeout=5.0)
+            report = json.decode(data.rstrip(), type=OnboardingReport)
+            assert report.details.startswith("You are viewing the project")
+            assert len(report.details) > 20
+        finally:
+            writer.close()
+            await writer.wait_closed()
     server.close()
     await server.wait_closed()

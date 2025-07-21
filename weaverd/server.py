@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# pyright: reportMissingImports=false
+# pyright: reportMissingImports=false  # Serena optional dependency
 import asyncio
 import getpass
 import os
