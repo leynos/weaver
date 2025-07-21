@@ -3,7 +3,7 @@ name = "weaver"
 version = "0.1.0"
 description = "weaver package"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11,<3.12"
 license = { text = "MIT" }
 dependencies = [
     # anyio 4.9.0 includes a known high-severity vulnerability.
