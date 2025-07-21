@@ -21,13 +21,13 @@ class _BareAgent:
     """Minimal agent providing only the prompt factory."""
 
     def __init__(self) -> None:
-        spf = import_module("serena.prompt_factory").SerenaPromptFactory
+        spf = import_module("serena.prompt_factory").SerenaPromptFactory  # pyright: ignore[reportAttributeAccessIssue]
         self.prompt_factory = spf()
 
 
 def create_onboarding_tool():
     """Return an instance of Serena's onboarding tool."""
-    onboarding_tool = import_module("serena.tools.workflow_tools").OnboardingTool
+    onboarding_tool = import_module("serena.tools.workflow_tools").OnboardingTool  # pyright: ignore[reportAttributeAccessIssue]
     return onboarding_tool(_BareAgent())
 
 

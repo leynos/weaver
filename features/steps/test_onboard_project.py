@@ -1,6 +1,7 @@
 import asyncio
 import multiprocessing as mp
 import os
+import sys
 from pathlib import Path
 
 from pytest_bdd import given, scenarios, then, when
@@ -11,6 +12,8 @@ from weaver.cli import app
 from weaver_schemas.reports import OnboardingReport
 from weaverd.rpc import RPCDispatcher
 from weaverd.server import create_onboarding_tool, start_server
+
+sys.path.insert(0, "/root/git/serena-0.1.2/src")
 
 scenarios("../onboard_project.feature")
 

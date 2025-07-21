@@ -62,8 +62,15 @@ check-fmt: ruff ## Verify formatting
 lint: ruff ## Run linters
 	ruff check
 
+SERENA_VERSION ?= 0.1.2
+SERENA_DIR := $(HOME)/git/serena-$(SERENA_VERSION)
+
 typecheck: build ty ## Run typechecking
-	ty check
+	if [ ! -d "$(SERENA_DIR)" ]; then \
+	mkdir -p $(HOME)/git; \
+	curl -L https://github.com/oraios/serena/archive/refs/tags/v$(SERENA_VERSION).tar.gz | tar -xz -C $(HOME)/git; \
+	fi
+	ty check --extra-search-path $(SERENA_DIR)/src
 
 markdownlint: $(MDLINT) ## Lint Markdown files
 	find . -type f -name '*.md' \
