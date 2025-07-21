@@ -20,15 +20,29 @@ from .rpc import RPCDispatcher
 class _BareAgent:
     """Minimal agent providing only the prompt factory."""
 
-    def __init__(self) -> None:
-        spf = import_module("serena.prompt_factory").SerenaPromptFactory  # pyright: ignore[reportAttributeAccessIssue]
-        self.prompt_factory = spf()
+    def __init__(self, prompt_factory) -> None:
+        self.prompt_factory = prompt_factory
 
 
 def create_onboarding_tool():
-    """Return an instance of Serena's onboarding tool."""
-    onboarding_tool = import_module("serena.tools.workflow_tools").OnboardingTool  # pyright: ignore[reportAttributeAccessIssue]
-    return onboarding_tool(_BareAgent())
+    """Return an instance of Serena's onboarding tool.
+
+    Raises ``RuntimeError`` with a helpful message if ``serena-agent`` is not
+    installed.
+    """
+    try:
+        wf_tools = import_module("serena.tools.workflow_tools")
+        prompt_mod = import_module("serena.prompt_factory")
+    except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
+        msg = (
+            "serena-agent is required for onboarding; install it via "
+            "'uv add serena-agent'."
+        )
+        raise RuntimeError(msg) from exc
+
+    onboarding_tool = wf_tools.OnboardingTool
+    prompt_factory = prompt_mod.SerenaPromptFactory
+    return onboarding_tool(_BareAgent(prompt_factory()))
 
 
 def default_socket_path() -> Path:
@@ -65,7 +79,6 @@ async def start_server(path: Path, dispatcher: RPCDispatcher) -> asyncio.Abstrac
 
 async def main(socket_path: Path | None = None) -> None:
     dispatcher = RPCDispatcher()
-    onboarding_tool = create_onboarding_tool()
 
     @dispatcher.register("project-status")
     async def project_status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
@@ -73,7 +86,8 @@ async def main(socket_path: Path | None = None) -> None:
 
     @dispatcher.register("onboard-project")
     async def onboard_project() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
-        details = await asyncio.to_thread(onboarding_tool.apply)
+        tool = create_onboarding_tool()
+        details = await asyncio.to_thread(tool.apply)
         return OnboardingReport(details=details)
 
     path = socket_path or default_socket_path()

@@ -25,10 +25,10 @@ def anyio_backend() -> str:
 @pytest.mark.anyio
 async def test_onboard_project(tmp_path: Path) -> None:
     dispatcher = RPCDispatcher()
-    tool = create_onboarding_tool()
 
     @dispatcher.register("onboard-project")
     async def onboard() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
+        tool = create_onboarding_tool()
         return OnboardingReport(details=tool.apply())
 
     sock = tmp_path / "o.sock"
