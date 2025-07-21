@@ -1,17 +1,34 @@
 from __future__ import annotations
 
+# pyright: reportMissingImports=false
 import asyncio
 import getpass
 import os
 import tempfile
+from importlib import import_module
 from pathlib import Path
 
 from msgspec import json
 
 from weaver_schemas.error import SchemaError
+from weaver_schemas.reports import OnboardingReport
 from weaver_schemas.status import ProjectStatus
 
 from .rpc import RPCDispatcher
+
+
+class _BareAgent:
+    """Minimal agent providing only the prompt factory."""
+
+    def __init__(self) -> None:
+        spf = import_module("serena.prompt_factory").SerenaPromptFactory
+        self.prompt_factory = spf()
+
+
+def create_onboarding_tool():
+    """Return an instance of Serena's onboarding tool."""
+    onboarding_tool = import_module("serena.tools.workflow_tools").OnboardingTool
+    return onboarding_tool(_BareAgent())
 
 
 def default_socket_path() -> Path:
@@ -48,10 +65,16 @@ async def start_server(path: Path, dispatcher: RPCDispatcher) -> asyncio.Abstrac
 
 async def main(socket_path: Path | None = None) -> None:
     dispatcher = RPCDispatcher()
+    onboarding_tool = create_onboarding_tool()
 
     @dispatcher.register("project-status")
     async def project_status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
         return ProjectStatus(message="ok")
+
+    @dispatcher.register("onboard-project")
+    async def onboard_project() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
+        details = await asyncio.to_thread(onboarding_tool.apply)
+        return OnboardingReport(details=details)
 
     path = socket_path or default_socket_path()
     server = await start_server(path, dispatcher)

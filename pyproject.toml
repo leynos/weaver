@@ -10,6 +10,7 @@ dependencies = [
     # Monitor the project for a security patch and upgrade when available.
     "anyio>=4.9.0",
     "msgspec>=0.19.0",
+    "serena-agent==0.1.2",
     "typer>=0.16.0",
 ]
 
@@ -30,6 +31,8 @@ dev = [
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 include = ["weaver", "weaver_schemas", "weaverd"]
+reportMissingImports = false
+reportMissingModuleSource = false
 
 [tool.ruff]
 line-length = 88

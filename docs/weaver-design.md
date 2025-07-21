@@ -259,6 +259,12 @@ available before issuing the request. Set the environment variable
 `WEAVER_DEBUG=1` to inherit the daemon's output streams when debugging startup
 failures.
 
+`onboard-project` is implemented using Serena's `OnboardingTool` from
+`serena.tools.workflow_tools` (see
+`/root/git/serena-0.1.2/src/serena/tools/workflow_tools.py`). The daemon
+initialises a minimal agent with `SerenaPromptFactory` on startup and executes
+this tool when the command is invoked, returning an `OnboardingReport`.
+
 `weaverd` exposes a lightweight RPC interface over a UNIX domain socket. A
 custom `RPCDispatcher` maps method names to coroutine handlers and uses
 `msgspec` to validate requests and serialise responses. The default socket path
