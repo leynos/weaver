@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import typing as t
+from pathlib import Path
 
 import pytest
 from msgspec import json
@@ -11,10 +13,10 @@ from weaver_schemas.reports import OnboardingReport
 from weaverd.rpc import RPCDispatcher
 from weaverd.server import create_onboarding_tool, start_server
 
-sys.path.insert(0, "/root/git/serena-0.1.2/src")
-
-if t.TYPE_CHECKING:
-    from pathlib import Path
+SERENA_VERSION = os.environ.get("SERENA_VERSION", "0.1.2")
+default_dir = Path.home() / "git" / f"serena-{SERENA_VERSION}"
+SERENA_DIR = Path(os.environ.get("SERENA_DIR", default_dir))
+sys.path.insert(0, str(SERENA_DIR / "src"))
 
 
 @pytest.fixture()

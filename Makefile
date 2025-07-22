@@ -63,12 +63,23 @@ lint: ruff ## Run linters
 	ruff check
 
 SERENA_VERSION ?= 0.1.2
-SERENA_DIR := $(HOME)/git/serena-$(SERENA_VERSION)
+# Allow callers to relocate the cached source; fall back to XDG if available.
+SERENA_CACHE_DIR ?= $(or $(XDG_CACHE_HOME),$(HOME)/.cache)/serena
+SERENA_DIR := $(SERENA_CACHE_DIR)/serena-$(SERENA_VERSION)
+SERENA_SHA256 ?=
 
 typecheck: build ty ## Run typechecking
 	if [ ! -d "$(SERENA_DIR)" ]; then \
-	mkdir -p $(HOME)/git; \
-	curl -L https://github.com/oraios/serena/archive/refs/tags/v$(SERENA_VERSION).tar.gz | tar -xz -C $(HOME)/git; \
+	tmp=$$(mktemp -d); \
+	url=https://github.com/oraios/serena/archive/refs/tags/v$(SERENA_VERSION).tar.gz; \
+	curl --fail --silent --show-error --location "$$url" -o "$$tmp/serena.tgz"; \
+	if [ -n "$(SERENA_SHA256)" ]; then \
+	echo "$(SERENA_SHA256)  $$tmp/serena.tgz" | sha256sum -c -; \
+	fi; \
+	mkdir -p $(SERENA_CACHE_DIR); \
+	tar -xzf "$$tmp/serena.tgz" -C "$$tmp"; \
+	mv "$$tmp"/serena-$(SERENA_VERSION) "$(SERENA_DIR)"; \
+	rm -rf "$$tmp"; \
 	fi
 	ty check --extra-search-path $(SERENA_DIR)/src
 
@@ -81,7 +92,7 @@ nixie: $(NIXIE) ## Validate Mermaid diagrams
 	  -not -path './.venv/*' -print0 | xargs -0 $(NIXIE)
 
 test: build uv pytest ## Run tests
-	uv run pytest -v
+	SERENA_DIR=$(SERENA_DIR) uv run pytest -v
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \
