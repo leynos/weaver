@@ -41,6 +41,24 @@ def invalid_project(context: dict[str, t.Any], monkeypatch) -> None:
     monkeypatch.setattr("weaver.client.spawn_daemon", fail_spawn)
 
 
+@given("the server is unavailable")
+def server_unavailable(context: dict[str, t.Any], monkeypatch) -> None:
+    def noop(_: Path) -> None:  # pragma: no cover - stub
+        pass
+
+    monkeypatch.setattr("weaver.client.spawn_daemon", noop)
+
+
+@given("the server returns malformed output")
+def server_malformed(context: dict[str, t.Any]) -> None:
+    def setup(dispatcher: RPCDispatcher) -> None:
+        @dispatcher.register("onboard-project")
+        async def onboard() -> str:  # pragma: no cover - stub
+            return "MALFORMED OUTPUT"
+
+    context["set_handlers"](setup)
+
+
 @given("the onboarding tool raises an error")
 def tool_error(context: dict[str, t.Any], monkeypatch) -> None:
     def setup(dispatcher: RPCDispatcher) -> None:
@@ -86,3 +104,18 @@ def check_report(context: dict[str, t.Any]) -> None:
     line = result.stdout.splitlines()[0]
     rec = json.loads(line)
     assert rec.get("type") == "error"
+
+
+@then("the output indicates the server is unavailable")
+def check_unavailable(context: dict[str, t.Any]) -> None:
+    result = context["result"]
+    assert result.exit_code != 0
+    out = result.stderr.lower()
+    assert "daemon" in out
+
+
+@then("the output is malformed")
+def check_malformed(context: dict[str, t.Any]) -> None:
+    result = context["result"]
+    assert result.exit_code == 0
+    assert "malformed output" in result.stdout.lower()

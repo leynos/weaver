@@ -15,3 +15,15 @@ Feature: onboard project command
     And the onboarding tool raises an error
     When I invoke the onboard-project command
     Then an error report is produced
+
+  Scenario: server unavailable
+    Given a temporary runtime dir
+    And the server is unavailable
+    When I invoke the onboard-project command
+    Then the output indicates the server is unavailable
+
+  Scenario: malformed output
+    Given a temporary runtime dir
+    And the server returns malformed output
+    When I invoke the onboard-project command
+    Then the output is malformed

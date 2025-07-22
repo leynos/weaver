@@ -3,6 +3,7 @@ NIXIE ?= $(shell which nixie)
 MDFORMAT_ALL ?= $(shell which mdformat-all)
 TOOLS = $(MDFORMAT_ALL) ruff ty $(MDLINT) $(NIXIE) uv
 VENV_TOOLS = pytest
+SHELL := bash
 
 .PHONY: help all clean build build-release lint fmt check-fmt \
 	markdownlint nixie test typecheck $(TOOLS) $(VENV_TOOLS)
@@ -64,13 +65,14 @@ lint: ruff ## Run linters
 
 SERENA_VERSION ?= 0.1.3
 # Allow callers to relocate the cached source; fall back to XDG if available.
-SERENA_CACHE_DIR ?= $(or $(XDG_CACHE_HOME),$(HOME)/.cache)/serena
+SERENA_CACHE_DIR ?= $(if $(XDG_CACHE_HOME),$(XDG_CACHE_HOME),$(HOME)/.cache)/serena
 SERENA_DIR := $(SERENA_CACHE_DIR)/serena-$(SERENA_VERSION)
 SERENA_SHA256 ?=
 
 typecheck: build ty ## Run typechecking
 	if [ ! -d "$(SERENA_DIR)" ]; then \
-	tmp=$$(mktemp -d); \
+	set -euo pipefail; \
+	tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
 	url=https://github.com/oraios/serena/archive/refs/tags/v$(SERENA_VERSION).tar.gz; \
 	curl --fail --silent --show-error --location "$$url" -o "$$tmp/serena.tgz"; \
 	if [ -n "$(SERENA_SHA256)" ]; then \
@@ -78,7 +80,10 @@ typecheck: build ty ## Run typechecking
 	fi; \
 	mkdir -p $(SERENA_CACHE_DIR); \
 	tar -xzf "$$tmp/serena.tgz" -C "$$tmp"; \
-	mv "$$tmp"/serena-$(SERENA_VERSION) "$(SERENA_DIR)"; \
+	mkdir -p "$(dir $(SERENA_DIR))"; \
+	rand=$$PPID.$$RANDOM; \
+	mv "$$tmp"/serena-$(SERENA_VERSION) "$(SERENA_DIR).$$rand" && \
+	mv -T "$(SERENA_DIR).$$rand" "$(SERENA_DIR)"; \
 	rm -rf "$$tmp"; \
 	fi
 	ty check --extra-search-path $(SERENA_DIR)/src
