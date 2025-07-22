@@ -13,7 +13,7 @@ from weaverd.rpc import RPCDispatcher
 from weaverd.server import create_onboarding_tool
 
 # Ensure the Serena sources are discoverable for tests
-SERENA_VERSION = os.environ.get("SERENA_VERSION", "0.1.2")
+SERENA_VERSION = os.environ.get("SERENA_VERSION", "0.1.3")
 default_dir = Path.home() / "git" / f"serena-{SERENA_VERSION}"
 SERENA_DIR = Path(os.environ.get("SERENA_DIR", default_dir))
 sys.path.insert(0, str(SERENA_DIR / "src"))

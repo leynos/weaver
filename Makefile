@@ -62,7 +62,7 @@ check-fmt: ruff ## Verify formatting
 lint: ruff ## Run linters
 	ruff check
 
-SERENA_VERSION ?= 0.1.2
+SERENA_VERSION ?= 0.1.3
 # Allow callers to relocate the cached source; fall back to XDG if available.
 SERENA_CACHE_DIR ?= $(or $(XDG_CACHE_HOME),$(HOME)/.cache)/serena
 SERENA_DIR := $(SERENA_CACHE_DIR)/serena-$(SERENA_VERSION)
