@@ -1,10 +1,10 @@
 import asyncio
+import collections.abc as cabc
 import multiprocessing as mp
 import os
 import time
+import typing as t
 from pathlib import Path
-from typing import Any
-from collections.abc import Generator
 
 import pytest
 
@@ -16,7 +16,7 @@ from weaverd.server import start_server
 @pytest.fixture()
 def runtime_dir(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> Generator[dict[str, Any], None, None]:
+) -> cabc.Generator[dict[str, t.Any], None, None]:
     os.environ["XDG_RUNTIME_DIR"] = str(tmp_path)
     sock = client.discover_socket()
     processes: list[mp.Process] = []
