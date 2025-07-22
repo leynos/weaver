@@ -1,4 +1,6 @@
+import json
 import sys
+import typing as t
 from pathlib import Path
 
 from pytest_bdd import given, scenarios, then, when
@@ -16,7 +18,7 @@ scenarios("../onboard_project.feature")
 
 
 @given("a temporary runtime dir", target_fixture="context")
-def runtime_dir(runtime_dir: dict) -> dict:
+def runtime_dir(runtime_dir: dict[str, t.Any]) -> dict[str, t.Any]:
     def setup(dispatcher: RPCDispatcher) -> None:
         @dispatcher.register("onboard-project")
         async def onboard() -> OnboardingReport:  # pragma: no cover - stub
@@ -28,29 +30,53 @@ def runtime_dir(runtime_dir: dict) -> dict:
 
 
 @given("an invalid project structure")
-def invalid_project(context: dict, monkeypatch) -> None:
+def invalid_project(context: dict[str, t.Any], monkeypatch) -> None:
     def fail_spawn(_: Path) -> None:  # pragma: no cover - stub
         pass
 
     monkeypatch.setattr("weaver.client.spawn_daemon", fail_spawn)
 
 
+@given("the onboarding tool raises an error")
+def tool_error(context: dict[str, t.Any], monkeypatch) -> None:
+    def setup(dispatcher: RPCDispatcher) -> None:
+        class FailingTool:
+            def apply(self) -> str:  # pragma: no cover - stub
+                raise RuntimeError("boom")
+
+        @dispatcher.register("onboard-project")
+        async def onboard() -> OnboardingReport:  # pragma: no cover - stub
+            tool = FailingTool()
+            return OnboardingReport(details=tool.apply())
+
+    context["set_handlers"](setup)
+
+
 @when("I invoke the onboard-project command")
-def invoke(context: dict) -> None:
+def invoke(context: dict[str, t.Any]) -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["onboard-project"])
     context["result"] = result
 
 
 @then("the output includes onboarding details")
-def check(context: dict) -> None:
+def check(context: dict[str, t.Any]) -> None:
     result = context["result"]
     assert result.exit_code == 0
     assert "You are viewing the project" in result.stdout
 
 
 @then("the command fails with an error message")
-def check_error(context: dict) -> None:
+def check_error(context: dict[str, t.Any]) -> None:
     result = context["result"]
     assert result.exit_code != 0
     assert "Could not ensure daemon" in result.stderr
+
+
+@then("an error report is produced")
+def check_report(context: dict[str, t.Any]) -> None:
+    result = context["result"]
+    assert result.exit_code == 0
+    line = result.stdout.splitlines()[0]
+    rec = json.loads(line)
+    assert rec.get("type") == "error"

@@ -1,3 +1,5 @@
+import typing as t
+
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
 
@@ -9,7 +11,7 @@ scenarios("../project_status.feature")
 
 
 @given("a temporary runtime dir", target_fixture="context")
-def runtime_dir(runtime_dir: dict) -> dict:
+def runtime_dir(runtime_dir: dict[str, t.Any]) -> dict[str, t.Any]:
     def setup(dispatcher: RPCDispatcher) -> None:
         @dispatcher.register("project-status")
         async def status() -> ProjectStatus:  # pragma: no cover - stub
@@ -20,14 +22,14 @@ def runtime_dir(runtime_dir: dict) -> dict:
 
 
 @when("I invoke the project-status command")
-def invoke(context: dict) -> None:
+def invoke(context: dict[str, t.Any]) -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["project-status"])
     context["result"] = result
 
 
 @then("the output includes a project status line")
-def check(context: dict) -> None:
+def check(context: dict[str, t.Any]) -> None:
     result = context["result"]
     assert result.exit_code == 0
     assert '"message":"ok"' in result.stdout

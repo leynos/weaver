@@ -87,7 +87,10 @@ async def main(socket_path: Path | None = None) -> None:
     @dispatcher.register("onboard-project")
     async def onboard_project() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
         tool = create_onboarding_tool()
-        details = await asyncio.to_thread(tool.apply)
+        try:
+            details = await asyncio.to_thread(tool.apply)
+        except Exception as exc:  # pragma: no cover - unexpected failures
+            raise RuntimeError(f"Onboarding failed: {exc}") from exc
         return OnboardingReport(details=details)
 
     path = socket_path or default_socket_path()
