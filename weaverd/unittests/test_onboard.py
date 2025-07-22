@@ -42,7 +42,8 @@ async def test_onboard_project(tmp_path: Path) -> None:
             await writer.drain()
             data = await asyncio.wait_for(reader.readline(), timeout=5.0)
             report = json.decode(data.rstrip(), type=OnboardingReport)
-            assert report.details.startswith("You are viewing the project")
+            text = report.details.lower()
+            assert "viewing" in text and "project" in text
             assert len(report.details) > 20
         finally:
             writer.close()

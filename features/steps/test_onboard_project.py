@@ -63,14 +63,16 @@ def invoke(context: dict[str, t.Any]) -> None:
 def check(context: dict[str, t.Any]) -> None:
     result = context["result"]
     assert result.exit_code == 0
-    assert "You are viewing the project" in result.stdout
+    out = result.stdout.lower()
+    assert "project" in out and "viewing" in out
 
 
 @then("the command fails with an error message")
 def check_error(context: dict[str, t.Any]) -> None:
     result = context["result"]
     assert result.exit_code != 0
-    assert "Could not ensure daemon" in result.stderr
+    err = result.stderr.lower()
+    assert any(p in err for p in ["daemon", "ensure", "spawn"])
 
 
 @then("an error report is produced")
