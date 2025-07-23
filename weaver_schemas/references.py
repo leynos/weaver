@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import typing as t
+import typing as typ
 
 import msgspec
 
@@ -13,14 +13,14 @@ class Symbol(msgspec.Struct):
     name: str
     kind: str
     location: Location
-    type: t.Literal["symbol"] = "symbol"
+    type: typ.Literal["symbol"] = "symbol"
 
 
 class Reference(msgspec.Struct):
     """A reference to a symbol."""
 
     location: Location
-    type: t.Literal["reference"] = "reference"
+    type: typ.Literal["reference"] = "reference"
 
 
 __all__ = ["Reference", "Symbol"]

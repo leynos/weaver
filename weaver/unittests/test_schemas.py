@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import typing as t
+import typing as typ
 
 import msgspec.json as msjson
 import pytest
@@ -65,7 +65,7 @@ def test_test_result_none_output() -> None:
 
 @pytest.mark.parametrize("severity", ["Error", "Warning", "Info", "Hint"])
 def test_diagnostic_severity_roundtrip(
-    severity: t.Literal["Error", "Warning", "Info", "Hint"],
+    severity: typ.Literal["Error", "Warning", "Info", "Hint"],
 ) -> None:
     diag = Diagnostic(
         location=Location(
@@ -82,7 +82,7 @@ def test_diagnostic_severity_roundtrip(
 
 @pytest.mark.parametrize("status", ["passed", "failed", "error", "skipped"])
 def test_test_result_status_roundtrip(
-    status: t.Literal["passed", "failed", "error", "skipped"],
+    status: typ.Literal["passed", "failed", "error", "skipped"],
 ) -> None:
     result = SchemaTestResult(name="pytest", status=status)
     data = msjson.encode(result)

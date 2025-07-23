@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import typing as t
+import typing as typ
 
 import msgspec
 
@@ -13,7 +13,7 @@ class CodeEdit(msgspec.Struct):
     file: str
     range: Range
     new_text: str
-    type: t.Literal["edit"] = "edit"
+    type: typ.Literal["edit"] = "edit"
 
 
 __all__ = ["CodeEdit"]

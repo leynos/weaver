@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import typing as t
+import typing as typ
 
 import msgspec.json as msjson
 import pytest
@@ -16,7 +16,7 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
-if t.TYPE_CHECKING:
+if typ.TYPE_CHECKING:
     from pathlib import Path
 
 

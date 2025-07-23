@@ -87,6 +87,7 @@ scipy = "sp"
 datetime = "dt"
 "unittest.mock" = "mock"
 "msgspec.json" = "msjson"
+typing = "typ"
 
 [tool.pytest.ini_options]
 # Ensure asyncio fixtures create a new event loop for each test
