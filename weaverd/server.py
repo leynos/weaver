@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import getpass
+import logging
 import os
 import tempfile
 from pathlib import Path
@@ -12,6 +13,8 @@ from weaver_schemas.error import SchemaError
 from weaver_schemas.status import ProjectStatus
 
 from .rpc import RPCDispatcher
+
+logger = logging.getLogger(__name__)
 
 
 def default_socket_path() -> Path:
@@ -30,8 +33,9 @@ async def handle_client(
             try:
                 response = await dispatcher.handle(data.rstrip())
             except Exception as exc:  # pragma: no cover - fallback
-                if isinstance(exc, asyncio.CancelledError | KeyboardInterrupt):
+                if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt)):  # noqa: UP038
                     raise
+                logger.exception("Unhandled RPC error")
                 response = msjson.encode(SchemaError(message=str(exc)))
             writer.write(response + b"\n")
             await writer.drain()
