@@ -30,6 +30,8 @@ def create_onboarding_tool():
     Raises ``RuntimeError`` with a helpful message if ``serena-agent`` is not
     installed.
     """
+    if os.environ.get("WEAVER_TEST_MISSING_SERENA"):
+        raise RuntimeError("serena-agent not found")
     try:
         wf_tools = import_module("serena.tools.workflow_tools")
         prompt_mod = import_module("serena.prompt_factory")

@@ -71,8 +71,8 @@ SERENA_DIR := $(SERENA_CACHE_DIR)/serena-$(SERENA_VERSION)
 # Compute the checksum via `sha256sum <file>` and export SERENA_SHA256=<hash>.
 SERENA_SHA256 ?=
 
-typecheck: build ty ## Run typechecking
-	if [ ! -d "$(SERENA_DIR)" ]; then \
+download-serena:
+	@if [ ! -d "$(SERENA_DIR)" ]; then \
 	set -euo pipefail; \
 	tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
 	url=https://github.com/oraios/serena/archive/refs/tags/v$(SERENA_VERSION).tar.gz; \
@@ -87,9 +87,11 @@ typecheck: build ty ## Run typechecking
 	mv "$$tmp"/serena-$(SERENA_VERSION) "$(SERENA_DIR).$$rand" && \
 	mv -T "$(SERENA_DIR).$$rand" "$(SERENA_DIR)"; \
 	rm -rf "$$tmp"; \
-	fi
-	ty check --extra-search-path $(SERENA_DIR)/src
+fi
 
+typecheck: build ty download-serena ## Run typechecking
+	ty check --extra-search-path $(SERENA_DIR)/src
+	
 markdownlint: $(MDLINT) ## Lint Markdown files
 	find . -type f -name '*.md' \
 	  -not -path './.venv/*' -print0 | xargs -0 $(MDLINT)

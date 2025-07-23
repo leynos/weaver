@@ -267,6 +267,9 @@ RPC handler is invoked to avoid leaking state between runs. Import failures
 surface a clear runtime error instructing the user to install
 `serena-agent`. The tool then generates an `OnboardingReport` returned to the
 client.
+For test scenarios, setting the environment variable
+`WEAVER_TEST_MISSING_SERENA=1` forces `create_onboarding_tool` to raise a
+runtime error, simulating an absent dependency.
 
 `weaverd` exposes a lightweight RPC interface over a UNIX domain socket. A
 custom `RPCDispatcher` maps method names to coroutine handlers and uses

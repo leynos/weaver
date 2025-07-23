@@ -68,16 +68,15 @@ def tool_error(context: dict[str, t.Any], monkeypatch) -> None:
 
 @given("serena-agent is missing")
 def missing_dependency(monkeypatch):
-    def raise_err():
-        raise RuntimeError("serena-agent not found")
-
-    monkeypatch.setattr("weaverd.server.create_onboarding_tool", raise_err)
+    monkeypatch.setenv("WEAVER_TEST_MISSING_SERENA", "1")
 
 
 @then("the command fails with a missing dependency message")
 def check_missing_dep(context: dict[str, t.Any]) -> None:
     result = context["result"]
     assert result.exit_code == 0
+    out = (result.stdout + result.stderr).lower()
+    assert "serena-agent" in out or "missing dependency" in out
 
 
 @when("I invoke the onboard-project command")
