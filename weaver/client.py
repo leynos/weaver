@@ -9,6 +9,7 @@ import typing as typ
 from pathlib import Path  # noqa: TC003
 
 import anyio
+import msgspec
 import msgspec.json as msjson
 import typer
 
@@ -65,6 +66,7 @@ async def rpc_call(
         raise typer.Exit(1) from exc
 
     reader, writer = await asyncio.open_unix_connection(str(path))
+    error = False
     try:
         writer.write(msjson.encode({"method": method, "params": params or {}}) + b"\n")
         await writer.drain()
@@ -76,6 +78,16 @@ async def rpc_call(
             else:
                 stdout.write(data.decode())
             stdout.flush()
+            try:
+                record = msjson.decode(data.rstrip())
+            except msgspec.DecodeError:
+                continue
+            if isinstance(record, dict) and record.get("type") == "error":
+                msg = str(record.get("message", "")).lower()
+                if "serena-agent" in msg or "missing dependency" in msg:
+                    error = True
     finally:
         writer.close()
         await writer.wait_closed()
+    if error:
+        raise typer.Exit(1)

@@ -1,3 +1,5 @@
+import typing as typ
+
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
 
