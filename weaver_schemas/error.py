@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import typing as typ
 
-import msgspec
+import msgspec as ms
 
 
-class SchemaError(msgspec.Struct):
+class SchemaError(ms.Struct, frozen=True):
     """A structured error message."""
 
     message: str

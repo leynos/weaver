@@ -5,7 +5,7 @@ building the `weaver` CLI and its associated `weaverd` daemon, based on the
 established design specification. It is intended for the implementation team to
 track progress and coordinate efforts.
 
-## **Phase 0: Core Scaffolding & Project Setup**
+## Phase 0: Core Scaffolding & Project Setup
 
 *This phase establishes the foundational architecture, project structure, and
 communication protocols. Completing this phase means the* `weaver` *client can
@@ -15,13 +15,13 @@ functionality will be implemented yet.*
 - [x] **Finalise Project Structure & Dependencies:**
 
   - [x] Decide on a monorepo and use
-    [uv](https://www.google.com/search?q=monorepo-development-with-astral-uv.md)
-    for package and environment management.
+    [UV](https://github.com/astral-sh/uv) for package and environment
+    management.
 
   - [x] Initialise the project with
-    [uv](https://www.google.com/search?q=monorepo-development-with-astral-uv.md)
-    and add core dependencies: `msgspec`, `typer` (for the CLI), `anyio` (for
-    async socket communication), and `serena` (for code intelligence tools).
+    [UV](https://github.com/astral-sh/uv) and add core dependencies: `msgspec`,
+    `typer` (for the CLI), `anyio` (for async socket communication), and
+    `serena` (for code intelligence tools).
 
 - [x] **Define the API Contract with msgspec:**
 
@@ -70,7 +70,7 @@ functionality will be implemented yet.*
     endpoint on the daemon. A successful run of this command validates the
     entire communication pipeline.
 
-## **Phase 1: Read-Only Verbs (Observe & Orient)**
+## Phase 1: Read-Only Verbs (Observe & Orient)
 
 *This phase brings the core read-only code intelligence to life. The goal is to
 enable the agent to inspect and understand a codebase without modifying it.
@@ -128,7 +128,7 @@ This phase focuses on wrapping Serena's tool capabilities.*
     this repository and validates the resulting JSONL output against expected
     snapshots.
 
-## **Phase 2: Simulation & Analysis Verbs (Decide)**
+## Phase 2: Simulation & Analysis Verbs (Decide)
 
 *This phase implements the "semantic firewall" — the ability to simulate
 changes and analyse their impact. This is the most complex part of the
@@ -174,7 +174,7 @@ read-only functionality and is critical for agent safety.*
     them using regex patterns (also defined in `project.yml`) to convert the
     human-readable output into `weaver` `Diagnostic` objects.
 
-## **Phase 3: Mutable Verbs (Act)**
+## Phase 3: Mutable Verbs (Act)
 
 *This phase grants the agent the ability to safely modify the filesystem. The
 key principles are atomicity and decoupling planning from execution.*
@@ -213,7 +213,7 @@ key principles are atomicity and decoupling planning from execution.*
   - [ ] `reload-workspace`: Implement the handler to trigger a reload or
     re-initialisation sequence for the active workspace via Serena's tools.
 
-## **Phase 4: Intelligence & Persistence (Memories)**
+## Phase 4: Intelligence & Persistence (Memories)
 
 *This phase adds long-term memory and project-specific intelligence, allowing
 the agent to adapt to local conventions.*
@@ -237,7 +237,7 @@ the agent to adapt to local conventions.*
   - [ ] `list-memories`: This command will simply read and stream the contents
     of the memory files to `stdout`.
 
-## **Phase 5: Polishing & Productionisation**
+## Phase 5: Polishing & Productionization
 
 *This final phase focuses on robustness, usability, and distribution.*
 

@@ -29,7 +29,9 @@ async def handle_client(
         while data := await reader.readline():
             try:
                 response = await dispatcher.handle(data.rstrip())
-            except Exception as exc:  # noqa: BLE001 pragma: no cover - fallback
+            except Exception as exc:  # pragma: no cover - fallback
+                if isinstance(exc, asyncio.CancelledError | KeyboardInterrupt):
+                    raise
                 response = msjson.encode(SchemaError(message=str(exc)))
             writer.write(response + b"\n")
             await writer.drain()

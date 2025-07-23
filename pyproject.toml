@@ -73,6 +73,7 @@ banned-from = [
     "enum",
     "unittest.mock",
     "msgspec",
+    "msgspec.json",
 ]
 
 [tool.ruff.lint.flake8-import-conventions.aliases]
@@ -86,6 +87,7 @@ scipy = "sp"
 "collections.abc" = "cabc"
 datetime = "dt"
 "unittest.mock" = "mock"
+msgspec = "ms"
 "msgspec.json" = "msjson"
 typing = "typ"
 
