@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import enum
 import io  # noqa: TC003
 import os
 import subprocess
@@ -16,6 +17,36 @@ import typer
 from weaverd.server import default_socket_path
 
 from .sockets import can_connect
+
+
+class DependencyErrorCode(enum.StrEnum):
+    """Enumerate dependency-related error codes."""
+
+    MISSING_DEPENDENCY = "MISSING_DEPENDENCY"
+    SERENA_AGENT_NOT_FOUND = "SERENA_AGENT_NOT_FOUND"
+    DEPENDENCY_UNAVAILABLE = "DEPENDENCY_UNAVAILABLE"
+    DEPENDENCY_VERSION_MISMATCH = "DEPENDENCY_VERSION_MISMATCH"
+
+
+def _check_dependency_error(record: dict[str, typ.Any]) -> bool:
+    """Return ``True`` if ``record`` signals a missing dependency."""
+
+    if record.get("type") != "error":
+        return False
+
+    code = record.get("error_code") or record.get("code")
+
+    match code:
+        case (
+            DependencyErrorCode.MISSING_DEPENDENCY
+            | DependencyErrorCode.SERENA_AGENT_NOT_FOUND
+            | DependencyErrorCode.DEPENDENCY_UNAVAILABLE
+            | DependencyErrorCode.DEPENDENCY_VERSION_MISMATCH
+        ):
+            return True
+        case _:
+            msg = str(record.get("message", "")).lower()
+            return "serena-agent" in msg or "missing dependency" in msg
 
 
 def discover_socket() -> Path:
@@ -82,10 +113,8 @@ async def rpc_call(
                 record = msjson.decode(data.rstrip())
             except msgspec.DecodeError:
                 continue
-            if isinstance(record, dict) and record.get("type") == "error":
-                msg = str(record.get("message", "")).lower()
-                if "serena-agent" in msg or "missing dependency" in msg:
-                    error = True
+            if isinstance(record, dict) and _check_dependency_error(record):
+                error = True
     finally:
         writer.close()
         await writer.wait_closed()
