@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import typing as typ
 
-from msgspec import Struct
+import msgspec
 
 from .primitives import Location  # noqa: TC001
 
 
-class Diagnostic(Struct):
+class Diagnostic(msgspec.Struct):
     """A compiler or linter message."""
 
     location: Location

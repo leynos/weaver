@@ -3,8 +3,8 @@ import multiprocessing as mp
 from io import StringIO
 from pathlib import Path
 
+import msgspec.json as msjson
 import pytest
-from msgspec import json
 
 from weaver import client
 from weaver_schemas.error import SchemaError
@@ -31,7 +31,7 @@ async def test_rpc_call_existing_daemon(tmp_path: Path) -> None:
     async with server:
         buf = StringIO()
         await client.rpc_call("project-status", socket_path=sock, stdout=buf)
-        assert json.decode(
+        assert msjson.decode(
             buf.getvalue().encode(), type=ProjectStatus
         ) == ProjectStatus(message="ok")
     server.close()
@@ -82,7 +82,7 @@ async def test_rpc_call_autostart(
     buf = StringIO()
     await client.rpc_call("project-status", socket_path=sock, stdout=buf)
     assert started is not None
-    assert json.decode(buf.getvalue().encode(), type=ProjectStatus) == ProjectStatus(
+    assert msjson.decode(buf.getvalue().encode(), type=ProjectStatus) == ProjectStatus(
         message="ok"
     )
     if started and started.is_alive():
@@ -102,7 +102,7 @@ async def test_rpc_call_unknown_method(tmp_path: Path) -> None:
     async with server:
         buf = StringIO()
         await client.rpc_call("nope", socket_path=sock, stdout=buf)
-        err = json.decode(buf.getvalue().encode(), type=SchemaError)
+        err = msjson.decode(buf.getvalue().encode(), type=SchemaError)
         assert err.message == "unknown method: nope"
     server.close()
     await server.wait_closed()

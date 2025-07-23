@@ -9,8 +9,8 @@ import typing as typ
 from pathlib import Path  # noqa: TC003
 
 import anyio
+import msgspec.json as msjson
 import typer
-from msgspec import json
 
 from weaverd.server import default_socket_path
 
@@ -66,7 +66,7 @@ async def rpc_call(
 
     reader, writer = await asyncio.open_unix_connection(str(path))
     try:
-        writer.write(json.encode({"method": method, "params": params or {}}) + b"\n")
+        writer.write(msjson.encode({"method": method, "params": params or {}}) + b"\n")
         await writer.drain()
         writer.write_eof()
         while data := await reader.readline():

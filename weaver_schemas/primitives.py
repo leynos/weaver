@@ -1,23 +1,23 @@
 from __future__ import annotations
 
-from msgspec import Struct
+import msgspec
 
 
-class Position(Struct):
+class Position(msgspec.Struct):
     """A point in a text file."""
 
     line: int
     character: int
 
 
-class Range(Struct):
+class Range(msgspec.Struct):
     """A span of text between two positions."""
 
     start: Position
     end: Position
 
 
-class Location(Struct):
+class Location(msgspec.Struct):
     """A range of text within a file."""
 
     file: str
