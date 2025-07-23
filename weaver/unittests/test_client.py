@@ -1,6 +1,6 @@
 import asyncio
 import multiprocessing as mp
-from io import StringIO
+from io import BytesIO, StringIO, TextIOWrapper
 from pathlib import Path
 
 import msgspec.json as msjson
@@ -106,3 +106,22 @@ async def test_rpc_call_unknown_method(tmp_path: Path) -> None:
         assert err.message == "unknown method: nope"
     server.close()
     await server.wait_closed()
+
+
+def test_process_response_line_detects_errors() -> None:
+    out = StringIO()
+    line = (
+        msjson.encode({"type": "error", "message": "missing dependency serena-agent"})
+        + b"\n"
+    )
+    assert client._process_response_line(line, out)
+    assert "serena-agent" in out.getvalue()
+
+
+def test_process_response_line_buffered_stdout() -> None:
+    buf = BytesIO()
+    out = TextIOWrapper(buf, encoding="utf-8")
+    line = msjson.encode({"type": "result", "value": 42}) + b"\n"
+    assert not client._process_response_line(line, out)
+    out.flush()
+    assert buf.getvalue() == line

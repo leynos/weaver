@@ -81,6 +81,33 @@ async def ensure_daemon_running(socket_path: Path) -> None:
     raise RuntimeError("weaverd failed to start")
 
 
+def _process_response_line(data: bytes, stdout: typ.TextIO) -> bool:
+    """Write ``data`` to ``stdout`` and detect dependency errors."""
+
+    buf: io.BufferedWriter | None = getattr(stdout, "buffer", None)
+    if buf is not None:
+        buf.write(data)
+    else:
+        stdout.write(data.decode())
+    stdout.flush()
+
+    try:
+        record = msjson.decode(data.rstrip())
+    except msgspec.DecodeError:
+        return False
+    return bool(isinstance(record, dict) and _check_dependency_error(record))
+
+
+async def _stream_response(reader: asyncio.StreamReader, stdout: typ.TextIO) -> bool:
+    """Stream lines from ``reader`` to ``stdout`` and flag dependency errors."""
+
+    error = False
+    while data := await reader.readline():
+        if _process_response_line(data, stdout):
+            error = True
+    return error
+
+
 async def rpc_call(
     method: str,
     params: dict[str, typ.Any] | None = None,
@@ -102,19 +129,7 @@ async def rpc_call(
         writer.write(msjson.encode({"method": method, "params": params or {}}) + b"\n")
         await writer.drain()
         writer.write_eof()
-        while data := await reader.readline():
-            buf: io.BufferedWriter | None = getattr(stdout, "buffer", None)
-            if buf is not None:
-                buf.write(data)
-            else:
-                stdout.write(data.decode())
-            stdout.flush()
-            try:
-                record = msjson.decode(data.rstrip())
-            except msgspec.DecodeError:
-                continue
-            if isinstance(record, dict) and _check_dependency_error(record):
-                error = True
+        error = await _stream_response(reader, stdout)
     finally:
         writer.close()
         await writer.wait_closed()
