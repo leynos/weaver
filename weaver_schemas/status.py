@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import typing as t
 
-from msgspec import Struct
+import msgspec
 
 
-class ProjectStatus(Struct, frozen=True):
+class ProjectStatus(msgspec.Struct, frozen=True):
     """Basic daemon health indicator."""
 
     message: str

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import typing as t
 
+import msgspec.json as msjson
 import pytest
-from msgspec import json
 
 from weaver_schemas import (
     CodeEdit,
@@ -25,8 +25,8 @@ def make_diagnostic() -> Diagnostic:
 
 def test_diagnostic_roundtrip() -> None:
     diag = make_diagnostic()
-    data = json.encode(diag)
-    assert json.decode(data, type=Diagnostic) == diag
+    data = msjson.encode(diag)
+    assert msjson.decode(data, type=Diagnostic) == diag
 
 
 def test_codeedit_roundtrip() -> None:
@@ -35,32 +35,32 @@ def test_codeedit_roundtrip() -> None:
         range=Range(start=Position(1, 0), end=Position(1, 1)),
         new_text="bar",
     )
-    data = json.encode(edit)
-    assert json.decode(data, type=CodeEdit) == edit
+    data = msjson.encode(edit)
+    assert msjson.decode(data, type=CodeEdit) == edit
 
 
 def test_impact_report_roundtrip() -> None:
     report = ImpactReport(diagnostics=[make_diagnostic()])
-    data = json.encode(report)
-    assert json.decode(data, type=ImpactReport) == report
+    data = msjson.encode(report)
+    assert msjson.decode(data, type=ImpactReport) == report
 
 
 def test_test_result_roundtrip() -> None:
     result = SchemaTestResult(name="pytest", status="passed", output="ok")
-    data = json.encode(result)
-    assert json.decode(data, type=SchemaTestResult) == result
+    data = msjson.encode(result)
+    assert msjson.decode(data, type=SchemaTestResult) == result
 
 
 def test_impact_report_empty_list() -> None:
     report = ImpactReport(diagnostics=[])
-    data = json.encode(report)
-    assert json.decode(data, type=ImpactReport) == report
+    data = msjson.encode(report)
+    assert msjson.decode(data, type=ImpactReport) == report
 
 
 def test_test_result_none_output() -> None:
     result = SchemaTestResult(name="pytest", status="failed", output=None)
-    data = json.encode(result)
-    assert json.decode(data, type=SchemaTestResult) == result
+    data = msjson.encode(result)
+    assert msjson.decode(data, type=SchemaTestResult) == result
 
 
 @pytest.mark.parametrize("severity", ["Error", "Warning", "Info", "Hint"])
@@ -76,8 +76,8 @@ def test_diagnostic_severity_roundtrip(
         code=None,
         message="msg",
     )
-    data = json.encode(diag)
-    assert json.decode(data, type=Diagnostic) == diag
+    data = msjson.encode(diag)
+    assert msjson.decode(data, type=Diagnostic) == diag
 
 
 @pytest.mark.parametrize("status", ["passed", "failed", "error", "skipped"])
@@ -85,5 +85,5 @@ def test_test_result_status_roundtrip(
     status: t.Literal["passed", "failed", "error", "skipped"],
 ) -> None:
     result = SchemaTestResult(name="pytest", status=status)
-    data = json.encode(result)
-    assert json.decode(data, type=SchemaTestResult) == result
+    data = msjson.encode(result)
+    assert msjson.decode(data, type=SchemaTestResult) == result

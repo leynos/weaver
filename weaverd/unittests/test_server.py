@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import typing as t
 
+import msgspec.json as msjson
 import pytest
-from msgspec import json
 
 from weaver_schemas.status import ProjectStatus
 from weaverd.rpc import RPCDispatcher
@@ -32,10 +32,10 @@ async def test_server_echoes_status(tmp_path: Path) -> None:
     server = await start_server(sock, dispatcher)
     async with server:
         reader, writer = await asyncio.open_unix_connection(str(sock))
-        writer.write(json.encode({"method": "project-status"}) + b"\n")
+        writer.write(msjson.encode({"method": "project-status"}) + b"\n")
         await writer.drain()
         data = await reader.readline()
-        assert json.decode(data.rstrip(), type=ProjectStatus) == ProjectStatus(
+        assert msjson.decode(data.rstrip(), type=ProjectStatus) == ProjectStatus(
             message="ok"
         )
         writer.close()
@@ -58,11 +58,11 @@ async def test_server_handles_multiple_requests(tmp_path: Path) -> None:
         reader, writer = await asyncio.open_unix_connection(str(sock))
         for i in (1, 2):
             writer.write(
-                json.encode({"method": "echo", "params": {"value": i}}) + b"\n"
+                msjson.encode({"method": "echo", "params": {"value": i}}) + b"\n"
             )
             await writer.drain()
             data = await reader.readline()
-            assert json.decode(data.rstrip(), type=ProjectStatus) == ProjectStatus(
+            assert msjson.decode(data.rstrip(), type=ProjectStatus) == ProjectStatus(
                 message=str(i)
             )
         writer.close()

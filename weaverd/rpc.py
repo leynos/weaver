@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import typing as t
 
-from msgspec import Struct, json
+import msgspec
+import msgspec.json as msjson
 
 from weaver_schemas.error import SchemaError
 
 Handler = t.Callable[..., t.Awaitable[t.Any]]
 
 
-class RPCRequest(Struct):
+class RPCRequest(msgspec.Struct):
     """JSON-RPC style request."""
 
     method: str
@@ -31,17 +32,19 @@ class RPCDispatcher:
 
     async def handle(self, data: bytes) -> bytes:
         try:
-            request = json.decode(data, type=RPCRequest)
+            request = msjson.decode(data, type=RPCRequest)
         except Exception as exc:  # noqa: BLE001 - fallback for malformed input
-            return json.encode(SchemaError(message=f"invalid request: {exc}"))
+            return msjson.encode(SchemaError(message=f"invalid request: {exc}"))
 
         handler = self._handlers.get(request.method)
         if handler is None:
-            return json.encode(SchemaError(message=f"unknown method: {request.method}"))
+            return msjson.encode(
+                SchemaError(message=f"unknown method: {request.method}")
+            )
 
         try:
             result = await handler(**(request.params or {}))
         except Exception as exc:  # noqa: BLE001 - ensure structured errors
-            return json.encode(SchemaError(message=str(exc)))
+            return msjson.encode(SchemaError(message=str(exc)))
 
-        return json.encode(result)
+        return msjson.encode(result)

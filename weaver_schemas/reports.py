@@ -2,19 +2,19 @@ from __future__ import annotations
 
 import typing as t
 
-from msgspec import Struct
+import msgspec
 
 from .diagnostics import Diagnostic  # noqa: TC001
 
 
-class ImpactReport(Struct):
+class ImpactReport(msgspec.Struct):
     """Result of analysing a proposed change."""
 
     diagnostics: list[Diagnostic]
     type: t.Literal["impact"] = "impact"
 
 
-class TestResult(Struct):
+class TestResult(msgspec.Struct):
     """Outcome of a project test run."""
 
     name: str
@@ -23,7 +23,7 @@ class TestResult(Struct):
     type: t.Literal["test-result"] = "test-result"
 
 
-class OnboardingReport(Struct):
+class OnboardingReport(msgspec.Struct):
     """Information gathered during project onboarding."""
 
     details: str

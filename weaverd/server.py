@@ -6,7 +6,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from msgspec import json
+import msgspec.json as msjson
 
 from weaver_schemas.error import SchemaError
 from weaver_schemas.status import ProjectStatus
@@ -30,7 +30,7 @@ async def handle_client(
             try:
                 response = await dispatcher.handle(data.rstrip())
             except Exception as exc:  # noqa: BLE001 pragma: no cover - fallback
-                response = json.encode(SchemaError(message=str(exc)))
+                response = msjson.encode(SchemaError(message=str(exc)))
             writer.write(response + b"\n")
             await writer.drain()
     finally:
