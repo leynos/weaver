@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-import typing as t
+import typing as typ
 
 from msgspec import Struct, json
 
 from weaver_schemas.error import SchemaError
 
-Handler = t.Callable[..., t.Awaitable[t.Any]]
+Handler = typ.Callable[..., typ.Awaitable[typ.Any]]
 
 
 class RPCRequest(Struct):
     """JSON-RPC style request."""
 
     method: str
-    params: dict[str, t.Any] | None = None
+    params: dict[str, typ.Any] | None = None
 
 
 class RPCDispatcher:
@@ -22,7 +22,7 @@ class RPCDispatcher:
     def __init__(self) -> None:
         self._handlers: dict[str, Handler] = {}
 
-    def register(self, name: str) -> t.Callable[[Handler], Handler]:
+    def register(self, name: str) -> typ.Callable[[Handler], Handler]:
         def decorator(func: Handler) -> Handler:
             self._handlers[name] = func
             return func

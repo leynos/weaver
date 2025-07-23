@@ -85,6 +85,7 @@ scipy = "sp"
 "collections.abc" = "cabc"
 datetime = "dt"
 "unittest.mock" = "mock"
+typing = "typ"
 
 [tool.pytest.ini_options]
 # Ensure asyncio fixtures create a new event loop for each test

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import typing as t
+import typing as typ
 
 from msgspec import Struct
 
@@ -11,10 +11,10 @@ class Diagnostic(Struct):
     """A compiler or linter message."""
 
     location: Location
-    severity: t.Literal["Error", "Warning", "Info", "Hint"]
+    severity: typ.Literal["Error", "Warning", "Info", "Hint"]
     code: str | None
     message: str
-    type: t.Literal["diagnostic"] = "diagnostic"
+    type: typ.Literal["diagnostic"] = "diagnostic"
 
 
 __all__ = ["Diagnostic"]
