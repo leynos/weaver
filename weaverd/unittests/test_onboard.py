@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import typing as t
+import typing as typ
 
-if t.TYPE_CHECKING:
+if typ.TYPE_CHECKING:
     from pathlib import Path
 
+import msgspec.json as msjson
 import pytest
-from msgspec import json
 
 from weaver_schemas.reports import OnboardingReport
 from weaverd.rpc import RPCDispatcher
@@ -35,10 +35,10 @@ async def test_onboard_project(tmp_path: Path) -> None:
             reader, writer = await asyncio.wait_for(
                 asyncio.open_unix_connection(str(sock)), timeout=5.0
             )
-            writer.write(json.encode({"method": "onboard-project"}) + b"\n")
+            writer.write(msjson.encode({"method": "onboard-project"}) + b"\n")
             await writer.drain()
             data = await asyncio.wait_for(reader.readline(), timeout=5.0)
-            report = json.decode(data.rstrip(), type=OnboardingReport)
+            report = msjson.decode(data.rstrip(), type=OnboardingReport)
             text = report.details.lower()
             assert "viewing" in text and "project" in text
             assert len(report.details) > 20
@@ -70,10 +70,10 @@ async def test_onboard_failure(tmp_path: Path) -> None:
             reader, writer = await asyncio.wait_for(
                 asyncio.open_unix_connection(str(sock)), timeout=5.0
             )
-            writer.write(json.encode({"method": "onboard-project"}) + b"\n")
+            writer.write(msjson.encode({"method": "onboard-project"}) + b"\n")
             await writer.drain()
             data = await asyncio.wait_for(reader.readline(), timeout=5.0)
-            error = json.decode(data.rstrip())
+            error = msjson.decode(data.rstrip())
             assert error.get("type") == "error"
         finally:
             writer.close()

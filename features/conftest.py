@@ -3,7 +3,7 @@ import collections.abc as cabc
 import multiprocessing as mp
 import os
 import time
-import typing as t
+import typing as typ
 from pathlib import Path
 
 import pytest
@@ -16,7 +16,7 @@ from weaverd.server import start_server
 @pytest.fixture()
 def runtime_dir(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> cabc.Generator[dict[str, t.Any], None, None]:
+) -> cabc.Generator[dict[str, typ.Any], None, None]:
     os.environ["XDG_RUNTIME_DIR"] = str(tmp_path)
     sock = client.discover_socket()
     processes: list[mp.Process] = []
@@ -51,7 +51,7 @@ def runtime_dir(
 
     ctx = {"sock": sock, "processes": processes}
 
-    def register(fn: cabc.Callable[[RPCDispatcher], None]) -> dict[str, t.Any]:
+    def register(fn: cabc.Callable[[RPCDispatcher], None]) -> dict[str, typ.Any]:
         handler["func"] = fn
         return ctx
 
