@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import typing as t
+import typing as typ
 
-from msgspec import Struct
+import msgspec
 
 
-class ProjectStatus(Struct, frozen=True):
+class ProjectStatus(msgspec.Struct, frozen=True):
     """Basic daemon health indicator."""
 
     message: str
-    type: t.Literal["project-status"] = "project-status"
+    type: typ.Literal["project-status"] = "project-status"
 
 
 __all__ = ["ProjectStatus"]

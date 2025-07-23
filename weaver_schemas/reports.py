@@ -1,33 +1,33 @@
 from __future__ import annotations
 
-import typing as t
+import typing as typ
 
-from msgspec import Struct
+import msgspec
 
 from .diagnostics import Diagnostic  # noqa: TC001
 
 
-class ImpactReport(Struct):
+class ImpactReport(msgspec.Struct, frozen=True):
     """Result of analysing a proposed change."""
 
-    diagnostics: list[Diagnostic]
-    type: t.Literal["impact"] = "impact"
+    diagnostics: tuple[Diagnostic, ...]
+    type: typ.Literal["impact"] = "impact"
 
 
-class TestResult(Struct):
+class TestResult(msgspec.Struct):
     """Outcome of a project test run."""
 
     name: str
-    status: t.Literal["passed", "failed", "error", "skipped"]
+    status: typ.Literal["passed", "failed", "error", "skipped"]
     output: str | None = None
-    type: t.Literal["test-result"] = "test-result"
+    type: typ.Literal["test-result"] = "test-result"
 
 
-class OnboardingReport(Struct):
+class OnboardingReport(msgspec.Struct):
     """Information gathered during project onboarding."""
 
     details: str
-    type: t.Literal["onboarding"] = "onboarding"
+    type: typ.Literal["onboarding"] = "onboarding"
 
 
 __all__ = ["ImpactReport", "OnboardingReport", "TestResult"]

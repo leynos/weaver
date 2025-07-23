@@ -1,26 +1,26 @@
 from __future__ import annotations
 
-import typing as t
+import typing as typ
 
-from msgspec import Struct
+import msgspec
 
 from .primitives import Location  # noqa: TC001
 
 
-class Symbol(Struct):
+class Symbol(msgspec.Struct):
     """A named code symbol."""
 
     name: str
     kind: str
     location: Location
-    type: t.Literal["symbol"] = "symbol"
+    type: typ.Literal["symbol"] = "symbol"
 
 
-class Reference(Struct):
+class Reference(msgspec.Struct):
     """A reference to a symbol."""
 
     location: Location
-    type: t.Literal["reference"] = "reference"
+    type: typ.Literal["reference"] = "reference"
 
 
 __all__ = ["Reference", "Symbol"]

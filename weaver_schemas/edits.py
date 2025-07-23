@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-import typing as t
+import typing as typ
 
-from msgspec import Struct
+import msgspec
 
 from .primitives import Range  # noqa: TC001
 
 
-class CodeEdit(Struct):
+class CodeEdit(msgspec.Struct):
     """A text replacement within a file."""
 
     file: str
     range: Range
     new_text: str
-    type: t.Literal["edit"] = "edit"
+    type: typ.Literal["edit"] = "edit"
 
 
 __all__ = ["CodeEdit"]

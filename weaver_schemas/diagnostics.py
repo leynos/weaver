@@ -1,20 +1,20 @@
 from __future__ import annotations
 
-import typing as t
+import typing as typ
 
-from msgspec import Struct
+import msgspec
 
 from .primitives import Location  # noqa: TC001
 
 
-class Diagnostic(Struct):
+class Diagnostic(msgspec.Struct):
     """A compiler or linter message."""
 
     location: Location
-    severity: t.Literal["Error", "Warning", "Info", "Hint"]
+    severity: typ.Literal["Error", "Warning", "Info", "Hint"]
     code: str | None
     message: str
-    type: t.Literal["diagnostic"] = "diagnostic"
+    type: typ.Literal["diagnostic"] = "diagnostic"
 
 
 __all__ = ["Diagnostic"]

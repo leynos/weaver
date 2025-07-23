@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import typing as t
+import typing as typ
 from pathlib import Path  # noqa: TC003 -- Typer evaluates this at runtime
 
 import anyio
@@ -35,7 +35,7 @@ def _todo(name: str) -> None:
     raise typer.Exit(1)
 
 
-def _make_stub(name: str) -> t.Callable[[], None]:
+def _make_stub(name: str) -> typ.Callable[[], None]:
     def command() -> None:  # pragma: no cover - stub
         _todo(name)
 

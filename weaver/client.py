@@ -5,12 +5,12 @@ import io  # noqa: TC003
 import os
 import subprocess
 import sys
-import typing as t
+import typing as typ
 from pathlib import Path  # noqa: TC003
 
 import anyio
+import msgspec.json as msjson
 import typer
-from msgspec import json
 
 from weaverd.server import default_socket_path
 
@@ -51,13 +51,13 @@ async def ensure_daemon_running(socket_path: Path) -> None:
 
 async def rpc_call(
     method: str,
-    params: dict[str, t.Any] | None = None,
+    params: dict[str, typ.Any] | None = None,
     socket_path: Path | None = None,
-    stdout: t.TextIO | None = None,
+    stdout: typ.TextIO | None = None,
 ) -> None:
     """Send an RPC request and stream the response to ``stdout``."""
     path = socket_path or discover_socket()
-    stdout = t.cast("t.TextIO", sys.stdout if stdout is None else stdout)
+    stdout = typ.cast("typ.TextIO", sys.stdout if stdout is None else stdout)
     try:
         await ensure_daemon_running(path)
     except Exception as exc:
@@ -66,7 +66,7 @@ async def rpc_call(
 
     reader, writer = await asyncio.open_unix_connection(str(path))
     try:
-        writer.write(json.encode({"method": method, "params": params or {}}) + b"\n")
+        writer.write(msjson.encode({"method": method, "params": params or {}}) + b"\n")
         await writer.drain()
         writer.write_eof()
         while data := await reader.readline():

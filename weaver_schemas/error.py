@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import typing as t
+import typing as typ
 
-from msgspec import Struct
+import msgspec
 
 
-class SchemaError(Struct):
+class SchemaError(msgspec.Struct):
     """A structured error message."""
 
     message: str
-    type: t.Literal["error"] = "error"
+    type: typ.Literal["error"] = "error"
 
 
 __all__ = ["SchemaError"]

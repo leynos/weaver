@@ -144,11 +144,11 @@ objects conforming to the schemas defined in Appendix A.
 
 ### 2.1 Observe
 
-| Command          | Synopsis                                                                      |
-| ---------------- | ----------------------------------------------------------------------------- |
-| project-status   | Health of daemon & language servers; RAM/CPU usage; protocol version.         |
+| Command          | Synopsis                                                                        |
+| ---------------- | ------------------------------------------------------------------------------- |
+| project-status   | Health of daemon & language servers; RAM/CPU usage; protocol version.           |
 | list-diagnostics | `[--severity S] [<files…>]` Stream Diagnostics for whole workspace or subset.   |
-| onboard-project  | First-run analysis, populates memories & returns OnboardingReport.            |
+| onboard-project  | First-run analysis, populates memories & returns OnboardingReport.              |
 
 ### 2.2 Orient
 
@@ -386,4 +386,81 @@ class Diagnostic(Struct):
 # ... and so on for Symbol, Reference, CodeEdit, ImpactReport,
 # TestResult, OnboardingReport, Error, etc.
 
+```
+
+```mermaid
+classDiagram
+    class Position {
+        +int line
+        +int character
+    }
+    class Range {
+        +Position start
+        +Position end
+    }
+    class Location {
+        +str file
+        +Range range
+    }
+    class Diagnostic {
+        +Location location
+        +str message
+        +str severity
+        +str type
+    }
+    class CodeEdit {
+        +str file
+        +Range range
+        +str replacement
+        +str type
+    }
+    class Symbol {
+        +str name
+        +str kind
+        +str type
+    }
+    class Reference {
+        +Location location
+        +str type
+    }
+    class ImpactReport {
+        +list~Diagnostic~ diagnostics
+        +str type
+    }
+    class TestResult {
+        +str name
+        +str outcome
+        +str type
+    }
+    class OnboardingReport {
+        +str details
+        +str type
+    }
+    class SchemaError {
+        +str message
+    }
+    class ProjectStatus {
+        +str message
+    }
+
+    %% All classes now inherit from msgspec.Struct
+    Position --|> msgspec.Struct
+    Range --|> msgspec.Struct
+    Location --|> msgspec.Struct
+    Diagnostic --|> msgspec.Struct
+    CodeEdit --|> msgspec.Struct
+    Symbol --|> msgspec.Struct
+    Reference --|> msgspec.Struct
+    ImpactReport --|> msgspec.Struct
+    TestResult --|> msgspec.Struct
+    OnboardingReport --|> msgspec.Struct
+    SchemaError --|> msgspec.Struct
+    ProjectStatus --|> msgspec.Struct
+
+    %% Relationships
+    Range --> Position : start/end
+    Location --> Range : range
+    Diagnostic --> Location : location
+    Reference --> Location : location
+    ImpactReport --> Diagnostic : diagnostics
 ```
