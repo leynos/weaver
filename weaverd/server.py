@@ -1,17 +1,50 @@
 from __future__ import annotations
 
+# pyright: reportMissingImports=false  # Serena optional dependency
 import asyncio
 import getpass
 import os
 import tempfile
+from importlib import import_module
 from pathlib import Path
 
 import msgspec.json as msjson
 
 from weaver_schemas.error import SchemaError
+from weaver_schemas.reports import OnboardingReport
 from weaver_schemas.status import ProjectStatus
 
 from .rpc import RPCDispatcher
+
+
+class _BareAgent:
+    """Minimal agent providing only the prompt factory."""
+
+    def __init__(self, prompt_factory) -> None:
+        self.prompt_factory = prompt_factory
+
+
+def create_onboarding_tool():
+    """Return an instance of Serena's onboarding tool.
+
+    Raises ``RuntimeError`` with a helpful message if ``serena-agent`` is not
+    installed.
+    """
+    if os.environ.get("WEAVER_TEST_MISSING_SERENA"):
+        raise RuntimeError("serena-agent not found")
+    try:
+        wf_tools = import_module("serena.tools.workflow_tools")
+        prompt_mod = import_module("serena.prompt_factory")
+    except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
+        msg = (
+            "serena-agent is required for onboarding; install it via "
+            "'uv add serena-agent'."
+        )
+        raise RuntimeError(msg) from exc
+
+    onboarding_tool = wf_tools.OnboardingTool
+    prompt_factory = prompt_mod.SerenaPromptFactory
+    return onboarding_tool(_BareAgent(prompt_factory()))
 
 
 def default_socket_path() -> Path:
@@ -52,6 +85,15 @@ async def main(socket_path: Path | None = None) -> None:
     @dispatcher.register("project-status")
     async def project_status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
         return ProjectStatus(message="ok")
+
+    @dispatcher.register("onboard-project")
+    async def onboard_project() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
+        tool = create_onboarding_tool()
+        try:
+            details = await asyncio.to_thread(tool.apply)
+        except Exception as exc:  # pragma: no cover - unexpected failures
+            raise RuntimeError(f"Onboarding failed: {exc}") from exc
+        return OnboardingReport(details=details)
 
     path = socket_path or default_socket_path()
     server = await start_server(path, dispatcher)

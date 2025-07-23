@@ -76,17 +76,17 @@ functionality will be implemented yet.*
 enable the agent to inspect and understand a codebase without modifying it.
 This phase focuses on wrapping Serena's tool capabilities.*
 
-- [ ] **Integrate Serena Tools into** `weaverd`**:**
+- [x] **Integrate Serena Tools into** `weaverd`**:**
 
-  - [ ] Implement logic within `weaverd` to initialise Serena's tool classes
+  - [x] Implement logic within `weaverd` to initialise Serena's tool classes
     (e.g., from `serena.tools`) on startup, providing them with the necessary
     project context.
 
-  - [ ] Implement the `onboard-project` command logic. This will use Serena's
+  - [x] Implement the `onboard-project` command logic. This will use Serena's
     tools to analyse the project and establish a workspace context for
     subsequent commands.
 
-  - [ ] The daemon will rely on Serena's tools to manage the lifecycle of any
+  - [x] The daemon will rely on Serena's tools to manage the lifecycle of any
     underlying LSP connections.
 
 - [ ] **Implement Observe Commands:**
