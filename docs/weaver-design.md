@@ -261,7 +261,7 @@ failures.
 
 `onboard-project` uses Serena's `OnboardingTool` from
 `serena.tools.workflow_tools` (see
-`/root/git/serena-0.1.2/src/serena/tools/workflow_tools.py`).
+`/root/git/serena-0.1.3/src/serena/tools/workflow_tools.py`).
 The daemon creates a minimal agent with `SerenaPromptFactory` **each time** the
 RPC handler is invoked to avoid leaking state between runs. Import failures
 surface a clear runtime error instructing the user to install

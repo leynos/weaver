@@ -49,11 +49,14 @@ def runtime_dir(
 
     monkeypatch.setattr(client, "spawn_daemon", spawn_daemon)
 
-    yield {
-        "sock": sock,
-        "processes": processes,
-        "set_handlers": lambda f: handler.update(func=f),
-    }
+    ctx = {"sock": sock, "processes": processes}
+
+    def register(fn: cabc.Callable[[RPCDispatcher], None]) -> dict[str, t.Any]:
+        handler["func"] = fn
+        return ctx
+
+    ctx["register"] = register
+    yield ctx
 
     for proc in processes:
         if proc and proc.is_alive():

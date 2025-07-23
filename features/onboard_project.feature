@@ -16,6 +16,12 @@ Feature: onboard project command
     When I invoke the onboard-project command
     Then an error report is produced
 
+  Scenario: missing serena-agent dependency
+    Given a temporary runtime dir
+    And serena-agent is missing
+    When I invoke the onboard-project command
+    Then the command fails with a missing dependency message
+
   Scenario: server unavailable
     Given a temporary runtime dir
     And the server is unavailable

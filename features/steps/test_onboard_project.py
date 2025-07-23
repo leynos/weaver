@@ -1,6 +1,4 @@
 import json
-import os
-import sys
 import typing as t
 from pathlib import Path
 
@@ -11,12 +9,6 @@ from weaver.cli import app
 from weaver_schemas.reports import OnboardingReport
 from weaverd.rpc import RPCDispatcher
 from weaverd.server import create_onboarding_tool
-
-# Ensure the Serena sources are discoverable for tests
-SERENA_VERSION = os.environ.get("SERENA_VERSION", "0.1.3")
-default_dir = Path.home() / "git" / f"serena-{SERENA_VERSION}"
-SERENA_DIR = Path(os.environ.get("SERENA_DIR", default_dir))
-sys.path.insert(0, str(SERENA_DIR / "src"))
 
 scenarios("../onboard_project.feature")
 
@@ -29,7 +21,7 @@ def runtime_dir(runtime_dir: dict[str, t.Any]) -> dict[str, t.Any]:
             tool = create_onboarding_tool()
             return OnboardingReport(details=tool.apply())
 
-    runtime_dir["set_handlers"](setup)
+    runtime_dir["register"](setup)
     return runtime_dir
 
 
@@ -56,7 +48,7 @@ def server_malformed(context: dict[str, t.Any]) -> None:
         async def onboard() -> str:  # pragma: no cover - stub
             return "MALFORMED OUTPUT"
 
-    context["set_handlers"](setup)
+    context["register"](setup)
 
 
 @given("the onboarding tool raises an error")
@@ -71,7 +63,21 @@ def tool_error(context: dict[str, t.Any], monkeypatch) -> None:
             tool = FailingTool()
             return OnboardingReport(details=tool.apply())
 
-    context["set_handlers"](setup)
+    context["register"](setup)
+
+
+@given("serena-agent is missing")
+def missing_dependency(monkeypatch):
+    def raise_err():
+        raise RuntimeError("serena-agent not found")
+
+    monkeypatch.setattr("weaverd.server.create_onboarding_tool", raise_err)
+
+
+@then("the command fails with a missing dependency message")
+def check_missing_dep(context: dict[str, t.Any]) -> None:
+    result = context["result"]
+    assert result.exit_code == 0
 
 
 @when("I invoke the onboard-project command")

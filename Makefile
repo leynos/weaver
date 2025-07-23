@@ -67,6 +67,8 @@ SERENA_VERSION ?= 0.1.3
 # Allow callers to relocate the cached source; fall back to XDG if available.
 SERENA_CACHE_DIR ?= $(if $(XDG_CACHE_HOME),$(XDG_CACHE_HOME),$(HOME)/.cache)/serena
 SERENA_DIR := $(SERENA_CACHE_DIR)/serena-$(SERENA_VERSION)
+# Optional: set SERENA_SHA256 to verify the downloaded archive.
+# Compute the checksum via `sha256sum <file>` and export SERENA_SHA256=<hash>.
 SERENA_SHA256 ?=
 
 typecheck: build ty ## Run typechecking

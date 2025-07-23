@@ -17,7 +17,7 @@ def runtime_dir(runtime_dir: dict[str, t.Any]) -> dict[str, t.Any]:
         async def status() -> ProjectStatus:  # pragma: no cover - stub
             return ProjectStatus(message="ok")
 
-    runtime_dir["set_handlers"](setup)
+    runtime_dir["register"](setup)
     return runtime_dir
 
 
