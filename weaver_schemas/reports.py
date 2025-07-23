@@ -7,10 +7,10 @@ import msgspec
 from .diagnostics import Diagnostic  # noqa: TC001
 
 
-class ImpactReport(msgspec.Struct):
+class ImpactReport(msgspec.Struct, frozen=True):
     """Result of analysing a proposed change."""
 
-    diagnostics: list[Diagnostic]
+    diagnostics: tuple[Diagnostic, ...]
     type: t.Literal["impact"] = "impact"
 
 

@@ -40,7 +40,7 @@ def test_codeedit_roundtrip() -> None:
 
 
 def test_impact_report_roundtrip() -> None:
-    report = ImpactReport(diagnostics=[make_diagnostic()])
+    report = ImpactReport(diagnostics=(make_diagnostic(),))
     data = msjson.encode(report)
     assert msjson.decode(data, type=ImpactReport) == report
 
@@ -52,7 +52,7 @@ def test_test_result_roundtrip() -> None:
 
 
 def test_impact_report_empty_list() -> None:
-    report = ImpactReport(diagnostics=[])
+    report = ImpactReport(diagnostics=())
     data = msjson.encode(report)
     assert msjson.decode(data, type=ImpactReport) == report
 

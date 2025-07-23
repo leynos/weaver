@@ -33,7 +33,7 @@ class RPCDispatcher:
     async def handle(self, data: bytes) -> bytes:
         try:
             request = msjson.decode(data, type=RPCRequest)
-        except Exception as exc:  # noqa: BLE001 - fallback for malformed input
+        except msgspec.DecodeError as exc:
             return msjson.encode(SchemaError(message=f"invalid request: {exc}"))
 
         handler = self._handlers.get(request.method)
