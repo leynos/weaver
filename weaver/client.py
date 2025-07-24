@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import io  # noqa: TC003
 import logging
 import os
 import subprocess
@@ -55,22 +54,17 @@ async def ensure_daemon_running(socket_path: Path) -> None:
 def _process_response_line(data: bytes, stdout: typ.TextIO) -> bool:
     """Write ``data`` to ``stdout`` and detect dependency errors."""
 
-    buf: io.BufferedWriter | None = getattr(stdout, "buffer", None)
-    if buf is not None:
-        buf.write(data)
-    else:
-        stdout.write(
-            data.decode(
-                encoding=getattr(stdout, "encoding", "utf-8") or "utf-8",
-                errors="replace",
-            )
-        )
+    text = data.decode(
+        encoding=getattr(stdout, "encoding", "utf-8") or "utf-8",
+        errors="replace",
+    )
+    stdout.write(text)
     stdout.flush()
 
     try:
         record = msjson.decode(data.rstrip())
     except msgspec.DecodeError as exc:
-        logging.debug("Failed to decode response line: %r: %s", data, exc)
+        logging.warning("Failed to decode response line: %r: %s", data, exc)
         return False
     return bool(isinstance(record, dict) and is_dependency_error(record))
 
