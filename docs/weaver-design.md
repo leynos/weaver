@@ -459,3 +459,18 @@ classDiagram
     Reference --> Location : location
     ImpactReport --> Diagnostic : diagnostics
 ```
+
+```mermaid
+classDiagram
+    class RPCRequest {
+        +str method
+        +dict params
+        +str id
+    }
+    RPCRequest --|> msgspec.Struct
+
+    class SchemaError {
+        +str message
+    }
+    SchemaError --|> msgspec.Struct
+```
