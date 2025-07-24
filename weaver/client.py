@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import io  # noqa: TC003
+import logging
 import os
 import subprocess
 import sys
@@ -9,11 +10,13 @@ import typing as typ
 from pathlib import Path  # noqa: TC003
 
 import anyio
+import msgspec
 import msgspec.json as msjson
 import typer
 
 from weaverd.server import default_socket_path
 
+from .errors import is_dependency_error
 from .sockets import can_connect
 
 
@@ -49,6 +52,39 @@ async def ensure_daemon_running(socket_path: Path) -> None:
     raise RuntimeError("weaverd failed to start")
 
 
+def _process_response_line(data: bytes, stdout: typ.TextIO) -> bool:
+    """Write ``data`` to ``stdout`` and detect dependency errors."""
+
+    buf: io.BufferedWriter | None = getattr(stdout, "buffer", None)
+    if buf is not None:
+        buf.write(data)
+    else:
+        stdout.write(
+            data.decode(
+                encoding=getattr(stdout, "encoding", "utf-8") or "utf-8",
+                errors="replace",
+            )
+        )
+    stdout.flush()
+
+    try:
+        record = msjson.decode(data.rstrip())
+    except msgspec.DecodeError as exc:
+        logging.debug("Failed to decode response line: %r: %s", data, exc)
+        return False
+    return bool(isinstance(record, dict) and is_dependency_error(record))
+
+
+async def _stream_response(reader: asyncio.StreamReader, stdout: typ.TextIO) -> bool:
+    """Stream lines from ``reader`` to ``stdout`` and flag dependency errors."""
+
+    error = False
+    while data := await reader.readline():
+        if _process_response_line(data, stdout):
+            error = True
+    return error
+
+
 async def rpc_call(
     method: str,
     params: dict[str, typ.Any] | None = None,
@@ -65,17 +101,14 @@ async def rpc_call(
         raise typer.Exit(1) from exc
 
     reader, writer = await asyncio.open_unix_connection(str(path))
+    error = False
     try:
         writer.write(msjson.encode({"method": method, "params": params or {}}) + b"\n")
         await writer.drain()
         writer.write_eof()
-        while data := await reader.readline():
-            buf: io.BufferedWriter | None = getattr(stdout, "buffer", None)
-            if buf is not None:
-                buf.write(data)
-            else:
-                stdout.write(data.decode())
-            stdout.flush()
+        error = await _stream_response(reader, stdout)
     finally:
         writer.close()
         await writer.wait_closed()
+    if error:
+        raise typer.Exit(1)

@@ -77,7 +77,9 @@ def missing_dependency(monkeypatch):
 @then("the command fails with a missing dependency message")
 def check_missing_dep(context: Context) -> None:
     result = context["result"]
-    assert result.exit_code == 0
+    # When a required dependency like serena-agent is absent, the command
+    # should fail with exit code 1.
+    assert result.exit_code == 1
     out = (result.stdout + result.stderr).lower()
     assert "serena-agent" in out or "missing dependency" in out
 
