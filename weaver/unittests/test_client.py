@@ -1,12 +1,13 @@
 import asyncio
 import multiprocessing as mp
-from io import StringIO
+from io import BytesIO, StringIO, TextIOWrapper
 from pathlib import Path
 
 import msgspec.json as msjson
 import pytest
 
 from weaver import client
+from weaver.errors import DependencyErrorCode
 from weaver_schemas.error import SchemaError
 from weaver_schemas.status import ProjectStatus
 from weaverd.rpc import RPCDispatcher
@@ -106,3 +107,34 @@ async def test_rpc_call_unknown_method(tmp_path: Path) -> None:
         assert err.message == "unknown method: nope"
     server.close()
     await server.wait_closed()
+
+
+@pytest.mark.parametrize("code", list(DependencyErrorCode))
+def test_process_response_line_detects_error_codes(code: DependencyErrorCode) -> None:
+    out = StringIO()
+    line = msjson.encode({"type": "error", "error_code": code}) + b"\n"
+    assert client._process_response_line(line, out)
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "missing dependency serena-agent",
+        "missing dependency: foo-lib",
+        "Serena-Agent not found",
+        "serena agent unavailable",
+    ],
+)
+def test_process_response_line_detects_error_messages(message: str) -> None:
+    out = StringIO()
+    line = msjson.encode({"type": "error", "message": message}) + b"\n"
+    assert client._process_response_line(line, out)
+
+
+def test_process_response_line_buffered_stdout() -> None:
+    buf = BytesIO()
+    out = TextIOWrapper(buf, encoding="utf-8")
+    line = msjson.encode({"type": "result", "value": 42}) + b"\n"
+    assert not client._process_response_line(line, out)
+    out.flush()
+    assert buf.getvalue() == line

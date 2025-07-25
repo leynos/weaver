@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-import msgspec
+import msgspec as ms
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
 
@@ -46,10 +46,10 @@ def server_unavailable(context: Context, monkeypatch) -> None:
 def server_malformed(context: Context) -> None:
     def setup(dispatcher: RPCDispatcher) -> None:
         @dispatcher.register("onboard-project")
-        async def malformed() -> msgspec.Raw:
+        async def malformed() -> ms.Raw:
             # Return raw bytes that do not form valid JSON so the
             # client hits a decode error.
-            return msgspec.Raw(b"MALFORMED OUTPUT")
+            return ms.Raw(b"MALFORMED OUTPUT")
 
     context["register"](setup)
 
@@ -77,7 +77,9 @@ def missing_dependency(monkeypatch):
 @then("the command fails with a missing dependency message")
 def check_missing_dep(context: Context) -> None:
     result = context["result"]
-    assert result.exit_code == 0
+    # When a required dependency like serena-agent is absent, the command
+    # should fail with exit code 1.
+    assert result.exit_code == 1
     out = (result.stdout + result.stderr).lower()
     assert "serena-agent" in out or "missing dependency" in out
 
