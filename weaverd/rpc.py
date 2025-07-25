@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typing as typ
 
-import msgspec
+import msgspec as ms
 import msgspec.json as msjson
 
 from weaver_schemas.error import SchemaError
@@ -10,7 +10,7 @@ from weaver_schemas.error import SchemaError
 Handler = typ.Callable[..., typ.Awaitable[typ.Any]]
 
 
-class RPCRequest(msgspec.Struct):
+class RPCRequest(ms.Struct, frozen=True):
     """JSON-RPC style request."""
 
     method: str
@@ -33,7 +33,7 @@ class RPCDispatcher:
     async def handle(self, data: bytes) -> bytes:
         try:
             request = msjson.decode(data, type=RPCRequest)
-        except msgspec.DecodeError as exc:
+        except ms.DecodeError as exc:
             return msjson.encode(SchemaError(message=f"invalid request: {exc}"))
 
         handler = self._handlers.get(request.method)

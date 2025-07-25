@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import typing as typ
 
-import msgspec
+import msgspec as ms
 
 from .primitives import Location  # noqa: TC001
 
 
-class Symbol(msgspec.Struct):
+class Symbol(ms.Struct, frozen=True):
     """A named code symbol."""
 
     name: str
@@ -16,7 +16,7 @@ class Symbol(msgspec.Struct):
     type: typ.Literal["symbol"] = "symbol"
 
 
-class Reference(msgspec.Struct):
+class Reference(ms.Struct, frozen=True):
     """A reference to a symbol."""
 
     location: Location

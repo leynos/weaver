@@ -35,7 +35,7 @@ async def test_server_echoes_status(tmp_path: Path) -> None:
         writer.write(msjson.encode({"method": "project-status"}) + b"\n")
         await writer.drain()
         data = await reader.readline()
-        assert msjson.decode(data.rstrip(), type=ProjectStatus) == ProjectStatus(
+        assert msjson.decode(data.rstrip(b"\n"), type=ProjectStatus) == ProjectStatus(
             message="ok"
         )
         writer.close()
@@ -62,9 +62,9 @@ async def test_server_handles_multiple_requests(tmp_path: Path) -> None:
             )
             await writer.drain()
             data = await reader.readline()
-            assert msjson.decode(data.rstrip(), type=ProjectStatus) == ProjectStatus(
-                message=str(i)
-            )
+            assert msjson.decode(
+                data.rstrip(b"\n"), type=ProjectStatus
+            ) == ProjectStatus(message=str(i))
         writer.close()
         await writer.wait_closed()
     server.close()

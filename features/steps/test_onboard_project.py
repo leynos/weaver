@@ -1,10 +1,11 @@
 import json
-import typing as typ
 from pathlib import Path
 
+import msgspec
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
 
+from features.types import Context
 from weaver.cli import app
 from weaver_schemas.reports import OnboardingReport
 from weaverd.rpc import RPCDispatcher
@@ -14,7 +15,7 @@ scenarios("../onboard_project.feature")
 
 
 @given("a temporary runtime dir", target_fixture="context")
-def runtime_dir(runtime_dir: dict[str, typ.Any]) -> dict[str, typ.Any]:
+def runtime_dir(runtime_dir: Context) -> Context:
     def setup(dispatcher: RPCDispatcher) -> None:
         @dispatcher.register("onboard-project")
         async def onboard() -> OnboardingReport:  # pragma: no cover - stub
@@ -26,7 +27,7 @@ def runtime_dir(runtime_dir: dict[str, typ.Any]) -> dict[str, typ.Any]:
 
 
 @given("an invalid project structure")
-def invalid_project(context: dict[str, typ.Any], monkeypatch) -> None:
+def invalid_project(context: Context, monkeypatch) -> None:
     def fail_spawn(_: Path) -> None:  # pragma: no cover - stub
         pass
 
@@ -34,7 +35,7 @@ def invalid_project(context: dict[str, typ.Any], monkeypatch) -> None:
 
 
 @given("the server is unavailable")
-def server_unavailable(context: dict[str, typ.Any], monkeypatch) -> None:
+def server_unavailable(context: Context, monkeypatch) -> None:
     def noop(_: Path) -> None:  # pragma: no cover - stub
         pass
 
@@ -42,17 +43,19 @@ def server_unavailable(context: dict[str, typ.Any], monkeypatch) -> None:
 
 
 @given("the server returns malformed output")
-def server_malformed(context: dict[str, typ.Any]) -> None:
+def server_malformed(context: Context) -> None:
     def setup(dispatcher: RPCDispatcher) -> None:
         @dispatcher.register("onboard-project")
-        async def onboard() -> str:  # pragma: no cover - stub
-            return "MALFORMED OUTPUT"
+        async def malformed() -> msgspec.Raw:
+            # Return raw bytes that do not form valid JSON so the
+            # client hits a decode error.
+            return msgspec.Raw(b"MALFORMED OUTPUT")
 
     context["register"](setup)
 
 
 @given("the onboarding tool raises an error")
-def tool_error(context: dict[str, typ.Any], monkeypatch) -> None:
+def tool_error(context: Context, monkeypatch) -> None:
     def setup(dispatcher: RPCDispatcher) -> None:
         class FailingTool:
             def apply(self) -> str:  # pragma: no cover - stub
@@ -72,7 +75,7 @@ def missing_dependency(monkeypatch):
 
 
 @then("the command fails with a missing dependency message")
-def check_missing_dep(context: dict[str, typ.Any]) -> None:
+def check_missing_dep(context: Context) -> None:
     result = context["result"]
     # When a required dependency like serena-agent is absent, the command
     # should fail with exit code 1.
@@ -82,14 +85,14 @@ def check_missing_dep(context: dict[str, typ.Any]) -> None:
 
 
 @when("I invoke the onboard-project command")
-def invoke(context: dict[str, typ.Any]) -> None:
+def invoke(context: Context) -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["onboard-project"])
     context["result"] = result
 
 
 @then("the output includes onboarding details")
-def check(context: dict[str, typ.Any]) -> None:
+def check(context: Context) -> None:
     result = context["result"]
     assert result.exit_code == 0
     assert result.stdout.strip()
@@ -98,7 +101,7 @@ def check(context: dict[str, typ.Any]) -> None:
 
 
 @then("the command fails with an error message")
-def check_error(context: dict[str, typ.Any]) -> None:
+def check_error(context: Context) -> None:
     result = context["result"]
     assert result.exit_code != 0
     err = result.stderr.lower()
@@ -106,7 +109,7 @@ def check_error(context: dict[str, typ.Any]) -> None:
 
 
 @then("an error report is produced")
-def check_report(context: dict[str, typ.Any]) -> None:
+def check_report(context: Context) -> None:
     result = context["result"]
     assert result.exit_code == 0
     line = result.stdout.splitlines()[0]
@@ -115,7 +118,7 @@ def check_report(context: dict[str, typ.Any]) -> None:
 
 
 @then("the output indicates the server is unavailable")
-def check_unavailable(context: dict[str, typ.Any]) -> None:
+def check_unavailable(context: Context) -> None:
     result = context["result"]
     assert result.exit_code != 0
     out = result.stderr.lower()
@@ -123,7 +126,7 @@ def check_unavailable(context: dict[str, typ.Any]) -> None:
 
 
 @then("the output is malformed")
-def check_malformed(context: dict[str, typ.Any]) -> None:
+def check_malformed(context: Context) -> None:
     result = context["result"]
     assert result.exit_code == 0
     assert "malformed output" in result.stdout.lower()

@@ -443,6 +443,12 @@ classDiagram
         +str message
     }
 
+    class RPCRequest {
+        +str method
+        +object|array|null params
+        +str|int|null id
+    }
+
     %% All classes now inherit from msgspec.Struct
     Position --|> msgspec.Struct
     Range --|> msgspec.Struct
@@ -456,6 +462,7 @@ classDiagram
     OnboardingReport --|> msgspec.Struct
     SchemaError --|> msgspec.Struct
     ProjectStatus --|> msgspec.Struct
+    RPCRequest --|> msgspec.Struct
 
     %% Relationships
     Range --> Position : start/end
