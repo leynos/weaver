@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import typing as typ
 
-import msgspec
+import msgspec as ms
 
 from .primitives import Range  # noqa: TC001
 
 
-class CodeEdit(msgspec.Struct):
+class CodeEdit(ms.Struct, frozen=True):
     """A text replacement within a file."""
 
     file: str

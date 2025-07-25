@@ -3,6 +3,7 @@ from __future__ import annotations
 # pyright: reportMissingImports=false  # Serena optional dependency
 import asyncio
 import getpass
+import logging
 import os
 import tempfile
 from importlib import import_module
@@ -15,6 +16,8 @@ from weaver_schemas.reports import OnboardingReport
 from weaver_schemas.status import ProjectStatus
 
 from .rpc import RPCDispatcher
+
+logger = logging.getLogger(__name__)
 
 
 class _BareAgent:
@@ -62,7 +65,10 @@ async def handle_client(
         while data := await reader.readline():
             try:
                 response = await dispatcher.handle(data.rstrip())
-            except Exception as exc:  # noqa: BLE001 pragma: no cover - fallback
+            except Exception as exc:  # pragma: no cover - fallback
+                if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt)):  # noqa: UP038
+                    raise
+                logger.exception("Unhandled RPC error")
                 response = msjson.encode(SchemaError(message=str(exc)))
             writer.write(response + b"\n")
             await writer.drain()
