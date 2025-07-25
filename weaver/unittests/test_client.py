@@ -1,5 +1,6 @@
 import asyncio
 import multiprocessing as mp
+import typing as typ
 from io import BytesIO, StringIO, TextIOWrapper
 from pathlib import Path
 
@@ -114,6 +115,33 @@ def test_process_response_line_detects_error_codes(code: DependencyErrorCode) ->
     out = StringIO()
     line = msjson.encode({"type": "error", "error_code": code}) + b"\n"
     assert client._process_response_line(line, out)
+
+
+@pytest.mark.parametrize("code", list(DependencyErrorCode))
+def test_process_response_line_detects_code_key(code: DependencyErrorCode) -> None:
+    out = StringIO()
+    line = msjson.encode({"type": "error", "code": code}) + b"\n"
+    assert client._process_response_line(line, out)
+
+
+def test_process_response_line_non_dependency_error_code() -> None:
+    out = StringIO()
+    line = msjson.encode({"type": "error", "error_code": "SOME_OTHER_ERROR"}) + b"\n"
+    assert not client._process_response_line(line, out)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"type": "info", "message": "not an error"},
+        {"foo": "bar"},
+        {},
+    ],
+)
+def test_process_response_line_non_error_type(payload: dict[str, typ.Any]) -> None:
+    out = StringIO()
+    line = msjson.encode(payload) + b"\n"
+    assert not client._process_response_line(line, out)
 
 
 @pytest.mark.parametrize(

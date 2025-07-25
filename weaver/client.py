@@ -18,6 +18,8 @@ from weaverd.server import default_socket_path
 from .errors import is_dependency_error
 from .sockets import can_connect
 
+logger = logging.getLogger(__name__)
+
 
 def discover_socket() -> Path:
     """Return the daemon socket path."""
@@ -68,7 +70,7 @@ def _process_response_line(data: bytes, stdout: typ.TextIO) -> bool:
     try:
         record = msjson.decode(data.rstrip())
     except ms.DecodeError as exc:
-        logging.warning("Failed to decode response line: %r: %s", data, exc)
+        logger.warning("Failed to decode response line: %r: %s", data, exc)
         return False
     return bool(isinstance(record, dict) and is_dependency_error(record))
 
