@@ -3,6 +3,7 @@ NIXIE ?= $(shell which nixie)
 MDFORMAT_ALL ?= $(shell which mdformat-all)
 TOOLS = $(MDFORMAT_ALL) ruff ty $(MDLINT) $(NIXIE) uv
 VENV_TOOLS = pytest
+SHELL := bash
 
 .PHONY: help all clean build build-release lint fmt check-fmt \
 	markdownlint nixie test typecheck $(TOOLS) $(VENV_TOOLS)
@@ -62,9 +63,32 @@ check-fmt: ruff ## Verify formatting
 lint: ruff ## Run linters
 	ruff check
 
-typecheck: build ty ## Run typechecking
-	ty check
+SERENA_VERSION ?= 0.1.3
+SERENA_DIR := $(HOME)/git/serena-$(SERENA_VERSION)
+# Optional: set SERENA_SHA256 to verify the downloaded archive.
+# Compute the checksum via `sha256sum <file>` and export SERENA_SHA256=<hash>.
+SERENA_SHA256 ?=
 
+download-serena:
+	@if [ ! -d "$(SERENA_DIR)" ]; then \
+	set -euo pipefail; \
+	tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
+	url=https://github.com/oraios/serena/archive/refs/tags/v$(SERENA_VERSION).tar.gz; \
+	curl --fail --silent --show-error --location "$$url" -o "$$tmp/serena.tgz"; \
+	if [ -n "$(SERENA_SHA256)" ]; then \
+	echo "$(SERENA_SHA256)  $$tmp/serena.tgz" | sha256sum -c -; \
+	fi; \
+        mkdir -p "$(dir $(SERENA_DIR))"; \
+        tar -xzf "$$tmp/serena.tgz" -C "$$tmp"; \
+	rand=$$PPID.$$RANDOM; \
+	mv "$$tmp"/serena-$(SERENA_VERSION) "$(SERENA_DIR).$$rand" && \
+	mv -T "$(SERENA_DIR).$$rand" "$(SERENA_DIR)"; \
+	rm -rf "$$tmp"; \
+fi
+
+typecheck: build ty download-serena ## Run typechecking
+	ty check --extra-search-path $(SERENA_DIR)/src
+	
 markdownlint: $(MDLINT) ## Lint Markdown files
 	find . -type f -name '*.md' \
 	  -not -path './.venv/*' -print0 | xargs -0 $(MDLINT)
@@ -74,7 +98,7 @@ nixie: $(NIXIE) ## Validate Mermaid diagrams
 	  -not -path './.venv/*' -print0 | xargs -0 $(NIXIE)
 
 test: build uv pytest ## Run tests
-	uv run pytest -v
+	SERENA_DIR=$(SERENA_DIR) uv run pytest -v
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \
