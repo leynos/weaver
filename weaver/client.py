@@ -52,7 +52,11 @@ async def ensure_daemon_running(socket_path: Path) -> None:
 
 
 def _process_response_line(data: bytes, stdout: typ.TextIO) -> bool:
-    """Write ``data`` to ``stdout`` and detect dependency errors."""
+    """Write ``data`` to ``stdout`` and detect dependency errors.
+
+    Returns:
+        bool: ``True`` if a dependency error was detected, ``False`` otherwise.
+    """
 
     text = data.decode(
         encoding=getattr(stdout, "encoding", "utf-8") or "utf-8",
