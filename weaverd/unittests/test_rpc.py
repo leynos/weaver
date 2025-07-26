@@ -19,11 +19,13 @@ async def test_dispatcher_handles_registered_method() -> None:
 
     @dispatcher.register("project-status")
     async def handler() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
-        return ProjectStatus(message="ok")
+        return ProjectStatus(pid=1, rss_mb=0.1, ready=True, message="ok")
 
     request = msjson.encode({"method": "project-status"})
     response = await dispatcher.handle(request)
-    assert msjson.decode(response, type=ProjectStatus) == ProjectStatus(message="ok")
+    assert msjson.decode(response, type=ProjectStatus) == ProjectStatus(
+        pid=1, rss_mb=0.1, ready=True, message="ok"
+    )
 
 
 @pytest.mark.anyio
@@ -32,11 +34,15 @@ async def test_dispatcher_passes_parameters() -> None:
 
     @dispatcher.register("echo")
     async def echo(value: int) -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
-        return ProjectStatus(message=str(value))
+        return ProjectStatus(
+            pid=value, rss_mb=float(value), ready=True, message=str(value)
+        )
 
     request = msjson.encode({"method": "echo", "params": {"value": 42}})
     response = await dispatcher.handle(request)
-    assert msjson.decode(response, type=ProjectStatus) == ProjectStatus(message="42")
+    assert msjson.decode(response, type=ProjectStatus) == ProjectStatus(
+        pid=42, rss_mb=42.0, ready=True, message="42"
+    )
 
 
 @pytest.mark.anyio

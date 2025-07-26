@@ -26,7 +26,7 @@ async def test_rpc_call_existing_daemon(tmp_path: Path) -> None:
 
     @dispatcher.register("project-status")
     async def status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
-        return ProjectStatus(message="ok")
+        return ProjectStatus(pid=99, rss_mb=1.0, ready=True, message="ok")
 
     sock = tmp_path / "d.sock"
     server = await start_server(sock, dispatcher)
@@ -34,7 +34,7 @@ async def test_rpc_call_existing_daemon(tmp_path: Path) -> None:
         buf = StringIO()
         await client.rpc_call("project-status", socket_path=sock, stdout=buf)
         assert msjson.decode(buf.getvalue(), type=ProjectStatus) == ProjectStatus(
-            message="ok"
+            pid=99, rss_mb=1.0, ready=True, message="ok"
         )
     server.close()
     await server.wait_closed()
@@ -58,7 +58,9 @@ async def test_rpc_call_autostart(
 
                     @dispatcher.register("project-status")
                     async def status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
-                        return ProjectStatus(message="ok")
+                        return ProjectStatus(
+                            pid=999, rss_mb=1.0, ready=True, message="ok"
+                        )
 
                     server = await start_server(path, dispatcher)
                     async with server:
@@ -85,7 +87,7 @@ async def test_rpc_call_autostart(
     await client.rpc_call("project-status", socket_path=sock, stdout=buf)
     assert started is not None
     assert msjson.decode(buf.getvalue(), type=ProjectStatus) == ProjectStatus(
-        message="ok"
+        pid=999, rss_mb=1.0, ready=True, message="ok"
     )
     if started and started.is_alive():
         started.terminate()

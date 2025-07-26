@@ -26,7 +26,7 @@ async def test_server_echoes_status(tmp_path: Path) -> None:
 
     @dispatcher.register("project-status")
     async def handler() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
-        return ProjectStatus(message="ok")
+        return ProjectStatus(pid=123, rss_mb=1.0, ready=True, message="ok")
 
     sock = tmp_path / "d.sock"
     server = await start_server(sock, dispatcher)
@@ -36,7 +36,7 @@ async def test_server_echoes_status(tmp_path: Path) -> None:
         await writer.drain()
         data = await reader.readline()
         assert msjson.decode(data.rstrip(b"\n"), type=ProjectStatus) == ProjectStatus(
-            message="ok"
+            pid=123, rss_mb=1.0, ready=True, message="ok"
         )
         writer.close()
         await writer.wait_closed()
@@ -50,7 +50,9 @@ async def test_server_handles_multiple_requests(tmp_path: Path) -> None:
 
     @dispatcher.register("echo")
     async def echo(value: int) -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
-        return ProjectStatus(message=str(value))
+        return ProjectStatus(
+            pid=value, rss_mb=float(value), ready=True, message=str(value)
+        )
 
     sock = tmp_path / "e.sock"
     server = await start_server(sock, dispatcher)
@@ -64,7 +66,7 @@ async def test_server_handles_multiple_requests(tmp_path: Path) -> None:
             data = await reader.readline()
             assert msjson.decode(
                 data.rstrip(b"\n"), type=ProjectStatus
-            ) == ProjectStatus(message=str(i))
+            ) == ProjectStatus(pid=i, rss_mb=float(i), ready=True, message=str(i))
         writer.close()
         await writer.wait_closed()
     server.close()
