@@ -5,6 +5,7 @@ import asyncio
 import getpass
 import logging
 import os
+import resource
 import tempfile
 from importlib import import_module
 from pathlib import Path
@@ -90,7 +91,24 @@ async def main(socket_path: Path | None = None) -> None:
 
     @dispatcher.register("project-status")
     async def project_status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
-        return ProjectStatus(message="ok")
+        try:
+            import_module("serena")
+            ready = True
+        except ModuleNotFoundError:
+            ready = False
+
+        try:
+            usage = resource.getrusage(resource.RUSAGE_SELF)
+            rss_mb = float(usage.ru_maxrss) / 1024
+        except OSError:  # pragma: no cover - platform mismatch
+            rss_mb = 0.0
+
+        return ProjectStatus(
+            pid=os.getpid(),
+            rss_mb=rss_mb,
+            ready=ready,
+            message="ok" if ready else "serena missing",
+        )
 
     @dispatcher.register("onboard-project")
     async def onboard_project() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]

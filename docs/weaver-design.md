@@ -150,6 +150,11 @@ objects conforming to the schemas defined in Appendix A.
 | list-diagnostics | `[--severity S] [<files…>]` Stream Diagnostics for whole workspace or subset.   |
 | onboard-project  | First-run analysis, populates memories & returns OnboardingReport.              |
 
+The `project-status` handler inspects runtime health using
+`resource.getrusage` and checks that the `serena` package imports
+successfully. The response reports the daemon process ID, resident memory
+(`rss_mb`), a readiness boolean, and a short message.
+
 ### 2.2 Orient
 
 | Command            | Synopsis                                                                                  |
@@ -261,15 +266,14 @@ failures.
 
 `onboard-project` uses Serena's `OnboardingTool` from
 `serena.tools.workflow_tools` (see
-`/root/git/serena-0.1.3/src/serena/tools/workflow_tools.py`).
-The daemon creates a minimal agent with `SerenaPromptFactory` **each time** the
-RPC handler is invoked to avoid leaking state between runs. Import failures
-surface a clear runtime error instructing the user to install
-`serena-agent`. The tool then generates an `OnboardingReport` returned to the
-client.
-For test scenarios, setting the environment variable
-`WEAVER_TEST_MISSING_SERENA=1` forces `create_onboarding_tool` to raise a
-runtime error, simulating an absent dependency.
+`/root/git/serena-0.1.3/src/serena/tools/workflow_tools.py`). The daemon
+creates a minimal agent with `SerenaPromptFactory` **each time** the RPC
+handler is invoked to avoid leaking state between runs. Import failures surface
+a clear runtime error instructing the user to install `serena-agent`. The tool
+then generates an `OnboardingReport` returned to the client. For test
+scenarios, setting the environment variable `WEAVER_TEST_MISSING_SERENA=1`
+forces `create_onboarding_tool` to raise a runtime error, simulating an absent
+dependency.
 
 `weaverd` exposes a lightweight RPC interface over a UNIX domain socket. A
 custom `RPCDispatcher` maps method names to coroutine handlers and uses
@@ -440,6 +444,9 @@ classDiagram
         +str message
     }
     class ProjectStatus {
+        +int pid
+        +float rss_mb
+        +bool ready
         +str message
     }
 
