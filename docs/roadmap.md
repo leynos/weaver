@@ -91,7 +91,7 @@ This phase focuses on wrapping Serena's tool capabilities.*
 
 - [ ] **Implement Observe Commands:**
 
-  - [ ] `project-status`: Enhance the stub to query the relevant Serena tools
+  - [x] `project-status`: Enhance the stub to query the relevant Serena tools
     for the actual status of the workspace and any underlying language servers
     (PID, memory, readiness state).
 

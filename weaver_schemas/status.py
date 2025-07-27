@@ -6,8 +6,11 @@ import msgspec as ms
 
 
 class ProjectStatus(ms.Struct, frozen=True):
-    """Basic daemon health indicator."""
+    """Health and readiness details for the daemon."""
 
+    pid: int
+    rss_mb: float
+    ready: bool
     message: str
     type: typ.Literal["project-status"] = "project-status"
 

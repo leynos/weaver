@@ -11,6 +11,7 @@ from weaver_schemas import (
     ImpactReport,
     Location,
     Position,
+    ProjectStatus,
     Range,
 )
 from weaver_schemas import (
@@ -87,3 +88,9 @@ def test_test_result_status_roundtrip(
     result = SchemaTestResult(name="pytest", status=status)
     data = msjson.encode(result)
     assert msjson.decode(data, type=SchemaTestResult) == result
+
+
+def test_project_status_roundtrip() -> None:
+    status = ProjectStatus(pid=1, rss_mb=0.5, ready=True, message="ok")
+    data = msjson.encode(status)
+    assert msjson.decode(data, type=ProjectStatus) == status

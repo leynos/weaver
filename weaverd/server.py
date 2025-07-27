@@ -5,6 +5,8 @@ import asyncio
 import getpass
 import logging
 import os
+import resource
+import sys
 import tempfile
 from importlib import import_module
 from pathlib import Path
@@ -85,12 +87,38 @@ async def start_server(path: Path, dispatcher: RPCDispatcher) -> asyncio.Abstrac
     )
 
 
+def _get_rss_mb() -> float:
+    """Return process memory usage in megabytes."""
+    try:
+        usage = resource.getrusage(resource.RUSAGE_SELF)
+    except OSError:  # pragma: no cover - unsupported platform
+        return 0.0
+
+    rss = float(usage.ru_maxrss)
+    if sys.platform == "darwin":
+        return rss / (1024 * 1024)
+    return rss / 1024
+
+
 async def main(socket_path: Path | None = None) -> None:
     dispatcher = RPCDispatcher()
 
     @dispatcher.register("project-status")
     async def project_status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
-        return ProjectStatus(message="ok")
+        try:
+            import_module("serena")
+            ready = True
+        except ModuleNotFoundError:
+            ready = False
+
+        rss_mb = _get_rss_mb()
+
+        return ProjectStatus(
+            pid=os.getpid(),
+            rss_mb=rss_mb,
+            ready=ready,
+            message="ok" if ready else "serena missing",
+        )
 
     @dispatcher.register("onboard-project")
     async def onboard_project() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
