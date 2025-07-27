@@ -1,6 +1,7 @@
 import os
 
 import msgspec as ms
+import pytest
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
 
@@ -32,7 +33,7 @@ def daemon_running(context: Context) -> None:
 
 
 @given("serena-agent is missing")
-def missing_dep(monkeypatch) -> None:
+def missing_dep(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("WEAVER_TEST_MISSING_SERENA", "1")
 
 
