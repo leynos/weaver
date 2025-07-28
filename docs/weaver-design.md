@@ -150,13 +150,12 @@ objects conforming to the schemas defined in Appendix A.
 | list-diagnostics | `[--severity S] [<files…>]` Stream Diagnostics for whole workspace or subset.   |
 | onboard-project  | First-run analysis, populates memories & returns OnboardingReport.              |
 
-The `project-status` handler inspects runtime health using
-`resource.getrusage` and checks that the `serena` package imports
-successfully. Memory usage requires a platform-specific conversion:
-`ru_maxrss` is measured in kilobytes on Linux but bytes on macOS. The daemon
-normalises this value to megabytes in the `rss_mb` field. The response reports
-the daemon process ID, resident memory (`rss_mb`), a readiness boolean, and a
-short message.
+The `project-status` handler inspects runtime health using `resource.getrusage`
+and checks that the `serena` package imports successfully. Memory usage
+requires a platform-specific conversion: `ru_maxrss` is measured in kilobytes
+on Linux but bytes on macOS. The daemon normalises this value to megabytes in
+the `rss_mb` field. The response reports the daemon process ID, resident memory
+(`rss_mb`), a readiness boolean, and a short message.
 
 ### 2.2 Orient
 
@@ -277,6 +276,11 @@ then generates an `OnboardingReport` returned to the client. For test
 scenarios, setting the environment variable `WEAVER_TEST_MISSING_SERENA=1`
 forces `create_onboarding_tool` to raise a runtime error, simulating an absent
 dependency.
+
+`list-diagnostics` relies on Serena's `ListDiagnosticsTool`. The handler
+initialises the tool with a new `SerenaPromptFactory`, invokes
+`list_diagnostics` in a background thread and converts each dictionary in the
+returned list to the internal `Diagnostic` model using `msgspec.convert`.
 
 `weaverd` exposes a lightweight RPC interface over a UNIX domain socket. A
 custom `RPCDispatcher` maps method names to coroutine handlers and uses

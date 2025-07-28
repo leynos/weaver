@@ -11,8 +11,10 @@ import tempfile
 from importlib import import_module
 from pathlib import Path
 
+import msgspec as ms
 import msgspec.json as msjson
 
+from weaver_schemas.diagnostics import Diagnostic
 from weaver_schemas.error import SchemaError
 from weaver_schemas.reports import OnboardingReport
 from weaver_schemas.status import ProjectStatus
@@ -50,6 +52,27 @@ def create_onboarding_tool():
     onboarding_tool = wf_tools.OnboardingTool
     prompt_factory = prompt_mod.SerenaPromptFactory
     return onboarding_tool(_BareAgent(prompt_factory()))
+
+
+def create_diagnostics_tool():
+    """Return an instance of Serena's diagnostics tool."""
+    if os.environ.get("WEAVER_TEST_MISSING_SERENA"):
+        raise RuntimeError("serena-agent not found")
+    try:
+        wf_tools = import_module("serena.tools.workflow_tools")
+        prompt_mod = import_module("serena.prompt_factory")
+    except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
+        msg = (
+            "serena-agent is required for diagnostics; install it via "
+            "'uv add serena-agent'."
+        )
+        raise RuntimeError(msg) from exc
+
+    prompt_factory = prompt_mod.SerenaPromptFactory
+    diag_tool = getattr(wf_tools, "ListDiagnosticsTool", None)
+    if diag_tool is None:  # pragma: no cover - optional dep
+        raise RuntimeError("ListDiagnosticsTool not found in serena")
+    return diag_tool(_BareAgent(prompt_factory()))
 
 
 def default_socket_path() -> Path:
@@ -128,6 +151,15 @@ async def main(socket_path: Path | None = None) -> None:
         except Exception as exc:  # pragma: no cover - unexpected failures
             raise RuntimeError(f"Onboarding failed: {exc}") from exc
         return OnboardingReport(details=details)
+
+    @dispatcher.register("list-diagnostics")
+    async def list_diagnostics() -> list[Diagnostic]:  # pyright: ignore[reportUnusedFunction]
+        tool = create_diagnostics_tool()
+        try:
+            data = await asyncio.to_thread(tool.list_diagnostics)
+        except Exception as exc:  # pragma: no cover - unexpected failures
+            raise RuntimeError(f"Diagnostics failed: {exc}") from exc
+        return [ms.convert(d, Diagnostic) for d in data]
 
     path = socket_path or default_socket_path()
     server = await start_server(path, dispatcher)

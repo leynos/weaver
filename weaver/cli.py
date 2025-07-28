@@ -52,6 +52,16 @@ def project_status() -> None:
         raise typer.Exit(1) from exc
 
 
+@app.command("list-diagnostics")
+def list_diagnostics() -> None:
+    """Stream diagnostics for the workspace."""
+    try:
+        anyio.run(rpc_call, "list-diagnostics")
+    except Exception as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+
 @app.command("onboard-project")
 def onboard_project() -> None:
     """Perform first-run project analysis."""
@@ -63,7 +73,6 @@ def onboard_project() -> None:
 
 
 STUBS = [
-    "list-diagnostics",
     "find-symbol",
     "get-definition",
     "list-references",

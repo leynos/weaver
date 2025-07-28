@@ -95,7 +95,7 @@ This phase focuses on wrapping Serena's tool capabilities.*
     for the actual status of the workspace and any underlying language servers
     (PID, memory, readiness state).
 
-  - [ ] `list-diagnostics`: Implement the handler to call the appropriate
+  - [x] `list-diagnostics`: Implement the handler to call the appropriate
     method in Serena's toolset to get diagnostics and stream the results,
     converting them to the `weaver` `Diagnostic` msgspec model.
 
