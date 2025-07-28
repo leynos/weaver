@@ -119,51 +119,60 @@ def _get_rss_mb() -> float:
     return rss / 1024
 
 
+async def handle_project_status() -> ProjectStatus:
+    """Return daemon PID, memory usage, and Serena availability."""
+
+    try:
+        import_module("serena")
+        ready = True
+    except ModuleNotFoundError:
+        ready = False
+
+    rss_mb = _get_rss_mb()
+
+    return ProjectStatus(
+        pid=os.getpid(),
+        rss_mb=rss_mb,
+        ready=ready,
+        message="ok" if ready else "serena missing",
+    )
+
+
+async def handle_onboard_project() -> OnboardingReport:
+    """Run the onboarding tool and return its report."""
+
+    tool = create_onboarding_tool()
+    try:
+        details = await asyncio.to_thread(tool.apply)
+    except Exception as exc:  # pragma: no cover - unexpected failures
+        raise RuntimeError(f"Onboarding failed: {exc}") from exc
+    return OnboardingReport(details=details)
+
+
+async def handle_list_diagnostics(
+    severity: str | None = None,
+    files: list[str] | None = None,
+) -> list[Diagnostic]:
+    """List diagnostics, optionally filtered by severity and files."""
+
+    tool = create_diagnostics_tool()
+    try:
+        data = await asyncio.to_thread(tool.list_diagnostics)
+    except RuntimeError as exc:
+        raise RuntimeError(f"Diagnostics failed: {exc}") from exc
+    diags = [ms.convert(d, Diagnostic) for d in data]
+    if severity:
+        diags = [d for d in diags if d.severity == severity]
+    if files:
+        diags = [d for d in diags if d.location.file in files]
+    return diags
+
+
 async def main(socket_path: Path | None = None) -> None:
     dispatcher = RPCDispatcher()
-
-    @dispatcher.register("project-status")
-    async def project_status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
-        try:
-            import_module("serena")
-            ready = True
-        except ModuleNotFoundError:
-            ready = False
-
-        rss_mb = _get_rss_mb()
-
-        return ProjectStatus(
-            pid=os.getpid(),
-            rss_mb=rss_mb,
-            ready=ready,
-            message="ok" if ready else "serena missing",
-        )
-
-    @dispatcher.register("onboard-project")
-    async def onboard_project() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
-        tool = create_onboarding_tool()
-        try:
-            details = await asyncio.to_thread(tool.apply)
-        except Exception as exc:  # pragma: no cover - unexpected failures
-            raise RuntimeError(f"Onboarding failed: {exc}") from exc
-        return OnboardingReport(details=details)
-
-    @dispatcher.register("list-diagnostics")
-    async def list_diagnostics(
-        severity: str | None = None,
-        files: list[str] | None = None,
-    ) -> list[Diagnostic]:  # pyright: ignore[reportUnusedFunction]
-        tool = create_diagnostics_tool()
-        try:
-            data = await asyncio.to_thread(tool.list_diagnostics)
-        except RuntimeError as exc:
-            raise RuntimeError(f"Diagnostics failed: {exc}") from exc
-        diags = [ms.convert(d, Diagnostic) for d in data]
-        if severity:
-            diags = [d for d in diags if d.severity == severity]
-        if files:
-            diags = [d for d in diags if d.location.file in files]
-        return diags
+    dispatcher.register("project-status")(handle_project_status)
+    dispatcher.register("onboard-project")(handle_onboard_project)
+    dispatcher.register("list-diagnostics")(handle_list_diagnostics)
 
     path = socket_path or default_socket_path()
     server = await start_server(path, dispatcher)
