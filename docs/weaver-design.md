@@ -155,7 +155,7 @@ and checks that the `serena` package imports successfully. Memory usage
 requires a platform-specific conversion: `ru_maxrss` is measured in kilobytes
 on Linux but bytes on macOS. The daemon normalises this value to megabytes in
 the `rss_mb` field. The response reports the daemon process ID, resident memory
-(`rss_mb`), a readiness boolean, and a short message.
+(`rss_mb`), a readiness boolean, and a brief message.
 
 ### 2.2 Orient
 
