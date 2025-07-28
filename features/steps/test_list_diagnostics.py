@@ -50,6 +50,7 @@ def daemon_running(context: Context) -> None:
 @given("serena-agent is missing")
 def missing_dep(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("WEAVER_TEST_MISSING_SERENA", "1")
+
     def raise_error() -> None:
         raise RuntimeError("serena-agent not found")
 
