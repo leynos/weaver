@@ -38,9 +38,17 @@ async def test_list_diagnostics(
     monkeypatch.setattr(server, "create_diagnostics_tool", lambda: StubTool())
 
     @dispatcher.register("list-diagnostics")
-    async def handler() -> list[Diagnostic]:  # pyright: ignore[reportUnusedFunction]
+    async def handler(
+        severity: str | None = None,
+        files: list[str] | None = None,
+    ) -> list[Diagnostic]:  # pyright: ignore[reportUnusedFunction]
         tool = server.create_diagnostics_tool()
-        return tool.list_diagnostics()
+        items = tool.list_diagnostics()
+        if severity:
+            items = [d for d in items if d.severity == severity]
+        if files:
+            items = [d for d in items if d.location.file in files]
+        return items
 
     sock = tmp_path / "d.sock"
     srv = await start_server(sock, dispatcher)
@@ -52,6 +60,50 @@ async def test_list_diagnostics(
         diags = msjson.decode(data.rstrip(), type=list[Diagnostic])
         assert len(diags) == 1
         assert diags[0].message == "boom"
+        writer.close()
+        await writer.wait_closed()
+    srv.close()
+    await srv.wait_closed()
+
+
+@pytest.mark.anyio
+async def test_list_diagnostics_filtered(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dispatcher = RPCDispatcher()
+
+    monkeypatch.setattr(server, "create_diagnostics_tool", lambda: StubTool())
+
+    @dispatcher.register("list-diagnostics")
+    async def handler(
+        severity: str | None = None,
+        files: list[str] | None = None,
+    ) -> list[Diagnostic]:  # pragma: no cover - stub
+        tool = server.create_diagnostics_tool()
+        items = tool.list_diagnostics()
+        if severity:
+            items = [d for d in items if d.severity == severity]
+        if files:
+            items = [d for d in items if d.location.file in files]
+        return items
+
+    sock = tmp_path / "f.sock"
+    srv = await start_server(sock, dispatcher)
+    async with srv:
+        reader, writer = await asyncio.open_unix_connection(str(sock))
+        writer.write(
+            msjson.encode(
+                {
+                    "method": "list-diagnostics",
+                    "params": {"severity": "Warning", "files": ["foo.py"]},
+                }
+            )
+            + b"\n"
+        )
+        await writer.drain()
+        data = await reader.readline()
+        diags = msjson.decode(data.rstrip(), type=list[Diagnostic])
+        assert diags == []
         writer.close()
         await writer.wait_closed()
     srv.close()

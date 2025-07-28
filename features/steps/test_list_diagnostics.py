@@ -34,9 +34,17 @@ def runtime_dir(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Contex
 
     def setup(dispatcher: RPCDispatcher) -> None:
         @dispatcher.register("list-diagnostics")
-        async def handler() -> list[Diagnostic]:  # pragma: no cover - stub
+        async def handler(
+            severity: str | None = None,
+            files: list[str] | None = None,
+        ) -> list[Diagnostic]:  # pragma: no cover - stub
             tool = server.create_diagnostics_tool()
-            return tool.list_diagnostics()
+            items = tool.list_diagnostics()
+            if severity:
+                items = [d for d in items if d.severity == severity]
+            if files:
+                items = [d for d in items if d.location.file in files]
+            return items
 
     runtime_dir["register"](setup)
     return runtime_dir
@@ -49,8 +57,6 @@ def daemon_running(context: Context) -> None:
 
 @given("serena-agent is missing")
 def missing_dep(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("WEAVER_TEST_MISSING_SERENA", "1")
-
     def raise_error() -> None:
         raise RuntimeError("serena-agent not found")
 
@@ -71,6 +77,20 @@ def server_malformed(context: Context) -> None:
 def invoke(context: Context) -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["list-diagnostics"])
+    context["result"] = result
+
+
+@when('I invoke the list-diagnostics command with severity "Error"')
+def invoke_severity(context: Context) -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["list-diagnostics", "--severity", "Error"])
+    context["result"] = result
+
+
+@when('I invoke the list-diagnostics command for file "foo.py"')
+def invoke_file(context: Context) -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["list-diagnostics", "foo.py"])
     context["result"] = result
 
 

@@ -37,8 +37,6 @@ def create_onboarding_tool():
     Raises ``RuntimeError`` with a helpful message if ``serena-agent`` is not
     installed.
     """
-    if os.environ.get("WEAVER_TEST_MISSING_SERENA"):
-        raise RuntimeError("serena-agent not found")
     try:
         wf_tools = import_module("serena.tools.workflow_tools")
         prompt_mod = import_module("serena.prompt_factory")
@@ -56,8 +54,6 @@ def create_onboarding_tool():
 
 def create_diagnostics_tool():
     """Return an instance of Serena's diagnostics tool."""
-    if os.environ.get("WEAVER_TEST_MISSING_SERENA"):
-        raise RuntimeError("serena-agent not found")
     try:
         wf_tools = import_module("serena.tools.workflow_tools")
         prompt_mod = import_module("serena.prompt_factory")
@@ -153,13 +149,21 @@ async def main(socket_path: Path | None = None) -> None:
         return OnboardingReport(details=details)
 
     @dispatcher.register("list-diagnostics")
-    async def list_diagnostics() -> list[Diagnostic]:  # pyright: ignore[reportUnusedFunction]
+    async def list_diagnostics(
+        severity: str | None = None,
+        files: list[str] | None = None,
+    ) -> list[Diagnostic]:  # pyright: ignore[reportUnusedFunction]
         tool = create_diagnostics_tool()
         try:
             data = await asyncio.to_thread(tool.list_diagnostics)
-        except Exception as exc:  # pragma: no cover - unexpected failures
+        except RuntimeError as exc:
             raise RuntimeError(f"Diagnostics failed: {exc}") from exc
-        return [ms.convert(d, Diagnostic) for d in data]
+        diags = [ms.convert(d, Diagnostic) for d in data]
+        if severity:
+            diags = [d for d in diags if d.severity == severity]
+        if files:
+            diags = [d for d in diags if d.location.file in files]
+        return diags
 
     path = socket_path or default_socket_path()
     server = await start_server(path, dispatcher)

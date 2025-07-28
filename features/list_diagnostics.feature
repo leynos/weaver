@@ -21,3 +21,13 @@ Feature: list diagnostics command
     And the server returns malformed output
     When I invoke the list-diagnostics command
     Then the output is malformed
+
+  Scenario: filter by severity
+    Given a temporary runtime dir
+    When I invoke the list-diagnostics command with severity "Error"
+    Then the output includes a diagnostic line
+
+  Scenario: filter by file
+    Given a temporary runtime dir
+    When I invoke the list-diagnostics command for file "foo.py"
+    Then the output includes a diagnostic line
