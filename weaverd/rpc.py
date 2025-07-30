@@ -54,27 +54,51 @@ class RPCDispatcher:
             return None, self._encode_error(str(exc))
         return result, None
 
+    async def _process_bytes_result(
+        self, result: bytes | bytearray
+    ) -> typ.AsyncIterator[bytes]:
+        yield typ.cast("bytes", result)
+
+    async def _process_async_iterable_result(
+        self, result: typ.AsyncIterable[typ.Any]
+    ) -> typ.AsyncIterator[bytes]:
+        try:
+            async for item in result:
+                yield msjson.encode(item)
+        except Exception as exc:  # noqa: BLE001 - ensure structured errors
+            yield self._encode_error(str(exc))
+
+    async def _process_sync_iterable_result(
+        self, result: typ.Iterable[typ.Any]
+    ) -> typ.AsyncIterator[bytes]:
+        try:
+            for item in result:
+                yield msjson.encode(item)
+        except Exception as exc:  # noqa: BLE001 - ensure structured errors
+            yield self._encode_error(str(exc))
+
+    async def _process_single_result(self, result: typ.Any) -> typ.AsyncIterator[bytes]:
+        yield msjson.encode(result)
+
     async def _process_result(self, result: typ.Any) -> typ.AsyncIterator[bytes]:
         if isinstance(result, (bytes | bytearray)):
-            yield typ.cast("bytes", result)
+            async for chunk in self._process_bytes_result(result):
+                yield chunk
             return
         if hasattr(result, "__aiter__"):
-            try:
-                async for item in typ.cast("typ.AsyncIterable[typ.Any]", result):
-                    yield msjson.encode(item)
-            except Exception as exc:  # noqa: BLE001 - ensure structured errors
-                yield self._encode_error(str(exc))
+            async for chunk in self._process_async_iterable_result(
+                typ.cast("typ.AsyncIterable[typ.Any]", result)
+            ):
+                yield chunk
             return
         if isinstance(result, typ.Iterable) and not isinstance(
             result, (str | bytes | bytearray)
         ):
-            try:
-                for item in result:
-                    yield msjson.encode(item)
-            except Exception as exc:  # noqa: BLE001 - ensure structured errors
-                yield self._encode_error(str(exc))
+            async for chunk in self._process_sync_iterable_result(result):
+                yield chunk
             return
-        yield msjson.encode(result)
+        async for chunk in self._process_single_result(result):
+            yield chunk
 
     async def handle(self, data: bytes) -> typ.AsyncIterator[bytes]:
         request, err = self._decode_request(data)
