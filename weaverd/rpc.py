@@ -80,24 +80,22 @@ class RPCDispatcher:
     async def _process_single_result(self, result: typ.Any) -> typ.AsyncIterator[bytes]:
         yield msjson.encode(result)
 
-    async def _process_result(self, result: typ.Any) -> typ.AsyncIterator[bytes]:
-        if isinstance(result, (bytes | bytearray)):
-            async for chunk in self._process_bytes_result(result):
-                yield chunk
-            return
+    def _get_result_processor(
+        self, result: typ.Any
+    ) -> typ.Callable[[typ.Any], typ.AsyncIterator[bytes]]:
+        if isinstance(result, (bytes, bytearray)):  # noqa: UP038 - tuple required
+            return self._process_bytes_result
         if hasattr(result, "__aiter__"):
-            async for chunk in self._process_async_iterable_result(
-                typ.cast("typ.AsyncIterable[typ.Any]", result)
-            ):
-                yield chunk
-            return
-        if isinstance(result, typ.Iterable) and not isinstance(
-            result, (str | bytes | bytearray)
+            return self._process_async_iterable_result
+        if isinstance(result, typ.Iterable) and not isinstance(  # noqa: UP038 - tuple required
+            result, (str, bytes, bytearray)
         ):
-            async for chunk in self._process_sync_iterable_result(result):
-                yield chunk
-            return
-        async for chunk in self._process_single_result(result):
+            return self._process_sync_iterable_result
+        return self._process_single_result
+
+    async def _process_result(self, result: typ.Any) -> typ.AsyncIterator[bytes]:
+        processor = self._get_result_processor(result)
+        async for chunk in processor(result):
             yield chunk
 
     async def handle(self, data: bytes) -> typ.AsyncIterator[bytes]:
