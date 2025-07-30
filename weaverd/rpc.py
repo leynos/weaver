@@ -82,9 +82,6 @@ class RPCDispatcher:
             yield err
             return
 
-        if request is None:  # pragma: no cover - decode error handled above
-            return
-
         result, err = await self._execute_handler(
             self._handlers.get(request.method), request
         )
