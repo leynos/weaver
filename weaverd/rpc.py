@@ -10,6 +10,13 @@ from weaver_schemas.error import SchemaError
 
 Handler = typ.Callable[..., typ.Awaitable[typ.Any]]
 
+ResultProcessor: typ.TypeAlias = (
+    typ.Callable[[bytes | bytearray], typ.AsyncIterator[bytes]]
+    | typ.Callable[[typ.AsyncIterable[typ.Any]], typ.AsyncIterator[bytes]]
+    | typ.Callable[[typ.Iterable[typ.Any]], typ.AsyncIterator[bytes]]
+    | typ.Callable[[typ.Any], typ.AsyncIterator[bytes]]
+)
+
 
 class RPCRequest(ms.Struct, frozen=True):
     """JSON-RPC style request."""
@@ -80,9 +87,7 @@ class RPCDispatcher:
     async def _process_single_result(self, result: typ.Any) -> typ.AsyncIterator[bytes]:
         yield msjson.encode(result)
 
-    def _get_result_processor(
-        self, result: typ.Any
-    ) -> typ.Callable[[typ.Any], typ.AsyncIterator[bytes]]:
+    def _get_result_processor(self, result: typ.Any) -> ResultProcessor:
         if isinstance(result, (bytes, bytearray)):  # noqa: UP038 - tuple required
             return self._process_bytes_result
         if hasattr(result, "__aiter__"):
