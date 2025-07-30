@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import builtins
+
 import msgspec.json as msjson
 import pytest
 
@@ -22,7 +24,8 @@ async def test_dispatcher_handles_registered_method() -> None:
         return ProjectStatus(pid=1, rss_mb=0.1, ready=True, message="ok")
 
     request = msjson.encode({"method": "project-status"})
-    response = await dispatcher.handle(request)
+    results = dispatcher.handle(request)
+    response = await builtins.anext(results)
     assert msjson.decode(response, type=ProjectStatus) == ProjectStatus(
         pid=1, rss_mb=0.1, ready=True, message="ok"
     )
@@ -39,7 +42,8 @@ async def test_dispatcher_passes_parameters() -> None:
         )
 
     request = msjson.encode({"method": "echo", "params": {"value": 42}})
-    response = await dispatcher.handle(request)
+    results = dispatcher.handle(request)
+    response = await builtins.anext(results)
     assert msjson.decode(response, type=ProjectStatus) == ProjectStatus(
         pid=42, rss_mb=42.0, ready=True, message="42"
     )
@@ -50,7 +54,8 @@ async def test_dispatcher_returns_error_on_unknown_method() -> None:
     dispatcher = RPCDispatcher()
 
     request = msjson.encode({"method": "missing"})
-    response = await dispatcher.handle(request)
+    results = dispatcher.handle(request)
+    response = await builtins.anext(results)
     assert msjson.decode(response, type=SchemaError) == SchemaError(
         message="unknown method: missing"
     )
@@ -60,6 +65,6 @@ async def test_dispatcher_returns_error_on_unknown_method() -> None:
 async def test_dispatcher_returns_error_on_bad_json() -> None:
     dispatcher = RPCDispatcher()
 
-    response = await dispatcher.handle(b"not-json")
-    err = msjson.decode(response, type=SchemaError)
+    results = dispatcher.handle(b"not-json")
+    err = msjson.decode(await builtins.anext(results), type=SchemaError)
     assert err.type == "error" and "invalid request" in err.message

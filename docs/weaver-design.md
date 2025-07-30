@@ -276,12 +276,16 @@ then generates an `OnboardingReport` returned to the client. In tests, the
 creation function can be patched to raise a runtime error to simulate a missing
 dependency.
 
+Both onboarding and diagnostics tools share common import logic. A helper in the
+daemon loads the requested Serena tool and prompt factory, raising a
+user-friendly ``RuntimeError`` if ``serena-agent`` is missing.
+
 `list-diagnostics` relies on Serena's `ListDiagnosticsTool`. The handler
 initialises the tool with a new `SerenaPromptFactory`, invokes
-`list_diagnostics` in a background thread and converts each dictionary in the
-returned list to the internal `Diagnostic` model using `msgspec.convert`.
-Optional `severity` and `files` parameters allow filtering of the resulting
-diagnostics before they are returned to the client.
+`list_diagnostics` in a background thread and yields each dictionary through the
+RPC stream after converting it to the internal `Diagnostic` model using
+`msgspec.convert`. Optional `severity` and `files` parameters filter the
+diagnostics while streaming, avoiding large in-memory collections.
 
 `weaverd` exposes a lightweight RPC interface over a UNIX domain socket. A
 custom `RPCDispatcher` maps method names to coroutine handlers and uses

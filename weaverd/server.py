@@ -8,6 +8,7 @@ import os
 import resource
 import sys
 import tempfile
+import typing as typ
 from importlib import import_module
 from pathlib import Path
 
@@ -19,7 +20,7 @@ from weaver_schemas.error import SchemaError
 from weaver_schemas.reports import OnboardingReport
 from weaver_schemas.status import ProjectStatus
 
-from .rpc import RPCDispatcher
+from .rpc import Handler, RPCDispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -31,44 +32,52 @@ class _BareAgent:
         self.prompt_factory = prompt_factory
 
 
-def create_onboarding_tool():
-    """Return an instance of Serena's onboarding tool.
+HANDLERS: list[tuple[str, Handler]] = []
 
-    Raises ``RuntimeError`` with a helpful message if ``serena-agent`` is not
-    installed.
+
+def rpc_handler(name: str) -> typ.Callable[[Handler], Handler]:
+    """Register ``func`` as an RPC handler with ``name``."""
+
+    def decorator(func: Handler) -> Handler:
+        HANDLERS.append((name, func))
+        return func
+
+    return decorator
+
+
+def _load_serena_tool(tool_attr: str):
+    """Return the requested Serena tool and prompt factory.
+
+    Raises:
+        RuntimeError: if the ``serena-agent`` package is missing or the tool
+            attribute cannot be imported.
     """
     try:
         wf_tools = import_module("serena.tools.workflow_tools")
         prompt_mod = import_module("serena.prompt_factory")
     except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
-        msg = (
-            "serena-agent is required for onboarding; install it via "
-            "'uv add serena-agent'."
-        )
+        msg = "serena-agent is required; install it via 'uv add serena-agent'."
         raise RuntimeError(msg) from exc
 
-    onboarding_tool = wf_tools.OnboardingTool
-    prompt_factory = prompt_mod.SerenaPromptFactory
-    return onboarding_tool(_BareAgent(prompt_factory()))
+    tool_cls = getattr(wf_tools, tool_attr, None)
+    if tool_cls is None:  # pragma: no cover - optional dep
+        raise RuntimeError(f"{tool_attr} not found in serena")
+
+    return tool_cls, prompt_mod.SerenaPromptFactory
+
+
+def create_onboarding_tool():
+    """Return an instance of Serena's onboarding tool."""
+
+    tool_cls, prompt_factory = _load_serena_tool("OnboardingTool")
+    return tool_cls(_BareAgent(prompt_factory()))
 
 
 def create_diagnostics_tool():
     """Return an instance of Serena's diagnostics tool."""
-    try:
-        wf_tools = import_module("serena.tools.workflow_tools")
-        prompt_mod = import_module("serena.prompt_factory")
-    except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
-        msg = (
-            "serena-agent is required for diagnostics; install it via "
-            "'uv add serena-agent'."
-        )
-        raise RuntimeError(msg) from exc
 
-    prompt_factory = prompt_mod.SerenaPromptFactory
-    diag_tool = getattr(wf_tools, "ListDiagnosticsTool", None)
-    if diag_tool is None:  # pragma: no cover - optional dep
-        raise RuntimeError("ListDiagnosticsTool not found in serena")
-    return diag_tool(_BareAgent(prompt_factory()))
+    tool_cls, prompt_factory = _load_serena_tool("ListDiagnosticsTool")
+    return tool_cls(_BareAgent(prompt_factory()))
 
 
 def default_socket_path() -> Path:
@@ -85,14 +94,19 @@ async def handle_client(
     try:
         while data := await reader.readline():
             try:
-                response = await dispatcher.handle(data.rstrip())
+                results = dispatcher.handle(data.rstrip())
             except Exception as exc:  # pragma: no cover - fallback
                 if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt)):  # noqa: UP038
                     raise
                 logger.exception("Unhandled RPC error")
-                response = msjson.encode(SchemaError(message=str(exc)))
-            writer.write(response + b"\n")
-            await writer.drain()
+
+                async def _err(error: Exception) -> typ.AsyncIterator[bytes]:
+                    yield msjson.encode(SchemaError(message=str(error)))
+
+                results = _err(exc)
+            async for chunk in results:
+                writer.write(chunk + b"\n")
+                await writer.drain()
     finally:
         writer.close()
         await writer.wait_closed()
@@ -119,6 +133,7 @@ def _get_rss_mb() -> float:
     return rss / 1024
 
 
+@rpc_handler("project-status")
 async def handle_project_status() -> ProjectStatus:
     """Return daemon PID, memory usage, and Serena availability."""
 
@@ -138,6 +153,7 @@ async def handle_project_status() -> ProjectStatus:
     )
 
 
+@rpc_handler("onboard-project")
 async def handle_onboard_project() -> OnboardingReport:
     """Run the onboarding tool and return its report."""
 
@@ -149,30 +165,31 @@ async def handle_onboard_project() -> OnboardingReport:
     return OnboardingReport(details=details)
 
 
+@rpc_handler("list-diagnostics")
 async def handle_list_diagnostics(
     severity: str | None = None,
     files: list[str] | None = None,
-) -> list[Diagnostic]:
-    """List diagnostics, optionally filtered by severity and files."""
+) -> typ.AsyncIterator[Diagnostic]:
+    """Yield diagnostics, optionally filtered by severity and files."""
 
     tool = create_diagnostics_tool()
     try:
         data = await asyncio.to_thread(tool.list_diagnostics)
     except RuntimeError as exc:
         raise RuntimeError(f"Diagnostics failed: {exc}") from exc
-    diags = [ms.convert(d, Diagnostic) for d in data]
-    if severity:
-        diags = [d for d in diags if d.severity == severity]
-    if files:
-        diags = [d for d in diags if d.location.file in files]
-    return diags
+    for item in data:
+        diag = ms.convert(item, Diagnostic)
+        if severity and diag.severity != severity:
+            continue
+        if files and diag.location.file not in files:
+            continue
+        yield diag
 
 
 async def main(socket_path: Path | None = None) -> None:
     dispatcher = RPCDispatcher()
-    dispatcher.register("project-status")(handle_project_status)
-    dispatcher.register("onboard-project")(handle_onboard_project)
-    dispatcher.register("list-diagnostics")(handle_list_diagnostics)
+    for name, func in HANDLERS:
+        dispatcher.register(name)(func)
 
     path = socket_path or default_socket_path()
     server = await start_server(path, dispatcher)

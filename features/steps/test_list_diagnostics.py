@@ -1,3 +1,5 @@
+import typing as typ
+
 import msgspec as ms
 import pytest
 from pytest_bdd import given, scenarios, then, when
@@ -37,14 +39,14 @@ def runtime_dir(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Contex
         async def handler(
             severity: str | None = None,
             files: list[str] | None = None,
-        ) -> list[Diagnostic]:  # pragma: no cover - stub
+        ) -> typ.AsyncIterator[Diagnostic]:  # pragma: no cover - stub
             tool = server.create_diagnostics_tool()
-            items = tool.list_diagnostics()
-            if severity:
-                items = [d for d in items if d.severity == severity]
-            if files:
-                items = [d for d in items if d.location.file in files]
-            return items
+            for d in tool.list_diagnostics():
+                if severity and d.severity != severity:
+                    continue
+                if files and d.location.file not in files:
+                    continue
+                yield d
 
     runtime_dir["register"](setup)
     return runtime_dir
