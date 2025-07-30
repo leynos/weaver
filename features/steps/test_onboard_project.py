@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import msgspec as ms
@@ -19,6 +20,8 @@ def runtime_dir(runtime_dir: Context) -> Context:
     def setup(dispatcher: RPCDispatcher) -> None:
         @dispatcher.register("onboard-project")
         async def onboard() -> OnboardingReport:  # pragma: no cover - stub
+            if os.environ.get("WEAVER_TEST_MISSING_SERENA"):
+                raise RuntimeError("serena-agent not found")
             tool = create_onboarding_tool()
             return OnboardingReport(details=tool.apply())
 
