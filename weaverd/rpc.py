@@ -31,44 +31,66 @@ class RPCDispatcher:
 
         return decorator
 
-    async def handle(self, data: bytes) -> typ.AsyncIterator[bytes]:
+    @staticmethod
+    def _encode_error(message: str) -> bytes:
+        return msjson.encode(SchemaError(message=message))
+
+    def _decode_request(self, data: bytes) -> tuple[RPCRequest | None, bytes | None]:
         try:
-            request = msjson.decode(data, type=RPCRequest)
+            return msjson.decode(data, type=RPCRequest), None
         except ms.DecodeError as exc:
-            yield msjson.encode(SchemaError(message=f"invalid request: {exc}"))
-            return
+            return None, self._encode_error(f"invalid request: {exc}")
 
-        handler = self._handlers.get(request.method)
+    async def _execute_handler(
+        self, handler: Handler | None, request: RPCRequest
+    ) -> tuple[typ.Any | None, bytes | None]:
         if handler is None:
-            yield msjson.encode(
-                SchemaError(message=f"unknown method: {request.method}")
-            )
-            return
-
+            return None, self._encode_error(f"unknown method: {request.method}")
         try:
             result = handler(**(request.params or {}))
             if inspect.isawaitable(result):
                 result = await typ.cast("typ.Awaitable[typ.Any]", result)
         except Exception as exc:  # noqa: BLE001 - ensure structured errors
-            yield msjson.encode(SchemaError(message=str(exc)))
-            return
+            return None, self._encode_error(str(exc))
+        return result, None
 
+    async def _process_result(self, result: typ.Any) -> typ.AsyncIterator[bytes]:
         if isinstance(result, (bytes | bytearray)):
-            yield result
+            yield typ.cast("bytes", result)
             return
         if hasattr(result, "__aiter__"):
             try:
                 async for item in typ.cast("typ.AsyncIterable[typ.Any]", result):
                     yield msjson.encode(item)
             except Exception as exc:  # noqa: BLE001 - ensure structured errors
-                yield msjson.encode(SchemaError(message=str(exc)))
-        elif isinstance(result, typ.Iterable) and not isinstance(
+                yield self._encode_error(str(exc))
+            return
+        if isinstance(result, typ.Iterable) and not isinstance(
             result, (str | bytes | bytearray)
         ):
             try:
                 for item in result:
                     yield msjson.encode(item)
             except Exception as exc:  # noqa: BLE001 - ensure structured errors
-                yield msjson.encode(SchemaError(message=str(exc)))
-        else:
-            yield msjson.encode(result)
+                yield self._encode_error(str(exc))
+            return
+        yield msjson.encode(result)
+
+    async def handle(self, data: bytes) -> typ.AsyncIterator[bytes]:
+        request, err = self._decode_request(data)
+        if err is not None:
+            yield err
+            return
+
+        if request is None:  # pragma: no cover - decode error handled above
+            return
+
+        result, err = await self._execute_handler(
+            self._handlers.get(request.method), request
+        )
+        if err is not None:
+            yield err
+            return
+
+        async for chunk in self._process_result(result):
+            yield chunk
