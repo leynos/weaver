@@ -16,6 +16,18 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
+async def _test_dispatcher_call(
+    dispatcher: RPCDispatcher,
+    request_data: dict[str, typ.Any],
+    expected_response: ProjectStatus,
+) -> None:
+    """Helper to send an RPC request and assert the response."""
+    request = msjson.encode(request_data)
+    results = dispatcher.handle(request)
+    response = await builtins.anext(results)
+    assert msjson.decode(response, type=ProjectStatus) == expected_response
+
+
 @pytest.mark.anyio
 async def test_dispatcher_handles_registered_method() -> None:
     dispatcher = RPCDispatcher()
@@ -24,11 +36,10 @@ async def test_dispatcher_handles_registered_method() -> None:
     async def handler() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
         return ProjectStatus(pid=1, rss_mb=0.1, ready=True, message="ok")
 
-    request = msjson.encode({"method": "project-status"})
-    results = dispatcher.handle(request)
-    response = await builtins.anext(results)
-    assert msjson.decode(response, type=ProjectStatus) == ProjectStatus(
-        pid=1, rss_mb=0.1, ready=True, message="ok"
+    await _test_dispatcher_call(
+        dispatcher,
+        {"method": "project-status"},
+        ProjectStatus(pid=1, rss_mb=0.1, ready=True, message="ok"),
     )
 
 
@@ -42,11 +53,10 @@ async def test_dispatcher_passes_parameters() -> None:
             pid=value, rss_mb=float(value), ready=True, message=str(value)
         )
 
-    request = msjson.encode({"method": "echo", "params": {"value": 42}})
-    results = dispatcher.handle(request)
-    response = await builtins.anext(results)
-    assert msjson.decode(response, type=ProjectStatus) == ProjectStatus(
-        pid=42, rss_mb=42.0, ready=True, message="42"
+    await _test_dispatcher_call(
+        dispatcher,
+        {"method": "echo", "params": {"value": 42}},
+        ProjectStatus(pid=42, rss_mb=42.0, ready=True, message="42"),
     )
 
 
