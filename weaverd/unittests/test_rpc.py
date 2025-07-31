@@ -21,7 +21,7 @@ async def _test_dispatcher_call(
     request_data: dict[str, typ.Any],
     expected_response: ProjectStatus,
 ) -> None:
-    """Helper to send an RPC request and assert the response."""
+    """Send ``request_data`` to ``dispatcher`` and check the result."""
     request = msjson.encode(request_data)
     results = dispatcher.handle(request)
     response = await builtins.anext(results)
