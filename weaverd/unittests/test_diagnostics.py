@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
 import typing as typ
 
 import msgspec.json as msjson
@@ -143,3 +144,26 @@ async def test_missing_diagnostics_dependency(
         await writer.wait_closed()
     srv.close()
     await srv.wait_closed()
+
+
+@pytest.mark.anyio
+async def test_list_diagnostics_case_insensitive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Tool:
+        def list_diagnostics(self) -> list[Diagnostic]:
+            loc = Location(
+                file="Foo.Py",
+                range=Range(start=Position(1, 0), end=Position(1, 1)),
+            )
+            return [
+                Diagnostic(location=loc, severity="Error", code="E1", message="boom")
+            ]
+
+    monkeypatch.setattr(server, "create_diagnostics_tool", lambda: Tool())
+
+    results = server.handle_list_diagnostics(severity="error", files=["foo.py"])
+    diag = await builtins.anext(results)
+    with pytest.raises(StopAsyncIteration):
+        await builtins.anext(results)
+    assert diag.message == "boom"

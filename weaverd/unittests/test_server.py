@@ -71,3 +71,23 @@ async def test_server_handles_multiple_requests(tmp_path: Path) -> None:
         await writer.wait_closed()
     server.close()
     await server.wait_closed()
+
+
+def test_rpc_handler_rejects_duplicates() -> None:
+    from weaverd import server as srv
+
+    original = srv.HANDLERS.copy()
+    srv.HANDLERS.clear()
+    try:
+
+        @srv.rpc_handler("dup")
+        async def first() -> None:
+            pass
+
+        with pytest.raises(ValueError):
+
+            @srv.rpc_handler("dup")
+            async def second() -> None:  # pragma: no cover - stub
+                pass
+    finally:
+        srv.HANDLERS[:] = original

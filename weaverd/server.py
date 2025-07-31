@@ -39,6 +39,8 @@ def rpc_handler(name: str) -> typ.Callable[[Handler], Handler]:
     """Register ``func`` as an RPC handler with ``name``."""
 
     def decorator(func: Handler) -> Handler:
+        if any(existing == name for existing, _ in HANDLERS):
+            raise ValueError(f"handler '{name}' already registered")
         HANDLERS.append((name, func))
         return func
 
@@ -165,12 +167,55 @@ async def handle_onboard_project() -> OnboardingReport:
     return OnboardingReport(details=details)
 
 
+def _normalize_filters(
+    severity: str | None, files: list[str] | None
+) -> tuple[str | None, set[str] | None]:
+    """Return case- and path-insensitive versions of filters."""
+
+    norm_severity = severity.lower() if severity else None
+    norm_files = (
+        {os.path.normcase(os.path.normpath(f)).lower() for f in files}
+        if files
+        else None
+    )
+    return norm_severity, norm_files
+
+
+def _normalize_diagnostic_data(diag: Diagnostic) -> tuple[str | None, str | None]:
+    """Return normalised severity and file path from ``diag``."""
+
+    diag_severity = diag.severity.lower() if diag.severity else None
+    diag_file = (
+        os.path.normcase(os.path.normpath(diag.location.file)).lower()
+        if diag.location and diag.location.file
+        else None
+    )
+    return diag_severity, diag_file
+
+
+def _should_include_diagnostic(
+    norm_severity: str | None,
+    norm_files: set[str] | None,
+    diag_severity: str | None,
+    diag_file: str | None,
+) -> bool:
+    """Return ``True`` if the diagnostic passes the given filters."""
+
+    return not (
+        (norm_severity and diag_severity != norm_severity)
+        or (norm_files and diag_file not in norm_files)
+    )
+
+
 @rpc_handler("list-diagnostics")
 async def handle_list_diagnostics(
     severity: str | None = None,
     files: list[str] | None = None,
 ) -> typ.AsyncIterator[Diagnostic]:
     """Yield diagnostics, optionally filtered by severity and files."""
+
+    # Prepare filters for case- and path-insensitive comparison
+    norm_severity, norm_files = _normalize_filters(severity, files)
 
     tool = create_diagnostics_tool()
     try:
@@ -179,11 +224,11 @@ async def handle_list_diagnostics(
         raise RuntimeError(f"Diagnostics failed: {exc}") from exc
     for item in data:
         diag = ms.convert(item, Diagnostic)
-        if severity and diag.severity != severity:
-            continue
-        if files and diag.location.file not in files:
-            continue
-        yield diag
+        diag_severity, diag_file = _normalize_diagnostic_data(diag)
+        if _should_include_diagnostic(
+            norm_severity, norm_files, diag_severity, diag_file
+        ):
+            yield diag
 
 
 async def main(socket_path: Path | None = None) -> None:
