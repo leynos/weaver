@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import builtins
+import typing as typ
 
 import msgspec.json as msjson
 import pytest
@@ -68,3 +69,42 @@ async def test_dispatcher_returns_error_on_bad_json() -> None:
     results = dispatcher.handle(b"not-json")
     err = msjson.decode(await builtins.anext(results), type=SchemaError)
     assert err.type == "error" and "invalid request" in err.message
+
+
+@pytest.mark.anyio
+async def test_dispatcher_streams_multiple_results() -> None:
+    dispatcher = RPCDispatcher()
+
+    @dispatcher.register("numbers")
+    async def numbers() -> typ.AsyncIterator[int]:  # pyright: ignore[reportUnusedFunction]
+        for i in range(3):
+            yield i
+
+    req = msjson.encode({"method": "numbers"})
+    results = dispatcher.handle(req)
+    output = [msjson.decode(await builtins.anext(results), type=int) for _ in range(3)]
+    with pytest.raises(StopAsyncIteration):
+        await builtins.anext(results)
+    assert output == [0, 1, 2]
+
+
+@pytest.mark.anyio
+async def test_dispatcher_streams_midstream_error() -> None:
+    dispatcher = RPCDispatcher()
+
+    async def boom() -> typ.AsyncIterator[int]:
+        yield 1
+        raise RuntimeError("boom")
+
+    @dispatcher.register("boom")
+    async def handler() -> typ.AsyncIterator[int]:  # pyright: ignore[reportUnusedFunction]
+        async for item in boom():
+            yield item
+
+    req = msjson.encode({"method": "boom"})
+    results = dispatcher.handle(req)
+    first = msjson.decode(await builtins.anext(results), type=int)
+    err = msjson.decode(await builtins.anext(results), type=SchemaError)
+    with pytest.raises(StopAsyncIteration):
+        await builtins.anext(results)
+    assert first == 1 and err.message == "boom"

@@ -39,6 +39,8 @@ def rpc_handler(name: str) -> typ.Callable[[Handler], Handler]:
     """Register ``func`` as an RPC handler with ``name``."""
 
     def decorator(func: Handler) -> Handler:
+        if any(existing == name for existing, _ in HANDLERS):
+            raise ValueError(f"handler '{name}' already registered")
         HANDLERS.append((name, func))
         return func
 
@@ -172,6 +174,10 @@ async def handle_list_diagnostics(
 ) -> typ.AsyncIterator[Diagnostic]:
     """Yield diagnostics, optionally filtered by severity and files."""
 
+    # Normalise filters to make comparisons case- and path-insensitive
+    norm_severity = severity.lower() if severity else None
+    norm_files = {os.path.normpath(f).lower() for f in files} if files else None
+
     tool = create_diagnostics_tool()
     try:
         data = await asyncio.to_thread(tool.list_diagnostics)
@@ -179,9 +185,15 @@ async def handle_list_diagnostics(
         raise RuntimeError(f"Diagnostics failed: {exc}") from exc
     for item in data:
         diag = ms.convert(item, Diagnostic)
-        if severity and diag.severity != severity:
+        diag_severity = diag.severity.lower() if diag.severity else None
+        diag_file = (
+            os.path.normpath(diag.location.file).lower()
+            if diag.location and diag.location.file
+            else None
+        )
+        if norm_severity and diag_severity != norm_severity:
             continue
-        if files and diag.location.file not in files:
+        if norm_files and diag_file not in norm_files:
             continue
         yield diag
 
