@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+# Inspect awaits handler results to support both sync and async handlers.
 import inspect
+
+# Use a short alias to keep type hints concise.
 import typing as typ
 
 import msgspec as ms
