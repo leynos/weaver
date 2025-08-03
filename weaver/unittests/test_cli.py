@@ -75,3 +75,41 @@ def test_cli_project_status(monkeypatch: pytest.MonkeyPatch) -> None:
         "method": "project-status",
         "params": None,
     }
+
+
+def test_cli_onboard_project(monkeypatch: pytest.MonkeyPatch) -> None:
+    """onboard-project uses _run_rpc to contact the daemon."""
+    called: dict[str, object] = {}
+
+    def fake_run(func, method, params=None):
+        # Avoid network access while verifying parameters.
+        called.update({"func": func, "method": method, "params": params})
+
+    monkeypatch.setattr(cli.anyio, "run", fake_run)
+
+    runner = CliRunner()
+    result = runner.invoke(cli.app, ["onboard-project"])
+
+    assert result.exit_code == 0
+    assert called == {
+        "func": cli.rpc_call,
+        "method": "onboard-project",
+        "params": None,
+    }
+
+
+def test_cli_onboard_project_reports_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """onboard-project surfaces RPC errors."""
+
+    def fake_run(func, method, params=None):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(cli.anyio, "run", fake_run)
+
+    runner = CliRunner()
+    result = runner.invoke(cli.app, ["onboard-project"])
+
+    assert result.exit_code == 1
+    assert "Error: boom" in result.stderr
