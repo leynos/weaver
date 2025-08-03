@@ -56,8 +56,17 @@ def test_run_rpc_reports_error(
     assert "Error: boom" in capsys.readouterr().err
 
 
-def test_cli_project_status(monkeypatch: pytest.MonkeyPatch) -> None:
-    """project-status uses _run_rpc to contact the daemon."""
+@pytest.mark.parametrize(
+    ("cli_command", "rpc_method"),
+    [
+        ("project-status", "project-status"),
+        ("onboard-project", "onboard-project"),
+    ],
+)
+def test_cli_commands_use_run_rpc(
+    cli_command: str, rpc_method: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CLI commands use _run_rpc to contact the daemon."""
     called: dict[str, object] = {}
 
     def fake_run(func, method, params=None):
@@ -67,33 +76,12 @@ def test_cli_project_status(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cli.anyio, "run", fake_run)
 
     runner = CliRunner()
-    result = runner.invoke(cli.app, ["project-status"])
+    result = runner.invoke(cli.app, [cli_command])
 
     assert result.exit_code == 0
     assert called == {
         "func": cli.rpc_call,
-        "method": "project-status",
-        "params": None,
-    }
-
-
-def test_cli_onboard_project(monkeypatch: pytest.MonkeyPatch) -> None:
-    """onboard-project uses _run_rpc to contact the daemon."""
-    called: dict[str, object] = {}
-
-    def fake_run(func, method, params=None):
-        # Avoid network access while verifying parameters.
-        called.update({"func": func, "method": method, "params": params})
-
-    monkeypatch.setattr(cli.anyio, "run", fake_run)
-
-    runner = CliRunner()
-    result = runner.invoke(cli.app, ["onboard-project"])
-
-    assert result.exit_code == 0
-    assert called == {
-        "func": cli.rpc_call,
-        "method": "onboard-project",
+        "method": rpc_method,
         "params": None,
     }
 
