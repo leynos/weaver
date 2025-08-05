@@ -42,14 +42,21 @@ def _make_stub(name: str) -> typ.Callable[[], None]:
     return command
 
 
+def _run_rpc(method: str, params: dict | None = None) -> None:
+    """Execute an RPC request and handle failures uniformly."""
+    try:
+        anyio.run(rpc_call, method, params)
+    except Exception as exc:
+        # We surface the raw error to aid debugging while keeping exit codes
+        # consistent for callers that rely on them.
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+
 @app.command("project-status")
 def project_status() -> None:
     """Check daemon and language server health."""
-    try:
-        anyio.run(rpc_call, "project-status")
-    except Exception as exc:
-        typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(1) from exc
+    _run_rpc("project-status")
 
 
 @app.command("list-diagnostics")
@@ -68,21 +75,13 @@ def list_diagnostics(
         params["severity"] = severity
     if files:
         params["files"] = [str(p) for p in files]
-    try:
-        anyio.run(rpc_call, "list-diagnostics", params or None)
-    except Exception as exc:
-        typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(1) from exc
+    _run_rpc("list-diagnostics", params or None)
 
 
 @app.command("onboard-project")
 def onboard_project() -> None:
     """Perform first-run project analysis."""
-    try:
-        anyio.run(rpc_call, "onboard-project")
-    except Exception as exc:
-        typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(1) from exc
+    _run_rpc("onboard-project")
 
 
 STUBS = [
