@@ -31,12 +31,18 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
-@pytest.mark.anyio
-async def test_list_diagnostics(
+@pytest.fixture()
+async def diagnostics_test_server(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    dispatcher = RPCDispatcher()
+) -> typ.AsyncIterator[Path]:
+    """Start a diagnostics test server and yield its socket path.
 
+    The server uses a stub Serena tool and exposes the ``list-diagnostics``
+    handler with filtering by severity and file. Consumers should close any
+    client connections they create; this fixture handles the server lifecycle.
+    """
+
+    dispatcher = RPCDispatcher()
     monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
 
     @dispatcher.register("list-diagnostics")
@@ -45,27 +51,35 @@ async def test_list_diagnostics(
         files: list[str] | None = None,
     ) -> typ.AsyncIterator[Diagnostic]:
         tool = server.create_serena_tool("ListDiagnosticsTool")
-        for d in tool.list_diagnostics():
-            if severity and d.severity != severity:
+        for diag in tool.list_diagnostics():
+            if severity and diag.severity != severity:
                 continue
-            if files and d.location.file not in files:
+            if files and diag.location.file not in files:
                 continue
-            yield d
+            yield diag
 
     sock = tmp_path / "d.sock"
     srv = await start_server(sock, dispatcher)
-    async with srv:
-        reader, writer = await asyncio.open_unix_connection(str(sock))
-        writer.write(msjson.encode({"method": "list-diagnostics"}) + b"\n")
-        await writer.drain()
-        writer.write_eof()
-        data = await reader.readline()
-        diag = msjson.decode(data.rstrip(), type=Diagnostic)
-        assert diag.message == "boom"
-        writer.close()
-        await writer.wait_closed()
-    srv.close()
-    await srv.wait_closed()
+    try:
+        async with srv:
+            yield sock
+    finally:
+        srv.close()
+        await srv.wait_closed()
+
+
+@pytest.mark.anyio
+async def test_list_diagnostics(diagnostics_test_server: Path) -> None:
+    sock = diagnostics_test_server
+    reader, writer = await asyncio.open_unix_connection(str(sock))
+    writer.write(msjson.encode({"method": "list-diagnostics"}) + b"\n")
+    await writer.drain()
+    writer.write_eof()
+    data = await reader.readline()
+    diag = msjson.decode(data.rstrip(), type=Diagnostic)
+    assert diag.message == "boom"
+    writer.close()
+    await writer.wait_closed()
 
 
 def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -95,47 +109,24 @@ def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.anyio
-async def test_list_diagnostics_filtered(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    dispatcher = RPCDispatcher()
-
-    monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
-
-    @dispatcher.register("list-diagnostics")
-    async def handler(
-        severity: str | None = None,
-        files: list[str] | None = None,
-    ) -> typ.AsyncIterator[Diagnostic]:  # pragma: no cover - stub
-        tool = server.create_serena_tool("ListDiagnosticsTool")
-        for d in tool.list_diagnostics():
-            if severity and d.severity != severity:
-                continue
-            if files and d.location.file not in files:
-                continue
-            yield d
-
-    sock = tmp_path / "f.sock"
-    srv = await start_server(sock, dispatcher)
-    async with srv:
-        reader, writer = await asyncio.open_unix_connection(str(sock))
-        writer.write(
-            msjson.encode(
-                {
-                    "method": "list-diagnostics",
-                    "params": {"severity": "Warning", "files": ["foo.py"]},
-                }
-            )
-            + b"\n"
+async def test_list_diagnostics_filtered(diagnostics_test_server: Path) -> None:
+    sock = diagnostics_test_server
+    reader, writer = await asyncio.open_unix_connection(str(sock))
+    writer.write(
+        msjson.encode(
+            {
+                "method": "list-diagnostics",
+                "params": {"severity": "Warning", "files": ["foo.py"]},
+            }
         )
-        await writer.drain()
-        writer.write_eof()
-        data = await reader.readline()
-        assert data == b""  # no results
-        writer.close()
-        await writer.wait_closed()
-    srv.close()
-    await srv.wait_closed()
+        + b"\n",
+    )
+    await writer.drain()
+    writer.write_eof()
+    data = await reader.readline()
+    assert data == b""  # no results
+    writer.close()
+    await writer.wait_closed()
 
 
 @pytest.mark.anyio
