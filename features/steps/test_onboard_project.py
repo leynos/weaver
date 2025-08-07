@@ -10,7 +10,7 @@ from features.types import Context
 from weaver.cli import app
 from weaver_schemas.reports import OnboardingReport
 from weaverd.rpc import RPCDispatcher
-from weaverd.serena_tools import create_serena_tool
+from weaverd.serena_tools import SerenaTool, create_serena_tool
 
 scenarios("../onboard_project.feature")
 
@@ -22,7 +22,7 @@ def runtime_dir(runtime_dir: Context) -> Context:
         async def onboard() -> OnboardingReport:  # pragma: no cover - stub
             if os.environ.get("WEAVER_TEST_MISSING_SERENA"):
                 raise RuntimeError("serena-agent not found")
-            tool = create_serena_tool("OnboardingTool")
+            tool = create_serena_tool(SerenaTool.ONBOARDING)
             return OnboardingReport(details=tool.apply())
 
     runtime_dir["register"](setup)

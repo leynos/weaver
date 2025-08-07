@@ -21,7 +21,7 @@ from weaver_schemas.reports import OnboardingReport
 from weaver_schemas.status import ProjectStatus
 
 from .rpc import Handler, RPCDispatcher
-from .serena_tools import create_serena_tool
+from .serena_tools import SerenaTool, create_serena_tool
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ async def handle_project_status() -> ProjectStatus:
 @rpc_handler("onboard-project")
 async def handle_onboard_project() -> OnboardingReport:
     """Run the onboarding tool and return its report."""
-    tool = create_serena_tool("OnboardingTool")
+    tool = create_serena_tool(SerenaTool.ONBOARDING)
     try:
         details = await asyncio.to_thread(tool.apply)
     except Exception as exc:  # pragma: no cover - unexpected failures
@@ -175,7 +175,7 @@ async def handle_list_diagnostics(
     # Prepare filters for case- and path-insensitive comparison
     norm_severity, norm_files = _normalize_filters(severity, files)
 
-    tool = create_serena_tool("ListDiagnosticsTool")
+    tool = create_serena_tool(SerenaTool.LIST_DIAGNOSTICS)
     try:
         data = await asyncio.to_thread(tool.list_diagnostics)
     except RuntimeError as exc:
