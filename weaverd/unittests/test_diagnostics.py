@@ -31,85 +31,102 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
-@pytest.mark.anyio
-async def test_list_diagnostics(
+@pytest.fixture()
+async def diagnostics_test_server(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    dispatcher = RPCDispatcher()
+) -> typ.AsyncIterator[Path]:
+    """Start a diagnostics test server and yield its socket path.
 
-    monkeypatch.setattr(server, "create_diagnostics_tool", lambda: StubTool())
+    The server uses a stub Serena tool and exposes the ``list-diagnostics``
+    handler with filtering by severity and file. Consumers should close any
+    client connections they create; this fixture handles the server lifecycle.
+    """
+
+    dispatcher = RPCDispatcher()
+    monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
 
     @dispatcher.register("list-diagnostics")
     async def handler(
         severity: str | None = None,
         files: list[str] | None = None,
     ) -> typ.AsyncIterator[Diagnostic]:
-        tool = server.create_diagnostics_tool()
-        for d in tool.list_diagnostics():
-            if severity and d.severity != severity:
+        tool = server.create_serena_tool("ListDiagnosticsTool")
+        for diag in tool.list_diagnostics():
+            if severity and diag.severity != severity:
                 continue
-            if files and d.location.file not in files:
+            if files and diag.location.file not in files:
                 continue
-            yield d
+            yield diag
 
     sock = tmp_path / "d.sock"
     srv = await start_server(sock, dispatcher)
-    async with srv:
-        reader, writer = await asyncio.open_unix_connection(str(sock))
-        writer.write(msjson.encode({"method": "list-diagnostics"}) + b"\n")
-        await writer.drain()
-        writer.write_eof()
-        data = await reader.readline()
-        diag = msjson.decode(data.rstrip(), type=Diagnostic)
-        assert diag.message == "boom"
-        writer.close()
-        await writer.wait_closed()
-    srv.close()
-    await srv.wait_closed()
+    try:
+        async with srv:
+            yield sock
+    finally:
+        srv.close()
+        await srv.wait_closed()
 
 
 @pytest.mark.anyio
-async def test_list_diagnostics_filtered(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    dispatcher = RPCDispatcher()
+async def test_list_diagnostics(diagnostics_test_server: Path) -> None:
+    sock = diagnostics_test_server
+    reader, writer = await asyncio.open_unix_connection(str(sock))
+    writer.write(msjson.encode({"method": "list-diagnostics"}) + b"\n")
+    await writer.drain()
+    writer.write_eof()
+    data = await reader.readline()
+    diag = msjson.decode(data.rstrip(), type=Diagnostic)
+    assert diag.message == "boom"
+    writer.close()
+    await writer.wait_closed()
 
-    monkeypatch.setattr(server, "create_diagnostics_tool", lambda: StubTool())
 
-    @dispatcher.register("list-diagnostics")
-    async def handler(
-        severity: str | None = None,
-        files: list[str] | None = None,
-    ) -> typ.AsyncIterator[Diagnostic]:  # pragma: no cover - stub
-        tool = server.create_diagnostics_tool()
-        for d in tool.list_diagnostics():
-            if severity and d.severity != severity:
-                continue
-            if files and d.location.file not in files:
-                continue
-            yield d
+def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
+    """create_serena_tool should error for unknown tool attributes."""
 
-    sock = tmp_path / "f.sock"
-    srv = await start_server(sock, dispatcher)
-    async with srv:
-        reader, writer = await asyncio.open_unix_connection(str(sock))
-        writer.write(
-            msjson.encode(
-                {
-                    "method": "list-diagnostics",
-                    "params": {"severity": "Warning", "files": ["foo.py"]},
-                }
-            )
-            + b"\n"
+    from weaverd import serena_tools
+
+    class ToolsMod:  # pragma: no cover - simple stub
+        pass
+
+    class PromptMod:  # pragma: no cover - simple stub
+        class SerenaPromptFactory:  # pragma: no cover - simple stub
+            def __call__(self) -> None:  # pragma: no cover - simple stub
+                return None
+
+    def fake_import(name: str) -> typ.Any:  # pragma: no cover - simple stub
+        if name == "serena.tools.workflow_tools":
+            return ToolsMod()
+        if name == "serena.prompt_factory":
+            return PromptMod
+        raise ModuleNotFoundError
+
+    monkeypatch.setattr(serena_tools, "import_module", fake_import)
+
+    with pytest.raises(RuntimeError, match="NoSuchTool"):
+        serena_tools.create_serena_tool("NoSuchTool")
+
+
+@pytest.mark.anyio
+async def test_list_diagnostics_filtered(diagnostics_test_server: Path) -> None:
+    sock = diagnostics_test_server
+    reader, writer = await asyncio.open_unix_connection(str(sock))
+    writer.write(
+        msjson.encode(
+            {
+                "method": "list-diagnostics",
+                "params": {"severity": "Warning", "files": ["foo.py"]},
+            }
         )
-        await writer.drain()
-        writer.write_eof()
-        data = await reader.readline()
-        assert data == b""  # no results
-        writer.close()
-        await writer.wait_closed()
-    srv.close()
-    await srv.wait_closed()
+        + b"\n",
+    )
+    await writer.drain()
+    writer.write_eof()
+    data = await reader.readline()
+    assert data == b""  # no results
+    writer.close()
+    await writer.wait_closed()
 
 
 @pytest.mark.anyio
@@ -118,14 +135,14 @@ async def test_missing_diagnostics_dependency(
 ) -> None:
     dispatcher = RPCDispatcher()
 
-    def raise_error() -> StubTool:
+    def raise_error(_: str) -> StubTool:
         raise RuntimeError("serena-agent not found")
 
-    monkeypatch.setattr(server, "create_diagnostics_tool", raise_error)
+    monkeypatch.setattr(server, "create_serena_tool", raise_error)
 
     @dispatcher.register("list-diagnostics")
     async def handler() -> typ.AsyncIterator[Diagnostic]:  # pragma: no cover - stub
-        tool = server.create_diagnostics_tool()
+        tool = server.create_serena_tool("ListDiagnosticsTool")
         for d in tool.list_diagnostics():
             yield d
 
@@ -160,7 +177,7 @@ async def test_list_diagnostics_case_insensitive(
                 Diagnostic(location=loc, severity="Error", code="E1", message="boom")
             ]
 
-    monkeypatch.setattr(server, "create_diagnostics_tool", lambda: Tool())
+    monkeypatch.setattr(server, "create_serena_tool", lambda _: Tool())
 
     results = server.handle_list_diagnostics(severity="error", files=["foo.py"])
     diag = await builtins.anext(results)

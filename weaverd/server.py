@@ -21,15 +21,9 @@ from weaver_schemas.reports import OnboardingReport
 from weaver_schemas.status import ProjectStatus
 
 from .rpc import Handler, RPCDispatcher
+from .serena_tools import create_serena_tool
 
 logger = logging.getLogger(__name__)
-
-
-class _BareAgent:
-    """Minimal agent providing only the prompt factory."""
-
-    def __init__(self, prompt_factory) -> None:
-        self.prompt_factory = prompt_factory
 
 
 HANDLERS: list[tuple[str, Handler]] = []
@@ -45,41 +39,6 @@ def rpc_handler(name: str) -> typ.Callable[[Handler], Handler]:
         return func
 
     return decorator
-
-
-def _load_serena_tool(tool_attr: str):
-    """Return the requested Serena tool and prompt factory.
-
-    Raises:
-        RuntimeError: if the ``serena-agent`` package is missing or the tool
-            attribute cannot be imported.
-    """
-    try:
-        wf_tools = import_module("serena.tools.workflow_tools")
-        prompt_mod = import_module("serena.prompt_factory")
-    except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
-        msg = "serena-agent is required; install it via 'uv add serena-agent'."
-        raise RuntimeError(msg) from exc
-
-    tool_cls = getattr(wf_tools, tool_attr, None)
-    if tool_cls is None:  # pragma: no cover - optional dep
-        raise RuntimeError(f"{tool_attr} not found in serena")
-
-    return tool_cls, prompt_mod.SerenaPromptFactory
-
-
-def create_onboarding_tool():
-    """Return an instance of Serena's onboarding tool."""
-
-    tool_cls, prompt_factory = _load_serena_tool("OnboardingTool")
-    return tool_cls(_BareAgent(prompt_factory()))
-
-
-def create_diagnostics_tool():
-    """Return an instance of Serena's diagnostics tool."""
-
-    tool_cls, prompt_factory = _load_serena_tool("ListDiagnosticsTool")
-    return tool_cls(_BareAgent(prompt_factory()))
 
 
 def default_socket_path() -> Path:
@@ -158,8 +117,7 @@ async def handle_project_status() -> ProjectStatus:
 @rpc_handler("onboard-project")
 async def handle_onboard_project() -> OnboardingReport:
     """Run the onboarding tool and return its report."""
-
-    tool = create_onboarding_tool()
+    tool = create_serena_tool("OnboardingTool")
     try:
         details = await asyncio.to_thread(tool.apply)
     except Exception as exc:  # pragma: no cover - unexpected failures
@@ -217,7 +175,7 @@ async def handle_list_diagnostics(
     # Prepare filters for case- and path-insensitive comparison
     norm_severity, norm_files = _normalize_filters(severity, files)
 
-    tool = create_diagnostics_tool()
+    tool = create_serena_tool("ListDiagnosticsTool")
     try:
         data = await asyncio.to_thread(tool.list_diagnostics)
     except RuntimeError as exc:
