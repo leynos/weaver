@@ -37,14 +37,14 @@ async def test_list_diagnostics(
 ) -> None:
     dispatcher = RPCDispatcher()
 
-    monkeypatch.setattr(server, "create_diagnostics_tool", lambda: StubTool())
+    monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
 
     @dispatcher.register("list-diagnostics")
     async def handler(
         severity: str | None = None,
         files: list[str] | None = None,
     ) -> typ.AsyncIterator[Diagnostic]:
-        tool = server.create_diagnostics_tool()
+        tool = server.create_serena_tool("ListDiagnosticsTool")
         for d in tool.list_diagnostics():
             if severity and d.severity != severity:
                 continue
@@ -74,14 +74,14 @@ async def test_list_diagnostics_filtered(
 ) -> None:
     dispatcher = RPCDispatcher()
 
-    monkeypatch.setattr(server, "create_diagnostics_tool", lambda: StubTool())
+    monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
 
     @dispatcher.register("list-diagnostics")
     async def handler(
         severity: str | None = None,
         files: list[str] | None = None,
     ) -> typ.AsyncIterator[Diagnostic]:  # pragma: no cover - stub
-        tool = server.create_diagnostics_tool()
+        tool = server.create_serena_tool("ListDiagnosticsTool")
         for d in tool.list_diagnostics():
             if severity and d.severity != severity:
                 continue
@@ -118,14 +118,14 @@ async def test_missing_diagnostics_dependency(
 ) -> None:
     dispatcher = RPCDispatcher()
 
-    def raise_error() -> StubTool:
+    def raise_error(_: str) -> StubTool:
         raise RuntimeError("serena-agent not found")
 
-    monkeypatch.setattr(server, "create_diagnostics_tool", raise_error)
+    monkeypatch.setattr(server, "create_serena_tool", raise_error)
 
     @dispatcher.register("list-diagnostics")
     async def handler() -> typ.AsyncIterator[Diagnostic]:  # pragma: no cover - stub
-        tool = server.create_diagnostics_tool()
+        tool = server.create_serena_tool("ListDiagnosticsTool")
         for d in tool.list_diagnostics():
             yield d
 
@@ -160,7 +160,7 @@ async def test_list_diagnostics_case_insensitive(
                 Diagnostic(location=loc, severity="Error", code="E1", message="boom")
             ]
 
-    monkeypatch.setattr(server, "create_diagnostics_tool", lambda: Tool())
+    monkeypatch.setattr(server, "create_serena_tool", lambda _: Tool())
 
     results = server.handle_list_diagnostics(severity="error", files=["foo.py"])
     diag = await builtins.anext(results)

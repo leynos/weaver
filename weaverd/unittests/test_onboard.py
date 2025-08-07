@@ -11,7 +11,8 @@ import pytest
 
 from weaver_schemas.reports import OnboardingReport
 from weaverd.rpc import RPCDispatcher
-from weaverd.server import create_onboarding_tool, start_server
+from weaverd.serena_tools import create_serena_tool
+from weaverd.server import start_server
 
 
 @pytest.fixture()
@@ -25,7 +26,7 @@ async def test_onboard_project(tmp_path: Path) -> None:
 
     @dispatcher.register("onboard-project")
     async def onboard() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
-        tool = create_onboarding_tool()
+        tool = create_serena_tool("OnboardingTool")
         return OnboardingReport(details=tool.apply())
 
     sock = tmp_path / "o.sock"

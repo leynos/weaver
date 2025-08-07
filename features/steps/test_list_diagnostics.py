@@ -32,7 +32,7 @@ def runtime_dir(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Contex
                 )
             ]
 
-    monkeypatch.setattr(server, "create_diagnostics_tool", lambda: StubTool())
+    monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
 
     def setup(dispatcher: RPCDispatcher) -> None:
         @dispatcher.register("list-diagnostics")
@@ -40,7 +40,7 @@ def runtime_dir(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Contex
             severity: str | None = None,
             files: list[str] | None = None,
         ) -> typ.AsyncIterator[Diagnostic]:  # pragma: no cover - stub
-            tool = server.create_diagnostics_tool()
+            tool = server.create_serena_tool("ListDiagnosticsTool")
             for d in tool.list_diagnostics():
                 if severity and d.severity != severity:
                     continue
@@ -59,10 +59,10 @@ def daemon_running(context: Context) -> None:
 
 @given("serena-agent is missing")
 def missing_dep(monkeypatch: pytest.MonkeyPatch) -> None:
-    def raise_error() -> None:
+    def raise_error(_: str) -> None:
         raise RuntimeError("serena-agent not found")
 
-    monkeypatch.setattr(server, "create_diagnostics_tool", raise_error)
+    monkeypatch.setattr(server, "create_serena_tool", raise_error)
 
 
 @given("the server returns malformed output")
