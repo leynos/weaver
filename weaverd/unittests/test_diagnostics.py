@@ -68,6 +68,32 @@ async def test_list_diagnostics(
     await srv.wait_closed()
 
 
+def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
+    """create_serena_tool should error for unknown tool attributes."""
+
+    from weaverd import serena_tools
+
+    class ToolsMod:  # pragma: no cover - simple stub
+        pass
+
+    class PromptMod:  # pragma: no cover - simple stub
+        class SerenaPromptFactory:  # pragma: no cover - simple stub
+            def __call__(self) -> None:  # pragma: no cover - simple stub
+                return None
+
+    def fake_import(name: str) -> typ.Any:  # pragma: no cover - simple stub
+        if name == "serena.tools.workflow_tools":
+            return ToolsMod()
+        if name == "serena.prompt_factory":
+            return PromptMod
+        raise ModuleNotFoundError
+
+    monkeypatch.setattr(serena_tools, "import_module", fake_import)
+
+    with pytest.raises(RuntimeError, match="NoSuchTool"):
+        serena_tools.create_serena_tool("NoSuchTool")
+
+
 @pytest.mark.anyio
 async def test_list_diagnostics_filtered(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch

@@ -65,6 +65,14 @@ def missing_dep(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(server, "create_serena_tool", raise_error)
 
 
+@given("the tool attribute is unknown")
+def unknown_tool(context: Context, monkeypatch: pytest.MonkeyPatch) -> None:
+    def raise_error(_: str) -> None:
+        raise RuntimeError("NoSuchTool not found in serena")
+
+    monkeypatch.setattr(server, "create_serena_tool", raise_error)
+
+
 @given("the server returns malformed output")
 def server_malformed(context: Context) -> None:
     def setup(dispatcher: RPCDispatcher) -> None:
@@ -110,6 +118,14 @@ def check_not_ready(context: Context) -> None:
     assert result.exit_code == 1
     out = (result.stdout + result.stderr).lower()
     assert "serena" in out or "missing" in out
+
+
+@then("the tool attribute is reported missing")
+def check_unknown_tool(context: Context) -> None:
+    result = context["result"]
+    assert result.exit_code == 0
+    out = (result.stdout + result.stderr).lower()
+    assert "not found" in out or "unknown" in out
 
 
 @then("the output is malformed")

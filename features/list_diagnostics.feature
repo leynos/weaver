@@ -16,6 +16,12 @@ Feature: list diagnostics command
     When I invoke the list-diagnostics command
     Then the daemon is not ready
 
+  Scenario: unknown tool attribute
+    Given a temporary runtime dir
+    And the tool attribute is unknown
+    When I invoke the list-diagnostics command
+    Then the tool attribute is reported missing
+
   Scenario: malformed output
     Given a temporary runtime dir
     And the server returns malformed output
