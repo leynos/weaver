@@ -2,16 +2,25 @@
 
 from __future__ import annotations
 
+import dataclasses
 import enum
 import typing as typ
 from functools import cache
 from importlib import import_module
-from types import SimpleNamespace
 
 # pyright: reportMissingImports=false  # Serena optional dependency
 
+if typ.TYPE_CHECKING:  # pragma: no cover - import-time only
+    from types import ModuleType
 
-class SerenaTool(str, enum.Enum):
+    from serena.prompt_factory import SerenaPromptFactory
+else:  # pragma: no cover - import-time only
+
+    class SerenaPromptFactory(typ.Protocol):  # type: ignore[reportMissingTypeStubs]
+        """Typed placeholder used when Serena is not installed."""
+
+
+class SerenaTool(enum.StrEnum):
     """Supported Serena tools."""
 
     ONBOARDING = "OnboardingTool"
@@ -19,11 +28,15 @@ class SerenaTool(str, enum.Enum):
 
 
 @cache
-def _serena_modules() -> tuple[typ.Any, typ.Any]:
+def _serena_modules() -> tuple[ModuleType, type[SerenaPromptFactory]]:
     """Return workflow tools module and prompt factory."""
 
     try:
         wf_tools = import_module("serena.tools.workflow_tools")
+    except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
+        msg = "serena-agent is required; install it via 'uv add serena-agent'."
+        raise RuntimeError(msg) from exc
+    try:
         prompt_mod = import_module("serena.prompt_factory")
     except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
         msg = "serena-agent is required; install it via 'uv add serena-agent'."
@@ -31,7 +44,35 @@ def _serena_modules() -> tuple[typ.Any, typ.Any]:
     return wf_tools, prompt_mod.SerenaPromptFactory
 
 
-def create_serena_tool(tool_attr: SerenaTool | str) -> typ.Any:
+class SerenaToolProtocol(typ.Protocol):
+    """Expected interface for Serena tools."""
+
+    def run(self, *args: object, **kwargs: object) -> object: ...
+    def __getattr__(self, name: str) -> typ.Any: ...
+
+
+def _resolve_tool_name(tool_attr: SerenaTool | str) -> str:
+    """Normalise tool identifiers to workflow attribute names."""
+
+    if isinstance(tool_attr, SerenaTool):
+        return tool_attr.value
+    if isinstance(tool_attr, str):
+        try:
+            # Allow enum member names such as "ONBOARDING".
+            return SerenaTool[tool_attr].value
+        except KeyError:
+            return tool_attr
+    raise TypeError("tool_attr must be SerenaTool or str")
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _Agent:
+    """Minimal agent providing only the prompt factory."""
+
+    prompt_factory: SerenaPromptFactory
+
+
+def create_serena_tool(tool_attr: SerenaTool | str) -> SerenaToolProtocol:
     """Instantiate a Serena tool.
 
     Accepts:
@@ -45,16 +86,7 @@ def create_serena_tool(tool_attr: SerenaTool | str) -> typ.Any:
     """
 
     wf_tools, prompt_factory_cls = _serena_modules()
-    if isinstance(tool_attr, SerenaTool):
-        name = tool_attr.value
-    elif isinstance(tool_attr, str):
-        try:
-            # Allow enum member names such as "ONBOARDING".
-            name = SerenaTool[tool_attr].value
-        except KeyError:
-            name = tool_attr
-    else:
-        raise TypeError("tool_attr must be SerenaTool or str")
+    name = _resolve_tool_name(tool_attr)
 
     tool_cls = getattr(wf_tools, name, None)
     if tool_cls is None:  # pragma: no cover - optional dep
@@ -62,5 +94,5 @@ def create_serena_tool(tool_attr: SerenaTool | str) -> typ.Any:
     if not callable(tool_cls):  # pragma: no cover - defensive
         raise RuntimeError(f"serena.tools.workflow_tools.{name} is not callable")
 
-    agent = SimpleNamespace(prompt_factory=prompt_factory_cls())
-    return tool_cls(agent)
+    agent = _Agent(prompt_factory_cls())
+    return typ.cast("SerenaToolProtocol", tool_cls(agent))
