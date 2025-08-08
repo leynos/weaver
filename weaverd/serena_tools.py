@@ -32,13 +32,35 @@ def _serena_modules() -> tuple[typ.Any, typ.Any]:
 
 
 def create_serena_tool(tool_attr: SerenaTool | str) -> typ.Any:
-    """Instantiate a Serena tool given its attribute name."""
+    """Instantiate a Serena tool.
+
+    Accepts:
+      - ``SerenaTool`` enum member, e.g. ``SerenaTool.ONBOARDING``
+      - ``str``: either the enum member name (``"ONBOARDING"``) or the
+        ``serena.tools.workflow_tools`` attribute name (``"OnboardingTool"``).
+
+    Raises:
+      ``RuntimeError`` if the tool class is not found or not callable.
+      ``TypeError`` if ``tool_attr`` is neither ``SerenaTool`` nor ``str``.
+    """
 
     wf_tools, prompt_factory_cls = _serena_modules()
-    name = tool_attr.value if isinstance(tool_attr, SerenaTool) else tool_attr
+    if isinstance(tool_attr, SerenaTool):
+        name = tool_attr.value
+    elif isinstance(tool_attr, str):
+        try:
+            # Allow enum member names such as "ONBOARDING".
+            name = SerenaTool[tool_attr].value
+        except KeyError:
+            name = tool_attr
+    else:
+        raise TypeError("tool_attr must be SerenaTool or str")
+
     tool_cls = getattr(wf_tools, name, None)
     if tool_cls is None:  # pragma: no cover - optional dep
-        raise RuntimeError(f"{name} not found in serena")
+        raise RuntimeError(f"serena.tools.workflow_tools.{name} not found")
+    if not callable(tool_cls):  # pragma: no cover - defensive
+        raise RuntimeError(f"serena.tools.workflow_tools.{name} is not callable")
 
     agent = SimpleNamespace(prompt_factory=prompt_factory_cls())
     return tool_cls(agent)

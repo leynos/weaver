@@ -106,8 +106,8 @@ def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(serena_tools, "import_module", fake_import)
     serena_tools._serena_modules.cache_clear()
 
-    with pytest.raises(RuntimeError, match="NoSuchTool"):
-        serena_tools.create_serena_tool("NoSuchTool")
+    with pytest.raises(RuntimeError, match="workflow_tools.OnboardingTool"):
+        serena_tools.create_serena_tool(SerenaTool.ONBOARDING)
     serena_tools._serena_modules.cache_clear()
 
 
