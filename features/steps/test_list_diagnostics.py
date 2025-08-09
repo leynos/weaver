@@ -10,7 +10,7 @@ from weaver import client
 from weaver.cli import app
 from weaver_schemas.diagnostics import Diagnostic
 from weaver_schemas.primitives import Location, Position, Range
-from weaverd import server
+from weaverd import serena_tools, server
 from weaverd.rpc import RPCDispatcher
 from weaverd.serena_tools import SerenaTool
 
@@ -134,3 +134,33 @@ def check_malformed(context: Context) -> None:
     result = context["result"]
     assert result.exit_code == 0
     assert "malformed output" in result.stdout.lower()
+
+
+def test_create_serena_tool_string_enum_equivalence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """create_serena_tool accepts both enum and string names."""
+
+    class ToolsMod:  # pragma: no cover - simple stub
+        class ListDiagnosticsTool:  # pragma: no cover - simple stub
+            def __init__(self, _: typ.Any) -> None:  # pragma: no cover - stub
+                pass
+
+    class PromptMod:  # pragma: no cover - simple stub
+        class SerenaPromptFactory:  # pragma: no cover - simple stub
+            def __call__(self) -> None:  # pragma: no cover - stub
+                return None
+
+    def fake_import(name: str) -> typ.Any:  # pragma: no cover - simple stub
+        if name == "serena.tools.workflow_tools":
+            return ToolsMod
+        if name == "serena.prompt_factory":
+            return PromptMod
+        raise ModuleNotFoundError
+
+    monkeypatch.setattr(serena_tools, "import_module", fake_import)
+    serena_tools.clear_serena_imports()
+    tool_enum = server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS)
+    serena_tools.clear_serena_imports()
+    tool_str = server.create_serena_tool("LIST_DIAGNOSTICS")
+    assert type(tool_enum) is type(tool_str)

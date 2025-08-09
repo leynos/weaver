@@ -10,6 +10,7 @@ import msgspec.json as msjson
 import pytest
 
 from weaver_schemas.reports import OnboardingReport
+from weaverd import serena_tools
 from weaverd.rpc import RPCDispatcher
 from weaverd.serena_tools import SerenaTool, create_serena_tool
 from weaverd.server import start_server
@@ -81,3 +82,33 @@ async def test_onboard_failure(tmp_path: Path) -> None:
             await writer.wait_closed()
     server.close()
     await server.wait_closed()
+
+
+def test_create_serena_tool_with_invalid_tool_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """create_serena_tool should raise for unknown tools."""
+
+    class ToolsMod:  # pragma: no cover - simple stub
+        class OnboardingTool:  # pragma: no cover - simple stub
+            def __init__(self, _: typ.Any) -> None:  # pragma: no cover - stub
+                pass
+
+    class PromptMod:  # pragma: no cover - simple stub
+        class SerenaPromptFactory:  # pragma: no cover - simple stub
+            def __call__(self) -> None:  # pragma: no cover - stub
+                return None
+
+    def fake_import(name: str) -> typ.Any:  # pragma: no cover - simple stub
+        if name == "serena.tools.workflow_tools":
+            return ToolsMod
+        if name == "serena.prompt_factory":
+            return PromptMod
+        raise ModuleNotFoundError
+
+    monkeypatch.setattr(serena_tools, "import_module", fake_import)
+    serena_tools.clear_serena_imports()
+
+    with pytest.raises(RuntimeError, match="NonExistentTool"):
+        create_serena_tool("NonExistentTool")
+    serena_tools.clear_serena_imports()
