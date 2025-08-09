@@ -2,42 +2,97 @@
 
 from __future__ import annotations
 
+import dataclasses
+import enum
 import typing as typ
+from functools import cache
 from importlib import import_module
 
 # pyright: reportMissingImports=false  # Serena optional dependency
 
+if typ.TYPE_CHECKING:  # pragma: no cover - import-time only
+    from types import ModuleType
 
-class _BareAgent:
-    """Minimal agent providing only the prompt factory."""
+    from serena.prompt_factory import SerenaPromptFactory
+else:  # pragma: no cover - import-time only
 
-    def __init__(self, prompt_factory: typ.Any) -> None:
-        self.prompt_factory = prompt_factory
+    class SerenaPromptFactory(typ.Protocol):  # type: ignore[reportMissingTypeStubs]
+        """Typed placeholder used when Serena is not installed."""
 
 
-def _load_serena_tool(tool_attr: str) -> tuple[typ.Any, typ.Any]:
-    """Return the requested Serena tool class and prompt factory.
+class SerenaTool(enum.StrEnum):
+    """Supported Serena tools."""
 
-    Raises:
-        RuntimeError: if the ``serena-agent`` package is missing or the tool
-        attribute cannot be imported.
-    """
+    ONBOARDING = "OnboardingTool"
+    LIST_DIAGNOSTICS = "ListDiagnosticsTool"
+
+
+@cache
+def _serena_modules() -> tuple[ModuleType, type[SerenaPromptFactory]]:
+    """Return workflow tools module and prompt factory."""
+
     try:
         wf_tools = import_module("serena.tools.workflow_tools")
+    except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
+        msg = "serena-agent is required; install it via 'uv add serena-agent'."
+        raise RuntimeError(msg) from exc
+    try:
         prompt_mod = import_module("serena.prompt_factory")
     except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
         msg = "serena-agent is required; install it via 'uv add serena-agent'."
         raise RuntimeError(msg) from exc
+    return wf_tools, prompt_mod.SerenaPromptFactory
 
-    tool_cls = getattr(wf_tools, tool_attr, None)
+
+class SerenaToolProtocol(typ.Protocol):
+    """Expected interface for Serena tools."""
+
+    def run(self, *args: object, **kwargs: object) -> object: ...
+    def __getattr__(self, name: str) -> typ.Any: ...
+
+
+def _resolve_tool_name(tool_attr: SerenaTool | str) -> str:
+    """Normalise tool identifiers to workflow attribute names."""
+
+    if isinstance(tool_attr, SerenaTool):
+        return tool_attr.value
+    if isinstance(tool_attr, str):
+        try:
+            # Allow enum member names such as "ONBOARDING".
+            return SerenaTool[tool_attr].value
+        except KeyError:
+            return tool_attr
+    raise TypeError("tool_attr must be SerenaTool or str")
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _Agent:
+    """Minimal agent providing only the prompt factory."""
+
+    prompt_factory: SerenaPromptFactory
+
+
+def create_serena_tool(tool_attr: SerenaTool | str) -> SerenaToolProtocol:
+    """Instantiate a Serena tool.
+
+    Accepts:
+      - ``SerenaTool`` enum member, e.g. ``SerenaTool.ONBOARDING``
+      - ``str``: either the enum member name (``"ONBOARDING"``) or the
+        ``serena.tools.workflow_tools`` attribute name (``"OnboardingTool"``).
+
+    Raises:
+      ``RuntimeError`` if the tool class is not found or not callable.
+      ``TypeError`` if ``tool_attr`` is neither ``SerenaTool`` nor ``str``.
+    """
+
+    wf_tools, prompt_factory_cls = _serena_modules()
+    name = _resolve_tool_name(tool_attr)
+
+    tool_cls = getattr(wf_tools, name, None)
     if tool_cls is None:  # pragma: no cover - optional dep
-        raise RuntimeError(f"{tool_attr} not found in serena")
+        raise RuntimeError(f"serena.tools.workflow_tools.{name} not found")
+    if not callable(tool_cls):  # pragma: no cover - defensive
+        raise RuntimeError(f"serena.tools.workflow_tools.{name} is not callable")
 
-    return tool_cls, prompt_mod.SerenaPromptFactory
-
-
-def create_serena_tool(tool_attr: str) -> typ.Any:
-    """Instantiate a Serena tool given its attribute name."""
-
-    tool_cls, prompt_factory = _load_serena_tool(tool_attr)
-    return tool_cls(_BareAgent(prompt_factory()))
+    agent = _Agent(prompt_factory_cls())
+    return typ.cast("SerenaToolProtocol", tool_cls(agent))

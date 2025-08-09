@@ -12,6 +12,7 @@ from weaver_schemas.error import SchemaError
 from weaver_schemas.primitives import Location, Position, Range
 from weaverd import server
 from weaverd.rpc import RPCDispatcher
+from weaverd.serena_tools import SerenaTool
 from weaverd.server import start_server
 
 if typ.TYPE_CHECKING:
@@ -50,7 +51,7 @@ async def diagnostics_test_server(
         severity: str | None = None,
         files: list[str] | None = None,
     ) -> typ.AsyncIterator[Diagnostic]:
-        tool = server.create_serena_tool("ListDiagnosticsTool")
+        tool = server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS)
         for diag in tool.list_diagnostics():
             if severity and diag.severity != severity:
                 continue
@@ -103,9 +104,11 @@ def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
         raise ModuleNotFoundError
 
     monkeypatch.setattr(serena_tools, "import_module", fake_import)
+    serena_tools._serena_modules.cache_clear()
 
-    with pytest.raises(RuntimeError, match="NoSuchTool"):
-        serena_tools.create_serena_tool("NoSuchTool")
+    with pytest.raises(RuntimeError, match="workflow_tools.OnboardingTool"):
+        serena_tools.create_serena_tool(SerenaTool.ONBOARDING)
+    serena_tools._serena_modules.cache_clear()
 
 
 @pytest.mark.anyio
@@ -135,14 +138,14 @@ async def test_missing_diagnostics_dependency(
 ) -> None:
     dispatcher = RPCDispatcher()
 
-    def raise_error(_: str) -> StubTool:
+    def raise_error(_: SerenaTool) -> StubTool:
         raise RuntimeError("serena-agent not found")
 
     monkeypatch.setattr(server, "create_serena_tool", raise_error)
 
     @dispatcher.register("list-diagnostics")
     async def handler() -> typ.AsyncIterator[Diagnostic]:  # pragma: no cover - stub
-        tool = server.create_serena_tool("ListDiagnosticsTool")
+        tool = server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS)
         for d in tool.list_diagnostics():
             yield d
 
