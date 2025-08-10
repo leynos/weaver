@@ -30,6 +30,9 @@ def clear_serena_imports() -> None:
     Tests use this helper to force ``import_module`` to attempt a fresh import.
     The standard ``sys.modules`` cache is cleared for the Serena modules used by
     :func:`create_serena_tool`.
+
+    This helper mutates ``sys.modules`` without any locking and is therefore
+    not thread-safe. It is intended for single-threaded test contexts only.
     """
 
     for name in ("serena.tools.workflow_tools", "serena.prompt_factory"):
@@ -51,25 +54,8 @@ def create_serena_tool(tool_attr: SerenaTool | str) -> typ.Any:
       ``TypeError`` if ``tool_attr`` is neither ``SerenaTool`` nor ``str``.
     """
 
-    try:
-        wf_tools = import_module("serena.tools.workflow_tools")
-        prompt_mod = import_module("serena.prompt_factory")
-    except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
-        msg = "serena-agent is required; install it via 'uv add serena-agent'."
-        raise RuntimeError(msg) from exc
-
-    if isinstance(tool_attr, SerenaTool):
-        name = tool_attr.value
-    elif isinstance(tool_attr, str):
-        upper = tool_attr.upper()
-        if upper in SerenaTool.__members__:
-            name = SerenaTool[upper].value
-        elif tool_attr in {t.value for t in SerenaTool}:
-            name = tool_attr
-        else:
-            raise RuntimeError(f"Unknown Serena tool '{tool_attr}'")
-    else:
-        raise TypeError("tool_attr must be SerenaTool or str")
+    wf_tools, prompt_mod = _load_serena_modules()
+    name = _resolve_tool_name(tool_attr)
 
     tool_cls = getattr(wf_tools, name, None)
     if tool_cls is None:
@@ -77,7 +63,38 @@ def create_serena_tool(tool_attr: SerenaTool | str) -> typ.Any:
     if not callable(tool_cls):
         raise RuntimeError(f"serena.tools.workflow_tools.{name} is not callable")
 
+    # Assumption: SerenaPromptFactory can be instantiated without arguments.
     return tool_cls(_BareAgent(prompt_mod.SerenaPromptFactory()))
+
+
+def _resolve_tool_name(tool_attr: SerenaTool | str) -> str:
+    """Resolve ``tool_attr`` to the actual workflow tool class name."""
+
+    if isinstance(tool_attr, SerenaTool):
+        return tool_attr.value
+
+    if not isinstance(tool_attr, str):
+        raise TypeError("tool_attr must be SerenaTool or str")
+
+    upper = tool_attr.upper()
+    if upper in SerenaTool.__members__:
+        return SerenaTool[upper].value
+    if tool_attr in {t.value for t in SerenaTool}:
+        return tool_attr
+    raise RuntimeError(f"Unknown Serena tool '{tool_attr}'")
+
+
+def _load_serena_modules() -> tuple[typ.Any, typ.Any]:
+    """Load the Serena workflow tools and prompt factory modules."""
+
+    try:
+        wf_tools = import_module("serena.tools.workflow_tools")
+        prompt_mod = import_module("serena.prompt_factory")
+    except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
+        msg = "serena-agent is required; install it via 'uv add serena-agent'."
+        raise RuntimeError(msg) from exc
+
+    return wf_tools, prompt_mod
 
 
 class _BareAgent:
