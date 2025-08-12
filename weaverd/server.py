@@ -17,6 +17,7 @@ import msgspec.json as msjson
 
 from weaver_schemas.diagnostics import Diagnostic
 from weaver_schemas.error import SchemaError
+from weaver_schemas.references import Symbol
 from weaver_schemas.reports import OnboardingReport
 from weaver_schemas.status import ProjectStatus
 
@@ -187,6 +188,23 @@ async def handle_list_diagnostics(
             norm_severity, norm_files, diag_severity, diag_file
         ):
             yield diag
+
+
+@rpc_handler("get-definition")
+async def handle_get_definition(
+    file: str, line: int, char: int
+) -> typ.AsyncIterator[Symbol]:
+    """Yield symbol definitions for the given position."""
+
+    tool = create_serena_tool(SerenaTool.GET_DEFINITION)
+    try:
+        data = await asyncio.to_thread(
+            tool.get_definition, file=file, line=line, char=char
+        )
+    except RuntimeError as exc:
+        raise RuntimeError(f"Definition lookup failed: {exc}") from exc
+    for item in data:
+        yield ms.convert(item, Symbol)
 
 
 async def main(socket_path: Path | None = None) -> None:

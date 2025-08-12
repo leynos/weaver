@@ -1,4 +1,5 @@
 import pathlib
+import typing as typ
 
 import pytest
 import typer
@@ -57,14 +58,24 @@ def test_run_rpc_reports_error(
 
 
 @pytest.mark.parametrize(
-    ("cli_command", "rpc_method"),
+    ("cli_command", "rpc_method", "args", "params"),
     [
-        ("project-status", "project-status"),
-        ("onboard-project", "onboard-project"),
+        ("project-status", "project-status", [], None),
+        ("onboard-project", "onboard-project", [], None),
+        (
+            "get-definition",
+            "get-definition",
+            ["foo.py", "1", "2"],
+            {"file": "foo.py", "line": 1, "char": 2},
+        ),
     ],
 )
 def test_cli_commands_use_run_rpc(
-    cli_command: str, rpc_method: str, monkeypatch: pytest.MonkeyPatch
+    cli_command: str,
+    rpc_method: str,
+    args: list[str],
+    params: dict[str, typ.Any] | None,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """CLI commands use _run_rpc to contact the daemon."""
     called: dict[str, object] = {}
@@ -76,13 +87,13 @@ def test_cli_commands_use_run_rpc(
     monkeypatch.setattr(cli.anyio, "run", fake_run)
 
     runner = CliRunner()
-    result = runner.invoke(cli.app, [cli_command])
+    result = runner.invoke(cli.app, [cli_command, *args])
 
     assert result.exit_code == 0
     assert called == {
         "func": cli.rpc_call,
         "method": rpc_method,
-        "params": None,
+        "params": params,
     }
 
 

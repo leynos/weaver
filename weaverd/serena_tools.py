@@ -31,6 +31,7 @@ class SerenaTool(enum.StrEnum):
 
     ONBOARDING = "OnboardingTool"
     LIST_DIAGNOSTICS = "ListDiagnosticsTool"
+    GET_DEFINITION = "GetDefinitionTool"
 
 
 _VALID_TOOL_MEMBER_NAMES = frozenset(SerenaTool.__members__.keys())
