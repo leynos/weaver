@@ -98,7 +98,7 @@ def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
 
     def fake_import(name: str) -> typ.Any:  # pragma: no cover - simple stub
         if name == "serena.tools.workflow_tools":
-            return ToolsMod()
+            return ToolsMod
         if name == "serena.prompt_factory":
             return PromptMod
         raise ModuleNotFoundError

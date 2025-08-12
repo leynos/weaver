@@ -5,11 +5,14 @@ from __future__ import annotations
 import enum
 import sys
 import typing as typ
-from importlib import import_module
+from contextlib import suppress
+from importlib import import_module, invalidate_caches
 
 # pyright: reportMissingImports=false  # Serena optional dependency
 
 if typ.TYPE_CHECKING:  # pragma: no cover - import-time only
+    from types import ModuleType
+
     from serena.prompt_factory import SerenaPromptFactory
 else:  # pragma: no cover - import-time only
 
@@ -35,6 +38,9 @@ def clear_serena_imports() -> None:
     not thread-safe. It is intended for single-threaded test contexts only.
     """
 
+    # Optional: ensure import finders don't use stale filesystem caches.
+    with suppress(Exception):  # pragma: no cover - best effort
+        invalidate_caches()
     for name in ("serena.tools.workflow_tools", "serena.prompt_factory"):
         sys.modules.pop(name, None)
 
@@ -64,7 +70,14 @@ def create_serena_tool(tool_attr: SerenaTool | str) -> typ.Any:
         raise RuntimeError(f"serena.tools.workflow_tools.{name} is not callable")
 
     # Assumption: SerenaPromptFactory can be instantiated without arguments.
-    return tool_cls(_BareAgent(prompt_mod.SerenaPromptFactory()))
+    try:
+        prompt_factory_cls = typ.cast(typ.Any, prompt_mod).SerenaPromptFactory  # noqa: TC006
+        agent = _BareAgent(prompt_factory_cls())
+        return tool_cls(agent)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to instantiate serena.tools.workflow_tools.{name}: {exc}"
+        ) from exc
 
 
 def _resolve_tool_name(tool_attr: SerenaTool | str) -> str:
@@ -81,10 +94,13 @@ def _resolve_tool_name(tool_attr: SerenaTool | str) -> str:
         return SerenaTool[upper].value
     if tool_attr in {t.value for t in SerenaTool}:
         return tool_attr
-    raise RuntimeError(f"Unknown Serena tool '{tool_attr}'")
+    valid = sorted(list(SerenaTool.__members__) + [t.value for t in SerenaTool])
+    raise RuntimeError(
+        f"Unknown Serena tool '{tool_attr}'. Expected one of: {', '.join(valid)}"
+    )
 
 
-def _load_serena_modules() -> tuple[typ.Any, typ.Any]:
+def _load_serena_modules() -> tuple[ModuleType, ModuleType]:
     """Load the Serena workflow tools and prompt factory modules."""
 
     try:
@@ -100,5 +116,10 @@ def _load_serena_modules() -> tuple[typ.Any, typ.Any]:
 class _BareAgent:
     """Minimal agent providing only the prompt factory."""
 
+    __slots__ = ("prompt_factory",)
+
     def __init__(self, prompt_factory: typ.Any) -> None:
         self.prompt_factory = prompt_factory
+
+    def __repr__(self) -> str:  # pragma: no cover - debug helper
+        return f"_BareAgent(prompt_factory={type(self.prompt_factory).__name__})"

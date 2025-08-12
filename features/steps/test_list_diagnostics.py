@@ -164,3 +164,6 @@ def test_create_serena_tool_string_enum_equivalence(
     serena_tools.clear_serena_imports()
     tool_str = server.create_serena_tool("LIST_DIAGNOSTICS")
     assert type(tool_enum) is type(tool_str)
+    serena_tools.clear_serena_imports()
+    tool_attr = server.create_serena_tool("ListDiagnosticsTool")
+    assert type(tool_enum) is type(tool_attr)
