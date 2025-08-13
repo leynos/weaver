@@ -27,6 +27,10 @@ class SerenaTool(enum.StrEnum):
     LIST_DIAGNOSTICS = "ListDiagnosticsTool"
 
 
+_VALID_TOOL_MEMBER_NAMES = frozenset(SerenaTool.__members__.keys())
+_VALID_TOOL_VALUES = frozenset(t.value for t in SerenaTool)
+
+
 def clear_serena_imports() -> None:
     """Remove cached Serena modules.
 
@@ -41,7 +45,12 @@ def clear_serena_imports() -> None:
     # Optional: ensure import finders don't use stale filesystem caches.
     with suppress(Exception):  # pragma: no cover - best effort
         invalidate_caches()
-    for name in ("serena.tools.workflow_tools", "serena.prompt_factory"):
+    for name in (
+        "serena.tools.workflow_tools",
+        "serena.prompt_factory",
+        "serena.tools",
+        "serena",
+    ):
         sys.modules.pop(name, None)
 
 
@@ -96,11 +105,11 @@ def _resolve_string_tool_name(tool_name: str) -> str:
     """Resolve ``tool_name`` to the actual workflow tool class name."""
 
     upper = tool_name.upper()
-    if upper in SerenaTool.__members__:
+    if upper in _VALID_TOOL_MEMBER_NAMES:
         return SerenaTool[upper].value
-    if tool_name in {t.value for t in SerenaTool}:
+    if tool_name in _VALID_TOOL_VALUES:
         return tool_name
-    valid = sorted(list(SerenaTool.__members__) + [t.value for t in SerenaTool])
+    valid = sorted({*_VALID_TOOL_MEMBER_NAMES, *_VALID_TOOL_VALUES})
     raise RuntimeError(
         f"Unknown Serena tool '{tool_name}'. Expected one of: {', '.join(valid)}"
     )
