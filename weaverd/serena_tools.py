@@ -89,14 +89,20 @@ def _resolve_tool_name(tool_attr: SerenaTool | str) -> str:
     if not isinstance(tool_attr, str):
         raise TypeError("tool_attr must be SerenaTool or str")
 
-    upper = tool_attr.upper()
+    return _resolve_string_tool_name(tool_attr)
+
+
+def _resolve_string_tool_name(tool_name: str) -> str:
+    """Resolve ``tool_name`` to the actual workflow tool class name."""
+
+    upper = tool_name.upper()
     if upper in SerenaTool.__members__:
         return SerenaTool[upper].value
-    if tool_attr in {t.value for t in SerenaTool}:
-        return tool_attr
+    if tool_name in {t.value for t in SerenaTool}:
+        return tool_name
     valid = sorted(list(SerenaTool.__members__) + [t.value for t in SerenaTool])
     raise RuntimeError(
-        f"Unknown Serena tool '{tool_attr}'. Expected one of: {', '.join(valid)}"
+        f"Unknown Serena tool '{tool_name}'. Expected one of: {', '.join(valid)}"
     )
 
 
