@@ -17,50 +17,54 @@ from weaverd.serena_tools import SerenaTool
 scenarios("../get_definition.feature")
 
 
+def _create_runtime_fixture(
+    get_definition_impl: cabc.Callable[[str, int, int], list[Symbol]],
+) -> cabc.Callable[[Context, pytest.MonkeyPatch], Context]:
+    """Return a fixture that configures a stubbed get-definition tool."""
+
+    def _fixture(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Context:
+        class StubTool:
+            def get_definition(
+                self, *, file: str, line: int, char: int
+            ) -> list[Symbol]:
+                return get_definition_impl(file, line, char)
+
+        monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
+
+        def setup(dispatcher: RPCDispatcher) -> None:
+            @dispatcher.register("get-definition")
+            async def handler(
+                file: str, line: int, char: int
+            ) -> cabc.AsyncIterator[Symbol]:  # pragma: no cover - stub
+                tool = server.create_serena_tool(SerenaTool.GET_DEFINITION)
+                for sym in tool.get_definition(file=file, line=line, char=char):
+                    yield sym
+
+        runtime_dir["register"](setup)
+        return runtime_dir
+
+    return _fixture
+
+
+def _return_foo_symbol(file: str, line: int, char: int) -> list[Symbol]:
+    loc = Location(
+        file=file, range=Range(start=Position(line, char), end=Position(line, char + 1))
+    )
+    return [Symbol(name="foo", kind="function", location=loc)]
+
+
+def _return_no_symbols(file: str, line: int, char: int) -> list[Symbol]:
+    return []
+
+
 @given("a temporary runtime dir", target_fixture="context")
 def runtime_dir(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Context:
-    class StubTool:
-        def get_definition(self, *, file: str, line: int, char: int) -> list[Symbol]:
-            loc = Location(
-                file=file,
-                range=Range(start=Position(line, char), end=Position(line, char + 1)),
-            )
-            return [Symbol(name="foo", kind="function", location=loc)]
-
-    monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
-
-    def setup(dispatcher: RPCDispatcher) -> None:
-        @dispatcher.register("get-definition")
-        async def handler(
-            file: str, line: int, char: int
-        ) -> cabc.AsyncIterator[Symbol]:  # pragma: no cover - stub
-            tool = server.create_serena_tool(SerenaTool.GET_DEFINITION)
-            for sym in tool.get_definition(file=file, line=line, char=char):
-                yield sym
-
-    runtime_dir["register"](setup)
-    return runtime_dir
+    return _create_runtime_fixture(_return_foo_symbol)(runtime_dir, monkeypatch)
 
 
 @given("a temporary runtime dir with no symbols", target_fixture="context")
 def runtime_dir_empty(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Context:
-    class StubTool:
-        def get_definition(self, *, file: str, line: int, char: int) -> list[Symbol]:
-            return []
-
-    monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
-
-    def setup(dispatcher: RPCDispatcher) -> None:
-        @dispatcher.register("get-definition")
-        async def handler(
-            file: str, line: int, char: int
-        ) -> cabc.AsyncIterator[Symbol]:  # pragma: no cover - stub
-            tool = server.create_serena_tool(SerenaTool.GET_DEFINITION)
-            for sym in tool.get_definition(file=file, line=line, char=char):
-                yield sym
-
-    runtime_dir["register"](setup)
-    return runtime_dir
+    return _create_runtime_fixture(_return_no_symbols)(runtime_dir, monkeypatch)
 
 
 @given("serena-agent is missing")
@@ -72,13 +76,15 @@ def missing_dep(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @when("I invoke the get-definition command")
-def invoke(context: Context) -> None:
-    file = Path("foo.py")
+def invoke(context: Context, tmp_path: Path) -> None:
+    file = tmp_path / "foo.py"
     file.write_text("pass")
     runner = CliRunner()
-    result = runner.invoke(app, ["get-definition", "foo.py", "1", "0"])
-    context["result"] = result
-    file.unlink(missing_ok=True)
+    try:
+        result = runner.invoke(app, ["get-definition", str(file), "1", "0"])
+        context["result"] = result
+    finally:
+        file.unlink(missing_ok=True)
 
 
 @when("I invoke the get-definition command with a missing file")
