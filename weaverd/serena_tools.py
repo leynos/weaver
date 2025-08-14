@@ -60,6 +60,43 @@ def clear_serena_imports() -> None:
         sys.modules.pop(name, None)
 
 
+def _validate_and_get_tool_class(wf_tools: ModuleType, name: str) -> typ.Any:
+    """Return the workflow tool class, ensuring it exists and is callable."""
+
+    tool_cls = getattr(wf_tools, name, None)
+    if tool_cls is None:
+        raise RuntimeError(f"serena.tools.workflow_tools.{name} not found")
+    if not callable(tool_cls):
+        raise RuntimeError(f"serena.tools.workflow_tools.{name} is not callable")
+    return tool_cls
+
+
+def _create_agent_with_prompt_factory(prompt_mod: ModuleType) -> _BareAgent:
+    """Create an agent using ``SerenaPromptFactory`` from ``prompt_mod``."""
+
+    # Assumption: SerenaPromptFactory can be instantiated without arguments.
+    prompt_factory_attr = getattr(prompt_mod, "SerenaPromptFactory", None)
+    if not isinstance(prompt_factory_attr, type):
+        raise RuntimeError(
+            "serena.prompt_factory.SerenaPromptFactory not found or not a type",
+        )
+    prompt_factory_cls = typ.cast("type[SerenaPromptFactory]", prompt_factory_attr)
+    return _BareAgent(prompt_factory_cls())
+
+
+def _instantiate_tool(
+    tool_cls: typ.Any, agent: _BareAgent, name: str
+) -> SerenaToolInstance:
+    """Instantiate ``tool_cls`` with ``agent`` and wrap errors."""
+
+    try:
+        return tool_cls(agent)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to instantiate serena.tools.workflow_tools.{name}: {exc}",
+        ) from exc
+
+
 def create_serena_tool(tool_attr: SerenaTool | str) -> SerenaToolInstance:
     """Instantiate a Serena tool.
 
@@ -85,27 +122,12 @@ def create_serena_tool(tool_attr: SerenaTool | str) -> SerenaToolInstance:
 
     wf_tools, prompt_mod = _load_serena_modules()
     name = _resolve_tool_name(tool_attr)
-
-    tool_cls = getattr(wf_tools, name, None)
-    if tool_cls is None:
-        raise RuntimeError(f"serena.tools.workflow_tools.{name} not found")
-    if not callable(tool_cls):
-        raise RuntimeError(f"serena.tools.workflow_tools.{name} is not callable")
-
-    # Assumption: SerenaPromptFactory can be instantiated without arguments.
-    try:
-        prompt_factory_attr = getattr(prompt_mod, "SerenaPromptFactory", None)
-        if not isinstance(prompt_factory_attr, type):
-            raise RuntimeError(
-                "serena.prompt_factory.SerenaPromptFactory not found or not a type"
-            )
-        prompt_factory_cls = typ.cast("type[SerenaPromptFactory]", prompt_factory_attr)
-        agent = _BareAgent(prompt_factory_cls())
-        return tool_cls(agent)
-    except Exception as exc:
-        raise RuntimeError(
-            f"Failed to instantiate serena.tools.workflow_tools.{name}: {exc}"
-        ) from exc
+    tool_cls = _validate_and_get_tool_class(wf_tools, name)
+    return _instantiate_tool(
+        tool_cls,
+        _create_agent_with_prompt_factory(prompt_mod),
+        name,
+    )
 
 
 def _resolve_tool_name(tool_attr: SerenaTool | str) -> str:
@@ -134,23 +156,23 @@ def _resolve_string_tool_name(tool_name: str) -> str:
     )
 
 
-def _load_serena_modules() -> tuple[ModuleType, ModuleType]:
-    """Load the Serena workflow tools and prompt factory modules."""
+def _import_serena_module(module_name: str) -> ModuleType:
+    """Import a Serena module with consistent error handling."""
 
     msg = "serena-agent is required; install it via 'uv add serena-agent'."
     try:
-        wf_tools = import_module("serena.tools.workflow_tools")
-    except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
-        if getattr(exc, "name", "") and str(exc.name).startswith("serena"):
-            raise RuntimeError(msg) from exc
-        raise
-    try:
-        prompt_mod = import_module("serena.prompt_factory")
+        return import_module(module_name)
     except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
         if getattr(exc, "name", "") and str(exc.name).startswith("serena"):
             raise RuntimeError(msg) from exc
         raise
 
+
+def _load_serena_modules() -> tuple[ModuleType, ModuleType]:
+    """Load the Serena workflow tools and prompt factory modules."""
+
+    wf_tools = _import_serena_module("serena.tools.workflow_tools")
+    prompt_mod = _import_serena_module("serena.prompt_factory")
     return wf_tools, prompt_mod
 
 
