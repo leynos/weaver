@@ -1,5 +1,6 @@
 import json
 import os
+import typing as typ
 from pathlib import Path
 
 import msgspec as ms
@@ -22,7 +23,7 @@ def runtime_dir(runtime_dir: Context) -> Context:
         async def onboard() -> OnboardingReport:  # pragma: no cover - stub
             if os.environ.get("WEAVER_TEST_MISSING_SERENA"):
                 raise RuntimeError("serena-agent not found")
-            tool = create_serena_tool(SerenaTool.ONBOARDING)
+            tool = typ.cast(typ.Any, create_serena_tool(SerenaTool.ONBOARDING))  # noqa: TC006
             return OnboardingReport(details=tool.apply())
 
     runtime_dir["register"](setup)

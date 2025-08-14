@@ -41,7 +41,10 @@ def runtime_dir(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Contex
             severity: str | None = None,
             files: list[str] | None = None,
         ) -> typ.AsyncIterator[Diagnostic]:  # pragma: no cover - stub
-            tool = server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS)
+            tool = typ.cast(
+                typ.Any,  # noqa: TC006
+                server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS),
+            )
             for d in tool.list_diagnostics():
                 if severity and d.severity != severity:
                     continue

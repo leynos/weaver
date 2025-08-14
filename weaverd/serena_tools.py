@@ -20,6 +20,12 @@ else:  # pragma: no cover - import-time only
         """Typed placeholder used when Serena is not installed."""
 
 
+# Opaque tool instance returned by Serena; interface comes from serena-agent.
+# We expose it as ``object`` to avoid ``Any`` in the public API while keeping it
+# flexible.
+SerenaToolInstance: typ.TypeAlias = object
+
+
 class SerenaTool(enum.StrEnum):
     """Supported Serena tools."""
 
@@ -54,19 +60,27 @@ def clear_serena_imports() -> None:
         sys.modules.pop(name, None)
 
 
-def create_serena_tool(tool_attr: SerenaTool | str) -> typ.Any:
-    """Instantiate a Serena tool from its enum member or raw attribute name.
+def create_serena_tool(tool_attr: SerenaTool | str) -> SerenaToolInstance:
+    """Instantiate a Serena tool.
 
-    Accepts:
-      - ``SerenaTool`` enum member, e.g. ``SerenaTool.ONBOARDING``
-      - ``str``: either the enum member name (case-insensitive, ``"ONBOARDING"``)
-        or the ``serena.tools.workflow_tools`` attribute name
-        (``"OnboardingTool"``).
+    Parameters
+    ----------
+    tool_attr:
+        ``SerenaTool`` enum member or string. Enum member names are
+        case-insensitive; raw class names are also accepted.
 
-    Raises:
-      ``RuntimeError`` if the tool class is not found or not callable.
-      ``RuntimeError`` if ``tool_attr`` is an unknown string.
-      ``TypeError`` if ``tool_attr`` is neither ``SerenaTool`` nor ``str``.
+    Returns
+    -------
+    SerenaToolInstance
+        Instantiated Serena tool.
+
+    Raises
+    ------
+    RuntimeError
+        If the tool class is not found, not callable or ``tool_attr`` is an
+        unknown string.
+    TypeError
+        If ``tool_attr`` is neither ``SerenaTool`` nor ``str``.
     """
 
     wf_tools, prompt_mod = _load_serena_modules()
@@ -80,7 +94,12 @@ def create_serena_tool(tool_attr: SerenaTool | str) -> typ.Any:
 
     # Assumption: SerenaPromptFactory can be instantiated without arguments.
     try:
-        prompt_factory_cls = typ.cast(typ.Any, prompt_mod).SerenaPromptFactory  # noqa: TC006
+        prompt_factory_attr = getattr(prompt_mod, "SerenaPromptFactory", None)
+        if not isinstance(prompt_factory_attr, type):
+            raise RuntimeError(
+                "serena.prompt_factory.SerenaPromptFactory not found or not a type"
+            )
+        prompt_factory_cls = typ.cast("type[SerenaPromptFactory]", prompt_factory_attr)
         agent = _BareAgent(prompt_factory_cls())
         return tool_cls(agent)
     except Exception as exc:
@@ -118,12 +137,19 @@ def _resolve_string_tool_name(tool_name: str) -> str:
 def _load_serena_modules() -> tuple[ModuleType, ModuleType]:
     """Load the Serena workflow tools and prompt factory modules."""
 
+    msg = "serena-agent is required; install it via 'uv add serena-agent'."
     try:
         wf_tools = import_module("serena.tools.workflow_tools")
+    except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
+        if getattr(exc, "name", "") and str(exc.name).startswith("serena"):
+            raise RuntimeError(msg) from exc
+        raise
+    try:
         prompt_mod = import_module("serena.prompt_factory")
     except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
-        msg = "serena-agent is required; install it via 'uv add serena-agent'."
-        raise RuntimeError(msg) from exc
+        if getattr(exc, "name", "") and str(exc.name).startswith("serena"):
+            raise RuntimeError(msg) from exc
+        raise
 
     return wf_tools, prompt_mod
 
@@ -133,7 +159,7 @@ class _BareAgent:
 
     __slots__ = ("prompt_factory",)
 
-    def __init__(self, prompt_factory: typ.Any) -> None:
+    def __init__(self, prompt_factory: SerenaPromptFactory) -> None:
         self.prompt_factory = prompt_factory
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper

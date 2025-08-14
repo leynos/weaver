@@ -26,7 +26,7 @@ async def test_onboard_project(tmp_path: Path) -> None:
 
     @dispatcher.register("onboard-project")
     async def onboard() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
-        tool = create_serena_tool(SerenaTool.ONBOARDING)
+        tool = typ.cast(typ.Any, create_serena_tool(SerenaTool.ONBOARDING))  # noqa: TC006
         return OnboardingReport(details=tool.apply())
 
     sock = tmp_path / "o.sock"
