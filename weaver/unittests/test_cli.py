@@ -1,3 +1,4 @@
+import dataclasses
 import pathlib
 import typing as typ
 
@@ -57,25 +58,29 @@ def test_run_rpc_reports_error(
     assert "Error: boom" in capsys.readouterr().err
 
 
+@dataclasses.dataclass
+class CLITestCase:
+    cli_command: str
+    rpc_method: str
+    args: list[str]
+    params: dict[str, typ.Any] | None
+
+
 @pytest.mark.parametrize(
-    ("cli_command", "rpc_method", "args", "params"),
+    "test_case",
     [
-        ("project-status", "project-status", [], None),
-        ("onboard-project", "onboard-project", [], None),
-        (
+        CLITestCase("project-status", "project-status", [], None),
+        CLITestCase("onboard-project", "onboard-project", [], None),
+        CLITestCase(
             "get-definition",
             "get-definition",
-            ["foo.py", "1", "2"],
-            {"file": "foo.py", "line": 1, "char": 2},
+            [__file__, "1", "2"],
+            {"file": __file__, "line": 1, "char": 2},
         ),
     ],
 )
 def test_cli_commands_use_run_rpc(
-    cli_command: str,
-    rpc_method: str,
-    args: list[str],
-    params: dict[str, typ.Any] | None,
-    monkeypatch: pytest.MonkeyPatch,
+    test_case: CLITestCase, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """CLI commands use _run_rpc to contact the daemon."""
     called: dict[str, object] = {}
@@ -87,14 +92,32 @@ def test_cli_commands_use_run_rpc(
     monkeypatch.setattr(cli.anyio, "run", fake_run)
 
     runner = CliRunner()
-    result = runner.invoke(cli.app, [cli_command, *args])
+    result = runner.invoke(cli.app, [test_case.cli_command, *test_case.args])
 
     assert result.exit_code == 0
     assert called == {
         "func": cli.rpc_call,
-        "method": rpc_method,
-        "params": params,
+        "method": test_case.rpc_method,
+        "params": test_case.params,
     }
+
+
+def test_cli_get_definition_handles_empty_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """get-definition exits cleanly when the RPC stream is empty."""
+
+    def fake_run(func, method, params=None):
+        # Simulate RPC call producing no output.
+        return None
+
+    monkeypatch.setattr(cli.anyio, "run", fake_run)
+
+    runner = CliRunner()
+    result = runner.invoke(cli.app, ["get-definition", __file__, "1", "2"])
+
+    assert result.exit_code == 0
+    assert result.stdout == ""
 
 
 def test_cli_onboard_project_reports_error(

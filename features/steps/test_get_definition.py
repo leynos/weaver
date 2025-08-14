@@ -1,4 +1,6 @@
 import collections.abc as cabc
+import json
+from pathlib import Path
 
 import pytest
 from pytest_bdd import given, scenarios, then, when
@@ -40,6 +42,27 @@ def runtime_dir(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Contex
     return runtime_dir
 
 
+@given("a temporary runtime dir with no symbols", target_fixture="context")
+def runtime_dir_empty(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Context:
+    class StubTool:
+        def get_definition(self, *, file: str, line: int, char: int) -> list[Symbol]:
+            return []
+
+    monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
+
+    def setup(dispatcher: RPCDispatcher) -> None:
+        @dispatcher.register("get-definition")
+        async def handler(
+            file: str, line: int, char: int
+        ) -> cabc.AsyncIterator[Symbol]:  # pragma: no cover - stub
+            tool = server.create_serena_tool(SerenaTool.GET_DEFINITION)
+            for sym in tool.get_definition(file=file, line=line, char=char):
+                yield sym
+
+    runtime_dir["register"](setup)
+    return runtime_dir
+
+
 @given("serena-agent is missing")
 def missing_dep(monkeypatch: pytest.MonkeyPatch) -> None:
     def raise_error(_: SerenaTool) -> None:
@@ -50,8 +73,19 @@ def missing_dep(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @when("I invoke the get-definition command")
 def invoke(context: Context) -> None:
+    file = Path("foo.py")
+    file.write_text("pass")
     runner = CliRunner()
     result = runner.invoke(app, ["get-definition", "foo.py", "1", "0"])
+    context["result"] = result
+    file.unlink(missing_ok=True)
+
+
+@when("I invoke the get-definition command with a missing file")
+def invoke_missing(context: Context) -> None:
+    Path("nope.py").unlink(missing_ok=True)
+    runner = CliRunner()
+    result = runner.invoke(app, ["get-definition", "nope.py", "1", "0"])
     context["result"] = result
 
 
@@ -59,8 +93,19 @@ def invoke(context: Context) -> None:
 def check(context: Context) -> None:
     result = context["result"]
     assert result.exit_code == 0
-    out = result.stdout
-    assert '"symbol"' in out or '"foo"' in out
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    assert lines
+    record = json.loads(lines[0])
+    symbol = record.get("symbol", record)
+    assert symbol.get("name") == "foo"
+    assert symbol.get("kind") == "function"
+
+
+@then("no output is produced")
+def check_empty(context: Context) -> None:
+    result = context["result"]
+    assert result.exit_code == 0
+    assert result.stdout.strip() == ""
 
 
 @then("the daemon is not ready")
@@ -69,3 +114,11 @@ def check_not_ready(context: Context) -> None:
     assert result.exit_code == 1
     out = (result.stdout + result.stderr).lower()
     assert "serena" in out or "missing" in out
+
+
+@then("the command fails with a missing file error")
+def check_missing_file(context: Context) -> None:
+    result = context["result"]
+    assert result.exit_code != 0
+    out = (result.stdout + result.stderr).lower()
+    assert "no such file" in out or "does not exist" in out

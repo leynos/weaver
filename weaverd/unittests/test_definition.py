@@ -32,6 +32,21 @@ async def test_handle_get_definition(monkeypatch: pytest.MonkeyPatch) -> None:
     assert sym.name == "foo"
 
 
+class EmptyTool:
+    def get_definition(self, *, file: str, line: int, char: int) -> list[Symbol]:
+        return []
+
+
+@pytest.mark.anyio
+async def test_handle_get_definition_no_symbols(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(server, "create_serena_tool", lambda _: EmptyTool())
+    results = server.handle_get_definition("foo.py", 1, 0)
+    with pytest.raises(StopAsyncIteration):
+        await builtins.anext(results)
+
+
 @pytest.mark.anyio
 async def test_handle_get_definition_missing_dependency(
     monkeypatch: pytest.MonkeyPatch,
