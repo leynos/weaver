@@ -117,7 +117,7 @@ async def handle_project_status() -> ProjectStatus:
 @rpc_handler("onboard-project")
 async def handle_onboard_project() -> OnboardingReport:
     """Run the onboarding tool and return its report."""
-    tool = create_serena_tool(SerenaTool.ONBOARDING)
+    tool = typ.cast(typ.Any, create_serena_tool(SerenaTool.ONBOARDING))  # noqa: TC006
     try:
         details = await asyncio.to_thread(tool.apply)
     except Exception as exc:  # pragma: no cover - unexpected failures
@@ -175,7 +175,7 @@ async def handle_list_diagnostics(
     # Prepare filters for case- and path-insensitive comparison
     norm_severity, norm_files = _normalize_filters(severity, files)
 
-    tool = create_serena_tool(SerenaTool.LIST_DIAGNOSTICS)
+    tool = typ.cast(typ.Any, create_serena_tool(SerenaTool.LIST_DIAGNOSTICS))  # noqa: TC006
     try:
         data = await asyncio.to_thread(tool.list_diagnostics)
     except RuntimeError as exc:

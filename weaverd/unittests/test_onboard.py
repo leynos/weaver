@@ -26,7 +26,7 @@ async def test_onboard_project(tmp_path: Path) -> None:
 
     @dispatcher.register("onboard-project")
     async def onboard() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
-        tool = create_serena_tool(SerenaTool.ONBOARDING)
+        tool = typ.cast(typ.Any, create_serena_tool(SerenaTool.ONBOARDING))  # noqa: TC006
         return OnboardingReport(details=tool.apply())
 
     sock = tmp_path / "o.sock"
@@ -81,3 +81,10 @@ async def test_onboard_failure(tmp_path: Path) -> None:
             await writer.wait_closed()
     server.close()
     await server.wait_closed()
+
+
+def test_create_serena_tool_with_invalid_tool_name() -> None:
+    """create_serena_tool should raise for unknown tools."""
+
+    with pytest.raises(RuntimeError, match="NonExistentTool"):
+        create_serena_tool("NonExistentTool")

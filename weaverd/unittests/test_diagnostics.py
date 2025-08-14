@@ -51,7 +51,7 @@ async def diagnostics_test_server(
         severity: str | None = None,
         files: list[str] | None = None,
     ) -> typ.AsyncIterator[Diagnostic]:
-        tool = server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS)
+        tool = typ.cast(typ.Any, server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS))  # noqa: TC006
         for diag in tool.list_diagnostics():
             if severity and diag.severity != severity:
                 continue
@@ -98,17 +98,37 @@ def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
 
     def fake_import(name: str) -> typ.Any:  # pragma: no cover - simple stub
         if name == "serena.tools.workflow_tools":
-            return ToolsMod()
+            return ToolsMod
         if name == "serena.prompt_factory":
             return PromptMod
         raise ModuleNotFoundError
 
     monkeypatch.setattr(serena_tools, "import_module", fake_import)
-    serena_tools._serena_modules.cache_clear()
+    serena_tools.clear_serena_imports()
 
     with pytest.raises(RuntimeError, match="workflow_tools.OnboardingTool"):
         serena_tools.create_serena_tool(SerenaTool.ONBOARDING)
-    serena_tools._serena_modules.cache_clear()
+    serena_tools.clear_serena_imports()
+
+    class NonCallableTool:  # pragma: no cover - simple stub
+        pass
+
+    def fake_import_noncallable(name: str) -> typ.Any:  # pragma: no cover - stub
+        if name == "serena.tools.workflow_tools":
+
+            class Tools:  # pragma: no cover - stub
+                OnboardingTool = NonCallableTool()  # not callable
+
+            return Tools
+        if name == "serena.prompt_factory":
+            return PromptMod
+        raise ModuleNotFoundError
+
+    monkeypatch.setattr(serena_tools, "import_module", fake_import_noncallable)
+    serena_tools.clear_serena_imports()
+    with pytest.raises(RuntimeError, match="not callable"):
+        serena_tools.create_serena_tool(SerenaTool.ONBOARDING)
+    serena_tools.clear_serena_imports()
 
 
 @pytest.mark.anyio
@@ -145,7 +165,7 @@ async def test_missing_diagnostics_dependency(
 
     @dispatcher.register("list-diagnostics")
     async def handler() -> typ.AsyncIterator[Diagnostic]:  # pragma: no cover - stub
-        tool = server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS)
+        tool = typ.cast(typ.Any, server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS))  # noqa: TC006
         for d in tool.list_diagnostics():
             yield d
 
