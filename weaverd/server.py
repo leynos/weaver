@@ -23,6 +23,15 @@ from weaver_schemas.status import ProjectStatus
 from .rpc import Handler, RPCDispatcher
 from .serena_tools import SerenaTool, create_serena_tool
 
+if typ.TYPE_CHECKING:  # pragma: no cover - typing only
+
+    class _OnboardingTool(typ.Protocol):
+        def apply(self) -> str: ...
+
+    class _DiagnosticsTool(typ.Protocol):
+        def list_diagnostics(self) -> list[typ.Any]: ...
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -117,9 +126,11 @@ async def handle_project_status() -> ProjectStatus:
 @rpc_handler("onboard-project")
 async def handle_onboard_project() -> OnboardingReport:
     """Run the onboarding tool and return its report."""
-    tool = typ.cast(typ.Any, create_serena_tool(SerenaTool.ONBOARDING))  # noqa: TC006
     try:
+        tool = typ.cast("_OnboardingTool", create_serena_tool(SerenaTool.ONBOARDING))
         details = await asyncio.to_thread(tool.apply)
+    except (asyncio.CancelledError, KeyboardInterrupt):  # propagate cancels
+        raise
     except Exception as exc:  # pragma: no cover - unexpected failures
         raise RuntimeError(f"Onboarding failed: {exc}") from exc
     return OnboardingReport(details=details)
@@ -174,11 +185,14 @@ async def handle_list_diagnostics(
 
     # Prepare filters for case- and path-insensitive comparison
     norm_severity, norm_files = _normalize_filters(severity, files)
-
-    tool = typ.cast(typ.Any, create_serena_tool(SerenaTool.LIST_DIAGNOSTICS))  # noqa: TC006
     try:
+        tool = typ.cast(
+            "_DiagnosticsTool", create_serena_tool(SerenaTool.LIST_DIAGNOSTICS)
+        )
         data = await asyncio.to_thread(tool.list_diagnostics)
-    except RuntimeError as exc:
+    except (asyncio.CancelledError, KeyboardInterrupt):  # propagate cancels
+        raise
+    except Exception as exc:
         raise RuntimeError(f"Diagnostics failed: {exc}") from exc
     for item in data:
         diag = ms.convert(item, Diagnostic)
