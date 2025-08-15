@@ -1,6 +1,5 @@
 import collections.abc as cabc
 import json
-import typing as typ
 from pathlib import Path
 
 import pytest
@@ -18,51 +17,33 @@ from weaverd.serena_tools import SerenaTool
 scenarios("../list_references.feature")
 
 
-def _create_runtime_fixture(
+def _configure_list_refs(
+    runtime_dir: Context,
+    monkeypatch: pytest.MonkeyPatch,
     list_refs_impl: cabc.Callable[..., list[Reference]],
-) -> cabc.Callable[[Context, pytest.MonkeyPatch], Context]:
-    """Return a fixture that configures a stubbed list-references tool."""
+) -> Context:
+    """Register the production handler with a stubbed Serena tool."""
 
-    def _fixture(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Context:
-        class StubTool:
-            def list_references(
-                self,
-                *,
-                file: str,
-                line: int,
-                char: int,
-                include_definition: bool = False,
-            ) -> list[Reference]:
-                return list_refs_impl(
-                    file, line, char, include_definition=include_definition
-                )
+    class StubTool:
+        def list_references(
+            self,
+            *,
+            file: str,
+            line: int,
+            char: int,
+            include_definition: bool = False,
+        ) -> list[Reference]:
+            return list_refs_impl(
+                file, line, char, include_definition=include_definition
+            )
 
-        monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
+    monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
 
-        def setup(dispatcher: RPCDispatcher) -> None:
-            @dispatcher.register("list-references")
-            async def handler(
-                file: str,
-                line: int,
-                char: int,
-                include_definition: bool | None = None,  # noqa: FBT001
-            ) -> cabc.AsyncIterator[Reference]:  # pragma: no cover - stub
-                tool = typ.cast(
-                    typ.Any,  # noqa: TC006
-                    server.create_serena_tool(SerenaTool.LIST_REFERENCES),
-                )
-                for ref in tool.list_references(
-                    file=file,
-                    line=line,
-                    char=char,
-                    include_definition=bool(include_definition),
-                ):
-                    yield ref
+    def setup(dispatcher: RPCDispatcher) -> None:
+        dispatcher.register("list-references")(server.handle_list_references)
 
-        runtime_dir["register"](setup)
-        return runtime_dir
-
-    return _fixture
+    runtime_dir["register"](setup)
+    return runtime_dir
 
 
 def _return_ref(
@@ -83,12 +64,12 @@ def _return_empty(
 
 @given("a temporary runtime dir", target_fixture="context")
 def runtime_dir(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Context:
-    return _create_runtime_fixture(_return_ref)(runtime_dir, monkeypatch)
+    return _configure_list_refs(runtime_dir, monkeypatch, _return_ref)
 
 
 @given("a temporary runtime dir with no references", target_fixture="context")
 def runtime_dir_empty(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Context:
-    return _create_runtime_fixture(_return_empty)(runtime_dir, monkeypatch)
+    return _configure_list_refs(runtime_dir, monkeypatch, _return_empty)
 
 
 @given("serena-agent is missing")

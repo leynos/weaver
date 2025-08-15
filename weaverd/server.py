@@ -232,7 +232,7 @@ async def handle_list_references(
     line: int,
     char: int,
     *,
-    include_definition: bool | None = None,
+    include_definition: bool = False,
 ) -> typ.AsyncIterator[Reference]:
     """Yield references for the symbol at the given position."""
 
@@ -246,7 +246,7 @@ async def handle_list_references(
             file=file,
             line=line,
             char=char,
-            include_definition=bool(include_definition),
+            include_definition=include_definition,
         )
     except RuntimeError as exc:
         raise RuntimeError(f"Reference lookup failed: {exc}") from exc

@@ -62,3 +62,19 @@ async def test_handle_list_references_missing_dependency(
 
     with pytest.raises(RuntimeError, match="serena-agent not found"):
         await builtins.anext(server.handle_list_references("foo.py", 1, 0))
+
+
+class FailingTool:
+    def list_references(
+        self, *, file: str, line: int, char: int, include_definition: bool = False
+    ) -> list[Reference]:
+        raise RuntimeError("boom")
+
+
+@pytest.mark.anyio
+async def test_handle_list_references_wraps_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(server, "create_serena_tool", lambda _: FailingTool())
+    with pytest.raises(RuntimeError, match="Reference lookup failed: boom"):
+        await builtins.anext(server.handle_list_references("foo.py", 1, 0))
