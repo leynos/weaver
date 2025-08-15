@@ -84,9 +84,15 @@ def onboard_project() -> None:
     _run_rpc("onboard-project")
 
 
+@app.command("get-definition")
+def get_definition(file: Path, line: int, char: int) -> None:
+    """Fetch the definition at the given location."""
+    params = {"file": str(file), "line": line, "char": char}
+    _run_rpc("get-definition", params)
+
+
 STUBS = [
     "find-symbol",
-    "get-definition",
     "list-references",
     "summarise-symbol",
     "get-call-graph",
