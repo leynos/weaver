@@ -104,7 +104,7 @@ This phase focuses on wrapping Serena's tool capabilities.*
   - [x] `get-definition`: Implement the handler to call the definition-fetching
     method in Serena's tools.
 
-  - [ ] `list-references`: Implement the handler to call the reference-finding
+  - [x] `list-references`: Implement the handler to call the reference-finding
     method in Serena's tools.
 
   - [ ] `find-symbol`: Implement the handler to call the workspace symbol

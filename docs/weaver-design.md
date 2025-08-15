@@ -174,6 +174,11 @@ passes the file and 0-indexed cursor position to the tool on a worker thread
 and streams each resulting `Symbol` structure back to the client. This mirrors
 the LSP definition request while remaining JSONL-friendly and non-blocking.
 
+The `list-references` handler wraps Serena's `ListReferencesTool`. It forwards
+the file path, cursor position, and an `include_definition` flag mirroring the
+LSP's `includeDeclaration` parameter. The tool's results are streamed back as
+`Reference` records, optionally including the symbol's defining location.
+
 ### 2.3 Decide
 
 | Command             | Synopsis                                                                                |

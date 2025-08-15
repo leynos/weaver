@@ -113,9 +113,32 @@ def get_definition(
     _run_rpc("get-definition", params)
 
 
+@app.command("list-references")
+def list_references(
+    file: Path = typer.Argument(  # noqa: B008
+        ...,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=False,
+    ),
+    line: int = typer.Argument(..., min=0),
+    char: int = typer.Argument(..., min=0),
+    include_definition: bool = typer.Option(  # noqa: FBT001
+        default=False, help="Include symbol definition in results"
+    ),
+) -> None:
+    """Locate all references to the symbol at the given position."""
+
+    params: dict[str, typ.Any] = {"file": str(file), "line": line, "char": char}
+    if include_definition:
+        params["include_definition"] = True
+    _run_rpc("list-references", params)
+
+
 STUBS = [
     "find-symbol",
-    "list-references",
     "summarise-symbol",
     "get-call-graph",
     "get-type-hierarchy",
