@@ -77,6 +77,12 @@ class CLITestCase:
             [__file__, "1", "2"],
             {"file": __file__, "line": 1, "char": 2},
         ),
+        CLITestCase(
+            "list-references",
+            "list-references",
+            [__file__, "1", "2"],
+            {"file": __file__, "line": 1, "char": 2},
+        ),
     ],
 )
 def test_cli_commands_use_run_rpc(
@@ -99,6 +105,37 @@ def test_cli_commands_use_run_rpc(
         "func": cli.rpc_call,
         "method": test_case.rpc_method,
         "params": test_case.params,
+    }
+
+
+def test_cli_list_references_include_definition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """list-references forwards include-definition flag to RPC."""
+
+    called: dict[str, object] = {}
+
+    def fake_run(func, method, params=None):
+        called.update({"func": func, "method": method, "params": params})
+
+    monkeypatch.setattr(cli.anyio, "run", fake_run)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.app,
+        ["list-references", "--include-definition", __file__, "1", "2"],
+    )
+
+    assert result.exit_code == 0
+    assert called == {
+        "func": cli.rpc_call,
+        "method": "list-references",
+        "params": {
+            "file": __file__,
+            "line": 1,
+            "char": 2,
+            "include_definition": True,
+        },
     }
 
 

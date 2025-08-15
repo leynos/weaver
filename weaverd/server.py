@@ -17,7 +17,7 @@ import msgspec.json as msjson
 
 from weaver_schemas.diagnostics import Diagnostic
 from weaver_schemas.error import SchemaError
-from weaver_schemas.references import Symbol
+from weaver_schemas.references import Reference, Symbol
 from weaver_schemas.reports import OnboardingReport
 from weaver_schemas.status import ProjectStatus
 
@@ -224,6 +224,34 @@ async def handle_get_definition(
         raise RuntimeError(f"Definition lookup failed: {exc}") from exc
     for item in data:
         yield ms.convert(item, Symbol)
+
+
+@rpc_handler("list-references")
+async def handle_list_references(
+    file: str,
+    line: int,
+    char: int,
+    *,
+    include_definition: bool | None = None,
+) -> typ.AsyncIterator[Reference]:
+    """Yield references for the symbol at the given position."""
+
+    tool = typ.cast(
+        typ.Any,  # noqa: TC006
+        create_serena_tool(SerenaTool.LIST_REFERENCES),
+    )
+    try:
+        data = await asyncio.to_thread(
+            tool.list_references,
+            file=file,
+            line=line,
+            char=char,
+            include_definition=bool(include_definition),
+        )
+    except RuntimeError as exc:
+        raise RuntimeError(f"Reference lookup failed: {exc}") from exc
+    for item in data:
+        yield ms.convert(item, Reference)
 
 
 async def main(socket_path: Path | None = None) -> None:

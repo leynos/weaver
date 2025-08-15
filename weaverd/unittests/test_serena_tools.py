@@ -14,6 +14,8 @@ from weaverd.serena_tools import (
     [
         ("onboarding", "OnboardingTool"),
         ("OnboardingTool", "OnboardingTool"),
+        ("list_references", "ListReferencesTool"),
+        ("ListReferencesTool", "ListReferencesTool"),
     ],
 )
 def test_resolve_string_tool_name_success(input_name: str, expected: str) -> None:
