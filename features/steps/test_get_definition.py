@@ -1,5 +1,6 @@
 import collections.abc as cabc
 import json
+import typing as typ
 from pathlib import Path
 
 import pytest
@@ -36,7 +37,10 @@ def _create_runtime_fixture(
             async def handler(
                 file: str, line: int, char: int
             ) -> cabc.AsyncIterator[Symbol]:  # pragma: no cover - stub
-                tool = server.create_serena_tool(SerenaTool.GET_DEFINITION)
+                tool = typ.cast(
+                    typ.Any,  # noqa: TC006
+                    server.create_serena_tool(SerenaTool.GET_DEFINITION),
+                )
                 for sym in tool.get_definition(file=file, line=line, char=char):
                     yield sym
 

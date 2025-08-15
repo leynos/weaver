@@ -196,7 +196,10 @@ async def handle_get_definition(
 ) -> typ.AsyncIterator[Symbol]:
     """Yield symbol definitions for the given position."""
 
-    tool = create_serena_tool(SerenaTool.GET_DEFINITION)
+    tool = typ.cast(
+        typ.Any,  # noqa: TC006
+        create_serena_tool(SerenaTool.GET_DEFINITION),
+    )
     try:
         data = await asyncio.to_thread(
             tool.get_definition, file=file, line=line, char=char
