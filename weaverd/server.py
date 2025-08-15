@@ -29,7 +29,9 @@ if typ.TYPE_CHECKING:  # pragma: no cover - typing only
         def apply(self) -> str: ...
 
     class _DiagnosticsTool(typ.Protocol):
-        def list_diagnostics(self) -> list[typ.Any]: ...
+        def list_diagnostics(
+            self,
+        ) -> typ.Iterable[Diagnostic | typ.Mapping[str, typ.Any]]: ...
 
 
 logger = logging.getLogger(__name__)
