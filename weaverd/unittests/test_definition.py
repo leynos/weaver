@@ -1,4 +1,4 @@
-import builtins
+from builtins import anext  # noqa: A004
 
 import pytest
 
@@ -26,10 +26,14 @@ def anyio_backend() -> str:
 async def test_handle_get_definition(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
     results = server.handle_get_definition("foo.py", 1, 0)
-    sym = await builtins.anext(results)
+    sym = await anext(results)
     with pytest.raises(StopAsyncIteration):
-        await builtins.anext(results)
+        await anext(results)
     assert sym.name == "foo"
+    assert sym.kind == "function"
+    assert sym.location.file == "foo.py"
+    assert sym.location.range.start.line == 1
+    assert sym.location.range.start.character == 0
 
 
 class EmptyTool:
@@ -44,7 +48,7 @@ async def test_handle_get_definition_no_symbols(
     monkeypatch.setattr(server, "create_serena_tool", lambda _: EmptyTool())
     results = server.handle_get_definition("foo.py", 1, 0)
     with pytest.raises(StopAsyncIteration):
-        await builtins.anext(results)
+        await anext(results)
 
 
 @pytest.mark.anyio
@@ -57,4 +61,4 @@ async def test_handle_get_definition_missing_dependency(
     monkeypatch.setattr(server, "create_serena_tool", raise_error)
 
     with pytest.raises(RuntimeError, match="serena-agent not found"):
-        await builtins.anext(server.handle_get_definition("foo.py", 1, 0))
+        await anext(server.handle_get_definition("foo.py", 1, 0))
