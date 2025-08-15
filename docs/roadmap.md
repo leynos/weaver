@@ -101,7 +101,7 @@ This phase focuses on wrapping Serena's tool capabilities.*
 
 - [ ] **Implement Orient Commands:**
 
-  - [ ] `get-definition`: Implement the handler to call the definition-fetching
+  - [x] `get-definition`: Implement the handler to call the definition-fetching
     method in Serena's tools.
 
   - [ ] `list-references`: Implement the handler to call the reference-finding

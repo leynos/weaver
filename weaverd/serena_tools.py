@@ -31,6 +31,7 @@ class SerenaTool(enum.StrEnum):
 
     ONBOARDING = "OnboardingTool"
     LIST_DIAGNOSTICS = "ListDiagnosticsTool"
+    GET_DEFINITION = "GetDefinitionTool"
 
 
 _VALID_TOOL_MEMBER_NAMES = frozenset(SerenaTool.__members__.keys())
@@ -119,7 +120,6 @@ def create_serena_tool(tool_attr: SerenaTool | str) -> SerenaToolInstance:
     TypeError
         If ``tool_attr`` is neither ``SerenaTool`` nor ``str``.
     """
-
     wf_tools, prompt_mod = _load_serena_modules()
     name = _resolve_tool_name(tool_attr)
     tool_cls = _validate_and_get_tool_class(wf_tools, name)

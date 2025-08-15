@@ -169,6 +169,11 @@ the `rss_mb` field. The response reports the daemon process ID, resident memory
 | get-type-hierarchy | `--direction <super|sub> <file> <line> <char>` Show type hierarchy for the symbol.        |
 | list-memories      | Stream previously stored memory snippets.                                                 |
 
+The `get-definition` handler invokes Serena's `GetDefinitionTool`. The daemon
+passes the file and 0-indexed cursor position to the tool on a worker thread
+and streams each resulting `Symbol` structure back to the client. This mirrors
+the LSP definition request while remaining JSONL-friendly and non-blocking.
+
 ### 2.3 Decide
 
 | Command             | Synopsis                                                                                |
@@ -276,14 +281,14 @@ then generates an `OnboardingReport` returned to the client. In tests, the
 creation function can be patched to raise a runtime error to simulate a missing
 dependency.
 
-Both onboarding and diagnostics tools share common import logic. A helper in the
-daemon loads the requested Serena tool and prompt factory, raising a
+Both onboarding and diagnostics tools share common import logic. A helper in
+the daemon loads the requested Serena tool and prompt factory, raising a
 user-friendly ``RuntimeError`` if ``serena-agent`` is missing.
 
 `list-diagnostics` relies on Serena's `ListDiagnosticsTool`. The handler
 initialises the tool with a new `SerenaPromptFactory`, invokes
-`list_diagnostics` in a background thread and yields each dictionary through the
-RPC stream after converting it to the internal `Diagnostic` model using
+`list_diagnostics` in a background thread and yields each dictionary through
+the RPC stream after converting it to the internal `Diagnostic` model using
 `msgspec.convert`. Optional `severity` and `files` parameters filter the
 diagnostics while streaming, avoiding large in-memory collections.
 

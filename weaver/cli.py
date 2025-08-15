@@ -84,9 +84,37 @@ def onboard_project() -> None:
     _run_rpc("onboard-project")
 
 
+@app.command("get-definition")
+def get_definition(
+    file: Path = typer.Argument(  # noqa: B008
+        ...,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=False,
+    ),
+    line: int = typer.Argument(..., min=0),
+    char: int = typer.Argument(..., min=0),
+) -> None:
+    """Locate the symbol definition at the given 0-indexed position.
+
+    Parameters
+    ----------
+    file : Path
+        Path to the source file.
+    line : int
+        0-indexed line number.
+    char : int
+        0-indexed character offset within the line.
+    """
+
+    params = {"file": str(file), "line": line, "char": char}
+    _run_rpc("get-definition", params)
+
+
 STUBS = [
     "find-symbol",
-    "get-definition",
     "list-references",
     "summarise-symbol",
     "get-call-graph",
