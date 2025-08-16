@@ -34,6 +34,8 @@ async def test_handle_get_definition(monkeypatch: pytest.MonkeyPatch) -> None:
     assert sym.location.file == "foo.py"
     assert sym.location.range.start.line == 1
     assert sym.location.range.start.character == 0
+    assert sym.location.range.end.line == 1
+    assert sym.location.range.end.character == 1
 
 
 class EmptyTool:

@@ -84,7 +84,7 @@ def invoke(context: Context, tmp_path: Path) -> None:
     file = tmp_path / "foo.py"
     file.write_text("pass")
     runner = CliRunner()
-    result = runner.invoke(app, ["get-definition", str(file), "1", "0"])
+    result = runner.invoke(app, ["get-definition", str(file), "0", "0"])
     context["result"] = result
 
 
@@ -92,7 +92,7 @@ def invoke(context: Context, tmp_path: Path) -> None:
 def invoke_missing(context: Context, tmp_path: Path) -> None:
     file = tmp_path / "nope.py"  # intentionally not created
     runner = CliRunner()
-    result = runner.invoke(app, ["get-definition", str(file), "1", "0"])
+    result = runner.invoke(app, ["get-definition", str(file), "0", "0"])
     context["result"] = result
 
 
