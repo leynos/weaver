@@ -17,6 +17,32 @@ class StubTool:
         return [Symbol(name="foo", kind="function", location=loc)]
 
 
+class EmptyTool:
+    def get_definition(self, *, file: str, line: int, char: int) -> list[Symbol]:
+        return []
+
+
+class MultiTool:
+    def get_definition(self, *, file: str, line: int, char: int) -> list[Symbol]:
+        loc1 = Location(
+            file=file,
+            range=Range(start=Position(line, char), end=Position(line, char + 1)),
+        )
+        loc2 = Location(
+            file=file,
+            range=Range(start=Position(line, char + 2), end=Position(line, char + 3)),
+        )
+        return [
+            Symbol(name="foo", kind="function", location=loc1),
+            Symbol(name="bar", kind="class", location=loc2),
+        ]
+
+
+class DummyTool:
+    def get_definition(self, *, file: str, line: int, char: int) -> list[Symbol]:
+        return []
+
+
 @pytest.fixture()
 def anyio_backend() -> str:
     return "asyncio"
@@ -38,11 +64,6 @@ async def test_handle_get_definition(monkeypatch: pytest.MonkeyPatch) -> None:
     assert sym.location.range.end.character == 1
 
 
-class EmptyTool:
-    def get_definition(self, *, file: str, line: int, char: int) -> list[Symbol]:
-        return []
-
-
 @pytest.mark.anyio
 async def test_handle_get_definition_no_symbols(
     monkeypatch: pytest.MonkeyPatch,
@@ -51,6 +72,19 @@ async def test_handle_get_definition_no_symbols(
     results = server.handle_get_definition("foo.py", 1, 0)
     with pytest.raises(StopAsyncIteration):
         await anext(results)
+
+
+@pytest.mark.anyio
+async def test_handle_get_definition_multiple_symbols(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(server, "create_serena_tool", lambda _: MultiTool())
+    results = server.handle_get_definition("foo.py", 1, 0)
+    first = await anext(results)
+    second = await anext(results)
+    with pytest.raises(StopAsyncIteration):
+        await anext(results)
+    assert [first.name, second.name] == ["foo", "bar"]
 
 
 @pytest.mark.anyio
@@ -64,3 +98,16 @@ async def test_handle_get_definition_missing_dependency(
 
     with pytest.raises(RuntimeError, match="serena-agent not found"):
         await anext(server.handle_get_definition("foo.py", 1, 0))
+
+
+@pytest.mark.anyio
+async def test_handle_get_definition_invalid_position(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(server, "create_serena_tool", lambda _: DummyTool())
+    with pytest.raises(ValueError):
+        await anext(server.handle_get_definition("foo.py", -1, 0))
+    with pytest.raises(ValueError):
+        await anext(server.handle_get_definition("foo.py", 1, -5))
+    with pytest.raises(ValueError):
+        await anext(server.handle_get_definition("foo.py", -2, -3))

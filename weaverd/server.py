@@ -196,6 +196,9 @@ async def handle_get_definition(
 ) -> typ.AsyncIterator[Symbol]:
     """Yield symbol definitions for the given position."""
 
+    if line < 0 or char < 0:  # basic input validation
+        raise ValueError("line and char must be non-negative")
+
     tool = typ.cast(
         typ.Any,  # noqa: TC006
         create_serena_tool(SerenaTool.GET_DEFINITION),
