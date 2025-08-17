@@ -53,6 +53,41 @@ class DummyTool:
         return []
 
 
+async def _setup_and_call_get_definition(
+    monkeypatch: pytest.MonkeyPatch, tool_class, file: str, line: int, char: int
+):
+    """Helper to setup mock and call handle_get_definition."""
+    monkeypatch.setattr(server, "create_serena_tool", lambda _: tool_class())
+    return server.handle_get_definition(file, line, char)
+
+
+async def _collect_symbols_from_results(results, expected_count: int) -> list[Symbol]:
+    """Helper to collect symbols from async iterator and verify count."""
+    symbols: list[Symbol] = []
+    try:
+        for _ in range(expected_count):
+            symbols.append(await anext(results))
+        # Verify no more symbols remain
+        with pytest.raises(StopAsyncIteration):
+            await anext(results)
+    except StopAsyncIteration:
+        if len(symbols) != expected_count:
+            pytest.fail(f"Expected {expected_count} symbols, got {len(symbols)}")
+        raise
+    return symbols
+
+
+def _assert_symbol_location(
+    symbol: Symbol, file: str, line: int, start_char: int, end_char: int
+) -> None:
+    """Helper to assert symbol location properties."""
+    assert symbol.location.file == file
+    assert symbol.location.range.start.line == line
+    assert symbol.location.range.start.character == start_char
+    assert symbol.location.range.end.line == line
+    assert symbol.location.range.end.character == end_char
+
+
 @pytest.fixture()
 def anyio_backend() -> str:
     return "asyncio"
@@ -60,45 +95,37 @@ def anyio_backend() -> str:
 
 @pytest.mark.anyio
 async def test_handle_get_definition(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
-    results = server.handle_get_definition("foo.py", 1, 0)
-    sym = await anext(results)
-    with pytest.raises(StopAsyncIteration):
-        await anext(results)
+    results = await _setup_and_call_get_definition(
+        monkeypatch, StubTool, "foo.py", 1, 0
+    )
+    sym = (await _collect_symbols_from_results(results, 1))[0]
     assert sym.name == "foo"
     assert sym.kind == "function"
-    assert sym.location.file == "foo.py"
-    assert sym.location.range.start.line == 1
-    assert sym.location.range.start.character == 0
-    assert sym.location.range.end.line == 1
-    assert sym.location.range.end.character == 1
+    _assert_symbol_location(sym, "foo.py", 1, 0, 1)
 
 
 @pytest.mark.anyio
 async def test_handle_get_definition_no_symbols(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(server, "create_serena_tool", lambda _: EmptyTool())
-    results = server.handle_get_definition("foo.py", 1, 0)
-    with pytest.raises(StopAsyncIteration):
-        await anext(results)
+    results = await _setup_and_call_get_definition(
+        monkeypatch, EmptyTool, "foo.py", 1, 0
+    )
+    await _collect_symbols_from_results(results, 0)
 
 
 @pytest.mark.anyio
 async def test_handle_get_definition_multiple_symbols(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(server, "create_serena_tool", lambda _: MultiTool())
-    results = server.handle_get_definition("foo.py", 1, 0)
-    first = await anext(results)
-    second = await anext(results)
-    with pytest.raises(StopAsyncIteration):
-        await anext(results)
+    results = await _setup_and_call_get_definition(
+        monkeypatch, MultiTool, "foo.py", 1, 0
+    )
+    first, second = await _collect_symbols_from_results(results, 2)
     assert [first.name, second.name] == ["foo", "bar"]
     assert [first.kind, second.kind] == ["function", "class"]
-    assert first.location.file == "foo.py"
-    assert first.location.range.start.character == 0
-    assert second.location.range.start.character == 2
+    _assert_symbol_location(first, "foo.py", 1, 0, 1)
+    _assert_symbol_location(second, "foo.py", 1, 2, 3)
 
 
 @pytest.mark.anyio
