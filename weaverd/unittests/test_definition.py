@@ -1,4 +1,5 @@
 import builtins
+from dataclasses import dataclass  # noqa: ICN003 -- simpler decorator usage
 
 import pytest
 
@@ -53,12 +54,19 @@ class DummyTool:
         return []
 
 
+@dataclass
+class FilePosition:
+    file: str
+    line: int
+    char: int
+
+
 async def _setup_and_call_get_definition(
-    monkeypatch: pytest.MonkeyPatch, tool_class, file: str, line: int, char: int
+    monkeypatch: pytest.MonkeyPatch, tool_class, position: FilePosition
 ):
     """Helper to setup mock and call handle_get_definition."""
     monkeypatch.setattr(server, "create_serena_tool", lambda _: tool_class())
-    return server.handle_get_definition(file, line, char)
+    return server.handle_get_definition(position.file, position.line, position.char)
 
 
 async def _collect_symbols_from_results(results, expected_count: int) -> list[Symbol]:
@@ -77,15 +85,15 @@ async def _collect_symbols_from_results(results, expected_count: int) -> list[Sy
     return symbols
 
 
-def _assert_symbol_location(
-    symbol: Symbol, file: str, line: int, start_char: int, end_char: int
-) -> None:
+def _assert_symbol_location(symbol: Symbol, expected_location: Location) -> None:
     """Helper to assert symbol location properties."""
-    assert symbol.location.file == file
-    assert symbol.location.range.start.line == line
-    assert symbol.location.range.start.character == start_char
-    assert symbol.location.range.end.line == line
-    assert symbol.location.range.end.character == end_char
+    assert symbol.location.file == expected_location.file
+    assert symbol.location.range.start.line == expected_location.range.start.line
+    assert (
+        symbol.location.range.start.character == expected_location.range.start.character
+    )
+    assert symbol.location.range.end.line == expected_location.range.end.line
+    assert symbol.location.range.end.character == expected_location.range.end.character
 
 
 @pytest.fixture()
@@ -96,12 +104,21 @@ def anyio_backend() -> str:
 @pytest.mark.anyio
 async def test_handle_get_definition(monkeypatch: pytest.MonkeyPatch) -> None:
     results = await _setup_and_call_get_definition(
-        monkeypatch, StubTool, "foo.py", 1, 0
+        monkeypatch, StubTool, FilePosition("foo.py", 1, 0)
     )
     sym = (await _collect_symbols_from_results(results, 1))[0]
     assert sym.name == "foo"
     assert sym.kind == "function"
-    _assert_symbol_location(sym, "foo.py", 1, 0, 1)
+    _assert_symbol_location(
+        sym,
+        Location(
+            file="foo.py",
+            range=Range(
+                start=Position(1, 0),
+                end=Position(1, 1),
+            ),
+        ),
+    )
 
 
 @pytest.mark.anyio
@@ -109,7 +126,7 @@ async def test_handle_get_definition_no_symbols(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     results = await _setup_and_call_get_definition(
-        monkeypatch, EmptyTool, "foo.py", 1, 0
+        monkeypatch, EmptyTool, FilePosition("foo.py", 1, 0)
     )
     await _collect_symbols_from_results(results, 0)
 
@@ -119,13 +136,31 @@ async def test_handle_get_definition_multiple_symbols(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     results = await _setup_and_call_get_definition(
-        monkeypatch, MultiTool, "foo.py", 1, 0
+        monkeypatch, MultiTool, FilePosition("foo.py", 1, 0)
     )
     first, second = await _collect_symbols_from_results(results, 2)
     assert [first.name, second.name] == ["foo", "bar"]
     assert [first.kind, second.kind] == ["function", "class"]
-    _assert_symbol_location(first, "foo.py", 1, 0, 1)
-    _assert_symbol_location(second, "foo.py", 1, 2, 3)
+    _assert_symbol_location(
+        first,
+        Location(
+            file="foo.py",
+            range=Range(
+                start=Position(1, 0),
+                end=Position(1, 1),
+            ),
+        ),
+    )
+    _assert_symbol_location(
+        second,
+        Location(
+            file="foo.py",
+            range=Range(
+                start=Position(1, 2),
+                end=Position(1, 3),
+            ),
+        ),
+    )
 
 
 @pytest.mark.anyio
