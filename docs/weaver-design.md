@@ -170,10 +170,10 @@ the `rss_mb` field. The response reports the daemon process ID, resident memory
 | list-memories      | Stream previously stored memory snippets.                                                 |
 
 The `get-definition` handler invokes Serena's `GetDefinitionTool`. The daemon
-passes the file and 0-indexed line/character (in UTF-16 code units) to the tool
-on a worker thread and streams each resulting `Symbol` back to the client. This
-mirrors the LSP `textDocument/definition` semantics while remaining
-JSONL-friendly and non-blocking.
+passes the file and a 0-indexed `Position` (line and character in UTF-16 code
+units) to the tool on a worker thread and streams each resulting `Symbol` back
+to the client. This mirrors the LSP `textDocument/definition` semantics while
+remaining JSONL-friendly and non-blocking.
 
 ### 2.3 Decide
 
@@ -288,10 +288,10 @@ user-friendly `RuntimeError` if `serena-agent` is missing.
 
 `list-diagnostics` relies on Serena's `ListDiagnosticsTool`. The handler
 initialises the tool with a new `SerenaPromptFactory`, invokes
-`list_diagnostics` in a background thread, and yields each `Diagnostic` model
-instance through the RPC stream after converting tool outputs with
-`msgspec.convert`. Optional `severity` and `files` parameters filter the
-diagnostics while streaming, avoiding large in-memory collections.
+`list_diagnostics` on a background thread and streams each `Diagnostic` model
+instance after converting tool outputs with `msgspec.convert`. Optional
+`severity` and `files` parameters filter the diagnostics while streaming,
+avoiding large in-memory collections.
 
 `weaverd` exposes a lightweight RPC interface over a UNIX domain socket. A
 custom `RPCDispatcher` maps method names to coroutine handlers and uses

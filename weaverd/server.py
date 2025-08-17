@@ -194,10 +194,12 @@ async def handle_list_diagnostics(
 async def handle_get_definition(
     file: str, line: int, char: int
 ) -> typ.AsyncIterator[Symbol]:
-    """Yield symbol definitions for the given position."""
+    """Yield symbol definitions for a 0-indexed UTF-16 line/character."""
 
     if line < 0 or char < 0:  # basic input validation
-        raise ValueError("line and char must be non-negative")
+        raise ValueError(
+            "line and character must be non-negative (0-indexed, UTF-16 code units)"
+        )
 
     tool = typ.cast(
         typ.Any,  # noqa: TC006

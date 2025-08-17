@@ -1,4 +1,4 @@
-from builtins import anext  # noqa: A004
+import builtins
 
 import pytest
 
@@ -6,6 +6,16 @@ from weaver_schemas.primitives import Location, Position, Range
 from weaver_schemas.references import Symbol
 from weaverd import server
 from weaverd.serena_tools import SerenaTool
+
+try:
+    _anext = builtins.anext  # type: ignore[attr-defined]
+except AttributeError:  # Python < 3.10
+
+    async def _anext(it):
+        return await it.__anext__()
+
+
+globals()["anext"] = _anext
 
 
 class StubTool:
@@ -85,6 +95,10 @@ async def test_handle_get_definition_multiple_symbols(
     with pytest.raises(StopAsyncIteration):
         await anext(results)
     assert [first.name, second.name] == ["foo", "bar"]
+    assert [first.kind, second.kind] == ["function", "class"]
+    assert first.location.file == "foo.py"
+    assert first.location.range.start.character == 0
+    assert second.location.range.start.character == 2
 
 
 @pytest.mark.anyio
@@ -101,13 +115,10 @@ async def test_handle_get_definition_missing_dependency(
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize("line,char", [(-1, 0), (1, -5), (-2, -3)])
 async def test_handle_get_definition_invalid_position(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, line: int, char: int
 ) -> None:
     monkeypatch.setattr(server, "create_serena_tool", lambda _: DummyTool())
     with pytest.raises(ValueError):
-        await anext(server.handle_get_definition("foo.py", -1, 0))
-    with pytest.raises(ValueError):
-        await anext(server.handle_get_definition("foo.py", 1, -5))
-    with pytest.raises(ValueError):
-        await anext(server.handle_get_definition("foo.py", -2, -3))
+        await anext(server.handle_get_definition("foo.py", line, char))
