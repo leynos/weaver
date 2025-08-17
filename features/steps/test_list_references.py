@@ -6,12 +6,12 @@ import pytest
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
 
+from features.steps.helpers import register_production_handlers
 from features.types import Context
 from weaver.cli import app
 from weaver_schemas.primitives import Location, Position, Range
 from weaver_schemas.references import Reference
 from weaverd import server
-from weaverd.rpc import RPCDispatcher
 from weaverd.serena_tools import SerenaTool
 
 scenarios("../list_references.feature")
@@ -22,7 +22,7 @@ def _configure_list_refs(
     monkeypatch: pytest.MonkeyPatch,
     list_refs_impl: cabc.Callable[..., list[Reference]],
 ) -> Context:
-    """Register the production handler with a stubbed Serena tool."""
+    """Register handlers with a stubbed Serena tool."""
 
     class StubTool:
         def list_references(
@@ -38,12 +38,7 @@ def _configure_list_refs(
             )
 
     monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
-
-    def setup(dispatcher: RPCDispatcher) -> None:
-        dispatcher.register("list-references")(server.handle_list_references)
-
-    runtime_dir["register"](setup)
-    return runtime_dir
+    return register_production_handlers(runtime_dir)
 
 
 def _return_ref(
