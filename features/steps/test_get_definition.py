@@ -84,18 +84,15 @@ def invoke(context: Context, tmp_path: Path) -> None:
     file = tmp_path / "foo.py"
     file.write_text("pass")
     runner = CliRunner()
-    try:
-        result = runner.invoke(app, ["get-definition", str(file), "1", "0"])
-        context["result"] = result
-    finally:
-        file.unlink(missing_ok=True)
+    result = runner.invoke(app, ["get-definition", str(file), "0", "0"])
+    context["result"] = result
 
 
 @when("I invoke the get-definition command with a missing file")
-def invoke_missing(context: Context) -> None:
-    Path("nope.py").unlink(missing_ok=True)
+def invoke_missing(context: Context, tmp_path: Path) -> None:
+    file = tmp_path / "nope.py"  # intentionally not created
     runner = CliRunner()
-    result = runner.invoke(app, ["get-definition", "nope.py", "1", "0"])
+    result = runner.invoke(app, ["get-definition", str(file), "0", "0"])
     context["result"] = result
 
 
