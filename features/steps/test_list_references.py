@@ -75,31 +75,33 @@ def missing_dep(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(server, "create_serena_tool", raise_error)
 
 
-@when("I invoke the list-references command")
-def invoke(context: Context, tmp_path: Path) -> None:
+def _invoke_list_references_command(
+    context: Context, tmp_path: Path, *, include_definition: bool = False
+) -> None:
+    """Invoke the list-references CLI and store the result."""
+
     file = tmp_path / "foo.py"
     file.write_text("pass")
     runner = CliRunner()
     try:
-        result = runner.invoke(app, ["list-references", str(file), "1", "0"])
+        args = ["list-references"]
+        if include_definition:
+            args.append("--include-definition")
+        args.extend([str(file), "1", "0"])
+        result = runner.invoke(app, args)
         context["result"] = result
     finally:
         file.unlink(missing_ok=True)
+
+
+@when("I invoke the list-references command")
+def invoke(context: Context, tmp_path: Path) -> None:
+    _invoke_list_references_command(context, tmp_path)
 
 
 @when("I invoke the list-references command with include-definition")
 def invoke_include(context: Context, tmp_path: Path) -> None:
-    file = tmp_path / "foo.py"
-    file.write_text("pass")
-    runner = CliRunner()
-    try:
-        result = runner.invoke(
-            app,
-            ["list-references", "--include-definition", str(file), "1", "0"],
-        )
-        context["result"] = result
-    finally:
-        file.unlink(missing_ok=True)
+    _invoke_list_references_command(context, tmp_path, include_definition=True)
 
 
 @when("I invoke the list-references command with a missing file")
