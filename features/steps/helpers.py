@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import typing as typ
+from typing import TYPE_CHECKING  # noqa: ICN003
 
-if typ.TYPE_CHECKING:
+if TYPE_CHECKING:
     from features.types import Context
     from weaverd.rpc import RPCDispatcher
 
-__all__ = ("register_production_handlers",)
+__all__: tuple[str, ...] = ("register_production_handlers",)
 
 
 def register_production_handlers(context: Context) -> Context:
