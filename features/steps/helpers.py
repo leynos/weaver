@@ -1,14 +1,35 @@
 """Shared helpers for BDD step implementations."""
 
-from features.types import Context
-from weaverd import server
-from weaverd.rpc import RPCDispatcher
+from __future__ import annotations
+
+import typing as typ
+
+if typ.TYPE_CHECKING:
+    from features.types import Context
+    from weaverd.rpc import RPCDispatcher
+
+__all__ = ("register_production_handlers",)
 
 
 def register_production_handlers(context: Context) -> Context:
-    """Register all production RPC handlers for the test dispatcher."""
+    """Register production RPC handlers on the test dispatcher.
+
+    Parameters
+    ----------
+    context : Context
+        Test context that provides a "register" hook accepting a callable
+        of shape (dispatcher: RPCDispatcher) -> None.
+
+    Returns
+    -------
+    Context
+        The same context, to enable fluent usage in step setup.
+    """
 
     def setup(dispatcher: RPCDispatcher) -> None:
+        # Import lazily to avoid import-time side effects in tests.
+        from weaverd import server
+
         for name, handler in server.HANDLERS:
             dispatcher.register(name)(handler)
 
