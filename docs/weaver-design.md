@@ -76,10 +76,80 @@ employs a client-server model.
 
   - Performs a version-handshake RPC to ensure compatibility.
 
-  - Streams JSONL responses from the daemon directly to `stdout`.
+    - Streams JSONL responses from the daemon directly to `stdout`.
 
-  - Exits with a code of `0` on success, or a non-zero code plus a final
-    `Error` JSON object on controlled failure.
+    - Exits with a code of `0` on success, or a non-zero code plus a final
+      `Error` JSON object on controlled failure.
+
+#### Component overview
+
+```mermaid
+classDiagram
+    class Client {
+        +async spawn_daemon(socket_path: Path, debug: bool | None = None) : asyncio.subprocess.Process
+    }
+    class Server {
+        +async handle_client(reader, writer)
+        +handle_project_status() : ProjectStatus
+    }
+    class Dispatcher {
+        +handle(data)
+    }
+    class RPC {
+        +_get_result_processor(result)
+        +_process_single_result(result)
+    }
+    Client --> Server : spawns
+    Server --> Dispatcher : uses
+    Server --> RPC : uses
+    note for Client "spawn_daemon is now async and uses asyncio.create_subprocess_exec"
+    note for Server "handle_project_status is now sync"
+    note for RPC "Type checks for result processing refined"
+```
+
+#### RPC flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Client
+    participant OS
+    participant Daemon as weaverd
+    participant RPC as RPC Dispatcher
+    participant Handler as Sync Handler
+
+    rect rgba(220,235,255,0.4)
+    User->>Client: ensure_daemon_running(socket_path)
+    Client->>Client: check socket exists
+    alt socket missing
+        Client->>OS: asyncio.create_subprocess_exec(weaverd ... , start_new_session)
+        OS-->>Client: Process handle
+        loop wait for socket
+            Client->>Client: await anyio.sleep(0.1)
+            Client->>Client: recheck socket
+        end
+    end
+    end
+
+    rect rgba(220,255,220,0.35)
+    User->>Client: RPC call
+    Client->>Daemon: request over socket
+    Daemon->>RPC: dispatch(method, params)
+    RPC->>Handler: invoke (sync)
+    Handler-->>RPC: result or iterator
+    alt single result
+        RPC-->>Client: single payload
+    else streaming iterator
+        loop items
+            RPC-->>Client: next chunk
+        end
+    end
+    Client-->>User: response/stream
+    end
+
+    note over Daemon: On error path, server awaits<br/>sleep(0) before streaming error
+```
 
 ### 1.2 Atomicity & Safety
 
