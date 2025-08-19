@@ -1,5 +1,6 @@
 import typing as typ
 
+import anyio
 import msgspec as ms
 import pytest
 from pytest_bdd import given, scenarios, then, when
@@ -37,10 +38,10 @@ def runtime_dir(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Contex
 
     def setup(dispatcher: RPCDispatcher) -> None:
         @dispatcher.register("list-diagnostics")
-        async def handler(
+        def handler(
             severity: str | None = None,
             files: list[str] | None = None,
-        ) -> typ.AsyncIterator[Diagnostic]:  # pragma: no cover - stub
+        ) -> typ.Iterator[Diagnostic]:  # pragma: no cover - stub
             tool = typ.cast(
                 typ.Any,  # noqa: TC006
                 server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS),
@@ -58,7 +59,7 @@ def runtime_dir(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Contex
 
 @given("the daemon is already running")
 def daemon_running(context: Context) -> None:
-    client.spawn_daemon(context["sock"])
+    anyio.run(client.spawn_daemon, context["sock"])
 
 
 @given("serena-agent is missing")
@@ -81,7 +82,7 @@ def unknown_tool(context: Context, monkeypatch: pytest.MonkeyPatch) -> None:
 def server_malformed(context: Context) -> None:
     def setup(dispatcher: RPCDispatcher) -> None:
         @dispatcher.register("list-diagnostics")
-        async def malformed() -> ms.Raw:  # pragma: no cover - stub
+        def malformed() -> ms.Raw:  # pragma: no cover - stub
             return ms.Raw(b"MALFORMED OUTPUT")
 
     context["register"](setup)

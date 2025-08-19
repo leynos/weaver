@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import subprocess
 import sys
 import typing as typ
 from pathlib import Path  # noqa: TC003
@@ -26,17 +25,21 @@ def discover_socket() -> Path:
     return default_socket_path()
 
 
-def spawn_daemon(
+async def spawn_daemon(
     socket_path: Path, *, debug: bool | None = None
-) -> subprocess.Popen[bytes]:
+) -> asyncio.subprocess.Process:
     """Spawn ``weaverd`` detached from the controlling terminal."""
     debug_env = os.environ.get("WEAVER_DEBUG", "0")
     debug = bool(int(debug_env)) if debug is None else debug
-    return subprocess.Popen(  # noqa: S603 -- trusted internal command
-        [sys.executable, "-m", "weaverd", "--socket-path", str(socket_path)],
-        stdin=subprocess.DEVNULL,
-        stdout=None if debug else subprocess.DEVNULL,
-        stderr=None if debug else subprocess.DEVNULL,
+    return await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "weaverd",
+        "--socket-path",
+        str(socket_path),
+        stdin=asyncio.subprocess.DEVNULL,
+        stdout=None if debug else asyncio.subprocess.DEVNULL,
+        stderr=None if debug else asyncio.subprocess.DEVNULL,
         start_new_session=True,
     )
 
@@ -45,7 +48,7 @@ async def ensure_daemon_running(socket_path: Path) -> None:
     """Start ``weaverd`` if the socket is unavailable."""
     if await can_connect(socket_path):
         return
-    spawn_daemon(socket_path)
+    await spawn_daemon(socket_path)
     for _ in range(50):
         if await can_connect(socket_path):
             return

@@ -69,11 +69,12 @@ async def handle_client(
             try:
                 results = dispatcher.handle(data.rstrip())
             except Exception as exc:  # pragma: no cover - fallback
-                if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt)):  # noqa: UP038
+                if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt)):
                     raise
                 logger.exception("Unhandled RPC error")
 
                 async def _err(error: Exception) -> typ.AsyncIterator[bytes]:
+                    await asyncio.sleep(0)
                     yield msjson.encode(SchemaError(message=str(error)))
 
                 results = _err(exc)
@@ -107,7 +108,7 @@ def _get_rss_mb() -> float:
 
 
 @rpc_handler("project-status")
-async def handle_project_status() -> ProjectStatus:
+def handle_project_status() -> ProjectStatus:
     """Return daemon PID, memory usage, and Serena availability."""
 
     try:

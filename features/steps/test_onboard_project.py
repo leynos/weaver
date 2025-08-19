@@ -3,6 +3,7 @@ import os
 import typing as typ
 from pathlib import Path
 
+import anyio
 import msgspec as ms
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
@@ -20,7 +21,7 @@ scenarios("../onboard_project.feature")
 def runtime_dir(runtime_dir: Context) -> Context:
     def setup(dispatcher: RPCDispatcher) -> None:
         @dispatcher.register("onboard-project")
-        async def onboard() -> OnboardingReport:  # pragma: no cover - stub
+        def onboard() -> OnboardingReport:  # pragma: no cover - stub
             if os.environ.get("WEAVER_TEST_MISSING_SERENA"):
                 raise RuntimeError("serena-agent not found")
             tool = typ.cast(typ.Any, create_serena_tool(SerenaTool.ONBOARDING))  # noqa: TC006
@@ -32,16 +33,16 @@ def runtime_dir(runtime_dir: Context) -> Context:
 
 @given("an invalid project structure")
 def invalid_project(context: Context, monkeypatch) -> None:
-    def fail_spawn(_: Path) -> None:  # pragma: no cover - stub
-        pass
+    async def fail_spawn(_: Path) -> None:  # pragma: no cover - stub
+        await anyio.sleep(0)
 
     monkeypatch.setattr("weaver.client.spawn_daemon", fail_spawn)
 
 
 @given("the server is unavailable")
 def server_unavailable(context: Context, monkeypatch) -> None:
-    def noop(_: Path) -> None:  # pragma: no cover - stub
-        pass
+    async def noop(_: Path) -> None:  # pragma: no cover - stub
+        await anyio.sleep(0)
 
     monkeypatch.setattr("weaver.client.spawn_daemon", noop)
 
@@ -50,7 +51,7 @@ def server_unavailable(context: Context, monkeypatch) -> None:
 def server_malformed(context: Context) -> None:
     def setup(dispatcher: RPCDispatcher) -> None:
         @dispatcher.register("onboard-project")
-        async def malformed() -> ms.Raw:
+        def malformed() -> ms.Raw:
             # Return raw bytes that do not form valid JSON so the
             # client hits a decode error.
             return ms.Raw(b"MALFORMED OUTPUT")
@@ -66,7 +67,7 @@ def tool_error(context: Context, monkeypatch) -> None:
                 raise RuntimeError("boom")
 
         @dispatcher.register("onboard-project")
-        async def onboard() -> OnboardingReport:  # pragma: no cover - stub
+        def onboard() -> OnboardingReport:  # pragma: no cover - stub
             tool = FailingTool()
             return OnboardingReport(details=tool.apply())
 

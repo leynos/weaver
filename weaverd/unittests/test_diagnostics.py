@@ -47,10 +47,10 @@ async def diagnostics_test_server(
     monkeypatch.setattr(server, "create_serena_tool", lambda _: StubTool())
 
     @dispatcher.register("list-diagnostics")
-    async def handler(
+    def handler(
         severity: str | None = None,
         files: list[str] | None = None,
-    ) -> typ.AsyncIterator[Diagnostic]:
+    ) -> typ.Iterator[Diagnostic]:
         tool = typ.cast(typ.Any, server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS))  # noqa: TC006
         for diag in tool.list_diagnostics():
             if severity and diag.severity != severity:
@@ -106,7 +106,7 @@ def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(serena_tools, "import_module", fake_import)
     serena_tools.clear_serena_imports()
 
-    with pytest.raises(RuntimeError, match="workflow_tools.OnboardingTool"):
+    with pytest.raises(RuntimeError, match=r"workflow_tools.OnboardingTool"):
         serena_tools.create_serena_tool(SerenaTool.ONBOARDING)
     serena_tools.clear_serena_imports()
 
@@ -136,12 +136,10 @@ async def test_list_diagnostics_filtered(diagnostics_test_server: Path) -> None:
     sock = diagnostics_test_server
     reader, writer = await asyncio.open_unix_connection(str(sock))
     writer.write(
-        msjson.encode(
-            {
-                "method": "list-diagnostics",
-                "params": {"severity": "Warning", "files": ["foo.py"]},
-            }
-        )
+        msjson.encode({
+            "method": "list-diagnostics",
+            "params": {"severity": "Warning", "files": ["foo.py"]},
+        })
         + b"\n",
     )
     await writer.drain()
@@ -164,10 +162,9 @@ async def test_missing_diagnostics_dependency(
     monkeypatch.setattr(server, "create_serena_tool", raise_error)
 
     @dispatcher.register("list-diagnostics")
-    async def handler() -> typ.AsyncIterator[Diagnostic]:  # pragma: no cover - stub
+    def handler() -> typ.Iterator[Diagnostic]:  # pragma: no cover - stub
         tool = typ.cast(typ.Any, server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS))  # noqa: TC006
-        for d in tool.list_diagnostics():
-            yield d
+        yield from tool.list_diagnostics()
 
     sock = tmp_path / "e.sock"
     srv = await start_server(sock, dispatcher)

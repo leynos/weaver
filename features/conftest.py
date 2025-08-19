@@ -2,9 +2,9 @@ import asyncio
 import collections.abc as cabc
 import multiprocessing as mp
 import os
-import time
 from pathlib import Path
 
+import anyio
 import pytest
 
 from features.types import Context
@@ -30,7 +30,7 @@ def runtime_dir(
         async with server:
             await server.serve_forever()
 
-    def spawn_daemon(_: Path) -> mp.Process:
+    async def spawn_daemon(_: Path) -> mp.Process:
         def _run() -> None:
             try:
                 loop = asyncio.new_event_loop()
@@ -44,7 +44,7 @@ def runtime_dir(
         proc = mp.Process(target=_run)
         proc.start()
         processes.append(proc)
-        time.sleep(0.1)
+        await anyio.sleep(0.1)
         return proc
 
     monkeypatch.setattr(client, "spawn_daemon", spawn_daemon)

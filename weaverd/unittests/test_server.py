@@ -25,7 +25,7 @@ async def test_server_echoes_status(tmp_path: Path) -> None:
     dispatcher = RPCDispatcher()
 
     @dispatcher.register("project-status")
-    async def handler() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
+    def handler() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
         return ProjectStatus(pid=123, rss_mb=1.0, ready=True, message="ok")
 
     sock = tmp_path / "d.sock"
@@ -49,7 +49,7 @@ async def test_server_handles_multiple_requests(tmp_path: Path) -> None:
     dispatcher = RPCDispatcher()
 
     @dispatcher.register("echo")
-    async def echo(value: int) -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
+    def echo(value: int) -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
         return ProjectStatus(
             pid=value, rss_mb=float(value), ready=True, message=str(value)
         )
@@ -81,13 +81,14 @@ def test_rpc_handler_rejects_duplicates() -> None:
     try:
 
         @srv.rpc_handler("dup")
-        async def first() -> None:
+        def first() -> None:
             pass
 
         with pytest.raises(ValueError):
 
             @srv.rpc_handler("dup")
-            async def second() -> None:  # pragma: no cover - stub
+            def second() -> None:  # pragma: no cover - stub
                 pass
+
     finally:
         srv.HANDLERS[:] = original

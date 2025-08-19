@@ -25,7 +25,7 @@ async def test_onboard_project(tmp_path: Path) -> None:
     dispatcher = RPCDispatcher()
 
     @dispatcher.register("onboard-project")
-    async def onboard() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
+    def onboard() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
         tool = typ.cast(typ.Any, create_serena_tool(SerenaTool.ONBOARDING))  # noqa: TC006
         return OnboardingReport(details=tool.apply())
 
@@ -59,7 +59,7 @@ async def test_onboard_failure(tmp_path: Path) -> None:
             raise RuntimeError("boom")
 
     @dispatcher.register("onboard-project")
-    async def onboard() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
+    def onboard() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
         return OnboardingReport(
             details=FailingTool().apply()
         )  # pragma: no cover - stub

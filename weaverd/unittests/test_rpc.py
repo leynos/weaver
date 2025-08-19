@@ -33,7 +33,7 @@ async def test_dispatcher_handles_registered_method() -> None:
     dispatcher = RPCDispatcher()
 
     @dispatcher.register("project-status")
-    async def handler() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
+    def handler() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
         return ProjectStatus(pid=1, rss_mb=0.1, ready=True, message="ok")
 
     await _test_dispatcher_call(
@@ -48,7 +48,7 @@ async def test_dispatcher_passes_parameters() -> None:
     dispatcher = RPCDispatcher()
 
     @dispatcher.register("echo")
-    async def echo(value: int) -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
+    def echo(value: int) -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
         return ProjectStatus(
             pid=value, rss_mb=float(value), ready=True, message=str(value)
         )
@@ -86,9 +86,8 @@ async def test_dispatcher_streams_multiple_results() -> None:
     dispatcher = RPCDispatcher()
 
     @dispatcher.register("numbers")
-    async def numbers() -> typ.AsyncIterator[int]:  # pyright: ignore[reportUnusedFunction]
-        for i in range(3):
-            yield i
+    def numbers() -> typ.Iterator[int]:  # pyright: ignore[reportUnusedFunction]
+        yield from range(3)
 
     req = msjson.encode({"method": "numbers"})
     results = dispatcher.handle(req)
@@ -102,14 +101,13 @@ async def test_dispatcher_streams_multiple_results() -> None:
 async def test_dispatcher_streams_midstream_error() -> None:
     dispatcher = RPCDispatcher()
 
-    async def boom() -> typ.AsyncIterator[int]:
+    def boom() -> typ.Iterator[int]:
         yield 1
         raise RuntimeError("boom")
 
     @dispatcher.register("boom")
-    async def handler() -> typ.AsyncIterator[int]:  # pyright: ignore[reportUnusedFunction]
-        async for item in boom():
-            yield item
+    def handler() -> typ.Iterator[int]:  # pyright: ignore[reportUnusedFunction]
+        yield from boom()
 
     req = msjson.encode({"method": "boom"})
     results = dispatcher.handle(req)

@@ -88,11 +88,11 @@ class RPCDispatcher:
         yield msjson.encode(result)
 
     def _get_result_processor(self, result: typ.Any) -> ResultProcessor:
-        if isinstance(result, (bytes, bytearray)):  # noqa: UP038 - tuple required
+        if isinstance(result, (bytes, bytearray)):
             return self._process_bytes_result
         if hasattr(result, "__aiter__"):
             return self._process_async_iterable_result
-        if isinstance(result, typ.Iterable) and not isinstance(  # noqa: UP038 - tuple required
+        if isinstance(result, typ.Iterable) and not isinstance(
             result, (str, bytes, bytearray)
         ):
             return self._process_sync_iterable_result

@@ -36,6 +36,7 @@ reportMissingModuleSource = false
 
 [tool.ruff]
 line-length = 88
+preview = true
 
 [tool.ruff.lint]
 select = [
@@ -60,7 +61,7 @@ select = [
     "DTZ",      # require strict timezone manipulation with datetime
     "FBT",      # detect boolean traps
     "N",        # enforce naming conventions, e.g. ClassName vs function_name
-    "FURB",
+    "FURB",      # Refurb-style suggestions
     "B",
     "RUF",
 ]
