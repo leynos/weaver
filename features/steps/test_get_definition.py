@@ -36,12 +36,12 @@ def _create_runtime_fixture(
             @dispatcher.register("get-definition")
             def handler(
                 file: str, line: int, char: int
-            ) -> cabc.Iterator[Symbol]:  # pragma: no cover - stub
+            ) -> cabc.Iterable[Symbol]:  # pragma: no cover - stub
                 tool = typ.cast(
                     typ.Any,  # noqa: TC006
                     server.create_serena_tool(SerenaTool.GET_DEFINITION),
                 )
-                yield from tool.get_definition(file=file, line=line, char=char)
+                return tool.get_definition(file=file, line=line, char=char)
 
         runtime_dir["register"](setup)
         return runtime_dir

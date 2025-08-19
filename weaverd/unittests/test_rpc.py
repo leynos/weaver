@@ -86,8 +86,8 @@ async def test_dispatcher_streams_multiple_results() -> None:
     dispatcher = RPCDispatcher()
 
     @dispatcher.register("numbers")
-    def numbers() -> typ.Iterator[int]:  # pyright: ignore[reportUnusedFunction]
-        yield from range(3)
+    def numbers() -> typ.Iterable[int]:  # pyright: ignore[reportUnusedFunction]
+        return range(3)
 
     req = msjson.encode({"method": "numbers"})
     results = dispatcher.handle(req)
@@ -106,8 +106,8 @@ async def test_dispatcher_streams_midstream_error() -> None:
         raise RuntimeError("boom")
 
     @dispatcher.register("boom")
-    def handler() -> typ.Iterator[int]:  # pyright: ignore[reportUnusedFunction]
-        yield from boom()
+    def handler() -> typ.Iterable[int]:  # pyright: ignore[reportUnusedFunction]
+        return boom()
 
     req = msjson.encode({"method": "boom"})
     results = dispatcher.handle(req)

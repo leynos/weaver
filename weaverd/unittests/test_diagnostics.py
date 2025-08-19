@@ -162,9 +162,9 @@ async def test_missing_diagnostics_dependency(
     monkeypatch.setattr(server, "create_serena_tool", raise_error)
 
     @dispatcher.register("list-diagnostics")
-    def handler() -> typ.Iterator[Diagnostic]:  # pragma: no cover - stub
+    def handler() -> typ.Iterable[Diagnostic]:  # pragma: no cover - stub
         tool = typ.cast(typ.Any, server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS))  # noqa: TC006
-        yield from tool.list_diagnostics()
+        return tool.list_diagnostics()
 
     sock = tmp_path / "e.sock"
     srv = await start_server(sock, dispatcher)
