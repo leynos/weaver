@@ -32,6 +32,7 @@ async def test_onboard_project(tmp_path: Path) -> None:
     sock = tmp_path / "o.sock"
     server = await start_server(sock, dispatcher)
     async with server:
+        writer: asyncio.StreamWriter | None = None
         try:
             reader, writer = await asyncio.wait_for(
                 asyncio.open_unix_connection(str(sock)), timeout=5.0
@@ -44,8 +45,9 @@ async def test_onboard_project(tmp_path: Path) -> None:
             assert "viewing" in text and "project" in text
             assert len(report.details) > 20
         finally:
-            writer.close()
-            await writer.wait_closed()
+            if writer is not None:
+                writer.close()
+                await writer.wait_closed()
     server.close()
     await server.wait_closed()
 
@@ -67,6 +69,7 @@ async def test_onboard_failure(tmp_path: Path) -> None:
     sock = tmp_path / "f.sock"
     server = await start_server(sock, dispatcher)
     async with server:
+        writer: asyncio.StreamWriter | None = None
         try:
             reader, writer = await asyncio.wait_for(
                 asyncio.open_unix_connection(str(sock)), timeout=5.0
@@ -77,8 +80,9 @@ async def test_onboard_failure(tmp_path: Path) -> None:
             error = msjson.decode(data.rstrip())
             assert error.get("type") == "error"
         finally:
-            writer.close()
-            await writer.wait_closed()
+            if writer is not None:
+                writer.close()
+                await writer.wait_closed()
     server.close()
     await server.wait_closed()
 

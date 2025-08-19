@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import collections.abc as cabc
 import inspect
 import typing as typ
 
@@ -8,7 +9,9 @@ import msgspec.json as msjson
 
 from weaver_schemas.error import SchemaError
 
-Handler = typ.Callable[..., typ.Awaitable[typ.Any]]
+HandlerSync = typ.Callable[..., typ.Any]
+HandlerAsync = typ.Callable[..., typ.Awaitable[typ.Any]]
+Handler = HandlerSync | HandlerAsync
 
 ResultProcessor: typ.TypeAlias = (
     typ.Callable[[bytes | bytearray], typ.AsyncIterator[bytes]]
@@ -56,7 +59,7 @@ class RPCDispatcher:
         try:
             result = handler(**(request.params or {}))
             if inspect.isawaitable(result):
-                result = await typ.cast("typ.Awaitable[typ.Any]", result)
+                result = await typ.cast(typ.Awaitable[typ.Any], result)  # noqa: TC006
         except Exception as exc:  # noqa: BLE001 - ensure structured errors
             return None, self._encode_error(str(exc))
         return result, None
@@ -64,7 +67,7 @@ class RPCDispatcher:
     async def _process_bytes_result(
         self, result: bytes | bytearray
     ) -> typ.AsyncIterator[bytes]:
-        yield typ.cast("bytes", result)
+        yield result if isinstance(result, bytes) else bytes(result)
 
     async def _process_async_iterable_result(
         self, result: typ.AsyncIterable[typ.Any]
@@ -90,9 +93,9 @@ class RPCDispatcher:
     def _get_result_processor(self, result: typ.Any) -> ResultProcessor:
         if isinstance(result, (bytes, bytearray)):
             return self._process_bytes_result
-        if hasattr(result, "__aiter__"):
+        if isinstance(result, cabc.AsyncIterable):
             return self._process_async_iterable_result
-        if isinstance(result, typ.Iterable) and not isinstance(
+        if isinstance(result, cabc.Iterable) and not isinstance(
             result, (str, bytes, bytearray)
         ):
             return self._process_sync_iterable_result

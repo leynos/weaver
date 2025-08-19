@@ -1,5 +1,6 @@
 import asyncio
 import collections.abc as cabc
+import contextlib
 import multiprocessing as mp
 import os
 from pathlib import Path
@@ -22,6 +23,20 @@ def runtime_dir(
     processes: list[mp.Process] = []
     handler = {"func": lambda dispatcher: None}
 
+    async def _wait_for_socket(path: Path, timeout: float = 5.0) -> None:
+        """Poll ``path`` until a daemon accepts a connection or timeout."""
+        deadline = anyio.current_time() + timeout
+        while anyio.current_time() < deadline:
+            try:
+                _, writer = await asyncio.open_unix_connection(str(path))
+                writer.close()
+                with contextlib.suppress(Exception):
+                    await writer.wait_closed()
+                return
+            except OSError:
+                await anyio.sleep(0.05)
+        raise TimeoutError(f"Daemon socket not ready: {path}")
+
     async def _serve_daemon(path: Path) -> None:
         """Run a minimal daemon for tests."""
         dispatcher = RPCDispatcher()
@@ -30,8 +45,12 @@ def runtime_dir(
         async with server:
             await server.serve_forever()
 
-    def spawn_daemon(_: Path) -> mp.Process:
+    def spawn_daemon(_: Path, *, debug: bool | None = None) -> mp.Process:
+        """Start the test daemon in a background process."""
+        del debug
+
         def _run() -> None:
+            loop: asyncio.AbstractEventLoop | None = None
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
@@ -39,16 +58,19 @@ def runtime_dir(
             except Exception:  # noqa: BLE001,S110 - best effort for tests
                 pass
             finally:
-                loop.close()
+                if loop is not None:
+                    loop.close()
 
         proc = mp.Process(target=_run)
         proc.start()
         processes.append(proc)
         return proc
 
-    async def async_spawn_daemon(path: Path) -> mp.Process:
-        proc = spawn_daemon(path)
-        await anyio.sleep(0.1)
+    async def async_spawn_daemon(
+        path: Path, *, debug: bool | None = None
+    ) -> mp.Process:
+        proc = spawn_daemon(path, debug=debug)
+        await _wait_for_socket(sock)
         return proc
 
     monkeypatch.setattr(client, "spawn_daemon", async_spawn_daemon)

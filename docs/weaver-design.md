@@ -341,11 +341,11 @@ single source of truth for the daemon and client API.
 handling common connection errors. The CLI's `check-socket` command reports
 availability of a specified path.
 
-The client auto-starts `weaverd` when the socket is missing. It forks the
-daemon in a detached `subprocess.Popen` call and waits for the socket to become
-available before issuing the request. Set the environment variable
-`WEAVER_DEBUG=1` to inherit the daemon's output streams when debugging startup
-failures.
+The client auto-starts `weaverd` when the socket is missing. It now launches
+the daemon with `asyncio.create_subprocess_exec(..., start_new_session=True)`
+and asynchronously polls for the socket in a short sleep loop until the daemon
+is ready. Set the environment variable `WEAVER_DEBUG=1` to inherit the daemon's
+output streams when debugging startup failures.
 
 `onboard-project` uses Serena's `OnboardingTool` from
 `serena.tools.workflow_tools` (see

@@ -46,12 +46,12 @@ def runtime_dir(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> Contex
                 typ.Any,  # noqa: TC006
                 server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS),
             )
-            for d in tool.list_diagnostics():
-                if severity and d.severity != severity:
-                    continue
-                if files and d.location.file not in files:
-                    continue
-                yield d
+            yield from (
+                d
+                for d in tool.list_diagnostics()
+                if (not severity or d.severity == severity)
+                and (not files or d.location.file in files)
+            )
 
     runtime_dir["register"](setup)
     return runtime_dir

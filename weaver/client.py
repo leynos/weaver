@@ -20,6 +20,11 @@ from .sockets import can_connect
 
 logger = logging.getLogger(__name__)
 
+JSONValue: typ.TypeAlias = (
+    bool | int | float | str | list["JSONValue"] | dict[str, "JSONValue"] | None
+)
+JSONObject: typ.TypeAlias = dict[str, JSONValue]
+
 
 def discover_socket() -> Path:
     """Return the daemon socket path."""
@@ -89,13 +94,13 @@ async def _stream_response(reader: asyncio.StreamReader, stdout: typ.TextIO) -> 
 
 async def rpc_call(
     method: str,
-    params: dict[str, typ.Any] | None = None,
+    params: JSONObject | None = None,
     socket_path: Path | None = None,
     stdout: typ.TextIO | None = None,
 ) -> None:
     """Send an RPC request and stream the response to ``stdout``."""
     path = socket_path or discover_socket()
-    stdout = typ.cast("typ.TextIO", sys.stdout if stdout is None else stdout)
+    stdout = typ.cast(typ.TextIO, sys.stdout if stdout is None else stdout)  # noqa: TC006
     try:
         await ensure_daemon_running(path)
     except Exception as exc:
@@ -114,3 +119,4 @@ async def rpc_call(
         await writer.wait_closed()
     if error:
         raise typer.Exit(1)
+    return

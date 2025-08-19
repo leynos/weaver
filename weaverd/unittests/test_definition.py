@@ -1,4 +1,5 @@
 import builtins
+import collections.abc as cabc
 from dataclasses import dataclass  # noqa: ICN003 -- simpler decorator usage
 
 import pytest
@@ -62,8 +63,10 @@ class FilePosition:
 
 
 def _setup_and_call_get_definition(
-    monkeypatch: pytest.MonkeyPatch, tool_class, position: FilePosition
-):
+    monkeypatch: pytest.MonkeyPatch,
+    tool_class: type[object],
+    position: FilePosition,
+) -> cabc.AsyncIterator[Symbol]:
     """Helper to setup mock and call handle_get_definition."""
     monkeypatch.setattr(server, "create_serena_tool", lambda _: tool_class())
     return server.handle_get_definition(position.file, position.line, position.char)
