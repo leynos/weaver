@@ -80,11 +80,9 @@ def _process_response_line(data: bytes, stdout: typ.TextIO) -> bool:
 
 async def _stream_response(reader: asyncio.StreamReader, stdout: typ.TextIO) -> bool:
     """Stream lines from ``reader`` to ``stdout`` and flag dependency errors."""
-
     error = False
-    while data := await reader.readline():
-        if _process_response_line(data, stdout):
-            error = True
+    async for line in reader:
+        error |= _process_response_line(line, stdout)
     return error
 
 
