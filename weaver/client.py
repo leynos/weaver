@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import asyncio.subprocess as aio_subprocess
 import logging
 import os
 import sys
@@ -27,19 +28,19 @@ def discover_socket() -> Path:
 
 async def spawn_daemon(
     socket_path: Path, *, debug: bool | None = None
-) -> asyncio.subprocess.Process:
+) -> aio_subprocess.Process:
     """Spawn ``weaverd`` detached from the controlling terminal."""
     debug_env = os.environ.get("WEAVER_DEBUG", "0")
     debug = bool(int(debug_env)) if debug is None else debug
-    return await asyncio.create_subprocess_exec(
+    return await aio_subprocess.create_subprocess_exec(
         sys.executable,
         "-m",
         "weaverd",
         "--socket-path",
         str(socket_path),
-        stdin=asyncio.subprocess.DEVNULL,
-        stdout=None if debug else asyncio.subprocess.DEVNULL,
-        stderr=None if debug else asyncio.subprocess.DEVNULL,
+        stdin=aio_subprocess.DEVNULL,
+        stdout=None if debug else aio_subprocess.DEVNULL,
+        stderr=None if debug else aio_subprocess.DEVNULL,
         start_new_session=True,
     )
 

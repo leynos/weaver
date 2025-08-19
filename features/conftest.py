@@ -30,7 +30,7 @@ def runtime_dir(
         async with server:
             await server.serve_forever()
 
-    async def spawn_daemon(_: Path) -> mp.Process:
+    def spawn_daemon(_: Path) -> mp.Process:
         def _run() -> None:
             try:
                 loop = asyncio.new_event_loop()
@@ -44,10 +44,14 @@ def runtime_dir(
         proc = mp.Process(target=_run)
         proc.start()
         processes.append(proc)
+        return proc
+
+    async def async_spawn_daemon(path: Path) -> mp.Process:
+        proc = spawn_daemon(path)
         await anyio.sleep(0.1)
         return proc
 
-    monkeypatch.setattr(client, "spawn_daemon", spawn_daemon)
+    monkeypatch.setattr(client, "spawn_daemon", async_spawn_daemon)
 
     ctx: Context = {"sock": sock, "processes": processes}
 

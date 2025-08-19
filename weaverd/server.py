@@ -74,6 +74,10 @@ async def handle_client(
                 logger.exception("Unhandled RPC error")
 
                 async def _err(error: Exception) -> typ.AsyncIterator[bytes]:
+                    # Yield to the event loop before streaming the error so the
+                    # response is delivered asynchronously like normal
+                    # handlers. Some runtimes expect an await point before the
+                    # first ``yield`` in async generators.
                     await asyncio.sleep(0)
                     yield msjson.encode(SchemaError(message=str(error)))
 
