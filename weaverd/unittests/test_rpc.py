@@ -11,7 +11,7 @@ from weaver_schemas.status import ProjectStatus
 from weaverd.rpc import RPCDispatcher
 
 
-@pytest.fixture()
+@pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
 
@@ -78,7 +78,8 @@ async def test_dispatcher_returns_error_on_bad_json() -> None:
 
     results = dispatcher.handle(b"not-json")
     err = msjson.decode(await builtins.anext(results), type=SchemaError)
-    assert err.type == "error" and "invalid request" in err.message
+    assert err.type == "error"
+    assert "invalid request" in err.message
 
 
 @pytest.mark.anyio
@@ -115,4 +116,5 @@ async def test_dispatcher_streams_midstream_error() -> None:
     err = msjson.decode(await builtins.anext(results), type=SchemaError)
     with pytest.raises(StopAsyncIteration):
         await builtins.anext(results)
-    assert first == 1 and err.message == "boom"
+    assert first == 1
+    assert err.message == "boom"

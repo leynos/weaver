@@ -11,7 +11,7 @@ from weaverd.rpc import RPCDispatcher
 from weaverd.server import start_server
 
 
-@pytest.fixture()
+@pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
 
@@ -84,7 +84,7 @@ def test_rpc_handler_rejects_duplicates() -> None:
         def first() -> None:
             pass
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="already registered"):
 
             @srv.rpc_handler("dup")
             def second() -> None:  # pragma: no cover - stub

@@ -66,6 +66,10 @@ select = [
     "N",        # enforce naming conventions, e.g. ClassName vs function_name
     "FURB",      # Refurb-style suggestions
     "B",         # Bugbear warnings
+    "LOG",      # Logging
+    "G",        # Log formatting
+    "Q",        # Quotes
+    "PT",       # PyTest style issues
     "RUF",
 ]
 per-file-ignores = {"**/test_*.py" = ["S101"]}

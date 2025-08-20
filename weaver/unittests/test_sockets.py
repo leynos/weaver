@@ -6,7 +6,7 @@ import pytest
 from weaver.sockets import can_connect
 
 
-@pytest.fixture()
+@pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
 

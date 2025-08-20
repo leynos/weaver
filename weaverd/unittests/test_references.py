@@ -19,7 +19,7 @@ class StubTool:
         return [Reference(location=loc)]
 
 
-@pytest.fixture()
+@pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
 
