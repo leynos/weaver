@@ -77,22 +77,28 @@ async def async_spawn_daemon(
     return proc
 
 
+def _cleanup_process(proc: mp.Process) -> None:
+    """Cleanup a single process with graceful fallback."""
+    if not (proc and proc.is_alive()):
+        return
+    proc.terminate()
+    try:  # noqa: SIM105
+        proc.join(timeout=5)
+    except Exception:  # noqa: BLE001,S110 - cleanup best effort
+        pass
+    if not proc.is_alive():
+        return
+    try:
+        proc.kill()
+        proc.join(timeout=1)
+    except Exception:  # noqa: BLE001,S110 - cleanup best effort
+        pass
+
+
 def _cleanup_processes(processes: list[mp.Process]) -> None:
     """Terminate test processes best effort."""
     for proc in processes:
-        if proc and proc.is_alive():
-            proc.terminate()
-            try:
-                proc.join(timeout=5)
-            except Exception:  # noqa: BLE001,S110 - cleanup best effort
-                pass
-            finally:
-                if proc.is_alive():
-                    try:
-                        proc.kill()
-                        proc.join(timeout=1)
-                    except Exception:  # noqa: BLE001,S110 - cleanup best effort
-                        pass
+        _cleanup_process(proc)
 
 
 @pytest.fixture()
