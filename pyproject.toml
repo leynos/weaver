@@ -65,7 +65,7 @@ select = [
     "FBT",      # detect boolean traps
     "N",        # enforce naming conventions, e.g. ClassName vs function_name
     "FURB",      # Refurb-style suggestions
-    "B",
+    "B",         # Bugbear warnings
     "RUF",
 ]
 per-file-ignores = {"**/test_*.py" = ["S101"]}
