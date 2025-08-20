@@ -1,5 +1,6 @@
 import os
 
+import anyio
 import msgspec as ms
 import pytest
 from pytest_bdd import given, scenarios, then, when
@@ -18,7 +19,7 @@ scenarios("../project_status.feature")
 def runtime_dir(runtime_dir: Context) -> Context:
     def setup(dispatcher: RPCDispatcher) -> None:
         @dispatcher.register("project-status")
-        async def status() -> ProjectStatus:  # pragma: no cover - stub
+        def status() -> ProjectStatus:  # pragma: no cover - stub
             ready = "WEAVER_TEST_MISSING_SERENA" not in os.environ
             msg = "ok" if ready else "serena missing"
             return ProjectStatus(pid=321, rss_mb=1.0, ready=ready, message=msg)
@@ -29,7 +30,7 @@ def runtime_dir(runtime_dir: Context) -> Context:
 
 @given("the daemon is already running")
 def daemon_running(context: Context) -> None:
-    client.spawn_daemon(context["sock"])
+    anyio.run(client.spawn_daemon, context["sock"])
 
 
 @given("serena-agent is missing")
@@ -41,7 +42,7 @@ def missing_dep(monkeypatch: pytest.MonkeyPatch) -> None:
 def server_malformed(context: Context) -> None:
     def setup(dispatcher: RPCDispatcher) -> None:
         @dispatcher.register("project-status")
-        async def malformed() -> ms.Raw:  # pragma: no cover - stub
+        def malformed() -> ms.Raw:  # pragma: no cover - stub
             return ms.Raw(b"MALFORMED OUTPUT")
 
     context["register"](setup)

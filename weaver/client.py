@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import asyncio.subprocess as aio_subprocess
 import logging
 import os
-import subprocess
 import sys
 import typing as typ
 from pathlib import Path  # noqa: TC003
@@ -20,23 +20,32 @@ from .sockets import can_connect
 
 logger = logging.getLogger(__name__)
 
+JSONValue: typ.TypeAlias = (
+    bool | int | float | str | list["JSONValue"] | dict[str, "JSONValue"] | None
+)
+JSONObject: typ.TypeAlias = dict[str, JSONValue]
+
 
 def discover_socket() -> Path:
     """Return the daemon socket path."""
     return default_socket_path()
 
 
-def spawn_daemon(
+async def spawn_daemon(
     socket_path: Path, *, debug: bool | None = None
-) -> subprocess.Popen[bytes]:
+) -> aio_subprocess.Process:
     """Spawn ``weaverd`` detached from the controlling terminal."""
     debug_env = os.environ.get("WEAVER_DEBUG", "0")
     debug = bool(int(debug_env)) if debug is None else debug
-    return subprocess.Popen(  # noqa: S603 -- trusted internal command
-        [sys.executable, "-m", "weaverd", "--socket-path", str(socket_path)],
-        stdin=subprocess.DEVNULL,
-        stdout=None if debug else subprocess.DEVNULL,
-        stderr=None if debug else subprocess.DEVNULL,
+    return await aio_subprocess.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "weaverd",
+        "--socket-path",
+        str(socket_path),
+        stdin=aio_subprocess.DEVNULL,
+        stdout=None if debug else aio_subprocess.DEVNULL,
+        stderr=None if debug else aio_subprocess.DEVNULL,
         start_new_session=True,
     )
 
@@ -45,7 +54,7 @@ async def ensure_daemon_running(socket_path: Path) -> None:
     """Start ``weaverd`` if the socket is unavailable."""
     if await can_connect(socket_path):
         return
-    spawn_daemon(socket_path)
+    await spawn_daemon(socket_path)
     for _ in range(50):
         if await can_connect(socket_path):
             return
@@ -77,23 +86,21 @@ def _process_response_line(data: bytes, stdout: typ.TextIO) -> bool:
 
 async def _stream_response(reader: asyncio.StreamReader, stdout: typ.TextIO) -> bool:
     """Stream lines from ``reader`` to ``stdout`` and flag dependency errors."""
-
     error = False
-    while data := await reader.readline():
-        if _process_response_line(data, stdout):
-            error = True
+    async for line in reader:
+        error |= _process_response_line(line, stdout)
     return error
 
 
 async def rpc_call(
     method: str,
-    params: dict[str, typ.Any] | None = None,
+    params: JSONObject | None = None,
     socket_path: Path | None = None,
     stdout: typ.TextIO | None = None,
 ) -> None:
     """Send an RPC request and stream the response to ``stdout``."""
     path = socket_path or discover_socket()
-    stdout = typ.cast("typ.TextIO", sys.stdout if stdout is None else stdout)
+    stdout = typ.cast(typ.TextIO, sys.stdout if stdout is None else stdout)  # noqa: TC006
     try:
         await ensure_daemon_running(path)
     except Exception as exc:
@@ -112,3 +119,4 @@ async def rpc_call(
         await writer.wait_closed()
     if error:
         raise typer.Exit(1)
+    return

@@ -25,7 +25,7 @@ async def test_rpc_call_existing_daemon(tmp_path: Path) -> None:
     dispatcher = RPCDispatcher()
 
     @dispatcher.register("project-status")
-    async def status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
+    def status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
         return ProjectStatus(pid=99, rss_mb=1.0, ready=True, message="ok")
 
     sock = tmp_path / "d.sock"
@@ -57,7 +57,7 @@ async def test_rpc_call_autostart(
                     dispatcher = RPCDispatcher()
 
                     @dispatcher.register("project-status")
-                    async def status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
+                    def status() -> ProjectStatus:  # pyright: ignore[reportUnusedFunction]
                         return ProjectStatus(
                             pid=999, rss_mb=1.0, ready=True, message="ok"
                         )
@@ -76,9 +76,9 @@ async def test_rpc_call_autostart(
 
     started: mp.Process | None = None
 
-    def wrapped(path: Path) -> mp.Process:
+    async def wrapped(path: Path) -> mp.Process:
         nonlocal started
-        started = spawn(path)
+        started = await asyncio.to_thread(spawn, path)
         return started
 
     monkeypatch.setattr(client, "spawn_daemon", wrapped)

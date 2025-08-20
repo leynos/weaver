@@ -1,4 +1,5 @@
 import builtins
+import collections.abc as cabc
 from dataclasses import dataclass  # noqa: ICN003 -- simpler decorator usage
 
 import pytest
@@ -61,9 +62,11 @@ class FilePosition:
     char: int
 
 
-async def _setup_and_call_get_definition(
-    monkeypatch: pytest.MonkeyPatch, tool_class, position: FilePosition
-):
+def _setup_and_call_get_definition(
+    monkeypatch: pytest.MonkeyPatch,
+    tool_class: type[object],
+    position: FilePosition,
+) -> cabc.AsyncIterator[Symbol]:
     """Helper to setup mock and call handle_get_definition."""
     monkeypatch.setattr(server, "create_serena_tool", lambda _: tool_class())
     return server.handle_get_definition(position.file, position.line, position.char)
@@ -103,7 +106,7 @@ def anyio_backend() -> str:
 
 @pytest.mark.anyio
 async def test_handle_get_definition(monkeypatch: pytest.MonkeyPatch) -> None:
-    results = await _setup_and_call_get_definition(
+    results = _setup_and_call_get_definition(
         monkeypatch, StubTool, FilePosition("foo.py", 1, 0)
     )
     sym = (await _collect_symbols_from_results(results, 1))[0]
@@ -125,7 +128,7 @@ async def test_handle_get_definition(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_handle_get_definition_no_symbols(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    results = await _setup_and_call_get_definition(
+    results = _setup_and_call_get_definition(
         monkeypatch, EmptyTool, FilePosition("foo.py", 1, 0)
     )
     await _collect_symbols_from_results(results, 0)
@@ -135,7 +138,7 @@ async def test_handle_get_definition_no_symbols(
 async def test_handle_get_definition_multiple_symbols(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    results = await _setup_and_call_get_definition(
+    results = _setup_and_call_get_definition(
         monkeypatch, MultiTool, FilePosition("foo.py", 1, 0)
     )
     first, second = await _collect_symbols_from_results(results, 2)

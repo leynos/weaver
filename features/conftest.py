@@ -1,16 +1,104 @@
 import asyncio
 import collections.abc as cabc
+import contextlib
+import functools
 import multiprocessing as mp
 import os
-import time
 from pathlib import Path
 
+import anyio
 import pytest
 
 from features.types import Context
 from weaver import client
 from weaverd.rpc import RPCDispatcher
 from weaverd.server import start_server
+
+HandlerFunc = cabc.Callable[[RPCDispatcher], None]
+
+
+async def _wait_for_socket(path: Path, timeout: float = 5.0) -> None:
+    """Poll ``path`` until a daemon accepts a connection or timeout."""
+    deadline = anyio.current_time() + timeout
+    while anyio.current_time() < deadline:
+        try:
+            _, writer = await asyncio.open_unix_connection(str(path))
+            writer.close()
+            with contextlib.suppress(Exception):
+                await writer.wait_closed()
+            return
+        except OSError:
+            await anyio.sleep(0.05)
+    raise TimeoutError(f"Daemon socket not ready: {path}")
+
+
+async def _serve_daemon(path: Path, handler_func: HandlerFunc) -> None:
+    """Run a minimal daemon for tests."""
+    dispatcher = RPCDispatcher()
+    handler_func(dispatcher)
+    server = await start_server(path, dispatcher)
+    async with server:
+        await server.serve_forever()
+
+
+def spawn_daemon(
+    path: Path, handler_func: HandlerFunc, *, debug: bool | None = None
+) -> mp.Process:
+    """Start the test daemon in a background process."""
+    del debug
+
+    def _run() -> None:
+        loop: asyncio.AbstractEventLoop | None = None
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(_serve_daemon(path, handler_func))
+        except Exception:  # noqa: BLE001,S110 - best effort for tests
+            pass
+        finally:
+            if loop is not None:
+                loop.close()
+
+    proc = mp.Process(target=_run)
+    proc.start()
+    return proc
+
+
+async def async_spawn_daemon(
+    path: Path,
+    *,
+    handler: dict[str, HandlerFunc],
+    processes: list[mp.Process],
+    debug: bool | None = None,
+) -> mp.Process:
+    proc = spawn_daemon(path, handler["func"], debug=debug)
+    processes.append(proc)
+    await _wait_for_socket(path)
+    return proc
+
+
+def _cleanup_process(proc: mp.Process) -> None:
+    """Cleanup a single process with graceful fallback."""
+    if not (proc and proc.is_alive()):
+        return
+    proc.terminate()
+    try:  # noqa: SIM105
+        proc.join(timeout=5)
+    except Exception:  # noqa: BLE001,S110 - cleanup best effort
+        pass
+    if not proc.is_alive():
+        return
+    try:
+        proc.kill()
+        proc.join(timeout=1)
+    except Exception:  # noqa: BLE001,S110 - cleanup best effort
+        pass
+
+
+def _cleanup_processes(processes: list[mp.Process]) -> None:
+    """Terminate test processes best effort."""
+    for proc in processes:
+        _cleanup_process(proc)
 
 
 @pytest.fixture()
@@ -20,55 +108,21 @@ def runtime_dir(
     os.environ["XDG_RUNTIME_DIR"] = str(tmp_path)
     sock = client.discover_socket()
     processes: list[mp.Process] = []
-    handler = {"func": lambda dispatcher: None}
+    handler: dict[str, HandlerFunc] = {"func": lambda dispatcher: None}
 
-    async def _serve_daemon(path: Path) -> None:
-        """Run a minimal daemon for tests."""
-        dispatcher = RPCDispatcher()
-        handler["func"](dispatcher)
-        server = await start_server(path, dispatcher)
-        async with server:
-            await server.serve_forever()
-
-    def spawn_daemon(_: Path) -> mp.Process:
-        def _run() -> None:
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(_serve_daemon(sock))
-            except Exception:  # noqa: BLE001,S110 - best effort for tests
-                pass
-            finally:
-                loop.close()
-
-        proc = mp.Process(target=_run)
-        proc.start()
-        processes.append(proc)
-        time.sleep(0.1)
-        return proc
-
-    monkeypatch.setattr(client, "spawn_daemon", spawn_daemon)
+    monkeypatch.setattr(
+        client,
+        "spawn_daemon",
+        functools.partial(async_spawn_daemon, handler=handler, processes=processes),
+    )
 
     ctx: Context = {"sock": sock, "processes": processes}
 
-    def register(fn: cabc.Callable[[RPCDispatcher], None]) -> Context:
+    def register(fn: HandlerFunc) -> Context:
         handler["func"] = fn
         return ctx
 
     ctx["register"] = register
     yield ctx
 
-    for proc in processes:
-        if proc and proc.is_alive():
-            proc.terminate()
-            try:
-                proc.join(timeout=5)
-            except Exception:  # noqa: BLE001,S110 - cleanup best effort
-                pass
-            finally:
-                if proc.is_alive():
-                    try:
-                        proc.kill()
-                        proc.join(timeout=1)
-                    except Exception:  # noqa: BLE001,S110 - cleanup best effort
-                        pass
+    _cleanup_processes(processes)
