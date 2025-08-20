@@ -85,12 +85,6 @@ banned-from = [
 
 [tool.ruff.lint.flake8-import-conventions.aliases]
 # Declare the default aliases.
-altair = "alt"
-"matplotlib.pyplot" = "plt"
-numpy = "np"
-pandas = "pd"
-seaborn = "sns"
-scipy = "sp"
 "collections.abc" = "cabc"
 datetime = "dt"
 "unittest.mock" = "mock"
