@@ -15,7 +15,7 @@ from weaverd.serena_tools import SerenaTool, create_serena_tool
 from weaverd.server import start_server
 
 
-@pytest.fixture()
+@pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
 
@@ -42,7 +42,8 @@ async def test_onboard_project(tmp_path: Path) -> None:
             data = await asyncio.wait_for(reader.readline(), timeout=5.0)
             report = msjson.decode(data.rstrip(), type=OnboardingReport)
             text = report.details.lower()
-            assert "viewing" in text and "project" in text
+            assert "viewing" in text
+            assert "project" in text
             assert len(report.details) > 20
         finally:
             if writer is not None:

@@ -15,7 +15,7 @@ from weaverd.rpc import RPCDispatcher
 from weaverd.server import start_server
 
 
-@pytest.fixture()
+@pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
 

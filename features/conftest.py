@@ -101,7 +101,7 @@ def _cleanup_processes(processes: list[mp.Process]) -> None:
         _cleanup_process(proc)
 
 
-@pytest.fixture()
+@pytest.fixture
 def runtime_dir(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> cabc.Generator[Context, None, None]:

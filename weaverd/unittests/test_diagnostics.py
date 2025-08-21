@@ -27,12 +27,12 @@ class StubTool:
         return [Diagnostic(location=loc, severity="Error", code="E1", message="boom")]
 
 
-@pytest.fixture()
+@pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
 
 
-@pytest.fixture()
+@pytest.fixture
 async def diagnostics_test_server(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> typ.AsyncIterator[Path]:

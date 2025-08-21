@@ -99,7 +99,7 @@ def _assert_symbol_location(symbol: Symbol, expected_location: Location) -> None
     assert symbol.location.range.end.character == expected_location.range.end.character
 
 
-@pytest.fixture()
+@pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
 
@@ -180,10 +180,13 @@ async def test_handle_get_definition_missing_dependency(
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("line,char", [(-1, 0), (1, -5), (-2, -3)])
+@pytest.mark.parametrize(("line", "char"), [(-1, 0), (1, -5), (-2, -3)])
 async def test_handle_get_definition_invalid_position(
     monkeypatch: pytest.MonkeyPatch, line: int, char: int
 ) -> None:
     monkeypatch.setattr(server, "create_serena_tool", lambda _: DummyTool())
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError,
+        match="non-negative",
+    ):
         await anext(server.handle_get_definition("foo.py", line, char))

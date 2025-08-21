@@ -102,7 +102,8 @@ def check(context: Context) -> None:
     assert result.exit_code == 0
     assert result.stdout.strip()
     out = result.stdout.lower()
-    assert "project" in out and ("viewing" in out or "onboarding" in out)
+    assert "project" in out
+    assert "viewing" in out or "onboarding" in out
 
 
 @then("the command fails with an error message")
