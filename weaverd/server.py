@@ -238,10 +238,8 @@ async def handle_list_diagnostics(
 
     # Prepare filters for case- and path-insensitive comparison
     norm_severity, norm_files = _normalize_filters(severity, files)
+    tool = typ.cast("_DiagnosticsTool", create_serena_tool(SerenaTool.LIST_DIAGNOSTICS))
     try:
-        tool = typ.cast(
-            "_DiagnosticsTool", create_serena_tool(SerenaTool.LIST_DIAGNOSTICS)
-        )
         data = await asyncio.to_thread(tool.list_diagnostics)
     except (asyncio.CancelledError, KeyboardInterrupt):  # propagate cancels
         raise

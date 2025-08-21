@@ -110,11 +110,15 @@ async def rpc_call(
     stdout = typ.cast(typ.TextIO, sys.stdout if stdout is None else stdout)  # noqa: TC006
     try:
         await ensure_daemon_running(path)
-    except Exception as exc:
+    except DaemonStartError as exc:
         print(f"Error: Could not ensure daemon is running: {exc}", file=sys.stderr)
         raise typer.Exit(1) from exc
 
-    reader, writer = await asyncio.open_unix_connection(str(path))
+    try:
+        reader, writer = await asyncio.open_unix_connection(str(path))
+    except OSError as exc:
+        print(f"Error: Failed to connect to daemon at {path}: {exc}", file=sys.stderr)
+        raise typer.Exit(1) from exc
     error = False
     try:
         writer.write(msjson.encode({"method": method, "params": params or {}}) + b"\n")
