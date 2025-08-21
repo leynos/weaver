@@ -26,7 +26,7 @@ JSONValue: typ.TypeAlias = (
 JSONObject: typ.TypeAlias = dict[str, JSONValue]
 
 
-class DaemonStartError(RuntimeError):
+class DaemonStartError(TimeoutError):
     """Raised when ``weaverd`` fails to become ready."""
 
     def __init__(self) -> None:

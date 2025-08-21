@@ -6,13 +6,15 @@ import pytest
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
 
-from features.steps.helpers import register_production_handlers
+from features.steps.helpers import (
+    raise_serena_agent_not_found,
+    register_production_handlers,
+)
 from features.types import Context
 from weaver.cli import app
 from weaver_schemas.primitives import Location, Position, Range
 from weaver_schemas.references import Reference
 from weaverd import server
-from weaverd.serena_tools import SerenaAgentNotFoundError, SerenaTool
 
 scenarios("../list_references.feature")
 
@@ -69,10 +71,7 @@ def runtime_dir_empty(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> 
 
 @given("serena-agent is missing")
 def missing_dep(monkeypatch: pytest.MonkeyPatch) -> None:
-    def raise_error(_: SerenaTool) -> None:
-        raise SerenaAgentNotFoundError()
-
-    monkeypatch.setattr(server, "create_serena_tool", raise_error)
+    monkeypatch.setattr(server, "create_serena_tool", raise_serena_agent_not_found)
 
 
 def _invoke_list_references_command(

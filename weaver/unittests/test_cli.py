@@ -48,7 +48,10 @@ def test_run_rpc_reports_error(
     """_run_rpc should convert exceptions into user-friendly exits."""
 
     def fake_run(func, method, params=None):
-        raise RuntimeError("boom")
+        class FakeRunError(RuntimeError):
+            """Test-only error to simulate RPC failure."""
+
+        raise FakeRunError("boom")
 
     monkeypatch.setattr(cli.anyio, "run", fake_run)
 
@@ -163,7 +166,10 @@ def test_cli_onboard_project_reports_error(
     """onboard-project surfaces RPC errors."""
 
     def fake_run(func, method, params=None):
-        raise RuntimeError("boom")
+        class FakeRunError(RuntimeError):
+            """Test-only error to simulate RPC failure."""
+
+        raise FakeRunError("boom")
 
     monkeypatch.setattr(cli.anyio, "run", fake_run)
 

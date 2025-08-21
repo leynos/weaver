@@ -1,5 +1,6 @@
 import builtins
 import collections.abc as cabc
+import typing as typ
 from dataclasses import dataclass  # noqa: ICN003 -- simpler decorator usage
 
 import pytest
@@ -72,7 +73,9 @@ def _setup_and_call_get_definition(
     return server.handle_get_definition(position.file, position.line, position.char)
 
 
-async def _collect_symbols_from_results(results, expected_count: int) -> list[Symbol]:
+async def _collect_symbols_from_results(
+    results: cabc.AsyncIterator[Symbol], expected_count: int
+) -> list[Symbol]:
     """Helper to collect symbols from async iterator and verify count."""
     symbols: list[Symbol] = []
     try:
@@ -170,7 +173,7 @@ async def test_handle_get_definition_multiple_symbols(
 async def test_handle_get_definition_missing_dependency(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def raise_error(_: SerenaTool) -> None:
+    def raise_error(_: SerenaTool) -> typ.NoReturn:
         raise SerenaAgentNotFoundError()
 
     monkeypatch.setattr(server, "create_serena_tool", raise_error)

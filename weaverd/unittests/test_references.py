@@ -1,4 +1,5 @@
 import builtins
+import typing as typ
 
 import pytest
 
@@ -56,7 +57,7 @@ async def test_handle_list_references_no_results(
 async def test_handle_list_references_missing_dependency(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def raise_error(_: SerenaTool) -> None:
+    def raise_error(_: SerenaTool) -> typ.NoReturn:
         raise SerenaAgentNotFoundError()
 
     monkeypatch.setattr(server, "create_serena_tool", raise_error)
@@ -69,7 +70,10 @@ class FailingTool:
     def list_references(
         self, *, file: str, line: int, char: int, include_definition: bool = False
     ) -> list[Reference]:
-        raise RuntimeError("boom")
+        class ListReferencesToolError(RuntimeError):
+            """Test-only error to simulate reference lookup failure."""
+
+        raise ListReferencesToolError("boom")
 
 
 @pytest.mark.anyio

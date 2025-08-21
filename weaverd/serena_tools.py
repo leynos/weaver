@@ -167,11 +167,16 @@ def create_serena_tool(tool_attr: SerenaTool | str) -> SerenaToolInstance:
 
     Raises
     ------
-    RuntimeError
-        If the tool class is not found, not callable or ``tool_attr`` is an
-        unknown string.
-    TypeError
+    SerenaAgentNotFoundError
+        If the Serena optional dependency is missing.
+    UnknownSerenaToolError
+        If ``tool_attr`` is an unknown string.
+    ToolAttrTypeError
         If ``tool_attr`` is neither ``SerenaTool`` nor ``str``.
+    ToolClassNotFoundError
+        If the tool class is not found.
+    ToolClassNotCallableError
+        If the tool class is not callable.
     """
     wf_tools, prompt_mod = _load_serena_modules()
     name = _resolve_tool_name(tool_attr)
@@ -212,7 +217,9 @@ def _import_serena_module(module_name: str) -> ModuleType:
     try:
         return import_module(module_name)
     except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
-        if getattr(exc, "name", "") and str(exc.name).startswith("serena"):
+        if module_name.startswith("serena") or (
+            getattr(exc, "name", "") and str(exc.name).startswith("serena")
+        ):
             raise SerenaAgentNotFoundError() from exc
         raise
 

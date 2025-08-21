@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import typing as typ
 from typing import TYPE_CHECKING  # noqa: ICN003
+
+from weaverd.serena_tools import SerenaAgentNotFoundError, SerenaTool
 
 if TYPE_CHECKING:
     from features.types import Context
     from weaverd.rpc import RPCDispatcher
 
-__all__: tuple[str, ...] = ("register_production_handlers",)
+__all__: tuple[str, ...] = (
+    "raise_serena_agent_not_found",
+    "register_production_handlers",
+)
 
 
 def register_production_handlers(context: Context) -> Context:
@@ -35,3 +41,13 @@ def register_production_handlers(context: Context) -> Context:
 
     context["register"](setup)
     return context
+
+
+def raise_serena_agent_not_found(_: SerenaTool) -> typ.NoReturn:
+    """Raise :class:`SerenaAgentNotFoundError` for missing serena-agent.
+
+    Centralizing this stub avoids repetition across step definitions and makes
+    updates to the error behaviour straightforward.
+    """
+
+    raise SerenaAgentNotFoundError()

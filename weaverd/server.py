@@ -79,9 +79,10 @@ class ReferenceLookupError(RuntimeError):
 class InvalidPositionError(ValueError):
     """Raised when a line or character index is negative."""
 
-    def __init__(self) -> None:
+    def __init__(self, line: int, char: int) -> None:
         super().__init__(
-            "line and character must be non-negative (0-indexed, UTF-16 code units)",
+            f"line and character must be non-negative (0-indexed, UTF-16 code units); "
+            f"got line={line}, char={char}",
         )
 
 
@@ -262,7 +263,7 @@ async def handle_get_definition(
     """Yield symbol definitions for a 0-indexed UTF-16 line/character."""
 
     if line < 0 or char < 0:  # basic input validation
-        raise InvalidPositionError()
+        raise InvalidPositionError(line, char)
 
     tool = typ.cast(
         typ.Any,  # noqa: TC006

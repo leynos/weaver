@@ -68,7 +68,10 @@ def tool_error(context: Context, monkeypatch) -> None:
     def setup(dispatcher: RPCDispatcher) -> None:
         class FailingTool:
             def apply(self) -> str:  # pragma: no cover - stub
-                raise RuntimeError("boom")
+                class ToolApplyError(RuntimeError):
+                    """Test-only error to simulate tool failure."""
+
+                raise ToolApplyError("boom")
 
         @dispatcher.register("onboard-project")
         def onboard() -> OnboardingReport:  # pragma: no cover - stub

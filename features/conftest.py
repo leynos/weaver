@@ -30,14 +30,15 @@ async def _wait_for_socket(path: Path, timeout: float = 5.0) -> None:
             with contextlib.suppress(Exception):
                 await writer.wait_closed()
             return
-    raise DaemonNotReadyError(path)
+    raise DaemonNotReadyError(path, timeout)
 
 
 class DaemonNotReadyError(TimeoutError):
     """Raised when the test daemon fails to accept connections."""
 
-    def __init__(self, path: Path) -> None:
-        super().__init__(f"Daemon socket not ready: {path}")
+    def __init__(self, path: Path, timeout: float | None = None) -> None:
+        suffix = f" (after {timeout:.2f}s)" if timeout is not None else ""
+        super().__init__(f"Daemon socket not ready: {path}{suffix}")
 
 
 async def _serve_daemon(path: Path, handler_func: HandlerFunc) -> None:

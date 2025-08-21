@@ -59,7 +59,10 @@ async def test_onboard_failure(tmp_path: Path) -> None:
 
     class FailingTool:
         def apply(self) -> str:  # pragma: no cover - stub
-            raise RuntimeError("boom")
+            class OnboardToolError(RuntimeError):
+                """Test-only error to simulate onboarding failure."""
+
+            raise OnboardToolError("boom")
 
     @dispatcher.register("onboard-project")
     def onboard() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
