@@ -11,7 +11,11 @@ import pytest
 
 from weaver_schemas.reports import OnboardingReport
 from weaverd.rpc import RPCDispatcher
-from weaverd.serena_tools import SerenaTool, create_serena_tool
+from weaverd.serena_tools import (
+    SerenaTool,
+    UnknownSerenaToolError,
+    create_serena_tool,
+)
 from weaverd.server import start_server
 
 
@@ -94,5 +98,5 @@ async def test_onboard_failure(tmp_path: Path) -> None:
 def test_create_serena_tool_with_invalid_tool_name() -> None:
     """create_serena_tool should raise for unknown tools."""
 
-    with pytest.raises(RuntimeError, match="NonExistentTool"):
+    with pytest.raises(UnknownSerenaToolError, match="NonExistentTool"):
         create_serena_tool("NonExistentTool")
