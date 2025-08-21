@@ -7,7 +7,7 @@ import pytest
 from weaver_schemas.primitives import Location, Position, Range
 from weaver_schemas.references import Symbol
 from weaverd import server
-from weaverd.serena_tools import SerenaTool
+from weaverd.serena_tools import SerenaAgentNotFoundError, SerenaTool
 
 try:
     _anext = builtins.anext  # type: ignore[attr-defined]
@@ -171,11 +171,11 @@ async def test_handle_get_definition_missing_dependency(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def raise_error(_: SerenaTool) -> None:
-        raise RuntimeError("serena-agent not found")
+        raise SerenaAgentNotFoundError()
 
     monkeypatch.setattr(server, "create_serena_tool", raise_error)
 
-    with pytest.raises(RuntimeError, match="serena-agent not found"):
+    with pytest.raises(SerenaAgentNotFoundError, match="serena-agent not found"):
         await anext(server.handle_get_definition("foo.py", 1, 0))
 
 

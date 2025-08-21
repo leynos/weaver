@@ -11,6 +11,7 @@ from importlib import import_module, invalidate_caches
 # pyright: reportMissingImports=false  # Serena optional dependency
 
 if typ.TYPE_CHECKING:  # pragma: no cover - import-time only
+    import collections.abc as cabc
     from types import ModuleType
 
     from serena.prompt_factory import SerenaPromptFactory
@@ -24,6 +25,61 @@ else:  # pragma: no cover - import-time only
 # We expose it as ``object`` to avoid ``Any`` in the public API while keeping it
 # flexible.
 SerenaToolInstance: typ.TypeAlias = object
+
+
+class SerenaAgentNotFoundError(RuntimeError):
+    """Raised when the optional Serena dependency is missing."""
+
+    def __init__(self) -> None:
+        super().__init__("serena-agent not found")
+
+
+class ToolClassNotFoundError(RuntimeError):
+    """Raised when a workflow tool class cannot be located."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(f"serena.tools.workflow_tools.{name} not found")
+
+
+class ToolClassNotCallableError(TypeError):
+    """Raised when a workflow tool attribute is not callable."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(f"serena.tools.workflow_tools.{name} is not callable")
+
+
+class PromptFactoryError(TypeError):
+    """Raised when ``SerenaPromptFactory`` is missing or invalid."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "serena.prompt_factory.SerenaPromptFactory not found or not a type",
+        )
+
+
+class ToolInstantiationError(RuntimeError):
+    """Raised when a tool fails to instantiate with the agent."""
+
+    def __init__(self, name: str, exc: Exception) -> None:
+        super().__init__(
+            f"Failed to instantiate serena.tools.workflow_tools.{name}: {exc}",
+        )
+
+
+class ToolAttrTypeError(TypeError):
+    """Raised when ``tool_attr`` is neither ``SerenaTool`` nor ``str``."""
+
+    def __init__(self) -> None:
+        super().__init__("tool_attr must be SerenaTool or str")
+
+
+class UnknownSerenaToolError(RuntimeError):
+    """Raised when a requested Serena tool does not exist."""
+
+    def __init__(self, tool_name: str, valid: cabc.Collection[str]) -> None:
+        super().__init__(
+            f"Unknown Serena tool '{tool_name}'. Expected one of: {', '.join(valid)}",
+        )
 
 
 class SerenaTool(enum.StrEnum):
@@ -67,9 +123,9 @@ def _validate_and_get_tool_class(wf_tools: ModuleType, name: str) -> typ.Any:
 
     tool_cls = getattr(wf_tools, name, None)
     if tool_cls is None:
-        raise RuntimeError(f"serena.tools.workflow_tools.{name} not found")
+        raise ToolClassNotFoundError(name)
     if not callable(tool_cls):
-        raise RuntimeError(f"serena.tools.workflow_tools.{name} is not callable")
+        raise ToolClassNotCallableError(name)
     return tool_cls
 
 
@@ -79,9 +135,7 @@ def _create_agent_with_prompt_factory(prompt_mod: ModuleType) -> _BareAgent:
     # Assumption: SerenaPromptFactory can be instantiated without arguments.
     prompt_factory_attr = getattr(prompt_mod, "SerenaPromptFactory", None)
     if not isinstance(prompt_factory_attr, type):
-        raise RuntimeError(
-            "serena.prompt_factory.SerenaPromptFactory not found or not a type",
-        )
+        raise PromptFactoryError()
     prompt_factory_cls = typ.cast("type[SerenaPromptFactory]", prompt_factory_attr)
     return _BareAgent(prompt_factory_cls())
 
@@ -93,10 +147,8 @@ def _instantiate_tool(
 
     try:
         return tool_cls(agent)
-    except Exception as exc:
-        raise RuntimeError(
-            f"Failed to instantiate serena.tools.workflow_tools.{name}: {exc}",
-        ) from exc
+    except Exception as exc:  # pragma: no cover - defensive
+        raise ToolInstantiationError(name, exc) from exc
 
 
 def create_serena_tool(tool_attr: SerenaTool | str) -> SerenaToolInstance:
@@ -138,7 +190,7 @@ def _resolve_tool_name(tool_attr: SerenaTool | str) -> str:
         return tool_attr.value
 
     if not isinstance(tool_attr, str):
-        raise TypeError("tool_attr must be SerenaTool or str")
+        raise ToolAttrTypeError()
 
     return _resolve_string_tool_name(tool_attr)
 
@@ -152,20 +204,16 @@ def _resolve_string_tool_name(tool_name: str) -> str:
     if tool_name in _VALID_TOOL_VALUES:
         return tool_name
     valid = sorted({*_VALID_TOOL_MEMBER_NAMES, *_VALID_TOOL_VALUES})
-    raise RuntimeError(
-        f"Unknown Serena tool '{tool_name}'. Expected one of: {', '.join(valid)}"
-    )
+    raise UnknownSerenaToolError(tool_name, valid)
 
 
 def _import_serena_module(module_name: str) -> ModuleType:
     """Import a Serena module with consistent error handling."""
-
-    msg = "serena-agent is required; install it via 'uv add serena-agent'."
     try:
         return import_module(module_name)
     except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
         if getattr(exc, "name", "") and str(exc.name).startswith("serena"):
-            raise RuntimeError(msg) from exc
+            raise SerenaAgentNotFoundError() from exc
         raise
 
 

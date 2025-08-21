@@ -26,6 +26,13 @@ JSONValue: typ.TypeAlias = (
 JSONObject: typ.TypeAlias = dict[str, JSONValue]
 
 
+class DaemonStartError(RuntimeError):
+    """Raised when ``weaverd`` fails to become ready."""
+
+    def __init__(self) -> None:
+        super().__init__("weaverd failed to start")
+
+
 def discover_socket() -> Path:
     """Return the daemon socket path."""
     return default_socket_path()
@@ -59,7 +66,7 @@ async def ensure_daemon_running(socket_path: Path) -> None:
         if await can_connect(socket_path):
             return
         await anyio.sleep(0.1)
-    raise RuntimeError("weaverd failed to start")
+    raise DaemonStartError()
 
 
 def _process_response_line(data: bytes, stdout: typ.TextIO) -> bool:

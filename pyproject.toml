@@ -66,6 +66,7 @@ select = [
     "N",        # enforce naming conventions, e.g. ClassName vs function_name
     "FURB",      # Refurb-style suggestions
     "B",         # Bugbear warnings
+    "TRY",      # Exception handling best practices
     "LOG",      # Logging
     "G",        # Log formatting
     "Q",        # Quotes

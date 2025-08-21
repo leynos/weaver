@@ -13,7 +13,7 @@ from weaver_schemas.primitives import Location, Position, Range
 from weaver_schemas.references import Symbol
 from weaverd import server
 from weaverd.rpc import RPCDispatcher
-from weaverd.serena_tools import SerenaTool
+from weaverd.serena_tools import SerenaAgentNotFoundError, SerenaTool
 
 scenarios("../get_definition.feature")
 
@@ -73,7 +73,7 @@ def runtime_dir_empty(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> 
 @given("serena-agent is missing")
 def missing_dep(monkeypatch: pytest.MonkeyPatch) -> None:
     def raise_error(_: SerenaTool) -> None:
-        raise RuntimeError("serena-agent not found")
+        raise SerenaAgentNotFoundError()
 
     monkeypatch.setattr(server, "create_serena_tool", raise_error)
 
