@@ -4,6 +4,7 @@ import pytest
 
 from weaverd.serena_tools import (
     SerenaTool,
+    _is_serena_related_error,
     _resolve_string_tool_name,
     _resolve_tool_name,
 )
@@ -34,3 +35,20 @@ def test_resolve_tool_name_type_error() -> None:
 
 def test_resolve_tool_name_from_enum() -> None:
     assert _resolve_tool_name(SerenaTool.ONBOARDING) == "OnboardingTool"
+
+
+def test_is_serena_related_error_by_module_name() -> None:
+    exc = ModuleNotFoundError()
+    assert _is_serena_related_error("serena.fake", exc) is True
+
+
+def test_is_serena_related_error_by_exc_name() -> None:
+    exc = ModuleNotFoundError()
+    exc.name = "serena.fake"
+    assert _is_serena_related_error("other", exc) is True
+
+
+def test_is_serena_related_error_false() -> None:
+    exc = ModuleNotFoundError()
+    exc.name = "other"
+    assert _is_serena_related_error("random", exc) is False

@@ -212,14 +212,28 @@ def _resolve_string_tool_name(tool_name: str) -> str:
     raise UnknownSerenaToolError(tool_name, valid)
 
 
+def _is_serena_related_error(module_name: str, exc: ModuleNotFoundError) -> bool:
+    """Return ``True`` if ``exc`` indicates a Serena import failure.
+
+    A ModuleNotFoundError is considered Serena-related when either the
+    requested module name or the exception's ``name`` attribute begins with
+    ``"serena"``. This helps distinguish missing optional dependencies from
+    unrelated import errors.
+    """
+
+    requested_module_is_serena = module_name.startswith("serena")
+    exc_name = getattr(exc, "name", "")
+    exc_has_name = bool(exc_name)
+    exc_name_is_serena = exc_has_name and str(exc_name).startswith("serena")
+    return requested_module_is_serena or exc_name_is_serena
+
+
 def _import_serena_module(module_name: str) -> ModuleType:
     """Import a Serena module with consistent error handling."""
     try:
         return import_module(module_name)
     except ModuleNotFoundError as exc:  # pragma: no cover - optional dep
-        if module_name.startswith("serena") or (
-            getattr(exc, "name", "") and str(exc.name).startswith("serena")
-        ):
+        if _is_serena_related_error(module_name, exc):
             raise SerenaAgentNotFoundError() from exc
         raise
 
