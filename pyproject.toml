@@ -5,7 +5,7 @@ description = "weaver package"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 license = { text = "MIT" }
-authors = [{ name = "Weaver Contributors", email = "opensource@weaver.dev" }]
+authors = [{ name = "Payton McIntosh", email = "pmcintosh@df12.net" }]
 keywords = ["weaver", "rpc"]
 classifiers = [
     "Programming Language :: Python :: 3",
