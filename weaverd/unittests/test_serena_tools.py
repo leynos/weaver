@@ -4,6 +4,7 @@ import pytest
 
 from weaverd.serena_tools import (
     SerenaTool,
+    UnknownSerenaToolError,
     _is_serena_related_error,
     _resolve_string_tool_name,
     _resolve_tool_name,
@@ -24,7 +25,7 @@ def test_resolve_string_tool_name_success(input_name: str, expected: str) -> Non
 
 
 def test_resolve_string_tool_name_unknown() -> None:
-    with pytest.raises(RuntimeError, match="Unknown Serena tool 'Nope'"):
+    with pytest.raises(UnknownSerenaToolError, match="Unknown Serena tool 'Nope'"):
         _resolve_string_tool_name("Nope")
 
 
