@@ -99,26 +99,35 @@ async def _stream_response(reader: asyncio.StreamReader, stdout: typ.TextIO) -> 
     return error
 
 
-async def rpc_call(
-    method: str,
-    params: JSONObject | None = None,
-    socket_path: Path | None = None,
-    stdout: typ.TextIO | None = None,
-) -> None:
-    """Send an RPC request and stream the response to ``stdout``."""
-    path = socket_path or discover_socket()
-    stdout = typ.cast(typ.TextIO, sys.stdout if stdout is None else stdout)  # noqa: TC006
+def _resolve_socket_path(socket_path: Path | None) -> Path:
+    """Return ``socket_path`` or discover a fallback."""
+    return socket_path or discover_socket()
+
+
+async def _establish_rpc_connection(
+    path: Path,
+) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+    """Ensure the daemon is running and open a Unix socket connection."""
     try:
         await ensure_daemon_running(path)
     except DaemonStartError as exc:
         print(f"Error: Could not ensure daemon is running: {exc}", file=sys.stderr)
         raise typer.Exit(1) from exc
-
     try:
-        reader, writer = await asyncio.open_unix_connection(str(path))
+        return await asyncio.open_unix_connection(str(path))
     except OSError as exc:
         print(f"Error: Failed to connect to daemon at {path}: {exc}", file=sys.stderr)
         raise typer.Exit(1) from exc
+
+
+async def _execute_rpc_request(
+    reader: asyncio.StreamReader,
+    writer: asyncio.StreamWriter,
+    method: str,
+    params: JSONObject | None,
+    stdout: typ.TextIO,
+) -> bool:
+    """Send an RPC request and stream the response."""
     error = False
     try:
         writer.write(msjson.encode({"method": method, "params": params or {}}) + b"\n")
@@ -128,6 +137,20 @@ async def rpc_call(
     finally:
         writer.close()
         await writer.wait_closed()
+    return error
+
+
+async def rpc_call(
+    method: str,
+    params: JSONObject | None = None,
+    socket_path: Path | None = None,
+    stdout: typ.TextIO | None = None,
+) -> None:
+    """Send an RPC request and stream the response to ``stdout``."""
+    path = _resolve_socket_path(socket_path)
+    stdout = typ.cast(typ.TextIO, sys.stdout if stdout is None else stdout)  # noqa: TC006
+    reader, writer = await _establish_rpc_connection(path)
+    error = await _execute_rpc_request(reader, writer, method, params, stdout)
     if error:
         raise typer.Exit(1)
     return
