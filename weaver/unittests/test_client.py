@@ -278,8 +278,7 @@ async def test_execute_rpc_request(monkeypatch: pytest.MonkeyPatch) -> None:
     error = await client._execute_rpc_request(
         reader,
         typ.cast("asyncio.StreamWriter", writer),
-        "m",
-        None,
+        client.RPCRequest(method="m"),
         stdout,
     )
     assert error

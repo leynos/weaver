@@ -31,6 +31,13 @@ JSONValue: typ.TypeAlias = (
 JSONObject: typ.TypeAlias = dict[str, JSONValue]
 
 
+class RPCRequest(ms.Struct):
+    """An RPC request with method and parameters."""
+
+    method: str
+    params: JSONObject | None = None
+
+
 class DaemonStartError(TimeoutError):
     """Raised when ``weaverd`` fails to become ready."""
 
@@ -132,14 +139,16 @@ async def _establish_rpc_connection(
 async def _execute_rpc_request(
     reader: asyncio.StreamReader,
     writer: asyncio.StreamWriter,
-    method: str,
-    params: JSONObject | None,
+    request: RPCRequest,
     stdout: typ.TextIO,
 ) -> bool:
     """Send an RPC request and stream the response."""
     error = False
     try:
-        writer.write(msjson.encode({"method": method, "params": params or {}}) + b"\n")
+        writer.write(
+            msjson.encode({"method": request.method, "params": request.params or {}})
+            + b"\n"
+        )
         await writer.drain()
         with contextlib.suppress(
             AttributeError, NotImplementedError
@@ -162,7 +171,8 @@ async def rpc_call(
     path = _resolve_socket_path(socket_path)
     stdout = typ.cast(typ.TextIO, sys.stdout if stdout is None else stdout)  # noqa: TC006
     reader, writer = await _establish_rpc_connection(path)
-    error = await _execute_rpc_request(reader, writer, method, params, stdout)
+    request = RPCRequest(method=method, params=params)
+    error = await _execute_rpc_request(reader, writer, request, stdout)
     if error:
         raise typer.Exit(1)
     return
