@@ -191,8 +191,10 @@ async def test_establish_rpc_connection_daemon_error(
         raise client.DaemonStartError()
 
     monkeypatch.setattr(client, "ensure_daemon_running", fail)
-    with pytest.raises(typer.Exit):
+    with pytest.raises(typer.Exit) as excinfo:
         await client._establish_rpc_connection(Path("x.sock"))
+    assert isinstance(excinfo.value, typer.Exit)
+    assert excinfo.value.exit_code == 1
     assert "Could not ensure daemon is running" in capsys.readouterr().err
 
 
@@ -215,8 +217,10 @@ async def test_establish_rpc_connection_connect_error(
 
     monkeypatch.setattr(client, "ensure_daemon_running", succeed)
     monkeypatch.setattr(asyncio, "open_unix_connection", connect)
-    with pytest.raises(typer.Exit):
+    with pytest.raises(typer.Exit) as excinfo:
         await client._establish_rpc_connection(Path("x.sock"))
+    assert isinstance(excinfo.value, typer.Exit)
+    assert excinfo.value.exit_code == 1
     assert "Failed to connect to daemon" in capsys.readouterr().err
 
 
@@ -236,10 +240,7 @@ async def test_establish_rpc_connection_success(
 
     monkeypatch.setattr(client, "ensure_daemon_running", succeed)
     monkeypatch.setattr(asyncio, "open_unix_connection", connect)
-    assert await client._establish_rpc_connection(Path("x.sock")) == (
-        typ.cast("asyncio.StreamReader", reader),
-        typ.cast("asyncio.StreamWriter", writer),
-    )
+    assert await client._establish_rpc_connection(Path("x.sock")) == (reader, writer)
 
 
 class _DummyWriter:
@@ -283,3 +284,5 @@ async def test_execute_rpc_request(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert error
     assert writer.closed
+    # Ensure the JSON-RPC line was encoded and framed as expected
+    assert writer.written == [msjson.encode({"method": "m", "params": {}}) + b"\n"]

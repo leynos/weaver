@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import asyncio.subprocess as aio_subprocess
+import contextlib
 import logging
 import os
 import sys
@@ -19,6 +20,10 @@ from .errors import is_dependency_error
 from .sockets import can_connect
 
 logger = logging.getLogger(__name__)
+
+# Daemon startup policy
+STARTUP_RETRIES = 50
+STARTUP_SLEEP_SECS = 0.1
 
 JSONValue: typ.TypeAlias = (
     bool | int | float | str | list["JSONValue"] | dict[str, "JSONValue"] | None
@@ -62,10 +67,10 @@ async def ensure_daemon_running(socket_path: Path) -> None:
     if await can_connect(socket_path):
         return
     await spawn_daemon(socket_path)
-    for _ in range(50):
+    for _ in range(STARTUP_RETRIES):
         if await can_connect(socket_path):
             return
-        await anyio.sleep(0.1)
+        await anyio.sleep(STARTUP_SLEEP_SECS)
     raise DaemonStartError()
 
 
@@ -107,7 +112,11 @@ def _resolve_socket_path(socket_path: Path | None) -> Path:
 async def _establish_rpc_connection(
     path: Path,
 ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-    """Ensure the daemon is running and open a Unix socket connection."""
+    """Ensure the daemon is running and open a Unix socket connection.
+
+    Raises:
+        typer.Exit: If the daemon fails to start or the Unix socket cannot be opened.
+    """
     try:
         await ensure_daemon_running(path)
     except DaemonStartError as exc:
@@ -132,7 +141,10 @@ async def _execute_rpc_request(
     try:
         writer.write(msjson.encode({"method": method, "params": params or {}}) + b"\n")
         await writer.drain()
-        writer.write_eof()
+        with contextlib.suppress(
+            AttributeError, NotImplementedError
+        ):  # pragma: no cover - transport-specific
+            writer.write_eof()
         error = await _stream_response(reader, stdout)
     finally:
         writer.close()
