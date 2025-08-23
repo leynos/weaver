@@ -13,8 +13,9 @@ from weaverd.serena_tools import SerenaAgentNotFoundError, SerenaTool
 try:
     _anext = builtins.anext  # type: ignore[attr-defined]
 except AttributeError:  # Python < 3.10
+    T = typ.TypeVar("T")
 
-    async def _anext(it):
+    async def _anext(it: cabc.AsyncIterator[T]) -> T:
         return await it.__anext__()
 
 

@@ -146,7 +146,7 @@ def test_create_serena_tool_string_enum_equivalence(
 
     class ToolsMod:  # pragma: no cover - simple stub
         class ListDiagnosticsTool:  # pragma: no cover - simple stub
-            def __init__(self, _: typ.Any) -> None:  # pragma: no cover - stub
+            def __init__(self, _: object) -> None:  # pragma: no cover - stub
                 pass
 
     class PromptMod:  # pragma: no cover - simple stub
@@ -154,7 +154,7 @@ def test_create_serena_tool_string_enum_equivalence(
             def __call__(self) -> None:  # pragma: no cover - stub
                 return None
 
-    def fake_import(name: str) -> typ.Any:  # pragma: no cover - simple stub
+    def fake_import(name: str) -> type[object]:  # pragma: no cover - simple stub
         if name == "serena.tools.workflow_tools":
             return ToolsMod
         if name == "serena.prompt_factory":

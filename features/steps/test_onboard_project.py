@@ -5,6 +5,7 @@ from pathlib import Path
 
 import anyio
 import msgspec as ms
+import pytest
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
 
@@ -36,7 +37,7 @@ def runtime_dir(runtime_dir: Context) -> Context:
 
 
 @given("an invalid project structure")
-def invalid_project(context: Context, monkeypatch) -> None:
+def invalid_project(context: Context, monkeypatch: pytest.MonkeyPatch) -> None:
     async def fail_spawn(_: Path) -> None:  # pragma: no cover - stub
         await anyio.sleep(0)
 
@@ -44,7 +45,7 @@ def invalid_project(context: Context, monkeypatch) -> None:
 
 
 @given("the server is unavailable")
-def server_unavailable(context: Context, monkeypatch) -> None:
+def server_unavailable(context: Context, monkeypatch: pytest.MonkeyPatch) -> None:
     async def noop(_: Path) -> None:  # pragma: no cover - stub
         await anyio.sleep(0)
 
@@ -64,7 +65,7 @@ def server_malformed(context: Context) -> None:
 
 
 @given("the onboarding tool raises an error")
-def tool_error(context: Context, monkeypatch) -> None:
+def tool_error(context: Context, monkeypatch: pytest.MonkeyPatch) -> None:
     def setup(dispatcher: RPCDispatcher) -> None:
         class FailingTool:
             def apply(self) -> str:  # pragma: no cover - stub
@@ -82,7 +83,7 @@ def tool_error(context: Context, monkeypatch) -> None:
 
 
 @given("serena-agent is missing")
-def missing_dependency(monkeypatch):
+def missing_dependency(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("WEAVER_TEST_MISSING_SERENA", "1")
 
 
