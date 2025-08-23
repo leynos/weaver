@@ -6,7 +6,6 @@ from pathlib import Path
 
 import msgspec.json as msjson
 import pytest
-import typer
 
 from weaver import client
 from weaver.errors import DependencyErrorCode
@@ -184,23 +183,20 @@ def test_resolve_socket_path_discover(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.anyio
 async def test_establish_rpc_connection_daemon_error(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def fail(path: Path) -> None:  # pragma: no cover - stub
         await asyncio.sleep(0)
-        raise client.DaemonStartError()
+        raise client.DaemonStartError(path, client.STARTUP_TIMEOUT_SECS)
 
     monkeypatch.setattr(client, "ensure_daemon_running", fail)
-    with pytest.raises(typer.Exit) as excinfo:
+    with pytest.raises(client.DaemonStartError):
         await client._establish_rpc_connection(Path("x.sock"))
-    assert isinstance(excinfo.value, typer.Exit)
-    assert excinfo.value.exit_code == 1
-    assert "Could not ensure daemon is running" in capsys.readouterr().err
 
 
 @pytest.mark.anyio
 async def test_establish_rpc_connection_connect_error(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def succeed(path: Path) -> None:
         await asyncio.sleep(0)
@@ -217,11 +213,8 @@ async def test_establish_rpc_connection_connect_error(
 
     monkeypatch.setattr(client, "ensure_daemon_running", succeed)
     monkeypatch.setattr(asyncio, "open_unix_connection", connect)
-    with pytest.raises(typer.Exit) as excinfo:
+    with pytest.raises(ConnectError):
         await client._establish_rpc_connection(Path("x.sock"))
-    assert isinstance(excinfo.value, typer.Exit)
-    assert excinfo.value.exit_code == 1
-    assert "Failed to connect to daemon" in capsys.readouterr().err
 
 
 @pytest.mark.anyio

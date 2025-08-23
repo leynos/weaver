@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 # Daemon startup policy
 STARTUP_RETRIES = 50
 STARTUP_SLEEP_SECS = 0.1
+STARTUP_TIMEOUT_SECS: float = STARTUP_RETRIES * STARTUP_SLEEP_SECS
 
 JSONValue: typ.TypeAlias = (
     bool | int | float | str | list["JSONValue"] | dict[str, "JSONValue"] | None
@@ -41,8 +42,12 @@ class RPCRequest(ms.Struct):
 class DaemonStartError(TimeoutError):
     """Raised when ``weaverd`` fails to become ready."""
 
-    def __init__(self) -> None:
-        super().__init__("weaverd failed to start")
+    def __init__(self, path: Path, timeout_secs: float) -> None:
+        self.path = path
+        self.timeout_secs = timeout_secs
+        super().__init__(
+            f"weaverd failed to start at {path} within {timeout_secs:.1f}s"
+        )
 
 
 def discover_socket() -> Path:
@@ -74,11 +79,15 @@ async def ensure_daemon_running(socket_path: Path) -> None:
     if await can_connect(socket_path):
         return
     await spawn_daemon(socket_path)
-    for _ in range(STARTUP_RETRIES):
-        if await can_connect(socket_path):
-            return
-        await anyio.sleep(STARTUP_SLEEP_SECS)
-    raise DaemonStartError()
+    try:
+        with anyio.fail_after(STARTUP_TIMEOUT_SECS):
+            for _ in range(STARTUP_RETRIES):
+                if await can_connect(socket_path):
+                    return
+                await anyio.sleep(STARTUP_SLEEP_SECS)
+    except TimeoutError as exc:
+        raise DaemonStartError(socket_path, STARTUP_TIMEOUT_SECS) from exc
+    raise DaemonStartError(socket_path, STARTUP_TIMEOUT_SECS)
 
 
 def _process_response_line(data: bytes, stdout: typ.TextIO) -> bool:
@@ -122,18 +131,11 @@ async def _establish_rpc_connection(
     """Ensure the daemon is running and open a Unix socket connection.
 
     Raises:
-        typer.Exit: If the daemon fails to start or the Unix socket cannot be opened.
+        DaemonStartError: If the daemon fails to start.
+        OSError: If the Unix socket cannot be opened.
     """
-    try:
-        await ensure_daemon_running(path)
-    except DaemonStartError as exc:
-        print(f"Error: Could not ensure daemon is running: {exc}", file=sys.stderr)
-        raise typer.Exit(1) from exc
-    try:
-        return await asyncio.open_unix_connection(str(path))
-    except OSError as exc:
-        print(f"Error: Failed to connect to daemon at {path}: {exc}", file=sys.stderr)
-        raise typer.Exit(1) from exc
+    await ensure_daemon_running(path)
+    return await asyncio.open_unix_connection(str(path))
 
 
 async def _execute_rpc_request(
@@ -143,7 +145,6 @@ async def _execute_rpc_request(
     stdout: typ.TextIO,
 ) -> bool:
     """Send an RPC request and stream the response."""
-    error = False
     try:
         writer.write(
             msjson.encode({"method": request.method, "params": request.params or {}})
@@ -154,11 +155,10 @@ async def _execute_rpc_request(
             AttributeError, NotImplementedError
         ):  # pragma: no cover - transport-specific
             writer.write_eof()
-        error = await _stream_response(reader, stdout)
+        return await _stream_response(reader, stdout)
     finally:
         writer.close()
         await writer.wait_closed()
-    return error
 
 
 async def rpc_call(
@@ -170,7 +170,14 @@ async def rpc_call(
     """Send an RPC request and stream the response to ``stdout``."""
     path = _resolve_socket_path(socket_path)
     stdout = typ.cast(typ.TextIO, sys.stdout if stdout is None else stdout)  # noqa: TC006
-    reader, writer = await _establish_rpc_connection(path)
+    try:
+        reader, writer = await _establish_rpc_connection(path)
+    except DaemonStartError as exc:
+        print(f"Error: Could not ensure daemon is running: {exc}", file=sys.stderr)
+        raise typer.Exit(1) from exc
+    except OSError as exc:
+        print(f"Error: Failed to connect to daemon at {path}: {exc}", file=sys.stderr)
+        raise typer.Exit(1) from exc
     request = RPCRequest(method=method, params=params)
     error = await _execute_rpc_request(reader, writer, request, stdout)
     if error:
