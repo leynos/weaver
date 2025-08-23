@@ -104,7 +104,11 @@ async def test_dispatcher_streams_midstream_error() -> None:
 
     def boom() -> typ.Iterator[int]:
         yield 1
-        raise RuntimeError("boom")
+
+        class BoomError(RuntimeError):
+            """Test-only error to simulate streaming failure."""
+
+        raise BoomError("boom")
 
     @dispatcher.register("boom")
     def handler() -> typ.Iterable[int]:  # pyright: ignore[reportUnusedFunction]

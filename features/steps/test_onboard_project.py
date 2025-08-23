@@ -12,7 +12,11 @@ from features.types import Context
 from weaver.cli import app
 from weaver_schemas.reports import OnboardingReport
 from weaverd.rpc import RPCDispatcher
-from weaverd.serena_tools import SerenaTool, create_serena_tool
+from weaverd.serena_tools import (
+    SerenaAgentNotFoundError,
+    SerenaTool,
+    create_serena_tool,
+)
 
 scenarios("../onboard_project.feature")
 
@@ -23,7 +27,7 @@ def runtime_dir(runtime_dir: Context) -> Context:
         @dispatcher.register("onboard-project")
         def onboard() -> OnboardingReport:  # pragma: no cover - stub
             if os.environ.get("WEAVER_TEST_MISSING_SERENA"):
-                raise RuntimeError("serena-agent not found")
+                raise SerenaAgentNotFoundError()
             tool = typ.cast(typ.Any, create_serena_tool(SerenaTool.ONBOARDING))  # noqa: TC006
             return OnboardingReport(details=tool.apply())
 
@@ -64,7 +68,10 @@ def tool_error(context: Context, monkeypatch) -> None:
     def setup(dispatcher: RPCDispatcher) -> None:
         class FailingTool:
             def apply(self) -> str:  # pragma: no cover - stub
-                raise RuntimeError("boom")
+                class ToolApplyError(RuntimeError):
+                    """Test-only error to simulate tool failure."""
+
+                raise ToolApplyError("boom")
 
         @dispatcher.register("onboard-project")
         def onboard() -> OnboardingReport:  # pragma: no cover - stub

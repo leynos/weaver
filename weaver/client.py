@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import asyncio.subprocess as aio_subprocess
+import contextlib
 import logging
 import os
 import sys
@@ -20,10 +21,33 @@ from .sockets import can_connect
 
 logger = logging.getLogger(__name__)
 
+# Daemon startup policy
+STARTUP_RETRIES = 50
+STARTUP_SLEEP_SECS = 0.1
+STARTUP_TIMEOUT_SECS: float = STARTUP_RETRIES * STARTUP_SLEEP_SECS
+
 JSONValue: typ.TypeAlias = (
     bool | int | float | str | list["JSONValue"] | dict[str, "JSONValue"] | None
 )
 JSONObject: typ.TypeAlias = dict[str, JSONValue]
+
+
+class RPCRequest(ms.Struct):
+    """An RPC request with method and parameters."""
+
+    method: str
+    params: JSONObject | None = None
+
+
+class DaemonStartError(TimeoutError):
+    """Raised when ``weaverd`` fails to become ready."""
+
+    def __init__(self, path: Path, timeout_secs: float) -> None:
+        self.path = path
+        self.timeout_secs = timeout_secs
+        super().__init__(
+            f"weaverd failed to start at {path} within {timeout_secs:.1f}s"
+        )
 
 
 def discover_socket() -> Path:
@@ -55,11 +79,15 @@ async def ensure_daemon_running(socket_path: Path) -> None:
     if await can_connect(socket_path):
         return
     await spawn_daemon(socket_path)
-    for _ in range(50):
-        if await can_connect(socket_path):
-            return
-        await anyio.sleep(0.1)
-    raise RuntimeError("weaverd failed to start")
+    try:
+        with anyio.fail_after(STARTUP_TIMEOUT_SECS):
+            for _ in range(STARTUP_RETRIES):
+                if await can_connect(socket_path):
+                    return
+                await anyio.sleep(STARTUP_SLEEP_SECS)
+    except TimeoutError as exc:
+        raise DaemonStartError(socket_path, STARTUP_TIMEOUT_SECS) from exc
+    raise DaemonStartError(socket_path, STARTUP_TIMEOUT_SECS)
 
 
 def _process_response_line(data: bytes, stdout: typ.TextIO) -> bool:
@@ -92,6 +120,47 @@ async def _stream_response(reader: asyncio.StreamReader, stdout: typ.TextIO) -> 
     return error
 
 
+def _resolve_socket_path(socket_path: Path | None) -> Path:
+    """Return ``socket_path`` or discover a fallback."""
+    return socket_path or discover_socket()
+
+
+async def _establish_rpc_connection(
+    path: Path,
+) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+    """Ensure the daemon is running and open a Unix socket connection.
+
+    Raises:
+        DaemonStartError: If the daemon fails to start.
+        OSError: If the Unix socket cannot be opened.
+    """
+    await ensure_daemon_running(path)
+    return await asyncio.open_unix_connection(str(path))
+
+
+async def _execute_rpc_request(
+    reader: asyncio.StreamReader,
+    writer: asyncio.StreamWriter,
+    request: RPCRequest,
+    stdout: typ.TextIO,
+) -> bool:
+    """Send an RPC request and stream the response."""
+    try:
+        writer.write(
+            msjson.encode({"method": request.method, "params": request.params or {}})
+            + b"\n"
+        )
+        await writer.drain()
+        with contextlib.suppress(
+            AttributeError, NotImplementedError
+        ):  # pragma: no cover - transport-specific
+            writer.write_eof()
+        return await _stream_response(reader, stdout)
+    finally:
+        writer.close()
+        await writer.wait_closed()
+
+
 async def rpc_call(
     method: str,
     params: JSONObject | None = None,
@@ -99,24 +168,18 @@ async def rpc_call(
     stdout: typ.TextIO | None = None,
 ) -> None:
     """Send an RPC request and stream the response to ``stdout``."""
-    path = socket_path or discover_socket()
+    path = _resolve_socket_path(socket_path)
     stdout = typ.cast(typ.TextIO, sys.stdout if stdout is None else stdout)  # noqa: TC006
     try:
-        await ensure_daemon_running(path)
-    except Exception as exc:
+        reader, writer = await _establish_rpc_connection(path)
+    except DaemonStartError as exc:
         print(f"Error: Could not ensure daemon is running: {exc}", file=sys.stderr)
         raise typer.Exit(1) from exc
-
-    reader, writer = await asyncio.open_unix_connection(str(path))
-    error = False
-    try:
-        writer.write(msjson.encode({"method": method, "params": params or {}}) + b"\n")
-        await writer.drain()
-        writer.write_eof()
-        error = await _stream_response(reader, stdout)
-    finally:
-        writer.close()
-        await writer.wait_closed()
+    except OSError as exc:
+        print(f"Error: Failed to connect to daemon at {path}: {exc}", file=sys.stderr)
+        raise typer.Exit(1) from exc
+    request = RPCRequest(method=method, params=params)
+    error = await _execute_rpc_request(reader, writer, request, stdout)
     if error:
         raise typer.Exit(1)
     return

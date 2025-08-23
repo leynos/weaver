@@ -15,6 +15,8 @@ from weaverd import server
 from weaverd.rpc import RPCDispatcher
 from weaverd.serena_tools import SerenaTool
 
+from .helpers import raise_serena_agent_not_found
+
 scenarios("../get_definition.feature")
 
 
@@ -72,10 +74,7 @@ def runtime_dir_empty(runtime_dir: Context, monkeypatch: pytest.MonkeyPatch) -> 
 
 @given("serena-agent is missing")
 def missing_dep(monkeypatch: pytest.MonkeyPatch) -> None:
-    def raise_error(_: SerenaTool) -> None:
-        raise RuntimeError("serena-agent not found")
-
-    monkeypatch.setattr(server, "create_serena_tool", raise_error)
+    monkeypatch.setattr(server, "create_serena_tool", raise_serena_agent_not_found)
 
 
 @when("I invoke the get-definition command")

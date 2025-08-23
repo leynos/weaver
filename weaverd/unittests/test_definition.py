@@ -1,5 +1,6 @@
 import builtins
 import collections.abc as cabc
+import typing as typ
 from dataclasses import dataclass  # noqa: ICN003 -- simpler decorator usage
 
 import pytest
@@ -7,7 +8,7 @@ import pytest
 from weaver_schemas.primitives import Location, Position, Range
 from weaver_schemas.references import Symbol
 from weaverd import server
-from weaverd.serena_tools import SerenaTool
+from weaverd.serena_tools import SerenaAgentNotFoundError, SerenaTool
 
 try:
     _anext = builtins.anext  # type: ignore[attr-defined]
@@ -72,7 +73,9 @@ def _setup_and_call_get_definition(
     return server.handle_get_definition(position.file, position.line, position.char)
 
 
-async def _collect_symbols_from_results(results, expected_count: int) -> list[Symbol]:
+async def _collect_symbols_from_results(
+    results: cabc.AsyncIterator[Symbol], expected_count: int
+) -> list[Symbol]:
     """Helper to collect symbols from async iterator and verify count."""
     symbols: list[Symbol] = []
     try:
@@ -170,12 +173,12 @@ async def test_handle_get_definition_multiple_symbols(
 async def test_handle_get_definition_missing_dependency(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def raise_error(_: SerenaTool) -> None:
-        raise RuntimeError("serena-agent not found")
+    def raise_error(_: SerenaTool) -> typ.NoReturn:
+        raise SerenaAgentNotFoundError()
 
     monkeypatch.setattr(server, "create_serena_tool", raise_error)
 
-    with pytest.raises(RuntimeError, match="serena-agent not found"):
+    with pytest.raises(SerenaAgentNotFoundError, match="serena-agent not found"):
         await anext(server.handle_get_definition("foo.py", 1, 0))
 
 

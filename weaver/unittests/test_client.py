@@ -168,3 +168,113 @@ def test_process_response_line_buffered_stdout() -> None:
     assert not client._process_response_line(line, out)
     out.flush()
     assert buf.getvalue() == line
+
+
+def test_resolve_socket_path_passthrough() -> None:
+    path = Path("test.sock")
+    assert client._resolve_socket_path(path) == path
+
+
+def test_resolve_socket_path_discover(monkeypatch: pytest.MonkeyPatch) -> None:
+    expected = Path("discover.sock")
+    monkeypatch.setattr(client, "discover_socket", lambda: expected)
+    assert client._resolve_socket_path(None) == expected
+
+
+@pytest.mark.anyio
+async def test_establish_rpc_connection_daemon_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fail(path: Path) -> None:  # pragma: no cover - stub
+        await asyncio.sleep(0)
+        raise client.DaemonStartError(path, client.STARTUP_TIMEOUT_SECS)
+
+    monkeypatch.setattr(client, "ensure_daemon_running", fail)
+    with pytest.raises(client.DaemonStartError):
+        await client._establish_rpc_connection(Path("x.sock"))
+
+
+@pytest.mark.anyio
+async def test_establish_rpc_connection_connect_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def succeed(path: Path) -> None:
+        await asyncio.sleep(0)
+
+    class ConnectError(OSError):
+        """Test-only error to simulate socket failure."""
+
+        def __init__(self) -> None:
+            super().__init__("no socket")
+
+    async def connect(path: str) -> None:  # pragma: no cover - stub
+        await asyncio.sleep(0)
+        raise ConnectError()
+
+    monkeypatch.setattr(client, "ensure_daemon_running", succeed)
+    monkeypatch.setattr(asyncio, "open_unix_connection", connect)
+    with pytest.raises(ConnectError):
+        await client._establish_rpc_connection(Path("x.sock"))
+
+
+@pytest.mark.anyio
+async def test_establish_rpc_connection_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def succeed(path: Path) -> None:
+        await asyncio.sleep(0)
+
+    reader = typ.cast("asyncio.StreamReader", object())
+    writer = typ.cast("asyncio.StreamWriter", object())
+
+    async def connect(path: str) -> tuple[object, object]:  # pragma: no cover - stub
+        await asyncio.sleep(0)
+        return reader, writer
+
+    monkeypatch.setattr(client, "ensure_daemon_running", succeed)
+    monkeypatch.setattr(asyncio, "open_unix_connection", connect)
+    assert await client._establish_rpc_connection(Path("x.sock")) == (reader, writer)
+
+
+class _DummyWriter:
+    def __init__(self) -> None:
+        self.closed = False
+        self.written: list[bytes] = []
+
+    def write(self, data: bytes) -> None:  # pragma: no cover - simple
+        self.written.append(data)
+
+    async def drain(self) -> None:  # pragma: no cover - simple
+        return None
+
+    def write_eof(self) -> None:  # pragma: no cover - simple
+        return None
+
+    def close(self) -> None:  # pragma: no cover - simple
+        self.closed = True
+
+    async def wait_closed(self) -> None:  # pragma: no cover - simple
+        return None
+
+
+@pytest.mark.anyio
+async def test_execute_rpc_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    writer = _DummyWriter()
+    reader = typ.cast("asyncio.StreamReader", object())
+    stdout = StringIO()
+
+    async def stream(_: asyncio.StreamReader, __: typ.TextIO) -> bool:
+        await asyncio.sleep(0)
+        return True
+
+    monkeypatch.setattr(client, "_stream_response", stream)
+    error = await client._execute_rpc_request(
+        reader,
+        typ.cast("asyncio.StreamWriter", writer),
+        client.RPCRequest(method="m"),
+        stdout,
+    )
+    assert error
+    assert writer.closed
+    # Ensure the JSON-RPC line was encoded and framed as expected
+    assert writer.written == [msjson.encode({"method": "m", "params": {}}) + b"\n"]

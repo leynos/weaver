@@ -13,7 +13,9 @@ from weaver_schemas.diagnostics import Diagnostic
 from weaver_schemas.primitives import Location, Position, Range
 from weaverd import serena_tools, server
 from weaverd.rpc import RPCDispatcher
-from weaverd.serena_tools import SerenaTool
+from weaverd.serena_tools import SerenaTool, ToolClassNotFoundError
+
+from .helpers import raise_serena_agent_not_found
 
 scenarios("../list_diagnostics.feature")
 
@@ -64,16 +66,13 @@ def daemon_running(context: Context) -> None:
 
 @given("serena-agent is missing")
 def missing_dep(monkeypatch: pytest.MonkeyPatch) -> None:
-    def raise_error(_: SerenaTool) -> None:
-        raise RuntimeError("serena-agent not found")
-
-    monkeypatch.setattr(server, "create_serena_tool", raise_error)
+    monkeypatch.setattr(server, "create_serena_tool", raise_serena_agent_not_found)
 
 
 @given("the tool attribute is unknown")
 def unknown_tool(context: Context, monkeypatch: pytest.MonkeyPatch) -> None:
-    def raise_error(_: SerenaTool) -> None:
-        raise RuntimeError("NoSuchTool not found in serena")
+    def raise_error(_: SerenaTool) -> typ.NoReturn:
+        raise ToolClassNotFoundError("NoSuchTool")
 
     monkeypatch.setattr(server, "create_serena_tool", raise_error)
 

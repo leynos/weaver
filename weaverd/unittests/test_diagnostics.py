@@ -12,7 +12,12 @@ from weaver_schemas.error import SchemaError
 from weaver_schemas.primitives import Location, Position, Range
 from weaverd import server
 from weaverd.rpc import RPCDispatcher
-from weaverd.serena_tools import SerenaTool
+from weaverd.serena_tools import (
+    SerenaAgentNotFoundError,
+    SerenaTool,
+    ToolClassNotCallableError,
+    ToolClassNotFoundError,
+)
 from weaverd.server import start_server
 
 if typ.TYPE_CHECKING:
@@ -106,7 +111,7 @@ def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(serena_tools, "import_module", fake_import)
     serena_tools.clear_serena_imports()
 
-    with pytest.raises(RuntimeError, match=r"workflow_tools.OnboardingTool"):
+    with pytest.raises(ToolClassNotFoundError, match=r"workflow_tools.OnboardingTool"):
         serena_tools.create_serena_tool(SerenaTool.ONBOARDING)
     serena_tools.clear_serena_imports()
 
@@ -126,7 +131,7 @@ def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(serena_tools, "import_module", fake_import_noncallable)
     serena_tools.clear_serena_imports()
-    with pytest.raises(RuntimeError, match="not callable"):
+    with pytest.raises(ToolClassNotCallableError, match="not callable"):
         serena_tools.create_serena_tool(SerenaTool.ONBOARDING)
     serena_tools.clear_serena_imports()
 
@@ -157,7 +162,7 @@ async def test_missing_diagnostics_dependency(
     dispatcher = RPCDispatcher()
 
     def raise_error(_: SerenaTool) -> StubTool:
-        raise RuntimeError("serena-agent not found")
+        raise SerenaAgentNotFoundError()
 
     monkeypatch.setattr(server, "create_serena_tool", raise_error)
 
