@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import dataclasses
-import pathlib
 import typing as typ
 
 import pytest
@@ -7,6 +8,11 @@ import typer
 from typer.testing import CliRunner
 
 import weaver.cli as cli
+
+if typ.TYPE_CHECKING:
+    import pathlib
+
+RPCCall = typ.Callable[[str, dict[str, object] | None], object]
 
 
 def test_cli_hello() -> None:
@@ -28,8 +34,12 @@ def test_run_rpc_invokes_anyio(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure _run_rpc delegates to anyio.run without I/O."""
     called: dict[str, object] = {}
 
-    def fake_run(func, method, params=None):
-        # The helper should forward rpc_call and user arguments verbatim.
+    def fake_run(
+        func: RPCCall,
+        method: str,
+        params: dict[str, object] | None = None,
+    ) -> None:
+        """Record parameters passed to anyio.run."""
         called.update({"func": func, "method": method, "params": params})
 
     monkeypatch.setattr(cli.anyio, "run", fake_run)
@@ -47,7 +57,13 @@ def test_run_rpc_reports_error(
 ) -> None:
     """_run_rpc should convert exceptions into user-friendly exits."""
 
-    def fake_run(func, method, params=None):
+    def fake_run(
+        func: RPCCall,
+        method: str,
+        params: dict[str, object] | None = None,
+    ) -> typ.Never:
+        """Simulate anyio.run raising an error."""
+
         class FakeRunError(RuntimeError):
             """Test-only error to simulate RPC failure."""
 
@@ -66,7 +82,7 @@ class CLITestCase:
     cli_command: str
     rpc_method: str
     args: list[str]
-    params: dict[str, typ.Any] | None
+    params: dict[str, object] | None
 
 
 @pytest.mark.parametrize(
@@ -94,7 +110,11 @@ def test_cli_commands_use_run_rpc(
     """CLI commands use _run_rpc to contact the daemon."""
     called: dict[str, object] = {}
 
-    def fake_run(func, method, params=None):
+    def fake_run(
+        func: RPCCall,
+        method: str,
+        params: dict[str, object] | None = None,
+    ) -> None:
         # Avoid network access while verifying parameters.
         called.update({"func": func, "method": method, "params": params})
 
@@ -118,7 +138,11 @@ def test_cli_list_references_include_definition(
 
     called: dict[str, object] = {}
 
-    def fake_run(func, method, params=None):
+    def fake_run(
+        func: RPCCall,
+        method: str,
+        params: dict[str, object] | None = None,
+    ) -> None:
         called.update({"func": func, "method": method, "params": params})
 
     monkeypatch.setattr(cli.anyio, "run", fake_run)
@@ -147,9 +171,13 @@ def test_cli_get_definition_handles_empty_response(
 ) -> None:
     """get-definition exits cleanly when the RPC stream is empty."""
 
-    def fake_run(func, method, params=None):
-        # Simulate RPC call producing no output.
-        return None
+    def fake_run(
+        func: RPCCall,
+        method: str,
+        params: dict[str, object] | None = None,
+    ) -> None:
+        """Simulate RPC call producing no output."""
+        return
 
     monkeypatch.setattr(cli.anyio, "run", fake_run)
 
@@ -165,7 +193,13 @@ def test_cli_onboard_project_reports_error(
 ) -> None:
     """onboard-project surfaces RPC errors."""
 
-    def fake_run(func, method, params=None):
+    def fake_run(
+        func: RPCCall,
+        method: str,
+        params: dict[str, object] | None = None,
+    ) -> typ.Never:
+        """Simulate RPC failure when invoking anyio.run."""
+
         class FakeRunError(RuntimeError):
             """Test-only error to simulate RPC failure."""
 

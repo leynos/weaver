@@ -74,6 +74,7 @@ select = [
     "DTZ",      # require strict timezone manipulation with datetime
     "FBT",      # detect boolean traps
     "N",        # enforce naming conventions, e.g. ClassName vs function_name
+    "ANN",      # Function/method annotations
     "FURB",      # Refurb-style suggestions
     "B",         # Bugbear warnings
     "TRY",      # Exception handling best practices

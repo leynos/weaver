@@ -118,7 +118,7 @@ def clear_serena_imports() -> None:
         sys.modules.pop(name, None)
 
 
-def _validate_and_get_tool_class(wf_tools: ModuleType, name: str) -> typ.Any:
+def _validate_and_get_tool_class(wf_tools: ModuleType, name: str) -> type[object]:
     """Return the workflow tool class, ensuring it exists and is callable."""
 
     tool_cls = getattr(wf_tools, name, None)
@@ -141,7 +141,7 @@ def _create_agent_with_prompt_factory(prompt_mod: ModuleType) -> _BareAgent:
 
 
 def _instantiate_tool(
-    tool_cls: typ.Any, agent: _BareAgent, name: str
+    tool_cls: type[object], agent: _BareAgent, name: str
 ) -> SerenaToolInstance:
     """Instantiate ``tool_cls`` with ``agent`` and wrap errors."""
 
