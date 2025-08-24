@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import builtins
-import collections.abc as cabc
 import typing as typ
 from dataclasses import dataclass  # noqa: ICN003 -- simpler decorator usage
 
 import pytest
+
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
 
 from weaver_schemas.primitives import Location, Position, Range
 from weaver_schemas.references import Symbol

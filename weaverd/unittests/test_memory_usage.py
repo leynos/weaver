@@ -26,7 +26,7 @@ def test_get_rss_mb_darwin(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_get_rss_mb_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    def raise_error(arg: object) -> typ.Never:
+    def raise_error(arg: int) -> typ.Never:
         raise OSError()
 
     monkeypatch.setattr(resource, "getrusage", raise_error)

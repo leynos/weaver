@@ -13,13 +13,6 @@ HandlerSync = typ.Callable[..., object]
 HandlerAsync = typ.Callable[..., typ.Awaitable[object]]
 Handler = HandlerSync | HandlerAsync
 
-ResultProcessor: typ.TypeAlias = (
-    typ.Callable[[bytes | bytearray], typ.AsyncIterator[bytes]]
-    | typ.Callable[[typ.AsyncIterable[object]], typ.AsyncIterator[bytes]]
-    | typ.Callable[[typ.Iterable[object]], typ.AsyncIterator[bytes]]
-    | typ.Callable[[object], typ.AsyncIterator[bytes]]
-)
-
 
 class RPCRequest(ms.Struct, frozen=True):
     """JSON-RPC style request."""
@@ -90,20 +83,22 @@ class RPCDispatcher:
     async def _process_single_result(self, result: object) -> typ.AsyncIterator[bytes]:
         yield msjson.encode(result)
 
-    def _get_result_processor(self, result: object) -> ResultProcessor:
+    async def _process_result(self, result: object) -> typ.AsyncIterator[bytes]:
         if isinstance(result, (bytes, bytearray)):
-            return self._process_bytes_result
+            async for chunk in self._process_bytes_result(result):
+                yield chunk
+            return
         if isinstance(result, cabc.AsyncIterable):
-            return self._process_async_iterable_result
+            async for chunk in self._process_async_iterable_result(result):
+                yield chunk
+            return
         if isinstance(result, cabc.Iterable) and not isinstance(
             result, (str, bytes, bytearray)
         ):
-            return self._process_sync_iterable_result
-        return self._process_single_result
-
-    async def _process_result(self, result: object) -> typ.AsyncIterator[bytes]:
-        processor = self._get_result_processor(result)
-        async for chunk in processor(result):
+            async for chunk in self._process_sync_iterable_result(result):
+                yield chunk
+            return
+        async for chunk in self._process_single_result(result):
             yield chunk
 
     async def handle(self, data: bytes) -> typ.AsyncIterator[bytes]:

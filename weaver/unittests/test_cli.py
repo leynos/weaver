@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import dataclasses
-import pathlib
 import typing as typ
 
 import pytest
@@ -7,6 +8,11 @@ import typer
 from typer.testing import CliRunner
 
 import weaver.cli as cli
+
+if typ.TYPE_CHECKING:
+    import pathlib
+
+RPCCall = typ.Callable[[str, dict[str, object] | None], object]
 
 
 def test_cli_hello() -> None:
@@ -29,7 +35,7 @@ def test_run_rpc_invokes_anyio(monkeypatch: pytest.MonkeyPatch) -> None:
     called: dict[str, object] = {}
 
     def fake_run(
-        func: typ.Callable[[str, dict[str, object] | None], object],
+        func: RPCCall,
         method: str,
         params: dict[str, object] | None = None,
     ) -> None:
@@ -52,7 +58,7 @@ def test_run_rpc_reports_error(
     """_run_rpc should convert exceptions into user-friendly exits."""
 
     def fake_run(
-        func: typ.Callable[[str, dict[str, object] | None], object],
+        func: RPCCall,
         method: str,
         params: dict[str, object] | None = None,
     ) -> typ.Never:
@@ -105,7 +111,7 @@ def test_cli_commands_use_run_rpc(
     called: dict[str, object] = {}
 
     def fake_run(
-        func: typ.Callable[[str, dict[str, object] | None], object],
+        func: RPCCall,
         method: str,
         params: dict[str, object] | None = None,
     ) -> None:
@@ -133,7 +139,7 @@ def test_cli_list_references_include_definition(
     called: dict[str, object] = {}
 
     def fake_run(
-        func: typ.Callable[[str, dict[str, object] | None], object],
+        func: RPCCall,
         method: str,
         params: dict[str, object] | None = None,
     ) -> None:
@@ -166,7 +172,7 @@ def test_cli_get_definition_handles_empty_response(
     """get-definition exits cleanly when the RPC stream is empty."""
 
     def fake_run(
-        func: typ.Callable[[str, dict[str, object] | None], object],
+        func: RPCCall,
         method: str,
         params: dict[str, object] | None = None,
     ) -> None:
@@ -188,7 +194,7 @@ def test_cli_onboard_project_reports_error(
     """onboard-project surfaces RPC errors."""
 
     def fake_run(
-        func: typ.Callable[[str, dict[str, object] | None], object],
+        func: RPCCall,
         method: str,
         params: dict[str, object] | None = None,
     ) -> typ.Never:

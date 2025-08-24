@@ -1,18 +1,24 @@
+from __future__ import annotations
+
+import types as _types
 import typing as typ
 
 import anyio
 import msgspec as ms
-import pytest
+
+if typ.TYPE_CHECKING:
+    import pytest
+
+    from features.types import Context
+    from weaverd.rpc import RPCDispatcher
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
 
-from features.types import Context
 from weaver import client
 from weaver.cli import app
 from weaver_schemas.diagnostics import Diagnostic
 from weaver_schemas.primitives import Location, Position, Range
 from weaverd import serena_tools, server
-from weaverd.rpc import RPCDispatcher
 from weaverd.serena_tools import SerenaTool, ToolClassNotFoundError
 
 from .helpers import raise_serena_agent_not_found
@@ -144,21 +150,22 @@ def test_create_serena_tool_string_enum_equivalence(
 ) -> None:
     """create_serena_tool accepts both enum and string names."""
 
-    class ToolsMod:  # pragma: no cover - simple stub
-        class ListDiagnosticsTool:  # pragma: no cover - simple stub
-            def __init__(self, _: object) -> None:  # pragma: no cover - stub
-                pass
+    class _ListDiagnosticsTool:  # pragma: no cover - simple stub
+        def __init__(self, _: object) -> None:  # pragma: no cover - stub
+            pass
 
-    class PromptMod:  # pragma: no cover - simple stub
-        class SerenaPromptFactory:  # pragma: no cover - simple stub
-            def __call__(self) -> None:  # pragma: no cover - stub
-                return None
+    class _SerenaPromptFactory:  # pragma: no cover - simple stub
+        def __call__(self) -> None:  # pragma: no cover - stub
+            return None
 
-    def fake_import(name: str) -> type[object]:  # pragma: no cover - simple stub
+    def fake_import(name: str) -> _types.ModuleType:  # pragma: no cover - simple stub
+        mod = _types.ModuleType(name)
         if name == "serena.tools.workflow_tools":
-            return ToolsMod
+            mod.ListDiagnosticsTool = _ListDiagnosticsTool  # type: ignore[attr-defined]
+            return mod
         if name == "serena.prompt_factory":
-            return PromptMod
+            mod.SerenaPromptFactory = _SerenaPromptFactory  # type: ignore[attr-defined]
+            return mod
         raise ModuleNotFoundError
 
     monkeypatch.setattr(serena_tools, "import_module", fake_import)

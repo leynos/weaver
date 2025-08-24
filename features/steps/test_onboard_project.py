@@ -1,18 +1,24 @@
+from __future__ import annotations
+
 import json
 import os
 import typing as typ
-from pathlib import Path
 
 import anyio
 import msgspec as ms
-import pytest
+
+if typ.TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
+
+    from features.types import Context
+    from weaverd.rpc import RPCDispatcher
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
 
-from features.types import Context
 from weaver.cli import app
 from weaver_schemas.reports import OnboardingReport
-from weaverd.rpc import RPCDispatcher
 from weaverd.serena_tools import (
     SerenaAgentNotFoundError,
     SerenaTool,

@@ -101,7 +101,7 @@ def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
             def __call__(self) -> None:  # pragma: no cover - simple stub
                 return None
 
-    def fake_import(name: str) -> type[object]:  # pragma: no cover - simple stub
+    def fake_import(name: str) -> object:  # pragma: no cover - simple stub
         if name == "serena.tools.workflow_tools":
             return ToolsMod
         if name == "serena.prompt_factory":
@@ -118,7 +118,7 @@ def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
     class NonCallableTool:  # pragma: no cover - simple stub
         pass
 
-    def fake_import_noncallable(name: str) -> type[object]:  # pragma: no cover - stub
+    def fake_import_noncallable(name: str) -> object:  # pragma: no cover - stub
         if name == "serena.tools.workflow_tools":
 
             class Tools:  # pragma: no cover - stub
