@@ -12,7 +12,7 @@ import weaver.cli as cli
 if typ.TYPE_CHECKING:
     import pathlib
 
-RPCCall = typ.Callable[[str, dict[str, object] | None], object]
+RPCCall: typ.TypeAlias = typ.Callable[[str, dict[str, object] | None], object]
 
 
 def test_cli_hello() -> None:
