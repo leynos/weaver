@@ -16,7 +16,7 @@ from weaverd.rpc import RPCDispatcher
 from weaverd.serena_tools import (
     SerenaAgentNotFoundError,
     SerenaTool,
-    ToolClassNotCallableError,
+    ToolAttrNotClassError,
     ToolClassNotFoundError,
 )
 from weaverd.server import start_server
@@ -124,7 +124,7 @@ def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(serena_tools, "import_module", fake_import_noncallable)
     serena_tools.clear_serena_imports()
-    with pytest.raises(ToolClassNotCallableError, match="not a class"):
+    with pytest.raises(ToolAttrNotClassError, match="not a class"):
         serena_tools.create_serena_tool(SerenaTool.ONBOARDING)
     serena_tools.clear_serena_imports()
 

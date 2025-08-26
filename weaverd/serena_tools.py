@@ -41,11 +41,15 @@ class ToolClassNotFoundError(RuntimeError):
         super().__init__(f"serena.tools.workflow_tools.{name} not found")
 
 
-class ToolClassNotCallableError(TypeError):
+class ToolAttrNotClassError(TypeError):
     """Raised when a workflow tool attribute is not a class."""
 
     def __init__(self, name: str) -> None:
         super().__init__(f"serena.tools.workflow_tools.{name} is not a class")
+
+
+# Backwards-compatible alias; remove in a future minor.
+ToolClassNotCallableError = ToolAttrNotClassError
 
 
 class PromptFactoryError(TypeError):
@@ -125,8 +129,10 @@ def _validate_and_get_tool_class(wf_tools: ModuleType, name: str) -> type[object
     if tool_cls is None:
         raise ToolClassNotFoundError(name)
     # Must be a class.
-    if not isinstance(tool_cls, type):
-        raise ToolClassNotCallableError(name)
+    import inspect
+
+    if not inspect.isclass(tool_cls):
+        raise ToolAttrNotClassError(name)
     # Help type-checkers: ``tool_cls`` is a class at this point.
     return typ.cast("type[object]", tool_cls)
 
@@ -177,7 +183,7 @@ def create_serena_tool(tool_attr: SerenaTool | str) -> SerenaToolInstance:
         If ``tool_attr`` is neither ``SerenaTool`` nor ``str``.
     ToolClassNotFoundError
         If the tool class is not found.
-    ToolClassNotCallableError
+    ToolAttrNotClassError
         If the tool attribute exists but is not a class.
     """
     wf_tools, prompt_mod = _load_serena_modules()
