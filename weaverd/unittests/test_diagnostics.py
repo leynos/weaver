@@ -131,7 +131,7 @@ def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(serena_tools, "import_module", fake_import_noncallable)
     serena_tools.clear_serena_imports()
-    with pytest.raises(ToolClassNotCallableError, match="not callable"):
+    with pytest.raises(ToolClassNotCallableError, match="not a class"):
         serena_tools.create_serena_tool(SerenaTool.ONBOARDING)
     serena_tools.clear_serena_imports()
 

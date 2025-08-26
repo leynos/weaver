@@ -9,6 +9,11 @@ import msgspec.json as msjson
 
 from weaver_schemas.error import SchemaError
 
+if typ.TYPE_CHECKING:
+    from weaver.client import JSONObject
+else:  # pragma: no cover - runtime compatibility
+    JSONObject = dict[str, object]
+
 HandlerSync = typ.Callable[..., object]
 HandlerAsync = typ.Callable[..., typ.Awaitable[object]]
 Handler = HandlerSync | HandlerAsync
@@ -21,7 +26,7 @@ class RPCRequest(ms.Struct, frozen=True):
     """JSON-RPC style request."""
 
     method: str
-    params: dict[str, object] | None = None
+    params: JSONObject | None = None
 
 
 class RPCDispatcher:
@@ -97,7 +102,7 @@ class RPCDispatcher:
     @staticmethod
     def _is_sync_iterable_result(result: object) -> bool:
         return isinstance(result, cabc.Iterable) and not isinstance(
-            result, (str, bytes, bytearray)
+            result, (str, bytes, bytearray, cabc.Mapping)
         )
 
     async def _process_result(self, result: object) -> typ.AsyncIterator[bytes]:

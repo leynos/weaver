@@ -8,12 +8,13 @@ import typer
 from typer.testing import CliRunner
 
 import weaver.cli as cli
+from weaver.client import JSONObject
 
 if typ.TYPE_CHECKING:
     import pathlib
 
-RPCCall: typ.TypeAlias = typ.Callable[[str, dict[str, object] | None], object]
-RunStub: typ.TypeAlias = typ.Callable[[RPCCall, str, dict[str, object] | None], None]
+RPCCall: typ.TypeAlias = typ.Callable[[str, JSONObject | None], object]
+RunStub: typ.TypeAlias = typ.Callable[[RPCCall, str, JSONObject | None], None]
 
 
 def make_run_stub(
@@ -30,7 +31,7 @@ def make_run_stub(
     def _run(
         func: RPCCall,
         method: str,
-        params: dict[str, object] | None = None,
+        params: JSONObject | None = None,
     ) -> None:
         if called is not None:
             called.update({"func": func, "method": method, "params": params})
@@ -89,7 +90,7 @@ class CLITestCase:
     cli_command: str
     rpc_method: str
     args: list[str]
-    params: dict[str, object] | None
+    params: JSONObject | None
 
 
 @pytest.mark.parametrize(

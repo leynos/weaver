@@ -7,7 +7,7 @@ import anyio
 import typer
 
 from . import pure
-from .client import rpc_call
+from .client import JSONObject, rpc_call
 from .sockets import can_connect
 
 app = typer.Typer(name="weaver")
@@ -42,7 +42,7 @@ def _make_stub(name: str) -> typ.Callable[[], None]:
     return command
 
 
-def _run_rpc(method: str, params: dict | None = None) -> None:
+def _run_rpc(method: str, params: JSONObject | None = None) -> None:
     """Execute an RPC request and handle failures uniformly."""
     try:
         anyio.run(rpc_call, method, params)
@@ -70,7 +70,7 @@ def list_diagnostics(
     files: list[Path] = typer.Argument(None, metavar="[FILES...]"),  # noqa: B008
 ) -> None:
     """Stream diagnostics for the workspace."""
-    params: dict[str, typ.Any] = {}
+    params: JSONObject = {}
     if severity:
         params["severity"] = severity
     if files:
@@ -109,7 +109,7 @@ def get_definition(
         0-indexed character offset within the line.
     """
 
-    params = {"file": str(file), "line": line, "char": char}
+    params: JSONObject = {"file": str(file), "line": line, "char": char}
     _run_rpc("get-definition", params)
 
 
@@ -131,7 +131,7 @@ def list_references(
 ) -> None:
     """Locate all references to the symbol at the given position."""
 
-    params: dict[str, typ.Any] = {"file": str(file), "line": line, "char": char}
+    params: JSONObject = {"file": str(file), "line": line, "char": char}
     if include_definition:
         params["include_definition"] = True
     _run_rpc("list-references", params)
