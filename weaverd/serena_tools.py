@@ -42,10 +42,10 @@ class ToolClassNotFoundError(RuntimeError):
 
 
 class ToolClassNotCallableError(TypeError):
-    """Raised when a workflow tool attribute is not callable."""
+    """Raised when a workflow tool attribute is not a class."""
 
     def __init__(self, name: str) -> None:
-        super().__init__(f"serena.tools.workflow_tools.{name} is not callable")
+        super().__init__(f"serena.tools.workflow_tools.{name} is not a class")
 
 
 class PromptFactoryError(TypeError):
@@ -118,15 +118,17 @@ def clear_serena_imports() -> None:
         sys.modules.pop(name, None)
 
 
-def _validate_and_get_tool_class(wf_tools: ModuleType, name: str) -> typ.Any:
-    """Return the workflow tool class, ensuring it exists and is callable."""
+def _validate_and_get_tool_class(wf_tools: ModuleType, name: str) -> type[object]:
+    """Return the workflow tool class, ensuring it exists and is a class."""
 
     tool_cls = getattr(wf_tools, name, None)
     if tool_cls is None:
         raise ToolClassNotFoundError(name)
-    if not callable(tool_cls):
+    # Must be a class.
+    if not isinstance(tool_cls, type):
         raise ToolClassNotCallableError(name)
-    return tool_cls
+    # Help type-checkers: ``tool_cls`` is a class at this point.
+    return typ.cast("type[object]", tool_cls)
 
 
 def _create_agent_with_prompt_factory(prompt_mod: ModuleType) -> _BareAgent:
@@ -141,7 +143,7 @@ def _create_agent_with_prompt_factory(prompt_mod: ModuleType) -> _BareAgent:
 
 
 def _instantiate_tool(
-    tool_cls: typ.Any, agent: _BareAgent, name: str
+    tool_cls: type[object], agent: _BareAgent, name: str
 ) -> SerenaToolInstance:
     """Instantiate ``tool_cls`` with ``agent`` and wrap errors."""
 

@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import builtins
-import collections.abc as cabc
 import typing as typ
 from dataclasses import dataclass  # noqa: ICN003 -- simpler decorator usage
 
 import pytest
+
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
 
 from weaver_schemas.primitives import Location, Position, Range
 from weaver_schemas.references import Symbol
@@ -13,8 +17,9 @@ from weaverd.serena_tools import SerenaAgentNotFoundError, SerenaTool
 try:
     _anext = builtins.anext  # type: ignore[attr-defined]
 except AttributeError:  # Python < 3.10
+    T = typ.TypeVar("T")
 
-    async def _anext(it):
+    async def _anext(it: cabc.AsyncIterator[T]) -> T:
         return await it.__anext__()
 
 
