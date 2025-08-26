@@ -124,9 +124,11 @@ def _validate_and_get_tool_class(wf_tools: ModuleType, name: str) -> type[object
     tool_cls = getattr(wf_tools, name, None)
     if tool_cls is None:
         raise ToolClassNotFoundError(name)
-    if not callable(tool_cls):
+    # Must be a class (callable is not sufficient).
+    if not callable(tool_cls) or not isinstance(tool_cls, type):
         raise ToolClassNotCallableError(name)
-    return tool_cls
+    # Help type-checkers: ``tool_cls`` is a class at this point.
+    return typ.cast("type[object]", tool_cls)
 
 
 def _create_agent_with_prompt_factory(prompt_mod: ModuleType) -> _BareAgent:
