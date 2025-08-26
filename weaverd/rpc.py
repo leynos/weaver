@@ -13,6 +13,9 @@ HandlerSync = typ.Callable[..., object]
 HandlerAsync = typ.Callable[..., typ.Awaitable[object]]
 Handler = HandlerSync | HandlerAsync
 
+Predicate = typ.Callable[[object], bool]
+ResultProcessor = typ.Callable[[object], typ.AsyncIterator[bytes]]
+
 
 class RPCRequest(ms.Struct, frozen=True):
     """JSON-RPC style request."""
@@ -83,21 +86,42 @@ class RPCDispatcher:
     async def _process_single_result(self, result: object) -> typ.AsyncIterator[bytes]:
         yield msjson.encode(result)
 
-    async def _process_result(self, result: object) -> typ.AsyncIterator[bytes]:
-        if isinstance(result, (bytes, bytearray)):
-            async for chunk in self._process_bytes_result(result):
-                yield chunk
-            return
-        if isinstance(result, cabc.AsyncIterable):
-            async for chunk in self._process_async_iterable_result(result):
-                yield chunk
-            return
-        if isinstance(result, cabc.Iterable) and not isinstance(
+    @staticmethod
+    def _is_bytes_result(result: object) -> bool:
+        return isinstance(result, (bytes, bytearray))
+
+    @staticmethod
+    def _is_async_iterable_result(result: object) -> bool:
+        return isinstance(result, cabc.AsyncIterable)
+
+    @staticmethod
+    def _is_sync_iterable_result(result: object) -> bool:
+        return isinstance(result, cabc.Iterable) and not isinstance(
             result, (str, bytes, bytearray)
-        ):
-            async for chunk in self._process_sync_iterable_result(result):
-                yield chunk
-            return
+        )
+
+    async def _process_result(self, result: object) -> typ.AsyncIterator[bytes]:
+        processor_chain: tuple[tuple[Predicate, ResultProcessor], ...] = (
+            (
+                self._is_bytes_result,
+                typ.cast("ResultProcessor", self._process_bytes_result),
+            ),
+            (
+                self._is_async_iterable_result,
+                typ.cast("ResultProcessor", self._process_async_iterable_result),
+            ),
+            (
+                self._is_sync_iterable_result,
+                typ.cast("ResultProcessor", self._process_sync_iterable_result),
+            ),
+        )
+
+        for predicate, processor in processor_chain:
+            if predicate(result):
+                async for chunk in processor(result):
+                    yield chunk
+                return
+
         async for chunk in self._process_single_result(result):
             yield chunk
 
