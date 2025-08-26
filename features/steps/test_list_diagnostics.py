@@ -1,19 +1,13 @@
 from __future__ import annotations
 
-import types as _types
 import typing as typ
 
 import anyio
 import msgspec as ms
-
-if typ.TYPE_CHECKING:
-    import pytest
-
-    from features.types import Context
-    from weaverd.rpc import RPCDispatcher
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
 
+from tests._stubs import make_fake_module
 from weaver import client
 from weaver.cli import app
 from weaver_schemas.diagnostics import Diagnostic
@@ -22,6 +16,14 @@ from weaverd import serena_tools, server
 from weaverd.serena_tools import SerenaTool, ToolClassNotFoundError
 
 from .helpers import raise_serena_agent_not_found
+
+if typ.TYPE_CHECKING:
+    import types as _types
+
+    import pytest
+
+    from features.types import Context
+    from weaverd.rpc import RPCDispatcher
 
 scenarios("../list_diagnostics.feature")
 
@@ -159,13 +161,10 @@ def test_create_serena_tool_string_enum_equivalence(
             return None
 
     def fake_import(name: str) -> _types.ModuleType:  # pragma: no cover - simple stub
-        mod = _types.ModuleType(name)
         if name == "serena.tools.workflow_tools":
-            mod.ListDiagnosticsTool = _ListDiagnosticsTool  # type: ignore[attr-defined]
-            return mod
+            return make_fake_module(name, ListDiagnosticsTool=_ListDiagnosticsTool)
         if name == "serena.prompt_factory":
-            mod.SerenaPromptFactory = _SerenaPromptFactory  # type: ignore[attr-defined]
-            return mod
+            return make_fake_module(name, SerenaPromptFactory=_SerenaPromptFactory)
         raise ModuleNotFoundError
 
     monkeypatch.setattr(serena_tools, "import_module", fake_import)

@@ -178,7 +178,7 @@ def create_serena_tool(tool_attr: SerenaTool | str) -> SerenaToolInstance:
     ToolClassNotFoundError
         If the tool class is not found.
     ToolClassNotCallableError
-        If the tool class is not callable.
+        If the tool attribute exists but is not a class.
     """
     wf_tools, prompt_mod = _load_serena_modules()
     name = _resolve_tool_name(tool_attr)

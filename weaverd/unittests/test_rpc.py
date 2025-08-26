@@ -99,16 +99,16 @@ async def test_dispatcher_streams_multiple_results() -> None:
 
 
 @pytest.mark.anyio
-async def test_dispatcher_handles_dict_result() -> None:
+async def test_dispatcher_handles_mapping_result() -> None:
     dispatcher = RPCDispatcher()
 
     @dispatcher.register("mapping")
-    def handler() -> dict[str, bool]:  # pyright: ignore[reportUnusedFunction]
+    def handler() -> typ.Mapping[str, bool]:  # pyright: ignore[reportUnusedFunction]
         return {"ok": True}
 
     req = msjson.encode({"method": "mapping"})
     results = dispatcher.handle(req)
-    response = msjson.decode(await builtins.anext(results), type=dict[str, bool])
+    response = msjson.decode(await builtins.anext(results), type=typ.Mapping[str, bool])
     with pytest.raises(StopAsyncIteration):
         await builtins.anext(results)
     assert response == {"ok": True}

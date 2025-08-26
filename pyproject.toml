@@ -22,15 +22,6 @@ dependencies = [
 weaver = "weaver.cli:app"
 weaverd = "weaverd.server:main"
 
-[project.optional-dependencies]
-dev = [
-    "pytest",
-    "ruff==0.12.7",
-    "pyright",
-    "pytest-timeout",
-    "pytest-bdd>=8.1.0",
-]
-
 [dependency-groups]
 dev = [
     "pytest",

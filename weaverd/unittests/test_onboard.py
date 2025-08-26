@@ -3,9 +3,6 @@ from __future__ import annotations
 import asyncio
 import typing as typ
 
-if typ.TYPE_CHECKING:
-    from pathlib import Path
-
 import msgspec.json as msjson
 import pytest
 
@@ -17,6 +14,9 @@ from weaverd.serena_tools import (
     create_serena_tool,
 )
 from weaverd.server import start_server
+
+if typ.TYPE_CHECKING:
+    from pathlib import Path
 
 
 @pytest.fixture
