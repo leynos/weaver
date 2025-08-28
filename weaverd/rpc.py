@@ -3,6 +3,7 @@ from __future__ import annotations
 import collections.abc as cabc
 import inspect
 import typing as typ
+from functools import cached_property
 
 import msgspec as ms
 import msgspec.json as msjson
@@ -105,8 +106,9 @@ class RPCDispatcher:
             result, (str, bytes, bytearray, cabc.Mapping)
         )
 
-    async def _process_result(self, result: object) -> typ.AsyncIterator[bytes]:
-        processor_chain: tuple[tuple[Predicate, ResultProcessor], ...] = (
+    @cached_property
+    def _processor_chain(self) -> tuple[tuple[Predicate, ResultProcessor], ...]:
+        return (
             (
                 self._is_bytes_result,
                 typ.cast("ResultProcessor", self._process_bytes_result),
@@ -121,7 +123,8 @@ class RPCDispatcher:
             ),
         )
 
-        for predicate, processor in processor_chain:
+    async def _process_result(self, result: object) -> typ.AsyncIterator[bytes]:
+        for predicate, processor in self._processor_chain:
             if predicate(result):
                 async for chunk in processor(result):
                     yield chunk

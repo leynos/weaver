@@ -7,6 +7,7 @@ import typing as typ
 import msgspec.json as msjson
 import pytest
 
+from tests._stubs import make_fake_module
 from weaver_schemas.diagnostics import Diagnostic
 from weaver_schemas.error import SchemaError
 from weaver_schemas.primitives import Location, Position, Range
@@ -15,7 +16,7 @@ from weaverd.rpc import RPCDispatcher
 from weaverd.serena_tools import (
     SerenaAgentNotFoundError,
     SerenaTool,
-    ToolClassNotCallableError,
+    ToolAttrNotClassError,
     ToolClassNotFoundError,
 )
 from weaverd.server import start_server
@@ -93,19 +94,15 @@ def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
 
     from weaverd import serena_tools
 
-    class ToolsMod:  # pragma: no cover - simple stub
-        pass
-
-    class PromptMod:  # pragma: no cover - simple stub
-        class SerenaPromptFactory:  # pragma: no cover - simple stub
-            def __call__(self) -> None:  # pragma: no cover - simple stub
-                return None
+    class SerenaPromptFactory:  # pragma: no cover - simple stub
+        def __call__(self) -> None:  # pragma: no cover - simple stub
+            return None
 
     def fake_import(name: str) -> object:  # pragma: no cover - simple stub
         if name == "serena.tools.workflow_tools":
-            return ToolsMod
+            return make_fake_module(name)
         if name == "serena.prompt_factory":
-            return PromptMod
+            return make_fake_module(name, SerenaPromptFactory=SerenaPromptFactory)
         raise ModuleNotFoundError
 
     monkeypatch.setattr(serena_tools, "import_module", fake_import)
@@ -120,18 +117,14 @@ def test_unknown_tool_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
 
     def fake_import_noncallable(name: str) -> object:  # pragma: no cover - stub
         if name == "serena.tools.workflow_tools":
-
-            class Tools:  # pragma: no cover - stub
-                OnboardingTool = NonCallableTool()  # not callable
-
-            return Tools
+            return make_fake_module(name, OnboardingTool=NonCallableTool())
         if name == "serena.prompt_factory":
-            return PromptMod
+            return make_fake_module(name, SerenaPromptFactory=SerenaPromptFactory)
         raise ModuleNotFoundError
 
     monkeypatch.setattr(serena_tools, "import_module", fake_import_noncallable)
     serena_tools.clear_serena_imports()
-    with pytest.raises(ToolClassNotCallableError, match="not a class"):
+    with pytest.raises(ToolAttrNotClassError, match="not a class"):
         serena_tools.create_serena_tool(SerenaTool.ONBOARDING)
     serena_tools.clear_serena_imports()
 

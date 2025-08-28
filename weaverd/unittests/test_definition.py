@@ -6,13 +6,13 @@ from dataclasses import dataclass  # noqa: ICN003 -- simpler decorator usage
 
 import pytest
 
-if typ.TYPE_CHECKING:
-    import collections.abc as cabc
-
 from weaver_schemas.primitives import Location, Position, Range
 from weaver_schemas.references import Symbol
 from weaverd import server
 from weaverd.serena_tools import SerenaAgentNotFoundError, SerenaTool
+
+if typ.TYPE_CHECKING:
+    import collections.abc as cabc
 
 try:
     _anext = builtins.anext  # type: ignore[attr-defined]

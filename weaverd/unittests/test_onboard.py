@@ -3,9 +3,6 @@ from __future__ import annotations
 import asyncio
 import typing as typ
 
-if typ.TYPE_CHECKING:
-    from pathlib import Path
-
 import msgspec.json as msjson
 import pytest
 
@@ -17,6 +14,15 @@ from weaverd.serena_tools import (
     create_serena_tool,
 )
 from weaverd.server import start_server
+
+if typ.TYPE_CHECKING:
+    from pathlib import Path
+
+
+class _Appliable(typ.Protocol):
+    """Test-local protocol for tools with ``apply``."""
+
+    def apply(self) -> str: ...
 
 
 @pytest.fixture
@@ -30,7 +36,7 @@ async def test_onboard_project(tmp_path: Path) -> None:
 
     @dispatcher.register("onboard-project")
     def onboard() -> OnboardingReport:  # pyright: ignore[reportUnusedFunction]
-        tool = typ.cast(typ.Any, create_serena_tool(SerenaTool.ONBOARDING))  # noqa: TC006
+        tool = typ.cast("_Appliable", create_serena_tool(SerenaTool.ONBOARDING))
         return OnboardingReport(details=tool.apply())
 
     sock = tmp_path / "o.sock"

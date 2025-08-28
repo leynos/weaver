@@ -10,14 +10,13 @@ from weaver_schemas.status import ProjectStatus
 from weaverd.rpc import RPCDispatcher
 from weaverd.server import start_server
 
+if typ.TYPE_CHECKING:
+    from pathlib import Path
+
 
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
-
-
-if typ.TYPE_CHECKING:
-    from pathlib import Path
 
 
 @pytest.mark.anyio

@@ -5,10 +5,10 @@ import sys
 import types
 import typing as typ
 
+from weaverd import server
+
 if typ.TYPE_CHECKING:
     import pytest
-
-from weaverd import server
 
 
 def test_get_rss_mb_linux(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -26,7 +26,7 @@ def test_get_rss_mb_darwin(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_get_rss_mb_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    def raise_error(arg: int) -> typ.Never:
+    def raise_error(_: object) -> typ.NoReturn:
         raise OSError()
 
     monkeypatch.setattr(resource, "getrusage", raise_error)

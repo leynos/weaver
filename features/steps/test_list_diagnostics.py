@@ -1,19 +1,13 @@
 from __future__ import annotations
 
-import types as _types
 import typing as typ
 
 import anyio
 import msgspec as ms
-
-if typ.TYPE_CHECKING:
-    import pytest
-
-    from features.types import Context
-    from weaverd.rpc import RPCDispatcher
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
 
+from tests._stubs import injected_modules, make_fake_module
 from weaver import client
 from weaver.cli import app
 from weaver_schemas.diagnostics import Diagnostic
@@ -22,6 +16,12 @@ from weaverd import serena_tools, server
 from weaverd.serena_tools import SerenaTool, ToolClassNotFoundError
 
 from .helpers import raise_serena_agent_not_found
+
+if typ.TYPE_CHECKING:
+    import pytest
+
+    from features.types import Context
+    from weaverd.rpc import RPCDispatcher
 
 scenarios("../list_diagnostics.feature")
 
@@ -145,9 +145,7 @@ def check_malformed(context: Context) -> None:
     assert "malformed output" in result.stdout.lower()
 
 
-def test_create_serena_tool_string_enum_equivalence(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_create_serena_tool_string_enum_equivalence() -> None:
     """create_serena_tool accepts both enum and string names."""
 
     class _ListDiagnosticsTool:  # pragma: no cover - simple stub
@@ -158,22 +156,26 @@ def test_create_serena_tool_string_enum_equivalence(
         def __call__(self) -> None:  # pragma: no cover - stub
             return None
 
-    def fake_import(name: str) -> _types.ModuleType:  # pragma: no cover - simple stub
-        mod = _types.ModuleType(name)
-        if name == "serena.tools.workflow_tools":
-            mod.ListDiagnosticsTool = _ListDiagnosticsTool  # type: ignore[attr-defined]
-            return mod
-        if name == "serena.prompt_factory":
-            mod.SerenaPromptFactory = _SerenaPromptFactory  # type: ignore[attr-defined]
-            return mod
-        raise ModuleNotFoundError
+    mods = {
+        "serena.tools.workflow_tools": make_fake_module(
+            "serena.tools.workflow_tools", ListDiagnosticsTool=_ListDiagnosticsTool
+        ),
+        "serena.prompt_factory": make_fake_module(
+            "serena.prompt_factory", SerenaPromptFactory=_SerenaPromptFactory
+        ),
+    }
 
-    monkeypatch.setattr(serena_tools, "import_module", fake_import)
     serena_tools.clear_serena_imports()
-    tool_enum = server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS)
+    with injected_modules(**mods):
+        tool_enum = server.create_serena_tool(SerenaTool.LIST_DIAGNOSTICS)
+
     serena_tools.clear_serena_imports()
-    tool_str = server.create_serena_tool("LIST_DIAGNOSTICS")
+    with injected_modules(**mods):
+        tool_str = server.create_serena_tool("LIST_DIAGNOSTICS")
+
+    serena_tools.clear_serena_imports()
+    with injected_modules(**mods):
+        tool_attr = server.create_serena_tool("ListDiagnosticsTool")
+
     assert type(tool_enum) is type(tool_str)
-    serena_tools.clear_serena_imports()
-    tool_attr = server.create_serena_tool("ListDiagnosticsTool")
     assert type(tool_enum) is type(tool_attr)

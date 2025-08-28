@@ -6,14 +6,6 @@ import typing as typ
 
 import anyio
 import msgspec as ms
-
-if typ.TYPE_CHECKING:
-    from pathlib import Path
-
-    import pytest
-
-    from features.types import Context
-    from weaverd.rpc import RPCDispatcher
 from pytest_bdd import given, scenarios, then, when
 from typer.testing import CliRunner
 
@@ -24,6 +16,14 @@ from weaverd.serena_tools import (
     SerenaTool,
     create_serena_tool,
 )
+
+if typ.TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
+
+    from features.types import Context
+    from weaverd.rpc import RPCDispatcher
 
 scenarios("../onboard_project.feature")
 
@@ -73,11 +73,11 @@ def server_malformed(context: Context) -> None:
 @given("the onboarding tool raises an error")
 def tool_error(context: Context, monkeypatch: pytest.MonkeyPatch) -> None:
     def setup(dispatcher: RPCDispatcher) -> None:
+        class ToolApplyError(RuntimeError):
+            """Test-only error to simulate tool failure."""
+
         class FailingTool:
             def apply(self) -> str:  # pragma: no cover - stub
-                class ToolApplyError(RuntimeError):
-                    """Test-only error to simulate tool failure."""
-
                 raise ToolApplyError("boom")
 
         @dispatcher.register("onboard-project")
