@@ -10,23 +10,44 @@
 and the foundational security and verification mechanisms. The MVP must be safe
 for write operations from day one.*
 
+### Step: Deliver CLI and daemon foundation
+
+- Outcome: Ship a pair of crates (`weaver-cli`, `weaverd`) that honour the
+  design contract in `docs/weaver-design.md` and expose the lifecycle expected
+  by `docs/documentation-style-guide.md`.
+
 - [ ] Define the shared configuration schema for `weaver-cli` and `weaverd`
-        in `weaver-config`, using `ortho-config` to merge config files,
-        environment overrides, and CLI flags for daemon sockets, logging, and
-        the capability matrix defaults.
+      in `weaver-config`, using `ortho-config` to merge config files,
+      environment overrides, and CLI flags for daemon sockets, logging, and the
+      capability matrix defaults.
+      - Acceptance criteria: Schema documented in crate docs, integration tests
+        demonstrate precedence order (file < env < CLI), and default sockets
+        align with the design doc.
 - [ ] Implement the `weaver-cli` executable as the thin JSONL client that
-        initialises configuration via `ortho-config`, exposes the
-        `--capabilities` probe, and streams requests to a running daemon over
-        standard IO.
+      initialises configuration via `ortho-config`, exposes the
+      `--capabilities` probe, and streams requests to a running daemon over
+      standard IO.
+      - Acceptance criteria: CLI command surface mirrors the design table,
+        capability probe outputs the negotiated matrix, and JSONL framing is
+        validated with golden tests.
 - [ ] Implement the `weaverd` daemon bootstrap that consumes the shared
-        configuration, starts the Semantic Fusion backends lazily, and
-        supervises them with structured logging and error reporting.
+      configuration, starts the Semantic Fusion backends lazily, and supervises
+      them with structured logging and error reporting.
+      - Acceptance criteria: Bootstrap performs health reporting hooks,
+        backends start only on demand, and failures propagate as structured
+        events.
 - [ ] Implement robust daemonisation and process management for `weaverd`,
-        including backgrounding with `daemonize-me`, PID/lock file handling,
-        health checks, and graceful shutdown on signals.
-- [ ] Provide lifecycle commands in `weaver-cli` (e.g. `daemon start`, `daemon
-        stop`, `daemon status`) that manage the daemon process, verify socket
-        availability, and surface actionable errors when start-up fails.
+      including backgrounding with `daemonize-me`, PID/lock file handling,
+      health checks, and graceful shutdown on signals.
+      - Acceptance criteria: Background start creates PID and lock files,
+        duplicate starts fail fast, and signal handling shuts down within the
+        timeout budget.
+- [ ] Provide lifecycle commands in `weaver-cli` (for example, `daemon start`,
+      `daemon stop`, `daemon status`) that manage the daemon process, verify
+      socket availability, and surface actionable errors when start-up fails.
+      - Acceptance criteria: Lifecycle commands call into shared helper logic,
+        refuse to start when sockets are bound, and emit recovery guidance for
+        the operator.
 
 - [ ] Build the `weaver-lsp-host` crate with support for initialisation,
     capability detection, and core LSP features (definition, references,
