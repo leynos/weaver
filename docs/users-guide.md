@@ -44,7 +44,7 @@ The same options are available through environment variables. They follow the
 - `WEAVER_LOG_FILTER`
 - `WEAVER_LOG_FORMAT`
 
-Environment variables override files but remain lower priority than CLI flags.
+Environment variables override files, but remain lower priority than CLI flags.
 
 ### Configuration file example
 

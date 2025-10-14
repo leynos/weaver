@@ -16,7 +16,7 @@ clean: ## Remove build artifacts
 	$(CARGO) clean
 
 test: ## Run tests with warnings treated as errors
-	RUSTFLAGS="-D warnings" $(CARGO) test $(BUILD_JOBS) --workspace --all-targets --all-features
+	RUSTFLAGS="-D warnings" RUSTDOCFLAGS="-D warnings" $(CARGO) test $(BUILD_JOBS) --workspace --all-targets --all-features
 
 target/%/$(APP): ## Build binary in debug or release mode
 	$(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) --bin $(APP)

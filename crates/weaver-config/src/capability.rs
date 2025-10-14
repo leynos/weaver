@@ -3,7 +3,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
-use strum_macros::{Display, EnumString};
+use strum::{Display, EnumString};
 use thiserror::Error;
 
 /// Directive applied to a capability during negotiation.

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use strum_macros::{Display, EnumString};
+use strum::{Display, EnumString};
 
 /// Supported logging output formats.
 #[derive(
