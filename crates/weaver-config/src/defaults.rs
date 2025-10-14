@@ -1,10 +1,11 @@
-use std::env;
-use std::path::PathBuf;
-
 use camino::Utf8PathBuf;
+use std::env;
 
 #[cfg(unix)]
 use libc::geteuid;
+
+#[cfg(unix)]
+use dirs::runtime_dir;
 
 use crate::socket::SocketEndpoint;
 
@@ -44,10 +45,7 @@ fn default_socket_endpoint_inner() -> SocketEndpoint {
 
 #[cfg(unix)]
 fn runtime_base_directory() -> Option<Utf8PathBuf> {
-    env::var_os("XDG_RUNTIME_DIR").and_then(|value| {
-        let path = PathBuf::from(value);
-        Utf8PathBuf::from_path_buf(path).ok()
-    })
+    runtime_dir().and_then(|path| Utf8PathBuf::from_path_buf(path).ok())
 }
 
 #[cfg(unix)]

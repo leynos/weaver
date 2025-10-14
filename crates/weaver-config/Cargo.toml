@@ -17,6 +17,7 @@ strum_macros = "0.26"
 url = "2.5"
 
 [target.'cfg(unix)'.dependencies]
+dirs.workspace = true
 libc = "0.2"
 
 [dev-dependencies]
