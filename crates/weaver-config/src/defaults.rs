@@ -13,8 +13,16 @@ use crate::socket::SocketEndpoint;
 pub const DEFAULT_TCP_PORT: u16 = 9779;
 
 /// Default log filter expression used by the binaries.
-pub fn default_log_filter() -> String {
-    "info".to_string()
+pub const DEFAULT_LOG_FILTER: &str = "info";
+
+/// Default log filter expression used by the binaries.
+pub fn default_log_filter() -> &'static str {
+    DEFAULT_LOG_FILTER
+}
+
+/// Owned log filter value used where allocation is required (e.g. serde).
+pub fn default_log_filter_string() -> String {
+    DEFAULT_LOG_FILTER.to_string()
 }
 
 /// Default logging format for the binaries.

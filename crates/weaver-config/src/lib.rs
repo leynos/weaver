@@ -37,7 +37,8 @@ pub use capability::{
     LanguageCapabilities,
 };
 pub use defaults::{
-    DEFAULT_TCP_PORT, default_log_filter, default_log_format, default_socket_endpoint,
+    DEFAULT_LOG_FILTER, DEFAULT_TCP_PORT, default_log_filter, default_log_format,
+    default_socket_endpoint,
 };
 pub use logging::{LogFormat, LogFormatParseError};
 pub use socket::{SocketEndpoint, SocketParseError, SocketPreparationError};
@@ -62,8 +63,11 @@ pub struct Config {
     #[ortho_config(default = crate::default_socket_endpoint(), cli_long = "daemon-socket")]
     pub daemon_socket: SocketEndpoint,
     /// Tracing filter applied to structured logs.
-    #[serde(default = "default_log_filter")]
-    #[ortho_config(default = crate::default_log_filter(), cli_long = "log-filter")]
+    #[serde(default = "crate::defaults::default_log_filter_string")]
+    #[ortho_config(
+        default = String::from(crate::default_log_filter()),
+        cli_long = "log-filter"
+    )]
     pub log_filter: String,
     /// Output format for structured logs.
     #[serde(default)]
@@ -128,7 +132,7 @@ impl Default for Config {
     fn default() -> Self {
         let mut config = Self {
             daemon_socket: default_socket_endpoint(),
-            log_filter: default_log_filter(),
+            log_filter: crate::defaults::default_log_filter_string(),
             log_format: default_log_format(),
             capability_overrides: Vec::new(),
         };

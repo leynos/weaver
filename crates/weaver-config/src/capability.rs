@@ -1,3 +1,8 @@
+//! Capability override parsing, normalisation, and lookup matrix.
+//!
+//! The module exposes helpers for parsing capability directives supplied by
+//! configuration sources and constructing normalised lookup tables for the
+//! daemon and CLI.
 use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
@@ -31,6 +36,12 @@ pub enum CapabilityDirectiveParseError {
     /// Capability override assignment (`=`) was missing from the directive.
     #[error("directive '{0}' is missing the override assignment '='")]
     MissingDirective(String),
+    /// The language identifier is empty after trimming whitespace.
+    #[error("directive '{0}' has an empty language identifier before ':'")]
+    EmptyLanguage(String),
+    /// The capability identifier is empty after trimming whitespace.
+    #[error("directive '{0}' has an empty capability identifier before '='")]
+    EmptyCapability(String),
     /// The override directive could not be parsed.
     #[error("unsupported capability directive '{0}'")]
     InvalidDirective(String),
@@ -80,10 +91,22 @@ impl FromStr for CapabilityDirective {
         let (language, rest) = input
             .split_once(':')
             .ok_or_else(|| CapabilityDirectiveParseError::MissingLanguage(input.to_string()))?;
+        let language = language.trim();
+        if language.is_empty() {
+            return Err(CapabilityDirectiveParseError::EmptyLanguage(
+                input.to_string(),
+            ));
+        }
         let (capability, directive) = rest
             .split_once('=')
             .ok_or_else(|| CapabilityDirectiveParseError::MissingDirective(input.to_string()))?;
-        let directive = CapabilityOverride::from_str(directive)
+        let capability = capability.trim();
+        if capability.is_empty() {
+            return Err(CapabilityDirectiveParseError::EmptyCapability(
+                input.to_string(),
+            ));
+        }
+        let directive = CapabilityOverride::from_str(directive.trim())
             .map_err(|_| CapabilityDirectiveParseError::InvalidDirective(directive.to_string()))?;
         Ok(Self::new(language, capability, directive))
     }
@@ -191,5 +214,31 @@ mod tests {
         assert_eq!(directives[0].directive, CapabilityOverride::Deny);
         assert_eq!(directives[0].language, "rust");
         assert_eq!(directives[0].capability, "observe.rename");
+    }
+
+    #[test]
+    fn parses_directive_trimming_whitespace() {
+        let directive: CapabilityDirective = "  Rust  :  observe.rename  =  deny  "
+            .parse()
+            .expect("valid directive");
+
+        assert_eq!(directive.language, "Rust");
+        assert_eq!(directive.capability, "observe.rename");
+        assert_eq!(directive.directive, CapabilityOverride::Deny);
+    }
+
+    #[test]
+    fn rejects_empty_language_or_capability() {
+        let empty_language = ":rename=force".parse::<CapabilityDirective>();
+        assert!(matches!(
+            empty_language,
+            Err(CapabilityDirectiveParseError::EmptyLanguage(_))
+        ));
+
+        let empty_capability = "rust:=force".parse::<CapabilityDirective>();
+        assert!(matches!(
+            empty_capability,
+            Err(CapabilityDirectiveParseError::EmptyCapability(_))
+        ));
     }
 }

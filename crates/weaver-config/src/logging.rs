@@ -1,3 +1,7 @@
+//! Logging configuration types for Weaver binaries.
+//!
+//! Defines the [`LogFormat`] enumeration used across the CLI and daemon along
+//! with parsing helpers that integrate with Serde and `strum` derives.
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString};
 
