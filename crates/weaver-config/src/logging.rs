@@ -2,7 +2,9 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
 
 /// Supported logging output formats.
-#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq, EnumString, Display)]
+#[derive(
+    Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq, EnumString, Display,
+)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case", ascii_case_insensitive)]
 pub enum LogFormat {
