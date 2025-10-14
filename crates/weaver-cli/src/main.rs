@@ -9,6 +9,9 @@ fn main() -> ExitCode {
             let _ = config;
             ExitCode::SUCCESS
         }
-        Err(_) => ExitCode::FAILURE,
+        Err(error) => {
+            eprintln!("Failed to load configuration: {error}");
+            ExitCode::FAILURE
+        }
     }
 }

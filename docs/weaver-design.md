@@ -273,10 +273,13 @@ daemon resolve identical results regardless of which component loads the
 settings.
 
 The daemon transport defaults to a Unix domain socket placed under
-`$XDG_RUNTIME_DIR/weaver/weaverd.sock`. When the runtime directory is
-unavailable the path falls back to `/tmp/weaver/weaverd.sock`. Non-Unix targets
-cannot rely on domain sockets, so the default becomes a loopback TCP listener
-on `127.0.0.1:9779`. These defaults are surfaced consistently via the
+`$XDG_RUNTIME_DIR/weaver/weaverd.sock`. When the runtime directory is absent
+the path falls back to a per-user namespace under the system temporary
+directory, for example `/tmp/weaver/uid-1000/weaverd.sock`. `weaverd` ensures
+the parent directory exists with restrictive permissions before binding,
+reporting a descriptive error when creation fails. Non-Unix targets cannot rely
+on domain sockets, so the default becomes a loopback TCP listener on
+`127.0.0.1:9779`. These defaults are surfaced consistently via the
 `--daemon-socket` CLI flag and the `WEAVER_DAEMON_SOCKET` environment variable.
 
 Structured logging is configured through the `--log-filter` flag (or
@@ -288,9 +291,12 @@ noise predictable.
 The capability override matrix is expressed as a sequence of directives using
 the syntax `language:capability=directive`. The directive may be `allow`,
 `deny`, or `force`, letting the operator mask unreliable capabilities or force
-a feature on when a server under-reports its support. These directives merge
-with the daemon's runtime discovery to produce the negotiated capability
-surface exposed by `weaver --capabilities`.
+a feature on when a server under-reports its support. Inputs are normalised by
+lowercasing identifiers and trimming surrounding whitespace, while duplicate
+entries are resolved by honouring the last directive supplied for a given
+language and capability pair. These directives merge with the daemon's runtime
+discovery to produce the negotiated capability surface exposed by
+`weaver --capabilities`.
 
 ## 3. Core Components: A Technical Deep Dive
 

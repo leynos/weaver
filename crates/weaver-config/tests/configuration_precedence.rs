@@ -5,7 +5,9 @@ use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use tempfile::TempDir;
 
-use weaver_config::{Config, SocketEndpoint};
+use weaver_config::{
+    Config, SocketEndpoint, default_log_filter, default_log_format, default_socket_endpoint,
+};
 
 struct Harness {
     temp_dir: TempDir,
@@ -124,6 +126,11 @@ fn when_cli_override(harness: &Harness, socket: String) {
     harness.push_cli_arg(OsString::from(&socket));
 }
 
+#[when("the configuration loads without overrides")]
+fn when_load_without_overrides(harness: &Harness) {
+    harness.load();
+}
+
 #[then("loading the configuration resolves the daemon socket to \"{socket}\"")]
 fn then_resolved_socket(harness: &Harness, socket: String) {
     harness.load();
@@ -144,6 +151,31 @@ fn then_resolved_socket(harness: &Harness, socket: String) {
     };
 
     assert_eq!(config.daemon_socket(), &expected);
+}
+
+#[then("loading the configuration applies the built-in defaults")]
+fn then_defaults_applied(harness: &Harness) {
+    harness.load();
+
+    if let Some(error) = harness.error.borrow().as_ref() {
+        panic!("configuration failed to load: {error}");
+    }
+
+    let loaded = harness.loaded.borrow();
+    let config = match loaded.as_ref() {
+        Some(config) => config,
+        None => panic!("configuration was not loaded"),
+    };
+
+    assert_eq!(config.daemon_socket(), &default_socket_endpoint());
+    assert_eq!(config.log_filter(), default_log_filter());
+    assert_eq!(config.log_format(), default_log_format());
+
+    let matrix = config.capability_matrix();
+    assert!(
+        matrix.languages.is_empty(),
+        "expected no capability overrides"
+    );
 }
 
 #[scenario(path = "tests/features/configuration_precedence.feature")]

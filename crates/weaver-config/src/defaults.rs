@@ -2,9 +2,11 @@ use std::env;
 use std::path::PathBuf;
 
 use camino::Utf8PathBuf;
-use once_cell::sync::Lazy;
 
-use crate::SocketEndpoint;
+#[cfg(unix)]
+use libc::geteuid;
+
+use crate::socket::SocketEndpoint;
 
 /// Default TCP port used when Unix domain sockets are not available.
 pub const DEFAULT_TCP_PORT: u16 = 9779;
@@ -15,8 +17,8 @@ pub fn default_log_filter() -> String {
 }
 
 /// Default logging format for the binaries.
-pub fn default_log_format() -> super::LogFormat {
-    super::LogFormat::Json
+pub fn default_log_format() -> crate::logging::LogFormat {
+    crate::logging::LogFormat::Json
 }
 
 /// Computes the default socket endpoint for the daemon.
@@ -26,23 +28,38 @@ pub fn default_socket_endpoint() -> SocketEndpoint {
 
 #[cfg(unix)]
 fn default_socket_endpoint_inner() -> SocketEndpoint {
-    static RUNTIME_DIR: Lazy<Utf8PathBuf> = Lazy::new(|| {
-        let runtime_candidate = env::var_os("XDG_RUNTIME_DIR").and_then(|value| {
-            let path = PathBuf::from(value);
-            Utf8PathBuf::from_path_buf(path).ok()
-        });
-        let base = match runtime_candidate {
-            Some(candidate) => candidate,
-            None => match Utf8PathBuf::from_path_buf(env::temp_dir()) {
-                Ok(path) => path,
-                Err(_) => Utf8PathBuf::from("/tmp"),
-            },
-        };
-        base.join("weaver")
-    });
+    let (mut base, apply_namespace) = match runtime_base_directory() {
+        Some(dir) => (dir, false),
+        None => (fallback_base_directory(), true),
+    };
 
-    let socket_path = RUNTIME_DIR.join("weaverd.sock");
+    base.push("weaver");
+    if apply_namespace {
+        base.push(user_namespace());
+    }
+
+    let socket_path = base.join("weaverd.sock");
     SocketEndpoint::unix(socket_path)
+}
+
+#[cfg(unix)]
+fn runtime_base_directory() -> Option<Utf8PathBuf> {
+    env::var_os("XDG_RUNTIME_DIR").and_then(|value| {
+        let path = PathBuf::from(value);
+        Utf8PathBuf::from_path_buf(path).ok()
+    })
+}
+
+#[cfg(unix)]
+fn fallback_base_directory() -> Utf8PathBuf {
+    let candidate = env::temp_dir();
+    Utf8PathBuf::from_path_buf(candidate).unwrap_or_else(|_| Utf8PathBuf::from("/tmp"))
+}
+
+#[cfg(unix)]
+fn user_namespace() -> String {
+    let uid = unsafe { geteuid() };
+    format!("uid-{uid}")
 }
 
 #[cfg(not(unix))]

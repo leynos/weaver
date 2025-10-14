@@ -9,10 +9,15 @@ doctest = false
 [dependencies]
 camino.workspace = true
 clap.workspace = true
-once_cell.workspace = true
 ortho_config.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+strum = "0.26"
+strum_macros = "0.26"
+url = "2.5"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [dev-dependencies]
 rstest.workspace = true

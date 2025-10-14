@@ -23,18 +23,24 @@
 //! strategy documented below. Users can provide an explicit configuration file
 //! with `--config-path` or `WEAVER_CONFIG_PATH`.
 
+mod capability;
 mod defaults;
+mod logging;
+mod socket;
 
-use std::collections::BTreeMap;
-use std::fmt;
-use std::str::FromStr;
-
-use camino::{Utf8Path, Utf8PathBuf};
+use capability::deduplicate_directives;
 use ortho_config::OrthoConfig;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
-pub use defaults::{DEFAULT_TCP_PORT, default_log_filter, default_socket_endpoint};
+pub use capability::{
+    CapabilityDirective, CapabilityDirectiveParseError, CapabilityMatrix, CapabilityOverride,
+    LanguageCapabilities,
+};
+pub use defaults::{
+    DEFAULT_TCP_PORT, default_log_filter, default_log_format, default_socket_endpoint,
+};
+pub use logging::{LogFormat, LogFormatParseError};
+pub use socket::{SocketEndpoint, SocketParseError, SocketPreparationError};
 
 /// Complete configuration merged from defaults, files, environment, and CLI.
 #[derive(Debug, Clone, Deserialize, Serialize, OrthoConfig)]
@@ -61,7 +67,7 @@ pub struct Config {
     pub log_filter: String,
     /// Output format for structured logs.
     #[serde(default)]
-    #[ortho_config(default = crate::defaults::default_log_format(), cli_long = "log-format")]
+    #[ortho_config(default = crate::default_log_format(), cli_long = "log-format")]
     pub log_format: LogFormat,
     /// Overrides for capability negotiation keyed by language and capability.
     #[serde(default)]
@@ -73,7 +79,9 @@ impl Config {
     /// Loads configuration from defaults, discovery, environment, and CLI.
     #[allow(clippy::missing_panics_doc)]
     pub fn load() -> ortho_config::OrthoResult<Self> {
-        <Self as OrthoConfig>::load()
+        let mut config = <Self as OrthoConfig>::load()?;
+        config.normalise_capability_overrides();
+        Ok(config)
     }
 
     /// Loads configuration using a custom iterator of CLI arguments.
@@ -82,7 +90,9 @@ impl Config {
         I: IntoIterator<Item = T>,
         T: Into<std::ffi::OsString> + Clone,
     {
-        <Self as OrthoConfig>::load_from_iter(iter)
+        let mut config = <Self as OrthoConfig>::load_from_iter(iter)?;
+        config.normalise_capability_overrides();
+        Ok(config)
     }
 
     /// Accessor for the configured daemon socket.
@@ -108,355 +118,21 @@ impl Config {
     pub fn capability_matrix(&self) -> CapabilityMatrix {
         CapabilityMatrix::from_directives(self.capability_overrides.iter())
     }
+
+    fn normalise_capability_overrides(&mut self) {
+        deduplicate_directives(&mut self.capability_overrides);
+    }
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self {
+        let mut config = Self {
             daemon_socket: default_socket_endpoint(),
             log_filter: default_log_filter(),
-            log_format: defaults::default_log_format(),
+            log_format: default_log_format(),
             capability_overrides: Vec::new(),
-        }
-    }
-}
-
-/// Supported logging output formats.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum LogFormat {
-    /// Structured JSON suitable for ingestion by logging stacks.
-    Json,
-    /// Human-readable single line output.
-    Compact,
-}
-
-impl Default for LogFormat {
-    fn default() -> Self {
-        defaults::default_log_format()
-    }
-}
-
-impl fmt::Display for LogFormat {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Json => formatter.write_str("json"),
-            Self::Compact => formatter.write_str("compact"),
-        }
-    }
-}
-
-impl FromStr for LogFormat {
-    type Err = LogFormatParseError;
-
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        match input {
-            "json" => Ok(Self::Json),
-            "compact" => Ok(Self::Compact),
-            other => Err(LogFormatParseError::UnknownFormat(other.to_string())),
-        }
-    }
-}
-
-/// Errors encountered while parsing a [`LogFormat`] from text.
-#[derive(Debug, Error)]
-pub enum LogFormatParseError {
-    /// Encountered an unknown formatting option.
-    #[error("unsupported log format '{0}'")]
-    UnknownFormat(String),
-}
-
-/// Declarative configuration for daemon sockets.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(tag = "transport", rename_all = "snake_case")]
-pub enum SocketEndpoint {
-    /// Unix domain socket endpoint.
-    Unix { path: Utf8PathBuf },
-    /// TCP socket endpoint.
-    Tcp { host: String, port: u16 },
-}
-
-impl SocketEndpoint {
-    /// Builds a Unix domain socket endpoint.
-    #[must_use]
-    pub fn unix(path: Utf8PathBuf) -> Self {
-        Self::Unix { path }
-    }
-
-    /// Builds a TCP socket endpoint.
-    #[must_use]
-    pub fn tcp(host: impl Into<String>, port: u16) -> Self {
-        Self::Tcp {
-            host: host.into(),
-            port,
-        }
-    }
-
-    /// Returns the Unix socket path when the endpoint uses the Unix transport.
-    #[must_use]
-    pub fn unix_path(&self) -> Option<&Utf8Path> {
-        match self {
-            Self::Unix { path } => Some(path.as_ref()),
-            Self::Tcp { .. } => None,
-        }
-    }
-}
-
-impl Default for SocketEndpoint {
-    fn default() -> Self {
-        default_socket_endpoint()
-    }
-}
-
-impl fmt::Display for SocketEndpoint {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Unix { path } => write!(formatter, "unix://{}", path),
-            Self::Tcp { host, port } => write!(formatter, "tcp://{host}:{port}"),
-        }
-    }
-}
-
-impl FromStr for SocketEndpoint {
-    type Err = SocketParseError;
-
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        if let Some(stripped) = input.strip_prefix("unix://") {
-            let path = Utf8PathBuf::from(stripped);
-            return Ok(Self::unix(path));
-        }
-
-        if let Some(stripped) = input.strip_prefix("tcp://") {
-            let mut parts = stripped.splitn(2, ':');
-            let host = parts
-                .next()
-                .ok_or_else(|| SocketParseError::MissingHost(stripped.to_string()))?;
-            let port_str = parts
-                .next()
-                .ok_or_else(|| SocketParseError::MissingPort(stripped.to_string()))?;
-            let port = port_str
-                .parse::<u16>()
-                .map_err(|_| SocketParseError::InvalidPort(port_str.to_string()))?;
-            return Ok(Self::tcp(host, port));
-        }
-
-        Err(SocketParseError::UnsupportedScheme(input.to_string()))
-    }
-}
-
-/// Errors encountered while parsing a [`SocketEndpoint`] from text.
-#[derive(Debug, Error)]
-pub enum SocketParseError {
-    /// Scheme was not recognised.
-    #[error("unsupported socket scheme in '{0}'")]
-    UnsupportedScheme(String),
-    /// TCP host name was missing.
-    #[error("missing TCP host in '{0}'")]
-    MissingHost(String),
-    /// TCP port was missing from the address.
-    #[error("missing TCP port in '{0}'")]
-    MissingPort(String),
-    /// TCP port failed to parse as a 16-bit unsigned integer.
-    #[error("invalid TCP port '{0}'")]
-    InvalidPort(String),
-}
-
-/// Declarative override for a capability.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-pub struct CapabilityDirective {
-    /// Language identifier such as `rust` or `python`.
-    pub language: String,
-    /// Capability identifier in dot-separated form.
-    pub capability: String,
-    /// Override applied to the capability.
-    pub directive: CapabilityOverride,
-}
-
-impl CapabilityDirective {
-    /// Creates a new directive.
-    #[must_use]
-    pub fn new(
-        language: impl Into<String>,
-        capability: impl Into<String>,
-        directive: CapabilityOverride,
-    ) -> Self {
-        Self {
-            language: language.into(),
-            capability: capability.into(),
-            directive,
-        }
-    }
-}
-
-impl fmt::Display for CapabilityDirective {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            formatter,
-            "{}:{}={}",
-            self.language, self.capability, self.directive
-        )
-    }
-}
-
-impl FromStr for CapabilityDirective {
-    type Err = CapabilityDirectiveParseError;
-
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        let (language, rest) = input
-            .split_once(':')
-            .ok_or_else(|| CapabilityDirectiveParseError::MissingLanguage(input.to_string()))?;
-        let (capability, directive) = rest
-            .split_once('=')
-            .ok_or_else(|| CapabilityDirectiveParseError::MissingDirective(input.to_string()))?;
-        let directive = CapabilityOverride::from_str(directive)?;
-        Ok(Self::new(language, capability, directive))
-    }
-}
-
-/// Errors produced when parsing [`CapabilityDirective`] values.
-#[derive(Debug, Error)]
-pub enum CapabilityDirectiveParseError {
-    /// Language separator (`:`) was missing from the directive.
-    #[error("directive '{0}' is missing the language separator ':'")]
-    MissingLanguage(String),
-    /// Capability override assignment (`=`) was missing from the directive.
-    #[error("directive '{0}' is missing the override assignment '='")]
-    MissingDirective(String),
-    /// The override directive could not be parsed.
-    #[error(transparent)]
-    InvalidDirective(#[from] CapabilityOverrideParseError),
-}
-
-/// Set of directives grouped by language and capability.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct CapabilityMatrix {
-    /// Mapping of language identifiers to their overrides.
-    #[serde(default)]
-    pub languages: BTreeMap<String, LanguageCapabilities>,
-}
-
-impl CapabilityMatrix {
-    /// Builds a matrix from an iterator of directives.
-    #[must_use]
-    pub fn from_directives<'a, I>(directives: I) -> Self
-    where
-        I: IntoIterator<Item = &'a CapabilityDirective>,
-    {
-        let mut matrix = Self::default();
-        for directive in directives {
-            matrix.set_override(
-                directive.language.clone(),
-                directive.capability.clone(),
-                directive.directive,
-            );
-        }
-        matrix
-    }
-
-    /// Stores or updates an override for a capability.
-    pub fn set_override(
-        &mut self,
-        language: impl Into<String>,
-        capability: impl Into<String>,
-        directive: CapabilityOverride,
-    ) {
-        let entry = self.languages.entry(language.into()).or_default();
-        entry.overrides.insert(capability.into(), directive);
-    }
-
-    /// Retrieves an override for a capability, when present.
-    #[must_use]
-    pub fn override_for(&self, language: &str, capability: &str) -> Option<CapabilityOverride> {
-        self.languages
-            .get(language)
-            .and_then(|caps| caps.overrides.get(capability).copied())
-    }
-}
-
-/// Capability overrides scoped to a single language.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct LanguageCapabilities {
-    /// Overrides keyed by fully-qualified capability path.
-    #[serde(default)]
-    pub overrides: BTreeMap<String, CapabilityOverride>,
-}
-
-/// Directive applied to a capability during negotiation.
-#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum CapabilityOverride {
-    /// Force the capability to be advertised even when backends decline it.
-    Force,
-    /// Disable the capability regardless of backend support.
-    Deny,
-    /// Leave negotiation to backend discovery (default behaviour).
-    #[default]
-    Allow,
-}
-
-impl fmt::Display for CapabilityOverride {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Force => formatter.write_str("force"),
-            Self::Deny => formatter.write_str("deny"),
-            Self::Allow => formatter.write_str("allow"),
-        }
-    }
-}
-
-impl FromStr for CapabilityOverride {
-    type Err = CapabilityOverrideParseError;
-
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        match input {
-            "force" => Ok(Self::Force),
-            "deny" => Ok(Self::Deny),
-            "allow" => Ok(Self::Allow),
-            other => Err(CapabilityOverrideParseError::UnknownDirective(
-                other.to_string(),
-            )),
-        }
-    }
-}
-
-/// Parsing errors for [`CapabilityOverride`].
-#[derive(Debug, Error)]
-pub enum CapabilityOverrideParseError {
-    /// Unknown directive string was supplied.
-    #[error("unsupported capability directive '{0}'")]
-    UnknownDirective(String),
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn display_unix_socket() {
-        let endpoint = SocketEndpoint::unix(Utf8PathBuf::from("/tmp/weaver.sock"));
-        assert_eq!(endpoint.to_string(), "unix:///tmp/weaver.sock");
-    }
-
-    #[test]
-    fn parse_tcp_socket() {
-        let endpoint: SocketEndpoint = match "tcp://127.0.0.1:9000".parse() {
-            Ok(endpoint) => endpoint,
-            Err(error) => panic!("failed to parse TCP socket: {error}"),
         };
-        assert!(matches!(endpoint, SocketEndpoint::Tcp { port: 9000, .. }));
-    }
-
-    #[test]
-    fn capability_matrix_from_directives() {
-        let directives = [CapabilityDirective::new(
-            "rust",
-            "observe.get-definition",
-            CapabilityOverride::Force,
-        )];
-        let matrix = CapabilityMatrix::from_directives(directives.iter());
-        assert_eq!(
-            matrix.override_for("rust", "observe.get-definition"),
-            Some(CapabilityOverride::Force)
-        );
+        config.normalise_capability_overrides();
+        config
     }
 }
