@@ -13,10 +13,10 @@ for write operations from day one.*
 ### Step: Deliver CLI and daemon foundation
 
 *Outcome: Ship a pair of crates (`weaver-cli`, `weaverd`) that honour the
-design contract in `docs/weaver-design.md` and expose the lifecycle expected
-by `docs/documentation-style-guide.md`.*
+design contract in `docs/weaver-design.md` and expose the lifecycle expected by
+`docs/documentation-style-guide.md`.*
 
-- [ ] Define the shared configuration schema for `weaver-cli` and `weaverd`
+- [x] Define the shared configuration schema for `weaver-cli` and `weaverd`
       in `weaver-config`, using `ortho-config` to merge config files,
       environment overrides, and CLI flags for daemon sockets, logging, and the
       capability matrix defaults.

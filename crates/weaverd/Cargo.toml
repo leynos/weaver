@@ -1,0 +1,7 @@
+[package]
+name = "weaverd"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+weaver-config = { path = "../weaver-config" }

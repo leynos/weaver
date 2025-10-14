@@ -1,6 +1,6 @@
 .PHONY: help all clean test build release lint fmt check-fmt markdownlint nixie
 
-APP ?= copier
+APP ?= weaver-cli
 CARGO ?= cargo
 BUILD_JOBS ?=
 CLIPPY_FLAGS ?= --all-targets --all-features -- -D warnings
