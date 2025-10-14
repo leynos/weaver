@@ -23,12 +23,12 @@ environment variable also supplies the same field.
 
 The CLI exposes the following configuration flags today:
 
-- `--config-path <PATH>` – reads an explicit configuration file.
-- `--daemon-socket <ENDPOINT>` – overrides the daemon transport. Accepts values
+- `--config-path <PATH>` — reads an explicit configuration file.
+- `--daemon-socket <ENDPOINT>` — overrides the daemon transport. Accepts values
   such as `unix:///run/user/1000/weaver.sock` or `tcp://127.0.0.1:9779`.
-- `--log-filter <FILTER>` – sets the tracing filter (defaults to `info`).
-- `--log-format <FORMAT>` – selects the log output format (`json` or `compact`).
-- `--capability-overrides <DIRECTIVE>` – appends a directive of the form
+- `--log-filter <FILTER>` — sets the tracing filter (defaults to `info`).
+- `--log-format <FORMAT>` — selects the log output format (`json` or `compact`).
+- `--capability-overrides <DIRECTIVE>` — appends a directive of the form
   `language:capability=directive`. Directives may be repeated to accumulate
   overrides. Duplicate entries are resolved by keeping the last directive for
   each language and capability pair, and lookups ignore case and surrounding
