@@ -67,7 +67,7 @@ directive = "force"
 
 - **Daemon socket:** On Unix-like targets the daemon listens on
   `$XDG_RUNTIME_DIR/weaver/weaverd.sock`. When the runtime directory is
-  unavailable the default falls back to a per-user namespace under the system
+  unavailable, the default falls back to a per-user namespace under the system
   temporary directory (for example `/tmp/weaver/uid-1000/weaverd.sock`). Other
   platforms default to `tcp://127.0.0.1:9779`.
 - **Logging:** The default filter is `info` and the default format is `json`.
