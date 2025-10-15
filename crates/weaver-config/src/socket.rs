@@ -323,24 +323,40 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[test]
-    fn prepare_filesystem_rejects_symlink_directories() {
+    use std::path::{Path, PathBuf};
+
+    #[cfg(unix)]
+    fn assert_prepare_filesystem_fails<Setup, Predicate>(setup: Setup, predicate: Predicate)
+    where
+        Setup: FnOnce(&Path) -> PathBuf,
+        Predicate: Fn(&SocketPreparationError) -> bool,
+    {
         let tmp = tempdir().expect("temporary directory");
-        let target = tmp.path().join("real");
-        std::fs::create_dir(&target).expect("create target directory");
-
-        let link = tmp.path().join("link");
-        symlink(&target, &link).expect("create symlink");
-
-        let socket_path = link.join("daemon.sock");
-        let socket_path = Utf8PathBuf::from_path_buf(socket_path).expect("utf8 path");
+        let socket_path = setup(tmp.path());
+        let socket_path =
+            Utf8PathBuf::from_path_buf(socket_path).expect("socket path should be UTF-8");
         let endpoint = SocketEndpoint::unix(socket_path);
 
-        let error = endpoint.prepare_filesystem().expect_err("symlink rejected");
-        assert!(matches!(
-            error,
-            SocketPreparationError::SymlinkDetected { .. }
-        ));
+        let error = endpoint
+            .prepare_filesystem()
+            .expect_err("filesystem preparation should fail");
+        assert!(predicate(&error), "unexpected error variant: {error}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn prepare_filesystem_rejects_symlink_directories() {
+        assert_prepare_filesystem_fails(
+            |base| {
+                let target = base.join("real");
+                std::fs::create_dir(&target).expect("create target directory");
+
+                let link = base.join("link");
+                symlink(&target, &link).expect("create symlink");
+                link.join("daemon.sock")
+            },
+            |error| matches!(error, SocketPreparationError::SymlinkDetected { .. }),
+        );
     }
 
     #[cfg(unix)]
@@ -391,20 +407,16 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn prepare_filesystem_rejects_path_traversal() {
-        let tmp = tempdir().expect("temporary directory");
-        let real_dir = tmp.path().join("real");
-        std::fs::create_dir(&real_dir).expect("create real directory");
-        let other_dir = tmp.path().join("other");
-        std::fs::create_dir(&other_dir).expect("create other directory");
+        assert_prepare_filesystem_fails(
+            |base| {
+                let real_dir = base.join("real");
+                std::fs::create_dir(&real_dir).expect("create real directory");
+                let other_dir = base.join("other");
+                std::fs::create_dir(&other_dir).expect("create other directory");
 
-        let socket_path = real_dir.join("..").join("other").join("daemon.sock");
-        let socket_path = Utf8PathBuf::from_path_buf(socket_path).expect("utf8 path");
-        let endpoint = SocketEndpoint::unix(socket_path);
-
-        let error = endpoint.prepare_filesystem().expect_err("reject traversal");
-        assert!(matches!(
-            error,
-            SocketPreparationError::PathTraversal { .. }
-        ));
+                real_dir.join("..").join("other").join("daemon.sock")
+            },
+            |error| matches!(error, SocketPreparationError::PathTraversal { .. }),
+        );
     }
 }
