@@ -312,7 +312,7 @@ mod tests {
     fn parse_tcp_socket() {
         let endpoint: SocketEndpoint = "tcp://127.0.0.1:9000"
             .parse()
-            .expect("parse IPv4 TCP socket URL");
+            .expect("valid IPv4 TCP socket URL");
         assert!(matches!(endpoint, SocketEndpoint::Tcp { port: 9000, .. }));
     }
 
@@ -320,7 +320,7 @@ mod tests {
     fn display_tcp_ipv6_roundtrip() {
         let endpoint: SocketEndpoint = "tcp://[::1]:9000"
             .parse()
-            .expect("parse IPv6 TCP socket URL");
+            .expect("valid IPv6 TCP socket URL");
         assert_eq!(endpoint.to_string(), "tcp://[::1]:9000");
     }
 
