@@ -1,6 +1,6 @@
 # Weaver user's guide
 
-This guide summarises the behaviour exposed to operators by the initial CLI and
+This guide summarizes the behaviour exposed to operators by the initial CLI and
 daemon foundation. Configuration is currently the primary focus because both
 binaries share the same loading pipeline and rely on the `weaver-config` crate
 to merge settings from files, environment variables, and command-line arguments.
@@ -65,7 +65,7 @@ directive = "force"
 
 ## Defaults
 
-- **Daemon socket:** On Unix-like targets the daemon listens on
+- **Daemon socket:** On Unix-like targets, the daemon listens on
   `$XDG_RUNTIME_DIR/weaver/weaverd.sock`. When the runtime directory is
   unavailable, the default falls back to a per-user namespace under the system
   temporary directory (for example `/tmp/weaver/uid-1000/weaverd.sock`). Other
@@ -76,7 +76,7 @@ directive = "force"
   overrides may be supplied to tailor the capability matrix for different
   languages.
 
-When `weaverd` starts it ensures the parent directory for the configured Unix
+When `weaverd` starts, it ensures the parent directory for the configured Unix
 socket exists, returning a descriptive error if the directory cannot be
 created. This prevents silent failures later when the daemon attempts to bind
 the socket.
