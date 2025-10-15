@@ -263,6 +263,42 @@ elevate the importance of key components.
 | `weaver-graph`    | Implements the relational intelligence layer. Orchestrates multiple providers (LSP, static analysis plugins, dynamic profilers) to generate and fuse call graphs and other relational models of the codebase.                                                   |
 | `weaver-plugins`  | Implements the plugin management and execution framework. Defines the IPC protocol between `weaverd` (as the broker) and sandboxed plugins, and manages the lifecycle of specialist tools.                                                                      |
 
+#### 2.3.1. Configuration contract
+
+`weaver-config` formalizes the shared configuration contract for the CLI and
+daemon. The crate centralizes the capability overrides, socket defaults, and
+logging format expectations so both binaries surface the same behaviour.
+Configuration is layered with `ortho-config`, producing the precedence order
+`defaults < files < environment < CLI`. File discovery honours `--config-path`
+alongside the standard XDG locations, ensuring the CLI and daemon resolve
+identical results regardless of which component loads the settings.
+
+The daemon transport defaults to a Unix domain socket placed under
+`$XDG_RUNTIME_DIR/weaver/weaverd.sock`. When the runtime directory is absent,
+or otherwise unavailable, the path falls back to a per-user namespace under the
+system temporary directory—for example, `/tmp/weaver/uid-1000/weaverd.sock`.
+`weaverd` ensures the parent directory exists with restrictive permissions
+before binding, reporting a descriptive error when creation fails. Non-Unix
+targets cannot rely on domain sockets, so the default becomes a loopback TCP
+listener on `127.0.0.1:9779`. These defaults are surfaced consistently via the
+`--daemon-socket` CLI flag and the `WEAVER_DAEMON_SOCKET` environment variable.
+
+Structured logging is configured through the `--log-filter` flag (or
+`WEAVER_LOG_FILTER`) and the `--log-format` flag (`WEAVER_LOG_FORMAT`). Weaver
+uses an `info` filter with JSON output by default, giving operators structured
+events suitable for ingestion by observability stacks while keeping console
+noise predictable.
+
+The capability override matrix is expressed as a sequence of directives using
+the syntax `language:capability=directive`. The directive may be `allow`,
+`deny`, or `force`, letting the operator mask unreliable capabilities or force
+a feature on when a server under-reports its support. Inputs are normalized by
+lowercasing identifiers and trimming surrounding whitespace, while duplicate
+entries are resolved by honouring the last directive supplied for a given
+language and capability pair. These directives merge with the daemon's runtime
+discovery to produce the negotiated capability surface exposed by
+`weaver --capabilities`.
+
 ## 3. Core Components: A Technical Deep Dive
 
 This section provides a detailed examination of the core technologies that

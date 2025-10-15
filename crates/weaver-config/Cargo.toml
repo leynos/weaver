@@ -1,0 +1,32 @@
+[package]
+name = "weaver-config"
+edition.workspace = true
+version.workspace = true
+rust-version.workspace = true
+
+[lib]
+doctest = false
+
+[features]
+default = []
+# Enable clap-derived parsers only when needed by consumer crates.
+cli = ["dep:clap"]
+
+[dependencies]
+camino.workspace = true
+clap = { workspace = true, optional = true }
+ortho_config.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+strum = { version = "0.26.3", features = ["derive"] }
+url = { version = "2.5", features = ["serde"] }
+
+[target.'cfg(unix)'.dependencies]
+dirs.workspace = true
+libc = "0.2"
+
+[dev-dependencies]
+rstest.workspace = true
+rstest-bdd.workspace = true
+rstest-bdd-macros.workspace = true
+tempfile.workspace = true
