@@ -266,11 +266,12 @@ elevate the importance of key components.
 #### 2.3.1. Configuration contract
 
 `weaver-config` formalizes the shared configuration contract for the CLI and
-daemon. Configuration is layered with `ortho-config`, producing the precedence
-order `defaults < files < environment < CLI`. File discovery honours
-`--config-path` alongside the standard XDG locations, ensuring the CLI and
-daemon resolve identical results regardless of which component loads the
-settings.
+daemon. The crate centralizes the capability overrides, socket defaults, and
+logging format expectations so both binaries surface the same behaviour.
+Configuration is layered with `ortho-config`, producing the precedence order
+`defaults < files < environment < CLI`. File discovery honours `--config-path`
+alongside the standard XDG locations, ensuring the CLI and daemon resolve
+identical results regardless of which component loads the settings.
 
 The daemon transport defaults to a Unix domain socket placed under
 `$XDG_RUNTIME_DIR/weaver/weaverd.sock`. When the runtime directory is absent,
