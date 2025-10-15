@@ -81,7 +81,14 @@ pub struct Config {
 
 impl Config {
     /// Loads configuration from defaults, discovery, environment, and CLI.
-    #[allow(clippy::missing_panics_doc)]
+    #[expect(
+        clippy::missing_panics_doc,
+        reason = "delegates to ortho-config generated loaders without adding new panic paths"
+    )]
+    // The expectation is exercised on toolchains where ortho-config's generated
+    // loaders emit debug assertions; stable Clippy occasionally skips the lint,
+    // so suppress the follow-up error in that configuration.
+    #[allow(unfulfilled_lint_expectations)]
     pub fn load() -> ortho_config::OrthoResult<Self> {
         let mut config = <Self as OrthoConfig>::load()?;
         config.normalise_capability_overrides();
@@ -89,6 +96,13 @@ impl Config {
     }
 
     /// Loads configuration using a custom iterator of CLI arguments.
+    #[expect(
+        clippy::missing_panics_doc,
+        reason = "delegates to ortho-config generated loaders without adding new panic paths"
+    )]
+    // See the comment on [`Config::load`] for the rationale behind this
+    // suppression.
+    #[allow(unfulfilled_lint_expectations)]
     pub fn load_from_iter<I, T>(iter: I) -> ortho_config::OrthoResult<Self>
     where
         I: IntoIterator<Item = T>,

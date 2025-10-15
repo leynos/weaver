@@ -1,3 +1,12 @@
+//! Houses the shared configuration defaults consumed across the Weaver
+//! binaries.
+//!
+//! The functions exported here define the default log filter and format while
+//! discovering the daemon socket endpoint in a platform-aware fashion. On Unix
+//! targets the socket prefers the XDG runtime directory and, when that location
+//! is unavailable, falls back to a user-namespaced directory under the system
+//! temporary directory to keep concurrent operators isolated.
+
 use camino::Utf8PathBuf;
 use std::env;
 
