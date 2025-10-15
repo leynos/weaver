@@ -68,7 +68,10 @@ fn runtime_base_directory() -> Option<Utf8PathBuf> {
 #[cfg(unix)]
 fn fallback_base_directory() -> Utf8PathBuf {
     let candidate = env::temp_dir();
-    Utf8PathBuf::from_path_buf(candidate).unwrap_or_else(|_| Utf8PathBuf::from("/tmp"))
+    match Utf8PathBuf::from_path_buf(candidate) {
+        Ok(path) => path,
+        Err(_) => Utf8PathBuf::from("/tmp"),
+    }
 }
 
 #[cfg(unix)]
