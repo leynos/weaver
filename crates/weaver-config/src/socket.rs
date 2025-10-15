@@ -4,6 +4,8 @@
 //! prepare Unix domain socket directories with restrictive permissions.
 use std::fmt;
 use std::fs::{self, DirBuilder};
+#[cfg(unix)]
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use camino::{Utf8Path, Utf8PathBuf};
@@ -133,6 +135,22 @@ fn ensure_secure_directory(parent: &Utf8Path) -> Result<(), SocketPreparationErr
         })?;
     }
 
+    let canonical = fs::canonicalize(parent.as_std_path()).map_err(|source| {
+        SocketPreparationError::Canonicalize {
+            path: parent.to_path_buf(),
+            source,
+        }
+    })?;
+    let canonical = Utf8PathBuf::from_path_buf(canonical)
+        .map_err(|path| SocketPreparationError::NonUtf8CanonicalPath { path })?;
+
+    if !canonical.ends_with(parent) {
+        return Err(SocketPreparationError::PathTraversal {
+            path: parent.to_path_buf(),
+            canonical,
+        });
+    }
+
     Ok(())
 }
 
@@ -220,10 +238,29 @@ pub enum SocketPreparationError {
         #[source]
         source: std::io::Error,
     },
+    /// Failed to canonicalize a socket directory while validating safety.
+    #[cfg(unix)]
+    #[error("failed to canonicalize socket directory '{path}': {source}")]
+    Canonicalize {
+        path: Utf8PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
     /// Encountered a symbolic link in the socket directory path.
     #[cfg(unix)]
     #[error("socket directory '{path}' resolves through a symlink")]
     SymlinkDetected { path: Utf8PathBuf },
+    /// Socket directory canonicalization produced a non-UTF-8 path.
+    #[cfg(unix)]
+    #[error("socket directory canonicalizes to a non-UTF-8 path: {path:?}")]
+    NonUtf8CanonicalPath { path: PathBuf },
+    /// Socket directory escapes the configured base path.
+    #[cfg(unix)]
+    #[error("socket directory '{path}' escapes to '{canonical}' when canonicalized")]
+    PathTraversal {
+        path: Utf8PathBuf,
+        canonical: Utf8PathBuf,
+    },
     /// Socket directory ownership does not match the effective user ID.
     #[cfg(unix)]
     #[error("socket directory '{path}' is owned by uid {owner} but expected uid {expected}")]
@@ -322,5 +359,25 @@ mod tests {
             .permissions()
             .mode();
         assert_eq!(mode & 0o777, 0o700);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn prepare_filesystem_rejects_path_traversal() {
+        let tmp = tempdir().expect("temporary directory");
+        let real_dir = tmp.path().join("real");
+        std::fs::create_dir(&real_dir).expect("create real directory");
+        let other_dir = tmp.path().join("other");
+        std::fs::create_dir(&other_dir).expect("create other directory");
+
+        let socket_path = real_dir.join("..").join("other").join("daemon.sock");
+        let socket_path = Utf8PathBuf::from_path_buf(socket_path).expect("utf8 path");
+        let endpoint = SocketEndpoint::unix(socket_path);
+
+        let error = endpoint.prepare_filesystem().expect_err("reject traversal");
+        assert!(matches!(
+            error,
+            SocketPreparationError::PathTraversal { .. }
+        ));
     }
 }
