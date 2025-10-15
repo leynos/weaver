@@ -115,6 +115,12 @@ fn ensure_secure_directory(parent: &Utf8Path) -> Result<(), SocketPreparationErr
         }
     })?;
 
+    if !metadata.file_type().is_dir() {
+        return Err(SocketPreparationError::NotDirectory {
+            path: parent.to_path_buf(),
+        });
+    }
+
     if metadata.uid() != expected_uid {
         return Err(SocketPreparationError::WrongOwner {
             path: parent.to_path_buf(),
@@ -261,6 +267,10 @@ pub enum SocketPreparationError {
         path: Utf8PathBuf,
         canonical: Utf8PathBuf,
     },
+    /// Socket directory resolves to a non-directory entry.
+    #[cfg(unix)]
+    #[error("socket directory '{path}' is not a directory")]
+    NotDirectory { path: Utf8PathBuf },
     /// Socket directory ownership does not match the effective user ID.
     #[cfg(unix)]
     #[error("socket directory '{path}' is owned by uid {owner} but expected uid {expected}")]
@@ -331,6 +341,23 @@ mod tests {
             error,
             SocketPreparationError::SymlinkDetected { .. }
         ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn prepare_filesystem_rejects_non_directory_parent() {
+        let tmp = tempdir().expect("temporary directory");
+        let file_path = tmp.path().join("not_a_directory");
+        std::fs::File::create(&file_path).expect("create placeholder file");
+
+        let socket_path = file_path.join("daemon.sock");
+        let socket_path = Utf8PathBuf::from_path_buf(socket_path).expect("utf8 path");
+        let endpoint = SocketEndpoint::unix(socket_path);
+
+        let error = endpoint
+            .prepare_filesystem()
+            .expect_err("reject non-directory parent");
+        assert!(matches!(error, SocketPreparationError::NotDirectory { .. }));
     }
 
     #[cfg(unix)]
