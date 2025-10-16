@@ -1,23 +1,15 @@
 //! CLI entrypoint for the Weaver semantic code tool.
 //!
-//! This binary serves as the lightweight client for the `weaverd` daemon. In
-//! the current foundation phase, it validates the configuration pipeline by
-//! loading the configuration and reporting success or failure. Future phases
-//! will extend this to serialize commands and communicate with the daemon.
+//! The binary now delegates to [`weaver_cli::run`], which loads configuration,
+//! processes command-line arguments, negotiates capability output, and streams
+//! JSONL requests to the configured daemon transport.
 
+use std::io::{self, StderrLock, StdinLock, StdoutLock};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
-    match weaver_config::Config::load() {
-        Ok(_) => {
-            // The CLI will be extended to connect to `weaverd` using this
-            // configuration in subsequent phases. For now we simply ensure the
-            // configuration pipeline succeeds end-to-end.
-            ExitCode::SUCCESS
-        }
-        Err(error) => {
-            eprintln!("Failed to load configuration: {error}");
-            ExitCode::FAILURE
-        }
-    }
+    let mut stdin: StdinLock<'_> = io::stdin().lock();
+    let mut stdout: StdoutLock<'_> = io::stdout().lock();
+    let mut stderr: StderrLock<'_> = io::stderr().lock();
+    weaver_cli::run(std::env::args_os(), &mut stdin, &mut stdout, &mut stderr)
 }

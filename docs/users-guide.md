@@ -80,3 +80,41 @@ When `weaverd` starts, it ensures the parent directory for the configured Unix
 socket exists, returning a descriptive error if the directory cannot be
 created. This prevents silent failures later when the daemon attempts to bind
 the socket.
+
+## Command usage
+
+`weaver` expects commands to be specified as a two-level verb pair. The first
+argument selects the domain (`observe`, `act`, or `verify`), while the second
+argument names the operation. All subsequent tokens are forwarded verbatim to
+the daemon and are encoded into the JSONL request without interpretation. For
+example:
+
+```sh
+weaver observe get-definition --uri file:///workspace/main.rs --position 42:17
+```
+
+The CLI serialises this invocation as:
+
+```json
+{"command":{"domain":"observe","operation":"get-definition"},"arguments":["--uri","file:///workspace/main.rs","--position","42:17"]}
+```
+
+Responses from the daemon are emitted as JSON objects, each tagged with a
+`stdout` or `stderr` stream. The CLI writes the payload to the corresponding
+host stream and terminates using the exit status provided by the final
+`{"kind":"exit","status":...}` message. Errors encountered while loading
+configuration or parsing the command are written to standard error before the
+process exits with status `1`.
+
+### Capability probe
+
+The capability matrix negotiated through configuration overrides can be
+inspected without starting the daemon:
+
+```sh
+weaver --capabilities
+```
+
+The CLI loads the shared configuration, applies any override directives, and
+prints the resulting matrix as pretty-printed JSON. The probe does not contact
+`weaverd`, making it safe to run during planning stages or health checks.
