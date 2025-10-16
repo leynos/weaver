@@ -19,3 +19,21 @@ Feature: Weaver CLI behaviour
     When the operator runs "observe"
     Then the CLI fails
     And stderr contains "command operation must be provided"
+
+  Scenario: Reporting malformed daemon responses
+    Given a running fake daemon sending malformed json
+    When the operator runs "observe get-definition --symbol main"
+    Then the CLI fails
+    And stderr contains "failed to parse daemon message"
+
+  Scenario: Detecting a missing exit status
+    Given a running fake daemon that closes without exit
+    When the operator runs "observe get-definition --symbol main"
+    Then the CLI fails
+    And stderr contains "daemon closed the stream without sending an exit status"
+
+  Scenario: Aborting after repeated empty responses
+    Given a running fake daemon that emits empty lines
+    When the operator runs "observe get-definition --symbol main"
+    Then the CLI fails
+    And stderr contains "Warning: received"

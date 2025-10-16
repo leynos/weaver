@@ -106,6 +106,14 @@ host stream and terminates using the exit status provided by the final
 configuration or parsing the command are written to standard error before the
 process exits with status `1`.
 
+Daemon connections are attempted with a five-second timeout. When the daemon
+does not accept a request within that window, the CLI aborts with a descriptive
+error instead of hanging. Likewise, if the daemon sends ten consecutive blank
+lines, the CLI emits a warning, stops reading further, and reports failure
+unless an exit status was already observed. Any session that ends without an
+explicit exit message is treated as an error so callers do not misinterpret a
+partial response as success.
+
 ### Capability probe
 
 The capability matrix negotiated through configuration overrides can be

@@ -1,23 +1,37 @@
-use std::ffi::OsString;
+//! Command-line interface runtime for the Weaver toolchain.
+//!
+//! The module owns argument parsing, configuration bootstrapping, request
+//! serialisation, and daemon transport negotiation. The interface is designed
+//! to be exercised both from the binary entrypoint and from tests where
+//! configuration loading and IO streams can be substituted.
+
+use std::ffi::{OsStr, OsString};
 use std::io::{self, Write};
-use std::net::TcpStream;
 use std::process::ExitCode;
 use std::sync::Arc;
 
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
+use weaver_config::{CapabilityMatrix, Config};
 
-#[cfg(unix)]
-use std::os::unix::net::UnixStream;
+mod transport;
+
+use transport::connect;
+const EMPTY_LINE_LIMIT: usize = 10;
+const CONFIG_CLI_FLAGS: &[&str] = &[
+    "--config-path",
+    "--daemon-socket",
+    "--log-filter",
+    "--log-format",
+    "--capability-overrides",
+];
 
 /// Runs the CLI using the provided arguments and IO handles.
 #[must_use]
-pub fn run<I, R, W, E>(args: I, _stdin: &mut R, stdout: &mut W, stderr: &mut E) -> ExitCode
+pub fn run<I, W, E>(args: I, stdout: &mut W, stderr: &mut E) -> ExitCode
 where
     I: IntoIterator<Item = OsString>,
-    R: io::Read,
     W: Write,
     E: Write,
 {
@@ -116,33 +130,6 @@ fn exit_code_from_status(status: i32) -> ExitCode {
     }
 }
 
-fn connect(endpoint: &SocketEndpoint) -> Result<Connection, AppError> {
-    match endpoint {
-        SocketEndpoint::Tcp { host, port } => TcpStream::connect((host.as_str(), *port))
-            .map(Connection::Tcp)
-            .map_err(|error| AppError::Connect {
-                endpoint: endpoint.to_string(),
-                source: error,
-            }),
-        SocketEndpoint::Unix { path } => {
-            #[cfg(unix)]
-            {
-                UnixStream::connect(path.as_str())
-                    .map(Connection::Unix)
-                    .map_err(|error| AppError::Connect {
-                        endpoint: endpoint.to_string(),
-                        source: error,
-                    })
-            }
-
-            #[cfg(not(unix))]
-            {
-                Err(AppError::UnsupportedUnixTransport(endpoint.to_string()))
-            }
-        }
-    }
-}
-
 fn read_daemon_messages<R, W, E>(
     connection: &mut R,
     stdout: &mut W,
@@ -157,7 +144,8 @@ where
 
     let mut reader = io::BufReader::new(connection);
     let mut line = String::new();
-    let mut exit_status = 0;
+    let mut exit_status: Option<i32> = None;
+    let mut consecutive_empty_lines = 0;
 
     while reader
         .read_line(&mut line)
@@ -165,9 +153,16 @@ where
         != 0
     {
         if line.trim().is_empty() {
+            consecutive_empty_lines += 1;
+            if consecutive_empty_lines >= EMPTY_LINE_LIMIT {
+                writeln!(stderr, "Warning: received {EMPTY_LINE_LIMIT} consecutive empty lines from daemon; aborting.")
+                    .map_err(AppError::ForwardResponse)?;
+                break;
+            }
             line.clear();
             continue;
         }
+        consecutive_empty_lines = 0;
         let message: DaemonMessage = serde_json::from_str(&line).map_err(AppError::ParseMessage)?;
         match message {
             DaemonMessage::Stream { stream, data } => {
@@ -177,14 +172,15 @@ where
                 }
                 .map_err(AppError::ForwardResponse)?;
             }
-            DaemonMessage::Exit { status } => exit_status = status,
+            DaemonMessage::Exit { status } => exit_status = Some(status),
         }
         line.clear();
     }
 
     stdout.flush().map_err(AppError::ForwardResponse)?;
     stderr.flush().map_err(AppError::ForwardResponse)?;
-    Ok(exit_status)
+
+    exit_status.ok_or(AppError::MissingExit)
 }
 
 #[derive(Parser, Debug)]
@@ -209,6 +205,7 @@ struct Cli {
     arguments: Vec<String>,
 }
 
+#[derive(Debug)]
 struct CommandInvocation {
     domain: String,
     operation: String,
@@ -288,40 +285,6 @@ enum StreamTarget {
     Stderr,
 }
 
-enum Connection {
-    Tcp(TcpStream),
-    #[cfg(unix)]
-    Unix(UnixStream),
-}
-
-impl io::Read for Connection {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self {
-            Self::Tcp(stream) => stream.read(buf),
-            #[cfg(unix)]
-            Self::Unix(stream) => stream.read(buf),
-        }
-    }
-}
-
-impl Write for Connection {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self {
-            Self::Tcp(stream) => stream.write(buf),
-            #[cfg(unix)]
-            Self::Unix(stream) => stream.write(buf),
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        match self {
-            Self::Tcp(stream) => stream.flush(),
-            #[cfg(unix)]
-            Self::Unix(stream) => stream.flush(),
-        }
-    }
-}
-
 /// Loads configuration for the CLI.
 trait ConfigLoader {
     fn load(&self, args: &[OsString]) -> Result<Config, AppError>;
@@ -331,7 +294,41 @@ struct OrthoConfigLoader;
 
 impl ConfigLoader for OrthoConfigLoader {
     fn load(&self, args: &[OsString]) -> Result<Config, AppError> {
-        Config::load_from_iter(args.iter().cloned()).map_err(AppError::LoadConfiguration)
+        let mut filtered: Vec<OsString> = Vec::new();
+        if let Some(first) = args.first() {
+            filtered.push(first.clone());
+        }
+
+        let mut pending_values = 0usize;
+        for argument in args.iter().skip(1) {
+            if pending_values > 0 {
+                filtered.push(argument.clone());
+                pending_values -= 1;
+                continue;
+            }
+
+            if argument == OsStr::new("--") {
+                break;
+            }
+
+            let argument_text = argument.to_string_lossy();
+            if argument_text.starts_with("--") {
+                let mut flag_parts = argument_text.splitn(2, '=');
+                let flag = flag_parts.next().unwrap();
+                let has_inline_value = flag_parts.next().is_some();
+                if CONFIG_CLI_FLAGS.contains(&flag) {
+                    filtered.push(argument.clone());
+                    if !has_inline_value {
+                        pending_values = 1;
+                    }
+                    continue;
+                }
+            }
+
+            break;
+        }
+
+        Config::load_from_iter(filtered).map_err(AppError::LoadConfiguration)
     }
 }
 
@@ -343,6 +340,8 @@ enum AppError {
     MissingDomain,
     #[error("the command operation must be provided")]
     MissingOperation,
+    #[error("failed to resolve daemon address {endpoint}: {source}")]
+    Resolve { endpoint: String, source: io::Error },
     #[error("failed to connect to daemon at {endpoint}: {source}")]
     Connect { endpoint: String, source: io::Error },
     #[cfg(not(unix))]
@@ -358,6 +357,8 @@ enum AppError {
     ParseMessage(serde_json::Error),
     #[error("failed to forward daemon output: {0}")]
     ForwardResponse(io::Error),
+    #[error("daemon closed the stream without sending an exit status")]
+    MissingExit,
     #[error("failed to serialise capability matrix: {0}")]
     SerialiseCapabilities(serde_json::Error),
     #[error("failed to emit capabilities: {0}")]

@@ -222,7 +222,11 @@ The CLI uses `clap`'s trailing argument capture to ensure any flag-like values
 responses are consumed line by line, expecting each JSON object to specify the
 target stream (`stdout` or `stderr`). The client writes the data to the
 corresponding host stream and honours the terminal `exit` message to mirror the
-daemon's status code.
+daemon's status code. A connection timeout of five seconds prevents the CLI
+from blocking indefinitely if the daemon is unreachable. Additionally, the
+reader abandons the session after ten consecutive blank lines and treats the
+absence of a terminating `exit` message as a failure. This ensures operators do
+not mistake a partial or stalled response for a successful execution.
 
 The capability probe specified in the roadmap is exposed as
 `weaver --capabilities`. The command loads the shared configuration, renders
