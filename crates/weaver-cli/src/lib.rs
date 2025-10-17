@@ -45,6 +45,73 @@ where
     run_with_loader(args, stdout, stderr, &OrthoConfigLoader)
 }
 
+fn prepare_cli_arguments(args: &[OsString], split: &ConfigArgumentSplit) -> Vec<OsString> {
+    let mut cli_arguments: Vec<OsString> = Vec::new();
+    if let Some(first) = args.first() {
+        cli_arguments.push(first.clone());
+    }
+    if split.command_start < args.len() {
+        cli_arguments.extend(args[split.command_start..].iter().cloned());
+    }
+    cli_arguments
+}
+
+fn handle_capabilities_mode<W, E>(
+    cli: &Cli,
+    config: &Config,
+    stdout: &mut W,
+    stderr: &mut E,
+) -> Option<ExitCode>
+where
+    W: Write,
+    E: Write,
+{
+    if !cli.capabilities {
+        return None;
+    }
+
+    match emit_capabilities(config, stdout) {
+        Ok(()) => Some(ExitCode::SUCCESS),
+        Err(error) => {
+            let _ = writeln!(stderr, "{error}");
+            Some(ExitCode::FAILURE)
+        }
+    }
+}
+
+fn execute_daemon_command<W, E>(
+    invocation: CommandInvocation,
+    config: &Config,
+    stdout: &mut W,
+    stderr: &mut E,
+) -> ExitCode
+where
+    W: Write,
+    E: Write,
+{
+    let request = CommandRequest::from(invocation);
+    let mut connection = match connect(config.daemon_socket()) {
+        Ok(connection) => connection,
+        Err(error) => {
+            let _ = writeln!(stderr, "{error}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if let Err(error) = request.write_jsonl(&mut connection) {
+        let _ = writeln!(stderr, "{error}");
+        return ExitCode::FAILURE;
+    }
+
+    match read_daemon_messages(&mut connection, stdout, stderr) {
+        Ok(status) => exit_code_from_status(status),
+        Err(error) => {
+            let _ = writeln!(stderr, "{error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 /// Runs the CLI with a custom configuration loader.
 #[must_use]
 pub(crate) fn run_with_loader<I, W, E, L>(
@@ -61,54 +128,31 @@ where
 {
     let args: Vec<OsString> = args.into_iter().collect();
     let split = split_config_arguments(&args);
-    let cli_arguments = build_cli_arguments(&args, &split);
+    let cli_arguments = prepare_cli_arguments(&args, &split);
 
-    match run_flow(cli_arguments, &split, stdout, stderr, loader) {
+    let result = Cli::try_parse_from(cli_arguments)
+        .map_err(AppError::CliUsage)
+        .and_then(|cli| {
+            loader
+                .load(&split.config_arguments)
+                .map(|config| (cli, config))
+        })
+        .and_then(|(cli, config)| {
+            if let Some(exit_code) = handle_capabilities_mode(&cli, &config, stdout, stderr) {
+                return Ok(exit_code);
+            }
+
+            let invocation = CommandInvocation::try_from(cli)?;
+            Ok(execute_daemon_command(invocation, &config, stdout, stderr))
+        });
+
+    match result {
         Ok(exit_code) => exit_code,
         Err(error) => {
             let _ = writeln!(stderr, "{error}");
             ExitCode::FAILURE
         }
     }
-}
-
-fn build_cli_arguments(args: &[OsString], split: &ConfigArgumentSplit) -> Vec<OsString> {
-    let mut cli_arguments: Vec<OsString> = Vec::new();
-    if let Some(first) = args.first() {
-        cli_arguments.push(first.clone());
-    }
-    if split.command_start < args.len() {
-        cli_arguments.extend(args[split.command_start..].iter().cloned());
-    }
-    cli_arguments
-}
-
-fn run_flow<W, E, L>(
-    cli_arguments: Vec<OsString>,
-    split: &ConfigArgumentSplit,
-    stdout: &mut W,
-    stderr: &mut E,
-    loader: &L,
-) -> Result<ExitCode, AppError>
-where
-    W: Write,
-    E: Write,
-    L: ConfigLoader,
-{
-    let cli = Cli::try_parse_from(cli_arguments).map_err(AppError::CliUsage)?;
-    let config = loader.load(&split.config_arguments)?;
-
-    if cli.capabilities {
-        emit_capabilities(&config, stdout)?;
-        return Ok(ExitCode::SUCCESS);
-    }
-
-    let invocation = CommandInvocation::try_from(cli)?;
-    let request = CommandRequest::from(invocation);
-    let mut connection = connect(config.daemon_socket())?;
-    request.write_jsonl(&mut connection)?;
-    let status = read_daemon_messages(&mut connection, stdout, stderr)?;
-    Ok(exit_code_from_status(status))
 }
 
 fn emit_capabilities<W>(config: &Config, stdout: &mut W) -> Result<(), AppError>
