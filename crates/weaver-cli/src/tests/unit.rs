@@ -30,52 +30,46 @@ fn serialises_command_request_matches_golden() {
     assert_eq!(actual, expected);
 }
 
-#[test]
-fn command_invocation_requires_domain() {
+#[rstest]
+#[case(None, Some(String::from("op")), "MissingDomain", "requires domain")]
+#[case(
+    Some(String::from("   ")),
+    Some(String::from("op")),
+    "MissingDomain",
+    "rejects blank domain"
+)]
+#[case(
+    Some(String::from("observe")),
+    None,
+    "MissingOperation",
+    "requires operation"
+)]
+#[case(
+    Some(String::from("observe")),
+    Some(String::from("   ")),
+    "MissingOperation",
+    "rejects blank operation"
+)]
+fn command_invocation_validation(
+    #[case] domain: Option<String>,
+    #[case] operation: Option<String>,
+    #[case] expected_error: &str,
+    #[case] _description: &str,
+) {
     let cli = Cli {
         capabilities: false,
-        domain: None,
-        operation: Some(String::from("op")),
+        domain,
+        operation,
         arguments: Vec::new(),
     };
-    let error = CommandInvocation::try_from(cli).unwrap_err();
-    assert!(matches!(error, AppError::MissingDomain));
-}
 
-#[test]
-fn command_invocation_rejects_blank_domain() {
-    let cli = Cli {
-        capabilities: false,
-        domain: Some(String::from("   ")),
-        operation: Some(String::from("op")),
-        arguments: Vec::new(),
-    };
-    let error = CommandInvocation::try_from(cli).unwrap_err();
-    assert!(matches!(error, AppError::MissingDomain));
-}
+    let error = CommandInvocation::try_from(cli).expect_err("validation must fail");
 
-#[test]
-fn command_invocation_requires_operation() {
-    let cli = Cli {
-        capabilities: false,
-        domain: Some(String::from("observe")),
-        operation: None,
-        arguments: Vec::new(),
-    };
-    let error = CommandInvocation::try_from(cli).unwrap_err();
-    assert!(matches!(error, AppError::MissingOperation));
-}
-
-#[test]
-fn command_invocation_rejects_blank_operation() {
-    let cli = Cli {
-        capabilities: false,
-        domain: Some(String::from("observe")),
-        operation: Some(String::from("   ")),
-        arguments: Vec::new(),
-    };
-    let error = CommandInvocation::try_from(cli).unwrap_err();
-    assert!(matches!(error, AppError::MissingOperation));
+    match expected_error {
+        "MissingDomain" => assert!(matches!(error, AppError::MissingDomain)),
+        "MissingOperation" => assert!(matches!(error, AppError::MissingOperation)),
+        other => panic!("unexpected expected_error marker: {}", other),
+    }
 }
 
 #[rstest]
@@ -152,25 +146,13 @@ fn run_with_loader_reports_configuration_failures() {
     );
 }
 
-#[test]
-fn connect_successfully_establishes_tcp_connection() {
-    let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind listener");
-    let port = listener.local_addr().unwrap().port();
-    let handle = thread::spawn(move || {
-        if let Ok((stream, _)) = listener.accept() {
-            let mut buffer = String::new();
-            let mut reader = io::BufReader::new(stream.try_clone().unwrap());
-            let _ = reader.read_line(&mut buffer);
-            let mut writer = stream;
-            for line in default_daemon_lines() {
-                writer.write_all(line.as_bytes()).unwrap();
-                writer.write_all(b"\n").unwrap();
-                writer.flush().unwrap();
-            }
-        }
-    });
+fn test_daemon_connection<F>(setup_listener: F)
+where
+    F: FnOnce() -> (SocketEndpoint, thread::JoinHandle<()>),
+{
+    let (endpoint, handle) = setup_listener();
 
-    let mut connection = connect(&SocketEndpoint::tcp("127.0.0.1", port)).expect("connect tcp");
+    let mut connection = connect(&endpoint).expect("connect to daemon");
     let request = CommandRequest {
         command: CommandDescriptor {
             domain: "observe".into(),
@@ -179,12 +161,38 @@ fn connect_successfully_establishes_tcp_connection() {
         arguments: Vec::new(),
     };
     request.write_jsonl(&mut connection).expect("write request");
+
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status =
         read_daemon_messages(&mut connection, &mut stdout, &mut stderr).expect("read responses");
     assert_eq!(status, 17);
-    let _ = handle.join();
+
+    handle.join().expect("join listener thread");
+}
+
+#[test]
+fn connect_successfully_establishes_tcp_connection() {
+    test_daemon_connection(|| {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind listener");
+        let port = listener.local_addr().unwrap().port();
+
+        let handle = thread::spawn(move || {
+            if let Ok((stream, _)) = listener.accept() {
+                let mut buffer = String::new();
+                let mut reader = io::BufReader::new(stream.try_clone().unwrap());
+                let _ = reader.read_line(&mut buffer);
+                let mut writer = stream;
+                for line in default_daemon_lines() {
+                    writer.write_all(line.as_bytes()).unwrap();
+                    writer.write_all(b"\n").unwrap();
+                    writer.flush().unwrap();
+                }
+            }
+        });
+
+        (SocketEndpoint::tcp("127.0.0.1", port), handle)
+    });
 }
 
 #[cfg(unix)]
@@ -194,35 +202,28 @@ fn connect_supports_unix_sockets() {
 
     let dir = tempfile::tempdir().expect("tempdir");
     let socket_path = dir.path().join("daemon.sock");
-    let listener = UnixListener::bind(&socket_path).expect("bind unix");
+    let socket_path_for_listener = socket_path.clone();
+    let socket_display = socket_path
+        .to_str()
+        .expect("socket path is utf8")
+        .to_owned();
 
-    let handle = thread::spawn(move || {
-        if let Ok((mut stream, _)) = listener.accept() {
-            let mut buffer = String::new();
-            let mut reader = io::BufReader::new(stream.try_clone().unwrap());
-            let _ = reader.read_line(&mut buffer);
-            for line in default_daemon_lines() {
-                stream.write_all(line.as_bytes()).unwrap();
-                stream.write_all(b"\n").unwrap();
-                stream.flush().unwrap();
+    test_daemon_connection(move || {
+        let listener = UnixListener::bind(&socket_path_for_listener).expect("bind unix");
+
+        let handle = thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut buffer = String::new();
+                let mut reader = io::BufReader::new(stream.try_clone().unwrap());
+                let _ = reader.read_line(&mut buffer);
+                for line in default_daemon_lines() {
+                    stream.write_all(line.as_bytes()).unwrap();
+                    stream.write_all(b"\n").unwrap();
+                    stream.flush().unwrap();
+                }
             }
-        }
-    });
+        });
 
-    let endpoint = SocketEndpoint::unix(socket_path.to_str().unwrap());
-    let mut connection = connect(&endpoint).expect("connect unix");
-    let request = CommandRequest {
-        command: CommandDescriptor {
-            domain: "observe".into(),
-            operation: "noop".into(),
-        },
-        arguments: Vec::new(),
-    };
-    request.write_jsonl(&mut connection).expect("write request");
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status =
-        read_daemon_messages(&mut connection, &mut stdout, &mut stderr).expect("read responses");
-    assert_eq!(status, 17);
-    let _ = handle.join();
+        (SocketEndpoint::unix(socket_display), handle)
+    });
 }
