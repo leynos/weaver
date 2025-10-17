@@ -53,7 +53,17 @@ where
     L: ConfigLoader,
 {
     let args: Vec<OsString> = args.into_iter().collect();
-    let cli = match Cli::try_parse_from(args.clone()) {
+    let split = split_config_arguments(&args);
+
+    let mut cli_arguments: Vec<OsString> = Vec::new();
+    if let Some(first) = args.first() {
+        cli_arguments.push(first.clone());
+    }
+    if split.command_start < args.len() {
+        cli_arguments.extend(args[split.command_start..].iter().cloned());
+    }
+
+    let cli = match Cli::try_parse_from(cli_arguments) {
         Ok(cli) => cli,
         Err(error) => {
             let _ = writeln!(stderr, "{error}");
@@ -61,7 +71,7 @@ where
         }
     };
 
-    let config = match loader.load(&args) {
+    let config = match loader.load(&split.config_arguments) {
         Ok(config) => config,
         Err(error) => {
             let _ = writeln!(stderr, "{error}");
@@ -287,6 +297,10 @@ enum StreamTarget {
 
 /// Loads configuration for the CLI.
 trait ConfigLoader {
+    /// Loads configuration using the filtered CLI arguments.
+    ///
+    /// Callers must provide only the binary name followed by configuration
+    /// flags recognised by the loader.
     fn load(&self, args: &[OsString]) -> Result<Config, AppError>;
 }
 
@@ -300,31 +314,7 @@ enum FlagAction {
 
 impl ConfigLoader for OrthoConfigLoader {
     fn load(&self, args: &[OsString]) -> Result<Config, AppError> {
-        let mut filtered: Vec<OsString> = Vec::new();
-        if let Some(first) = args.first() {
-            filtered.push(first.clone());
-        }
-
-        let mut pending_values = 0usize;
-        for argument in args.iter().skip(1) {
-            if pending_values > 0 {
-                filtered.push(argument.clone());
-                pending_values -= 1;
-                continue;
-            }
-
-            match Self::process_config_flag(argument) {
-                FlagAction::Include { needs_value } => {
-                    filtered.push(argument.clone());
-                    if needs_value {
-                        pending_values = 1;
-                    }
-                }
-                FlagAction::Skip => break,
-            }
-        }
-
-        Config::load_from_iter(filtered).map_err(AppError::LoadConfiguration)
+        Config::load_from_iter(args.iter().cloned()).map_err(AppError::LoadConfiguration)
     }
 }
 
@@ -346,6 +336,57 @@ impl OrthoConfigLoader {
         }
 
         FlagAction::Skip
+    }
+}
+
+struct ConfigArgumentSplit {
+    config_arguments: Vec<OsString>,
+    command_start: usize,
+}
+
+fn split_config_arguments(args: &[OsString]) -> ConfigArgumentSplit {
+    if args.is_empty() {
+        return ConfigArgumentSplit {
+            config_arguments: Vec::new(),
+            command_start: 0,
+        };
+    }
+
+    let mut filtered: Vec<OsString> = Vec::new();
+    filtered.push(args[0].clone());
+
+    let mut command_start = 1usize;
+    let mut index = 1usize;
+    let mut pending_values = 0usize;
+
+    while index < args.len() {
+        let argument = &args[index];
+        if pending_values > 0 {
+            filtered.push(argument.clone());
+            pending_values -= 1;
+            index += 1;
+            command_start = index;
+            continue;
+        }
+
+        match OrthoConfigLoader::process_config_flag(argument.as_os_str()) {
+            FlagAction::Include { needs_value } => {
+                filtered.push(argument.clone());
+                index += 1;
+                command_start = index;
+                if needs_value {
+                    pending_values = 1;
+                }
+            }
+            FlagAction::Skip => {
+                break;
+            }
+        }
+    }
+
+    ConfigArgumentSplit {
+        config_arguments: filtered,
+        command_start,
     }
 }
 

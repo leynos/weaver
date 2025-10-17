@@ -1,5 +1,6 @@
 use super::support::{default_daemon_lines, read_fixture};
 
+use std::cell::RefCell;
 use std::ffi::OsString;
 use std::io::{self, BufRead, Cursor, Write};
 use std::net::TcpListener;
@@ -144,6 +145,70 @@ fn run_with_loader_reports_configuration_failures() {
             .unwrap()
             .contains("command domain")
     );
+}
+
+#[test]
+fn run_with_loader_filters_configuration_arguments() {
+    struct RecordingLoader {
+        recorded: RefCell<Vec<OsString>>,
+    }
+
+    impl RecordingLoader {
+        fn new() -> Self {
+            Self {
+                recorded: RefCell::new(Vec::new()),
+            }
+        }
+    }
+
+    impl ConfigLoader for RecordingLoader {
+        fn load(&self, args: &[OsString]) -> Result<Config, AppError> {
+            self.recorded.borrow_mut().extend(args.iter().cloned());
+            Err(AppError::MissingDomain)
+        }
+    }
+
+    let loader = RecordingLoader::new();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let exit = run_with_loader(
+        vec![
+            OsString::from("weaver"),
+            OsString::from("--config-path"),
+            OsString::from("custom.toml"),
+            OsString::from("--log-filter"),
+            OsString::from("debug"),
+            OsString::from("observe"),
+            OsString::from("get-definition"),
+            OsString::from("--"),
+            OsString::from("--extra"),
+        ],
+        &mut stdout,
+        &mut stderr,
+        &loader,
+    );
+
+    assert_eq!(exit, ExitCode::FAILURE);
+    let recorded: Vec<String> = loader
+        .recorded
+        .borrow()
+        .iter()
+        .map(|value| value.to_string_lossy().into_owned())
+        .collect();
+
+    assert_eq!(
+        recorded,
+        vec![
+            String::from("weaver"),
+            String::from("--config-path"),
+            String::from("custom.toml"),
+            String::from("--log-filter"),
+            String::from("debug"),
+        ]
+    );
+
+    assert!(!stderr.is_empty());
+    assert!(stdout.is_empty());
 }
 
 fn test_daemon_connection<F>(setup_listener: F)
