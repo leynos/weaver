@@ -292,6 +292,12 @@ trait ConfigLoader {
 
 struct OrthoConfigLoader;
 
+#[derive(Debug, Clone, Copy)]
+enum FlagAction {
+    Include { needs_value: bool },
+    Skip,
+}
+
 impl ConfigLoader for OrthoConfigLoader {
     fn load(&self, args: &[OsString]) -> Result<Config, AppError> {
         let mut filtered: Vec<OsString> = Vec::new();
@@ -307,28 +313,39 @@ impl ConfigLoader for OrthoConfigLoader {
                 continue;
             }
 
-            if argument == OsStr::new("--") {
-                break;
-            }
-
-            let argument_text = argument.to_string_lossy();
-            if argument_text.starts_with("--") {
-                let mut flag_parts = argument_text.splitn(2, '=');
-                let flag = flag_parts.next().unwrap();
-                let has_inline_value = flag_parts.next().is_some();
-                if CONFIG_CLI_FLAGS.contains(&flag) {
+            match Self::process_config_flag(argument) {
+                FlagAction::Include { needs_value } => {
                     filtered.push(argument.clone());
-                    if !has_inline_value {
+                    if needs_value {
                         pending_values = 1;
                     }
-                    continue;
                 }
+                FlagAction::Skip => break,
             }
-
-            break;
         }
 
         Config::load_from_iter(filtered).map_err(AppError::LoadConfiguration)
+    }
+}
+
+impl OrthoConfigLoader {
+    fn process_config_flag(argument: &OsStr) -> FlagAction {
+        let argument_text = argument.to_string_lossy();
+        if !argument_text.starts_with("--") {
+            return FlagAction::Skip;
+        }
+
+        let mut flag_parts = argument_text.splitn(2, '=');
+        let flag = flag_parts.next().unwrap_or_default();
+        let has_inline_value = flag_parts.next().is_some();
+
+        if CONFIG_CLI_FLAGS.contains(&flag) {
+            return FlagAction::Include {
+                needs_value: !has_inline_value,
+            };
+        }
+
+        FlagAction::Skip
     }
 }
 
