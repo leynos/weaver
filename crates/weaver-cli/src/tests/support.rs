@@ -1,3 +1,9 @@
+//! Test support utilities for Weaver CLI behavioural coverage.
+//!
+//! Supplies harness types for starting fake daemons, capturing CLI output, and
+//! loading fixtures so step definitions and unit tests remain focused on their
+//! assertions.
+
 use std::cell::RefCell;
 use std::ffi::OsString;
 use std::fs;

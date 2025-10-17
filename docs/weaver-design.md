@@ -231,7 +231,7 @@ not mistake a partial or stalled response for a successful execution.
 The capability probe specified in the roadmap is exposed as
 `weaver --capabilities`. The command loads the shared configuration, renders
 the negotiated capability matrix as pretty-printed JSON, and exits without
-contacting the daemon. This keeps the probe side-effect free and allows agents
+contacting the daemon. This keeps the probe side effect free and allows agents
 to cache the matrix easily.
 
 ### 2.2. Semantic, Syntactic, and Relational Fusion

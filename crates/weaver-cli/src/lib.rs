@@ -5,20 +5,26 @@
 //! to be exercised both from the binary entrypoint and from tests where
 //! configuration loading and IO streams can be substituted.
 
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsString;
 use std::io::{self, Write};
 use std::process::ExitCode;
 use std::sync::Arc;
 
 use clap::Parser;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use thiserror::Error;
 use weaver_config::{CapabilityMatrix, Config};
 
+mod command;
+mod config;
 mod transport;
 
+#[cfg(test)]
+pub(crate) use command::CommandDescriptor;
+pub(crate) use command::{CommandInvocation, CommandRequest};
+use config::{ConfigArgumentSplit, split_config_arguments};
+pub(crate) use config::{ConfigLoader, OrthoConfigLoader};
 use transport::connect;
-const EMPTY_LINE_LIMIT: usize = 10;
 const CONFIG_CLI_FLAGS: &[&str] = &[
     "--config-path",
     "--daemon-socket",
@@ -26,6 +32,7 @@ const CONFIG_CLI_FLAGS: &[&str] = &[
     "--log-format",
     "--capability-overrides",
 ];
+const EMPTY_LINE_LIMIT: usize = 10;
 
 /// Runs the CLI using the provided arguments and IO handles.
 #[must_use]
@@ -54,7 +61,18 @@ where
 {
     let args: Vec<OsString> = args.into_iter().collect();
     let split = split_config_arguments(&args);
+    let cli_arguments = build_cli_arguments(&args, &split);
 
+    match run_flow(cli_arguments, &split, stdout, stderr, loader) {
+        Ok(exit_code) => exit_code,
+        Err(error) => {
+            let _ = writeln!(stderr, "{error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn build_cli_arguments(args: &[OsString], split: &ConfigArgumentSplit) -> Vec<OsString> {
     let mut cli_arguments: Vec<OsString> = Vec::new();
     if let Some(first) = args.first() {
         cli_arguments.push(first.clone());
@@ -62,62 +80,35 @@ where
     if split.command_start < args.len() {
         cli_arguments.extend(args[split.command_start..].iter().cloned());
     }
+    cli_arguments
+}
 
-    let cli = match Cli::try_parse_from(cli_arguments) {
-        Ok(cli) => cli,
-        Err(error) => {
-            let _ = writeln!(stderr, "{error}");
-            return ExitCode::FAILURE;
-        }
-    };
-
-    let config = match loader.load(&split.config_arguments) {
-        Ok(config) => config,
-        Err(error) => {
-            let _ = writeln!(stderr, "{error}");
-            return ExitCode::FAILURE;
-        }
-    };
+fn run_flow<W, E, L>(
+    cli_arguments: Vec<OsString>,
+    split: &ConfigArgumentSplit,
+    stdout: &mut W,
+    stderr: &mut E,
+    loader: &L,
+) -> Result<ExitCode, AppError>
+where
+    W: Write,
+    E: Write,
+    L: ConfigLoader,
+{
+    let cli = Cli::try_parse_from(cli_arguments).map_err(AppError::CliUsage)?;
+    let config = loader.load(&split.config_arguments)?;
 
     if cli.capabilities {
-        return match emit_capabilities(&config, stdout) {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(error) => {
-                let _ = writeln!(stderr, "{error}");
-                ExitCode::FAILURE
-            }
-        };
+        emit_capabilities(&config, stdout)?;
+        return Ok(ExitCode::SUCCESS);
     }
 
-    let invocation = match CommandInvocation::try_from(cli) {
-        Ok(invocation) => invocation,
-        Err(error) => {
-            let _ = writeln!(stderr, "{error}");
-            return ExitCode::FAILURE;
-        }
-    };
-
+    let invocation = CommandInvocation::try_from(cli)?;
     let request = CommandRequest::from(invocation);
-    let mut connection = match connect(config.daemon_socket()) {
-        Ok(connection) => connection,
-        Err(error) => {
-            let _ = writeln!(stderr, "{error}");
-            return ExitCode::FAILURE;
-        }
-    };
-
-    if let Err(error) = request.write_jsonl(&mut connection) {
-        let _ = writeln!(stderr, "{error}");
-        return ExitCode::FAILURE;
-    }
-
-    match read_daemon_messages(&mut connection, stdout, stderr) {
-        Ok(status) => exit_code_from_status(status),
-        Err(error) => {
-            let _ = writeln!(stderr, "{error}");
-            ExitCode::FAILURE
-        }
-    }
+    let mut connection = connect(config.daemon_socket())?;
+    request.write_jsonl(&mut connection)?;
+    let status = read_daemon_messages(&mut connection, stdout, stderr)?;
+    Ok(exit_code_from_status(status))
 }
 
 fn emit_capabilities<W>(config: &Config, stdout: &mut W) -> Result<(), AppError>
@@ -215,72 +206,6 @@ struct Cli {
     arguments: Vec<String>,
 }
 
-#[derive(Debug)]
-struct CommandInvocation {
-    domain: String,
-    operation: String,
-    arguments: Vec<String>,
-}
-
-impl TryFrom<Cli> for CommandInvocation {
-    type Error = AppError;
-
-    fn try_from(cli: Cli) -> Result<Self, Self::Error> {
-        let domain = cli.domain.ok_or(AppError::MissingDomain)?.trim().to_owned();
-        let operation = cli
-            .operation
-            .ok_or(AppError::MissingOperation)?
-            .trim()
-            .to_owned();
-        if domain.is_empty() {
-            return Err(AppError::MissingDomain);
-        }
-        if operation.is_empty() {
-            return Err(AppError::MissingOperation);
-        }
-        Ok(Self {
-            domain,
-            operation,
-            arguments: cli.arguments,
-        })
-    }
-}
-
-#[derive(Debug, Serialize)]
-struct CommandRequest {
-    command: CommandDescriptor,
-    arguments: Vec<String>,
-}
-
-#[derive(Debug, Serialize)]
-struct CommandDescriptor {
-    domain: String,
-    operation: String,
-}
-
-impl From<CommandInvocation> for CommandRequest {
-    fn from(invocation: CommandInvocation) -> Self {
-        Self {
-            command: CommandDescriptor {
-                domain: invocation.domain,
-                operation: invocation.operation,
-            },
-            arguments: invocation.arguments,
-        }
-    }
-}
-
-impl CommandRequest {
-    fn write_jsonl<W>(&self, writer: &mut W) -> Result<(), AppError>
-    where
-        W: Write,
-    {
-        serde_json::to_writer(&mut *writer, self).map_err(AppError::SerialiseRequest)?;
-        writer.write_all(b"\n").map_err(AppError::SendRequest)?;
-        writer.flush().map_err(AppError::SendRequest)
-    }
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum DaemonMessage {
@@ -295,105 +220,12 @@ enum StreamTarget {
     Stderr,
 }
 
-/// Loads configuration for the CLI.
-trait ConfigLoader {
-    /// Loads configuration using the filtered CLI arguments.
-    ///
-    /// Callers must provide only the binary name followed by configuration
-    /// flags recognised by the loader.
-    fn load(&self, args: &[OsString]) -> Result<Config, AppError>;
-}
-
-struct OrthoConfigLoader;
-
-#[derive(Debug, Clone, Copy)]
-enum FlagAction {
-    Include { needs_value: bool },
-    Skip,
-}
-
-impl ConfigLoader for OrthoConfigLoader {
-    fn load(&self, args: &[OsString]) -> Result<Config, AppError> {
-        Config::load_from_iter(args.iter().cloned()).map_err(AppError::LoadConfiguration)
-    }
-}
-
-impl OrthoConfigLoader {
-    fn process_config_flag(argument: &OsStr) -> FlagAction {
-        let argument_text = argument.to_string_lossy();
-        if !argument_text.starts_with("--") {
-            return FlagAction::Skip;
-        }
-
-        let mut flag_parts = argument_text.splitn(2, '=');
-        let flag = flag_parts.next().unwrap_or_default();
-        let has_inline_value = flag_parts.next().is_some();
-
-        if CONFIG_CLI_FLAGS.contains(&flag) {
-            return FlagAction::Include {
-                needs_value: !has_inline_value,
-            };
-        }
-
-        FlagAction::Skip
-    }
-}
-
-struct ConfigArgumentSplit {
-    config_arguments: Vec<OsString>,
-    command_start: usize,
-}
-
-fn split_config_arguments(args: &[OsString]) -> ConfigArgumentSplit {
-    if args.is_empty() {
-        return ConfigArgumentSplit {
-            config_arguments: Vec::new(),
-            command_start: 0,
-        };
-    }
-
-    let mut filtered: Vec<OsString> = Vec::new();
-    filtered.push(args[0].clone());
-
-    let mut command_start = 1usize;
-    let mut index = 1usize;
-    let mut pending_values = 0usize;
-
-    while index < args.len() {
-        let argument = &args[index];
-        if pending_values > 0 {
-            filtered.push(argument.clone());
-            pending_values -= 1;
-            index += 1;
-            command_start = index;
-            continue;
-        }
-
-        match OrthoConfigLoader::process_config_flag(argument.as_os_str()) {
-            FlagAction::Include { needs_value } => {
-                filtered.push(argument.clone());
-                index += 1;
-                command_start = index;
-                if needs_value {
-                    pending_values = 1;
-                }
-            }
-            FlagAction::Skip => {
-                break;
-            }
-        }
-    }
-
-    ConfigArgumentSplit {
-        config_arguments: filtered,
-        command_start,
-    }
-}
-
 #[derive(Debug, Error)]
 enum AppError {
     #[error("failed to load configuration: {0}")]
     LoadConfiguration(Arc<ortho_config::OrthoError>),
+    #[error("{0}")]
+    CliUsage(clap::Error),
     #[error("the command domain must be provided")]
     MissingDomain,
     #[error("the command operation must be provided")]

@@ -1,3 +1,8 @@
+//! BDD step definitions for Weaver CLI behavioural tests.
+//!
+//! These steps map feature scenarios in `tests/features/weaver_cli.feature`
+//! to harness operations that exercise the CLI against a fake daemon.
+
 use super::support::*;
 use crate::EMPTY_LINE_LIMIT;
 

@@ -211,6 +211,11 @@ fn run_with_loader_filters_configuration_arguments() {
     assert!(stdout.is_empty());
 }
 
+/// Exercises a full daemon connection cycle for the provided listener setup.
+///
+/// The helper connects to the listener, sends a JSONL request, and ensures the
+/// daemon response contains the expected exit code before joining the handler
+/// thread.
 fn test_daemon_connection<F>(setup_listener: F)
 where
     F: FnOnce() -> (SocketEndpoint, thread::JoinHandle<()>),
