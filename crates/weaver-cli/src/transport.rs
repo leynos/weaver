@@ -14,6 +14,9 @@ use weaver_config::SocketEndpoint;
 use std::os::unix::net::UnixStream;
 
 #[cfg(unix)]
+use std::os::fd::{FromRawFd, IntoRawFd, OwnedFd};
+
+#[cfg(unix)]
 use socket2::{Domain, SockAddr, Socket, Type};
 
 use super::AppError;
@@ -99,6 +102,9 @@ fn connect_unix(path: &str) -> io::Result<Connection> {
     let socket = Socket::new(Domain::UNIX, Type::STREAM, None)?;
     let address = SockAddr::unix(path)?;
     socket.connect_timeout(&address, CONNECTION_TIMEOUT)?;
-    let stream: UnixStream = socket.into();
-    Ok(Connection::Unix(stream))
+    let fd = socket.into_raw_fd();
+    // SAFETY: `from_raw_fd` takes ownership of the file descriptor produced by
+    // `into_raw_fd`, so the resulting `OwnedFd` is valid and uniquely owned.
+    let owned = unsafe { OwnedFd::from_raw_fd(fd) };
+    Ok(Connection::Unix(UnixStream::from(owned)))
 }

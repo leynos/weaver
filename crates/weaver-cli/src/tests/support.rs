@@ -166,6 +166,14 @@ impl FakeDaemon {
     }
 }
 
+impl Drop for FakeDaemon {
+    fn drop(&mut self) {
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
 pub(super) fn read_fixture(name: &str) -> String {
     match name.trim() {
         "request_observe_get_definition.jsonl" => include_str!(concat!(

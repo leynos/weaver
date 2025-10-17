@@ -40,7 +40,7 @@ impl OrthoConfigLoader {
         }
 
         let mut flag_parts = argument_text.splitn(2, '=');
-        let flag = flag_parts.next().unwrap_or_default();
+        let flag = flag_parts.next().unwrap();
         let has_inline_value = flag_parts.next().is_some();
 
         if super::CONFIG_CLI_FLAGS.contains(&flag) {
@@ -130,16 +130,12 @@ mod tests {
     #[test]
     fn non_flag_arguments_signal_stop() {
         let result = OrthoConfigLoader::process_config_flag(OsStr::new("observe"));
-        matches!(result, FlagAction::Skip)
-            .then_some(())
-            .expect("should skip");
+        assert!(matches!(result, FlagAction::Skip), "should skip");
     }
 
     #[test]
     fn unknown_flags_are_skipped() {
         let result = OrthoConfigLoader::process_config_flag(OsStr::new("--unknown"));
-        matches!(result, FlagAction::Skip)
-            .then_some(())
-            .expect("should skip");
+        assert!(matches!(result, FlagAction::Skip), "should skip");
     }
 }

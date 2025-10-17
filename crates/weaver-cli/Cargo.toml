@@ -10,7 +10,9 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 ortho_config = { workspace = true }
 thiserror = { workspace = true }
-socket2 = { version = "0.5", features = ["all"] }
+
+[target.'cfg(unix)'.dependencies]
+socket2 = { version = "0.5" }
 
 [dev-dependencies]
 rstest = { workspace = true }
