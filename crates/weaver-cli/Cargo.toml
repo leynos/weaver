@@ -20,4 +20,4 @@ rstest-bdd = { workspace = true }
 rstest-bdd-macros = { workspace = true }
 assert_cmd = "2.0"
 predicates = "3.0"
-tempfile = "3.10"
+tempfile = { workspace = true }
