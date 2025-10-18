@@ -23,7 +23,7 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
       - Acceptance criteria: Schema documented in crate docs, integration tests
         demonstrate precedence order (file < env < CLI), and default sockets
         align with the design doc.
-- [ ] Implement the `weaver-cli` executable as the thin JSONL client that
+- [x] Implement the `weaver-cli` executable as the thin JSONL client that
       initialises configuration via `ortho-config`, exposes the
       `--capabilities` probe, and streams requests to a running daemon over
       standard IO.

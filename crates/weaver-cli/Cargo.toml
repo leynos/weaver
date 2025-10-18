@@ -5,3 +5,19 @@ version.workspace = true
 
 [dependencies]
 weaver-config = { path = "../weaver-config", features = ["cli"] }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+ortho_config = { workspace = true }
+thiserror = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+socket2 = { version = "0.5" }
+
+[dev-dependencies]
+rstest = { workspace = true }
+rstest-bdd = { workspace = true }
+rstest-bdd-macros = { workspace = true }
+assert_cmd = "2.0"
+predicates = "3.0"
+tempfile = { workspace = true }

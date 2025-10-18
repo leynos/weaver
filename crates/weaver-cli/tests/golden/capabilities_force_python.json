@@ -1,0 +1,9 @@
+{
+  "languages": {
+    "python": {
+      "overrides": {
+        "act.rename-symbol": "force"
+      }
+    }
+  }
+}
