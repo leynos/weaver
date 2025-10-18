@@ -15,6 +15,12 @@ pub(crate) trait ConfigLoader {
     ///
     /// Callers must provide only the binary name followed by configuration
     /// flags recognised by the loader.
+    ///
+    /// # Flag Ordering
+    ///
+    /// Configuration flags listed in [`super::CONFIG_CLI_FLAGS`] must appear
+    /// before any command tokens. Once a non-flag argument is encountered the
+    /// remaining tokens are forwarded to the daemon without further filtering.
     fn load(&self, args: &[OsString]) -> Result<Config, AppError>;
 }
 

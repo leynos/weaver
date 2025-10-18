@@ -175,27 +175,13 @@ impl Drop for FakeDaemon {
 }
 
 pub(super) fn read_fixture(name: &str) -> String {
-    match name.trim() {
-        "request_observe_get_definition.jsonl" => include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/golden/request_observe_get_definition.jsonl"
-        ))
-        .to_string(),
-        "capabilities_force_python.json" => include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/golden/capabilities_force_python.json"
-        ))
-        .to_string(),
-        other => {
-            let normalized = other.trim_matches('"');
-            let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-            path.push("tests");
-            path.push("golden");
-            path.push(normalized);
-            fs::read_to_string(&path)
-                .unwrap_or_else(|error| panic!("read fixture at {}: {error}", path.display()))
-        }
-    }
+    let normalized = name.trim().trim_matches('"');
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("tests");
+    path.push("golden");
+    path.push(normalized);
+    fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("read fixture at {}: {error}", path.display()))
 }
 
 pub(super) fn default_daemon_lines() -> Vec<String> {
