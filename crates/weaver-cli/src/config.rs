@@ -11,16 +11,14 @@ use weaver_config::Config;
 use crate::AppError;
 
 pub(crate) trait ConfigLoader {
-    /// Loads configuration using the filtered CLI arguments.
-    ///
-    /// Callers must provide only the binary name followed by configuration
-    /// flags recognised by the loader.
+    /// Loads configuration for the CLI.
     ///
     /// # Flag Ordering
     ///
-    /// Configuration flags listed in [`super::CONFIG_CLI_FLAGS`] must appear
-    /// before any command tokens. Once a non-flag argument is encountered the
-    /// remaining tokens are forwarded to the daemon without further filtering.
+    /// Configuration flags (listed in `CONFIG_CLI_FLAGS`) must appear before any
+    /// command tokens. Configuration flags appearing after positional arguments
+    /// will be treated as command arguments and passed to the daemon rather than
+    /// configuring the CLI.
     fn load(&self, args: &[OsString]) -> Result<Config, AppError>;
 }
 

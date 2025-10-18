@@ -25,6 +25,11 @@ pub(crate) use command::{CommandInvocation, CommandRequest};
 use config::{ConfigArgumentSplit, split_config_arguments};
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader};
 use transport::connect;
+/// CLI flags recognised by the configuration loader.
+///
+/// MAINTENANCE: This list must be kept in sync with the configuration flags
+/// defined in `weaver-config`. When adding new configuration options, update
+/// this array accordingly.
 const CONFIG_CLI_FLAGS: &[&str] = &[
     "--config-path",
     "--daemon-socket",
