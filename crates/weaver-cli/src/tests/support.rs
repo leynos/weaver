@@ -7,12 +7,13 @@
 use std::cell::RefCell;
 use std::ffi::OsString;
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use crate::{AppError, ConfigLoader, run_with_loader};
 use anyhow::{Context, Result, anyhow, ensure};
@@ -156,6 +157,9 @@ pub(super) struct FakeDaemon {
 impl FakeDaemon {
     pub fn spawn(lines: Vec<String>) -> Result<Self> {
         let listener = TcpListener::bind(("127.0.0.1", 0)).context("bind fake daemon")?;
+        listener
+            .set_nonblocking(true)
+            .context("fake daemon nonblocking")?;
         let port = listener.local_addr().context("local addr")?.port();
         let requests: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
         let requests_clone = Arc::clone(&requests);
@@ -193,9 +197,25 @@ impl FakeDaemon {
         lines: Vec<String>,
         requests: Arc<Mutex<Vec<String>>>,
     ) -> Result<()> {
-        let (stream, _) = listener.accept().context("accept connection")?;
-        Self::record_request(&stream, &requests)?;
-        Self::stream_responses(stream, &lines)
+        let deadline = Instant::now() + Duration::from_secs(2);
+        // Exit after a short grace period so tests cannot hang forever when the CLI
+        // aborts before connecting (e.g. capabilities mode exiting early).
+        loop {
+            if Instant::now() >= deadline {
+                return Ok(());
+            }
+
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    Self::record_request(&stream, &requests)?;
+                    return Self::stream_responses(stream, &lines);
+                }
+                Err(ref error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Err(error) => return Err(error).context("accept connection"),
+            }
+        }
     }
 
     fn record_request(stream: &TcpStream, requests: &Arc<Mutex<Vec<String>>>) -> Result<()> {
