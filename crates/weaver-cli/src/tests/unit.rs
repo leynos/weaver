@@ -1,3 +1,8 @@
+//! Unit tests for Weaver CLI core functionality.
+//!
+//! Exercises command serialisation, daemon message parsing, configuration
+//! loading, and socket connection establishment (TCP and Unix domain sockets).
+
 use super::support::{accept_tcp_connection, decode_utf8, default_daemon_lines, read_fixture};
 
 #[cfg(unix)]
