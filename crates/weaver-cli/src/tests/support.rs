@@ -151,6 +151,7 @@ impl TestWorld {
 pub(super) struct FakeDaemon {
     port: u16,
     requests: Arc<Mutex<Vec<String>>>,
+    result: Arc<Mutex<Option<Result<()>>>>,
     handle: Option<thread::JoinHandle<()>>,
 }
 
@@ -162,15 +163,19 @@ impl FakeDaemon {
             .context("fake daemon nonblocking")?;
         let port = listener.local_addr().context("local addr")?.port();
         let requests: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+        let result: Arc<Mutex<Option<Result<()>>>> = Arc::new(Mutex::new(None));
         let requests_clone = Arc::clone(&requests);
+        let result_clone = Arc::clone(&result);
         let handle = thread::spawn(move || {
-            if let Err(error) = Self::serve_client(listener, lines, requests_clone) {
-                panic!("fake daemon failed: {error:?}");
+            let outcome = Self::serve_client(listener, lines, requests_clone);
+            if let Ok(mut guard) = result_clone.lock() {
+                *guard = Some(outcome);
             }
         });
         Ok(Self {
             port,
             requests,
+            result,
             handle: Some(handle),
         })
     }
@@ -185,6 +190,14 @@ impl FakeDaemon {
                 .join()
                 .map_err(|_| anyhow!("fake daemon thread panicked"))?;
         }
+        if let Some(outcome) = self
+            .result
+            .lock()
+            .map_err(|error| anyhow!("lock fake daemon result: {error}"))?
+            .take()
+        {
+            outcome.context("fake daemon failed")?;
+        }
         let requests = self
             .requests
             .lock()
@@ -198,20 +211,22 @@ impl FakeDaemon {
         requests: Arc<Mutex<Vec<String>>>,
     ) -> Result<()> {
         let deadline = Instant::now() + Duration::from_secs(2);
-        // Exit after a short grace period so tests cannot hang forever when the CLI
-        // aborts before connecting (e.g. capabilities mode exiting early).
         loop {
-            if Instant::now() >= deadline {
-                return Ok(());
-            }
-
             match listener.accept() {
                 Ok((stream, _)) => {
                     Self::record_request(&stream, &requests)?;
                     return Self::stream_responses(stream, &lines);
                 }
-                Err(ref error) if error.kind() == io::ErrorKind::WouldBlock => {
+                Err(ref error)
+                    if error.kind() == io::ErrorKind::WouldBlock
+                        && Instant::now() < deadline =>
+                {
                     thread::sleep(Duration::from_millis(10));
+                }
+                Err(ref error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    // No connection arrived; exit cleanly so tests do not hang when the CLI
+                    // aborts before connecting (e.g. capabilities mode exiting early).
+                    return Ok(());
                 }
                 Err(error) => return Err(error).context("accept connection"),
             }
