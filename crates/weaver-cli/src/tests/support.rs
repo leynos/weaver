@@ -7,13 +7,16 @@
 use std::cell::RefCell;
 use std::ffi::OsString;
 use std::fs;
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+
+#[cfg(unix)]
+use std::os::unix::net::UnixStream;
 
 use crate::{AppError, ConfigLoader, run_with_loader};
 use anyhow::{Context, Result, anyhow, ensure};
@@ -95,11 +98,11 @@ impl TestWorld {
     }
 
     pub fn stdout_text(&self) -> Result<String> {
-        String::from_utf8(self.stdout.clone()).context("stdout utf8")
+        decode_utf8(self.stdout.clone(), "stdout")
     }
 
     pub fn stderr_text(&self) -> Result<String> {
-        String::from_utf8(self.stderr.clone()).context("stderr utf8")
+        decode_utf8(self.stderr.clone(), "stderr")
     }
 
     pub fn assert_exit_code(&self, expected: u8) -> Result<()> {
@@ -218,8 +221,7 @@ impl FakeDaemon {
                     return Self::stream_responses(stream, &lines);
                 }
                 Err(ref error)
-                    if error.kind() == io::ErrorKind::WouldBlock
-                        && Instant::now() < deadline =>
+                    if error.kind() == io::ErrorKind::WouldBlock && Instant::now() < deadline =>
                 {
                     thread::sleep(Duration::from_millis(10));
                 }
@@ -251,13 +253,8 @@ impl FakeDaemon {
     }
 
     fn stream_responses(mut stream: TcpStream, lines: &[String]) -> Result<()> {
-        for payload in lines {
-            stream
-                .write_all(payload.as_bytes())
-                .context("write payload")?;
-            stream.write_all(b"\n").context("write newline")?;
-        }
-        stream.flush().context("flush payloads")
+        write_lines(&mut stream, lines).context("write response lines")?;
+        Ok(())
     }
 }
 
@@ -269,6 +266,64 @@ impl Drop for FakeDaemon {
     }
 }
 
+pub(super) fn respond_to_request<T>(mut stream: T, lines: &[String]) -> Result<()>
+where
+    T: TryCloneStream,
+{
+    let mut buffer = String::new();
+    {
+        let clone = stream.try_clone().context("clone stream")?;
+        let mut reader = BufReader::new(clone);
+        let _ = reader.read_line(&mut buffer).context("read request")?;
+    }
+    write_lines(&mut stream, lines).context("write response lines")
+}
+
+pub(super) fn write_lines(stream: &mut impl Write, lines: &[String]) -> io::Result<()> {
+    for line in lines {
+        stream.write_all(line.as_bytes())?;
+        stream.write_all(b"\n")?;
+    }
+    stream.flush()
+}
+
+pub(super) fn accept_tcp_connection(listener: TcpListener, lines: Vec<String>) -> Result<()> {
+    let (stream, _) = listener.accept().context("accept tcp connection")?;
+    respond_to_request(stream, &lines)
+}
+
+#[cfg(unix)]
+pub(super) fn accept_unix_connection(
+    listener: std::os::unix::net::UnixListener,
+    lines: Vec<String>,
+) -> Result<()> {
+    let (stream, _) = listener.accept().context("accept unix connection")?;
+    respond_to_request(stream, &lines)
+}
+
+pub(super) trait TryCloneStream: Write {
+    type Owned: Read + Write + Send + 'static;
+
+    fn try_clone(&self) -> io::Result<Self::Owned>;
+}
+
+impl TryCloneStream for TcpStream {
+    type Owned = TcpStream;
+
+    fn try_clone(&self) -> io::Result<Self::Owned> {
+        TcpStream::try_clone(self)
+    }
+}
+
+#[cfg(unix)]
+impl TryCloneStream for UnixStream {
+    type Owned = UnixStream;
+
+    fn try_clone(&self) -> io::Result<Self::Owned> {
+        UnixStream::try_clone(self)
+    }
+}
+
 pub(super) fn read_fixture(name: &str) -> Result<String> {
     let normalized = name.trim().trim_matches('"');
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -276,6 +331,10 @@ pub(super) fn read_fixture(name: &str) -> Result<String> {
     path.push("golden");
     path.push(normalized);
     fs::read_to_string(&path).with_context(|| format!("read fixture at {}", path.display()))
+}
+
+pub(super) fn decode_utf8(buffer: Vec<u8>, label: &str) -> Result<String> {
+    String::from_utf8(buffer).with_context(|| format!("{label} utf8"))
 }
 
 pub(super) fn default_daemon_lines() -> Vec<String> {

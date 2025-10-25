@@ -1,9 +1,12 @@
-use super::support::{default_daemon_lines, read_fixture};
+use super::support::{accept_tcp_connection, decode_utf8, default_daemon_lines, read_fixture};
+
+#[cfg(unix)]
+use super::support::accept_unix_connection;
 
 use std::cell::RefCell;
 use std::ffi::OsString;
-use std::io::{self, BufRead, BufReader, Cursor, Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::io::Cursor;
+use std::net::TcpListener;
 use std::process::ExitCode;
 use std::thread;
 
@@ -28,7 +31,7 @@ fn serialises_command_request_matches_golden() -> Result<()> {
     request
         .write_jsonl(&mut buffer)
         .context("serialises request")?;
-    let actual = String::from_utf8(buffer).context("request utf8")?;
+    let actual = decode_utf8(buffer, "request")?;
     let expected = read_fixture("request_observe_get_definition.jsonl")?;
     assert_eq!(actual, expected);
     Ok(())
@@ -97,7 +100,7 @@ fn read_daemon_messages_errors_without_exit() -> Result<()> {
     let mut stderr = Vec::new();
     let error = read_daemon_messages(&mut cursor, &mut stdout, &mut stderr).unwrap_err();
     assert!(matches!(error, AppError::MissingExit));
-    assert_eq!(String::from_utf8(stdout).context("stdout utf8")?, "hi");
+    assert_eq!(decode_utf8(stdout, "stdout")?, "hi");
     Ok(())
 }
 
@@ -112,7 +115,7 @@ fn read_daemon_messages_warns_after_empty_lines() -> Result<()> {
     let mut stderr = Vec::new();
     let error = read_daemon_messages(&mut cursor, &mut stdout, &mut stderr).unwrap_err();
     assert!(matches!(error, AppError::MissingExit));
-    let warning = String::from_utf8(stderr).context("stderr utf8")?;
+    let warning = decode_utf8(stderr, "stderr")?;
     assert!(warning.contains("Warning: received"));
     Ok(())
 }
@@ -146,11 +149,7 @@ fn run_with_loader_reports_configuration_failures() -> Result<()> {
         &FailingLoader,
     );
     assert_eq!(exit, ExitCode::FAILURE);
-    assert!(
-        String::from_utf8(stderr)
-            .context("stderr utf8")?
-            .contains("command domain")
-    );
+    assert!(decode_utf8(stderr, "stderr")?.contains("command domain"));
     Ok(())
 }
 
@@ -294,62 +293,4 @@ fn connect_supports_unix_sockets() -> Result<()> {
         Ok((SocketEndpoint::unix(socket_display), handle))
     })?;
     Ok(())
-}
-
-fn accept_tcp_connection(listener: TcpListener, lines: Vec<String>) -> Result<()> {
-    let (stream, _) = listener.accept().context("accept tcp connection")?;
-    respond_to_request(stream, &lines)
-}
-
-#[cfg(unix)]
-fn accept_unix_connection(
-    listener: std::os::unix::net::UnixListener,
-    lines: Vec<String>,
-) -> Result<()> {
-    let (stream, _) = listener.accept().context("accept unix connection")?;
-    respond_to_request(stream, &lines)
-}
-
-fn respond_to_request<T>(mut stream: T, lines: &[String]) -> Result<()>
-where
-    T: TryCloneStream,
-{
-    let mut buffer = String::new();
-    {
-        let clone = stream.try_clone().context("clone stream")?;
-        let mut reader = BufReader::new(clone);
-        let _ = reader.read_line(&mut buffer).context("read request")?;
-    }
-    write_lines(&mut stream, lines).context("write response lines")
-}
-
-fn write_lines(stream: &mut impl Write, lines: &[String]) -> io::Result<()> {
-    for line in lines {
-        stream.write_all(line.as_bytes())?;
-        stream.write_all(b"\n")?;
-    }
-    stream.flush()
-}
-
-trait TryCloneStream: Write {
-    type Owned: Read + Write + Send + 'static;
-
-    fn try_clone(&self) -> io::Result<Self::Owned>;
-}
-
-impl TryCloneStream for TcpStream {
-    type Owned = TcpStream;
-
-    fn try_clone(&self) -> io::Result<Self::Owned> {
-        TcpStream::try_clone(self)
-    }
-}
-
-#[cfg(unix)]
-impl TryCloneStream for std::os::unix::net::UnixStream {
-    type Owned = std::os::unix::net::UnixStream;
-
-    fn try_clone(&self) -> io::Result<Self::Owned> {
-        std::os::unix::net::UnixStream::try_clone(self)
-    }
 }
