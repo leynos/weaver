@@ -35,15 +35,34 @@ impl fmt::Display for BackendKind {
     }
 }
 
+/// Error returned when parsing a backend kind fails.
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
+#[error("unsupported backend kind: {0}")]
+pub struct BackendKindParseError(String);
+
+impl BackendKindParseError {
+    /// Creates a parse error describing the unsupported value.
+    #[must_use]
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    /// Returns the offending value that could not be parsed.
+    #[must_use]
+    pub fn value(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 impl FromStr for BackendKind {
-    type Err = String;
+    type Err = BackendKindParseError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value.trim().to_ascii_lowercase().as_str() {
             "semantic" => Ok(Self::Semantic),
             "syntactic" => Ok(Self::Syntactic),
             "relational" => Ok(Self::Relational),
-            other => Err(format!("unsupported backend kind: {other}")),
+            other => Err(BackendKindParseError::new(other)),
         }
     }
 }
@@ -130,6 +149,14 @@ impl<P> FusionBackends<P> {
     }
 
     /// Ensures the specified backend has been started.
+    ///
+    /// Successful calls are idempotent: once a backend starts, subsequent
+    /// invocations return immediately without consulting the provider again.
+    /// When the provider reports an error, the backend remains outside the
+    /// started set, so later calls retry `BackendProvider::start_backend`.
+    /// This favours eventual success for transient faults at the cost of
+    /// possible retries and assumes providers classify identical failures
+    /// deterministically.
     pub fn ensure_started(&mut self, kind: BackendKind) -> Result<(), BackendStartupError>
     where
         P: BackendProvider,

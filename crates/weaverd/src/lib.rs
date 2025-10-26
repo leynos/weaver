@@ -18,7 +18,9 @@ mod bootstrap;
 mod health;
 mod telemetry;
 
-pub use backends::{BackendKind, BackendProvider, BackendStartupError, FusionBackends};
+pub use backends::{
+    BackendKind, BackendKindParseError, BackendProvider, BackendStartupError, FusionBackends,
+};
 pub use bootstrap::{BootstrapError, ConfigLoader, Daemon, SystemConfigLoader, bootstrap_with};
 pub use health::{HealthReporter, StructuredHealthReporter};
 pub use telemetry::{TelemetryError, TelemetryHandle};

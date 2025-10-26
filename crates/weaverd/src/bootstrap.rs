@@ -124,6 +124,12 @@ where
 }
 
 /// Bootstraps the daemon using the supplied collaborators.
+///
+/// The reporter observes a `bootstrap_starting` event before work begins.
+/// `bootstrap_succeeded` fires once configuration, telemetry, and socket
+/// preparation complete, while `bootstrap_failed` publishes any early
+/// termination. Successful bootstraps install the global telemetry pipeline
+/// before returning the daemon handle.
 pub fn bootstrap_with<P>(
     loader: &dyn ConfigLoader,
     reporter: Arc<dyn HealthReporter>,

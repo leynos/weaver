@@ -1,7 +1,5 @@
 //! Structured health reporting for daemon lifecycle events.
 
-use std::sync::Arc;
-
 use crate::backends::{BackendKind, BackendStartupError};
 use crate::bootstrap::BootstrapError;
 
@@ -18,25 +16,6 @@ macro_rules! info_event {
 macro_rules! error_event {
     ($($rest:tt)*) => {
         tracing::error!(target: HEALTH_TARGET, $($rest)*);
-    };
-}
-
-macro_rules! impl_arc_health_reporter {
-    (
-        $(
-            fn $method:ident( $( $arg:ident : $ty:ty ),* );
-        )*
-    ) => {
-        impl<T> HealthReporter for Arc<T>
-        where
-            T: HealthReporter,
-        {
-            $(
-                fn $method(&self, $( $arg: $ty ),*) {
-                    (**self).$method($( $arg ),*);
-                }
-            )*
-        }
     };
 }
 
@@ -59,15 +38,6 @@ pub trait HealthReporter: Send + Sync {
 
     /// Invoked when a backend fails to start.
     fn backend_failed(&self, error: &BackendStartupError);
-}
-
-impl_arc_health_reporter! {
-    fn bootstrap_starting();
-    fn bootstrap_succeeded(config: &Config);
-    fn bootstrap_failed(error: &BootstrapError);
-    fn backend_starting(kind: BackendKind);
-    fn backend_ready(kind: BackendKind);
-    fn backend_failed(error: &BackendStartupError);
 }
 
 /// Default reporter that records lifecycle events using `tracing`.

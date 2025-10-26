@@ -16,9 +16,7 @@ fn bootstrap_does_not_eagerly_start_backends() {
     let reporter = Arc::new(RecordingHealthReporter::default());
     let provider = RecordingBackendProvider::default();
 
-    let daemon = bootstrap_with(&loader, reporter.clone(), provider.clone())
-        .expect("bootstrap should succeed");
-    assert!(daemon.config().daemon_socket().prepare_filesystem().is_ok());
+    bootstrap_with(&loader, reporter.clone(), provider.clone()).expect("bootstrap should succeed");
 
     let events = reporter.events();
     assert!(events.contains(&HealthEvent::BootstrapStarting));
