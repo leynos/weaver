@@ -30,7 +30,7 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
       - Acceptance criteria: CLI command surface mirrors the design table,
         capability probe outputs the negotiated matrix, and JSONL framing is
         validated with golden tests.
-- [ ] Implement the `weaverd` daemon bootstrap that consumes the shared
+- [x] Implement the `weaverd` daemon bootstrap that consumes the shared
       configuration, starts the Semantic Fusion backends lazily, and supervises
       them with structured logging and error reporting.
       - Acceptance criteria: Bootstrap performs health reporting hooks,
