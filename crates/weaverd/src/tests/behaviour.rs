@@ -87,27 +87,38 @@ fn then_backend_start_fails(world: &RefCell<TestWorld>) {
     assert!(result.is_err(), "backend start succeeded unexpectedly");
 }
 
+/// Ensures the recording reporter captured the expected health event.
+///
+/// # Examples
+///
+/// ```ignore
+/// assert_event_recorded(&world, HealthEvent::BootstrapStarting, "event missing");
+/// ```
+fn assert_event_recorded(world: &RefCell<TestWorld>, event: HealthEvent, message: &str) {
+    let events = world.borrow().reporter.events();
+    assert!(
+        events.contains(&event),
+        "{message}: {events:?}",
+        message = message,
+        events = events
+    );
+}
+
 #[then("the reporter recorded bootstrap start")]
 fn then_reporter_start(world: &RefCell<TestWorld>) {
-    assert!(
-        world
-            .borrow()
-            .reporter
-            .events()
-            .contains(&HealthEvent::BootstrapStarting),
-        "bootstrap start event missing"
+    assert_event_recorded(
+        world,
+        HealthEvent::BootstrapStarting,
+        "bootstrap start event missing",
     );
 }
 
 #[then("the reporter recorded bootstrap success")]
 fn then_reporter_success(world: &RefCell<TestWorld>) {
-    assert!(
-        world
-            .borrow()
-            .reporter
-            .events()
-            .contains(&HealthEvent::BootstrapSucceeded),
-        "bootstrap success event missing"
+    assert_event_recorded(
+        world,
+        HealthEvent::BootstrapSucceeded,
+        "bootstrap success event missing",
     );
 }
 
