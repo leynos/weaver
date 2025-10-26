@@ -1,4 +1,4 @@
-//! Unit tests for the daemon bootstrap utilities.
+//! Tests that exercise the crate's public re-exports.
 
 use std::sync::Arc;
 
@@ -11,15 +11,15 @@ use super::support::{
 };
 
 #[rstest]
-fn bootstrap_does_not_eagerly_start_backends() {
+fn bootstrap_with_reexport_initialises_daemon() {
     let loader = TestConfigLoader::new();
     let reporter = Arc::new(RecordingHealthReporter::default());
     let provider = RecordingBackendProvider::default();
 
     let daemon = bootstrap_with(&loader, reporter.clone(), provider.clone())
         .expect("bootstrap should succeed");
-    assert!(daemon.config().daemon_socket().prepare_filesystem().is_ok());
 
+    assert!(daemon.config().daemon_socket().prepare_filesystem().is_ok());
     let events = reporter.events();
     assert!(events.contains(&HealthEvent::BootstrapStarting));
     assert!(events.contains(&HealthEvent::BootstrapSucceeded));
@@ -27,7 +27,7 @@ fn bootstrap_does_not_eagerly_start_backends() {
 }
 
 #[rstest]
-fn ensure_backend_starts_on_demand() {
+fn daemon_reexport_controls_backends() {
     let loader = TestConfigLoader::new();
     let reporter = Arc::new(RecordingHealthReporter::default());
     let provider = RecordingBackendProvider::default();
@@ -38,24 +38,4 @@ fn ensure_backend_starts_on_demand() {
         .ensure_backend(BackendKind::Semantic)
         .expect("backend should start");
     assert_eq!(provider.recorded_starts(), vec![BackendKind::Semantic]);
-    let events = reporter.events();
-    assert!(events.contains(&HealthEvent::BackendStarting(BackendKind::Semantic)));
-    assert!(events.contains(&HealthEvent::BackendReady(BackendKind::Semantic)));
-}
-
-#[rstest]
-fn ensure_backend_propagates_failures() {
-    let loader = TestConfigLoader::new();
-    let reporter = Arc::new(RecordingHealthReporter::default());
-    let provider = RecordingBackendProvider::default();
-    provider.fail_on(BackendKind::Relational, "deliberate failure");
-    let mut daemon = bootstrap_with(&loader, reporter.clone(), provider.clone())
-        .expect("bootstrap should succeed");
-
-    let error = daemon
-        .ensure_backend(BackendKind::Relational)
-        .expect_err("backend should fail");
-    assert_eq!(error.kind, BackendKind::Relational);
-    let events = reporter.events();
-    assert!(events.contains(&HealthEvent::BackendFailed(BackendKind::Relational)));
 }

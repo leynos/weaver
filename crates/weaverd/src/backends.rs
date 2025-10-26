@@ -153,11 +153,21 @@ impl<P> FusionBackends<P> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::{fixture, rstest};
     use weaver_config::SocketEndpoint;
 
     #[derive(Clone, Debug, Default)]
     struct RecordingProvider {
         calls: std::sync::Arc<std::sync::Mutex<Vec<BackendKind>>>,
+    }
+
+    impl RecordingProvider {
+        fn calls(&self) -> Vec<BackendKind> {
+            self.calls
+                .lock()
+                .expect("recording provider mutex poisoned")
+                .clone()
+        }
     }
 
     impl BackendProvider for RecordingProvider {
@@ -175,6 +185,7 @@ mod tests {
         }
     }
 
+    #[fixture]
     fn config() -> Config {
         Config {
             daemon_socket: SocketEndpoint::unix("/tmp/weaver-tests/socket.sock"),
@@ -182,12 +193,25 @@ mod tests {
         }
     }
 
-    #[test]
-    fn ensures_backend_starts_only_once() {
-        let provider = RecordingProvider::default();
-        let calls = provider.calls.clone();
-        let mut backends = FusionBackends::new(config(), provider);
+    #[fixture]
+    fn provider() -> RecordingProvider {
+        RecordingProvider::default()
+    }
 
+    #[fixture]
+    fn fusion_backends(
+        config: Config,
+        provider: RecordingProvider,
+    ) -> (FusionBackends<RecordingProvider>, RecordingProvider) {
+        let inspector = provider.clone();
+        (FusionBackends::new(config, provider), inspector)
+    }
+
+    #[rstest]
+    fn ensures_backend_starts_only_once(
+        fusion_backends: (FusionBackends<RecordingProvider>, RecordingProvider),
+    ) {
+        let (mut backends, inspector) = fusion_backends;
         backends
             .ensure_started(BackendKind::Semantic)
             .expect("start backend");
@@ -195,7 +219,6 @@ mod tests {
             .ensure_started(BackendKind::Semantic)
             .expect("start backend");
 
-        let calls = calls.lock().expect("recording provider mutex poisoned");
-        assert_eq!(calls.as_slice(), &[BackendKind::Semantic]);
+        assert_eq!(inspector.calls().as_slice(), &[BackendKind::Semantic]);
     }
 }

@@ -48,6 +48,13 @@ fn when_backend_requested(world: &RefCell<TestWorld>, backend: String) -> StepRe
     Ok(())
 }
 
+#[when("the {backend} backend is requested again")]
+fn when_backend_requested_again(world: &RefCell<TestWorld>, backend: String) -> StepResult {
+    let kind = parse_backend(&backend)?;
+    world.borrow_mut().request_backend(kind);
+    Ok(())
+}
+
 #[then("bootstrap succeeds")]
 fn then_bootstrap_succeeds(world: &RefCell<TestWorld>) {
     let world = world.borrow();
@@ -87,6 +94,16 @@ fn then_backend_start_fails(world: &RefCell<TestWorld>) {
     assert!(result.is_err(), "backend start succeeded unexpectedly");
 }
 
+#[then("starting the backend succeeds")]
+fn then_backend_start_succeeds(world: &RefCell<TestWorld>) {
+    let borrow = world.borrow();
+    let result = borrow.backend_result().expect("backend result missing");
+    assert!(
+        result.is_ok(),
+        "backend start failed unexpectedly: {result:?}"
+    );
+}
+
 /// Ensures the recording reporter captured the expected health event.
 ///
 /// # Examples
@@ -122,6 +139,28 @@ fn then_reporter_success(world: &RefCell<TestWorld>) {
     );
 }
 
+#[then("the reporter recorded backend start for {backend}")]
+fn then_reporter_backend_start(world: &RefCell<TestWorld>, backend: String) -> StepResult {
+    let kind = parse_backend(&backend)?;
+    assert_event_recorded(
+        world,
+        HealthEvent::BackendStarting(kind),
+        "backend start event missing",
+    );
+    Ok(())
+}
+
+#[then("the reporter recorded backend ready for {backend}")]
+fn then_reporter_backend_ready(world: &RefCell<TestWorld>, backend: String) -> StepResult {
+    let kind = parse_backend(&backend)?;
+    assert_event_recorded(
+        world,
+        HealthEvent::BackendReady(kind),
+        "backend ready event missing",
+    );
+    Ok(())
+}
+
 #[then("the reporter recorded bootstrap failure")]
 fn then_reporter_failure(world: &RefCell<TestWorld>) {
     let events = world.borrow().reporter.events();
@@ -144,6 +183,19 @@ fn then_reporter_backend_failure(world: &RefCell<TestWorld>, backend: String) ->
     } else {
         Err(format!(
             "backend failure event missing for {kind:?}: {events:?}"
+        ))
+    }
+}
+
+#[then("the backend was started exactly once for {backend}")]
+fn then_backend_started_once(world: &RefCell<TestWorld>, backend: String) -> StepResult {
+    let kind = parse_backend(&backend)?;
+    let starts = world.borrow().backend_starts();
+    if starts.as_slice() == [kind] {
+        Ok(())
+    } else {
+        Err(format!(
+            "expected single start for {kind:?}, got {starts:?}"
         ))
     }
 }

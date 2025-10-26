@@ -17,6 +17,17 @@ Feature: Daemon bootstrap
     And starting the backend fails
     And the reporter recorded backend failure for semantic
 
+  Scenario: Backend startup emits readiness events once
+    Given a healthy configuration loader
+    When the daemon bootstrap runs
+    And the semantic backend is requested
+    And the semantic backend is requested again
+    Then bootstrap succeeds
+    And starting the backend succeeds
+    And the reporter recorded backend start for semantic
+    And the reporter recorded backend ready for semantic
+    And the backend was started exactly once for semantic
+
   Scenario: Configuration failures are reported
     Given a failing configuration loader
     When the daemon bootstrap runs

@@ -7,6 +7,39 @@ use crate::bootstrap::BootstrapError;
 
 use weaver_config::Config;
 
+const HEALTH_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::health");
+
+macro_rules! info_event {
+    ($($rest:tt)*) => {
+        tracing::info!(target: HEALTH_TARGET, $($rest)*);
+    };
+}
+
+macro_rules! error_event {
+    ($($rest:tt)*) => {
+        tracing::error!(target: HEALTH_TARGET, $($rest)*);
+    };
+}
+
+macro_rules! impl_arc_health_reporter {
+    (
+        $(
+            fn $method:ident( $( $arg:ident : $ty:ty ),* );
+        )*
+    ) => {
+        impl<T> HealthReporter for Arc<T>
+        where
+            T: HealthReporter,
+        {
+            $(
+                fn $method(&self, $( $arg: $ty ),*) {
+                    (**self).$method($( $arg ),*);
+                }
+            )*
+        }
+    };
+}
+
 /// Observer trait used to surface lifecycle events to telemetry sinks.
 pub trait HealthReporter: Send + Sync {
     /// Invoked before configuration loading begins.
@@ -28,33 +61,13 @@ pub trait HealthReporter: Send + Sync {
     fn backend_failed(&self, error: &BackendStartupError);
 }
 
-impl<T> HealthReporter for Arc<T>
-where
-    T: HealthReporter,
-{
-    fn bootstrap_starting(&self) {
-        (**self).bootstrap_starting();
-    }
-
-    fn bootstrap_succeeded(&self, config: &Config) {
-        (**self).bootstrap_succeeded(config);
-    }
-
-    fn bootstrap_failed(&self, error: &BootstrapError) {
-        (**self).bootstrap_failed(error);
-    }
-
-    fn backend_starting(&self, kind: BackendKind) {
-        (**self).backend_starting(kind);
-    }
-
-    fn backend_ready(&self, kind: BackendKind) {
-        (**self).backend_ready(kind);
-    }
-
-    fn backend_failed(&self, error: &BackendStartupError) {
-        (**self).backend_failed(error);
-    }
+impl_arc_health_reporter! {
+    fn bootstrap_starting();
+    fn bootstrap_succeeded(config: &Config);
+    fn bootstrap_failed(error: &BootstrapError);
+    fn backend_starting(kind: BackendKind);
+    fn backend_ready(kind: BackendKind);
+    fn backend_failed(error: &BackendStartupError);
 }
 
 /// Default reporter that records lifecycle events using `tracing`.
@@ -71,16 +84,11 @@ impl StructuredHealthReporter {
 
 impl HealthReporter for StructuredHealthReporter {
     fn bootstrap_starting(&self) {
-        tracing::info!(
-            target: "weaverd::health",
-            event = "bootstrap_starting",
-            "starting daemon bootstrap"
-        );
+        info_event!(event = "bootstrap_starting", "starting daemon bootstrap");
     }
 
     fn bootstrap_succeeded(&self, config: &Config) {
-        tracing::info!(
-            target: "weaverd::health",
+        info_event!(
             event = "bootstrap_succeeded",
             socket = %config.daemon_socket(),
             log_filter = %config.log_filter(),
@@ -90,35 +98,19 @@ impl HealthReporter for StructuredHealthReporter {
     }
 
     fn bootstrap_failed(&self, error: &BootstrapError) {
-        tracing::error!(
-            target: "weaverd::health",
-            event = "bootstrap_failed",
-            error = %error,
-            "daemon bootstrap failed"
-        );
+        error_event!(event = "bootstrap_failed", error = %error, "daemon bootstrap failed");
     }
 
     fn backend_starting(&self, kind: BackendKind) {
-        tracing::info!(
-            target: "weaverd::health",
-            event = "backend_starting",
-            backend = %kind,
-            "starting backend"
-        );
+        info_event!(event = "backend_starting", backend = %kind, "starting backend");
     }
 
     fn backend_ready(&self, kind: BackendKind) {
-        tracing::info!(
-            target: "weaverd::health",
-            event = "backend_ready",
-            backend = %kind,
-            "backend ready"
-        );
+        info_event!(event = "backend_ready", backend = %kind, "backend ready");
     }
 
     fn backend_failed(&self, error: &BackendStartupError) {
-        tracing::error!(
-            target: "weaverd::health",
+        error_event!(
             event = "backend_failed",
             backend = %error.kind,
             message = %error.message(),

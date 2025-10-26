@@ -8,49 +8,30 @@
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use weaver_config::Config;
+use weaverd::{StructuredHealthReporter, SystemConfigLoader, bootstrap_with};
 
-use weaverd::{
-    BackendKind, BackendProvider, BackendStartupError, StructuredHealthReporter,
-    SystemConfigLoader, bootstrap_with,
-};
+mod placeholder_provider;
+
+const BOOTSTRAP_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::bootstrap");
 
 fn main() -> ExitCode {
     let reporter = Arc::new(StructuredHealthReporter::new());
-    let provider = NoopBackendProvider;
+    let provider = placeholder_provider::NoopBackendProvider;
     match bootstrap_with(&SystemConfigLoader, reporter, provider) {
         Ok(_daemon) => {
             tracing::info!(
-                target: "weaverd::bootstrap",
+                target: BOOTSTRAP_TARGET,
                 "daemon bootstrap completed; command loop not yet initialised"
             );
             ExitCode::SUCCESS
         }
         Err(error) => {
             tracing::error!(
-                target: "weaverd::bootstrap",
+                target: BOOTSTRAP_TARGET,
                 error = %error,
                 "daemon bootstrap failed"
             );
             ExitCode::FAILURE
         }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-struct NoopBackendProvider;
-
-impl BackendProvider for NoopBackendProvider {
-    fn start_backend(
-        &self,
-        kind: BackendKind,
-        _config: &Config,
-    ) -> Result<(), BackendStartupError> {
-        tracing::warn!(
-            target: "weaverd::backends",
-            backend = %kind,
-            "backend start requested but not yet implemented"
-        );
-        Ok(())
     }
 }

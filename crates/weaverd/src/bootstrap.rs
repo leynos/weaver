@@ -11,6 +11,19 @@ use crate::backends::{BackendKind, BackendProvider, BackendStartupError, FusionB
 use crate::health::HealthReporter;
 use crate::telemetry::{self, TelemetryError, TelemetryHandle};
 
+macro_rules! try_bootstrap {
+    ($reporter:expr, $expr:expr => $variant:ident) => {{
+        match $expr {
+            Ok(value) => value,
+            Err(source) => {
+                let error = BootstrapError::$variant { source };
+                $reporter.bootstrap_failed(&error);
+                return Err(error);
+            }
+        }
+    }};
+}
+
 /// Trait abstracting configuration loading for testability.
 pub trait ConfigLoader: Send + Sync {
     /// Loads the daemon configuration.
@@ -121,29 +134,11 @@ where
 {
     reporter.bootstrap_starting();
 
-    let config = match loader.load() {
-        Ok(config) => config,
-        Err(source) => {
-            let error = BootstrapError::Configuration { source };
-            reporter.bootstrap_failed(&error);
-            return Err(error);
-        }
-    };
+    let config = try_bootstrap!(reporter, loader.load() => Configuration);
 
-    let telemetry = match telemetry::initialise(&config) {
-        Ok(handle) => handle,
-        Err(source) => {
-            let error = BootstrapError::Telemetry { source };
-            reporter.bootstrap_failed(&error);
-            return Err(error);
-        }
-    };
+    let telemetry = try_bootstrap!(reporter, telemetry::initialise(&config) => Telemetry);
 
-    if let Err(source) = config.daemon_socket().prepare_filesystem() {
-        let error = BootstrapError::Socket { source };
-        reporter.bootstrap_failed(&error);
-        return Err(error);
-    }
+    try_bootstrap!(reporter, config.daemon_socket().prepare_filesystem() => Socket);
 
     let backends = FusionBackends::new(config.clone(), provider);
     reporter.bootstrap_succeeded(&config);
