@@ -7,14 +7,11 @@ use weaver_config::Config;
 
 const HEALTH_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::health");
 
-macro_rules! info_event {
-    ($($rest:tt)*) => {
+macro_rules! health_event {
+    (info, $($rest:tt)*) => {
         tracing::info!(target: HEALTH_TARGET, $($rest)*);
     };
-}
-
-macro_rules! error_event {
-    ($($rest:tt)*) => {
+    (error, $($rest:tt)*) => {
         tracing::error!(target: HEALTH_TARGET, $($rest)*);
     };
 }
@@ -54,11 +51,16 @@ impl StructuredHealthReporter {
 
 impl HealthReporter for StructuredHealthReporter {
     fn bootstrap_starting(&self) {
-        info_event!(event = "bootstrap_starting", "starting daemon bootstrap");
+        health_event!(
+            info,
+            event = "bootstrap_starting",
+            "starting daemon bootstrap"
+        );
     }
 
     fn bootstrap_succeeded(&self, config: &Config) {
-        info_event!(
+        health_event!(
+            info,
             event = "bootstrap_succeeded",
             socket = %config.daemon_socket(),
             log_filter = %config.log_filter(),
@@ -68,19 +70,25 @@ impl HealthReporter for StructuredHealthReporter {
     }
 
     fn bootstrap_failed(&self, error: &BootstrapError) {
-        error_event!(event = "bootstrap_failed", error = %error, "daemon bootstrap failed");
+        health_event!(
+            error,
+            event = "bootstrap_failed",
+            error = %error,
+            "daemon bootstrap failed"
+        );
     }
 
     fn backend_starting(&self, kind: BackendKind) {
-        info_event!(event = "backend_starting", backend = %kind, "starting backend");
+        health_event!(info, event = "backend_starting", backend = %kind, "starting backend");
     }
 
     fn backend_ready(&self, kind: BackendKind) {
-        info_event!(event = "backend_ready", backend = %kind, "backend ready");
+        health_event!(info, event = "backend_ready", backend = %kind, "backend ready");
     }
 
     fn backend_failed(&self, error: &BackendStartupError) {
-        error_event!(
+        health_event!(
+            error,
             event = "backend_failed",
             backend = %error.kind,
             message = %error.message(),
