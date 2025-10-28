@@ -31,6 +31,7 @@ fn main() -> ExitCode {
                 error = %error,
                 "daemon bootstrap failed"
             );
+            eprintln!("daemon bootstrap failed: {error}");
             ExitCode::FAILURE
         }
     }
