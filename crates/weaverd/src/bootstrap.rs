@@ -109,10 +109,15 @@ where
 {
     /// Ensures the specified backend is running, starting it on demand.
     pub fn ensure_backend(&mut self, kind: BackendKind) -> Result<(), BackendStartupError> {
-        self.reporter.backend_starting(kind);
+        let starting = !self.backends.is_started(kind);
+        if starting {
+            self.reporter.backend_starting(kind);
+        }
         match self.backends.ensure_started(kind) {
             Ok(()) => {
-                self.reporter.backend_ready(kind);
+                if starting {
+                    self.reporter.backend_ready(kind);
+                }
                 Ok(())
             }
             Err(error) => {

@@ -92,7 +92,7 @@ impl HealthReporter for StructuredHealthReporter {
             event = "backend_failed",
             backend = %error.kind,
             message = %error.message(),
-            error = ?error,
+            error = %error,
             "backend failed to start"
         );
     }

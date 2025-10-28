@@ -25,6 +25,29 @@ pub enum TelemetryError {
 }
 
 /// Configures the global tracing subscriber when invoked for the first time.
+///
+/// Repeated calls are idempotent: the first invocation installs the global
+/// subscriber. Subsequent invocations return a fresh [`TelemetryHandle`]
+/// without touching the global state again.
+///
+/// # Examples
+///
+/// ```rust
+/// use weaver_config::Config;
+/// use weaverd::telemetry;
+///
+/// # fn main() -> Result<(), weaverd::telemetry::TelemetryError> {
+/// let config = Config::default();
+/// let first = telemetry::initialise(&config)?;
+/// let second = telemetry::initialise(&config)?;
+///
+/// // Both handles remain usable; only the first call installs
+/// // telemetry.
+/// drop(first);
+/// drop(second);
+/// # Ok(())
+/// # }
+/// ```
 pub fn initialise(config: &Config) -> Result<TelemetryHandle, TelemetryError> {
     TELEMETRY_GUARD
         .get_or_try_init(|| install_subscriber(config))
@@ -43,6 +66,11 @@ fn install_subscriber(config: &Config) -> Result<(), TelemetryError> {
             .with_thread_ids(false)
             .with_thread_names(false)
             .with_writer(std::io::stderr)
+            // Avoid stray colour codes in non-TTY sinks while keeping colour
+            // on interactive terminals.
+            .with_ansi(atty::is(atty::Stream::Stderr))
+            // Add a timestamp so operators can correlate daemon activity.
+            .with_timer(tracing_subscriber::fmt::time::UtcTime::rfc_3339())
     };
 
     let subscriber: Box<dyn Subscriber + Send + Sync> = match config.log_format() {
