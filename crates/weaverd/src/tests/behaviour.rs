@@ -187,9 +187,15 @@ fn then_reporter_failure(world: &RefCell<TestWorld>) {
 fn then_reporter_backend_failure(world: &RefCell<TestWorld>, backend: String) -> StepResult {
     let kind = parse_backend(&backend)?;
     let events = world.borrow().reporter.events();
-    let failed = events
-        .iter()
-        .any(|event| matches!(event, HealthEvent::BackendFailed(recorded) if *recorded == kind));
+    let failed = events.iter().any(|event| {
+        matches!(
+            event,
+            HealthEvent::BackendFailed {
+                kind: recorded,
+                ..
+            } if *recorded == kind
+        )
+    });
     if failed {
         Ok(())
     } else {

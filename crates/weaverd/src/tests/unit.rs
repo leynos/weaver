@@ -55,5 +55,8 @@ fn ensure_backend_propagates_failures() {
         .expect_err("backend should fail");
     assert_eq!(error.kind, BackendKind::Relational);
     let events = reporter.events();
-    assert!(events.contains(&HealthEvent::BackendFailed(BackendKind::Relational)));
+    assert!(events.contains(&HealthEvent::BackendFailed {
+        kind: BackendKind::Relational,
+        message: "deliberate failure".to_owned(),
+    }));
 }

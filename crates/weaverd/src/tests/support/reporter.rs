@@ -1,3 +1,8 @@
+//! Test double for [`HealthReporter`] that records structured events for assertions.
+//!
+//! The recorder captures the daemon lifecycle telemetry emitted during bootstrap
+//! and backend orchestration so behaviour tests can validate observable events.
+
 use std::sync::Mutex;
 
 use crate::backends::{BackendKind, BackendStartupError};
@@ -19,8 +24,8 @@ pub enum HealthEvent {
     BackendStarting(BackendKind),
     /// Backend started successfully.
     BackendReady(BackendKind),
-    /// Backend failed to start.
-    BackendFailed(BackendKind),
+    /// Backend failed to start with a message.
+    BackendFailed { kind: BackendKind, message: String },
 }
 
 /// Records health events for assertions.
@@ -31,6 +36,7 @@ pub struct RecordingHealthReporter {
 
 impl RecordingHealthReporter {
     /// Captures a copy of the recorded events.
+    #[must_use]
     pub fn events(&self) -> Vec<HealthEvent> {
         self.events
             .lock()
@@ -68,6 +74,9 @@ impl HealthReporter for RecordingHealthReporter {
     }
 
     fn backend_failed(&self, error: &BackendStartupError) {
-        self.record(HealthEvent::BackendFailed(error.kind));
+        self.record(HealthEvent::BackendFailed {
+            kind: error.kind,
+            message: error.message().to_owned(),
+        });
     }
 }

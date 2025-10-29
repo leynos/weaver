@@ -23,6 +23,7 @@ impl TestConfigLoader {
         }
     }
 
+    #[must_use]
     fn socket_path(&self) -> String {
         let dir = self
             .socket_dir

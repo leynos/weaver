@@ -85,11 +85,13 @@ impl TestWorld {
     }
 
     /// Returns a snapshot of recorded backend starts.
+    #[must_use]
     pub fn backend_starts(&self) -> Vec<BackendKind> {
         self.provider.recorded_starts()
     }
 
     /// Returns the last backend result, if any.
+    #[must_use]
     pub fn backend_result(&self) -> Option<&Result<(), BackendStartupError>> {
         self.backend_result.as_ref()
     }
