@@ -1,6 +1,7 @@
 //! Structured telemetry initialisation for the daemon.
 
-use atty::Stream;
+use std::io::{self, IsTerminal};
+
 use once_cell::sync::OnceCell;
 use tracing::{Subscriber, subscriber::SetGlobalDefaultError};
 use tracing_subscriber::EnvFilter;
@@ -66,10 +67,10 @@ fn install_subscriber(config: &Config) -> Result<(), TelemetryError> {
             .with_level(true)
             .with_thread_ids(false)
             .with_thread_names(false)
-            .with_writer(std::io::stderr)
+            .with_writer(io::stderr)
             // Avoid stray colour codes in non-TTY sinks while keeping colour on
             // interactive terminals.
-            .with_ansi(atty::is(Stream::Stderr))
+            .with_ansi(io::stderr().is_terminal())
             // Add a timestamp so operators can correlate daemon activity.
             .with_timer(tracing_subscriber::fmt::time::UtcTime::rfc_3339())
     };

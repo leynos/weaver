@@ -121,6 +121,21 @@ fn assert_event_recorded(world: &RefCell<TestWorld>, event: HealthEvent, message
     );
 }
 
+/// Parses the backend identifier and asserts the reporter observed the event.
+fn assert_backend_event<F>(
+    world: &RefCell<TestWorld>,
+    backend: String,
+    event: F,
+    message: &str,
+) -> StepResult
+where
+    F: FnOnce(BackendKind) -> HealthEvent,
+{
+    let kind = parse_backend(&backend)?;
+    assert_event_recorded(world, event(kind), message);
+    Ok(())
+}
+
 #[then("the reporter recorded bootstrap start")]
 fn then_reporter_start(world: &RefCell<TestWorld>) {
     assert_event_recorded(
@@ -141,24 +156,22 @@ fn then_reporter_success(world: &RefCell<TestWorld>) {
 
 #[then("the reporter recorded backend start for {backend}")]
 fn then_reporter_backend_start(world: &RefCell<TestWorld>, backend: String) -> StepResult {
-    let kind = parse_backend(&backend)?;
-    assert_event_recorded(
+    assert_backend_event(
         world,
-        HealthEvent::BackendStarting(kind),
+        backend,
+        HealthEvent::BackendStarting,
         "backend start event missing",
-    );
-    Ok(())
+    )
 }
 
 #[then("the reporter recorded backend ready for {backend}")]
 fn then_reporter_backend_ready(world: &RefCell<TestWorld>, backend: String) -> StepResult {
-    let kind = parse_backend(&backend)?;
-    assert_event_recorded(
+    assert_backend_event(
         world,
-        HealthEvent::BackendReady(kind),
+        backend,
+        HealthEvent::BackendReady,
         "backend ready event missing",
-    );
-    Ok(())
+    )
 }
 
 #[then("the reporter recorded bootstrap failure")]
@@ -174,10 +187,9 @@ fn then_reporter_failure(world: &RefCell<TestWorld>) {
 fn then_reporter_backend_failure(world: &RefCell<TestWorld>, backend: String) -> StepResult {
     let kind = parse_backend(&backend)?;
     let events = world.borrow().reporter.events();
-    let failed = events.iter().any(|event| match event {
-        HealthEvent::BackendFailed(recorded) => *recorded == kind,
-        _ => false,
-    });
+    let failed = events
+        .iter()
+        .any(|event| matches!(event, HealthEvent::BackendFailed(recorded) if *recorded == kind));
     if failed {
         Ok(())
     } else {
@@ -202,7 +214,8 @@ fn then_backend_started_once(world: &RefCell<TestWorld>, backend: String) -> Ste
 
 #[scenario(path = "tests/features/daemon_bootstrap.feature")]
 fn daemon_bootstrap(world: RefCell<TestWorld>) -> StepResult {
-    let _ = world;
+    // Keep the `world` parameter so `rstest_bdd` wires the fixture correctly.
+    drop(world);
     Ok(())
 }
 

@@ -1,3 +1,6 @@
+//! Test backend provider: records start requests and supports injected
+//! failures for BDD scenarios.
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
