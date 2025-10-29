@@ -87,6 +87,8 @@ impl HealthReporter for StructuredHealthReporter {
     }
 
     fn backend_failed(&self, error: &BackendStartupError) {
+        // Emit the backend error using `Display` to match the
+        // `bootstrap_failed` schema field format.
         health_event!(
             error,
             event = "backend_failed",
