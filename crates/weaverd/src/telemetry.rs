@@ -1,5 +1,6 @@
 //! Structured telemetry initialisation for the daemon.
 
+use atty::Stream;
 use once_cell::sync::OnceCell;
 use tracing::{Subscriber, subscriber::SetGlobalDefaultError};
 use tracing_subscriber::EnvFilter;
@@ -27,8 +28,8 @@ pub enum TelemetryError {
 /// Configures the global tracing subscriber when invoked for the first time.
 ///
 /// Repeated calls are idempotent: the first invocation installs the global
-/// subscriber. Subsequent invocations return a fresh [`TelemetryHandle`]
-/// without touching the global state again.
+/// subscriber. Subsequent invocations detect the existing registration and
+/// return a fresh [`TelemetryHandle`] without touching the global state again.
 ///
 /// # Examples
 ///
@@ -66,15 +67,19 @@ fn install_subscriber(config: &Config) -> Result<(), TelemetryError> {
             .with_thread_ids(false)
             .with_thread_names(false)
             .with_writer(std::io::stderr)
-            // Avoid stray colour codes in non-TTY sinks while keeping colour
-            // on interactive terminals.
-            .with_ansi(atty::is(atty::Stream::Stderr))
+            // Avoid stray colour codes in non-TTY sinks while keeping colour on
+            // interactive terminals.
+            .with_ansi(atty::is(Stream::Stderr))
             // Add a timestamp so operators can correlate daemon activity.
             .with_timer(tracing_subscriber::fmt::time::UtcTime::rfc_3339())
     };
 
     let subscriber: Box<dyn Subscriber + Send + Sync> = match config.log_format() {
-        LogFormat::Json => Box::new(builder(filter.clone()).json().flatten_event(true).finish()),
+        LogFormat::Json => {
+            let json_builder = builder(filter.clone()).json();
+            let json = json_builder.flatten_event(true).finish();
+            Box::new(json)
+        }
         LogFormat::Compact => Box::new(builder(filter).compact().finish()),
     };
 
