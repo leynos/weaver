@@ -29,7 +29,7 @@ pub enum HealthEvent {
 }
 
 /// Records health events for assertions.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct RecordingHealthReporter {
     events: Mutex<Vec<HealthEvent>>,
 }
