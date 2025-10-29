@@ -2,5 +2,6 @@
 
 mod behaviour;
 mod lib_api;
+mod process_behaviour;
 mod support;
 mod unit;

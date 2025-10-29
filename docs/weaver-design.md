@@ -347,6 +347,22 @@ through a `StructuredHealthReporter` that records `bootstrap_starting`,
 events are logged as structured traces, matching the roadmap's requirement for
 supervised backends.
 
+Process supervision now enforces the singleton contract described in the
+roadmap. A dedicated `ProcessGuard` claims a lock file (`weaverd.lock`) under
+the runtime directory before any work begins. If the lock already exists the
+guard reads the peer's PID from `weaverd.pid` and probes the process using
+`kill(pid, 0)`. Live peers cause the launch to abort, while stale artefacts are
+removed before retrying. Successful launches then background the daemon via
+`daemonize-me`, write the current PID, and publish a JSON health snapshot to
+`weaverd.health`. The snapshot records the lifecycle state (`starting`,
+`ready`, `stopping`), the PID, and a UNIX timestamp so external probes can
+consume the same readiness signal as the CLI. A `SystemShutdownSignal` built on
+`signal-hook` listens for `SIGTERM`, `SIGINT`, `SIGQUIT`, and `SIGHUP`, logging
+the event and giving the runtime a ten-second budget to shut down gracefully.
+Developers can opt into a foreground mode for debugging by setting the
+`WEAVER_FOREGROUND` environment variable, which bypasses daemonisation while
+preserving the same PID/lock/health choreography.
+
 Semantic Fusion backends are modelled as a `FusionBackends` registry. Each
 backend starts lazily via `ensure_backend`, keeping the process lightweight
 until a command requires a specific capability. The supervisor records whether
