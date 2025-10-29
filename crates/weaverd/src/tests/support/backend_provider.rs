@@ -22,6 +22,7 @@ impl RecordingBackendProvider {
     }
 
     /// Returns all backends that were requested.
+    #[must_use]
     pub fn recorded_starts(&self) -> Vec<BackendKind> {
         let state = self.state.lock().expect("backend state mutex poisoned");
         state.starts.clone()
@@ -30,11 +31,13 @@ impl RecordingBackendProvider {
 
 impl BackendProvider for RecordingBackendProvider {
     fn start_backend(&self, kind: BackendKind, config: &Config) -> Result<(), BackendStartupError> {
-        let mut state = self.state.lock().expect("backend state mutex poisoned");
-        state.starts.push(kind);
-        if let Some(message) = state.failures.get(&kind) {
-            let error = BackendStartupError::new(kind, message.clone());
-            return Err(error);
+        let failure = {
+            let mut state = self.state.lock().expect("backend state mutex poisoned");
+            state.starts.push(kind);
+            state.failures.get(&kind).cloned()
+        };
+        if let Some(message) = failure {
+            return Err(BackendStartupError::new(kind, message));
         }
         // Touch the configuration in tests to ensure it is fully initialised.
         let _ = config.log_filter();

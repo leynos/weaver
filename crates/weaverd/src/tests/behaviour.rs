@@ -213,9 +213,7 @@ fn then_backend_started_once(world: &RefCell<TestWorld>, backend: String) -> Ste
 }
 
 #[scenario(path = "tests/features/daemon_bootstrap.feature")]
-fn daemon_bootstrap(world: RefCell<TestWorld>) -> StepResult {
-    // Keep the `world` parameter so `rstest_bdd` wires the fixture correctly.
-    drop(world);
+fn daemon_bootstrap(#[from(world)] _: RefCell<TestWorld>) -> StepResult {
     Ok(())
 }
 

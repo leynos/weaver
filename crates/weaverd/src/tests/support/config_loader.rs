@@ -1,3 +1,5 @@
+//! Test configuration loaders for scenarios covering success and failure paths.
+//!
 use std::ffi::OsString;
 use std::sync::{Arc, Mutex};
 

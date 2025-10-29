@@ -181,6 +181,7 @@ impl<P> FusionBackends<P> {
 mod tests {
     use super::*;
     use rstest::{fixture, rstest};
+    use std::sync::{Arc, Mutex};
     use weaver_config::SocketEndpoint;
 
     #[derive(Clone, Debug, Default)]
@@ -247,5 +248,49 @@ mod tests {
             .expect("start backend");
 
         assert_eq!(inspector.calls().as_slice(), &[BackendKind::Semantic]);
+    }
+
+    #[derive(Clone, Debug, Default)]
+    struct FailingProvider {
+        calls: Arc<Mutex<usize>>,
+    }
+
+    impl FailingProvider {
+        fn calls(&self) -> usize {
+            *self.calls.lock().expect("failing provider mutex poisoned")
+        }
+    }
+
+    impl BackendProvider for FailingProvider {
+        fn start_backend(
+            &self,
+            kind: BackendKind,
+            _config: &Config,
+        ) -> Result<(), BackendStartupError> {
+            let mut calls = self.calls.lock().expect("failing provider mutex poisoned");
+            *calls += 1;
+            Err(BackendStartupError::new(
+                kind,
+                "deliberate failure for retry assertion",
+            ))
+        }
+    }
+
+    #[rstest]
+    fn retries_after_failure_and_does_not_mark_started(config: Config) {
+        let provider = FailingProvider::default();
+        let mut backends = FusionBackends::new(config, provider.clone());
+
+        let error = backends
+            .ensure_started(BackendKind::Semantic)
+            .expect_err("first failure should surface");
+        assert_eq!(error.kind, BackendKind::Semantic);
+        assert!(!backends.is_started(BackendKind::Semantic));
+        assert_eq!(provider.calls(), 1);
+
+        let second = backends.ensure_started(BackendKind::Semantic);
+        assert!(second.is_err(), "failures must not be cached as success");
+        assert_eq!(provider.calls(), 2, "provider should be retried");
+        assert!(!backends.is_started(BackendKind::Semantic));
     }
 }

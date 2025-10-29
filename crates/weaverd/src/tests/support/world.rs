@@ -1,3 +1,5 @@
+//! BDD test world: encapsulates loader, reporter, provider, and daemon/bootstrap state for step functions.
+//!
 use std::cell::RefCell;
 use std::sync::Arc;
 
@@ -62,6 +64,7 @@ impl TestWorld {
     }
 
     /// Returns whether bootstrap produced an error.
+    #[must_use]
     pub fn bootstrap_error(&self) -> Option<&BootstrapError> {
         self.bootstrap_error.as_ref()
     }
