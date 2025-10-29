@@ -330,6 +330,31 @@ language and capability pair. These directives merge with the daemon's runtime
 discovery to produce the negotiated capability surface exposed by
 `weaver --capabilities`.
 
+#### 2.3.2. Daemon bootstrap decisions
+
+The initial daemon bootstrap focuses on observability and safety. The
+implementation introduces a `ConfigLoader` trait so the production loader and
+tests share a common interface while avoiding global environment mutation. The
+bootstrap harness uses this trait to inject failing loaders in behavioural
+tests, proving that configuration errors propagate as structured events.
+
+Structured telemetry is configured through `tracing` and `tracing-subscriber`.
+The daemon installs a global subscriber once per process using a `OnceCell`
+guard. The log filter and format derive from the shared configuration, so the
+CLI and daemon emit consistent JSON or compact output. Health reporting flows
+through a `StructuredHealthReporter` that records `bootstrap_starting`,
+`bootstrap_succeeded`, `bootstrap_failed`, and backend lifecycle events. These
+events are logged as structured traces, matching the roadmap's requirement for
+supervised backends.
+
+Semantic Fusion backends are modelled as a `FusionBackends` registry. Each
+backend starts lazily via `ensure_backend`, keeping the process lightweight
+until a command requires a specific capability. The supervisor records whether
+a backend has already started and surfaces errors using a dedicated
+`BackendStartupError`. Behavioural tests exercise both successful and failing
+paths, ensuring that lazy initialisation and error propagation behave as
+designed.
+
 ## 3. Core Components: A Technical Deep Dive
 
 This section provides a detailed examination of the core technologies that

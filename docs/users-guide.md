@@ -81,6 +81,16 @@ socket exists, returning a descriptive error if the directory cannot be
 created. This prevents silent failures later when the daemon attempts to bind
 the socket.
 
+During bootstrap, the daemon emits structured telemetry using `tracing`. Events
+named `bootstrap_starting`, `bootstrap_succeeded`, and `bootstrap_failed` make
+the lifecycle visible in observability pipelines. The output format (JSON or
+compact) respects the shared configuration, so operators see consistent logs
+between the CLI and daemon. Semantic Fusion backends are started lazily: the
+first request for a backend triggers a `backend_starting` event, followed by
+either `backend_ready` or `backend_failed`. This keeps the daemon lightweight
+until specific capabilities are required, while still surfacing failures as
+structured events.
+
 ## Command usage
 
 `weaver` expects commands to be specified as a two-level verb pair. The first
