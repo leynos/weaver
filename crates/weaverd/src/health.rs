@@ -102,6 +102,7 @@ impl HealthReporter for StructuredHealthReporter {
     }
 }
 
+#[inline]
 fn display_error<E>(error: &E) -> tracing::field::DisplayValue<&E>
 where
     E: fmt::Display + ?Sized,
