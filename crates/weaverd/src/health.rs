@@ -102,6 +102,7 @@ impl HealthReporter for StructuredHealthReporter {
     }
 }
 
+/// Wraps an error reference so tracing records its `Display` representation.
 #[inline]
 fn display_error<E>(error: &E) -> tracing::field::DisplayValue<&E>
 where
