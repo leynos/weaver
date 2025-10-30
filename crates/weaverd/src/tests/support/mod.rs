@@ -2,10 +2,14 @@
 
 mod backend_provider;
 mod config_loader;
+mod process_world;
 mod reporter;
 mod world;
 
 pub use backend_provider::RecordingBackendProvider;
-pub use config_loader::TestConfigLoader;
+pub use config_loader::{FailingConfigLoader, TestConfigLoader};
+pub use process_world::{
+    POLL_INTERVAL, ProcessTestWorld, StepResult, WAIT_TIMEOUT, snapshot_status,
+};
 pub use reporter::{HealthEvent, RecordingHealthReporter};
 pub use world::{TestWorld, world};

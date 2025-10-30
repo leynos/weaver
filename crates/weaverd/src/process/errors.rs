@@ -62,6 +62,14 @@ pub enum LaunchError {
         /// PID recorded in the existing PID file.
         pid: u32,
     },
+    /// Another launch is still initialising the runtime artefacts.
+    #[error("daemon launch already in progress (lock: '{lock}', pid: '{pid}')")]
+    StartupInProgress {
+        /// Lock file guarding the active launch.
+        lock: PathBuf,
+        /// PID file expected from the active launch.
+        pid: PathBuf,
+    },
     /// Removing a stale runtime artefact failed.
     #[error("failed to remove stale file '{path}': {source}")]
     Cleanup {

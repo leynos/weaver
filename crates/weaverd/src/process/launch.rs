@@ -35,6 +35,16 @@ impl LaunchMode {
     }
 }
 
+/// Collaborators required to launch the daemon runtime.
+pub(crate) struct LaunchPlan<L, P, D, S> {
+    pub(crate) mode: LaunchMode,
+    pub(crate) loader: L,
+    pub(crate) reporter: Arc<dyn HealthReporter>,
+    pub(crate) provider: P,
+    pub(crate) daemonizer: D,
+    pub(crate) shutdown: S,
+}
+
 /// Runs the daemon using the production collaborators.
 pub fn run_daemon() -> Result<(), LaunchError> {
     let mode = LaunchMode::detect();
@@ -42,35 +52,34 @@ pub fn run_daemon() -> Result<(), LaunchError> {
     let provider = NoopBackendProvider;
     let daemonizer = SystemDaemonizer::new();
     let shutdown = SystemShutdownSignal::new(SHUTDOWN_TIMEOUT);
-    run_daemon_with(
+    let plan = LaunchPlan {
         mode,
-        &SystemConfigLoader,
+        loader: SystemConfigLoader,
         reporter,
         provider,
         daemonizer,
         shutdown,
-    )
+    };
+    run_daemon_with(plan)
 }
 
 /// Runs the daemon with injected collaborators.
-#[allow(clippy::too_many_arguments)]
-// The daemon runtime is assembled from orthogonal collaborators so tests can
-// swap each piece independently. Grouping them into a struct would obscure the
-// call site without reducing complexity.
-pub(crate) fn run_daemon_with<P, L, D, S>(
-    mode: LaunchMode,
-    loader: &L,
-    reporter: Arc<dyn HealthReporter>,
-    provider: P,
-    daemonizer: D,
-    shutdown: S,
-) -> Result<(), LaunchError>
+pub(crate) fn run_daemon_with<L, P, D, S>(plan: LaunchPlan<L, P, D, S>) -> Result<(), LaunchError>
 where
     P: BackendProvider,
     L: ConfigLoader,
     D: Daemonizer,
     S: ShutdownSignal,
 {
+    let LaunchPlan {
+        mode,
+        loader,
+        reporter,
+        provider,
+        daemonizer,
+        shutdown,
+    } = plan;
+
     info!(
         target: PROCESS_TARGET,
         ?mode,
