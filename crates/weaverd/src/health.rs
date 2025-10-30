@@ -3,6 +3,8 @@
 use crate::backends::{BackendKind, BackendStartupError};
 use crate::bootstrap::BootstrapError;
 
+use std::fmt;
+
 use weaver_config::Config;
 
 const HEALTH_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::health");
@@ -73,7 +75,7 @@ impl HealthReporter for StructuredHealthReporter {
         health_event!(
             error,
             event = "bootstrap_failed",
-            error = %error,
+            error = display_error(error),
             "daemon bootstrap failed"
         );
     }
@@ -86,14 +88,25 @@ impl HealthReporter for StructuredHealthReporter {
         health_event!(info, event = "backend_ready", backend = %kind, "backend ready");
     }
 
+    /// Emits the backend error using `Display` to match the
+    /// `bootstrap_failed` schema field format.
     fn backend_failed(&self, error: &BackendStartupError) {
         health_event!(
             error,
             event = "backend_failed",
             backend = %error.kind,
             message = %error.message(),
-            error = %error,
+            error = display_error(error),
             "backend failed to start"
         );
     }
+}
+
+/// Wraps an error reference so tracing records its `Display` representation.
+#[inline]
+fn display_error<E>(error: &E) -> tracing::field::DisplayValue<&E>
+where
+    E: fmt::Display + ?Sized,
+{
+    tracing::field::display(error)
 }
