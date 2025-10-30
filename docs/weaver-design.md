@@ -363,6 +363,38 @@ Developers can opt into a foreground mode for debugging by setting the
 `WEAVER_FOREGROUND` environment variable, which bypasses daemonisation while
 preserving the same PID/lock/health choreography.
 
+```mermaid
+erDiagram
+    PROCESS_GUARD {
+        string lock_path
+        string pid_path
+        string health_path
+        int pid
+    }
+    HEALTH_SNAPSHOT {
+        string status
+        int pid
+        int timestamp
+    }
+    PROCESS_GUARD ||--o| HEALTH_SNAPSHOT : writes
+    PROCESS_GUARD ||--o| LOCK_FILE : manages
+    PROCESS_GUARD ||--o| PID_FILE : manages
+    PROCESS_GUARD ||--o| HEALTH_FILE : manages
+    LOCK_FILE {
+        string path
+    }
+    PID_FILE {
+        string path
+        int pid
+    }
+    HEALTH_FILE {
+        string path
+        string status
+        int pid
+        int timestamp
+    }
+```
+
 Semantic Fusion backends are modelled as a `FusionBackends` registry. Each
 backend starts lazily via `ensure_backend`, keeping the process lightweight
 until a command requires a specific capability. The supervisor records whether

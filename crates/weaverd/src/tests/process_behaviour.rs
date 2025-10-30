@@ -12,10 +12,11 @@ use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use serde_json::Value;
 
-use crate::process::{
-    DaemonizeError, Daemonizer, LaunchError, LaunchMode, ProcessPaths, ShutdownSignal,
-    run_daemon_with,
-};
+use crate::process::daemonizer::{DaemonizeError, Daemonizer};
+use crate::process::launch::run_daemon_with;
+use crate::process::paths::ProcessPaths;
+use crate::process::shutdown::{ShutdownError, ShutdownSignal};
+use crate::process::{LaunchError, LaunchMode};
 use crate::tests::support::{RecordingBackendProvider, RecordingHealthReporter, TestConfigLoader};
 
 const WAIT_TIMEOUT: Duration = Duration::from_secs(2);
@@ -332,7 +333,7 @@ impl TestShutdownSignal {
 }
 
 impl ShutdownSignal for TestShutdownSignal {
-    fn wait(&self) -> Result<(), crate::process::ShutdownError> {
+    fn wait(&self) -> Result<(), ShutdownError> {
         let (lock, cvar) = &*self.inner;
         let mut triggered = lock.lock().expect("shutdown mutex poisoned");
         while !*triggered {
