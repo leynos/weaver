@@ -220,6 +220,7 @@ fn handle_existing_lock(paths: &ProcessPaths) -> Result<File, LaunchError> {
 
     remove_file(paths.lock_path())?;
     remove_file(paths.pid_path())?;
+    remove_file(paths.health_path())?;
     acquire_lock(paths)
 }
 
@@ -329,8 +330,13 @@ mod tests {
         let (_dir, paths) = build_paths();
         fs::write(paths.lock_path(), b"").expect("failed to seed lock file");
         fs::write(paths.pid_path(), b"0\n").expect("failed to seed pid file");
+        fs::write(paths.health_path(), b"stale").expect("failed to seed health file");
         let mut guard =
             ProcessGuard::acquire(paths.clone()).expect("stale runtime should be reclaimed");
+        assert!(
+            !paths.health_path().exists(),
+            "stale health file should be removed before reacquiring",
+        );
         guard.write_pid(42).expect("pid write should succeed");
     }
 
