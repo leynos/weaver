@@ -90,16 +90,7 @@ impl ProcessGuard {
             self.paths.pid_path(),
             self.paths.health_path(),
         ] {
-            match fs::remove_file(path) {
-                Ok(()) => {}
-                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-                Err(error) => warn!(
-                    target: PROCESS_TARGET,
-                    file = %path.display(),
-                    error = %error,
-                    "failed to remove runtime artefact",
-                ),
-            }
+            remove_runtime_file(path);
         }
     }
 }
@@ -107,6 +98,19 @@ impl ProcessGuard {
 impl Drop for ProcessGuard {
     fn drop(&mut self) {
         self.cleanup();
+    }
+}
+
+fn remove_runtime_file(path: &Path) {
+    match fs::remove_file(path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => warn!(
+            target: PROCESS_TARGET,
+            file = %path.display(),
+            error = %error,
+            "failed to remove runtime artefact",
+        ),
     }
 }
 
