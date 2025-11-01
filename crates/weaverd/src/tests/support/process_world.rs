@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use serde_json::Value;
 
 use crate::process::daemonizer::{DaemonizeError, Daemonizer};
-use crate::process::launch::{LaunchPlan, run_daemon_with};
+use crate::process::launch::{LaunchPlan, ProcessControl, ServiceDeps, run_daemon_with};
 use crate::process::paths::ProcessPaths;
 use crate::process::shutdown::{ShutdownError, ShutdownSignal};
 use crate::process::{LaunchError, LaunchMode, test_support};
@@ -72,12 +72,16 @@ impl ProcessTestWorld {
         let shutdown = self.shutdown.clone();
         self.handle = Some(thread::spawn(move || {
             let plan = LaunchPlan {
-                mode: LaunchMode::Background,
-                loader,
-                reporter,
-                provider,
-                daemonizer,
-                shutdown,
+                process: ProcessControl {
+                    mode: LaunchMode::Background,
+                    daemonizer,
+                    shutdown,
+                },
+                services: ServiceDeps {
+                    loader,
+                    reporter,
+                    provider,
+                },
             };
             run_daemon_with(plan)
         }));
@@ -98,12 +102,16 @@ impl ProcessTestWorld {
             TestShutdownSignal::new()
         };
         let plan = LaunchPlan {
-            mode,
-            loader: self.loader.clone(),
-            reporter,
-            provider: self.provider.clone(),
-            daemonizer: self.daemonizer.clone(),
-            shutdown: shutdown_signal,
+            process: ProcessControl {
+                mode,
+                daemonizer: self.daemonizer.clone(),
+                shutdown: shutdown_signal,
+            },
+            services: ServiceDeps {
+                loader: self.loader.clone(),
+                reporter,
+                provider: self.provider.clone(),
+            },
         };
         let result = run_daemon_with(plan);
         self.result = Some(result);
@@ -117,12 +125,16 @@ impl ProcessTestWorld {
         self.reset_observations();
         let reporter = self.reporter.clone() as Arc<dyn crate::health::HealthReporter>;
         let plan = LaunchPlan {
-            mode: LaunchMode::Foreground,
-            loader: FailingConfigLoader,
-            reporter,
-            provider: self.provider.clone(),
-            daemonizer: self.daemonizer.clone(),
-            shutdown: TestShutdownSignal::new(),
+            process: ProcessControl {
+                mode: LaunchMode::Foreground,
+                daemonizer: self.daemonizer.clone(),
+                shutdown: TestShutdownSignal::new(),
+            },
+            services: ServiceDeps {
+                loader: FailingConfigLoader,
+                reporter,
+                provider: self.provider.clone(),
+            },
         };
         let result = run_daemon_with(plan);
         self.result = Some(result);

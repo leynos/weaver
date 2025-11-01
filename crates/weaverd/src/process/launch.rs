@@ -35,14 +35,24 @@ impl LaunchMode {
     }
 }
 
-/// Collaborators required to launch the daemon runtime.
-pub(crate) struct LaunchPlan<L, P, D, S> {
+/// Process-level collaborators needed to control daemon lifecycle.
+pub(crate) struct ProcessControl<D, S> {
     pub(crate) mode: LaunchMode,
+    pub(crate) daemonizer: D,
+    pub(crate) shutdown: S,
+}
+
+/// Service dependencies required to construct the daemon runtime.
+pub(crate) struct ServiceDeps<L, P> {
     pub(crate) loader: L,
     pub(crate) reporter: Arc<dyn HealthReporter>,
     pub(crate) provider: P,
-    pub(crate) daemonizer: D,
-    pub(crate) shutdown: S,
+}
+
+/// Collaborators required to launch the daemon runtime.
+pub(crate) struct LaunchPlan<L, P, D, S> {
+    pub(crate) process: ProcessControl<D, S>,
+    pub(crate) services: ServiceDeps<L, P>,
 }
 
 /// Runs the daemon using the production collaborators.
@@ -53,12 +63,16 @@ pub fn run_daemon() -> Result<(), LaunchError> {
     let daemonizer = SystemDaemonizer::new();
     let shutdown = SystemShutdownSignal::new(SHUTDOWN_TIMEOUT);
     let plan = LaunchPlan {
-        mode,
-        loader: SystemConfigLoader,
-        reporter,
-        provider,
-        daemonizer,
-        shutdown,
+        process: ProcessControl {
+            mode,
+            daemonizer,
+            shutdown,
+        },
+        services: ServiceDeps {
+            loader: SystemConfigLoader,
+            reporter,
+            provider,
+        },
     };
     run_daemon_with(plan)
 }
@@ -71,14 +85,17 @@ where
     D: Daemonizer,
     S: ShutdownSignal,
 {
-    let LaunchPlan {
+    let LaunchPlan { process, services } = plan;
+    let ProcessControl {
         mode,
+        daemonizer,
+        shutdown,
+    } = process;
+    let ServiceDeps {
         loader,
         reporter,
         provider,
-        daemonizer,
-        shutdown,
-    } = plan;
+    } = services;
 
     info!(
         target: PROCESS_TARGET,
