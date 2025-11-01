@@ -26,11 +26,14 @@ impl ProcessPaths {
             path: runtime_dir.clone(),
             source,
         })?;
+        let lock_path = runtime_dir.join("weaverd.lock");
+        let pid_path = runtime_dir.join("weaverd.pid");
+        let health_path = runtime_dir.join("weaverd.health");
         Ok(Self {
-            lock_path: runtime_dir.join("weaverd.lock"),
-            pid_path: runtime_dir.join("weaverd.pid"),
-            health_path: runtime_dir.join("weaverd.health"),
             runtime_dir,
+            lock_path,
+            pid_path,
+            health_path,
         })
     }
 
