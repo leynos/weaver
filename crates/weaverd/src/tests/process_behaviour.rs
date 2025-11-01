@@ -95,10 +95,7 @@ fn then_pid_file_exists(world: &RefCell<ProcessTestWorld>) {
     {
         let world_ref = world.borrow();
         world_ref
-            .wait_for_condition(
-                |state| state.pid_path().exists(),
-                "pid file to be written",
-            )
+            .wait_for_condition(|state| state.pid_path().exists(), "pid file to be written")
             .expect("pid file should be written");
     }
     let world = world.borrow();
