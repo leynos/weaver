@@ -314,6 +314,18 @@ mod tests {
         (dir, paths)
     }
 
+    /// Acquires a guard, records the provided health state, and returns the guard for assertions.
+    fn setup_guard_with_health(paths: &ProcessPaths, state: HealthState) -> ProcessGuard {
+        test_support::clear_health_events(paths.health_path());
+        let mut guard = ProcessGuard::acquire(paths.clone()).expect("lock should be acquired");
+        let pid = std::process::id();
+        guard.write_pid(pid).expect("pid write should succeed");
+        guard
+            .write_health(state)
+            .expect("health write should succeed");
+        guard
+    }
+
     #[test]
     fn missing_pid_file_refuses_reacquire() {
         let (_dir, paths) = build_paths();
@@ -369,13 +381,7 @@ mod tests {
     #[test]
     fn health_snapshot_is_written_with_newline() {
         let (_dir, paths) = build_paths();
-        test_support::clear_health_events(paths.health_path());
-        let mut guard = ProcessGuard::acquire(paths.clone()).expect("lock should be acquired");
-        let pid = std::process::id();
-        guard.write_pid(pid).expect("pid write should succeed");
-        guard
-            .write_health(HealthState::Ready)
-            .expect("health write should succeed");
+        let _guard = setup_guard_with_health(&paths, HealthState::Ready);
         let content =
             fs::read_to_string(paths.health_path()).expect("health file should be readable");
         assert!(
@@ -387,13 +393,7 @@ mod tests {
     #[test]
     fn health_snapshot_records_event() {
         let (_dir, paths) = build_paths();
-        test_support::clear_health_events(paths.health_path());
-        let mut guard = ProcessGuard::acquire(paths.clone()).expect("lock should be acquired");
-        let pid = std::process::id();
-        guard.write_pid(pid).expect("pid write should succeed");
-        guard
-            .write_health(HealthState::Starting)
-            .expect("health write should succeed");
+        let _guard = setup_guard_with_health(&paths, HealthState::Starting);
         assert_eq!(
             test_support::health_events(paths.health_path()),
             vec!["starting"],
