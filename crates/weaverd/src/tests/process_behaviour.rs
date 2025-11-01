@@ -81,14 +81,26 @@ fn then_daemonisation_requested(world: &RefCell<ProcessTestWorld>) {
 
 #[then("the daemon wrote the lock file")]
 fn then_lock_file_exists(world: &RefCell<ProcessTestWorld>) {
-    assert!(
-        world.borrow().lock_path().exists(),
-        "lock file should exist whilst daemon is running",
-    );
+    world
+        .borrow()
+        .wait_for_condition(
+            |state| state.lock_path().exists(),
+            "lock file to be written",
+        )
+        .expect("lock file should exist whilst daemon is running");
 }
 
 #[then("the daemon wrote the pid file")]
 fn then_pid_file_exists(world: &RefCell<ProcessTestWorld>) {
+    {
+        let world_ref = world.borrow();
+        world_ref
+            .wait_for_condition(
+                |state| state.pid_path().exists(),
+                "pid file to be written",
+            )
+            .expect("pid file should be written");
+    }
     let world = world.borrow();
     let path = world.pid_path();
     let content = fs::read_to_string(&path).expect("pid file should be readable");
