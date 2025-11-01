@@ -1,3 +1,5 @@
+//! Handles OS-level shutdown signals for the daemon lifecycle.
+
 use std::io;
 use std::time::Duration;
 

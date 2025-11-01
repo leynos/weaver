@@ -1,3 +1,5 @@
+//! Supervises daemon launch sequencing and runtime orchestration.
+
 use std::env;
 use std::sync::Arc;
 

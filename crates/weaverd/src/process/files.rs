@@ -1,3 +1,5 @@
+//! Provides atomic write helpers for daemon runtime artefacts.
+
 use std::io::{self, Write};
 use std::path::Path;
 

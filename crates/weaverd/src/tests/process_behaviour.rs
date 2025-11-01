@@ -2,16 +2,12 @@
 
 use std::cell::RefCell;
 use std::fs;
-use std::thread;
-use std::time::Instant;
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
 use crate::process::{LaunchError, LaunchMode};
-use crate::tests::support::{
-    POLL_INTERVAL, ProcessTestWorld, StepResult, WAIT_TIMEOUT, snapshot_status,
-};
+use crate::tests::support::{ProcessTestWorld, StepResult, snapshot_status};
 
 #[fixture]
 fn world() -> RefCell<ProcessTestWorld> {
@@ -74,14 +70,13 @@ fn given_lock_without_pid(world: &RefCell<ProcessTestWorld>) -> StepResult {
 
 #[then("daemonisation was requested")]
 fn then_daemonisation_requested(world: &RefCell<ProcessTestWorld>) {
-    let deadline = Instant::now() + WAIT_TIMEOUT;
-    while Instant::now() < deadline {
-        if world.borrow().daemonizer_calls() > 0 {
-            return;
-        }
-        thread::sleep(POLL_INTERVAL);
-    }
-    panic!("expected daemonisation to be invoked at least once");
+    world
+        .borrow()
+        .wait_for_condition(
+            |state| state.daemonizer_calls() > 0,
+            "daemonisation to be invoked",
+        )
+        .expect("expected daemonisation to be invoked at least once");
 }
 
 #[then("the daemon wrote the lock file")]
@@ -125,17 +120,23 @@ fn then_health_ready(world: &RefCell<ProcessTestWorld>) {
 
 #[then("the daemon recorded the starting health snapshot")]
 fn then_health_starting(world: &RefCell<ProcessTestWorld>) {
-    assert!(
-        world.borrow().saw_status("starting"),
-        "starting health snapshot should have been observed",
-    );
+    world
+        .borrow()
+        .wait_for_condition(
+            |state| state.saw_status("starting"),
+            "starting health snapshot",
+        )
+        .expect("starting health snapshot should have been observed");
 }
 
 #[then("the daemon wrote the stopping health snapshot")]
 fn then_health_stopping(world: &RefCell<ProcessTestWorld>) {
     world
         .borrow()
-        .wait_for_status("stopping")
+        .wait_for_condition(
+            |state| state.saw_status("stopping"),
+            "stopping health snapshot",
+        )
         .expect("daemon should publish stopping health snapshot");
 }
 
@@ -236,10 +237,7 @@ fn assert_daemon_error_contains(world: &RefCell<ProcessTestWorld>, needle: &str)
         result.is_err(),
         "daemon run should fail, but got success: {result:?}",
     );
-    let error_message = result
-        .as_ref()
-        .expect_err("result should contain error")
-        .to_string();
+    let error_message = result.as_ref().unwrap_err().to_string();
     assert!(
         error_message.contains(needle),
         "expected error to contain '{needle}', got '{error_message}'",

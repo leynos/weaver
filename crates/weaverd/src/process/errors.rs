@@ -1,3 +1,5 @@
+//! Defines the unified error surface for daemon launch and supervision.
+
 use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;

@@ -1,3 +1,5 @@
+//! Manages runtime lock, PID, and health files for the daemon process.
+
 use std::fs::{self, File, OpenOptions};
 use std::io;
 use std::path::Path;

@@ -1,3 +1,5 @@
+//! Aggregates process lifecycle components and public entry points.
+
 use std::time::Duration;
 
 pub(crate) mod daemonizer;

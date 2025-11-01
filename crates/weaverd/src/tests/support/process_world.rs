@@ -162,6 +162,7 @@ impl ProcessTestWorld {
     pub fn reset_observations(&mut self) {
         self.wait_error = None;
         self.health_history.borrow_mut().clear();
+        self.shutdown = TestShutdownSignal::new();
         test_support::clear_health_events(self.health_path().as_path());
     }
 
@@ -257,6 +258,20 @@ impl ProcessTestWorld {
             thread::sleep(POLL_INTERVAL);
         }
         Err(format!("daemon did not publish {expected} health snapshot"))
+    }
+
+    pub fn wait_for_condition<F>(&self, predicate: F, description: &str) -> StepResult
+    where
+        F: Fn(&Self) -> bool,
+    {
+        let deadline = Instant::now() + WAIT_TIMEOUT;
+        while Instant::now() < deadline {
+            if predicate(self) {
+                return Ok(());
+            }
+            thread::sleep(POLL_INTERVAL);
+        }
+        Err(format!("timeout waiting for {description}"))
     }
 
     pub fn sample_status(&self) -> Option<String> {
