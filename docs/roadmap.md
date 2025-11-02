@@ -36,7 +36,7 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
       - Acceptance criteria: Bootstrap performs health reporting hooks,
         backends start only on demand, and failures propagate as structured
         events.
-- [ ] Implement robust daemonisation and process management for `weaverd`,
+- [x] Implement robust daemonisation and process management for `weaverd`,
       including backgrounding with `daemonize-me`, PID/lock file handling,
       health checks, and graceful shutdown on signals.
       - Acceptance criteria: Background start creates PID and lock files,

@@ -3,7 +3,7 @@
 
 use weaver_config::Config;
 
-use weaverd::{BackendKind, BackendProvider, BackendStartupError};
+use crate::{BackendKind, BackendProvider, BackendStartupError};
 
 const BACKEND_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::backends::noop");
 

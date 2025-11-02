@@ -40,6 +40,25 @@ impl ConfigLoader for SystemConfigLoader {
     }
 }
 
+/// Loader that always returns the supplied configuration clone.
+#[derive(Debug, Clone)]
+pub struct StaticConfigLoader {
+    config: Config,
+}
+
+impl StaticConfigLoader {
+    /// Builds a loader that always returns the provided configuration.
+    pub fn new(config: Config) -> Self {
+        Self { config }
+    }
+}
+
+impl ConfigLoader for StaticConfigLoader {
+    fn load(&self) -> Result<Config, Arc<OrthoError>> {
+        Ok(self.config.clone())
+    }
+}
+
 /// Errors surfaced during bootstrap.
 #[derive(Debug, Error)]
 pub enum BootstrapError {

@@ -91,6 +91,35 @@ either `backend_ready` or `backend_failed`. This keeps the daemon lightweight
 until specific capabilities are required, while still surfacing failures as
 structured events.
 
+## Daemon lifecycle
+
+`weaverd` backgrounds itself using `daemonize-me` and manages runtime artefacts
+under the same directory as the Unix socket (for example
+`$XDG_RUNTIME_DIR/weaver`). Launching the daemon creates a lock file
+(`weaverd.lock`), a PID file (`weaverd.pid`), and a health snapshot
+(`weaverd.health`). PID and health files are written atomically, so observers
+never see a partially written payload. Attempts to start a second copy while
+one is running fail fast with an "already running" error that reports the
+existing PID. When the original launch is still initialising and has not yet
+published a PID, the second invocation now reports "launch already in progress"
+instead of removing the lock. If the daemon exited uncleanly, the new instance
+removes the stale files before continuing.
+
+The health snapshot is a single-line JSON document describing the current
+state, enabling operators and automation to poll readiness without speaking the
+daemon protocol. Example:
+
+```json
+{"status":"ready","pid":12345,"timestamp":1713356400}
+```
+
+The `status` transitions through `starting`, `ready`, and `stopping` before the
+files are removed on shutdown. Sending `SIGTERM`, `SIGINT`, `SIGQUIT`, or
+`SIGHUP` prompts the daemon to log the request and complete its shutdown
+sequence within a ten-second budget. For interactive debugging or CI jobs, set
+`WEAVER_FOREGROUND=1` to keep the daemon attached to the terminal while
+preserving the same lock, PID, and health semantics.
+
 ## Command usage
 
 `weaver` expects commands to be specified as a two-level verb pair. The first

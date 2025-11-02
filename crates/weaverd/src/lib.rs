@@ -16,13 +16,18 @@
 mod backends;
 mod bootstrap;
 mod health;
+mod placeholder_provider;
+mod process;
 mod telemetry;
 
 pub use backends::{
     BackendKind, BackendKindParseError, BackendProvider, BackendStartupError, FusionBackends,
 };
-pub use bootstrap::{BootstrapError, ConfigLoader, Daemon, SystemConfigLoader, bootstrap_with};
+pub use bootstrap::{
+    BootstrapError, ConfigLoader, Daemon, StaticConfigLoader, SystemConfigLoader, bootstrap_with,
+};
 pub use health::{HealthReporter, StructuredHealthReporter};
+pub use process::{LaunchError, LaunchMode, run_daemon};
 pub use telemetry::{TelemetryError, TelemetryHandle};
 
 #[cfg(test)]

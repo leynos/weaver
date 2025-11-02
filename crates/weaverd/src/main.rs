@@ -1,37 +1,31 @@
 //! Daemon entrypoint for the Weaver semantic code tool.
 //!
-//! The executable currently exercises the bootstrap pipeline which loads the
-//! shared configuration, initialises structured telemetry, prepares the socket
-//! filesystem, and wires the lazy backend supervisor. Future phases will attach
-//! the command loop described in the design document.
+//! The executable initialises the daemon, backgrounds it using the shared
+//! process supervisor, and then waits for termination signals. Future phases
+//! will attach the command loop described in the design document.
 
 use std::process::ExitCode;
-use std::sync::Arc;
 
-use weaverd::{StructuredHealthReporter, SystemConfigLoader, bootstrap_with};
+use weaverd::run_daemon;
 
-mod placeholder_provider;
-
-const BOOTSTRAP_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::bootstrap");
+const DAEMON_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::daemon");
 
 fn main() -> ExitCode {
-    let reporter = Arc::new(StructuredHealthReporter::new());
-    let provider = placeholder_provider::NoopBackendProvider;
-    match bootstrap_with(&SystemConfigLoader, reporter, provider) {
-        Ok(_daemon) => {
+    match run_daemon() {
+        Ok(()) => {
             tracing::info!(
-                target: BOOTSTRAP_TARGET,
-                "daemon bootstrap completed; command loop not yet initialised"
+                target: DAEMON_TARGET,
+                "daemon shutdown completed"
             );
             ExitCode::SUCCESS
         }
         Err(error) => {
             tracing::error!(
-                target: BOOTSTRAP_TARGET,
+                target: DAEMON_TARGET,
                 error = %error,
-                "daemon bootstrap failed"
+                "daemon terminated with error"
             );
-            eprintln!("daemon bootstrap failed: {error}");
+            eprintln!("daemon failed: {error}");
             ExitCode::FAILURE
         }
     }
