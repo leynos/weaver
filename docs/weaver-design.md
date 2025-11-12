@@ -1052,3 +1052,19 @@ a logical, incremental progression.
 - Zig Project. (n.d.). `zig/language-server`: Issue #398.
 
 - C# Project. (n.d.). `csharp/language-server`: Issue #2612.
+
+### C. Design Decision Log
+
+#### 2025-11-12: Adopt `rstest-bdd` 0.1.0 for scenario tests
+
+We moved the workspace dependency on `rstest-bdd`/`rstest-bdd-macros` from
+`0.1.0-alpha4` to the `0.1.0` stable release to reduce reliance on pre-release
+behavioural testing tooling. The upgrade keeps the ergonomics of
+`compile-time-validation` and `strict-compile-time-validation` features intact
+while benefiting from upstream fixes (notably improved localisation support and
+step registration diagnostics) that shipped with the stable tag. All crates
+consuming the workspace dependency continue to share the same version through
+`workspace.dependencies`, ensuring scenarios and supporting macros evolve in
+lockstep. Upstream still ships the internal `rstest-bdd-patterns` crate as an
+`alpha4` build, but it remains a purely transitive dependency bundled with the
+stable API surface, so no additional action is required on our side.

@@ -254,6 +254,4 @@ fn assert_daemon_error_contains(world: &RefCell<ProcessTestWorld>, needle: &str)
 }
 
 #[scenario(path = "tests/features/daemon_process.feature")]
-fn daemon_process(#[from(world)] _: RefCell<ProcessTestWorld>) -> StepResult {
-    Ok(())
-}
+fn daemon_process(#[from(world)] _: RefCell<ProcessTestWorld>) {}

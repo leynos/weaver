@@ -219,9 +219,7 @@ fn then_backend_started_once(world: &RefCell<TestWorld>, backend: String) -> Ste
 }
 
 #[scenario(path = "tests/features/daemon_bootstrap.feature")]
-fn daemon_bootstrap(#[from(world)] _: RefCell<TestWorld>) -> StepResult {
-    Ok(())
-}
+fn daemon_bootstrap(#[from(world)] _: RefCell<TestWorld>) {}
 
 fn parse_backend(name: &str) -> Result<BackendKind, String> {
     name.parse::<BackendKind>()

@@ -100,7 +100,6 @@ fn then_capabilities(world: &RefCell<TestWorld>, fixture: String) -> Result<()> 
 }
 
 #[scenario(path = "tests/features/weaver_cli.feature")]
-fn weaver_cli_behaviour(world: RefCell<TestWorld>) -> Result<()> {
+fn weaver_cli_behaviour(world: RefCell<TestWorld>) {
     let _ = world;
-    Ok(())
 }
