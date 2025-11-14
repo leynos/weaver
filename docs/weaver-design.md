@@ -1057,14 +1057,16 @@ a logical, incremental progression.
 
 #### 2025-11-12: Adopt `rstest-bdd` 0.1.0 for scenario tests
 
-We moved the workspace dependency on `rstest-bdd`/`rstest-bdd-macros` from
+The workspace dependency on `rstest-bdd`/`rstest-bdd-macros` moved from
 `0.1.0-alpha4` to the `0.1.0` stable release to reduce reliance on pre-release
 behavioural testing tooling. The upgrade keeps the ergonomics of
 `compile-time-validation` and `strict-compile-time-validation` features intact
-while benefiting from upstream fixes (notably improved localisation support and
+while benefiting from upstream fixes (notably improved localization support and
 step registration diagnostics) that shipped with the stable tag. All crates
 consuming the workspace dependency continue to share the same version through
 `workspace.dependencies`, ensuring scenarios and supporting macros evolve in
-lockstep. Upstream still ships the internal `rstest-bdd-patterns` crate as an
-`alpha4` build, but it remains a purely transitive dependency bundled with the
-stable API surface, so no additional action is required on our side.
+lockstep. The default `diagnostics` feature is now disabled to avoid the
+additional serde/serde_json surface when it is not required, which partially
+offsets the build bloat introduced by the new localization stack (i18n-embed,
+fluent, unic-langid). Upstream now ships `rstest-bdd-patterns` 0.1.0 via the
+same pin, so the entire stack aligns on stable releases.

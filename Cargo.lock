@@ -1457,8 +1457,6 @@ dependencies = [
  "regex",
  "rstest-bdd-patterns",
  "rust-embed",
- "serde",
- "serde_json",
  "thiserror 1.0.69",
  "unic-langid",
 ]
@@ -1487,9 +1485,9 @@ dependencies = [
 
 [[package]]
 name = "rstest-bdd-patterns"
-version = "0.1.0-alpha4"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77e86cae3abdbeecef13e120bdedaa6d96e9d3fee9b83efa58b86fc250fdf32f"
+checksum = "dee8d9e47e63602b9061a3d73e48c0248f49d5bc730d64a8b27750f09342f81b"
 dependencies = [
  "regex",
  "thiserror 1.0.69",
