@@ -5,6 +5,7 @@
 //! assertions.
 
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::ffi::OsString;
 use std::fs;
 use std::io::{self, BufRead, BufReader, Read, Write};
@@ -18,6 +19,9 @@ use std::time::{Duration, Instant};
 #[cfg(unix)]
 use std::os::unix::net::UnixStream;
 
+use crate::lifecycle::{
+    LifecycleCommand, LifecycleContext, LifecycleError, LifecycleHandler, LifecycleInvocation,
+};
 use crate::{AppError, ConfigLoader, run_with_loader};
 use anyhow::{Context, Result, anyhow, ensure};
 use rstest::fixture;
@@ -47,6 +51,7 @@ pub(super) struct TestWorld {
     pub stderr: Vec<u8>,
     pub exit_code: Option<ExitCode>,
     pub requests: Vec<String>,
+    pub lifecycle: TestLifecycle,
 }
 
 impl TestWorld {
@@ -75,7 +80,13 @@ impl TestWorld {
         self.requests.clear();
         let args = Self::build_args(command);
         let loader = StaticConfigLoader::new(self.config.clone());
-        let exit = run_with_loader(args, &mut self.stdout, &mut self.stderr, &loader);
+        let exit = run_with_loader(
+            args,
+            &mut self.stdout,
+            &mut self.stderr,
+            &loader,
+            &self.lifecycle,
+        );
         self.exit_code = Some(exit);
         if let Some(daemon) = self.daemon.as_mut() {
             self.requests = daemon.take_requests()?;
@@ -146,6 +157,27 @@ impl TestWorld {
         ensure!(
             stdout == expected,
             "capabilities output mismatch: expected {expected:?}, got {stdout:?}"
+        );
+        Ok(())
+    }
+
+    pub fn lifecycle_calls(&self) -> Vec<LifecycleCall> {
+        self.lifecycle.record()
+    }
+
+    pub fn lifecycle_enqueue_success(&self) {
+        self.lifecycle.enqueue(Ok(ExitCode::SUCCESS));
+    }
+
+    pub fn lifecycle_enqueue_error(&self, error: LifecycleError) {
+        self.lifecycle.enqueue(Err(error));
+    }
+
+    pub fn assert_no_daemon_requests(&self) -> Result<()> {
+        ensure!(
+            self.requests.is_empty(),
+            "expected no daemon requests but found {:?}",
+            self.requests
         );
         Ok(())
     }
@@ -343,6 +375,48 @@ pub(super) fn default_daemon_lines() -> Vec<String> {
         "{\"kind\":\"stream\",\"stream\":\"stderr\",\"data\":\"daemon complains\"}".to_string(),
         "{\"kind\":\"exit\",\"status\":17}".to_string(),
     ]
+}
+
+#[derive(Default)]
+pub(super) struct TestLifecycle {
+    calls: RefCell<Vec<LifecycleCall>>,
+    responses: RefCell<VecDeque<Result<ExitCode, LifecycleError>>>,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct LifecycleCall {
+    pub command: LifecycleCommand,
+}
+
+impl TestLifecycle {
+    pub fn record(&self) -> Vec<LifecycleCall> {
+        self.calls.borrow().clone()
+    }
+
+    pub fn enqueue(&self, result: Result<ExitCode, LifecycleError>) {
+        self.responses.borrow_mut().push_back(result);
+    }
+}
+
+impl LifecycleHandler for TestLifecycle {
+    fn handle<W: Write, E: Write>(
+        &self,
+        invocation: LifecycleInvocation,
+        _context: LifecycleContext<'_>,
+        _stdout: &mut W,
+        _stderr: &mut E,
+    ) -> Result<ExitCode, AppError> {
+        let call = LifecycleCall {
+            command: invocation.command,
+        };
+        self.calls.borrow_mut().push(call);
+        let result = self
+            .responses
+            .borrow_mut()
+            .pop_front()
+            .unwrap_or(Ok(ExitCode::SUCCESS));
+        result.map_err(AppError::from)
+    }
 }
 
 #[fixture]

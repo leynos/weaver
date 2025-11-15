@@ -17,6 +17,7 @@ use weaver_config::{CapabilityMatrix, Config};
 
 mod command;
 mod config;
+mod lifecycle;
 mod transport;
 
 #[cfg(test)]
@@ -24,6 +25,10 @@ pub(crate) use command::CommandDescriptor;
 pub(crate) use command::{CommandInvocation, CommandRequest};
 use config::{ConfigArgumentSplit, split_config_arguments};
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader};
+use lifecycle::{
+    LifecycleCommand, LifecycleContext, LifecycleError, LifecycleHandler, LifecycleInvocation,
+    SystemLifecycle,
+};
 use transport::connect;
 /// CLI flags recognised by the configuration loader.
 ///
@@ -47,7 +52,7 @@ where
     W: Write,
     E: Write,
 {
-    run_with_loader(args, stdout, stderr, &OrthoConfigLoader)
+    run_with_loader(args, stdout, stderr, &OrthoConfigLoader, &SystemLifecycle)
 }
 
 fn prepare_cli_arguments(args: &[OsString], split: &ConfigArgumentSplit) -> Vec<OsString> {
@@ -82,6 +87,32 @@ where
             Some(ExitCode::FAILURE)
         }
     }
+}
+
+fn parse_lifecycle_invocation(cli: &Cli) -> Result<Option<LifecycleInvocation>, AppError> {
+    let Some(domain) = cli.domain.as_deref() else {
+        return Ok(None);
+    };
+    if !domain.trim().eq_ignore_ascii_case("daemon") {
+        return Ok(None);
+    }
+    let operation = cli.operation.as_deref().ok_or(AppError::MissingOperation)?;
+    let trimmed = operation.trim();
+    let command = if trimmed.eq_ignore_ascii_case("start") {
+        LifecycleCommand::Start
+    } else if trimmed.eq_ignore_ascii_case("stop") {
+        LifecycleCommand::Stop
+    } else if trimmed.eq_ignore_ascii_case("status") {
+        LifecycleCommand::Status
+    } else {
+        return Err(AppError::UnsupportedLifecycleOperation {
+            operation: trimmed.to_string(),
+        });
+    };
+    Ok(Some(LifecycleInvocation {
+        command,
+        arguments: cli.arguments.clone(),
+    }))
 }
 
 fn execute_daemon_command<W, E>(
@@ -119,17 +150,19 @@ where
 
 /// Runs the CLI with a custom configuration loader.
 #[must_use]
-pub(crate) fn run_with_loader<I, W, E, L>(
+pub(crate) fn run_with_loader<I, W, E, L, H>(
     args: I,
     stdout: &mut W,
     stderr: &mut E,
     loader: &L,
+    lifecycle: &H,
 ) -> ExitCode
 where
     I: IntoIterator<Item = OsString>,
     W: Write,
     E: Write,
     L: ConfigLoader,
+    H: LifecycleHandler,
 {
     let args: Vec<OsString> = args.into_iter().collect();
     let split = split_config_arguments(&args);
@@ -145,6 +178,14 @@ where
         .and_then(|(cli, config)| {
             if let Some(exit_code) = handle_capabilities_mode(&cli, &config, stdout, stderr) {
                 return Ok(exit_code);
+            }
+
+            if let Some(lifecycle_invocation) = parse_lifecycle_invocation(&cli)? {
+                let context = LifecycleContext {
+                    config: &config,
+                    config_arguments: &split.config_arguments,
+                };
+                return lifecycle.handle(lifecycle_invocation, context, stdout, stderr);
             }
 
             let invocation = CommandInvocation::try_from(cli)?;
@@ -302,6 +343,10 @@ enum AppError {
     SerialiseCapabilities(serde_json::Error),
     #[error("failed to emit capabilities: {0}")]
     EmitCapabilities(io::Error),
+    #[error("unsupported daemon lifecycle operation '{operation}'")]
+    UnsupportedLifecycleOperation { operation: String },
+    #[error("daemon lifecycle command failed: {0}")]
+    Lifecycle(#[from] LifecycleError),
 }
 
 #[cfg(test)]

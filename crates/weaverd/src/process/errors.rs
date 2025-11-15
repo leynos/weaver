@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use ortho_config::OrthoError;
 
-use weaver_config::SocketPreparationError;
+use weaver_config::{RuntimePathsError, SocketPreparationError};
 
 use crate::bootstrap::BootstrapError;
 
@@ -156,6 +156,17 @@ impl From<Arc<OrthoError>> for LaunchError {
 impl From<SocketPreparationError> for LaunchError {
     fn from(source: SocketPreparationError) -> Self {
         Self::Socket { source }
+    }
+}
+
+impl From<RuntimePathsError> for LaunchError {
+    fn from(source: RuntimePathsError) -> Self {
+        match source {
+            RuntimePathsError::MissingSocketParent { path } => Self::MissingSocketParent { path },
+            RuntimePathsError::RuntimeDirectory { path, source } => {
+                Self::RuntimeDirectory { path, source }
+            }
+        }
     }
 }
 

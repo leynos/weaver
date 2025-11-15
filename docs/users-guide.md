@@ -139,6 +139,33 @@ sequence within a ten-second budget. For interactive debugging or CI jobs, set
 `WEAVER_FOREGROUND=1` to keep the daemon attached to the terminal while
 preserving the same lock, PID, and health semantics.
 
+### Lifecycle commands
+
+`weaver` now exposes explicit lifecycle commands so operators do not need to
+manage the daemon manually. All three commands share the same helper logic and
+therefore honour the configuration flags supplied to the CLI, including
+`--config-path` and `--daemon-socket`.
+
+- `weaver daemon start` verifies that the configured socket is free, spawns the
+  `weaverd` binary (the path can be overridden via `WEAVERD_BIN`), and waits
+  for the health snapshot to report `ready`. The command refuses to start when
+  the socket already accepts connections and prints the runtime directory that
+  now holds the lock, PID, and health files.
+- `weaver daemon stop` reads the PID file, sends `SIGTERM`, and waits for the
+  runtime artefacts and socket to disappear. If the socket is reachable but the
+  PID file is missing, the command surfaces an error rather than blindly
+  killing a process. Successful stops report the PID that was terminated and
+  confirm the runtime directory was cleaned up.
+- `weaver daemon status` inspects the JSON health snapshot when present, falling
+  back to the PID file and socket reachability. When no runtime artefacts exist
+  the command prints a short reminder that `daemon start` can be used to launch
+  a new instance.
+
+Lifecycle commands never contact the daemon's JSONL transport. They operate
+solely on the shared runtime files exported by `weaver-config`, ensuring the
+CLI and daemon use the exact same directory layout even when the daemon socket
+is overridden.
+
 ## Command usage
 
 `weaver` expects commands to be specified as a two-level verb pair. The first

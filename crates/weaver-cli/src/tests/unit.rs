@@ -3,7 +3,9 @@
 //! Exercises command serialisation, daemon message parsing, configuration
 //! loading, and socket connection establishment (TCP and Unix domain sockets).
 
-use super::support::{accept_tcp_connection, decode_utf8, default_daemon_lines, read_fixture};
+use super::support::{
+    TestLifecycle, accept_tcp_connection, decode_utf8, default_daemon_lines, read_fixture,
+};
 
 #[cfg(unix)]
 use super::support::accept_unix_connection;
@@ -17,7 +19,8 @@ use std::thread;
 
 use crate::{
     AppError, Cli, CommandDescriptor, CommandInvocation, CommandRequest, ConfigLoader,
-    EMPTY_LINE_LIMIT, connect, exit_code_from_status, read_daemon_messages, run_with_loader,
+    EMPTY_LINE_LIMIT, LifecycleCommand, connect, exit_code_from_status, parse_lifecycle_invocation,
+    read_daemon_messages, run_with_loader,
 };
 use rstest::rstest;
 use weaver_config::{Config, SocketEndpoint};
@@ -82,6 +85,52 @@ fn command_invocation_validation(
     }
 }
 
+#[test]
+fn parse_lifecycle_invocation_detects_start_command() {
+    let cli = Cli {
+        capabilities: false,
+        domain: Some(String::from("daemon")),
+        operation: Some(String::from("start")),
+        arguments: vec![String::from("--force")],
+    };
+    let invocation = parse_lifecycle_invocation(&cli)
+        .expect("parse result")
+        .expect("lifecycle invocation");
+    assert_eq!(invocation.command, LifecycleCommand::Start);
+    assert_eq!(invocation.arguments, vec![String::from("--force")]);
+}
+
+#[test]
+fn parse_lifecycle_invocation_rejects_unknown_operation() {
+    let cli = Cli {
+        capabilities: false,
+        domain: Some(String::from("daemon")),
+        operation: Some(String::from("restart")),
+        arguments: Vec::new(),
+    };
+    match parse_lifecycle_invocation(&cli) {
+        Err(AppError::UnsupportedLifecycleOperation { operation }) => {
+            assert_eq!(operation, "restart")
+        }
+        other => panic!("expected unsupported operation error, got {other:?}"),
+    }
+}
+
+#[test]
+fn parse_lifecycle_invocation_ignores_other_domains() {
+    let cli = Cli {
+        capabilities: false,
+        domain: Some(String::from("observe")),
+        operation: Some(String::from("start")),
+        arguments: Vec::new(),
+    };
+    let parsed = parse_lifecycle_invocation(&cli).expect("parse result");
+    assert!(
+        parsed.is_none(),
+        "non-daemon domains should bypass lifecycle"
+    );
+}
+
 #[rstest]
 #[case(0, ExitCode::SUCCESS)]
 #[case(17, ExitCode::from(17))]
@@ -143,11 +192,13 @@ fn run_with_loader_reports_configuration_failures() {
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
+    let lifecycle = TestLifecycle::default();
     let exit = run_with_loader(
         vec![OsString::from("weaver")],
         &mut stdout,
         &mut stderr,
         &FailingLoader,
+        &lifecycle,
     );
     assert_eq!(exit, ExitCode::FAILURE);
     let stderr_text = decode_utf8(stderr, "stderr").expect("decode stderr");
@@ -178,6 +229,7 @@ fn run_with_loader_filters_configuration_arguments() {
     let loader = RecordingLoader::new();
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
+    let lifecycle = TestLifecycle::default();
     let exit = run_with_loader(
         vec![
             OsString::from("weaver"),
@@ -193,6 +245,7 @@ fn run_with_loader_filters_configuration_arguments() {
         &mut stdout,
         &mut stderr,
         &loader,
+        &lifecycle,
     );
 
     assert_eq!(exit, ExitCode::FAILURE);
