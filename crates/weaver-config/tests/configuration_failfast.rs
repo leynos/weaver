@@ -2,23 +2,33 @@
 
 use std::ffi::{OsStr, OsString};
 use std::fs;
+use std::sync::{Mutex, MutexGuard};
 
+use once_cell::sync::Lazy;
 use ortho_config::OrthoError;
 use tempfile::TempDir;
 use weaver_config::Config;
 
+static ENV_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+
 struct EnvOverride {
     key: &'static str,
     previous: Option<OsString>,
+    guard: Option<MutexGuard<'static, ()>>,
 }
 
 impl EnvOverride {
     fn set_var(key: &'static str, value: &OsStr) -> Self {
+        let guard = ENV_MUTEX.lock().expect("env mutex poisoned");
         let previous = std::env::var_os(key);
         // Nightly currently marks environment mutation as unsafe while the API
         // stabilises, so mirror the pattern used in other tests.
         unsafe { std::env::set_var(key, value) };
-        Self { key, previous }
+        Self {
+            key,
+            previous,
+            guard: Some(guard),
+        }
     }
 }
 
@@ -30,6 +40,7 @@ impl Drop for EnvOverride {
             Some(value) => unsafe { std::env::set_var(self.key, value) },
             None => unsafe { std::env::remove_var(self.key) },
         }
+        drop(self.guard.take());
     }
 }
 
