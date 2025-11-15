@@ -70,14 +70,25 @@ pub(crate) struct LifecycleContext<'a> {
     pub(crate) config_arguments: &'a [OsString],
 }
 
+/// Wrapper around the CLI output streams used by lifecycle handlers.
+pub(crate) struct LifecycleOutput<W, E> {
+    pub(crate) stdout: W,
+    pub(crate) stderr: E,
+}
+
+impl<W: Write, E: Write> LifecycleOutput<W, E> {
+    pub(crate) fn new(stdout: W, stderr: E) -> Self {
+        Self { stdout, stderr }
+    }
+}
+
 /// Abstract interface for handling lifecycle commands.
 pub(crate) trait LifecycleHandler {
     fn handle<W: Write, E: Write>(
         &self,
         invocation: LifecycleInvocation,
         context: LifecycleContext<'_>,
-        stdout: &mut W,
-        stderr: &mut E,
+        output: &mut LifecycleOutput<W, E>,
     ) -> Result<ExitCode, AppError>;
 }
 
@@ -90,13 +101,12 @@ impl LifecycleHandler for SystemLifecycle {
         &self,
         invocation: LifecycleInvocation,
         context: LifecycleContext<'_>,
-        stdout: &mut W,
-        stderr: &mut E,
+        output: &mut LifecycleOutput<W, E>,
     ) -> Result<ExitCode, AppError> {
         let result = match invocation.command {
-            LifecycleCommand::Start => self.start(&invocation, context, stdout, stderr),
-            LifecycleCommand::Stop => self.stop(&invocation, context, stdout, stderr),
-            LifecycleCommand::Status => self.status(&invocation, context, stdout),
+            LifecycleCommand::Start => self.start(&invocation, context, output),
+            LifecycleCommand::Stop => self.stop(&invocation, context, output),
+            LifecycleCommand::Status => self.status(&invocation, context, output),
         };
         result.map_err(AppError::from)
     }
@@ -107,8 +117,7 @@ impl SystemLifecycle {
         &self,
         invocation: &LifecycleInvocation,
         context: LifecycleContext<'_>,
-        stdout: &mut W,
-        stderr: &mut E,
+        output: &mut LifecycleOutput<W, E>,
     ) -> Result<ExitCode, LifecycleError> {
         ensure_no_extra_arguments(invocation)?;
         ensure_socket_available(context.config.daemon_socket())?;
@@ -116,14 +125,14 @@ impl SystemLifecycle {
         let mut child = spawn_daemon(context.config_arguments)?;
         let snapshot = wait_for_ready(&paths, &mut child)?;
         writeln!(
-            stdout,
+            output.stdout,
             "daemon ready (pid {}) on {}",
             snapshot.pid,
             context.config.daemon_socket()
         )
         .map_err(LifecycleError::Io)?;
         writeln!(
-            stderr,
+            output.stderr,
             "runtime artefacts stored under {}",
             paths.runtime_dir().display()
         )
@@ -135,8 +144,7 @@ impl SystemLifecycle {
         &self,
         invocation: &LifecycleInvocation,
         context: LifecycleContext<'_>,
-        stdout: &mut W,
-        stderr: &mut E,
+        output: &mut LifecycleOutput<W, E>,
     ) -> Result<ExitCode, LifecycleError> {
         ensure_no_extra_arguments(invocation)?;
         let paths = RuntimePaths::from_config(context.config)?;
@@ -149,7 +157,7 @@ impl SystemLifecycle {
                 });
             }
             writeln!(
-                stdout,
+                output.stdout,
                 "daemon is not running (pid file missing at {})",
                 paths.pid_path().display()
             )
@@ -158,9 +166,9 @@ impl SystemLifecycle {
         };
         signal_daemon(pid)?;
         wait_for_shutdown(&paths, context.config.daemon_socket())?;
-        writeln!(stdout, "daemon pid {pid} stopped cleanly").map_err(LifecycleError::Io)?;
+        writeln!(output.stdout, "daemon pid {pid} stopped cleanly").map_err(LifecycleError::Io)?;
         writeln!(
-            stderr,
+            output.stderr,
             "removed runtime artefacts from {}",
             paths.runtime_dir().display()
         )
@@ -168,11 +176,11 @@ impl SystemLifecycle {
         Ok(ExitCode::SUCCESS)
     }
 
-    fn status<W: Write>(
+    fn status<W: Write, E: Write>(
         &self,
         invocation: &LifecycleInvocation,
         context: LifecycleContext<'_>,
-        stdout: &mut W,
+        output: &mut LifecycleOutput<W, E>,
     ) -> Result<ExitCode, LifecycleError> {
         ensure_no_extra_arguments(invocation)?;
         let paths = RuntimePaths::from_config(context.config)?;
@@ -180,7 +188,7 @@ impl SystemLifecycle {
         let reachable = socket_is_reachable(context.config.daemon_socket())?;
         if let Some(snapshot) = snapshot {
             writeln!(
-                stdout,
+                output.stdout,
                 "daemon status: {} (pid {}) via {}",
                 snapshot.status,
                 snapshot.pid,
@@ -193,7 +201,7 @@ impl SystemLifecycle {
         match pid {
             Some(pid) => {
                 writeln!(
-                    stdout,
+                    output.stdout,
                     "daemon recorded pid {pid} but health snapshot is missing; check {}",
                     paths.health_path().display()
                 )
@@ -201,7 +209,7 @@ impl SystemLifecycle {
             }
             None if reachable => {
                 writeln!(
-                    stdout,
+                    output.stdout,
                     "daemon socket {} is listening but runtime files are missing; consider 'weaver daemon stop' or removing {}",
                     context.config.daemon_socket(),
                     paths.runtime_dir().display()
@@ -210,7 +218,7 @@ impl SystemLifecycle {
             }
             None => {
                 writeln!(
-                    stdout,
+                    output.stdout,
                     "daemon is not running; use 'weaver daemon start' to launch it."
                 )
                 .map_err(LifecycleError::Io)?;

@@ -21,8 +21,9 @@ use std::os::unix::net::UnixStream;
 
 use crate::lifecycle::{
     LifecycleCommand, LifecycleContext, LifecycleError, LifecycleHandler, LifecycleInvocation,
+    LifecycleOutput,
 };
-use crate::{AppError, ConfigLoader, run_with_loader};
+use crate::{AppError, ConfigLoader, IoStreams, run_with_loader};
 use anyhow::{Context, Result, anyhow, ensure};
 use rstest::fixture;
 use weaver_config::{CapabilityDirective, CapabilityOverride, Config, SocketEndpoint};
@@ -80,13 +81,8 @@ impl TestWorld {
         self.requests.clear();
         let args = Self::build_args(command);
         let loader = StaticConfigLoader::new(self.config.clone());
-        let exit = run_with_loader(
-            args,
-            &mut self.stdout,
-            &mut self.stderr,
-            &loader,
-            &self.lifecycle,
-        );
+        let mut io = IoStreams::new(&mut self.stdout, &mut self.stderr);
+        let exit = run_with_loader(args, &mut io, &loader, &self.lifecycle);
         self.exit_code = Some(exit);
         if let Some(daemon) = self.daemon.as_mut() {
             self.requests = daemon.take_requests()?;
@@ -403,8 +399,7 @@ impl LifecycleHandler for TestLifecycle {
         &self,
         invocation: LifecycleInvocation,
         _context: LifecycleContext<'_>,
-        _stdout: &mut W,
-        _stderr: &mut E,
+        _output: &mut LifecycleOutput<W, E>,
     ) -> Result<ExitCode, AppError> {
         let call = LifecycleCall {
             command: invocation.command,

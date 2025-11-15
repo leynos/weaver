@@ -19,8 +19,8 @@ use std::thread;
 
 use crate::{
     AppError, Cli, CommandDescriptor, CommandInvocation, CommandRequest, ConfigLoader,
-    EMPTY_LINE_LIMIT, LifecycleCommand, connect, exit_code_from_status, parse_lifecycle_invocation,
-    read_daemon_messages, run_with_loader,
+    EMPTY_LINE_LIMIT, IoStreams, LifecycleCommand, connect, exit_code_from_status,
+    parse_lifecycle_invocation, read_daemon_messages, run_with_loader,
 };
 use rstest::rstest;
 use weaver_config::{Config, SocketEndpoint};
@@ -193,10 +193,10 @@ fn run_with_loader_reports_configuration_failures() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let lifecycle = TestLifecycle::default();
+    let mut io = IoStreams::new(&mut stdout, &mut stderr);
     let exit = run_with_loader(
         vec![OsString::from("weaver")],
-        &mut stdout,
-        &mut stderr,
+        &mut io,
         &FailingLoader,
         &lifecycle,
     );
@@ -230,6 +230,7 @@ fn run_with_loader_filters_configuration_arguments() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let lifecycle = TestLifecycle::default();
+    let mut io = IoStreams::new(&mut stdout, &mut stderr);
     let exit = run_with_loader(
         vec![
             OsString::from("weaver"),
@@ -242,8 +243,7 @@ fn run_with_loader_filters_configuration_arguments() {
             OsString::from("--"),
             OsString::from("--extra"),
         ],
-        &mut stdout,
-        &mut stderr,
+        &mut io,
         &loader,
         &lifecycle,
     );

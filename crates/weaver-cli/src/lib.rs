@@ -27,7 +27,7 @@ use config::{ConfigArgumentSplit, split_config_arguments};
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader};
 use lifecycle::{
     LifecycleCommand, LifecycleContext, LifecycleError, LifecycleHandler, LifecycleInvocation,
-    SystemLifecycle,
+    LifecycleOutput, SystemLifecycle,
 };
 use transport::connect;
 /// CLI flags recognised by the configuration loader.
@@ -44,6 +44,18 @@ const CONFIG_CLI_FLAGS: &[&str] = &[
 ];
 const EMPTY_LINE_LIMIT: usize = 10;
 
+/// Bundles the IO streams provided to the CLI runtime.
+pub(crate) struct IoStreams<'a, W: Write, E: Write> {
+    pub(crate) stdout: &'a mut W,
+    pub(crate) stderr: &'a mut E,
+}
+
+impl<'a, W: Write, E: Write> IoStreams<'a, W, E> {
+    pub(crate) fn new(stdout: &'a mut W, stderr: &'a mut E) -> Self {
+        Self { stdout, stderr }
+    }
+}
+
 /// Runs the CLI using the provided arguments and IO handles.
 #[must_use]
 pub fn run<I, W, E>(args: I, stdout: &mut W, stderr: &mut E) -> ExitCode
@@ -52,7 +64,8 @@ where
     W: Write,
     E: Write,
 {
-    run_with_loader(args, stdout, stderr, &OrthoConfigLoader, &SystemLifecycle)
+    let mut io = IoStreams::new(stdout, stderr);
+    run_with_loader(args, &mut io, &OrthoConfigLoader, &SystemLifecycle)
 }
 
 fn prepare_cli_arguments(args: &[OsString], split: &ConfigArgumentSplit) -> Vec<OsString> {
@@ -69,8 +82,7 @@ fn prepare_cli_arguments(args: &[OsString], split: &ConfigArgumentSplit) -> Vec<
 fn handle_capabilities_mode<W, E>(
     cli: &Cli,
     config: &Config,
-    stdout: &mut W,
-    stderr: &mut E,
+    io: &mut IoStreams<'_, W, E>,
 ) -> Option<ExitCode>
 where
     W: Write,
@@ -80,10 +92,10 @@ where
         return None;
     }
 
-    match emit_capabilities(config, stdout) {
+    match emit_capabilities(config, io.stdout) {
         Ok(()) => Some(ExitCode::SUCCESS),
         Err(error) => {
-            let _ = writeln!(stderr, "{error}");
+            let _ = writeln!(io.stderr, "{error}");
             Some(ExitCode::FAILURE)
         }
     }
@@ -118,8 +130,7 @@ fn parse_lifecycle_invocation(cli: &Cli) -> Result<Option<LifecycleInvocation>, 
 fn execute_daemon_command<W, E>(
     invocation: CommandInvocation,
     config: &Config,
-    stdout: &mut W,
-    stderr: &mut E,
+    io: &mut IoStreams<'_, W, E>,
 ) -> ExitCode
 where
     W: Write,
@@ -129,20 +140,20 @@ where
     let mut connection = match connect(config.daemon_socket()) {
         Ok(connection) => connection,
         Err(error) => {
-            let _ = writeln!(stderr, "{error}");
+            let _ = writeln!(io.stderr, "{error}");
             return ExitCode::FAILURE;
         }
     };
 
     if let Err(error) = request.write_jsonl(&mut connection) {
-        let _ = writeln!(stderr, "{error}");
+        let _ = writeln!(io.stderr, "{error}");
         return ExitCode::FAILURE;
     }
 
-    match read_daemon_messages(&mut connection, stdout, stderr) {
+    match read_daemon_messages(&mut connection, &mut *io.stdout, &mut *io.stderr) {
         Ok(status) => exit_code_from_status(status),
         Err(error) => {
-            let _ = writeln!(stderr, "{error}");
+            let _ = writeln!(io.stderr, "{error}");
             ExitCode::FAILURE
         }
     }
@@ -152,8 +163,7 @@ where
 #[must_use]
 pub(crate) fn run_with_loader<I, W, E, L, H>(
     args: I,
-    stdout: &mut W,
-    stderr: &mut E,
+    io: &mut IoStreams<'_, W, E>,
     loader: &L,
     lifecycle: &H,
 ) -> ExitCode
@@ -176,7 +186,7 @@ where
                 .map(|config| (cli, config))
         })
         .and_then(|(cli, config)| {
-            if let Some(exit_code) = handle_capabilities_mode(&cli, &config, stdout, stderr) {
+            if let Some(exit_code) = handle_capabilities_mode(&cli, &config, io) {
                 return Ok(exit_code);
             }
 
@@ -185,17 +195,18 @@ where
                     config: &config,
                     config_arguments: &split.config_arguments,
                 };
-                return lifecycle.handle(lifecycle_invocation, context, stdout, stderr);
+                let mut output = LifecycleOutput::new(&mut *io.stdout, &mut *io.stderr);
+                return lifecycle.handle(lifecycle_invocation, context, &mut output);
             }
 
             let invocation = CommandInvocation::try_from(cli)?;
-            Ok(execute_daemon_command(invocation, &config, stdout, stderr))
+            Ok(execute_daemon_command(invocation, &config, io))
         });
 
     match result {
         Ok(exit_code) => exit_code,
         Err(error) => {
-            let _ = writeln!(stderr, "{error}");
+            let _ = writeln!(io.stderr, "{error}");
             ExitCode::FAILURE
         }
     }
