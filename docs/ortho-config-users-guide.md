@@ -8,10 +8,24 @@ to minimize boiler‑plate. The library uses `serde` for deserialization and
 management. This guide covers the functionality currently implemented in the
 repository.
 
+## Weaver integration
+
+The `weaver-config` crate targets `ortho-config` v0.6.0. Its `Config` struct
+declares discovery rules inline via `#[ortho_config(discovery(...))]`, listing
+the `weaver.toml` project file, `.weaver.toml` dotfile, and the
+`--config-path`/`WEAVER_CONFIG_PATH` override in one attribute. The CLI calls
+`Config::load_from_iter` while the daemon calls `Config::load`, so both
+binaries share the generated loaders with no manual builders to maintain.
+
+Because v0.6.0 returns an aggregated error whenever every discovered file
+fails, the CLI and daemon now exit immediately when a configuration file exists
+but cannot be parsed. Operators no longer see silent fallbacks to defaults; the
+`OrthoError` reported via `LoadConfiguration` pinpoints each offending file.
+
 ## Core concepts and motivation
 
 Rust projects often wire together `clap` for CLI parsing, `serde` for
-de/serialization, and ad‑hoc code for loading `*.toml` files or reading
+de/serialization, and ad-hoc code for loading `*.toml` files or reading
 environment variables. Mapping between different naming conventions (kebab‑case
 flags, `UPPER_SNAKE_CASE` environment variables, and `snake_case` struct
 fields) can be tedious. `OrthoConfig` addresses these problems by letting

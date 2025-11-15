@@ -304,6 +304,17 @@ Configuration is layered with `ortho-config`, producing the precedence order
 alongside the standard XDG locations, ensuring the CLI and daemon resolve
 identical results regardless of which component loads the settings.
 
+The workspace now targets `ortho-config` v0.6.0. The switch lets
+`weaver-config::Config` declare its discovery policy inline through the
+`#[ortho_config(discovery(...))]` attribute. The app name, dotfile, project
+file, and `--config-path` flag are all defined next to the struct, so every
+consumer shares the same generated loader without bespoke builders.
+
+Version 0.6.0 also tightens error handling: if any discovered configuration
+file fails to parse, `ConfigDiscovery::load_first` returns an aggregated
+`OrthoError`. Both the CLI and daemon bubble that error to the user instead of
+quietly falling back to defaults, making misconfigurations immediately visible.
+
 The daemon transport defaults to a Unix domain socket placed under
 `$XDG_RUNTIME_DIR/weaver/weaverd.sock`. When the runtime directory is absent,
 or otherwise unavailable, the path falls back to a per-user namespace under the

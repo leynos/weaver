@@ -63,6 +63,25 @@ capability = "act.rename-symbol"
 directive = "force"
 ```
 
+### Validation and error reporting
+
+`weaver` now uses `ortho-config` v0.6.0, which treats invalid configuration
+files as fatal. When `--config-path` points at a broken file—or when discovery
+finds a malformed `weaver.toml`/`.weaver.toml`—, both the CLI and daemon abort
+with a `LoadConfiguration` error that lists every offending path. Remove or fix
+the reported files before retrying. If no configuration files exist at all the
+loader still falls back to the built-in defaults described below.
+
+Operators will see aggregated errors enumerated in the order discovery
+encounters them. For example:
+
+```text
+failed to load configuration: multiple configuration errors:
+1: Configuration file error in '/etc/weaver/weaver.toml': expected `}`
+2: Configuration file error in '/home/alex/.weaver.toml': invalid type:
+string "yes", expected a boolean
+```
+
 ## Defaults
 
 - **Daemon socket:** On Unix-like targets, the daemon listens on

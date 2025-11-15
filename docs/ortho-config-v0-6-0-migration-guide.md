@@ -220,6 +220,23 @@ announcements.[^changelog]
 Once everything compiles and tests pass, the upgraded configuration experience
 is ready for release.
 
+## Weaver adoption status
+
+The Weaver workspace now follows this migration guide:
+
+- `Cargo.toml` pins `ortho_config = "0.6.0"`, so every crate (CLI, daemon, and
+  shared config) compiles against the new runtime and macro releases.
+- `Cargo.lock` records `ortho_config`/`ortho_config_macros` v0.6.0, ensuring
+  reproducible builds pick up the stricter discovery semantics.
+- `weaver-config::Config` relies on the `#[ortho_config(discovery(...))]`
+  attribute, so no bespoke builders remain to audit for the new declarative API.
+- Both `weaver-cli` and `weaverd` bubble the aggregated `OrthoError` returned
+  by `Config::load`/`load_from_iter`, meaning broken configuration files now
+  stop launches immediately instead of falling back to defaults.
+- Operator-facing documentation (`docs/weaver-design.md` and
+  `docs/users-guide.md`) now calls out the fail-fast behaviour so users know
+  how to remedy invalid configuration files.
+
 [^forwarded-features]: Optional parser features on `ortho_config` automatically
 enable matching flags on the macro crate, keeping generated code in sync with
 runtime capabilities.【F:ortho_config/Cargo.toml†L41-L45】
