@@ -275,12 +275,11 @@ fn wait_for_ready(
         if let Some(status) = child
             .try_wait()
             .map_err(|source| LifecycleError::MonitorChild { source })?
+            .filter(|status| !status.success())
         {
-            if !status.success() {
-                return Err(LifecycleError::StartupFailed {
-                    exit_status: status.code(),
-                });
-            }
+            return Err(LifecycleError::StartupFailed {
+                exit_status: status.code(),
+            });
         }
         thread::sleep(POLL_INTERVAL);
     }

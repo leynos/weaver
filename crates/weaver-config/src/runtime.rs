@@ -120,8 +120,10 @@ mod tests {
 
     #[test]
     fn derives_paths_for_tcp_socket() {
-        let mut config = Config::default();
-        config.daemon_socket = SocketEndpoint::tcp("127.0.0.1", 9000);
+        let config = Config {
+            daemon_socket: SocketEndpoint::tcp("127.0.0.1", 9000),
+            ..Config::default()
+        };
         let paths = RuntimePaths::from_config(&config).expect("paths should derive for tcp");
         let tail = paths
             .runtime_dir()
@@ -139,8 +141,10 @@ mod tests {
 
     #[test]
     fn rejects_unix_socket_without_parent() {
-        let mut config = Config::default();
-        config.daemon_socket = SocketEndpoint::unix("weaver.sock");
+        let config = Config {
+            daemon_socket: SocketEndpoint::unix("weaver.sock"),
+            ..Config::default()
+        };
         let error = RuntimePaths::from_config(&config)
             .expect_err("paths should fail for sockets without parents");
         assert!(matches!(
