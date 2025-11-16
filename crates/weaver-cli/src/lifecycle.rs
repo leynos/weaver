@@ -80,6 +80,14 @@ impl<W: Write, E: Write> LifecycleOutput<W, E> {
     pub(crate) fn new(stdout: W, stderr: E) -> Self {
         Self { stdout, stderr }
     }
+
+    fn stdout_line(&mut self, args: fmt::Arguments<'_>) -> Result<(), LifecycleError> {
+        self.stdout.write_fmt(args).map_err(LifecycleError::Io)
+    }
+
+    fn stderr_line(&mut self, args: fmt::Arguments<'_>) -> Result<(), LifecycleError> {
+        self.stderr.write_fmt(args).map_err(LifecycleError::Io)
+    }
 }
 
 /// Abstract interface for handling lifecycle commands.
@@ -124,19 +132,15 @@ impl SystemLifecycle {
         let paths = RuntimePaths::from_config(context.config)?;
         let mut child = spawn_daemon(context.config_arguments)?;
         let snapshot = wait_for_ready(&paths, &mut child)?;
-        writeln!(
-            output.stdout,
-            "daemon ready (pid {}) on {}",
+        output.stdout_line(format_args!(
+            "daemon ready (pid {}) on {}\n",
             snapshot.pid,
             context.config.daemon_socket()
-        )
-        .map_err(LifecycleError::Io)?;
-        writeln!(
-            output.stderr,
-            "runtime artefacts stored under {}",
+        ))?;
+        output.stderr_line(format_args!(
+            "runtime artefacts stored under {}\n",
             paths.runtime_dir().display()
-        )
-        .map_err(LifecycleError::Io)?;
+        ))?;
         Ok(ExitCode::SUCCESS)
     }
 
@@ -156,23 +160,19 @@ impl SystemLifecycle {
                     endpoint: context.config.daemon_socket().to_string(),
                 });
             }
-            writeln!(
-                output.stdout,
-                "daemon is not running (pid file missing at {})",
+            output.stdout_line(format_args!(
+                "daemon is not running (pid file missing at {})\n",
                 paths.pid_path().display()
-            )
-            .map_err(LifecycleError::Io)?;
+            ))?;
             return Ok(ExitCode::SUCCESS);
         };
         signal_daemon(pid)?;
         wait_for_shutdown(&paths, context.config.daemon_socket())?;
-        writeln!(output.stdout, "daemon pid {pid} stopped cleanly").map_err(LifecycleError::Io)?;
-        writeln!(
-            output.stderr,
-            "removed runtime artefacts from {}",
+        output.stdout_line(format_args!("daemon pid {pid} stopped cleanly\n"))?;
+        output.stderr_line(format_args!(
+            "removed runtime artefacts from {}\n",
             paths.runtime_dir().display()
-        )
-        .map_err(LifecycleError::Io)?;
+        ))?;
         Ok(ExitCode::SUCCESS)
     }
 
@@ -187,41 +187,33 @@ impl SystemLifecycle {
         let snapshot = read_health(paths.health_path())?;
         let reachable = socket_is_reachable(context.config.daemon_socket())?;
         if let Some(snapshot) = snapshot {
-            writeln!(
-                output.stdout,
-                "daemon status: {} (pid {}) via {}",
+            output.stdout_line(format_args!(
+                "daemon status: {} (pid {}) via {}\n",
                 snapshot.status,
                 snapshot.pid,
                 context.config.daemon_socket()
-            )
-            .map_err(LifecycleError::Io)?;
+            ))?;
             return Ok(ExitCode::SUCCESS);
         }
         let pid = read_pid(paths.pid_path())?;
         match pid {
             Some(pid) => {
-                writeln!(
-                    output.stdout,
-                    "daemon recorded pid {pid} but health snapshot is missing; check {}",
+                output.stdout_line(format_args!(
+                    "daemon recorded pid {pid} but health snapshot is missing; check {}\n",
                     paths.health_path().display()
-                )
-                .map_err(LifecycleError::Io)?;
+                ))?;
             }
             None if reachable => {
-                writeln!(
-                    output.stdout,
-                    "daemon socket {} is listening but runtime files are missing; consider 'weaver daemon stop' or removing {}",
+                output.stdout_line(format_args!(
+                    "daemon socket {} is listening but runtime files are missing; consider 'weaver daemon stop' or removing {}\n",
                     context.config.daemon_socket(),
                     paths.runtime_dir().display()
-                )
-                .map_err(LifecycleError::Io)?;
+                ))?;
             }
             None => {
-                writeln!(
-                    output.stdout,
-                    "daemon is not running; use 'weaver daemon start' to launch it."
-                )
-                .map_err(LifecycleError::Io)?;
+                output.stdout_line(format_args!(
+                    "daemon is not running; use 'weaver daemon start' to launch it.\n"
+                ))?;
             }
         }
         Ok(ExitCode::SUCCESS)
