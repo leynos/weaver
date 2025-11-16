@@ -44,6 +44,11 @@ const CONFIG_CLI_FLAGS: &[&str] = &[
 const EMPTY_LINE_LIMIT: usize = 10;
 
 /// Bundles the IO streams provided to the CLI runtime.
+///
+/// `IoStreams` owns the long-lived writers used while parsing CLI arguments.
+/// Lifecycle commands receive a short-lived [`LifecycleOutput`] wrapper that
+/// borrows these streams so helpers can flush individual messages without
+/// threading the CLI runtime through every call.
 pub(crate) struct IoStreams<'a, W: Write, E: Write> {
     pub(crate) stdout: &'a mut W,
     pub(crate) stderr: &'a mut E,
@@ -105,9 +110,9 @@ where
                     return Ok(exit_code);
                 }
 
-                if let Some(CliCommand::Daemon { action }) = cli.command.clone() {
+                if let Some(CliCommand::Daemon { action }) = cli.command.as_ref() {
                     let invocation = LifecycleInvocation {
-                        command: action.into(),
+                        command: (*action).into(),
                         arguments: Vec::new(),
                     };
                     let context = LifecycleContext {

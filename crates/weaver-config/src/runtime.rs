@@ -29,17 +29,19 @@ pub struct RuntimePaths {
 impl RuntimePaths {
     /// Derives runtime paths from the shared configuration.
     pub fn from_config(config: &Config) -> Result<Self, RuntimePathsError> {
-        let runtime_dir = runtime_directory(config)?;
-        fs::create_dir_all(&runtime_dir).map_err(|source| RuntimePathsError::RuntimeDirectory {
-            path: runtime_dir.clone(),
-            source,
+        let paths = Self::derive_paths(config)?;
+        fs::create_dir_all(paths.runtime_dir()).map_err(|source| {
+            RuntimePathsError::RuntimeDirectory {
+                path: paths.runtime_dir.clone(),
+                source,
+            }
         })?;
-        Ok(Self {
-            lock_path: runtime_dir.join("weaverd.lock"),
-            pid_path: runtime_dir.join("weaverd.pid"),
-            health_path: runtime_dir.join("weaverd.health"),
-            runtime_dir,
-        })
+        Ok(paths)
+    }
+
+    /// Derives runtime paths without touching the filesystem.
+    pub fn from_config_readonly(config: &Config) -> Result<Self, RuntimePathsError> {
+        Self::derive_paths(config)
     }
 
     /// Directory holding runtime artefacts.
@@ -60,6 +62,18 @@ impl RuntimePaths {
     /// Path to the health snapshot.
     pub fn health_path(&self) -> &Path {
         self.health_path.as_path()
+    }
+}
+
+impl RuntimePaths {
+    fn derive_paths(config: &Config) -> Result<Self, RuntimePathsError> {
+        let runtime_dir = runtime_directory(config)?;
+        Ok(Self {
+            lock_path: runtime_dir.join("weaverd.lock"),
+            pid_path: runtime_dir.join("weaverd.pid"),
+            health_path: runtime_dir.join("weaverd.health"),
+            runtime_dir,
+        })
     }
 }
 
@@ -86,6 +100,9 @@ fn default_runtime_directory() -> PathBuf {
         }
         let mut dir = env::temp_dir();
         dir.push("weaver");
+        // SAFETY: `geteuid` has no preconditions and simply returns the
+        // caller's effective UID, which we use to namespace per-user temp
+        // directories.
         dir.push(format!("uid-{}", unsafe { geteuid() }));
         dir
     }

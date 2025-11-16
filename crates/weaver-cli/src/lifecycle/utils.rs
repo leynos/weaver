@@ -1,3 +1,8 @@
+//! Daemon lifecycle orchestration utilities.
+//!
+//! Provides low-level helpers for preparing runtime directories, spawning the
+//! daemon, monitoring health snapshots, and coordinating shutdown sequences.
+
 use std::env;
 use std::ffi::OsString;
 use std::fs;
@@ -47,6 +52,8 @@ pub(super) fn spawn_daemon(config_arguments: &[OsString]) -> Result<Child, Lifec
     let binary = daemon_binary();
     let mut command = Command::new(&binary);
     if config_arguments.len() > 1 {
+        // Skip argv[0], which is the binary name, and forward the remaining CLI
+        // arguments verbatim to the daemon.
         for arg in &config_arguments[1..] {
             command.arg(arg);
         }
@@ -195,7 +202,7 @@ fn try_connect(endpoint: &SocketEndpoint) -> io::Result<()> {
 fn resolve_tcp(host: &str, port: u16) -> io::Result<SocketAddr> {
     let mut addrs = (host, port).to_socket_addrs()?;
     addrs
-        .find(|addr| matches!(addr, SocketAddr::V4(_) | SocketAddr::V6(_)))
+        .next()
         .ok_or_else(|| io::Error::new(io::ErrorKind::AddrNotAvailable, "no resolved address"))
 }
 
@@ -227,6 +234,9 @@ fn is_socket_available(error: &io::Error) -> bool {
 pub(super) fn signal_daemon(pid: u32) -> Result<(), LifecycleError> {
     #[cfg(unix)]
     {
+        // SAFETY: `kill(2)` is memory-safe even when the PID is invalid; the
+        // kernel simply returns an error. We only translate the integer and use
+        // the standard SIGTERM signal.
         let result = unsafe { kill(pid as libc::pid_t, SIGTERM) };
         if result == 0 {
             Ok(())
@@ -269,12 +279,12 @@ pub(super) fn write_startup_banner<W: Write, E: Write>(
     paths: &RuntimePaths,
 ) -> Result<(), LifecycleError> {
     output.stdout_line(format_args!(
-        "daemon ready (pid {}) on {}\n",
+        "daemon ready (pid {}) on {}",
         snapshot.pid,
         context.config.daemon_socket()
     ))?;
     output.stderr_line(format_args!(
-        "runtime artefacts stored under {}\n",
+        "runtime artefacts stored under {}",
         paths.runtime_dir().display()
     ))
 }

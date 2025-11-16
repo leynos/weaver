@@ -1,3 +1,8 @@
+//! Lifecycle command types and output abstractions.
+//!
+//! Defines the payloads and IO wrappers shared across lifecycle commands so the
+//! controller can remain agnostic of concrete writers.
+
 use std::ffi::OsString;
 use std::fmt;
 use std::io::Write;
@@ -51,11 +56,15 @@ impl<W: Write, E: Write> LifecycleOutput<W, E> {
     }
 
     pub fn stdout_line(&mut self, args: fmt::Arguments<'_>) -> Result<(), LifecycleError> {
-        self.stdout.write_fmt(args).map_err(LifecycleError::Io)
+        self.stdout.write_fmt(args).map_err(LifecycleError::Io)?;
+        self.stdout.write_all(b"\n").map_err(LifecycleError::Io)?;
+        self.stdout.flush().map_err(LifecycleError::Io)
     }
 
     pub fn stderr_line(&mut self, args: fmt::Arguments<'_>) -> Result<(), LifecycleError> {
-        self.stderr.write_fmt(args).map_err(LifecycleError::Io)
+        self.stderr.write_fmt(args).map_err(LifecycleError::Io)?;
+        self.stderr.write_all(b"\n").map_err(LifecycleError::Io)?;
+        self.stderr.flush().map_err(LifecycleError::Io)
     }
 }
 

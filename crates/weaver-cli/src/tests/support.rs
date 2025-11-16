@@ -394,9 +394,6 @@ impl TestLifecycle {
     pub fn enqueue(&self, result: Result<ExitCode, LifecycleError>) {
         self.responses.borrow_mut().push_back(result);
     }
-}
-
-impl TestLifecycle {
     pub fn handle<W: Write, E: Write>(
         &self,
         invocation: LifecycleInvocation,

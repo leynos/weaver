@@ -63,16 +63,16 @@ impl SystemLifecycle {
                 });
             }
             output.stdout_line(format_args!(
-                "daemon is not running (pid file missing at {})\n",
+                "daemon is not running (pid file missing at {})",
                 paths.pid_path().display()
             ))?;
             return Ok(ExitCode::SUCCESS);
         };
         signal_daemon(pid)?;
         wait_for_shutdown(&paths, context.config.daemon_socket())?;
-        output.stdout_line(format_args!("daemon pid {pid} stopped cleanly\n"))?;
+        output.stdout_line(format_args!("daemon pid {pid} stopped cleanly"))?;
         output.stderr_line(format_args!(
-            "removed runtime artefacts from {}\n",
+            "removed runtime artefacts from {}",
             paths.runtime_dir().display()
         ))?;
         Ok(ExitCode::SUCCESS)
@@ -85,36 +85,50 @@ impl SystemLifecycle {
         output: &mut LifecycleOutput<W, E>,
     ) -> Result<ExitCode, LifecycleError> {
         ensure_no_extra_arguments(invocation)?;
-        let paths = RuntimePaths::from_config(context.config).map_err(LifecycleError::from)?;
+        let paths = match RuntimePaths::from_config_readonly(context.config) {
+            Ok(paths) => paths,
+            Err(_) => {
+                output.stdout_line(format_args!(
+                    "daemon is not running; use 'weaver daemon start' to launch it."
+                ))?;
+                return Ok(ExitCode::SUCCESS);
+            }
+        };
+        if !paths.runtime_dir().exists() {
+            output.stdout_line(format_args!(
+                "daemon is not running; use 'weaver daemon start' to launch it."
+            ))?;
+            return Ok(ExitCode::SUCCESS);
+        }
         let snapshot = read_health(paths.health_path())?;
-        let reachable = socket_is_reachable(context.config.daemon_socket())?;
         if let Some(snapshot) = snapshot {
             output.stdout_line(format_args!(
-                "daemon status: {} (pid {}) via {}\n",
+                "daemon status: {} (pid {}) via {}",
                 snapshot.status,
                 snapshot.pid,
                 context.config.daemon_socket()
             ))?;
             return Ok(ExitCode::SUCCESS);
         }
+        let reachable = socket_is_reachable(context.config.daemon_socket())?;
         let pid = read_pid(paths.pid_path())?;
         match pid {
             Some(pid) => {
                 output.stdout_line(format_args!(
-                    "daemon recorded pid {pid} but health snapshot is missing; check {}\n",
+                    "daemon recorded pid {pid} but health snapshot is missing; check {}",
                     paths.health_path().display()
                 ))?;
             }
             None if reachable => {
                 output.stdout_line(format_args!(
-                    "daemon socket {} is listening but runtime files are missing; consider 'weaver daemon stop' or removing {}\n",
+                    "daemon socket {} is listening but runtime files are missing; consider 'weaver daemon stop' or removing {}",
                     context.config.daemon_socket(),
                     paths.runtime_dir().display()
                 ))?;
             }
             None => {
                 output.stdout_line(format_args!(
-                    "daemon is not running; use 'weaver daemon start' to launch it.\n"
+                    "daemon is not running; use 'weaver daemon start' to launch it."
                 ))?;
             }
         }
