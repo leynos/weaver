@@ -6,7 +6,7 @@ use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use socket2::{Domain, SockAddr, Socket, Type};
 use weaver_config::{RuntimePaths, SocketEndpoint};
@@ -64,10 +64,18 @@ fn daemon_binary() -> OsString {
 pub(super) fn wait_for_ready(
     paths: &RuntimePaths,
     child: &mut Child,
+    started_at: SystemTime,
 ) -> Result<HealthSnapshot, LifecycleError> {
     let deadline = Instant::now() + STARTUP_TIMEOUT;
+    let expected_pid = child.id();
     while Instant::now() < deadline {
         if let Some(snapshot) = read_health(paths.health_path())? {
+            if !snapshot_matches_process(&snapshot, expected_pid)
+                || !snapshot_is_recent(&snapshot, started_at)
+            {
+                thread::sleep(POLL_INTERVAL);
+                continue;
+            }
             if snapshot.status == "ready" {
                 return Ok(snapshot);
             }
@@ -243,6 +251,17 @@ pub(crate) struct HealthSnapshot {
     pub timestamp: u64,
 }
 
+fn snapshot_matches_process(snapshot: &HealthSnapshot, expected_pid: u32) -> bool {
+    snapshot.pid == expected_pid
+}
+
+fn snapshot_is_recent(snapshot: &HealthSnapshot, started_at: SystemTime) -> bool {
+    match UNIX_EPOCH.checked_add(Duration::from_secs(snapshot.timestamp)) {
+        Some(snapshot_time) => snapshot_time >= started_at,
+        None => false,
+    }
+}
+
 pub(super) fn write_startup_banner<W: Write, E: Write>(
     output: &mut LifecycleOutput<W, E>,
     context: LifecycleContext<'_>,
@@ -311,5 +330,29 @@ pub(crate) mod tests {
         assert!(matches!(error, LifecycleError::SocketInUse { .. }));
         drop(listener);
         ensure_socket_available(&endpoint).expect("socket becomes available");
+    }
+
+    #[test]
+    fn snapshot_validation_requires_matching_pid() {
+        let snapshot = HealthSnapshot {
+            status: String::from("ready"),
+            pid: 42,
+            timestamp: 0,
+        };
+        assert!(snapshot_matches_process(&snapshot, 42));
+        assert!(!snapshot_matches_process(&snapshot, 1));
+    }
+
+    #[test]
+    fn snapshot_validation_requires_recent_timestamp() {
+        let snapshot = HealthSnapshot {
+            status: String::from("ready"),
+            pid: 1,
+            timestamp: 10,
+        };
+        let start = UNIX_EPOCH + Duration::from_secs(20);
+        assert!(!snapshot_is_recent(&snapshot, start));
+        let start = UNIX_EPOCH + Duration::from_secs(5);
+        assert!(snapshot_is_recent(&snapshot, start));
     }
 }

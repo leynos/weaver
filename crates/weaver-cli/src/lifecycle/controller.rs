@@ -1,5 +1,6 @@
 use std::io::Write;
 use std::process::ExitCode;
+use std::time::SystemTime;
 
 use weaver_config::RuntimePaths;
 
@@ -39,7 +40,8 @@ impl SystemLifecycle {
         ensure_socket_available(context.config.daemon_socket())?;
         let paths = prepare_runtime(context)?;
         let mut child = spawn_daemon(context.config_arguments)?;
-        let snapshot = wait_for_ready(&paths, &mut child)?;
+        let started_at = SystemTime::now();
+        let snapshot = wait_for_ready(&paths, &mut child, started_at)?;
         write_startup_banner(output, context, &snapshot, &paths)?;
         Ok(ExitCode::SUCCESS)
     }
