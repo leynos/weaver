@@ -3,9 +3,7 @@
 //! Exercises command serialisation, daemon message parsing, configuration
 //! loading, and socket connection establishment (TCP and Unix domain sockets).
 
-use super::support::{
-    TestLifecycle, accept_tcp_connection, decode_utf8, default_daemon_lines, read_fixture,
-};
+use super::support::{accept_tcp_connection, decode_utf8, default_daemon_lines, read_fixture};
 
 #[cfg(unix)]
 use super::support::accept_unix_connection;
@@ -18,10 +16,11 @@ use std::process::ExitCode;
 use std::thread;
 
 use crate::{
-    AppError, Cli, CommandDescriptor, CommandInvocation, CommandRequest, ConfigLoader,
-    EMPTY_LINE_LIMIT, IoStreams, LifecycleCommand, connect, exit_code_from_status,
-    parse_lifecycle_invocation, read_daemon_messages, run_with_loader,
+    AppError, Cli, CliCommand, CommandDescriptor, CommandInvocation, CommandRequest, ConfigLoader,
+    DaemonAction, EMPTY_LINE_LIMIT, IoStreams, connect, exit_code_from_status,
+    read_daemon_messages, run_with_loader,
 };
+use clap::Parser;
 use rstest::rstest;
 use weaver_config::{Config, SocketEndpoint};
 
@@ -71,6 +70,7 @@ fn command_invocation_validation(
 ) {
     let cli = Cli {
         capabilities: false,
+        command: None,
         domain,
         operation,
         arguments: Vec::new(),
@@ -86,49 +86,14 @@ fn command_invocation_validation(
 }
 
 #[test]
-fn parse_lifecycle_invocation_detects_start_command() {
-    let cli = Cli {
-        capabilities: false,
-        domain: Some(String::from("daemon")),
-        operation: Some(String::from("start")),
-        arguments: vec![String::from("--force")],
-    };
-    let invocation = parse_lifecycle_invocation(&cli)
-        .expect("parse result")
-        .expect("lifecycle invocation");
-    assert_eq!(invocation.command, LifecycleCommand::Start);
-    assert_eq!(invocation.arguments, vec![String::from("--force")]);
-}
-
-#[test]
-fn parse_lifecycle_invocation_rejects_unknown_operation() {
-    let cli = Cli {
-        capabilities: false,
-        domain: Some(String::from("daemon")),
-        operation: Some(String::from("restart")),
-        arguments: Vec::new(),
-    };
-    match parse_lifecycle_invocation(&cli) {
-        Err(AppError::UnsupportedLifecycleOperation { operation }) => {
-            assert_eq!(operation, "restart")
-        }
-        other => panic!("expected unsupported operation error, got {other:?}"),
+fn cli_parses_daemon_subcommand() {
+    let cli = Cli::try_parse_from(["weaver", "daemon", "status"]).expect("parse daemon");
+    match cli.command {
+        Some(CliCommand::Daemon {
+            action: DaemonAction::Status,
+        }) => {}
+        other => panic!("expected daemon status command, got {other:?}"),
     }
-}
-
-#[test]
-fn parse_lifecycle_invocation_ignores_other_domains() {
-    let cli = Cli {
-        capabilities: false,
-        domain: Some(String::from("observe")),
-        operation: Some(String::from("start")),
-        arguments: Vec::new(),
-    };
-    let parsed = parse_lifecycle_invocation(&cli).expect("parse result");
-    assert!(
-        parsed.is_none(),
-        "non-daemon domains should bypass lifecycle"
-    );
 }
 
 #[rstest]
@@ -192,14 +157,8 @@ fn run_with_loader_reports_configuration_failures() {
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let lifecycle = TestLifecycle::default();
     let mut io = IoStreams::new(&mut stdout, &mut stderr);
-    let exit = run_with_loader(
-        vec![OsString::from("weaver")],
-        &mut io,
-        &FailingLoader,
-        &lifecycle,
-    );
+    let exit = run_with_loader(vec![OsString::from("weaver")], &mut io, &FailingLoader);
     assert_eq!(exit, ExitCode::FAILURE);
     let stderr_text = decode_utf8(stderr, "stderr").expect("decode stderr");
     assert!(stderr_text.contains("command domain"));
@@ -229,7 +188,6 @@ fn run_with_loader_filters_configuration_arguments() {
     let loader = RecordingLoader::new();
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let lifecycle = TestLifecycle::default();
     let mut io = IoStreams::new(&mut stdout, &mut stderr);
     let exit = run_with_loader(
         vec![
@@ -245,7 +203,6 @@ fn run_with_loader_filters_configuration_arguments() {
         ],
         &mut io,
         &loader,
-        &lifecycle,
     );
 
     assert_eq!(exit, ExitCode::FAILURE);

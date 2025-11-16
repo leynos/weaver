@@ -10,7 +10,7 @@ use std::io::{self, Write};
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use serde::Deserialize;
 use thiserror::Error;
 use weaver_config::{CapabilityMatrix, Config};
@@ -26,8 +26,7 @@ pub(crate) use command::{CommandInvocation, CommandRequest};
 use config::{ConfigArgumentSplit, split_config_arguments};
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader};
 use lifecycle::{
-    LifecycleCommand, LifecycleContext, LifecycleError, LifecycleHandler, LifecycleInvocation,
-    LifecycleOutput, SystemLifecycle,
+    LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput, SystemLifecycle,
 };
 use transport::connect;
 /// CLI flags recognised by the configuration loader.
@@ -56,6 +55,84 @@ impl<'a, W: Write, E: Write> IoStreams<'a, W, E> {
     }
 }
 
+struct CliRunner<'a, W: Write, E: Write, L: ConfigLoader> {
+    io: &'a mut IoStreams<'a, W, E>,
+    loader: &'a L,
+}
+
+impl<'a, W, E, L> CliRunner<'a, W, E, L>
+where
+    W: Write,
+    E: Write,
+    L: ConfigLoader,
+{
+    fn new(io: &'a mut IoStreams<'a, W, E>, loader: &'a L) -> Self {
+        Self { io, loader }
+    }
+
+    fn run<I>(&mut self, args: I) -> ExitCode
+    where
+        I: IntoIterator<Item = OsString>,
+    {
+        let mut lifecycle = SystemLifecycle;
+        self.run_with_handler(args, |invocation, context, output| {
+            lifecycle.handle(invocation, context, output)
+        })
+    }
+
+    fn run_with_handler<I, F>(&mut self, args: I, mut handler: F) -> ExitCode
+    where
+        I: IntoIterator<Item = OsString>,
+        F: FnMut(
+            LifecycleInvocation,
+            LifecycleContext<'_>,
+            &mut LifecycleOutput<&mut W, &mut E>,
+        ) -> Result<ExitCode, LifecycleError>,
+    {
+        let args: Vec<OsString> = args.into_iter().collect();
+        let split = split_config_arguments(&args);
+        let cli_arguments = prepare_cli_arguments(&args, &split);
+
+        let result = Cli::try_parse_from(cli_arguments)
+            .map_err(AppError::CliUsage)
+            .and_then(|cli| {
+                self.loader
+                    .load(&split.config_arguments)
+                    .map(|config| (cli, config))
+            })
+            .and_then(|(cli, config)| {
+                if let Some(exit_code) = handle_capabilities_mode(&cli, &config, self.io) {
+                    return Ok(exit_code);
+                }
+
+                if let Some(CliCommand::Daemon { action }) = cli.command.clone() {
+                    let invocation = LifecycleInvocation {
+                        command: action.into(),
+                        arguments: Vec::new(),
+                    };
+                    let context = LifecycleContext {
+                        config: &config,
+                        config_arguments: &split.config_arguments,
+                    };
+                    let mut output =
+                        LifecycleOutput::new(&mut *self.io.stdout, &mut *self.io.stderr);
+                    return handler(invocation, context, &mut output).map_err(AppError::from);
+                }
+
+                let invocation = CommandInvocation::try_from(cli)?;
+                Ok(execute_daemon_command(invocation, &config, self.io))
+            });
+
+        match result {
+            Ok(exit_code) => exit_code,
+            Err(error) => {
+                let _ = writeln!(self.io.stderr, "{error}");
+                ExitCode::FAILURE
+            }
+        }
+    }
+}
+
 /// Runs the CLI using the provided arguments and IO handles.
 #[must_use]
 pub fn run<I, W, E>(args: I, stdout: &mut W, stderr: &mut E) -> ExitCode
@@ -65,7 +142,7 @@ where
     E: Write,
 {
     let mut io = IoStreams::new(stdout, stderr);
-    run_with_loader(args, &mut io, &OrthoConfigLoader, &SystemLifecycle)
+    run_with_loader(args, &mut io, &OrthoConfigLoader)
 }
 
 fn prepare_cli_arguments(args: &[OsString], split: &ConfigArgumentSplit) -> Vec<OsString> {
@@ -99,32 +176,6 @@ where
             Some(ExitCode::FAILURE)
         }
     }
-}
-
-fn parse_lifecycle_invocation(cli: &Cli) -> Result<Option<LifecycleInvocation>, AppError> {
-    let Some(domain) = cli.domain.as_deref() else {
-        return Ok(None);
-    };
-    if !domain.trim().eq_ignore_ascii_case("daemon") {
-        return Ok(None);
-    }
-    let operation = cli.operation.as_deref().ok_or(AppError::MissingOperation)?;
-    let trimmed = operation.trim();
-    let command = if trimmed.eq_ignore_ascii_case("start") {
-        LifecycleCommand::Start
-    } else if trimmed.eq_ignore_ascii_case("stop") {
-        LifecycleCommand::Stop
-    } else if trimmed.eq_ignore_ascii_case("status") {
-        LifecycleCommand::Status
-    } else {
-        return Err(AppError::UnsupportedLifecycleOperation {
-            operation: trimmed.to_string(),
-        });
-    };
-    Ok(Some(LifecycleInvocation {
-        command,
-        arguments: cli.arguments.clone(),
-    }))
 }
 
 fn execute_daemon_command<W, E>(
@@ -161,55 +212,39 @@ where
 
 /// Runs the CLI with a custom configuration loader.
 #[must_use]
-pub(crate) fn run_with_loader<I, W, E, L, H>(
+pub(crate) fn run_with_loader<'a, I, W, E, L>(
     args: I,
-    io: &mut IoStreams<'_, W, E>,
-    loader: &L,
-    lifecycle: &H,
+    io: &'a mut IoStreams<'a, W, E>,
+    loader: &'a L,
 ) -> ExitCode
 where
     I: IntoIterator<Item = OsString>,
     W: Write,
     E: Write,
     L: ConfigLoader,
-    H: LifecycleHandler,
 {
-    let args: Vec<OsString> = args.into_iter().collect();
-    let split = split_config_arguments(&args);
-    let cli_arguments = prepare_cli_arguments(&args, &split);
+    CliRunner::new(io, loader).run(args)
+}
 
-    let result = Cli::try_parse_from(cli_arguments)
-        .map_err(AppError::CliUsage)
-        .and_then(|cli| {
-            loader
-                .load(&split.config_arguments)
-                .map(|config| (cli, config))
-        })
-        .and_then(|(cli, config)| {
-            if let Some(exit_code) = handle_capabilities_mode(&cli, &config, io) {
-                return Ok(exit_code);
-            }
-
-            if let Some(lifecycle_invocation) = parse_lifecycle_invocation(&cli)? {
-                let context = LifecycleContext {
-                    config: &config,
-                    config_arguments: &split.config_arguments,
-                };
-                let mut output = LifecycleOutput::new(&mut *io.stdout, &mut *io.stderr);
-                return lifecycle.handle(lifecycle_invocation, context, &mut output);
-            }
-
-            let invocation = CommandInvocation::try_from(cli)?;
-            Ok(execute_daemon_command(invocation, &config, io))
-        });
-
-    match result {
-        Ok(exit_code) => exit_code,
-        Err(error) => {
-            let _ = writeln!(io.stderr, "{error}");
-            ExitCode::FAILURE
-        }
-    }
+#[cfg(test)]
+pub(crate) fn run_with_loader_with_handler<'a, I, W, E, L, F>(
+    args: I,
+    io: &'a mut IoStreams<'a, W, E>,
+    loader: &'a L,
+    handler: F,
+) -> ExitCode
+where
+    I: IntoIterator<Item = OsString>,
+    W: Write,
+    E: Write,
+    L: ConfigLoader,
+    F: FnMut(
+        LifecycleInvocation,
+        LifecycleContext<'_>,
+        &mut LifecycleOutput<&mut W, &mut E>,
+    ) -> Result<ExitCode, LifecycleError>,
+{
+    CliRunner::new(io, loader).run_with_handler(args, handler)
 }
 
 fn emit_capabilities<W>(config: &Config, stdout: &mut W) -> Result<(), AppError>
@@ -286,11 +321,18 @@ where
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "weaver", disable_help_subcommand = true)]
+#[command(
+    name = "weaver",
+    disable_help_subcommand = true,
+    subcommand_negates_reqs = true
+)]
 struct Cli {
     /// Prints the negotiated capability matrix and exits.
     #[arg(long)]
     capabilities: bool,
+    /// Structured subcommands (for example `daemon start`).
+    #[command(subcommand)]
+    command: Option<CliCommand>,
     /// The command domain (for example `observe`).
     #[arg(value_name = "DOMAIN")]
     domain: Option<String>,
@@ -305,6 +347,25 @@ struct Cli {
         allow_hyphen_values = true
     )]
     arguments: Vec<String>,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+enum CliCommand {
+    /// Runs daemon lifecycle commands.
+    Daemon {
+        #[command(subcommand)]
+        action: DaemonAction,
+    },
+}
+
+#[derive(Subcommand, Debug, Clone, Copy)]
+enum DaemonAction {
+    /// Starts the daemon and waits for readiness.
+    Start,
+    /// Stops the daemon gracefully.
+    Stop,
+    /// Prints daemon health information.
+    Status,
 }
 
 #[derive(Debug, Deserialize)]
@@ -354,8 +415,6 @@ enum AppError {
     SerialiseCapabilities(serde_json::Error),
     #[error("failed to emit capabilities: {0}")]
     EmitCapabilities(io::Error),
-    #[error("unsupported daemon lifecycle operation '{operation}'")]
-    UnsupportedLifecycleOperation { operation: String },
     #[error("daemon lifecycle command failed: {0}")]
     Lifecycle(#[from] LifecycleError),
 }

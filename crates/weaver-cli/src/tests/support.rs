@@ -20,10 +20,9 @@ use std::time::{Duration, Instant};
 use std::os::unix::net::UnixStream;
 
 use crate::lifecycle::{
-    LifecycleCommand, LifecycleContext, LifecycleError, LifecycleHandler, LifecycleInvocation,
-    LifecycleOutput,
+    LifecycleCommand, LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput,
 };
-use crate::{AppError, ConfigLoader, IoStreams, run_with_loader};
+use crate::{AppError, ConfigLoader, IoStreams, run_with_loader_with_handler};
 use anyhow::{Context, Result, anyhow, ensure};
 use rstest::fixture;
 use weaver_config::{CapabilityDirective, CapabilityOverride, Config, SocketEndpoint};
@@ -82,7 +81,10 @@ impl TestWorld {
         let args = Self::build_args(command);
         let loader = StaticConfigLoader::new(self.config.clone());
         let mut io = IoStreams::new(&mut self.stdout, &mut self.stderr);
-        let exit = run_with_loader(args, &mut io, &loader, &self.lifecycle);
+        let exit =
+            run_with_loader_with_handler(args, &mut io, &loader, |invocation, context, output| {
+                self.lifecycle.handle(invocation, context, output)
+            });
         self.exit_code = Some(exit);
         if let Some(daemon) = self.daemon.as_mut() {
             self.requests = daemon.take_requests()?;
@@ -394,23 +396,21 @@ impl TestLifecycle {
     }
 }
 
-impl LifecycleHandler for TestLifecycle {
-    fn handle<W: Write, E: Write>(
+impl TestLifecycle {
+    pub fn handle<W: Write, E: Write>(
         &self,
         invocation: LifecycleInvocation,
         _context: LifecycleContext<'_>,
         _output: &mut LifecycleOutput<W, E>,
-    ) -> Result<ExitCode, AppError> {
+    ) -> Result<ExitCode, LifecycleError> {
         let call = LifecycleCall {
             command: invocation.command,
         };
         self.calls.borrow_mut().push(call);
-        let result = self
-            .responses
+        self.responses
             .borrow_mut()
             .pop_front()
-            .unwrap_or(Ok(ExitCode::SUCCESS));
-        result.map_err(AppError::from)
+            .unwrap_or(Ok(ExitCode::SUCCESS))
     }
 }
 

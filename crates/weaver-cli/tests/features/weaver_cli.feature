@@ -51,3 +51,10 @@ Feature: Weaver CLI behaviour
     Then the lifecycle stub recorded "start"
     And stderr contains "already in use"
     And the CLI fails
+
+  Scenario: Stopping the daemon through the lifecycle helper
+    Given lifecycle responses succeed
+    When the operator runs "daemon stop"
+    Then the lifecycle stub recorded "stop"
+    And no daemon command was sent
+    And the CLI exits with code 0
