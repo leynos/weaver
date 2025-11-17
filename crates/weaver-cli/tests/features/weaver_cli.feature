@@ -37,3 +37,24 @@ Feature: Weaver CLI behaviour
     When the operator runs "observe get-definition --symbol main"
     Then the CLI fails
     And stderr contains "Warning: received"
+
+  Scenario: Routing lifecycle commands through helper
+    Given lifecycle responses succeed
+    When the operator runs "daemon status"
+    Then the lifecycle stub recorded "status"
+    And no daemon command was sent
+    And the CLI exits with code 0
+
+  Scenario: Reporting lifecycle failures
+    Given lifecycle responses fail with socket busy
+    When the operator runs "daemon start"
+    Then the lifecycle stub recorded "start"
+    And stderr contains "already in use"
+    And the CLI fails
+
+  Scenario: Stopping the daemon through the lifecycle helper
+    Given lifecycle responses succeed
+    When the operator runs "daemon stop"
+    Then the lifecycle stub recorded "stop"
+    And no daemon command was sent
+    And the CLI exits with code 0

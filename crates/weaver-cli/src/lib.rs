@@ -10,13 +10,14 @@ use std::io::{self, Write};
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use serde::Deserialize;
 use thiserror::Error;
 use weaver_config::{CapabilityMatrix, Config};
 
 mod command;
 mod config;
+mod lifecycle;
 mod transport;
 
 #[cfg(test)]
@@ -24,6 +25,9 @@ pub(crate) use command::CommandDescriptor;
 pub(crate) use command::{CommandInvocation, CommandRequest};
 use config::{ConfigArgumentSplit, split_config_arguments};
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader};
+use lifecycle::{
+    LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput, SystemLifecycle,
+};
 use transport::connect;
 /// CLI flags recognised by the configuration loader.
 ///
@@ -39,6 +43,101 @@ const CONFIG_CLI_FLAGS: &[&str] = &[
 ];
 const EMPTY_LINE_LIMIT: usize = 10;
 
+/// Bundles the IO streams provided to the CLI runtime.
+///
+/// `IoStreams` owns the long-lived writers used while parsing CLI arguments.
+/// Lifecycle commands receive a short-lived [`LifecycleOutput`] wrapper that
+/// borrows these streams so helpers can flush individual messages without
+/// threading the CLI runtime through every call.
+pub(crate) struct IoStreams<'a, W: Write, E: Write> {
+    pub(crate) stdout: &'a mut W,
+    pub(crate) stderr: &'a mut E,
+}
+
+impl<'a, W: Write, E: Write> IoStreams<'a, W, E> {
+    pub(crate) fn new(stdout: &'a mut W, stderr: &'a mut E) -> Self {
+        Self { stdout, stderr }
+    }
+}
+
+struct CliRunner<'a, W: Write, E: Write, L: ConfigLoader> {
+    io: &'a mut IoStreams<'a, W, E>,
+    loader: &'a L,
+}
+
+impl<'a, W, E, L> CliRunner<'a, W, E, L>
+where
+    W: Write,
+    E: Write,
+    L: ConfigLoader,
+{
+    fn new(io: &'a mut IoStreams<'a, W, E>, loader: &'a L) -> Self {
+        Self { io, loader }
+    }
+
+    fn run<I>(&mut self, args: I) -> ExitCode
+    where
+        I: IntoIterator<Item = OsString>,
+    {
+        let mut lifecycle = SystemLifecycle;
+        self.run_with_handler(args, |invocation, context, output| {
+            lifecycle.handle(invocation, context, output)
+        })
+    }
+
+    fn run_with_handler<I, F>(&mut self, args: I, mut handler: F) -> ExitCode
+    where
+        I: IntoIterator<Item = OsString>,
+        F: FnMut(
+            LifecycleInvocation,
+            LifecycleContext<'_>,
+            &mut LifecycleOutput<&mut W, &mut E>,
+        ) -> Result<ExitCode, LifecycleError>,
+    {
+        let args: Vec<OsString> = args.into_iter().collect();
+        let split = split_config_arguments(&args);
+        let cli_arguments = prepare_cli_arguments(&args, &split);
+
+        let result = Cli::try_parse_from(cli_arguments)
+            .map_err(AppError::CliUsage)
+            .and_then(|cli| {
+                self.loader
+                    .load(&split.config_arguments)
+                    .map(|config| (cli, config))
+            })
+            .and_then(|(cli, config)| {
+                if let Some(exit_code) = handle_capabilities_mode(&cli, &config, self.io) {
+                    return Ok(exit_code);
+                }
+
+                if let Some(CliCommand::Daemon { action }) = cli.command.as_ref() {
+                    let invocation = LifecycleInvocation {
+                        command: (*action).into(),
+                        arguments: Vec::new(),
+                    };
+                    let context = LifecycleContext {
+                        config: &config,
+                        config_arguments: &split.config_arguments,
+                    };
+                    let mut output =
+                        LifecycleOutput::new(&mut *self.io.stdout, &mut *self.io.stderr);
+                    return handler(invocation, context, &mut output).map_err(AppError::from);
+                }
+
+                let invocation = CommandInvocation::try_from(cli)?;
+                Ok(execute_daemon_command(invocation, &config, self.io))
+            });
+
+        match result {
+            Ok(exit_code) => exit_code,
+            Err(error) => {
+                let _ = writeln!(self.io.stderr, "{error}");
+                ExitCode::FAILURE
+            }
+        }
+    }
+}
+
 /// Runs the CLI using the provided arguments and IO handles.
 #[must_use]
 pub fn run<I, W, E>(args: I, stdout: &mut W, stderr: &mut E) -> ExitCode
@@ -47,7 +146,8 @@ where
     W: Write,
     E: Write,
 {
-    run_with_loader(args, stdout, stderr, &OrthoConfigLoader)
+    let mut io = IoStreams::new(stdout, stderr);
+    run_with_loader(args, &mut io, &OrthoConfigLoader)
 }
 
 fn prepare_cli_arguments(args: &[OsString], split: &ConfigArgumentSplit) -> Vec<OsString> {
@@ -64,8 +164,7 @@ fn prepare_cli_arguments(args: &[OsString], split: &ConfigArgumentSplit) -> Vec<
 fn handle_capabilities_mode<W, E>(
     cli: &Cli,
     config: &Config,
-    stdout: &mut W,
-    stderr: &mut E,
+    io: &mut IoStreams<'_, W, E>,
 ) -> Option<ExitCode>
 where
     W: Write,
@@ -75,10 +174,10 @@ where
         return None;
     }
 
-    match emit_capabilities(config, stdout) {
+    match emit_capabilities(config, io.stdout) {
         Ok(()) => Some(ExitCode::SUCCESS),
         Err(error) => {
-            let _ = writeln!(stderr, "{error}");
+            let _ = writeln!(io.stderr, "{error}");
             Some(ExitCode::FAILURE)
         }
     }
@@ -87,8 +186,7 @@ where
 fn execute_daemon_command<W, E>(
     invocation: CommandInvocation,
     config: &Config,
-    stdout: &mut W,
-    stderr: &mut E,
+    io: &mut IoStreams<'_, W, E>,
 ) -> ExitCode
 where
     W: Write,
@@ -98,20 +196,20 @@ where
     let mut connection = match connect(config.daemon_socket()) {
         Ok(connection) => connection,
         Err(error) => {
-            let _ = writeln!(stderr, "{error}");
+            let _ = writeln!(io.stderr, "{error}");
             return ExitCode::FAILURE;
         }
     };
 
     if let Err(error) = request.write_jsonl(&mut connection) {
-        let _ = writeln!(stderr, "{error}");
+        let _ = writeln!(io.stderr, "{error}");
         return ExitCode::FAILURE;
     }
 
-    match read_daemon_messages(&mut connection, stdout, stderr) {
+    match read_daemon_messages(&mut connection, &mut *io.stdout, &mut *io.stderr) {
         Ok(status) => exit_code_from_status(status),
         Err(error) => {
-            let _ = writeln!(stderr, "{error}");
+            let _ = writeln!(io.stderr, "{error}");
             ExitCode::FAILURE
         }
     }
@@ -119,11 +217,10 @@ where
 
 /// Runs the CLI with a custom configuration loader.
 #[must_use]
-pub(crate) fn run_with_loader<I, W, E, L>(
+pub(crate) fn run_with_loader<'a, I, W, E, L>(
     args: I,
-    stdout: &mut W,
-    stderr: &mut E,
-    loader: &L,
+    io: &'a mut IoStreams<'a, W, E>,
+    loader: &'a L,
 ) -> ExitCode
 where
     I: IntoIterator<Item = OsString>,
@@ -131,33 +228,28 @@ where
     E: Write,
     L: ConfigLoader,
 {
-    let args: Vec<OsString> = args.into_iter().collect();
-    let split = split_config_arguments(&args);
-    let cli_arguments = prepare_cli_arguments(&args, &split);
+    CliRunner::new(io, loader).run(args)
+}
 
-    let result = Cli::try_parse_from(cli_arguments)
-        .map_err(AppError::CliUsage)
-        .and_then(|cli| {
-            loader
-                .load(&split.config_arguments)
-                .map(|config| (cli, config))
-        })
-        .and_then(|(cli, config)| {
-            if let Some(exit_code) = handle_capabilities_mode(&cli, &config, stdout, stderr) {
-                return Ok(exit_code);
-            }
-
-            let invocation = CommandInvocation::try_from(cli)?;
-            Ok(execute_daemon_command(invocation, &config, stdout, stderr))
-        });
-
-    match result {
-        Ok(exit_code) => exit_code,
-        Err(error) => {
-            let _ = writeln!(stderr, "{error}");
-            ExitCode::FAILURE
-        }
-    }
+#[cfg(test)]
+pub(crate) fn run_with_loader_with_handler<'a, I, W, E, L, F>(
+    args: I,
+    io: &'a mut IoStreams<'a, W, E>,
+    loader: &'a L,
+    handler: F,
+) -> ExitCode
+where
+    I: IntoIterator<Item = OsString>,
+    W: Write,
+    E: Write,
+    L: ConfigLoader,
+    F: FnMut(
+        LifecycleInvocation,
+        LifecycleContext<'_>,
+        &mut LifecycleOutput<&mut W, &mut E>,
+    ) -> Result<ExitCode, LifecycleError>,
+{
+    CliRunner::new(io, loader).run_with_handler(args, handler)
 }
 
 fn emit_capabilities<W>(config: &Config, stdout: &mut W) -> Result<(), AppError>
@@ -234,11 +326,18 @@ where
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "weaver", disable_help_subcommand = true)]
+#[command(
+    name = "weaver",
+    disable_help_subcommand = true,
+    subcommand_negates_reqs = true
+)]
 struct Cli {
     /// Prints the negotiated capability matrix and exits.
     #[arg(long)]
     capabilities: bool,
+    /// Structured subcommands (for example `daemon start`).
+    #[command(subcommand)]
+    command: Option<CliCommand>,
     /// The command domain (for example `observe`).
     #[arg(value_name = "DOMAIN")]
     domain: Option<String>,
@@ -253,6 +352,25 @@ struct Cli {
         allow_hyphen_values = true
     )]
     arguments: Vec<String>,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+enum CliCommand {
+    /// Runs daemon lifecycle commands.
+    Daemon {
+        #[command(subcommand)]
+        action: DaemonAction,
+    },
+}
+
+#[derive(Subcommand, Debug, Clone, Copy)]
+enum DaemonAction {
+    /// Starts the daemon and waits for readiness.
+    Start,
+    /// Stops the daemon gracefully.
+    Stop,
+    /// Prints daemon health information.
+    Status,
 }
 
 #[derive(Debug, Deserialize)]
@@ -302,6 +420,8 @@ enum AppError {
     SerialiseCapabilities(serde_json::Error),
     #[error("failed to emit capabilities: {0}")]
     EmitCapabilities(io::Error),
+    #[error("daemon lifecycle command failed: {0}")]
+    Lifecycle(#[from] LifecycleError),
 }
 
 #[cfg(test)]

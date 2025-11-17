@@ -12,12 +12,12 @@ use serde_json::Value;
 
 use crate::process::daemonizer::{DaemonizeError, Daemonizer};
 use crate::process::launch::{LaunchPlan, ProcessControl, ServiceDeps, run_daemon_with};
-use crate::process::paths::ProcessPaths;
 use crate::process::shutdown::{ShutdownError, ShutdownSignal};
 use crate::process::{LaunchError, LaunchMode, test_support};
 use crate::tests::support::{
     FailingConfigLoader, RecordingBackendProvider, RecordingHealthReporter, TestConfigLoader,
 };
+use weaver_config::RuntimePaths;
 
 pub const WAIT_TIMEOUT: Duration = Duration::from_secs(2);
 pub const POLL_INTERVAL: Duration = Duration::from_millis(25);
@@ -305,7 +305,7 @@ impl TestDaemonizer {
 }
 
 impl Daemonizer for TestDaemonizer {
-    fn daemonize(&self, _paths: &ProcessPaths) -> Result<(), DaemonizeError> {
+    fn daemonize(&self, _paths: &RuntimePaths) -> Result<(), DaemonizeError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }

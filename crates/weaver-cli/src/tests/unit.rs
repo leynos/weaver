@@ -16,9 +16,11 @@ use std::process::ExitCode;
 use std::thread;
 
 use crate::{
-    AppError, Cli, CommandDescriptor, CommandInvocation, CommandRequest, ConfigLoader,
-    EMPTY_LINE_LIMIT, connect, exit_code_from_status, read_daemon_messages, run_with_loader,
+    AppError, Cli, CliCommand, CommandDescriptor, CommandInvocation, CommandRequest, ConfigLoader,
+    DaemonAction, EMPTY_LINE_LIMIT, IoStreams, connect, exit_code_from_status,
+    read_daemon_messages, run_with_loader,
 };
+use clap::Parser;
 use rstest::rstest;
 use weaver_config::{Config, SocketEndpoint};
 
@@ -68,6 +70,7 @@ fn command_invocation_validation(
 ) {
     let cli = Cli {
         capabilities: false,
+        command: None,
         domain,
         operation,
         arguments: Vec::new(),
@@ -79,6 +82,17 @@ fn command_invocation_validation(
         "MissingDomain" => assert!(matches!(error, AppError::MissingDomain)),
         "MissingOperation" => assert!(matches!(error, AppError::MissingOperation)),
         other => panic!("unexpected expected_error marker: {}", other),
+    }
+}
+
+#[test]
+fn cli_parses_daemon_subcommand() {
+    let cli = Cli::try_parse_from(["weaver", "daemon", "status"]).expect("parse daemon");
+    match cli.command {
+        Some(CliCommand::Daemon {
+            action: DaemonAction::Status,
+        }) => {}
+        other => panic!("expected daemon status command, got {other:?}"),
     }
 }
 
@@ -143,12 +157,8 @@ fn run_with_loader_reports_configuration_failures() {
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let exit = run_with_loader(
-        vec![OsString::from("weaver")],
-        &mut stdout,
-        &mut stderr,
-        &FailingLoader,
-    );
+    let mut io = IoStreams::new(&mut stdout, &mut stderr);
+    let exit = run_with_loader(vec![OsString::from("weaver")], &mut io, &FailingLoader);
     assert_eq!(exit, ExitCode::FAILURE);
     let stderr_text = decode_utf8(stderr, "stderr").expect("decode stderr");
     assert!(stderr_text.contains("command domain"));
@@ -178,6 +188,7 @@ fn run_with_loader_filters_configuration_arguments() {
     let loader = RecordingLoader::new();
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
+    let mut io = IoStreams::new(&mut stdout, &mut stderr);
     let exit = run_with_loader(
         vec![
             OsString::from("weaver"),
@@ -190,8 +201,7 @@ fn run_with_loader_filters_configuration_arguments() {
             OsString::from("--"),
             OsString::from("--extra"),
         ],
-        &mut stdout,
-        &mut stderr,
+        &mut io,
         &loader,
     );
 

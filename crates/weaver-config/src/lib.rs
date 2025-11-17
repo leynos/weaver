@@ -26,6 +26,7 @@
 mod capability;
 mod defaults;
 mod logging;
+mod runtime;
 mod socket;
 
 use capability::deduplicate_directives;
@@ -41,6 +42,7 @@ pub use defaults::{
     default_socket_endpoint,
 };
 pub use logging::{LogFormat, LogFormatParseError};
+pub use runtime::{RuntimePaths, RuntimePathsError};
 pub use socket::{SocketEndpoint, SocketParseError, SocketPreparationError};
 
 /// Complete configuration merged from defaults, files, environment, and CLI.

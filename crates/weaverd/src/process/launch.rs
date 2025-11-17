@@ -14,9 +14,9 @@ use crate::placeholder_provider::NoopBackendProvider;
 use super::daemonizer::{Daemonizer, SystemDaemonizer};
 use super::errors::LaunchError;
 use super::guard::{HealthState, ProcessGuard};
-use super::paths::ProcessPaths;
 use super::shutdown::{ShutdownSignal, SystemShutdownSignal};
 use super::{FOREGROUND_ENV_VAR, PROCESS_TARGET, SHUTDOWN_TIMEOUT};
+use weaver_config::RuntimePaths;
 
 /// Launch mode for the daemon.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -106,7 +106,8 @@ where
     );
     let config = loader.load()?;
     config.daemon_socket().prepare_filesystem()?;
-    let mut guard = ProcessGuard::acquire(ProcessPaths::derive(&config)?)?;
+    let runtime_paths = RuntimePaths::from_config(&config)?;
+    let mut guard = ProcessGuard::acquire(runtime_paths)?;
     if matches!(mode, LaunchMode::Background) {
         daemonizer.daemonize(guard.paths())?;
     }

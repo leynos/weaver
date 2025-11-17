@@ -5,6 +5,7 @@
 
 use super::support::*;
 use crate::EMPTY_LINE_LIMIT;
+use crate::lifecycle::{LifecycleCommand, LifecycleError};
 
 use std::cell::RefCell;
 
@@ -16,6 +17,20 @@ fn given_running_daemon(world: &RefCell<TestWorld>) {
         .borrow_mut()
         .start_daemon()
         .expect("failed to start fake daemon");
+}
+
+#[given("lifecycle responses succeed")]
+fn given_lifecycle_success(world: &RefCell<TestWorld>) {
+    world.borrow().lifecycle_enqueue_success();
+}
+
+#[given("lifecycle responses fail with socket busy")]
+fn given_lifecycle_error(world: &RefCell<TestWorld>) {
+    world
+        .borrow()
+        .lifecycle_enqueue_error(LifecycleError::SocketInUse {
+            endpoint: String::from("tcp://127.0.0.1:9000"),
+        });
 }
 
 #[given("capability overrides force python rename")]
@@ -67,6 +82,26 @@ fn then_daemon_receives(world: &RefCell<TestWorld>, fixture: String) {
         .borrow()
         .assert_golden_request(&fixture)
         .expect("daemon did not receive expected fixture");
+}
+
+#[then("no daemon command was sent")]
+fn then_no_daemon_command(world: &RefCell<TestWorld>) {
+    world
+        .borrow()
+        .assert_no_daemon_requests()
+        .expect("unexpected daemon request recorded");
+}
+
+#[then("the lifecycle stub recorded {operation}")]
+fn then_lifecycle_recorded(world: &RefCell<TestWorld>, operation: String) {
+    let expected = parse_lifecycle_command(&operation);
+    let calls = world.borrow().lifecycle_calls();
+    assert!(
+        calls.iter().any(|call| call.command == expected),
+        "lifecycle did not record {:?}, saw {:?}",
+        expected,
+        calls
+    );
 }
 
 #[then("stdout is {expected}")]
@@ -125,4 +160,13 @@ fn then_capabilities(world: &RefCell<TestWorld>, fixture: String) {
 #[scenario(path = "tests/features/weaver_cli.feature")]
 fn weaver_cli_behaviour(world: RefCell<TestWorld>) {
     let _ = world;
+}
+
+fn parse_lifecycle_command(label: &str) -> LifecycleCommand {
+    match label.trim().to_ascii_lowercase().as_str() {
+        "start" => LifecycleCommand::Start,
+        "stop" => LifecycleCommand::Stop,
+        "status" => LifecycleCommand::Status,
+        other => panic!("unsupported lifecycle command label {other}"),
+    }
 }

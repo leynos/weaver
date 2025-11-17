@@ -6,12 +6,12 @@ use thiserror::Error;
 use tracing::info;
 
 use super::PROCESS_TARGET;
-use super::paths::ProcessPaths;
+use weaver_config::RuntimePaths;
 
 /// Abstraction over daemonisation strategies.
 pub trait Daemonizer: Send + Sync {
     /// Detaches the process into the background.
-    fn daemonize(&self, paths: &ProcessPaths) -> Result<(), DaemonizeError>;
+    fn daemonize(&self, paths: &RuntimePaths) -> Result<(), DaemonizeError>;
 }
 
 /// Errors surfaced by the daemonisation backend.
@@ -34,7 +34,7 @@ impl SystemDaemonizer {
 }
 
 impl Daemonizer for SystemDaemonizer {
-    fn daemonize(&self, paths: &ProcessPaths) -> Result<(), DaemonizeError> {
+    fn daemonize(&self, paths: &RuntimePaths) -> Result<(), DaemonizeError> {
         info!(
             target: PROCESS_TARGET,
             runtime = %paths.runtime_dir().display(),

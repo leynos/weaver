@@ -42,7 +42,7 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
       - Acceptance criteria: Background start creates PID and lock files,
         duplicate starts fail fast, and signal handling shuts down within the
         timeout budget.
-- [ ] Provide lifecycle commands in `weaver-cli` (for example, `daemon start`,
+- [x] Provide lifecycle commands in `weaver-cli` (for example, `daemon start`,
       `daemon stop`, `daemon status`) that manage the daemon process, verify
       socket availability, and surface actionable errors when start-up fails.
       - Acceptance criteria: Lifecycle commands call into shared helper logic,

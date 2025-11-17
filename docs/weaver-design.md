@@ -234,6 +234,31 @@ the negotiated capability matrix as pretty-printed JSON, and exits without
 contacting the daemon. This keeps the probe side effect free and allows agents
 to cache the matrix easily.
 
+#### 2.1.2. Lifecycle orchestration
+
+Operators now control the daemon lifecycle directly through the CLI via
+`weaver daemon start`, `weaver daemon stop`, and `weaver daemon status`. These
+commands defer to a shared lifecycle helper that lives alongside the transport
+runtime, ensuring every entry point honours the same socket, logging, and
+capability overrides. The helper exposes the `RuntimePaths` abstraction (moved
+into `weaver-config`) so both the CLI and daemon derive the lock, PID, and
+health file locations from the same source of truth regardless of the socket
+transport.
+
+`daemon start` refuses to launch when the configured socket already accepts
+connections, spawns the `weaverd` binary with any CLI configuration overrides,
+and waits for the health snapshot to report `ready`. Operators see immediate
+feedback when `weaverd` fails early or takes too long to publish readiness, and
+the command prints the runtime directory holding the artefacts for later
+inspection. `daemon stop` reads the PID file, sends `SIGTERM`, and polls both
+the runtime files and socket reachability to confirm shutdown, surfacing an
+actionable error when the socket is still bound but the PID file is missing.
+`daemon status` reports the structured state recorded in the health snapshot,
+falling back to the PID file and socket probe when health data is unavailable.
+Because lifecycle commands operate exclusively on shared filesystem artefacts
+they remain side-effect free with respect to the JSONL transport and can be
+used safely from automation tooling.
+
 ### 2.2. Semantic, Syntactic, and Relational Fusion
 
 A core premise of `Weaver` is that a truly robust understanding of a codebase

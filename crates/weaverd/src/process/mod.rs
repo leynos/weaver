@@ -7,7 +7,6 @@ mod errors;
 mod files;
 mod guard;
 pub(crate) mod launch;
-pub(crate) mod paths;
 pub(crate) mod shutdown;
 
 pub use errors::LaunchError;

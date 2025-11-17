@@ -22,20 +22,20 @@ use std::sync::{Mutex, OnceLock};
 
 use super::PROCESS_TARGET;
 use super::errors::LaunchError;
-use super::paths::ProcessPaths;
+use weaver_config::RuntimePaths;
 
 #[cfg(test)]
 static HEALTH_EVENTS: OnceLock<Mutex<HashMap<PathBuf, Vec<&'static str>>>> = OnceLock::new();
 
 #[derive(Debug)]
 pub(super) struct ProcessGuard {
-    paths: ProcessPaths,
+    paths: RuntimePaths,
     _lock: File,
     pid: Option<u32>,
 }
 
 impl ProcessGuard {
-    pub(super) fn acquire(paths: ProcessPaths) -> Result<Self, LaunchError> {
+    pub(super) fn acquire(paths: RuntimePaths) -> Result<Self, LaunchError> {
         let lock = acquire_lock(&paths)?;
         Ok(Self {
             paths,
@@ -82,7 +82,7 @@ impl ProcessGuard {
         Ok(())
     }
 
-    pub(super) fn paths(&self) -> &ProcessPaths {
+    pub(super) fn paths(&self) -> &RuntimePaths {
         &self.paths
     }
 
@@ -154,7 +154,7 @@ impl<'a> HealthSnapshot<'a> {
     }
 }
 
-fn acquire_lock(paths: &ProcessPaths) -> Result<File, LaunchError> {
+fn acquire_lock(paths: &RuntimePaths) -> Result<File, LaunchError> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
@@ -179,7 +179,7 @@ fn acquire_lock(paths: &ProcessPaths) -> Result<File, LaunchError> {
     }
 }
 
-fn handle_existing_lock(paths: &ProcessPaths) -> Result<File, LaunchError> {
+fn handle_existing_lock(paths: &RuntimePaths) -> Result<File, LaunchError> {
     if !paths.pid_path().exists() {
         info!(
             target: PROCESS_TARGET,
@@ -301,7 +301,7 @@ mod tests {
     use tempfile::TempDir;
     use weaver_config::{Config, SocketEndpoint};
 
-    fn build_paths() -> (TempDir, ProcessPaths) {
+    fn build_paths() -> (TempDir, RuntimePaths) {
         let dir = TempDir::new().expect("failed to create temporary runtime directory");
         let socket = dir.path().join("weaverd.sock");
         let socket_path = socket
@@ -312,12 +312,13 @@ mod tests {
             daemon_socket: SocketEndpoint::unix(socket_path),
             ..Config::default()
         };
-        let paths = ProcessPaths::derive(&config).expect("paths should derive for temp config");
+        let paths =
+            RuntimePaths::from_config(&config).expect("paths should derive for temp config");
         (dir, paths)
     }
 
     /// Acquires a guard, records the provided health state, and returns the guard for assertions.
-    fn setup_guard_with_health(paths: &ProcessPaths, state: HealthState) -> ProcessGuard {
+    fn setup_guard_with_health(paths: &RuntimePaths, state: HealthState) -> ProcessGuard {
         test_support::clear_health_events(paths.health_path());
         let mut guard = ProcessGuard::acquire(paths.clone()).expect("lock should be acquired");
         let pid = std::process::id();

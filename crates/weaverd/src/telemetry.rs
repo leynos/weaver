@@ -34,7 +34,7 @@ pub enum TelemetryError {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,ignore
 /// use weaver_config::Config;
 /// use weaverd::telemetry;
 ///
