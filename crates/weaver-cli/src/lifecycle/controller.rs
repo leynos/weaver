@@ -1,3 +1,9 @@
+//! High-level orchestration for daemon lifecycle commands.
+//!
+//! This module wires the start/stop/status flows together using the helpers in
+//! `types` and `utils`, ensuring the CLI drives a single entrypoint when
+//! interacting with `weaverd`.
+
 use std::io::Write;
 use std::process::ExitCode;
 use std::time::SystemTime;

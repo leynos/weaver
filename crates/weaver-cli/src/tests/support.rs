@@ -375,6 +375,7 @@ pub(super) fn default_daemon_lines() -> Vec<String> {
     ]
 }
 
+/// Captures lifecycle invocations and replays queued results for behavioural tests.
 #[derive(Default)]
 pub(super) struct TestLifecycle {
     calls: RefCell<Vec<LifecycleCall>>,
