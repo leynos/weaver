@@ -45,7 +45,7 @@ pub struct LifecycleContext<'a> {
 }
 
 /// Output handle abstracting over stdout/stderr writers.
-pub struct LifecycleOutput<W, E> {
+pub struct LifecycleOutput<W: Write, E: Write> {
     pub stdout: W,
     pub stderr: E,
 }
