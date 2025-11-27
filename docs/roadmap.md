@@ -49,7 +49,7 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
         refuse to start when sockets are bound, and emit recovery guidance for
         the operator.
 
-- [ ] Build the `weaver-lsp-host` crate with support for initialisation,
+- [x] Build the `weaver-lsp-host` crate with support for initialisation,
     capability detection, and core LSP features (definition, references,
     diagnostics) for Rust, Python, and TypeScript.
 

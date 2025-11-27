@@ -1106,3 +1106,17 @@ additional serde/serde_json surface when it is not required, which partially
 offsets the build bloat introduced by the new localization stack (i18n-embed,
 fluent, unic-langid). Upstream now ships `rstest-bdd-patterns` 0.1.0 via the
 same pin, so the entire stack aligns on stable releases.
+
+#### 2025-11-27: Introduce `weaver-lsp-host` with capability-aware routing
+
+The new `weaver-lsp-host` crate owns the lifecycle of language servers for
+Rust, Python, and TypeScript. Initialisation now records the capabilities the
+server advertises for `textDocument/definition`, `textDocument/references`, and
+diagnostics, and then folds in operator overrides from `weaver-config`.
+Explicit `force` directives enable missing features, while `deny` directives
+block requests even when the server reports support. Core observe/verify calls
+are routed through a small trait so higher layers can inject sandboxed or
+recording implementations without spawning real servers during tests. Requests
+fail fast with structured errors that surface both the language and the reason
+(server missing, override deny, or server error) to callers, keeping the
+capability matrix honest before the daemon adds sandboxing and transport.
