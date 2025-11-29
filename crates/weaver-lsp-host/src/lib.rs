@@ -1,5 +1,5 @@
-#![deny(missing_docs)]
 //! Language Server Protocol host facade.
+#![deny(missing_docs)]
 //!
 //! The crate owns the lifecycle of per-language servers, merges their
 //! advertised capabilities with configuration overrides, and exposes a narrow

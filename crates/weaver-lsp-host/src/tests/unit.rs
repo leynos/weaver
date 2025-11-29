@@ -6,9 +6,10 @@ use std::str::FromStr;
 use rstest::rstest;
 use weaver_config::{CapabilityMatrix, CapabilityOverride};
 
+use crate::errors::HostOperation;
 use crate::capability::{CapabilityKind, CapabilitySource};
 use crate::errors::LspHostError;
-use crate::language::Language;
+use crate::language::{Language, LanguageParseError};
 use crate::server::ServerCapabilitySet;
 use crate::tests::support::{CallKind, RecordingLanguageServer, ResponseSet, TestWorld};
 
@@ -50,6 +51,31 @@ fn applies_force_and_deny_overrides() {
 }
 
 #[rstest]
+fn parses_known_languages() {
+    assert_eq!(Language::from_str("rust").unwrap(), Language::Rust);
+    assert_eq!(Language::from_str("python").unwrap(), Language::Python);
+    assert_eq!(Language::from_str("typescript").unwrap(), Language::TypeScript);
+}
+
+#[rstest]
+fn parses_typescript_alias_ts() {
+    assert_eq!(Language::from_str("ts").unwrap(), Language::TypeScript);
+}
+
+#[rstest]
+fn trims_whitespace_in_language_parse() {
+    assert_eq!(Language::from_str(" rust ").unwrap(), Language::Rust);
+    assert_eq!(Language::from_str("\tpython\n").unwrap(), Language::Python);
+}
+
+#[rstest]
+fn rejects_invalid_language_with_message() {
+    let err = Language::from_str("go").unwrap_err();
+    assert_eq!(err.input(), "go");
+    assert_eq!(err.to_string(), "unsupported language 'go'");
+}
+
+#[rstest]
 fn rejects_duplicate_language_registration() {
     let server = RecordingLanguageServer::new(
         ServerCapabilitySet::new(true, true, true),
@@ -72,6 +98,54 @@ fn reports_unknown_language_on_request() {
     match host.goto_definition(Language::Rust, definition_params()) {
         Err(LspHostError::UnknownLanguage { .. }) => {}
         other => panic!("expected unknown language error, got {other:?}"),
+    }
+}
+
+#[rstest]
+fn propagates_server_error_from_definition() {
+    struct FailingServer;
+    impl crate::server::LanguageServer for FailingServer {
+        fn initialise(&mut self) -> Result<ServerCapabilitySet, crate::server::LanguageServerError> {
+            Ok(ServerCapabilitySet::new(true, true, true))
+        }
+
+        fn goto_definition(
+            &mut self,
+            _params: lsp_types::GotoDefinitionParams,
+        ) -> Result<lsp_types::GotoDefinitionResponse, crate::server::LanguageServerError> {
+            Err(crate::server::LanguageServerError::new("boom"))
+        }
+
+        fn references(
+            &mut self,
+            _params: lsp_types::ReferenceParams,
+        ) -> Result<Vec<lsp_types::Location>, crate::server::LanguageServerError> {
+            Ok(Vec::new())
+        }
+
+        fn diagnostics(
+            &mut self,
+            _uri: lsp_types::Uri,
+        ) -> Result<Vec<lsp_types::Diagnostic>, crate::server::LanguageServerError> {
+            Ok(Vec::new())
+        }
+    }
+
+    let mut host = crate::LspHost::new(CapabilityMatrix::default());
+    host
+        .register_language(Language::Rust, Box::new(FailingServer))
+        .expect("registration failed");
+
+    match host.goto_definition(Language::Rust, definition_params()) {
+        Err(LspHostError::Server {
+            language,
+            operation,
+            ..
+        }) => {
+            assert_eq!(language, Language::Rust);
+            assert_eq!(operation, HostOperation::Definition);
+        }
+        other => panic!("expected server error, got {other:?}"),
     }
 }
 

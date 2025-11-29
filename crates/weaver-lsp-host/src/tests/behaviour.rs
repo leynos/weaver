@@ -202,8 +202,17 @@ fn then_override_succeeds(world: &RefCell<TestWorld>) {
 fn then_missing_capability(world: &RefCell<TestWorld>) {
     let borrow = world.borrow();
     match &borrow.last_error {
-        Some(LspHostError::CapabilityUnavailable { capability, .. }) => {
+        Some(LspHostError::CapabilityUnavailable {
+            capability,
+            reason,
+            ..
+        }) => {
             assert_eq!(*capability, CapabilityKind::References);
+            assert_eq!(
+                *reason,
+                CapabilitySource::MissingOnServer,
+                "unexpected capability unavailability reason for References"
+            );
         }
         other => panic!("expected capability error, got {other:?}"),
     }

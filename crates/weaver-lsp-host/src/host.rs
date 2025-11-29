@@ -14,42 +14,14 @@ struct Session {
     state: SessionState,
 }
 
-struct CallContext {
-    language: Language,
-    capability: CapabilityKind,
-    operation: HostOperation,
-}
-
 enum SessionState {
     Pending,
     Ready { summary: CapabilitySummary },
 }
 
-macro_rules! lsp_method {
-    (
-        $(#[$meta:meta])* $vis:vis fn $name:ident(
-            &mut self,
-            language: Language,
-            $param:ident : $pty:ty $(,)?
-        ) -> $ret:ty {
-            $cap:expr,
-            $op:expr,
-            $server_method:ident
-        }
-    ) => {
-        $(#[$meta])* $vis fn $name(
-            &mut self,
-            language: Language,
-            $param: $pty,
-        ) -> $ret {
-            let context = CallContext {
-                language,
-                capability: $cap,
-                operation: $op,
-            };
-            self.call_with_capability(context, move |server| server.$server_method($param))
-        }
-    };
+struct CallSpec {
+    capability: CapabilityKind,
+    operation: HostOperation,
 }
 
 /// Orchestrates multiple language servers and applies capability overrides.
@@ -90,9 +62,12 @@ impl LspHost {
 
     /// Initialises the language server and returns the resolved capability summary.
     pub fn initialise(&mut self, language: Language) -> Result<CapabilitySummary, LspHostError> {
-        let overrides = self.overrides.clone();
-        let session = self.session_mut(language)?;
-        Self::ensure_initialised(language, session, &overrides)
+        let overrides = &self.overrides;
+        let session = self
+            .sessions
+            .get_mut(&language)
+            .ok_or_else(|| LspHostError::unknown(language))?;
+        Self::ensure_initialised(language, session, overrides)
     }
 
     /// Returns the resolved capabilities when the language is already initialised.
@@ -106,67 +81,80 @@ impl LspHost {
             })
     }
 
-    lsp_method!(
-        /// Routes a definition request to the configured language server.
-        pub fn goto_definition(
-            &mut self,
-            language: Language,
-            params: GotoDefinitionParams,
-        ) -> Result<GotoDefinitionResponse, LspHostError> {
-            CapabilityKind::Definition,
-            HostOperation::Definition,
-            goto_definition
-        }
-    );
+    /// Routes a definition request to the configured language server.
+    pub fn goto_definition(
+        &mut self,
+        language: Language,
+        params: GotoDefinitionParams,
+    ) -> Result<GotoDefinitionResponse, LspHostError> {
+        self.call_with_capability(
+            language,
+            CallSpec {
+                capability: CapabilityKind::Definition,
+                operation: HostOperation::Definition,
+            },
+            |server| server.goto_definition(params),
+        )
+    }
 
-    lsp_method!(
-        /// Routes a references request to the configured language server.
-        pub fn references(
-            &mut self,
-            language: Language,
-            params: ReferenceParams,
-        ) -> Result<Vec<lsp_types::Location>, LspHostError> {
-            CapabilityKind::References,
-            HostOperation::References,
-            references
-        }
-    );
+    /// Routes a references request to the configured language server.
+    pub fn references(
+        &mut self,
+        language: Language,
+        params: ReferenceParams,
+    ) -> Result<Vec<lsp_types::Location>, LspHostError> {
+        self.call_with_capability(
+            language,
+            CallSpec {
+                capability: CapabilityKind::References,
+                operation: HostOperation::References,
+            },
+            |server| server.references(params),
+        )
+    }
 
-    lsp_method!(
-        /// Retrieves diagnostics for the supplied document.
-        pub fn diagnostics(
-            &mut self,
-            language: Language,
-            uri: Uri,
-        ) -> Result<Vec<lsp_types::Diagnostic>, LspHostError> {
-            CapabilityKind::Diagnostics,
-            HostOperation::Diagnostics,
-            diagnostics
-        }
-    );
+    /// Retrieves diagnostics for the supplied document.
+    pub fn diagnostics(
+        &mut self,
+        language: Language,
+        uri: Uri,
+    ) -> Result<Vec<lsp_types::Diagnostic>, LspHostError> {
+        self.call_with_capability(
+            language,
+            CallSpec {
+                capability: CapabilityKind::Diagnostics,
+                operation: HostOperation::Diagnostics,
+            },
+            |server| server.diagnostics(uri),
+        )
+    }
 
     fn call_with_capability<F, T>(
         &mut self,
-        context: CallContext,
+        language: Language,
+        spec: CallSpec,
         call: F,
     ) -> Result<T, LspHostError>
     where
         F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
     {
-        let overrides = self.overrides.clone();
-        let session = self.session_mut(context.language)?;
-        let summary = Self::ensure_initialised(context.language, session, &overrides)?;
-        let state = summary.state(context.capability);
+        let overrides = &self.overrides;
+        let session = self
+            .sessions
+            .get_mut(&language)
+            .ok_or_else(|| LspHostError::unknown(language))?;
+        let summary = Self::ensure_initialised(language, session, overrides)?;
+        let state = summary.state(spec.capability);
         if !state.enabled {
             return Err(LspHostError::capability_unavailable(
-                context.language,
-                context.capability,
+                language,
+                spec.capability,
                 state.source,
             ));
         }
 
         call(session.server.as_mut())
-            .map_err(|source| LspHostError::server(context.language, context.operation, source))
+            .map_err(|source| LspHostError::server(language, spec.operation, source))
     }
 
     fn ensure_initialised(
@@ -188,11 +176,5 @@ impl LspHost {
                 Ok(summary)
             }
         }
-    }
-
-    fn session_mut(&mut self, language: Language) -> Result<&mut Session, LspHostError> {
-        self.sessions
-            .get_mut(&language)
-            .ok_or_else(|| LspHostError::unknown(language))
     }
 }
