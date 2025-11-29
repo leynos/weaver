@@ -57,6 +57,23 @@ impl RecordingLanguageServer {
             shared: Arc::clone(&self.shared),
         }
     }
+
+    fn handle_request<R>(
+        &mut self,
+        call_kind: CallKind,
+        operation: &str,
+        extract_response: impl FnOnce(&ResponseSet) -> R,
+    ) -> Result<R, LanguageServerError> {
+        with_state(&self.shared, |state| {
+            state.record_call(call_kind);
+            if !state.initialised {
+                return Err(LanguageServerError::new(format!(
+                    "{operation} requested before initialisation",
+                )));
+            }
+            Ok(extract_response(&state.responses))
+        })
+    }
 }
 
 impl LanguageServer for RecordingLanguageServer {
@@ -75,14 +92,8 @@ impl LanguageServer for RecordingLanguageServer {
         &mut self,
         _params: GotoDefinitionParams,
     ) -> Result<GotoDefinitionResponse, LanguageServerError> {
-        with_state(&self.shared, |state| {
-            state.record_call(CallKind::Definition);
-            if !state.initialised {
-                return Err(LanguageServerError::new(
-                    "definition requested before initialisation",
-                ));
-            }
-            Ok(state.responses.definition.clone())
+        self.handle_request(CallKind::Definition, "definition", |responses| {
+            responses.definition.clone()
         })
     }
 
@@ -90,26 +101,14 @@ impl LanguageServer for RecordingLanguageServer {
         &mut self,
         _params: ReferenceParams,
     ) -> Result<Vec<Location>, LanguageServerError> {
-        with_state(&self.shared, |state| {
-            state.record_call(CallKind::References);
-            if !state.initialised {
-                return Err(LanguageServerError::new(
-                    "references requested before initialisation",
-                ));
-            }
-            Ok(state.responses.references.clone())
+        self.handle_request(CallKind::References, "references", |responses| {
+            responses.references.clone()
         })
     }
 
     fn diagnostics(&mut self, _uri: Uri) -> Result<Vec<Diagnostic>, LanguageServerError> {
-        with_state(&self.shared, |state| {
-            state.record_call(CallKind::Diagnostics);
-            if !state.initialised {
-                return Err(LanguageServerError::new(
-                    "diagnostics requested before initialisation",
-                ));
-            }
-            Ok(state.responses.diagnostics.clone())
+        self.handle_request(CallKind::Diagnostics, "diagnostics", |responses| {
+            responses.diagnostics.clone()
         })
     }
 }

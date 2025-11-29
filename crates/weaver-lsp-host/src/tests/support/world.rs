@@ -69,6 +69,26 @@ pub struct TestWorld {
 }
 
 impl TestWorld {
+    macro_rules! request_method {
+        (
+            $(#[$meta:meta])* $name:ident,
+            $host_method:ident,
+            $param_ty:ty,
+            $field:ident,
+            $response_ty:ty
+        ) => {
+            $(#[$meta])*
+            pub fn $name(&mut self, language: Language, params: $param_ty) {
+                self.$field = None;
+                self.last_error = None;
+                match self.host.$host_method(language, params) {
+                    Ok(response) => self.$field = Some(response),
+                    Err(error) => self.last_error = Some(error),
+                }
+            }
+        };
+    }
+
     /// Builds a world populated with the supplied stub servers.
     #[must_use]
     pub fn new(configs: Vec<TestServerConfig>, overrides: weaver_config::CapabilityMatrix) -> Self {
@@ -103,33 +123,23 @@ impl TestWorld {
         }
     }
 
-    /// Issues a definition request.
-    pub fn request_definition(
-        &mut self,
-        language: Language,
-        params: lsp_types::GotoDefinitionParams,
-    ) {
-        self.last_definition = None;
-        self.last_error = None;
-        match self.host.goto_definition(language, params) {
-            Ok(response) => self.last_definition = Some(response),
-            Err(error) => self.last_error = Some(error),
-        }
-    }
+    request_method!(
+        /// Issues a definition request.
+        request_definition,
+        goto_definition,
+        lsp_types::GotoDefinitionParams,
+        last_definition,
+        GotoDefinitionResponse
+    );
 
-    /// Issues a references request.
-    pub fn request_references(
-        &mut self,
-        language: Language,
-        params: lsp_types::ReferenceParams,
-    ) {
-        self.last_references = None;
-        self.last_error = None;
-        match self.host.references(language, params) {
-            Ok(response) => self.last_references = Some(response),
-            Err(error) => self.last_error = Some(error),
-        }
-    }
+    request_method!(
+        /// Issues a references request.
+        request_references,
+        references,
+        lsp_types::ReferenceParams,
+        last_references,
+        Vec<Location>
+    );
 
     /// Issues a diagnostics request.
     pub fn request_diagnostics(&mut self, language: Language, uri: Uri) {
