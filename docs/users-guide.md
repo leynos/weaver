@@ -199,6 +199,19 @@ unless an exit status was already observed. Any session that ends without an
 explicit exit message is treated as an error, so callers do not misinterpret a
 partial response as success.
 
+## Language server capability detection
+
+The new `weaver-lsp-host` crate initialises the LSP servers for Rust, Python,
+and TypeScript and records which core requests each server advertises:
+`textDocument/definition`, `textDocument/references`, and diagnostics. These
+advertised capabilities are merged with any overrides provided via
+`capability_overrides` in `weaver-config`. `force` directives allow a request
+even when the server claims not to support it, while `deny` directives block
+the request regardless of the server report. When a request is rejected, the
+error explains whether the feature was disabled by configuration or simply
+absent from the server so operators and agents can adjust their plans without
+guesswork.
+
 ### Capability probe
 
 The capability matrix negotiated through configuration overrides can be
