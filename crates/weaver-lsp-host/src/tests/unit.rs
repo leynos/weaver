@@ -1,7 +1,6 @@
 //! Unit tests for small host behaviours.
 
 use std::cell::RefCell;
-use std::str::FromStr;
 
 use rstest::rstest;
 use weaver_config::{CapabilityMatrix, CapabilityOverride};
@@ -11,7 +10,7 @@ use crate::capability::{CapabilityKind, CapabilitySource};
 use crate::errors::LspHostError;
 use crate::language::{Language, LanguageParseError};
 use crate::server::ServerCapabilitySet;
-use crate::tests::support::{CallKind, RecordingLanguageServer, ResponseSet, TestWorld};
+use crate::tests::support::{sample_uri, CallKind, RecordingLanguageServer, ResponseSet, TestWorld};
 
 #[rstest]
 fn applies_force_and_deny_overrides() {
@@ -35,7 +34,7 @@ fn applies_force_and_deny_overrides() {
     }];
     let mut world = TestWorld::new(config, overrides);
 
-    world.initialise(Language::Rust);
+    world.initialize(Language::Rust);
     let summary = world
         .last_capabilities
         .take()
@@ -105,7 +104,7 @@ fn reports_unknown_language_on_request() {
 fn propagates_server_error_from_definition() {
     struct FailingServer;
     impl crate::server::LanguageServer for FailingServer {
-        fn initialise(&mut self) -> Result<ServerCapabilitySet, crate::server::LanguageServerError> {
+        fn initialize(&mut self) -> Result<ServerCapabilitySet, crate::server::LanguageServerError> {
             Ok(ServerCapabilitySet::new(true, true, true))
         }
 
@@ -150,11 +149,11 @@ fn propagates_server_error_from_definition() {
 }
 
 #[rstest]
-fn calls_initialise_before_requests() {
-    let responses = ResponseSet::default();
-    let server = RecordingLanguageServer::new(
-        ServerCapabilitySet::new(true, true, true),
-        responses,
+    fn calls_initialise_before_requests() {
+        let responses = ResponseSet::default();
+        let server = RecordingLanguageServer::new(
+            ServerCapabilitySet::new(true, true, true),
+            responses,
     );
     let handle = server.handle();
     let mut host = crate::LspHost::new(CapabilityMatrix::default());
@@ -181,9 +180,4 @@ fn definition_params() -> lsp_types::GotoDefinitionParams {
         work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
         partial_result_params: lsp_types::PartialResultParams::default(),
     }
-}
-
-fn sample_uri() -> lsp_types::Uri {
-    lsp_types::Uri::from_str("file:///workspace/main.rs")
-        .unwrap_or_else(|error| panic!("invalid test URL: {error}"))
 }

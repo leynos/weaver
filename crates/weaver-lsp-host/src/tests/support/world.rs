@@ -114,10 +114,10 @@ impl TestWorld {
     }
 
     /// Initialises the server for the language and stores the outcome.
-    pub fn initialise(&mut self, language: Language) {
+    pub fn initialize(&mut self, language: Language) {
         self.last_capabilities = None;
         self.last_error = None;
-        match self.host.initialise(language) {
+        match self.host.initialize(language) {
             Ok(summary) => self.last_capabilities = Some(summary),
             Err(error) => self.last_error = Some(error),
         }
@@ -163,7 +163,7 @@ impl TestWorld {
 
         for config in &self.configs {
             let server = match &config.initialisation_error {
-                Some(message) => RecordingLanguageServer::failing_initialise(
+                Some(message) => RecordingLanguageServer::failing_initialize(
                     config.capabilities,
                     message.clone(),
                 ),
@@ -176,9 +176,8 @@ impl TestWorld {
             let handle = server.handle();
             if let Err(error) = self.host.register_language(config.language, Box::new(server)) {
                 panic!(
-                    "failed to register stub server for {language}: {error}",
-                    language = config.language,
-                    error = error
+                    "failed to register stub server for {}: {}",
+                    config.language, error
                 );
             }
             self.handles.insert(config.language, handle);

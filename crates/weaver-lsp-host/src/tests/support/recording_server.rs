@@ -38,7 +38,7 @@ impl RecordingLanguageServer {
     }
 
     /// Creates a server that fails during initialisation.
-    pub fn failing_initialise(
+    pub fn failing_initialize(
         capabilities: ServerCapabilitySet,
         message: impl Into<String>,
     ) -> Self {
@@ -77,7 +77,7 @@ impl RecordingLanguageServer {
 }
 
 impl LanguageServer for RecordingLanguageServer {
-    fn initialise(&mut self) -> Result<ServerCapabilitySet, LanguageServerError> {
+    fn initialize(&mut self) -> Result<ServerCapabilitySet, LanguageServerError> {
         with_state(&self.shared, |state| {
             state.record_call(CallKind::Initialise);
             if let Some(message) = &state.fail_initialise {

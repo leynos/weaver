@@ -1,7 +1,6 @@
 //! Behavioural tests for the LSP host facade using `rstest-bdd`.
 
 use std::cell::RefCell;
-use std::str::FromStr;
 
 use lsp_types::{
     Diagnostic, GotoDefinitionParams, GotoDefinitionResponse, Location, PartialResultParams,
@@ -16,7 +15,7 @@ use crate::capability::{CapabilityKind, CapabilitySource};
 use crate::errors::{HostOperation, LspHostError};
 use crate::language::Language;
 use crate::server::ServerCapabilitySet;
-use crate::tests::support::{CallKind, ResponseSet, TestServerConfig, TestWorld};
+use crate::tests::support::{sample_uri, CallKind, ResponseSet, TestServerConfig, TestWorld};
 
 #[fixture]
 fn world() -> RefCell<TestWorld> {
@@ -107,12 +106,12 @@ fn given_force_override(world: &RefCell<TestWorld>) {
 
 #[when("rust is initialised")]
 fn when_rust_initialised(world: &RefCell<TestWorld>) {
-    world.borrow_mut().initialise(Language::Rust);
+    world.borrow_mut().initialize(Language::Rust);
 }
 
 #[when("python is initialised")]
 fn when_python_initialised(world: &RefCell<TestWorld>) {
-    world.borrow_mut().initialise(Language::Python);
+    world.borrow_mut().initialize(Language::Python);
 }
 
 #[when("typescript handles a diagnostics request")]
@@ -278,11 +277,6 @@ fn sample_responses() -> ResponseSet {
         }],
         diagnostics: vec![Diagnostic::default()],
     }
-}
-
-fn sample_uri() -> Uri {
-    Uri::from_str("file:///workspace/main.rs")
-        .unwrap_or_else(|error| panic!("invalid test URL: {error}"))
 }
 
 fn definition_params() -> GotoDefinitionParams {

@@ -143,18 +143,18 @@ fn resolve_state(
     }
 
     let (available, source) = match capability {
-        CapabilityKind::Definition => (
-            advertised.supports_definition(),
-            capability_source(advertised.supports_definition()),
-        ),
-        CapabilityKind::References => (
-            advertised.supports_references(),
-            capability_source(advertised.supports_references()),
-        ),
-        CapabilityKind::Diagnostics => (
-            advertised.supports_diagnostics(),
-            capability_source(advertised.supports_diagnostics()),
-        ),
+        CapabilityKind::Definition => {
+            let available = advertised.supports_definition();
+            (available, capability_source(available))
+        }
+        CapabilityKind::References => {
+            let available = advertised.supports_references();
+            (available, capability_source(available))
+        }
+        CapabilityKind::Diagnostics => {
+            let available = advertised.supports_diagnostics();
+            (available, capability_source(available))
+        }
     };
 
     CapabilityState::new(capability, available, source)

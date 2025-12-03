@@ -84,8 +84,8 @@ impl LanguageServerError {
 
 /// Behaviour required from concrete language server bindings.
 pub trait LanguageServer: Send {
-    /// Runs the server initialisation handshake and returns advertised capabilities.
-    fn initialise(&mut self) -> Result<ServerCapabilitySet, LanguageServerError>;
+    /// Runs the server initialization handshake and returns advertised capabilities.
+    fn initialize(&mut self) -> Result<ServerCapabilitySet, LanguageServerError>;
 
     /// Handles a `textDocument/definition` request.
     fn goto_definition(

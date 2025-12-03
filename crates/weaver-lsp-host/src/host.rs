@@ -90,13 +90,13 @@ impl LspHost {
     }
 
     /// Initialises the language server and returns the resolved capability summary.
-    pub fn initialise(&mut self, language: Language) -> Result<CapabilitySummary, LspHostError> {
+    pub fn initialize(&mut self, language: Language) -> Result<CapabilitySummary, LspHostError> {
         let overrides = &self.overrides;
         let session = self
             .sessions
             .get_mut(&language)
             .ok_or_else(|| LspHostError::unknown(language))?;
-        Self::ensure_initialised(language, session, overrides)
+        Self::ensure_initialized(language, session, overrides)
     }
 
     /// Returns the resolved capabilities when the language is already initialised.
@@ -163,7 +163,7 @@ impl LspHost {
             .sessions
             .get_mut(&language)
             .ok_or_else(|| LspHostError::unknown(language))?;
-        let summary = Self::ensure_initialised(language, session, overrides)?;
+        let summary = Self::ensure_initialized(language, session, overrides)?;
         let state = summary.state(spec.capability);
         if !state.enabled {
             return Err(LspHostError::capability_unavailable(
@@ -177,7 +177,7 @@ impl LspHost {
             .map_err(|source| LspHostError::server(language, spec.operation, source))
     }
 
-    fn ensure_initialised(
+    fn ensure_initialized(
         language: Language,
         session: &mut Session,
         overrides: &weaver_config::CapabilityMatrix,
@@ -185,7 +185,7 @@ impl LspHost {
         match &session.state {
             SessionState::Ready { summary } => Ok(summary.clone()),
             SessionState::Pending => {
-                let capabilities = session.server.initialise().map_err(|source| {
+                let capabilities = session.server.initialize().map_err(|source| {
                     LspHostError::server(language, HostOperation::Initialise, source)
                 })?;
 
