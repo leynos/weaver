@@ -160,6 +160,169 @@ It separates the high-cost initialization of language analysis tools from the
 rapid execution of commands, and it fuses multiple data sources to build a
 comprehensive model of the codebase.
 
+### LSP host structure
+
+The following class diagram captures the structure of the `weaver-lsp-host`
+module, showing how capability negotiation, session state, and language server
+adaptors fit together:
+
+```mermaid
+classDiagram
+    class LspHost {
+        -CapabilityMatrix overrides
+        -HashMap~Language, Session~ sessions
+        +new(overrides: CapabilityMatrix) LspHost
+        +register_language(language: Language, server: Box~LanguageServer~) Result~(), LspHostError~
+        +initialise(language: Language) Result~CapabilitySummary, LspHostError~
+        +capabilities(language: Language) Option~CapabilitySummary~
+        +goto_definition(language: Language, params: GotoDefinitionParams) Result~GotoDefinitionResponse, LspHostError~
+        +references(language: Language, params: ReferenceParams) Result~Vec~Location~, LspHostError~
+        +diagnostics(language: Language, uri: Uri) Result~Vec~Diagnostic~, LspHostError~
+        -call_with_capability(context: CallContext, call: FnOnce) Result~T, LspHostError~
+        -ensure_initialised(language: Language, session: Session, overrides: CapabilityMatrix)
+          Result~CapabilitySummary, LspHostError~
+        -session_mut(language: Language) Result~Session, LspHostError~
+    }
+
+    class Session {
+        -Box~LanguageServer~ server
+        -SessionState state
+    }
+
+    class SessionState {
+        <<enum>>
+        Pending
+        Ready(summary: CapabilitySummary)
+    }
+
+    class CallContext {
+        -Language language
+        -CapabilityKind capability
+        -HostOperation operation
+    }
+
+    class LanguageServer {
+        <<interface>>
+        +initialise() Result~ServerCapabilitySet, LanguageServerError~
+        +goto_definition(params: GotoDefinitionParams) Result~GotoDefinitionResponse, LanguageServerError~
+        +references(params: ReferenceParams) Result~Vec~Location~, LanguageServerError~
+        +diagnostics(uri: Uri) Result~Vec~Diagnostic~, LanguageServerError~
+    }
+
+    class ServerCapabilitySet {
+        -bool definition
+        -bool references
+        -bool diagnostics
+        +new(definition: bool, references: bool, diagnostics: bool) ServerCapabilitySet
+        +supports_definition() bool
+        +supports_references() bool
+        +supports_diagnostics() bool
+    }
+
+    class LanguageServerError {
+        -String message
+        -Option~Error~ source
+        +new(message: String) LanguageServerError
+        +with_source(message: String, source: Error) LanguageServerError
+        +message() &str
+    }
+
+    class CapabilityKind {
+        <<enum>>
+        Definition
+        References
+        Diagnostics
+        +key() &str
+    }
+
+    class CapabilitySource {
+        <<enum>>
+        ServerAdvertised
+        ForcedOverride
+        DeniedOverride
+        MissingOnServer
+    }
+
+    class CapabilityState {
+        +CapabilityKind kind
+        +bool enabled
+        +CapabilitySource source
+        +new(kind: CapabilityKind, enabled: bool, source: CapabilitySource) CapabilityState
+    }
+
+    class CapabilitySummary {
+        -Language language
+        -BTreeMap~CapabilityKind, CapabilityState~ states
+        +language() Language
+        +state(capability: CapabilityKind) CapabilityState
+        +states() Iterator~CapabilityState~
+    }
+
+    class Language {
+        <<enum>>
+        Rust
+        Python
+        TypeScript
+        +as_str() &str
+        +from_str(input: &str) Result~Language, LanguageParseError~
+    }
+
+    class LanguageParseError {
+        -String input
+        +input() &str
+    }
+
+    class HostOperation {
+        <<enum>>
+        Initialise
+        Definition
+        References
+        Diagnostics
+    }
+
+    class LspHostError {
+        <<enum>>
+        UnknownLanguage(language: Language)
+        DuplicateLanguage(language: Language)
+        CapabilityUnavailable(language: Language, capability: CapabilityKind, reason: CapabilitySource)
+        Server(language: Language, operation: HostOperation, source: LanguageServerError)
+        +unknown(language: Language) LspHostError
+        +duplicate(language: Language) LspHostError
+        +capability_unavailable(language: Language, capability: CapabilityKind, reason: CapabilitySource) LspHostError
+        +server(language: Language, operation: HostOperation, source: LanguageServerError) LspHostError
+    }
+
+    class CapabilityMatrix {
+    }
+
+    %% Relationships
+    LspHost --> Session : manages
+    LspHost --> CapabilityMatrix : uses overrides
+    LspHost --> CapabilitySummary : returns
+    LspHost --> LspHostError : returns
+    Session --> SessionState : has
+    Session --> LanguageServer : owns
+    CapabilitySummary --> CapabilityState : aggregates
+    CapabilitySummary --> CapabilityKind : keyed by
+    CapabilityState --> CapabilityKind : describes
+    CapabilityState --> CapabilitySource : describes
+    LspHostError --> Language : references
+    LspHostError --> CapabilityKind : references
+    LspHostError --> CapabilitySource : references
+    LspHostError --> HostOperation : references
+    LspHostError --> LanguageServerError : wraps
+    LanguageServerError --> ServerCapabilitySet : produced by initialise
+    ServerCapabilitySet --> CapabilityKind : describes support for
+    Language --> LanguageParseError : parse failure
+    CapabilityMatrix ..> Language : keyed by
+    CapabilityMatrix ..> CapabilityKind : keyed by
+    LanguageServer <|.. RecordingLanguageServer
+
+    class RecordingLanguageServer {
+        <<test double>>
+    }
+```
+
 ### 2.1. Client-Daemon Interaction: The UNIX Way with JSONL
 
 The system is split into two primary components: `weaver`, a lightweight
