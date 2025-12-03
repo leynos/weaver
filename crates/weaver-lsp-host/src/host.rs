@@ -89,7 +89,7 @@ impl LspHost {
         Ok(())
     }
 
-    /// Initialises the language server and returns the resolved capability summary.
+    /// Initializes the language server and returns the resolved capability summary.
     pub fn initialize(&mut self, language: Language) -> Result<CapabilitySummary, LspHostError> {
         let overrides = &self.overrides;
         let session = self

@@ -153,7 +153,7 @@ fn then_rust_capabilities(world: &RefCell<TestWorld>) {
     let summary = borrow
         .last_capabilities
         .as_ref()
-        .unwrap_or_else(|| panic!("capabilities missing"));
+        .expect("capabilities missing");
 
     for state in summary.states() {
         assert!(state.enabled, "capability {:?} should be enabled", state.kind);
@@ -192,7 +192,7 @@ fn then_override_succeeds(world: &RefCell<TestWorld>) {
     let summary = borrow
         .host
         .capabilities(Language::TypeScript)
-        .unwrap_or_else(|| panic!("capability summary missing"));
+        .expect("capability summary missing");
     let diagnostics = summary.state(CapabilityKind::Diagnostics);
     assert_eq!(diagnostics.source, CapabilitySource::ForcedOverride);
 }
@@ -222,7 +222,7 @@ fn then_python_calls(world: &RefCell<TestWorld>) {
     let calls = world
         .borrow()
         .calls(Language::Python)
-        .unwrap_or_else(|| panic!("calls missing"));
+        .expect("calls missing");
     assert_eq!(calls, [CallKind::Initialise]);
 }
 

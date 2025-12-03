@@ -24,7 +24,7 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
         demonstrate precedence order (file < env < CLI), and default sockets
         align with the design doc.
 - [x] Implement the `weaver-cli` executable as the thin JSONL client that
-      initialises configuration via `ortho-config`, exposes the
+      initializes configuration via `ortho-config`, exposes the
       `--capabilities` probe, and streams requests to a running daemon over
       standard IO.
       - Acceptance criteria: CLI command surface mirrors the design table,

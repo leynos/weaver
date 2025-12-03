@@ -17,11 +17,11 @@ use super::recording_server::{CallKind, RecordingLanguageServer, RecordingServer
 pub struct TestServerConfig {
     /// Language served by the stub.
     pub language: Language,
-    /// Capabilities reported during initialisation.
+    /// Capabilities reported during initialization.
     pub capabilities: ServerCapabilitySet,
     /// Responses returned for core operations.
     pub responses: ResponseSet,
-    /// Optional error to surface during initialisation.
+    /// Optional error to surface during initialization.
     pub initialisation_error: Option<String>,
 }
 

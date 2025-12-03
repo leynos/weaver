@@ -38,7 +38,7 @@ fn applies_force_and_deny_overrides() {
     let summary = world
         .last_capabilities
         .take()
-        .unwrap_or_else(|| panic!("missing capabilities"));
+        .expect("missing capabilities");
 
     let references = summary.state(CapabilityKind::References);
     assert!(references.enabled);
@@ -51,20 +51,35 @@ fn applies_force_and_deny_overrides() {
 
 #[rstest]
 fn parses_known_languages() {
-    assert_eq!(Language::from_str("rust").unwrap(), Language::Rust);
-    assert_eq!(Language::from_str("python").unwrap(), Language::Python);
-    assert_eq!(Language::from_str("typescript").unwrap(), Language::TypeScript);
+    assert_eq!(Language::from_str("rust").expect("rust should parse"), Language::Rust);
+    assert_eq!(
+        Language::from_str("python").expect("python should parse"),
+        Language::Python
+    );
+    assert_eq!(
+        Language::from_str("typescript").expect("typescript should parse"),
+        Language::TypeScript
+    );
 }
 
 #[rstest]
 fn parses_typescript_alias_ts() {
-    assert_eq!(Language::from_str("ts").unwrap(), Language::TypeScript);
+    assert_eq!(
+        Language::from_str("ts").expect("ts alias should parse"),
+        Language::TypeScript
+    );
 }
 
 #[rstest]
 fn trims_whitespace_in_language_parse() {
-    assert_eq!(Language::from_str(" rust ").unwrap(), Language::Rust);
-    assert_eq!(Language::from_str("\tpython\n").unwrap(), Language::Python);
+    assert_eq!(
+        Language::from_str(" rust ").expect("padded rust should parse"),
+        Language::Rust
+    );
+    assert_eq!(
+        Language::from_str("\tpython\n").expect("padded python should parse"),
+        Language::Python
+    );
 }
 
 #[rstest]
