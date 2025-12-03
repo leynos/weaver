@@ -30,7 +30,7 @@ fn applies_force_and_deny_overrides() {
         language: Language::Rust,
         capabilities: ServerCapabilitySet::new(true, false, false),
         responses: ResponseSet::default(),
-        initialisation_error: None,
+        initialization_error: None,
     }];
     let mut world = TestWorld::new(config, overrides);
 
@@ -164,11 +164,11 @@ fn propagates_server_error_from_definition() {
 }
 
 #[rstest]
-    fn calls_initialise_before_requests() {
-        let responses = ResponseSet::default();
-        let server = RecordingLanguageServer::new(
-            ServerCapabilitySet::new(true, true, true),
-            responses,
+fn calls_initialise_before_requests() {
+    let responses = ResponseSet::default();
+    let server = RecordingLanguageServer::new(
+        ServerCapabilitySet::new(true, true, true),
+        responses,
     );
     let handle = server.handle();
     let mut host = crate::LspHost::new(CapabilityMatrix::default());

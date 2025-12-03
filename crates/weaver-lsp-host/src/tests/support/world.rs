@@ -22,7 +22,7 @@ pub struct TestServerConfig {
     /// Responses returned for core operations.
     pub responses: ResponseSet,
     /// Optional error to surface during initialization.
-    pub initialisation_error: Option<String>,
+    pub initialization_error: Option<String>,
 }
 
 impl TestServerConfig {
@@ -33,7 +33,7 @@ impl TestServerConfig {
             language,
             capabilities,
             responses: ResponseSet::default(),
-            initialisation_error: None,
+            initialization_error: None,
         }
     }
 }
@@ -44,7 +44,7 @@ impl Default for TestServerConfig {
             language: Language::Rust,
             capabilities: ServerCapabilitySet::new(true, true, true),
             responses: ResponseSet::default(),
-            initialisation_error: None,
+            initialization_error: None,
         }
     }
 }
@@ -113,7 +113,7 @@ impl TestWorld {
             .map(RecordingServerHandle::calls)
     }
 
-    /// Initialises the server for the language and stores the outcome.
+    /// Initializes the server for the language and stores the outcome.
     pub fn initialize(&mut self, language: Language) {
         self.last_capabilities = None;
         self.last_error = None;
@@ -162,7 +162,7 @@ impl TestWorld {
         self.last_capabilities = None;
 
         for config in &self.configs {
-            let server = match &config.initialisation_error {
+            let server = match &config.initialization_error {
                 Some(message) => RecordingLanguageServer::failing_initialize(
                     config.capabilities,
                     message.clone(),

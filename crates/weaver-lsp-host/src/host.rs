@@ -99,7 +99,7 @@ impl LspHost {
         Self::ensure_initialized(language, session, overrides)
     }
 
-    /// Returns the resolved capabilities when the language is already initialised.
+    /// Returns the resolved capabilities when the language is already initialized.
     #[must_use]
     pub fn capabilities(&self, language: Language) -> Option<CapabilitySummary> {
         self.sessions

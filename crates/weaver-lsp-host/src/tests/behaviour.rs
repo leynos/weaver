@@ -30,19 +30,19 @@ fn given_all_languages(world: &RefCell<TestWorld>) {
             language: Language::Rust,
             capabilities: ServerCapabilitySet::new(true, true, true),
             responses: responses.clone(),
-            initialisation_error: None,
+            initialization_error: None,
         },
         TestServerConfig {
             language: Language::Python,
             capabilities: ServerCapabilitySet::new(true, true, true),
             responses: responses.clone(),
-            initialisation_error: None,
+            initialization_error: None,
         },
         TestServerConfig {
             language: Language::TypeScript,
             capabilities: ServerCapabilitySet::new(true, true, true),
             responses,
-            initialisation_error: None,
+            initialization_error: None,
         },
     ];
 
@@ -57,7 +57,7 @@ fn given_python_missing_references(world: &RefCell<TestWorld>) {
         language: Language::Python,
         capabilities: ServerCapabilitySet::new(true, false, true),
         responses,
-        initialisation_error: None,
+        initialization_error: None,
     }];
 
     *world.borrow_mut() = TestWorld::new(configs, CapabilityMatrix::default());
@@ -71,7 +71,7 @@ fn given_typescript_missing_diagnostics(world: &RefCell<TestWorld>) {
         language: Language::TypeScript,
         capabilities: ServerCapabilitySet::new(true, true, false),
         responses,
-        initialisation_error: None,
+        initialization_error: None,
     }];
 
     *world.borrow_mut() = TestWorld::new(configs, CapabilityMatrix::default());
@@ -83,7 +83,7 @@ fn given_rust_failure(world: &RefCell<TestWorld>) {
         language: Language::Rust,
         capabilities: ServerCapabilitySet::new(true, true, true),
         responses: sample_responses(),
-        initialisation_error: Some(String::from("intentional init failure")),
+        initialization_error: Some(String::from("intentional init failure")),
     }];
 
     *world.borrow_mut() = TestWorld::new(configs, CapabilityMatrix::default());
@@ -247,7 +247,7 @@ fn assert_call_recorded(world: &RefCell<TestWorld>, language: Language, kind: Ca
     let borrow = world.borrow();
     let calls = borrow
         .calls(language)
-        .unwrap_or_else(|| panic!("missing calls for {language}"));
+        .expect("missing calls for language");
     assert!(
         calls.contains(&kind),
         "expected to record {kind:?} for {language}, got {calls:?}"
