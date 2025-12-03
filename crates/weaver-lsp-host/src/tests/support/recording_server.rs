@@ -9,7 +9,7 @@ use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 /// Discriminates the kind of call recorded by the stub server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CallKind {
-    /// `initialize` was invoked.
+    /// `initialise` was invoked.
     Initialise,
     /// `textDocument/definition` was invoked.
     Definition,
