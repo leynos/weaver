@@ -24,7 +24,7 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
         demonstrate precedence order (file < env < CLI), and default sockets
         align with the design doc.
 - [x] Implement the `weaver-cli` executable as the thin JSONL client that
-      initialises configuration via `ortho-config`, exposes the
+      initializes configuration via `ortho-config`, exposes the
       `--capabilities` probe, and streams requests to a running daemon over
       standard IO.
       - Acceptance criteria: CLI command surface mirrors the design table,
@@ -49,7 +49,7 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
         refuse to start when sockets are bound, and emit recovery guidance for
         the operator.
 
-- [ ] Build the `weaver-lsp-host` crate with support for initialisation,
+- [x] Build the `weaver-lsp-host` crate with support for initialization,
     capability detection, and core LSP features (definition, references,
     diagnostics) for Rust, Python, and TypeScript.
 

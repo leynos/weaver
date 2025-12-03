@@ -1,0 +1,14 @@
+[package]
+name = "weaver-lsp-host"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+weaver-config = { path = "../weaver-config" }
+lsp-types = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
+rstest-bdd = { workspace = true }
+rstest-bdd-macros = { workspace = true }
