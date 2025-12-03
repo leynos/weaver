@@ -24,6 +24,35 @@ struct CallSpec {
     operation: HostOperation,
 }
 
+macro_rules! lsp_method {
+    (
+        $(#[$meta:meta])* $vis:vis fn $name:ident(
+            &mut self,
+            language: Language,
+            $param:ident : $pty:ty $(,)?
+        ) -> $ret:ty {
+            $cap:expr,
+            $op:expr,
+            $server_method:ident
+        }
+    ) => {
+        $(#[$meta])* $vis fn $name(
+            &mut self,
+            language: Language,
+            $param: $pty,
+        ) -> $ret {
+            self.call_with_capability(
+                language,
+                CallSpec {
+                    capability: $cap,
+                    operation: $op,
+                },
+                move |server| server.$server_method($param),
+            )
+        }
+    };
+}
+
 /// Orchestrates multiple language servers and applies capability overrides.
 pub struct LspHost {
     overrides: weaver_config::CapabilityMatrix,
@@ -81,53 +110,44 @@ impl LspHost {
             })
     }
 
-    /// Routes a definition request to the configured language server.
-    pub fn goto_definition(
-        &mut self,
-        language: Language,
-        params: GotoDefinitionParams,
-    ) -> Result<GotoDefinitionResponse, LspHostError> {
-        self.call_with_capability(
-            language,
-            CallSpec {
-                capability: CapabilityKind::Definition,
-                operation: HostOperation::Definition,
-            },
-            |server| server.goto_definition(params),
-        )
-    }
+    lsp_method!(
+        /// Routes a definition request to the configured language server.
+        pub fn goto_definition(
+            &mut self,
+            language: Language,
+            params: GotoDefinitionParams,
+        ) -> Result<GotoDefinitionResponse, LspHostError> {
+            CapabilityKind::Definition,
+            HostOperation::Definition,
+            goto_definition
+        }
+    );
 
-    /// Routes a references request to the configured language server.
-    pub fn references(
-        &mut self,
-        language: Language,
-        params: ReferenceParams,
-    ) -> Result<Vec<lsp_types::Location>, LspHostError> {
-        self.call_with_capability(
-            language,
-            CallSpec {
-                capability: CapabilityKind::References,
-                operation: HostOperation::References,
-            },
-            |server| server.references(params),
-        )
-    }
+    lsp_method!(
+        /// Routes a references request to the configured language server.
+        pub fn references(
+            &mut self,
+            language: Language,
+            params: ReferenceParams,
+        ) -> Result<Vec<lsp_types::Location>, LspHostError> {
+            CapabilityKind::References,
+            HostOperation::References,
+            references
+        }
+    );
 
-    /// Retrieves diagnostics for the supplied document.
-    pub fn diagnostics(
-        &mut self,
-        language: Language,
-        uri: Uri,
-    ) -> Result<Vec<lsp_types::Diagnostic>, LspHostError> {
-        self.call_with_capability(
-            language,
-            CallSpec {
-                capability: CapabilityKind::Diagnostics,
-                operation: HostOperation::Diagnostics,
-            },
-            |server| server.diagnostics(uri),
-        )
-    }
+    lsp_method!(
+        /// Retrieves diagnostics for the supplied document.
+        pub fn diagnostics(
+            &mut self,
+            language: Language,
+            uri: Uri,
+        ) -> Result<Vec<lsp_types::Diagnostic>, LspHostError> {
+            CapabilityKind::Diagnostics,
+            HostOperation::Diagnostics,
+            diagnostics
+        }
+    );
 
     fn call_with_capability<F, T>(
         &mut self,
