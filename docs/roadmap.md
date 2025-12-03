@@ -53,7 +53,7 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
     capability detection, and core LSP features (definition, references,
     diagnostics) for Rust, Python, and TypeScript.
 
-- [ ] Implement the initial version of the `weaver-sandbox` crate, using
+- [x] Implement the initial version of the `weaver-sandbox` crate, using
     `birdcage` for its focused scope and production usage, prioritising robust
     Linux support via namespaces and seccomp-bpf.
 

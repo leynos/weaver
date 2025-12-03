@@ -139,6 +139,19 @@ sequence within a ten-second budget. For interactive debugging or CI jobs, set
 `WEAVER_FOREGROUND=1` to keep the daemon attached to the terminal while
 preserving the same lock, PID, and health semantics.
 
+## Sandbox defaults
+
+External tools launched by the daemon now run inside the `weaver-sandbox`
+wrapper around `birdcage` 0.8.1. Linux namespaces and `seccomp-bpf` filters are
+applied automatically, networking is disabled by default, and only a small set
+of standard library directories are readable to keep dynamically linked
+executables functioning. Commands must be provided as absolute paths and added
+to the sandbox allowlist before launch; requests made from multi-threaded
+contexts return a `MultiThreaded` error rather than panicking the process. The
+sandbox strips the environment unless specific variables are explicitly
+whitelisted, so callers should pass configuration via the broker rather than
+relying on inherited host state.
+
 ### Lifecycle commands
 
 `weaver` now exposes explicit lifecycle commands so operators do not need to

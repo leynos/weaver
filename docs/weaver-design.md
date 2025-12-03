@@ -980,6 +980,23 @@ descriptor, but its `seccomp-bpf` filter will block any attempt to make its own
 surface and ensures that sandboxing is not just a library call, but a core
 principle of the system's design.
 
+### 5.3 Initial `weaver-sandbox` implementation
+
+The first cut of the dedicated `weaver-sandbox` crate now wraps `birdcage`
+v0.8.1 with Weaver defaults. Executables must be supplied as absolute paths and
+whitelisted explicitly; the wrapper canonicalises the whitelist before launch
+to prevent symlink escapes. Standard Linux library roots (`/lib`, `/lib64`,
+`/usr/lib`, and their architecture-specific variants) are whitelisted for
+read-only access by default so dynamically linked binaries remain functional
+without exposing the wider filesystem. Network access remains disabled unless
+requested, and the environment is isolated by default with an allowlist for
+specific variables when needed.
+
+`birdcage` enforces a single-threaded caller; the wrapper performs a preflight
+check and reports a `MultiThreaded` error instead of panicking when multiple
+threads are active. The test harness runs with `RUST_TEST_THREADS=1` to cover
+the happy path until a dedicated single-threaded launcher process lands.
+
 ## 6. Advanced Capabilities for AI Agents
 
 Beyond core observation and action primitives, `Weaver` is designed with
