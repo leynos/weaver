@@ -83,7 +83,7 @@ fn read_write_paths_are_recorded() {
 }
 
 #[test]
-fn canonicalises_nonexistent_child_when_parent_exists() {
+fn records_nonexistent_future_path() {
     let base = tempfile::tempdir().expect("tempdir");
     let target = base.path().join("future_dir").join("file.txt");
 

@@ -1,3 +1,4 @@
+#![cfg(target_os = "linux")]
 //! Behavioural tests for sandbox spawning using `rstest-bdd`.
 
 use std::cell::RefCell;

@@ -38,6 +38,9 @@ pub struct SandboxProfile {
     read_only_paths: Vec<PathBuf>,
     read_write_paths: Vec<PathBuf>,
     executable_paths: Vec<PathBuf>,
+    read_only_paths_canon: std::sync::OnceLock<std::collections::BTreeSet<PathBuf>>,
+    read_write_paths_canon: std::sync::OnceLock<std::collections::BTreeSet<PathBuf>>,
+    executable_paths_canon: std::sync::OnceLock<std::collections::BTreeSet<PathBuf>>,
     environment: EnvironmentPolicy,
     network: NetworkPolicy,
 }
@@ -60,6 +63,9 @@ impl SandboxProfile {
             read_only_paths: linux_runtime_roots(),
             read_write_paths: Vec::new(),
             executable_paths: Vec::new(),
+            read_only_paths_canon: std::sync::OnceLock::new(),
+            read_write_paths_canon: std::sync::OnceLock::new(),
+            executable_paths_canon: std::sync::OnceLock::new(),
             environment: EnvironmentPolicy::default(),
             network: NetworkPolicy::default(),
         }
@@ -87,6 +93,9 @@ impl SandboxProfile {
     }
 
     /// Whitelists an environment variable for inheritance.
+    ///
+    /// When the policy is already [`EnvironmentPolicy::InheritAll`] this is a
+    /// no-op because the full environment is already permitted.
     #[must_use]
     pub fn allow_environment_variable(mut self, key: impl Into<String>) -> Self {
         self.environment = self.environment.clone().with_allowed(key.into());
@@ -107,19 +116,47 @@ impl SandboxProfile {
         self
     }
 
-    /// Returns read-only paths configured on the profile.
-    pub(crate) fn read_only_paths(&self) -> &[PathBuf] {
-        &self.read_only_paths
+    pub(crate) fn read_only_paths_canonicalised(
+        &self,
+    ) -> Result<&std::collections::BTreeSet<PathBuf>, crate::SandboxError> {
+        if let Some(set) = self.read_only_paths_canon.get() {
+            return Ok(set);
+        }
+        let set = crate::sandbox::canonicalised_set(&self.read_only_paths)?;
+        let _ = self.read_only_paths_canon.set(set);
+        // Safe because we set the cell above.
+        Ok(self
+            .read_only_paths_canon
+            .get()
+            .expect("read_only_paths_canon just initialised"))
     }
 
-    /// Returns read-write paths configured on the profile.
-    pub(crate) fn read_write_paths(&self) -> &[PathBuf] {
-        &self.read_write_paths
+    pub(crate) fn read_write_paths_canonicalised(
+        &self,
+    ) -> Result<&std::collections::BTreeSet<PathBuf>, crate::SandboxError> {
+        if let Some(set) = self.read_write_paths_canon.get() {
+            return Ok(set);
+        }
+        let set = crate::sandbox::canonicalised_set(&self.read_write_paths)?;
+        let _ = self.read_write_paths_canon.set(set);
+        Ok(self
+            .read_write_paths_canon
+            .get()
+            .expect("read_write_paths_canon just initialised"))
     }
 
-    /// Returns executable paths configured on the profile.
-    pub(crate) fn executable_paths(&self) -> &[PathBuf] {
-        &self.executable_paths
+    pub(crate) fn executable_paths_canonicalised(
+        &self,
+    ) -> Result<&std::collections::BTreeSet<PathBuf>, crate::SandboxError> {
+        if let Some(set) = self.executable_paths_canon.get() {
+            return Ok(set);
+        }
+        let set = crate::sandbox::canonicalised_set(&self.executable_paths)?;
+        let _ = self.executable_paths_canon.set(set);
+        Ok(self
+            .executable_paths_canon
+            .get()
+            .expect("executable_paths_canon just initialised"))
     }
 
     /// Returns the configured environment policy.

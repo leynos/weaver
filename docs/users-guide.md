@@ -143,7 +143,7 @@ preserving the same lock, PID, and health semantics.
 
 External tools launched by the daemon now run inside the `weaver-sandbox`
 wrapper around `birdcage` 0.8.1. Linux namespaces and `seccomp-bpf` filters are
-applied automatically, networking is disabled by default, and only a small set
+applied automatically; networking is disabled by default; and only a small set
 of standard library directories are readable to keep dynamically linked
 executables functioning. Commands must be provided as absolute paths and added
 to the sandbox allowlist before launch; requests made from multi-threaded

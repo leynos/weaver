@@ -11,6 +11,7 @@ use crate::env_guard::EnvGuard;
 use crate::error::SandboxError;
 use crate::profile::{NetworkPolicy, SandboxProfile};
 use crate::runtime::thread_count;
+use std::fmt;
 
 /// Builder for sandboxed commands.
 pub type SandboxCommand = Command;
@@ -20,16 +21,38 @@ pub type SandboxChild = Child;
 pub type SandboxOutput = Output;
 
 /// Launches commands inside a restrictive sandbox.
-#[derive(Debug)]
 pub struct Sandbox {
     profile: SandboxProfile,
+    thread_counter: Box<dyn Fn() -> Result<usize, std::io::Error> + Send + Sync>,
+}
+
+impl fmt::Debug for Sandbox {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Sandbox")
+            .field("profile", &self.profile)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Sandbox {
     /// Creates a sandbox with the supplied profile.
     #[must_use]
     pub fn new(profile: SandboxProfile) -> Self {
-        Self { profile }
+        Self {
+            profile,
+            thread_counter: Box::new(thread_count),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn with_thread_counter_for_tests(
+        profile: SandboxProfile,
+        counter: Box<dyn Fn() -> Result<usize, std::io::Error> + Send + Sync>,
+    ) -> Self {
+        Self {
+            profile,
+            thread_counter: counter,
+        }
     }
 
     /// Spawns the provided command inside the configured sandbox.
@@ -57,8 +80,8 @@ impl Sandbox {
     }
 
     fn ensure_single_threaded(&self) -> Result<(), SandboxError> {
-        let threads =
-            thread_count().map_err(|source| SandboxError::ThreadCountUnavailable { source })?;
+        let threads = (self.thread_counter)()
+            .map_err(|source| SandboxError::ThreadCountUnavailable { source })?;
         if threads > 1 {
             return Err(SandboxError::MultiThreaded {
                 thread_count: threads,
@@ -68,7 +91,7 @@ impl Sandbox {
     }
 
     fn ensure_program_whitelisted(&self, program: &Path) -> Result<(), SandboxError> {
-        let authorised = canonicalised_set(self.profile.executable_paths())?;
+        let authorised = self.profile.executable_paths_canonicalised()?;
         if authorised.contains(program) {
             return Ok(());
         }
@@ -79,21 +102,23 @@ impl Sandbox {
 
     fn collect_exceptions(&self, program: &Path) -> Result<Vec<Exception>, SandboxError> {
         let mut exceptions = Vec::new();
-        let read_only = canonicalised_set(self.profile.read_only_paths())?;
-        let read_write = canonicalised_set(self.profile.read_write_paths())?;
-        let executables = canonicalised_set(self.profile.executable_paths())?;
+        let read_only = self.profile.read_only_paths_canonicalised()?;
+        let read_write = self.profile.read_write_paths_canonicalised()?;
+        let executables = self.profile.executable_paths_canonicalised()?;
 
         for path in read_only {
-            exceptions.push(Exception::Read(path));
+            exceptions.push(Exception::Read(path.clone()));
         }
         for path in read_write {
-            exceptions.push(Exception::WriteAndRead(path));
+            exceptions.push(Exception::WriteAndRead(path.clone()));
         }
         for path in executables {
-            exceptions.push(Exception::ExecuteAndRead(path));
+            exceptions.push(Exception::ExecuteAndRead(path.clone()));
         }
 
-        exceptions.push(Exception::ExecuteAndRead(program.to_path_buf()));
+        if !executables.contains(program) {
+            exceptions.push(Exception::ExecuteAndRead(program.to_path_buf()));
+        }
 
         exceptions.extend(self.profile.environment_policy().to_exceptions());
 
@@ -109,24 +134,30 @@ impl Sandbox {
             return Err(SandboxError::ProgramNotAbsolute(program.to_path_buf()));
         }
 
-        canonicalise(program)
+        canonicalise(program, true)
     }
 }
 
-fn canonicalised_set(paths: &[PathBuf]) -> Result<BTreeSet<PathBuf>, SandboxError> {
+pub(crate) fn canonicalised_set(paths: &[PathBuf]) -> Result<BTreeSet<PathBuf>, SandboxError> {
     let mut set = BTreeSet::new();
     for path in paths {
-        let canonical = canonicalise(path)?;
+        let canonical = canonicalise(path, false)?;
         let _ = set.insert(canonical);
     }
     Ok(set)
 }
 
-fn canonicalise(path: &Path) -> Result<PathBuf, SandboxError> {
+fn canonicalise(path: &Path, require_exists: bool) -> Result<PathBuf, SandboxError> {
     match fs::canonicalize(path) {
         Ok(resolved) => Ok(resolved),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            rebuild_from_existing_ancestor(path)
+            if require_exists {
+                Err(SandboxError::MissingPath {
+                    path: path.to_path_buf(),
+                })
+            } else {
+                rebuild_from_existing_ancestor(path)
+            }
         }
         Err(source) => Err(SandboxError::CanonicalisationFailed {
             path: path.to_path_buf(),

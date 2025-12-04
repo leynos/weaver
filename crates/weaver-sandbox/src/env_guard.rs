@@ -6,14 +6,23 @@
 //! upstream marker while still containing all mutations behind the guard's
 //! snapshot-and-restore discipline.
 
-use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ffi::OsString;
+
+#[inline]
+fn unset_env_var<K: AsRef<std::ffi::OsStr>>(key: K) {
+    unsafe { env::remove_var(key) };
+}
+
+#[inline]
+fn set_env_var<K: AsRef<std::ffi::OsStr>, V: AsRef<std::ffi::OsStr>>(key: K, value: V) {
+    unsafe { env::set_var(key, value) };
+}
 
 /// Restores the parent process environment after `birdcage` strips variables.
 #[derive(Debug)]
 pub struct EnvGuard {
-    original: HashMap<OsString, OsString>,
+    original: Vec<(OsString, OsString)>,
 }
 
 impl EnvGuard {
@@ -26,22 +35,14 @@ impl EnvGuard {
     }
 
     pub(crate) fn restore(&self) {
-        let current: HashMap<OsString, OsString> = env::vars_os().collect();
-        let expected_keys: HashSet<&OsString> = self.original.keys().collect();
-
-        // Remove variables introduced while the guard was active.
-        for key in current.keys() {
-            if !expected_keys.contains(key) {
-                // Safety: project policy requires env mutation to be wrapped in
-                // `unsafe` until the std APIs settle for Rust 2024. We mutate
-                // only after snapshotting to avoid iterator invalidation.
-                unsafe { env::remove_var(key) };
-            }
+        // Clear current environment.
+        for (key, _) in env::vars_os() {
+            unset_env_var(&key);
         }
 
+        // Restore snapshot.
         for (key, value) in &self.original {
-            // Safety: see note above regarding env mutation policy.
-            unsafe { env::set_var(key, value) };
+            set_env_var(key, value);
         }
     }
 }

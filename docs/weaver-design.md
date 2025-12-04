@@ -984,7 +984,7 @@ principle of the system's design.
 
 The first cut of the dedicated `weaver-sandbox` crate now wraps `birdcage`
 v0.8.1 with Weaver defaults. Executables must be supplied as absolute paths and
-whitelisted explicitly; the wrapper canonicalises the whitelist before launch
+whitelisted explicitly; the wrapper canonicalizes the whitelist before launch
 to prevent symlink escapes. Standard Linux library roots (`/lib`, `/lib64`,
 `/usr/lib`, and their architecture-specific variants) are whitelisted for
 read-only access by default so dynamically linked binaries remain functional

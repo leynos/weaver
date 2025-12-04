@@ -64,3 +64,30 @@ fn removes_variables_created_during_guard_lifetime() {
 
     unsafe { env::remove_var(PRE_EXISTING) };
 }
+
+#[test]
+fn restores_environment_on_drop() {
+    const PRE_EXISTING: &str = "WEAVER_ENV_GUARD_DROP_PRE_EXISTING";
+    const CREATED: &str = "WEAVER_ENV_GUARD_DROP_CREATED";
+
+    let _guard = lock_env();
+
+    unsafe { env::set_var(PRE_EXISTING, "original") };
+
+    {
+        let _snapshot = EnvGuard::capture();
+
+        unsafe {
+            env::set_var(PRE_EXISTING, "modified");
+            env::set_var(CREATED, "temporary");
+        }
+
+        assert_eq!(env::var(PRE_EXISTING).as_deref(), Ok("modified"));
+        assert_eq!(env::var(CREATED).as_deref(), Ok("temporary"));
+    }
+
+    assert_eq!(env::var(PRE_EXISTING).as_deref(), Ok("original"));
+    assert!(env::var(CREATED).is_err());
+
+    unsafe { env::remove_var(PRE_EXISTING) };
+}
