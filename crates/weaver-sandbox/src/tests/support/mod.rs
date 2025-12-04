@@ -3,9 +3,7 @@
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
-
-use std::sync::OnceLock;
+use std::sync::MutexGuard;
 use tempfile::TempDir;
 
 use crate::error::SandboxError;
@@ -14,7 +12,8 @@ use crate::process::Stdio;
 use crate::profile::SandboxProfile;
 use crate::sandbox::{Sandbox, SandboxChild, SandboxCommand, SandboxOutput};
 
-static ENV_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
+mod env;
+pub(crate) use env::lock_env;
 
 #[derive(Debug)]
 struct EnvHandle {
@@ -25,10 +24,7 @@ struct EnvHandle {
 impl EnvHandle {
     fn acquire() -> Self {
         Self {
-            guard: ENV_MUTEX
-                .get_or_init(|| Mutex::new(()))
-                .lock()
-                .expect("env mutex poisoned"),
+            guard: lock_env(),
             snapshot: EnvGuard::capture(),
         }
     }

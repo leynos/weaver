@@ -1,6 +1,5 @@
 //! Sandbox orchestration built on top of `birdcage`.
 
-use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -92,7 +91,7 @@ impl Sandbox {
 
     fn ensure_program_whitelisted(&self, program: &Path) -> Result<(), SandboxError> {
         let authorised = self.profile.executable_paths_canonicalised()?;
-        if authorised.contains(program) {
+        if authorised.iter().any(|p| p == program) {
             return Ok(());
         }
         Err(SandboxError::ExecutableNotAuthorised {
@@ -116,7 +115,7 @@ impl Sandbox {
             exceptions.push(Exception::ExecuteAndRead(path.clone()));
         }
 
-        if !executables.contains(program) {
+        if !executables.iter().any(|p| p == program) {
             exceptions.push(Exception::ExecuteAndRead(program.to_path_buf()));
         }
 
@@ -138,13 +137,13 @@ impl Sandbox {
     }
 }
 
-pub(crate) fn canonicalised_set(paths: &[PathBuf]) -> Result<BTreeSet<PathBuf>, SandboxError> {
-    let mut set = BTreeSet::new();
+pub(crate) fn canonicalised_set(paths: &[PathBuf]) -> Result<Vec<PathBuf>, SandboxError> {
+    let mut result = Vec::with_capacity(paths.len());
     for path in paths {
         let canonical = canonicalise(path, false)?;
-        let _ = set.insert(canonical);
+        result.push(canonical);
     }
-    Ok(set)
+    Ok(result)
 }
 
 fn canonicalise(path: &Path, require_exists: bool) -> Result<PathBuf, SandboxError> {

@@ -38,9 +38,9 @@ pub struct SandboxProfile {
     read_only_paths: Vec<PathBuf>,
     read_write_paths: Vec<PathBuf>,
     executable_paths: Vec<PathBuf>,
-    read_only_paths_canon: std::sync::OnceLock<std::collections::BTreeSet<PathBuf>>,
-    read_write_paths_canon: std::sync::OnceLock<std::collections::BTreeSet<PathBuf>>,
-    executable_paths_canon: std::sync::OnceLock<std::collections::BTreeSet<PathBuf>>,
+    read_only_paths_canon: std::sync::OnceLock<Vec<PathBuf>>,
+    read_write_paths_canon: std::sync::OnceLock<Vec<PathBuf>>,
+    executable_paths_canon: std::sync::OnceLock<Vec<PathBuf>>,
     environment: EnvironmentPolicy,
     network: NetworkPolicy,
 }
@@ -118,7 +118,7 @@ impl SandboxProfile {
 
     pub(crate) fn read_only_paths_canonicalised(
         &self,
-    ) -> Result<&std::collections::BTreeSet<PathBuf>, crate::SandboxError> {
+    ) -> Result<&Vec<PathBuf>, crate::SandboxError> {
         if let Some(set) = self.read_only_paths_canon.get() {
             return Ok(set);
         }
@@ -133,7 +133,7 @@ impl SandboxProfile {
 
     pub(crate) fn read_write_paths_canonicalised(
         &self,
-    ) -> Result<&std::collections::BTreeSet<PathBuf>, crate::SandboxError> {
+    ) -> Result<&Vec<PathBuf>, crate::SandboxError> {
         if let Some(set) = self.read_write_paths_canon.get() {
             return Ok(set);
         }
@@ -147,7 +147,7 @@ impl SandboxProfile {
 
     pub(crate) fn executable_paths_canonicalised(
         &self,
-    ) -> Result<&std::collections::BTreeSet<PathBuf>, crate::SandboxError> {
+    ) -> Result<&Vec<PathBuf>, crate::SandboxError> {
         if let Some(set) = self.executable_paths_canon.get() {
             return Ok(set);
         }
