@@ -39,6 +39,34 @@ fn network_is_denied_by_default() {
 }
 
 #[test]
+fn network_can_be_allowed() {
+    let profile = SandboxProfile::new().allow_networking();
+    assert_eq!(profile.network_policy(), NetworkPolicy::Allow);
+    assert!(!NetworkPolicy::Allow.is_denied());
+}
+
+#[test]
+fn full_environment_can_be_inherited() {
+    let profile = SandboxProfile::new().allow_full_environment();
+    assert!(matches!(
+        profile.environment_policy(),
+        EnvironmentPolicy::InheritAll
+    ));
+}
+
+#[test]
+fn environment_allowlist_has_no_effect_after_full_inherit() {
+    let profile = SandboxProfile::new()
+        .allow_full_environment()
+        .allow_environment_variable("SHOULD_BE_IGNORED");
+
+    assert!(matches!(
+        profile.environment_policy(),
+        EnvironmentPolicy::InheritAll
+    ));
+}
+
+#[test]
 fn read_write_paths_are_recorded() {
     let profile = SandboxProfile::new()
         .allow_read_path(PathBuf::from("/tmp"))
@@ -52,4 +80,18 @@ fn read_write_paths_are_recorded() {
         .read_write_paths()
         .iter()
         .any(|path| path.ends_with("tmp")));
+}
+
+#[test]
+fn canonicalises_nonexistent_child_when_parent_exists() {
+    let base = tempfile::tempdir().expect("tempdir");
+    let target = base.path().join("future_dir").join("file.txt");
+
+    let profile = SandboxProfile::new().allow_read_write_path(&target);
+
+    let set = profile.read_write_paths();
+    assert!(
+        set.iter().any(|p| p.ends_with("file.txt")),
+        "expected future file to be recorded"
+    );
 }

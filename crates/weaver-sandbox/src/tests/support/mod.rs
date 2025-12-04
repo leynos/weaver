@@ -9,6 +9,7 @@ use once_cell::sync::Lazy;
 use tempfile::TempDir;
 
 use crate::error::SandboxError;
+use crate::env_guard::EnvGuard;
 use crate::process::Stdio;
 use crate::profile::SandboxProfile;
 use crate::sandbox::{Sandbox, SandboxChild, SandboxCommand, SandboxOutput};
@@ -18,33 +19,27 @@ static ENV_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 #[derive(Debug)]
 struct EnvHandle {
     guard: MutexGuard<'static, ()>,
-    originals: Vec<(&'static str, Option<std::ffi::OsString>)>,
+    snapshot: EnvGuard,
 }
 
 impl EnvHandle {
     fn acquire() -> Self {
         Self {
             guard: ENV_MUTEX.lock().expect("env mutex poisoned"),
-            originals: Vec::new(),
+            snapshot: EnvGuard::capture(),
         }
     }
 
     fn set_var(&mut self, key: &'static str, value: &str) {
-        let previous = std::env::var_os(key);
-        self.originals.push((key, previous));
-        // Environment mutation is unsafe on Rust 2024 toolchains.
         unsafe { std::env::set_var(key, value) };
     }
 }
 
 impl Drop for EnvHandle {
     fn drop(&mut self) {
-        for (key, previous) in self.originals.drain(..) {
-            match previous {
-                Some(value) => unsafe { std::env::set_var(key, value) },
-                None => unsafe { std::env::remove_var(key) },
-            }
-        }
+        // Restore the snapshot before releasing the mutex to avoid races with
+        // other tests mutating the environment.
+        self.snapshot.restore();
         drop(&self.guard);
     }
 }

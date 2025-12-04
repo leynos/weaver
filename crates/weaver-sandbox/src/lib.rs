@@ -39,7 +39,7 @@
 //! [`SandboxError::MultiThreaded`] rather than panicking on the internal
 //! assertion used by `birdcage`.
 
-mod env_guard;
+pub(crate) mod env_guard;
 mod error;
 mod profile;
 mod runtime;

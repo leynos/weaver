@@ -9,7 +9,7 @@ use birdcage::{Birdcage, Exception, Sandbox as BirdcageTrait};
 
 use crate::env_guard::EnvGuard;
 use crate::error::SandboxError;
-use crate::profile::{EnvironmentPolicy, NetworkPolicy, SandboxProfile};
+use crate::profile::{NetworkPolicy, SandboxProfile};
 use crate::runtime::thread_count;
 
 /// Builder for sandboxed commands.
@@ -95,15 +95,7 @@ impl Sandbox {
 
         exceptions.push(Exception::ExecuteAndRead(program.to_path_buf()));
 
-        match self.profile.environment_policy() {
-            EnvironmentPolicy::Isolated => {}
-            EnvironmentPolicy::AllowList(keys) => {
-                for key in keys {
-                    exceptions.push(Exception::Environment(key.clone()));
-                }
-            }
-            EnvironmentPolicy::InheritAll => exceptions.push(Exception::FullEnvironment),
-        }
+        exceptions.extend(self.profile.environment_policy().to_exceptions());
 
         if matches!(self.profile.network_policy(), NetworkPolicy::Allow) {
             exceptions.push(Exception::Networking);
@@ -131,14 +123,43 @@ fn canonicalised_set(paths: &[PathBuf]) -> Result<BTreeSet<PathBuf>, SandboxErro
 }
 
 fn canonicalise(path: &Path) -> Result<PathBuf, SandboxError> {
-    if !path.exists() {
-        return Err(SandboxError::MissingPath {
+    match fs::canonicalize(path) {
+        Ok(resolved) => Ok(resolved),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => rebuild_from_existing_ancestor(path),
+        Err(source) => Err(SandboxError::CanonicalisationFailed {
             path: path.to_path_buf(),
-        });
+            source,
+        }),
+    }
+}
+
+fn rebuild_from_existing_ancestor(path: &Path) -> Result<PathBuf, SandboxError> {
+    let mut missing_components: Vec<PathBuf> = Vec::new();
+    let mut cursor = Some(path);
+
+    while let Some(current) = cursor {
+        if current.exists() {
+            let base = fs::canonicalize(current).map_err(|source| {
+                SandboxError::CanonicalisationFailed {
+                    path: current.to_path_buf(),
+                    source,
+                }
+            })?;
+
+            let rebuilt = missing_components
+                .into_iter()
+                .rev()
+                .fold(base, |acc, comp| acc.join(comp));
+            return Ok(rebuilt);
+        }
+
+        if let Some(name) = current.file_name() {
+            missing_components.push(PathBuf::from(name));
+        }
+        cursor = current.parent();
     }
 
-    fs::canonicalize(path).map_err(|source| SandboxError::CanonicalisationFailed {
+    Err(SandboxError::MissingPath {
         path: path.to_path_buf(),
-        source,
     })
 }

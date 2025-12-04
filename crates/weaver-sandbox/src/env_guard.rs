@@ -1,13 +1,13 @@
 //! Restores the parent process environment after sandbox activation.
 
-use std::collections::BTreeSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ffi::OsString;
 
 /// Restores the parent process environment after `birdcage` strips variables.
 #[derive(Debug)]
 pub struct EnvGuard {
-    original: Vec<(OsString, OsString)>,
+    original: HashMap<OsString, OsString>,
 }
 
 impl EnvGuard {
@@ -19,27 +19,20 @@ impl EnvGuard {
         }
     }
 
-    fn original_keys(&self) -> BTreeSet<OsString> {
-        self.original.iter().map(|(key, _)| key.clone()).collect()
-    }
-
-    fn restore(&self) {
-        let expected_keys = self.original_keys();
+    pub(crate) fn restore(&self) {
+        let current: HashMap<OsString, OsString> = env::vars_os().collect();
+        let expected_keys: HashSet<&OsString> = self.original.keys().collect();
 
         // Remove variables introduced while the guard was active.
-        for (key, _) in env::vars_os() {
-            if !expected_keys.contains(&key) {
-                // SAFETY: keys originate from the host OS and were previously
-                // present in the environment, so removal cannot violate
-                // invariants expected by `std::env`.
-                unsafe { env::remove_var(&key) };
+        for key in current.keys() {
+            if !expected_keys.contains(key) {
+                // Nightly marks environment mutation as unsafe while the API
+                // stabilises; perform the operation within an unsafe block.
+                unsafe { env::remove_var(key) };
             }
         }
 
         for (key, value) in &self.original {
-            // SAFETY: keys and values were captured from the process
-            // environment before sandboxing mutated it, so restoring them
-            // preserves the prior state without introducing invalid data.
             unsafe { env::set_var(key, value) };
         }
     }

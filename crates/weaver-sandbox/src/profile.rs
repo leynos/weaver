@@ -89,17 +89,7 @@ impl SandboxProfile {
     /// Whitelists an environment variable for inheritance.
     #[must_use]
     pub fn allow_environment_variable(mut self, key: impl Into<String>) -> Self {
-        match &mut self.environment {
-            EnvironmentPolicy::Isolated => {
-                let mut allow = BTreeSet::new();
-                allow.insert(key.into());
-                self.environment = EnvironmentPolicy::AllowList(allow);
-            }
-            EnvironmentPolicy::AllowList(keys) => {
-                let _ = keys.insert(key.into());
-            }
-            EnvironmentPolicy::InheritAll => {}
-        }
+        self.environment = self.environment.clone().with_allowed(key.into());
         self
     }
 
@@ -155,5 +145,34 @@ impl NetworkPolicy {
     #[must_use]
     pub fn is_denied(self) -> bool {
         matches!(self, Self::Deny)
+    }
+}
+
+impl EnvironmentPolicy {
+    pub(crate) fn with_allowed(self, key: String) -> Self {
+        match self {
+            Self::Isolated => {
+                let mut allow = BTreeSet::new();
+                allow.insert(key);
+                Self::AllowList(allow)
+            }
+            Self::AllowList(mut keys) => {
+                let _ = keys.insert(key);
+                Self::AllowList(keys)
+            }
+            Self::InheritAll => Self::InheritAll,
+        }
+    }
+
+    pub(crate) fn to_exceptions(&self) -> Vec<birdcage::Exception> {
+        match self {
+            Self::Isolated => Vec::new(),
+            Self::AllowList(keys) => keys
+                .iter()
+                .cloned()
+                .map(birdcage::Exception::Environment)
+                .collect(),
+            Self::InheritAll => vec![birdcage::Exception::FullEnvironment],
+        }
     }
 }

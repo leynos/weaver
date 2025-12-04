@@ -57,6 +57,19 @@ fn given_environment_allowlist(world: &RefCell<TestWorld>) {
         .allow_environment_variable("KEEP_ME");
 }
 
+#[given("the sandbox uses the default environment isolation")]
+fn given_environment_default_isolation(world: &RefCell<TestWorld>) {
+    let mut world = world.borrow_mut();
+    world.configure_env_reader();
+}
+
+#[given("the sandbox inherits the full environment")]
+fn given_environment_full_inheritance(world: &RefCell<TestWorld>) {
+    let mut world = world.borrow_mut();
+    world.configure_env_reader();
+    world.profile = world.profile.clone().allow_full_environment();
+}
+
 #[when("the sandbox launches the command")]
 fn when_launch(world: &RefCell<TestWorld>) {
     world.borrow_mut().launch();
