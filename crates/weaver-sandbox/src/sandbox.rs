@@ -151,48 +151,14 @@ fn canonicalise(path: &Path, require_exists: bool) -> Result<PathBuf, SandboxErr
     match fs::canonicalize(path) {
         Ok(resolved) => Ok(resolved),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            if require_exists {
-                Err(SandboxError::MissingPath {
-                    path: path.to_path_buf(),
-                })
-            } else {
-                rebuild_from_existing_ancestor(path)
-            }
+            let _ = require_exists;
+            Err(SandboxError::MissingPath {
+                path: path.to_path_buf(),
+            })
         }
         Err(source) => Err(SandboxError::CanonicalisationFailed {
             path: path.to_path_buf(),
             source,
         }),
     }
-}
-
-fn rebuild_from_existing_ancestor(path: &Path) -> Result<PathBuf, SandboxError> {
-    let mut missing_components: Vec<PathBuf> = Vec::new();
-    let mut cursor = Some(path);
-
-    while let Some(current) = cursor {
-        if current.exists() {
-            let base = fs::canonicalize(current).map_err(|source| {
-                SandboxError::CanonicalisationFailed {
-                    path: current.to_path_buf(),
-                    source,
-                }
-            })?;
-
-            let rebuilt = missing_components
-                .into_iter()
-                .rev()
-                .fold(base, |acc, comp| acc.join(comp));
-            return Ok(rebuilt);
-        }
-
-        if let Some(name) = current.file_name() {
-            missing_components.push(PathBuf::from(name));
-        }
-        cursor = current.parent();
-    }
-
-    Err(SandboxError::MissingPath {
-        path: path.to_path_buf(),
-    })
 }
