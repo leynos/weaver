@@ -115,9 +115,7 @@ fn then_stdout_absent(world: &RefCell<TestWorld>, text: String) {
 
 #[then("environment markers are cleaned up")]
 fn then_environment_cleaned(world: &RefCell<TestWorld>) {
-    {
-        world.borrow_mut().clear_env();
-    }
+    world.borrow_mut().restore_env();
     assert!(std::env::var_os("KEEP_ME").is_none());
     assert!(std::env::var_os("DROP_ME").is_none());
 }

@@ -115,7 +115,7 @@ impl TestWorld {
             .set_var(key, value);
     }
 
-    pub fn clear_env(&mut self) {
+    pub fn restore_env(&mut self) {
         self.env = None;
     }
 
@@ -137,6 +137,12 @@ impl TestWorld {
             .wait_with_output()
             .unwrap_or_else(|error| panic!("failed to read child output: {error}"));
         self.output = Some(output);
+    }
+}
+
+impl Drop for TestWorld {
+    fn drop(&mut self) {
+        self.restore_env();
     }
 }
 
