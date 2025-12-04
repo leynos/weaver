@@ -1,4 +1,10 @@
 //! Restores the parent process environment after sandbox activation.
+//!
+//! Note: Project testing policy requires environment mutations (`set_var`,
+//! `remove_var`) to remain inside `unsafe` blocks on Rust 2024 toolchains.
+//! Although these std APIs are normally safe, wrapping them acknowledges the
+//! upstream marker while still containing all mutations behind the guard's
+//! snapshot-and-restore discipline.
 
 use std::collections::{HashMap, HashSet};
 use std::env;
