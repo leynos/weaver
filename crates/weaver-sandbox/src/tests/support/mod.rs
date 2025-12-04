@@ -5,7 +5,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
-use once_cell::sync::Lazy;
+use std::sync::OnceLock;
 use tempfile::TempDir;
 
 use crate::error::SandboxError;
@@ -14,7 +14,7 @@ use crate::process::Stdio;
 use crate::profile::SandboxProfile;
 use crate::sandbox::{Sandbox, SandboxChild, SandboxCommand, SandboxOutput};
 
-static ENV_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+static ENV_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
 
 #[derive(Debug)]
 struct EnvHandle {
@@ -25,7 +25,10 @@ struct EnvHandle {
 impl EnvHandle {
     fn acquire() -> Self {
         Self {
-            guard: ENV_MUTEX.lock().expect("env mutex poisoned"),
+            guard: ENV_MUTEX
+                .get_or_init(|| Mutex::new(()))
+                .lock()
+                .expect("env mutex poisoned"),
             snapshot: EnvGuard::capture(),
         }
     }
@@ -141,6 +144,7 @@ impl Drop for TestWorld {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub fn resolve_binary(candidates: &[&str]) -> PathBuf {
     for candidate in candidates {
         let path = Path::new(candidate);
@@ -149,6 +153,11 @@ pub fn resolve_binary(candidates: &[&str]) -> PathBuf {
         }
     }
     panic!("no candidate binary found in {candidates:?}");
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn resolve_binary(_candidates: &[&str]) -> PathBuf {
+    panic!("sandbox behaviour tests are intended for Linux hosts only");
 }
 
 fn write_fixture(path: &Path, contents: &str) {

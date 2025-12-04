@@ -12,4 +12,3 @@ rstest.workspace = true
 rstest-bdd.workspace = true
 rstest-bdd-macros.workspace = true
 tempfile.workspace = true
-once_cell.workspace = true

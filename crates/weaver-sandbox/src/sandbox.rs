@@ -125,7 +125,9 @@ fn canonicalised_set(paths: &[PathBuf]) -> Result<BTreeSet<PathBuf>, SandboxErro
 fn canonicalise(path: &Path) -> Result<PathBuf, SandboxError> {
     match fs::canonicalize(path) {
         Ok(resolved) => Ok(resolved),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => rebuild_from_existing_ancestor(path),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            rebuild_from_existing_ancestor(path)
+        }
         Err(source) => Err(SandboxError::CanonicalisationFailed {
             path: path.to_path_buf(),
             source,

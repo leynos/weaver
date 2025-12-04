@@ -26,13 +26,15 @@ impl EnvGuard {
         // Remove variables introduced while the guard was active.
         for key in current.keys() {
             if !expected_keys.contains(key) {
-                // Nightly marks environment mutation as unsafe while the API
-                // stabilises; perform the operation within an unsafe block.
+                // Safety: project policy requires env mutation to be wrapped in
+                // `unsafe` until the std APIs settle for Rust 2024. We mutate
+                // only after snapshotting to avoid iterator invalidation.
                 unsafe { env::remove_var(key) };
             }
         }
 
         for (key, value) in &self.original {
+            // Safety: see note above regarding env mutation policy.
             unsafe { env::set_var(key, value) };
         }
     }

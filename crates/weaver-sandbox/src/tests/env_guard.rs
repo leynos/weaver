@@ -1,16 +1,17 @@
 //! Unit tests for environment snapshot and restoration.
 
 use std::env;
-use std::sync::{Mutex, MutexGuard};
-
-use once_cell::sync::Lazy;
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use crate::env_guard::EnvGuard;
 
-static ENV_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+static ENV_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
 
 fn lock_env() -> MutexGuard<'static, ()> {
-    ENV_MUTEX.lock().expect("env mutex poisoned")
+    ENV_MUTEX
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .expect("env mutex poisoned")
 }
 
 #[test]

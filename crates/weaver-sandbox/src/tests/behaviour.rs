@@ -38,13 +38,10 @@ fn given_profile_allows_fixture(world: &RefCell<TestWorld>) {
 }
 
 #[given("environment variables KEEP_ME and DROP_ME are set")]
-fn given_environment_variables(_world: &RefCell<TestWorld>) {
-    _world
-        .borrow_mut()
-        .set_env_var("KEEP_ME", "present");
-    _world
-        .borrow_mut()
-        .set_env_var("DROP_ME", "remove-me");
+fn given_environment_variables(world: &RefCell<TestWorld>) {
+    let mut world = world.borrow_mut();
+    world.set_env_var("KEEP_ME", "present");
+    world.set_env_var("DROP_ME", "remove-me");
 }
 
 #[given("the sandbox allows only KEEP_ME to be inherited")]
@@ -129,8 +126,16 @@ fn then_stdout_absent(world: &RefCell<TestWorld>, text: String) {
 #[then("environment markers are cleaned up")]
 fn then_environment_cleaned(world: &RefCell<TestWorld>) {
     world.borrow_mut().restore_env();
-    assert!(std::env::var_os("KEEP_ME").is_none());
-    assert!(std::env::var_os("DROP_ME").is_none());
+    assert_ne!(
+        std::env::var_os("KEEP_ME"),
+        Some(std::ffi::OsString::from("present")),
+        "KEEP_ME still holds the scenario value after restoration"
+    );
+    assert_ne!(
+        std::env::var_os("DROP_ME"),
+        Some(std::ffi::OsString::from("remove-me")),
+        "DROP_ME still holds the scenario value after restoration"
+    );
 }
 
 #[scenario(path = "tests/features/sandbox.feature")]

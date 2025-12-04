@@ -16,6 +16,8 @@ pub fn linux_runtime_roots() -> Vec<PathBuf> {
             "/usr/lib64",
             "/lib/x86_64-linux-gnu",
             "/usr/lib/x86_64-linux-gnu",
+            "/lib/aarch64-linux-gnu",
+            "/usr/lib/aarch64-linux-gnu",
         ];
         candidates
             .iter()
