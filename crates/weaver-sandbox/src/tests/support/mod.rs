@@ -3,13 +3,51 @@
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard};
 
+use once_cell::sync::Lazy;
 use tempfile::TempDir;
 
 use crate::error::SandboxError;
+use crate::process::Stdio;
 use crate::profile::SandboxProfile;
 use crate::sandbox::{Sandbox, SandboxChild, SandboxCommand, SandboxOutput};
-use crate::process::Stdio;
+
+static ENV_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+
+#[derive(Debug)]
+struct EnvHandle {
+    guard: MutexGuard<'static, ()>,
+    originals: Vec<(&'static str, Option<std::ffi::OsString>)>,
+}
+
+impl EnvHandle {
+    fn acquire() -> Self {
+        Self {
+            guard: ENV_MUTEX.lock().expect("env mutex poisoned"),
+            originals: Vec::new(),
+        }
+    }
+
+    fn set_var(&mut self, key: &'static str, value: &str) {
+        let previous = std::env::var_os(key);
+        self.originals.push((key, previous));
+        // Environment mutation is unsafe on Rust 2024 toolchains.
+        unsafe { std::env::set_var(key, value) };
+    }
+}
+
+impl Drop for EnvHandle {
+    fn drop(&mut self) {
+        for (key, previous) in self.originals.drain(..) {
+            match previous {
+                Some(value) => unsafe { std::env::set_var(key, value) },
+                None => unsafe { std::env::remove_var(key) },
+            }
+        }
+        drop(&self.guard);
+    }
+}
 
 /// Shared state for behavioural sandbox tests.
 pub struct TestWorld {
@@ -20,6 +58,7 @@ pub struct TestWorld {
     pub temp_dir: TempDir,
     pub allowed_file: PathBuf,
     pub forbidden_file: PathBuf,
+    env: Option<EnvHandle>,
 }
 
 impl TestWorld {
@@ -39,6 +78,7 @@ impl TestWorld {
             temp_dir,
             allowed_file,
             forbidden_file,
+            env: None,
         }
     }
 
@@ -63,6 +103,20 @@ impl TestWorld {
             .allow_executable(command.get_program());
 
         self.command = Some(command);
+    }
+
+    pub fn set_env_var(&mut self, key: &'static str, value: &str) {
+        if self.env.is_none() {
+            self.env = Some(EnvHandle::acquire());
+        }
+        self.env
+            .as_mut()
+            .expect("env handle missing")
+            .set_var(key, value);
+    }
+
+    pub fn clear_env(&mut self) {
+        self.env = None;
     }
 
     pub fn launch(&mut self) {

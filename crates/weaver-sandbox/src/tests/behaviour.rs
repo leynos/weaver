@@ -1,7 +1,6 @@
 //! Behavioural tests for sandbox spawning using `rstest-bdd`.
 
 use std::cell::RefCell;
-use std::env;
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
@@ -40,8 +39,12 @@ fn given_profile_allows_fixture(world: &RefCell<TestWorld>) {
 
 #[given("environment variables KEEP_ME and DROP_ME are set")]
 fn given_environment_variables(_world: &RefCell<TestWorld>) {
-    env::set_var("KEEP_ME", "present");
-    env::set_var("DROP_ME", "remove-me");
+    _world
+        .borrow_mut()
+        .set_env_var("KEEP_ME", "present");
+    _world
+        .borrow_mut()
+        .set_env_var("DROP_ME", "remove-me");
 }
 
 #[given("the sandbox allows only KEEP_ME to be inherited")]
@@ -111,9 +114,12 @@ fn then_stdout_absent(world: &RefCell<TestWorld>, text: String) {
 }
 
 #[then("environment markers are cleaned up")]
-fn then_environment_cleaned(_world: &RefCell<TestWorld>) {
-    env::remove_var("KEEP_ME");
-    env::remove_var("DROP_ME");
+fn then_environment_cleaned(world: &RefCell<TestWorld>) {
+    {
+        world.borrow_mut().clear_env();
+    }
+    assert!(std::env::var_os("KEEP_ME").is_none());
+    assert!(std::env::var_os("DROP_ME").is_none());
 }
 
 #[scenario(path = "tests/features/sandbox.feature")]
