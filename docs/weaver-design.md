@@ -980,6 +980,140 @@ descriptor, but its `seccomp-bpf` filter will block any attempt to make its own
 surface and ensures that sandboxing is not just a library call, but a core
 principle of the system's design.
 
+### 5.3 Initial `weaver-sandbox` implementation
+
+The first cut of the dedicated `weaver-sandbox` crate now wraps `birdcage`
+v0.8.1 with Weaver defaults. Executables must be supplied as absolute paths and
+whitelisted explicitly; the wrapper canonicalizes the whitelist before launch
+to prevent symlink escapes. Standard Linux library roots (`/lib`, `/lib64`,
+`/usr/lib`, and their architecture-specific variants) are whitelisted for
+read-only access by default so dynamically linked binaries remain functional
+without exposing the wider filesystem. Network access remains disabled unless
+requested, and the environment is isolated by default with an allowlist for
+specific variables when needed.
+
+`birdcage` enforces a single-threaded caller; the wrapper performs a preflight
+check and reports a `MultiThreaded` error instead of panicking when multiple
+threads are active. The test harness runs with `RUST_TEST_THREADS=1` to cover
+the happy path until a dedicated single-threaded launcher process lands.
+
+Figure 5.1 illustrates the sandbox crate structure and its integration points.
+
+```mermaid
+classDiagram
+    class Sandbox {
+        - SandboxProfile profile
+        + new(profile: SandboxProfile) Sandbox
+        + spawn(command: SandboxCommand) Result~SandboxChild, SandboxError~
+        - ensure_single_threaded() Result~(), SandboxError~
+        - ensure_program_whitelisted(program: Path) Result~(), SandboxError~
+        - collect_exceptions(program: Path) Result~Vec~Exception~, SandboxError~
+        - canonical_program(program: Path) Result~PathBuf, SandboxError~
+    }
+
+    class SandboxProfile {
+        - Vec~PathBuf~ read_only_paths
+        - Vec~PathBuf~ read_write_paths
+        - Vec~PathBuf~ executable_paths
+        - EnvironmentPolicy environment
+        - NetworkPolicy network
+        + new() SandboxProfile
+        + allow_executable(path: PathBuf) SandboxProfile
+        + allow_read_path(path: PathBuf) SandboxProfile
+        + allow_read_write_path(path: PathBuf) SandboxProfile
+        + allow_environment_variable(key: String) SandboxProfile
+        + allow_full_environment() SandboxProfile
+        + allow_networking() SandboxProfile
+        + read_only_paths() &[PathBuf]
+        + read_write_paths() &[PathBuf]
+        + executable_paths() &[PathBuf]
+        + environment_policy() &EnvironmentPolicy
+        + network_policy() NetworkPolicy
+    }
+
+    class EnvironmentPolicy {
+        <<enum>>
+        Isolated
+        AllowList(keys: BTreeSet~String~)
+        InheritAll
+        + with_allowed(key: String) EnvironmentPolicy
+        + to_exceptions() Vec~Exception~
+    }
+
+    class NetworkPolicy {
+        <<enum>>
+        Deny
+        Allow
+        + is_denied() bool
+    }
+
+    class EnvGuard {
+        - HashMap~OsString, OsString~ original
+        + capture() EnvGuard
+        + restore() void
+        - drop() void
+    }
+
+    class SandboxError {
+        <<enum>>
+        ProgramNotAbsolute(path: PathBuf)
+        ExecutableNotAuthorised(program: PathBuf)
+        MissingPath(path: PathBuf)
+        CanonicalisationFailed(path: PathBuf, source: io::Error)
+        MultiThreaded(thread_count: usize)
+        ThreadCountUnavailable(source: io::Error)
+        Activation(source: BirdcageError)
+    }
+
+    class RuntimeHelpers {
+        + linux_runtime_roots() Vec~PathBuf~
+        + thread_count() Result~usize, io::Error~
+    }
+
+    class BirdcageSandbox {
+        <<external>>
+        + new() BirdcageSandbox
+        + add_exception(exception: Exception) Result~(), BirdcageError~
+        + spawn(command: SandboxCommand) Result~SandboxChild, BirdcageError~
+    }
+
+    class BirdcageProcessTypes {
+        <<external>>
+        SandboxCommand
+        SandboxChild
+        SandboxOutput
+    }
+
+    class BirdcageException {
+        <<external enum>>
+        Read(path: PathBuf)
+        WriteAndRead(path: PathBuf)
+        ExecuteAndRead(path: PathBuf)
+        Environment(key: String)
+        FullEnvironment
+        Networking
+    }
+
+    Sandbox --> SandboxProfile : uses
+    Sandbox --> EnvGuard : uses
+    Sandbox --> BirdcageSandbox : wraps
+    Sandbox --> BirdcageException : builds
+    Sandbox --> SandboxError : returns
+    Sandbox --> RuntimeHelpers : uses
+
+    SandboxProfile --> EnvironmentPolicy : has
+    SandboxProfile --> NetworkPolicy : has
+    SandboxProfile --> RuntimeHelpers : uses linux_runtime_roots
+
+    EnvironmentPolicy --> BirdcageException : to_exceptions builds
+
+    SandboxError --> BirdcageSandbox : wraps BirdcageError
+
+    BirdcageSandbox --> BirdcageProcessTypes : spawns
+
+    RuntimeHelpers --> BirdcageSandbox : preflight for spawn
+```
+
 ## 6. Advanced Capabilities for AI Agents
 
 Beyond core observation and action primitives, `Weaver` is designed with

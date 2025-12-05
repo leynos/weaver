@@ -1,0 +1,15 @@
+[package]
+name = "weaver-sandbox"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+birdcage.workspace = true
+once_cell.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+rstest.workspace = true
+rstest-bdd.workspace = true
+rstest-bdd-macros.workspace = true
+tempfile.workspace = true
