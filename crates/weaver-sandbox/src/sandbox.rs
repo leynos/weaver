@@ -134,12 +134,7 @@ impl Sandbox {
 }
 
 pub(crate) fn canonicalised_set(paths: &[PathBuf]) -> Result<Vec<PathBuf>, SandboxError> {
-    let mut result = Vec::with_capacity(paths.len());
-    for path in paths {
-        let canonical = canonicalise(path, false)?;
-        result.push(canonical);
-    }
-    Ok(result)
+    paths.iter().map(|path| canonicalise(path, false)).collect()
 }
 
 fn canonicalise(path: &Path, require_exists: bool) -> Result<PathBuf, SandboxError> {
@@ -175,12 +170,13 @@ fn rebuild_from_existing_ancestor(path: &Path) -> Result<PathBuf, SandboxError> 
         })?;
 
     // `existing` comes from `path.ancestors()`, so this prefix relationship
-    // should always hold. Mapping the failure to `MissingPath` preserves total
-    // behaviour while signalling an unexpected invariant break.
+    // should always hold. If it does not, treat it as an internal invariant
+    // break rather than a caller error.
     let tail = path
         .strip_prefix(existing)
-        .map_err(|_| SandboxError::MissingPath {
+        .map_err(|_| SandboxError::CanonicalisationFailed {
             path: path.to_path_buf(),
+            source: std::io::Error::other("strip_prefix failed for known ancestor"),
         })?;
 
     Ok(base.join(tail))
