@@ -3,6 +3,8 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
+use once_cell::sync::OnceCell;
+
 use crate::runtime::linux_runtime_roots;
 
 /// Environment inheritance strategy applied to sandboxed processes.
@@ -38,9 +40,9 @@ pub struct SandboxProfile {
     read_only_paths: Vec<PathBuf>,
     read_write_paths: Vec<PathBuf>,
     executable_paths: Vec<PathBuf>,
-    read_only_paths_canon: std::sync::OnceLock<Vec<PathBuf>>,
-    read_write_paths_canon: std::sync::OnceLock<Vec<PathBuf>>,
-    executable_paths_canon: std::sync::OnceLock<Vec<PathBuf>>,
+    read_only_paths_canon: OnceCell<Vec<PathBuf>>,
+    read_write_paths_canon: OnceCell<Vec<PathBuf>>,
+    executable_paths_canon: OnceCell<Vec<PathBuf>>,
     environment: EnvironmentPolicy,
     network: NetworkPolicy,
 }
@@ -63,9 +65,9 @@ impl SandboxProfile {
             read_only_paths: linux_runtime_roots(),
             read_write_paths: Vec::new(),
             executable_paths: Vec::new(),
-            read_only_paths_canon: std::sync::OnceLock::new(),
-            read_write_paths_canon: std::sync::OnceLock::new(),
-            executable_paths_canon: std::sync::OnceLock::new(),
+            read_only_paths_canon: OnceCell::new(),
+            read_write_paths_canon: OnceCell::new(),
+            executable_paths_canon: OnceCell::new(),
             environment: EnvironmentPolicy::default(),
             network: NetworkPolicy::default(),
         }
@@ -151,15 +153,10 @@ impl SandboxProfile {
 impl SandboxProfile {
     fn canonicalised_paths<'a>(
         &'a self,
-        cache: &'a std::sync::OnceLock<Vec<PathBuf>>,
+        cache: &'a OnceCell<Vec<PathBuf>>,
         paths: &[PathBuf],
     ) -> Result<&'a Vec<PathBuf>, crate::SandboxError> {
-        if let Some(existing) = cache.get() {
-            return Ok(existing);
-        }
-
-        let computed = crate::sandbox::canonicalised_set(paths)?;
-        Ok(cache.get_or_init(move || computed.clone()))
+        cache.get_or_try_init(|| crate::sandbox::canonicalised_set(paths))
     }
 }
 

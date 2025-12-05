@@ -174,6 +174,9 @@ fn rebuild_from_existing_ancestor(path: &Path) -> Result<PathBuf, SandboxError> 
             source,
         })?;
 
+    // `existing` comes from `path.ancestors()`, so this prefix relationship
+    // should always hold. Mapping the failure to `MissingPath` preserves total
+    // behaviour while signalling an unexpected invariant break.
     let tail = path
         .strip_prefix(existing)
         .map_err(|_| SandboxError::MissingPath {
