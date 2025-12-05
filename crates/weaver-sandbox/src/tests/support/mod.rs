@@ -30,6 +30,9 @@ impl EnvHandle {
     }
 
     fn set_var(&mut self, key: &'static str, value: &str) {
+        // SAFETY: Environment mutation is guarded by `ENV_MUTEX`, ensuring
+        // serialised access across tests. The accompanying `EnvGuard`
+        // restores the snapshot on drop so mutations cannot leak.
         unsafe { std::env::set_var(key, value) };
     }
 }
@@ -39,7 +42,6 @@ impl Drop for EnvHandle {
         // Restore the snapshot before releasing the mutex to avoid races with
         // other tests mutating the environment.
         self.snapshot.restore();
-        drop(&self.guard);
     }
 }
 

@@ -98,7 +98,9 @@ impl SandboxProfile {
     /// no-op because the full environment is already permitted.
     #[must_use]
     pub fn allow_environment_variable(mut self, key: impl Into<String>) -> Self {
-        self.environment = self.environment.clone().with_allowed(key.into());
+        // Move the current policy to avoid cloning potentially large allow lists.
+        let current = std::mem::take(&mut self.environment);
+        self.environment = current.with_allowed(key.into());
         self
     }
 
@@ -119,44 +121,19 @@ impl SandboxProfile {
     pub(crate) fn read_only_paths_canonicalised(
         &self,
     ) -> Result<&Vec<PathBuf>, crate::SandboxError> {
-        if let Some(set) = self.read_only_paths_canon.get() {
-            return Ok(set);
-        }
-        let set = crate::sandbox::canonicalised_set(&self.read_only_paths)?;
-        let _ = self.read_only_paths_canon.set(set);
-        // Safe because we set the cell above.
-        Ok(self
-            .read_only_paths_canon
-            .get()
-            .expect("read_only_paths_canon just initialised"))
+        self.canonicalised_paths(&self.read_only_paths_canon, &self.read_only_paths)
     }
 
     pub(crate) fn read_write_paths_canonicalised(
         &self,
     ) -> Result<&Vec<PathBuf>, crate::SandboxError> {
-        if let Some(set) = self.read_write_paths_canon.get() {
-            return Ok(set);
-        }
-        let set = crate::sandbox::canonicalised_set(&self.read_write_paths)?;
-        let _ = self.read_write_paths_canon.set(set);
-        Ok(self
-            .read_write_paths_canon
-            .get()
-            .expect("read_write_paths_canon just initialised"))
+        self.canonicalised_paths(&self.read_write_paths_canon, &self.read_write_paths)
     }
 
     pub(crate) fn executable_paths_canonicalised(
         &self,
     ) -> Result<&Vec<PathBuf>, crate::SandboxError> {
-        if let Some(set) = self.executable_paths_canon.get() {
-            return Ok(set);
-        }
-        let set = crate::sandbox::canonicalised_set(&self.executable_paths)?;
-        let _ = self.executable_paths_canon.set(set);
-        Ok(self
-            .executable_paths_canon
-            .get()
-            .expect("executable_paths_canon just initialised"))
+        self.canonicalised_paths(&self.executable_paths_canon, &self.executable_paths)
     }
 
     /// Returns the configured environment policy.
@@ -168,6 +145,21 @@ impl SandboxProfile {
     #[must_use]
     pub fn network_policy(&self) -> NetworkPolicy {
         self.network
+    }
+}
+
+impl SandboxProfile {
+    fn canonicalised_paths<'a>(
+        &'a self,
+        cache: &'a std::sync::OnceLock<Vec<PathBuf>>,
+        paths: &[PathBuf],
+    ) -> Result<&'a Vec<PathBuf>, crate::SandboxError> {
+        if let Some(existing) = cache.get() {
+            return Ok(existing);
+        }
+
+        let computed = crate::sandbox::canonicalised_set(paths)?;
+        Ok(cache.get_or_init(move || computed.clone()))
     }
 }
 

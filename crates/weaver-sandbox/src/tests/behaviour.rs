@@ -18,24 +18,33 @@ fn given_world(_world: &RefCell<TestWorld>) {}
 
 #[given("the command cats the allowed file")]
 fn given_allowed_cat(world: &RefCell<TestWorld>) {
-    let mut world = world.borrow_mut();
-    world.configure_cat(&world.allowed_file);
+    let mut w = world.borrow_mut();
+    let target = w.allowed_file.clone();
+    w.configure_cat(&target);
 }
 
 #[given("the command cats the forbidden file")]
 fn given_forbidden_cat(world: &RefCell<TestWorld>) {
-    let mut world = world.borrow_mut();
-    world.configure_cat(&world.forbidden_file);
+    let mut w = world.borrow_mut();
+    let target = w.forbidden_file.clone();
+    w.configure_cat(&target);
 }
 
 #[given("the sandbox allows the command and fixture file")]
 fn given_profile_allows_fixture(world: &RefCell<TestWorld>) {
-    let mut world = world.borrow_mut();
-    world.profile = world
+    let mut w = world.borrow_mut();
+    let program = w
+        .command
+        .as_ref()
+        .expect("command not configured")
+        .get_program()
+        .to_path_buf();
+    let allowed = w.allowed_file.clone();
+    w.profile = w
         .profile
         .clone()
-        .allow_executable(world.command.as_ref().unwrap().get_program())
-        .allow_read_path(&world.allowed_file);
+        .allow_executable(&program)
+        .allow_read_path(&allowed);
 }
 
 #[given("environment variables KEEP_ME and DROP_ME are set")]

@@ -99,7 +99,7 @@ impl Sandbox {
         })
     }
 
-    fn collect_exceptions(&self, program: &Path) -> Result<Vec<Exception>, SandboxError> {
+    fn collect_exceptions(&self, _program: &Path) -> Result<Vec<Exception>, SandboxError> {
         let mut exceptions = Vec::new();
         let read_only = self.profile.read_only_paths_canonicalised()?;
         let read_write = self.profile.read_write_paths_canonicalised()?;
@@ -113,10 +113,6 @@ impl Sandbox {
         }
         for path in executables {
             exceptions.push(Exception::ExecuteAndRead(path.clone()));
-        }
-
-        if !executables.iter().any(|p| p == program) {
-            exceptions.push(Exception::ExecuteAndRead(program.to_path_buf()));
         }
 
         exceptions.extend(self.profile.environment_policy().to_exceptions());
@@ -150,10 +146,43 @@ fn canonicalise(path: &Path, require_exists: bool) -> Result<PathBuf, SandboxErr
     match fs::canonicalize(path) {
         Ok(resolved) => Ok(resolved),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            let _ = require_exists;
-            Err(SandboxError::MissingPath {
-                path: path.to_path_buf(),
-            })
+            if require_exists {
+                return Err(SandboxError::MissingPath {
+                    path: path.to_path_buf(),
+                });
+            }
+
+            // Rebuild the path from the closest existing ancestor so callers can
+            // whitelist future outputs (e.g. files that will be created by the
+            // sandboxed command) under an allowed directory.
+            let mut components_to_append = Vec::new();
+            let mut ancestor_opt = path;
+            while let Some(parent) = ancestor_opt.parent() {
+                components_to_append.push(ancestor_opt.file_name().map(PathBuf::from));
+                ancestor_opt = parent;
+                if ancestor_opt.exists() {
+                    break;
+                }
+            }
+
+            if !ancestor_opt.exists() {
+                return Err(SandboxError::MissingPath {
+                    path: path.to_path_buf(),
+                });
+            }
+
+            let mut rebuilt = fs::canonicalize(ancestor_opt).map_err(|source| {
+                SandboxError::CanonicalisationFailed {
+                    path: ancestor_opt.to_path_buf(),
+                    source,
+                }
+            })?;
+
+            for component in components_to_append.into_iter().rev().flatten() {
+                rebuilt.push(component);
+            }
+
+            Ok(rebuilt)
         }
         Err(source) => Err(SandboxError::CanonicalisationFailed {
             path: path.to_path_buf(),

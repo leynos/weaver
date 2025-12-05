@@ -1,16 +1,11 @@
 //! Unit tests covering sandbox spawn preflight errors.
 
-use std::path::PathBuf;
 use std::io;
+use std::path::PathBuf;
 
 use crate::sandbox::{Sandbox, SandboxCommand};
 use crate::{SandboxError, SandboxProfile};
 
-fn sandbox_with_profile(profile: SandboxProfile) -> Sandbox {
-    Sandbox::new(profile)
-}
-
-#[cfg(test)]
 fn sandbox_with_forced_thread_count<F>(profile: SandboxProfile, counter: F) -> Sandbox
 where
     F: Fn() -> Result<usize, io::Error> + Send + Sync + 'static,
@@ -18,9 +13,18 @@ where
     Sandbox::with_thread_counter_for_tests(profile, Box::new(counter))
 }
 
+fn spawn_expect_error(program: &PathBuf, profile: SandboxProfile) -> SandboxError {
+    let mut command = SandboxCommand::new(program);
+    command.arg("hello");
+
+    Sandbox::new(profile)
+        .spawn(command)
+        .expect_err("spawn should fail")
+}
+
 #[test]
 fn rejects_relative_program_paths() {
-    let sandbox = sandbox_with_profile(SandboxProfile::new());
+    let sandbox = Sandbox::new(SandboxProfile::new());
     let command = SandboxCommand::new("relative/bin");
 
     let err = sandbox.spawn(command).expect_err("spawn should fail");
@@ -35,11 +39,8 @@ fn rejects_relative_program_paths() {
 #[test]
 fn rejects_missing_program_paths() {
     let missing = PathBuf::from("/definitely/missing/tool");
-    let sandbox = sandbox_with_profile(SandboxProfile::new());
-    let command = SandboxCommand::new(&missing);
-
-    let err = sandbox.spawn(command).expect_err("spawn should fail");
-    match err {
+    let error = spawn_expect_error(&missing, SandboxProfile::new());
+    match error {
         SandboxError::MissingPath { path } => assert_eq!(path, missing),
         other => panic!("unexpected error: {other:?}"),
     }
@@ -48,12 +49,8 @@ fn rejects_missing_program_paths() {
 #[test]
 fn rejects_unwhitelisted_programs() {
     let program = PathBuf::from("/bin/echo");
-    let sandbox = sandbox_with_profile(SandboxProfile::new());
-    let mut command = SandboxCommand::new(&program);
-    command.arg("hello");
-
-    let err = sandbox.spawn(command).expect_err("spawn should fail");
-    match err {
+    let error = spawn_expect_error(&program, SandboxProfile::new());
+    match error {
         SandboxError::ExecutableNotAuthorised { program: p } => assert_eq!(p, program),
         other => panic!("unexpected error: {other:?}"),
     }
