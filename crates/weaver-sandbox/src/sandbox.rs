@@ -152,41 +152,33 @@ fn canonicalise(path: &Path, require_exists: bool) -> Result<PathBuf, SandboxErr
                 });
             }
 
-            // Rebuild the path from the closest existing ancestor so callers can
-            // whitelist future outputs (e.g. files that will be created by the
-            // sandboxed command) under an allowed directory.
-            let mut components_to_append = Vec::new();
-            let mut ancestor_opt = path;
-            while let Some(parent) = ancestor_opt.parent() {
-                components_to_append.push(ancestor_opt.file_name().map(PathBuf::from));
-                ancestor_opt = parent;
-                if ancestor_opt.exists() {
-                    break;
-                }
-            }
-
-            if !ancestor_opt.exists() {
-                return Err(SandboxError::MissingPath {
-                    path: path.to_path_buf(),
-                });
-            }
-
-            let mut rebuilt = fs::canonicalize(ancestor_opt).map_err(|source| {
-                SandboxError::CanonicalisationFailed {
-                    path: ancestor_opt.to_path_buf(),
-                    source,
-                }
-            })?;
-
-            for component in components_to_append.into_iter().rev().flatten() {
-                rebuilt.push(component);
-            }
-
-            Ok(rebuilt)
+            rebuild_from_existing_ancestor(path)
         }
         Err(source) => Err(SandboxError::CanonicalisationFailed {
             path: path.to_path_buf(),
             source,
         }),
     }
+}
+
+fn rebuild_from_existing_ancestor(path: &Path) -> Result<PathBuf, SandboxError> {
+    let Some(existing) = path.ancestors().find(|candidate| candidate.exists()) else {
+        return Err(SandboxError::MissingPath {
+            path: path.to_path_buf(),
+        });
+    };
+
+    let base =
+        fs::canonicalize(existing).map_err(|source| SandboxError::CanonicalisationFailed {
+            path: existing.to_path_buf(),
+            source,
+        })?;
+
+    let tail = path
+        .strip_prefix(existing)
+        .map_err(|_| SandboxError::MissingPath {
+            path: path.to_path_buf(),
+        })?;
+
+    Ok(base.join(tail))
 }
