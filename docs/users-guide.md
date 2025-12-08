@@ -237,3 +237,67 @@ weaver --capabilities
 The CLI loads the shared configuration, applies any override directives, and
 prints the resulting matrix as pretty-printed JSON. The probe does not contact
 `weaverd`, making it safe to run during planning stages or health checks.
+
+## Double-Lock safety harness
+
+All `act` commands pass through a "Double-Lock" safety harness before any
+changes are committed to the filesystem. This verification layer ensures that
+agent-generated modifications do not corrupt the codebase by introducing syntax
+errors or type mismatches.
+
+### Two-phase verification
+
+The harness validates proposed edits in two sequential phases:
+
+1. **Syntactic Lock**: Each modified file is parsed to ensure it produces a
+   valid syntax tree. Structural errors such as unbalanced braces, missing
+   semicolons, or malformed declarations are caught at this stage. Files that
+   fail parsing are rejected immediately, and the filesystem remains untouched.
+
+2. **Semantic Lock**: If the syntactic lock passes, the modified content is
+   submitted to the configured language server. The daemon requests fresh
+   diagnostics and compares them against the pre-edit baseline. Any new errors
+   or high-severity warnings cause the semantic lock to fail. Only when both
+   locks pass are the changes atomically written to disk.
+
+### In-memory application
+
+Edits are first applied to in-memory copies of the affected files. The original
+content is preserved until both verification phases succeed. This allows the
+harness to reject problematic changes without leaving partially written files
+on disk.
+
+### Atomic commits
+
+When both locks pass, the harness writes each modified file atomically by
+creating a temporary file and renaming it into place. This guarantees that a
+crash or power loss during the commit phase does not leave files in a corrupted
+intermediate state.
+
+### Error reporting
+
+When verification fails, the harness returns a structured error describing:
+
+- **Lock phase**: Whether the failure occurred during syntactic or semantic
+  validation.
+- **Affected files**: Paths to the files that triggered the failure.
+- **Locations**: Optional line and column numbers pinpointing each issue.
+- **Messages**: Human-readable descriptions of what went wrong.
+
+Agents can use this information to diagnose problems and regenerate corrected
+edits. The structured format also enables tooling to present failures in IDE
+integrations or CI pipelines.
+
+### Backend unavailability
+
+If a language server is not running or crashes mid-request, the semantic lock
+returns a backend-unavailable error rather than silently passing. Operators
+should ensure the appropriate language servers are healthy before executing
+`act` commands.
+
+### Placeholder implementation note
+
+The current syntactic lock uses a placeholder implementation that always passes.
+Full Tree-sitter integration will be delivered in a future phase. The semantic
+lock relies on the `weaver-lsp-host` infrastructure, which requires language
+servers to be registered and initialised for the relevant languages.

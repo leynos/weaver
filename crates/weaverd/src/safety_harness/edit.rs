@@ -1,0 +1,235 @@
+//! Types representing file edits and modifications.
+//!
+//! These types form the input to the Double-Lock safety harness. External tools
+//! produce edits that are captured here before being validated and applied.
+
+use std::path::PathBuf;
+
+/// A position within a text file.
+///
+/// Uses zero-based line and column offsets. Column offsets count UTF-8 bytes,
+/// matching the convention used by the Language Server Protocol.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Position {
+    /// Line number (zero-based).
+    pub line: u32,
+    /// Column offset (zero-based, UTF-8 bytes).
+    pub column: u32,
+}
+
+impl Position {
+    /// Creates a new position.
+    #[must_use]
+    pub const fn new(line: u32, column: u32) -> Self {
+        Self { line, column }
+    }
+}
+
+/// A range within a text file, defined by start and end positions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TextRange {
+    /// Start of the range (inclusive).
+    pub start: Position,
+    /// End of the range (exclusive).
+    pub end: Position,
+}
+
+impl TextRange {
+    /// Creates a new range from start to end.
+    #[must_use]
+    pub const fn new(start: Position, end: Position) -> Self {
+        Self { start, end }
+    }
+
+    /// Creates a zero-length range at the given position.
+    #[must_use]
+    pub const fn point(position: Position) -> Self {
+        Self {
+            start: position,
+            end: position,
+        }
+    }
+}
+
+/// A single text replacement within a file.
+///
+/// Range values use zero-based line and column offsets. Column offsets count
+/// UTF-8 bytes, matching the convention used by the Language Server Protocol.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextEdit {
+    /// Range being replaced.
+    range: TextRange,
+    /// Replacement text.
+    new_text: String,
+}
+
+impl TextEdit {
+    /// Builds a text edit from a range and replacement text.
+    #[must_use]
+    pub const fn new(range: TextRange, new_text: String) -> Self {
+        Self { range, new_text }
+    }
+
+    /// Builds a text edit from explicit positions.
+    ///
+    /// This convenience constructor accepts position coordinates directly when
+    /// callers do not want to create intermediate [`Position`] and [`TextRange`]
+    /// values. The argument count is intentionally above the clippy threshold to
+    /// match LSP conventions.
+    #[must_use]
+    #[allow(clippy::too_many_arguments, reason = "matches LSP coordinate convention")]
+    pub const fn from_coords(
+        start_line: u32,
+        start_column: u32,
+        end_line: u32,
+        end_column: u32,
+        new_text: String,
+    ) -> Self {
+        Self::new(
+            TextRange::new(
+                Position::new(start_line, start_column),
+                Position::new(end_line, end_column),
+            ),
+            new_text,
+        )
+    }
+
+    /// Creates an insertion at the specified position.
+    #[must_use]
+    pub const fn insert(line: u32, column: u32, text: String) -> Self {
+        Self::new(TextRange::point(Position::new(line, column)), text)
+    }
+
+    /// Creates a deletion spanning the given range.
+    #[must_use]
+    pub const fn delete(
+        start_line: u32,
+        start_column: u32,
+        end_line: u32,
+        end_column: u32,
+    ) -> Self {
+        Self::from_coords(
+            start_line,
+            start_column,
+            end_line,
+            end_column,
+            String::new(),
+        )
+    }
+
+    /// Starting line (zero-based).
+    #[must_use]
+    pub const fn start_line(&self) -> u32 {
+        self.range.start.line
+    }
+
+    /// Starting column (zero-based, UTF-8 bytes).
+    #[must_use]
+    pub const fn start_column(&self) -> u32 {
+        self.range.start.column
+    }
+
+    /// Ending line (zero-based).
+    #[must_use]
+    pub const fn end_line(&self) -> u32 {
+        self.range.end.line
+    }
+
+    /// Ending column (zero-based, UTF-8 bytes).
+    #[must_use]
+    pub const fn end_column(&self) -> u32 {
+        self.range.end.column
+    }
+
+    /// Replacement text.
+    #[must_use]
+    pub fn new_text(&self) -> &str {
+        &self.new_text
+    }
+}
+
+/// A collection of edits for a single file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileEdit {
+    /// Path to the file being edited.
+    path: PathBuf,
+    /// Edits to apply, sorted by position.
+    edits: Vec<TextEdit>,
+}
+
+impl FileEdit {
+    /// Creates a new file edit with no changes.
+    #[must_use]
+    pub fn new(path: PathBuf) -> Self {
+        Self {
+            path,
+            edits: Vec::new(),
+        }
+    }
+
+    /// Adds a text edit to this file.
+    pub fn add_edit(&mut self, edit: TextEdit) {
+        self.edits.push(edit);
+    }
+
+    /// Builds a file edit from an existing collection of edits.
+    #[must_use]
+    pub fn with_edits(path: PathBuf, edits: Vec<TextEdit>) -> Self {
+        Self { path, edits }
+    }
+
+    /// Path to the file being edited.
+    #[must_use]
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+
+    /// Edits to apply.
+    #[must_use]
+    pub fn edits(&self) -> &[TextEdit] {
+        &self.edits
+    }
+
+    /// Returns true when no edits are present.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.edits.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn text_edit_insert_is_zero_length() {
+        let edit = TextEdit::insert(5, 10, "hello".to_string());
+        assert_eq!(edit.start_line(), 5);
+        assert_eq!(edit.start_column(), 10);
+        assert_eq!(edit.end_line(), 5);
+        assert_eq!(edit.end_column(), 10);
+        assert_eq!(edit.new_text(), "hello");
+    }
+
+    #[test]
+    fn text_edit_delete_has_empty_replacement() {
+        let edit = TextEdit::delete(1, 0, 3, 5);
+        assert_eq!(edit.start_line(), 1);
+        assert_eq!(edit.start_column(), 0);
+        assert_eq!(edit.end_line(), 3);
+        assert_eq!(edit.end_column(), 5);
+        assert!(edit.new_text().is_empty());
+    }
+
+    #[test]
+    fn file_edit_tracks_path_and_edits() {
+        let path = PathBuf::from("/project/src/main.rs");
+        let mut file_edit = FileEdit::new(path.clone());
+        assert!(file_edit.is_empty());
+
+        file_edit.add_edit(TextEdit::insert(0, 0, "// header\n".to_string()));
+        assert!(!file_edit.is_empty());
+        assert_eq!(file_edit.path(), &path);
+        assert_eq!(file_edit.edits().len(), 1);
+    }
+}

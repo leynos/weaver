@@ -12,12 +12,30 @@
 //! quickly. Semantic fusion backends are started lazily the first time they are
 //! requested, ensuring the daemon remains lightweight when only a subset of the
 //! functionality is required.
+//!
+//! ## Double-Lock Safety Harness
+//!
+//! All `act` commands pass through the "Double-Lock" safety harness before
+//! committing changes to the filesystem. The harness validates proposed edits
+//! in two phases:
+//!
+//! 1. **Syntactic Lock**: Modified files are parsed to ensure they produce
+//!    valid syntax trees. This catches structural errors before they reach the
+//!    semantic analysis phase.
+//!
+//! 2. **Semantic Lock**: Changes are sent to the configured language server,
+//!    which verifies that no new errors or high-severity warnings are
+//!    introduced compared to the pre-edit state.
+//!
+//! Changes that fail either lock are rejected, leaving the filesystem
+//! untouched. See the [`safety_harness`] module for details.
 
 mod backends;
 mod bootstrap;
 mod health;
 mod placeholder_provider;
 mod process;
+pub mod safety_harness;
 mod telemetry;
 
 pub use backends::{

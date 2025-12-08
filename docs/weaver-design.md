@@ -898,6 +898,58 @@ leverage the most advanced and specialized refactoring tools available, knowing
 that `Weaver` provides a safety net that protects the codebase from corruption
 and regressions.
 
+#### 4.2.1. Implementation decisions
+
+The initial Double-Lock implementation resides in the `weaverd::safety_harness`
+module. The architecture uses trait-based abstraction for both lock phases,
+enabling straightforward unit and integration testing without requiring real
+language servers or parsers during development.
+
+**Core types**:
+
+- `FileEdit` and `TextEdit` represent proposed changes using zero-based line
+  and column offsets following LSP conventions.
+- `VerificationContext` maintains in-memory copies of both original and
+  modified file content, isolating the verification process from the real
+  filesystem.
+- `EditTransaction` orchestrates the full workflow: reading original files,
+  applying edits in-memory, validating through both locks, and committing
+  atomically on success.
+
+**Lock traits**:
+
+- `SyntacticLock::validate(&self, context: &VerificationContext) ->
+  SyntacticLockResult` returns either `Passed` or `Failed { failures }`.
+- `SemanticLock::validate(&self, context: &VerificationContext) ->
+  Result<SemanticLockResult, SafetyHarnessError>` permits the semantic backend
+  to surface unavailability errors separately from verification failures.
+
+**Placeholder implementations**:
+
+Until `weaver-syntax` delivers Tree-sitter parsing, the `PlaceholderSyntacticLock`
+unconditionally passes all files. This maintains the contract while deferring
+parser integration. `PlaceholderSemanticLock` likewise passes until the full LSP
+diagnostic comparison pipeline is wired through `weaver-lsp-host`.
+
+**Configurable test doubles**:
+
+`ConfigurableSyntacticLock` and `ConfigurableSemanticLock` accept pre-determined
+results, enabling BDD scenarios to exercise pass, fail, and backend-unavailable
+paths without external dependencies. These doubles power the
+`safety_harness.feature` behavioural tests.
+
+**Atomic commit strategy**:
+
+Successful transactions write modified files using temporary file creation
+followed by an atomic rename. This prevents partial writes from corrupting files
+during a crash or power loss.
+
+**Structured error reporting**:
+
+`SafetyHarnessError` captures the lock phase, affected files, optional line and
+column locations, and human-readable messages. Agents can parse this structure
+to diagnose failures and regenerate corrected edits without manual intervention.
+
 ## 5. Security by Design: A Zero-Trust Sandboxing Model
 
 Given that `Weaver` is designed to be programmatically controlled by AI agents

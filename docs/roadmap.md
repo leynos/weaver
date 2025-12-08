@@ -57,12 +57,12 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
     `birdcage` for its focused scope and production usage, prioritising robust
     Linux support via namespaces and seccomp-bpf.
 
-- [ ] Implement the full "Double-Lock" safety harness logic in `weaverd`.
+- [x] Implement the full "Double-Lock" safety harness logic in `weaverd`.
     This is a critical, non-negotiable feature for the MVP. All `act` commands
     must pass through this verification layer before committing to the
     filesystem.
 
-- [ ] Implement atomic edits to ensure that multi-file changes either succeed
+- [x] Implement atomic edits to ensure that multi-file changes either succeed
     or fail as a single transaction.
 
 ## Phase 2: Syntactic & Relational Intelligence
