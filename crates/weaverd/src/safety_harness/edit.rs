@@ -51,6 +51,58 @@ impl TextRange {
     }
 }
 
+/// Newtype wrapper for replacement text in edits.
+///
+/// This type reduces primitive obsession by providing a dedicated type for
+/// text that replaces a range in a file. It provides ergonomic conversions
+/// from strings while making the domain intent explicit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplacementText(String);
+
+impl ReplacementText {
+    /// Creates a new replacement text from a string.
+    #[must_use]
+    pub fn new(text: String) -> Self {
+        Self(text)
+    }
+
+    /// Creates an empty replacement text (for deletions).
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self(String::new())
+    }
+
+    /// Returns the replacement text as a string slice.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Consumes the wrapper and returns the inner string.
+    #[must_use]
+    pub fn into_inner(self) -> String {
+        self.0
+    }
+}
+
+impl From<String> for ReplacementText {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+impl From<&str> for ReplacementText {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl AsRef<str> for ReplacementText {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 /// A single text replacement within a file.
 ///
 /// Range values use zero-based line and column offsets. Column offsets count
@@ -64,10 +116,29 @@ pub struct TextEdit {
 }
 
 impl TextEdit {
+    /// Builds a text edit from a range and typed replacement text.
+    ///
+    /// This is the preferred constructor for reducing primitive obsession.
+    #[must_use]
+    pub fn with_replacement(range: TextRange, text: ReplacementText) -> Self {
+        Self {
+            range,
+            new_text: text.into_inner(),
+        }
+    }
+
     /// Builds a text edit from a range and replacement text.
     #[must_use]
     pub const fn new(range: TextRange, new_text: String) -> Self {
         Self { range, new_text }
+    }
+
+    /// Builds a text edit from Position types and typed replacement text.
+    ///
+    /// This is the preferred constructor for reducing primitive obsession.
+    #[must_use]
+    pub fn from_positions(start: Position, end: Position, text: ReplacementText) -> Self {
+        Self::with_replacement(TextRange::new(start, end), text)
     }
 
     /// Builds a text edit from explicit positions.
@@ -76,6 +147,8 @@ impl TextEdit {
     /// callers do not want to create intermediate [`Position`] and [`TextRange`]
     /// values. The argument count is intentionally above the clippy threshold to
     /// match LSP conventions.
+    ///
+    /// Consider using [`Self::from_positions`] to reduce primitive obsession.
     #[must_use]
     #[allow(
         clippy::too_many_arguments,
@@ -97,13 +170,33 @@ impl TextEdit {
         )
     }
 
+    /// Creates an insertion at the specified position using typed replacement text.
+    ///
+    /// This is the preferred constructor for reducing primitive obsession.
+    #[must_use]
+    pub fn insert_at(position: Position, text: ReplacementText) -> Self {
+        Self::with_replacement(TextRange::point(position), text)
+    }
+
     /// Creates an insertion at the specified position.
+    ///
+    /// Consider using [`Self::insert_at`] to reduce primitive obsession.
     #[must_use]
     pub const fn insert(line: u32, column: u32, text: String) -> Self {
         Self::new(TextRange::point(Position::new(line, column)), text)
     }
 
+    /// Creates a deletion spanning the given range using Position types.
+    ///
+    /// This is the preferred constructor for reducing primitive obsession.
+    #[must_use]
+    pub fn delete_range(start: Position, end: Position) -> Self {
+        Self::from_positions(start, end, ReplacementText::empty())
+    }
+
     /// Creates a deletion spanning the given range.
+    ///
+    /// Consider using [`Self::delete_range`] to reduce primitive obsession.
     #[must_use]
     pub const fn delete(
         start_line: u32,
