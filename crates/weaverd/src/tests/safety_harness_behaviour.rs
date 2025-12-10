@@ -63,8 +63,6 @@ impl SafetyHarnessWorld {
 
     /// Adds an edit that replaces text.
     fn add_replacement_edit(&mut self, name: &FileName, old: &TextPattern, new: &TextPattern) {
-        use crate::safety_harness::Position;
-
         let path = self.file_path(name);
         let content = if path.exists() {
             fs::read_to_string(&path).expect("read file")

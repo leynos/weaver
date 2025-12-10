@@ -61,9 +61,17 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
     This is a critical, non-negotiable feature for the MVP. All `act` commands
     must pass through this verification layer before committing to the
     filesystem.
+  - Acceptance criteria: Edit transactions pass through syntactic and semantic
+    lock validation before commit, failures leave the filesystem untouched,
+    and BDD scenarios cover success, syntactic failure, semantic failure, and
+    backend unavailable error paths.
 
 - [x] Implement atomic edits to ensure that multi-file changes either succeed
     or fail as a single transaction.
+  - Acceptance criteria: Two-phase commit with prepare (temp files) and commit
+    (atomic renames) phases, rollback restores original content on partial
+    failure, and new file creation properly tracks file existence for
+    rollback.
 
 ## Phase 2: Syntactic & Relational Intelligence
 

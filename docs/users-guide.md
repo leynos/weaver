@@ -300,4 +300,4 @@ should ensure the appropriate language servers are healthy before executing
 The current syntactic lock uses a placeholder implementation that always passes.
 Full Tree-sitter integration will be delivered in a future phase. The semantic
 lock relies on the `weaver-lsp-host` infrastructure, which requires language
-servers to be registered and initialised for the relevant languages.
+servers to be registered and initialized for the relevant languages.

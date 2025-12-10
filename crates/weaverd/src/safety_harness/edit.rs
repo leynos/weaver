@@ -3,7 +3,7 @@
 //! These types form the input to the Double-Lock safety harness. External tools
 //! produce edits that are captured here before being validated and applied.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// A position within a text file.
 ///
@@ -215,7 +215,7 @@ impl FileEdit {
 
     /// Path to the file being edited.
     #[must_use]
-    pub fn path(&self) -> &PathBuf {
+    pub fn path(&self) -> &Path {
         &self.path
     }
 
