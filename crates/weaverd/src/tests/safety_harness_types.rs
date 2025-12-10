@@ -3,12 +3,14 @@
 //! These types eliminate string-heavy function arguments and make the test
 //! domain model explicit and type-safe.
 
-use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use derive_more::{AsRef, Deref};
+
 /// Wraps file name strings.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deref, AsRef)]
+#[as_ref(forward)]
 pub struct FileName(String);
 
 impl From<String> for FileName {
@@ -20,20 +22,6 @@ impl From<String> for FileName {
 impl From<&str> for FileName {
     fn from(s: &str) -> Self {
         Self(s.trim_matches('"').to_string())
-    }
-}
-
-impl AsRef<str> for FileName {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl Deref for FileName {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 
@@ -58,7 +46,8 @@ impl FromStr for FileName {
 }
 
 /// Wraps file content strings.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deref, AsRef)]
+#[as_ref(forward)]
 pub struct FileContent(String);
 
 impl From<String> for FileContent {
@@ -70,20 +59,6 @@ impl From<String> for FileContent {
 impl From<&str> for FileContent {
     fn from(s: &str) -> Self {
         Self(s.trim_matches('"').to_string())
-    }
-}
-
-impl AsRef<str> for FileContent {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl Deref for FileContent {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 
@@ -108,7 +83,8 @@ impl FromStr for FileContent {
 }
 
 /// Wraps text patterns for search/replace/assertion.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deref, AsRef)]
+#[as_ref(forward)]
 pub struct TextPattern(String);
 
 impl From<String> for TextPattern {
@@ -120,20 +96,6 @@ impl From<String> for TextPattern {
 impl From<&str> for TextPattern {
     fn from(s: &str) -> Self {
         Self(s.trim_matches('"').to_string())
-    }
-}
-
-impl AsRef<str> for TextPattern {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl Deref for TextPattern {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 
@@ -153,7 +115,8 @@ impl FromStr for TextPattern {
 }
 
 /// Wraps diagnostic messages for lock configuration.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deref, AsRef)]
+#[as_ref(forward)]
 pub struct DiagnosticMessage(String);
 
 impl From<String> for DiagnosticMessage {
@@ -165,20 +128,6 @@ impl From<String> for DiagnosticMessage {
 impl From<&str> for DiagnosticMessage {
     fn from(s: &str) -> Self {
         Self(s.trim_matches('"').to_string())
-    }
-}
-
-impl AsRef<str> for DiagnosticMessage {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl Deref for DiagnosticMessage {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 
