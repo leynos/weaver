@@ -408,10 +408,7 @@ mod tests {
         let path = PathBuf::from("test.txt");
         let edit = FileEdit::with_edits(
             path,
-            vec![TextEdit::insert_at(
-                Position::new(0, 6),
-                "beautiful ".into(),
-            )],
+            vec![TextEdit::insert_at(Position::new(0, 6), "beautiful ")],
         );
         let result = apply_edits(original, &edit).expect("edit should succeed");
         assert_eq!(result, "hello beautiful world");

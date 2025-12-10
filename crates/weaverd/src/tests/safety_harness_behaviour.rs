@@ -92,7 +92,7 @@ impl SafetyHarnessWorld {
     /// Adds an edit that creates a new file with content.
     fn add_creation_edit(&mut self, name: &FileName, content: &FileContent) {
         let path = self.file_path(name);
-        let edit = TextEdit::insert_at(Position::new(0, 0), content.as_str().into());
+        let edit = TextEdit::insert_at(Position::new(0, 0), content.as_str());
         let file_edit = FileEdit::with_edits(path.clone(), vec![edit]);
         self.pending_edits.push(file_edit);
         self.files.insert(name.as_str().to_string(), path);

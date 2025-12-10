@@ -368,10 +368,8 @@ mod tests {
         /// Adds an insert edit for the file at the given index.
         fn with_insert_edit(mut self, file_idx: usize, text: &str) -> Self {
             let path = self.files[file_idx].0.clone();
-            let edit = FileEdit::with_edits(
-                path,
-                vec![TextEdit::insert_at(Position::new(0, 0), text.into())],
-            );
+            let edit =
+                FileEdit::with_edits(path, vec![TextEdit::insert_at(Position::new(0, 0), text)]);
             self.edits.push(edit);
             self
         }

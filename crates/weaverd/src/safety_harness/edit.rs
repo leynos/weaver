@@ -62,13 +62,13 @@ pub struct ReplacementText(String);
 impl ReplacementText {
     /// Creates a new replacement text from a string.
     #[must_use]
-    pub fn new(text: String) -> Self {
-        Self(text)
+    pub fn new(text: impl Into<String>) -> Self {
+        Self(text.into())
     }
 
     /// Creates an empty replacement text (for deletions).
     #[must_use]
-    pub const fn empty() -> Self {
+    pub fn empty() -> Self {
         Self(String::new())
     }
 
@@ -116,56 +116,40 @@ pub struct TextEdit {
 }
 
 impl TextEdit {
-    /// Builds a text edit from a range and typed replacement text.
+    /// Builds a text edit from a range and replacement text.
     ///
-    /// This is the preferred constructor for reducing primitive obsession.
+    /// This is the core constructor. All other constructors delegate to this.
     #[must_use]
-    pub fn with_replacement(range: TextRange, text: ReplacementText) -> Self {
+    pub fn new(range: TextRange, new_text: impl Into<String>) -> Self {
         Self {
             range,
-            new_text: text.into_inner(),
+            new_text: new_text.into(),
         }
-    }
-
-    /// Builds a text edit from a range and replacement text.
-    #[must_use]
-    pub const fn new(range: TextRange, new_text: String) -> Self {
-        Self { range, new_text }
-    }
-
-    /// Builds a text edit from Position types and typed replacement text.
-    ///
-    /// This is the preferred constructor for reducing primitive obsession when
-    /// using the [`ReplacementText`] newtype.
-    #[must_use]
-    pub fn from_positions_typed(start: Position, end: Position, text: ReplacementText) -> Self {
-        Self::with_replacement(TextRange::new(start, end), text)
     }
 
     /// Builds a text edit from Position types and replacement text.
     ///
     /// This constructor uses the parameter object pattern, accepting [`Position`]
-    /// objects instead of primitive coordinates. It is the preferred way to
-    /// construct text edits when you have position information available.
+    /// objects instead of primitive coordinates.
     #[must_use]
-    pub fn from_positions(start: Position, end: Position, new_text: String) -> Self {
+    pub fn from_positions(start: Position, end: Position, new_text: impl Into<String>) -> Self {
         Self::new(TextRange::new(start, end), new_text)
     }
 
-    /// Creates an insertion at the specified position using typed replacement text.
+    /// Creates an insertion at the specified position.
     ///
-    /// This is the preferred constructor for reducing primitive obsession.
+    /// An insertion is a zero-length replacement (start == end) with non-empty text.
     #[must_use]
-    pub fn insert_at(position: Position, text: ReplacementText) -> Self {
-        Self::with_replacement(TextRange::point(position), text)
+    pub fn insert_at(position: Position, new_text: impl Into<String>) -> Self {
+        Self::new(TextRange::point(position), new_text)
     }
 
-    /// Creates a deletion spanning the given range using Position types.
+    /// Creates a deletion spanning the given range.
     ///
-    /// This is the preferred constructor for reducing primitive obsession.
+    /// A deletion is a replacement with empty text.
     #[must_use]
     pub fn delete_range(start: Position, end: Position) -> Self {
-        Self::from_positions_typed(start, end, ReplacementText::empty())
+        Self::new(TextRange::new(start, end), String::new())
     }
 
     /// Starting line (zero-based).
@@ -254,7 +238,7 @@ mod tests {
 
     #[test]
     fn text_edit_insert_is_zero_length() {
-        let edit = TextEdit::insert_at(Position::new(5, 10), "hello".into());
+        let edit = TextEdit::insert_at(Position::new(5, 10), "hello");
         assert_eq!(edit.start_line(), 5);
         assert_eq!(edit.start_column(), 10);
         assert_eq!(edit.end_line(), 5);
@@ -278,10 +262,7 @@ mod tests {
         let mut file_edit = FileEdit::new(path.clone());
         assert!(file_edit.is_empty());
 
-        file_edit.add_edit(TextEdit::insert_at(
-            Position::new(0, 0),
-            "// header\n".into(),
-        ));
+        file_edit.add_edit(TextEdit::insert_at(Position::new(0, 0), "// header\n"));
         assert!(!file_edit.is_empty());
         assert_eq!(file_edit.path(), &path);
         assert_eq!(file_edit.edits().len(), 1);
