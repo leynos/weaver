@@ -229,6 +229,26 @@ mod tests {
         assert_eq!(content, "hello world");
     }
 
+    /// Tests lock failure scenarios, eliminating duplication between syntactic and semantic tests.
+    ///
+    /// The `configure_locks` closure receives the file path and returns configured locks.
+    /// The `verify_outcome` closure performs test-specific assertions on the outcome.
+    fn test_lock_failure<F, V>(configure_locks: F, verify_outcome: V)
+    where
+        F: FnOnce(PathBuf) -> (ConfigurableSyntacticLock, ConfigurableSemanticLock),
+        V: FnOnce(&TransactionOutcome),
+    {
+        let builder = failure_scenario_builder();
+        let path = builder.file_path(0).clone();
+        let (syntactic, semantic) = configure_locks(path.clone());
+
+        let (result, _, _dir) = builder.execute_with_locks(&syntactic, &semantic);
+        let outcome = result.expect("should succeed");
+
+        verify_outcome(&outcome);
+        assert_file_unchanged(&path);
+    }
+
     /// Builder for constructing test transactions with reduced boilerplate.
     struct TransactionTestBuilder {
         dir: TempDir,
@@ -354,38 +374,40 @@ mod tests {
 
     #[test]
     fn syntactic_failure_prevents_commit() {
-        let builder = failure_scenario_builder();
-        let path = builder.file_path(0).clone();
-        let failures = vec![VerificationFailure::new(path.clone(), "syntax error")];
-        let syntactic = ConfigurableSyntacticLock::failing(failures);
-        let semantic = ConfigurableSemanticLock::passing();
-
-        let (result, _, _dir) = builder.execute_with_locks(&syntactic, &semantic);
-        let outcome = result.expect("should succeed");
-
-        assert!(matches!(
-            outcome,
-            TransactionOutcome::SyntacticLockFailed { .. }
-        ));
-        assert_file_unchanged(&path);
+        test_lock_failure(
+            |path| {
+                let failures = vec![VerificationFailure::new(path, "syntax error")];
+                (
+                    ConfigurableSyntacticLock::failing(failures),
+                    ConfigurableSemanticLock::passing(),
+                )
+            },
+            |outcome| {
+                assert!(matches!(
+                    outcome,
+                    TransactionOutcome::SyntacticLockFailed { .. }
+                ));
+            },
+        );
     }
 
     #[test]
     fn semantic_failure_prevents_commit() {
-        let builder = failure_scenario_builder();
-        let path = builder.file_path(0).clone();
-        let failures = vec![VerificationFailure::new(path.clone(), "type error")];
-        let syntactic = ConfigurableSyntacticLock::passing();
-        let semantic = ConfigurableSemanticLock::failing(failures);
-
-        let (result, _, _dir) = builder.execute_with_locks(&syntactic, &semantic);
-        let outcome = result.expect("should succeed");
-
-        assert!(matches!(
-            outcome,
-            TransactionOutcome::SemanticLockFailed { .. }
-        ));
-        assert_file_unchanged(&path);
+        test_lock_failure(
+            |path| {
+                let failures = vec![VerificationFailure::new(path, "type error")];
+                (
+                    ConfigurableSyntacticLock::passing(),
+                    ConfigurableSemanticLock::failing(failures),
+                )
+            },
+            |outcome| {
+                assert!(matches!(
+                    outcome,
+                    TransactionOutcome::SemanticLockFailed { .. }
+                ));
+            },
+        );
     }
 
     #[test]
