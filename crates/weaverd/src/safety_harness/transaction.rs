@@ -2,8 +2,9 @@
 //!
 //! An edit transaction collects proposed file edits, applies them to in-memory
 //! buffers, validates through both syntactic and semantic locks, and commits
-//! only when both checks pass. Failed transactions leave the filesystem
-//! untouched.
+//! only when both checks pass. The commit phase uses two-phase commit with
+//! rollback to ensure multi-file atomicity: either all files are updated or
+//! none are (barring catastrophic failures during rollback itself).
 
 use std::fs;
 use std::io::Write as IoWrite;
@@ -155,15 +156,27 @@ fn read_file(path: &PathBuf) -> Result<String, SafetyHarnessError> {
     }
 }
 
-/// Writes all modified content to the filesystem.
+/// Writes all modified content to the filesystem using two-phase commit.
 ///
-/// Writes are performed atomically per file by writing to a temporary file
-/// first and then renaming. This ensures that a crash during commit does not
-/// leave files in a corrupted state.
+/// # Atomicity Guarantee
+///
+/// Phase 1 (prepare): All modified content is written to temporary files.
+/// Phase 2 (commit): Temporary files are atomically renamed to targets.
+///
+/// If any rename fails, all previously renamed files are rolled back to
+/// their original content. This provides multi-file transaction semantics.
+///
+/// # Rollback Limitations
+///
+/// Rollback is best-effort: if a catastrophic failure occurs during rollback
+/// (e.g., disk removed), some files may remain in an inconsistent state.
 fn commit_changes(
     context: &VerificationContext,
     paths: &[PathBuf],
 ) -> Result<(), SafetyHarnessError> {
+    // Phase 1: Prepare all files (write to temps)
+    let mut prepared: Vec<(PathBuf, tempfile::NamedTempFile, String)> = Vec::new();
+
     for path in paths {
         let content = context
             .modified(path)
@@ -172,29 +185,59 @@ fn commit_changes(
                 message: "modified content missing from context".to_string(),
             })?;
 
-        write_file_atomic(path, content)?;
+        let original = context.original(path).cloned().unwrap_or_default();
+        let temp_file = prepare_file(path, content)?;
+        prepared.push((path.clone(), temp_file, original));
+    }
+
+    // Phase 2: Commit all files (atomic renames)
+    let mut committed: Vec<(PathBuf, String)> = Vec::new();
+
+    for (path, temp_file, original) in prepared {
+        if let Err(err) = temp_file.persist(&path) {
+            rollback(&committed);
+            return Err(SafetyHarnessError::file_write(path, err.error));
+        }
+        committed.push((path, original));
     }
 
     Ok(())
 }
 
-/// Writes content atomically by writing to a temp file and renaming.
-fn write_file_atomic(path: &PathBuf, content: &str) -> Result<(), SafetyHarnessError> {
+/// Prepares a file for commit by writing content to a temporary file.
+///
+/// The temp file is created in the same directory as the target to ensure
+/// atomic rename is possible (same filesystem).
+fn prepare_file(
+    path: &std::path::Path,
+    content: &str,
+) -> Result<tempfile::NamedTempFile, SafetyHarnessError> {
     let parent = path.parent().unwrap_or_else(|| std::path::Path::new("."));
 
-    // Create temp file in the same directory for atomic rename
     let mut temp_file = tempfile::NamedTempFile::new_in(parent)
-        .map_err(|err| SafetyHarnessError::file_write(path.clone(), err))?;
+        .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
 
     temp_file
         .write_all(content.as_bytes())
-        .map_err(|err| SafetyHarnessError::file_write(path.clone(), err))?;
+        .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
 
-    temp_file
-        .persist(path)
-        .map_err(|err| SafetyHarnessError::file_write(path.clone(), err.error))?;
+    Ok(temp_file)
+}
 
-    Ok(())
+/// Rolls back committed files to their original content.
+///
+/// This is a best-effort operation: if restoration fails for any file,
+/// we continue attempting to restore the remaining files.
+fn rollback(committed: &[(PathBuf, String)]) {
+    for (path, original) in committed {
+        if original.is_empty() {
+            // File was newly created, remove it
+            let _ = std::fs::remove_file(path);
+        } else {
+            // Restore original content (best effort)
+            let _ = std::fs::write(path, original);
+        }
+    }
 }
 
 #[cfg(test)]
