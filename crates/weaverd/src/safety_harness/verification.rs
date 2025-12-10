@@ -383,19 +383,34 @@ mod tests {
 
     #[test]
     fn apply_edits_inserts_text() {
+        use crate::safety_harness::edit::Position;
+
         let original = "hello world";
         let path = PathBuf::from("test.txt");
-        let edit =
-            FileEdit::with_edits(path, vec![TextEdit::insert(0, 6, "beautiful ".to_string())]);
+        let edit = FileEdit::with_edits(
+            path,
+            vec![TextEdit::insert_at(
+                Position::new(0, 6),
+                "beautiful ".into(),
+            )],
+        );
         let result = apply_edits(original, &edit).expect("edit should succeed");
         assert_eq!(result, "hello beautiful world");
     }
 
     #[test]
     fn apply_edits_deletes_text() {
+        use crate::safety_harness::edit::Position;
+
         let original = "hello beautiful world";
         let path = PathBuf::from("test.txt");
-        let edit = FileEdit::with_edits(path, vec![TextEdit::delete(0, 6, 0, 16)]);
+        let edit = FileEdit::with_edits(
+            path,
+            vec![TextEdit::delete_range(
+                Position::new(0, 6),
+                Position::new(0, 16),
+            )],
+        );
         let result = apply_edits(original, &edit).expect("edit should succeed");
         assert_eq!(result, "hello world");
     }

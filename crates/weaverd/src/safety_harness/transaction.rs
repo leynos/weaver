@@ -247,7 +247,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use crate::safety_harness::edit::TextEdit;
+    use crate::safety_harness::edit::{Position, TextEdit};
     use crate::safety_harness::verification::{
         ConfigurableSemanticLock, ConfigurableSyntacticLock,
     };
@@ -352,8 +352,6 @@ mod tests {
 
         /// Adds a replacement edit for the file at the given index.
         fn with_replacement_edit(mut self, file_idx: usize, replacement: LineReplacement) -> Self {
-            use crate::safety_harness::edit::Position;
-
             let path = self.files[file_idx].0.clone();
             let edit = FileEdit::with_edits(
                 path,
@@ -370,7 +368,10 @@ mod tests {
         /// Adds an insert edit for the file at the given index.
         fn with_insert_edit(mut self, file_idx: usize, text: &str) -> Self {
             let path = self.files[file_idx].0.clone();
-            let edit = FileEdit::with_edits(path, vec![TextEdit::insert(0, 0, text.to_string())]);
+            let edit = FileEdit::with_edits(
+                path,
+                vec![TextEdit::insert_at(Position::new(0, 0), text.into())],
+            );
             self.edits.push(edit);
             self
         }

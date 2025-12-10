@@ -926,17 +926,18 @@ language servers or parsers during development.
 
 **Placeholder implementations**:
 
-Until `weaver-syntax` delivers Tree-sitter parsing, the `PlaceholderSyntacticLock`
-unconditionally passes all files. This maintains the contract while deferring
-parser integration. `PlaceholderSemanticLock` likewise passes until the full LSP
-diagnostic comparison pipeline is wired through `weaver-lsp-host`.
+Until `weaver-syntax` delivers Tree-sitter parsing, the
+`PlaceholderSyntacticLock` unconditionally passes all files. This maintains the
+contract while deferring parser integration. `PlaceholderSemanticLock` likewise
+passes until the full LSP diagnostic comparison pipeline is wired through
+`weaver-lsp-host`.
 
 **Configurable test doubles**:
 
-`ConfigurableSyntacticLock` and `ConfigurableSemanticLock` accept pre-determined
-results, enabling BDD scenarios to exercise pass, fail, and backend-unavailable
-paths without external dependencies. These doubles power the
-`safety_harness.feature` behavioural tests.
+`ConfigurableSyntacticLock` and `ConfigurableSemanticLock` accept
+pre-determined results, enabling BDD scenarios to exercise pass, fail, and
+backend-unavailable paths without external dependencies. These doubles power
+the `safety_harness.feature` behavioural tests.
 
 **Atomic commit strategy**:
 
@@ -961,23 +962,23 @@ to diagnose failures and regenerate corrected edits without manual intervention.
 #### 4.2.2. Future: LSP Document Sync for Semantic Validation
 
 For operations spanning multiple files (renames, signature changes), the
-semantic lock must validate cross-file references. Rather than writing
-modified content to temporary files (which would break import resolution),
-the semantic lock will use LSP's document synchronization protocol:
+semantic lock must validate cross-file references. Rather than writing modified
+content to temporary files (which would break import resolution), the semantic
+lock will use LSP's document synchronization protocol:
 
 1. **`textDocument/didOpen`**: Open each affected file at its real URI,
    sending the modified content as the document text.
 2. **Request diagnostics**: The LSP validates the in-memory content as if
-   it were at the actual file path, allowing imports and references to
-   resolve correctly.
+   it were at the actual file path, allowing imports and references to resolve
+   correctly.
 3. **Compare diagnostics**: Check for new errors compared to the pre-edit
    baseline.
 4. **`textDocument/didClose`**: Clean up the virtual document state.
 
 This approach leverages the standard LSP document lifecycle that editors use,
-where the LSP always validates in-memory content rather than disk content.
-The `LanguageServer` trait in `weaver-lsp-host` will be extended with
-`did_open`, `did_change`, and `did_close` methods to support this workflow.
+where the LSP always validates in-memory content rather than disk content. The
+`LanguageServer` trait in `weaver-lsp-host` will be extended with `did_open`,
+`did_change`, and `did_close` methods to support this workflow.
 
 ## 5. Security by Design: A Zero-Trust Sandboxing Model
 

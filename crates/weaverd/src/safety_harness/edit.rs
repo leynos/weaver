@@ -152,37 +152,6 @@ impl TextEdit {
         Self::new(TextRange::new(start, end), new_text)
     }
 
-    /// Builds a text edit from explicit positions.
-    ///
-    /// This convenience constructor accepts position coordinates directly when
-    /// callers do not want to create intermediate [`Position`] and [`TextRange`]
-    /// values. The argument count is intentionally above the clippy threshold to
-    /// match LSP conventions.
-    ///
-    /// # Deprecated
-    ///
-    /// This method is deprecated in favor of [`Self::from_positions`], which
-    /// uses the parameter object pattern for better type safety.
-    #[must_use]
-    #[deprecated(since = "0.2.0", note = "use `from_positions` instead")]
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "matches LSP coordinate convention"
-    )]
-    pub fn from_coords(
-        start_line: u32,
-        start_column: u32,
-        end_line: u32,
-        end_column: u32,
-        new_text: String,
-    ) -> Self {
-        Self::from_positions(
-            Position::new(start_line, start_column),
-            Position::new(end_line, end_column),
-            new_text,
-        )
-    }
-
     /// Creates an insertion at the specified position using typed replacement text.
     ///
     /// This is the preferred constructor for reducing primitive obsession.
@@ -191,32 +160,12 @@ impl TextEdit {
         Self::with_replacement(TextRange::point(position), text)
     }
 
-    /// Creates an insertion at the specified position.
-    ///
-    /// Consider using [`Self::insert_at`] to reduce primitive obsession.
-    #[must_use]
-    pub const fn insert(line: u32, column: u32, text: String) -> Self {
-        Self::new(TextRange::point(Position::new(line, column)), text)
-    }
-
     /// Creates a deletion spanning the given range using Position types.
     ///
     /// This is the preferred constructor for reducing primitive obsession.
     #[must_use]
     pub fn delete_range(start: Position, end: Position) -> Self {
         Self::from_positions_typed(start, end, ReplacementText::empty())
-    }
-
-    /// Creates a deletion spanning the given range.
-    ///
-    /// Consider using [`Self::delete_range`] to reduce primitive obsession.
-    #[must_use]
-    pub fn delete(start_line: u32, start_column: u32, end_line: u32, end_column: u32) -> Self {
-        Self::from_positions(
-            Position::new(start_line, start_column),
-            Position::new(end_line, end_column),
-            String::new(),
-        )
     }
 
     /// Starting line (zero-based).
@@ -305,7 +254,7 @@ mod tests {
 
     #[test]
     fn text_edit_insert_is_zero_length() {
-        let edit = TextEdit::insert(5, 10, "hello".to_string());
+        let edit = TextEdit::insert_at(Position::new(5, 10), "hello".into());
         assert_eq!(edit.start_line(), 5);
         assert_eq!(edit.start_column(), 10);
         assert_eq!(edit.end_line(), 5);
@@ -315,7 +264,7 @@ mod tests {
 
     #[test]
     fn text_edit_delete_has_empty_replacement() {
-        let edit = TextEdit::delete(1, 0, 3, 5);
+        let edit = TextEdit::delete_range(Position::new(1, 0), Position::new(3, 5));
         assert_eq!(edit.start_line(), 1);
         assert_eq!(edit.start_column(), 0);
         assert_eq!(edit.end_line(), 3);
@@ -329,7 +278,10 @@ mod tests {
         let mut file_edit = FileEdit::new(path.clone());
         assert!(file_edit.is_empty());
 
-        file_edit.add_edit(TextEdit::insert(0, 0, "// header\n".to_string()));
+        file_edit.add_edit(TextEdit::insert_at(
+            Position::new(0, 0),
+            "// header\n".into(),
+        ));
         assert!(!file_edit.is_empty());
         assert_eq!(file_edit.path(), &path);
         assert_eq!(file_edit.edits().len(), 1);
