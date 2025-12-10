@@ -220,7 +220,7 @@ mod tests {
     fn failure_scenario_builder() -> TransactionTestBuilder {
         TransactionTestBuilder::new()
             .with_file("test.txt", "hello world")
-            .with_replacement_edit(0, 0, 5, "greetings")
+            .with_replacement_edit(0, LineReplacement::from_start(5, "greetings"))
     }
 
     /// Asserts that the file at the given path contains "hello world".
@@ -247,6 +247,33 @@ mod tests {
 
         verify_outcome(&outcome);
         assert_file_unchanged(&path);
+    }
+
+    /// Parameter object for line replacement edits.
+    ///
+    /// Encapsulates column range and replacement text for a single-line edit,
+    /// reducing argument count in builder methods.
+    #[derive(Debug, Clone)]
+    struct LineReplacement {
+        start_col: u32,
+        end_col: u32,
+        text: String,
+    }
+
+    impl LineReplacement {
+        /// Creates a new line replacement with explicit column range.
+        fn new(start_col: u32, end_col: u32, text: impl Into<String>) -> Self {
+            Self {
+                start_col,
+                end_col,
+                text: text.into(),
+            }
+        }
+
+        /// Creates a replacement starting from column 0.
+        fn from_start(end_col: u32, text: impl Into<String>) -> Self {
+            Self::new(0, end_col, text)
+        }
     }
 
     /// Builder for constructing test transactions with reduced boilerplate.
@@ -281,26 +308,16 @@ mod tests {
         }
 
         /// Adds a replacement edit for the file at the given index.
-        #[allow(
-            clippy::too_many_arguments,
-            reason = "test builder accepts explicit edit coordinates for convenience"
-        )]
-        fn with_replacement_edit(
-            mut self,
-            file_idx: usize,
-            start_col: u32,
-            end_col: u32,
-            text: &str,
-        ) -> Self {
+        fn with_replacement_edit(mut self, file_idx: usize, replacement: LineReplacement) -> Self {
             use crate::safety_harness::edit::Position;
 
             let path = self.files[file_idx].0.clone();
             let edit = FileEdit::with_edits(
                 path,
                 vec![TextEdit::from_positions(
-                    Position::new(0, start_col),
-                    Position::new(0, end_col),
-                    text.to_string(),
+                    Position::new(0, replacement.start_col),
+                    Position::new(0, replacement.end_col),
+                    replacement.text,
                 )],
             );
             self.edits.push(edit);
@@ -357,7 +374,7 @@ mod tests {
     fn successful_transaction_commits_changes() {
         let builder = TransactionTestBuilder::new()
             .with_file("test.txt", "hello world")
-            .with_replacement_edit(0, 0, 5, "greetings");
+            .with_replacement_edit(0, LineReplacement::from_start(5, "greetings"));
 
         let syntactic = ConfigurableSyntacticLock::passing();
         let semantic = ConfigurableSemanticLock::passing();
