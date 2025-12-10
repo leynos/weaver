@@ -117,55 +117,52 @@ mod tests {
     use super::*;
     use crate::safety_harness::edit::{FileEdit, Position, TextEdit};
 
+    /// Helper for testing successful edit application scenarios.
+    fn assert_edits_produce(original: &str, edits: Vec<TextEdit>, expected: &str) {
+        let path = PathBuf::from("test.txt");
+        let edit = FileEdit::with_edits(path, edits);
+        let result = apply_edits(original, &edit).expect("edit should succeed");
+        assert_eq!(result, expected);
+    }
+
     #[test]
     fn apply_edits_inserts_text() {
-        let original = "hello world";
-        let path = PathBuf::from("test.txt");
-        let edit = FileEdit::with_edits(
-            path,
+        assert_edits_produce(
+            "hello world",
             vec![TextEdit::insert_at(Position::new(0, 6), "beautiful ")],
+            "hello beautiful world",
         );
-        let result = apply_edits(original, &edit).expect("edit should succeed");
-        assert_eq!(result, "hello beautiful world");
     }
 
     #[test]
     fn apply_edits_deletes_text() {
-        let original = "hello beautiful world";
-        let path = PathBuf::from("test.txt");
-        let edit = FileEdit::with_edits(
-            path,
+        assert_edits_produce(
+            "hello beautiful world",
             vec![TextEdit::delete_range(
                 Position::new(0, 6),
                 Position::new(0, 16),
             )],
+            "hello world",
         );
-        let result = apply_edits(original, &edit).expect("edit should succeed");
-        assert_eq!(result, "hello world");
     }
 
     #[test]
     fn apply_edits_replaces_text() {
-        let original = "fn foo() {}";
-        let path = PathBuf::from("test.rs");
-        let edit = FileEdit::with_edits(
-            path,
+        assert_edits_produce(
+            "fn foo() {}",
             vec![TextEdit::from_positions(
                 Position::new(0, 3),
                 Position::new(0, 6),
                 "bar".to_string(),
             )],
+            "fn bar() {}",
         );
-        let result = apply_edits(original, &edit).expect("edit should succeed");
-        assert_eq!(result, "fn bar() {}");
     }
 
     #[test]
     fn apply_edits_handles_multiple_edits() {
-        let original = "aaa bbb ccc";
-        let path = PathBuf::from("test.txt");
-        let edit = FileEdit::with_edits(
-            path,
+        assert_edits_produce(
+            "aaa bbb ccc",
             vec![
                 TextEdit::from_positions(
                     Position::new(0, 0),
@@ -178,47 +175,38 @@ mod tests {
                     "CCC".to_string(),
                 ),
             ],
+            "AAA bbb CCC",
         );
-        let result = apply_edits(original, &edit).expect("edit should succeed");
-        assert_eq!(result, "AAA bbb CCC");
     }
 
     #[test]
     fn apply_edits_handles_crlf_line_endings() {
         // CRLF line endings: each \r\n is 2 bytes
-        let original = "line one\r\nline two\r\nline three";
-        let path = PathBuf::from("test.txt");
-
         // Replace "two" on line 1 (zero-indexed)
-        let edit = FileEdit::with_edits(
-            path,
+        assert_edits_produce(
+            "line one\r\nline two\r\nline three",
             vec![TextEdit::from_positions(
                 Position::new(1, 5),
                 Position::new(1, 8),
                 "TWO".to_string(),
             )],
+            "line one\r\nline TWO\r\nline three",
         );
-        let result = apply_edits(original, &edit).expect("edit should succeed");
-        assert_eq!(result, "line one\r\nline TWO\r\nline three");
     }
 
     #[test]
     fn apply_edits_handles_mixed_multiline_with_lf() {
         // LF line endings
-        let original = "first\nsecond\nthird";
-        let path = PathBuf::from("test.txt");
-
         // Replace "second" on line 1
-        let edit = FileEdit::with_edits(
-            path,
+        assert_edits_produce(
+            "first\nsecond\nthird",
             vec![TextEdit::from_positions(
                 Position::new(1, 0),
                 Position::new(1, 6),
                 "SECOND".to_string(),
             )],
+            "first\nSECOND\nthird",
         );
-        let result = apply_edits(original, &edit).expect("edit should succeed");
-        assert_eq!(result, "first\nSECOND\nthird");
     }
 
     #[test]
@@ -239,15 +227,11 @@ mod tests {
     #[test]
     fn apply_edits_allows_end_of_file_position() {
         // Single line without trailing newline
-        let original = "hello";
-        let path = PathBuf::from("test.txt");
-
         // Insert at end of line 0 (column 5, after "hello")
-        let edit = FileEdit::with_edits(
-            path,
+        assert_edits_produce(
+            "hello",
             vec![TextEdit::insert_at(Position::new(0, 5), " world")],
+            "hello world",
         );
-        let result = apply_edits(original, &edit).expect("edit should succeed");
-        assert_eq!(result, "hello world");
     }
 }
