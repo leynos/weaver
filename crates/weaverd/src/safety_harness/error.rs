@@ -1,30 +1,12 @@
 //! Error types for the Double-Lock safety harness.
 //!
-//! These errors provide structured information about verification failures,
-//! enabling agents to diagnose issues and adjust their plans accordingly.
+//! These errors provide structured information about operational failures.
+//! Verification failures (syntactic/semantic lock failures) are returned as
+//! `TransactionOutcome` variants, not as errors.
 
 use std::path::PathBuf;
 
 use thiserror::Error;
-
-/// Phase at which a lock check failed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LockPhase {
-    /// Syntactic validation phase.
-    Syntactic,
-    /// Semantic validation phase.
-    Semantic,
-}
-
-impl std::fmt::Display for LockPhase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let label = match self {
-            Self::Syntactic => "syntactic",
-            Self::Semantic => "semantic",
-        };
-        f.write_str(label)
-    }
-}
 
 /// Describes a single problem discovered during verification.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -98,19 +80,12 @@ impl std::fmt::Display for VerificationFailure {
 }
 
 /// Errors surfaced by the Double-Lock safety harness.
+///
+/// Note: Verification failures (syntactic/semantic lock failures) are returned
+/// as `TransactionOutcome` variants, not as errors. This enum only covers
+/// unexpected operational errors that prevent the transaction from completing.
 #[derive(Debug, Error)]
 pub enum SafetyHarnessError {
-    /// A verification phase rejected the proposed changes.
-    #[error("{phase} lock failed: {count} issue(s) detected")]
-    VerificationFailed {
-        /// Phase at which verification failed.
-        phase: LockPhase,
-        /// Number of issues detected.
-        count: usize,
-        /// Details about each failure.
-        failures: Vec<VerificationFailure>,
-    },
-
     /// An I/O error occurred while reading original file content.
     #[error("failed to read file {path}: {message}")]
     FileReadError {
@@ -154,24 +129,6 @@ pub enum SafetyHarnessError {
 }
 
 impl SafetyHarnessError {
-    /// Creates a syntactic verification failure.
-    pub fn syntactic_failed(failures: Vec<VerificationFailure>) -> Self {
-        Self::VerificationFailed {
-            phase: LockPhase::Syntactic,
-            count: failures.len(),
-            failures,
-        }
-    }
-
-    /// Creates a semantic verification failure.
-    pub fn semantic_failed(failures: Vec<VerificationFailure>) -> Self {
-        Self::VerificationFailed {
-            phase: LockPhase::Semantic,
-            count: failures.len(),
-            failures,
-        }
-    }
-
     /// Creates a file read error.
     pub fn file_read(path: PathBuf, error: std::io::Error) -> Self {
         Self::FileReadError {
@@ -185,24 +142,6 @@ impl SafetyHarnessError {
         Self::FileWriteError {
             path,
             message: error.to_string(),
-        }
-    }
-
-    /// Returns the verification failures, if this is a verification error.
-    #[must_use]
-    pub fn failures(&self) -> Option<&[VerificationFailure]> {
-        match self {
-            Self::VerificationFailed { failures, .. } => Some(failures),
-            _ => None,
-        }
-    }
-
-    /// Returns the lock phase, if this is a verification error.
-    #[must_use]
-    pub fn lock_phase(&self) -> Option<LockPhase> {
-        match self {
-            Self::VerificationFailed { phase, .. } => Some(*phase),
-            _ => None,
         }
     }
 }
@@ -221,22 +160,5 @@ mod tests {
         assert!(display.contains("42"));
         assert!(display.contains("17"));
         assert!(display.contains("unexpected token"));
-    }
-
-    #[test]
-    fn syntactic_failed_sets_phase() {
-        let error = SafetyHarnessError::syntactic_failed(vec![VerificationFailure::new(
-            PathBuf::from("test.rs"),
-            "parse error",
-        )]);
-
-        assert_eq!(error.lock_phase(), Some(LockPhase::Syntactic));
-        assert_eq!(error.failures().map(|f| f.len()), Some(1));
-    }
-
-    #[test]
-    fn semantic_failed_sets_phase() {
-        let error = SafetyHarnessError::semantic_failed(vec![]);
-        assert_eq!(error.lock_phase(), Some(LockPhase::Semantic));
     }
 }

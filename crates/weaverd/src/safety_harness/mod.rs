@@ -33,7 +33,7 @@ mod transaction;
 mod verification;
 
 pub use edit::{FileEdit, Position, ReplacementText, TextEdit, TextRange};
-pub use error::{LockPhase, SafetyHarnessError, VerificationFailure};
+pub use error::{SafetyHarnessError, VerificationFailure};
 pub use locks::{SemanticLockResult, SyntacticLockResult};
 pub use transaction::{EditTransaction, TransactionOutcome};
 pub use verification::{

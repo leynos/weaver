@@ -235,8 +235,11 @@ impl SemanticLock for ConfigurableSemanticLock {
 ///
 /// Edits are applied in reverse order (from end of file to start) to avoid
 /// invalidating positions as text is inserted or deleted.
+///
+/// Handles both LF (`\n`) and CRLF (`\r\n`) line endings correctly by computing
+/// byte offsets from the original content rather than assuming fixed newline lengths.
 pub fn apply_edits(original: &str, file_edit: &FileEdit) -> Result<String, SafetyHarnessError> {
-    let lines: Vec<&str> = original.lines().collect();
+    let line_starts = compute_line_start_offsets(original);
     let mut result = original.to_string();
 
     // Sort edits in reverse order by position to avoid offset shifts
@@ -248,25 +251,31 @@ pub fn apply_edits(original: &str, file_edit: &FileEdit) -> Result<String, Safet
     });
 
     for edit in edits {
-        let start_offset = line_column_to_offset(&lines, edit.start_line(), edit.start_column())
-            .ok_or_else(|| SafetyHarnessError::EditApplicationError {
-                path: file_edit.path().clone(),
-                message: format!(
-                    "invalid start position: line {}, column {}",
-                    edit.start_line(),
-                    edit.start_column()
-                ),
-            })?;
+        let start_offset = line_column_to_offset(
+            &line_starts,
+            original,
+            edit.start_line(),
+            edit.start_column(),
+        )
+        .ok_or_else(|| SafetyHarnessError::EditApplicationError {
+            path: file_edit.path().clone(),
+            message: format!(
+                "invalid start position: line {}, column {}",
+                edit.start_line(),
+                edit.start_column()
+            ),
+        })?;
 
-        let end_offset = line_column_to_offset(&lines, edit.end_line(), edit.end_column())
-            .ok_or_else(|| SafetyHarnessError::EditApplicationError {
-                path: file_edit.path().clone(),
-                message: format!(
-                    "invalid end position: line {}, column {}",
-                    edit.end_line(),
-                    edit.end_column()
-                ),
-            })?;
+        let end_offset =
+            line_column_to_offset(&line_starts, original, edit.end_line(), edit.end_column())
+                .ok_or_else(|| SafetyHarnessError::EditApplicationError {
+                    path: file_edit.path().clone(),
+                    message: format!(
+                        "invalid end position: line {}, column {}",
+                        edit.end_line(),
+                        edit.end_column()
+                    ),
+                })?;
 
         result.replace_range(start_offset..end_offset, edit.new_text());
     }
@@ -274,50 +283,60 @@ pub fn apply_edits(original: &str, file_edit: &FileEdit) -> Result<String, Safet
     Ok(result)
 }
 
+/// Computes the byte offset of each line start in the original content.
+///
+/// Handles both LF (`\n`) and CRLF (`\r\n`) line endings by scanning for actual
+/// newline positions rather than assuming fixed lengths.
+fn compute_line_start_offsets(content: &str) -> Vec<usize> {
+    let mut offsets = vec![0]; // Line 0 starts at byte 0
+    for (idx, byte) in content.bytes().enumerate() {
+        if byte == b'\n' {
+            offsets.push(idx + 1); // Next line starts after the newline
+        }
+    }
+    offsets
+}
+
 /// Converts a line and column pair to a byte offset in the original text.
-fn line_column_to_offset(lines: &[&str], line: u32, column: u32) -> Option<usize> {
+///
+/// Uses pre-computed line start offsets for correct handling of any newline style.
+fn line_column_to_offset(
+    line_starts: &[usize],
+    content: &str,
+    line: u32,
+    column: u32,
+) -> Option<usize> {
     let line_idx = line as usize;
-    if line_idx > lines.len() {
+    let col_offset = column as usize;
+
+    // Get the byte offset where this line starts
+    let line_start = *line_starts.get(line_idx)?;
+
+    // Calculate line length to validate column
+    let line_end = line_starts
+        .get(line_idx + 1)
+        .copied()
+        .unwrap_or(content.len());
+
+    // Calculate content length (excluding newline characters)
+    let line_content_end = if line_end > 0 && content.as_bytes().get(line_end - 1) == Some(&b'\n') {
+        if line_end > 1 && content.as_bytes().get(line_end - 2) == Some(&b'\r') {
+            line_end - 2 // CRLF
+        } else {
+            line_end - 1 // LF
+        }
+    } else {
+        line_end // Last line without trailing newline
+    };
+
+    let line_len = line_content_end.saturating_sub(line_start);
+
+    // Allow column to be at most line_len (for end-of-line positions)
+    if col_offset > line_len {
         return None;
     }
 
-    let line_start_offset = calculate_line_start_offset(lines, line_idx)?;
-    add_validated_column_offset(lines, line_idx, column, line_start_offset)
-}
-
-/// Calculates the byte offset to the start of a target line.
-///
-/// Iterates through lines up to (but not including) the target line index,
-/// accumulating byte lengths plus one for each newline character.
-fn calculate_line_start_offset(lines: &[&str], target_line_idx: usize) -> Option<usize> {
-    let mut offset: usize = 0;
-    for (idx, &line_content) in lines.iter().enumerate() {
-        if idx == target_line_idx {
-            break;
-        }
-        offset = offset.checked_add(line_content.len())?;
-        offset = offset.checked_add(1)?; // newline character
-    }
-    Some(offset)
-}
-
-/// Validates the column offset and adds it to the line start offset.
-///
-/// Returns `None` if the column exceeds the line length.
-fn add_validated_column_offset(
-    lines: &[&str],
-    line_idx: usize,
-    column: u32,
-    line_start_offset: usize,
-) -> Option<usize> {
-    let col_offset = column as usize;
-    if line_idx < lines.len() {
-        let line_content = lines.get(line_idx)?;
-        if col_offset > line_content.len() {
-            return None;
-        }
-    }
-    line_start_offset.checked_add(col_offset)
+    line_start.checked_add(col_offset)
 }
 
 #[cfg(test)]
@@ -456,5 +475,47 @@ mod tests {
         );
         let result = apply_edits(original, &edit).expect("edit should succeed");
         assert_eq!(result, "AAA bbb CCC");
+    }
+
+    #[test]
+    fn apply_edits_handles_crlf_line_endings() {
+        use crate::safety_harness::edit::Position;
+
+        // CRLF line endings: each \r\n is 2 bytes
+        let original = "line one\r\nline two\r\nline three";
+        let path = PathBuf::from("test.txt");
+
+        // Replace "two" on line 1 (zero-indexed)
+        let edit = FileEdit::with_edits(
+            path,
+            vec![TextEdit::from_positions(
+                Position::new(1, 5),
+                Position::new(1, 8),
+                "TWO".to_string(),
+            )],
+        );
+        let result = apply_edits(original, &edit).expect("edit should succeed");
+        assert_eq!(result, "line one\r\nline TWO\r\nline three");
+    }
+
+    #[test]
+    fn apply_edits_handles_mixed_multiline_with_lf() {
+        use crate::safety_harness::edit::Position;
+
+        // LF line endings
+        let original = "first\nsecond\nthird";
+        let path = PathBuf::from("test.txt");
+
+        // Replace "second" on line 1
+        let edit = FileEdit::with_edits(
+            path,
+            vec![TextEdit::from_positions(
+                Position::new(1, 0),
+                Position::new(1, 6),
+                "SECOND".to_string(),
+            )],
+        );
+        let result = apply_edits(original, &edit).expect("edit should succeed");
+        assert_eq!(result, "first\nSECOND\nthird");
     }
 }
