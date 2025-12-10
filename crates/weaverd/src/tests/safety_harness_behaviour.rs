@@ -62,6 +62,7 @@ impl SafetyHarnessWorld {
     }
 
     /// Adds an edit that replaces text.
+    #[allow(deprecated, reason = "test helper uses legacy coordinate API")]
     fn add_replacement_edit(&mut self, name: &FileName, old: &TextPattern, new: &TextPattern) {
         let path = self.file_path(name);
         let content = if path.exists() {

@@ -252,6 +252,7 @@ mod tests {
             clippy::too_many_arguments,
             reason = "test builder accepts explicit edit coordinates"
         )]
+        #[allow(deprecated, reason = "test helper uses legacy coordinate API")]
         fn with_replacement_edit(
             mut self,
             file_idx: usize,
@@ -431,6 +432,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated, reason = "test uses legacy coordinate API")]
     fn handles_multiple_files() {
         let dir = TempDir::new().expect("create temp dir");
         let path1 = temp_file(&dir, "file1.txt", "aaa");

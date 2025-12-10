@@ -135,10 +135,21 @@ impl TextEdit {
 
     /// Builds a text edit from Position types and typed replacement text.
     ///
-    /// This is the preferred constructor for reducing primitive obsession.
+    /// This is the preferred constructor for reducing primitive obsession when
+    /// using the [`ReplacementText`] newtype.
     #[must_use]
-    pub fn from_positions(start: Position, end: Position, text: ReplacementText) -> Self {
+    pub fn from_positions_typed(start: Position, end: Position, text: ReplacementText) -> Self {
         Self::with_replacement(TextRange::new(start, end), text)
+    }
+
+    /// Builds a text edit from Position types and replacement text.
+    ///
+    /// This constructor uses the parameter object pattern, accepting [`Position`]
+    /// objects instead of primitive coordinates. It is the preferred way to
+    /// construct text edits when you have position information available.
+    #[must_use]
+    pub fn from_positions(start: Position, end: Position, new_text: String) -> Self {
+        Self::new(TextRange::new(start, end), new_text)
     }
 
     /// Builds a text edit from explicit positions.
@@ -148,24 +159,26 @@ impl TextEdit {
     /// values. The argument count is intentionally above the clippy threshold to
     /// match LSP conventions.
     ///
-    /// Consider using [`Self::from_positions`] to reduce primitive obsession.
+    /// # Deprecated
+    ///
+    /// This method is deprecated in favor of [`Self::from_positions`], which
+    /// uses the parameter object pattern for better type safety.
     #[must_use]
+    #[deprecated(since = "0.2.0", note = "use `from_positions` instead")]
     #[allow(
         clippy::too_many_arguments,
         reason = "matches LSP coordinate convention"
     )]
-    pub const fn from_coords(
+    pub fn from_coords(
         start_line: u32,
         start_column: u32,
         end_line: u32,
         end_column: u32,
         new_text: String,
     ) -> Self {
-        Self::new(
-            TextRange::new(
-                Position::new(start_line, start_column),
-                Position::new(end_line, end_column),
-            ),
+        Self::from_positions(
+            Position::new(start_line, start_column),
+            Position::new(end_line, end_column),
             new_text,
         )
     }
@@ -191,24 +204,17 @@ impl TextEdit {
     /// This is the preferred constructor for reducing primitive obsession.
     #[must_use]
     pub fn delete_range(start: Position, end: Position) -> Self {
-        Self::from_positions(start, end, ReplacementText::empty())
+        Self::from_positions_typed(start, end, ReplacementText::empty())
     }
 
     /// Creates a deletion spanning the given range.
     ///
     /// Consider using [`Self::delete_range`] to reduce primitive obsession.
     #[must_use]
-    pub const fn delete(
-        start_line: u32,
-        start_column: u32,
-        end_line: u32,
-        end_column: u32,
-    ) -> Self {
-        Self::from_coords(
-            start_line,
-            start_column,
-            end_line,
-            end_column,
+    pub fn delete(start_line: u32, start_column: u32, end_line: u32, end_column: u32) -> Self {
+        Self::from_positions(
+            Position::new(start_line, start_column),
+            Position::new(end_line, end_column),
             String::new(),
         )
     }

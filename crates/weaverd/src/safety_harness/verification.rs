@@ -401,6 +401,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated, reason = "test uses legacy coordinate API")]
     fn apply_edits_replaces_text() {
         let original = "fn foo() {}";
         let path = PathBuf::from("test.rs");
@@ -413,6 +414,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated, reason = "test uses legacy coordinate API")]
     fn apply_edits_handles_multiple_edits() {
         let original = "aaa bbb ccc";
         let path = PathBuf::from("test.txt");
