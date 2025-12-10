@@ -216,6 +216,19 @@ mod tests {
         path
     }
 
+    /// Creates a standard failure scenario builder with a test file and replacement edit.
+    fn failure_scenario_builder() -> TransactionTestBuilder {
+        TransactionTestBuilder::new()
+            .with_file("test.txt", "hello world")
+            .with_replacement_edit(0, 0, 5, "greetings")
+    }
+
+    /// Asserts that the file at the given path contains "hello world".
+    fn assert_file_unchanged(path: &PathBuf) {
+        let content = fs::read_to_string(path).expect("read file");
+        assert_eq!(content, "hello world");
+    }
+
     /// Builder for constructing test transactions with reduced boilerplate.
     struct TransactionTestBuilder {
         dir: TempDir,
@@ -341,10 +354,7 @@ mod tests {
 
     #[test]
     fn syntactic_failure_prevents_commit() {
-        let builder = TransactionTestBuilder::new()
-            .with_file("test.txt", "hello world")
-            .with_replacement_edit(0, 0, 5, "greetings");
-
+        let builder = failure_scenario_builder();
         let path = builder.file_path(0).clone();
         let failures = vec![VerificationFailure::new(path.clone(), "syntax error")];
         let syntactic = ConfigurableSyntacticLock::failing(failures);
@@ -357,18 +367,12 @@ mod tests {
             outcome,
             TransactionOutcome::SyntacticLockFailed { .. }
         ));
-
-        // File should be unchanged
-        let content = fs::read_to_string(&path).expect("read file");
-        assert_eq!(content, "hello world");
+        assert_file_unchanged(&path);
     }
 
     #[test]
     fn semantic_failure_prevents_commit() {
-        let builder = TransactionTestBuilder::new()
-            .with_file("test.txt", "hello world")
-            .with_replacement_edit(0, 0, 5, "greetings");
-
+        let builder = failure_scenario_builder();
         let path = builder.file_path(0).clone();
         let failures = vec![VerificationFailure::new(path.clone(), "type error")];
         let syntactic = ConfigurableSyntacticLock::passing();
@@ -381,18 +385,12 @@ mod tests {
             outcome,
             TransactionOutcome::SemanticLockFailed { .. }
         ));
-
-        // File should be unchanged
-        let content = fs::read_to_string(&path).expect("read file");
-        assert_eq!(content, "hello world");
+        assert_file_unchanged(&path);
     }
 
     #[test]
     fn semantic_backend_error_propagates() {
-        let builder = TransactionTestBuilder::new()
-            .with_file("test.txt", "hello world")
-            .with_replacement_edit(0, 0, 5, "greetings");
-
+        let builder = failure_scenario_builder();
         let path = builder.file_path(0).clone();
         let syntactic = ConfigurableSyntacticLock::passing();
         let semantic = ConfigurableSemanticLock::unavailable("LSP crashed");
@@ -403,10 +401,7 @@ mod tests {
             result.unwrap_err(),
             SafetyHarnessError::SemanticBackendUnavailable { .. }
         ));
-
-        // File should be unchanged
-        let content = fs::read_to_string(&path).expect("read file");
-        assert_eq!(content, "hello world");
+        assert_file_unchanged(&path);
     }
 
     #[test]
