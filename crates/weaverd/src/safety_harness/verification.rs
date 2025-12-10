@@ -281,17 +281,35 @@ fn line_column_to_offset(lines: &[&str], line: u32, column: u32) -> Option<usize
         return None;
     }
 
-    // Calculate offset to the start of the target line
+    let line_start_offset = calculate_line_start_offset(lines, line_idx)?;
+    add_validated_column_offset(lines, line_idx, column, line_start_offset)
+}
+
+/// Calculates the byte offset to the start of a target line.
+///
+/// Iterates through lines up to (but not including) the target line index,
+/// accumulating byte lengths plus one for each newline character.
+fn calculate_line_start_offset(lines: &[&str], target_line_idx: usize) -> Option<usize> {
     let mut offset: usize = 0;
     for (idx, &line_content) in lines.iter().enumerate() {
-        if idx == line_idx {
+        if idx == target_line_idx {
             break;
         }
         offset = offset.checked_add(line_content.len())?;
         offset = offset.checked_add(1)?; // newline character
     }
+    Some(offset)
+}
 
-    // Add column offset
+/// Validates the column offset and adds it to the line start offset.
+///
+/// Returns `None` if the column exceeds the line length.
+fn add_validated_column_offset(
+    lines: &[&str],
+    line_idx: usize,
+    column: u32,
+    line_start_offset: usize,
+) -> Option<usize> {
     let col_offset = column as usize;
     if line_idx < lines.len() {
         let line_content = lines.get(line_idx)?;
@@ -299,7 +317,7 @@ fn line_column_to_offset(lines: &[&str], line: u32, column: u32) -> Option<usize
             return None;
         }
     }
-    offset.checked_add(col_offset)
+    line_start_offset.checked_add(col_offset)
 }
 
 #[cfg(test)]

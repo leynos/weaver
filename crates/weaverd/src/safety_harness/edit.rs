@@ -77,7 +77,10 @@ impl TextEdit {
     /// values. The argument count is intentionally above the clippy threshold to
     /// match LSP conventions.
     #[must_use]
-    #[allow(clippy::too_many_arguments, reason = "matches LSP coordinate convention")]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "matches LSP coordinate convention"
+    )]
     pub const fn from_coords(
         start_line: u32,
         start_column: u32,
