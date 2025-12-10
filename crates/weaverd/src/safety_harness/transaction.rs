@@ -250,9 +250,8 @@ mod tests {
         /// Adds a replacement edit for the file at the given index.
         #[allow(
             clippy::too_many_arguments,
-            reason = "test builder accepts explicit edit coordinates"
+            reason = "test builder accepts explicit edit coordinates for convenience"
         )]
-        #[allow(deprecated, reason = "test helper uses legacy coordinate API")]
         fn with_replacement_edit(
             mut self,
             file_idx: usize,
@@ -260,14 +259,14 @@ mod tests {
             end_col: u32,
             text: &str,
         ) -> Self {
+            use crate::safety_harness::edit::Position;
+
             let path = self.files[file_idx].0.clone();
             let edit = FileEdit::with_edits(
                 path,
-                vec![TextEdit::from_coords(
-                    0,
-                    start_col,
-                    0,
-                    end_col,
+                vec![TextEdit::from_positions(
+                    Position::new(0, start_col),
+                    Position::new(0, end_col),
                     text.to_string(),
                 )],
             );
@@ -432,19 +431,28 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated, reason = "test uses legacy coordinate API")]
     fn handles_multiple_files() {
+        use crate::safety_harness::edit::Position;
+
         let dir = TempDir::new().expect("create temp dir");
         let path1 = temp_file(&dir, "file1.txt", "aaa");
         let path2 = temp_file(&dir, "file2.txt", "bbb");
 
         let edit1 = FileEdit::with_edits(
             path1.clone(),
-            vec![TextEdit::from_coords(0, 0, 0, 3, "AAA".to_string())],
+            vec![TextEdit::from_positions(
+                Position::new(0, 0),
+                Position::new(0, 3),
+                "AAA".to_string(),
+            )],
         );
         let edit2 = FileEdit::with_edits(
             path2.clone(),
-            vec![TextEdit::from_coords(0, 0, 0, 3, "BBB".to_string())],
+            vec![TextEdit::from_positions(
+                Position::new(0, 0),
+                Position::new(0, 3),
+                "BBB".to_string(),
+            )],
         );
 
         let syntactic = ConfigurableSyntacticLock::passing();

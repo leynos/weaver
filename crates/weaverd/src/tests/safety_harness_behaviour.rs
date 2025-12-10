@@ -62,8 +62,9 @@ impl SafetyHarnessWorld {
     }
 
     /// Adds an edit that replaces text.
-    #[allow(deprecated, reason = "test helper uses legacy coordinate API")]
     fn add_replacement_edit(&mut self, name: &FileName, old: &TextPattern, new: &TextPattern) {
+        use crate::safety_harness::Position;
+
         let path = self.file_path(name);
         let content = if path.exists() {
             fs::read_to_string(&path).expect("read file")
@@ -78,8 +79,11 @@ impl SafetyHarnessWorld {
             let column = (pos - line_start) as u32;
             let old_end_col = column + old.len() as u32;
 
-            let edit =
-                TextEdit::from_coords(line, column, line, old_end_col, new.as_str().to_string());
+            let edit = TextEdit::from_positions(
+                Position::new(line, column),
+                Position::new(line, old_end_col),
+                new.as_str().to_string(),
+            );
             let file_edit = FileEdit::with_edits(path, vec![edit]);
             self.pending_edits.push(file_edit);
         }

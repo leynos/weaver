@@ -401,28 +401,42 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated, reason = "test uses legacy coordinate API")]
     fn apply_edits_replaces_text() {
+        use crate::safety_harness::edit::Position;
+
         let original = "fn foo() {}";
         let path = PathBuf::from("test.rs");
         let edit = FileEdit::with_edits(
             path,
-            vec![TextEdit::from_coords(0, 3, 0, 6, "bar".to_string())],
+            vec![TextEdit::from_positions(
+                Position::new(0, 3),
+                Position::new(0, 6),
+                "bar".to_string(),
+            )],
         );
         let result = apply_edits(original, &edit).expect("edit should succeed");
         assert_eq!(result, "fn bar() {}");
     }
 
     #[test]
-    #[allow(deprecated, reason = "test uses legacy coordinate API")]
     fn apply_edits_handles_multiple_edits() {
+        use crate::safety_harness::edit::Position;
+
         let original = "aaa bbb ccc";
         let path = PathBuf::from("test.txt");
         let edit = FileEdit::with_edits(
             path,
             vec![
-                TextEdit::from_coords(0, 0, 0, 3, "AAA".to_string()),
-                TextEdit::from_coords(0, 8, 0, 11, "CCC".to_string()),
+                TextEdit::from_positions(
+                    Position::new(0, 0),
+                    Position::new(0, 3),
+                    "AAA".to_string(),
+                ),
+                TextEdit::from_positions(
+                    Position::new(0, 8),
+                    Position::new(0, 11),
+                    "CCC".to_string(),
+                ),
             ],
         );
         let result = apply_edits(original, &edit).expect("edit should succeed");
