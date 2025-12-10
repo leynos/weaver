@@ -515,4 +515,38 @@ mod tests {
         let result = apply_edits(original, &edit).expect("edit should succeed");
         assert_eq!(result, "first\nSECOND\nthird");
     }
+
+    #[test]
+    fn apply_edits_rejects_past_eof_line() {
+        use crate::safety_harness::edit::Position;
+
+        // Single line without trailing newline
+        let original = "hello";
+        let path = PathBuf::from("test.txt");
+
+        // Try to insert at line 1 (past EOF on a file with no trailing newline)
+        let edit = FileEdit::with_edits(
+            path,
+            vec![TextEdit::insert_at(Position::new(1, 0), "world")],
+        );
+        let result = apply_edits(original, &edit);
+        assert!(result.is_err(), "should reject past-EOF line");
+    }
+
+    #[test]
+    fn apply_edits_allows_end_of_file_position() {
+        use crate::safety_harness::edit::Position;
+
+        // Single line without trailing newline
+        let original = "hello";
+        let path = PathBuf::from("test.txt");
+
+        // Insert at end of line 0 (column 5, after "hello")
+        let edit = FileEdit::with_edits(
+            path,
+            vec![TextEdit::insert_at(Position::new(0, 5), " world")],
+        );
+        let result = apply_edits(original, &edit).expect("edit should succeed");
+        assert_eq!(result, "hello world");
+    }
 }
