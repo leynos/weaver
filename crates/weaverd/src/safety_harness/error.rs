@@ -107,6 +107,13 @@ pub enum SafetyHarnessError {
         source: Arc<std::io::Error>,
     },
 
+    /// Modified content for a path was not available in the context.
+    #[error("modified content missing from context for {path}")]
+    ModifiedContentMissing {
+        /// Path whose modified content was unexpectedly absent.
+        path: PathBuf,
+    },
+
     /// Failed to apply edits to the in-memory buffer.
     #[error("edit application failed for {path}: {message}")]
     EditApplicationError {
@@ -147,6 +154,17 @@ impl SafetyHarnessError {
             source: Arc::new(error),
         }
     }
+
+    /// Returns the underlying I/O source for read/write errors, if any.
+    #[must_use]
+    pub fn io_source(&self) -> Option<&std::io::Error> {
+        match self {
+            Self::FileReadError { source, .. } | Self::FileWriteError { source, .. } => {
+                Some(source.as_ref())
+            }
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -175,5 +193,14 @@ mod tests {
         let source = error.source().expect("source should be preserved");
         assert_eq!(source.to_string(), "boom");
         assert!(format!("{error}").contains("boom"));
+    }
+
+    #[test]
+    fn io_source_accessor_exposes_underlying_error() {
+        let io_error = std::io::Error::other("kaboom");
+        let error = SafetyHarnessError::file_write(PathBuf::from("/tmp/file"), io_error);
+
+        let extracted = error.io_source().expect("io source should exist");
+        assert_eq!(extracted.to_string(), "kaboom");
     }
 }
