@@ -295,9 +295,36 @@ returns a backend-unavailable error rather than silently passing. Operators
 should ensure the appropriate language servers are healthy before executing
 `act` commands.
 
-### Placeholder implementation note
+### Tree-sitter syntactic lock
 
-The current syntactic lock uses a placeholder implementation that always passes.
-Full Tree-sitter integration will be delivered in a future phase. The semantic
-lock relies on the `weaver-lsp-host` infrastructure, which requires language
-servers to be registered and initialized for the relevant languages.
+The syntactic lock is powered by the `weaver-syntax` crate, which integrates
+Tree-sitter parsers for Rust, Python, and TypeScript. When validating a file,
+the lock parses the content and inspects the resulting syntax tree for ERROR
+nodes. Files containing structural errors—such as unbalanced braces, missing
+semicolons, or malformed declarations—are rejected before the semantic lock
+runs. Files with extensions not recognized by any configured parser are skipped
+(pass through) to avoid blocking edits to configuration files, documentation,
+or other non-code artefacts.
+
+The validation reports each failure with:
+
+- **Path**: The file that failed validation.
+- **Line and column**: The position of the first syntax error.
+- **Message**: A human-readable description (typically "syntax error").
+
+This fast, local check catches many common agent mistakes without needing to
+contact a language server.
+
+### Pattern matching and rewriting
+
+The `weaver-syntax` crate also provides a structural pattern matching engine
+inspired by ast-grep. Patterns use metavariables (`$VAR` for single captures,
+`$$VAR` for multiple) to match and capture portions of the syntax tree. This
+enables the future `observe grep` and `act apply-rewrite` commands to perform
+precise, AST-aware search and transformation across the codebase. The engine
+currently supports Rust, Python, and TypeScript.
+
+### Semantic lock
+
+The semantic lock relies on the `weaver-lsp-host` infrastructure, which requires
+language servers to be registered and initialized for the relevant languages.

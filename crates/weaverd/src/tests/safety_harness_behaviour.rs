@@ -190,8 +190,8 @@ fn when_edit_replaces_in_file(
 }
 
 #[when("no edits are submitted")]
-fn when_no_edits(_world: &RefCell<SafetyHarnessWorld>) {
-    // No edits to add
+fn when_no_edits(world: &RefCell<SafetyHarnessWorld>) {
+    let _ = world; // No edits to add
 }
 
 #[when("an edit creates {name} with content {content}")]

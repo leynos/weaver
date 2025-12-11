@@ -1499,3 +1499,31 @@ recording implementations without spawning real servers during tests. Requests
 fail fast with structured errors that surface both the language and the reason
 (server missing, override deny, or server error) to callers, keeping the
 capability matrix honest before the daemon adds sandboxing and transport.
+
+#### 2025-12-11: Deliver `weaver-syntax` crate with Tree-sitter integration
+
+The new `weaver-syntax` crate provides the syntactic layer for the Semantic
+Fusion Engine. It wraps Tree-sitter parsers for Rust, Python, and TypeScript
+behind a unified `Parser` abstraction that detects languages from file
+extensions. The `TreeSitterSyntacticLock` implements the `SyntacticLock` trait
+required by the Double-Lock safety harness, validating files by parsing them
+and reporting any ERROR nodes as validation failures with line/column
+positions. Unknown file extensions are silently skipped to avoid blocking edits
+to non-code artefacts.
+
+The crate also delivers an ast-grep-inspired pattern matching engine. Patterns
+support metavariables (`$VAR` for single captures, `$$VAR` for multiple) which
+Tree-sitter parses as native `metavariable` nodes. The `Pattern` type compiles
+a pattern string into a parsed tree and extracts metavariable definitions; the
+`Matcher` walks the source tree and the pattern tree in parallel, yielding
+`MatchResult` instances with captured text ranges. A `Rewriter` applies
+`RewriteRule` instances to transform matched code, substituting captured values
+into a replacement template and returning the rewritten source with a
+change-tracking flag.
+
+Testing follows the workspace conventions: `rstest-bdd` 0.2.0 powers BDD
+scenarios defined in `tests/features/weaver_syntax.feature`, while `insta`
+captures snapshot expectations for language detection, parse error formatting,
+and validation failure output. The combination of unit, behavioural, and
+end-to-end tests exercises happy and unhappy paths across all supported
+languages.

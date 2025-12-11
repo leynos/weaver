@@ -78,7 +78,7 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
 *Goal: Add the Tree-sitter and call graph layers to provide deeper structural
 and relational understanding of code.*
 
-- [ ] Create the `weaver-syntax` crate and implement the structural search
+- [x] Create the `weaver-syntax` crate and implement the structural search
     engine for `observe grep` and `act apply-rewrite`, drawing inspiration from
     ast-grep's pattern language.
 
