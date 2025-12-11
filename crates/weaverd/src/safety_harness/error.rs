@@ -4,7 +4,7 @@
 //! Verification failures (syntactic/semantic lock failures) are returned as
 //! `TransactionOutcome` variants, not as errors.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
@@ -43,7 +43,7 @@ impl VerificationFailure {
 
     /// Path to the affected file.
     #[must_use]
-    pub fn file(&self) -> &PathBuf {
+    pub fn file(&self) -> &Path {
         &self.file
     }
 

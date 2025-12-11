@@ -8,7 +8,7 @@ mod apply;
 mod test_doubles;
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub use apply::apply_edits;
 pub use test_doubles::{ConfigurableSemanticLock, ConfigurableSyntacticLock};
@@ -50,24 +50,24 @@ impl VerificationContext {
 
     /// Returns the original content for a path.
     #[must_use]
-    pub fn original(&self, path: &PathBuf) -> Option<&String> {
+    pub fn original(&self, path: &Path) -> Option<&String> {
         self.original_content.get(path)
     }
 
     /// Returns the modified content for a path.
     #[must_use]
-    pub fn modified(&self, path: &PathBuf) -> Option<&String> {
+    pub fn modified(&self, path: &Path) -> Option<&String> {
         self.modified_content.get(path)
     }
 
     /// Returns all paths with modified content.
-    pub fn modified_paths(&self) -> impl Iterator<Item = &PathBuf> {
-        self.modified_content.keys()
+    pub fn modified_paths(&self) -> impl Iterator<Item = &Path> {
+        self.modified_content.keys().map(PathBuf::as_path)
     }
 
     /// Returns all modified content as path-content pairs.
-    pub fn modified_files(&self) -> impl Iterator<Item = (&PathBuf, &String)> {
-        self.modified_content.iter()
+    pub fn modified_files(&self) -> impl Iterator<Item = (&Path, &String)> {
+        self.modified_content.iter().map(|(p, c)| (p.as_path(), c))
     }
 
     /// Returns the number of files in the modified set.

@@ -207,6 +207,10 @@ fn then_commits(world: &RefCell<SafetyHarnessWorld>) {
 
 #[then("the transaction fails with a syntactic lock error")]
 fn then_syntactic_fails(world: &RefCell<SafetyHarnessWorld>) {
+    // Execute if not already done
+    if world.borrow().outcome().is_none() {
+        world.borrow_mut().execute_transaction();
+    }
     let world = world.borrow();
     let outcome = world.outcome().expect("outcome should exist");
     match outcome {
@@ -217,6 +221,10 @@ fn then_syntactic_fails(world: &RefCell<SafetyHarnessWorld>) {
 
 #[then("the transaction fails with a semantic lock error")]
 fn then_semantic_fails(world: &RefCell<SafetyHarnessWorld>) {
+    // Execute if not already done
+    if world.borrow().outcome().is_none() {
+        world.borrow_mut().execute_transaction();
+    }
     let world = world.borrow();
     let outcome = world.outcome().expect("outcome should exist");
     match outcome {
@@ -227,6 +235,10 @@ fn then_semantic_fails(world: &RefCell<SafetyHarnessWorld>) {
 
 #[then("the transaction fails with a backend error")]
 fn then_backend_error(world: &RefCell<SafetyHarnessWorld>) {
+    // Execute if not already done
+    if world.borrow().outcome().is_none() {
+        world.borrow_mut().execute_transaction();
+    }
     let world = world.borrow();
     let outcome = world.outcome().expect("outcome should exist");
     match outcome {
