@@ -59,9 +59,25 @@ Weaver is organised as a Cargo workspace with five crates:
 
 ## Getting started
 
-For installation, configuration, and usage instructions, please see the
-[User's Guide](docs/users-guide.md). It covers everything from setting up your
-first daemon to understanding the command syntax.
+Here's the quickest path to your first Weaver command:
+
+```sh
+# Start the daemon
+weaver daemon start
+
+# Query a symbol definition
+weaver observe get-definition --uri file:///path/to/main.rs --position 42:17
+
+# Check daemon status
+weaver daemon status
+
+# Stop the daemon when you're done
+weaver daemon stop
+```
+
+For full installation, configuration, and usage instructions, please see the
+[User's Guide](docs/users-guide.md). It covers daemon lifecycle management,
+configuration layering, and the complete command reference.
 
 ## Building from source
 
