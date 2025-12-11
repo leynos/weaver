@@ -20,6 +20,8 @@ use crate::safety_harness::{
 pub struct SafetyHarnessWorld {
     temp_dir: TempDir,
     files: HashMap<String, PathBuf>,
+    /// Original content of files when created, for unchanged assertions.
+    original_content: HashMap<String, String>,
     syntactic_lock: ConfigurableSyntacticLock,
     semantic_lock: ConfigurableSemanticLock,
     pending_edits: Vec<FileEdit>,
@@ -32,6 +34,7 @@ impl SafetyHarnessWorld {
         Self {
             temp_dir: TempDir::new().expect("create temp dir"),
             files: HashMap::new(),
+            original_content: HashMap::new(),
             syntactic_lock: ConfigurableSyntacticLock::passing(),
             semantic_lock: ConfigurableSemanticLock::passing(),
             pending_edits: Vec::new(),
@@ -44,7 +47,15 @@ impl SafetyHarnessWorld {
         let path = name.to_path(self.temp_dir.path());
         let mut file = fs::File::create(&path).expect("create file");
         file.write_all(content.as_bytes()).expect("write content");
-        self.files.insert(name.as_str().to_string(), path);
+        let name_str = name.as_str().to_string();
+        self.files.insert(name_str.clone(), path);
+        self.original_content
+            .insert(name_str, content.as_str().to_string());
+    }
+
+    /// Returns the original content for a named file.
+    fn original_content(&self, name: &FileName) -> Option<&str> {
+        self.original_content.get(name.as_str()).map(String::as_str)
     }
 
     /// Returns the path for a named file.
@@ -191,74 +202,59 @@ fn when_edit_creates(world: &RefCell<SafetyHarnessWorld>, name: FileName, conten
 
 // ---- Then steps ----
 
-#[then("the transaction commits successfully")]
-fn then_commits(world: &RefCell<SafetyHarnessWorld>) {
-    // Execute if not already done
+/// Helper for outcome assertion steps that execute the transaction if needed.
+fn assert_outcome<F>(world: &RefCell<SafetyHarnessWorld>, assertion: F)
+where
+    F: FnOnce(&Result<TransactionOutcome, SafetyHarnessError>),
+{
     if world.borrow().outcome().is_none() {
         world.borrow_mut().execute_transaction();
     }
     let world = world.borrow();
     let outcome = world.outcome().expect("outcome should exist");
-    assert!(
-        outcome.as_ref().is_ok_and(|o| o.committed()),
-        "transaction should commit: {outcome:?}"
-    );
+    assertion(outcome);
+}
+
+#[then("the transaction commits successfully")]
+fn then_commits(world: &RefCell<SafetyHarnessWorld>) {
+    assert_outcome(world, |outcome| {
+        assert!(
+            outcome.as_ref().is_ok_and(|o| o.committed()),
+            "transaction should commit: {outcome:?}"
+        );
+    });
 }
 
 #[then("the transaction fails with a syntactic lock error")]
 fn then_syntactic_fails(world: &RefCell<SafetyHarnessWorld>) {
-    // Execute if not already done
-    if world.borrow().outcome().is_none() {
-        world.borrow_mut().execute_transaction();
-    }
-    let world = world.borrow();
-    let outcome = world.outcome().expect("outcome should exist");
-    match outcome {
+    assert_outcome(world, |outcome| match outcome {
         Ok(TransactionOutcome::SyntacticLockFailed { .. }) => {}
         other => panic!("expected syntactic lock failure, got {other:?}"),
-    }
+    });
 }
 
 #[then("the transaction fails with a semantic lock error")]
 fn then_semantic_fails(world: &RefCell<SafetyHarnessWorld>) {
-    // Execute if not already done
-    if world.borrow().outcome().is_none() {
-        world.borrow_mut().execute_transaction();
-    }
-    let world = world.borrow();
-    let outcome = world.outcome().expect("outcome should exist");
-    match outcome {
+    assert_outcome(world, |outcome| match outcome {
         Ok(TransactionOutcome::SemanticLockFailed { .. }) => {}
         other => panic!("expected semantic lock failure, got {other:?}"),
-    }
+    });
 }
 
 #[then("the transaction fails with a backend error")]
 fn then_backend_error(world: &RefCell<SafetyHarnessWorld>) {
-    // Execute if not already done
-    if world.borrow().outcome().is_none() {
-        world.borrow_mut().execute_transaction();
-    }
-    let world = world.borrow();
-    let outcome = world.outcome().expect("outcome should exist");
-    match outcome {
+    assert_outcome(world, |outcome| match outcome {
         Err(SafetyHarnessError::SemanticBackendUnavailable { .. }) => {}
         other => panic!("expected backend error, got {other:?}"),
-    }
+    });
 }
 
 #[then("the transaction reports no changes")]
 fn then_no_changes(world: &RefCell<SafetyHarnessWorld>) {
-    // Execute if not already done
-    if world.borrow().outcome().is_none() {
-        world.borrow_mut().execute_transaction();
-    }
-    let world = world.borrow();
-    let outcome = world.outcome().expect("outcome should exist");
-    match outcome {
+    assert_outcome(world, |outcome| match outcome {
         Ok(TransactionOutcome::NoChanges) => {}
         other => panic!("expected no changes, got {other:?}"),
-    }
+    });
 }
 
 #[then("the file contains {expected}")]
@@ -296,12 +292,11 @@ fn then_file_unchanged(world: &RefCell<SafetyHarnessWorld>) {
 
 #[then("the file {name} is unchanged")]
 fn then_named_file_unchanged(world: &RefCell<SafetyHarnessWorld>, name: FileName) {
-    let content = world.borrow().read_file(&name);
-    let expected = match name.as_str() {
-        "file1.txt" => "aaa",
-        "file2.txt" => "bbb",
-        _ => panic!("unknown file: {}", name.as_str()),
-    };
+    let world = world.borrow();
+    let content = world.read_file(&name);
+    let expected = world
+        .original_content(&name)
+        .unwrap_or_else(|| panic!("no original content recorded for {}", name.as_str()));
     assert_eq!(content, expected, "{} should be unchanged", name.as_str());
 }
 

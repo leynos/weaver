@@ -51,58 +51,6 @@ impl TextRange {
     }
 }
 
-/// Newtype wrapper for replacement text in edits.
-///
-/// This type reduces primitive obsession by providing a dedicated type for
-/// text that replaces a range in a file. It provides ergonomic conversions
-/// from strings while making the domain intent explicit.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReplacementText(String);
-
-impl ReplacementText {
-    /// Creates a new replacement text from a string.
-    #[must_use]
-    pub fn new(text: impl Into<String>) -> Self {
-        Self(text.into())
-    }
-
-    /// Creates an empty replacement text (for deletions).
-    #[must_use]
-    pub fn empty() -> Self {
-        Self(String::new())
-    }
-
-    /// Returns the replacement text as a string slice.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    /// Consumes the wrapper and returns the inner string.
-    #[must_use]
-    pub fn into_inner(self) -> String {
-        self.0
-    }
-}
-
-impl From<String> for ReplacementText {
-    fn from(s: String) -> Self {
-        Self(s)
-    }
-}
-
-impl From<&str> for ReplacementText {
-    fn from(s: &str) -> Self {
-        Self(s.to_string())
-    }
-}
-
-impl AsRef<str> for ReplacementText {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
 /// A single text replacement within a file.
 ///
 /// Range values use zero-based line and column offsets. Column offsets count

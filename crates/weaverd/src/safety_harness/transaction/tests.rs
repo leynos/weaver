@@ -4,6 +4,7 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 
+use rstest::rstest;
 use tempfile::TempDir;
 
 use super::{EditTransaction, SafetyHarnessError, TransactionOutcome};
@@ -191,42 +192,47 @@ fn successful_transaction_commits_changes() {
     assert_eq!(content, "greetings world");
 }
 
-#[test]
-fn syntactic_failure_prevents_commit() {
-    test_lock_failure(
-        |path| {
-            let failures = vec![VerificationFailure::new(path, "syntax error")];
-            (
+/// Lock failure type for parameterised testing.
+#[derive(Debug, Clone, Copy)]
+enum LockFailureKind {
+    Syntactic,
+    Semantic,
+}
+
+#[rstest]
+#[case::syntactic(LockFailureKind::Syntactic)]
+#[case::semantic(LockFailureKind::Semantic)]
+fn lock_failure_prevents_commit(#[case] kind: LockFailureKind) {
+    let configure_locks = |path: PathBuf| -> (ConfigurableSyntacticLock, ConfigurableSemanticLock) {
+        let failures = vec![VerificationFailure::new(path, "test error")];
+        match kind {
+            LockFailureKind::Syntactic => (
                 ConfigurableSyntacticLock::failing(failures),
                 ConfigurableSemanticLock::passing(),
-            )
-        },
-        |outcome| {
+            ),
+            LockFailureKind::Semantic => (
+                ConfigurableSyntacticLock::passing(),
+                ConfigurableSemanticLock::failing(failures),
+            ),
+        }
+    };
+
+    let verify_outcome = |outcome: &TransactionOutcome| match kind {
+        LockFailureKind::Syntactic => {
             assert!(matches!(
                 outcome,
                 TransactionOutcome::SyntacticLockFailed { .. }
             ));
-        },
-    );
-}
-
-#[test]
-fn semantic_failure_prevents_commit() {
-    test_lock_failure(
-        |path| {
-            let failures = vec![VerificationFailure::new(path, "type error")];
-            (
-                ConfigurableSyntacticLock::passing(),
-                ConfigurableSemanticLock::failing(failures),
-            )
-        },
-        |outcome| {
+        }
+        LockFailureKind::Semantic => {
             assert!(matches!(
                 outcome,
                 TransactionOutcome::SemanticLockFailed { .. }
             ));
-        },
-    );
+        }
+    };
+
+    test_lock_failure(configure_locks, verify_outcome);
 }
 
 #[test]
