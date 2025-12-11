@@ -450,6 +450,226 @@ The engine is built on three distinct layers of analysis:
     enable high-precision structural search and manipulation that LSP often
     lacks, and facilitate context-aware code slicing for prompt engineering.^13^
 
+The following class diagram captures the structure of the `weaver-syntax`
+module, showing how language detection, parsing, pattern matching, rewriting,
+and syntactic lock validation fit together:
+
+```mermaid
+classDiagram
+    class SupportedLanguage {
+      <<enum>>
+      +Rust
+      +Python
+      +TypeScript
+      +as_str() str
+      +from_extension(ext str) SupportedLanguage?
+      +from_path(path Path) SupportedLanguage?
+      +tree_sitter_language() Language
+      +all() SupportedLanguage[]
+    }
+
+    class SyntaxError {
+      <<enum>>
+      +GrammarLoadError
+      +PatternError
+      +RewriteError
+      +UnsupportedLanguage
+      +NoExtension
+      +ParseError
+      +grammar_load(language SupportedLanguage, message str) SyntaxError
+      +pattern(language SupportedLanguage, message str) SyntaxError
+      +rewrite(message str) SyntaxError
+      +unsupported_language(extension str) SyntaxError
+      +no_extension(path PathBuf) SyntaxError
+      +parse(language SupportedLanguage, message str) SyntaxError
+    }
+
+    class Parser {
+      -inner Parser
+      -language SupportedLanguage
+      +new(language SupportedLanguage) Result~Parser, SyntaxError~
+      +language() SupportedLanguage
+      +parse(source str) Result~ParseResult, SyntaxError~
+      -collect_error_nodes(node Node) SyntaxErrorNode[]
+    }
+
+    class ParseResult {
+      -tree Tree
+      -source str
+      -language SupportedLanguage
+      -has_errors bool
+      -error_nodes SyntaxErrorNode[]
+      +tree() Tree
+      +source() str
+      +language() SupportedLanguage
+      +has_errors() bool
+      +errors() SyntaxErrorNode[]
+      +root_node() Node
+    }
+
+    class SyntaxErrorNode {
+      -start_byte usize
+      -end_byte usize
+      -line usize
+      -column usize
+      -kind str
+      +start_byte() usize
+      +end_byte() usize
+      +line() usize
+      +line_one_based() usize
+      +column() usize
+      +column_one_based() usize
+      +kind() str
+    }
+
+    class Pattern {
+      -source str
+      -language SupportedLanguage
+      -metavariables MetaVariable[]
+      -tree Tree
+      -normalised_source str
+      +compile(source str, language SupportedLanguage) Result~Pattern, SyntaxError~
+      +source() str
+      +language() SupportedLanguage
+      +metavariables() MetaVariable[]
+      +tree() Tree
+      +normalised_source() str
+      -extract_metavariables(source str) MetaVariable[]
+      -normalise_source(source str, metavars MetaVariable[]) str
+    }
+
+    class MetaVariable {
+      -name str
+      -kind MetaVarKind
+      -position usize
+      +name() str
+      +kind() MetaVarKind
+      +position() usize
+      +pattern_string() str
+    }
+
+    class MetaVarKind {
+      <<enum>>
+      +Single
+      +Multiple
+      +Unnamed
+      +prefix() str
+    }
+
+    class MatchResult {
+      -text str
+      -byte_range Range~usize~
+      -line usize
+      -column usize
+      -captures HashMap~str, CapturedNode~
+      +text() str
+      +byte_range() Range~usize~
+      +line() usize
+      +line_one_based() usize
+      +column() usize
+      +column_one_based() usize
+      +captures() HashMap~str, CapturedNode~
+      +capture(name str) CapturedNode?
+    }
+
+    class CapturedNode {
+      -text str
+      -byte_range Range~usize~
+      -kind str
+      +text() str
+      +byte_range() Range~usize~
+      +kind() str
+    }
+
+    class RewriteRule {
+      -pattern Pattern
+      -replacement str
+      +new(pattern Pattern, replacement str) RewriteRule
+      +compile(pattern_str str, replacement str, language SupportedLanguage) Result~RewriteRule, SyntaxError~
+      +pattern() Pattern
+      +replacement() str
+    }
+
+    class Rewriter {
+      -language SupportedLanguage
+      +new(language SupportedLanguage) Rewriter
+      +language() SupportedLanguage
+      +apply(rule RewriteRule, source str) Result~str, SyntaxError~
+      +apply_all(rules RewriteRule[], source str) Result~str, SyntaxError~
+      -substitute_metavariables(template str, match_result MatchResult) str
+    }
+
+    class TreeSitterSyntacticLock {
+      -parsers RefCell~HashMap~SupportedLanguage, Parser~~
+      +new() TreeSitterSyntacticLock
+      +validate(context VerificationContext) SyntacticLockResult
+      -get_parser(language SupportedLanguage) RefMut~Parser~
+      -validate_file(path Path, content str) Result~VerificationFailure[], SyntaxError~
+    }
+
+    class SyntacticLock {
+      <<trait>>
+      +validate(context VerificationContext) SyntacticLockResult
+    }
+
+    class VerificationContext {
+      +new() VerificationContext
+      +modified_files() Iterator~(PathBuf, str)~
+      +add_modified(path PathBuf, content str) void
+    }
+
+    class VerificationFailure {
+      +new(path PathBuf, message str) VerificationFailure
+      +at_location(line u32, column u32) VerificationFailure
+      +file() PathBuf
+      +line() Option~u32~
+    }
+
+    class SyntacticLockResult {
+      <<enum>>
+      +Passed
+      +Failed
+      +passed() bool
+      +failures() VerificationFailure[]?
+    }
+
+    %% Relationships
+    Parser --> SupportedLanguage
+    Parser --> ParseResult
+    Parser --> SyntaxError
+
+    ParseResult --> SyntaxErrorNode
+    ParseResult --> SupportedLanguage
+
+    SyntaxErrorNode --> SupportedLanguage
+
+    Pattern --> SupportedLanguage
+    Pattern --> MetaVariable
+    Pattern --> SyntaxError
+
+    MetaVariable --> MetaVarKind
+
+    MatchResult --> CapturedNode
+
+    RewriteRule --> Pattern
+    RewriteRule --> SupportedLanguage
+    RewriteRule --> SyntaxError
+
+    Rewriter --> SupportedLanguage
+    Rewriter --> RewriteRule
+    Rewriter --> Parser
+    Rewriter --> MatchResult
+    Rewriter --> SyntaxError
+
+    TreeSitterSyntacticLock ..|> SyntacticLock
+    TreeSitterSyntacticLock --> Parser
+    TreeSitterSyntacticLock --> SupportedLanguage
+    TreeSitterSyntacticLock --> SyntaxError
+    TreeSitterSyntacticLock --> VerificationContext
+    TreeSitterSyntacticLock --> VerificationFailure
+    TreeSitterSyntacticLock --> SyntacticLockResult
+```
+
 3. **Relational Insight (Call-Graph Analysis):** Managed by the `weaver-graph`
     crate, this layer builds a higher-level model of the program's control flow
     and component relationships. It is not limited to a single data source;
