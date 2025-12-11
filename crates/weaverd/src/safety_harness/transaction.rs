@@ -181,12 +181,12 @@ fn commit_changes(
     let mut prepared: Vec<(PathBuf, tempfile::NamedTempFile, String, bool)> = Vec::new();
 
     for path in paths {
-        let content = context
-            .modified(path)
-            .ok_or_else(|| SafetyHarnessError::FileWriteError {
-                path: path.clone(),
-                message: "modified content missing from context".to_string(),
-            })?;
+        let content = context.modified(path).ok_or_else(|| {
+            SafetyHarnessError::file_write(
+                path.clone(),
+                std::io::Error::other("modified content missing from context"),
+            )
+        })?;
 
         let original = context.original(path).cloned().unwrap_or_default();
         let existed = path.exists();

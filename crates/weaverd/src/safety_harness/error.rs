@@ -5,6 +5,7 @@
 //! `TransactionOutcome` variants, not as errors.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use thiserror::Error;
 
@@ -84,24 +85,26 @@ impl std::fmt::Display for VerificationFailure {
 /// Note: Verification failures (syntactic/semantic lock failures) are returned
 /// as `TransactionOutcome` variants, not as errors. This enum only covers
 /// unexpected operational errors that prevent the transaction from completing.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum SafetyHarnessError {
     /// An I/O error occurred while reading original file content.
-    #[error("failed to read file {path}: {message}")]
+    #[error("failed to read file {path}: {source}")]
     FileReadError {
         /// Path to the file that could not be read.
         path: PathBuf,
-        /// Description of the I/O error.
-        message: String,
+        /// Underlying I/O error.
+        #[source]
+        source: Arc<std::io::Error>,
     },
 
     /// An I/O error occurred while writing the final output.
-    #[error("failed to write file {path}: {message}")]
+    #[error("failed to write file {path}: {source}")]
     FileWriteError {
         /// Path to the file that could not be written.
         path: PathBuf,
-        /// Description of the I/O error.
-        message: String,
+        /// Underlying I/O error.
+        #[source]
+        source: Arc<std::io::Error>,
     },
 
     /// Failed to apply edits to the in-memory buffer.
@@ -133,7 +136,7 @@ impl SafetyHarnessError {
     pub fn file_read(path: PathBuf, error: std::io::Error) -> Self {
         Self::FileReadError {
             path,
-            message: error.to_string(),
+            source: Arc::new(error),
         }
     }
 
@@ -141,7 +144,7 @@ impl SafetyHarnessError {
     pub fn file_write(path: PathBuf, error: std::io::Error) -> Self {
         Self::FileWriteError {
             path,
-            message: error.to_string(),
+            source: Arc::new(error),
         }
     }
 }
@@ -160,5 +163,17 @@ mod tests {
         assert!(display.contains("42"));
         assert!(display.contains("17"));
         assert!(display.contains("unexpected token"));
+    }
+
+    #[test]
+    fn io_errors_preserve_source_chain() {
+        use std::error::Error as StdError;
+
+        let io_error = std::io::Error::other("boom");
+        let error = SafetyHarnessError::file_read(PathBuf::from("/tmp/file"), io_error);
+
+        let source = error.source().expect("source should be preserved");
+        assert_eq!(source.to_string(), "boom");
+        assert!(format!("{error}").contains("boom"));
     }
 }
