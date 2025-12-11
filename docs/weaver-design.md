@@ -898,6 +898,88 @@ leverage the most advanced and specialized refactoring tools available, knowing
 that `Weaver` provides a safety net that protects the codebase from corruption
 and regressions.
 
+#### 4.2.1. Implementation decisions
+
+The initial Double-Lock implementation resides in the `weaverd::safety_harness`
+module. The architecture uses trait-based abstraction for both lock phases,
+enabling straightforward unit and integration testing without requiring real
+language servers or parsers during development.
+
+**Core types**:
+
+- `FileEdit` and `TextEdit` represent proposed changes using zero-based line
+  and column offsets following LSP conventions.
+- `VerificationContext` maintains in-memory copies of both original and
+  modified file content, isolating the verification process from the real
+  filesystem.
+- `EditTransaction` orchestrates the full workflow: reading original files,
+  applying edits in-memory, validating through both locks, and committing
+  atomically on success.
+
+**Lock traits**:
+
+- `SyntacticLock::validate(&self, context: &VerificationContext) ->
+  SyntacticLockResult` returns either `Passed` or `Failed { failures }`.
+- `SemanticLock::validate(&self, context: &VerificationContext) ->
+  Result<SemanticLockResult, SafetyHarnessError>` permits the semantic backend
+  to surface unavailability errors separately from verification failures.
+
+**Placeholder implementations**:
+
+Until `weaver-syntax` delivers Tree-sitter parsing, the
+`PlaceholderSyntacticLock` unconditionally passes all files. This maintains the
+contract while deferring parser integration. `PlaceholderSemanticLock` likewise
+passes until the full LSP diagnostic comparison pipeline is wired through
+`weaver-lsp-host`.
+
+**Configurable test doubles**:
+
+`ConfigurableSyntacticLock` and `ConfigurableSemanticLock` accept
+pre-determined results, enabling BDD scenarios to exercise pass, fail, and
+backend-unavailable paths without external dependencies. These doubles power
+the `safety_harness.feature` behavioural tests.
+
+**Atomic commit strategy**:
+
+Successful transactions use two-phase commit with rollback:
+
+1. **Prepare phase**: All modified content is written to temporary files in
+   the same directory as the target files.
+2. **Commit phase**: Temporary files are atomically renamed to their targets.
+3. **Rollback**: If any rename fails, all previously committed files are
+   restored to their original content from the `VerificationContext`.
+
+This ensures multi-file atomicity: either all files are updated or none are.
+Rollback is best-effort; catastrophic failures during rollback (e.g., disk
+removal) may leave some files in an inconsistent state.
+
+**Structured error reporting**:
+
+`SafetyHarnessError` captures the lock phase, affected files, optional line and
+column locations, and human-readable messages. Agents can parse this structure
+to diagnose failures and regenerate corrected edits without manual intervention.
+
+#### 4.2.2. Future: LSP Document Sync for Semantic Validation
+
+For operations spanning multiple files (renames, signature changes), the
+semantic lock must validate cross-file references. Rather than writing modified
+content to temporary files (which would break import resolution), the semantic
+lock will use LSP's document synchronization protocol:
+
+1. **`textDocument/didOpen`**: Open each affected file at its real URI,
+   sending the modified content as the document text.
+2. **Request diagnostics**: The LSP validates the in-memory content as if
+   it were at the actual file path, allowing imports and references to resolve
+   correctly.
+3. **Compare diagnostics**: Check for new errors compared to the pre-edit
+   baseline.
+4. **`textDocument/didClose`**: Clean up the virtual document state.
+
+This approach leverages the standard LSP document lifecycle that editors use,
+where the LSP always validates in-memory content rather than disk content. The
+`LanguageServer` trait in `weaver-lsp-host` will be extended with `did_open`,
+`did_change`, and `did_close` methods to support this workflow.
+
 ## 5. Security by Design: A Zero-Trust Sandboxing Model
 
 Given that `Weaver` is designed to be programmatically controlled by AI agents

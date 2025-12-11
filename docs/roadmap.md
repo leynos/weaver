@@ -57,13 +57,21 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
     `birdcage` for its focused scope and production usage, prioritising robust
     Linux support via namespaces and seccomp-bpf.
 
-- [ ] Implement the full "Double-Lock" safety harness logic in `weaverd`.
+- [x] Implement the full "Double-Lock" safety harness logic in `weaverd`.
     This is a critical, non-negotiable feature for the MVP. All `act` commands
     must pass through this verification layer before committing to the
     filesystem.
+  - Acceptance criteria: Edit transactions pass through syntactic and semantic
+    lock validation before commit, failures leave the filesystem untouched,
+    and BDD scenarios cover success, syntactic failure, semantic failure, and
+    backend unavailable error paths.
 
-- [ ] Implement atomic edits to ensure that multi-file changes either succeed
+- [x] Implement atomic edits to ensure that multi-file changes either succeed
     or fail as a single transaction.
+  - Acceptance criteria: Two-phase commit with prepare (temp files) and commit
+    (atomic renames) phases, rollback restores original content on partial
+    failure, and new file creation properly tracks file existence for
+    rollback.
 
 ## Phase 2: Syntactic & Relational Intelligence
 
@@ -76,6 +84,10 @@ and relational understanding of code.*
 
 - [ ] Integrate the "Syntactic Lock" from `weaver-syntax` into the
     "Double-Lock" harness.
+
+- [ ] Extend the `LanguageServer` trait with document sync methods
+    (`did_open`, `did_change`, `did_close`) to enable semantic validation
+    of modified content at real file paths without writing to disk.
 
 - [ ] Create the `weaver-graph` crate and implement the LSP Provider for call
     graph generation, using the `textDocument/callHierarchy` request as the
