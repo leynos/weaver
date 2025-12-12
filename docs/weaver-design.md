@@ -450,6 +450,13 @@ The engine is built on three distinct layers of analysis:
     enable high-precision structural search and manipulation that LSP often
     lacks, and facilitate context-aware code slicing for prompt engineering.^13^
 
+3. **Relational Insight (Call-Graph Analysis):** Managed by the `weaver-graph`
+    crate, this layer builds a higher-level model of the program's control flow
+    and component relationships. It is not limited to a single data source;
+    instead, it fuses evidence from LSP's `callHierarchy` feature, dedicated
+    static analysis plugins, and potentially the output of dynamic profiling
+    tools to construct a more complete and accurate call graph.^15^
+
 The following class diagram captures the structure of the `weaver-syntax`
 module, showing how language detection, parsing, pattern matching, rewriting,
 and syntactic lock validation fit together:
@@ -669,13 +676,6 @@ classDiagram
     TreeSitterSyntacticLock --> VerificationFailure
     TreeSitterSyntacticLock --> SyntacticLockResult
 ```
-
-3. **Relational Insight (Call-Graph Analysis):** Managed by the `weaver-graph`
-    crate, this layer builds a higher-level model of the program's control flow
-    and component relationships. It is not limited to a single data source;
-    instead, it fuses evidence from LSP's `callHierarchy` feature, dedicated
-    static analysis plugins, and potentially the output of dynamic profiling
-    tools to construct a more complete and accurate call graph.^15^
 
 Each piece of information gathered by these layers---a symbol reference from
 LSP, a potential call site identified by a Tree-sitter query, a dependency link
