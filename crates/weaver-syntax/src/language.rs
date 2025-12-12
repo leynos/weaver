@@ -143,54 +143,37 @@ impl FromStr for SupportedLanguage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
-    #[test]
-    fn from_extension_recognises_rust() {
-        assert_eq!(
-            SupportedLanguage::from_extension("rs"),
-            Some(SupportedLanguage::Rust)
-        );
+    #[rstest]
+    #[case("rs", SupportedLanguage::Rust)]
+    #[case("py", SupportedLanguage::Python)]
+    #[case("pyi", SupportedLanguage::Python)]
+    #[case("ts", SupportedLanguage::TypeScript)]
+    #[case("tsx", SupportedLanguage::TypeScript)]
+    #[case("mts", SupportedLanguage::TypeScript)]
+    #[case("cts", SupportedLanguage::TypeScript)]
+    fn from_extension_recognises_supported_languages(
+        #[case] ext: &str,
+        #[case] expected: SupportedLanguage,
+    ) {
+        assert_eq!(SupportedLanguage::from_extension(ext), Some(expected));
     }
 
-    #[test]
-    fn from_extension_recognises_python() {
-        assert_eq!(
-            SupportedLanguage::from_extension("py"),
-            Some(SupportedLanguage::Python)
-        );
-        assert_eq!(
-            SupportedLanguage::from_extension("pyi"),
-            Some(SupportedLanguage::Python)
-        );
+    #[rstest]
+    #[case("json")]
+    #[case("md")]
+    fn from_extension_returns_none_for_unknown(#[case] ext: &str) {
+        assert_eq!(SupportedLanguage::from_extension(ext), None);
     }
 
-    #[test]
-    fn from_extension_recognises_typescript() {
+    #[rstest]
+    #[case("src/main.rs", SupportedLanguage::Rust)]
+    #[case("script.py", SupportedLanguage::Python)]
+    fn from_path_extracts_extension(#[case] path_str: &str, #[case] expected: SupportedLanguage) {
         assert_eq!(
-            SupportedLanguage::from_extension("ts"),
-            Some(SupportedLanguage::TypeScript)
-        );
-        assert_eq!(
-            SupportedLanguage::from_extension("tsx"),
-            Some(SupportedLanguage::TypeScript)
-        );
-    }
-
-    #[test]
-    fn from_extension_returns_none_for_unknown() {
-        assert_eq!(SupportedLanguage::from_extension("json"), None);
-        assert_eq!(SupportedLanguage::from_extension("md"), None);
-    }
-
-    #[test]
-    fn from_path_extracts_extension() {
-        assert_eq!(
-            SupportedLanguage::from_path(Path::new("src/main.rs")),
-            Some(SupportedLanguage::Rust)
-        );
-        assert_eq!(
-            SupportedLanguage::from_path(Path::new("script.py")),
-            Some(SupportedLanguage::Python)
+            SupportedLanguage::from_path(Path::new(path_str)),
+            Some(expected)
         );
     }
 
@@ -199,11 +182,12 @@ mod tests {
         assert_eq!(SupportedLanguage::from_path(Path::new("Makefile")), None);
     }
 
-    #[test]
-    fn from_str_parses_language_names() {
-        assert_eq!("rust".parse(), Ok(SupportedLanguage::Rust));
-        assert_eq!("Python".parse(), Ok(SupportedLanguage::Python));
-        assert_eq!("TYPESCRIPT".parse(), Ok(SupportedLanguage::TypeScript));
+    #[rstest]
+    #[case("rust", SupportedLanguage::Rust)]
+    #[case("Python", SupportedLanguage::Python)]
+    #[case("TYPESCRIPT", SupportedLanguage::TypeScript)]
+    fn from_str_parses_language_names(#[case] input: &str, #[case] expected: SupportedLanguage) {
+        assert_eq!(SupportedLanguage::from_str(input), Ok(expected));
     }
 
     #[test]

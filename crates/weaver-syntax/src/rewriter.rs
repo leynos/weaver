@@ -195,11 +195,16 @@ impl RewriteResult {
     }
 }
 
+/// Checks if a character is valid for a metavariable name.
+const fn is_valid_metavar_char(c: char) -> bool {
+    c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'
+}
+
 /// Helper to extract a metavariable name from a character stream.
 fn extract_var_name(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>) -> String {
     let mut name = String::new();
     while let Some((_, c)) = chars.peek() {
-        if c.is_ascii_uppercase() || c.is_ascii_digit() || *c == '_' {
+        if is_valid_metavar_char(*c) {
             name.push(*c);
             chars.next();
         } else {

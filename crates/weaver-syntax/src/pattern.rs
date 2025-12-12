@@ -122,6 +122,21 @@ impl Pattern {
     }
 }
 
+/// Returns whether `c` is a valid first character for a metavariable name.
+///
+/// Metavariable names must begin with an ASCII uppercase letter or `_`.
+const fn is_valid_metavar_start_char(c: char) -> bool {
+    c.is_ascii_uppercase() || c == '_'
+}
+
+/// Returns whether `c` is a valid continuation character for a metavariable name.
+///
+/// After the first character, metavariable names may contain ASCII uppercase
+/// letters, ASCII digits, or `_`.
+const fn is_valid_metavar_continuation_char(c: char) -> bool {
+    c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'
+}
+
 /// Helper to extract a metavariable name from a character stream.
 fn extract_metavar_name(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>) -> String {
     let mut name = String::new();
@@ -131,7 +146,7 @@ fn extract_metavar_name(chars: &mut std::iter::Peekable<std::str::CharIndices<'_
         return name;
     };
 
-    if !first_char.is_ascii_uppercase() && first_char != '_' {
+    if !is_valid_metavar_start_char(first_char) {
         return name;
     }
 
@@ -140,7 +155,7 @@ fn extract_metavar_name(chars: &mut std::iter::Peekable<std::str::CharIndices<'_
 
     // Subsequent characters: uppercase, digit, or underscore
     while let Some((_, c)) = chars.peek().copied() {
-        if !c.is_ascii_uppercase() && !c.is_ascii_digit() && c != '_' {
+        if !is_valid_metavar_continuation_char(c) {
             break;
         }
         name.push(c);

@@ -18,7 +18,7 @@ tree-sitter-typescript = { workspace = true }
 assert_cmd = { workspace = true }
 insta = { workspace = true }
 predicates = { workspace = true }
-rstest = { workspace = true }
+rstest = "0.26.1"
 rstest-bdd = { workspace = true }
 rstest-bdd-macros = { workspace = true }
 tempfile = { workspace = true }

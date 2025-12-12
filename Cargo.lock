@@ -1553,8 +1553,19 @@ checksum = "0a2c585be59b6b5dd66a9d2084aa1d8bd52fbdb806eafdeffb52791147862035"
 dependencies = [
  "futures",
  "futures-timer",
- "rstest_macros",
+ "rstest_macros 0.23.0",
  "rustc_version",
+]
+
+[[package]]
+name = "rstest"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5a3193c063baaa2a95a33f03035c8a72b83d97a54916055ba22d35ed3839d49"
+dependencies = [
+ "futures-timer",
+ "futures-util",
+ "rstest_macros 0.26.1",
 ]
 
 [[package]]
@@ -1617,6 +1628,24 @@ name = "rstest_macros"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "825ea780781b15345a146be27eaefb05085e337e869bff01b4306a4fd4a9ad5a"
+dependencies = [
+ "cfg-if",
+ "glob",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "relative-path",
+ "rustc_version",
+ "syn 2.0.106",
+ "unicode-ident",
+]
+
+[[package]]
+name = "rstest_macros"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c845311f0ff7951c5506121a9ad75aec44d083c31583b2ea5a30bcb0b0abba0"
 dependencies = [
  "cfg-if",
  "glob",
@@ -2541,7 +2570,7 @@ dependencies = [
  "libc",
  "ortho_config",
  "predicates",
- "rstest",
+ "rstest 0.23.0",
  "rstest-bdd",
  "rstest-bdd-macros",
  "serde",
@@ -2562,7 +2591,7 @@ dependencies = [
  "libc",
  "once_cell",
  "ortho_config",
- "rstest",
+ "rstest 0.23.0",
  "rstest-bdd",
  "rstest-bdd-macros",
  "serde",
@@ -2577,7 +2606,7 @@ name = "weaver-lsp-host"
 version = "0.1.0"
 dependencies = [
  "lsp-types",
- "rstest",
+ "rstest 0.23.0",
  "rstest-bdd",
  "rstest-bdd-macros",
  "thiserror 2.0.17",
@@ -2590,7 +2619,7 @@ version = "0.1.0"
 dependencies = [
  "birdcage",
  "once_cell",
- "rstest",
+ "rstest 0.23.0",
  "rstest-bdd",
  "rstest-bdd-macros",
  "tempfile",
@@ -2604,7 +2633,7 @@ dependencies = [
  "assert_cmd",
  "insta",
  "predicates",
- "rstest",
+ "rstest 0.26.1",
  "rstest-bdd",
  "rstest-bdd-macros",
  "tempfile",
@@ -2625,7 +2654,7 @@ dependencies = [
  "nix 0.28.0",
  "once_cell",
  "ortho_config",
- "rstest",
+ "rstest 0.23.0",
  "rstest-bdd",
  "rstest-bdd-macros",
  "serde",
