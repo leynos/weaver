@@ -183,10 +183,7 @@ fn commit_changes(
     for path in paths {
         let content = context
             .modified(path)
-            .ok_or_else(|| SafetyHarnessError::FileWriteError {
-                path: path.clone(),
-                message: "modified content missing from context".to_string(),
-            })?;
+            .ok_or_else(|| SafetyHarnessError::ModifiedContentMissing { path: path.clone() })?;
 
         let original = context.original(path).cloned().unwrap_or_default();
         let existed = path.exists();
