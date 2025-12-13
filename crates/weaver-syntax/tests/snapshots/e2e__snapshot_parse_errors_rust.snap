@@ -1,0 +1,6 @@
+---
+source: crates/weaver-syntax/tests/e2e.rs
+assertion_line: 314
+expression: "format!(\"{errors:?}\")"
+---
+["syntax error"]

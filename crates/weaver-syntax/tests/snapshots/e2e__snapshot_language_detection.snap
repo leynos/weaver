@@ -1,0 +1,13 @@
+---
+source: crates/weaver-syntax/tests/e2e.rs
+assertion_line: 339
+expression: "results.join(\"\\n\")"
+---
+rs: Some(Rust)
+py: Some(Python)
+pyi: Some(Python)
+ts: Some(TypeScript)
+tsx: Some(TypeScript)
+json: None
+md: None
+toml: None

@@ -1,0 +1,40 @@
+---
+source: crates/weaver-syntax/tests/e2e.rs
+expression: "(rust, python, typescript)"
+---
+(
+    [
+        {
+            "BODY": "let a = 1; let b = 2;",
+            "NAME": "main",
+        },
+        {
+            "BODY": "",
+            "NAME": "other",
+        },
+    ],
+    [
+        {
+            "ARGS": "(name)",
+            "BODY": "print(name)",
+            "NAME": "greet",
+        },
+        {
+            "ARGS": "()",
+            "BODY": "pass",
+            "NAME": "other",
+        },
+    ],
+    [
+        {
+            "ARGS": "(name: string)",
+            "BODY": "console.log(name);",
+            "NAME": "greet",
+        },
+        {
+            "ARGS": "()",
+            "BODY": "",
+            "NAME": "other",
+        },
+    ],
+)
