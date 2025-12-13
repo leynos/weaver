@@ -85,12 +85,12 @@ impl TreeSitterSyntacticLock {
             }
         };
 
-        let mut parser = parser
+        let mut parser_guard = parser
             .lock()
             .map_err(|_| SyntaxError::internal_error("parser lock poisoned"))?;
 
         // Parse the content
-        let result = parser.parse(content)?;
+        let result = parser_guard.parse(content)?;
 
         // Collect errors
         let failures: Vec<ValidationFailure> = result
@@ -188,18 +188,26 @@ impl std::fmt::Display for ValidationFailure {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use rstest::rstest;
+    use std::path::PathBuf;
 
     #[rstest]
     #[case("test.rs", "fn main() { println!(\"hello\"); }", true)]
     #[case("test.rs", "fn broken() {", false)]
     #[case("script.py", "def hello():\n    print('hello')", true)]
     #[case("script.py", "def broken(", false)]
-    #[case("app.ts", "function greet(name: string): void { console.log(name); }", true)]
+    #[case(
+        "app.ts",
+        "function greet(name: string): void { console.log(name); }",
+        true
+    )]
     #[case("broken.tsx", "function broken( {", false)]
     #[case("data.json", "{invalid json without quotes}", true)]
-    fn validate_file_cases(#[case] filename: &str, #[case] content: &str, #[case] should_pass: bool) {
+    fn validate_file_cases(
+        #[case] filename: &str,
+        #[case] content: &str,
+        #[case] should_pass: bool,
+    ) {
         let lock = TreeSitterSyntacticLock::new();
         let path = PathBuf::from(filename);
 

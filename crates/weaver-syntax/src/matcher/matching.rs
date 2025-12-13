@@ -1,8 +1,8 @@
 //! Matching algorithms for the [`Matcher`] implementation.
 
+use crate::matcher::MatchResult;
 use crate::matcher::capture::Captures;
 use crate::matcher::context::MatchContext;
-use crate::matcher::MatchResult;
 use crate::metavariables::metavar_name_from_placeholder;
 use crate::parser::ParseResult;
 use crate::pattern::{MetaVarKind, MetaVariable, Pattern};
@@ -78,6 +78,10 @@ fn find_metavariable_in_pattern<'p>(
         return None;
     }
 
+    if pattern_node.kind().contains("block") {
+        return None;
+    }
+
     let mut cursor = pattern_node.walk();
     let children: Vec<_> = pattern_node.named_children(&mut cursor).collect();
     if let [child] = children.as_slice() {
@@ -115,7 +119,7 @@ fn nodes_match<'a>(
     match_children(source_node, pattern_node, ctx, captures)
 }
 
-fn node_children<'a>(node: tree_sitter::Node<'a>) -> Vec<tree_sitter::Node<'a>> {
+fn node_children(node: tree_sitter::Node<'_>) -> Vec<tree_sitter::Node<'_>> {
     let mut cursor = node.walk();
     node.children(&mut cursor).collect()
 }
@@ -151,79 +155,111 @@ fn match_children<'a>(
     true
 }
 
-fn match_with_multiple<'a>(
-    source_children: &[tree_sitter::Node<'a>],
-    pattern_children: &[tree_sitter::Node<'_>],
-    ctx: &MatchContext<'a, '_>,
-    captures: &mut Captures<'a>,
-) -> bool {
-    fn match_seq<'a>(
-        source_children: &[tree_sitter::Node<'a>],
-        pattern_children: &[tree_sitter::Node<'_>],
-        source_idx: usize,
-        pattern_idx: usize,
-        ctx: &MatchContext<'a, '_>,
-        captures: &mut Captures<'a>,
-    ) -> bool {
-        if pattern_idx == pattern_children.len() {
-            return source_idx == source_children.len();
+struct SequenceMatcher<'a, 'p, 'c> {
+    source_children: &'c [tree_sitter::Node<'a>],
+    pattern_children: &'c [tree_sitter::Node<'p>],
+    ctx: &'c MatchContext<'a, 'p>,
+}
+
+#[derive(Clone, Copy)]
+struct MatchIndices {
+    source_idx: usize,
+    pattern_idx: usize,
+}
+
+impl<'a, 'p> SequenceMatcher<'a, 'p, '_> {
+    fn matches(&self, source_idx: usize, pattern_idx: usize, captures: &mut Captures<'a>) -> bool {
+        if pattern_idx == self.pattern_children.len() {
+            return source_idx == self.source_children.len();
         }
 
-        let pattern_child = pattern_children[pattern_idx];
-        if let Some(metavar) = find_metavariable_in_pattern(pattern_child, ctx)
+        let Some(pattern_child) = self.pattern_children.get(pattern_idx).copied() else {
+            return false;
+        };
+
+        if let Some(metavar) = find_metavariable_in_pattern(pattern_child, self.ctx)
             .filter(|metavar| metavar.kind == MetaVarKind::Multiple)
         {
-            for k in source_idx..=source_children.len() {
-                let mut trial = captures.clone();
-                if !trial.capture_multiple(&metavar.name, &source_children[source_idx..k], ctx.source)
-                {
-                    continue;
-                }
-                if match_seq(
-                    source_children,
-                    pattern_children,
-                    k,
-                    pattern_idx.saturating_add(1),
-                    ctx,
-                    &mut trial,
-                ) {
-                    *captures = trial;
-                    return true;
-                }
-            }
-            return false;
+            return self.matches_multiple(
+                MatchIndices {
+                    source_idx,
+                    pattern_idx,
+                },
+                metavar,
+                captures,
+            );
         }
 
-        let Some(source_child) = source_children.get(source_idx).copied() else {
+        self.matches_single(
+            MatchIndices {
+                source_idx,
+                pattern_idx,
+            },
+            pattern_child,
+            captures,
+        )
+    }
+
+    fn matches_multiple(
+        &self,
+        indices: MatchIndices,
+        metavar: &MetaVariable,
+        captures: &mut Captures<'a>,
+    ) -> bool {
+        let next_pattern_idx = indices.pattern_idx + 1;
+        for k in indices.source_idx..=self.source_children.len() {
+            let Some(candidate) = self.source_children.get(indices.source_idx..k) else {
+                continue;
+            };
+
+            let mut trial = captures.clone();
+            if !trial.capture_multiple(&metavar.name, candidate, self.ctx.source) {
+                continue;
+            }
+
+            if self.matches(k, next_pattern_idx, &mut trial) {
+                *captures = trial;
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn matches_single(
+        &self,
+        indices: MatchIndices,
+        pattern_child: tree_sitter::Node<'p>,
+        captures: &mut Captures<'a>,
+    ) -> bool {
+        let Some(source_child) = self.source_children.get(indices.source_idx).copied() else {
             return false;
         };
 
         let mut trial = captures.clone();
-        if !nodes_match(source_child, pattern_child, ctx, &mut trial) {
+        if !nodes_match(source_child, pattern_child, self.ctx, &mut trial) {
             return false;
         }
 
-        if match_seq(
-            source_children,
-            pattern_children,
-            source_idx.saturating_add(1),
-            pattern_idx.saturating_add(1),
-            ctx,
-            &mut trial,
-        ) {
+        if self.matches(indices.source_idx + 1, indices.pattern_idx + 1, &mut trial) {
             *captures = trial;
             return true;
         }
 
         false
     }
+}
 
-    match_seq(
+fn match_with_multiple<'a, 'p>(
+    source_children: &[tree_sitter::Node<'a>],
+    pattern_children: &[tree_sitter::Node<'p>],
+    ctx: &MatchContext<'a, 'p>,
+    captures: &mut Captures<'a>,
+) -> bool {
+    SequenceMatcher {
         source_children,
         pattern_children,
-        0,
-        0,
         ctx,
-        captures,
-    )
+    }
+    .matches(0, 0, captures)
 }

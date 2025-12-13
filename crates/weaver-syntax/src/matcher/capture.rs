@@ -151,16 +151,15 @@ impl<'a> Captures<'a> {
             })
             .collect();
 
-        let (byte_range, text) = if let (Some(first), Some(last)) =
-            (nodes.first().copied(), nodes.last().copied())
-        {
-            let start = first.start_byte();
-            let end = last.end_byte();
-            let range = start..end;
-            (range.clone(), source.get(range).unwrap_or_default())
-        } else {
-            (0..0, "")
-        };
+        let (byte_range, text) =
+            if let (Some(first), Some(last)) = (nodes.first().copied(), nodes.last().copied()) {
+                let start = first.start_byte();
+                let end = last.end_byte();
+                let range = start..end;
+                (range.clone(), source.get(range).unwrap_or_default())
+            } else {
+                (0..0, "")
+            };
 
         let value = CapturedValue::Multiple(CapturedNodes {
             nodes: captured_nodes,
@@ -184,11 +183,9 @@ impl<'a> Captures<'a> {
             (CapturedValue::Multiple(a), CapturedValue::Multiple(b)) => {
                 a.text == b.text
                     && a.nodes.len() == b.nodes.len()
-                    && a
-                        .nodes
-                        .iter()
-                        .zip(b.nodes.iter())
-                        .all(|(left, right)| left.node.kind() == right.node.kind() && left.text == right.text)
+                    && a.nodes.iter().zip(b.nodes.iter()).all(|(left, right)| {
+                        left.node.kind() == right.node.kind() && left.text == right.text
+                    })
             }
             _ => false,
         }

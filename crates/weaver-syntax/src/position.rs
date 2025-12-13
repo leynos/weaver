@@ -11,4 +11,3 @@ pub(crate) fn point_to_one_based(pos: tree_sitter::Point) -> (u32, u32) {
     let column = u32::try_from(pos.column.saturating_add(1)).unwrap_or(u32::MAX);
     (line, column)
 }
-

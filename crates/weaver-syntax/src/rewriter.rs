@@ -7,9 +7,10 @@
 use crate::error::SyntaxError;
 use crate::language::SupportedLanguage;
 use crate::matcher::MatchResult;
-use crate::metavariables::extract_metavar_name;
+use crate::metavariables::{is_valid_metavar_continuation_char, is_valid_metavar_start_char};
 use crate::parser::Parser;
 use crate::pattern::Pattern;
+use std::collections::HashSet;
 
 /// A structural rewrite rule.
 ///
@@ -37,8 +38,6 @@ impl RewriteRule {
         let replacement_str = replacement.into();
 
         // Validate that replacement metavariables exist in the pattern
-        use std::collections::HashSet;
-
         let pattern_vars: HashSet<_> = pattern
             .metavariables()
             .iter()
@@ -209,6 +208,94 @@ impl RewriteResult {
     }
 }
 
+#[derive(Debug)]
+struct TemplateMetavar {
+    dollars: usize,
+    name: String,
+}
+
+/// Checks if a character is valid for a metavariable name.
+const fn is_valid_metavar_char(c: char) -> bool {
+    is_valid_metavar_continuation_char(c)
+}
+
+fn extract_var_name(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>) -> String {
+    let mut name = String::new();
+
+    let Some((_, first_char)) = chars.peek().copied() else {
+        return name;
+    };
+
+    if !is_valid_metavar_start_char(first_char) {
+        return name;
+    }
+
+    name.push(first_char);
+    chars.next();
+
+    while let Some((_, c)) = chars.peek().copied() {
+        if !is_valid_metavar_char(c) {
+            break;
+        }
+        name.push(c);
+        chars.next();
+    }
+
+    name
+}
+
+fn parse_template_metavar(
+    chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>,
+) -> TemplateMetavar {
+    let mut dollars = 1;
+    while chars.peek().is_some_and(|(_, c)| *c == '$') {
+        dollars += 1;
+        chars.next();
+    }
+
+    let name = extract_var_name(chars);
+
+    TemplateMetavar { dollars, name }
+}
+
+fn push_literal_metavar(out: &mut String, dollars: usize, name: &str) {
+    out.extend(std::iter::repeat_n('$', dollars));
+    out.push_str(name);
+}
+
+fn substitute_template_metavar(
+    out: &mut String,
+    reference: TemplateMetavar,
+    match_result: &MatchResult<'_>,
+) {
+    let TemplateMetavar { dollars, name } = reference;
+
+    if name.is_empty() || dollars == 2 {
+        push_literal_metavar(out, dollars, &name);
+        return;
+    }
+
+    if name == "_" {
+        return;
+    }
+
+    match dollars {
+        1 => {
+            if let Some(capture) = match_result.capture(&name) {
+                out.push_str(capture.text());
+            } else {
+                push_literal_metavar(out, dollars, &name);
+            }
+        }
+        3 => {
+            if let Some(capture) = match_result.capture(&name) {
+                out.push_str(capture.text());
+            }
+        }
+        _ => push_literal_metavar(out, dollars, &name),
+    }
+}
+
 /// Extracts metavariable references from a replacement template.
 fn extract_replacement_vars(replacement: &str) -> Vec<String> {
     let mut vars = Vec::new();
@@ -216,13 +303,7 @@ fn extract_replacement_vars(replacement: &str) -> Vec<String> {
 
     while let Some((_, ch)) = chars.next() {
         if ch == '$' {
-            let mut dollars = 1;
-            while chars.peek().is_some_and(|(_, c)| *c == '$') {
-                dollars += 1;
-                chars.next();
-            }
-
-            let name = extract_metavar_name(&mut chars);
+            let TemplateMetavar { dollars, name } = parse_template_metavar(&mut chars);
             if name.is_empty() || dollars == 2 {
                 continue;
             }
@@ -247,35 +328,8 @@ fn substitute_metavariables(template: &str, match_result: &MatchResult<'_>) -> S
             continue;
         }
 
-        let mut dollars = 1;
-        while chars.peek().is_some_and(|(_, c)| *c == '$') {
-            dollars += 1;
-            chars.next();
-        }
-
-        let name = extract_metavar_name(&mut chars);
-        if name.is_empty() || dollars == 2 {
-            out.push_str(&"$".repeat(dollars));
-            out.push_str(&name);
-            continue;
-        }
-
-        if name == "_" {
-            continue;
-        }
-
-        if dollars == 1 || dollars == 3 {
-            if let Some(capture) = match_result.capture(&name) {
-                out.push_str(capture.text());
-            } else if dollars == 1 {
-                out.push_str(&"$".repeat(dollars));
-                out.push_str(&name);
-            }
-            continue;
-        }
-
-        out.push_str(&"$".repeat(dollars));
-        out.push_str(&name);
+        let reference = parse_template_metavar(&mut chars);
+        substitute_template_metavar(&mut out, reference, match_result);
     }
 
     out

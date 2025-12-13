@@ -6,9 +6,11 @@
 use std::path::Path;
 
 use insta::{assert_debug_snapshot, assert_snapshot};
+use rstest::rstest;
 
 use weaver_syntax::{
-    Parser, Pattern, RewriteRule, Rewriter, SupportedLanguage, TreeSitterSyntacticLock,
+    Parser, Pattern, RewriteResult, RewriteRule, Rewriter, SupportedLanguage,
+    TreeSitterSyntacticLock,
 };
 
 // =============================================================================
@@ -17,10 +19,11 @@ use weaver_syntax::{
 
 #[test]
 fn parse_valid_rust_file_succeeds() {
-    let mut parser = Parser::new(SupportedLanguage::Rust).expect("parser init");
+    let mut parser =
+        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser init: {err}"));
     let result = parser
         .parse("fn main() { println!(\"hello\"); }")
-        .expect("parse");
+        .unwrap_or_else(|err| panic!("parse: {err}"));
 
     assert!(!result.has_errors());
     assert_eq!(result.language(), SupportedLanguage::Rust);
@@ -28,10 +31,11 @@ fn parse_valid_rust_file_succeeds() {
 
 #[test]
 fn parse_valid_python_file_succeeds() {
-    let mut parser = Parser::new(SupportedLanguage::Python).expect("parser init");
+    let mut parser =
+        Parser::new(SupportedLanguage::Python).unwrap_or_else(|err| panic!("parser init: {err}"));
     let result = parser
         .parse("def greet(name):\n    print(f'Hello, {name}')")
-        .expect("parse");
+        .unwrap_or_else(|err| panic!("parse: {err}"));
 
     assert!(!result.has_errors());
     assert_eq!(result.language(), SupportedLanguage::Python);
@@ -39,10 +43,11 @@ fn parse_valid_python_file_succeeds() {
 
 #[test]
 fn parse_valid_typescript_file_succeeds() {
-    let mut parser = Parser::new(SupportedLanguage::TypeScript).expect("parser init");
+    let mut parser = Parser::new(SupportedLanguage::TypeScript)
+        .unwrap_or_else(|err| panic!("parser init: {err}"));
     let result = parser
         .parse("function greet(name: string): void { console.log(name); }")
-        .expect("parse");
+        .unwrap_or_else(|err| panic!("parse: {err}"));
 
     assert!(!result.has_errors());
     assert_eq!(result.language(), SupportedLanguage::TypeScript);
@@ -54,12 +59,14 @@ fn parse_valid_typescript_file_succeeds() {
 
 #[test]
 fn pattern_finds_all_function_definitions() {
-    let mut parser = Parser::new(SupportedLanguage::Rust).expect("parser");
+    let mut parser =
+        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
     let source = parser
         .parse("fn foo() {} fn bar() {} fn baz() {}")
-        .expect("parse");
+        .unwrap_or_else(|err| panic!("parse: {err}"));
 
-    let pattern = Pattern::compile("fn $NAME() {}", SupportedLanguage::Rust).expect("pattern");
+    let pattern = Pattern::compile("fn $NAME() {}", SupportedLanguage::Rust)
+        .unwrap_or_else(|err| panic!("pattern: {err}"));
     let matches = pattern.find_all(&source);
 
     assert!(!matches.is_empty(), "Should find function definitions");
@@ -67,24 +74,38 @@ fn pattern_finds_all_function_definitions() {
 
 #[test]
 fn pattern_captures_metavariables_correctly() {
-    let mut parser = Parser::new(SupportedLanguage::Rust).expect("parser");
-    let source = parser.parse("fn hello_world() {}").expect("parse");
+    let mut parser =
+        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
+    let source = parser
+        .parse("fn hello_world() {}")
+        .unwrap_or_else(|err| panic!("parse: {err}"));
 
-    let pattern = Pattern::compile("fn $NAME() {}", SupportedLanguage::Rust).expect("pattern");
+    let pattern = Pattern::compile("fn $NAME() {}", SupportedLanguage::Rust)
+        .unwrap_or_else(|err| panic!("pattern: {err}"));
 
-    let m = pattern.find_first(&source).expect("should find match");
-    let capture = m.capture("NAME").expect("should capture NAME");
+    let Some(m) = pattern.find_first(&source) else {
+        panic!("should find match");
+    };
+    let Some(capture) = m.capture("NAME") else {
+        panic!("should capture NAME");
+    };
     assert_eq!(capture.text(), "hello_world");
 }
 
 #[test]
 fn pattern_match_has_correct_position() {
-    let mut parser = Parser::new(SupportedLanguage::Rust).expect("parser");
-    let source = parser.parse("fn test() {}").expect("parse");
+    let mut parser =
+        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
+    let source = parser
+        .parse("fn test() {}")
+        .unwrap_or_else(|err| panic!("parse: {err}"));
 
-    let pattern = Pattern::compile("fn $NAME() {}", SupportedLanguage::Rust).expect("pattern");
+    let pattern = Pattern::compile("fn $NAME() {}", SupportedLanguage::Rust)
+        .unwrap_or_else(|err| panic!("pattern: {err}"));
 
-    let m = pattern.find_first(&source).expect("should find match");
+    let Some(m) = pattern.find_first(&source) else {
+        panic!("should find match");
+    };
     let (line, col) = m.start_position();
     assert_eq!(line, 1, "Should be on line 1");
     assert!(col >= 1, "Column should be positive");
@@ -94,32 +115,29 @@ fn pattern_match_has_correct_position() {
 // Happy Path: Rewriting
 // =============================================================================
 
-#[test]
-fn rewrite_transforms_code_correctly() {
-    let pattern = Pattern::compile("let $VAR = $VAL", SupportedLanguage::Rust).expect("pattern");
-    let rule = RewriteRule::new(pattern, "const $VAR: _ = $VAL").expect("rule");
-
-    let rewriter = Rewriter::new(SupportedLanguage::Rust);
-    let result = rewriter
-        .apply(&rule, "fn main() { let x = 42; }")
-        .expect("rewrite");
-
-    assert!(result.has_changes());
-    assert!(result.output().contains("const"));
+fn rust_const_rewrite_rule() -> RewriteRule {
+    let pattern = Pattern::compile("let $VAR = $VAL", SupportedLanguage::Rust)
+        .unwrap_or_else(|err| panic!("pattern: {err}"));
+    RewriteRule::new(pattern, "const $VAR: _ = $VAL;").unwrap_or_else(|err| panic!("rule: {err}"))
 }
 
-#[test]
-fn rewrite_handles_multiple_matches() {
-    let pattern = Pattern::compile("let $VAR = $VAL", SupportedLanguage::Rust).expect("pattern");
-    let rule = RewriteRule::new(pattern, "const $VAR: _ = $VAL").expect("rule");
-
+fn apply_rust_const_rewrite(source: &str) -> RewriteResult {
     let rewriter = Rewriter::new(SupportedLanguage::Rust);
-    let result = rewriter
-        .apply(&rule, "fn main() { let a = 1; let b = 2; }")
-        .expect("rewrite");
+    let rule = rust_const_rewrite_rule();
+    rewriter
+        .apply(&rule, source)
+        .unwrap_or_else(|err| panic!("rewrite: {err}"))
+}
+
+#[rstest]
+#[case("fn main() { let x = 42; }", 1)]
+#[case("fn main() { let a = 1; let b = 2; }", 2)]
+fn rewrite_transforms_code_correctly(#[case] source: &str, #[case] expected_replacements: usize) {
+    let result = apply_rust_const_rewrite(source);
 
     assert!(result.has_changes());
-    assert!(result.num_replacements() >= 1);
+    assert_eq!(result.num_replacements(), expected_replacements);
+    assert!(result.output().contains("const"));
 }
 
 // =============================================================================
@@ -132,7 +150,7 @@ fn syntactic_lock_validates_valid_code() {
 
     let failures = lock
         .validate_file(Path::new("main.rs"), "fn main() { println!(\"OK\"); }")
-        .expect("validate");
+        .unwrap_or_else(|err| panic!("validate: {err}"));
 
     assert!(failures.is_empty());
 }
@@ -147,7 +165,9 @@ fn syntactic_lock_handles_multiple_languages() {
         (Path::new("app.ts"), "function main(): void {}"),
     ];
 
-    let failures = lock.validate_files(files).expect("validate");
+    let failures = lock
+        .validate_files(files)
+        .unwrap_or_else(|err| panic!("validate: {err}"));
     assert!(failures.is_empty());
 }
 
@@ -157,8 +177,11 @@ fn syntactic_lock_handles_multiple_languages() {
 
 #[test]
 fn parse_invalid_rust_returns_errors() {
-    let mut parser = Parser::new(SupportedLanguage::Rust).expect("parser");
-    let result = parser.parse("fn broken() {").expect("parse");
+    let mut parser =
+        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
+    let result = parser
+        .parse("fn broken() {")
+        .unwrap_or_else(|err| panic!("parse: {err}"));
 
     assert!(result.has_errors());
     let errors = result.errors();
@@ -167,16 +190,22 @@ fn parse_invalid_rust_returns_errors() {
 
 #[test]
 fn parse_invalid_python_returns_errors() {
-    let mut parser = Parser::new(SupportedLanguage::Python).expect("parser");
-    let result = parser.parse("def broken(").expect("parse");
+    let mut parser =
+        Parser::new(SupportedLanguage::Python).unwrap_or_else(|err| panic!("parser: {err}"));
+    let result = parser
+        .parse("def broken(")
+        .unwrap_or_else(|err| panic!("parse: {err}"));
 
     assert!(result.has_errors());
 }
 
 #[test]
 fn parse_invalid_typescript_returns_errors() {
-    let mut parser = Parser::new(SupportedLanguage::TypeScript).expect("parser");
-    let result = parser.parse("function broken( {").expect("parse");
+    let mut parser =
+        Parser::new(SupportedLanguage::TypeScript).unwrap_or_else(|err| panic!("parser: {err}"));
+    let result = parser
+        .parse("function broken( {")
+        .unwrap_or_else(|err| panic!("parse: {err}"));
 
     assert!(result.has_errors());
 }
@@ -191,10 +220,12 @@ fn syntactic_lock_detects_syntax_errors() {
 
     let failures = lock
         .validate_file(Path::new("broken.rs"), "fn broken() {")
-        .expect("validate");
+        .unwrap_or_else(|err| panic!("validate: {err}"));
 
     assert!(!failures.is_empty());
-    let first = failures.first().expect("failure");
+    let first = failures
+        .first()
+        .unwrap_or_else(|| panic!("expected validation failure"));
     assert!(first.line >= 1);
 }
 
@@ -205,10 +236,12 @@ fn syntactic_lock_reports_error_location() {
     let code = "fn main() {\n    let x = \n}";
     let failures = lock
         .validate_file(Path::new("test.rs"), code)
-        .expect("validate");
+        .unwrap_or_else(|err| panic!("validate: {err}"));
 
     assert!(!failures.is_empty());
-    let first = failures.first().expect("failure");
+    let first = failures
+        .first()
+        .unwrap_or_else(|| panic!("expected validation failure"));
     assert!(first.line >= 1);
     assert!(first.column >= 1);
 }
@@ -224,7 +257,7 @@ fn syntactic_lock_skips_unknown_extensions() {
     // Invalid JSON should pass because .json is not a supported extension
     let failures = lock
         .validate_file(Path::new("data.json"), "{invalid json without quotes}")
-        .expect("validate");
+        .unwrap_or_else(|err| panic!("validate: {err}"));
 
     assert!(
         failures.is_empty(),
@@ -245,7 +278,8 @@ fn language_detection_returns_none_for_unsupported() {
 
 #[test]
 fn rewrite_rule_rejects_undefined_metavariables() {
-    let pattern = Pattern::compile("fn $NAME() {}", SupportedLanguage::Rust).expect("pattern");
+    let pattern = Pattern::compile("fn $NAME() {}", SupportedLanguage::Rust)
+        .unwrap_or_else(|err| panic!("pattern: {err}"));
     let result = RewriteRule::new(pattern, "fn $UNDEFINED() {}");
 
     assert!(result.is_err());
@@ -253,10 +287,14 @@ fn rewrite_rule_rejects_undefined_metavariables() {
 
 #[test]
 fn pattern_with_no_matches_returns_empty() {
-    let mut parser = Parser::new(SupportedLanguage::Rust).expect("parser");
-    let source = parser.parse("fn main() {}").expect("parse");
+    let mut parser =
+        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
+    let source = parser
+        .parse("fn main() {}")
+        .unwrap_or_else(|err| panic!("parse: {err}"));
 
-    let pattern = Pattern::compile("struct $NAME {}", SupportedLanguage::Rust).expect("pattern");
+    let pattern = Pattern::compile("struct $NAME {}", SupportedLanguage::Rust)
+        .unwrap_or_else(|err| panic!("pattern: {err}"));
     let matches = pattern.find_all(&source);
 
     assert!(matches.is_empty());
@@ -268,8 +306,11 @@ fn pattern_with_no_matches_returns_empty() {
 
 #[test]
 fn handles_empty_source() {
-    let mut parser = Parser::new(SupportedLanguage::Rust).expect("parser");
-    let result = parser.parse("").expect("parse");
+    let mut parser =
+        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
+    let result = parser
+        .parse("")
+        .unwrap_or_else(|err| panic!("parse: {err}"));
 
     // Empty source should parse without errors
     assert!(!result.has_errors());
@@ -277,20 +318,27 @@ fn handles_empty_source() {
 
 #[test]
 fn handles_whitespace_only_source() {
-    let mut parser = Parser::new(SupportedLanguage::Rust).expect("parser");
-    let result = parser.parse("   \n\n   ").expect("parse");
+    let mut parser =
+        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
+    let result = parser
+        .parse("   \n\n   ")
+        .unwrap_or_else(|err| panic!("parse: {err}"));
 
     assert!(!result.has_errors());
 }
 
 #[test]
 fn rewrite_no_match_returns_unchanged() {
-    let pattern = Pattern::compile("struct $NAME {}", SupportedLanguage::Rust).expect("pattern");
-    let rule = RewriteRule::new(pattern, "enum $NAME {}").expect("rule");
+    let pattern = Pattern::compile("struct $NAME {}", SupportedLanguage::Rust)
+        .unwrap_or_else(|err| panic!("pattern: {err}"));
+    let rule =
+        RewriteRule::new(pattern, "enum $NAME {}").unwrap_or_else(|err| panic!("rule: {err}"));
 
     let rewriter = Rewriter::new(SupportedLanguage::Rust);
     let source = "fn main() {}";
-    let result = rewriter.apply(&rule, source).expect("rewrite");
+    let result = rewriter
+        .apply(&rule, source)
+        .unwrap_or_else(|err| panic!("rewrite: {err}"));
 
     assert!(!result.has_changes());
     assert_eq!(result.output(), source);
@@ -302,10 +350,11 @@ fn rewrite_no_match_returns_unchanged() {
 
 #[test]
 fn snapshot_parse_errors_rust() {
-    let mut parser = Parser::new(SupportedLanguage::Rust).expect("parser");
+    let mut parser =
+        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
     let result = parser
         .parse("fn broken() {\n    let x = \n}")
-        .expect("parse");
+        .unwrap_or_else(|err| panic!("parse: {err}"));
 
     let errors: Vec<_> = result.errors().iter().map(|e| e.message.clone()).collect();
     assert_snapshot!(format!("{errors:?}"));
@@ -316,7 +365,7 @@ fn snapshot_validation_failure_format() {
     let lock = TreeSitterSyntacticLock::new();
     let failures = lock
         .validate_file(Path::new("test.rs"), "fn broken() {")
-        .expect("validate");
+        .unwrap_or_else(|err| panic!("validate: {err}"));
 
     let formatted: Vec<_> = failures.iter().map(ToString::to_string).collect();
     assert_snapshot!(format!("{formatted:?}"));
@@ -343,11 +392,14 @@ fn snapshot_pattern_match_captures_across_languages() {
         source: &str,
         pattern: &str,
     ) -> Vec<std::collections::BTreeMap<String, String>> {
-        let mut parser = Parser::new(language).expect("parser");
-        let parsed = parser.parse(source).expect("parse");
-        let pattern = Pattern::compile(pattern, language).expect("pattern");
+        let mut parser = Parser::new(language).unwrap_or_else(|err| panic!("parser: {err}"));
+        let parsed = parser
+            .parse(source)
+            .unwrap_or_else(|err| panic!("parse: {err}"));
+        let compiled_pattern =
+            Pattern::compile(pattern, language).unwrap_or_else(|err| panic!("pattern: {err}"));
 
-        pattern
+        compiled_pattern
             .find_all(&parsed)
             .into_iter()
             .map(|m| {
@@ -380,13 +432,7 @@ fn snapshot_pattern_match_captures_across_languages() {
 
 #[test]
 fn snapshot_rewrite_result_includes_replacement_count() {
-    let pattern = Pattern::compile("let $VAR = $VAL", SupportedLanguage::Rust).expect("pattern");
-    let rule = RewriteRule::new(pattern, "const $VAR: _ = $VAL").expect("rule");
-
-    let rewriter = Rewriter::new(SupportedLanguage::Rust);
-    let result = rewriter
-        .apply(&rule, "fn main() { let a = 1; let b = 2; }")
-        .expect("rewrite");
+    let result = apply_rust_const_rewrite("fn main() { let a = 1; let b = 2; }");
 
     assert_debug_snapshot!((result.num_replacements(), result.output().to_owned()));
 }

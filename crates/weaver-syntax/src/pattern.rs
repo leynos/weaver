@@ -94,7 +94,10 @@ impl Pattern {
         }
 
         if parsed.has_errors() {
-            return Err(SyntaxError::pattern_compile(language, "pattern contains syntax errors"));
+            return Err(SyntaxError::pattern_compile(
+                language,
+                "pattern contains syntax errors",
+            ));
         }
 
         Ok(Self {
@@ -145,9 +148,8 @@ fn wrap_pattern_for_parse(language: SupportedLanguage, pattern: &str) -> String 
     match language {
         SupportedLanguage::Rust => {
             let trimmed = pattern.trim_end();
-            let needs_semicolon = !trimmed.is_empty()
-                && !trimmed.ends_with(';')
-                && !trimmed.ends_with('}');
+            let needs_semicolon =
+                !trimmed.is_empty() && !trimmed.ends_with(';') && !trimmed.ends_with('}');
             let statement = if needs_semicolon {
                 format!("{trimmed};")
             } else {
@@ -250,11 +252,7 @@ fn extract_metavariables(source: &str) -> Result<Vec<MetaVariable>, SyntaxError>
                 )));
             }
 
-            metavariables.push(MetaVariable {
-                name,
-                kind,
-                offset,
-            });
+            metavariables.push(MetaVariable { name, kind, offset });
         }
     }
 

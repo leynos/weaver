@@ -72,8 +72,8 @@ fn strip_quotes(s: &str) -> &str {
 #[given("language {language}")]
 fn given_language(world: &RefCell<TestWorld>, language: String) {
     let mut w = world.borrow_mut();
-    let language = strip_quotes(&language);
-    w.language = Some(SupportedLanguage::from_str(language).expect("language"));
+    let language_str = strip_quotes(&language);
+    w.language = Some(SupportedLanguage::from_str(language_str).expect("language"));
 }
 
 #[given("a file {filename} with content {content}")]

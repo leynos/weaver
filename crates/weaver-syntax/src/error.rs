@@ -103,7 +103,7 @@ impl SyntaxError {
 
     /// Creates an unknown language error.
     #[must_use]
-    pub fn unknown_language(path: PathBuf) -> Self {
+    pub const fn unknown_language(path: PathBuf) -> Self {
         Self::UnknownLanguage { path }
     }
 
