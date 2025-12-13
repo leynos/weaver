@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use crate::error::SyntaxError;
 use crate::language::SupportedLanguage;
@@ -25,7 +25,7 @@ use crate::parser::Parser;
 /// parser state is protected by a mutex.
 pub struct TreeSitterSyntacticLock {
     /// Cached parsers for each language.
-    parsers: Mutex<HashMap<SupportedLanguage, Parser>>,
+    parsers: Mutex<HashMap<SupportedLanguage, Arc<Mutex<Parser>>>>,
 }
 
 impl TreeSitterSyntacticLock {
@@ -70,20 +70,24 @@ impl TreeSitterSyntacticLock {
         };
 
         // Get or create parser for this language
-        let mut parsers = self
-            .parsers
-            .lock()
-            .map_err(|_| SyntaxError::parser_init(language, "lock poisoned"))?;
+        let parser = {
+            let mut parsers = self
+                .parsers
+                .lock()
+                .map_err(|_| SyntaxError::internal_error("parser map lock poisoned"))?;
 
-        let parser = if let Some(p) = parsers.get_mut(&language) {
-            p
-        } else {
-            let new_parser = Parser::new(language)?;
-            parsers.insert(language, new_parser);
-            parsers.get_mut(&language).ok_or_else(|| {
-                SyntaxError::parser_init(language, "parser not found after insert")
-            })?
+            if let Some(parser) = parsers.get(&language) {
+                parser.clone()
+            } else {
+                let parser = Arc::new(Mutex::new(Parser::new(language)?));
+                parsers.insert(language, parser.clone());
+                parser
+            }
         };
+
+        let mut parser = parser
+            .lock()
+            .map_err(|_| SyntaxError::internal_error("parser lock poisoned"))?;
 
         // Parse the content
         let result = parser.parse(content)?;
@@ -185,66 +189,26 @@ impl std::fmt::Display for ValidationFailure {
 mod tests {
     use super::*;
     use std::path::PathBuf;
+    use rstest::rstest;
 
-    #[test]
-    fn validates_valid_rust() {
+    #[rstest]
+    #[case("test.rs", "fn main() { println!(\"hello\"); }", true)]
+    #[case("test.rs", "fn broken() {", false)]
+    #[case("script.py", "def hello():\n    print('hello')", true)]
+    #[case("script.py", "def broken(", false)]
+    #[case("app.ts", "function greet(name: string): void { console.log(name); }", true)]
+    #[case("broken.tsx", "function broken( {", false)]
+    #[case("data.json", "{invalid json without quotes}", true)]
+    fn validate_file_cases(#[case] filename: &str, #[case] content: &str, #[case] should_pass: bool) {
         let lock = TreeSitterSyntacticLock::new();
-        let path = PathBuf::from("test.rs");
-        let content = "fn main() { println!(\"hello\"); }";
+        let path = PathBuf::from(filename);
 
         let failures = lock.validate_file(&path, content).expect("validate");
-        assert!(failures.is_empty());
-    }
-
-    #[test]
-    fn detects_invalid_rust() {
-        let lock = TreeSitterSyntacticLock::new();
-        let path = PathBuf::from("test.rs");
-        let content = "fn broken() {";
-
-        let failures = lock.validate_file(&path, content).expect("validate");
-        assert!(!failures.is_empty());
-    }
-
-    #[test]
-    fn skips_unknown_extensions() {
-        let lock = TreeSitterSyntacticLock::new();
-        let path = PathBuf::from("data.json");
-        let content = "{invalid json without quotes}";
-
-        let failures = lock.validate_file(&path, content).expect("validate");
-        // Unknown extension should pass through
-        assert!(failures.is_empty());
-    }
-
-    #[test]
-    fn validates_valid_python() {
-        let lock = TreeSitterSyntacticLock::new();
-        let path = PathBuf::from("script.py");
-        let content = "def hello():\n    print('hello')";
-
-        let failures = lock.validate_file(&path, content).expect("validate");
-        assert!(failures.is_empty());
-    }
-
-    #[test]
-    fn detects_invalid_python() {
-        let lock = TreeSitterSyntacticLock::new();
-        let path = PathBuf::from("script.py");
-        let content = "def broken(";
-
-        let failures = lock.validate_file(&path, content).expect("validate");
-        assert!(!failures.is_empty());
-    }
-
-    #[test]
-    fn validates_valid_typescript() {
-        let lock = TreeSitterSyntacticLock::new();
-        let path = PathBuf::from("app.ts");
-        let content = "function greet(name: string): void { console.log(name); }";
-
-        let failures = lock.validate_file(&path, content).expect("validate");
-        assert!(failures.is_empty());
+        if should_pass {
+            assert!(failures.is_empty(), "Expected no failures for {filename}");
+        } else {
+            assert!(!failures.is_empty(), "Expected failures for {filename}");
+        }
     }
 
     #[test]
@@ -285,18 +249,17 @@ mod tests {
         );
     }
 
-    #[test]
-    fn supports_file_detects_extensions() {
-        assert!(TreeSitterSyntacticLock::supports_file(Path::new("main.rs")));
-        assert!(TreeSitterSyntacticLock::supports_file(Path::new(
-            "script.py"
-        )));
-        assert!(TreeSitterSyntacticLock::supports_file(Path::new("app.ts")));
-        assert!(!TreeSitterSyntacticLock::supports_file(Path::new(
-            "data.json"
-        )));
-        assert!(!TreeSitterSyntacticLock::supports_file(Path::new(
-            "README.md"
-        )));
+    #[rstest]
+    #[case("main.rs", true)]
+    #[case("script.py", true)]
+    #[case("app.ts", true)]
+    #[case("view.tsx", true)]
+    #[case("data.json", false)]
+    #[case("README.md", false)]
+    fn supports_file_detects_extensions(#[case] path: &str, #[case] expected: bool) {
+        assert_eq!(
+            TreeSitterSyntacticLock::supports_file(Path::new(path)),
+            expected
+        );
     }
 }

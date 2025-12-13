@@ -15,6 +15,7 @@
 
 use crate::error::SyntaxError;
 use crate::language::SupportedLanguage;
+use crate::metavariables::{extract_metavar_name, placeholder_for_metavar};
 use crate::parser::{ParseResult, Parser};
 
 /// A compiled structural pattern for matching code.
@@ -29,6 +30,7 @@ pub struct Pattern {
     language: SupportedLanguage,
     metavariables: Vec<MetaVariable>,
     parsed: ParseResult,
+    wrapped_in_function: bool,
 }
 
 /// A metavariable in a pattern.
@@ -79,15 +81,28 @@ impl Pattern {
         // Extract metavariables from the source
         let metavariables = extract_metavariables(source)?;
 
+        let normalised_source = normalise_metavariables(source)?;
+
         // Parse the pattern as code
         let mut parser = Parser::new(language)?;
-        let parsed = parser.parse(source)?;
+        let mut wrapped_in_function = false;
+        let mut parsed = parser.parse(&normalised_source)?;
+        if parsed.has_errors() {
+            let wrapped_source = wrap_pattern_for_parse(language, &normalised_source);
+            parsed = parser.parse(&wrapped_source)?;
+            wrapped_in_function = true;
+        }
+
+        if parsed.has_errors() {
+            return Err(SyntaxError::pattern_compile(language, "pattern contains syntax errors"));
+        }
 
         Ok(Self {
             source: source.to_owned(),
             language,
             metavariables,
             parsed,
+            wrapped_in_function,
         })
     }
 
@@ -101,6 +116,10 @@ impl Pattern {
     #[must_use]
     pub const fn language(&self) -> SupportedLanguage {
         self.language
+    }
+
+    pub(crate) const fn wrapped_in_function(&self) -> bool {
+        self.wrapped_in_function
     }
 
     /// Returns the metavariables defined in this pattern.
@@ -122,47 +141,75 @@ impl Pattern {
     }
 }
 
-/// Returns whether `c` is a valid first character for a metavariable name.
-///
-/// Metavariable names must begin with an ASCII uppercase letter or `_`.
-const fn is_valid_metavar_start_char(c: char) -> bool {
-    c.is_ascii_uppercase() || c == '_'
-}
+fn wrap_pattern_for_parse(language: SupportedLanguage, pattern: &str) -> String {
+    match language {
+        SupportedLanguage::Rust => {
+            let trimmed = pattern.trim_end();
+            let needs_semicolon = !trimmed.is_empty()
+                && !trimmed.ends_with(';')
+                && !trimmed.ends_with('}');
+            let statement = if needs_semicolon {
+                format!("{trimmed};")
+            } else {
+                trimmed.to_owned()
+            };
 
-/// Returns whether `c` is a valid continuation character for a metavariable name.
-///
-/// After the first character, metavariable names may contain ASCII uppercase
-/// letters, ASCII digits, or `_`.
-const fn is_valid_metavar_continuation_char(c: char) -> bool {
-    c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'
-}
-
-/// Helper to extract a metavariable name from a character stream.
-fn extract_metavar_name(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>) -> String {
-    let mut name = String::new();
-
-    // First character must be uppercase or underscore
-    let Some((_, first_char)) = chars.peek().copied() else {
-        return name;
-    };
-
-    if !is_valid_metavar_start_char(first_char) {
-        return name;
-    }
-
-    name.push(first_char);
-    chars.next();
-
-    // Subsequent characters: uppercase, digit, or underscore
-    while let Some((_, c)) = chars.peek().copied() {
-        if !is_valid_metavar_continuation_char(c) {
-            break;
+            format!("fn __weaver_pattern_wrapper__() {{ {statement} }}")
         }
-        name.push(c);
-        chars.next();
+        SupportedLanguage::Python => {
+            let mut out = String::from("def __weaver_pattern_wrapper__():\n");
+            if pattern.trim().is_empty() {
+                out.push_str("    pass\n");
+                return out;
+            }
+
+            for line in pattern.lines() {
+                out.push_str("    ");
+                out.push_str(line);
+                out.push('\n');
+            }
+
+            out
+        }
+        SupportedLanguage::TypeScript => {
+            format!("function __weaver_pattern_wrapper__() {{ {pattern} }}")
+        }
+    }
+}
+
+fn normalise_metavariables(source: &str) -> Result<String, SyntaxError> {
+    let mut out = String::with_capacity(source.len());
+    let mut chars = source.char_indices().peekable();
+
+    while let Some((_, ch)) = chars.next() {
+        if ch != '$' {
+            out.push(ch);
+            continue;
+        }
+
+        let mut dollar_count = 1;
+        while chars.peek().is_some_and(|(_, c)| *c == '$') {
+            chars.next();
+            dollar_count += 1;
+        }
+
+        if dollar_count == 2 || dollar_count > 3 {
+            return Err(SyntaxError::invalid_metavariable(format!(
+                "metavariable has invalid '$' prefix length ({dollar_count})"
+            )));
+        }
+
+        let name = extract_metavar_name(&mut chars);
+        if name.is_empty() {
+            return Err(SyntaxError::invalid_metavariable(
+                "metavariable has no valid name",
+            ));
+        }
+
+        out.push_str(&placeholder_for_metavar(&name));
     }
 
-    name
+    Ok(out)
 }
 
 /// Extracts metavariables from a pattern source string.
@@ -182,14 +229,19 @@ fn extract_metavariables(source: &str) -> Result<Vec<MetaVariable>, SyntaxError>
                 dollar_count += 1;
             }
 
-            let kind = if dollar_count >= 3 {
+            if dollar_count == 2 || dollar_count > 3 {
+                return Err(SyntaxError::invalid_metavariable(format!(
+                    "metavariable at offset {offset} has invalid '$' prefix length ({dollar_count})"
+                )));
+            }
+
+            let kind = if dollar_count == 3 {
                 MetaVarKind::Multiple
             } else {
                 MetaVarKind::Single
             };
 
             // Extract the metavariable name
-            let name_start = chars.peek().map(|(i, _)| *i);
             let name = extract_metavar_name(&mut chars);
 
             if name.is_empty() {
@@ -201,7 +253,7 @@ fn extract_metavariables(source: &str) -> Result<Vec<MetaVariable>, SyntaxError>
             metavariables.push(MetaVariable {
                 name,
                 kind,
-                offset: name_start.unwrap_or(offset),
+                offset,
             });
         }
     }

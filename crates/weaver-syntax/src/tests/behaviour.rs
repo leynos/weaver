@@ -1,7 +1,8 @@
-//! BDD step definitions for weaver-syntax scenarios.
+//! Behaviour-driven development (BDD) step definitions for weaver-syntax scenarios.
 
 use std::cell::RefCell;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
@@ -33,7 +34,7 @@ struct TestWorld {
     /// Rewrite result.
     rewrite_result: Option<RewriteResult>,
     /// Language for current operations.
-    language: SupportedLanguage,
+    language: Option<SupportedLanguage>,
 }
 
 /// Snapshot of match result data (owned, not borrowed).
@@ -68,6 +69,13 @@ fn strip_quotes(s: &str) -> &str {
     s.trim_matches('"')
 }
 
+#[given("language {language}")]
+fn given_language(world: &RefCell<TestWorld>, language: String) {
+    let mut w = world.borrow_mut();
+    let language = strip_quotes(&language);
+    w.language = Some(SupportedLanguage::from_str(language).expect("language"));
+}
+
 #[given("a file {filename} with content {content}")]
 fn given_file(world: &RefCell<TestWorld>, filename: String, content: String) {
     let mut w = world.borrow_mut();
@@ -80,7 +88,7 @@ fn given_file(world: &RefCell<TestWorld>, filename: String, content: String) {
 #[given("Rust source code {code}")]
 fn given_rust_source(world: &RefCell<TestWorld>, code: String) {
     let mut w = world.borrow_mut();
-    w.language = SupportedLanguage::Rust;
+    w.language = Some(SupportedLanguage::Rust);
     let source_code = strip_quotes(&code);
 
     let mut parser = Parser::new(SupportedLanguage::Rust).expect("parser init");
@@ -92,7 +100,8 @@ fn given_rust_source(world: &RefCell<TestWorld>, code: String) {
 fn given_pattern(world: &RefCell<TestWorld>, pattern: String) {
     let mut w = world.borrow_mut();
     let pat = strip_quotes(&pattern);
-    let compiled = Pattern::compile(pat, w.language).expect("pattern compile");
+    let language = w.language.expect("language should be set");
+    let compiled = Pattern::compile(pat, language).expect("pattern compile");
     w.pattern = Some(compiled);
 }
 
@@ -101,8 +110,9 @@ fn given_rewrite_rule(world: &RefCell<TestWorld>, from_pattern: String, to_repla
     let mut w = world.borrow_mut();
     let from_pat = strip_quotes(&from_pattern);
     let to_repl = strip_quotes(&to_replacement);
+    let language = w.language.expect("language should be set");
     // Store the pattern and replacement for later use
-    w.pattern = Some(Pattern::compile(from_pat, w.language).expect("pattern"));
+    w.pattern = Some(Pattern::compile(from_pat, language).expect("pattern"));
     w.replacement = Some(to_repl.to_owned());
 }
 
@@ -150,7 +160,7 @@ fn when_apply_rewrite(world: &RefCell<TestWorld>) {
     let mut w = world.borrow_mut();
 
     // Get the pattern and source for rewriting
-    let language = w.language;
+    let language = w.language.expect("language should be set");
     let source_text = w.parsed_source.as_ref().map(|p| p.source().to_owned());
     let pat = w.pattern.take();
     let replacement = w.replacement.take();
@@ -253,35 +263,26 @@ fn then_capture_contains(world: &RefCell<TestWorld>, name: String, expected: Str
 fn then_output_contains(world: &RefCell<TestWorld>, text: String) {
     let w = world.borrow();
     let expected_text = strip_quotes(&text);
-    if let Some(result) = &w.rewrite_result {
-        assert!(
-            result.output().contains(expected_text),
-            "Expected output to contain '{expected_text}', got: {}",
-            result.output()
-        );
-    } else {
-        panic!("No rewrite result available");
-    }
+    let result = w.rewrite_result.as_ref().expect("rewrite result");
+    assert!(
+        result.output().contains(expected_text),
+        "Expected output to contain '{expected_text}', got: {}",
+        result.output()
+    );
 }
 
 #[then("the rewrite made changes")]
 fn then_rewrite_changed(world: &RefCell<TestWorld>) {
     let w = world.borrow();
-    if let Some(result) = &w.rewrite_result {
-        assert!(result.has_changes(), "Expected rewrite to make changes");
-    } else {
-        panic!("No rewrite result available");
-    }
+    let result = w.rewrite_result.as_ref().expect("rewrite result");
+    assert!(result.has_changes(), "Expected rewrite to make changes");
 }
 
 #[then("the rewrite made no changes")]
 fn then_rewrite_unchanged(world: &RefCell<TestWorld>) {
     let w = world.borrow();
-    if let Some(result) = &w.rewrite_result {
-        assert!(!result.has_changes(), "Expected rewrite to make no changes");
-    } else {
-        panic!("No rewrite result available");
-    }
+    let result = w.rewrite_result.as_ref().expect("rewrite result");
+    assert!(!result.has_changes(), "Expected rewrite to make no changes");
 }
 
 // =============================================================================
@@ -317,6 +318,14 @@ fn valid_python_validation(world: RefCell<TestWorld>) {
     name = "Invalid Python code fails with error location"
 )]
 fn invalid_python_validation(world: RefCell<TestWorld>) {
+    let _ = world;
+}
+
+#[scenario(
+    path = "tests/features/weaver_syntax.feature",
+    name = "Invalid TypeScript code fails with error location"
+)]
+fn invalid_typescript_validation(world: RefCell<TestWorld>) {
     let _ = world;
 }
 

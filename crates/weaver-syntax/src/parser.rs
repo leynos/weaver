@@ -8,6 +8,7 @@ use std::ops::Range;
 
 use crate::error::SyntaxError;
 use crate::language::SupportedLanguage;
+use crate::position::point_to_one_based;
 
 /// Result of parsing source code.
 ///
@@ -107,10 +108,7 @@ impl SyntaxErrorInfo {
             "syntax error".to_owned()
         };
 
-        // Line/column numbers will realistically never exceed u32::MAX
-        // Tree-sitter uses usize but files are limited to reasonable sizes
-        let line = u32::try_from(start.row.saturating_add(1)).unwrap_or(u32::MAX);
-        let column = u32::try_from(start.column.saturating_add(1)).unwrap_or(u32::MAX);
+        let (line, column) = point_to_one_based(start);
 
         Self {
             byte_range,
@@ -167,7 +165,7 @@ impl Parser {
         let tree = self
             .inner
             .parse(source, None)
-            .ok_or_else(|| SyntaxError::parser_init(self.language, "parsing failed"))?;
+            .ok_or_else(|| SyntaxError::parse(self.language, "parsing failed"))?;
 
         Ok(ParseResult {
             tree,

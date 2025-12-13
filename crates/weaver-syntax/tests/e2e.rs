@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use insta::assert_snapshot;
+use insta::{assert_debug_snapshot, assert_snapshot};
 
 use weaver_syntax::{
     Parser, Pattern, RewriteRule, Rewriter, SupportedLanguage, TreeSitterSyntacticLock,
@@ -72,11 +72,9 @@ fn pattern_captures_metavariables_correctly() {
 
     let pattern = Pattern::compile("fn $NAME() {}", SupportedLanguage::Rust).expect("pattern");
 
-    if let Some(m) = pattern.find_first(&source) {
-        if let Some(capture) = m.capture("NAME") {
-            assert_eq!(capture.text(), "hello_world");
-        }
-    }
+    let m = pattern.find_first(&source).expect("should find match");
+    let capture = m.capture("NAME").expect("should capture NAME");
+    assert_eq!(capture.text(), "hello_world");
 }
 
 #[test]
@@ -86,11 +84,10 @@ fn pattern_match_has_correct_position() {
 
     let pattern = Pattern::compile("fn $NAME() {}", SupportedLanguage::Rust).expect("pattern");
 
-    if let Some(m) = pattern.find_first(&source) {
-        let (line, col) = m.start_position();
-        assert_eq!(line, 1, "Should be on line 1");
-        assert!(col >= 1, "Column should be positive");
-    }
+    let m = pattern.find_first(&source).expect("should find match");
+    let (line, col) = m.start_position();
+    assert_eq!(line, 1, "Should be on line 1");
+    assert!(col >= 1, "Column should be positive");
 }
 
 // =============================================================================
@@ -337,4 +334,59 @@ fn snapshot_language_detection() {
         .collect();
 
     assert_snapshot!(results.join("\n"));
+}
+
+#[test]
+fn snapshot_pattern_match_captures_across_languages() {
+    fn snapshots_for(
+        language: SupportedLanguage,
+        source: &str,
+        pattern: &str,
+    ) -> Vec<std::collections::BTreeMap<String, String>> {
+        let mut parser = Parser::new(language).expect("parser");
+        let parsed = parser.parse(source).expect("parse");
+        let pattern = Pattern::compile(pattern, language).expect("pattern");
+
+        pattern
+            .find_all(&parsed)
+            .into_iter()
+            .map(|m| {
+                m.captures()
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.text().to_owned()))
+                    .collect()
+            })
+            .collect()
+    }
+
+    let rust = snapshots_for(
+        SupportedLanguage::Rust,
+        "fn main() { let a = 1; let b = 2; }\nfn other() {}",
+        "fn $NAME() { $$$BODY }",
+    );
+    let python = snapshots_for(
+        SupportedLanguage::Python,
+        "def greet(name):\n    print(name)\n\ndef other():\n    pass\n",
+        "def $NAME($$$ARGS):\n    $$$BODY",
+    );
+    let typescript = snapshots_for(
+        SupportedLanguage::TypeScript,
+        "function greet(name: string): void { console.log(name); }\nfunction other(): void {}",
+        "function $NAME($$$ARGS): void { $$$BODY }",
+    );
+
+    assert_debug_snapshot!((rust, python, typescript));
+}
+
+#[test]
+fn snapshot_rewrite_result_includes_replacement_count() {
+    let pattern = Pattern::compile("let $VAR = $VAL", SupportedLanguage::Rust).expect("pattern");
+    let rule = RewriteRule::new(pattern, "const $VAR: _ = $VAL").expect("rule");
+
+    let rewriter = Rewriter::new(SupportedLanguage::Rust);
+    let result = rewriter
+        .apply(&rule, "fn main() { let a = 1; let b = 2; }")
+        .expect("rewrite");
+
+    assert_debug_snapshot!((result.num_replacements(), result.output().to_owned()));
 }

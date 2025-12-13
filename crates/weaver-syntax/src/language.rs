@@ -84,7 +84,8 @@ impl SupportedLanguage {
         match self {
             Self::Rust => tree_sitter_rust::LANGUAGE.into(),
             Self::Python => tree_sitter_python::LANGUAGE.into(),
-            Self::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
+            // Use a TSX-capable grammar so `.tsx` is parsed correctly.
+            Self::TypeScript => tree_sitter_typescript::LANGUAGE_TSX.into(),
         }
     }
 

@@ -11,6 +11,7 @@ use crate::language::SupportedLanguage;
 
 /// Errors from syntactic analysis operations.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum SyntaxError {
     /// Failed to initialise the Tree-sitter parser for a language.
     #[error("failed to initialise parser for {language}: {message}")]
@@ -33,6 +34,15 @@ pub enum SyntaxError {
     UnknownLanguage {
         /// The path that could not be mapped to a language.
         path: PathBuf,
+    },
+
+    /// Failed to parse source code.
+    #[error("failed to parse {language}: {message}")]
+    ParseError {
+        /// The language that failed to parse.
+        language: SupportedLanguage,
+        /// Description of the failure.
+        message: String,
     },
 
     /// Pattern compilation failed.
@@ -64,6 +74,13 @@ pub enum SyntaxError {
         /// Description of the replacement error.
         message: String,
     },
+
+    /// Internal error indicating a bug or system failure.
+    #[error("internal error: {message}")]
+    InternalError {
+        /// Description of the internal error.
+        message: String,
+    },
 }
 
 impl SyntaxError {
@@ -86,8 +103,17 @@ impl SyntaxError {
 
     /// Creates an unknown language error.
     #[must_use]
-    pub const fn unknown_language(path: PathBuf) -> Self {
+    pub fn unknown_language(path: PathBuf) -> Self {
         Self::UnknownLanguage { path }
+    }
+
+    /// Creates a parse error.
+    #[must_use]
+    pub fn parse(language: SupportedLanguage, message: impl Into<String>) -> Self {
+        Self::ParseError {
+            language,
+            message: message.into(),
+        }
     }
 
     /// Creates a pattern compilation error.
@@ -119,6 +145,14 @@ impl SyntaxError {
     #[must_use]
     pub fn invalid_replacement(message: impl Into<String>) -> Self {
         Self::InvalidReplacement {
+            message: message.into(),
+        }
+    }
+
+    /// Creates an internal error.
+    #[must_use]
+    pub fn internal_error(message: impl Into<String>) -> Self {
+        Self::InternalError {
             message: message.into(),
         }
     }

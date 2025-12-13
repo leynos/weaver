@@ -117,13 +117,9 @@ fn pattern_captures_metavariables() {
     let source = parser.parse("fn hello() {}").expect("parse");
     let pattern = Pattern::compile("fn $NAME() {}", SupportedLanguage::Rust).expect("pattern");
 
-    if let Some(m) = pattern.find_first(&source) {
-        let name_capture = m.capture("NAME");
-        assert!(name_capture.is_some(), "Should capture NAME");
-        if let Some(capture) = name_capture {
-            assert_eq!(capture.text(), "hello");
-        }
-    }
+    let m = pattern.find_first(&source).expect("should find match");
+    let capture = m.capture("NAME").expect("should capture NAME");
+    assert_eq!(capture.text(), "hello");
 }
 
 #[test]

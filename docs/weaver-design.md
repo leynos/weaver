@@ -468,176 +468,136 @@ classDiagram
       +Rust
       +Python
       +TypeScript
-      +as_str() str
       +from_extension(ext str) SupportedLanguage?
       +from_path(path Path) SupportedLanguage?
       +tree_sitter_language() Language
+      +as_str() str
       +all() SupportedLanguage[]
+    }
+
+    class LanguageParseError {
+      +input() str
     }
 
     class SyntaxError {
       <<enum>>
-      +GrammarLoadError
-      +PatternError
-      +RewriteError
-      +UnsupportedLanguage
-      +NoExtension
+      +ParserInitError
+      +UnsupportedExtension
+      +UnknownLanguage
       +ParseError
-      +grammar_load(language SupportedLanguage, message str) SyntaxError
-      +pattern(language SupportedLanguage, message str) SyntaxError
-      +rewrite(message str) SyntaxError
-      +unsupported_language(extension str) SyntaxError
-      +no_extension(path PathBuf) SyntaxError
-      +parse(language SupportedLanguage, message str) SyntaxError
+      +PatternCompileError
+      +InvalidMetavariable
+      +RewriteError
+      +InvalidReplacement
+      +InternalError
     }
 
     class Parser {
-      -inner Parser
-      -language SupportedLanguage
       +new(language SupportedLanguage) Result~Parser, SyntaxError~
       +language() SupportedLanguage
       +parse(source str) Result~ParseResult, SyntaxError~
-      -collect_error_nodes(node Node) SyntaxErrorNode[]
     }
 
     class ParseResult {
-      -tree Tree
-      -source str
-      -language SupportedLanguage
-      -has_errors bool
-      -error_nodes SyntaxErrorNode[]
-      +tree() Tree
       +source() str
       +language() SupportedLanguage
       +has_errors() bool
-      +errors() SyntaxErrorNode[]
+      +errors() SyntaxErrorInfo[]
       +root_node() Node
     }
 
-    class SyntaxErrorNode {
-      -start_byte usize
-      -end_byte usize
-      -line usize
-      -column usize
-      -kind str
-      +start_byte() usize
-      +end_byte() usize
-      +line() usize
-      +line_one_based() usize
-      +column() usize
-      +column_one_based() usize
-      +kind() str
+    class SyntaxErrorInfo {
+      +byte_range Range~usize~
+      +line u32
+      +column u32
+      +context str
+      +message str
     }
 
     class Pattern {
-      -source str
-      -language SupportedLanguage
-      -metavariables MetaVariable[]
-      -tree Tree
-      -normalised_source str
       +compile(source str, language SupportedLanguage) Result~Pattern, SyntaxError~
       +source() str
       +language() SupportedLanguage
       +metavariables() MetaVariable[]
-      +tree() Tree
-      +normalised_source() str
-      -extract_metavariables(source str) MetaVariable[]
-      -normalise_source(source str, metavars MetaVariable[]) str
+      +parsed() ParseResult
+      +has_metavariables() bool
     }
 
     class MetaVariable {
-      -name str
-      -kind MetaVarKind
-      -position usize
-      +name() str
-      +kind() MetaVarKind
-      +position() usize
-      +pattern_string() str
+      +name str
+      +kind MetaVarKind
+      +offset usize
     }
 
     class MetaVarKind {
       <<enum>>
       +Single
       +Multiple
-      +Unnamed
-      +prefix() str
+    }
+
+    class Matcher {
+      +new(pattern Pattern) Matcher
+      +find_all(parsed ParseResult) MatchResult[]
+      +find_first(parsed ParseResult) MatchResult?
     }
 
     class MatchResult {
-      -text str
-      -byte_range Range~usize~
-      -line usize
-      -column usize
-      -captures HashMap~str, CapturedNode~
       +text() str
       +byte_range() Range~usize~
-      +line() usize
-      +line_one_based() usize
-      +column() usize
-      +column_one_based() usize
-      +captures() HashMap~str, CapturedNode~
-      +capture(name str) CapturedNode?
+      +start_position() (u32, u32)
+      +end_position() (u32, u32)
+      +captures() HashMap~str, CapturedValue~
+      +capture(name str) CapturedValue?
+    }
+
+    class CapturedValue {
+      <<enum>>
+      +Single
+      +Multiple
+      +text() str
+      +byte_range() Range~usize~
     }
 
     class CapturedNode {
-      -text str
-      -byte_range Range~usize~
-      -kind str
       +text() str
       +byte_range() Range~usize~
-      +kind() str
+    }
+
+    class CapturedNodes {
+      +text() str
+      +byte_range() Range~usize~
     }
 
     class RewriteRule {
-      -pattern Pattern
-      -replacement str
-      +new(pattern Pattern, replacement str) RewriteRule
-      +compile(pattern_str str, replacement str, language SupportedLanguage) Result~RewriteRule, SyntaxError~
+      +new(pattern Pattern, replacement str) Result~RewriteRule, SyntaxError~
       +pattern() Pattern
       +replacement() str
     }
 
     class Rewriter {
-      -language SupportedLanguage
       +new(language SupportedLanguage) Rewriter
-      +language() SupportedLanguage
-      +apply(rule RewriteRule, source str) Result~str, SyntaxError~
-      +apply_all(rules RewriteRule[], source str) Result~str, SyntaxError~
-      -substitute_metavariables(template str, match_result MatchResult) str
+      +apply(rule RewriteRule, source str) Result~RewriteResult, SyntaxError~
+      +apply_all(rules RewriteRule[], source str) Result~RewriteResult, SyntaxError~
+    }
+
+    class RewriteResult {
+      +output() str
+      +num_replacements() usize
+      +has_changes() bool
     }
 
     class TreeSitterSyntacticLock {
-      -parsers RefCell~HashMap~SupportedLanguage, Parser~~
       +new() TreeSitterSyntacticLock
-      +validate(context VerificationContext) SyntacticLockResult
-      -get_parser(language SupportedLanguage) RefMut~Parser~
-      -validate_file(path Path, content str) Result~VerificationFailure[], SyntaxError~
+      +validate_file(path Path, content str) Result~ValidationFailure[], SyntaxError~
+      +validate_files(files (Path, str)[]) Result~ValidationFailure[], SyntaxError~
+      +supports_file(path Path) bool
     }
 
-    class SyntacticLock {
-      <<trait>>
-      +validate(context VerificationContext) SyntacticLockResult
-    }
-
-    class VerificationContext {
-      +new() VerificationContext
-      +modified_files() Iterator~(PathBuf, str)~
-      +add_modified(path PathBuf, content str) void
-    }
-
-    class VerificationFailure {
-      +new(path PathBuf, message str) VerificationFailure
-      +at_location(line u32, column u32) VerificationFailure
-      +file() PathBuf
-      +line() Option~u32~
-    }
-
-    class SyntacticLockResult {
-      <<enum>>
-      +Passed
-      +Failed
-      +passed() bool
-      +failures() VerificationFailure[]?
+    class ValidationFailure {
+      +path PathBuf
+      +line u32
+      +column u32
+      +message str
     }
 
     %% Relationships
@@ -645,36 +605,37 @@ classDiagram
     Parser --> ParseResult
     Parser --> SyntaxError
 
-    ParseResult --> SyntaxErrorNode
     ParseResult --> SupportedLanguage
-
-    SyntaxErrorNode --> SupportedLanguage
+    ParseResult --> SyntaxErrorInfo
 
     Pattern --> SupportedLanguage
+    Pattern --> ParseResult
     Pattern --> MetaVariable
     Pattern --> SyntaxError
 
     MetaVariable --> MetaVarKind
 
-    MatchResult --> CapturedNode
+    Matcher --> Pattern
+    Matcher --> ParseResult
+    Matcher --> MatchResult
+
+    MatchResult --> CapturedValue
+    CapturedValue --> CapturedNode
+    CapturedValue --> CapturedNodes
 
     RewriteRule --> Pattern
-    RewriteRule --> SupportedLanguage
     RewriteRule --> SyntaxError
 
     Rewriter --> SupportedLanguage
     Rewriter --> RewriteRule
     Rewriter --> Parser
-    Rewriter --> MatchResult
+    Rewriter --> RewriteResult
     Rewriter --> SyntaxError
 
-    TreeSitterSyntacticLock ..|> SyntacticLock
     TreeSitterSyntacticLock --> Parser
     TreeSitterSyntacticLock --> SupportedLanguage
     TreeSitterSyntacticLock --> SyntaxError
-    TreeSitterSyntacticLock --> VerificationContext
-    TreeSitterSyntacticLock --> VerificationFailure
-    TreeSitterSyntacticLock --> SyntacticLockResult
+    TreeSitterSyntacticLock --> ValidationFailure
 ```
 
 Each piece of information gathered by these layers---a symbol reference from
@@ -1725,14 +1686,14 @@ capability matrix honest before the daemon adds sandboxing and transport.
 The new `weaver-syntax` crate provides the syntactic layer for the Semantic
 Fusion Engine. It wraps Tree-sitter parsers for Rust, Python, and TypeScript
 behind a unified `Parser` abstraction that detects languages from file
-extensions. The `TreeSitterSyntacticLock` implements the `SyntacticLock` trait
-required by the Double-Lock safety harness, validating files by parsing them
-and reporting any ERROR nodes as validation failures with line/column
-positions. Unknown file extensions are silently skipped to avoid blocking edits
-to non-code artefacts.
+extensions. The `TreeSitterSyntacticLock` provides the syntactic lock required
+by the Double-Lock safety harness, validating files by parsing them and
+reporting any ERROR nodes as validation failures with line/column positions.
+Unknown file extensions are silently skipped to avoid blocking edits to
+non-code artefacts.
 
 The crate also delivers an ast-grep-inspired pattern matching engine. Patterns
-support metavariables (`$VAR` for single captures, `$$VAR` for multiple) which
+support metavariables (`$VAR` for single captures, `$$$VAR` for multiple) which
 Tree-sitter parses as native `metavariable` nodes. The `Pattern` type compiles
 a pattern string into a parsed tree and extracts metavariable definitions; the
 `Matcher` walks the source tree and the pattern tree in parallel, yielding
@@ -1741,7 +1702,8 @@ a pattern string into a parsed tree and extracts metavariable definitions; the
 into a replacement template and returning the rewritten source with a
 change-tracking flag.
 
-Testing follows the workspace conventions: `rstest-bdd` 0.2.0 powers BDD
+Testing follows the workspace conventions: `rstest-bdd` 0.2.0 powers
+behaviour-driven development (BDD)
 scenarios defined in `tests/features/weaver_syntax.feature`, while `insta`
 captures snapshot expectations for language detection, parse error formatting,
 and validation failure output. The combination of unit, behavioural, and

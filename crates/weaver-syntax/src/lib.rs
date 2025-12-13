@@ -92,14 +92,16 @@
 mod error;
 mod language;
 mod matcher;
+mod metavariables;
 mod parser;
 mod pattern;
+mod position;
 mod rewriter;
 mod syntactic_lock;
 
 pub use error::SyntaxError;
 pub use language::{LanguageParseError, SupportedLanguage};
-pub use matcher::{CapturedNode, MatchResult, Matcher};
+pub use matcher::{CapturedNode, CapturedNodes, CapturedValue, MatchResult, Matcher};
 pub use parser::{ParseResult, Parser, SyntaxErrorInfo};
 pub use pattern::{MetaVarKind, MetaVariable, Pattern};
 pub use rewriter::{RewriteResult, RewriteRule, Rewriter};

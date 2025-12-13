@@ -26,6 +26,11 @@ Feature: Syntactic analysis and pattern matching
     When the syntactic lock validates the file
     Then validation fails
 
+  Scenario: Invalid TypeScript code fails with error location
+    Given a file "broken.ts" with content "function broken( {"
+    When the syntactic lock validates the file
+    Then validation fails
+
   Scenario: Unknown file extensions are skipped
     Given a file "data.json" with content "{invalid json"
     When the syntactic lock validates the file

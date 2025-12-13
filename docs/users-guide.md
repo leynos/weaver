@@ -302,7 +302,7 @@ Tree-sitter parsers for Rust, Python, and TypeScript. When validating a file,
 the lock parses the content and inspects the resulting syntax tree for ERROR
 nodes. Files containing structural errors—such as unbalanced braces, missing
 semicolons, or malformed declarations—are rejected before the semantic lock
-runs. Files with extensions not recognized by any configured parser are skipped
+runs. Files with extensions not recognised by any configured parser are skipped
 (pass through) to avoid blocking edits to configuration files, documentation,
 or other non-code artefacts.
 
@@ -319,7 +319,7 @@ contact a language server.
 
 The `weaver-syntax` crate also provides a structural pattern matching engine
 inspired by ast-grep. Patterns use metavariables (`$VAR` for single captures,
-`$$VAR` for multiple) to match and capture portions of the syntax tree. This
+`$$$VAR` for multiple) to match and capture portions of the syntax tree. This
 enables the future `observe grep` and `act apply-rewrite` commands to perform
 precise, AST-aware search and transformation across the codebase. The engine
 currently supports Rust, Python, and TypeScript.
@@ -327,4 +327,4 @@ currently supports Rust, Python, and TypeScript.
 ### Semantic lock
 
 The semantic lock relies on the `weaver-lsp-host` infrastructure, which requires
-language servers to be registered and initialized for the relevant languages.
+language servers to be registered and initialised for the relevant languages.

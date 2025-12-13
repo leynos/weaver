@@ -7,6 +7,7 @@
 use crate::error::SyntaxError;
 use crate::language::SupportedLanguage;
 use crate::matcher::MatchResult;
+use crate::metavariables::extract_metavar_name;
 use crate::parser::Parser;
 use crate::pattern::Pattern;
 
@@ -36,11 +37,17 @@ impl RewriteRule {
         let replacement_str = replacement.into();
 
         // Validate that replacement metavariables exist in the pattern
-        let pattern_vars: Vec<_> = pattern.metavariables().iter().map(|m| &m.name).collect();
+        use std::collections::HashSet;
+
+        let pattern_vars: HashSet<_> = pattern
+            .metavariables()
+            .iter()
+            .map(|m| m.name.as_str())
+            .collect();
         let replacement_vars = extract_replacement_vars(&replacement_str);
 
         for var in &replacement_vars {
-            if var != "_" && !pattern_vars.contains(&var) {
+            if var != "_" && !pattern_vars.contains(var.as_str()) {
                 return Err(SyntaxError::invalid_replacement(format!(
                     "replacement references undefined metavariable: ${var}"
                 )));
@@ -104,7 +111,7 @@ impl Rewriter {
             });
         }
 
-        let output = Self::apply_replacements(source, &matches, &rule.replacement);
+        let output = Self::apply_replacements(source, &matches, &rule.replacement)?;
 
         Ok(RewriteResult {
             output,
@@ -144,7 +151,7 @@ impl Rewriter {
         source: &str,
         matches: &[MatchResult<'_>],
         replacement_template: &str,
-    ) -> String {
+    ) -> Result<String, SyntaxError> {
         // Sort matches by byte offset (descending) to replace from end to start
         // This preserves earlier offsets when replacing
         let mut sorted_matches: Vec<_> = matches.iter().collect();
@@ -157,12 +164,19 @@ impl Rewriter {
             let range = m.byte_range();
 
             // Replace in the result string
-            if range.start <= result.len() && range.end <= result.len() {
-                result.replace_range(range, &replacement);
+            if range.start > result.len() || range.end > result.len() {
+                continue;
             }
+            if !result.is_char_boundary(range.start) || !result.is_char_boundary(range.end) {
+                return Err(SyntaxError::internal_error(
+                    "rewrite match range is not on a UTF-8 boundary",
+                ));
+            }
+
+            result.replace_range(range, &replacement);
         }
 
-        result
+        Ok(result)
     }
 }
 
@@ -195,25 +209,6 @@ impl RewriteResult {
     }
 }
 
-/// Checks if a character is valid for a metavariable name.
-const fn is_valid_metavar_char(c: char) -> bool {
-    c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'
-}
-
-/// Helper to extract a metavariable name from a character stream.
-fn extract_var_name(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>) -> String {
-    let mut name = String::new();
-    while let Some((_, c)) = chars.peek() {
-        if is_valid_metavar_char(*c) {
-            name.push(*c);
-            chars.next();
-        } else {
-            break;
-        }
-    }
-    name
-}
-
 /// Extracts metavariable references from a replacement template.
 fn extract_replacement_vars(replacement: &str) -> Vec<String> {
     let mut vars = Vec::new();
@@ -221,14 +216,18 @@ fn extract_replacement_vars(replacement: &str) -> Vec<String> {
 
     while let Some((_, ch)) = chars.next() {
         if ch == '$' {
-            // Skip multiple $ prefixes
+            let mut dollars = 1;
             while chars.peek().is_some_and(|(_, c)| *c == '$') {
+                dollars += 1;
                 chars.next();
             }
 
-            // Extract name
-            let name = extract_var_name(&mut chars);
-            if !name.is_empty() {
+            let name = extract_metavar_name(&mut chars);
+            if name.is_empty() || dollars == 2 {
+                continue;
+            }
+
+            if dollars == 1 || dollars == 3 {
                 vars.push(name);
             }
         }
@@ -239,17 +238,47 @@ fn extract_replacement_vars(replacement: &str) -> Vec<String> {
 
 /// Substitutes metavariables in a replacement template with captured values.
 fn substitute_metavariables(template: &str, match_result: &MatchResult<'_>) -> String {
-    let mut result = template.to_owned();
+    let mut out = String::with_capacity(template.len());
+    let mut chars = template.char_indices().peekable();
 
-    for (name, capture) in match_result.captures() {
-        // Handle both $VAR and $$$VAR references
-        let patterns = [format!("$$${name}"), format!("${name}")];
-        for pattern in patterns {
-            result = result.replace(&pattern, capture.text());
+    while let Some((_, ch)) = chars.next() {
+        if ch != '$' {
+            out.push(ch);
+            continue;
         }
+
+        let mut dollars = 1;
+        while chars.peek().is_some_and(|(_, c)| *c == '$') {
+            dollars += 1;
+            chars.next();
+        }
+
+        let name = extract_metavar_name(&mut chars);
+        if name.is_empty() || dollars == 2 {
+            out.push_str(&"$".repeat(dollars));
+            out.push_str(&name);
+            continue;
+        }
+
+        if name == "_" {
+            continue;
+        }
+
+        if dollars == 1 || dollars == 3 {
+            if let Some(capture) = match_result.capture(&name) {
+                out.push_str(capture.text());
+            } else if dollars == 1 {
+                out.push_str(&"$".repeat(dollars));
+                out.push_str(&name);
+            }
+            continue;
+        }
+
+        out.push_str(&"$".repeat(dollars));
+        out.push_str(&name);
     }
 
-    result
+    out
 }
 
 #[cfg(test)]
