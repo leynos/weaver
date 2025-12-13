@@ -181,11 +181,36 @@ fn wrap_pattern_for_parse(language: SupportedLanguage, pattern: &str) -> String 
 
 fn normalise_metavariables(source: &str) -> Result<String, SyntaxError> {
     let mut out = String::with_capacity(source.len());
-    let mut chars = source.char_indices().peekable();
 
-    while let Some((_, ch)) = chars.next() {
+    visit_metavariables(source, |event| match event {
+        MetavarEvent::Literal(ch) => out.push(ch),
+        MetavarEvent::Metavar(metavar) => out.push_str(&placeholder_for_metavar(&metavar.name)),
+    })?;
+
+    Ok(out)
+}
+
+#[derive(Debug)]
+struct MetavarReference {
+    dollars: usize,
+    name: String,
+    offset: usize,
+}
+
+#[derive(Debug)]
+enum MetavarEvent {
+    Literal(char),
+    Metavar(MetavarReference),
+}
+
+fn visit_metavariables<F>(source: &str, mut handler: F) -> Result<(), SyntaxError>
+where
+    F: FnMut(MetavarEvent),
+{
+    let mut chars = source.char_indices().peekable();
+    while let Some((offset, ch)) = chars.next() {
         if ch != '$' {
-            out.push(ch);
+            handler(MetavarEvent::Literal(ch));
             continue;
         }
 
@@ -197,21 +222,25 @@ fn normalise_metavariables(source: &str) -> Result<String, SyntaxError> {
 
         if dollar_count == 2 || dollar_count > 3 {
             return Err(SyntaxError::invalid_metavariable(format!(
-                "metavariable has invalid '$' prefix length ({dollar_count})"
+                "metavariable at offset {offset} has invalid '$' prefix length ({dollar_count})"
             )));
         }
 
         let name = extract_metavar_name(&mut chars);
         if name.is_empty() {
-            return Err(SyntaxError::invalid_metavariable(
-                "metavariable has no valid name",
-            ));
+            return Err(SyntaxError::invalid_metavariable(format!(
+                "metavariable at offset {offset} has no valid name"
+            )));
         }
 
-        out.push_str(&placeholder_for_metavar(&name));
+        handler(MetavarEvent::Metavar(MetavarReference {
+            dollars: dollar_count,
+            name,
+            offset,
+        }));
     }
 
-    Ok(out)
+    Ok(())
 }
 
 /// Extracts metavariables from a pattern source string.
@@ -220,41 +249,23 @@ fn normalise_metavariables(source: &str) -> Result<String, SyntaxError> {
 /// information about each metavariable found.
 fn extract_metavariables(source: &str) -> Result<Vec<MetaVariable>, SyntaxError> {
     let mut metavariables = Vec::new();
-    let mut chars = source.char_indices().peekable();
+    visit_metavariables(source, |event| {
+        let MetavarEvent::Metavar(metavar) = event else {
+            return;
+        };
 
-    while let Some((offset, ch)) = chars.next() {
-        if ch == '$' {
-            // Check for multiple-match prefix ($$$)
-            let mut dollar_count = 1;
-            while chars.peek().is_some_and(|(_, c)| *c == '$') {
-                chars.next();
-                dollar_count += 1;
-            }
+        let kind = if metavar.dollars == 3 {
+            MetaVarKind::Multiple
+        } else {
+            MetaVarKind::Single
+        };
 
-            if dollar_count == 2 || dollar_count > 3 {
-                return Err(SyntaxError::invalid_metavariable(format!(
-                    "metavariable at offset {offset} has invalid '$' prefix length ({dollar_count})"
-                )));
-            }
-
-            let kind = if dollar_count == 3 {
-                MetaVarKind::Multiple
-            } else {
-                MetaVarKind::Single
-            };
-
-            // Extract the metavariable name
-            let name = extract_metavar_name(&mut chars);
-
-            if name.is_empty() {
-                return Err(SyntaxError::invalid_metavariable(format!(
-                    "metavariable at offset {offset} has no valid name"
-                )));
-            }
-
-            metavariables.push(MetaVariable { name, kind, offset });
-        }
-    }
+        metavariables.push(MetaVariable {
+            name: metavar.name,
+            kind,
+            offset: metavar.offset,
+        });
+    })?;
 
     Ok(metavariables)
 }
@@ -323,5 +334,11 @@ mod tests {
     fn pattern_without_metavariables() {
         let pattern = Pattern::compile("fn main() {}", SupportedLanguage::Rust).expect("compile");
         assert!(!pattern.has_metavariables());
+    }
+
+    #[test]
+    fn compile_rejects_patterns_with_syntax_errors() {
+        let result = Pattern::compile("fn (", SupportedLanguage::Rust);
+        assert!(result.is_err());
     }
 }

@@ -7,7 +7,7 @@
 use crate::error::SyntaxError;
 use crate::language::SupportedLanguage;
 use crate::matcher::MatchResult;
-use crate::metavariables::{is_valid_metavar_continuation_char, is_valid_metavar_start_char};
+use crate::metavariables::extract_metavar_name;
 use crate::parser::Parser;
 use crate::pattern::Pattern;
 use std::collections::HashSet;
@@ -208,70 +208,33 @@ impl RewriteResult {
     }
 }
 
-#[derive(Debug)]
-struct TemplateMetavar {
-    dollars: usize,
-    name: String,
-}
-
-/// Checks if a character is valid for a metavariable name.
-const fn is_valid_metavar_char(c: char) -> bool {
-    is_valid_metavar_continuation_char(c)
-}
-
-fn extract_var_name(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>) -> String {
-    let mut name = String::new();
-
-    let Some((_, first_char)) = chars.peek().copied() else {
-        return name;
-    };
-
-    if !is_valid_metavar_start_char(first_char) {
-        return name;
-    }
-
-    name.push(first_char);
-    chars.next();
-
-    while let Some((_, c)) = chars.peek().copied() {
-        if !is_valid_metavar_char(c) {
-            break;
-        }
-        name.push(c);
-        chars.next();
-    }
-
-    name
-}
-
-fn parse_template_metavar(
-    chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>,
-) -> TemplateMetavar {
+/// Counts consecutive dollar signs starting from the current position.
+///
+/// The caller must have already consumed the first `$`.
+fn count_dollars(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>) -> usize {
     let mut dollars = 1;
     while chars.peek().is_some_and(|(_, c)| *c == '$') {
         dollars += 1;
         chars.next();
     }
-
-    let name = extract_var_name(chars);
-
-    TemplateMetavar { dollars, name }
+    dollars
 }
 
-fn push_literal_metavar(out: &mut String, dollars: usize, name: &str) {
+/// Appends the literal dollar prefix and name to the output.
+fn append_literal_dollars(out: &mut String, dollars: usize, name: &str) {
     out.extend(std::iter::repeat_n('$', dollars));
     out.push_str(name);
 }
 
-fn substitute_template_metavar(
+/// Attempts to substitute a metavariable reference, falling back to literals when needed.
+fn try_substitute_metavar(
     out: &mut String,
-    reference: TemplateMetavar,
+    dollars: usize,
+    name: &str,
     match_result: &MatchResult<'_>,
 ) {
-    let TemplateMetavar { dollars, name } = reference;
-
     if name.is_empty() || dollars == 2 {
-        push_literal_metavar(out, dollars, &name);
+        append_literal_dollars(out, dollars, name);
         return;
     }
 
@@ -279,20 +242,18 @@ fn substitute_template_metavar(
         return;
     }
 
-    match dollars {
-        1 => {
-            if let Some(capture) = match_result.capture(&name) {
-                out.push_str(capture.text());
-            } else {
-                push_literal_metavar(out, dollars, &name);
-            }
-        }
-        3 => {
-            if let Some(capture) = match_result.capture(&name) {
-                out.push_str(capture.text());
-            }
-        }
-        _ => push_literal_metavar(out, dollars, &name),
+    if dollars != 1 && dollars != 3 {
+        append_literal_dollars(out, dollars, name);
+        return;
+    }
+
+    if let Some(capture) = match_result.capture(name) {
+        out.push_str(capture.text());
+        return;
+    }
+
+    if dollars == 1 {
+        append_literal_dollars(out, dollars, name);
     }
 }
 
@@ -303,7 +264,8 @@ fn extract_replacement_vars(replacement: &str) -> Vec<String> {
 
     while let Some((_, ch)) = chars.next() {
         if ch == '$' {
-            let TemplateMetavar { dollars, name } = parse_template_metavar(&mut chars);
+            let dollars = count_dollars(&mut chars);
+            let name = extract_metavar_name(&mut chars);
             if name.is_empty() || dollars == 2 {
                 continue;
             }
@@ -328,8 +290,9 @@ fn substitute_metavariables(template: &str, match_result: &MatchResult<'_>) -> S
             continue;
         }
 
-        let reference = parse_template_metavar(&mut chars);
-        substitute_template_metavar(&mut out, reference, match_result);
+        let dollars = count_dollars(&mut chars);
+        let name = extract_metavar_name(&mut chars);
+        try_substitute_metavar(&mut out, dollars, &name, match_result);
     }
 
     out
