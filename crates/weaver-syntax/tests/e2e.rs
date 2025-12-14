@@ -46,12 +46,17 @@ fn rust_parser() -> Parser {
     Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"))
 }
 
-/// Helper to parse source and compile a Rust pattern.
-fn parse_and_compile_pattern(
+/// Helper to parse source, compile a pattern, and find the first match.
+///
+/// This helper accepts a callback because [`weaver_syntax::MatchResult`] borrows
+/// from the parsed source and cannot be returned alongside it without a
+/// self-referential structure.
+fn parse_compile_and_find_first(
     parser: &mut Parser,
     source: &str,
     pattern_str: &str,
-) -> (weaver_syntax::ParseResult, Pattern) {
+    assertion: impl for<'a> FnOnce(weaver_syntax::MatchResult<'a>),
+) {
     let parsed = parser
         .parse(source)
         .unwrap_or_else(|err| panic!("parse: {err}"));
@@ -59,7 +64,11 @@ fn parse_and_compile_pattern(
     let pattern = Pattern::compile(pattern_str, SupportedLanguage::Rust)
         .unwrap_or_else(|err| panic!("pattern: {err}"));
 
-    (parsed, pattern)
+    let match_result = pattern
+        .find_first(&parsed)
+        .unwrap_or_else(|| panic!("should find match"));
+
+    assertion(match_result);
 }
 
 /// Helper to validate a file and return the first validation failure.
@@ -95,27 +104,26 @@ fn pattern_finds_all_function_definitions(mut rust_parser: Parser) {
 
 #[rstest]
 fn pattern_captures_metavariables_correctly(mut rust_parser: Parser) {
-    let (parsed, pattern) =
-        parse_and_compile_pattern(&mut rust_parser, "fn hello_world() {}", "fn $NAME() {}");
-    let Some(m) = pattern.find_first(&parsed) else {
-        panic!("should find match");
-    };
-    let Some(capture) = m.capture("NAME") else {
-        panic!("should capture NAME");
-    };
-    assert_eq!(capture.text(), "hello_world");
+    parse_compile_and_find_first(
+        &mut rust_parser,
+        "fn hello_world() {}",
+        "fn $NAME() {}",
+        |m| {
+            let Some(capture) = m.capture("NAME") else {
+                panic!("should capture NAME");
+            };
+            assert_eq!(capture.text(), "hello_world");
+        },
+    );
 }
 
 #[rstest]
 fn pattern_match_has_correct_position(mut rust_parser: Parser) {
-    let (parsed, pattern) =
-        parse_and_compile_pattern(&mut rust_parser, "fn test() {}", "fn $NAME() {}");
-    let Some(m) = pattern.find_first(&parsed) else {
-        panic!("should find match");
-    };
-    let (line, col) = m.start_position();
-    assert_eq!(line, 1, "Should be on line 1");
-    assert!(col >= 1, "Column should be positive");
+    parse_compile_and_find_first(&mut rust_parser, "fn test() {}", "fn $NAME() {}", |m| {
+        let (line, col) = m.start_position();
+        assert_eq!(line, 1, "Should be on line 1");
+        assert!(col >= 1, "Column should be positive");
+    });
 }
 
 // =============================================================================
