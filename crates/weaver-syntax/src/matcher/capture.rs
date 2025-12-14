@@ -117,12 +117,16 @@ fn slice_source_range(source: &str, range: Range<usize>) -> &str {
     let start = range.start;
     let end = range.end;
 
-    source.get(start..end).unwrap_or_else(|| {
-        panic!(
+    let Some(slice) = source.get(start..end) else {
+        debug_assert!(
+            false,
             "tree-sitter node byte range {start}..{end} is not valid for source length {}",
             source.len()
-        )
-    })
+        );
+        return "";
+    };
+
+    slice
 }
 
 impl<'a> Captures<'a> {

@@ -21,6 +21,11 @@ Feature: Syntactic analysis and pattern matching
     When the syntactic lock validates the file
     Then validation passes with no failures
 
+  Scenario: Valid TypeScript code passes syntactic validation
+    Given a file "main.ts" with content "function main(): void {}"
+    When the syntactic lock validates the file
+    Then validation passes with no failures
+
   Scenario: Invalid Python code fails with error location
     Given a file "broken.py" with content "def broken("
     When the syntactic lock validates the file

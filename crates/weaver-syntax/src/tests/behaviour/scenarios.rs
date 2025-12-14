@@ -42,6 +42,14 @@ fn valid_python_validation(world: RefCell<TestWorld>) {
 
 #[scenario(
     path = "tests/features/weaver_syntax.feature",
+    name = "Valid TypeScript code passes syntactic validation"
+)]
+fn valid_typescript_validation(world: RefCell<TestWorld>) {
+    drop(world);
+}
+
+#[scenario(
+    path = "tests/features/weaver_syntax.feature",
     name = "Invalid Python code fails with error location"
 )]
 fn invalid_python_validation(world: RefCell<TestWorld>) {

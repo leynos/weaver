@@ -83,9 +83,10 @@ fn find_metavariable_in_pattern<'p>(
     }
 
     let mut cursor = pattern_node.walk();
-    let children: Vec<_> = pattern_node.named_children(&mut cursor).collect();
-    if let [child] = children.as_slice() {
-        return find_metavariable_in_pattern(*child, ctx);
+    let mut children = pattern_node.named_children(&mut cursor);
+    let child = children.next()?;
+    if children.next().is_none() {
+        return find_metavariable_in_pattern(child, ctx);
     }
 
     None
@@ -112,7 +113,16 @@ fn nodes_match<'a>(
 
     let pattern_text = ctx.pattern_text(pattern_node);
     if pattern_node.child_count() == 0 {
-        let source_text = ctx.source.get(source_node.byte_range()).unwrap_or_default();
+        let range = source_node.byte_range();
+        let Some(source_text) = ctx.source.get(range.clone()) else {
+            debug_assert!(
+                false,
+                "tree-sitter node byte range {:?} is not valid for source length {}",
+                range,
+                ctx.source.len()
+            );
+            return false;
+        };
         return source_text == pattern_text;
     }
 
