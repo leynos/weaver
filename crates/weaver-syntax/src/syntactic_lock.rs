@@ -174,14 +174,17 @@ impl TreeSitterSyntacticLock {
     where
         I: IntoIterator<Item = OwnedFile>,
     {
-        let mut all_failures = Vec::new();
+        let owned_files: Vec<_> = files
+            .into_iter()
+            .map(|OwnedFile { path, content }| (path, content))
+            .collect();
 
-        for OwnedFile { path, content } in files {
-            let failures = self.validate_file(&path, &content)?;
-            all_failures.extend(failures);
-        }
+        let file_refs: Vec<_> = owned_files
+            .iter()
+            .map(|(path, content)| (path.as_path(), content.as_str()))
+            .collect();
 
-        Ok(all_failures)
+        self.validate_files(file_refs)
     }
 
     /// Checks if a file would be validated by this lock.

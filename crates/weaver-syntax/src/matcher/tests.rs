@@ -26,6 +26,19 @@ fn first_rust_match<'a>(pattern: &Pattern, source: &'a ParseResult) -> MatchResu
     pattern.find_first(source).expect("should find a match")
 }
 
+/// Helper to parse and return a multiple metavariable capture's text.
+fn extract_multiple_capture_text(
+    parser: &mut Parser,
+    source: &str,
+    pattern_str: &str,
+    capture_name: &str,
+) -> String {
+    let (parsed, pattern) = parse_and_pattern(parser, source, pattern_str);
+    let m = first_rust_match(&pattern, &parsed);
+    let nodes = extract_multiple_capture(&m, capture_name);
+    nodes.text().to_owned()
+}
+
 /// Helper to extract a multiple metavariable capture from a match result.
 fn extract_multiple_capture<'a>(
     match_result: &'a MatchResult<'a>,
@@ -88,15 +101,15 @@ fn match_result_has_position(mut rust_parser: Parser) {
 
 #[rstest]
 fn trailing_multiple_metavariable_can_match_empty(mut rust_parser: Parser) {
-    let (source, pattern) =
-        parse_and_pattern(&mut rust_parser, "fn main() {}", "fn main() { $$$BODY }");
-    let m = first_rust_match(&pattern, &source);
-
-    let nodes = extract_multiple_capture(&m, "BODY");
+    let text = extract_multiple_capture_text(
+        &mut rust_parser,
+        "fn main() {}",
+        "fn main() { $$$BODY }",
+        "BODY",
+    );
     assert!(
-        nodes.text().trim().is_empty(),
-        "expected empty capture, got {:?}",
-        nodes.text()
+        text.trim().is_empty(),
+        "expected empty capture, got {text:?}"
     );
 }
 
@@ -125,10 +138,8 @@ fn multiple_metavariable_capture_behaves(
     mut rust_parser: Parser,
     #[case] case: MultipleMetavariableCaptureCase,
 ) {
-    let (source, pattern) = parse_and_pattern(&mut rust_parser, case.source_code, case.pattern_str);
-    let m = first_rust_match(&pattern, &source);
-    let nodes = extract_multiple_capture(&m, "BODY");
-    let text = nodes.text();
+    let text =
+        extract_multiple_capture_text(&mut rust_parser, case.source_code, case.pattern_str, "BODY");
 
     for expected in case.must_contain {
         assert!(
