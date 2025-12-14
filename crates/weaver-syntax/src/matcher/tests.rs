@@ -26,6 +26,18 @@ fn first_rust_match<'a>(pattern: &Pattern, source: &'a ParseResult) -> MatchResu
     pattern.find_first(source).expect("should find a match")
 }
 
+/// Helper to extract a multiple metavariable capture from a match result.
+fn extract_multiple_capture<'a>(
+    match_result: &'a MatchResult<'a>,
+    var_name: &str,
+) -> &'a CapturedNodes<'a> {
+    match_result
+        .capture(var_name)
+        .unwrap_or_else(|| panic!("should capture {var_name}"))
+        .as_multiple()
+        .unwrap_or_else(|| panic!("{var_name} should be multiple"))
+}
+
 #[rstest]
 fn find_literal_pattern(mut rust_parser: Parser) {
     let (source, pattern) =
@@ -83,8 +95,7 @@ fn multiple_metavariable_captures_all_children_in_block(mut rust_parser: Parser)
     );
     let m = first_rust_match(&pattern, &source);
 
-    let body = m.capture("BODY").expect("should capture BODY");
-    let nodes = body.as_multiple().expect("BODY should be multiple");
+    let nodes = extract_multiple_capture(&m, "BODY");
     assert!(nodes.text().contains("let a"));
     assert!(nodes.text().contains("let b"));
 }
@@ -112,8 +123,7 @@ fn multiple_metavariable_respects_following_sibling_match(mut rust_parser: Parse
         "fn main() { $$$BODY; println!(\"tail\"); }",
     );
     let m = first_rust_match(&pattern, &source);
-    let body = m.capture("BODY").expect("should capture BODY");
-    let nodes = body.as_multiple().expect("BODY should be multiple");
+    let nodes = extract_multiple_capture(&m, "BODY");
     assert!(nodes.text().contains("println!(\"a\")"));
     assert!(!nodes.text().contains("tail"));
 }
