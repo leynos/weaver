@@ -136,6 +136,22 @@ impl TreeSitterSyntacticLock {
         self.validate_file(&path, &content)
     }
 
+    fn validate_pairs<I, P, C>(&self, files: I) -> Result<Vec<ValidationFailure>, SyntaxError>
+    where
+        I: IntoIterator<Item = (P, C)>,
+        P: AsRef<Path>,
+        C: AsRef<str>,
+    {
+        let mut all_failures = Vec::new();
+
+        for (path, content) in files {
+            let failures = self.validate_file(path.as_ref(), content.as_ref())?;
+            all_failures.extend(failures);
+        }
+
+        Ok(all_failures)
+    }
+
     /// Validates multiple files.
     ///
     /// Returns all validation failures across all files.
@@ -151,14 +167,7 @@ impl TreeSitterSyntacticLock {
     where
         I: IntoIterator<Item = (&'a Path, &'a str)>,
     {
-        let mut all_failures = Vec::new();
-
-        for (path, content) in files {
-            let failures = self.validate_file(path, content)?;
-            all_failures.extend(failures);
-        }
-
-        Ok(all_failures)
+        self.validate_pairs(files)
     }
 
     /// Validates multiple files using owned inputs.
@@ -174,17 +183,11 @@ impl TreeSitterSyntacticLock {
     where
         I: IntoIterator<Item = OwnedFile>,
     {
-        let owned_files: Vec<_> = files
-            .into_iter()
-            .map(|OwnedFile { path, content }| (path, content))
-            .collect();
-
-        let file_refs: Vec<_> = owned_files
-            .iter()
-            .map(|(path, content)| (path.as_path(), content.as_str()))
-            .collect();
-
-        self.validate_files(file_refs)
+        self.validate_pairs(
+            files
+                .into_iter()
+                .map(|OwnedFile { path, content }| (path, content)),
+        )
     }
 
     /// Checks if a file would be validated by this lock.

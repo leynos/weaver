@@ -542,11 +542,12 @@ classDiagram
     }
 
     class MatchResult {
+      +node() Node
       +text() str
       +byte_range() Range~usize~
       +start_position() (u32, u32)
       +end_position() (u32, u32)
-      +captures() HashMap~str, CapturedValue~
+      +captures() &HashMap~String, CapturedValue~
       +capture(name str) CapturedValue?
     }
 
@@ -559,11 +560,13 @@ classDiagram
     }
 
     class CapturedNode {
+      +node() Node
       +text() str
       +byte_range() Range~usize~
     }
 
     class CapturedNodes {
+      +nodes() CapturedNode[]
       +text() str
       +byte_range() Range~usize~
     }

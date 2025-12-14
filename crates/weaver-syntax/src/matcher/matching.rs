@@ -27,7 +27,7 @@ fn find_matches_recursive<'a>(
     ctx: &MatchContext<'a, '_>,
     results: &mut Vec<MatchResult<'a>>,
 ) {
-    let mut captures = Captures::default();
+    let mut captures = Captures::new(ctx.source);
     if nodes_match(source_node, ctx.pattern_root, ctx, &mut captures) {
         results.push(MatchResult {
             node: source_node,
@@ -46,7 +46,7 @@ fn find_first_recursive<'a>(
     source_node: tree_sitter::Node<'a>,
     ctx: &MatchContext<'a, '_>,
 ) -> Option<MatchResult<'a>> {
-    let mut captures = Captures::default();
+    let mut captures = Captures::new(ctx.source);
     if nodes_match(source_node, ctx.pattern_root, ctx, &mut captures) {
         return Some(MatchResult {
             node: source_node,
@@ -99,9 +99,9 @@ fn nodes_match<'a>(
 ) -> bool {
     if let Some(metavar) = find_metavariable_in_pattern(pattern_node, ctx) {
         return match metavar.kind {
-            MetaVarKind::Single => captures.capture_single(&metavar.name, source_node, ctx.source),
+            MetaVarKind::Single => captures.capture_single(&metavar.name, source_node),
             MetaVarKind::Multiple => {
-                captures.capture_multiple(&metavar.name, &[source_node], ctx.source)
+                captures.capture_multiple(&metavar.name, &[source_node], source_node.start_byte())
             }
         };
     }
@@ -139,7 +139,13 @@ fn match_children<'a>(
     });
 
     if has_multiple {
-        return match_with_multiple(&source_children, &pattern_children, ctx, captures);
+        return SequenceMatcher {
+            source_parent: source_node,
+            source_children: &source_children,
+            pattern_children: &pattern_children,
+            ctx,
+        }
+        .matches(0, 0, captures);
     }
 
     if source_children.len() != pattern_children.len() {
@@ -156,6 +162,7 @@ fn match_children<'a>(
 }
 
 struct SequenceMatcher<'a, 'p, 'c> {
+    source_parent: tree_sitter::Node<'a>,
     source_children: &'c [tree_sitter::Node<'a>],
     pattern_children: &'c [tree_sitter::Node<'p>],
     ctx: &'c MatchContext<'a, 'p>,
@@ -168,6 +175,18 @@ struct MatchIndices {
 }
 
 impl<'a, 'p> SequenceMatcher<'a, 'p, '_> {
+    fn empty_anchor_byte(&self, source_idx: usize) -> usize {
+        if let Some(next) = self.source_children.get(source_idx) {
+            return next.start_byte();
+        }
+
+        if let Some(last) = self.source_children.last() {
+            return last.end_byte();
+        }
+
+        self.source_parent.start_byte()
+    }
+
     fn matches(&self, source_idx: usize, pattern_idx: usize, captures: &mut Captures<'a>) -> bool {
         if pattern_idx == self.pattern_children.len() {
             return source_idx == self.source_children.len();
@@ -207,13 +226,14 @@ impl<'a, 'p> SequenceMatcher<'a, 'p, '_> {
         captures: &mut Captures<'a>,
     ) -> bool {
         let next_pattern_idx = indices.pattern_idx + 1;
+        let empty_anchor_byte = self.empty_anchor_byte(indices.source_idx);
         for k in indices.source_idx..=self.source_children.len() {
             let Some(candidate) = self.source_children.get(indices.source_idx..k) else {
                 continue;
             };
 
             let mut trial = captures.clone();
-            if !trial.capture_multiple(&metavar.name, candidate, self.ctx.source) {
+            if !trial.capture_multiple(&metavar.name, candidate, empty_anchor_byte) {
                 continue;
             }
 
@@ -250,16 +270,5 @@ impl<'a, 'p> SequenceMatcher<'a, 'p, '_> {
     }
 }
 
-fn match_with_multiple<'a, 'p>(
-    source_children: &[tree_sitter::Node<'a>],
-    pattern_children: &[tree_sitter::Node<'p>],
-    ctx: &MatchContext<'a, 'p>,
-    captures: &mut Captures<'a>,
-) -> bool {
-    SequenceMatcher {
-        source_children,
-        pattern_children,
-        ctx,
-    }
-    .matches(0, 0, captures)
-}
+// `match_with_multiple` is implemented by `SequenceMatcher::matches` to keep
+// the matching logic local to the sequence matcher.

@@ -90,17 +90,24 @@ impl SyntaxErrorInfo {
         let byte_range = node.byte_range();
 
         // Extract context: the text of the error node, truncated if too long
-        let context = source
-            .get(byte_range.clone())
-            .map(|s| {
-                if s.len() > 50 {
-                    let truncated: String = s.chars().take(47).collect();
+        let context = source.get(byte_range.clone()).map_or_else(
+            || {
+                format!(
+                    "<unavailable context for byte range {}..{} in {}-byte source>",
+                    byte_range.start,
+                    byte_range.end,
+                    source.len()
+                )
+            },
+            |text| {
+                if text.len() > 50 {
+                    let truncated: String = text.chars().take(47).collect();
                     format!("{truncated}...")
                 } else {
-                    s.to_owned()
+                    text.to_owned()
                 }
-            })
-            .unwrap_or_default();
+            },
+        );
 
         let message = if node.is_missing() {
             format!("missing {}", node.kind())

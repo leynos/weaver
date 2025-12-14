@@ -1,16 +1,21 @@
-//! Behaviour-driven development (BDD) step definitions for weaver-syntax scenarios.
+//! Behaviour-driven development (BDD) step definitions for `weaver-syntax`.
+//!
+//! These tests execute the Gherkin feature file via `rstest-bdd` and exercise
+//! the crate's public APIs end-to-end.
 
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use rstest::fixture;
-use rstest_bdd_macros::{given, scenario, then, when};
+use rstest_bdd_macros::{given, then, when};
 
 use crate::{
     MatchResult, ParseResult, Parser, Pattern, RewriteResult, RewriteRule, Rewriter,
     SupportedLanguage, TreeSitterSyntacticLock, ValidationFailure,
 };
+
+mod scenarios;
 
 // =============================================================================
 // Test World
@@ -303,104 +308,4 @@ fn then_rewrite_unchanged(world: &RefCell<TestWorld>) {
     let w = world.borrow();
     let result = w.rewrite_result.as_ref().expect("rewrite result");
     assert!(!result.has_changes(), "Expected rewrite to make no changes");
-}
-
-// =============================================================================
-// Scenario Bindings
-// =============================================================================
-
-#[scenario(
-    path = "tests/features/weaver_syntax.feature",
-    name = "Valid Rust code passes syntactic validation"
-)]
-fn valid_rust_validation(world: RefCell<TestWorld>) {
-    let _ = world;
-}
-
-#[scenario(
-    path = "tests/features/weaver_syntax.feature",
-    name = "Invalid Rust code fails with error location"
-)]
-fn invalid_rust_validation(world: RefCell<TestWorld>) {
-    let _ = world;
-}
-
-#[scenario(
-    path = "tests/features/weaver_syntax.feature",
-    name = "Valid Python code passes syntactic validation"
-)]
-fn valid_python_validation(world: RefCell<TestWorld>) {
-    let _ = world;
-}
-
-#[scenario(
-    path = "tests/features/weaver_syntax.feature",
-    name = "Invalid Python code fails with error location"
-)]
-fn invalid_python_validation(world: RefCell<TestWorld>) {
-    let _ = world;
-}
-
-#[scenario(
-    path = "tests/features/weaver_syntax.feature",
-    name = "Invalid TypeScript code fails with error location"
-)]
-fn invalid_typescript_validation(world: RefCell<TestWorld>) {
-    let _ = world;
-}
-
-#[scenario(
-    path = "tests/features/weaver_syntax.feature",
-    name = "Unknown file extensions are skipped"
-)]
-fn unknown_extension_skipped(world: RefCell<TestWorld>) {
-    let _ = world;
-}
-
-#[scenario(
-    path = "tests/features/weaver_syntax.feature",
-    name = "Multiple files validated together"
-)]
-fn multiple_files_validation(world: RefCell<TestWorld>) {
-    let _ = world;
-}
-
-#[scenario(
-    path = "tests/features/weaver_syntax.feature",
-    name = "Pattern matches function definitions"
-)]
-fn pattern_matches_functions(world: RefCell<TestWorld>) {
-    let _ = world;
-}
-
-#[scenario(
-    path = "tests/features/weaver_syntax.feature",
-    name = "Pattern captures metavariable values"
-)]
-fn pattern_captures_metavars(world: RefCell<TestWorld>) {
-    let _ = world;
-}
-
-#[scenario(
-    path = "tests/features/weaver_syntax.feature",
-    name = "Pattern with no matches returns empty"
-)]
-fn pattern_no_matches(world: RefCell<TestWorld>) {
-    let _ = world;
-}
-
-#[scenario(
-    path = "tests/features/weaver_syntax.feature",
-    name = "Rewrite transforms matching code"
-)]
-fn rewrite_transforms_code(world: RefCell<TestWorld>) {
-    let _ = world;
-}
-
-#[scenario(
-    path = "tests/features/weaver_syntax.feature",
-    name = "Rewrite with no matches leaves code unchanged"
-)]
-fn rewrite_no_changes(world: RefCell<TestWorld>) {
-    let _ = world;
 }

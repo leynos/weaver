@@ -107,8 +107,9 @@ impl<'a> CapturedValue<'a> {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub(super) struct Captures<'a> {
+    source: &'a str,
     inner: HashMap<String, CapturedValue<'a>>,
 }
 
@@ -125,21 +126,23 @@ fn slice_source_range(source: &str, range: Range<usize>) -> &str {
 }
 
 impl<'a> Captures<'a> {
+    pub(super) fn new(source: &'a str) -> Self {
+        Self {
+            source,
+            inner: HashMap::new(),
+        }
+    }
+
     pub(super) fn into_inner(self) -> HashMap<String, CapturedValue<'a>> {
         self.inner
     }
 
-    pub(super) fn capture_single(
-        &mut self,
-        name: &str,
-        node: tree_sitter::Node<'a>,
-        source: &'a str,
-    ) -> bool {
+    pub(super) fn capture_single(&mut self, name: &str, node: tree_sitter::Node<'a>) -> bool {
         if name == "_" {
             return true;
         }
 
-        let text = slice_source_range(source, node.byte_range());
+        let text = slice_source_range(self.source, node.byte_range());
         let value = CapturedValue::Single(CapturedNode { node, text });
 
         self.insert_consistent(name, value)
@@ -149,7 +152,7 @@ impl<'a> Captures<'a> {
         &mut self,
         name: &str,
         nodes: &[tree_sitter::Node<'a>],
-        source: &'a str,
+        empty_anchor_byte: usize,
     ) -> bool {
         if name == "_" {
             return true;
@@ -159,7 +162,7 @@ impl<'a> Captures<'a> {
             .iter()
             .map(|node| CapturedNode {
                 node: *node,
-                text: slice_source_range(source, node.byte_range()),
+                text: slice_source_range(self.source, node.byte_range()),
             })
             .collect();
 
@@ -168,10 +171,12 @@ impl<'a> Captures<'a> {
                 let start = first.start_byte();
                 let end = last.end_byte();
                 let byte_range = start..end;
-                let text = slice_source_range(source, start..end);
+                let text = slice_source_range(self.source, start..end);
                 (byte_range, text)
             } else {
-                (0..0, "")
+                let byte_range = empty_anchor_byte..empty_anchor_byte;
+                let text = slice_source_range(self.source, byte_range.clone());
+                (byte_range, text)
             };
 
         let value = CapturedValue::Multiple(CapturedNodes {

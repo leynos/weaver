@@ -1,3 +1,7 @@
+//! Matcher unit tests.
+//!
+//! Exercises pattern matching, capture extraction, and match positioning.
+
 use super::*;
 
 use rstest::*;
@@ -22,7 +26,10 @@ fn parse_and_pattern(
     (parsed, pattern)
 }
 
-fn first_rust_match<'a>(pattern: &Pattern, source: &'a ParseResult) -> MatchResult<'a> {
+fn first_rust_match<'a>(
+    pattern: &Pattern,
+    source: &'a crate::parser::ParseResult,
+) -> MatchResult<'a> {
     pattern.find_first(source).expect("should find a match")
 }
 
@@ -96,7 +103,7 @@ fn match_result_has_position(mut rust_parser: Parser) {
     let m = first_rust_match(&pattern, &source);
     let (line, col) = m.start_position();
     assert_eq!(line, 1);
-    assert!(col >= 1);
+    assert_eq!(col, 1);
 }
 
 #[rstest]
@@ -111,6 +118,24 @@ fn trailing_multiple_metavariable_can_match_empty(mut rust_parser: Parser) {
         text.trim().is_empty(),
         "expected empty capture, got {text:?}"
     );
+}
+
+#[rstest]
+fn empty_multiple_metavariable_has_anchored_byte_range(mut rust_parser: Parser) {
+    let (source, pattern) = parse_and_pattern(
+        &mut rust_parser,
+        "fn main() { let x = 1; }",
+        "fn main() { let x = 1; $$$BODY }",
+    );
+    let m = first_rust_match(&pattern, &source);
+    let nodes = extract_multiple_capture(&m, "BODY");
+    assert!(nodes.text().trim().is_empty());
+
+    let brace_anchor = source
+        .source()
+        .find('}')
+        .expect("should locate closing brace");
+    assert_eq!(nodes.byte_range(), brace_anchor..brace_anchor);
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -161,7 +186,7 @@ fn operator_tokens_must_match(mut rust_parser: Parser) {
     let (source, pattern) = parse_and_pattern(
         &mut rust_parser,
         "fn main() { let _ = 1 - 2; }",
-        "let _ = 1 + 2",
+        "let _ = 1 + 2;",
     );
     assert!(pattern.find_first(&source).is_none());
 }

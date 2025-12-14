@@ -1,3 +1,8 @@
+//! Integration tests for the `weaver-cli` binary entry point.
+//!
+//! Verifies the capabilities probe behaviour and user-facing error handling
+//! when required arguments are missing.
+
 use assert_cmd::cargo::cargo_bin_cmd;
 use predicates::str::contains;
 
