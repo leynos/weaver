@@ -641,6 +641,46 @@ classDiagram
     TreeSitterSyntacticLock --> ValidationFailure
 ```
 
+The following sequence diagram shows how a caller typically composes the
+`weaver-syntax` APIs for parsing, matching, rewriting, and syntactic
+validation:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Parser
+    participant Pattern
+    participant Matcher
+    participant Rewriter
+    participant Lock as SyntacticLock
+
+    User->>Parser: new(language) / parse(source)
+    Parser-->>User: ParseResult (tree + SyntaxErrorInfo?)
+
+    User->>Pattern: compile(pattern_src, language)
+    Pattern->>Parser: parse(wrapped_or_normalised_pattern)
+    Parser-->>Pattern: ParseResult (pattern AST + metavariables)
+
+    User->>Matcher: find_all(pattern, parsed_source)
+    Matcher->>Matcher: recursive traversal & SequenceMatcher backtracking
+    Matcher-->>User: Vec<MatchResult> (captures + positions)
+
+    User->>Rewriter: apply(rule, source)
+    Rewriter->>Parser: parse(source)
+    Rewriter->>Matcher: find_all(rule.pattern, parsed)
+    Rewriter->>Rewriter: perform substitutions (end‑to‑start)
+    Rewriter-->>User: RewriteResult (output + replacement count)
+
+    User->>Lock: validate_file(path, content)
+    Lock->>Parser: parse(content, detected_language)
+    Lock->>Lock: detect ERROR nodes → build ValidationFailure(s)
+    Lock-->>User: Vec<ValidationFailure>
+```
+
+*Figure: Typical `weaver-syntax` API flow across parsing, matching, rewriting,
+and syntactic validation.*
+
 Each piece of information gathered by these layers---a symbol reference from
 LSP, a potential call site identified by a Tree-sitter query, a dependency link
 from a build file---is treated as an input to the fusion engine. The engine
