@@ -112,6 +112,18 @@ pub(super) struct Captures<'a> {
     inner: HashMap<String, CapturedValue<'a>>,
 }
 
+fn slice_source_range(source: &str, range: Range<usize>) -> &str {
+    let start = range.start;
+    let end = range.end;
+
+    source.get(start..end).unwrap_or_else(|| {
+        panic!(
+            "tree-sitter node byte range {start}..{end} is not valid for source length {}",
+            source.len()
+        )
+    })
+}
+
 impl<'a> Captures<'a> {
     pub(super) fn into_inner(self) -> HashMap<String, CapturedValue<'a>> {
         self.inner
@@ -127,7 +139,7 @@ impl<'a> Captures<'a> {
             return true;
         }
 
-        let text = source.get(node.byte_range()).unwrap_or_default();
+        let text = slice_source_range(source, node.byte_range());
         let value = CapturedValue::Single(CapturedNode { node, text });
 
         self.insert_consistent(name, value)
@@ -147,7 +159,7 @@ impl<'a> Captures<'a> {
             .iter()
             .map(|node| CapturedNode {
                 node: *node,
-                text: source.get(node.byte_range()).unwrap_or_default(),
+                text: slice_source_range(source, node.byte_range()),
             })
             .collect();
 
@@ -155,8 +167,9 @@ impl<'a> Captures<'a> {
             if let (Some(first), Some(last)) = (nodes.first().copied(), nodes.last().copied()) {
                 let start = first.start_byte();
                 let end = last.end_byte();
-                let range = start..end;
-                (range.clone(), source.get(range).unwrap_or_default())
+                let byte_range = start..end;
+                let text = slice_source_range(source, start..end);
+                (byte_range, text)
             } else {
                 (0..0, "")
             };
@@ -176,7 +189,7 @@ impl<'a> Captures<'a> {
             return true;
         };
 
-        match (existing, &next) {
+        let is_consistent = match (existing, &next) {
             (CapturedValue::Single(a), CapturedValue::Single(b)) => {
                 a.node.kind() == b.node.kind() && a.text == b.text
             }
@@ -188,10 +201,12 @@ impl<'a> Captures<'a> {
                     })
             }
             _ => false,
-        }
-        .then(|| {
+        };
+
+        if is_consistent {
             self.inner.insert(name.to_owned(), next);
-        })
-        .is_some()
+        }
+
+        is_consistent
     }
 }

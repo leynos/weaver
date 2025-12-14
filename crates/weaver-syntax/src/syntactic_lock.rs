@@ -6,7 +6,7 @@
 //! being committed.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use crate::error::SyntaxError;
@@ -26,6 +26,18 @@ use crate::parser::Parser;
 pub struct TreeSitterSyntacticLock {
     /// Cached parsers for each language.
     parsers: Mutex<HashMap<SupportedLanguage, Arc<Mutex<Parser>>>>,
+}
+
+/// Owned file content for syntactic lock validation.
+///
+/// This is a small convenience wrapper for callers that naturally work with
+/// `PathBuf` and `String` values (e.g. staging edits before validation).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OwnedFile {
+    /// Path to the file (used for language detection).
+    pub path: PathBuf,
+    /// File content to validate.
+    pub content: String,
 }
 
 impl TreeSitterSyntacticLock {
@@ -107,6 +119,23 @@ impl TreeSitterSyntacticLock {
         Ok(failures)
     }
 
+    /// Validates a single file using owned inputs.
+    ///
+    /// This is a convenience wrapper around [`Self::validate_file`] for call
+    /// sites that already have owned `PathBuf`/`String` values.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::validate_file`], such as parser
+    /// initialisation failures or internal lock poisoning.
+    pub fn validate_owned_file(
+        &self,
+        file: OwnedFile,
+    ) -> Result<Vec<ValidationFailure>, SyntaxError> {
+        let OwnedFile { path, content } = file;
+        self.validate_file(&path, &content)
+    }
+
     /// Validates multiple files.
     ///
     /// Returns all validation failures across all files.
@@ -126,6 +155,29 @@ impl TreeSitterSyntacticLock {
 
         for (path, content) in files {
             let failures = self.validate_file(path, content)?;
+            all_failures.extend(failures);
+        }
+
+        Ok(all_failures)
+    }
+
+    /// Validates multiple files using owned inputs.
+    ///
+    /// This is a convenience wrapper around [`Self::validate_files`] for call
+    /// sites that store file data as owned values.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::validate_files`], such as parser
+    /// initialisation failures.
+    pub fn validate_owned_files<I>(&self, files: I) -> Result<Vec<ValidationFailure>, SyntaxError>
+    where
+        I: IntoIterator<Item = OwnedFile>,
+    {
+        let mut all_failures = Vec::new();
+
+        for OwnedFile { path, content } in files {
+            let failures = self.validate_file(&path, &content)?;
             all_failures.extend(failures);
         }
 
@@ -269,5 +321,36 @@ mod tests {
             TreeSitterSyntacticLock::supports_file(Path::new(path)),
             expected
         );
+    }
+
+    #[test]
+    fn validate_owned_file_accepts_pathbuf_and_string() {
+        let lock = TreeSitterSyntacticLock::new();
+        let file = OwnedFile {
+            path: PathBuf::from("test.rs"),
+            content: "fn main() {}".to_owned(),
+        };
+
+        let failures = lock.validate_owned_file(file).expect("validate");
+        assert!(failures.is_empty());
+    }
+
+    #[test]
+    fn validate_owned_files_collects_failures() {
+        let lock = TreeSitterSyntacticLock::new();
+        let files = vec![
+            OwnedFile {
+                path: PathBuf::from("ok.rs"),
+                content: "fn main() {}".to_owned(),
+            },
+            OwnedFile {
+                path: PathBuf::from("broken.rs"),
+                content: "fn broken() {".to_owned(),
+            },
+        ];
+
+        let failures = lock.validate_owned_files(files).expect("validate");
+        assert!(!failures.is_empty());
+        assert!(failures.iter().any(|f| f.path.ends_with("broken.rs")));
     }
 }

@@ -87,27 +87,12 @@ fn match_result_has_position(mut rust_parser: Parser) {
 }
 
 #[rstest]
-fn multiple_metavariable_captures_all_children_in_block(mut rust_parser: Parser) {
-    let (source, pattern) = parse_and_pattern(
-        &mut rust_parser,
-        "fn main() { let a = 1; let b = 2; }",
-        "fn main() { $$$BODY }",
-    );
-    let m = first_rust_match(&pattern, &source);
-
-    let nodes = extract_multiple_capture(&m, "BODY");
-    assert!(nodes.text().contains("let a"));
-    assert!(nodes.text().contains("let b"));
-}
-
-#[rstest]
 fn trailing_multiple_metavariable_can_match_empty(mut rust_parser: Parser) {
     let (source, pattern) =
         parse_and_pattern(&mut rust_parser, "fn main() {}", "fn main() { $$$BODY }");
     let m = first_rust_match(&pattern, &source);
 
-    let body = m.capture("BODY").expect("should capture BODY");
-    let nodes = body.as_multiple().expect("BODY should be multiple");
+    let nodes = extract_multiple_capture(&m, "BODY");
     assert!(
         nodes.text().trim().is_empty(),
         "expected empty capture, got {:?}",
@@ -115,17 +100,49 @@ fn trailing_multiple_metavariable_can_match_empty(mut rust_parser: Parser) {
     );
 }
 
+#[derive(Clone, Copy, Debug)]
+struct MultipleMetavariableCaptureCase {
+    source_code: &'static str,
+    pattern_str: &'static str,
+    must_contain: &'static [&'static str],
+    must_not_contain: &'static [&'static str],
+}
+
 #[rstest]
-fn multiple_metavariable_respects_following_sibling_match(mut rust_parser: Parser) {
-    let (source, pattern) = parse_and_pattern(
-        &mut rust_parser,
-        "fn main() { println!(\"a\"); println!(\"tail\"); }",
-        "fn main() { $$$BODY; println!(\"tail\"); }",
-    );
+#[case(MultipleMetavariableCaptureCase {
+    source_code: "fn main() { let a = 1; let b = 2; }",
+    pattern_str: "fn main() { $$$BODY }",
+    must_contain: &["let a", "let b"],
+    must_not_contain: &[] as &[&str],
+})]
+#[case(MultipleMetavariableCaptureCase {
+    source_code: "fn main() { println!(\"a\"); println!(\"tail\"); }",
+    pattern_str: "fn main() { $$$BODY; println!(\"tail\"); }",
+    must_contain: &["println!(\"a\")"],
+    must_not_contain: &["tail"],
+})]
+fn multiple_metavariable_capture_behaves(
+    mut rust_parser: Parser,
+    #[case] case: MultipleMetavariableCaptureCase,
+) {
+    let (source, pattern) = parse_and_pattern(&mut rust_parser, case.source_code, case.pattern_str);
     let m = first_rust_match(&pattern, &source);
     let nodes = extract_multiple_capture(&m, "BODY");
-    assert!(nodes.text().contains("println!(\"a\")"));
-    assert!(!nodes.text().contains("tail"));
+    let text = nodes.text();
+
+    for expected in case.must_contain {
+        assert!(
+            text.contains(expected),
+            "expected capture to include {expected:?}, got {text:?}"
+        );
+    }
+
+    for forbidden in case.must_not_contain {
+        assert!(
+            !text.contains(forbidden),
+            "expected capture to exclude {forbidden:?}, got {text:?}"
+        );
+    }
 }
 
 #[rstest]

@@ -46,6 +46,40 @@ fn rust_parser() -> Parser {
     Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"))
 }
 
+/// Helper to parse source and compile a Rust pattern.
+fn parse_and_compile_pattern(
+    parser: &mut Parser,
+    source: &str,
+    pattern_str: &str,
+) -> (weaver_syntax::ParseResult, Pattern) {
+    let parsed = parser
+        .parse(source)
+        .unwrap_or_else(|err| panic!("parse: {err}"));
+
+    let pattern = Pattern::compile(pattern_str, SupportedLanguage::Rust)
+        .unwrap_or_else(|err| panic!("pattern: {err}"));
+
+    (parsed, pattern)
+}
+
+/// Helper to validate a file and return the first validation failure.
+fn validate_and_get_first_failure(
+    lock: &TreeSitterSyntacticLock,
+    path: &Path,
+    content: &str,
+) -> weaver_syntax::ValidationFailure {
+    let failures = lock
+        .validate_file(path, content)
+        .unwrap_or_else(|err| panic!("validate: {err}"));
+
+    assert!(!failures.is_empty(), "Expected validation failures");
+
+    failures
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| panic!("expected validation failure"))
+}
+
 #[rstest]
 fn pattern_finds_all_function_definitions(mut rust_parser: Parser) {
     let source = rust_parser
@@ -61,14 +95,9 @@ fn pattern_finds_all_function_definitions(mut rust_parser: Parser) {
 
 #[rstest]
 fn pattern_captures_metavariables_correctly(mut rust_parser: Parser) {
-    let source = rust_parser
-        .parse("fn hello_world() {}")
-        .unwrap_or_else(|err| panic!("parse: {err}"));
-
-    let pattern = Pattern::compile("fn $NAME() {}", SupportedLanguage::Rust)
-        .unwrap_or_else(|err| panic!("pattern: {err}"));
-
-    let Some(m) = pattern.find_first(&source) else {
+    let (parsed, pattern) =
+        parse_and_compile_pattern(&mut rust_parser, "fn hello_world() {}", "fn $NAME() {}");
+    let Some(m) = pattern.find_first(&parsed) else {
         panic!("should find match");
     };
     let Some(capture) = m.capture("NAME") else {
@@ -79,14 +108,9 @@ fn pattern_captures_metavariables_correctly(mut rust_parser: Parser) {
 
 #[rstest]
 fn pattern_match_has_correct_position(mut rust_parser: Parser) {
-    let source = rust_parser
-        .parse("fn test() {}")
-        .unwrap_or_else(|err| panic!("parse: {err}"));
-
-    let pattern = Pattern::compile("fn $NAME() {}", SupportedLanguage::Rust)
-        .unwrap_or_else(|err| panic!("pattern: {err}"));
-
-    let Some(m) = pattern.find_first(&source) else {
+    let (parsed, pattern) =
+        parse_and_compile_pattern(&mut rust_parser, "fn test() {}", "fn $NAME() {}");
+    let Some(m) = pattern.find_first(&parsed) else {
         panic!("should find match");
     };
     let (line, col) = m.start_position();
@@ -127,7 +151,11 @@ fn rewrite_handles_multiple_matches() {
         .unwrap_or_else(|err| panic!("rewrite: {err}"));
 
     assert!(result.has_changes());
-    assert!(result.num_replacements() >= 1);
+    assert_eq!(
+        result.num_replacements(),
+        2,
+        "should replace both let bindings"
+    );
 }
 
 // =============================================================================
@@ -187,16 +215,8 @@ fn parse_invalid_file_returns_errors(#[case] language: SupportedLanguage, #[case
 #[test]
 fn syntactic_lock_detects_syntax_errors() {
     let lock = TreeSitterSyntacticLock::new();
-
-    let failures = lock
-        .validate_file(Path::new("broken.rs"), "fn broken() {")
-        .unwrap_or_else(|err| panic!("validate: {err}"));
-
-    assert!(!failures.is_empty());
-    let first = failures
-        .first()
-        .unwrap_or_else(|| panic!("expected validation failure"));
-    assert!(first.line >= 1);
+    let failure = validate_and_get_first_failure(&lock, Path::new("broken.rs"), "fn broken() {");
+    assert!(failure.line >= 1);
 }
 
 #[test]
@@ -204,16 +224,9 @@ fn syntactic_lock_reports_error_location() {
     let lock = TreeSitterSyntacticLock::new();
 
     let code = "fn main() {\n    let x = \n}";
-    let failures = lock
-        .validate_file(Path::new("test.rs"), code)
-        .unwrap_or_else(|err| panic!("validate: {err}"));
-
-    assert!(!failures.is_empty());
-    let first = failures
-        .first()
-        .unwrap_or_else(|| panic!("expected validation failure"));
-    assert!(first.line >= 1);
-    assert!(first.column >= 1);
+    let failure = validate_and_get_first_failure(&lock, Path::new("test.rs"), code);
+    assert!(failure.line >= 1);
+    assert!(failure.column >= 1);
 }
 
 // =============================================================================

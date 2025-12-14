@@ -10,32 +10,6 @@ use crate::{Parser, Pattern, RewriteRule, Rewriter, SupportedLanguage, TreeSitte
 // Language Detection Tests
 // =============================================================================
 
-#[rstest]
-#[case("rs", Some(SupportedLanguage::Rust))]
-#[case("py", Some(SupportedLanguage::Python))]
-#[case("pyi", Some(SupportedLanguage::Python))]
-#[case("ts", Some(SupportedLanguage::TypeScript))]
-#[case("tsx", Some(SupportedLanguage::TypeScript))]
-#[case("json", None)]
-#[case("md", None)]
-#[case("toml", None)]
-fn from_extension_recognises_languages(
-    #[case] ext: &str,
-    #[case] expected: Option<SupportedLanguage>,
-) {
-    assert_eq!(SupportedLanguage::from_extension(ext), expected);
-}
-
-#[rstest]
-#[case("src/main.rs", Some(SupportedLanguage::Rust))]
-#[case("lib/utils.py", Some(SupportedLanguage::Python))]
-#[case("app/index.ts", Some(SupportedLanguage::TypeScript))]
-#[case("README.md", None)]
-#[case("Makefile", None)]
-fn from_path_detects_languages(#[case] path: &str, #[case] expected: Option<SupportedLanguage>) {
-    assert_eq!(SupportedLanguage::from_path(Path::new(path)), expected);
-}
-
 // =============================================================================
 // Parser Tests
 // =============================================================================

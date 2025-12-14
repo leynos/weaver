@@ -16,10 +16,10 @@
 //!
 //! ```rust,no_run
 //! use weaver_sandbox::{
-//!     Sandbox, SandboxCommand, SandboxProfile, error::SandboxError, process::Stdio,
+//!     Sandbox, SandboxCommand, SandboxProfile, process::Stdio,
 //! };
 //!
-//! # fn main() -> Result<(), SandboxError> {
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let profile = SandboxProfile::new()
 //!     .allow_executable("/bin/echo")
 //!     .allow_networking();

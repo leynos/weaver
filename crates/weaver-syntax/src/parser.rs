@@ -210,50 +210,33 @@ fn collect_error_nodes(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
-    #[test]
-    fn parser_parses_valid_rust() {
-        let mut parser = Parser::new(SupportedLanguage::Rust).expect("parser init");
-        let result = parser.parse("fn main() {}").expect("parse");
+    #[rstest]
+    #[case(SupportedLanguage::Rust, "fn main() {}")]
+    #[case(SupportedLanguage::Python, "def hello():\n    pass")]
+    #[case(
+        SupportedLanguage::TypeScript,
+        "function hello(): string { return 'hi'; }"
+    )]
+    fn parser_parses_valid_source(#[case] language: SupportedLanguage, #[case] source: &str) {
+        let mut parser = Parser::new(language).expect("parser init");
+        let result = parser.parse(source).expect("parse");
 
         assert!(!result.has_errors());
-        assert_eq!(result.language(), SupportedLanguage::Rust);
+        assert_eq!(result.language(), language);
     }
 
-    #[test]
-    fn parser_detects_rust_syntax_errors() {
-        let mut parser = Parser::new(SupportedLanguage::Rust).expect("parser init");
-        let result = parser.parse("fn broken() {").expect("parse");
+    #[rstest]
+    #[case(SupportedLanguage::Rust, "fn broken() {")]
+    #[case(SupportedLanguage::Python, "def broken(")]
+    #[case(SupportedLanguage::TypeScript, "function broken( {")]
+    fn parser_detects_syntax_errors(#[case] language: SupportedLanguage, #[case] source: &str) {
+        let mut parser = Parser::new(language).expect("parser init");
+        let result = parser.parse(source).expect("parse");
 
         assert!(result.has_errors());
-        let errors = result.errors();
-        assert!(!errors.is_empty());
-    }
-
-    #[test]
-    fn parser_parses_valid_python() {
-        let mut parser = Parser::new(SupportedLanguage::Python).expect("parser init");
-        let result = parser.parse("def hello():\n    pass").expect("parse");
-
-        assert!(!result.has_errors());
-    }
-
-    #[test]
-    fn parser_detects_python_syntax_errors() {
-        let mut parser = Parser::new(SupportedLanguage::Python).expect("parser init");
-        let result = parser.parse("def broken(").expect("parse");
-
-        assert!(result.has_errors());
-    }
-
-    #[test]
-    fn parser_parses_valid_typescript() {
-        let mut parser = Parser::new(SupportedLanguage::TypeScript).expect("parser init");
-        let result = parser
-            .parse("function hello(): string { return 'hi'; }")
-            .expect("parse");
-
-        assert!(!result.has_errors());
+        assert!(!result.errors().is_empty());
     }
 
     #[test]

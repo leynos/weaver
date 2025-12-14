@@ -125,10 +125,14 @@ fn when_validate_single_file(world: &RefCell<TestWorld>) {
     let mut w = world.borrow_mut();
     let lock = TreeSitterSyntacticLock::new();
 
-    if let Some((path, content)) = w.files.first() {
-        let failures = lock.validate_file(path, content).expect("validate");
-        w.validation_failures = failures;
-    }
+    let (path, content) = w
+        .files
+        .first()
+        .expect("world should have at least one file to validate");
+    let failures = lock
+        .validate_file(path, content)
+        .expect("syntactic lock validation should succeed");
+    w.validation_failures = failures;
 }
 
 #[when("the syntactic lock validates all files")]
@@ -149,10 +153,17 @@ fn when_validate_all_files(world: &RefCell<TestWorld>) {
 fn when_match_pattern(world: &RefCell<TestWorld>) {
     let mut w = world.borrow_mut();
 
-    if let (Some(parsed), Some(pattern)) = (w.parsed_source.as_ref(), w.pattern.as_ref()) {
-        let results = pattern.find_all(parsed);
-        w.matches = results.iter().map(MatchResultSnapshot::from).collect();
-    }
+    let parsed = w
+        .parsed_source
+        .as_ref()
+        .expect("parsed source should be set before matching");
+    let pattern = w
+        .pattern
+        .as_ref()
+        .expect("pattern should be set before matching");
+
+    let results = pattern.find_all(parsed);
+    w.matches = results.iter().map(MatchResultSnapshot::from).collect();
 }
 
 #[when("the rewrite is applied")]
@@ -161,18 +172,27 @@ fn when_apply_rewrite(world: &RefCell<TestWorld>) {
 
     // Get the pattern and source for rewriting
     let language = w.language.expect("language should be set");
-    let source_text = w.parsed_source.as_ref().map(|p| p.source().to_owned());
-    let pat = w.pattern.take();
-    let replacement = w.replacement.take();
+    let source_text = w
+        .parsed_source
+        .as_ref()
+        .map(|p| p.source().to_owned())
+        .expect("parsed source should be set before applying rewrite");
+    let pat = w
+        .pattern
+        .take()
+        .expect("pattern should be set before applying rewrite");
+    let replacement = w
+        .replacement
+        .take()
+        .expect("replacement should be set before applying rewrite");
 
     // Apply the rewrite
-    if let (Some(src), Some(p), Some(repl)) = (source_text, pat, replacement) {
-        let rewriter = Rewriter::new(language);
-
-        let rule = RewriteRule::new(p, &repl).expect("rule");
-        let result = rewriter.apply(&rule, &src).expect("rewrite");
-        w.rewrite_result = Some(result);
-    }
+    let rewriter = Rewriter::new(language);
+    let rule = RewriteRule::new(pat, &replacement).expect("rewrite rule should build");
+    let result = rewriter
+        .apply(&rule, &source_text)
+        .expect("rewrite should apply");
+    w.rewrite_result = Some(result);
 }
 
 // =============================================================================
