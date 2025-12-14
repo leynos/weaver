@@ -105,7 +105,7 @@ pub use matcher::{CapturedNode, CapturedNodes, CapturedValue, MatchResult, Match
 pub use parser::{ParseResult, Parser, SyntaxErrorInfo};
 pub use pattern::{MetaVarKind, MetaVariable, Pattern};
 pub use rewriter::{RewriteResult, RewriteRule, Rewriter};
-pub use syntactic_lock::{TreeSitterSyntacticLock, ValidationFailure};
+pub use syntactic_lock::{OwnedFile, TreeSitterSyntacticLock, ValidationFailure};
 
 #[cfg(test)]
 mod tests;
