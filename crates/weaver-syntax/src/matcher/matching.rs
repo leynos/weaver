@@ -7,6 +7,9 @@ use crate::metavariables::metavar_name_from_placeholder;
 use crate::parser::ParseResult;
 use crate::pattern::{MetaVarKind, MetaVariable, Pattern};
 
+/// Finds all matches of `pattern` in `parsed` via depth-first traversal.
+///
+/// Returns matches in traversal order (pre-order) and borrows from `parsed`.
 pub(super) fn find_all<'a>(pattern: &Pattern, parsed: &'a ParseResult) -> Vec<MatchResult<'a>> {
     let ctx = MatchContext::new(pattern, parsed.source());
     let mut results = Vec::new();
@@ -14,6 +17,10 @@ pub(super) fn find_all<'a>(pattern: &Pattern, parsed: &'a ParseResult) -> Vec<Ma
     results
 }
 
+/// Finds the first match of `pattern` in `parsed` via depth-first traversal.
+///
+/// Returns the earliest match in traversal order (pre-order) and borrows from
+/// `parsed`.
 pub(super) fn find_first<'a>(
     pattern: &Pattern,
     parsed: &'a ParseResult,
