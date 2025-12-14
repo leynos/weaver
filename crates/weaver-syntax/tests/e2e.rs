@@ -6,6 +6,7 @@
 use std::path::Path;
 
 use insta::{assert_debug_snapshot, assert_snapshot};
+use rstest::{fixture, rstest};
 
 use weaver_syntax::{
     Parser, Pattern, RewriteRule, Rewriter, SupportedLanguage, TreeSitterSyntacticLock,
@@ -15,51 +16,39 @@ use weaver_syntax::{
 // Happy Path: Parsing
 // =============================================================================
 
-#[test]
-fn parse_valid_rust_file_succeeds() {
-    let mut parser =
-        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser init: {err}"));
+#[rstest]
+#[case(SupportedLanguage::Rust, "fn main() { println!(\"hello\"); }")]
+#[case(
+    SupportedLanguage::Python,
+    "def greet(name):\n    print(f'Hello, {name}')"
+)]
+#[case(
+    SupportedLanguage::TypeScript,
+    "function greet(name: string): void { console.log(name); }"
+)]
+fn parse_valid_file_succeeds(#[case] language: SupportedLanguage, #[case] source: &str) {
+    let mut parser = Parser::new(language).unwrap_or_else(|err| panic!("parser init: {err}"));
     let result = parser
-        .parse("fn main() { println!(\"hello\"); }")
+        .parse(source)
         .unwrap_or_else(|err| panic!("parse: {err}"));
 
     assert!(!result.has_errors());
-    assert_eq!(result.language(), SupportedLanguage::Rust);
-}
-
-#[test]
-fn parse_valid_python_file_succeeds() {
-    let mut parser =
-        Parser::new(SupportedLanguage::Python).unwrap_or_else(|err| panic!("parser init: {err}"));
-    let result = parser
-        .parse("def greet(name):\n    print(f'Hello, {name}')")
-        .unwrap_or_else(|err| panic!("parse: {err}"));
-
-    assert!(!result.has_errors());
-    assert_eq!(result.language(), SupportedLanguage::Python);
-}
-
-#[test]
-fn parse_valid_typescript_file_succeeds() {
-    let mut parser = Parser::new(SupportedLanguage::TypeScript)
-        .unwrap_or_else(|err| panic!("parser init: {err}"));
-    let result = parser
-        .parse("function greet(name: string): void { console.log(name); }")
-        .unwrap_or_else(|err| panic!("parse: {err}"));
-
-    assert!(!result.has_errors());
-    assert_eq!(result.language(), SupportedLanguage::TypeScript);
+    assert_eq!(result.language(), language);
 }
 
 // =============================================================================
 // Happy Path: Pattern Matching
 // =============================================================================
 
-#[test]
-fn pattern_finds_all_function_definitions() {
-    let mut parser =
-        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
-    let source = parser
+/// Fixture providing a Rust parser for pattern matching tests.
+#[fixture]
+fn rust_parser() -> Parser {
+    Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"))
+}
+
+#[rstest]
+fn pattern_finds_all_function_definitions(mut rust_parser: Parser) {
+    let source = rust_parser
         .parse("fn foo() {} fn bar() {} fn baz() {}")
         .unwrap_or_else(|err| panic!("parse: {err}"));
 
@@ -70,11 +59,9 @@ fn pattern_finds_all_function_definitions() {
     assert!(!matches.is_empty(), "Should find function definitions");
 }
 
-#[test]
-fn pattern_captures_metavariables_correctly() {
-    let mut parser =
-        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
-    let source = parser
+#[rstest]
+fn pattern_captures_metavariables_correctly(mut rust_parser: Parser) {
+    let source = rust_parser
         .parse("fn hello_world() {}")
         .unwrap_or_else(|err| panic!("parse: {err}"));
 
@@ -90,11 +77,9 @@ fn pattern_captures_metavariables_correctly() {
     assert_eq!(capture.text(), "hello_world");
 }
 
-#[test]
-fn pattern_match_has_correct_position() {
-    let mut parser =
-        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
-    let source = parser
+#[rstest]
+fn pattern_match_has_correct_position(mut rust_parser: Parser) {
+    let source = rust_parser
         .parse("fn test() {}")
         .unwrap_or_else(|err| panic!("parse: {err}"));
 
@@ -180,39 +165,19 @@ fn syntactic_lock_handles_multiple_languages() {
 // Unhappy Path: Parsing Errors
 // =============================================================================
 
-#[test]
-fn parse_invalid_rust_returns_errors() {
-    let mut parser =
-        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
+#[rstest]
+#[case(SupportedLanguage::Rust, "fn broken() {")]
+#[case(SupportedLanguage::Python, "def broken(")]
+#[case(SupportedLanguage::TypeScript, "function broken( {")]
+fn parse_invalid_file_returns_errors(#[case] language: SupportedLanguage, #[case] source: &str) {
+    let mut parser = Parser::new(language).unwrap_or_else(|err| panic!("parser: {err}"));
     let result = parser
-        .parse("fn broken() {")
+        .parse(source)
         .unwrap_or_else(|err| panic!("parse: {err}"));
 
     assert!(result.has_errors());
     let errors = result.errors();
     assert!(!errors.is_empty());
-}
-
-#[test]
-fn parse_invalid_python_returns_errors() {
-    let mut parser =
-        Parser::new(SupportedLanguage::Python).unwrap_or_else(|err| panic!("parser: {err}"));
-    let result = parser
-        .parse("def broken(")
-        .unwrap_or_else(|err| panic!("parse: {err}"));
-
-    assert!(result.has_errors());
-}
-
-#[test]
-fn parse_invalid_typescript_returns_errors() {
-    let mut parser =
-        Parser::new(SupportedLanguage::TypeScript).unwrap_or_else(|err| panic!("parser: {err}"));
-    let result = parser
-        .parse("function broken( {")
-        .unwrap_or_else(|err| panic!("parse: {err}"));
-
-    assert!(result.has_errors());
 }
 
 // =============================================================================
