@@ -1806,6 +1806,15 @@ fail fast with structured errors that surface both the language and the reason
 (server missing, override deny, or server error) to callers, keeping the
 capability matrix honest before the daemon adds sandboxing and transport.
 
+#### 2025-12-03: Upgrade `rstest-bdd` from 0.1.0 to 0.2.0
+
+The workspace dependency on `rstest-bdd`/`rstest-bdd-macros` moved from `0.1.0`
+to `0.2.0` to pick up upstream fixes and API improvements needed by the growing
+behavioural test suite. The upgrade keeps the default feature set disabled and
+continues to pin the macros crate alongside the runtime crate via
+`workspace.dependencies` so step definitions and scenario bindings remain
+consistent across crates.
+
 #### 2025-12-11: Deliver `weaver-syntax` crate with Tree-sitter integration
 
 The new `weaver-syntax` crate provides the syntactic layer for the Semantic

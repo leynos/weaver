@@ -7,6 +7,12 @@ use crate::metavariables::metavar_name_from_placeholder;
 use crate::parser::ParseResult;
 use crate::pattern::{MetaVarKind, MetaVariable, Pattern};
 
+/// Returns true if the node kind represents a block construct that should not
+/// be traversed when searching for metavariables.
+fn is_block_node_kind(kind: &str) -> bool {
+    matches!(kind, "block" | "statement_block" | "compound_statement")
+}
+
 /// Finds all matches of `pattern` in `parsed` via depth-first traversal.
 ///
 /// Returns matches in traversal order (pre-order) and borrows from `parsed`.
@@ -92,7 +98,7 @@ fn find_metavariable_in_pattern<'p>(
         return None;
     }
 
-    if pattern_node.kind().contains("block") {
+    if is_block_node_kind(pattern_node.kind()) {
         return None;
     }
 
