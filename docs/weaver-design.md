@@ -681,6 +681,88 @@ sequenceDiagram
 *Figure: Typical `weaver-syntax` API flow across parsing, matching, rewriting,
 and syntactic validation.*
 
+The following sequence diagram focuses on the syntactic lock integration used
+by the safety harness to validate modified files:
+
+```mermaid
+sequenceDiagram
+    actor Operator
+    participant SafetyHarness
+    participant TreeSitterSyntacticLock
+    participant Parser
+    participant TreeSitter
+
+    Operator->>SafetyHarness: request_validation(modified_files)
+    SafetyHarness->>TreeSitterSyntacticLock: validate_files(files)
+
+    loop for_each_file
+        TreeSitterSyntacticLock->>TreeSitterSyntacticLock: SupportedLanguage::from_path(path)
+        alt supported_language
+            TreeSitterSyntacticLock->>TreeSitterSyntacticLock: lookup_or_create Parser
+            TreeSitterSyntacticLock->>Parser: parse(content)
+            Parser->>TreeSitter: parse(source,language)
+            TreeSitter-->>Parser: Tree
+            Parser-->>TreeSitterSyntacticLock: ParseResult
+            TreeSitterSyntacticLock->>ParseResult: errors()
+            ParseResult-->>TreeSitterSyntacticLock: SyntaxErrorInfo[]
+            alt errors_found
+                TreeSitterSyntacticLock->>TreeSitterSyntacticLock: map_to ValidationFailure
+            else no_errors
+                TreeSitterSyntacticLock->>TreeSitterSyntacticLock: no_failure_for_file
+            end
+        else unsupported_extension
+            TreeSitterSyntacticLock->>TreeSitterSyntacticLock: skip_file(pass_through)
+        end
+    end
+
+    TreeSitterSyntacticLock-->>SafetyHarness: all ValidationFailure[]
+    SafetyHarness-->>Operator: report_pass_or_fail
+```
+
+*Figure: Syntactic lock validation flow across the safety harness.*
+
+The following sequence diagram focuses on the end-to-end rewrite application
+flow from the CLI through to match discovery and substitution:
+
+```mermaid
+sequenceDiagram
+    actor Operator
+    participant CLI
+    participant Rewriter
+    participant Parser
+    participant Pattern
+    participant Matcher
+
+    Operator->>CLI: act apply-rewrite(rule,source)
+    CLI->>Rewriter: apply(rule,source)
+
+    Rewriter->>Parser: new(language)
+    Parser-->>Rewriter: Parser
+    Rewriter->>Parser: parse(source)
+    Parser-->>Rewriter: ParseResult
+
+    Rewriter->>Pattern: pattern()
+    Pattern-->>Rewriter: Pattern
+    Rewriter->>Pattern: find_all(ParseResult)
+    Pattern->>Matcher: new(Pattern)
+    Matcher->>Matcher: find_all(parsed)
+    Matcher-->>Pattern: MatchResult[]
+    Pattern-->>Rewriter: MatchResult[]
+
+    alt matches_found
+        loop for_each_match(descending_offsets)
+            Rewriter->>Rewriter: substitute_metavariables(template,MatchResult)
+        end
+        Rewriter-->>CLI: RewriteResult(output,has_changes=true)
+    else no_matches
+        Rewriter-->>CLI: RewriteResult(output=source,has_changes=false)
+    end
+
+    CLI-->>Operator: display_rewritten_source
+```
+
+*Figure: Rewrite application flow from CLI to substitutions.*
+
 Each piece of information gathered by these layers---a symbol reference from
 LSP, a potential call site identified by a Tree-sitter query, a dependency link
 from a build file---is treated as an input to the fusion engine. The engine
