@@ -339,12 +339,12 @@ responsibilities are to:
 
 1. Parse command-line arguments and flags using the `clap` library.
 
-1. Serialize these arguments into a single JSONL object representing a command
+2. Serialize these arguments into a single JSONL object representing a command
     request.
 
-1. Write this JSONL object to the standard input of the `weaverd` process.
+3. Write this JSONL object to the standard input of the `weaverd` process.
 
-1. Pipe the standard output and standard error from `weaverd` directly to the
+4. Pipe the standard output and standard error from `weaverd` directly to the
     user's terminal.
 
 The `weaverd` daemon, managed by libraries like `daemonize-me`, continuously

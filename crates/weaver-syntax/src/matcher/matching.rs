@@ -29,6 +29,8 @@ pub(super) fn find_first<'a>(
     find_first_recursive(parsed.root_node(), &ctx)
 }
 
+/// Recursively traverses the source AST in pre-order, collecting all matches
+/// of the pattern. Creates a fresh capture state for each candidate node.
 fn find_matches_recursive<'a>(
     source_node: tree_sitter::Node<'a>,
     ctx: &MatchContext<'a, '_>,
@@ -49,6 +51,8 @@ fn find_matches_recursive<'a>(
     }
 }
 
+/// Recursively traverses the source AST in pre-order, returning the first match
+/// of the pattern. Creates a fresh capture state for each candidate node.
 fn find_first_recursive<'a>(
     source_node: tree_sitter::Node<'a>,
     ctx: &MatchContext<'a, '_>,
@@ -72,6 +76,9 @@ fn find_first_recursive<'a>(
     None
 }
 
+/// Extracts a metavariable reference from a pattern node by checking placeholder
+/// text, recursing through single-child wrapper nodes, and skipping ERROR/block
+/// nodes.
 fn find_metavariable_in_pattern<'p>(
     pattern_node: tree_sitter::Node<'p>,
     ctx: &MatchContext<'_, 'p>,
@@ -99,6 +106,9 @@ fn find_metavariable_in_pattern<'p>(
     None
 }
 
+/// Checks whether `source_node` matches `pattern_node`, handling metavariables,
+/// kind comparison, leaf text comparison, and delegating to child matching.
+/// Updates `captures` if the match succeeds.
 fn nodes_match<'a>(
     source_node: tree_sitter::Node<'a>,
     pattern_node: tree_sitter::Node<'_>,
@@ -136,11 +146,17 @@ fn nodes_match<'a>(
     match_children(source_node, pattern_node, ctx, captures)
 }
 
+/// Collects all children of `node` into a Vec.
+/// Used by `match_children` and `SequenceMatcher` for backtracking over child
+/// sequences.
 fn node_children(node: tree_sitter::Node<'_>) -> Vec<tree_sitter::Node<'_>> {
     let mut cursor = node.walk();
     node.children(&mut cursor).collect()
 }
 
+/// Matches children of `source_node` against children of `pattern_node`.
+/// If the pattern contains Multiple metavariables, delegates to
+/// `SequenceMatcher` for backtracking; otherwise performs pairwise matching.
 fn match_children<'a>(
     source_node: tree_sitter::Node<'a>,
     pattern_node: tree_sitter::Node<'_>,
@@ -178,6 +194,9 @@ fn match_children<'a>(
     true
 }
 
+/// Implements backtracking-based matching for child sequences containing
+/// Multiple metavariables (`$$$VAR`), trying all possible bindings to find a
+/// valid match.
 struct SequenceMatcher<'a, 'p, 'c> {
     source_parent: tree_sitter::Node<'a>,
     source_children: &'c [tree_sitter::Node<'a>],
@@ -185,6 +204,8 @@ struct SequenceMatcher<'a, 'p, 'c> {
     ctx: &'c MatchContext<'a, 'p>,
 }
 
+/// Tracks current positions in source and pattern child sequences during
+/// backtracking.
 #[derive(Clone, Copy)]
 struct MatchIndices {
     source_idx: usize,
@@ -192,6 +213,11 @@ struct MatchIndices {
 }
 
 impl<'a, 'p> SequenceMatcher<'a, 'p, '_> {
+    /// Computes the byte position anchor for empty Multiple metavariable
+    /// captures.
+    ///
+    /// Returns the start byte of the next source child, the end byte of the
+    /// last source child, or the parent's start byte if no children exist.
     fn empty_anchor_byte(&self, source_idx: usize) -> usize {
         if let Some(next) = self.source_children.get(source_idx) {
             return next.start_byte();
@@ -204,6 +230,8 @@ impl<'a, 'p> SequenceMatcher<'a, 'p, '_> {
         self.source_parent.start_byte()
     }
 
+    /// Recursively matches child sequences, dispatching to `matches_multiple`
+    /// or `matches_single`.
     fn matches(&self, source_idx: usize, pattern_idx: usize, captures: &mut Captures<'a>) -> bool {
         if pattern_idx == self.pattern_children.len() {
             return source_idx == self.source_children.len();
@@ -236,6 +264,8 @@ impl<'a, 'p> SequenceMatcher<'a, 'p, '_> {
         )
     }
 
+    /// Tries all possible capture ranges for a Multiple metavariable via
+    /// backtracking.
     fn matches_multiple(
         &self,
         indices: MatchIndices,
@@ -263,6 +293,10 @@ impl<'a, 'p> SequenceMatcher<'a, 'p, '_> {
         false
     }
 
+    /// Matches a single pattern child against a single source child.
+    ///
+    /// Clones captures to preserve state in case the subsequent sequence fails
+    /// to match.
     fn matches_single(
         &self,
         indices: MatchIndices,
