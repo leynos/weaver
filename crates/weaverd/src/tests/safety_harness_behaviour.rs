@@ -13,8 +13,27 @@ use tempfile::TempDir;
 use super::safety_harness_types::{DiagnosticMessage, FileContent, FileName, TextPattern};
 use crate::safety_harness::{
     ConfigurableSemanticLock, ConfigurableSyntacticLock, EditTransaction, FileEdit, Position,
-    SafetyHarnessError, TextEdit, TransactionOutcome, VerificationFailure,
+    SafetyHarnessError, SyntacticLock, SyntacticLockResult, TextEdit, TransactionOutcome,
+    TreeSitterSyntacticLockAdapter, VerificationContext, VerificationFailure,
 };
+
+/// Syntactic lock variant for BDD test scenarios.
+///
+/// Allows tests to use either a configurable lock (for controlled outcomes)
+/// or the real Tree-sitter adapter (for integration testing).
+enum SyntacticLockVariant {
+    Configurable(ConfigurableSyntacticLock),
+    TreeSitter(TreeSitterSyntacticLockAdapter),
+}
+
+impl SyntacticLock for SyntacticLockVariant {
+    fn validate(&self, context: &VerificationContext) -> SyntacticLockResult {
+        match self {
+            Self::Configurable(lock) => lock.validate(context),
+            Self::TreeSitter(lock) => lock.validate(context),
+        }
+    }
+}
 
 /// Test world for safety harness BDD scenarios.
 pub struct SafetyHarnessWorld {
@@ -22,7 +41,9 @@ pub struct SafetyHarnessWorld {
     files: HashMap<String, PathBuf>,
     /// Original content of files when created, for unchanged assertions.
     original_content: HashMap<String, String>,
-    syntactic_lock: ConfigurableSyntacticLock,
+    /// The most recently created source file (used as default for edits).
+    current_file: Option<String>,
+    syntactic_lock: SyntacticLockVariant,
     semantic_lock: ConfigurableSemanticLock,
     pending_edits: Vec<FileEdit>,
     outcome: Option<Result<TransactionOutcome, SafetyHarnessError>>,
@@ -35,7 +56,8 @@ impl SafetyHarnessWorld {
             temp_dir: TempDir::new().expect("create temp dir"),
             files: HashMap::new(),
             original_content: HashMap::new(),
-            syntactic_lock: ConfigurableSyntacticLock::passing(),
+            current_file: None,
+            syntactic_lock: SyntacticLockVariant::Configurable(ConfigurableSyntacticLock::passing()),
             semantic_lock: ConfigurableSemanticLock::passing(),
             pending_edits: Vec::new(),
             outcome: None,
@@ -50,7 +72,13 @@ impl SafetyHarnessWorld {
         let name_str = name.as_str().to_string();
         self.files.insert(name_str.clone(), path);
         self.original_content
-            .insert(name_str, content.as_str().to_string());
+            .insert(name_str.clone(), content.as_str().to_string());
+        self.current_file = Some(name_str);
+    }
+
+    /// Returns the current (most recently created) file name for edits.
+    fn current_file_name(&self) -> FileName {
+        self.current_file.as_deref().unwrap_or("test.txt").into()
     }
 
     /// Returns the original content for a named file.
@@ -142,13 +170,21 @@ fn given_no_file(world: &RefCell<SafetyHarnessWorld>, name: FileName) {
 
 #[given("a syntactic lock that passes")]
 fn given_syntactic_passes(world: &RefCell<SafetyHarnessWorld>) {
-    world.borrow_mut().syntactic_lock = ConfigurableSyntacticLock::passing();
+    world.borrow_mut().syntactic_lock =
+        SyntacticLockVariant::Configurable(ConfigurableSyntacticLock::passing());
 }
 
 #[given("a syntactic lock that fails with {message}")]
 fn given_syntactic_fails(world: &RefCell<SafetyHarnessWorld>, message: DiagnosticMessage) {
     let failure = VerificationFailure::new(PathBuf::from("test"), message.as_str());
-    world.borrow_mut().syntactic_lock = ConfigurableSyntacticLock::failing(vec![failure]);
+    world.borrow_mut().syntactic_lock =
+        SyntacticLockVariant::Configurable(ConfigurableSyntacticLock::failing(vec![failure]));
+}
+
+#[given("a Tree-sitter syntactic lock")]
+fn given_tree_sitter_syntactic_lock(world: &RefCell<SafetyHarnessWorld>) {
+    world.borrow_mut().syntactic_lock =
+        SyntacticLockVariant::TreeSitter(TreeSitterSyntacticLockAdapter::new());
 }
 
 #[given("a semantic lock that passes")]
@@ -171,11 +207,11 @@ fn given_semantic_unavailable(world: &RefCell<SafetyHarnessWorld>, message: Diag
 
 #[when("an edit replaces {old} with {new}")]
 fn when_edit_replaces(world: &RefCell<SafetyHarnessWorld>, old: TextPattern, new: TextPattern) {
-    // Use default file name "test.txt"
-    let default_name: FileName = "test.txt".into();
+    // Use current file from scenario, falling back to "test.txt"
+    let file_name = world.borrow().current_file_name();
     world
         .borrow_mut()
-        .add_replacement_edit(&default_name, &old, &new);
+        .add_replacement_edit(&file_name, &old, &new);
     world.borrow_mut().execute_transaction();
 }
 

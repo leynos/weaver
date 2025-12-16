@@ -82,7 +82,7 @@ and relational understanding of code.*
     engine for `observe grep` and `act apply-rewrite`, drawing inspiration from
     ast-grep's pattern language.
 
-- [ ] Integrate the "Syntactic Lock" from `weaver-syntax` into the
+- [x] Integrate the "Syntactic Lock" from `weaver-syntax` into the
     "Double-Lock" harness.
 
 - [ ] Extend the `LanguageServer` trait with document sync methods

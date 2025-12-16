@@ -16,6 +16,7 @@ thiserror.workspace = true
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json", "time"] }
 weaver-config = { path = "../weaver-config", features = ["cli"] }
+weaver-syntax = { path = "../weaver-syntax" }
 tempfile.workspace = true
 
 [dev-dependencies]

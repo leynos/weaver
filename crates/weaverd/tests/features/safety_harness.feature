@@ -71,3 +71,40 @@ Feature: Double-Lock safety harness
     When an edit creates "new_file.txt" with content "fresh content"
     Then the transaction commits successfully
     And the file "new_file.txt" contains "fresh content"
+
+  # Tree-sitter Integration Scenarios
+
+  Scenario: Valid Rust code passes Tree-sitter syntactic validation
+    Given a source file "main.rs" with content "fn main() {}"
+    And a Tree-sitter syntactic lock
+    And a semantic lock that passes
+    When an edit replaces "fn main() {}" with "fn main() { println!(\"hi\"); }"
+    Then the transaction commits successfully
+
+  Scenario: Invalid Rust code fails Tree-sitter syntactic validation
+    Given a source file "main.rs" with content "fn main() {}"
+    And a Tree-sitter syntactic lock
+    And a semantic lock that passes
+    When an edit replaces "fn main() {}" with "fn broken() {"
+    Then the transaction fails with a syntactic lock error
+
+  Scenario: Unknown file extensions pass through Tree-sitter validation
+    Given a source file "config.json" with content "valid"
+    And a Tree-sitter syntactic lock
+    And a semantic lock that passes
+    When an edit replaces "valid" with "{invalid json"
+    Then the transaction commits successfully
+
+  Scenario: Invalid Python code fails Tree-sitter validation
+    Given a source file "script.py" with content "def hello(): pass"
+    And a Tree-sitter syntactic lock
+    And a semantic lock that passes
+    When an edit replaces "def hello(): pass" with "def hello("
+    Then the transaction fails with a syntactic lock error
+
+  Scenario: Invalid TypeScript code fails Tree-sitter validation
+    Given a source file "app.ts" with content "function greet(): void {}"
+    And a Tree-sitter syntactic lock
+    And a semantic lock that passes
+    When an edit replaces "function greet(): void {}" with "function broken( {"
+    Then the transaction fails with a syntactic lock error
