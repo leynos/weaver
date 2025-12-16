@@ -1,0 +1,337 @@
+//! End-to-end tests for weaver-syntax using insta for snapshot testing.
+//!
+//! These tests validate the public API behaviour across happy and unhappy
+//! paths, with snapshot testing for structured outputs.
+
+use std::path::Path;
+
+use rstest::{fixture, rstest};
+
+use weaver_syntax::{
+    Parser, Pattern, RewriteRule, Rewriter, SupportedLanguage, TreeSitterSyntacticLock,
+};
+
+// =============================================================================
+// Happy Path: Parsing
+// =============================================================================
+
+#[rstest]
+#[case(SupportedLanguage::Rust, "fn main() { println!(\"hello\"); }")]
+#[case(
+    SupportedLanguage::Python,
+    "def greet(name):\n    print(f'Hello, {name}')"
+)]
+#[case(
+    SupportedLanguage::TypeScript,
+    "function greet(name: string): void { console.log(name); }"
+)]
+fn parse_valid_file_succeeds(#[case] language: SupportedLanguage, #[case] source: &str) {
+    let mut parser = Parser::new(language).unwrap_or_else(|err| panic!("parser init: {err}"));
+    let result = parser
+        .parse(source)
+        .unwrap_or_else(|err| panic!("parse: {err}"));
+
+    assert!(!result.has_errors());
+    assert_eq!(result.language(), language);
+}
+
+// =============================================================================
+// Happy Path: Pattern Matching
+// =============================================================================
+
+/// Fixture providing a Rust parser for pattern matching tests.
+#[fixture]
+fn rust_parser() -> Parser {
+    Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"))
+}
+
+/// Helper to parse source, compile a pattern, and find the first match.
+///
+/// This helper accepts a callback because [`weaver_syntax::MatchResult`] borrows
+/// from the parsed source and cannot be returned alongside it without a
+/// self-referential structure.
+fn parse_compile_and_find_first(
+    parser: &mut Parser,
+    source: &str,
+    pattern_str: &str,
+    assertion: impl for<'a> FnOnce(weaver_syntax::MatchResult<'a>),
+) {
+    let parsed = parser
+        .parse(source)
+        .unwrap_or_else(|err| panic!("parse: {err}"));
+
+    let pattern = Pattern::compile(pattern_str, SupportedLanguage::Rust)
+        .unwrap_or_else(|err| panic!("pattern: {err}"));
+
+    let match_result = pattern
+        .find_first(&parsed)
+        .unwrap_or_else(|| panic!("should find match"));
+
+    assertion(match_result);
+}
+
+/// Helper to validate a file and return the first validation failure.
+fn validate_and_get_first_failure(
+    lock: &TreeSitterSyntacticLock,
+    path: &Path,
+    content: &str,
+) -> weaver_syntax::ValidationFailure {
+    let failures = lock
+        .validate_file(path, content)
+        .unwrap_or_else(|err| panic!("validate: {err}"));
+
+    assert!(!failures.is_empty(), "Expected validation failures");
+
+    failures
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| panic!("expected validation failure"))
+}
+
+#[rstest]
+fn pattern_finds_all_function_definitions(mut rust_parser: Parser) {
+    let source = rust_parser
+        .parse("fn foo() {} fn bar() {} fn baz() {}")
+        .unwrap_or_else(|err| panic!("parse: {err}"));
+
+    let pattern = Pattern::compile("fn $NAME() {}", SupportedLanguage::Rust)
+        .unwrap_or_else(|err| panic!("pattern: {err}"));
+    let matches = pattern.find_all(&source);
+
+    assert!(!matches.is_empty(), "Should find function definitions");
+}
+
+#[rstest]
+fn pattern_captures_metavariables_correctly(mut rust_parser: Parser) {
+    parse_compile_and_find_first(
+        &mut rust_parser,
+        "fn hello_world() {}",
+        "fn $NAME() {}",
+        |m| {
+            let Some(capture) = m.capture("NAME") else {
+                panic!("should capture NAME");
+            };
+            assert_eq!(capture.text(), "hello_world");
+        },
+    );
+}
+
+#[rstest]
+fn pattern_match_has_correct_position(mut rust_parser: Parser) {
+    parse_compile_and_find_first(&mut rust_parser, "fn test() {}", "fn $NAME() {}", |m| {
+        let (line, col) = m.start_position();
+        assert_eq!(line, 1, "Should be on line 1");
+        assert!(col >= 1, "Column should be positive");
+    });
+}
+
+// =============================================================================
+// Happy Path: Rewriting
+// =============================================================================
+
+/// Helper to create a common let->const rewrite rule and rewriter for testing.
+fn setup_let_to_const_rewriter() -> (RewriteRule, Rewriter) {
+    let pattern = Pattern::compile("let $VAR = $VAL", SupportedLanguage::Rust)
+        .unwrap_or_else(|err| panic!("pattern: {err}"));
+    let rewriter = Rewriter::new(SupportedLanguage::Rust);
+    let rule = RewriteRule::new(pattern, "const $VAR: _ = $VAL;")
+        .unwrap_or_else(|err| panic!("rule: {err}"));
+    (rule, rewriter)
+}
+
+#[test]
+fn rewrite_transforms_code_correctly() {
+    let (rule, rewriter) = setup_let_to_const_rewriter();
+    let result = rewriter
+        .apply(&rule, "fn main() { let x = 42; }")
+        .unwrap_or_else(|err| panic!("rewrite: {err}"));
+
+    assert!(result.has_changes());
+    assert!(result.output().contains("const"));
+}
+
+#[test]
+fn rewrite_handles_multiple_matches() {
+    let (rule, rewriter) = setup_let_to_const_rewriter();
+    let result = rewriter
+        .apply(&rule, "fn main() { let a = 1; let b = 2; }")
+        .unwrap_or_else(|err| panic!("rewrite: {err}"));
+
+    assert!(result.has_changes());
+    assert_eq!(
+        result.num_replacements(),
+        2,
+        "should replace both let bindings"
+    );
+}
+
+// =============================================================================
+// Happy Path: Syntactic Lock
+// =============================================================================
+
+#[test]
+fn syntactic_lock_validates_valid_code() {
+    let lock = TreeSitterSyntacticLock::new();
+
+    let failures = lock
+        .validate_file(Path::new("main.rs"), "fn main() { println!(\"OK\"); }")
+        .unwrap_or_else(|err| panic!("validate: {err}"));
+
+    assert!(failures.is_empty());
+}
+
+#[test]
+fn syntactic_lock_handles_multiple_languages() {
+    let lock = TreeSitterSyntacticLock::new();
+
+    let files: Vec<(&Path, &str)> = vec![
+        (Path::new("main.rs"), "fn main() {}"),
+        (Path::new("script.py"), "def main(): pass"),
+        (Path::new("app.ts"), "function main(): void {}"),
+    ];
+
+    let failures = lock
+        .validate_files(files)
+        .unwrap_or_else(|err| panic!("validate: {err}"));
+    assert!(failures.is_empty());
+}
+
+// =============================================================================
+// Unhappy Path: Parsing Errors
+// =============================================================================
+
+#[rstest]
+#[case(SupportedLanguage::Rust, "fn broken() {")]
+#[case(SupportedLanguage::Python, "def broken(")]
+#[case(SupportedLanguage::TypeScript, "function broken( {")]
+fn parse_invalid_file_returns_errors(#[case] language: SupportedLanguage, #[case] source: &str) {
+    let mut parser = Parser::new(language).unwrap_or_else(|err| panic!("parser: {err}"));
+    let result = parser
+        .parse(source)
+        .unwrap_or_else(|err| panic!("parse: {err}"));
+
+    assert!(result.has_errors());
+    let errors = result.errors();
+    assert!(!errors.is_empty());
+}
+
+// =============================================================================
+// Unhappy Path: Syntactic Lock Failures
+// =============================================================================
+
+#[test]
+fn syntactic_lock_detects_syntax_errors() {
+    let lock = TreeSitterSyntacticLock::new();
+    let failure = validate_and_get_first_failure(&lock, Path::new("broken.rs"), "fn broken() {");
+    assert!(failure.line >= 1);
+}
+
+#[test]
+fn syntactic_lock_reports_error_location() {
+    let lock = TreeSitterSyntacticLock::new();
+
+    let code = "fn main() {\n    let x = \n}";
+    let failure = validate_and_get_first_failure(&lock, Path::new("test.rs"), code);
+    assert!(failure.line >= 1);
+    assert!(failure.column >= 1);
+}
+
+// =============================================================================
+// Unhappy Path: Unknown Extensions
+// =============================================================================
+
+#[test]
+fn syntactic_lock_skips_unknown_extensions() {
+    let lock = TreeSitterSyntacticLock::new();
+
+    // Invalid JSON should pass because .json is not a supported extension
+    let failures = lock
+        .validate_file(Path::new("data.json"), "{invalid json without quotes}")
+        .unwrap_or_else(|err| panic!("validate: {err}"));
+
+    assert!(
+        failures.is_empty(),
+        "Unknown extensions should pass through"
+    );
+}
+
+#[test]
+fn language_detection_returns_none_for_unsupported() {
+    assert!(SupportedLanguage::from_extension("json").is_none());
+    assert!(SupportedLanguage::from_extension("md").is_none());
+    assert!(SupportedLanguage::from_extension("toml").is_none());
+}
+
+// =============================================================================
+// Unhappy Path: Pattern Errors
+// =============================================================================
+
+#[test]
+fn rewrite_rule_rejects_undefined_metavariables() {
+    let pattern = Pattern::compile("fn $NAME() {}", SupportedLanguage::Rust)
+        .unwrap_or_else(|err| panic!("pattern: {err}"));
+    let result = RewriteRule::new(pattern, "fn $UNDEFINED() {}");
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn pattern_with_no_matches_returns_empty() {
+    let mut parser =
+        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
+    let source = parser
+        .parse("fn main() {}")
+        .unwrap_or_else(|err| panic!("parse: {err}"));
+
+    let pattern = Pattern::compile("struct $NAME {}", SupportedLanguage::Rust)
+        .unwrap_or_else(|err| panic!("pattern: {err}"));
+    let matches = pattern.find_all(&source);
+
+    assert!(matches.is_empty());
+}
+
+// =============================================================================
+// Edge Cases
+// =============================================================================
+
+#[test]
+fn handles_empty_source() {
+    let mut parser =
+        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
+    let result = parser
+        .parse("")
+        .unwrap_or_else(|err| panic!("parse: {err}"));
+
+    // Empty source should parse without errors
+    assert!(!result.has_errors());
+}
+
+#[test]
+fn handles_whitespace_only_source() {
+    let mut parser =
+        Parser::new(SupportedLanguage::Rust).unwrap_or_else(|err| panic!("parser: {err}"));
+    let result = parser
+        .parse("   \n\n   ")
+        .unwrap_or_else(|err| panic!("parse: {err}"));
+
+    assert!(!result.has_errors());
+}
+
+#[test]
+fn rewrite_no_match_returns_unchanged() {
+    let pattern = Pattern::compile("struct $NAME {}", SupportedLanguage::Rust)
+        .unwrap_or_else(|err| panic!("pattern: {err}"));
+    let rule =
+        RewriteRule::new(pattern, "enum $NAME {}").unwrap_or_else(|err| panic!("rule: {err}"));
+
+    let rewriter = Rewriter::new(SupportedLanguage::Rust);
+    let source = "fn main() {}";
+    let result = rewriter
+        .apply(&rule, source)
+        .unwrap_or_else(|err| panic!("rewrite: {err}"));
+
+    assert!(!result.has_changes());
+    assert_eq!(result.output(), source);
+}
+
+mod snapshots;

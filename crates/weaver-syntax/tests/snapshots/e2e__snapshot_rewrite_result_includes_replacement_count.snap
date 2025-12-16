@@ -1,0 +1,8 @@
+---
+source: crates/weaver-syntax/tests/e2e.rs
+expression: "(result.num_replacements(), result.output().to_owned())"
+---
+(
+    2,
+    "fn main() { const a: _ = 1; const b: _ = 2; }",
+)

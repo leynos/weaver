@@ -457,6 +457,312 @@ The engine is built on three distinct layers of analysis:
     static analysis plugins, and potentially the output of dynamic profiling
     tools to construct a more complete and accurate call graph.^15^
 
+The following class diagram captures the structure of the `weaver-syntax`
+module, showing how language detection, parsing, pattern matching, rewriting,
+and syntactic lock validation fit together:
+
+```mermaid
+classDiagram
+    class SupportedLanguage {
+      <<enum>>
+      +Rust
+      +Python
+      +TypeScript
+      +from_extension(ext str) SupportedLanguage?
+      +from_path(path Path) SupportedLanguage?
+      +tree_sitter_language() Language
+      +as_str() str
+      +all() SupportedLanguage[]
+    }
+
+    class LanguageParseError {
+      +input() str
+    }
+
+    class SyntaxError {
+      <<enum>>
+      +ParserInitError
+      +UnsupportedExtension
+      +UnknownLanguage
+      +ParseError
+      +PatternCompileError
+      +InvalidMetavariable
+      +RewriteError
+      +InvalidReplacement
+      +InternalError
+    }
+
+    class Parser {
+      +new(language SupportedLanguage) Result~Parser, SyntaxError~
+      +language() SupportedLanguage
+      +parse(source str) Result~ParseResult, SyntaxError~
+    }
+
+    class ParseResult {
+      +source() str
+      +language() SupportedLanguage
+      +has_errors() bool
+      +errors() SyntaxErrorInfo[]
+      +root_node() Node
+    }
+
+    class SyntaxErrorInfo {
+      +byte_range Range~usize~
+      +line u32
+      +column u32
+      +context str
+      +message str
+    }
+
+    class Pattern {
+      +compile(source str, language SupportedLanguage) Result~Pattern, SyntaxError~
+      +source() str
+      +language() SupportedLanguage
+      +metavariables() MetaVariable[]
+      +parsed() ParseResult
+      +has_metavariables() bool
+    }
+
+    class MetaVariable {
+      +name str
+      +kind MetaVarKind
+      +offset usize
+    }
+
+    class MetaVarKind {
+      <<enum>>
+      +Single
+      +Multiple
+    }
+
+    class Matcher {
+      +new(pattern Pattern) Matcher
+      +find_all(parsed ParseResult) MatchResult[]
+      +find_first(parsed ParseResult) MatchResult?
+    }
+
+    class MatchResult {
+      +node() Node
+      +text() str
+      +byte_range() Range~usize~
+      +start_position() (u32, u32)
+      +end_position() (u32, u32)
+      +captures() &HashMap~String, CapturedValue~
+      +capture(name str) CapturedValue?
+    }
+
+    class CapturedValue {
+      <<enum>>
+      +Single
+      +Multiple
+      +text() str
+      +byte_range() Range~usize~
+    }
+
+    class CapturedNode {
+      +node() Node
+      +text() str
+      +byte_range() Range~usize~
+    }
+
+    class CapturedNodes {
+      +nodes() CapturedNode[]
+      +text() str
+      +byte_range() Range~usize~
+    }
+
+    class RewriteRule {
+      +new(pattern Pattern, replacement str) Result~RewriteRule, SyntaxError~
+      +pattern() Pattern
+      +replacement() str
+    }
+
+    class Rewriter {
+      +new(language SupportedLanguage) Rewriter
+      +apply(rule RewriteRule, source str) Result~RewriteResult, SyntaxError~
+      +apply_all(rules RewriteRule[], source str) Result~RewriteResult, SyntaxError~
+    }
+
+    class RewriteResult {
+      +output() str
+      +num_replacements() usize
+      +has_changes() bool
+    }
+
+    class TreeSitterSyntacticLock {
+      +new() TreeSitterSyntacticLock
+      +validate_file(path Path, content str) Result~ValidationFailure[], SyntaxError~
+      +validate_files(files (Path, str)[]) Result~ValidationFailure[], SyntaxError~
+      +supports_file(path Path) bool
+    }
+
+    class ValidationFailure {
+      +path PathBuf
+      +line u32
+      +column u32
+      +message str
+    }
+
+    %% Relationships
+    Parser --> SupportedLanguage
+    Parser --> ParseResult
+    Parser --> SyntaxError
+
+    ParseResult --> SupportedLanguage
+    ParseResult --> SyntaxErrorInfo
+
+    Pattern --> SupportedLanguage
+    Pattern --> ParseResult
+    Pattern --> MetaVariable
+    Pattern --> SyntaxError
+
+    MetaVariable --> MetaVarKind
+
+    Matcher --> Pattern
+    Matcher --> ParseResult
+    Matcher --> MatchResult
+
+    MatchResult --> CapturedValue
+    CapturedValue --> CapturedNode
+    CapturedValue --> CapturedNodes
+
+    RewriteRule --> Pattern
+    RewriteRule --> SyntaxError
+
+    Rewriter --> SupportedLanguage
+    Rewriter --> RewriteRule
+    Rewriter --> Parser
+    Rewriter --> RewriteResult
+    Rewriter --> SyntaxError
+
+    TreeSitterSyntacticLock --> Parser
+    TreeSitterSyntacticLock --> SupportedLanguage
+    TreeSitterSyntacticLock --> SyntaxError
+    TreeSitterSyntacticLock --> ValidationFailure
+```
+
+The following sequence diagram shows how a caller typically composes the
+`weaver-syntax` APIs for parsing, matching, rewriting, and syntactic
+validation:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Parser
+    participant Pattern
+    participant Matcher
+    participant Rewriter
+    participant Lock as SyntacticLock
+
+    User->>Parser: new(language) / parse(source)
+    Parser-->>User: ParseResult (tree + SyntaxErrorInfo?)
+
+    User->>Pattern: compile(pattern_src, language)
+    Pattern->>Parser: parse(wrapped_or_normalised_pattern)
+    Parser-->>Pattern: ParseResult (pattern AST + metavariables)
+
+    User->>Matcher: find_all(pattern, parsed_source)
+    Matcher->>Matcher: recursive traversal & SequenceMatcher backtracking
+    Matcher-->>User: Vec<MatchResult> (captures + positions)
+
+    User->>Rewriter: apply(rule, source)
+    Rewriter->>Parser: parse(source)
+    Rewriter->>Matcher: find_all(rule.pattern, parsed)
+    Rewriter->>Rewriter: perform substitutions (end‑to‑start)
+    Rewriter-->>User: RewriteResult (output + replacement count)
+
+    User->>Lock: validate_file(path, content)
+    Lock->>Parser: parse(content, detected_language)
+    Lock->>Lock: detect ERROR nodes → build ValidationFailure(s)
+    Lock-->>User: Vec<ValidationFailure>
+```
+
+*Figure: Typical `weaver-syntax` API flow across parsing, matching, rewriting,
+and syntactic validation.*
+
+The following sequence diagram focuses on the syntactic lock integration used
+by the safety harness to validate modified files:
+
+```mermaid
+sequenceDiagram
+    actor Operator
+    participant SafetyHarness
+    participant TreeSitterSyntacticLock
+    participant Parser
+    participant TreeSitter
+
+    Operator->>SafetyHarness: request_validation(modified_files)
+    SafetyHarness->>TreeSitterSyntacticLock: validate_files(files)
+
+    loop for_each_file
+        TreeSitterSyntacticLock->>TreeSitterSyntacticLock: SupportedLanguage::from_path(path)
+        alt supported_language
+            TreeSitterSyntacticLock->>TreeSitterSyntacticLock: lookup_or_create Parser
+            TreeSitterSyntacticLock->>Parser: parse(content)
+            Parser->>TreeSitter: parse(source,language)
+            TreeSitter-->>Parser: Tree
+            Parser-->>TreeSitterSyntacticLock: ParseResult
+            TreeSitterSyntacticLock->>ParseResult: errors()
+            ParseResult-->>TreeSitterSyntacticLock: SyntaxErrorInfo[]
+            alt errors_found
+                TreeSitterSyntacticLock->>TreeSitterSyntacticLock: map_to ValidationFailure
+            else no_errors
+                TreeSitterSyntacticLock->>TreeSitterSyntacticLock: no_failure_for_file
+            end
+        else unsupported_extension
+            TreeSitterSyntacticLock->>TreeSitterSyntacticLock: skip_file(pass_through)
+        end
+    end
+
+    TreeSitterSyntacticLock-->>SafetyHarness: all ValidationFailure[]
+    SafetyHarness-->>Operator: report_pass_or_fail
+```
+
+*Figure: Syntactic lock validation flow across the safety harness.*
+
+The following sequence diagram focuses on the end-to-end rewrite application
+flow from the CLI through to match discovery and substitution:
+
+```mermaid
+sequenceDiagram
+    actor Operator
+    participant CLI
+    participant Rewriter
+    participant Parser
+    participant Pattern
+    participant Matcher
+
+    Operator->>CLI: act apply-rewrite(rule,source)
+    CLI->>Rewriter: apply(rule,source)
+
+    Rewriter->>Parser: new(language)
+    Parser-->>Rewriter: Parser
+    Rewriter->>Parser: parse(source)
+    Parser-->>Rewriter: ParseResult
+
+    Rewriter->>Pattern: pattern()
+    Pattern-->>Rewriter: Pattern
+    Rewriter->>Pattern: find_all(ParseResult)
+    Pattern->>Matcher: new(Pattern)
+    Matcher->>Matcher: find_all(parsed)
+    Matcher-->>Pattern: MatchResult[]
+    Pattern-->>Rewriter: MatchResult[]
+
+    alt matches_found
+        loop for_each_match(descending_offsets)
+            Rewriter->>Rewriter: substitute_metavariables(template,MatchResult)
+        end
+        Rewriter-->>CLI: RewriteResult(output,has_changes=true)
+    else no_matches
+        Rewriter-->>CLI: RewriteResult(output=source,has_changes=false)
+    end
+
+    CLI-->>Operator: display_rewritten_source
+```
+
+*Figure: Rewrite application flow from CLI to substitutions.*
+
 Each piece of information gathered by these layers---a symbol reference from
 LSP, a potential call site identified by a Tree-sitter query, a dependency link
 from a build file---is treated as an input to the fusion engine. The engine
@@ -1499,3 +1805,41 @@ recording implementations without spawning real servers during tests. Requests
 fail fast with structured errors that surface both the language and the reason
 (server missing, override deny, or server error) to callers, keeping the
 capability matrix honest before the daemon adds sandboxing and transport.
+
+#### 2025-12-03: Upgrade `rstest-bdd` from 0.1.0 to 0.2.0
+
+The workspace dependency on `rstest-bdd`/`rstest-bdd-macros` moved from `0.1.0`
+to `0.2.0` to pick up upstream fixes and API improvements needed by the growing
+behavioural test suite. The upgrade keeps the default feature set disabled and
+continues to pin the macros crate alongside the runtime crate via
+`workspace.dependencies` so step definitions and scenario bindings remain
+consistent across crates.
+
+#### 2025-12-11: Deliver `weaver-syntax` crate with Tree-sitter integration
+
+The new `weaver-syntax` crate provides the syntactic layer for the Semantic
+Fusion Engine. It wraps Tree-sitter parsers for Rust, Python, and TypeScript
+behind a unified `Parser` abstraction that detects languages from file
+extensions. The `TreeSitterSyntacticLock` provides the syntactic lock required
+by the Double-Lock safety harness, validating files by parsing them and
+reporting any ERROR nodes as validation failures with line/column positions.
+Unknown file extensions are silently skipped to avoid blocking edits to
+non-code artefacts.
+
+The crate also delivers an ast-grep-inspired pattern matching engine. Patterns
+support metavariables (`$VAR` for single captures, `$$$VAR` for multiple) which
+Tree-sitter parses as native `metavariable` nodes. The `Pattern` type compiles
+a pattern string into a parsed tree and extracts metavariable definitions; the
+`Matcher` walks the source tree and the pattern tree in parallel, yielding
+`MatchResult` instances with captured text ranges. A `Rewriter` applies
+`RewriteRule` instances to transform matched code, substituting captured values
+into a replacement template and returning the rewritten source with a
+change-tracking flag.
+
+Testing follows the workspace conventions: `rstest-bdd` 0.2.0 powers
+behaviour-driven development (BDD)
+scenarios defined in `tests/features/weaver_syntax.feature`, while `insta`
+captures snapshot expectations for language detection, parse error formatting,
+and validation failure output. The combination of unit, behavioural, and
+end-to-end tests exercises happy and unhappy paths across all supported
+languages.
