@@ -16,7 +16,8 @@ The Double-Lock safety harness validates code modifications through two
 sequential phases:
 
 1. **Syntactic Lock**: Ensures modified files produce valid syntax trees
-2. **Semantic Lock**: Verifies no new errors are introduced via LSP diagnostics
+2. **Semantic Lock**: Verifies no new errors are introduced via Language Server
+   Protocol (LSP) diagnostics
 
 Currently, the syntactic lock uses a placeholder implementation that always
 passes. The `weaver-syntax` crate provides `TreeSitterSyntacticLock`, a
@@ -62,17 +63,19 @@ single `VerificationFailure` containing the error message.
 - Keeps the adapter separate from test doubles in `test_doubles.rs`
 - Makes the integration point explicit and easy to locate
 
-### DD-4: Test World Abstraction for BDD
+### DD-4: Test World Abstraction for Behaviour-Driven Development (BDD)
 
-**Decision**: Modify `SafetyHarnessWorld` to store syntactic locks as
-`Box<dyn SyntacticLock>` to enable pluggable lock implementations in BDD tests.
+**Decision**: Modify `SafetyHarnessWorld` to use a `SyntacticLockVariant` enum
+that can hold either `ConfigurableSyntacticLock` or `TreeSitterSyntacticLockAdapter`,
+enabling pluggable lock implementations in BDD tests.
 
 **Rationale**:
 
 - Enables testing with both `ConfigurableSyntacticLock` (for controlled
   outcomes) and `TreeSitterSyntacticLockAdapter` (for real validation)
+- Avoids heap allocation overhead of `Box<dyn SyntacticLock>`
 - Maintains backwards compatibility with existing scenarios
-- Follows Rust idioms for runtime polymorphism
+- Uses a closed enum since only two lock variants are needed in tests
 
 ## Implementation Checklist
 
