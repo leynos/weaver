@@ -8,7 +8,7 @@ use std::str::FromStr;
 use lsp_types::Uri;
 use rstest::fixture;
 
-pub use recording_server::{CallKind, RecordingLanguageServer, RecordingServerHandle};
+pub use recording_server::{CallKind, DocumentSyncErrors, RecordingLanguageServer, ResponseSet};
 pub use world::{TestServerConfig, TestWorld};
 
 /// Common URI used by host tests.

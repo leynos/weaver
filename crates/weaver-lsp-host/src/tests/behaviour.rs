@@ -3,9 +3,11 @@
 use std::cell::RefCell;
 
 use lsp_types::{
-    Diagnostic, GotoDefinitionParams, GotoDefinitionResponse, Location, PartialResultParams,
-    Position, ReferenceContext, ReferenceParams, TextDocumentIdentifier, TextDocumentPositionParams,
-    Uri, WorkDoneProgressParams,
+    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    GotoDefinitionParams, GotoDefinitionResponse, Location, PartialResultParams, Position,
+    ReferenceContext, ReferenceParams, TextDocumentContentChangeEvent, TextDocumentIdentifier,
+    TextDocumentItem, TextDocumentPositionParams, VersionedTextDocumentIdentifier,
+    WorkDoneProgressParams,
 };
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
@@ -15,7 +17,9 @@ use crate::capability::{CapabilityKind, CapabilitySource};
 use crate::errors::{HostOperation, LspHostError};
 use crate::language::Language;
 use crate::server::ServerCapabilitySet;
-use crate::tests::support::{sample_uri, CallKind, ResponseSet, TestServerConfig, TestWorld};
+use crate::tests::support::{
+    CallKind, DocumentSyncErrors, ResponseSet, TestServerConfig, TestWorld, sample_uri,
+};
 
 #[fixture]
 fn world() -> RefCell<TestWorld> {
@@ -89,9 +93,32 @@ fn given_rust_failure(world: &RefCell<TestWorld>) {
     *world.borrow_mut() = TestWorld::new(configs, CapabilityMatrix::default());
 }
 
+#[given("a rust server that fails during document sync")]
+fn given_rust_document_sync_failure(world: &RefCell<TestWorld>) {
+    let mut responses = sample_responses();
+    responses.document_sync = DocumentSyncErrors {
+        did_open_error: None,
+        did_change_error: Some(String::from("intentional didChange failure")),
+        did_close_error: None,
+    };
+    let configs = vec![TestServerConfig {
+        language: Language::Rust,
+        capabilities: ServerCapabilitySet::new(true, true, true),
+        responses,
+        initialization_error: None,
+    }];
+
+    *world.borrow_mut() = TestWorld::new(configs, CapabilityMatrix::default());
+}
+
 #[given("a deny override for python references")]
 fn given_deny_override(world: &RefCell<TestWorld>) {
-    apply_override(world, Language::Python, CapabilityKind::References, CapabilityOverride::Deny);
+    apply_override(
+        world,
+        Language::Python,
+        CapabilityKind::References,
+        CapabilityOverride::Deny,
+    );
 }
 
 #[given("a force override for typescript diagnostics")]
@@ -103,50 +130,62 @@ fn given_force_override(world: &RefCell<TestWorld>) {
         CapabilityOverride::Force,
     );
 }
-
 #[when("rust is initialised")]
 fn when_rust_initialised(world: &RefCell<TestWorld>) {
     world.borrow_mut().initialize(Language::Rust);
 }
-
 #[when("python is initialised")]
 fn when_python_initialised(world: &RefCell<TestWorld>) {
     world.borrow_mut().initialize(Language::Python);
 }
-
 #[when("typescript handles a diagnostics request")]
 fn when_typescript_diagnostics(world: &RefCell<TestWorld>) {
     let uri = sample_uri();
-    world.borrow_mut().request_diagnostics(Language::TypeScript, uri);
+    world
+        .borrow_mut()
+        .request_diagnostics(Language::TypeScript, uri);
 }
-
 #[when("rust handles a definition request")]
 fn when_rust_definition(world: &RefCell<TestWorld>) {
     world
         .borrow_mut()
         .request_definition(Language::Rust, definition_params());
 }
-
 #[when("rust handles a references request")]
 fn when_rust_references(world: &RefCell<TestWorld>) {
     world
         .borrow_mut()
         .request_references(Language::Rust, reference_params());
 }
-
 #[when("rust handles a diagnostics request")]
 fn when_rust_diagnostics(world: &RefCell<TestWorld>) {
     let uri = sample_uri();
     world.borrow_mut().request_diagnostics(Language::Rust, uri);
 }
-
+#[when("rust opens a document")]
+fn when_rust_opens_document(world: &RefCell<TestWorld>) {
+    world
+        .borrow_mut()
+        .notify_did_open(Language::Rust, did_open_params());
+}
+#[when("rust changes a document")]
+fn when_rust_changes_document(world: &RefCell<TestWorld>) {
+    world
+        .borrow_mut()
+        .notify_did_change(Language::Rust, did_change_params());
+}
+#[when("rust closes a document")]
+fn when_rust_closes_document(world: &RefCell<TestWorld>) {
+    world
+        .borrow_mut()
+        .notify_did_close(Language::Rust, did_close_params());
+}
 #[when("python handles a references request")]
 fn when_python_references(world: &RefCell<TestWorld>) {
     world
         .borrow_mut()
         .request_references(Language::Python, reference_params());
 }
-
 #[then("rust capabilities are available from the server")]
 fn then_rust_capabilities(world: &RefCell<TestWorld>) {
     let borrow = world.borrow();
@@ -156,30 +195,45 @@ fn then_rust_capabilities(world: &RefCell<TestWorld>) {
         .expect("capabilities missing");
 
     for state in summary.states() {
-        assert!(state.enabled, "capability {:?} should be enabled", state.kind);
+        assert!(
+            state.enabled,
+            "capability {:?} should be enabled",
+            state.kind
+        );
         assert_eq!(state.source, CapabilitySource::ServerAdvertised);
     }
 }
-
 #[then("rust recorded a definition call")]
 fn then_rust_recorded_definition(world: &RefCell<TestWorld>) {
     assert_call_recorded(world, Language::Rust, CallKind::Definition);
 }
-
 #[then("rust recorded a references call")]
 fn then_rust_recorded_references(world: &RefCell<TestWorld>) {
     assert_call_recorded(world, Language::Rust, CallKind::References);
 }
-
 #[then("rust recorded a diagnostics call")]
 fn then_rust_recorded_diagnostics(world: &RefCell<TestWorld>) {
     assert_call_recorded(world, Language::Rust, CallKind::Diagnostics);
 }
-
+#[then("rust recorded a did open call")]
+fn then_rust_recorded_did_open(world: &RefCell<TestWorld>) {
+    assert_call_recorded(world, Language::Rust, CallKind::DidOpen);
+}
+#[then("rust recorded a did change call")]
+fn then_rust_recorded_did_change(world: &RefCell<TestWorld>) {
+    assert_call_recorded(world, Language::Rust, CallKind::DidChange);
+}
+#[then("rust recorded a did close call")]
+fn then_rust_recorded_did_close(world: &RefCell<TestWorld>) {
+    assert_call_recorded(world, Language::Rust, CallKind::DidClose);
+}
 #[then("diagnostics succeed via override")]
 fn then_override_succeeds(world: &RefCell<TestWorld>) {
     let borrow = world.borrow();
-    assert!(borrow.last_error.is_none(), "override should allow diagnostics");
+    assert!(
+        borrow.last_error.is_none(),
+        "override should allow diagnostics"
+    );
     assert!(
         borrow
             .last_diagnostics
@@ -196,15 +250,12 @@ fn then_override_succeeds(world: &RefCell<TestWorld>) {
     let diagnostics = summary.state(CapabilityKind::Diagnostics);
     assert_eq!(diagnostics.source, CapabilitySource::ForcedOverride);
 }
-
 #[then("the request fails with an unavailable capability error")]
 fn then_missing_capability(world: &RefCell<TestWorld>) {
     let borrow = world.borrow();
     match &borrow.last_error {
         Some(LspHostError::CapabilityUnavailable {
-            capability,
-            reason,
-            ..
+            capability, reason, ..
         }) => {
             assert_eq!(*capability, CapabilityKind::References);
             assert_eq!(
@@ -216,7 +267,6 @@ fn then_missing_capability(world: &RefCell<TestWorld>) {
         other => panic!("expected capability error, got {other:?}"),
     }
 }
-
 #[then("python recorded only initialisation")]
 fn then_python_calls(world: &RefCell<TestWorld>) {
     let calls = world
@@ -225,12 +275,10 @@ fn then_python_calls(world: &RefCell<TestWorld>) {
         .expect("calls missing");
     assert_eq!(calls, [CallKind::Initialise]);
 }
-
 #[then("typescript recorded a diagnostics call")]
 fn then_override_order(world: &RefCell<TestWorld>) {
     assert_call_recorded(world, Language::TypeScript, CallKind::Diagnostics);
 }
-
 #[then("the request fails with a server error")]
 fn then_server_error(world: &RefCell<TestWorld>) {
     let borrow = world.borrow();
@@ -242,12 +290,20 @@ fn then_server_error(world: &RefCell<TestWorld>) {
         other => panic!("expected server error, got {other:?}"),
     }
 }
-
+#[then("the document sync request fails with a server error")]
+fn then_document_sync_error(world: &RefCell<TestWorld>) {
+    let borrow = world.borrow();
+    match &borrow.last_error {
+        Some(LspHostError::Server {
+            operation: HostOperation::DidChange,
+            ..
+        }) => {}
+        other => panic!("expected document sync server error, got {other:?}"),
+    }
+}
 fn assert_call_recorded(world: &RefCell<TestWorld>, language: Language, kind: CallKind) {
     let borrow = world.borrow();
-    let calls = borrow
-        .calls(language)
-        .expect("missing calls for language");
+    let calls = borrow.calls(language).expect("missing calls for language");
     assert!(
         calls.contains(&kind),
         "expected to record {kind:?} for {language}, got {calls:?}"
@@ -276,6 +332,7 @@ fn sample_responses() -> ResponseSet {
             range: lsp_types::Range::default(),
         }],
         diagnostics: vec![Diagnostic::default()],
+        document_sync: DocumentSyncErrors::default(),
     }
 }
 
@@ -301,6 +358,37 @@ fn reference_params() -> ReferenceParams {
         context: ReferenceContext {
             include_declaration: false,
         },
+    }
+}
+
+fn did_open_params() -> DidOpenTextDocumentParams {
+    DidOpenTextDocumentParams {
+        text_document: TextDocumentItem {
+            uri: sample_uri(),
+            language_id: String::from("rust"),
+            version: 1,
+            text: String::from("fn main() {}"),
+        },
+    }
+}
+
+fn did_change_params() -> DidChangeTextDocumentParams {
+    DidChangeTextDocumentParams {
+        text_document: VersionedTextDocumentIdentifier {
+            uri: sample_uri(),
+            version: 2,
+        },
+        content_changes: vec![TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: String::from("fn main() { println!(\"hi\"); }"),
+        }],
+    }
+}
+
+fn did_close_params() -> DidCloseTextDocumentParams {
+    DidCloseTextDocumentParams {
+        text_document: TextDocumentIdentifier { uri: sample_uri() },
     }
 }
 

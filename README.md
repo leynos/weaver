@@ -34,8 +34,8 @@ TypeScript, and the security sandbox—but there's more to come. Check out our
 ## Key features
 
 - **Semantic operations as shell verbs** — Commands like
-  `observe get-definition`
-  and `act rename-symbol` bring IDE-level intelligence to your terminal.
+  `observe get-definition` and `act rename-symbol` bring IDE-level intelligence
+  to your terminal.
 - **JSONL-native protocol** — Every request and response is a JSON object,
   making integration with other tools trivial.
 - **Multi-layer fusion** — Combines Language Server Protocol (LSP), Tree-sitter

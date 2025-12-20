@@ -19,6 +19,12 @@ pub enum HostOperation {
     References,
     /// Diagnostic retrieval.
     Diagnostics,
+    /// `textDocument/didOpen` notification.
+    DidOpen,
+    /// `textDocument/didChange` notification.
+    DidChange,
+    /// `textDocument/didClose` notification.
+    DidClose,
 }
 
 impl fmt::Display for HostOperation {
@@ -28,6 +34,9 @@ impl fmt::Display for HostOperation {
             Self::Definition => "definition",
             Self::References => "references",
             Self::Diagnostics => "diagnostics",
+            Self::DidOpen => "didOpen",
+            Self::DidChange => "didChange",
+            Self::DidClose => "didClose",
         };
         formatter.write_str(label)
     }

@@ -2,7 +2,10 @@
 
 use std::sync::{Arc, Mutex};
 
-use lsp_types::{Diagnostic, GotoDefinitionParams, GotoDefinitionResponse, Location, ReferenceParams, Uri};
+use lsp_types::{
+    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    GotoDefinitionParams, GotoDefinitionResponse, Location, ReferenceParams, Uri,
+};
 
 use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 
@@ -17,6 +20,12 @@ pub enum CallKind {
     References,
     /// Diagnostics were requested.
     Diagnostics,
+    /// `textDocument/didOpen` was invoked.
+    DidOpen,
+    /// `textDocument/didChange` was invoked.
+    DidChange,
+    /// `textDocument/didClose` was invoked.
+    DidClose,
 }
 
 /// Test double that records every request routed through it.
@@ -74,6 +83,26 @@ impl RecordingLanguageServer {
             Ok(extract_response(&state.responses))
         })
     }
+
+    fn handle_notification(
+        &mut self,
+        call_kind: CallKind,
+        operation: &str,
+        extract_error: impl FnOnce(&ResponseSet) -> Option<String>,
+    ) -> Result<(), LanguageServerError> {
+        with_state(&self.shared, |state| {
+            state.record_call(call_kind);
+            if !state.initialised {
+                return Err(LanguageServerError::new(format!(
+                    "{operation} requested before initialisation",
+                )));
+            }
+            if let Some(message) = extract_error(&state.responses) {
+                return Err(LanguageServerError::new(message));
+            }
+            Ok(())
+        })
+    }
 }
 
 impl LanguageServer for RecordingLanguageServer {
@@ -111,6 +140,30 @@ impl LanguageServer for RecordingLanguageServer {
             responses.diagnostics.clone()
         })
     }
+
+    fn did_open(&mut self, _params: DidOpenTextDocumentParams) -> Result<(), LanguageServerError> {
+        self.handle_notification(CallKind::DidOpen, "didOpen", |responses| {
+            responses.document_sync.did_open_error.clone()
+        })
+    }
+
+    fn did_change(
+        &mut self,
+        _params: DidChangeTextDocumentParams,
+    ) -> Result<(), LanguageServerError> {
+        self.handle_notification(CallKind::DidChange, "didChange", |responses| {
+            responses.document_sync.did_change_error.clone()
+        })
+    }
+
+    fn did_close(
+        &mut self,
+        _params: DidCloseTextDocumentParams,
+    ) -> Result<(), LanguageServerError> {
+        self.handle_notification(CallKind::DidClose, "didClose", |responses| {
+            responses.document_sync.did_close_error.clone()
+        })
+    }
 }
 
 /// Handle that exposes recorded state for assertions.
@@ -130,9 +183,7 @@ fn with_state<R, F>(shared: &Arc<Mutex<RecordingState>>, action: F) -> R
 where
     F: FnOnce(&mut RecordingState) -> R,
 {
-    let mut guard = shared
-        .lock()
-        .unwrap_or_else(|poison| poison.into_inner());
+    let mut guard = shared.lock().unwrap_or_else(|poison| poison.into_inner());
     action(&mut guard)
 }
 
@@ -145,6 +196,8 @@ pub struct ResponseSet {
     pub references: Vec<Location>,
     /// Response returned for diagnostics requests.
     pub diagnostics: Vec<Diagnostic>,
+    /// Errors returned for document sync notifications.
+    pub document_sync: DocumentSyncErrors,
 }
 
 impl Default for ResponseSet {
@@ -153,8 +206,20 @@ impl Default for ResponseSet {
             definition: GotoDefinitionResponse::Array(Vec::new()),
             references: Vec::new(),
             diagnostics: Vec::new(),
+            document_sync: DocumentSyncErrors::default(),
         }
     }
+}
+
+/// Document sync failures for notifications.
+#[derive(Debug, Clone, Default)]
+pub struct DocumentSyncErrors {
+    /// Error raised when `did_open` is called.
+    pub did_open_error: Option<String>,
+    /// Error raised when `did_change` is called.
+    pub did_change_error: Option<String>,
+    /// Error raised when `did_close` is called.
+    pub did_close_error: Option<String>,
 }
 
 #[derive(Debug)]

@@ -2,7 +2,10 @@
 
 use std::collections::HashMap;
 
-use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse, ReferenceParams, Uri};
+use lsp_types::{
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    GotoDefinitionParams, GotoDefinitionResponse, ReferenceParams, Uri,
+};
 
 use crate::capability::{CapabilityKind, CapabilitySummary, resolve_capabilities};
 use crate::errors::{HostOperation, LspHostError};
@@ -149,6 +152,42 @@ impl LspHost {
         }
     );
 
+    /// Notifies the server that a document has been opened with in-memory content.
+    #[doc = include_str!("../docs/did_open.md")]
+    pub fn did_open(
+        &mut self,
+        language: Language,
+        params: DidOpenTextDocumentParams,
+    ) -> Result<(), LspHostError> {
+        self.call_on_server(language, HostOperation::DidOpen, move |server| {
+            server.did_open(params)
+        })
+    }
+
+    /// Notifies the server that a document has changed with in-memory content.
+    #[doc = include_str!("../docs/did_change.md")]
+    pub fn did_change(
+        &mut self,
+        language: Language,
+        params: DidChangeTextDocumentParams,
+    ) -> Result<(), LspHostError> {
+        self.call_on_server(language, HostOperation::DidChange, move |server| {
+            server.did_change(params)
+        })
+    }
+
+    /// Notifies the server that a document has been closed.
+    #[doc = include_str!("../docs/did_close.md")]
+    pub fn did_close(
+        &mut self,
+        language: Language,
+        params: DidCloseTextDocumentParams,
+    ) -> Result<(), LspHostError> {
+        self.call_on_server(language, HostOperation::DidClose, move |server| {
+            server.did_close(params)
+        })
+    }
+
     fn call_with_capability<F, T>(
         &mut self,
         language: Language,
@@ -175,6 +214,25 @@ impl LspHost {
 
         call(session.server.as_mut())
             .map_err(|source| LspHostError::server(language, spec.operation, source))
+    }
+
+    fn call_on_server<F, T>(
+        &mut self,
+        language: Language,
+        operation: HostOperation,
+        call: F,
+    ) -> Result<T, LspHostError>
+    where
+        F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
+    {
+        let overrides = &self.overrides;
+        let session = self
+            .sessions
+            .get_mut(&language)
+            .ok_or_else(|| LspHostError::unknown(language))?;
+        let _summary = Self::ensure_initialized(language, session, overrides)?;
+        call(session.server.as_mut())
+            .map_err(|source| LspHostError::server(language, operation, source))
     }
 
     fn ensure_initialized(

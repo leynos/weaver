@@ -19,3 +19,6 @@ pub use errors::{HostOperation, LspHostError};
 pub use host::LspHost;
 pub use language::{Language, LanguageParseError};
 pub use server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
+
+#[cfg(test)]
+mod tests;
