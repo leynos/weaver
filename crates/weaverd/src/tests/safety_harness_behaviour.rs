@@ -294,8 +294,8 @@ fn then_no_changes(world: &RefCell<SafetyHarnessWorld>) {
 
 #[then("the file contains {expected}")]
 fn then_file_contains(world: &RefCell<SafetyHarnessWorld>, expected: TextPattern) {
-    let default_name: FileName = "test.txt".into();
-    let content = world.borrow().read_file(&default_name);
+    let file_name = world.borrow().current_file_name();
+    let content = world.borrow().read_file(&file_name);
     assert!(
         content.contains(expected.as_str()),
         "expected file to contain '{}', got '{content}'",
@@ -320,9 +320,13 @@ fn then_named_file_contains(
 
 #[then("the file is unchanged")]
 fn then_file_unchanged(world: &RefCell<SafetyHarnessWorld>) {
-    let default_name: FileName = "test.txt".into();
-    let content = world.borrow().read_file(&default_name);
-    assert_eq!(content, "hello world", "file should be unchanged");
+    let file_name = world.borrow().current_file_name();
+    let world = world.borrow();
+    let content = world.read_file(&file_name);
+    let expected = world
+        .original_content(&file_name)
+        .unwrap_or_else(|| panic!("no original content recorded for {}", file_name.as_str()));
+    assert_eq!(content, expected, "file should be unchanged");
 }
 
 #[then("the file {name} is unchanged")]

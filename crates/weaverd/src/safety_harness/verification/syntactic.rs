@@ -14,7 +14,7 @@ use crate::safety_harness::locks::SyntacticLockResult;
 /// Adapter wrapping [`weaver_syntax::TreeSitterSyntacticLock`] for the harness.
 ///
 /// This adapter validates modified files using Tree-sitter parsers for Rust,
-/// Python, and TypeScript. Files with unrecognised extensions are passed
+/// Python, and TypeScript. Files with unrecognized extensions are passed
 /// through without validation, allowing non-code artefacts to coexist.
 ///
 /// # Thread Safety
@@ -44,7 +44,7 @@ pub struct TreeSitterSyntacticLockAdapter {
 impl TreeSitterSyntacticLockAdapter {
     /// Creates a new adapter with a fresh Tree-sitter syntactic lock.
     ///
-    /// Parsers for each language are initialised lazily on first use.
+    /// Parsers for each language are initialized lazily on first use.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -82,7 +82,7 @@ impl TreeSitterSyntacticLockAdapter {
                     failures.extend(file_failures.into_iter().map(convert_failure));
                 }
                 Err(err) => {
-                    // Parser initialisation or internal error - treat as failure
+                    // Parser initialization or internal error - treat as failure
                     failures.push(VerificationFailure::new(
                         path.to_path_buf(),
                         format!("syntactic backend error: {err}"),

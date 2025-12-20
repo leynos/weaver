@@ -51,7 +51,7 @@ single `VerificationFailure` containing the error message.
 - Prevents silent failures that could allow invalid code through
 - Provides actionable error messages to operators
 
-### DD-3: Module Organisation
+### DD-3: Module Organization
 
 **Decision**: Place the adapter in a new file
 `crates/weaverd/src/safety_harness/verification/syntactic.rs`.
@@ -98,7 +98,7 @@ enabling pluggable lock implementations in BDD tests.
 | `crates/weaverd/src/safety_harness/verification/syntactic.rs` | Complete | New adapter |
 | `crates/weaverd/src/safety_harness/verification.rs` | Complete | Module declaration |
 | `crates/weaverd/src/safety_harness/mod.rs` | Complete | Public export |
-| `crates/weaverd/src/tests/safety_harness_behaviour.rs` | Complete | BDD steps |
+| `crates/weaverd/src/tests/safety_harness_behaviour.rs` | Complete | BDD world & steps |
 | `crates/weaverd/tests/features/safety_harness.feature` | Complete | BDD scenarios |
 | `docs/roadmap.md` | Complete | Mark complete |
 | `docs/users-guide.md` | Complete | Verify accuracy |
@@ -126,7 +126,7 @@ enabling pluggable lock implementations in BDD tests.
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Parser initialisation failure | Medium | Map to backend error, not silent pass |
+| Parser initialization failure | Medium | Map to backend error, not silent pass |
 | Type conversion overhead | Low | Conversion is O(n) where n = failures |
 | Thread safety concerns | Low | `TreeSitterSyntacticLock` is `Send + Sync` |
 
