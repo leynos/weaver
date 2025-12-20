@@ -24,6 +24,53 @@ passes. The `weaver-syntax` crate provides `TreeSitterSyntacticLock`, a
 production-ready implementation using Tree-sitter parsers for Rust, Python, and
 TypeScript.
 
+### Syntactic Lock Validation Flow
+
+The following diagram illustrates how the safety harness delegates syntactic
+validation to the `TreeSitterSyntacticLockAdapter`, which in turn invokes the
+underlying `TreeSitterSyntacticLock` from `weaver-syntax`:
+
+```mermaid
+sequenceDiagram
+    participant Harness as SafetyHarness
+    participant SynLock as SyntacticLock
+    participant Adapter as TreeSitterSyntacticLockAdapter
+    participant TSLock as TreeSitterSyntacticLock
+
+    Harness->>Harness: build VerificationContext from modified_files
+    Harness->>SynLock: validate(context)
+    activate SynLock
+
+    Note over SynLock,Adapter: In this PR, SynLock is TreeSitterSyntacticLockAdapter
+
+    SynLock->>Adapter: validate(context)
+    activate Adapter
+    Adapter->>Adapter: collect_failures(context)
+
+    loop for each (path, content) in context.modified_files()
+        Adapter->>TSLock: validate_file(path, content)
+        alt Ok(file_failures)
+            TSLock-->>Adapter: Vec_ValidationFailure
+            Adapter->>Adapter: convert_failure(ValidationFailure) to VerificationFailure
+        else Err(error)
+            TSLock-->>Adapter: Error
+            Adapter->>Adapter: push VerificationFailure for backend error
+        end
+    end
+
+    Adapter-->>SynLock: SyntacticLockResult::Passed or SyntacticLockResult::Failed
+    deactivate Adapter
+
+    SynLock-->>Harness: SyntacticLockResult
+    deactivate SynLock
+
+    alt result.passed()
+        Harness->>Harness: proceed to SemanticLock phase
+    else
+        Harness->>Harness: abort double_lock with syntactic failures
+    end
+```
+
 ## Design Decisions
 
 ### DD-1: Adapter Pattern for Integration
