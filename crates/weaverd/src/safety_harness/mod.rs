@@ -38,5 +38,6 @@ pub use locks::{SemanticLockResult, SyntacticLockResult};
 pub use transaction::{EditTransaction, TransactionOutcome};
 pub use verification::{
     ConfigurableSemanticLock, ConfigurableSyntacticLock, PlaceholderSemanticLock,
-    PlaceholderSyntacticLock, SemanticLock, SyntacticLock, VerificationContext,
+    PlaceholderSyntacticLock, SemanticLock, SyntacticLock, TreeSitterSyntacticLockAdapter,
+    VerificationContext,
 };

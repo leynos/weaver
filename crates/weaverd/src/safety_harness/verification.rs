@@ -5,12 +5,14 @@
 //! injected via the trait system to enable testing and pluggable backends.
 
 mod apply;
+mod syntactic;
 mod test_doubles;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 pub use apply::apply_edits;
+pub use syntactic::TreeSitterSyntacticLockAdapter;
 pub use test_doubles::{ConfigurableSemanticLock, ConfigurableSyntacticLock};
 
 use super::error::SafetyHarnessError;
