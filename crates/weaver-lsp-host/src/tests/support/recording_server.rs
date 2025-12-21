@@ -67,11 +67,11 @@ impl RecordingLanguageServer {
         }
     }
 
-    fn handle_request<R>(
+    fn validate_and_execute<R>(
         &mut self,
         call_kind: CallKind,
         operation: &str,
-        extract_response: impl FnOnce(&ResponseSet) -> R,
+        action: impl FnOnce(&ResponseSet) -> Result<R, LanguageServerError>,
     ) -> Result<R, LanguageServerError> {
         with_state(&self.shared, |state| {
             state.record_call(call_kind);
@@ -80,7 +80,18 @@ impl RecordingLanguageServer {
                     "{operation} requested before initialisation",
                 )));
             }
-            Ok(extract_response(&state.responses))
+            action(&state.responses)
+        })
+    }
+
+    fn handle_request<R>(
+        &mut self,
+        call_kind: CallKind,
+        operation: &str,
+        extract_response: impl FnOnce(&ResponseSet) -> R,
+    ) -> Result<R, LanguageServerError> {
+        self.validate_and_execute(call_kind, operation, |responses| {
+            Ok(extract_response(responses))
         })
     }
 
@@ -90,14 +101,8 @@ impl RecordingLanguageServer {
         operation: &str,
         extract_error: impl FnOnce(&ResponseSet) -> Option<String>,
     ) -> Result<(), LanguageServerError> {
-        with_state(&self.shared, |state| {
-            state.record_call(call_kind);
-            if !state.initialised {
-                return Err(LanguageServerError::new(format!(
-                    "{operation} requested before initialisation",
-                )));
-            }
-            if let Some(message) = extract_error(&state.responses) {
+        self.validate_and_execute(call_kind, operation, |responses| {
+            if let Some(message) = extract_error(responses) {
                 return Err(LanguageServerError::new(message));
             }
             Ok(())

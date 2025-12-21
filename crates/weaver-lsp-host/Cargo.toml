@@ -4,7 +4,7 @@ edition.workspace = true
 version.workspace = true
 
 [dependencies]
-weaver-config = { path = "../weaver-config" }
+weaver-config = { path = "../weaver-config", features = ["cli"] }
 lsp-types = { workspace = true }
 thiserror = { workspace = true }
 

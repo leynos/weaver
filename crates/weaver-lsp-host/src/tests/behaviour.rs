@@ -55,30 +55,22 @@ fn given_all_languages(world: &RefCell<TestWorld>) {
 
 #[given("a python server missing references")]
 fn given_python_missing_references(world: &RefCell<TestWorld>) {
-    let mut responses = sample_responses();
-    responses.references = Vec::new();
-    let configs = vec![TestServerConfig {
-        language: Language::Python,
-        capabilities: ServerCapabilitySet::new(true, false, true),
-        responses,
-        initialization_error: None,
-    }];
-
-    *world.borrow_mut() = TestWorld::new(configs, CapabilityMatrix::default());
+    given_server_with_missing_capability(
+        world,
+        Language::Python,
+        |responses| responses.references = Vec::new(),
+        ServerCapabilitySet::new(true, false, true),
+    );
 }
 
 #[given("a typescript server missing diagnostics")]
 fn given_typescript_missing_diagnostics(world: &RefCell<TestWorld>) {
-    let mut responses = sample_responses();
-    responses.diagnostics = Vec::new();
-    let configs = vec![TestServerConfig {
-        language: Language::TypeScript,
-        capabilities: ServerCapabilitySet::new(true, true, false),
-        responses,
-        initialization_error: None,
-    }];
-
-    *world.borrow_mut() = TestWorld::new(configs, CapabilityMatrix::default());
+    given_server_with_missing_capability(
+        world,
+        Language::TypeScript,
+        |responses| responses.diagnostics = Vec::new(),
+        ServerCapabilitySet::new(true, true, false),
+    );
 }
 
 #[given("a rust server that fails during initialisation")]
@@ -281,25 +273,11 @@ fn then_override_order(world: &RefCell<TestWorld>) {
 }
 #[then("the request fails with a server error")]
 fn then_server_error(world: &RefCell<TestWorld>) {
-    let borrow = world.borrow();
-    match &borrow.last_error {
-        Some(LspHostError::Server {
-            operation: HostOperation::Initialise,
-            ..
-        }) => {}
-        other => panic!("expected server error, got {other:?}"),
-    }
+    assert_server_error(world, HostOperation::Initialise);
 }
 #[then("the document sync request fails with a server error")]
 fn then_document_sync_error(world: &RefCell<TestWorld>) {
-    let borrow = world.borrow();
-    match &borrow.last_error {
-        Some(LspHostError::Server {
-            operation: HostOperation::DidChange,
-            ..
-        }) => {}
-        other => panic!("expected document sync server error, got {other:?}"),
-    }
+    assert_server_error(world, HostOperation::DidChange);
 }
 fn assert_call_recorded(world: &RefCell<TestWorld>, language: Language, kind: CallKind) {
     let borrow = world.borrow();
@@ -319,6 +297,35 @@ fn apply_override(
     let mut overrides = CapabilityMatrix::default();
     overrides.set_override(language.as_str(), capability.key(), directive);
     world.borrow_mut().rebuild_host(overrides);
+}
+
+fn given_server_with_missing_capability(
+    world: &RefCell<TestWorld>,
+    language: Language,
+    modify_responses: impl FnOnce(&mut ResponseSet),
+    capabilities: ServerCapabilitySet,
+) {
+    let mut responses = sample_responses();
+    modify_responses(&mut responses);
+    let configs = vec![TestServerConfig {
+        language,
+        capabilities,
+        responses,
+        initialization_error: None,
+    }];
+
+    *world.borrow_mut() = TestWorld::new(configs, CapabilityMatrix::default());
+}
+
+fn assert_server_error(world: &RefCell<TestWorld>, operation: HostOperation) {
+    let borrow = world.borrow();
+    match &borrow.last_error {
+        Some(LspHostError::Server {
+            operation: observed_operation,
+            ..
+        }) => assert_eq!(*observed_operation, operation),
+        other => panic!("expected server error, got {other:?}"),
+    }
 }
 
 fn sample_responses() -> ResponseSet {
