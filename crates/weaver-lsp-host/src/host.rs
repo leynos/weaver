@@ -27,6 +27,12 @@ struct CallSpec {
     operation: HostOperation,
 }
 
+struct CallContext {
+    language: Language,
+    operation: HostOperation,
+    capability: Option<CapabilityKind>,
+}
+
 macro_rules! lsp_method {
     (
         $(#[$meta:meta])* $vis:vis fn $name:ident(
@@ -197,23 +203,14 @@ impl LspHost {
     where
         F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
     {
-        let overrides = &self.overrides;
-        let session = self
-            .sessions
-            .get_mut(&language)
-            .ok_or_else(|| LspHostError::unknown(language))?;
-        let summary = Self::ensure_initialized(language, session, overrides)?;
-        let state = summary.state(spec.capability);
-        if !state.enabled {
-            return Err(LspHostError::capability_unavailable(
+        self.call_with_session(
+            CallContext {
                 language,
-                spec.capability,
-                state.source,
-            ));
-        }
-
-        call(session.server.as_mut())
-            .map_err(|source| LspHostError::server(language, spec.operation, source))
+                operation: spec.operation,
+                capability: Some(spec.capability),
+            },
+            call,
+        )
     }
 
     fn call_on_server<F, T>(
@@ -225,14 +222,39 @@ impl LspHost {
     where
         F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
     {
+        self.call_with_session(
+            CallContext {
+                language,
+                operation,
+                capability: None,
+            },
+            call,
+        )
+    }
+
+    fn call_with_session<F, T>(&mut self, context: CallContext, call: F) -> Result<T, LspHostError>
+    where
+        F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
+    {
         let overrides = &self.overrides;
         let session = self
             .sessions
-            .get_mut(&language)
-            .ok_or_else(|| LspHostError::unknown(language))?;
-        let _summary = Self::ensure_initialized(language, session, overrides)?;
+            .get_mut(&context.language)
+            .ok_or_else(|| LspHostError::unknown(context.language))?;
+        let summary = Self::ensure_initialized(context.language, session, overrides)?;
+        if let Some(capability) = context.capability {
+            let state = summary.state(capability);
+            if !state.enabled {
+                return Err(LspHostError::capability_unavailable(
+                    context.language,
+                    capability,
+                    state.source,
+                ));
+            }
+        }
+
         call(session.server.as_mut())
-            .map_err(|source| LspHostError::server(language, operation, source))
+            .map_err(|source| LspHostError::server(context.language, context.operation, source))
     }
 
     fn ensure_initialized(

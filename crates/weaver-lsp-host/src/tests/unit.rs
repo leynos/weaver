@@ -11,11 +11,12 @@ use crate::errors::LspHostError;
 use crate::language::Language;
 use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 use crate::tests::support::{
-    CallKind, RecordingLanguageServer, ResponseSet, TestWorld, sample_uri,
+    CallKind, RecordingLanguageServer, ResponseSet, TestWorld, definition_params,
+    did_change_params, did_close_params, did_open_params, sample_uri,
 };
 
 macro_rules! failing_server {
-    ($name:ident, goto_definition, $message:expr) => {
+    ($name:ident, $method:ident, $message:expr) => {
         struct $name;
 
         impl LanguageServer for $name {
@@ -27,57 +28,11 @@ macro_rules! failing_server {
                 &mut self,
                 _params: lsp_types::GotoDefinitionParams,
             ) -> Result<lsp_types::GotoDefinitionResponse, LanguageServerError> {
-                Err(LanguageServerError::new($message))
-            }
-
-            fn references(
-                &mut self,
-                _params: lsp_types::ReferenceParams,
-            ) -> Result<Vec<lsp_types::Location>, LanguageServerError> {
-                Ok(Vec::new())
-            }
-
-            fn diagnostics(
-                &mut self,
-                _uri: lsp_types::Uri,
-            ) -> Result<Vec<lsp_types::Diagnostic>, LanguageServerError> {
-                Ok(Vec::new())
-            }
-
-            fn did_open(
-                &mut self,
-                _params: lsp_types::DidOpenTextDocumentParams,
-            ) -> Result<(), LanguageServerError> {
-                Ok(())
-            }
-
-            fn did_change(
-                &mut self,
-                _params: lsp_types::DidChangeTextDocumentParams,
-            ) -> Result<(), LanguageServerError> {
-                Ok(())
-            }
-
-            fn did_close(
-                &mut self,
-                _params: lsp_types::DidCloseTextDocumentParams,
-            ) -> Result<(), LanguageServerError> {
-                Ok(())
-            }
-        }
-    };
-    ($name:ident, did_change, $message:expr) => {
-        struct $name;
-
-        impl LanguageServer for $name {
-            fn initialize(&mut self) -> Result<ServerCapabilitySet, LanguageServerError> {
-                Ok(ServerCapabilitySet::new(true, true, true))
-            }
-
-            fn goto_definition(
-                &mut self,
-                _params: lsp_types::GotoDefinitionParams,
-            ) -> Result<lsp_types::GotoDefinitionResponse, LanguageServerError> {
+                fail_if(
+                    FailingMethod::$method,
+                    FailingMethod::GotoDefinition,
+                    $message,
+                )?;
                 Ok(lsp_types::GotoDefinitionResponse::Array(Vec::new()))
             }
 
@@ -99,6 +54,7 @@ macro_rules! failing_server {
                 &mut self,
                 _params: lsp_types::DidOpenTextDocumentParams,
             ) -> Result<(), LanguageServerError> {
+                fail_if(FailingMethod::$method, FailingMethod::DidOpen, $message)?;
                 Ok(())
             }
 
@@ -106,21 +62,44 @@ macro_rules! failing_server {
                 &mut self,
                 _params: lsp_types::DidChangeTextDocumentParams,
             ) -> Result<(), LanguageServerError> {
-                Err(LanguageServerError::new($message))
+                fail_if(FailingMethod::$method, FailingMethod::DidChange, $message)?;
+                Ok(())
             }
 
             fn did_close(
                 &mut self,
                 _params: lsp_types::DidCloseTextDocumentParams,
             ) -> Result<(), LanguageServerError> {
+                fail_if(FailingMethod::$method, FailingMethod::DidClose, $message)?;
                 Ok(())
             }
         }
     };
 }
 
-failing_server!(FailingDefinitionServer, goto_definition, "boom");
-failing_server!(FailingDidChangeServer, did_change, "change failed");
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FailingMethod {
+    GotoDefinition,
+    DidOpen,
+    DidChange,
+    DidClose,
+}
+
+fn fail_if(
+    failing: FailingMethod,
+    current: FailingMethod,
+    message: &str,
+) -> Result<(), LanguageServerError> {
+    if failing == current {
+        return Err(LanguageServerError::new(message));
+    }
+    Ok(())
+}
+
+failing_server!(FailingDefinitionServer, GotoDefinition, "boom");
+failing_server!(FailingDidChangeServer, DidChange, "change failed");
+failing_server!(FailingDidOpenServer, DidOpen, "open failed");
+failing_server!(FailingDidCloseServer, DidClose, "close failed");
 
 #[rstest]
 fn applies_force_and_deny_overrides() {
@@ -244,6 +223,20 @@ fn propagates_server_error_from_did_change() {
 }
 
 #[rstest]
+fn propagates_server_error_from_did_open() {
+    assert_server_error_propagates(FailingDidOpenServer, HostOperation::DidOpen, |host| {
+        host.did_open(Language::Rust, did_open_params())
+    });
+}
+
+#[rstest]
+fn propagates_server_error_from_did_close() {
+    assert_server_error_propagates(FailingDidCloseServer, HostOperation::DidClose, |host| {
+        host.did_close(Language::Rust, did_close_params())
+    });
+}
+
+#[rstest]
 fn calls_initialise_before_requests() {
     assert_initialise_before(
         |host| {
@@ -307,40 +300,4 @@ where
 
     let calls = handle.calls();
     assert!(calls.starts_with(expected_prefix), "{message}: {calls:?}");
-}
-
-fn definition_params() -> lsp_types::GotoDefinitionParams {
-    lsp_types::GotoDefinitionParams {
-        text_document_position_params: lsp_types::TextDocumentPositionParams {
-            text_document: lsp_types::TextDocumentIdentifier { uri: sample_uri() },
-            position: lsp_types::Position::new(1, 2),
-        },
-        work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
-        partial_result_params: lsp_types::PartialResultParams::default(),
-    }
-}
-
-fn did_open_params() -> lsp_types::DidOpenTextDocumentParams {
-    lsp_types::DidOpenTextDocumentParams {
-        text_document: lsp_types::TextDocumentItem {
-            uri: sample_uri(),
-            language_id: String::from("rust"),
-            version: 1,
-            text: String::from("fn main() {}"),
-        },
-    }
-}
-
-fn did_change_params() -> lsp_types::DidChangeTextDocumentParams {
-    lsp_types::DidChangeTextDocumentParams {
-        text_document: lsp_types::VersionedTextDocumentIdentifier {
-            uri: sample_uri(),
-            version: 2,
-        },
-        content_changes: vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: String::from("fn main() { println!(\"hi\"); }"),
-        }],
-    }
 }

@@ -2,13 +2,7 @@
 
 use std::cell::RefCell;
 
-use lsp_types::{
-    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    GotoDefinitionParams, GotoDefinitionResponse, Location, PartialResultParams, Position,
-    ReferenceContext, ReferenceParams, TextDocumentContentChangeEvent, TextDocumentIdentifier,
-    TextDocumentItem, TextDocumentPositionParams, VersionedTextDocumentIdentifier,
-    WorkDoneProgressParams,
-};
+use lsp_types::{Diagnostic, GotoDefinitionResponse, Location};
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use weaver_config::{CapabilityMatrix, CapabilityOverride};
@@ -18,7 +12,8 @@ use crate::errors::{HostOperation, LspHostError};
 use crate::language::Language;
 use crate::server::ServerCapabilitySet;
 use crate::tests::support::{
-    CallKind, DocumentSyncErrors, ResponseSet, TestServerConfig, TestWorld, sample_uri,
+    CallKind, DocumentSyncErrors, ResponseSet, TestServerConfig, TestWorld, definition_params,
+    did_change_params, did_close_params, did_open_params, reference_params, sample_uri,
 };
 
 #[fixture]
@@ -340,62 +335,6 @@ fn sample_responses() -> ResponseSet {
         }],
         diagnostics: vec![Diagnostic::default()],
         document_sync: DocumentSyncErrors::default(),
-    }
-}
-
-fn definition_params() -> GotoDefinitionParams {
-    GotoDefinitionParams {
-        text_document_position_params: TextDocumentPositionParams {
-            text_document: TextDocumentIdentifier { uri: sample_uri() },
-            position: Position::new(1, 2),
-        },
-        work_done_progress_params: WorkDoneProgressParams::default(),
-        partial_result_params: PartialResultParams::default(),
-    }
-}
-
-fn reference_params() -> ReferenceParams {
-    ReferenceParams {
-        text_document_position: TextDocumentPositionParams {
-            text_document: TextDocumentIdentifier { uri: sample_uri() },
-            position: Position::new(1, 2),
-        },
-        work_done_progress_params: WorkDoneProgressParams::default(),
-        partial_result_params: PartialResultParams::default(),
-        context: ReferenceContext {
-            include_declaration: false,
-        },
-    }
-}
-
-fn did_open_params() -> DidOpenTextDocumentParams {
-    DidOpenTextDocumentParams {
-        text_document: TextDocumentItem {
-            uri: sample_uri(),
-            language_id: String::from("rust"),
-            version: 1,
-            text: String::from("fn main() {}"),
-        },
-    }
-}
-
-fn did_change_params() -> DidChangeTextDocumentParams {
-    DidChangeTextDocumentParams {
-        text_document: VersionedTextDocumentIdentifier {
-            uri: sample_uri(),
-            version: 2,
-        },
-        content_changes: vec![TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: String::from("fn main() { println!(\"hi\"); }"),
-        }],
-    }
-}
-
-fn did_close_params() -> DidCloseTextDocumentParams {
-    DidCloseTextDocumentParams {
-        text_document: TextDocumentIdentifier { uri: sample_uri() },
     }
 }
 

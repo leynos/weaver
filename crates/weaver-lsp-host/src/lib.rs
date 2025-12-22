@@ -9,6 +9,8 @@
 //! real language servers.
 
 mod capability;
+#[cfg(doc)]
+pub mod doc_support;
 mod errors;
 mod host;
 mod language;
