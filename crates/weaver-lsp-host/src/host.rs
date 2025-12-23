@@ -240,11 +240,7 @@ impl LspHost {
         }
     );
 
-    fn call_with_context<F, T>(
-        &mut self,
-        context: CallContext,
-        call: F,
-    ) -> Result<T, LspHostError>
+    fn call_with_context<F, T>(&mut self, context: CallContext, call: F) -> Result<T, LspHostError>
     where
         F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
     {
