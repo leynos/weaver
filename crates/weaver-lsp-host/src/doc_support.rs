@@ -1,4 +1,11 @@
-//! Doc-only helpers for examples in rustdoc.
+//! Doc-only helpers for rustdoc examples.
+//!
+//! This module provides a no-op [`LanguageServer`] implementation
+//! ([`DocStubServer`]) and a helper constructor ([`doc_host`]) so documentation
+//! examples can focus on the API surface without repeating boilerplate.
+//! `DocStubServer` advertises no capabilities and returns empty responses,
+//! while `doc_host` registers it with an [`LspHost`] for convenience in
+//! user-facing docs and doctests.
 
 use lsp_types::{
     Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
@@ -15,7 +22,11 @@ pub struct DocStubServer;
 
 impl LanguageServer for DocStubServer {
     fn initialize(&mut self) -> Result<ServerCapabilitySet, LanguageServerError> {
-        Ok(ServerCapabilitySet::new(false, false, false))
+        Ok(ServerCapabilitySet {
+            definition: false,
+            references: false,
+            diagnostics: false,
+        })
     }
 
     fn goto_definition(

@@ -12,9 +12,9 @@ use thiserror::Error;
 /// Minimal set of capabilities the host inspects during negotiation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ServerCapabilitySet {
-    definition: bool,
-    references: bool,
-    diagnostics: bool,
+    pub(crate) definition: bool,
+    pub(crate) references: bool,
+    pub(crate) diagnostics: bool,
 }
 
 impl ServerCapabilitySet {
