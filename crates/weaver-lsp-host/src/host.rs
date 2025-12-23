@@ -22,15 +22,32 @@ enum SessionState {
     Ready { summary: CapabilitySummary },
 }
 
-struct CallSpec {
-    capability: CapabilityKind,
-    operation: HostOperation,
-}
-
 struct CallContext {
     language: Language,
     operation: HostOperation,
     capability: Option<CapabilityKind>,
+}
+
+impl CallContext {
+    fn for_capability(
+        language: Language,
+        operation: HostOperation,
+        capability: CapabilityKind,
+    ) -> Self {
+        Self {
+            language,
+            operation,
+            capability: Some(capability),
+        }
+    }
+
+    fn for_operation(language: Language, operation: HostOperation) -> Self {
+        Self {
+            language,
+            operation,
+            capability: None,
+        }
+    }
 }
 
 macro_rules! lsp_method {
@@ -50,12 +67,8 @@ macro_rules! lsp_method {
             language: Language,
             $param: $pty,
         ) -> $ret {
-            self.call_with_capability(
-                language,
-                CallSpec {
-                    capability: $cap,
-                    operation: $op,
-                },
+            self.call_with_session(
+                CallContext::for_capability(language, $op, $cap),
                 move |server| server.$server_method($param),
             )
         }
@@ -165,9 +178,10 @@ impl LspHost {
         language: Language,
         params: DidOpenTextDocumentParams,
     ) -> Result<(), LspHostError> {
-        self.call_on_server(language, HostOperation::DidOpen, move |server| {
-            server.did_open(params)
-        })
+        self.call_with_session(
+            CallContext::for_operation(language, HostOperation::DidOpen),
+            move |server| server.did_open(params),
+        )
     }
 
     /// Notifies the server that a document has changed with in-memory content.
@@ -177,9 +191,10 @@ impl LspHost {
         language: Language,
         params: DidChangeTextDocumentParams,
     ) -> Result<(), LspHostError> {
-        self.call_on_server(language, HostOperation::DidChange, move |server| {
-            server.did_change(params)
-        })
+        self.call_with_session(
+            CallContext::for_operation(language, HostOperation::DidChange),
+            move |server| server.did_change(params),
+        )
     }
 
     /// Notifies the server that a document has been closed.
@@ -189,46 +204,9 @@ impl LspHost {
         language: Language,
         params: DidCloseTextDocumentParams,
     ) -> Result<(), LspHostError> {
-        self.call_on_server(language, HostOperation::DidClose, move |server| {
-            server.did_close(params)
-        })
-    }
-
-    fn call_with_capability<F, T>(
-        &mut self,
-        language: Language,
-        spec: CallSpec,
-        call: F,
-    ) -> Result<T, LspHostError>
-    where
-        F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
-    {
         self.call_with_session(
-            CallContext {
-                language,
-                operation: spec.operation,
-                capability: Some(spec.capability),
-            },
-            call,
-        )
-    }
-
-    fn call_on_server<F, T>(
-        &mut self,
-        language: Language,
-        operation: HostOperation,
-        call: F,
-    ) -> Result<T, LspHostError>
-    where
-        F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
-    {
-        self.call_with_session(
-            CallContext {
-                language,
-                operation,
-                capability: None,
-            },
-            call,
+            CallContext::for_operation(language, HostOperation::DidClose),
+            move |server| server.did_close(params),
         )
     }
 
