@@ -9,7 +9,7 @@
 //! real language servers.
 
 mod capability;
-#[cfg(doc)]
+#[doc(hidden)]
 pub mod doc_support;
 mod errors;
 mod host;

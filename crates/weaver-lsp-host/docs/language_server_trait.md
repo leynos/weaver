@@ -55,5 +55,6 @@ impl LanguageServer for StubServer {
 }
 
 let mut server = StubServer;
-let _ = &mut server;
+let _capabilities = server.initialize()?;
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```

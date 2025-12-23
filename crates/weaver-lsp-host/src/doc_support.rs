@@ -12,6 +12,12 @@ use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 /// Stub server used in rustdoc examples.
 pub struct DocStubServer;
 
+impl Default for DocStubServer {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl LanguageServer for DocStubServer {
     fn initialize(&mut self) -> Result<ServerCapabilitySet, LanguageServerError> {
         Ok(ServerCapabilitySet::new(false, false, false))
