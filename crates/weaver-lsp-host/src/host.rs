@@ -33,6 +33,28 @@ struct CallContext {
     capability: Option<CapabilityKind>,
 }
 
+impl CallContext {
+    fn for_operation(language: Language, operation: HostOperation) -> Self {
+        Self {
+            language,
+            operation,
+            capability: None,
+        }
+    }
+
+    fn with_capability(
+        language: Language,
+        operation: HostOperation,
+        capability: CapabilityKind,
+    ) -> Self {
+        Self {
+            language,
+            operation,
+            capability: Some(capability),
+        }
+    }
+}
+
 macro_rules! lsp_method {
     (
         $(#[$meta:meta])* $vis:vis fn $name:ident(
@@ -218,26 +240,15 @@ impl LspHost {
         }
     );
 
-    // Clippy: keep explicit arguments to make call sites self-descriptive.
-    #[allow(clippy::too_many_arguments)]
     fn call_with_context<F, T>(
         &mut self,
-        language: Language,
-        operation: HostOperation,
-        capability: Option<CapabilityKind>,
+        context: CallContext,
         call: F,
     ) -> Result<T, LspHostError>
     where
         F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
     {
-        self.call_with_session(
-            CallContext {
-                language,
-                operation,
-                capability,
-            },
-            call,
-        )
+        self.call_with_session(context, call)
     }
 
     fn call_with_capability<F, T>(
@@ -249,7 +260,10 @@ impl LspHost {
     where
         F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
     {
-        self.call_with_context(language, spec.operation, Some(spec.capability), call)
+        self.call_with_context(
+            CallContext::with_capability(language, spec.operation, spec.capability),
+            call,
+        )
     }
 
     fn call_on_server<F, T>(
@@ -261,7 +275,7 @@ impl LspHost {
     where
         F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
     {
-        self.call_with_context(language, operation, None, call)
+        self.call_with_context(CallContext::for_operation(language, operation), call)
     }
 
     fn call_with_session<F, T>(&mut self, context: CallContext, call: F) -> Result<T, LspHostError>
