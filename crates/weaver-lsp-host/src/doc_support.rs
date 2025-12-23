@@ -8,7 +8,8 @@
 //! user-facing docs and doctests.
 
 use lsp_types::{
-    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    Diagnostic, DidChangeTextDocumentParams as DidChangeParams,
+    DidCloseTextDocumentParams as DidCloseParams, DidOpenTextDocumentParams as DidOpenParams,
     GotoDefinitionParams, GotoDefinitionResponse, Location, ReferenceParams, Uri,
 };
 
@@ -47,23 +48,15 @@ impl LanguageServer for DocStubServer {
         Ok(Vec::new())
     }
 
-    fn did_open(&mut self, _params: DidOpenTextDocumentParams) -> Result<(), LanguageServerError> {
-        Ok(())
-    }
+    // Keep single-line no-op methods for doc stub readability.
+    #[rustfmt::skip]
+    fn did_open(&mut self, _params: DidOpenParams) -> Result<(), LanguageServerError> { Ok(()) }
 
-    fn did_change(
-        &mut self,
-        _params: DidChangeTextDocumentParams,
-    ) -> Result<(), LanguageServerError> {
-        Ok(())
-    }
+    #[rustfmt::skip]
+    fn did_change(&mut self, _params: DidChangeParams) -> Result<(), LanguageServerError> { Ok(()) }
 
-    fn did_close(
-        &mut self,
-        _params: DidCloseTextDocumentParams,
-    ) -> Result<(), LanguageServerError> {
-        Ok(())
-    }
+    #[rustfmt::skip]
+    fn did_close(&mut self, _params: DidCloseParams) -> Result<(), LanguageServerError> { Ok(()) }
 }
 
 /// Builds an [`LspHost`] with a registered Rust stub server.
