@@ -1,8 +1,8 @@
 # Weaver LSP Host v0.1.0 migration guide
 
-## Document synchronisation methods
+## Document synchronization methods
 
-The `LanguageServer` trait now requires document synchronisation methods:
+The `LanguageServer` trait now requires document synchronization methods:
 `did_open`, `did_change`, and `did_close`. These notifications are required for
 semantic validation that operates on in-memory document contents. Any crate
 implementing the trait must now provide these methods.
@@ -30,7 +30,11 @@ struct MyServer;
 
 impl LanguageServer for MyServer {
     fn initialize(&mut self) -> Result<ServerCapabilitySet, LanguageServerError> {
-        Ok(ServerCapabilitySet::new(false, false, false))
+        Ok(ServerCapabilitySet {
+            definition: false,
+            references: false,
+            diagnostics: false,
+        })
     }
 
     fn goto_definition(
