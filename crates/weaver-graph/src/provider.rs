@@ -7,14 +7,14 @@
 use camino::Utf8PathBuf;
 use lsp_types::{
     CallHierarchyIncomingCallsParams, CallHierarchyItem, CallHierarchyOutgoingCallsParams,
-    CallHierarchyPrepareParams, Position, TextDocumentIdentifier, TextDocumentPositionParams, Uri,
-    WorkDoneProgressParams,
+    CallHierarchyPrepareParams, Position as LspPosition, TextDocumentIdentifier,
+    TextDocumentPositionParams, Uri, WorkDoneProgressParams,
 };
 
 use crate::edge::{CallEdge, EdgeSource};
 use crate::error::GraphError;
 use crate::graph::CallGraph;
-use crate::node::{CallNode, SymbolKind};
+use crate::node::{CallNode, Position, SymbolKind};
 
 /// A position in a source file for initiating call graph queries.
 #[derive(Debug, Clone)]
@@ -236,7 +236,7 @@ impl<C: CallHierarchyClient> LspCallGraphProvider<C> {
         let params = CallHierarchyPrepareParams {
             text_document_position_params: TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier { uri },
-                position: Position::new(position.line, position.column),
+                position: LspPosition::new(position.line, position.column),
             },
             work_done_progress_params: WorkDoneProgressParams::default(),
         };
@@ -347,10 +347,12 @@ impl<C: CallHierarchyClient> LspCallGraphProvider<C> {
 fn call_hierarchy_item_to_node(item: &CallHierarchyItem) -> CallNode {
     let path = uri_to_path(&item.uri);
     let kind = SymbolKind::from_lsp(item.kind);
-    let line = item.selection_range.start.line;
-    let column = item.selection_range.start.character;
+    let position = Position::new(
+        item.selection_range.start.line,
+        item.selection_range.start.character,
+    );
 
-    let mut node = CallNode::new(&item.name, kind, path, line, column);
+    let mut node = CallNode::new(&item.name, kind, path, position);
 
     if let Some(detail) = &item.detail {
         node = node.with_container(detail.clone());

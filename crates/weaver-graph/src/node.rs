@@ -29,6 +29,23 @@ impl std::fmt::Display for NodeId {
     }
 }
 
+/// Position in source code (line and column).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Position {
+    /// Zero-based line number.
+    pub line: u32,
+    /// Zero-based column number (UTF-16 code units).
+    pub column: u32,
+}
+
+impl Position {
+    /// Creates a new source position.
+    #[must_use]
+    pub const fn new(line: u32, column: u32) -> Self {
+        Self { line, column }
+    }
+}
+
 /// Kind of symbol represented by a call graph node.
 ///
 /// This mirrors LSP's `SymbolKind` but only includes callable symbols.
@@ -82,27 +99,22 @@ pub struct CallNode {
 impl CallNode {
     /// Creates a new call node.
     #[must_use]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "location requires path, line, column; name and kind are essential"
-    )]
     pub fn new(
         name: impl Into<String>,
         kind: SymbolKind,
         path: impl Into<Utf8PathBuf>,
-        line: u32,
-        column: u32,
+        position: Position,
     ) -> Self {
         let name_str = name.into();
         let path_buf = path.into();
-        let id = NodeId::new(&path_buf, line, column, &name_str);
+        let id = NodeId::new(&path_buf, position.line, position.column, &name_str);
         Self {
             id,
             name: name_str,
             kind,
             path: path_buf,
-            line,
-            column,
+            line: position.line,
+            column: position.column,
             container: None,
         }
     }

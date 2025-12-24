@@ -49,7 +49,7 @@ mod provider;
 pub use edge::{CallEdge, EdgeSource};
 pub use error::GraphError;
 pub use graph::CallGraph;
-pub use node::{CallNode, NodeId, SymbolKind};
+pub use node::{CallNode, NodeId, Position, SymbolKind};
 pub use provider::{CallGraphProvider, CallHierarchyClient, LspCallGraphProvider, SourcePosition};
 
 #[cfg(test)]

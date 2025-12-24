@@ -14,7 +14,7 @@
 mod graph_tests {
     use crate::edge::{CallEdge, EdgeSource};
     use crate::graph::CallGraph;
-    use crate::node::{CallNode, SymbolKind};
+    use crate::node::{CallNode, Position, SymbolKind};
 
     #[test]
     fn empty_graph_has_no_nodes() {
@@ -27,7 +27,12 @@ mod graph_tests {
     #[test]
     fn can_add_and_retrieve_node() {
         let mut graph = CallGraph::new();
-        let node = CallNode::new("main", SymbolKind::Function, "/src/main.rs", 10, 0);
+        let node = CallNode::new(
+            "main",
+            SymbolKind::Function,
+            "/src/main.rs",
+            Position::new(10, 0),
+        );
         let id = node.id().clone();
 
         graph.add_node(node);
@@ -45,8 +50,18 @@ mod graph_tests {
     fn can_add_edges_and_query_callers() {
         let mut graph = CallGraph::new();
 
-        let caller = CallNode::new("caller", SymbolKind::Function, "/src/lib.rs", 5, 0);
-        let callee = CallNode::new("callee", SymbolKind::Function, "/src/lib.rs", 20, 0);
+        let caller = CallNode::new(
+            "caller",
+            SymbolKind::Function,
+            "/src/lib.rs",
+            Position::new(5, 0),
+        );
+        let callee = CallNode::new(
+            "callee",
+            SymbolKind::Function,
+            "/src/lib.rs",
+            Position::new(20, 0),
+        );
 
         let caller_id = caller.id().clone();
         let callee_id = callee.id().clone();
@@ -72,7 +87,12 @@ mod graph_tests {
     fn find_by_name_works() {
         let mut graph = CallGraph::new();
 
-        let node = CallNode::new("my_function", SymbolKind::Function, "/src/lib.rs", 10, 0);
+        let node = CallNode::new(
+            "my_function",
+            SymbolKind::Function,
+            "/src/lib.rs",
+            Position::new(10, 0),
+        );
         graph.add_node(node);
 
         assert!(graph.find_by_name("my_function").is_some());
@@ -81,15 +101,20 @@ mod graph_tests {
 
     #[test]
     fn qualified_name_includes_container() {
-        let node =
-            CallNode::new("method", SymbolKind::Method, "/src/lib.rs", 10, 0).with_container("Foo");
+        let node = CallNode::new(
+            "method",
+            SymbolKind::Method,
+            "/src/lib.rs",
+            Position::new(10, 0),
+        )
+        .with_container("Foo");
 
         assert_eq!(node.qualified_name(), "Foo.method");
     }
 }
 
 mod node_tests {
-    use crate::node::{CallNode, NodeId, SymbolKind};
+    use crate::node::{CallNode, NodeId, Position, SymbolKind};
     use camino::Utf8PathBuf;
 
     #[test]
@@ -102,7 +127,12 @@ mod node_tests {
 
     #[test]
     fn node_accessors_return_correct_values() {
-        let node = CallNode::new("test_fn", SymbolKind::Function, "/src/lib.rs", 42, 8);
+        let node = CallNode::new(
+            "test_fn",
+            SymbolKind::Function,
+            "/src/lib.rs",
+            Position::new(42, 8),
+        );
 
         assert_eq!(node.name(), "test_fn");
         assert_eq!(node.kind(), SymbolKind::Function);
