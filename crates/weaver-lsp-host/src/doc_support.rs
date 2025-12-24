@@ -8,9 +8,12 @@
 //! user-facing docs and doctests.
 
 use lsp_types::{
-    Diagnostic, DidChangeTextDocumentParams as DidChangeParams,
-    DidCloseTextDocumentParams as DidCloseParams, DidOpenTextDocumentParams as DidOpenParams,
-    GotoDefinitionParams, GotoDefinitionResponse, Location, ReferenceParams, Uri,
+    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
+    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams as PrepareParams, Diagnostic,
+    DidChangeTextDocumentParams as DidChangeParams, DidCloseTextDocumentParams as DidCloseParams,
+    DidOpenTextDocumentParams as DidOpenParams, GotoDefinitionParams, GotoDefinitionResponse,
+    Location, ReferenceParams, Uri,
 };
 
 use crate::LspHost;
@@ -27,6 +30,7 @@ impl LanguageServer for DocStubServer {
             definition: false,
             references: false,
             diagnostics: false,
+            call_hierarchy: false,
         })
     }
 
@@ -57,6 +61,27 @@ impl LanguageServer for DocStubServer {
 
     #[rustfmt::skip]
     fn did_close(&mut self, _params: DidCloseParams) -> Result<(), LanguageServerError> { Ok(()) }
+
+    fn prepare_call_hierarchy(
+        &mut self,
+        _params: PrepareParams,
+    ) -> Result<Option<Vec<CallHierarchyItem>>, LanguageServerError> {
+        Ok(None)
+    }
+
+    fn incoming_calls(
+        &mut self,
+        _params: CallHierarchyIncomingCallsParams,
+    ) -> Result<Option<Vec<CallHierarchyIncomingCall>>, LanguageServerError> {
+        Ok(None)
+    }
+
+    fn outgoing_calls(
+        &mut self,
+        _params: CallHierarchyOutgoingCallsParams,
+    ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, LanguageServerError> {
+        Ok(None)
+    }
 }
 
 /// Builds an [`LspHost`] with a registered Rust stub server.

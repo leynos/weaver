@@ -2,6 +2,8 @@
 
 ```rust,no_run
 use lsp_types::{
+    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
+    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     GotoDefinitionParams, GotoDefinitionResponse, Location, ReferenceParams, Uri,
 };
@@ -51,6 +53,27 @@ impl LanguageServer for StubServer {
         _params: DidCloseTextDocumentParams,
     ) -> Result<(), LanguageServerError> {
         Ok(())
+    }
+
+    fn prepare_call_hierarchy(
+        &mut self,
+        _params: CallHierarchyPrepareParams,
+    ) -> Result<Option<Vec<CallHierarchyItem>>, LanguageServerError> {
+        Ok(None)
+    }
+
+    fn incoming_calls(
+        &mut self,
+        _params: CallHierarchyIncomingCallsParams,
+    ) -> Result<Option<Vec<CallHierarchyIncomingCall>>, LanguageServerError> {
+        Ok(None)
+    }
+
+    fn outgoing_calls(
+        &mut self,
+        _params: CallHierarchyOutgoingCallsParams,
+    ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, LanguageServerError> {
+        Ok(None)
     }
 }
 

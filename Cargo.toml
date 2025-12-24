@@ -2,6 +2,8 @@
 members = [
     "crates/weaver-cli",
     "crates/weaver-config",
+    "crates/weaver-e2e",
+    "crates/weaver-graph",
     "crates/weaverd",
     "crates/weaver-lsp-host",
     "crates/weaver-sandbox",

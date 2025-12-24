@@ -73,6 +73,29 @@ macro_rules! failing_server {
                 fail_if(FailingMethod::$method, FailingMethod::DidClose, $message)?;
                 Ok(())
             }
+
+            fn prepare_call_hierarchy(
+                &mut self,
+                _params: lsp_types::CallHierarchyPrepareParams,
+            ) -> Result<Option<Vec<lsp_types::CallHierarchyItem>>, LanguageServerError> {
+                Ok(None)
+            }
+
+            fn incoming_calls(
+                &mut self,
+                _params: lsp_types::CallHierarchyIncomingCallsParams,
+            ) -> Result<Option<Vec<lsp_types::CallHierarchyIncomingCall>>, LanguageServerError>
+            {
+                Ok(None)
+            }
+
+            fn outgoing_calls(
+                &mut self,
+                _params: lsp_types::CallHierarchyOutgoingCallsParams,
+            ) -> Result<Option<Vec<lsp_types::CallHierarchyOutgoingCall>>, LanguageServerError>
+            {
+                Ok(None)
+            }
         }
     };
 }

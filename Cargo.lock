@@ -2502,6 +2502,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "weaver-e2e"
+version = "0.1.0"
+dependencies = [
+ "camino",
+ "insta",
+ "lsp-types",
+ "rstest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.17",
+ "weaver-graph",
+ "weaver-lsp-host",
+]
+
+[[package]]
+name = "weaver-graph"
+version = "0.1.0"
+dependencies = [
+ "camino",
+ "insta",
+ "lsp-types",
+ "rstest",
+ "thiserror 2.0.17",
+ "weaver-lsp-host",
+]
+
+[[package]]
 name = "weaver-lsp-host"
 version = "0.1.0"
 dependencies = [

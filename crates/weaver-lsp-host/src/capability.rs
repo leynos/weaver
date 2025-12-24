@@ -17,6 +17,8 @@ pub enum CapabilityKind {
     References,
     /// Diagnostics for a document.
     Diagnostics,
+    /// `textDocument/prepareCallHierarchy` and related requests.
+    CallHierarchy,
 }
 
 impl CapabilityKind {
@@ -27,6 +29,7 @@ impl CapabilityKind {
             Self::Definition => "observe.get-definition",
             Self::References => "observe.find-references",
             Self::Diagnostics => "verify.diagnostics",
+            Self::CallHierarchy => "observe.call-hierarchy",
         }
     }
 }
@@ -119,6 +122,7 @@ pub(crate) fn resolve_capabilities(
         CapabilityKind::Definition,
         CapabilityKind::References,
         CapabilityKind::Diagnostics,
+        CapabilityKind::CallHierarchy,
     ] {
         let state = resolve_state(language, capability, advertised, overrides);
         states.insert(capability, state);
@@ -153,6 +157,10 @@ fn resolve_state(
         }
         CapabilityKind::Diagnostics => {
             let available = advertised.supports_diagnostics();
+            (available, capability_source(available))
+        }
+        CapabilityKind::CallHierarchy => {
+            let available = advertised.supports_call_hierarchy();
             (available, capability_source(available))
         }
     };

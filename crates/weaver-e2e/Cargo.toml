@@ -1,0 +1,21 @@
+[package]
+name = "weaver-e2e"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+weaver-graph = { path = "../weaver-graph" }
+weaver-lsp-host = { path = "../weaver-lsp-host" }
+lsp-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+camino = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
+insta = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

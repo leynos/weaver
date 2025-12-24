@@ -25,6 +25,12 @@ pub enum HostOperation {
     DidChange,
     /// `textDocument/didClose` notification.
     DidClose,
+    /// `textDocument/prepareCallHierarchy` request.
+    PrepareCallHierarchy,
+    /// `callHierarchy/incomingCalls` request.
+    IncomingCalls,
+    /// `callHierarchy/outgoingCalls` request.
+    OutgoingCalls,
 }
 
 impl fmt::Display for HostOperation {
@@ -37,6 +43,9 @@ impl fmt::Display for HostOperation {
             Self::DidOpen => "didOpen",
             Self::DidChange => "didChange",
             Self::DidClose => "didClose",
+            Self::PrepareCallHierarchy => "prepareCallHierarchy",
+            Self::IncomingCalls => "incomingCalls",
+            Self::OutgoingCalls => "outgoingCalls",
         };
         formatter.write_str(label)
     }
