@@ -85,7 +85,7 @@ and relational understanding of code.*
 - [x] Integrate the "Syntactic Lock" from `weaver-syntax` into the
     "Double-Lock" harness.
 
-- [ ] Extend the `LanguageServer` trait with document sync methods
+- [x] Extend the `LanguageServer` trait with document sync methods
     (`did_open`, `did_change`, `did_close`) to enable semantic validation
     of modified content at real file paths without writing to disk.
 

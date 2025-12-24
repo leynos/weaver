@@ -3,15 +3,18 @@
 use std::error::Error;
 use std::fmt;
 
-use lsp_types::{Diagnostic, GotoDefinitionParams, GotoDefinitionResponse, ReferenceParams, Uri};
+use lsp_types::{
+    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    GotoDefinitionParams, GotoDefinitionResponse, ReferenceParams, Uri,
+};
 use thiserror::Error;
 
 /// Minimal set of capabilities the host inspects during negotiation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ServerCapabilitySet {
-    definition: bool,
-    references: bool,
-    diagnostics: bool,
+    pub(crate) definition: bool,
+    pub(crate) references: bool,
+    pub(crate) diagnostics: bool,
 }
 
 impl ServerCapabilitySet {
@@ -83,6 +86,7 @@ impl LanguageServerError {
 }
 
 /// Behaviour required from concrete language server bindings.
+#[doc = include_str!("../docs/language_server_trait.md")]
 pub trait LanguageServer: Send {
     /// Runs the server initialization handshake and returns advertised capabilities.
     fn initialize(&mut self) -> Result<ServerCapabilitySet, LanguageServerError>;
@@ -101,6 +105,21 @@ pub trait LanguageServer: Send {
 
     /// Returns diagnostics for the supplied URI.
     fn diagnostics(&mut self, uri: Uri) -> Result<Vec<Diagnostic>, LanguageServerError>;
+
+    /// Notifies the server that a document has been opened with in-memory content.
+    #[doc = include_str!("../docs/language_server_did_open.md")]
+    fn did_open(&mut self, params: DidOpenTextDocumentParams) -> Result<(), LanguageServerError>;
+
+    /// Notifies the server that a document has changed with updated in-memory content.
+    #[doc = include_str!("../docs/language_server_did_change.md")]
+    fn did_change(
+        &mut self,
+        params: DidChangeTextDocumentParams,
+    ) -> Result<(), LanguageServerError>;
+
+    /// Notifies the server that a document has been closed.
+    #[doc = include_str!("../docs/language_server_did_close.md")]
+    fn did_close(&mut self, params: DidCloseTextDocumentParams) -> Result<(), LanguageServerError>;
 }
 
 impl fmt::Debug for dyn LanguageServer {

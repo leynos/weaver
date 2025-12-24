@@ -9,6 +9,8 @@
 //! real language servers.
 
 mod capability;
+#[doc(hidden)]
+pub mod doc_support;
 mod errors;
 mod host;
 mod language;
@@ -19,3 +21,6 @@ pub use errors::{HostOperation, LspHostError};
 pub use host::LspHost;
 pub use language::{Language, LanguageParseError};
 pub use server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
+
+#[cfg(test)]
+mod tests;

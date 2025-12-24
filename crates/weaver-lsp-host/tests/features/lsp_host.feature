@@ -11,6 +11,15 @@ Feature: LSP host core routing
     And rust recorded a references call
     And rust recorded a diagnostics call
 
+  Scenario: Document sync notifications are routed
+    Given stub servers for all primary languages
+    When rust opens a document
+    And rust changes a document
+    And rust closes a document
+    Then rust recorded a did open call
+    And rust recorded a did change call
+    And rust recorded a did close call
+
   Scenario: Deny override blocks unsupported capability
     Given a python server missing references
     And a deny override for python references
@@ -30,3 +39,8 @@ Feature: LSP host core routing
     Given a rust server that fails during initialisation
     When rust is initialised
     Then the request fails with a server error
+
+  Scenario: Document sync failures surface errors
+    Given a rust server that fails during document sync
+    When rust changes a document
+    Then the document sync request fails with a server error

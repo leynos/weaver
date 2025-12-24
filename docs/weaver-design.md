@@ -178,7 +178,11 @@ classDiagram
         +goto_definition(language: Language, params: GotoDefinitionParams) Result~GotoDefinitionResponse, LspHostError~
         +references(language: Language, params: ReferenceParams) Result~Vec~Location~, LspHostError~
         +diagnostics(language: Language, uri: Uri) Result~Vec~Diagnostic~, LspHostError~
+        +did_open(language: Language, params: DidOpenTextDocumentParams) Result~(), LspHostError~
+        +did_change(language: Language, params: DidChangeTextDocumentParams) Result~(), LspHostError~
+        +did_close(language: Language, params: DidCloseTextDocumentParams) Result~(), LspHostError~
         -call_with_capability(context: CallContext, call: FnOnce) Result~T, LspHostError~
+        -call_on_server(language: Language, operation: HostOperation, call: FnOnce) Result~T, LspHostError~
         -ensure_initialised(language: Language, session: Session, overrides: CapabilityMatrix)
           Result~CapabilitySummary, LspHostError~
         -session_mut(language: Language) Result~Session, LspHostError~
@@ -207,6 +211,9 @@ classDiagram
         +goto_definition(params: GotoDefinitionParams) Result~GotoDefinitionResponse, LanguageServerError~
         +references(params: ReferenceParams) Result~Vec~Location~, LanguageServerError~
         +diagnostics(uri: Uri) Result~Vec~Diagnostic~, LanguageServerError~
+        +did_open(params: DidOpenTextDocumentParams) Result~(), LanguageServerError~
+        +did_change(params: DidChangeTextDocumentParams) Result~(), LanguageServerError~
+        +did_close(params: DidCloseTextDocumentParams) Result~(), LanguageServerError~
     }
 
     class ServerCapabilitySet {
@@ -642,8 +649,7 @@ classDiagram
 ```
 
 The following sequence diagram shows how a caller typically composes the
-`weaver-syntax` APIs for parsing, matching, rewriting, and syntactic
-validation:
+`weaver-syntax` APIs for parsing, matching, rewriting, and syntactic validation:
 
 ```mermaid
 sequenceDiagram
@@ -1226,9 +1232,8 @@ language servers or parsers during development.
 
 - `SyntacticLock::validate(&self, context: &VerificationContext) ->
   SyntacticLockResult` returns either `Passed` or `Failed { failures }`.
-- `SemanticLock::validate(&self, context: &VerificationContext) ->
-  Result<SemanticLockResult, SafetyHarnessError>` permits the semantic backend
-  to surface unavailability errors separately from verification failures.
+- `SemanticLock::validate(...)` permits the semantic backend to surface
+  unavailability errors separately from verification failures.
 
 **Placeholder implementations**:
 
@@ -1265,7 +1270,7 @@ removal) may leave some files in an inconsistent state.
 column locations, and human-readable messages. Agents can parse this structure
 to diagnose failures and regenerate corrected edits without manual intervention.
 
-#### 4.2.2. Future: LSP Document Sync for Semantic Validation
+#### 4.2.2. LSP Document Sync for Semantic Validation
 
 For operations spanning multiple files (renames, signature changes), the
 semantic lock must validate cross-file references. Rather than writing modified
@@ -1283,8 +1288,19 @@ lock will use LSP's document synchronization protocol:
 
 This approach leverages the standard LSP document lifecycle that editors use,
 where the LSP always validates in-memory content rather than disk content. The
-`LanguageServer` trait in `weaver-lsp-host` will be extended with `did_open`,
-`did_change`, and `did_close` methods to support this workflow.
+`LanguageServer` trait in `weaver-lsp-host` is extended with `did_open`,
+`did_change`, and `did_close` methods to support this workflow, and `LspHost`
+routes the notifications to the appropriate server.
+
+##### Design decisions
+
+- Document sync notifications are routed through `LspHost` without capability
+  gating because they are required to prepare diagnostics at real URIs.
+- `LspHost` always initialises the server before invoking `did_open`,
+  `did_change`, or `did_close`, so document sync behaves consistently with the
+  request methods.
+- Failures in document sync map to `HostOperation::DidOpen`, `DidChange`, or
+  `DidClose` for clearer error reporting in the safety harness.
 
 ## 5. Security by Design: A Zero-Trust Sandboxing Model
 
@@ -1837,9 +1853,8 @@ into a replacement template and returning the rewritten source with a
 change-tracking flag.
 
 Testing follows the workspace conventions: `rstest-bdd` 0.2.0 powers
-behaviour-driven development (BDD)
-scenarios defined in `tests/features/weaver_syntax.feature`, while `insta`
-captures snapshot expectations for language detection, parse error formatting,
-and validation failure output. The combination of unit, behavioural, and
-end-to-end tests exercises happy and unhappy paths across all supported
-languages.
+behaviour-driven development (BDD) scenarios defined in
+`tests/features/weaver_syntax.feature`, while `insta` captures snapshot
+expectations for language detection, parse error formatting, and validation
+failure output. The combination of unit, behavioural, and end-to-end tests
+exercises happy and unhappy paths across all supported languages.

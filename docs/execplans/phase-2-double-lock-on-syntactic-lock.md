@@ -1,8 +1,7 @@
 # Execution Plan: Integrate Syntactic Lock into Double-Lock Harness
 
-**Status**: Complete
-**Phase**: 2 - Syntactic & Relational Intelligence
-**Last Updated**: 2025-12-16
+**Status**: Complete **Phase**: 2 - Syntactic & Relational Intelligence **Last
+Updated**: 2025-12-16
 
 ## Overview
 
@@ -113,8 +112,9 @@ single `VerificationFailure` containing the error message.
 ### DD-4: Test World Abstraction for Behaviour-Driven Development (BDD)
 
 **Decision**: Modify `SafetyHarnessWorld` to use a `SyntacticLockVariant` enum
-that can hold either `ConfigurableSyntacticLock` or `TreeSitterSyntacticLockAdapter`,
-enabling pluggable lock implementations in BDD tests.
+that can hold either `ConfigurableSyntacticLock` or
+`TreeSitterSyntacticLockAdapter`, enabling pluggable lock implementations in
+BDD tests.
 
 **Rationale**:
 
@@ -139,16 +139,16 @@ enabling pluggable lock implementations in BDD tests.
 
 ## Files Modified
 
-| File | Status | Description |
-|------|--------|-------------|
-| `crates/weaverd/Cargo.toml` | Complete | Add dependency |
-| `crates/weaverd/src/safety_harness/verification/syntactic.rs` | Complete | New adapter |
-| `crates/weaverd/src/safety_harness/verification.rs` | Complete | Module declaration |
-| `crates/weaverd/src/safety_harness/mod.rs` | Complete | Public export |
-| `crates/weaverd/src/tests/safety_harness_behaviour.rs` | Complete | BDD world & steps |
-| `crates/weaverd/tests/features/safety_harness.feature` | Complete | BDD scenarios |
-| `docs/roadmap.md` | Complete | Mark complete |
-| `docs/users-guide.md` | Complete | Verify accuracy |
+| File                                                          | Status   | Description        |
+| ------------------------------------------------------------- | -------- | ------------------ |
+| `crates/weaverd/Cargo.toml`                                   | Complete | Add dependency     |
+| `crates/weaverd/src/safety_harness/verification/syntactic.rs` | Complete | New adapter        |
+| `crates/weaverd/src/safety_harness/verification.rs`           | Complete | Module declaration |
+| `crates/weaverd/src/safety_harness/mod.rs`                    | Complete | Public export      |
+| `crates/weaverd/src/tests/safety_harness_behaviour.rs`        | Complete | BDD world & steps  |
+| `crates/weaverd/tests/features/safety_harness.feature`        | Complete | BDD scenarios      |
+| `docs/roadmap.md`                                             | Complete | Mark complete      |
+| `docs/users-guide.md`                                         | Complete | Verify accuracy    |
 
 ## Test Coverage
 
@@ -171,11 +171,11 @@ enabling pluggable lock implementations in BDD tests.
 
 ## Risks and Mitigations
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Parser initialization failure | Medium | Map to backend error, not silent pass |
-| Type conversion overhead | Low | Conversion is O(n) where n = failures |
-| Thread safety concerns | Low | `TreeSitterSyntacticLock` is `Send + Sync` |
+| Risk                          | Impact | Mitigation                                 |
+| ----------------------------- | ------ | ------------------------------------------ |
+| Parser initialization failure | Medium | Map to backend error, not silent pass      |
+| Type conversion overhead      | Low    | Conversion is O(n) where n = failures      |
+| Thread safety concerns        | Low    | `TreeSitterSyntacticLock` is `Send + Sync` |
 
 ## References
 

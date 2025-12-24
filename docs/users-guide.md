@@ -267,6 +267,14 @@ content is preserved until both verification phases succeed. This allows the
 harness to reject problematic changes without leaving partially written files
 on disk.
 
+### Document sync notifications
+
+The semantic lock now opens in-memory documents on the language server using
+`textDocument/didOpen`, applies updates with `textDocument/didChange`, and
+closes them with `textDocument/didClose` once diagnostics are collected. This
+lets the server validate the modified content at the real file URI without
+writing temporary files, so cross-file imports resolve as usual.
+
 ### Atomic commits
 
 When both locks pass, the harness writes each modified file atomically by
@@ -326,5 +334,6 @@ currently supports Rust, Python, and TypeScript.
 
 ### Semantic lock
 
-The semantic lock relies on the `weaver-lsp-host` infrastructure, which requires
-language servers to be registered and initialised for the relevant languages.
+The semantic lock relies on the `weaver-lsp-host` infrastructure, which
+requires language servers to be registered and initialised for the relevant
+languages.

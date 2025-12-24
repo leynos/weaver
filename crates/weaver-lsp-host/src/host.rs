@@ -2,7 +2,10 @@
 
 use std::collections::HashMap;
 
-use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse, ReferenceParams, Uri};
+use lsp_types::{
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    GotoDefinitionParams, GotoDefinitionResponse, ReferenceParams, Uri,
+};
 
 use crate::capability::{CapabilityKind, CapabilitySummary, resolve_capabilities};
 use crate::errors::{HostOperation, LspHostError};
@@ -22,6 +25,34 @@ enum SessionState {
 struct CallSpec {
     capability: CapabilityKind,
     operation: HostOperation,
+}
+
+struct CallContext {
+    language: Language,
+    operation: HostOperation,
+    capability: Option<CapabilityKind>,
+}
+
+impl CallContext {
+    fn for_operation(language: Language, operation: HostOperation) -> Self {
+        Self {
+            language,
+            operation,
+            capability: None,
+        }
+    }
+
+    fn with_capability(
+        language: Language,
+        operation: HostOperation,
+        capability: CapabilityKind,
+    ) -> Self {
+        Self {
+            language,
+            operation,
+            capability: Some(capability),
+        }
+    }
 }
 
 macro_rules! lsp_method {
@@ -49,6 +80,27 @@ macro_rules! lsp_method {
                 },
                 move |server| server.$server_method($param),
             )
+        }
+    };
+}
+
+macro_rules! lsp_notification {
+    (
+        $(#[$meta:meta])* $vis:vis fn $name:ident(
+            &mut self,
+            language: Language,
+            $param:ident : $pty:ty $(,)?
+        ) -> $ret:ty {
+            $op:expr,
+            $server_method:ident
+        }
+    ) => {
+        $(#[$meta])* $vis fn $name(
+            &mut self,
+            language: Language,
+            $param: $pty,
+        ) -> $ret {
+            self.call_on_server(language, $op, move |server| server.$server_method($param))
         }
     };
 }
@@ -149,6 +201,52 @@ impl LspHost {
         }
     );
 
+    lsp_notification!(
+        /// Notifies the server that a document has been opened with in-memory content.
+        #[doc = include_str!("../docs/did_open.md")]
+        pub fn did_open(
+            &mut self,
+            language: Language,
+            params: DidOpenTextDocumentParams,
+        ) -> Result<(), LspHostError> {
+            HostOperation::DidOpen,
+            did_open
+        }
+    );
+
+    lsp_notification!(
+        /// Notifies the server that a document has changed with in-memory content.
+        #[doc = include_str!("../docs/did_change.md")]
+        pub fn did_change(
+            &mut self,
+            language: Language,
+            params: DidChangeTextDocumentParams,
+        ) -> Result<(), LspHostError> {
+            HostOperation::DidChange,
+            did_change
+        }
+    );
+
+    lsp_notification!(
+        /// Notifies the server that a document has been closed.
+        #[doc = include_str!("../docs/did_close.md")]
+        pub fn did_close(
+            &mut self,
+            language: Language,
+            params: DidCloseTextDocumentParams,
+        ) -> Result<(), LspHostError> {
+            HostOperation::DidClose,
+            did_close
+        }
+    );
+
+    fn call_with_context<F, T>(&mut self, context: CallContext, call: F) -> Result<T, LspHostError>
+    where
+        F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
+    {
+        self.call_with_session(context, call)
+    }
+
     fn call_with_capability<F, T>(
         &mut self,
         language: Language,
@@ -158,23 +256,47 @@ impl LspHost {
     where
         F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
     {
+        self.call_with_context(
+            CallContext::with_capability(language, spec.operation, spec.capability),
+            call,
+        )
+    }
+
+    fn call_on_server<F, T>(
+        &mut self,
+        language: Language,
+        operation: HostOperation,
+        call: F,
+    ) -> Result<T, LspHostError>
+    where
+        F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
+    {
+        self.call_with_context(CallContext::for_operation(language, operation), call)
+    }
+
+    fn call_with_session<F, T>(&mut self, context: CallContext, call: F) -> Result<T, LspHostError>
+    where
+        F: FnOnce(&mut dyn LanguageServer) -> Result<T, LanguageServerError>,
+    {
         let overrides = &self.overrides;
         let session = self
             .sessions
-            .get_mut(&language)
-            .ok_or_else(|| LspHostError::unknown(language))?;
-        let summary = Self::ensure_initialized(language, session, overrides)?;
-        let state = summary.state(spec.capability);
-        if !state.enabled {
-            return Err(LspHostError::capability_unavailable(
-                language,
-                spec.capability,
-                state.source,
-            ));
+            .get_mut(&context.language)
+            .ok_or_else(|| LspHostError::unknown(context.language))?;
+        let summary = Self::ensure_initialized(context.language, session, overrides)?;
+        if let Some(capability) = context.capability {
+            let state = summary.state(capability);
+            if !state.enabled {
+                return Err(LspHostError::capability_unavailable(
+                    context.language,
+                    capability,
+                    state.source,
+                ));
+            }
         }
 
         call(session.server.as_mut())
-            .map_err(|source| LspHostError::server(language, spec.operation, source))
+            .map_err(|source| LspHostError::server(context.language, context.operation, source))
     }
 
     fn ensure_initialized(
