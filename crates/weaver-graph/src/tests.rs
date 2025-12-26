@@ -145,7 +145,7 @@ mod node_tests {
 
 mod edge_tests {
     use crate::edge::{CallEdge, EdgeSource};
-    use crate::node::NodeId;
+    use crate::node::{NodeId, Position};
     use camino::Utf8PathBuf;
 
     #[test]
@@ -155,7 +155,7 @@ mod edge_tests {
         let callee_id = NodeId::new(&path, 20, 0, "callee");
 
         let edge = CallEdge::new(caller_id.clone(), callee_id.clone(), EdgeSource::Lsp)
-            .with_call_site(15, 4);
+            .with_call_site(Position::new(15, 4));
 
         assert_eq!(edge.caller().as_str(), caller_id.as_str());
         assert_eq!(edge.callee().as_str(), callee_id.as_str());

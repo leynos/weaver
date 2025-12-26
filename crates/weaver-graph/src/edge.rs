@@ -54,8 +54,8 @@ impl CallEdge {
 
     /// Sets the call site location.
     #[must_use]
-    pub const fn with_call_site(mut self, line: u32, column: u32) -> Self {
-        self.call_site = Some(Position::new(line, column));
+    pub const fn with_call_site(mut self, position: Position) -> Self {
+        self.call_site = Some(position);
         self
     }
 

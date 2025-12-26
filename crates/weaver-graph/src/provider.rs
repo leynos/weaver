@@ -289,7 +289,7 @@ impl<C: CallHierarchyClient> LspCallGraphProvider<C> {
 
             // Use the first call site range if available
             if let Some(range) = call.from_ranges.first() {
-                edge = edge.with_call_site(range.start.line, range.start.character);
+                edge = edge.with_call_site(Position::new(range.start.line, range.start.character));
             }
 
             graph.add_edge(edge);
@@ -337,7 +337,7 @@ impl<C: CallHierarchyClient> LspCallGraphProvider<C> {
 
             // Use the first call site range if available
             if let Some(range) = call.from_ranges.first() {
-                edge = edge.with_call_site(range.start.line, range.start.character);
+                edge = edge.with_call_site(Position::new(range.start.line, range.start.character));
             }
 
             graph.add_edge(edge);

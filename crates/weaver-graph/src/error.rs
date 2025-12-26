@@ -45,6 +45,10 @@ pub enum GraphError {
     /// The requested node was not found in the graph.
     #[error("node not found: {0}")]
     NodeNotFound(String),
+
+    /// A validation error occurred (e.g., invalid path or URI).
+    #[error("validation error: {0}")]
+    Validation(String),
 }
 
 impl GraphError {
@@ -79,5 +83,11 @@ impl GraphError {
     #[must_use]
     pub fn node_not_found(node_id: impl Into<String>) -> Self {
         Self::NodeNotFound(node_id.into())
+    }
+
+    /// Creates a new `Validation` error.
+    #[must_use]
+    pub fn validation(message: impl Into<String>) -> Self {
+        Self::Validation(message.into())
     }
 }

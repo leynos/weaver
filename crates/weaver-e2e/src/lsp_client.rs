@@ -352,7 +352,12 @@ impl LspClient {
             .read_exact(&mut buffer)
             .map_err(LspClientError::Io)?;
 
-        let content = String::from_utf8_lossy(&buffer);
+        let content = String::from_utf8(buffer).map_err(|e| {
+            LspClientError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("invalid UTF-8 in response: {e}"),
+            ))
+        })?;
         serde_json::from_str(&content).map_err(LspClientError::Json)
     }
 }
