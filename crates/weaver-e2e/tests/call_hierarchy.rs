@@ -64,8 +64,7 @@ fn prepare_call_hierarchy_finds_function() {
         .prepare_call_hierarchy(params)
         .expect("prepare call hierarchy");
 
-    assert!(result.is_some(), "should find call hierarchy item");
-    let items = result.expect("items");
+    let items = result.expect("should find call hierarchy item");
     assert!(!items.is_empty(), "should have at least one item");
     assert_eq!(items.first().map(|i| i.name.as_str()), Some("a"));
 
@@ -118,8 +117,7 @@ fn outgoing_calls_returns_callees() {
         .outgoing_calls(outgoing_params)
         .expect("outgoing calls");
 
-    assert!(outgoing.is_some(), "should have outgoing calls");
-    let calls = outgoing.expect("calls");
+    let calls = outgoing.expect("should have outgoing calls");
     assert!(!calls.is_empty(), "should have at least one call");
 
     // `a` calls `b`
@@ -178,8 +176,7 @@ fn incoming_calls_returns_callers() {
         .incoming_calls(incoming_params)
         .expect("incoming calls");
 
-    assert!(incoming.is_some(), "should have incoming calls");
-    let calls = incoming.expect("calls");
+    let calls = incoming.expect("should have incoming calls");
     assert!(!calls.is_empty(), "should have at least one call");
 
     // `b` is called by `a`

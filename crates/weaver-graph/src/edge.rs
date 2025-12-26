@@ -1,6 +1,6 @@
 //! Call graph edge representation.
 
-use crate::node::NodeId;
+use crate::node::{NodeId, Position};
 
 /// Provenance of a call edge, indicating its source.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,10 +36,8 @@ pub struct CallEdge {
     callee: NodeId,
     /// How this edge was discovered.
     source: EdgeSource,
-    /// Line in the caller where the call occurs (if known).
-    call_site_line: Option<u32>,
-    /// Column in the caller where the call occurs (if known).
-    call_site_column: Option<u32>,
+    /// Position in the caller where the call occurs (if known).
+    call_site: Option<Position>,
 }
 
 impl CallEdge {
@@ -50,16 +48,14 @@ impl CallEdge {
             caller: from_caller,
             callee: to_callee,
             source,
-            call_site_line: None,
-            call_site_column: None,
+            call_site: None,
         }
     }
 
     /// Sets the call site location.
     #[must_use]
     pub const fn with_call_site(mut self, line: u32, column: u32) -> Self {
-        self.call_site_line = Some(line);
-        self.call_site_column = Some(column);
+        self.call_site = Some(Position::new(line, column));
         self
     }
 
@@ -81,15 +77,27 @@ impl CallEdge {
         self.source
     }
 
+    /// Returns the call site position if known.
+    #[must_use]
+    pub const fn call_site(&self) -> Option<Position> {
+        self.call_site
+    }
+
     /// Returns the call site line if known.
     #[must_use]
     pub const fn call_site_line(&self) -> Option<u32> {
-        self.call_site_line
+        match self.call_site {
+            Some(pos) => Some(pos.line),
+            None => None,
+        }
     }
 
     /// Returns the call site column if known.
     #[must_use]
     pub const fn call_site_column(&self) -> Option<u32> {
-        self.call_site_column
+        match self.call_site {
+            Some(pos) => Some(pos.column),
+            None => None,
+        }
     }
 }

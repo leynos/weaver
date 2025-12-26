@@ -17,6 +17,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use thiserror::Error;
 
+/// Maximum number of messages to read before giving up on finding a response.
+const MAX_RESPONSE_ITERATIONS: usize = 1000;
+
 /// Errors that can occur during LSP communication.
 #[derive(Debug, Error)]
 pub enum LspClientError {
@@ -44,6 +47,14 @@ pub enum LspClientError {
     /// No response received for a request.
     #[error("no response received for request {0}")]
     NoResponse(i64),
+
+    /// Client has not been initialized.
+    #[error("client not initialized: call initialize() first")]
+    NotInitialized,
+
+    /// Response timeout: too many messages without finding matching response.
+    #[error("timeout waiting for response to request {0}")]
+    ResponseTimeout(i64),
 }
 
 /// JSON-RPC request structure.
@@ -158,13 +169,14 @@ impl LspClient {
     /// Opens a document in the language server.
     ///
     /// # Errors
-    /// Returns an error if the notification fails.
+    /// Returns an error if the client is not initialized or if the notification fails.
     pub fn did_open(
         &mut self,
         uri: Uri,
         language_id: &str,
         text: &str,
     ) -> Result<(), LspClientError> {
+        self.require_initialized()?;
         let params = DidOpenTextDocumentParams {
             text_document: TextDocumentItem {
                 uri,
@@ -183,11 +195,12 @@ impl LspClient {
     /// Prepares call hierarchy at the given position.
     ///
     /// # Errors
-    /// Returns an error if the request fails.
+    /// Returns an error if the client is not initialized or if the request fails.
     pub fn prepare_call_hierarchy(
         &mut self,
         params: CallHierarchyPrepareParams,
     ) -> Result<Option<Vec<CallHierarchyItem>>, LspClientError> {
+        self.require_initialized()?;
         self.request(
             "textDocument/prepareCallHierarchy",
             Some(serde_json::to_value(params).map_err(LspClientError::Json)?),
@@ -197,11 +210,12 @@ impl LspClient {
     /// Gets incoming calls for a call hierarchy item.
     ///
     /// # Errors
-    /// Returns an error if the request fails.
+    /// Returns an error if the client is not initialized or if the request fails.
     pub fn incoming_calls(
         &mut self,
         params: CallHierarchyIncomingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyIncomingCall>>, LspClientError> {
+        self.require_initialized()?;
         self.request(
             "callHierarchy/incomingCalls",
             Some(serde_json::to_value(params).map_err(LspClientError::Json)?),
@@ -211,11 +225,12 @@ impl LspClient {
     /// Gets outgoing calls for a call hierarchy item.
     ///
     /// # Errors
-    /// Returns an error if the request fails.
+    /// Returns an error if the client is not initialized or if the request fails.
     pub fn outgoing_calls(
         &mut self,
         params: CallHierarchyOutgoingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, LspClientError> {
+        self.require_initialized()?;
         self.request(
             "callHierarchy/outgoingCalls",
             Some(serde_json::to_value(params).map_err(LspClientError::Json)?),
@@ -230,6 +245,15 @@ impl LspClient {
         let _: Option<()> = self.request("shutdown", None)?;
         self.notify("exit", None)?;
         Ok(())
+    }
+
+    /// Returns an error if the client has not been initialized.
+    const fn require_initialized(&self) -> Result<(), LspClientError> {
+        if self.initialized {
+            Ok(())
+        } else {
+            Err(LspClientError::NotInitialized)
+        }
     }
 
     fn request<T: for<'de> Deserialize<'de>>(
@@ -249,7 +273,7 @@ impl LspClient {
         self.send_message(&serde_json::to_string(&request).map_err(LspClientError::Json)?)?;
 
         // Read responses until we get one matching our request ID
-        loop {
+        for _ in 0..MAX_RESPONSE_ITERATIONS {
             let response = self.read_response()?;
 
             if response.id != Some(id) {
@@ -269,6 +293,8 @@ impl LspClient {
                 |value| serde_json::from_value(value).map_err(LspClientError::Json),
             );
         }
+
+        Err(LspClientError::ResponseTimeout(id))
     }
 
     fn notify(&mut self, method: &str, params: Option<Value>) -> Result<(), LspClientError> {

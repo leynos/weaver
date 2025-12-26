@@ -8,23 +8,22 @@ use camino::Utf8PathBuf;
 use lsp_types::{
     CallHierarchyIncomingCallsParams, CallHierarchyItem, CallHierarchyOutgoingCallsParams,
     CallHierarchyPrepareParams, Position as LspPosition, TextDocumentIdentifier,
-    TextDocumentPositionParams, Uri, WorkDoneProgressParams,
+    TextDocumentPositionParams, WorkDoneProgressParams,
 };
 
 use crate::edge::{CallEdge, EdgeSource};
 use crate::error::GraphError;
 use crate::graph::CallGraph;
 use crate::node::{CallNode, Position, SymbolKind};
+use crate::uri::{path_to_uri, uri_to_path};
 
 /// A position in a source file for initiating call graph queries.
 #[derive(Debug, Clone)]
 pub struct SourcePosition {
     /// Path to the source file.
     pub path: Utf8PathBuf,
-    /// Line number (0-based).
-    pub line: u32,
-    /// Column number (0-based).
-    pub column: u32,
+    /// Position within the file (0-based line and column).
+    pub position: Position,
 }
 
 impl SourcePosition {
@@ -33,9 +32,20 @@ impl SourcePosition {
     pub fn new(path: impl Into<Utf8PathBuf>, line: u32, column: u32) -> Self {
         Self {
             path: path.into(),
-            line,
-            column,
+            position: Position::new(line, column),
         }
+    }
+
+    /// Returns the line number (0-based).
+    #[must_use]
+    pub const fn line(&self) -> u32 {
+        self.position.line
+    }
+
+    /// Returns the column number (0-based).
+    #[must_use]
+    pub const fn column(&self) -> u32 {
+        self.position.column
     }
 }
 
@@ -152,8 +162,8 @@ impl<C: CallHierarchyClient> CallGraphProvider for LspCallGraphProvider<C> {
         if items.is_empty() {
             return Err(GraphError::symbol_not_found(
                 &position.path,
-                position.line,
-                position.column,
+                position.line(),
+                position.column(),
             ));
         }
 
@@ -179,25 +189,9 @@ impl<C: CallHierarchyClient> CallGraphProvider for LspCallGraphProvider<C> {
         position: &SourcePosition,
         depth: u32,
     ) -> Result<CallGraph, GraphError> {
-        let mut graph = CallGraph::new();
-
-        let items = self.prepare_at_position(position)?;
-
-        if items.is_empty() {
-            return Err(GraphError::symbol_not_found(
-                &position.path,
-                position.line,
-                position.column,
-            ));
-        }
-
-        for item in &items {
-            let node = call_hierarchy_item_to_node(item);
-            graph.add_node(node);
-            self.explore_callers(&mut graph, item, depth)?;
-        }
-
-        Ok(graph)
+        self.build_directional_graph(position, depth, |provider, graph, item, d| {
+            provider.explore_callers(graph, item, d)
+        })
     }
 
     fn callees_graph(
@@ -205,6 +199,23 @@ impl<C: CallHierarchyClient> CallGraphProvider for LspCallGraphProvider<C> {
         position: &SourcePosition,
         depth: u32,
     ) -> Result<CallGraph, GraphError> {
+        self.build_directional_graph(position, depth, |provider, graph, item, d| {
+            provider.explore_callees(graph, item, d)
+        })
+    }
+}
+
+impl<C: CallHierarchyClient> LspCallGraphProvider<C> {
+    /// Shared helper for building directional graphs (callers or callees).
+    fn build_directional_graph<F>(
+        &mut self,
+        position: &SourcePosition,
+        depth: u32,
+        explore_fn: F,
+    ) -> Result<CallGraph, GraphError>
+    where
+        F: Fn(&mut Self, &mut CallGraph, &CallHierarchyItem, u32) -> Result<(), GraphError>,
+    {
         let mut graph = CallGraph::new();
 
         let items = self.prepare_at_position(position)?;
@@ -212,22 +223,20 @@ impl<C: CallHierarchyClient> CallGraphProvider for LspCallGraphProvider<C> {
         if items.is_empty() {
             return Err(GraphError::symbol_not_found(
                 &position.path,
-                position.line,
-                position.column,
+                position.line(),
+                position.column(),
             ));
         }
 
         for item in &items {
             let node = call_hierarchy_item_to_node(item);
             graph.add_node(node);
-            self.explore_callees(&mut graph, item, depth)?;
+            explore_fn(self, &mut graph, item, depth)?;
         }
 
         Ok(graph)
     }
-}
 
-impl<C: CallHierarchyClient> LspCallGraphProvider<C> {
     fn prepare_at_position(
         &mut self,
         position: &SourcePosition,
@@ -236,7 +245,7 @@ impl<C: CallHierarchyClient> LspCallGraphProvider<C> {
         let params = CallHierarchyPrepareParams {
             text_document_position_params: TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier { uri },
-                position: LspPosition::new(position.line, position.column),
+                position: LspPosition::new(position.line(), position.column()),
             },
             work_done_progress_params: WorkDoneProgressParams::default(),
         };
@@ -359,51 +368,4 @@ fn call_hierarchy_item_to_node(item: &CallHierarchyItem) -> CallNode {
     }
 
     node
-}
-
-/// Converts a URI to a `Utf8PathBuf`.
-fn uri_to_path(uri: &Uri) -> Utf8PathBuf {
-    // Try to extract the path from a file:// URI
-    let uri_str = uri.as_str();
-    uri_str.strip_prefix("file://").map_or_else(
-        || Utf8PathBuf::from(uri_str),
-        |path| Utf8PathBuf::from(percent_decode(path)),
-    )
-}
-
-/// Converts a path to a file:// URI.
-fn path_to_uri(path: &Utf8PathBuf) -> Result<Uri, GraphError> {
-    let uri_string = format!("file://{path}");
-    uri_string.parse().map_err(|_| {
-        GraphError::io(
-            format!("failed to convert path to URI: {path}"),
-            std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid path"),
-        )
-    })
-}
-
-/// Simple percent-decoding for URI paths.
-fn percent_decode(input: &str) -> String {
-    let mut result = String::with_capacity(input.len());
-    let mut chars = input.chars().peekable();
-
-    while let Some(c) = chars.next() {
-        if c == '%' {
-            // Try to decode a percent-encoded sequence
-            let hex: String = chars.by_ref().take(2).collect();
-            if hex.len() == 2
-                && let Ok(byte) = u8::from_str_radix(&hex, 16)
-            {
-                result.push(byte as char);
-                continue;
-            }
-            // If decoding failed, keep the original
-            result.push('%');
-            result.push_str(&hex);
-        } else {
-            result.push(c);
-        }
-    }
-
-    result
 }

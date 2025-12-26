@@ -45,6 +45,7 @@ mod error;
 mod graph;
 mod node;
 mod provider;
+mod uri;
 
 pub use edge::{CallEdge, EdgeSource};
 pub use error::GraphError;

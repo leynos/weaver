@@ -8,6 +8,7 @@ weaver-lsp-host = { path = "../weaver-lsp-host" }
 lsp-types = { workspace = true }
 thiserror = { workspace = true }
 camino = { workspace = true }
+url = "2.5"
 
 [dev-dependencies]
 rstest = { workspace = true }

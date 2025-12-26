@@ -88,10 +88,8 @@ pub struct CallNode {
     kind: SymbolKind,
     /// Path to the file containing this symbol.
     path: Utf8PathBuf,
-    /// Line number where the symbol is defined (0-based).
-    line: u32,
-    /// Column number where the symbol is defined (0-based).
-    column: u32,
+    /// Position where the symbol is defined (0-based line and column).
+    position: Position,
     /// Optional container name (e.g., class name for methods).
     container: Option<String>,
 }
@@ -113,8 +111,7 @@ impl CallNode {
             name: name_str,
             kind,
             path: path_buf,
-            line: position.line,
-            column: position.column,
+            position,
             container: None,
         }
     }
@@ -150,16 +147,22 @@ impl CallNode {
         &self.path
     }
 
+    /// Returns the position where the symbol is defined.
+    #[must_use]
+    pub const fn position(&self) -> Position {
+        self.position
+    }
+
     /// Returns the line number where the symbol is defined.
     #[must_use]
     pub const fn line(&self) -> u32 {
-        self.line
+        self.position.line
     }
 
     /// Returns the column number where the symbol is defined.
     #[must_use]
     pub const fn column(&self) -> u32 {
-        self.column
+        self.position.column
     }
 
     /// Returns the container name if present.

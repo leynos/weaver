@@ -138,7 +138,8 @@ impl CallGraph {
     /// Merges another graph into this one.
     ///
     /// Nodes with the same ID are replaced. All edges from the other graph
-    /// are added.
+    /// are added without deduplication—if both graphs contain the same edge
+    /// (same caller→callee with same source), it will appear twice.
     pub fn merge(&mut self, other: Self) {
         for node in other.nodes.into_values() {
             self.add_node(node);
