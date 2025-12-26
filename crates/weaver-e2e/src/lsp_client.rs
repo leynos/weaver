@@ -200,11 +200,7 @@ impl LspClient {
         &mut self,
         params: CallHierarchyPrepareParams,
     ) -> Result<Option<Vec<CallHierarchyItem>>, LspClientError> {
-        self.require_initialized()?;
-        self.request(
-            "textDocument/prepareCallHierarchy",
-            Some(serde_json::to_value(params).map_err(LspClientError::Json)?),
-        )
+        self.call_hierarchy_request("textDocument/prepareCallHierarchy", params)
     }
 
     /// Gets incoming calls for a call hierarchy item.
@@ -215,11 +211,7 @@ impl LspClient {
         &mut self,
         params: CallHierarchyIncomingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyIncomingCall>>, LspClientError> {
-        self.require_initialized()?;
-        self.request(
-            "callHierarchy/incomingCalls",
-            Some(serde_json::to_value(params).map_err(LspClientError::Json)?),
-        )
+        self.call_hierarchy_request("callHierarchy/incomingCalls", params)
     }
 
     /// Gets outgoing calls for a call hierarchy item.
@@ -230,11 +222,7 @@ impl LspClient {
         &mut self,
         params: CallHierarchyOutgoingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, LspClientError> {
-        self.require_initialized()?;
-        self.request(
-            "callHierarchy/outgoingCalls",
-            Some(serde_json::to_value(params).map_err(LspClientError::Json)?),
-        )
+        self.call_hierarchy_request("callHierarchy/outgoingCalls", params)
     }
 
     /// Shuts down the language server.
@@ -254,6 +242,19 @@ impl LspClient {
         } else {
             Err(LspClientError::NotInitialized)
         }
+    }
+
+    /// Helper for making LSP requests with automatic initialisation check and serialisation.
+    fn call_hierarchy_request<P, R>(&mut self, method: &str, params: P) -> Result<R, LspClientError>
+    where
+        P: Serialize,
+        R: for<'de> Deserialize<'de>,
+    {
+        self.require_initialized()?;
+        self.request(
+            method,
+            Some(serde_json::to_value(params).map_err(LspClientError::Json)?),
+        )
     }
 
     fn request<T: for<'de> Deserialize<'de>>(

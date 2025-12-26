@@ -17,17 +17,21 @@ pub fn uri_to_path(uri: &Uri) -> Utf8PathBuf {
     let uri_str = uri.as_str();
 
     // Try to parse as a URL and extract the file path
-    if let Ok(url) = Url::parse(uri_str)
-        && let Ok(path) = url.to_file_path()
-        && let Ok(utf8_path) = Utf8PathBuf::try_from(path)
-    {
-        return utf8_path;
+    if let Some(path) = try_parse_uri_to_path(uri_str) {
+        return path;
     }
 
     // Fallback: strip file:// prefix manually
     uri_str
         .strip_prefix("file://")
         .map_or_else(|| Utf8PathBuf::from(uri_str), Utf8PathBuf::from)
+}
+
+/// Attempts to parse a URI string into a UTF-8 path using the url crate.
+fn try_parse_uri_to_path(uri_str: &str) -> Option<Utf8PathBuf> {
+    let url = Url::parse(uri_str).ok()?;
+    let path = url.to_file_path().ok()?;
+    Utf8PathBuf::try_from(path).ok()
 }
 
 /// Converts a path to a file:// URI.
