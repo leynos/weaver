@@ -3,13 +3,12 @@
 //! These tests exercise the call hierarchy features against a real Pyrefly
 //! language server. Tests are skipped gracefully if Pyrefly is not available.
 
-#![allow(
+#![expect(
     clippy::expect_used,
     reason = "test code uses expect for clarity and assertions"
 )]
 
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::path::{Path, PathBuf};
 
 use lsp_types::{
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
@@ -17,14 +16,16 @@ use lsp_types::{
 };
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
+use url::Url;
 
 use weaver_e2e::fixtures;
 use weaver_e2e::lsp_client::LspClient;
 use weaver_e2e::pyrefly_available;
 
-/// Creates a file URI from a path string.
-fn file_uri(path: &str) -> Uri {
-    Uri::from_str(&format!("file://{path}")).expect("valid URI")
+/// Creates a file URI from a path, handling cross-platform differences correctly.
+fn file_uri(path: &Path) -> Uri {
+    let url = Url::from_file_path(path).expect("valid file path");
+    url.as_str().parse().expect("valid URI")
 }
 
 /// Skips the test if Pyrefly is not available.
@@ -57,18 +58,18 @@ fn linear_chain_context() -> Option<TestContext> {
     let file_path = temp_dir.path().join("test.py");
     std::fs::write(&file_path, fixtures::LINEAR_CHAIN).expect("write test file");
 
-    let root_uri = file_uri(temp_dir.path().to_str().expect("valid path"));
-    let file_uri = file_uri(file_path.to_str().expect("valid path"));
+    let root_uri = file_uri(temp_dir.path());
+    let file_uri_val = file_uri(&file_path);
 
     let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"]).expect("spawn pyrefly");
     client.initialize(root_uri).expect("initialize");
     client
-        .did_open(file_uri.clone(), "python", fixtures::LINEAR_CHAIN)
+        .did_open(file_uri_val.clone(), "python", fixtures::LINEAR_CHAIN)
         .expect("open file");
 
     Some(TestContext {
         client,
-        file_uri,
+        file_uri: file_uri_val,
         _temp_dir: temp_dir,
     })
 }
@@ -84,8 +85,8 @@ fn no_calls_context() -> Option<(TestContext, PathBuf)> {
     let file_path = temp_dir.path().join("test.py");
     std::fs::write(&file_path, fixtures::NO_CALLS).expect("write test file");
 
-    let root_uri = file_uri(temp_dir.path().to_str().expect("valid path"));
-    let file_uri_val = file_uri(file_path.to_str().expect("valid path"));
+    let root_uri = file_uri(temp_dir.path());
+    let file_uri_val = file_uri(&file_path);
 
     let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"]).expect("spawn pyrefly");
     client.initialize(root_uri).expect("initialize");
