@@ -3,6 +3,8 @@
 use std::sync::{Arc, Mutex};
 
 use lsp_types::{
+    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
+    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     GotoDefinitionParams, GotoDefinitionResponse, Location, ReferenceParams, Uri,
 };
@@ -26,6 +28,12 @@ pub enum CallKind {
     DidChange,
     /// `textDocument/didClose` was invoked.
     DidClose,
+    /// `textDocument/prepareCallHierarchy` was invoked.
+    PrepareCallHierarchy,
+    /// `callHierarchy/incomingCalls` was invoked.
+    IncomingCalls,
+    /// `callHierarchy/outgoingCalls` was invoked.
+    OutgoingCalls,
 }
 
 /// Test double that records every request routed through it.
@@ -169,6 +177,35 @@ impl LanguageServer for RecordingLanguageServer {
             responses.document_sync.did_close_error.clone()
         })
     }
+
+    fn prepare_call_hierarchy(
+        &mut self,
+        _params: CallHierarchyPrepareParams,
+    ) -> Result<Option<Vec<CallHierarchyItem>>, LanguageServerError> {
+        self.handle_request(
+            CallKind::PrepareCallHierarchy,
+            "prepareCallHierarchy",
+            |responses| responses.call_hierarchy.prepare.clone(),
+        )
+    }
+
+    fn incoming_calls(
+        &mut self,
+        _params: CallHierarchyIncomingCallsParams,
+    ) -> Result<Option<Vec<CallHierarchyIncomingCall>>, LanguageServerError> {
+        self.handle_request(CallKind::IncomingCalls, "incomingCalls", |responses| {
+            responses.call_hierarchy.incoming.clone()
+        })
+    }
+
+    fn outgoing_calls(
+        &mut self,
+        _params: CallHierarchyOutgoingCallsParams,
+    ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, LanguageServerError> {
+        self.handle_request(CallKind::OutgoingCalls, "outgoingCalls", |responses| {
+            responses.call_hierarchy.outgoing.clone()
+        })
+    }
 }
 
 /// Handle that exposes recorded state for assertions.
@@ -203,6 +240,8 @@ pub struct ResponseSet {
     pub diagnostics: Vec<Diagnostic>,
     /// Errors returned for document sync notifications.
     pub document_sync: DocumentSyncErrors,
+    /// Responses for call hierarchy requests.
+    pub call_hierarchy: CallHierarchyResponses,
 }
 
 impl Default for ResponseSet {
@@ -212,8 +251,20 @@ impl Default for ResponseSet {
             references: Vec::new(),
             diagnostics: Vec::new(),
             document_sync: DocumentSyncErrors::default(),
+            call_hierarchy: CallHierarchyResponses::default(),
         }
     }
+}
+
+/// Static responses for call hierarchy requests.
+#[derive(Debug, Clone, Default)]
+pub struct CallHierarchyResponses {
+    /// Response for `textDocument/prepareCallHierarchy`.
+    pub prepare: Option<Vec<CallHierarchyItem>>,
+    /// Response for `callHierarchy/incomingCalls`.
+    pub incoming: Option<Vec<CallHierarchyIncomingCall>>,
+    /// Response for `callHierarchy/outgoingCalls`.
+    pub outgoing: Option<Vec<CallHierarchyOutgoingCall>>,
 }
 
 /// Document sync failures for notifications.

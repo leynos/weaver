@@ -3,6 +3,8 @@
 use std::collections::HashMap;
 
 use lsp_types::{
+    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
+    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     GotoDefinitionParams, GotoDefinitionResponse, ReferenceParams, Uri,
 };
@@ -237,6 +239,48 @@ impl LspHost {
         ) -> Result<(), LspHostError> {
             HostOperation::DidClose,
             did_close
+        }
+    );
+
+    lsp_method!(
+        /// Prepares a call hierarchy request at the given position.
+        ///
+        /// Returns a list of call hierarchy items representing the callable symbols
+        /// at the position. This is the first step in the call hierarchy protocol.
+        pub fn prepare_call_hierarchy(
+            &mut self,
+            language: Language,
+            params: CallHierarchyPrepareParams,
+        ) -> Result<Option<Vec<CallHierarchyItem>>, LspHostError> {
+            CapabilityKind::CallHierarchy,
+            HostOperation::PrepareCallHierarchy,
+            prepare_call_hierarchy
+        }
+    );
+
+    lsp_method!(
+        /// Returns the incoming calls (callers) for the given call hierarchy item.
+        pub fn incoming_calls(
+            &mut self,
+            language: Language,
+            params: CallHierarchyIncomingCallsParams,
+        ) -> Result<Option<Vec<CallHierarchyIncomingCall>>, LspHostError> {
+            CapabilityKind::CallHierarchy,
+            HostOperation::IncomingCalls,
+            incoming_calls
+        }
+    );
+
+    lsp_method!(
+        /// Returns the outgoing calls (callees) for the given call hierarchy item.
+        pub fn outgoing_calls(
+            &mut self,
+            language: Language,
+            params: CallHierarchyOutgoingCallsParams,
+        ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, LspHostError> {
+            CapabilityKind::CallHierarchy,
+            HostOperation::OutgoingCalls,
+            outgoing_calls
         }
     );
 
