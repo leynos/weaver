@@ -157,13 +157,16 @@ mod test_impl {
         ctx.client.shutdown().expect("shutdown");
     }
 
+    /// Asserts that outgoing calls from the given item include the expected callee.
     #[expect(
         clippy::expect_used,
-        reason = "test uses expect for LSP operations and assertions"
+        reason = "test helper uses expect for LSP operations"
     )]
-    pub fn outgoing_calls_returns_callees_impl(ctx: &mut TestContext) {
-        let item = prepare_call_hierarchy_item(ctx, 0, 4);
-
+    fn assert_outgoing_calls_contain(
+        ctx: &mut TestContext,
+        item: CallHierarchyItem,
+        expected_callee: &str,
+    ) {
         let outgoing_params = CallHierarchyOutgoingCallsParams {
             item,
             work_done_progress_params: WorkDoneProgressParams::default(),
@@ -178,23 +181,23 @@ mod test_impl {
 
         assert!(!calls.is_empty(), "should have at least one call");
 
-        // `a` calls `b`
         let callee_names: Vec<_> = calls.iter().map(|c| c.to.name.as_str()).collect();
         assert!(
-            callee_names.contains(&"b"),
-            "should include call to `b`, got: {callee_names:?}"
+            callee_names.contains(&expected_callee),
+            "should include call to `{expected_callee}`, got: {callee_names:?}"
         );
-
-        ctx.client.shutdown().expect("shutdown");
     }
 
+    /// Asserts that incoming calls to the given item include the expected caller.
     #[expect(
         clippy::expect_used,
-        reason = "test uses expect for LSP operations and assertions"
+        reason = "test helper uses expect for LSP operations"
     )]
-    pub fn incoming_calls_returns_callers_impl(ctx: &mut TestContext) {
-        let item = prepare_call_hierarchy_item(ctx, 3, 4);
-
+    fn assert_incoming_calls_contain(
+        ctx: &mut TestContext,
+        item: CallHierarchyItem,
+        expected_caller: &str,
+    ) {
         let incoming_params = CallHierarchyIncomingCallsParams {
             item,
             work_done_progress_params: WorkDoneProgressParams::default(),
@@ -209,13 +212,30 @@ mod test_impl {
 
         assert!(!calls.is_empty(), "should have at least one call");
 
-        // `b` is called by `a`
         let caller_names: Vec<_> = calls.iter().map(|c| c.from.name.as_str()).collect();
         assert!(
-            caller_names.contains(&"a"),
-            "should include call from `a`, got: {caller_names:?}"
+            caller_names.contains(&expected_caller),
+            "should include call from `{expected_caller}`, got: {caller_names:?}"
         );
+    }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "test uses expect for LSP operations and assertions"
+    )]
+    pub fn outgoing_calls_returns_callees_impl(ctx: &mut TestContext) {
+        let item = prepare_call_hierarchy_item(ctx, 0, 4);
+        assert_outgoing_calls_contain(ctx, item, "b");
+        ctx.client.shutdown().expect("shutdown");
+    }
+
+    #[expect(
+        clippy::expect_used,
+        reason = "test uses expect for LSP operations and assertions"
+    )]
+    pub fn incoming_calls_returns_callers_impl(ctx: &mut TestContext) {
+        let item = prepare_call_hierarchy_item(ctx, 3, 4);
+        assert_incoming_calls_contain(ctx, item, "a");
         ctx.client.shutdown().expect("shutdown");
     }
 
