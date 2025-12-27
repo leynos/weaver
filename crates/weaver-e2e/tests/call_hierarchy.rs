@@ -3,7 +3,7 @@
 //! These tests exercise the call hierarchy features against a real Pyrefly
 //! language server. Tests are skipped gracefully if Pyrefly is not available.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use lsp_types::{
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
@@ -39,11 +39,27 @@ macro_rules! require_pyrefly {
     };
 }
 
+/// Runs a test implementation with the given fixture context.
+///
+/// This macro handles the common pattern of:
+/// 1. Checking if Pyrefly is available
+/// 2. Unwrapping the fixture Option
+/// 3. Delegating to the test implementation function
+macro_rules! run_test_with_context {
+    ($fixture:expr, $impl_fn:path) => {{
+        require_pyrefly!();
+        let Some(ctx) = $fixture.as_mut() else {
+            panic!("context should exist when pyrefly is available");
+        };
+        $impl_fn(ctx);
+    }};
+}
+
 /// Test context containing an initialized LSP client and file URIs.
 struct TestContext {
     client: LspClient,
     file_uri: Uri,
-    temp_dir: TempDir,
+    _temp_dir: TempDir,
 }
 
 /// Module containing fixtures with `expect_used` lint expectation.
@@ -73,7 +89,7 @@ mod fixtures_impl {
         Some(TestContext {
             client,
             file_uri: file_uri_val,
-            temp_dir,
+            _temp_dir: temp_dir,
         })
     }
 
@@ -85,10 +101,8 @@ mod fixtures_impl {
 
     /// Creates a test context for standalone function tests.
     #[fixture]
-    pub fn no_calls_context() -> Option<(TestContext, PathBuf)> {
-        let ctx = create_test_context(fixtures::NO_CALLS)?;
-        let file_path = ctx.temp_dir.path().join("test.py");
-        Some((ctx, file_path))
+    pub fn no_calls_context() -> Option<TestContext> {
+        create_test_context(fixtures::NO_CALLS)
     }
 }
 
@@ -101,6 +115,32 @@ use fixtures_impl::{linear_chain_context, no_calls_context};
 )]
 mod test_impl {
     use super::*;
+    use lsp_types::CallHierarchyItem;
+
+    /// Prepares call hierarchy at the given position and returns the first item.
+    fn prepare_call_hierarchy_item(
+        ctx: &mut TestContext,
+        line: u32,
+        column: u32,
+    ) -> CallHierarchyItem {
+        let prepare_params = CallHierarchyPrepareParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: ctx.file_uri.clone(),
+                },
+                position: Position::new(line, column),
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        };
+
+        ctx.client
+            .prepare_call_hierarchy(prepare_params)
+            .expect("prepare")
+            .expect("items")
+            .into_iter()
+            .next()
+            .expect("first item")
+    }
 
     pub fn prepare_call_hierarchy_finds_function_impl(ctx: &mut TestContext) {
         // Prepare call hierarchy at function `a` (line 0, column 4)
@@ -127,38 +167,20 @@ mod test_impl {
     }
 
     pub fn outgoing_calls_returns_callees_impl(ctx: &mut TestContext) {
-        // First prepare call hierarchy for function `a`
-        let prepare_params = CallHierarchyPrepareParams {
-            text_document_position_params: TextDocumentPositionParams {
-                text_document: TextDocumentIdentifier {
-                    uri: ctx.file_uri.clone(),
-                },
-                position: Position::new(0, 4),
-            },
-            work_done_progress_params: WorkDoneProgressParams::default(),
-        };
+        let item = prepare_call_hierarchy_item(ctx, 0, 4);
 
-        let items = ctx
-            .client
-            .prepare_call_hierarchy(prepare_params)
-            .expect("prepare")
-            .expect("items");
-
-        let item = items.into_iter().next().expect("first item");
-
-        // Now get outgoing calls
         let outgoing_params = CallHierarchyOutgoingCallsParams {
             item,
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: lsp_types::PartialResultParams::default(),
         };
 
-        let outgoing = ctx
+        let calls = ctx
             .client
             .outgoing_calls(outgoing_params)
-            .expect("outgoing calls");
+            .expect("outgoing calls")
+            .expect("should have outgoing calls");
 
-        let calls = outgoing.expect("should have outgoing calls");
         assert!(!calls.is_empty(), "should have at least one call");
 
         // `a` calls `b`
@@ -172,38 +194,20 @@ mod test_impl {
     }
 
     pub fn incoming_calls_returns_callers_impl(ctx: &mut TestContext) {
-        // Prepare call hierarchy for function `b` (line 3, column 4)
-        let prepare_params = CallHierarchyPrepareParams {
-            text_document_position_params: TextDocumentPositionParams {
-                text_document: TextDocumentIdentifier {
-                    uri: ctx.file_uri.clone(),
-                },
-                position: Position::new(3, 4),
-            },
-            work_done_progress_params: WorkDoneProgressParams::default(),
-        };
+        let item = prepare_call_hierarchy_item(ctx, 3, 4);
 
-        let items = ctx
-            .client
-            .prepare_call_hierarchy(prepare_params)
-            .expect("prepare")
-            .expect("items");
-
-        let item = items.into_iter().next().expect("first item");
-
-        // Now get incoming calls
         let incoming_params = CallHierarchyIncomingCallsParams {
             item,
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: lsp_types::PartialResultParams::default(),
         };
 
-        let incoming = ctx
+        let calls = ctx
             .client
             .incoming_calls(incoming_params)
-            .expect("incoming calls");
+            .expect("incoming calls")
+            .expect("should have incoming calls");
 
-        let calls = incoming.expect("should have incoming calls");
         assert!(!calls.is_empty(), "should have at least one call");
 
         // `b` is called by `a`
@@ -217,24 +221,7 @@ mod test_impl {
     }
 
     pub fn no_calls_for_standalone_function_impl(ctx: &mut TestContext) {
-        // Prepare call hierarchy for function `standalone`
-        let prepare_params = CallHierarchyPrepareParams {
-            text_document_position_params: TextDocumentPositionParams {
-                text_document: TextDocumentIdentifier {
-                    uri: ctx.file_uri.clone(),
-                },
-                position: Position::new(0, 4),
-            },
-            work_done_progress_params: WorkDoneProgressParams::default(),
-        };
-
-        let items = ctx
-            .client
-            .prepare_call_hierarchy(prepare_params)
-            .expect("prepare")
-            .expect("items");
-
-        let item = items.into_iter().next().expect("first item");
+        let item = prepare_call_hierarchy_item(ctx, 0, 4);
 
         // Check incoming calls - should be empty or None
         let incoming_params = CallHierarchyIncomingCallsParams {
@@ -252,19 +239,16 @@ mod test_impl {
         assert_eq!(incoming_count, 0, "standalone should have no callers");
 
         // Check outgoing calls - should be empty or None (no user-defined function calls)
+        // Note: outgoing may include built-in function calls, so we just check it doesn't error
         let outgoing_params = CallHierarchyOutgoingCallsParams {
             item,
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: lsp_types::PartialResultParams::default(),
         };
 
-        let outgoing = ctx
-            .client
+        ctx.client
             .outgoing_calls(outgoing_params)
             .expect("outgoing calls");
-
-        // Note: outgoing may include built-in function calls, so we just check it doesn't error
-        let _ = outgoing;
 
         ctx.client.shutdown().expect("shutdown");
     }
@@ -272,36 +256,32 @@ mod test_impl {
 
 #[rstest]
 fn prepare_call_hierarchy_finds_function(mut linear_chain_context: Option<TestContext>) {
-    require_pyrefly!();
-    let Some(ctx) = linear_chain_context.as_mut() else {
-        panic!("context should exist when pyrefly is available");
-    };
-    test_impl::prepare_call_hierarchy_finds_function_impl(ctx);
+    run_test_with_context!(
+        linear_chain_context,
+        test_impl::prepare_call_hierarchy_finds_function_impl
+    );
 }
 
 #[rstest]
 fn outgoing_calls_returns_callees(mut linear_chain_context: Option<TestContext>) {
-    require_pyrefly!();
-    let Some(ctx) = linear_chain_context.as_mut() else {
-        panic!("context should exist when pyrefly is available");
-    };
-    test_impl::outgoing_calls_returns_callees_impl(ctx);
+    run_test_with_context!(
+        linear_chain_context,
+        test_impl::outgoing_calls_returns_callees_impl
+    );
 }
 
 #[rstest]
 fn incoming_calls_returns_callers(mut linear_chain_context: Option<TestContext>) {
-    require_pyrefly!();
-    let Some(ctx) = linear_chain_context.as_mut() else {
-        panic!("context should exist when pyrefly is available");
-    };
-    test_impl::incoming_calls_returns_callers_impl(ctx);
+    run_test_with_context!(
+        linear_chain_context,
+        test_impl::incoming_calls_returns_callers_impl
+    );
 }
 
 #[rstest]
-fn no_calls_for_standalone_function(mut no_calls_context: Option<(TestContext, PathBuf)>) {
-    require_pyrefly!();
-    let Some((ctx, _file_path)) = no_calls_context.as_mut() else {
-        panic!("context should exist when pyrefly is available");
-    };
-    test_impl::no_calls_for_standalone_function_impl(ctx);
+fn no_calls_for_standalone_function(mut no_calls_context: Option<TestContext>) {
+    run_test_with_context!(
+        no_calls_context,
+        test_impl::no_calls_for_standalone_function_impl
+    );
 }
