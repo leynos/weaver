@@ -43,7 +43,7 @@ macro_rules! require_pyrefly {
 struct TestContext {
     client: LspClient,
     file_uri: Uri,
-    _temp_dir: TempDir,
+    temp_dir: TempDir,
 }
 
 /// Module containing fixtures with `expect_used` lint expectation.
@@ -52,15 +52,14 @@ mod fixtures_impl {
     use super::*;
 
     /// Creates a test context with a Python fixture file opened in Pyrefly.
-    #[fixture]
-    pub fn linear_chain_context() -> Option<TestContext> {
+    fn create_test_context(fixture_content: &str) -> Option<TestContext> {
         if !pyrefly_available() {
             return None;
         }
 
         let temp_dir = TempDir::new().expect("create temp dir");
         let file_path = temp_dir.path().join("test.py");
-        std::fs::write(&file_path, fixtures::LINEAR_CHAIN).expect("write test file");
+        std::fs::write(&file_path, fixture_content).expect("write test file");
 
         let root_uri = file_uri(temp_dir.path());
         let file_uri_val = file_uri(&file_path);
@@ -68,44 +67,28 @@ mod fixtures_impl {
         let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"]).expect("spawn pyrefly");
         client.initialize(root_uri).expect("initialize");
         client
-            .did_open(file_uri_val.clone(), "python", fixtures::LINEAR_CHAIN)
+            .did_open(file_uri_val.clone(), "python", fixture_content)
             .expect("open file");
 
         Some(TestContext {
             client,
             file_uri: file_uri_val,
-            _temp_dir: temp_dir,
+            temp_dir,
         })
+    }
+
+    /// Creates a test context with a linear call chain fixture opened in Pyrefly.
+    #[fixture]
+    pub fn linear_chain_context() -> Option<TestContext> {
+        create_test_context(fixtures::LINEAR_CHAIN)
     }
 
     /// Creates a test context for standalone function tests.
     #[fixture]
     pub fn no_calls_context() -> Option<(TestContext, PathBuf)> {
-        if !pyrefly_available() {
-            return None;
-        }
-
-        let temp_dir = TempDir::new().expect("create temp dir");
-        let file_path = temp_dir.path().join("test.py");
-        std::fs::write(&file_path, fixtures::NO_CALLS).expect("write test file");
-
-        let root_uri = file_uri(temp_dir.path());
-        let file_uri_val = file_uri(&file_path);
-
-        let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"]).expect("spawn pyrefly");
-        client.initialize(root_uri).expect("initialize");
-        client
-            .did_open(file_uri_val.clone(), "python", fixtures::NO_CALLS)
-            .expect("open file");
-
-        Some((
-            TestContext {
-                client,
-                file_uri: file_uri_val,
-                _temp_dir: temp_dir,
-            },
-            file_path,
-        ))
+        let ctx = create_test_context(fixtures::NO_CALLS)?;
+        let file_path = ctx.temp_dir.path().join("test.py");
+        Some((ctx, file_path))
     }
 }
 
