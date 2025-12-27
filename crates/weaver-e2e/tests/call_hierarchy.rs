@@ -62,12 +62,15 @@ struct TestContext {
     _temp_dir: TempDir,
 }
 
-/// Module containing fixtures with `expect_used` lint expectation.
-#[expect(clippy::expect_used, reason = "fixtures use expect for setup")]
+/// Module containing fixtures for call hierarchy tests.
 mod fixtures_impl {
     use super::*;
 
     /// Creates a test context with a Python fixture file opened in Pyrefly.
+    #[expect(
+        clippy::expect_used,
+        reason = "fixture setup uses expect for infallible operations"
+    )]
     fn create_test_context(fixture_content: &str) -> Option<TestContext> {
         if !pyrefly_available() {
             return None;
@@ -108,16 +111,16 @@ mod fixtures_impl {
 
 use fixtures_impl::{linear_chain_context, no_calls_context};
 
-/// Module containing test implementations with `expect_used` lint expectation.
-#[expect(
-    clippy::expect_used,
-    reason = "test implementations use expect for assertions"
-)]
+/// Module containing test implementations.
 mod test_impl {
     use super::*;
     use lsp_types::CallHierarchyItem;
 
     /// Prepares call hierarchy at the given position and returns the first item.
+    #[expect(
+        clippy::expect_used,
+        reason = "test helper uses expect for LSP operations"
+    )]
     fn prepare_call_hierarchy_item(
         ctx: &mut TestContext,
         line: u32,
@@ -142,30 +145,22 @@ mod test_impl {
             .expect("first item")
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "test uses expect for LSP operations and assertions"
+    )]
     pub fn prepare_call_hierarchy_finds_function_impl(ctx: &mut TestContext) {
         // Prepare call hierarchy at function `a` (line 0, column 4)
-        let params = CallHierarchyPrepareParams {
-            text_document_position_params: TextDocumentPositionParams {
-                text_document: TextDocumentIdentifier {
-                    uri: ctx.file_uri.clone(),
-                },
-                position: Position::new(0, 4),
-            },
-            work_done_progress_params: WorkDoneProgressParams::default(),
-        };
-
-        let result = ctx
-            .client
-            .prepare_call_hierarchy(params)
-            .expect("prepare call hierarchy");
-
-        let items = result.expect("should find call hierarchy item");
-        assert!(!items.is_empty(), "should have at least one item");
-        assert_eq!(items.first().map(|i| i.name.as_str()), Some("a"));
+        let item = prepare_call_hierarchy_item(ctx, 0, 4);
+        assert_eq!(item.name.as_str(), "a");
 
         ctx.client.shutdown().expect("shutdown");
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "test uses expect for LSP operations and assertions"
+    )]
     pub fn outgoing_calls_returns_callees_impl(ctx: &mut TestContext) {
         let item = prepare_call_hierarchy_item(ctx, 0, 4);
 
@@ -193,6 +188,10 @@ mod test_impl {
         ctx.client.shutdown().expect("shutdown");
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "test uses expect for LSP operations and assertions"
+    )]
     pub fn incoming_calls_returns_callers_impl(ctx: &mut TestContext) {
         let item = prepare_call_hierarchy_item(ctx, 3, 4);
 
@@ -220,6 +219,10 @@ mod test_impl {
         ctx.client.shutdown().expect("shutdown");
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "test uses expect for LSP operations and assertions"
+    )]
     pub fn no_calls_for_standalone_function_impl(ctx: &mut TestContext) {
         let item = prepare_call_hierarchy_item(ctx, 0, 4);
 
