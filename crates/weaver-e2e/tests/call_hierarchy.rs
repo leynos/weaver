@@ -209,12 +209,12 @@ mod test_impl {
         }
     }
 
+    /// Verifies that `prepare_call_hierarchy` correctly identifies function `a`.
     #[expect(
         clippy::expect_used,
         reason = "test uses expect for LSP operations and assertions"
     )]
     pub fn prepare_call_hierarchy_finds_function_impl(ctx: &mut TestContext) {
-        // Prepare call hierarchy at function `a` (line 0, column 4)
         let item = prepare_call_hierarchy_item(ctx, 0, 4);
         assert_eq!(item.name.as_str(), "a");
 
@@ -239,6 +239,7 @@ mod test_impl {
         assert_calls_contain_impl(ctx, item, CallDirection::Incoming, expected_caller);
     }
 
+    /// Verifies that `outgoing_calls` returns callee `b` when called from function `a`.
     #[expect(
         clippy::expect_used,
         reason = "test uses expect for LSP operations and assertions"
@@ -249,6 +250,7 @@ mod test_impl {
         ctx.client.shutdown().expect("shutdown");
     }
 
+    /// Verifies that `incoming_calls` returns caller `a` when querying function `b`.
     #[expect(
         clippy::expect_used,
         reason = "test uses expect for LSP operations and assertions"
@@ -259,6 +261,7 @@ mod test_impl {
         ctx.client.shutdown().expect("shutdown");
     }
 
+    /// Verifies that a standalone function has no incoming or outgoing calls.
     #[expect(
         clippy::expect_used,
         reason = "test uses expect for LSP operations and assertions"
