@@ -9,12 +9,12 @@ doctest = false
 
 [features]
 default = []
-# Enable clap-derived parsers only when needed by consumer crates.
-cli = ["dep:clap"]
+# Placeholder feature for compatibility; clap is now always required.
+cli = []
 
 [dependencies]
 camino.workspace = true
-clap = { workspace = true, optional = true }
+clap.workspace = true
 ortho_config.workspace = true
 serde.workspace = true
 thiserror.workspace = true

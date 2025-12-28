@@ -4,6 +4,8 @@ use std::error::Error;
 use std::fmt;
 
 use lsp_types::{
+    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
+    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     GotoDefinitionParams, GotoDefinitionResponse, ReferenceParams, Uri,
 };
@@ -15,6 +17,7 @@ pub struct ServerCapabilitySet {
     pub(crate) definition: bool,
     pub(crate) references: bool,
     pub(crate) diagnostics: bool,
+    pub(crate) call_hierarchy: bool,
 }
 
 impl ServerCapabilitySet {
@@ -25,7 +28,15 @@ impl ServerCapabilitySet {
             definition,
             references,
             diagnostics,
+            call_hierarchy: false,
         }
+    }
+
+    /// Builds a capability set with call hierarchy support.
+    #[must_use]
+    pub const fn with_call_hierarchy(mut self, supported: bool) -> Self {
+        self.call_hierarchy = supported;
+        self
     }
 
     /// Whether the server reports support for `textDocument/definition`.
@@ -44,6 +55,12 @@ impl ServerCapabilitySet {
     #[must_use]
     pub fn supports_diagnostics(self) -> bool {
         self.diagnostics
+    }
+
+    /// Whether the server reports support for `textDocument/prepareCallHierarchy`.
+    #[must_use]
+    pub fn supports_call_hierarchy(self) -> bool {
+        self.call_hierarchy
     }
 }
 
@@ -120,6 +137,27 @@ pub trait LanguageServer: Send {
     /// Notifies the server that a document has been closed.
     #[doc = include_str!("../docs/language_server_did_close.md")]
     fn did_close(&mut self, params: DidCloseTextDocumentParams) -> Result<(), LanguageServerError>;
+
+    /// Prepares a call hierarchy request at the given position.
+    ///
+    /// This is the first step in the call hierarchy protocol. It returns a list
+    /// of call hierarchy items representing the functions/methods at the position.
+    fn prepare_call_hierarchy(
+        &mut self,
+        params: CallHierarchyPrepareParams,
+    ) -> Result<Option<Vec<CallHierarchyItem>>, LanguageServerError>;
+
+    /// Returns the incoming calls (callers) for the given call hierarchy item.
+    fn incoming_calls(
+        &mut self,
+        params: CallHierarchyIncomingCallsParams,
+    ) -> Result<Option<Vec<CallHierarchyIncomingCall>>, LanguageServerError>;
+
+    /// Returns the outgoing calls (callees) for the given call hierarchy item.
+    fn outgoing_calls(
+        &mut self,
+        params: CallHierarchyOutgoingCallsParams,
+    ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, LanguageServerError>;
 }
 
 impl fmt::Debug for dyn LanguageServer {
