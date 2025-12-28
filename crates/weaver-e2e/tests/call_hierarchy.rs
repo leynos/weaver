@@ -145,6 +145,70 @@ mod test_impl {
             .expect("first item")
     }
 
+    /// Direction for call hierarchy traversal.
+    #[derive(Debug, Clone, Copy)]
+    enum CallDirection {
+        Incoming,
+        Outgoing,
+    }
+
+    /// Common implementation for asserting call hierarchy contains an expected name.
+    #[expect(
+        clippy::expect_used,
+        reason = "test helper uses expect for LSP operations"
+    )]
+    fn assert_calls_contain_impl(
+        ctx: &mut TestContext,
+        item: CallHierarchyItem,
+        direction: CallDirection,
+        expected_name: &str,
+    ) {
+        match direction {
+            CallDirection::Incoming => {
+                let incoming_params = CallHierarchyIncomingCallsParams {
+                    item,
+                    work_done_progress_params: WorkDoneProgressParams::default(),
+                    partial_result_params: lsp_types::PartialResultParams::default(),
+                };
+
+                let calls = ctx
+                    .client
+                    .incoming_calls(incoming_params)
+                    .expect("incoming calls")
+                    .expect("should have incoming calls");
+
+                assert!(!calls.is_empty(), "should have at least one call");
+
+                let caller_names: Vec<_> = calls.iter().map(|c| c.from.name.as_str()).collect();
+                assert!(
+                    caller_names.contains(&expected_name),
+                    "should include call from `{expected_name}`, got: {caller_names:?}"
+                );
+            }
+            CallDirection::Outgoing => {
+                let outgoing_params = CallHierarchyOutgoingCallsParams {
+                    item,
+                    work_done_progress_params: WorkDoneProgressParams::default(),
+                    partial_result_params: lsp_types::PartialResultParams::default(),
+                };
+
+                let calls = ctx
+                    .client
+                    .outgoing_calls(outgoing_params)
+                    .expect("outgoing calls")
+                    .expect("should have outgoing calls");
+
+                assert!(!calls.is_empty(), "should have at least one call");
+
+                let callee_names: Vec<_> = calls.iter().map(|c| c.to.name.as_str()).collect();
+                assert!(
+                    callee_names.contains(&expected_name),
+                    "should include call to `{expected_name}`, got: {callee_names:?}"
+                );
+            }
+        }
+    }
+
     #[expect(
         clippy::expect_used,
         reason = "test uses expect for LSP operations and assertions"
@@ -158,65 +222,21 @@ mod test_impl {
     }
 
     /// Asserts that outgoing calls from the given item include the expected callee.
-    #[expect(
-        clippy::expect_used,
-        reason = "test helper uses expect for LSP operations"
-    )]
     fn assert_outgoing_calls_contain(
         ctx: &mut TestContext,
         item: CallHierarchyItem,
         expected_callee: &str,
     ) {
-        let outgoing_params = CallHierarchyOutgoingCallsParams {
-            item,
-            work_done_progress_params: WorkDoneProgressParams::default(),
-            partial_result_params: lsp_types::PartialResultParams::default(),
-        };
-
-        let calls = ctx
-            .client
-            .outgoing_calls(outgoing_params)
-            .expect("outgoing calls")
-            .expect("should have outgoing calls");
-
-        assert!(!calls.is_empty(), "should have at least one call");
-
-        let callee_names: Vec<_> = calls.iter().map(|c| c.to.name.as_str()).collect();
-        assert!(
-            callee_names.contains(&expected_callee),
-            "should include call to `{expected_callee}`, got: {callee_names:?}"
-        );
+        assert_calls_contain_impl(ctx, item, CallDirection::Outgoing, expected_callee);
     }
 
     /// Asserts that incoming calls to the given item include the expected caller.
-    #[expect(
-        clippy::expect_used,
-        reason = "test helper uses expect for LSP operations"
-    )]
     fn assert_incoming_calls_contain(
         ctx: &mut TestContext,
         item: CallHierarchyItem,
         expected_caller: &str,
     ) {
-        let incoming_params = CallHierarchyIncomingCallsParams {
-            item,
-            work_done_progress_params: WorkDoneProgressParams::default(),
-            partial_result_params: lsp_types::PartialResultParams::default(),
-        };
-
-        let calls = ctx
-            .client
-            .incoming_calls(incoming_params)
-            .expect("incoming calls")
-            .expect("should have incoming calls");
-
-        assert!(!calls.is_empty(), "should have at least one call");
-
-        let caller_names: Vec<_> = calls.iter().map(|c| c.from.name.as_str()).collect();
-        assert!(
-            caller_names.contains(&expected_caller),
-            "should include call from `{expected_caller}`, got: {caller_names:?}"
-        );
+        assert_calls_contain_impl(ctx, item, CallDirection::Incoming, expected_caller);
     }
 
     #[expect(
