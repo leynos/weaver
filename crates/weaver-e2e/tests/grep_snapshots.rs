@@ -10,6 +10,19 @@ use weaver_syntax::{Parser, Pattern, SupportedLanguage};
 
 use weaver_e2e::fixtures;
 
+/// Test error type for grep snapshot tests.
+#[derive(Debug, thiserror::Error)]
+enum TestError {
+    #[error("parser creation failed: {0}")]
+    ParserCreation(String),
+
+    #[error("parsing failed: {0}")]
+    Parsing(String),
+
+    #[error("pattern compilation failed: {0}")]
+    PatternCompilation(String),
+}
+
 /// Represents a single match result for snapshot comparison.
 ///
 /// Uses `BTreeMap` for deterministic ordering in snapshots.
@@ -38,17 +51,21 @@ struct MatchSnapshot {
 }
 
 /// Helper to find all matches and convert to snapshot-friendly format.
-#[expect(
-    clippy::expect_used,
-    reason = "test helper uses expect for infallible test operations"
-)]
-fn find_matches(source: &str, pattern: &str, language: SupportedLanguage) -> Vec<MatchSnapshot> {
-    let mut parser = Parser::new(language).expect("parser creation should succeed");
-    let parsed = parser.parse(source).expect("parsing should succeed");
+fn find_matches(
+    source: &str,
+    pattern: &str,
+    language: SupportedLanguage,
+) -> Result<Vec<MatchSnapshot>, TestError> {
+    let mut parser =
+        Parser::new(language).map_err(|e| TestError::ParserCreation(e.to_string()))?;
+    let parsed = parser
+        .parse(source)
+        .map_err(|e| TestError::Parsing(e.to_string()))?;
 
-    let compiled = Pattern::compile(pattern, language).expect("pattern compilation should succeed");
+    let compiled = Pattern::compile(pattern, language)
+        .map_err(|e| TestError::PatternCompilation(e.to_string()))?;
 
-    compiled
+    Ok(compiled
         .find_all(&parsed)
         .into_iter()
         .map(|m| MatchSnapshot {
@@ -61,7 +78,7 @@ fn find_matches(source: &str, pattern: &str, language: SupportedLanguage) -> Vec
                 .map(|(k, v)| (k.clone(), v.text().to_owned()))
                 .collect(),
         })
-        .collect()
+        .collect())
 }
 
 // =============================================================================
@@ -69,74 +86,81 @@ fn find_matches(source: &str, pattern: &str, language: SupportedLanguage) -> Vec
 // =============================================================================
 
 #[test]
-fn grep_rust_function_definitions() {
+fn grep_rust_function_definitions() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::RUST_FUNCTIONS,
         "fn $NAME() { $$$BODY }",
         SupportedLanguage::Rust,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_rust_function_with_params() {
+fn grep_rust_function_with_params() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::RUST_FUNCTIONS,
         "fn $NAME($$$PARAMS) -> $RET { $$$BODY }",
         SupportedLanguage::Rust,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_rust_let_bindings() {
+fn grep_rust_let_bindings() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::RUST_LET_BINDINGS,
         "let $VAR = $VAL",
         SupportedLanguage::Rust,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_rust_println_macro() {
+fn grep_rust_println_macro() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::RUST_PRINTLN,
         "println!($$$ARGS)",
         SupportedLanguage::Rust,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_rust_dbg_macro() {
+fn grep_rust_dbg_macro() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::RUST_DEBUG_MACROS,
         "dbg!($EXPR)",
         SupportedLanguage::Rust,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_rust_struct_expression() {
+fn grep_rust_struct_expression() -> Result<(), TestError> {
     // Match struct instantiation expressions like Point { x: 0, y: 0 }
     let matches = find_matches(
         "let p = Point { x: 0, y: 0 };",
         "Point { x: $X, y: $Y }",
         SupportedLanguage::Rust,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_rust_no_matches() {
+fn grep_rust_no_matches() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::RUST_FUNCTIONS,
         "enum $NAME { $$$VARIANTS }",
         SupportedLanguage::Rust,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 // =============================================================================
@@ -144,63 +168,69 @@ fn grep_rust_no_matches() {
 // =============================================================================
 
 #[test]
-fn grep_python_function_definitions() {
+fn grep_python_function_definitions() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::PYTHON_FUNCTIONS,
         "def $NAME($$$ARGS):",
         SupportedLanguage::Python,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_python_print_calls() {
+fn grep_python_print_calls() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::PYTHON_PRINTS,
         "print($$$ARGS)",
         SupportedLanguage::Python,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_python_method_definitions() {
+fn grep_python_method_definitions() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::PYTHON_CLASS,
         "def $NAME(self, $$$ARGS):",
         SupportedLanguage::Python,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_python_self_method_calls() {
+fn grep_python_self_method_calls() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::PYTHON_CLASS,
         "self.$METHOD($$$ARGS)",
         SupportedLanguage::Python,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_python_class_definition() {
+fn grep_python_class_definition() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::PYTHON_CLASS,
         "class $NAME:",
         SupportedLanguage::Python,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_python_no_matches() {
+fn grep_python_no_matches() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::PYTHON_FUNCTIONS,
         "import $MODULE",
         SupportedLanguage::Python,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 // =============================================================================
@@ -208,74 +238,81 @@ fn grep_python_no_matches() {
 // =============================================================================
 
 #[test]
-fn grep_typescript_function_declarations() {
+fn grep_typescript_function_declarations() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::TYPESCRIPT_FUNCTIONS,
         "function $NAME($$$PARAMS): $RET { $$$BODY }",
         SupportedLanguage::TypeScript,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_typescript_console_log() {
+fn grep_typescript_console_log() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::TYPESCRIPT_CONSOLE,
         "console.log($$$ARGS)",
         SupportedLanguage::TypeScript,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_typescript_arrow_functions() {
+fn grep_typescript_arrow_functions() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::TYPESCRIPT_ARROW_FUNCTIONS,
         "const $NAME = ($$$PARAMS): $RET => $$$BODY",
         SupportedLanguage::TypeScript,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_typescript_interface_definitions() {
+fn grep_typescript_interface_definitions() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::TYPESCRIPT_INTERFACES,
         "interface $NAME { $$$MEMBERS }",
         SupportedLanguage::TypeScript,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_typescript_var_declarations() {
+fn grep_typescript_var_declarations() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::TYPESCRIPT_VAR_DECLARATIONS,
         "var $VAR = $VAL",
         SupportedLanguage::TypeScript,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_typescript_new_expression() {
+fn grep_typescript_new_expression() -> Result<(), TestError> {
     // Match new expressions
     let matches = find_matches(
         fixtures::TYPESCRIPT_CLASS,
         "new Calculator()",
         SupportedLanguage::TypeScript,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 #[test]
-fn grep_typescript_no_matches() {
+fn grep_typescript_no_matches() -> Result<(), TestError> {
     let matches = find_matches(
         fixtures::TYPESCRIPT_FUNCTIONS,
         "type $NAME = $$$DEFINITION",
         SupportedLanguage::TypeScript,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }
 
 // =============================================================================
@@ -283,33 +320,35 @@ fn grep_typescript_no_matches() {
 // =============================================================================
 
 #[test]
-fn grep_cross_language_function_patterns() {
+fn grep_cross_language_function_patterns() -> Result<(), TestError> {
     let rust = find_matches(
         "fn hello() { println!(\"hi\"); }",
         "fn $NAME() { $$$BODY }",
         SupportedLanguage::Rust,
-    );
+    )?;
     let python = find_matches(
         "def hello():\n    print(\"hi\")",
         "def $NAME():",
         SupportedLanguage::Python,
-    );
+    )?;
     let typescript = find_matches(
         "function hello(): void { console.log(\"hi\"); }",
         "function $NAME(): void { $$$BODY }",
         SupportedLanguage::TypeScript,
-    );
+    )?;
 
     assert_debug_snapshot!((rust, python, typescript));
+    Ok(())
 }
 
 #[test]
-fn grep_wildcard_patterns() {
+fn grep_wildcard_patterns() -> Result<(), TestError> {
     // Using $_ as wildcard (matches but doesn't capture)
     let matches = find_matches(
         fixtures::RUST_LET_BINDINGS,
         "let $_ = $_",
         SupportedLanguage::Rust,
-    );
+    )?;
     assert_debug_snapshot!(matches);
+    Ok(())
 }

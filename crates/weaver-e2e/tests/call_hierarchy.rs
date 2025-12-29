@@ -14,17 +14,49 @@ use tempfile::TempDir;
 use url::Url;
 
 use weaver_e2e::fixtures;
-use weaver_e2e::lsp_client::LspClient;
+use weaver_e2e::lsp_client::{LspClient, LspClientError};
 use weaver_e2e::pyrefly_available;
 
+/// Test error type for call hierarchy tests.
+#[derive(Debug, thiserror::Error)]
+enum TestError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("LSP client error: {0}")]
+    LspClient(#[from] LspClientError),
+
+    #[error("invalid file path: cannot convert to URI")]
+    InvalidFilePath,
+
+    #[error("invalid URI: {0}")]
+    InvalidUri(String),
+
+    #[error("no call hierarchy items returned")]
+    NoCallHierarchyItems,
+
+    #[error("expected call to `{expected}` not found, got: {actual:?}")]
+    ExpectedCallNotFound {
+        expected: String,
+        actual: Vec<String>,
+    },
+
+    #[error("expected at least one call")]
+    NoCallsFound,
+
+    #[error("unexpected function name: expected `{expected}`, got `{actual}`")]
+    UnexpectedFunctionName { expected: String, actual: String },
+
+    #[error("expected no callers, but found {count}")]
+    UnexpectedCallers { count: usize },
+}
+
 /// Creates a file URI from a path, handling cross-platform differences correctly.
-#[expect(
-    clippy::expect_used,
-    reason = "test helper uses expect for infallible conversions"
-)]
-fn file_uri(path: &Path) -> Uri {
-    let url = Url::from_file_path(path).expect("valid file path");
-    url.as_str().parse().expect("valid URI")
+fn file_uri(path: &Path) -> Result<Uri, TestError> {
+    let url = Url::from_file_path(path).map_err(|()| TestError::InvalidFilePath)?;
+    url.as_str()
+        .parse()
+        .map_err(|_| TestError::InvalidUri(url.to_string()))
 }
 
 /// Skips the test if Pyrefly is not available.
@@ -34,7 +66,7 @@ macro_rules! require_pyrefly {
             eprintln!(
                 "Skipping test: Pyrefly not available (install with `uv tool install pyrefly`)"
             );
-            return;
+            return Ok(());
         }
     };
 }
@@ -51,61 +83,75 @@ macro_rules! run_test_with_context {
         let Some(ctx) = $fixture.as_mut() else {
             panic!("context should exist when pyrefly is available");
         };
-        $impl_fn(ctx);
+        $impl_fn(ctx)
     }};
 }
 
 /// Test context containing an initialized LSP client and file URIs.
+///
+/// Implements `Drop` to ensure the LSP client is shut down even on early panics.
 struct TestContext {
     client: LspClient,
     file_uri: Uri,
     _temp_dir: TempDir,
 }
 
+impl Drop for TestContext {
+    fn drop(&mut self) {
+        // Attempt to shut down the client gracefully; ignore errors since
+        // we may be dropping due to a panic or the server may have crashed.
+        drop(self.client.shutdown());
+    }
+}
+
 /// Module containing fixtures for call hierarchy tests.
+#[expect(
+    clippy::expect_used,
+    reason = "fixture setup uses expect to panic on failure for clear test diagnostics"
+)]
 mod fixtures_impl {
     use super::*;
 
     /// Creates a test context with a Python fixture file opened in Pyrefly.
-    #[expect(
-        clippy::expect_used,
-        reason = "fixture setup uses expect for infallible operations"
-    )]
-    fn create_test_context(fixture_content: &str) -> Option<TestContext> {
+    fn create_test_context(fixture_content: &str) -> Result<Option<TestContext>, TestError> {
         if !pyrefly_available() {
-            return None;
+            return Ok(None);
         }
 
-        let temp_dir = TempDir::new().expect("create temp dir");
+        let temp_dir = TempDir::new()?;
         let file_path = temp_dir.path().join("test.py");
-        std::fs::write(&file_path, fixture_content).expect("write test file");
+        std::fs::write(&file_path, fixture_content)?;
 
-        let root_uri = file_uri(temp_dir.path());
-        let file_uri_val = file_uri(&file_path);
+        let root_uri = file_uri(temp_dir.path())?;
+        let file_uri_val = file_uri(&file_path)?;
 
-        let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"]).expect("spawn pyrefly");
-        client.initialize(root_uri).expect("initialize");
-        client
-            .did_open(file_uri_val.clone(), "python", fixture_content)
-            .expect("open file");
+        let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"])?;
+        client.initialize(root_uri)?;
+        client.did_open(file_uri_val.clone(), "python", fixture_content)?;
 
-        Some(TestContext {
+        Ok(Some(TestContext {
             client,
             file_uri: file_uri_val,
             _temp_dir: temp_dir,
-        })
+        }))
     }
 
     /// Creates a test context with a linear call chain fixture opened in Pyrefly.
+    ///
+    /// # Panics
+    /// Panics if the test context cannot be created (e.g., spawn or initialization fails).
     #[fixture]
     pub fn linear_chain_context() -> Option<TestContext> {
-        create_test_context(fixtures::LINEAR_CHAIN)
+        create_test_context(fixtures::LINEAR_CHAIN).expect("failed to create test context")
     }
 
     /// Creates a test context for standalone function tests.
+    ///
+    /// # Panics
+    /// Panics if the test context cannot be created (e.g., spawn or initialization fails).
     #[fixture]
     pub fn no_calls_context() -> Option<TestContext> {
-        create_test_context(fixtures::NO_CALLS)
+        create_test_context(fixtures::NO_CALLS).expect("failed to create test context")
     }
 }
 
@@ -117,15 +163,11 @@ mod test_impl {
     use lsp_types::CallHierarchyItem;
 
     /// Prepares call hierarchy at the given position and returns the first item.
-    #[expect(
-        clippy::expect_used,
-        reason = "test helper uses expect for LSP operations"
-    )]
     fn prepare_call_hierarchy_item(
         ctx: &mut TestContext,
         line: u32,
         column: u32,
-    ) -> CallHierarchyItem {
+    ) -> Result<CallHierarchyItem, TestError> {
         let prepare_params = CallHierarchyPrepareParams {
             text_document_position_params: TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier {
@@ -137,12 +179,11 @@ mod test_impl {
         };
 
         ctx.client
-            .prepare_call_hierarchy(prepare_params)
-            .expect("prepare")
-            .expect("items")
+            .prepare_call_hierarchy(prepare_params)?
+            .ok_or(TestError::NoCallHierarchyItems)?
             .into_iter()
             .next()
-            .expect("first item")
+            .ok_or(TestError::NoCallHierarchyItems)
     }
 
     /// Direction for call hierarchy traversal.
@@ -153,16 +194,12 @@ mod test_impl {
     }
 
     /// Common implementation for asserting call hierarchy contains an expected name.
-    #[expect(
-        clippy::expect_used,
-        reason = "test helper uses expect for LSP operations"
-    )]
     fn assert_calls_contain_impl(
         ctx: &mut TestContext,
         item: CallHierarchyItem,
         direction: CallDirection,
         expected_name: &str,
-    ) {
+    ) -> Result<(), TestError> {
         match direction {
             CallDirection::Incoming => {
                 let incoming_params = CallHierarchyIncomingCallsParams {
@@ -173,17 +210,21 @@ mod test_impl {
 
                 let calls = ctx
                     .client
-                    .incoming_calls(incoming_params)
-                    .expect("incoming calls")
-                    .expect("should have incoming calls");
+                    .incoming_calls(incoming_params)?
+                    .ok_or(TestError::NoCallsFound)?;
 
-                assert!(!calls.is_empty(), "should have at least one call");
+                if calls.is_empty() {
+                    return Err(TestError::NoCallsFound);
+                }
 
-                let caller_names: Vec<_> = calls.iter().map(|c| c.from.name.as_str()).collect();
-                assert!(
-                    caller_names.contains(&expected_name),
-                    "should include call from `{expected_name}`, got: {caller_names:?}"
-                );
+                let caller_names: Vec<_> =
+                    calls.iter().map(|c| c.from.name.clone()).collect();
+                if !caller_names.iter().any(|n| n == expected_name) {
+                    return Err(TestError::ExpectedCallNotFound {
+                        expected: expected_name.to_owned(),
+                        actual: caller_names,
+                    });
+                }
             }
             CallDirection::Outgoing => {
                 let outgoing_params = CallHierarchyOutgoingCallsParams {
@@ -194,31 +235,37 @@ mod test_impl {
 
                 let calls = ctx
                     .client
-                    .outgoing_calls(outgoing_params)
-                    .expect("outgoing calls")
-                    .expect("should have outgoing calls");
+                    .outgoing_calls(outgoing_params)?
+                    .ok_or(TestError::NoCallsFound)?;
 
-                assert!(!calls.is_empty(), "should have at least one call");
+                if calls.is_empty() {
+                    return Err(TestError::NoCallsFound);
+                }
 
-                let callee_names: Vec<_> = calls.iter().map(|c| c.to.name.as_str()).collect();
-                assert!(
-                    callee_names.contains(&expected_name),
-                    "should include call to `{expected_name}`, got: {callee_names:?}"
-                );
+                let callee_names: Vec<_> = calls.iter().map(|c| c.to.name.clone()).collect();
+                if !callee_names.iter().any(|n| n == expected_name) {
+                    return Err(TestError::ExpectedCallNotFound {
+                        expected: expected_name.to_owned(),
+                        actual: callee_names,
+                    });
+                }
             }
         }
+        Ok(())
     }
 
     /// Verifies that `prepare_call_hierarchy` correctly identifies function `a`.
-    #[expect(
-        clippy::expect_used,
-        reason = "test uses expect for LSP operations and assertions"
-    )]
-    pub fn prepare_call_hierarchy_finds_function_impl(ctx: &mut TestContext) {
-        let item = prepare_call_hierarchy_item(ctx, 0, 4);
-        assert_eq!(item.name.as_str(), "a");
-
-        ctx.client.shutdown().expect("shutdown");
+    pub fn prepare_call_hierarchy_finds_function_impl(
+        ctx: &mut TestContext,
+    ) -> Result<(), TestError> {
+        let item = prepare_call_hierarchy_item(ctx, 0, 4)?;
+        if item.name.as_str() != "a" {
+            return Err(TestError::UnexpectedFunctionName {
+                expected: "a".to_owned(),
+                actual: item.name.clone(),
+            });
+        }
+        Ok(())
     }
 
     /// Asserts that outgoing calls from the given item include the expected callee.
@@ -226,8 +273,8 @@ mod test_impl {
         ctx: &mut TestContext,
         item: CallHierarchyItem,
         expected_callee: &str,
-    ) {
-        assert_calls_contain_impl(ctx, item, CallDirection::Outgoing, expected_callee);
+    ) -> Result<(), TestError> {
+        assert_calls_contain_impl(ctx, item, CallDirection::Outgoing, expected_callee)
     }
 
     /// Asserts that incoming calls to the given item include the expected caller.
@@ -235,39 +282,25 @@ mod test_impl {
         ctx: &mut TestContext,
         item: CallHierarchyItem,
         expected_caller: &str,
-    ) {
-        assert_calls_contain_impl(ctx, item, CallDirection::Incoming, expected_caller);
+    ) -> Result<(), TestError> {
+        assert_calls_contain_impl(ctx, item, CallDirection::Incoming, expected_caller)
     }
 
     /// Verifies that `outgoing_calls` returns callee `b` when called from function `a`.
-    #[expect(
-        clippy::expect_used,
-        reason = "test uses expect for LSP operations and assertions"
-    )]
-    pub fn outgoing_calls_returns_callees_impl(ctx: &mut TestContext) {
-        let item = prepare_call_hierarchy_item(ctx, 0, 4);
-        assert_outgoing_calls_contain(ctx, item, "b");
-        ctx.client.shutdown().expect("shutdown");
+    pub fn outgoing_calls_returns_callees_impl(ctx: &mut TestContext) -> Result<(), TestError> {
+        let item = prepare_call_hierarchy_item(ctx, 0, 4)?;
+        assert_outgoing_calls_contain(ctx, item, "b")
     }
 
     /// Verifies that `incoming_calls` returns caller `a` when querying function `b`.
-    #[expect(
-        clippy::expect_used,
-        reason = "test uses expect for LSP operations and assertions"
-    )]
-    pub fn incoming_calls_returns_callers_impl(ctx: &mut TestContext) {
-        let item = prepare_call_hierarchy_item(ctx, 3, 4);
-        assert_incoming_calls_contain(ctx, item, "a");
-        ctx.client.shutdown().expect("shutdown");
+    pub fn incoming_calls_returns_callers_impl(ctx: &mut TestContext) -> Result<(), TestError> {
+        let item = prepare_call_hierarchy_item(ctx, 3, 4)?;
+        assert_incoming_calls_contain(ctx, item, "a")
     }
 
     /// Verifies that a standalone function has no incoming or outgoing calls.
-    #[expect(
-        clippy::expect_used,
-        reason = "test uses expect for LSP operations and assertions"
-    )]
-    pub fn no_calls_for_standalone_function_impl(ctx: &mut TestContext) {
-        let item = prepare_call_hierarchy_item(ctx, 0, 4);
+    pub fn no_calls_for_standalone_function_impl(ctx: &mut TestContext) -> Result<(), TestError> {
+        let item = prepare_call_hierarchy_item(ctx, 0, 4)?;
 
         // Check incoming calls - should be empty or None
         let incoming_params = CallHierarchyIncomingCallsParams {
@@ -276,13 +309,14 @@ mod test_impl {
             partial_result_params: lsp_types::PartialResultParams::default(),
         };
 
-        let incoming = ctx
-            .client
-            .incoming_calls(incoming_params)
-            .expect("incoming calls");
+        let incoming = ctx.client.incoming_calls(incoming_params)?;
 
         let incoming_count = incoming.map_or(0, |c| c.len());
-        assert_eq!(incoming_count, 0, "standalone should have no callers");
+        if incoming_count != 0 {
+            return Err(TestError::UnexpectedCallers {
+                count: incoming_count,
+            });
+        }
 
         // Check outgoing calls - should be empty or None (no user-defined function calls)
         // Note: outgoing may include built-in function calls, so we just check it doesn't error
@@ -292,42 +326,47 @@ mod test_impl {
             partial_result_params: lsp_types::PartialResultParams::default(),
         };
 
-        ctx.client
-            .outgoing_calls(outgoing_params)
-            .expect("outgoing calls");
-
-        ctx.client.shutdown().expect("shutdown");
+        ctx.client.outgoing_calls(outgoing_params)?;
+        Ok(())
     }
 }
 
 #[rstest]
-fn prepare_call_hierarchy_finds_function(mut linear_chain_context: Option<TestContext>) {
+fn prepare_call_hierarchy_finds_function(
+    mut linear_chain_context: Option<TestContext>,
+) -> Result<(), TestError> {
     run_test_with_context!(
         linear_chain_context,
         test_impl::prepare_call_hierarchy_finds_function_impl
-    );
+    )
 }
 
 #[rstest]
-fn outgoing_calls_returns_callees(mut linear_chain_context: Option<TestContext>) {
+fn outgoing_calls_returns_callees(
+    mut linear_chain_context: Option<TestContext>,
+) -> Result<(), TestError> {
     run_test_with_context!(
         linear_chain_context,
         test_impl::outgoing_calls_returns_callees_impl
-    );
+    )
 }
 
 #[rstest]
-fn incoming_calls_returns_callers(mut linear_chain_context: Option<TestContext>) {
+fn incoming_calls_returns_callers(
+    mut linear_chain_context: Option<TestContext>,
+) -> Result<(), TestError> {
     run_test_with_context!(
         linear_chain_context,
         test_impl::incoming_calls_returns_callers_impl
-    );
+    )
 }
 
 #[rstest]
-fn no_calls_for_standalone_function(mut no_calls_context: Option<TestContext>) {
+fn no_calls_for_standalone_function(
+    mut no_calls_context: Option<TestContext>,
+) -> Result<(), TestError> {
     run_test_with_context!(
         no_calls_context,
         test_impl::no_calls_for_standalone_function_impl
-    );
+    )
 }

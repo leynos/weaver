@@ -12,17 +12,31 @@ use tempfile::TempDir;
 use url::Url;
 
 use weaver_e2e::fixtures;
-use weaver_e2e::lsp_client::LspClient;
+use weaver_e2e::lsp_client::{LspClient, LspClientError};
 use weaver_e2e::pyrefly_available;
 
+/// Test error type for definition snapshot tests.
+#[derive(Debug, thiserror::Error)]
+enum TestError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("LSP client error: {0}")]
+    LspClient(#[from] LspClientError),
+
+    #[error("invalid file path: cannot convert to URI")]
+    InvalidFilePath,
+
+    #[error("invalid URI: {0}")]
+    InvalidUri(String),
+}
+
 /// Creates a file URI from a path, handling cross-platform differences correctly.
-#[expect(
-    clippy::expect_used,
-    reason = "test helper uses expect for infallible conversions"
-)]
-fn file_uri(path: &Path) -> Uri {
-    let url = Url::from_file_path(path).expect("valid file path");
-    url.as_str().parse().expect("valid URI")
+fn file_uri(path: &Path) -> Result<Uri, TestError> {
+    let url = Url::from_file_path(path).map_err(|()| TestError::InvalidFilePath)?;
+    url.as_str()
+        .parse()
+        .map_err(|_| TestError::InvalidUri(url.to_string()))
 }
 
 /// Skips the test if Pyrefly is not available.
@@ -32,7 +46,7 @@ macro_rules! require_pyrefly {
             eprintln!(
                 "Skipping test: Pyrefly not available (install with `uv tool install pyrefly`)"
             );
-            return;
+            return Ok(());
         }
     };
 }
@@ -44,7 +58,7 @@ macro_rules! run_test_with_context {
         let Some(ctx) = $fixture.as_mut() else {
             panic!("context should exist when pyrefly is available");
         };
-        $impl_fn(ctx);
+        $impl_fn(ctx)
     }};
 }
 
@@ -164,55 +178,62 @@ impl From<Option<GotoDefinitionResponse>> for DefinitionSnapshot {
 }
 
 /// Module containing fixtures for definition tests.
+#[expect(
+    clippy::expect_used,
+    reason = "fixture setup uses expect to panic on failure for clear test diagnostics"
+)]
 mod fixtures_impl {
     use super::*;
 
     /// Creates a test context with a Python fixture file opened in Pyrefly.
-    #[expect(
-        clippy::expect_used,
-        reason = "fixture setup uses expect for infallible operations"
-    )]
-    fn create_test_context(fixture_content: &str) -> Option<TestContext> {
+    fn create_test_context(fixture_content: &str) -> Result<Option<TestContext>, TestError> {
         if !pyrefly_available() {
-            return None;
+            return Ok(None);
         }
 
-        let temp_dir = TempDir::new().expect("create temp dir");
+        let temp_dir = TempDir::new()?;
         let file_path = temp_dir.path().join("test.py");
-        std::fs::write(&file_path, fixture_content).expect("write test file");
+        std::fs::write(&file_path, fixture_content)?;
 
-        let root_uri = file_uri(temp_dir.path());
-        let file_uri_val = file_uri(&file_path);
+        let root_uri = file_uri(temp_dir.path())?;
+        let file_uri_val = file_uri(&file_path)?;
 
-        let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"]).expect("spawn pyrefly");
-        client.initialize(root_uri).expect("initialize");
-        client
-            .did_open(file_uri_val.clone(), "python", fixture_content)
-            .expect("open file");
+        let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"])?;
+        client.initialize(root_uri)?;
+        client.did_open(file_uri_val.clone(), "python", fixture_content)?;
 
-        Some(TestContext {
+        Ok(Some(TestContext {
             client,
             file_uri: file_uri_val,
             _temp_dir: temp_dir,
-        })
+        }))
     }
 
     /// Creates a test context with a linear call chain fixture.
+    ///
+    /// # Panics
+    /// Panics if the test context cannot be created (e.g., spawn or initialization fails).
     #[fixture]
     pub fn linear_chain_context() -> Option<TestContext> {
-        create_test_context(fixtures::LINEAR_CHAIN)
+        create_test_context(fixtures::LINEAR_CHAIN).expect("failed to create test context")
     }
 
     /// Creates a test context with Python class fixture.
+    ///
+    /// # Panics
+    /// Panics if the test context cannot be created (e.g., spawn or initialization fails).
     #[fixture]
     pub fn python_class_context() -> Option<TestContext> {
-        create_test_context(fixtures::PYTHON_CLASS)
+        create_test_context(fixtures::PYTHON_CLASS).expect("failed to create test context")
     }
 
     /// Creates a test context with Python functions fixture.
+    ///
+    /// # Panics
+    /// Panics if the test context cannot be created (e.g., spawn or initialization fails).
     #[fixture]
     pub fn python_functions_context() -> Option<TestContext> {
-        create_test_context(fixtures::PYTHON_FUNCTIONS)
+        create_test_context(fixtures::PYTHON_FUNCTIONS).expect("failed to create test context")
     }
 }
 
@@ -223,71 +244,75 @@ mod test_impl {
     use super::*;
 
     /// Gets definition at the given position and returns a snapshot.
-    #[expect(
-        clippy::expect_used,
-        reason = "test helper uses expect for LSP operations"
-    )]
     fn get_definition_snapshot(
         ctx: &mut TestContext,
         line: u32,
         character: u32,
-    ) -> DefinitionSnapshot {
-        let response = ctx
-            .client
-            .goto_definition_at(&ctx.file_uri, line, character)
-            .expect("goto_definition");
-        DefinitionSnapshot::from(response)
+    ) -> Result<DefinitionSnapshot, TestError> {
+        let response = ctx.client.goto_definition_at(&ctx.file_uri, line, character)?;
+        Ok(DefinitionSnapshot::from(response))
     }
 
     /// Tests definition lookup from a function call to its definition.
-    pub fn definition_from_call_to_function_impl(ctx: &mut TestContext) {
+    pub fn definition_from_call_to_function_impl(
+        ctx: &mut TestContext,
+    ) -> Result<(), TestError> {
         // In LINEAR_CHAIN: def a() calls b() on line 1, character ~4
         // b() is defined on line 3
-        let snapshot = get_definition_snapshot(ctx, 1, 4);
+        let snapshot = get_definition_snapshot(ctx, 1, 4)?;
         assert_debug_snapshot!("definition_from_call_to_function", snapshot);
+        Ok(())
     }
 
     /// Tests definition lookup for a function name at its definition site.
-    pub fn definition_at_function_definition_impl(ctx: &mut TestContext) {
+    pub fn definition_at_function_definition_impl(
+        ctx: &mut TestContext,
+    ) -> Result<(), TestError> {
         // In LINEAR_CHAIN: def a() is on line 0, character 4
-        let snapshot = get_definition_snapshot(ctx, 0, 4);
+        let snapshot = get_definition_snapshot(ctx, 0, 4)?;
         assert_debug_snapshot!("definition_at_function_definition", snapshot);
+        Ok(())
     }
 
     /// Tests definition lookup for a method call on self.
-    pub fn definition_self_method_call_impl(ctx: &mut TestContext) {
+    pub fn definition_self_method_call_impl(ctx: &mut TestContext) -> Result<(), TestError> {
         // In PYTHON_CLASS: self.validate() is called on line 2
         // validate is defined on line 5
-        let snapshot = get_definition_snapshot(ctx, 2, 25);
+        let snapshot = get_definition_snapshot(ctx, 2, 25)?;
         assert_debug_snapshot!("definition_self_method_call", snapshot);
+        Ok(())
     }
 
     /// Tests definition lookup for a class method definition.
-    pub fn definition_class_method_impl(ctx: &mut TestContext) {
+    pub fn definition_class_method_impl(ctx: &mut TestContext) -> Result<(), TestError> {
         // In PYTHON_CLASS: def process(self, data) on line 1
-        let snapshot = get_definition_snapshot(ctx, 1, 8);
+        let snapshot = get_definition_snapshot(ctx, 1, 8)?;
         assert_debug_snapshot!("definition_class_method", snapshot);
+        Ok(())
     }
 
     /// Tests definition lookup for the class name.
-    pub fn definition_class_name_impl(ctx: &mut TestContext) {
+    pub fn definition_class_name_impl(ctx: &mut TestContext) -> Result<(), TestError> {
         // In PYTHON_CLASS: class Service on line 0
-        let snapshot = get_definition_snapshot(ctx, 0, 6);
+        let snapshot = get_definition_snapshot(ctx, 0, 6)?;
         assert_debug_snapshot!("definition_class_name", snapshot);
+        Ok(())
     }
 
     /// Tests definition lookup for a parameter.
-    pub fn definition_parameter_impl(ctx: &mut TestContext) {
+    pub fn definition_parameter_impl(ctx: &mut TestContext) -> Result<(), TestError> {
         // In PYTHON_FUNCTIONS: def greet(name) - name parameter on line 0
-        let snapshot = get_definition_snapshot(ctx, 0, 10);
+        let snapshot = get_definition_snapshot(ctx, 0, 10)?;
         assert_debug_snapshot!("definition_parameter", snapshot);
+        Ok(())
     }
 
     /// Tests definition lookup on whitespace (should return None).
-    pub fn definition_on_whitespace_impl(ctx: &mut TestContext) {
+    pub fn definition_on_whitespace_impl(ctx: &mut TestContext) -> Result<(), TestError> {
         // Position on whitespace/indentation
-        let snapshot = get_definition_snapshot(ctx, 1, 0);
+        let snapshot = get_definition_snapshot(ctx, 1, 0)?;
         assert_debug_snapshot!("definition_on_whitespace", snapshot);
+        Ok(())
     }
 }
 
@@ -296,54 +321,68 @@ mod test_impl {
 // =============================================================================
 
 #[rstest]
-fn definition_from_call_to_function(mut linear_chain_context: Option<TestContext>) {
+fn definition_from_call_to_function(
+    mut linear_chain_context: Option<TestContext>,
+) -> Result<(), TestError> {
     run_test_with_context!(
         linear_chain_context,
         test_impl::definition_from_call_to_function_impl
-    );
+    )
 }
 
 #[rstest]
-fn definition_at_function_definition(mut linear_chain_context: Option<TestContext>) {
+fn definition_at_function_definition(
+    mut linear_chain_context: Option<TestContext>,
+) -> Result<(), TestError> {
     run_test_with_context!(
         linear_chain_context,
         test_impl::definition_at_function_definition_impl
-    );
+    )
 }
 
 #[rstest]
-fn definition_self_method_call(mut python_class_context: Option<TestContext>) {
+fn definition_self_method_call(
+    mut python_class_context: Option<TestContext>,
+) -> Result<(), TestError> {
     run_test_with_context!(
         python_class_context,
         test_impl::definition_self_method_call_impl
-    );
+    )
 }
 
 #[rstest]
-fn definition_class_method(mut python_class_context: Option<TestContext>) {
+fn definition_class_method(
+    mut python_class_context: Option<TestContext>,
+) -> Result<(), TestError> {
     run_test_with_context!(
         python_class_context,
         test_impl::definition_class_method_impl
-    );
+    )
 }
 
 #[rstest]
-fn definition_class_name(mut python_class_context: Option<TestContext>) {
-    run_test_with_context!(python_class_context, test_impl::definition_class_name_impl);
+fn definition_class_name(
+    mut python_class_context: Option<TestContext>,
+) -> Result<(), TestError> {
+    run_test_with_context!(python_class_context, test_impl::definition_class_name_impl)
 }
 
 #[rstest]
-fn definition_parameter(mut python_functions_context: Option<TestContext>) {
+fn definition_parameter(
+    mut python_functions_context: Option<TestContext>,
+) -> Result<(), TestError> {
     run_test_with_context!(
         python_functions_context,
         test_impl::definition_parameter_impl
-    );
+    )
 }
 
 #[rstest]
-fn definition_on_whitespace(mut linear_chain_context: Option<TestContext>) {
+fn definition_on_whitespace(
+    mut linear_chain_context: Option<TestContext>,
+) -> Result<(), TestError> {
     run_test_with_context!(
         linear_chain_context,
         test_impl::definition_on_whitespace_impl
-    );
+    )
 }
