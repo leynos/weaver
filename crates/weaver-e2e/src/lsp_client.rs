@@ -18,6 +18,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use thiserror::Error;
 
+use crate::jsonrpc::{Notification, Request, Response};
+
 /// Maximum number of messages to read before giving up on finding a response.
 const MAX_RESPONSE_ITERATIONS: usize = 1000;
 
@@ -56,42 +58,6 @@ pub enum LspClientError {
     /// Response timeout: too many messages without finding matching response.
     #[error("timeout waiting for response to request {0}")]
     ResponseTimeout(i64),
-}
-
-/// JSON-RPC request structure.
-#[derive(Debug, Serialize)]
-struct Request {
-    jsonrpc: &'static str,
-    id: i64,
-    method: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    params: Option<Value>,
-}
-
-/// JSON-RPC notification structure.
-#[derive(Debug, Serialize)]
-struct Notification {
-    jsonrpc: &'static str,
-    method: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    params: Option<Value>,
-}
-
-/// JSON-RPC response structure.
-#[derive(Debug, Deserialize)]
-struct Response {
-    #[expect(dead_code, reason = "required by JSON-RPC protocol but not used")]
-    jsonrpc: String,
-    id: Option<i64>,
-    result: Option<Value>,
-    error: Option<ResponseError>,
-}
-
-/// JSON-RPC error structure.
-#[derive(Debug, Deserialize)]
-struct ResponseError {
-    code: i64,
-    message: String,
 }
 
 /// A simple LSP client for E2E testing.
