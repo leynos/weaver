@@ -1,0 +1,5 @@
+---
+source: crates/weaver-e2e/tests/grep_snapshots.rs
+expression: matches
+---
+[]

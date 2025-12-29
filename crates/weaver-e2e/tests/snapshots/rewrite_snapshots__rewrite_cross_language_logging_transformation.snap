@@ -1,0 +1,21 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: "(rust, python, typescript)"
+---
+(
+    RewriteSnapshot {
+        output: "fn main() { log::info!((\"message\")); }",
+        num_replacements: 1,
+        has_changes: true,
+    },
+    RewriteSnapshot {
+        output: "def main():\n    logging.info((\"message\"))",
+        num_replacements: 1,
+        has_changes: true,
+    },
+    RewriteSnapshot {
+        output: "function main(): void { console.log(\"message\"); }",
+        num_replacements: 0,
+        has_changes: false,
+    },
+)

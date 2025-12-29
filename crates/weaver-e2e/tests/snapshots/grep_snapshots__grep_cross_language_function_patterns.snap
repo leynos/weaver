@@ -1,0 +1,41 @@
+---
+source: crates/weaver-e2e/tests/grep_snapshots.rs
+expression: "(rust, python, typescript)"
+---
+(
+    [
+        MatchSnapshot {
+            text: "fn hello() { println!(\"hi\"); }",
+            start: (
+                1,
+                1,
+            ),
+            end: (
+                1,
+                31,
+            ),
+            captures: {
+                "BODY": "println!(\"hi\");",
+                "NAME": "hello",
+            },
+        },
+    ],
+    [],
+    [
+        MatchSnapshot {
+            text: "function hello(): void { console.log(\"hi\"); }",
+            start: (
+                1,
+                1,
+            ),
+            end: (
+                1,
+                46,
+            ),
+            captures: {
+                "BODY": "console.log(\"hi\");",
+                "NAME": "hello",
+            },
+        },
+    ],
+)

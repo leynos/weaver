@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: result
+---
+RewriteSnapshot {
+    output: "function logMessages(): void {\n    console.log(\"Starting\");\n    console.log(\"Processing\", 42);\n    console.log(\"Done\");\n}\n",
+    num_replacements: 0,
+    has_changes: false,
+}

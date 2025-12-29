@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: result
+---
+RewriteSnapshot {
+    output: "fn example() {\n    let x = (1);\n    let y = (2);\n    let z = (x + y);\n}",
+    num_replacements: 3,
+    has_changes: true,
+}

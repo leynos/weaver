@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: result
+---
+RewriteSnapshot {
+    output: "def log_info():\n    logging.info((\"Starting process\"))\n    logging.info((\"Step 1 complete\"))\n    logging.info((\"Step 2 complete\"))\n    logging.info((\"Finished\"))\n",
+    num_replacements: 4,
+    has_changes: true,
+}

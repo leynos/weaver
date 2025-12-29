@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: result
+---
+RewriteSnapshot {
+    output: "fn calculate() {\n    const a: _ = 1\n    const b: _ = 2\n    const result: _ = a + b\n    println!(\"Result: {}\", result);\n}\n",
+    num_replacements: 3,
+    has_changes: true,
+}

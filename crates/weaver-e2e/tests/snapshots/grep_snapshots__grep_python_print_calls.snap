@@ -1,0 +1,62 @@
+---
+source: crates/weaver-e2e/tests/grep_snapshots.rs
+expression: matches
+---
+[
+    MatchSnapshot {
+        text: "print(\"Starting process\")",
+        start: (
+            2,
+            5,
+        ),
+        end: (
+            2,
+            30,
+        ),
+        captures: {
+            "ARGS": "(\"Starting process\")",
+        },
+    },
+    MatchSnapshot {
+        text: "print(\"Step 1 complete\")",
+        start: (
+            3,
+            5,
+        ),
+        end: (
+            3,
+            29,
+        ),
+        captures: {
+            "ARGS": "(\"Step 1 complete\")",
+        },
+    },
+    MatchSnapshot {
+        text: "print(\"Step 2 complete\")",
+        start: (
+            4,
+            5,
+        ),
+        end: (
+            4,
+            29,
+        ),
+        captures: {
+            "ARGS": "(\"Step 2 complete\")",
+        },
+    },
+    MatchSnapshot {
+        text: "print(\"Finished\")",
+        start: (
+            5,
+            5,
+        ),
+        end: (
+            5,
+            22,
+        ),
+        captures: {
+            "ARGS": "(\"Finished\")",
+        },
+    },
+]

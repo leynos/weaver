@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: result
+---
+RewriteSnapshot {
+    output: "fn main() {\n    println!(\"Hello, world!\");\n}\n\nfn helper() {\n    let x = 42;\n    println!(\"Value: {}\", x);\n}\n\nfn process(data: &str) -> String {\n    data.to_uppercase()\n}\n",
+    num_replacements: 0,
+    has_changes: false,
+}

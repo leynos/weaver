@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: result
+---
+RewriteSnapshot {
+    output: "fn debug_values() {\n    let x = 42;\n    let y = \"hello\";\n    (x);\n    (y);\n    (x + 1);\n}\n",
+    num_replacements: 3,
+    has_changes: true,
+}

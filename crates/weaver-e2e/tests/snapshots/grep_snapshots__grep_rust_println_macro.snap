@@ -1,0 +1,48 @@
+---
+source: crates/weaver-e2e/tests/grep_snapshots.rs
+expression: matches
+---
+[
+    MatchSnapshot {
+        text: "println!(\"Starting\")",
+        start: (
+            2,
+            5,
+        ),
+        end: (
+            2,
+            25,
+        ),
+        captures: {
+            "ARGS": "(\"Starting\")",
+        },
+    },
+    MatchSnapshot {
+        text: "println!(\"Processing: {}\", 42)",
+        start: (
+            3,
+            5,
+        ),
+        end: (
+            3,
+            35,
+        ),
+        captures: {
+            "ARGS": "(\"Processing: {}\", 42)",
+        },
+    },
+    MatchSnapshot {
+        text: "println!(\"Done\")",
+        start: (
+            4,
+            5,
+        ),
+        end: (
+            4,
+            21,
+        ),
+        captures: {
+            "ARGS": "(\"Done\")",
+        },
+    },
+]

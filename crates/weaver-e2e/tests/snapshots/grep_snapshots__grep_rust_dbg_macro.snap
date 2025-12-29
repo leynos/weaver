@@ -1,0 +1,48 @@
+---
+source: crates/weaver-e2e/tests/grep_snapshots.rs
+expression: matches
+---
+[
+    MatchSnapshot {
+        text: "dbg!(x)",
+        start: (
+            4,
+            5,
+        ),
+        end: (
+            4,
+            12,
+        ),
+        captures: {
+            "EXPR": "(x)",
+        },
+    },
+    MatchSnapshot {
+        text: "dbg!(y)",
+        start: (
+            5,
+            5,
+        ),
+        end: (
+            5,
+            12,
+        ),
+        captures: {
+            "EXPR": "(y)",
+        },
+    },
+    MatchSnapshot {
+        text: "dbg!(x + 1)",
+        start: (
+            6,
+            5,
+        ),
+        end: (
+            6,
+            16,
+        ),
+        captures: {
+            "EXPR": "(x + 1)",
+        },
+    },
+]

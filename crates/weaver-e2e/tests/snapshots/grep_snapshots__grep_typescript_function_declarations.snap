@@ -1,0 +1,57 @@
+---
+source: crates/weaver-e2e/tests/grep_snapshots.rs
+expression: matches
+---
+[
+    MatchSnapshot {
+        text: "function greet(name: string): void {\n    console.log(`Hello, ${name}`);\n}",
+        start: (
+            1,
+            1,
+        ),
+        end: (
+            3,
+            2,
+        ),
+        captures: {
+            "BODY": "console.log(`Hello, ${name}`);",
+            "NAME": "greet",
+            "PARAMS": "(name: string)",
+            "RET": ": void",
+        },
+    },
+    MatchSnapshot {
+        text: "function farewell(name: string): void {\n    console.log(`Goodbye, ${name}`);\n}",
+        start: (
+            5,
+            1,
+        ),
+        end: (
+            7,
+            2,
+        ),
+        captures: {
+            "BODY": "console.log(`Goodbye, ${name}`);",
+            "NAME": "farewell",
+            "PARAMS": "(name: string)",
+            "RET": ": void",
+        },
+    },
+    MatchSnapshot {
+        text: "function process(data: string): string {\n    return data.toUpperCase();\n}",
+        start: (
+            9,
+            1,
+        ),
+        end: (
+            11,
+            2,
+        ),
+        captures: {
+            "BODY": "return data.toUpperCase();",
+            "NAME": "process",
+            "PARAMS": "(data: string)",
+            "RET": ": string",
+        },
+    },
+]

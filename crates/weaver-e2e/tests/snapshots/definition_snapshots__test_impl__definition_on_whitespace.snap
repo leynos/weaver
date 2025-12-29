@@ -1,0 +1,5 @@
+---
+source: crates/weaver-e2e/tests/definition_snapshots.rs
+expression: snapshot
+---
+None

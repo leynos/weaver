@@ -1,0 +1,36 @@
+---
+source: crates/weaver-e2e/tests/grep_snapshots.rs
+expression: matches
+---
+[
+    MatchSnapshot {
+        text: "fn main() {\n    println!(\"Hello, world!\");\n}",
+        start: (
+            1,
+            1,
+        ),
+        end: (
+            3,
+            2,
+        ),
+        captures: {
+            "BODY": "println!(\"Hello, world!\");",
+            "NAME": "main",
+        },
+    },
+    MatchSnapshot {
+        text: "fn helper() {\n    let x = 42;\n    println!(\"Value: {}\", x);\n}",
+        start: (
+            5,
+            1,
+        ),
+        end: (
+            8,
+            2,
+        ),
+        captures: {
+            "BODY": "let x = 42;\n    println!(\"Value: {}\", x);",
+            "NAME": "helper",
+        },
+    },
+]

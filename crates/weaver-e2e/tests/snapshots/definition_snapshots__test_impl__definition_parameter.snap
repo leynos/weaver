@@ -1,0 +1,13 @@
+---
+source: crates/weaver-e2e/tests/definition_snapshots.rs
+expression: snapshot
+---
+Single(
+    LocationSnapshot {
+        filename: "test.py",
+        start_line: 0,
+        start_char: 10,
+        end_line: 0,
+        end_char: 14,
+    },
+)
