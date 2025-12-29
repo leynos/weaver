@@ -49,6 +49,12 @@ enum TestError {
 
     #[error("expected no callers, but found {count}")]
     UnexpectedCallers { count: usize },
+
+    #[error("expected error but operation succeeded")]
+    ExpectedError,
+
+    #[error("expected NotInitialized error, got: {actual}")]
+    WrongErrorType { actual: String },
 }
 
 /// Creates a file URI from a path, handling cross-platform differences correctly.
@@ -217,8 +223,7 @@ mod test_impl {
                     return Err(TestError::NoCallsFound);
                 }
 
-                let caller_names: Vec<_> =
-                    calls.iter().map(|c| c.from.name.clone()).collect();
+                let caller_names: Vec<_> = calls.iter().map(|c| c.from.name.clone()).collect();
                 if !caller_names.iter().any(|n| n == expected_name) {
                     return Err(TestError::ExpectedCallNotFound {
                         expected: expected_name.to_owned(),
@@ -369,4 +374,38 @@ fn no_calls_for_standalone_function(
         no_calls_context,
         test_impl::no_calls_for_standalone_function_impl
     )
+}
+
+// =============================================================================
+// Error Case Tests
+// =============================================================================
+
+#[test]
+fn lsp_prepare_call_hierarchy_before_init_returns_error() -> Result<(), TestError> {
+    require_pyrefly!();
+
+    // Spawn client but don't call initialize()
+    let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"])?;
+
+    // Create a dummy URI
+    let uri: Uri = "file:///tmp/test.py"
+        .parse()
+        .map_err(|_| TestError::InvalidUri("file:///tmp/test.py".to_owned()))?;
+
+    // Try to call prepare_call_hierarchy before initialize - should fail
+    let params = CallHierarchyPrepareParams {
+        text_document_position_params: TextDocumentPositionParams {
+            text_document: TextDocumentIdentifier { uri },
+            position: Position::new(0, 0),
+        },
+        work_done_progress_params: WorkDoneProgressParams::default(),
+    };
+
+    match client.prepare_call_hierarchy(params) {
+        Err(LspClientError::NotInitialized) => Ok(()),
+        Err(other) => Err(TestError::WrongErrorType {
+            actual: other.to_string(),
+        }),
+        Ok(_) => Err(TestError::ExpectedError),
+    }
 }

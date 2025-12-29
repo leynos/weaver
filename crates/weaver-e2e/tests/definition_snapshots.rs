@@ -29,6 +29,12 @@ enum TestError {
 
     #[error("invalid URI: {0}")]
     InvalidUri(String),
+
+    #[error("expected error but operation succeeded")]
+    ExpectedError,
+
+    #[error("expected NotInitialized error, got: {actual}")]
+    WrongErrorType { actual: String },
 }
 
 /// Creates a file URI from a path, handling cross-platform differences correctly.
@@ -249,14 +255,14 @@ mod test_impl {
         line: u32,
         character: u32,
     ) -> Result<DefinitionSnapshot, TestError> {
-        let response = ctx.client.goto_definition_at(&ctx.file_uri, line, character)?;
+        let response = ctx
+            .client
+            .goto_definition_at(&ctx.file_uri, line, character)?;
         Ok(DefinitionSnapshot::from(response))
     }
 
     /// Tests definition lookup from a function call to its definition.
-    pub fn definition_from_call_to_function_impl(
-        ctx: &mut TestContext,
-    ) -> Result<(), TestError> {
+    pub fn definition_from_call_to_function_impl(ctx: &mut TestContext) -> Result<(), TestError> {
         // In LINEAR_CHAIN: def a() calls b() on line 1, character ~4
         // b() is defined on line 3
         let snapshot = get_definition_snapshot(ctx, 1, 4)?;
@@ -265,9 +271,7 @@ mod test_impl {
     }
 
     /// Tests definition lookup for a function name at its definition site.
-    pub fn definition_at_function_definition_impl(
-        ctx: &mut TestContext,
-    ) -> Result<(), TestError> {
+    pub fn definition_at_function_definition_impl(ctx: &mut TestContext) -> Result<(), TestError> {
         // In LINEAR_CHAIN: def a() is on line 0, character 4
         let snapshot = get_definition_snapshot(ctx, 0, 4)?;
         assert_debug_snapshot!("definition_at_function_definition", snapshot);
@@ -351,9 +355,7 @@ fn definition_self_method_call(
 }
 
 #[rstest]
-fn definition_class_method(
-    mut python_class_context: Option<TestContext>,
-) -> Result<(), TestError> {
+fn definition_class_method(mut python_class_context: Option<TestContext>) -> Result<(), TestError> {
     run_test_with_context!(
         python_class_context,
         test_impl::definition_class_method_impl
@@ -361,9 +363,7 @@ fn definition_class_method(
 }
 
 #[rstest]
-fn definition_class_name(
-    mut python_class_context: Option<TestContext>,
-) -> Result<(), TestError> {
+fn definition_class_name(mut python_class_context: Option<TestContext>) -> Result<(), TestError> {
     run_test_with_context!(python_class_context, test_impl::definition_class_name_impl)
 }
 
@@ -385,4 +385,52 @@ fn definition_on_whitespace(
         linear_chain_context,
         test_impl::definition_on_whitespace_impl
     )
+}
+
+// =============================================================================
+// Error Case Tests
+// =============================================================================
+
+#[test]
+fn lsp_operation_before_init_returns_error() -> Result<(), TestError> {
+    require_pyrefly!();
+
+    // Spawn client but don't call initialize()
+    let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"])?;
+
+    // Create a dummy URI
+    let uri: Uri = "file:///tmp/test.py"
+        .parse()
+        .map_err(|_| TestError::InvalidUri("file:///tmp/test.py".to_owned()))?;
+
+    // Try to call did_open before initialize - should fail
+    match client.did_open(uri, "python", "def foo(): pass") {
+        Err(LspClientError::NotInitialized) => Ok(()),
+        Err(other) => Err(TestError::WrongErrorType {
+            actual: other.to_string(),
+        }),
+        Ok(()) => Err(TestError::ExpectedError),
+    }
+}
+
+#[test]
+fn lsp_goto_definition_before_init_returns_error() -> Result<(), TestError> {
+    require_pyrefly!();
+
+    // Spawn client but don't call initialize()
+    let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"])?;
+
+    // Create a dummy URI
+    let uri: Uri = "file:///tmp/test.py"
+        .parse()
+        .map_err(|_| TestError::InvalidUri("file:///tmp/test.py".to_owned()))?;
+
+    // Try to call goto_definition before initialize - should fail
+    match client.goto_definition_at(&uri, 0, 0) {
+        Err(LspClientError::NotInitialized) => Ok(()),
+        Err(other) => Err(TestError::WrongErrorType {
+            actual: other.to_string(),
+        }),
+        Ok(_) => Err(TestError::ExpectedError),
+    }
 }

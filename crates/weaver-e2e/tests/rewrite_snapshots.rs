@@ -326,3 +326,83 @@ fn rewrite_chained_transformations() -> Result<(), TestError> {
     assert_debug_snapshot!((first, second));
     Ok(())
 }
+
+// =============================================================================
+// Error Case Tests
+// =============================================================================
+
+#[test]
+fn rewrite_invalid_pattern_syntax_returns_error() {
+    // Pattern with unclosed braces should fail to compile
+    let result = apply_rewrite(
+        "fn foo() {}",
+        "fn $NAME {",
+        "fn $NAME() {}",
+        SupportedLanguage::Rust,
+    );
+    assert!(result.is_err());
+
+    let err = result.expect_err("should have returned error");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("pattern") || msg.contains("syntax"),
+        "error message should mention pattern or syntax: {msg}"
+    );
+}
+
+#[test]
+fn rewrite_undefined_metavariable_in_replacement_returns_error() {
+    // Replacement references $UNDEFINED which is not in the pattern
+    let result = apply_rewrite(
+        "fn foo() {}",
+        "fn $NAME() {}",
+        "fn $UNDEFINED() {}",
+        SupportedLanguage::Rust,
+    );
+    assert!(result.is_err());
+
+    let err = result.expect_err("should have returned error");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("undefined") || msg.contains("replacement"),
+        "error message should mention undefined or replacement: {msg}"
+    );
+}
+
+#[test]
+fn rewrite_invalid_metavariable_syntax_in_pattern_returns_error() {
+    // $$VAR is invalid (must be $ or $$$, not $$)
+    let result = apply_rewrite(
+        "fn foo() {}",
+        "fn $$INVALID() {}",
+        "fn bar() {}",
+        SupportedLanguage::Rust,
+    );
+    assert!(result.is_err());
+
+    let err = result.expect_err("should have returned error");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("metavariable"),
+        "error message should mention metavariable: {msg}"
+    );
+}
+
+#[test]
+fn rewrite_empty_metavariable_name_in_pattern_returns_error() {
+    // $ without a name following it is invalid
+    let result = apply_rewrite(
+        "let x = 1",
+        "let $ = $VAL",
+        "const x = $VAL",
+        SupportedLanguage::Rust,
+    );
+    assert!(result.is_err());
+
+    let err = result.expect_err("should have returned error");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("metavariable"),
+        "error message should mention metavariable: {msg}"
+    );
+}
