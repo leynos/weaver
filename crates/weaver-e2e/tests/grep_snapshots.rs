@@ -10,6 +10,9 @@ use weaver_syntax::{Parser, Pattern, SupportedLanguage};
 
 use weaver_e2e::fixtures;
 
+/// Minimal Rust source for testing pattern error handling.
+static DUMMY_RUST_SOURCE: &str = "fn foo() {}";
+
 /// Test error type for grep snapshot tests.
 #[derive(Debug, thiserror::Error)]
 enum TestError {
@@ -82,7 +85,7 @@ fn find_matches(
 
 /// Helper to assert that a pattern fails to compile with an expected error substring.
 fn assert_pattern_error(pattern: &str, expected_substring: &str) {
-    let result = find_matches("fn foo() {}", pattern, SupportedLanguage::Rust);
+    let result = find_matches(DUMMY_RUST_SOURCE, pattern, SupportedLanguage::Rust);
     let Err(err) = result else {
         panic!("expected error for pattern: {pattern}");
     };

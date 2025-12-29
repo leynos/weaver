@@ -1,4 +1,9 @@
 //! Snapshot tests for code rewriting (`act apply-rewrite` functionality).
+//!
+//! These tests validate structural code transformations using `weaver-syntax`
+//! pattern and replacement pairs. Outputs are verified using the `insta`
+//! snapshot library. The suite covers both success and error scenarios across
+//! Rust, Python, and TypeScript.
 
 use insta::assert_debug_snapshot;
 use weaver_syntax::{Pattern, RewriteRule, Rewriter, SupportedLanguage};
@@ -73,70 +78,81 @@ fn assert_rewrite_error(case: RewriteTestCase<'_>, expected_substring: &str) {
     );
 }
 
-#[test]
-fn rewrite_rust_let_to_const() -> Result<(), TestError> {
-    test_rewrite(
-        RewriteTestCase {
-            source: fixtures::RUST_LET_BINDINGS,
-            pattern: "let $VAR = $VAL",
-            replacement: "const $VAR: _ = $VAL",
-            language: SupportedLanguage::Rust,
-        },
-        "rewrite_rust_let_to_const",
-    )
+/// Macro to generate a snapshot-based rewrite test.
+macro_rules! rewrite_test {
+    ($name:ident, $source:expr, $pattern:expr, $replacement:expr, $language:expr) => {
+        #[test]
+        fn $name() -> Result<(), TestError> {
+            test_rewrite(
+                RewriteTestCase {
+                    source: $source,
+                    pattern: $pattern,
+                    replacement: $replacement,
+                    language: $language,
+                },
+                stringify!($name),
+            )
+        }
+    };
 }
 
-#[test]
-fn rewrite_rust_remove_dbg() -> Result<(), TestError> {
-    test_rewrite(
-        RewriteTestCase {
-            source: fixtures::RUST_DEBUG_MACROS,
-            pattern: "dbg!($EXPR)",
-            replacement: "$EXPR",
-            language: SupportedLanguage::Rust,
-        },
-        "rewrite_rust_remove_dbg",
-    )
+/// Macro to generate an error-checking rewrite test.
+macro_rules! rewrite_error_test {
+    ($name:ident, $source:expr, $pattern:expr, $replacement:expr, $language:expr, $expected:expr) => {
+        #[test]
+        fn $name() {
+            assert_rewrite_error(
+                RewriteTestCase {
+                    source: $source,
+                    pattern: $pattern,
+                    replacement: $replacement,
+                    language: $language,
+                },
+                $expected,
+            );
+        }
+    };
 }
 
-#[test]
-fn rewrite_rust_println_to_log() -> Result<(), TestError> {
-    test_rewrite(
-        RewriteTestCase {
-            source: fixtures::RUST_PRINTLN,
-            pattern: "println!($$$ARGS)",
-            replacement: "log::info!($$$ARGS)",
-            language: SupportedLanguage::Rust,
-        },
-        "rewrite_rust_println_to_log",
-    )
-}
+rewrite_test!(
+    rewrite_rust_let_to_const,
+    fixtures::RUST_LET_BINDINGS,
+    "let $VAR = $VAL",
+    "const $VAR: _ = $VAL",
+    SupportedLanguage::Rust
+);
 
-#[test]
-fn rewrite_rust_no_match_unchanged() -> Result<(), TestError> {
-    test_rewrite(
-        RewriteTestCase {
-            source: fixtures::RUST_FUNCTIONS,
-            pattern: "panic!($$$ARGS)",
-            replacement: "bail!($$$ARGS)",
-            language: SupportedLanguage::Rust,
-        },
-        "rewrite_rust_no_match_unchanged",
-    )
-}
+rewrite_test!(
+    rewrite_rust_remove_dbg,
+    fixtures::RUST_DEBUG_MACROS,
+    "dbg!($EXPR)",
+    "$EXPR",
+    SupportedLanguage::Rust
+);
 
-#[test]
-fn rewrite_rust_struct_to_enum() -> Result<(), TestError> {
-    test_rewrite(
-        RewriteTestCase {
-            source: "struct Empty {}",
-            pattern: "struct $NAME {}",
-            replacement: "enum $NAME {}",
-            language: SupportedLanguage::Rust,
-        },
-        "rewrite_rust_struct_to_enum",
-    )
-}
+rewrite_test!(
+    rewrite_rust_println_to_log,
+    fixtures::RUST_PRINTLN,
+    "println!($$$ARGS)",
+    "log::info!($$$ARGS)",
+    SupportedLanguage::Rust
+);
+
+rewrite_test!(
+    rewrite_rust_no_match_unchanged,
+    fixtures::RUST_FUNCTIONS,
+    "panic!($$$ARGS)",
+    "bail!($$$ARGS)",
+    SupportedLanguage::Rust
+);
+
+rewrite_test!(
+    rewrite_rust_struct_to_enum,
+    "struct Empty {}",
+    "struct $NAME {}",
+    "enum $NAME {}",
+    SupportedLanguage::Rust
+);
 
 #[test]
 fn rewrite_rust_multiple_replacements() -> Result<(), TestError> {
@@ -150,31 +166,21 @@ fn rewrite_rust_multiple_replacements() -> Result<(), TestError> {
     Ok(())
 }
 
-#[test]
-fn rewrite_python_print_to_logging() -> Result<(), TestError> {
-    test_rewrite(
-        RewriteTestCase {
-            source: fixtures::PYTHON_PRINTS,
-            pattern: "print($$$ARGS)",
-            replacement: "logging.info($$$ARGS)",
-            language: SupportedLanguage::Python,
-        },
-        "rewrite_python_print_to_logging",
-    )
-}
+rewrite_test!(
+    rewrite_python_print_to_logging,
+    fixtures::PYTHON_PRINTS,
+    "print($$$ARGS)",
+    "logging.info($$$ARGS)",
+    SupportedLanguage::Python
+);
 
-#[test]
-fn rewrite_python_no_match_unchanged() -> Result<(), TestError> {
-    test_rewrite(
-        RewriteTestCase {
-            source: fixtures::PYTHON_FUNCTIONS,
-            pattern: "import $MODULE",
-            replacement: "from $MODULE import *",
-            language: SupportedLanguage::Python,
-        },
-        "rewrite_python_no_match_unchanged",
-    )
-}
+rewrite_test!(
+    rewrite_python_no_match_unchanged,
+    fixtures::PYTHON_FUNCTIONS,
+    "import $MODULE",
+    "from $MODULE import *",
+    SupportedLanguage::Python
+);
 
 #[test]
 fn rewrite_python_self_method_rename() -> Result<(), TestError> {
@@ -208,44 +214,29 @@ other = old_func(x)
     Ok(())
 }
 
-#[test]
-fn rewrite_typescript_console_to_logger() -> Result<(), TestError> {
-    test_rewrite(
-        RewriteTestCase {
-            source: fixtures::TYPESCRIPT_CONSOLE,
-            pattern: "console.log($$$ARGS)",
-            replacement: "logger.info($$$ARGS)",
-            language: SupportedLanguage::TypeScript,
-        },
-        "rewrite_typescript_console_to_logger",
-    )
-}
+rewrite_test!(
+    rewrite_typescript_console_to_logger,
+    fixtures::TYPESCRIPT_CONSOLE,
+    "console.log($$$ARGS)",
+    "logger.info($$$ARGS)",
+    SupportedLanguage::TypeScript
+);
 
-#[test]
-fn rewrite_typescript_var_to_const() -> Result<(), TestError> {
-    test_rewrite(
-        RewriteTestCase {
-            source: fixtures::TYPESCRIPT_VAR_DECLARATIONS,
-            pattern: "var $VAR = $VAL",
-            replacement: "const $VAR = $VAL",
-            language: SupportedLanguage::TypeScript,
-        },
-        "rewrite_typescript_var_to_const",
-    )
-}
+rewrite_test!(
+    rewrite_typescript_var_to_const,
+    fixtures::TYPESCRIPT_VAR_DECLARATIONS,
+    "var $VAR = $VAL",
+    "const $VAR = $VAL",
+    SupportedLanguage::TypeScript
+);
 
-#[test]
-fn rewrite_typescript_no_match_unchanged() -> Result<(), TestError> {
-    test_rewrite(
-        RewriteTestCase {
-            source: fixtures::TYPESCRIPT_FUNCTIONS,
-            pattern: "debugger",
-            replacement: "// debugger removed",
-            language: SupportedLanguage::TypeScript,
-        },
-        "rewrite_typescript_no_match_unchanged",
-    )
-}
+rewrite_test!(
+    rewrite_typescript_no_match_unchanged,
+    fixtures::TYPESCRIPT_FUNCTIONS,
+    "debugger",
+    "// debugger removed",
+    SupportedLanguage::TypeScript
+);
 
 #[test]
 fn rewrite_typescript_function_rename() -> Result<(), TestError> {
@@ -330,54 +321,38 @@ fn rewrite_chained_transformations() -> Result<(), TestError> {
     Ok(())
 }
 
-#[test]
-fn rewrite_invalid_pattern_syntax_returns_error() {
-    assert_rewrite_error(
-        RewriteTestCase {
-            source: "fn foo() {}",
-            pattern: "fn $NAME {",
-            replacement: "fn $NAME() {}",
-            language: SupportedLanguage::Rust,
-        },
-        "pattern",
-    );
-}
+rewrite_error_test!(
+    rewrite_invalid_pattern_syntax_returns_error,
+    "fn foo() {}",
+    "fn $NAME {",
+    "fn $NAME() {}",
+    SupportedLanguage::Rust,
+    "pattern"
+);
 
-#[test]
-fn rewrite_undefined_metavariable_in_replacement_returns_error() {
-    assert_rewrite_error(
-        RewriteTestCase {
-            source: "fn foo() {}",
-            pattern: "fn $NAME() {}",
-            replacement: "fn $UNDEFINED() {}",
-            language: SupportedLanguage::Rust,
-        },
-        "undefined",
-    );
-}
+rewrite_error_test!(
+    rewrite_undefined_metavariable_in_replacement_returns_error,
+    "fn foo() {}",
+    "fn $NAME() {}",
+    "fn $UNDEFINED() {}",
+    SupportedLanguage::Rust,
+    "undefined"
+);
 
-#[test]
-fn rewrite_invalid_metavariable_syntax_in_pattern_returns_error() {
-    assert_rewrite_error(
-        RewriteTestCase {
-            source: "fn foo() {}",
-            pattern: "fn $$INVALID() {}",
-            replacement: "fn bar() {}",
-            language: SupportedLanguage::Rust,
-        },
-        "metavariable",
-    );
-}
+rewrite_error_test!(
+    rewrite_invalid_metavariable_syntax_in_pattern_returns_error,
+    "fn foo() {}",
+    "fn $$INVALID() {}",
+    "fn bar() {}",
+    SupportedLanguage::Rust,
+    "metavariable"
+);
 
-#[test]
-fn rewrite_empty_metavariable_name_in_pattern_returns_error() {
-    assert_rewrite_error(
-        RewriteTestCase {
-            source: "fn foo() {}",
-            pattern: "let $ = $VAL",
-            replacement: "const x = $VAL",
-            language: SupportedLanguage::Rust,
-        },
-        "metavariable",
-    );
-}
+rewrite_error_test!(
+    rewrite_empty_metavariable_name_in_pattern_returns_error,
+    "fn foo() {}",
+    "let $ = $VAL",
+    "const x = $VAL",
+    SupportedLanguage::Rust,
+    "metavariable"
+);
