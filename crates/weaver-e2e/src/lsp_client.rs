@@ -167,7 +167,7 @@ impl LspClient {
         &mut self,
         params: CallHierarchyPrepareParams,
     ) -> Result<Option<Vec<CallHierarchyItem>>, LspClientError> {
-        self.call_hierarchy_request("textDocument/prepareCallHierarchy", params)
+        self.lsp_request("textDocument/prepareCallHierarchy", params)
     }
 
     /// Gets incoming calls for a call hierarchy item.
@@ -178,7 +178,7 @@ impl LspClient {
         &mut self,
         params: CallHierarchyIncomingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyIncomingCall>>, LspClientError> {
-        self.call_hierarchy_request("callHierarchy/incomingCalls", params)
+        self.lsp_request("callHierarchy/incomingCalls", params)
     }
 
     /// Gets outgoing calls for a call hierarchy item.
@@ -189,7 +189,7 @@ impl LspClient {
         &mut self,
         params: CallHierarchyOutgoingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, LspClientError> {
-        self.call_hierarchy_request("callHierarchy/outgoingCalls", params)
+        self.lsp_request("callHierarchy/outgoingCalls", params)
     }
 
     /// Gets the definition location for a symbol at the given position.
@@ -256,15 +256,6 @@ impl LspClient {
             method,
             Some(serde_json::to_value(params).map_err(LspClientError::Json)?),
         )
-    }
-
-    /// Alias for `lsp_request` for call hierarchy methods.
-    fn call_hierarchy_request<P, R>(&mut self, method: &str, params: P) -> Result<R, LspClientError>
-    where
-        P: Serialize,
-        R: for<'de> Deserialize<'de>,
-    {
-        self.lsp_request(method, params)
     }
 
     fn request<T: for<'de> Deserialize<'de>>(
