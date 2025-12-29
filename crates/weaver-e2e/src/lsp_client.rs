@@ -245,13 +245,13 @@ impl LspClient {
     /// Returns an error if the client is not initialized or if the request fails.
     pub fn goto_definition_at(
         &mut self,
-        uri: Uri,
+        uri: &Uri,
         line: u32,
         character: u32,
     ) -> Result<Option<GotoDefinitionResponse>, LspClientError> {
         let params = GotoDefinitionParams {
             text_document_position_params: TextDocumentPositionParams {
-                text_document: TextDocumentIdentifier { uri },
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
                 position: lsp_types::Position { line, character },
             },
             work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),

@@ -49,10 +49,20 @@ macro_rules! run_test_with_context {
 }
 
 /// Test context containing an initialised LSP client and file URIs.
+///
+/// Implements `Drop` to ensure the LSP client is shut down even on early panics.
 struct TestContext {
     client: LspClient,
     file_uri: Uri,
     _temp_dir: TempDir,
+}
+
+impl Drop for TestContext {
+    fn drop(&mut self) {
+        // Attempt to shut down the client gracefully; ignore errors since
+        // we may be dropping due to a panic or the server may have crashed.
+        drop(self.client.shutdown());
+    }
 }
 
 /// Simplified location for snapshot comparison.
@@ -224,74 +234,60 @@ mod test_impl {
     ) -> DefinitionSnapshot {
         let response = ctx
             .client
-            .goto_definition_at(ctx.file_uri.clone(), line, character)
+            .goto_definition_at(&ctx.file_uri, line, character)
             .expect("goto_definition");
         DefinitionSnapshot::from(response)
     }
 
     /// Tests definition lookup from a function call to its definition.
-    #[expect(clippy::expect_used, reason = "test uses expect for LSP operations")]
     pub fn definition_from_call_to_function_impl(ctx: &mut TestContext) {
         // In LINEAR_CHAIN: def a() calls b() on line 1, character ~4
         // b() is defined on line 3
         let snapshot = get_definition_snapshot(ctx, 1, 4);
         assert_debug_snapshot!("definition_from_call_to_function", snapshot);
-        ctx.client.shutdown().expect("shutdown");
     }
 
     /// Tests definition lookup for a function name at its definition site.
-    #[expect(clippy::expect_used, reason = "test uses expect for LSP operations")]
     pub fn definition_at_function_definition_impl(ctx: &mut TestContext) {
         // In LINEAR_CHAIN: def a() is on line 0, character 4
         let snapshot = get_definition_snapshot(ctx, 0, 4);
         assert_debug_snapshot!("definition_at_function_definition", snapshot);
-        ctx.client.shutdown().expect("shutdown");
     }
 
     /// Tests definition lookup for a method call on self.
-    #[expect(clippy::expect_used, reason = "test uses expect for LSP operations")]
     pub fn definition_self_method_call_impl(ctx: &mut TestContext) {
         // In PYTHON_CLASS: self.validate() is called on line 2
         // validate is defined on line 5
         let snapshot = get_definition_snapshot(ctx, 2, 25);
         assert_debug_snapshot!("definition_self_method_call", snapshot);
-        ctx.client.shutdown().expect("shutdown");
     }
 
     /// Tests definition lookup for a class method definition.
-    #[expect(clippy::expect_used, reason = "test uses expect for LSP operations")]
     pub fn definition_class_method_impl(ctx: &mut TestContext) {
         // In PYTHON_CLASS: def process(self, data) on line 1
         let snapshot = get_definition_snapshot(ctx, 1, 8);
         assert_debug_snapshot!("definition_class_method", snapshot);
-        ctx.client.shutdown().expect("shutdown");
     }
 
     /// Tests definition lookup for the class name.
-    #[expect(clippy::expect_used, reason = "test uses expect for LSP operations")]
     pub fn definition_class_name_impl(ctx: &mut TestContext) {
         // In PYTHON_CLASS: class Service on line 0
         let snapshot = get_definition_snapshot(ctx, 0, 6);
         assert_debug_snapshot!("definition_class_name", snapshot);
-        ctx.client.shutdown().expect("shutdown");
     }
 
     /// Tests definition lookup for a parameter.
-    #[expect(clippy::expect_used, reason = "test uses expect for LSP operations")]
     pub fn definition_parameter_impl(ctx: &mut TestContext) {
         // In PYTHON_FUNCTIONS: def greet(name) - name parameter on line 0
         let snapshot = get_definition_snapshot(ctx, 0, 10);
         assert_debug_snapshot!("definition_parameter", snapshot);
-        ctx.client.shutdown().expect("shutdown");
     }
 
     /// Tests definition lookup on whitespace (should return None).
-    #[expect(clippy::expect_used, reason = "test uses expect for LSP operations")]
     pub fn definition_on_whitespace_impl(ctx: &mut TestContext) {
         // Position on whitespace/indentation
         let snapshot = get_definition_snapshot(ctx, 1, 0);
         assert_debug_snapshot!("definition_on_whitespace", snapshot);
-        ctx.client.shutdown().expect("shutdown");
     }
 }
 
