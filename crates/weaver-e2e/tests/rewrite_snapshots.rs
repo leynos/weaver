@@ -61,68 +61,93 @@ fn apply_rewrite(
     })
 }
 
+/// Helper to test a rewrite and snapshot the result with a given name.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "test helper needs all parameters for clarity and explicit snapshot naming"
+)]
+fn test_rewrite(
+    source: &str,
+    pattern: &str,
+    replacement: &str,
+    language: SupportedLanguage,
+    snapshot_name: &str,
+) -> Result<(), TestError> {
+    let result = apply_rewrite(source, pattern, replacement, language)?;
+    assert_debug_snapshot!(snapshot_name, result);
+    Ok(())
+}
+
+/// Helper to assert that a rewrite fails with an expected error substring.
+fn assert_rewrite_error(pattern: &str, replacement: &str, expected_substring: &str) {
+    let result = apply_rewrite("fn foo() {}", pattern, replacement, SupportedLanguage::Rust);
+    let Err(err) = result else {
+        panic!("expected error for pattern: {pattern}");
+    };
+    let msg = err.to_string();
+    assert!(
+        msg.contains(expected_substring),
+        "error message should mention '{expected_substring}': {msg}"
+    );
+}
+
 // =============================================================================
 // Rust Rewrite Tests
 // =============================================================================
 
 #[test]
 fn rewrite_rust_let_to_const() -> Result<(), TestError> {
-    let result = apply_rewrite(
+    test_rewrite(
         fixtures::RUST_LET_BINDINGS,
         "let $VAR = $VAL",
         "const $VAR: _ = $VAL",
         SupportedLanguage::Rust,
-    )?;
-    assert_debug_snapshot!(result);
-    Ok(())
+        "rewrite_rust_let_to_const",
+    )
 }
 
 #[test]
 fn rewrite_rust_remove_dbg() -> Result<(), TestError> {
-    let result = apply_rewrite(
+    test_rewrite(
         fixtures::RUST_DEBUG_MACROS,
         "dbg!($EXPR)",
         "$EXPR",
         SupportedLanguage::Rust,
-    )?;
-    assert_debug_snapshot!(result);
-    Ok(())
+        "rewrite_rust_remove_dbg",
+    )
 }
 
 #[test]
 fn rewrite_rust_println_to_log() -> Result<(), TestError> {
-    let result = apply_rewrite(
+    test_rewrite(
         fixtures::RUST_PRINTLN,
         "println!($$$ARGS)",
         "log::info!($$$ARGS)",
         SupportedLanguage::Rust,
-    )?;
-    assert_debug_snapshot!(result);
-    Ok(())
+        "rewrite_rust_println_to_log",
+    )
 }
 
 #[test]
 fn rewrite_rust_no_match_unchanged() -> Result<(), TestError> {
-    let result = apply_rewrite(
+    test_rewrite(
         fixtures::RUST_FUNCTIONS,
         "panic!($$$ARGS)",
         "bail!($$$ARGS)",
         SupportedLanguage::Rust,
-    )?;
-    assert_debug_snapshot!(result);
-    Ok(())
+        "rewrite_rust_no_match_unchanged",
+    )
 }
 
 #[test]
 fn rewrite_rust_struct_to_enum() -> Result<(), TestError> {
-    let result = apply_rewrite(
+    test_rewrite(
         "struct Empty {}",
         "struct $NAME {}",
         "enum $NAME {}",
         SupportedLanguage::Rust,
-    )?;
-    assert_debug_snapshot!(result);
-    Ok(())
+        "rewrite_rust_struct_to_enum",
+    )
 }
 
 #[test]
@@ -143,26 +168,24 @@ fn rewrite_rust_multiple_replacements() -> Result<(), TestError> {
 
 #[test]
 fn rewrite_python_print_to_logging() -> Result<(), TestError> {
-    let result = apply_rewrite(
+    test_rewrite(
         fixtures::PYTHON_PRINTS,
         "print($$$ARGS)",
         "logging.info($$$ARGS)",
         SupportedLanguage::Python,
-    )?;
-    assert_debug_snapshot!(result);
-    Ok(())
+        "rewrite_python_print_to_logging",
+    )
 }
 
 #[test]
 fn rewrite_python_no_match_unchanged() -> Result<(), TestError> {
-    let result = apply_rewrite(
+    test_rewrite(
         fixtures::PYTHON_FUNCTIONS,
         "import $MODULE",
         "from $MODULE import *",
         SupportedLanguage::Python,
-    )?;
-    assert_debug_snapshot!(result);
-    Ok(())
+        "rewrite_python_no_match_unchanged",
+    )
 }
 
 #[test]
@@ -203,38 +226,35 @@ other = old_func(x)
 
 #[test]
 fn rewrite_typescript_console_to_logger() -> Result<(), TestError> {
-    let result = apply_rewrite(
+    test_rewrite(
         fixtures::TYPESCRIPT_CONSOLE,
         "console.log($$$ARGS)",
         "logger.info($$$ARGS)",
         SupportedLanguage::TypeScript,
-    )?;
-    assert_debug_snapshot!(result);
-    Ok(())
+        "rewrite_typescript_console_to_logger",
+    )
 }
 
 #[test]
 fn rewrite_typescript_var_to_const() -> Result<(), TestError> {
-    let result = apply_rewrite(
+    test_rewrite(
         fixtures::TYPESCRIPT_VAR_DECLARATIONS,
         "var $VAR = $VAL",
         "const $VAR = $VAL",
         SupportedLanguage::TypeScript,
-    )?;
-    assert_debug_snapshot!(result);
-    Ok(())
+        "rewrite_typescript_var_to_const",
+    )
 }
 
 #[test]
 fn rewrite_typescript_no_match_unchanged() -> Result<(), TestError> {
-    let result = apply_rewrite(
+    test_rewrite(
         fixtures::TYPESCRIPT_FUNCTIONS,
         "debugger",
         "// debugger removed",
         SupportedLanguage::TypeScript,
-    )?;
-    assert_debug_snapshot!(result);
-    Ok(())
+        "rewrite_typescript_no_match_unchanged",
+    )
 }
 
 #[test]
@@ -334,75 +354,23 @@ fn rewrite_chained_transformations() -> Result<(), TestError> {
 #[test]
 fn rewrite_invalid_pattern_syntax_returns_error() {
     // Pattern with unclosed braces should fail to compile
-    let result = apply_rewrite(
-        "fn foo() {}",
-        "fn $NAME {",
-        "fn $NAME() {}",
-        SupportedLanguage::Rust,
-    );
-    assert!(result.is_err());
-
-    let err = result.expect_err("should have returned error");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("pattern") || msg.contains("syntax"),
-        "error message should mention pattern or syntax: {msg}"
-    );
+    assert_rewrite_error("fn $NAME {", "fn $NAME() {}", "pattern");
 }
 
 #[test]
 fn rewrite_undefined_metavariable_in_replacement_returns_error() {
     // Replacement references $UNDEFINED which is not in the pattern
-    let result = apply_rewrite(
-        "fn foo() {}",
-        "fn $NAME() {}",
-        "fn $UNDEFINED() {}",
-        SupportedLanguage::Rust,
-    );
-    assert!(result.is_err());
-
-    let err = result.expect_err("should have returned error");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("undefined") || msg.contains("replacement"),
-        "error message should mention undefined or replacement: {msg}"
-    );
+    assert_rewrite_error("fn $NAME() {}", "fn $UNDEFINED() {}", "undefined");
 }
 
 #[test]
 fn rewrite_invalid_metavariable_syntax_in_pattern_returns_error() {
     // $$VAR is invalid (must be $ or $$$, not $$)
-    let result = apply_rewrite(
-        "fn foo() {}",
-        "fn $$INVALID() {}",
-        "fn bar() {}",
-        SupportedLanguage::Rust,
-    );
-    assert!(result.is_err());
-
-    let err = result.expect_err("should have returned error");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("metavariable"),
-        "error message should mention metavariable: {msg}"
-    );
+    assert_rewrite_error("fn $$INVALID() {}", "fn bar() {}", "metavariable");
 }
 
 #[test]
 fn rewrite_empty_metavariable_name_in_pattern_returns_error() {
     // $ without a name following it is invalid
-    let result = apply_rewrite(
-        "let x = 1",
-        "let $ = $VAL",
-        "const x = $VAL",
-        SupportedLanguage::Rust,
-    );
-    assert!(result.is_err());
-
-    let err = result.expect_err("should have returned error");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("metavariable"),
-        "error message should mention metavariable: {msg}"
-    );
+    assert_rewrite_error("let $ = $VAL", "const x = $VAL", "metavariable");
 }

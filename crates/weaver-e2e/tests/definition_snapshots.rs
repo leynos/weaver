@@ -89,31 +89,15 @@ impl Drop for TestContext {
 ///
 /// Strips the temp directory path prefix for stable snapshots.
 #[derive(Debug)]
+#[expect(
+    dead_code,
+    reason = "fields used in debug output for snapshot comparison"
+)]
 struct LocationSnapshot {
-    #[expect(
-        dead_code,
-        reason = "field used in debug output for snapshot comparison"
-    )]
     filename: String,
-    #[expect(
-        dead_code,
-        reason = "field used in debug output for snapshot comparison"
-    )]
     start_line: u32,
-    #[expect(
-        dead_code,
-        reason = "field used in debug output for snapshot comparison"
-    )]
     start_char: u32,
-    #[expect(
-        dead_code,
-        reason = "field used in debug output for snapshot comparison"
-    )]
     end_line: u32,
-    #[expect(
-        dead_code,
-        reason = "field used in debug output for snapshot comparison"
-    )]
     end_char: u32,
 }
 
@@ -133,31 +117,25 @@ impl LocationSnapshot {
     }
 
     fn from_link(link: &lsp_types::LocationLink) -> Self {
-        let loc = Location {
+        Self::from_location(&Location {
             uri: link.target_uri.clone(),
             range: link.target_selection_range,
-        };
-        Self::from_location(&loc)
+        })
     }
 }
 
 /// Represents a definition result for snapshot comparison.
 #[derive(Debug)]
+#[expect(
+    dead_code,
+    reason = "variants used in debug output for snapshot comparison"
+)]
 enum DefinitionSnapshot {
     None,
-    #[expect(
-        dead_code,
-        reason = "variant used in debug output for snapshot comparison"
-    )]
     Single(LocationSnapshot),
-    #[expect(
-        dead_code,
-        reason = "variant used in debug output for snapshot comparison"
-    )]
     Multiple(Vec<LocationSnapshot>),
 }
 
-#[expect(clippy::indexing_slicing, reason = "we check length before indexing")]
 impl From<Option<GotoDefinitionResponse>> for DefinitionSnapshot {
     fn from(response: Option<GotoDefinitionResponse>) -> Self {
         match response {
@@ -165,20 +143,16 @@ impl From<Option<GotoDefinitionResponse>> for DefinitionSnapshot {
             Some(GotoDefinitionResponse::Scalar(loc)) => {
                 Self::Single(LocationSnapshot::from_location(&loc))
             }
-            Some(GotoDefinitionResponse::Array(locs)) if locs.is_empty() => Self::None,
-            Some(GotoDefinitionResponse::Array(locs)) if locs.len() == 1 => {
-                Self::Single(LocationSnapshot::from_location(&locs[0]))
-            }
-            Some(GotoDefinitionResponse::Array(locs)) => {
-                Self::Multiple(locs.iter().map(LocationSnapshot::from_location).collect())
-            }
-            Some(GotoDefinitionResponse::Link(links)) if links.is_empty() => Self::None,
-            Some(GotoDefinitionResponse::Link(links)) if links.len() == 1 => {
-                Self::Single(LocationSnapshot::from_link(&links[0]))
-            }
-            Some(GotoDefinitionResponse::Link(links)) => {
-                Self::Multiple(links.iter().map(LocationSnapshot::from_link).collect())
-            }
+            Some(GotoDefinitionResponse::Array(locs)) => match locs.as_slice() {
+                [] => Self::None,
+                [loc] => Self::Single(LocationSnapshot::from_location(loc)),
+                _ => Self::Multiple(locs.iter().map(LocationSnapshot::from_location).collect()),
+            },
+            Some(GotoDefinitionResponse::Link(links)) => match links.as_slice() {
+                [] => Self::None,
+                [link] => Self::Single(LocationSnapshot::from_link(link)),
+                _ => Self::Multiple(links.iter().map(LocationSnapshot::from_link).collect()),
+            },
         }
     }
 }
@@ -215,28 +189,18 @@ mod fixtures_impl {
         }))
     }
 
-    /// Creates a test context with a linear call chain fixture.
-    ///
-    /// # Panics
-    /// Panics if the test context cannot be created (e.g., spawn or initialization fails).
+    // Note: All fixture functions panic if context creation fails.
+
     #[fixture]
     pub fn linear_chain_context() -> Option<TestContext> {
         create_test_context(fixtures::LINEAR_CHAIN).expect("failed to create test context")
     }
 
-    /// Creates a test context with Python class fixture.
-    ///
-    /// # Panics
-    /// Panics if the test context cannot be created (e.g., spawn or initialization fails).
     #[fixture]
     pub fn python_class_context() -> Option<TestContext> {
         create_test_context(fixtures::PYTHON_CLASS).expect("failed to create test context")
     }
 
-    /// Creates a test context with Python functions fixture.
-    ///
-    /// # Panics
-    /// Panics if the test context cannot be created (e.g., spawn or initialization fails).
     #[fixture]
     pub fn python_functions_context() -> Option<TestContext> {
         create_test_context(fixtures::PYTHON_FUNCTIONS).expect("failed to create test context")
@@ -391,19 +355,20 @@ fn definition_on_whitespace(
 // Error Case Tests
 // =============================================================================
 
-#[test]
-fn lsp_operation_before_init_returns_error() -> Result<(), TestError> {
-    require_pyrefly!();
-
-    // Spawn client but don't call initialize()
-    let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"])?;
-
-    // Create a dummy URI
+/// Spawns an uninitialized LSP client for error testing.
+fn spawn_uninitialized_client() -> Result<(LspClient, Uri), TestError> {
+    let client = LspClient::spawn("uvx", &["pyrefly", "lsp"])?;
     let uri: Uri = "file:///tmp/test.py"
         .parse()
         .map_err(|_| TestError::InvalidUri("file:///tmp/test.py".to_owned()))?;
+    Ok((client, uri))
+}
 
-    // Try to call did_open before initialize - should fail
+#[test]
+fn lsp_operation_before_init_returns_error() -> Result<(), TestError> {
+    require_pyrefly!();
+    let (mut client, uri) = spawn_uninitialized_client()?;
+
     match client.did_open(uri, "python", "def foo(): pass") {
         Err(LspClientError::NotInitialized) => Ok(()),
         Err(other) => Err(TestError::WrongErrorType {
@@ -416,16 +381,8 @@ fn lsp_operation_before_init_returns_error() -> Result<(), TestError> {
 #[test]
 fn lsp_goto_definition_before_init_returns_error() -> Result<(), TestError> {
     require_pyrefly!();
+    let (mut client, uri) = spawn_uninitialized_client()?;
 
-    // Spawn client but don't call initialize()
-    let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"])?;
-
-    // Create a dummy URI
-    let uri: Uri = "file:///tmp/test.py"
-        .parse()
-        .map_err(|_| TestError::InvalidUri("file:///tmp/test.py".to_owned()))?;
-
-    // Try to call goto_definition before initialize - should fail
     match client.goto_definition_at(&uri, 0, 0) {
         Err(LspClientError::NotInitialized) => Ok(()),
         Err(other) => Err(TestError::WrongErrorType {

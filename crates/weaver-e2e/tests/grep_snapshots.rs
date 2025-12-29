@@ -80,6 +80,19 @@ fn find_matches(
         .collect())
 }
 
+/// Helper to assert that a pattern fails to compile with an expected error substring.
+fn assert_pattern_error(pattern: &str, expected_substring: &str) {
+    let result = find_matches("fn foo() {}", pattern, SupportedLanguage::Rust);
+    let Err(err) = result else {
+        panic!("expected error for pattern: {pattern}");
+    };
+    let msg = err.to_string();
+    assert!(
+        msg.contains(expected_substring),
+        "error message should mention '{expected_substring}': {msg}"
+    );
+}
+
 // =============================================================================
 // Rust Pattern Matching Tests
 // =============================================================================
@@ -359,41 +372,17 @@ fn grep_wildcard_patterns() -> Result<(), TestError> {
 #[test]
 fn grep_invalid_pattern_syntax_returns_error() {
     // Pattern with unclosed parenthesis should fail to compile
-    let result = find_matches("fn foo() {}", "fn $NAME(", SupportedLanguage::Rust);
-    assert!(result.is_err());
-
-    let err = result.expect_err("should have returned error");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("pattern") || msg.contains("syntax"),
-        "error message should mention pattern or syntax: {msg}"
-    );
+    assert_pattern_error("fn $NAME(", "pattern");
 }
 
 #[test]
 fn grep_invalid_metavariable_syntax_returns_error() {
     // $$VAR is invalid (must be $ or $$$, not $$)
-    let result = find_matches("fn foo() {}", "$$INVALID", SupportedLanguage::Rust);
-    assert!(result.is_err());
-
-    let err = result.expect_err("should have returned error");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("metavariable"),
-        "error message should mention metavariable: {msg}"
-    );
+    assert_pattern_error("$$INVALID", "metavariable");
 }
 
 #[test]
 fn grep_empty_metavariable_name_returns_error() {
     // $ without a name following it is invalid
-    let result = find_matches("fn foo() {}", "let $ = 1", SupportedLanguage::Rust);
-    assert!(result.is_err());
-
-    let err = result.expect_err("should have returned error");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("metavariable"),
-        "error message should mention metavariable: {msg}"
-    );
+    assert_pattern_error("let $ = 1", "metavariable");
 }
