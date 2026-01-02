@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: result
+---
+RewriteSnapshot {
+    output: "function oldName(): void {\n    console.log(\"old\");\n}\noldName();\n",
+    num_replacements: 0,
+    has_changes: false,
+}

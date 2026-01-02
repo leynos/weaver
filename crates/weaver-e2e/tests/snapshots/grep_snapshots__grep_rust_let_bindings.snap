@@ -1,0 +1,51 @@
+---
+source: crates/weaver-e2e/tests/grep_snapshots.rs
+expression: matches
+---
+[
+    MatchSnapshot {
+        text: "let a = 1;",
+        start: (
+            2,
+            5,
+        ),
+        end: (
+            2,
+            15,
+        ),
+        captures: {
+            "VAL": "1",
+            "VAR": "a",
+        },
+    },
+    MatchSnapshot {
+        text: "let b = 2;",
+        start: (
+            3,
+            5,
+        ),
+        end: (
+            3,
+            15,
+        ),
+        captures: {
+            "VAL": "2",
+            "VAR": "b",
+        },
+    },
+    MatchSnapshot {
+        text: "let result = a + b;",
+        start: (
+            4,
+            5,
+        ),
+        end: (
+            4,
+            24,
+        ),
+        captures: {
+            "VAL": "a + b",
+            "VAR": "result",
+        },
+    },
+]

@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: result
+---
+RewriteSnapshot {
+    output: "fn logging() {\n    log::info!((\"Starting\"));\n    log::info!((\"Processing: {}\", 42));\n    log::info!((\"Done\"));\n}\n",
+    num_replacements: 3,
+    has_changes: true,
+}

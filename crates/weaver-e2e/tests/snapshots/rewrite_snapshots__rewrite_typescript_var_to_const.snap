@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: result
+---
+RewriteSnapshot {
+    output: "function oldStyle(): void {\n    var x = 1;\n    var y = 2;\n    var result = x + y;\n    console.log(result);\n}\n",
+    num_replacements: 0,
+    has_changes: false,
+}

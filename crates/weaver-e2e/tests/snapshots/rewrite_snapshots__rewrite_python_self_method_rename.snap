@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: result
+---
+RewriteSnapshot {
+    output: "class Example:\n    def process(self):\n        self.new_method()\n        self.new_method()\n",
+    num_replacements: 2,
+    has_changes: true,
+}

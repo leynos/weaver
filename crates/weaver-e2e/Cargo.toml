@@ -6,6 +6,7 @@ version.workspace = true
 [dependencies]
 weaver-graph = { path = "../weaver-graph" }
 weaver-lsp-host = { path = "../weaver-lsp-host" }
+weaver-syntax = { path = "../weaver-syntax" }
 lsp-types = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: result
+---
+RewriteSnapshot {
+    output: "// Header comment\nfn before() {}\n\nfn target() {\n    const x: _ = 1\n}\n\nfn after() {}\n// Footer comment",
+    num_replacements: 1,
+    has_changes: true,
+}

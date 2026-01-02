@@ -21,6 +21,7 @@
 //! are not available, ensuring CI resilience.
 
 pub mod fixtures;
+mod jsonrpc;
 pub mod lsp_client;
 pub mod pyrefly;
 

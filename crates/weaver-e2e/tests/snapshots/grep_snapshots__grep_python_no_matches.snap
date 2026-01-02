@@ -1,0 +1,972 @@
+---
+source: crates/weaver-e2e/tests/grep_snapshots.rs
+expression: matches
+---
+[
+    MatchSnapshot {
+        text: "def greet(name):\n    print(f\"Hello, {name}\")\n\ndef farewell(name):\n    print(f\"Goodbye, {name}\")\n\ndef process(data):\n    result = transform(data)\n    return result\n",
+        start: (
+            1,
+            1,
+        ),
+        end: (
+            10,
+            1,
+        ),
+        captures: {
+            "MODULE": "def greet(name):\n    print(f\"Hello, {name}\")\n\ndef farewell(name):\n    print(f\"Goodbye, {name}\")\n\ndef process(data):\n    result = transform(data)\n    return result\n",
+        },
+    },
+    MatchSnapshot {
+        text: "def greet(name):\n    print(f\"Hello, {name}\")",
+        start: (
+            1,
+            1,
+        ),
+        end: (
+            2,
+            28,
+        ),
+        captures: {
+            "MODULE": "def greet(name):\n    print(f\"Hello, {name}\")",
+        },
+    },
+    MatchSnapshot {
+        text: "def",
+        start: (
+            1,
+            1,
+        ),
+        end: (
+            1,
+            4,
+        ),
+        captures: {
+            "MODULE": "def",
+        },
+    },
+    MatchSnapshot {
+        text: "greet",
+        start: (
+            1,
+            5,
+        ),
+        end: (
+            1,
+            10,
+        ),
+        captures: {
+            "MODULE": "greet",
+        },
+    },
+    MatchSnapshot {
+        text: "(name)",
+        start: (
+            1,
+            10,
+        ),
+        end: (
+            1,
+            16,
+        ),
+        captures: {
+            "MODULE": "(name)",
+        },
+    },
+    MatchSnapshot {
+        text: "(",
+        start: (
+            1,
+            10,
+        ),
+        end: (
+            1,
+            11,
+        ),
+        captures: {
+            "MODULE": "(",
+        },
+    },
+    MatchSnapshot {
+        text: "name",
+        start: (
+            1,
+            11,
+        ),
+        end: (
+            1,
+            15,
+        ),
+        captures: {
+            "MODULE": "name",
+        },
+    },
+    MatchSnapshot {
+        text: ")",
+        start: (
+            1,
+            15,
+        ),
+        end: (
+            1,
+            16,
+        ),
+        captures: {
+            "MODULE": ")",
+        },
+    },
+    MatchSnapshot {
+        text: ":",
+        start: (
+            1,
+            16,
+        ),
+        end: (
+            1,
+            17,
+        ),
+        captures: {
+            "MODULE": ":",
+        },
+    },
+    MatchSnapshot {
+        text: "print(f\"Hello, {name}\")",
+        start: (
+            2,
+            5,
+        ),
+        end: (
+            2,
+            28,
+        ),
+        captures: {
+            "MODULE": "print(f\"Hello, {name}\")",
+        },
+    },
+    MatchSnapshot {
+        text: "print(f\"Hello, {name}\")",
+        start: (
+            2,
+            5,
+        ),
+        end: (
+            2,
+            28,
+        ),
+        captures: {
+            "MODULE": "print(f\"Hello, {name}\")",
+        },
+    },
+    MatchSnapshot {
+        text: "print(f\"Hello, {name}\")",
+        start: (
+            2,
+            5,
+        ),
+        end: (
+            2,
+            28,
+        ),
+        captures: {
+            "MODULE": "print(f\"Hello, {name}\")",
+        },
+    },
+    MatchSnapshot {
+        text: "print",
+        start: (
+            2,
+            5,
+        ),
+        end: (
+            2,
+            10,
+        ),
+        captures: {
+            "MODULE": "print",
+        },
+    },
+    MatchSnapshot {
+        text: "(f\"Hello, {name}\")",
+        start: (
+            2,
+            10,
+        ),
+        end: (
+            2,
+            28,
+        ),
+        captures: {
+            "MODULE": "(f\"Hello, {name}\")",
+        },
+    },
+    MatchSnapshot {
+        text: "(",
+        start: (
+            2,
+            10,
+        ),
+        end: (
+            2,
+            11,
+        ),
+        captures: {
+            "MODULE": "(",
+        },
+    },
+    MatchSnapshot {
+        text: "f\"Hello, {name}\"",
+        start: (
+            2,
+            11,
+        ),
+        end: (
+            2,
+            27,
+        ),
+        captures: {
+            "MODULE": "f\"Hello, {name}\"",
+        },
+    },
+    MatchSnapshot {
+        text: "f\"",
+        start: (
+            2,
+            11,
+        ),
+        end: (
+            2,
+            13,
+        ),
+        captures: {
+            "MODULE": "f\"",
+        },
+    },
+    MatchSnapshot {
+        text: "Hello, ",
+        start: (
+            2,
+            13,
+        ),
+        end: (
+            2,
+            20,
+        ),
+        captures: {
+            "MODULE": "Hello, ",
+        },
+    },
+    MatchSnapshot {
+        text: "{name}",
+        start: (
+            2,
+            20,
+        ),
+        end: (
+            2,
+            26,
+        ),
+        captures: {
+            "MODULE": "{name}",
+        },
+    },
+    MatchSnapshot {
+        text: "{",
+        start: (
+            2,
+            20,
+        ),
+        end: (
+            2,
+            21,
+        ),
+        captures: {
+            "MODULE": "{",
+        },
+    },
+    MatchSnapshot {
+        text: "name",
+        start: (
+            2,
+            21,
+        ),
+        end: (
+            2,
+            25,
+        ),
+        captures: {
+            "MODULE": "name",
+        },
+    },
+    MatchSnapshot {
+        text: "}",
+        start: (
+            2,
+            25,
+        ),
+        end: (
+            2,
+            26,
+        ),
+        captures: {
+            "MODULE": "}",
+        },
+    },
+    MatchSnapshot {
+        text: "\"",
+        start: (
+            2,
+            26,
+        ),
+        end: (
+            2,
+            27,
+        ),
+        captures: {
+            "MODULE": "\"",
+        },
+    },
+    MatchSnapshot {
+        text: ")",
+        start: (
+            2,
+            27,
+        ),
+        end: (
+            2,
+            28,
+        ),
+        captures: {
+            "MODULE": ")",
+        },
+    },
+    MatchSnapshot {
+        text: "def farewell(name):\n    print(f\"Goodbye, {name}\")",
+        start: (
+            4,
+            1,
+        ),
+        end: (
+            5,
+            30,
+        ),
+        captures: {
+            "MODULE": "def farewell(name):\n    print(f\"Goodbye, {name}\")",
+        },
+    },
+    MatchSnapshot {
+        text: "def",
+        start: (
+            4,
+            1,
+        ),
+        end: (
+            4,
+            4,
+        ),
+        captures: {
+            "MODULE": "def",
+        },
+    },
+    MatchSnapshot {
+        text: "farewell",
+        start: (
+            4,
+            5,
+        ),
+        end: (
+            4,
+            13,
+        ),
+        captures: {
+            "MODULE": "farewell",
+        },
+    },
+    MatchSnapshot {
+        text: "(name)",
+        start: (
+            4,
+            13,
+        ),
+        end: (
+            4,
+            19,
+        ),
+        captures: {
+            "MODULE": "(name)",
+        },
+    },
+    MatchSnapshot {
+        text: "(",
+        start: (
+            4,
+            13,
+        ),
+        end: (
+            4,
+            14,
+        ),
+        captures: {
+            "MODULE": "(",
+        },
+    },
+    MatchSnapshot {
+        text: "name",
+        start: (
+            4,
+            14,
+        ),
+        end: (
+            4,
+            18,
+        ),
+        captures: {
+            "MODULE": "name",
+        },
+    },
+    MatchSnapshot {
+        text: ")",
+        start: (
+            4,
+            18,
+        ),
+        end: (
+            4,
+            19,
+        ),
+        captures: {
+            "MODULE": ")",
+        },
+    },
+    MatchSnapshot {
+        text: ":",
+        start: (
+            4,
+            19,
+        ),
+        end: (
+            4,
+            20,
+        ),
+        captures: {
+            "MODULE": ":",
+        },
+    },
+    MatchSnapshot {
+        text: "print(f\"Goodbye, {name}\")",
+        start: (
+            5,
+            5,
+        ),
+        end: (
+            5,
+            30,
+        ),
+        captures: {
+            "MODULE": "print(f\"Goodbye, {name}\")",
+        },
+    },
+    MatchSnapshot {
+        text: "print(f\"Goodbye, {name}\")",
+        start: (
+            5,
+            5,
+        ),
+        end: (
+            5,
+            30,
+        ),
+        captures: {
+            "MODULE": "print(f\"Goodbye, {name}\")",
+        },
+    },
+    MatchSnapshot {
+        text: "print(f\"Goodbye, {name}\")",
+        start: (
+            5,
+            5,
+        ),
+        end: (
+            5,
+            30,
+        ),
+        captures: {
+            "MODULE": "print(f\"Goodbye, {name}\")",
+        },
+    },
+    MatchSnapshot {
+        text: "print",
+        start: (
+            5,
+            5,
+        ),
+        end: (
+            5,
+            10,
+        ),
+        captures: {
+            "MODULE": "print",
+        },
+    },
+    MatchSnapshot {
+        text: "(f\"Goodbye, {name}\")",
+        start: (
+            5,
+            10,
+        ),
+        end: (
+            5,
+            30,
+        ),
+        captures: {
+            "MODULE": "(f\"Goodbye, {name}\")",
+        },
+    },
+    MatchSnapshot {
+        text: "(",
+        start: (
+            5,
+            10,
+        ),
+        end: (
+            5,
+            11,
+        ),
+        captures: {
+            "MODULE": "(",
+        },
+    },
+    MatchSnapshot {
+        text: "f\"Goodbye, {name}\"",
+        start: (
+            5,
+            11,
+        ),
+        end: (
+            5,
+            29,
+        ),
+        captures: {
+            "MODULE": "f\"Goodbye, {name}\"",
+        },
+    },
+    MatchSnapshot {
+        text: "f\"",
+        start: (
+            5,
+            11,
+        ),
+        end: (
+            5,
+            13,
+        ),
+        captures: {
+            "MODULE": "f\"",
+        },
+    },
+    MatchSnapshot {
+        text: "Goodbye, ",
+        start: (
+            5,
+            13,
+        ),
+        end: (
+            5,
+            22,
+        ),
+        captures: {
+            "MODULE": "Goodbye, ",
+        },
+    },
+    MatchSnapshot {
+        text: "{name}",
+        start: (
+            5,
+            22,
+        ),
+        end: (
+            5,
+            28,
+        ),
+        captures: {
+            "MODULE": "{name}",
+        },
+    },
+    MatchSnapshot {
+        text: "{",
+        start: (
+            5,
+            22,
+        ),
+        end: (
+            5,
+            23,
+        ),
+        captures: {
+            "MODULE": "{",
+        },
+    },
+    MatchSnapshot {
+        text: "name",
+        start: (
+            5,
+            23,
+        ),
+        end: (
+            5,
+            27,
+        ),
+        captures: {
+            "MODULE": "name",
+        },
+    },
+    MatchSnapshot {
+        text: "}",
+        start: (
+            5,
+            27,
+        ),
+        end: (
+            5,
+            28,
+        ),
+        captures: {
+            "MODULE": "}",
+        },
+    },
+    MatchSnapshot {
+        text: "\"",
+        start: (
+            5,
+            28,
+        ),
+        end: (
+            5,
+            29,
+        ),
+        captures: {
+            "MODULE": "\"",
+        },
+    },
+    MatchSnapshot {
+        text: ")",
+        start: (
+            5,
+            29,
+        ),
+        end: (
+            5,
+            30,
+        ),
+        captures: {
+            "MODULE": ")",
+        },
+    },
+    MatchSnapshot {
+        text: "def process(data):\n    result = transform(data)\n    return result",
+        start: (
+            7,
+            1,
+        ),
+        end: (
+            9,
+            18,
+        ),
+        captures: {
+            "MODULE": "def process(data):\n    result = transform(data)\n    return result",
+        },
+    },
+    MatchSnapshot {
+        text: "def",
+        start: (
+            7,
+            1,
+        ),
+        end: (
+            7,
+            4,
+        ),
+        captures: {
+            "MODULE": "def",
+        },
+    },
+    MatchSnapshot {
+        text: "process",
+        start: (
+            7,
+            5,
+        ),
+        end: (
+            7,
+            12,
+        ),
+        captures: {
+            "MODULE": "process",
+        },
+    },
+    MatchSnapshot {
+        text: "(data)",
+        start: (
+            7,
+            12,
+        ),
+        end: (
+            7,
+            18,
+        ),
+        captures: {
+            "MODULE": "(data)",
+        },
+    },
+    MatchSnapshot {
+        text: "(",
+        start: (
+            7,
+            12,
+        ),
+        end: (
+            7,
+            13,
+        ),
+        captures: {
+            "MODULE": "(",
+        },
+    },
+    MatchSnapshot {
+        text: "data",
+        start: (
+            7,
+            13,
+        ),
+        end: (
+            7,
+            17,
+        ),
+        captures: {
+            "MODULE": "data",
+        },
+    },
+    MatchSnapshot {
+        text: ")",
+        start: (
+            7,
+            17,
+        ),
+        end: (
+            7,
+            18,
+        ),
+        captures: {
+            "MODULE": ")",
+        },
+    },
+    MatchSnapshot {
+        text: ":",
+        start: (
+            7,
+            18,
+        ),
+        end: (
+            7,
+            19,
+        ),
+        captures: {
+            "MODULE": ":",
+        },
+    },
+    MatchSnapshot {
+        text: "result = transform(data)\n    return result",
+        start: (
+            8,
+            5,
+        ),
+        end: (
+            9,
+            18,
+        ),
+        captures: {
+            "MODULE": "result = transform(data)\n    return result",
+        },
+    },
+    MatchSnapshot {
+        text: "result = transform(data)",
+        start: (
+            8,
+            5,
+        ),
+        end: (
+            8,
+            29,
+        ),
+        captures: {
+            "MODULE": "result = transform(data)",
+        },
+    },
+    MatchSnapshot {
+        text: "result = transform(data)",
+        start: (
+            8,
+            5,
+        ),
+        end: (
+            8,
+            29,
+        ),
+        captures: {
+            "MODULE": "result = transform(data)",
+        },
+    },
+    MatchSnapshot {
+        text: "result",
+        start: (
+            8,
+            5,
+        ),
+        end: (
+            8,
+            11,
+        ),
+        captures: {
+            "MODULE": "result",
+        },
+    },
+    MatchSnapshot {
+        text: "=",
+        start: (
+            8,
+            12,
+        ),
+        end: (
+            8,
+            13,
+        ),
+        captures: {
+            "MODULE": "=",
+        },
+    },
+    MatchSnapshot {
+        text: "transform(data)",
+        start: (
+            8,
+            14,
+        ),
+        end: (
+            8,
+            29,
+        ),
+        captures: {
+            "MODULE": "transform(data)",
+        },
+    },
+    MatchSnapshot {
+        text: "transform",
+        start: (
+            8,
+            14,
+        ),
+        end: (
+            8,
+            23,
+        ),
+        captures: {
+            "MODULE": "transform",
+        },
+    },
+    MatchSnapshot {
+        text: "(data)",
+        start: (
+            8,
+            23,
+        ),
+        end: (
+            8,
+            29,
+        ),
+        captures: {
+            "MODULE": "(data)",
+        },
+    },
+    MatchSnapshot {
+        text: "(",
+        start: (
+            8,
+            23,
+        ),
+        end: (
+            8,
+            24,
+        ),
+        captures: {
+            "MODULE": "(",
+        },
+    },
+    MatchSnapshot {
+        text: "data",
+        start: (
+            8,
+            24,
+        ),
+        end: (
+            8,
+            28,
+        ),
+        captures: {
+            "MODULE": "data",
+        },
+    },
+    MatchSnapshot {
+        text: ")",
+        start: (
+            8,
+            28,
+        ),
+        end: (
+            8,
+            29,
+        ),
+        captures: {
+            "MODULE": ")",
+        },
+    },
+    MatchSnapshot {
+        text: "return result",
+        start: (
+            9,
+            5,
+        ),
+        end: (
+            9,
+            18,
+        ),
+        captures: {
+            "MODULE": "return result",
+        },
+    },
+    MatchSnapshot {
+        text: "return",
+        start: (
+            9,
+            5,
+        ),
+        end: (
+            9,
+            11,
+        ),
+        captures: {
+            "MODULE": "return",
+        },
+    },
+    MatchSnapshot {
+        text: "result",
+        start: (
+            9,
+            12,
+        ),
+        end: (
+            9,
+            18,
+        ),
+        captures: {
+            "MODULE": "result",
+        },
+    },
+]

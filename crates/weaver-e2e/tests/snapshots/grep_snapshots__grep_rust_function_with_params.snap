@@ -1,0 +1,23 @@
+---
+source: crates/weaver-e2e/tests/grep_snapshots.rs
+expression: matches
+---
+[
+    MatchSnapshot {
+        text: "fn process(data: &str) -> String {\n    data.to_uppercase()\n}",
+        start: (
+            10,
+            1,
+        ),
+        end: (
+            12,
+            2,
+        ),
+        captures: {
+            "BODY": "data.to_uppercase()",
+            "NAME": "process",
+            "PARAMS": "(data: &str)",
+            "RET": "String",
+        },
+    },
+]

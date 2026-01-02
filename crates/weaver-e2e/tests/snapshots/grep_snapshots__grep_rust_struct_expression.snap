@@ -1,0 +1,21 @@
+---
+source: crates/weaver-e2e/tests/grep_snapshots.rs
+expression: matches
+---
+[
+    MatchSnapshot {
+        text: "Point { x: 0, y: 0 }",
+        start: (
+            1,
+            9,
+        ),
+        end: (
+            1,
+            29,
+        ),
+        captures: {
+            "X": "0",
+            "Y": "0",
+        },
+    },
+]

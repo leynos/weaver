@@ -10,12 +10,15 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    ClientCapabilities, DidOpenTextDocumentParams, InitializeParams, InitializeResult,
-    TextDocumentItem, Uri, WorkspaceFolder,
+    ClientCapabilities, DidOpenTextDocumentParams, GotoDefinitionParams, GotoDefinitionResponse,
+    InitializeParams, InitializeResult, TextDocumentIdentifier, TextDocumentItem,
+    TextDocumentPositionParams, Uri, WorkspaceFolder,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use thiserror::Error;
+
+use crate::jsonrpc::{Notification, Request, Response};
 
 /// Maximum number of messages to read before giving up on finding a response.
 const MAX_RESPONSE_ITERATIONS: usize = 1000;
@@ -55,42 +58,6 @@ pub enum LspClientError {
     /// Response timeout: too many messages without finding matching response.
     #[error("timeout waiting for response to request {0}")]
     ResponseTimeout(i64),
-}
-
-/// JSON-RPC request structure.
-#[derive(Debug, Serialize)]
-struct Request {
-    jsonrpc: &'static str,
-    id: i64,
-    method: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    params: Option<Value>,
-}
-
-/// JSON-RPC notification structure.
-#[derive(Debug, Serialize)]
-struct Notification {
-    jsonrpc: &'static str,
-    method: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    params: Option<Value>,
-}
-
-/// JSON-RPC response structure.
-#[derive(Debug, Deserialize)]
-struct Response {
-    #[expect(dead_code, reason = "required by JSON-RPC protocol but not used")]
-    jsonrpc: String,
-    id: Option<i64>,
-    result: Option<Value>,
-    error: Option<ResponseError>,
-}
-
-/// JSON-RPC error structure.
-#[derive(Debug, Deserialize)]
-struct ResponseError {
-    code: i64,
-    message: String,
 }
 
 /// A simple LSP client for E2E testing.
@@ -200,7 +167,7 @@ impl LspClient {
         &mut self,
         params: CallHierarchyPrepareParams,
     ) -> Result<Option<Vec<CallHierarchyItem>>, LspClientError> {
-        self.call_hierarchy_request("textDocument/prepareCallHierarchy", params)
+        self.lsp_request("textDocument/prepareCallHierarchy", params)
     }
 
     /// Gets incoming calls for a call hierarchy item.
@@ -211,7 +178,7 @@ impl LspClient {
         &mut self,
         params: CallHierarchyIncomingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyIncomingCall>>, LspClientError> {
-        self.call_hierarchy_request("callHierarchy/incomingCalls", params)
+        self.lsp_request("callHierarchy/incomingCalls", params)
     }
 
     /// Gets outgoing calls for a call hierarchy item.
@@ -222,7 +189,41 @@ impl LspClient {
         &mut self,
         params: CallHierarchyOutgoingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, LspClientError> {
-        self.call_hierarchy_request("callHierarchy/outgoingCalls", params)
+        self.lsp_request("callHierarchy/outgoingCalls", params)
+    }
+
+    /// Gets the definition location for a symbol at the given position.
+    ///
+    /// # Errors
+    /// Returns an error if the client is not initialized or if the request fails.
+    pub fn goto_definition(
+        &mut self,
+        params: GotoDefinitionParams,
+    ) -> Result<Option<GotoDefinitionResponse>, LspClientError> {
+        self.lsp_request("textDocument/definition", params)
+    }
+
+    /// Gets the definition location for a symbol at the given position.
+    ///
+    /// Convenience method that builds `GotoDefinitionParams` from components.
+    ///
+    /// # Errors
+    /// Returns an error if the client is not initialized or if the request fails.
+    pub fn goto_definition_at(
+        &mut self,
+        uri: &Uri,
+        line: u32,
+        character: u32,
+    ) -> Result<Option<GotoDefinitionResponse>, LspClientError> {
+        let params = GotoDefinitionParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                position: lsp_types::Position { line, character },
+            },
+            work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+            partial_result_params: lsp_types::PartialResultParams::default(),
+        };
+        self.goto_definition(params)
     }
 
     /// Shuts down the language server.
@@ -245,7 +246,7 @@ impl LspClient {
     }
 
     /// Helper for making LSP requests with automatic initialisation check and serialisation.
-    fn call_hierarchy_request<P, R>(&mut self, method: &str, params: P) -> Result<R, LspClientError>
+    fn lsp_request<P, R>(&mut self, method: &str, params: P) -> Result<R, LspClientError>
     where
         P: Serialize,
         R: for<'de> Deserialize<'de>,
@@ -362,12 +363,16 @@ impl LspClient {
     }
 }
 
-/// Returns client capabilities for call hierarchy support.
+/// Returns client capabilities for LSP features including call hierarchy and definition.
 fn client_capabilities() -> ClientCapabilities {
     ClientCapabilities {
         text_document: Some(lsp_types::TextDocumentClientCapabilities {
             call_hierarchy: Some(lsp_types::CallHierarchyClientCapabilities {
                 dynamic_registration: Some(false),
+            }),
+            definition: Some(lsp_types::GotoCapability {
+                dynamic_registration: Some(false),
+                link_support: Some(false),
             }),
             ..Default::default()
         }),

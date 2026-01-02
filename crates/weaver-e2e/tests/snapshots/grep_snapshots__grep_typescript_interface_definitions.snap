@@ -1,0 +1,51 @@
+---
+source: crates/weaver-e2e/tests/grep_snapshots.rs
+expression: matches
+---
+[
+    MatchSnapshot {
+        text: "interface Point {\n    x: number;\n    y: number;\n}",
+        start: (
+            1,
+            1,
+        ),
+        end: (
+            4,
+            2,
+        ),
+        captures: {
+            "MEMBERS": "{\n    x: number;\n    y: number;\n}",
+            "NAME": "Point",
+        },
+    },
+    MatchSnapshot {
+        text: "interface Rectangle {\n    width: number;\n    height: number;\n}",
+        start: (
+            6,
+            1,
+        ),
+        end: (
+            9,
+            2,
+        ),
+        captures: {
+            "MEMBERS": "{\n    width: number;\n    height: number;\n}",
+            "NAME": "Rectangle",
+        },
+    },
+    MatchSnapshot {
+        text: "interface User {\n    name: string;\n    email: string;\n}",
+        start: (
+            11,
+            1,
+        ),
+        end: (
+            14,
+            2,
+        ),
+        captures: {
+            "MEMBERS": "{\n    name: string;\n    email: string;\n}",
+            "NAME": "User",
+        },
+    },
+]

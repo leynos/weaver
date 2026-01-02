@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: result
+---
+RewriteSnapshot {
+    output: "result = old_func(a, b, c)\nother = old_func(x)\n",
+    num_replacements: 0,
+    has_changes: false,
+}

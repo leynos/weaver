@@ -1,0 +1,16 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: "(first, second)"
+---
+(
+    RewriteSnapshot {
+        output: "fn test() { let x = (1); }",
+        num_replacements: 1,
+        has_changes: true,
+    },
+    RewriteSnapshot {
+        output: "fn test() { const x = (1) }",
+        num_replacements: 1,
+        has_changes: true,
+    },
+)

@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: result
+---
+RewriteSnapshot {
+    output: "from def import *m def greet(name):\n    print(f\"Hello, {name}\") import *me}\")\n\ndef farewell(name):\n    print(f\"Goodbye, {name}\")\n\ndef process(data):\n    result = transform(data)\n    return result\n import *mport *me}\") import * (f\"Hello, {name}\") import *m f\"Hello, {name}\" import *mport *from { import *rom {name} import *name import *from } import *from \" import *from ) import *\n\nfrom def import *m def farewell(name):\n    print(f\"Goodbye, {name}\") import *e) import *name import *from ) import *from : import *\n    from print import *print(f\"Goodbye, {name}\") import *me}\") import *me}\") import *f\"Goodbye, {name}\") import *f\"Goodbye, {name}\" import *mport *from { import *rom {name} import *name import *from } import *from \" import *from ) import *\n\nfrom def import *m def process(data):\n    result = transform(data)\n    return result import *mport *from ) import *from : import *\n    from result import *esult = transform(data) import *data) import *data)\n    return result import *rt *sform(data) import * import *rom (data) import *data import *from ) import *\n    from return import *eturn result import *esult import *\n",
+    num_replacements: 69,
+    has_changes: true,
+}

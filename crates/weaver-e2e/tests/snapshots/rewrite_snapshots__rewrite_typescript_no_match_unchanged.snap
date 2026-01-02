@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/rewrite_snapshots.rs
+expression: result
+---
+RewriteSnapshot {
+    output: "function greet(name: string): void {\n    console.log(`Hello, ${name}`);\n}\n\nfunction farewell(name: string): void {\n    console.log(`Goodbye, ${name}`);\n}\n\nfunction process(data: string): string {\n    return data.toUpperCase();\n}\n",
+    num_replacements: 0,
+    has_changes: false,
+}
