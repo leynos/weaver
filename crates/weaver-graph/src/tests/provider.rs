@@ -68,6 +68,16 @@ impl TestClient {
             counts,
         }
     }
+
+    fn handle_call<T: Clone>(
+        &self,
+        response: &Response<T>,
+        update_counter: impl FnOnce(&mut CallCounts),
+    ) -> Result<Option<Vec<T>>, GraphError> {
+        let mut counts = self.counts.lock().expect("call count mutex poisoned");
+        update_counter(&mut counts);
+        response.as_result()
+    }
 }
 
 impl CallHierarchyClient for TestClient {
@@ -82,24 +92,18 @@ impl CallHierarchyClient for TestClient {
         &mut self,
         _params: CallHierarchyIncomingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyIncomingCall>>, GraphError> {
-        let mut counts = self
-            .counts
-            .lock()
-            .expect("incoming call count mutex poisoned");
-        counts.incoming += 1;
-        self.incoming.as_result()
+        self.handle_call(&self.incoming, |counts| {
+            counts.incoming += 1;
+        })
     }
 
     fn outgoing_calls(
         &mut self,
         _params: CallHierarchyOutgoingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, GraphError> {
-        let mut counts = self
-            .counts
-            .lock()
-            .expect("outgoing call count mutex poisoned");
-        counts.outgoing += 1;
-        self.outgoing.as_result()
+        self.handle_call(&self.outgoing, |counts| {
+            counts.outgoing += 1;
+        })
     }
 }
 
@@ -146,6 +150,22 @@ fn build_graph(provider: &mut LspCallGraphProvider<TestClient>, depth: u32) -> C
     provider
         .build_graph(&position, depth)
         .expect("graph should build")
+}
+
+fn test_build_graph_error(
+    prepare: Response<CallHierarchyItem>,
+    assert_error: impl FnOnce(GraphError),
+) {
+    let counts = Arc::new(Mutex::new(CallCounts::default()));
+    let client = TestClient::new(prepare, Response::Ok(None), Response::Ok(None), counts);
+    let mut provider = LspCallGraphProvider::new(client);
+    let position = SourcePosition::new("/src/main.rs", 1, 1);
+
+    let err = provider
+        .build_graph(&position, 1)
+        .expect_err("expected graph error");
+
+    assert_error(err);
 }
 
 #[test]
@@ -229,38 +249,14 @@ fn callers_graph_uses_incoming_only() {
 
 #[test]
 fn build_graph_returns_symbol_not_found_on_empty_prepare() {
-    let counts = Arc::new(Mutex::new(CallCounts::default()));
-    let client = TestClient::new(
-        Response::Ok(Some(Vec::new())),
-        Response::Ok(None),
-        Response::Ok(None),
-        counts,
-    );
-    let mut provider = LspCallGraphProvider::new(client);
-    let position = SourcePosition::new("/src/main.rs", 1, 1);
-
-    let err = provider
-        .build_graph(&position, 1)
-        .expect_err("expected symbol not found error");
-
-    assert!(matches!(err, GraphError::SymbolNotFound { .. }));
+    test_build_graph_error(Response::Ok(Some(Vec::new())), |err| {
+        assert!(matches!(err, GraphError::SymbolNotFound { .. }));
+    });
 }
 
 #[test]
 fn build_graph_propagates_prepare_error() {
-    let counts = Arc::new(Mutex::new(CallCounts::default()));
-    let client = TestClient::new(
-        Response::Err(ErrorKind::Validation),
-        Response::Ok(None),
-        Response::Ok(None),
-        counts,
-    );
-    let mut provider = LspCallGraphProvider::new(client);
-    let position = SourcePosition::new("/src/main.rs", 1, 1);
-
-    let err = provider
-        .build_graph(&position, 1)
-        .expect_err("expected validation error");
-
-    assert!(matches!(err, GraphError::Validation(_)));
+    test_build_graph_error(Response::Err(ErrorKind::Validation), |err| {
+        assert!(matches!(err, GraphError::Validation(_)));
+    });
 }
