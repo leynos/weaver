@@ -166,7 +166,9 @@ mod edge_tests {
 }
 
 mod provider_tests {
-    use crate::provider::{CallGraphProvider, CallHierarchyClient, LspCallGraphProvider, SourcePosition};
+    use crate::provider::{
+        CallGraphProvider, CallHierarchyClient, LspCallGraphProvider, SourcePosition,
+    };
     use crate::{CallGraph, GraphError};
     use lsp_types::{
         CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
@@ -196,7 +198,7 @@ mod provider_tests {
     }
 
     impl<T: Clone> Response<T> {
-        fn into_result(&self) -> Result<Option<Vec<T>>, GraphError> {
+        fn as_result(&self) -> Result<Option<Vec<T>>, GraphError> {
             match self {
                 Self::Ok(value) => Ok(value.clone()),
                 Self::Err(kind) => Err(kind.to_error()),
@@ -239,7 +241,7 @@ mod provider_tests {
             &mut self,
             _params: CallHierarchyPrepareParams,
         ) -> Result<Option<Vec<CallHierarchyItem>>, GraphError> {
-            self.prepare.into_result()
+            self.prepare.as_result()
         }
 
         fn incoming_calls(
@@ -251,7 +253,7 @@ mod provider_tests {
                 .lock()
                 .expect("incoming call count mutex poisoned");
             counts.incoming += 1;
-            self.incoming.into_result()
+            self.incoming.as_result()
         }
 
         fn outgoing_calls(
@@ -263,7 +265,7 @@ mod provider_tests {
                 .lock()
                 .expect("outgoing call count mutex poisoned");
             counts.outgoing += 1;
-            self.outgoing.into_result()
+            self.outgoing.as_result()
         }
     }
 
@@ -280,7 +282,7 @@ mod provider_tests {
 
     fn item(name: &str, line: u32, column: u32) -> CallHierarchyItem {
         CallHierarchyItem {
-            name: name.to_string(),
+            name: name.to_owned(),
             kind: SymbolKind::FUNCTION,
             tags: None,
             detail: None,
@@ -327,9 +329,9 @@ mod provider_tests {
 
         assert_eq!(graph.node_count(), 1);
         assert_eq!(graph.edge_count(), 0);
-        let counts = counts.lock().expect("call count mutex poisoned");
-        assert_eq!(counts.incoming, 0);
-        assert_eq!(counts.outgoing, 0);
+        let call_counts = counts.lock().expect("call count mutex poisoned");
+        assert_eq!(call_counts.incoming, 0);
+        assert_eq!(call_counts.outgoing, 0);
     }
 
     #[test]
@@ -353,16 +355,20 @@ mod provider_tests {
         let helper = graph.find_by_name("helper").expect("helper node missing");
 
         assert!(
-            graph.callers_of(main.id()).any(|node| node.id() == caller.id()),
+            graph
+                .callers_of(main.id())
+                .any(|node| node.id() == caller.id()),
             "caller edge missing"
         );
         assert!(
-            graph.callees_of(main.id()).any(|node| node.id() == helper.id()),
+            graph
+                .callees_of(main.id())
+                .any(|node| node.id() == helper.id()),
             "callee edge missing"
         );
-        let counts = counts.lock().expect("call count mutex poisoned");
-        assert_eq!(counts.incoming, 1);
-        assert_eq!(counts.outgoing, 1);
+        let call_counts = counts.lock().expect("call count mutex poisoned");
+        assert_eq!(call_counts.incoming, 1);
+        assert_eq!(call_counts.outgoing, 1);
     }
 
     #[test]
@@ -382,9 +388,9 @@ mod provider_tests {
             .expect("callers graph should build");
 
         assert_eq!(graph.node_count(), 2);
-        let counts = counts.lock().expect("call count mutex poisoned");
-        assert_eq!(counts.outgoing, 0);
-        assert_eq!(counts.incoming, 1);
+        let call_counts = counts.lock().expect("call count mutex poisoned");
+        assert_eq!(call_counts.outgoing, 0);
+        assert_eq!(call_counts.incoming, 1);
     }
 
     #[test]

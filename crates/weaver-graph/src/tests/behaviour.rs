@@ -6,7 +6,9 @@ use std::str::FromStr;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
-use crate::provider::{CallGraphProvider, CallHierarchyClient, LspCallGraphProvider, SourcePosition};
+use crate::provider::{
+    CallGraphProvider, CallHierarchyClient, LspCallGraphProvider, SourcePosition,
+};
 use crate::{CallGraph, GraphError};
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
@@ -45,7 +47,7 @@ enum Response<T: Clone> {
 }
 
 impl<T: Clone> Response<T> {
-    fn into_result(&self) -> Result<Option<Vec<T>>, GraphError> {
+    fn as_result(&self) -> Result<Option<Vec<T>>, GraphError> {
         match self {
             Self::Ok(value) => Ok(value.clone()),
             Self::Err(kind) => Err(kind.to_error()),
@@ -91,21 +93,21 @@ impl CallHierarchyClient for TestClient {
         &mut self,
         _params: CallHierarchyPrepareParams,
     ) -> Result<Option<Vec<CallHierarchyItem>>, GraphError> {
-        self.prepare.into_result()
+        self.prepare.as_result()
     }
 
     fn incoming_calls(
         &mut self,
         _params: CallHierarchyIncomingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyIncomingCall>>, GraphError> {
-        self.incoming.into_result()
+        self.incoming.as_result()
     }
 
     fn outgoing_calls(
         &mut self,
         _params: CallHierarchyOutgoingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, GraphError> {
-        self.outgoing.into_result()
+        self.outgoing.as_result()
     }
 }
 
@@ -122,7 +124,7 @@ fn range(line: u32, column: u32) -> Range {
 
 fn item(name: &str, line: u32, column: u32) -> CallHierarchyItem {
     CallHierarchyItem {
-        name: name.to_string(),
+        name: name.to_owned(),
         kind: SymbolKind::FUNCTION,
         tags: None,
         detail: None,
@@ -169,17 +171,20 @@ fn given_erroring_client(world: &RefCell<TestWorld>) {
 #[when("I build a call graph from {symbol} with depth {depth}")]
 fn when_build_graph(world: &RefCell<TestWorld>, symbol: String, depth: u32) {
     let _ = strip_quotes(&symbol);
-    let mut world = world.borrow_mut();
-    let provider = world.provider.as_mut().expect("provider should be configured");
+    let mut world_state = world.borrow_mut();
+    let provider = world_state
+        .provider
+        .as_mut()
+        .expect("provider should be configured");
     let position = SourcePosition::new("/src/main.rs", 1, 1);
     let result = provider.build_graph(&position, depth);
-    world.result = Some(result);
+    world_state.result = Some(result);
 }
 
 #[then("the graph has {node_count} nodes and {edge_count} edges")]
 fn then_graph_counts(world: &RefCell<TestWorld>, node_count: usize, edge_count: usize) {
-    let world = world.borrow();
-    let graph = world
+    let world_state = world.borrow();
+    let graph = world_state
         .result
         .as_ref()
         .expect("result missing")
@@ -191,21 +196,24 @@ fn then_graph_counts(world: &RefCell<TestWorld>, node_count: usize, edge_count: 
 
 #[then("the graph includes node {name}")]
 fn then_graph_includes_node(world: &RefCell<TestWorld>, name: String) {
-    let world = world.borrow();
-    let graph = world
+    let world_state = world.borrow();
+    let graph = world_state
         .result
         .as_ref()
         .expect("result missing")
         .as_ref()
         .expect("graph build failed");
-    let name = strip_quotes(&name);
-    assert!(graph.find_by_name(name).is_some(), "node {name} missing");
+    let node_name = strip_quotes(&name);
+    assert!(
+        graph.find_by_name(node_name).is_some(),
+        "node {node_name} missing"
+    );
 }
 
 #[then("the graph includes an edge from {caller} to {callee}")]
 fn then_graph_includes_edge(world: &RefCell<TestWorld>, caller: String, callee: String) {
-    let world = world.borrow();
-    let graph = world
+    let world_state = world.borrow();
+    let graph = world_state
         .result
         .as_ref()
         .expect("result missing")
@@ -219,26 +227,23 @@ fn then_graph_includes_edge(world: &RefCell<TestWorld>, caller: String, callee: 
     let callee_node = graph
         .find_by_name(callee_name)
         .expect("callee node missing");
-    let has_edge = graph.edges().any(|edge| {
-        edge.caller() == caller_node.id() && edge.callee() == callee_node.id()
-    });
-    assert!(
-        has_edge,
-        "edge {caller_name} -> {callee_name} missing"
-    );
+    let has_edge = graph
+        .edges()
+        .any(|edge| edge.caller() == caller_node.id() && edge.callee() == callee_node.id());
+    assert!(has_edge, "edge {caller_name} -> {callee_name} missing");
 }
 
 #[then("the graph build fails with {error_kind}")]
 fn then_graph_build_fails(world: &RefCell<TestWorld>, error_kind: String) {
-    let world = world.borrow();
-    let err = world
+    let world_state = world.borrow();
+    let err = world_state
         .result
         .as_ref()
         .expect("result missing")
         .as_ref()
         .expect_err("expected graph build to fail");
-    let error_kind = strip_quotes(&error_kind);
-    match error_kind {
+    let expected_kind = strip_quotes(&error_kind);
+    match expected_kind {
         "symbol_not_found" => {
             assert!(matches!(err, GraphError::SymbolNotFound { .. }));
         }

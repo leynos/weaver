@@ -11,8 +11,8 @@ its own.
 
 Implement the relational intelligence layer so Weaver can build a call graph
 from LSP `textDocument/callHierarchy` data. Success is visible when the
-weaver-graph crate can return a graph of nodes and edges for a symbol, and
-when the daemon-facing interface (or any public API) can surface that graph to
+weaver-graph crate can return a graph of nodes and edges for a symbol, and when
+the daemon-facing interface (or any public API) can surface that graph to
 callers with clear errors for unsupported or empty results. Behavioural tests
 must exercise both happy and unhappy paths using `rstest-bdd` v0.2.0.
 
@@ -34,10 +34,8 @@ must exercise both happy and unhappy paths using `rstest-bdd` v0.2.0.
 ## Decision Log
 
 - Decision: Use LSP `textDocument/callHierarchy` as the MVP provider for the
-  call graph.
-  Rationale: Matches the Phase 2 roadmap requirement and reuses existing LSP
-  infrastructure.
-  Date/Author: 2026-01-02 / plan author.
+  call graph. Rationale: Matches the Phase 2 roadmap requirement and reuses
+  existing LSP infrastructure. Date/Author: 2026-01-02 / plan author.
 
 ## Outcomes & Retrospective
 
@@ -88,19 +86,18 @@ Implement a provider trait that can build graphs from a start position and
 accept a depth limit. The LSP provider should: prepare call hierarchy items at
 the requested position, map items to nodes, traverse incoming and outgoing
 calls up to the requested depth, deduplicate nodes, and record edges with
-source metadata. Return semantic errors for missing symbols, missing
-capability support, and upstream LSP failures. Ensure each module has a `//!`
-comment and public APIs have rustdoc examples.
+source metadata. Return semantic errors for missing symbols, missing capability
+support, and upstream LSP failures. Ensure each module has a `//!` comment and
+public APIs have rustdoc examples.
 
 Add unit tests that validate graph structure behaviour (node IDs, edge
 creation, deduplication, depth limits, callers/callees queries). For
 behavioural tests, add a new Gherkin feature file and use `rstest-bdd` to
 exercise the provider against a stub call hierarchy client. Include scenarios
-for a simple happy path (single caller and callee), a no-results path
-(symbol not found), and a provider error path (simulated LSP failure or
-unsupported capability). Use `rstest` fixtures for shared setup, keep tests
-deterministic, and prefer `mockall` or a small in-memory stub implementing the
-client trait.
+for a simple happy path (single caller and callee), a no-results path (symbol
+not found), and a provider error path (simulated LSP failure or unsupported
+capability). Use `rstest` fixtures for shared setup, keep tests deterministic,
+and prefer `mockall` or a small in-memory stub implementing the client trait.
 
 Update documentation to reflect the implemented behaviour. In
 `docs/weaver-design.md`, document the concrete graph data model and the LSP
@@ -116,9 +113,8 @@ are safe to re-run.
 
 1. Inventory current implementation and call hierarchy wiring.
 
-   rg "weaver-graph" -n
-   rg "callHierarchy" -n crates/weaver-lsp-host
-   rg "call-hierarchy" -n docs
+   rg "weaver-graph" -n rg "callHierarchy" -n crates/weaver-lsp-host rg
+   "call-hierarchy" -n docs
 
 2. If the crate does not exist, create it and add it to the workspace.
 
@@ -157,18 +153,16 @@ are safe to re-run.
 
 7. Format and validate documentation (required after doc changes):
 
-   set -o pipefail
-   make fmt 2>&1 | tee /tmp/weaver-fmt.log
-   make markdownlint 2>&1 | tee /tmp/weaver-markdownlint.log
+   set -o pipefail make fmt 2>&1 | tee /tmp/weaver-fmt.log make markdownlint
+   2>&1 | tee /tmp/weaver-markdownlint.log
 
    Run `make nixie` only if a Mermaid diagram was edited.
 
 8. Run the Rust quality gates:
 
-   set -o pipefail
-   make check-fmt 2>&1 | tee /tmp/weaver-check-fmt.log
-   make lint 2>&1 | tee /tmp/weaver-lint.log
-   make test 2>&1 | tee /tmp/weaver-test.log
+   set -o pipefail make check-fmt 2>&1 | tee /tmp/weaver-check-fmt.log make
+   lint 2>&1 | tee /tmp/weaver-lint.log make test 2>&1 | tee
+   /tmp/weaver-test.log
 
 ## Validation and Acceptance
 

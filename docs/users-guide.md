@@ -315,8 +315,32 @@ call hierarchy: <SYMBOL> (direction outgoing, depth 2)
 
 JSON payload:
 
+Call hierarchy responses return a call graph. Each node includes its stable
+identifier, symbol name, kind, location, and optional container. Each edge
+captures the caller, callee, provenance, and optional call-site position.
+
 ```json
-{"nodes":[{"id":"n1"}],"edges":[{"caller":"n1","callee":"n2"}]}
+{
+  "nodes": [
+    {
+      "id": "/src/lib.rs:10:0:main",
+      "name": "main",
+      "kind": "function",
+      "uri": "file:///src/lib.rs",
+      "line": 10,
+      "column": 0,
+      "container": null
+    }
+  ],
+  "edges": [
+    {
+      "caller": "/src/lib.rs:10:0:main",
+      "callee": "/src/lib.rs:42:0:helper",
+      "source": "lsp",
+      "call_site": { "line": 12, "column": 4 }
+    }
+  ]
+}
 ```
 
 #### observe grep
