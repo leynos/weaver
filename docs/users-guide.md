@@ -261,39 +261,129 @@ the exact payload schema.
 
 #### observe get-definition
 
-Syntax: `weaver observe get-definition --uri <URI> --position <LINE:COL>` Human
-output: `definition: <URI>:<LINE>:<COL>` JSON payload:
-`{"uri":"<URI>","line":42,"column":17}`
+Syntax:
+
+```sh
+weaver observe get-definition --uri <URI> --position <LINE:COL>
+```
+
+Human output:
+
+```text
+definition: <URI>:<LINE>:<COL>
+```
+
+JSON payload:
+
+```json
+{"uri":"<URI>","line":42,"column":17}
+```
 
 #### observe find-references
 
-Syntax: `weaver observe find-references --uri <URI> --position <LINE:COL>`
-Human output: `reference: <URI>:<LINE>:<COL>` JSON payload:
-`{"references":[{"uri":"<URI>","line":12,"column":3}]}`
+Syntax:
+
+```sh
+weaver observe find-references --uri <URI> --position <LINE:COL>
+```
+
+Human output:
+
+```text
+reference: <URI>:<LINE>:<COL>
+```
+
+JSON payload:
+
+```json
+{"references":[{"uri":"<URI>","line":12,"column":3}]}
+```
 
 #### observe call-hierarchy
 
-Syntax: `weaver observe call-hierarchy --uri <URI> --position <LINE:COL>` Human
-output: `call-hierarchy: <SYMBOL> (direction outgoing, depth 2)` JSON payload:
-`{"nodes":[{"id":"n1"}],"edges":[{"caller":"n1","callee":"n2"}]}`
+Syntax:
+
+```sh
+weaver observe call-hierarchy --uri <URI> --position <LINE:COL>
+```
+
+Human output:
+
+```text
+call hierarchy: <SYMBOL> (direction outgoing, depth 2)
+```
+
+JSON payload:
+
+```json
+{"nodes":[{"id":"n1"}],"edges":[{"caller":"n1","callee":"n2"}]}
+```
 
 #### observe grep
 
-Syntax: `weaver observe grep --pattern <PATTERN> --path <PATH>` Optional:
-`--language <LANG>` Human output: `match: <PATH>:<LINE>:<COL> "$NAME"` JSON
-payload: `{"matches":[{"start":[1,1],"captures":{"NAME":"foo"}}]}`
+Syntax:
+
+```sh
+weaver observe grep --pattern <PATTERN> --path <PATH>
+```
+
+Optional flags:
+
+```text
+--language <LANG>
+```
+
+Human output:
+
+```text
+match: <PATH>:<LINE>:<COL> "$NAME"
+```
+
+JSON payload:
+
+```json
+{"matches":[{"start":[1,1],"captures":{"NAME":"foo"}}]}
+```
 
 #### verify diagnostics
 
-Syntax: `weaver verify diagnostics --uri <URI>` Human output:
-`diagnostic: <URI>:<LINE>:<COL> <MESSAGE>` JSON payload:
-`{"diagnostics":[{"line":12,"column":5,"message":"..."}]}`
+Syntax:
+
+```sh
+weaver verify diagnostics --uri <URI>
+```
+
+Human output:
+
+```text
+diagnostic: <URI>:<LINE>:<COL> <MESSAGE>
+```
+
+JSON payload:
+
+```json
+{"diagnostics":[{"line":12,"column":5,"message":"..."}]}
+```
 
 #### act apply-rewrite
 
-Syntax: `weaver act apply-rewrite --pattern <PATTERN> --replacement <REPL>`
-Target: `--path <PATH>` Human output: `rewrite: <PATH> (replacements 2)` JSON
-payload: `{"path":"<PATH>","replacements":2,"changed":true}`
+Syntax:
+
+```sh
+weaver act apply-rewrite --pattern <PATTERN> --replacement <REPL> --path <PATH>
+```
+
+Human output:
+
+```text
+rewrite: <PATH> (replacements 2)
+```
+
+JSON payload:
+
+```json
+{"path":"<PATH>","replacements":2,"changed":true}
+```
 
 ## Language server capability detection
 
