@@ -24,10 +24,11 @@ environment variable also supplies the same field.
 The CLI exposes the following configuration flags today:
 
 - `--config-path <PATH>` — reads an explicit configuration file.
-- `--daemon-socket <ENDPOINT>` — overrides the daemon transport. Accepts values
-  such as `unix:///run/user/1000/weaver.sock` or `tcp://127.0.0.1:9779`.
+- `--daemon-socket <ENDPOINT>` — overrides the daemon transport. Accepts
+  values such as `unix:///run/user/1000/weaver.sock` or `tcp://127.0.0.1:9779`.
 - `--log-filter <FILTER>` — sets the tracing filter (defaults to `info`).
-- `--log-format <FORMAT>` — selects the log output format (`json` or `compact`).
+- `--log-format <FORMAT>` — selects the log output format (`json` or `compact`
+  only).
 - `--capability-overrides <DIRECTIVE>` — appends a directive of the form
   `language:capability=directive`. Directives may be repeated to accumulate
   overrides. Duplicate entries are resolved by keeping the last directive for
@@ -49,8 +50,8 @@ Environment variables override files, but remain lower priority than CLI flags.
 ### Configuration file example
 
 Configuration files are written in TOML. The following snippet demonstrates how
-to pin the daemon socket, switch to a compact log format, and force the rename
-capability for Python:
+to pin the daemon socket, switch to a compact log format, and force the call
+hierarchy capability for Python:
 
 ```toml
 daemon_socket = { transport = "tcp", host = "127.0.0.1", port = 9779 }
@@ -59,7 +60,7 @@ log_format = "compact"
 
 [[capability_overrides]]
 language = "python"
-capability = "act.rename-symbol"
+capability = "observe.call-hierarchy"
 directive = "force"
 ```
 
@@ -99,16 +100,6 @@ When `weaverd` starts, it ensures the parent directory for the configured Unix
 socket exists, returning a descriptive error if the directory cannot be
 created. This prevents silent failures later when the daemon attempts to bind
 the socket.
-
-During bootstrap, the daemon emits structured telemetry using `tracing`. Events
-named `bootstrap_starting`, `bootstrap_succeeded`, and `bootstrap_failed` make
-the lifecycle visible in observability pipelines. The output format (JSON or
-compact) respects the shared configuration, so operators see consistent logs
-between the CLI and daemon. Semantic Fusion backends are started lazily: the
-first request for a backend triggers a `backend_starting` event, followed by
-either `backend_ready` or `backend_failed`. This keeps the daemon lightweight
-until specific capabilities are required, while still surfacing failures as
-structured events.
 
 ## Daemon lifecycle
 
@@ -174,69 +165,149 @@ therefore honour the configuration flags supplied to the CLI, including
   the command prints a short reminder that `daemon start` can be used to launch
   a new instance.
 
-Lifecycle commands never contact the daemon's JSONL transport. They operate
-solely on the shared runtime files exported by `weaver-config`, ensuring the
-CLI and daemon use the exact same directory layout even when the daemon socket
-is overridden.
+Lifecycle commands never contact the daemon's JSONL transport. They operate on
+shared runtime files from `weaver-config`, so the CLI and daemon use the same
+directory layout even when the daemon socket is overridden.
 
-## Command usage
+## Command reference
 
-`weaver` expects commands to be specified as a two-level verb pair. The first
-argument selects the domain (`observe`, `act`, or `verify`), while the second
-argument names the operation. All subsequent tokens are forwarded verbatim to
-the daemon and are encoded into the JSONL request without interpretation. For
-example:
+`weaver` exposes three command families: the `--capabilities` probe, daemon
+lifecycle commands, and domain operations (`observe`, `act`, `verify`). Domain
+commands are sent to the daemon as JSONL; any arguments after the operation are
+forwarded verbatim without CLI validation.
 
-```sh
-weaver observe get-definition --uri file:///workspace/main.rs --position 42:17
-```
+### Output formats
 
-The CLI serialises this invocation as:
+Daemon responses are JSON objects with `kind` set to `stream` or `exit`. Stream
+messages include a `stream` field (`stdout` or `stderr`) plus a `data` payload;
+exit messages contain a numeric `status`. The CLI writes each `data` payload to
+the matching host stream and terminates using the exit status provided by the
+final exit message. The `data` payload can be plain text (human-readable) or a
+JSON document (machine-readable). Example JSONL envelope:
 
 ```json
-{"command":{"domain":"observe","operation":"get-definition"},"arguments":["--uri","file:///workspace/main.rs","--position","42:17"]}
+{"kind":"stream","stream":"stdout","data":"definition: file:///path/main.rs:42:17\n"}
+{"kind":"exit","status":0}
 ```
 
-Responses from the daemon are emitted as JSON objects, each tagged with a
-`stdout` or `stderr` stream. The CLI writes the payload to the corresponding
-host stream and terminates using the exit status provided by the final
-`{"kind":"exit","status":...}` message. Errors encountered while loading
-configuration or parsing the command are written to standard error before the
-process exits with status `1`.
+Daemon connections time out after five seconds. The CLI aborts after ten
+consecutive blank lines and treats missing exit messages as failures.
 
-Daemon connections are attempted with a five-second timeout. When the daemon
-does not accept a request within that window, the CLI aborts with a descriptive
-error instead of hanging. Likewise, if the daemon sends ten consecutive blank
-lines, the CLI emits a warning, stops reading further, and reports failure
-unless an exit status was already observed. Any session that ends without an
-explicit exit message is treated as an error, so callers do not misinterpret a
-partial response as success.
+### Capability probe
+
+Syntax:
+
+```sh
+weaver --capabilities
+```
+
+Output is always JSON (pretty-printed for humans). Example:
+
+```json
+{
+  "languages": {
+    "python": {
+      "overrides": {
+        "observe.call-hierarchy": "force"
+      }
+    }
+  }
+}
+```
+
+### Daemon lifecycle commands
+
+Syntax:
+
+```sh
+weaver daemon start
+weaver daemon stop
+weaver daemon status
+```
+
+Example human-readable output (`daemon start`):
+
+```text
+daemon ready (pid 12345) on unix:///tmp/weaver/uid-1000/weaverd.sock
+runtime artefacts stored under /tmp/weaver/uid-1000
+```
+
+Example JSON output written by the daemon health snapshot file
+(`weaverd.health`):
+
+```json
+{"status":"ready","pid":12345,"timestamp":1713356400}
+```
+
+### Domain commands (`observe`, `act`, `verify`)
+
+Syntax:
+
+```sh
+weaver <domain> <operation> [ARG ...]
+```
+
+Current capability keys used for LSP-backed operations:
+
+- `observe.get-definition`
+- `observe.find-references`
+- `observe.call-hierarchy`
+- `verify.diagnostics`
+
+Syntactic operations provided by `weaver-syntax` use the same domain/operation
+shape (`observe grep` and `act apply-rewrite`) once they are wired into the
+daemon request loop. The examples below are illustrative; the daemon defines
+the exact payload schema.
+
+#### observe get-definition
+
+Syntax: `weaver observe get-definition --uri <URI> --position <LINE:COL>` Human
+output: `definition: <URI>:<LINE>:<COL>` JSON payload:
+`{"uri":"<URI>","line":42,"column":17}`
+
+#### observe find-references
+
+Syntax: `weaver observe find-references --uri <URI> --position <LINE:COL>`
+Human output: `reference: <URI>:<LINE>:<COL>` JSON payload:
+`{"references":[{"uri":"<URI>","line":12,"column":3}]}`
+
+#### observe call-hierarchy
+
+Syntax: `weaver observe call-hierarchy --uri <URI> --position <LINE:COL>` Human
+output: `call-hierarchy: <SYMBOL> (direction outgoing, depth 2)` JSON payload:
+`{"nodes":[{"id":"n1"}],"edges":[{"caller":"n1","callee":"n2"}]}`
+
+#### observe grep
+
+Syntax: `weaver observe grep --pattern <PATTERN> --path <PATH>` Optional:
+`--language <LANG>` Human output: `match: <PATH>:<LINE>:<COL> "$NAME"` JSON
+payload: `{"matches":[{"start":[1,1],"captures":{"NAME":"foo"}}]}`
+
+#### verify diagnostics
+
+Syntax: `weaver verify diagnostics --uri <URI>` Human output:
+`diagnostic: <URI>:<LINE>:<COL> <MESSAGE>` JSON payload:
+`{"diagnostics":[{"line":12,"column":5,"message":"..."}]}`
+
+#### act apply-rewrite
+
+Syntax: `weaver act apply-rewrite --pattern <PATTERN> --replacement <REPL>`
+Target: `--path <PATH>` Human output: `rewrite: <PATH> (replacements 2)` JSON
+payload: `{"path":"<PATH>","replacements":2,"changed":true}`
 
 ## Language server capability detection
 
 The new `weaver-lsp-host` crate initialises the LSP servers for Rust, Python,
 and TypeScript and records which core requests each server advertises:
-`textDocument/definition`, `textDocument/references`, and diagnostics. These
-advertised capabilities are merged with any overrides provided via
+`textDocument/definition`, `textDocument/references`, diagnostics, and call
+hierarchy (`textDocument/prepareCallHierarchy` plus incoming/outgoing calls).
+These advertised capabilities are merged with any overrides provided via
 `capability_overrides` in `weaver-config`. `force` directives allow a request
 even when the server claims not to support it, while `deny` directives block
 the request regardless of the server report. When a request is rejected, the
 error explains whether the feature was disabled by configuration or simply
 absent from the server so operators and agents can adjust their plans without
 guesswork.
-
-### Capability probe
-
-The capability matrix negotiated through configuration overrides can be
-inspected without starting the daemon:
-
-```sh
-weaver --capabilities
-```
-
-The CLI loads the shared configuration, applies any override directives, and
-prints the resulting matrix as pretty-printed JSON. The probe does not contact
-`weaverd`, making it safe to run during planning stages or health checks.
 
 ## Double-Lock safety harness
 
@@ -296,13 +367,6 @@ Agents can use this information to diagnose problems and regenerate corrected
 edits. The structured format also enables tooling to present failures in IDE
 integrations or CI pipelines.
 
-### Backend unavailability
-
-If a language server is not running or crashes mid-request, the semantic lock
-returns a backend-unavailable error rather than silently passing. Operators
-should ensure the appropriate language servers are healthy before executing
-`act` commands.
-
 ### Tree-sitter syntactic lock
 
 The syntactic lock is powered by the `weaver-syntax` crate, which integrates
@@ -331,9 +395,3 @@ inspired by ast-grep. Patterns use metavariables (`$VAR` for single captures,
 enables the future `observe grep` and `act apply-rewrite` commands to perform
 precise, AST-aware search and transformation across the codebase. The engine
 currently supports Rust, Python, and TypeScript.
-
-### Semantic lock
-
-The semantic lock relies on the `weaver-lsp-host` infrastructure, which
-requires language servers to be registered and initialised for the relevant
-languages.
