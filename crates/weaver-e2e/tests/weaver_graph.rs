@@ -134,18 +134,18 @@ impl GraphTestContext {
         let root_uri = file_uri(temp_dir.path())?;
         let file_uri_val = file_uri(&file_path)?;
 
-        let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"])?;
-        client.initialize(root_uri)?;
-        client.did_open(file_uri_val, "python", fixture)?;
+        let mut lsp_client = LspClient::spawn("uvx", &["pyrefly", "lsp"])?;
+        lsp_client.initialize(root_uri)?;
+        lsp_client.did_open(file_uri_val, "python", fixture)?;
 
-        let client = std::sync::Arc::new(std::sync::Mutex::new(client));
+        let shared_client = std::sync::Arc::new(std::sync::Mutex::new(lsp_client));
         let provider = LspCallGraphProvider::new(SharedClient {
-            client: std::sync::Arc::clone(&client),
+            client: std::sync::Arc::clone(&shared_client),
         });
 
         Ok(Self {
             provider,
-            client,
+            client: shared_client,
             file_path: to_utf8_path(&file_path)?,
             _temp_dir: temp_dir,
         })
@@ -218,8 +218,7 @@ fn call_graph_builds_from_pyrefly() -> Result<(), TestError> {
     let shutdown_result = context.shutdown();
 
     match (test_result, shutdown_result) {
-        (Err(error), _) => Err(error),
-        (Ok(()), Err(error)) => Err(error),
+        (Err(error), _) | (Ok(()), Err(error)) => Err(error),
         (Ok(()), Ok(())) => Ok(()),
     }
 }
