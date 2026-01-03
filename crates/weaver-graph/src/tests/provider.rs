@@ -83,6 +83,25 @@ impl TestClient {
     }
 }
 
+macro_rules! impl_call_handler {
+    (
+        $method:ident,
+        $params:ty,
+        $item:ty,
+        $response_field:ident,
+        $counter_field:ident,
+        $label:literal
+    ) => {
+        fn $method(&mut self, _params: $params) -> Result<Option<Vec<$item>>, GraphError> {
+            self.handle_call(
+                &self.$response_field.clone(),
+                |counts| counts.$counter_field += 1,
+                $label,
+            )
+        }
+    };
+}
+
 impl CallHierarchyClient for TestClient {
     fn prepare_call_hierarchy(
         &mut self,
@@ -91,27 +110,22 @@ impl CallHierarchyClient for TestClient {
         self.prepare.as_result()
     }
 
-    fn incoming_calls(
-        &mut self,
-        _params: CallHierarchyIncomingCallsParams,
-    ) -> Result<Option<Vec<CallHierarchyIncomingCall>>, GraphError> {
-        self.handle_call(
-            &self.incoming.clone(),
-            |counts| counts.incoming += 1,
-            "incoming",
-        )
-    }
-
-    fn outgoing_calls(
-        &mut self,
-        _params: CallHierarchyOutgoingCallsParams,
-    ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, GraphError> {
-        self.handle_call(
-            &self.outgoing.clone(),
-            |counts| counts.outgoing += 1,
-            "outgoing",
-        )
-    }
+    impl_call_handler!(
+        incoming_calls,
+        CallHierarchyIncomingCallsParams,
+        CallHierarchyIncomingCall,
+        incoming,
+        incoming,
+        "incoming"
+    );
+    impl_call_handler!(
+        outgoing_calls,
+        CallHierarchyOutgoingCallsParams,
+        CallHierarchyOutgoingCall,
+        outgoing,
+        outgoing,
+        "outgoing"
+    );
 }
 
 fn test_uri() -> Uri {
