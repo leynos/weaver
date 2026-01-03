@@ -3,42 +3,13 @@
 use crate::provider::{
     CallGraphProvider, CallHierarchyClient, LspCallGraphProvider, SourcePosition,
 };
+use crate::tests::support::{ErrorKind, Response, incoming_call, item, outgoing_call};
 use crate::{CallGraph, GraphError};
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    Position, Range, SymbolKind, Uri,
 };
-use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-
-#[derive(Clone, Copy, Debug)]
-enum ErrorKind {
-    Validation,
-}
-
-impl ErrorKind {
-    fn to_error(self) -> GraphError {
-        match self {
-            Self::Validation => GraphError::validation("test failure"),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-enum Response<T: Clone> {
-    Ok(Option<Vec<T>>),
-    Err(ErrorKind),
-}
-
-impl<T: Clone> Response<T> {
-    fn as_result(&self) -> Result<Option<Vec<T>>, GraphError> {
-        match self {
-            Self::Ok(value) => Ok(value.clone()),
-            Self::Err(kind) => Err(kind.to_error()),
-        }
-    }
-}
 
 #[derive(Debug, Default)]
 struct CallCounts {
@@ -126,44 +97,6 @@ impl CallHierarchyClient for TestClient {
         outgoing,
         "outgoing"
     );
-}
-
-fn test_uri() -> Uri {
-    Uri::from_str("file:///src/main.rs").expect("valid URI")
-}
-
-fn range(line: u32, column: u32) -> Range {
-    Range {
-        start: Position::new(line, column),
-        end: Position::new(line, column + 1),
-    }
-}
-
-fn item(name: &str, line: u32, column: u32) -> CallHierarchyItem {
-    CallHierarchyItem {
-        name: name.to_owned(),
-        kind: SymbolKind::FUNCTION,
-        tags: None,
-        detail: None,
-        uri: test_uri(),
-        range: range(line, column),
-        selection_range: range(line, column),
-        data: None,
-    }
-}
-
-fn incoming_call(name: &str, line: u32, column: u32) -> CallHierarchyIncomingCall {
-    CallHierarchyIncomingCall {
-        from: item(name, line, column),
-        from_ranges: vec![range(line + 1, column + 2)],
-    }
-}
-
-fn outgoing_call(name: &str, line: u32, column: u32) -> CallHierarchyOutgoingCall {
-    CallHierarchyOutgoingCall {
-        to: item(name, line, column),
-        from_ranges: vec![range(line + 1, column + 2)],
-    }
 }
 
 fn build_graph(provider: &mut LspCallGraphProvider<TestClient>, depth: u32) -> CallGraph {

@@ -40,6 +40,9 @@ enum TestError {
     #[error("invalid utf-8 path for file: {0}")]
     InvalidUtf8Path(String),
 
+    #[error("LSP client lock poisoned")]
+    LspClientLockPoisoned,
+
     #[error("missing expected node: {0}")]
     MissingNode(String),
 
@@ -70,22 +73,20 @@ macro_rules! require_pyrefly {
     };
 }
 
-struct LspClientAdapter {
-    client: LspClient,
+struct SharedClient {
+    client: std::sync::Arc<std::sync::Mutex<LspClient>>,
 }
 
-impl Drop for LspClientAdapter {
-    fn drop(&mut self) {
-        drop(self.client.shutdown());
-    }
-}
-
-impl CallHierarchyClient for LspClientAdapter {
+impl CallHierarchyClient for SharedClient {
     fn prepare_call_hierarchy(
         &mut self,
         params: CallHierarchyPrepareParams,
     ) -> Result<Option<Vec<lsp_types::CallHierarchyItem>>, GraphError> {
-        self.client
+        let mut client = self
+            .client
+            .lock()
+            .map_err(|_| GraphError::validation("LSP client lock poisoned"))?;
+        client
             .prepare_call_hierarchy(params)
             .map_err(|err| GraphError::validation(err.to_string()))
     }
@@ -94,7 +95,11 @@ impl CallHierarchyClient for LspClientAdapter {
         &mut self,
         params: CallHierarchyIncomingCallsParams,
     ) -> Result<Option<Vec<lsp_types::CallHierarchyIncomingCall>>, GraphError> {
-        self.client
+        let mut client = self
+            .client
+            .lock()
+            .map_err(|_| GraphError::validation("LSP client lock poisoned"))?;
+        client
             .incoming_calls(params)
             .map_err(|err| GraphError::validation(err.to_string()))
     }
@@ -103,14 +108,19 @@ impl CallHierarchyClient for LspClientAdapter {
         &mut self,
         params: CallHierarchyOutgoingCallsParams,
     ) -> Result<Option<Vec<lsp_types::CallHierarchyOutgoingCall>>, GraphError> {
-        self.client
+        let mut client = self
+            .client
+            .lock()
+            .map_err(|_| GraphError::validation("LSP client lock poisoned"))?;
+        client
             .outgoing_calls(params)
             .map_err(|err| GraphError::validation(err.to_string()))
     }
 }
 
 struct GraphTestContext {
-    provider: LspCallGraphProvider<LspClientAdapter>,
+    provider: LspCallGraphProvider<SharedClient>,
+    client: std::sync::Arc<std::sync::Mutex<LspClient>>,
     file_path: Utf8PathBuf,
     _temp_dir: TempDir,
 }
@@ -128,11 +138,14 @@ impl GraphTestContext {
         client.initialize(root_uri)?;
         client.did_open(file_uri_val, "python", fixture)?;
 
-        let adapter = LspClientAdapter { client };
-        let provider = LspCallGraphProvider::new(adapter);
+        let client = std::sync::Arc::new(std::sync::Mutex::new(client));
+        let provider = LspCallGraphProvider::new(SharedClient {
+            client: std::sync::Arc::clone(&client),
+        });
 
         Ok(Self {
             provider,
+            client,
             file_path: to_utf8_path(&file_path)?,
             _temp_dir: temp_dir,
         })
@@ -140,6 +153,14 @@ impl GraphTestContext {
 
     fn source_position(&self, line: u32, column: u32) -> SourcePosition {
         SourcePosition::new(self.file_path.clone(), line, column)
+    }
+
+    fn shutdown(&self) -> Result<(), TestError> {
+        let mut client = self
+            .client
+            .lock()
+            .map_err(|_| TestError::LspClientLockPoisoned)?;
+        client.shutdown().map_err(TestError::LspClient)
     }
 }
 
@@ -183,12 +204,22 @@ fn call_graph_builds_from_pyrefly() -> Result<(), TestError> {
 
     let mut context = GraphTestContext::new(fixtures::LINEAR_CHAIN)?;
     let position = context.source_position(0, 4);
-    let graph = context.provider.build_graph(&position, 2)?;
+    let test_result = (|| {
+        let graph = context.provider.build_graph(&position, 2)?;
 
-    assert_node(&graph, "a")?;
-    assert_node(&graph, "b")?;
-    assert_node(&graph, "c")?;
-    assert_edge(&graph, "a", "b")?;
-    assert_edge(&graph, "b", "c")?;
-    Ok(())
+        assert_node(&graph, "a")?;
+        assert_node(&graph, "b")?;
+        assert_node(&graph, "c")?;
+        assert_edge(&graph, "a", "b")?;
+        assert_edge(&graph, "b", "c")?;
+        Ok(())
+    })();
+
+    let shutdown_result = context.shutdown();
+
+    match (test_result, shutdown_result) {
+        (Err(error), _) => Err(error),
+        (Ok(()), Err(error)) => Err(error),
+        (Ok(()), Ok(())) => Ok(()),
+    }
 }

@@ -10,11 +10,12 @@ its own.
 ## Purpose / Big Picture
 
 Implement the relational intelligence layer so Weaver can build a call graph
-from LSP `textDocument/callHierarchy` data. Success is visible when the
-weaver-graph crate can return a graph of nodes and edges for a symbol, and when
-the daemon-facing interface (or any public API) can surface that graph to
-callers with clear errors for unsupported or empty results. Behavioural tests
-must exercise both happy and unhappy paths using `rstest-bdd` v0.2.0.
+from Language Server Protocol (LSP) `textDocument/callHierarchy` data. Success
+is visible when the weaver-graph crate can return a graph of nodes and edges
+for a symbol, and when the daemon-facing interface (or any public API) can
+surface that graph to callers with clear errors for unsupported or empty
+results. Behavioural tests must exercise both happy and unhappy paths using
+`rstest-bdd` v0.2.0.
 
 ## Progress
 
@@ -33,9 +34,10 @@ must exercise both happy and unhappy paths using `rstest-bdd` v0.2.0.
 
 ## Decision Log
 
-- Decision: Use LSP `textDocument/callHierarchy` as the MVP provider for the
-  call graph. Rationale: Matches the Phase 2 roadmap requirement and reuses
-  existing LSP infrastructure. Date/Author: 2026-01-02 / plan author.
+- Decision: Use Language Server Protocol (LSP) `textDocument/callHierarchy` as
+  the minimum viable product (MVP) provider for the call graph. Rationale:
+  Matches the Phase 2 roadmap requirement and reuses existing LSP
+  infrastructure. Date/Author: 2026-01-02 / plan author.
 
 ## Outcomes & Retrospective
 
@@ -194,7 +196,7 @@ Example Gherkin snippet for the behavioural test (stored in the feature file):
 
       Scenario: Build a call graph for a symbol with callers and callees
         Given a call hierarchy client with a simple call chain
-        When I build a call graph from "main" with depth 2
+        When a call graph is built from "main" with depth 2
         Then the graph includes nodes "main" and "helper"
         And the graph includes an edge from "main" to "helper"
 

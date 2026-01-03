@@ -1,7 +1,6 @@
 //! Behaviour-driven tests for the weaver-graph call hierarchy provider.
 
 use std::cell::RefCell;
-use std::str::FromStr;
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
@@ -9,11 +8,11 @@ use rstest_bdd_macros::{given, scenario, then, when};
 use crate::provider::{
     CallGraphProvider, CallHierarchyClient, LspCallGraphProvider, SourcePosition,
 };
+use crate::tests::support::{ErrorKind, Response, incoming_call, item, outgoing_call};
 use crate::{CallGraph, GraphError};
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    Position, Range, SymbolKind, Uri,
 };
 
 #[derive(Default)]
@@ -25,34 +24,6 @@ struct TestWorld {
 #[fixture]
 fn world() -> RefCell<TestWorld> {
     RefCell::new(TestWorld::default())
-}
-
-#[derive(Clone, Copy, Debug)]
-enum ErrorKind {
-    Validation,
-}
-
-impl ErrorKind {
-    fn to_error(self) -> GraphError {
-        match self {
-            Self::Validation => GraphError::validation("call hierarchy failure"),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-enum Response<T: Clone> {
-    Ok(Option<Vec<T>>),
-    Err(ErrorKind),
-}
-
-impl<T: Clone> Response<T> {
-    fn as_result(&self) -> Result<Option<Vec<T>>, GraphError> {
-        match self {
-            Self::Ok(value) => Ok(value.clone()),
-            Self::Err(kind) => Err(kind.to_error()),
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -111,44 +82,6 @@ impl CallHierarchyClient for TestClient {
     }
 }
 
-fn test_uri() -> Uri {
-    Uri::from_str("file:///src/main.rs").expect("valid URI")
-}
-
-fn range(line: u32, column: u32) -> Range {
-    Range {
-        start: Position::new(line, column),
-        end: Position::new(line, column + 1),
-    }
-}
-
-fn item(name: &str, line: u32, column: u32) -> CallHierarchyItem {
-    CallHierarchyItem {
-        name: name.to_owned(),
-        kind: SymbolKind::FUNCTION,
-        tags: None,
-        detail: None,
-        uri: test_uri(),
-        range: range(line, column),
-        selection_range: range(line, column),
-        data: None,
-    }
-}
-
-fn incoming_call(name: &str, line: u32, column: u32) -> CallHierarchyIncomingCall {
-    CallHierarchyIncomingCall {
-        from: item(name, line, column),
-        from_ranges: vec![range(line + 1, column + 2)],
-    }
-}
-
-fn outgoing_call(name: &str, line: u32, column: u32) -> CallHierarchyOutgoingCall {
-    CallHierarchyOutgoingCall {
-        to: item(name, line, column),
-        from_ranges: vec![range(line + 1, column + 2)],
-    }
-}
-
 fn strip_quotes(value: &str) -> &str {
     value.trim_matches('"')
 }
@@ -168,9 +101,8 @@ fn given_erroring_client(world: &RefCell<TestWorld>) {
     world.borrow_mut().provider = Some(LspCallGraphProvider::new(TestClient::failing()));
 }
 
-#[when("I build a call graph from {symbol} with depth {depth}")]
-fn when_build_graph(world: &RefCell<TestWorld>, symbol: String, depth: u32) {
-    let _ = strip_quotes(&symbol);
+#[when("a call graph is built with depth {depth}")]
+fn when_build_graph(world: &RefCell<TestWorld>, depth: u32) {
     let mut world_state = world.borrow_mut();
     let provider = world_state
         .provider
