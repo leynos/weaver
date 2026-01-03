@@ -75,10 +75,9 @@ impl TestClient {
         counter_update: impl FnOnce(&mut CallCounts),
         call_type: &str,
     ) -> Result<Option<Vec<T>>, GraphError> {
-        let mut counts = self
-            .counts
-            .lock()
-            .unwrap_or_else(|_| panic!("{call_type} call count mutex poisoned"));
+        let mut counts = self.counts.lock().map_err(|_| {
+            GraphError::validation(format!("{call_type} call count mutex poisoned"))
+        })?;
         counter_update(&mut counts);
         response.as_result()
     }

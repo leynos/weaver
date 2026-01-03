@@ -76,7 +76,7 @@ struct LspClientAdapter {
 
 impl Drop for LspClientAdapter {
     fn drop(&mut self) {
-        let _ = self.client.shutdown();
+        drop(self.client.shutdown());
     }
 }
 
@@ -153,26 +153,26 @@ fn assert_node(graph: &weaver_graph::CallGraph, name: &str) -> Result<(), TestEr
 
 fn assert_edge(
     graph: &weaver_graph::CallGraph,
-    caller: &str,
-    callee: &str,
+    source: &str,
+    target: &str,
 ) -> Result<(), TestError> {
-    let caller_node = graph
-        .find_by_name(caller)
-        .ok_or_else(|| TestError::MissingNode(caller.to_owned()))?;
-    let callee_node = graph
-        .find_by_name(callee)
-        .ok_or_else(|| TestError::MissingNode(callee.to_owned()))?;
+    let source_node = graph
+        .find_by_name(source)
+        .ok_or_else(|| TestError::MissingNode(source.to_owned()))?;
+    let target_node = graph
+        .find_by_name(target)
+        .ok_or_else(|| TestError::MissingNode(target.to_owned()))?;
 
     let has_edge = graph
         .edges()
-        .any(|edge| edge.caller() == caller_node.id() && edge.callee() == callee_node.id());
+        .any(|edge| edge.caller() == source_node.id() && edge.callee() == target_node.id());
 
     if has_edge {
         Ok(())
     } else {
         Err(TestError::MissingEdge {
-            caller: caller.to_owned(),
-            callee: callee.to_owned(),
+            caller: source.to_owned(),
+            callee: target.to_owned(),
         })
     }
 }
