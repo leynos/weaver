@@ -1083,6 +1083,21 @@ provenance (e.g., `{source: "lsp", confidence: 0.8}` or
 reason about the completeness and accuracy of the graph and to make more
 informed decisions based on the available relational data.
 
+#### Phase 2 implementation notes (LSP provider)
+
+The initial `weaver-graph` implementation uses LSP call hierarchy requests as
+the first provider, with the following concrete design choices:
+
+- Nodes are identified by `{path}:{line}:{column}:{name}` to keep IDs stable
+  across providers and easy for humans to read.
+- Edges carry an explicit `source` (`lsp`, `static`, or `dynamic`) plus an
+  optional call-site position when the provider supplies it.
+- The LSP provider uses `textDocument/prepareCallHierarchy` to seed the graph,
+  then performs depth-limited traversal of incoming and outgoing calls while
+  deduplicating nodes by their IDs.
+- The graph stores both incoming and outgoing indices so callers and callees
+  can be queried in O(1) time for a given node ID.
+
 ## 4. The Actuation and Verification Layer
 
 This section details the components of `Weaver` responsible for actively

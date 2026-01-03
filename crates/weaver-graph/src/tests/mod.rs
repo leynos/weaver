@@ -164,3 +164,7 @@ mod edge_tests {
         assert_eq!(edge.call_site_column(), Some(4));
     }
 }
+
+mod behaviour;
+mod provider;
+mod support;
