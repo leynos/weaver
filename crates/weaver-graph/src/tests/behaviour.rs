@@ -8,7 +8,7 @@ use rstest_bdd_macros::{given, scenario, then, when};
 use crate::provider::{
     CallGraphProvider, CallHierarchyClient, LspCallGraphProvider, SourcePosition,
 };
-use crate::tests::support::{ErrorKind, Response, incoming_call, item, outgoing_call};
+use crate::tests::support::{Response, incoming_call, item, outgoing_call};
 use crate::{CallGraph, GraphError};
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
@@ -52,7 +52,7 @@ impl TestClient {
 
     fn failing() -> Self {
         Self {
-            prepare: Response::Err(ErrorKind::Validation),
+            prepare: Response::Err,
             incoming: Response::Ok(None),
             outgoing: Response::Ok(None),
         }

@@ -115,8 +115,11 @@ are safe to re-run.
 
 1. Inventory current implementation and call hierarchy wiring.
 
-   rg "weaver-graph" -n rg "callHierarchy" -n crates/weaver-lsp-host rg
-   "call-hierarchy" -n docs
+   ```sh
+   rg "weaver-graph" -n
+   rg "callHierarchy" -n crates/weaver-lsp-host
+   rg "call-hierarchy" -n docs
+   ```
 
 2. If the crate does not exist, create it and add it to the workspace.
 
@@ -155,16 +158,22 @@ are safe to re-run.
 
 7. Format and validate documentation (required after doc changes):
 
-   set -o pipefail make fmt 2>&1 | tee /tmp/weaver-fmt.log make markdownlint
-   2>&1 | tee /tmp/weaver-markdownlint.log
+   ```sh
+   set -o pipefail
+   make fmt 2>&1 | tee /tmp/weaver-fmt.log
+   make markdownlint 2>&1 | tee /tmp/weaver-markdownlint.log
+   ```
 
    Run `make nixie` only if a Mermaid diagram was edited.
 
 8. Run the Rust quality gates:
 
-   set -o pipefail make check-fmt 2>&1 | tee /tmp/weaver-check-fmt.log make
-   lint 2>&1 | tee /tmp/weaver-lint.log make test 2>&1 | tee
-   /tmp/weaver-test.log
+   ```sh
+   set -o pipefail
+   make check-fmt 2>&1 | tee /tmp/weaver-check-fmt.log
+   make lint 2>&1 | tee /tmp/weaver-lint.log
+   make test 2>&1 | tee /tmp/weaver-test.log
+   ```
 
 ## Validation and Acceptance
 
@@ -192,18 +201,22 @@ multiple times without drift.
 
 Example Gherkin snippet for the behavioural test (stored in the feature file):
 
-    Feature: Call graph via LSP call hierarchy
+```gherkin
+Feature: Call graph via LSP call hierarchy
 
-      Scenario: Build a call graph for a symbol with callers and callees
-        Given a call hierarchy client with a simple call chain
-        When a call graph is built from "main" with depth 2
-        Then the graph includes nodes "main" and "helper"
-        And the graph includes an edge from "main" to "helper"
+  Scenario: Build a call graph for a symbol with callers and callees
+    Given a call hierarchy client with a simple call chain
+    When a call graph is built from "main" with depth 2
+    Then the graph includes nodes "main" and "helper"
+    And the graph includes an edge from "main" to "helper"
+```
 
 Example JSON payload for `observe call-hierarchy` (update to match actual
 output schema):
 
-    {"nodes":[{"id":"/src/lib.rs:10:0:main"}],"edges":[{"caller":"n1","callee":"n2"}]}
+```json
+{"nodes":[{"id":"/src/lib.rs:10:0:main"}],"edges":[{"caller":"n1","callee":"n2"}]}
+```
 
 ## Interfaces and Dependencies
 

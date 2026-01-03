@@ -7,30 +7,19 @@ use lsp_types::{
 };
 use std::str::FromStr;
 
-#[derive(Clone, Copy, Debug)]
-pub(super) enum ErrorKind {
-    Validation,
-}
-
-impl ErrorKind {
-    pub(super) fn to_error(self) -> GraphError {
-        match self {
-            Self::Validation => GraphError::validation("test failure"),
-        }
-    }
-}
-
+/// Test-friendly wrapper for call hierarchy responses.
 #[derive(Clone, Debug)]
 pub(super) enum Response<T: Clone> {
     Ok(Option<Vec<T>>),
-    Err(ErrorKind),
+    Err,
 }
 
 impl<T: Clone> Response<T> {
+    /// Converts the response into a `Result` for provider-facing tests.
     pub(super) fn as_result(&self) -> Result<Option<Vec<T>>, GraphError> {
         match self {
             Self::Ok(value) => Ok(value.clone()),
-            Self::Err(kind) => Err(kind.to_error()),
+            Self::Err => Err(GraphError::validation("test failure")),
         }
     }
 }
@@ -46,6 +35,7 @@ fn range(line: u32, column: u32) -> Range {
     }
 }
 
+/// Builds a test call hierarchy item for the provided name and position.
 pub(super) fn item(name: &str, line: u32, column: u32) -> CallHierarchyItem {
     CallHierarchyItem {
         name: name.to_owned(),
@@ -59,6 +49,7 @@ pub(super) fn item(name: &str, line: u32, column: u32) -> CallHierarchyItem {
     }
 }
 
+/// Builds a test incoming call with a caller item and an offset call range.
 pub(super) fn incoming_call(name: &str, line: u32, column: u32) -> CallHierarchyIncomingCall {
     CallHierarchyIncomingCall {
         from: item(name, line, column),
@@ -66,6 +57,7 @@ pub(super) fn incoming_call(name: &str, line: u32, column: u32) -> CallHierarchy
     }
 }
 
+/// Builds a test outgoing call with a callee item and an offset call range.
 pub(super) fn outgoing_call(name: &str, line: u32, column: u32) -> CallHierarchyOutgoingCall {
     CallHierarchyOutgoingCall {
         to: item(name, line, column),

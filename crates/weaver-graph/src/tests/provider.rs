@@ -3,7 +3,7 @@
 use crate::provider::{
     CallGraphProvider, CallHierarchyClient, LspCallGraphProvider, SourcePosition,
 };
-use crate::tests::support::{ErrorKind, Response, incoming_call, item, outgoing_call};
+use crate::tests::support::{Response, incoming_call, item, outgoing_call};
 use crate::{CallGraph, GraphError};
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
@@ -132,8 +132,8 @@ fn build_graph_depth_zero_skips_traversal() {
     let counts = Arc::new(Mutex::new(CallCounts::default()));
     let client = TestClient::new(
         Response::Ok(Some(vec![item("main", 1, 1)])),
-        Response::Err(ErrorKind::Validation),
-        Response::Err(ErrorKind::Validation),
+        Response::Err,
+        Response::Err,
         Arc::clone(&counts),
     );
     let mut provider = LspCallGraphProvider::new(client);
@@ -190,7 +190,7 @@ fn callers_graph_uses_incoming_only() {
     let client = TestClient::new(
         Response::Ok(Some(vec![item("main", 1, 1)])),
         Response::Ok(Some(vec![incoming_call("caller", 3, 0)])),
-        Response::Err(ErrorKind::Validation),
+        Response::Err,
         Arc::clone(&counts),
     );
     let mut provider = LspCallGraphProvider::new(client);
@@ -215,7 +215,7 @@ fn build_graph_returns_symbol_not_found_on_empty_prepare() {
 
 #[test]
 fn build_graph_propagates_prepare_error() {
-    test_build_graph_error(Response::Err(ErrorKind::Validation), |err| {
+    test_build_graph_error(Response::Err, |err| {
         matches!(err, GraphError::Validation(_))
     });
 }

@@ -77,44 +77,40 @@ struct SharedClient {
     client: std::sync::Arc<std::sync::Mutex<LspClient>>,
 }
 
+impl SharedClient {
+    fn call_hierarchy<T, P>(
+        &mut self,
+        params: P,
+        call: impl FnOnce(&mut LspClient, P) -> Result<Option<Vec<T>>, LspClientError>,
+    ) -> Result<Option<Vec<T>>, GraphError> {
+        let mut client = self
+            .client
+            .lock()
+            .map_err(|_| GraphError::validation("LSP client lock poisoned"))?;
+        call(&mut client, params).map_err(|err| GraphError::validation(err.to_string()))
+    }
+}
+
 impl CallHierarchyClient for SharedClient {
     fn prepare_call_hierarchy(
         &mut self,
         params: CallHierarchyPrepareParams,
     ) -> Result<Option<Vec<lsp_types::CallHierarchyItem>>, GraphError> {
-        let mut client = self
-            .client
-            .lock()
-            .map_err(|_| GraphError::validation("LSP client lock poisoned"))?;
-        client
-            .prepare_call_hierarchy(params)
-            .map_err(|err| GraphError::validation(err.to_string()))
+        self.call_hierarchy(params, LspClient::prepare_call_hierarchy)
     }
 
     fn incoming_calls(
         &mut self,
         params: CallHierarchyIncomingCallsParams,
     ) -> Result<Option<Vec<lsp_types::CallHierarchyIncomingCall>>, GraphError> {
-        let mut client = self
-            .client
-            .lock()
-            .map_err(|_| GraphError::validation("LSP client lock poisoned"))?;
-        client
-            .incoming_calls(params)
-            .map_err(|err| GraphError::validation(err.to_string()))
+        self.call_hierarchy(params, LspClient::incoming_calls)
     }
 
     fn outgoing_calls(
         &mut self,
         params: CallHierarchyOutgoingCallsParams,
     ) -> Result<Option<Vec<lsp_types::CallHierarchyOutgoingCall>>, GraphError> {
-        let mut client = self
-            .client
-            .lock()
-            .map_err(|_| GraphError::validation("LSP client lock poisoned"))?;
-        client
-            .outgoing_calls(params)
-            .map_err(|err| GraphError::validation(err.to_string()))
+        self.call_hierarchy(params, LspClient::outgoing_calls)
     }
 }
 
@@ -151,9 +147,8 @@ impl GraphTestContext {
         })
     }
 
-    fn source_position(&self, line: u32, column: u32) -> SourcePosition {
-        SourcePosition::new(self.file_path.clone(), line, column)
-    }
+    #[rustfmt::skip]
+    fn source_position(&self, line: u32, column: u32) -> SourcePosition { SourcePosition::new(self.file_path.clone(), line, column) }
 
     fn shutdown(&self) -> Result<(), TestError> {
         let mut client = self
