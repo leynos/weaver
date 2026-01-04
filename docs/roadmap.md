@@ -93,6 +93,30 @@ and relational understanding of code.*
     graph generation, using the `textDocument/callHierarchy` request as the
     initial data source.
 
+### Step: Deliver `act apply-patch` command
+
+*Outcome: Provide a safety-locked patch application path that mirrors the
+`apply_patch` semantics for agents and integrates with the Double-Lock harness.*
+
+- [ ] Add JSONL request/response types and a `weaver act apply-patch` command
+    that reads the patch stream from STDIN and forwards it to the daemon.
+  - Acceptance criteria: CLI streams raw patch input, returns non-zero exit
+    codes on failure, and surfaces structured errors.
+- [ ] Implement the patch parser and matcher in `weaverd` to support modify,
+    create, and delete operations, including fuzzy matching, line-ending
+    normalisation, and path traversal checks.
+  - Acceptance criteria: patch application is atomic per command, missing
+    hunks are rejected, and parent directories are created for new files.
+- [ ] Integrate apply-patch with the safety harness using syntactic and
+    semantic locks, ensuring no on-disk writes on lock failure.
+  - Acceptance criteria: Tree-sitter validates modified/new files, LSP
+    diagnostics are compared against the pre-edit baseline, and failures
+    leave the filesystem untouched.
+- [ ] Add unit, BDD, and end-to-end tests covering create/modify/delete and
+    failure paths (missing hunk, invalid header, traversal attempt).
+  - Acceptance criteria: tests pass under `make test` and error messaging is
+    asserted for each failure mode.
+
 ## Phase 3: Plugin Ecosystem & Specialist Tools
 
 *Goal: Build the plugin architecture to enable orchestration of best-in-class,

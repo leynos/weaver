@@ -85,7 +85,7 @@ the developer's shell. Commands are grouped into intuitive categories:
     `observe get-definition`, `observe find-references`, `observe grep`).
 
 - **`act`**: Commands for modifying the codebase (e.g., `act rename-symbol`,
-    `act apply-edits`, `act refactor`).
+    `act apply-edits`, `act apply-patch`, `act refactor`).
 
 - **`verify`**: Commands for checking the integrity of the codebase (e.g.,
     `verify diagnostics`).
@@ -1316,6 +1316,94 @@ routes the notifications to the appropriate server.
   request methods.
 - Failures in document sync map to `HostOperation::DidOpen`, `DidChange`, or
   `DidClose` for clearer error reporting in the safety harness.
+
+### 4.3. The `act apply-patch` command: safety-locked patch application
+
+`act apply-patch` provides a deterministic, CLI-first way to apply structured
+patches while still benefiting from Weaver's Double-Lock safety harness. The
+command re-implements the `apply_patch` semantics used by AI agent tooling,
+favouring resilient search-and-replace blocks over line-numbered diffs. Every
+operation is validated through the Tree-sitter syntactic lock and the LSP
+semantic lock before any file is written to disk.
+
+#### 4.3.1. Patch format and operations
+
+`act apply-patch` reads a stream of Git-style file operations from STDIN. Each
+operation starts with a `diff --git a/... b/...` header; the tool targets the
+`b/` path relative to the workspace root and supports quoted filenames. The
+operation type is inferred from the metadata lines that follow:
+
+- **Modify**: Uses one or more `SEARCH`/`REPLACE` blocks.
+- **Create**: Uses `new file mode <permissions>` and a standard diff hunk.
+- **Delete**: Uses `deleted file mode <permissions>` and an empty body.
+
+Example (modification):
+
+```diff
+diff --git a/src/main.rs b/src/main.rs
+<<<<<<< SEARCH
+fn main() {
+    println!("Old Message");
+}
+=======
+fn main() {
+    println!("New Message");
+}
+>>>>>>> REPLACE
+```
+
+Example (creation):
+
+```diff
+diff --git a/src/new_module.rs b/src/new_module.rs
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/src/new_module.rs
+@@ -0,0 +1,3 @@
++pub fn hello() {
++    println!("Hello World");
++}
+```
+
+#### 4.3.2. Modification semantics
+
+The modify operation uses an ordered, cursor-based search to apply multiple
+blocks within a single file:
+
+- The file is loaded into memory and a `cursor` starts at byte offset 0.
+- Each `SEARCH` block is matched against the remaining content from `cursor`.
+- Matching tries an exact match first, then a fuzzy match that trims leading
+  and trailing whitespace and normalises line endings (`\r\n` vs `\n`).
+- If a block fails to match, the entire command fails and no files are
+  modified.
+- When a match succeeds, the matched span is replaced with the `REPLACE`
+  block and the cursor advances to the end of the replacement.
+
+This strategy avoids false positives while remaining resilient to unrelated
+line shifts and indentation changes.
+
+#### 4.3.3. Creation and deletion semantics
+
+For `new file mode` operations, the tool extracts the added (`+`) lines from
+the first diff hunk, creates any parent directories, and writes the new file
+content. For `deleted file mode` operations, the target file is removed; any
+additional body content is ignored.
+
+#### 4.3.4. Safety harness integration and path validation
+
+`act apply-patch` is governed by the same Double-Lock verification pipeline as
+other `act` commands. The parsed patch is applied to in-memory buffers, then:
+
+- **Syntactic Lock (Tree-sitter)**: All modified or created files are parsed
+  to ensure they remain syntactically valid.
+- **Semantic Lock (LSP)**: The modified content is synchronised to the LSP
+  server and diagnostics are checked for newly introduced errors.
+
+Only if both locks pass does the daemon commit the changes atomically. Paths
+are normalised and rejected if they escape the workspace root (for example,
+`../..` traversal or absolute paths), preventing patch-based directory
+traversal attacks.
 
 ## 5. Security by Design: A Zero-Trust Sandboxing Model
 
