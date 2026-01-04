@@ -53,6 +53,15 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
     capability detection, and core LSP features (definition, references,
     diagnostics) for Rust, Python, and TypeScript.
 
+- [ ] Add human-readable output rendering for commands that return code
+    locations or diagnostics, using `miette` or a compatible renderer to
+    show context blocks.
+  - Acceptance criteria: Definition, reference, diagnostics, and safety
+    harness failure outputs include file headers, line-numbered source
+    context, and caret spans in human-readable mode; JSONL output remains
+    unchanged; missing source content falls back to path-and-range with a
+    clear explanation.
+
 - [x] Implement the initial version of the `weaver-sandbox` crate, using
     `birdcage` for its focused scope and production usage, prioritising robust
     Linux support via namespaces and seccomp-bpf.
