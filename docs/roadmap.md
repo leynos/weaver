@@ -89,7 +89,7 @@ and relational understanding of code.*
     (`did_open`, `did_change`, `did_close`) to enable semantic validation
     of modified content at real file paths without writing to disk.
 
-- [ ] Create the `weaver-graph` crate and implement the LSP Provider for call
+- [x] Create the `weaver-graph` crate and implement the LSP Provider for call
     graph generation, using the `textDocument/callHierarchy` request as the
     initial data source.
 
