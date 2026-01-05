@@ -23,7 +23,8 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
       - Acceptance criteria: Schema documented in crate docs, integration tests
         demonstrate precedence order (file < env < CLI), and default sockets
         align with the design doc.
-- [x] Implement the `weaver-cli` executable as the thin JSONL client that
+- [x] Implement the `weaver-cli` executable as the thin JSON Lines (JSONL)
+      client that
       initializes configuration via `ortho-config`, exposes the
       `--capabilities` probe, and streams requests to a running daemon over
       standard IO.
@@ -63,8 +64,8 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
     filesystem.
   - Acceptance criteria: Edit transactions pass through syntactic and semantic
     lock validation before commit, failures leave the filesystem untouched,
-    and BDD scenarios cover success, syntactic failure, semantic failure, and
-    backend unavailable error paths.
+    and behaviour-driven development (BDD) scenarios cover success, syntactic
+    failure, semantic failure, and backend unavailable error paths.
 
 - [x] Implement atomic edits to ensure that multi-file changes either succeed
     or fail as a single transaction.
@@ -98,9 +99,9 @@ and relational understanding of code.*
 *Outcome: Provide a safety-locked patch application path that mirrors the
 `apply_patch` semantics for agents and integrates with the Double-Lock harness.*
 
-- [ ] Add JSON Lines (JSONL) request/response types and a
-    `weaver act apply-patch` command that reads the patch stream from standard
-    input (STDIN) and forwards it to the daemon.
+- [ ] Add JSONL request/response types and a `weaver act apply-patch` command
+    that reads the patch stream from standard input (STDIN) and forwards it to
+    the daemon.
   - Acceptance criteria: CLI streams raw patch input, returns non-zero exit
     codes on failure, and surfaces structured errors.
 - [ ] Implement the patch parser and matcher in `weaverd` to support modify,
@@ -113,9 +114,8 @@ and relational understanding of code.*
   - Acceptance criteria: Tree-sitter validates modified/new files, LSP
     diagnostics are compared against the pre-edit baseline, and failures
     leave the filesystem untouched.
-- [ ] Add unit, behaviour-driven development (BDD), and end-to-end tests
-    covering create/modify/delete and failure paths (missing hunk, invalid
-    header, traversal attempt).
+- [ ] Add unit, BDD, and end-to-end tests covering create/modify/delete and
+    failure paths (missing hunk, invalid header, traversal attempt).
   - Acceptance criteria: tests pass under `make test` and error messaging is
     asserted for each failure mode.
 
