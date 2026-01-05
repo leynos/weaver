@@ -435,10 +435,11 @@ Weaver continues to treat JSONL as the canonical, machine-readable transport,
 but the CLI may emit human-readable output when the daemon streams plain text
 payloads. Whenever a command returns code locations or diagnostics, the
 human-readable output must include code context blocks rendered using `miette`
-or a renderer modelled on its output. This applies to any response containing
-`Location`, `Range`, or `Diagnostic` data, including definition lookups,
-reference searches, call hierarchy edges, structural matches, rewrite results,
-and verification failures surfaced by the safety harness.
+(a user-friendly diagnostic rendering library) or a renderer modelled on its
+output. This applies to any response containing `Location`, `Range`, or
+`Diagnostic` data, including definition lookups, reference searches, call
+hierarchy edges, structural matches, rewrite results, and verification failures
+surfaced by the safety harness.
 
 Context blocks are required because line-and-column tuples alone are
 insufficient for fast triage. The renderer should show a labelled header with
