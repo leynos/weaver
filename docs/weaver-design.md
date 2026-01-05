@@ -1319,23 +1319,29 @@ routes the notifications to the appropriate server.
 
 ### 4.3. The `act apply-patch` command: safety-locked patch application
 
-`act apply-patch` provides a deterministic, CLI-first way to apply structured
-patches while still benefiting from Weaver's Double-Lock safety harness. The
-command re-implements the `apply_patch` semantics used by AI agent tooling,
-favouring resilient search-and-replace blocks over line-numbered diffs. Every
-operation is validated through the Tree-sitter syntactic lock and the LSP
-semantic lock before any file is written to disk.
+`act apply-patch` provides a deterministic, command-line interface (CLI)-first
+way to apply structured patches while still benefiting from Weaver's
+Double-Lock safety harness. The command re-implements the `apply_patch`
+semantics used by AI agent tooling, favouring resilient search-and-replace
+blocks over line-numbered diffs. Every operation is validated through the
+Tree-sitter syntactic lock and the LSP semantic lock before any file is written
+to disk.
 
 #### 4.3.1. Patch format and operations
 
-`act apply-patch` reads a stream of Git-style file operations from STDIN. Each
-operation starts with a `diff --git a/... b/...` header; the tool targets the
-`b/` path relative to the workspace root and supports quoted filenames. The
-operation type is inferred from the metadata lines that follow:
+`act apply-patch` reads a stream of Git-style file operations from standard
+input (STDIN). Each operation starts with a `diff --git a/... b/...` header;
+the tool targets the `b/` path relative to the workspace root and supports
+quoted filenames. The operation type is inferred from the metadata lines that
+follow:
 
 - **Modify**: Uses one or more `SEARCH`/`REPLACE` blocks.
 - **Create**: Uses `new file mode <permissions>` and a standard diff hunk.
 - **Delete**: Uses `deleted file mode <permissions>` and an empty body.
+
+`act apply-patch` accepts text-only patches. Binary diffs (for example, Git
+binary patch blocks or hunks containing NUL bytes) are rejected with a
+structured error; callers must supply text representations instead.
 
 Example (modification):
 
@@ -1374,31 +1380,133 @@ blocks within a single file:
 - The file is loaded into memory and a `cursor` starts at byte offset 0.
 - Each `SEARCH` block is matched against the remaining content from `cursor`.
 - Matching tries an exact match first, then a fuzzy match that trims leading
-  and trailing whitespace and normalises line endings (`\r\n` vs `\n`).
+  and trailing whitespace and normalizes line endings (`\r\n` vs `\n`).
 - If a block fails to match, the entire command fails and no files are
   modified.
 - When a match succeeds, the matched span is replaced with the `REPLACE`
   block and the cursor advances to the end of the replacement.
 
 This strategy avoids false positives while remaining resilient to unrelated
-line shifts and indentation changes.
+line shifts and indentation changes. The replacement content preserves the
+existing file's dominant line ending style; new files follow the line endings
+present in the patch hunk, defaulting to `\n` when no style is implied.
 
-#### 4.3.3. Creation and deletion semantics
+#### 4.3.3. Apply-patch end-to-end flow
+
+```mermaid
+flowchart TD
+    A[Start act_apply_patch] --> B[Read patch stream from STDIN]
+    B --> C[Parse Git-style diff headers and metadata]
+    C --> D[For each file operation]
+
+    D --> E{Operation type}
+    E --> F[Modify operation] --> F1[Load target file into memory]
+    F1 --> F2[Initialise cursor at byte offset 0]
+    F2 --> F3[For each SEARCH/REPLACE block]
+    F3 --> F4[Try exact match from cursor]
+    F4 --> F5{Exact match found?}
+    F5 -->|Yes| F8[Replace span with REPLACE block]
+    F5 -->|No| F6[Try fuzzy match with whitespace and line ending normalization]
+    F6 --> F7{Fuzzy match found?}
+    F7 -->|No| Z1[Fail command, no files modified]
+    F7 -->|Yes| F8[Replace span with REPLACE block]
+    F8 --> F9[Advance cursor to end of replacement]
+    F9 --> F3
+
+    E --> G[Create operation] --> G1[Extract added lines from first diff hunk]
+    G1 --> G2[Normalize and validate target path]
+    G2 --> G3[Create parent directories if missing]
+    G3 --> G4[Prepare new file content in memory]
+
+    E --> H[Delete operation] --> H1[Normalize and validate target path]
+    H1 --> H2[Mark file for deletion]
+
+    F3 -->|All blocks processed| I[All operations prepared in memory]
+    G4 --> I
+    H2 --> I
+
+    I --> J[Run Tree-sitter syntactic lock on modified and created files]
+    J --> K{Syntactic lock passes?}
+    K -->|No| Z1
+    K -->|Yes| L[Sync buffers to LSP and run semantic lock]
+
+    L --> M{New diagnostics introduced?}
+    M -->|Yes| Z1
+    M -->|No| N[Commit all changes atomically to filesystem]
+
+    N --> O[Return success, zero exit code]
+    Z1 --> P[Return structured error, non-zero exit code]
+    O --> Q[End]
+    P --> Q[End]
+```
+
+*Figure: `act apply-patch` execution flow from patch parsing to lock-guarded
+commit.*
+
+#### 4.3.4. Apply-patch lock interaction sequence
+
+```mermaid
+sequenceDiagram
+    actor Developer
+    participant CLI as act_apply_patch_CLI
+    participant Daemon as weaverd_daemon
+    participant Harness as SafetyHarness_DoubleLock
+    participant TS as TreeSitter
+    participant LSP as LSPServer
+    participant FS as WorkspaceFilesystem
+
+    Developer->>CLI: Invoke weaver act apply-patch
+    Developer->>CLI: Stream patch via STDIN
+    CLI->>Daemon: JSONL request with raw patch stream
+    Daemon->>Daemon: Parse patch
+    Daemon->>Daemon: Classify operations (Modify/Create/Delete)
+
+    Daemon->>Harness: Apply patch to in_memory_buffers
+    Harness->>TS: Run syntactic_lock on modified and created files
+    TS-->>Harness: Syntactic result (pass or fail)
+    alt Syntactic lock fails
+        Harness-->>Daemon: Lock_failure_syntax
+        Daemon-->>CLI: Structured error, non_zero exit_code
+        CLI-->>Developer: Report failure, no filesystem writes
+    else Syntactic lock passes
+        Harness->>LSP: Sync buffers and run semantic_lock
+        LSP-->>Harness: Diagnostics and comparison vs baseline
+        alt Semantic lock fails
+            Harness-->>Daemon: Lock_failure_semantics
+            Daemon-->>CLI: Structured error, non_zero exit_code
+            CLI-->>Developer: Report failure, no filesystem writes
+        else Both locks pass
+            Daemon->>FS: Commit changes atomically
+            FS-->>Daemon: Write result
+            Daemon-->>CLI: Success response, zero exit_code
+            CLI-->>Developer: Confirm patch applied safely
+        end
+    end
+```
+
+*Figure: `act apply-patch` sequence with Double-Lock verification and atomic
+commit.*
+
+#### 4.3.5. Creation and deletion semantics
 
 For `new file mode` operations, the tool extracts the added (`+`) lines from
 the first diff hunk, creates any parent directories, and writes the new file
 content. For `deleted file mode` operations, the target file is removed; any
 additional body content is ignored.
 
-#### 4.3.4. Safety harness integration and path validation
+#### 4.3.6. Safety harness integration and path validation
 
 `act apply-patch` is governed by the same Double-Lock verification pipeline as
 other `act` commands. The parsed patch is applied to in-memory buffers, then:
 
 - **Syntactic Lock (Tree-sitter)**: All modified or created files are parsed
-  to ensure they remain syntactically valid.
+  to ensure they remain syntactically valid. If the parser is unavailable or a
+  timeout elapses, the command fails fast with a structured backend-unavailable
+  error.
 - **Semantic Lock (LSP)**: The modified content is synchronised to the LSP
-  server and diagnostics are checked for newly introduced errors.
+  server and diagnostics are checked for newly introduced errors. If the LSP
+  backend is unavailable or times out, the command fails fast without falling
+  back to a weaker validation mode.
 
 Only if both locks pass does the daemon commit the changes atomically. Paths
 are normalised and rejected if they escape the workspace root (for example,
