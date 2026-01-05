@@ -429,6 +429,43 @@ Because lifecycle commands operate exclusively on shared filesystem artefacts
 they remain side-effect free with respect to the JSONL transport and can be
 used safely from automation tooling.
 
+#### 2.1.3. Human-readable output and code context blocks
+
+Weaver continues to treat JSONL as the canonical, machine-readable transport,
+but the CLI may emit human-readable output when the daemon streams plain text
+payloads. Whenever a command returns code locations or diagnostics, the
+human-readable output must include code context blocks rendered using `miette`
+(a user-friendly diagnostic rendering library) or a renderer modelled on its
+output. This applies to any response containing `Location`, `Range`, or
+`Diagnostic` data, including definition lookups, reference searches, call
+hierarchy edges, structural matches, rewrite results, and verification failures
+surfaced by the safety harness.
+
+Context blocks are required because line-and-column tuples alone are
+insufficient for fast triage. The renderer should show a labelled header with
+the path and coordinate, a small window of surrounding source (defaulting to
+two lines of context before and after), and a caret span highlighting the exact
+range. Multi-line ranges should render a distinct marker on each line. When
+multiple results point into the same file, the output should group them under a
+single file header to avoid repetition while still emitting a separate context
+block for each location.
+
+If the renderer cannot access the file contents (for example, the file is
+missing or was generated in-memory), the output should fall back to the
+path-and-range header plus a short explanation describing why the context could
+not be rendered. JSONL payloads remain unchanged; the context blocks are an
+additive, human-facing presentation layer.
+
+Example (ASCII-only, modelled on `miette`):
+
+```text
+error: Undefined variable `new_function_name`
+  --> src/main.py:42:5
+   |
+42 |     print(new_function_name)
+   |           ^^^^^^^^^^^^^^^^^ not found in this scope
+```
+
 ### 2.2. Semantic, Syntactic, and Relational Fusion
 
 A core premise of `Weaver` is that a truly robust understanding of a codebase
