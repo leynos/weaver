@@ -1508,6 +1508,11 @@ other `act` commands. The parsed patch is applied to in-memory buffers, then:
   backend is unavailable or times out, the command fails fast without falling
   back to a weaker validation mode.
 
+Lock evaluation is single-shot: `act apply-patch` does not retry or fall back
+when Tree-sitter or LSP validation is unavailable or exceeds the timeout.
+Instead, it returns a structured backend-unavailable error and exits with a
+non-zero status after leaving the filesystem untouched.
+
 Only if both locks pass does the daemon commit the changes atomically. Paths
 are normalised and rejected if they escape the workspace root (for example,
 `../..` traversal or absolute paths), preventing patch-based directory
