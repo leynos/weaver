@@ -1,6 +1,6 @@
-.PHONY: help all clean test build release lint fmt check-fmt markdownlint nixie
+.PHONY: help all clean test build release lint fmt check-fmt markdownlint nixie install
 
-APP ?= weaver-cli
+APP ?= weaver
 CARGO ?= cargo
 BUILD_JOBS ?=
 CLIPPY_FLAGS ?= --workspace --all-targets --all-features -- -D warnings
@@ -43,3 +43,7 @@ nixie: ## Validate Mermaid diagrams
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \
 	awk 'BEGIN {FS=":"; printf "Available targets:\n"} {printf "  %-20s %s\n", $$1, $$2}'
+
+install: ## Install weaver and weaverd binaries
+	$(CARGO) install --path crates/weaver-cli
+	$(CARGO) install --path crates/weaverd
