@@ -74,6 +74,23 @@ impl TestWorld {
         )];
     }
 
+    /// Configures the test to trigger auto-start behaviour that will fail.
+    ///
+    /// Sets up a socket endpoint that refuses connections and ensures the
+    /// daemon binary lookup will fail, allowing us to observe the "Waiting for
+    /// daemon start..." message before the failure error.
+    pub fn configure_auto_start_failure(&mut self) {
+        // Use a TCP endpoint on a port that's definitely not listening.
+        // The CLI will try to connect, fail, then attempt auto-start.
+        self.config.daemon_socket = SocketEndpoint::tcp("127.0.0.1", 1);
+        // Point to a non-existent binary so spawn fails quickly.
+        // SAFETY: Tests run single-threaded via cargo test, so modifying env
+        // vars is safe. The variable affects only daemon binary lookup.
+        unsafe {
+            std::env::set_var("WEAVERD_BIN", "/nonexistent/weaverd");
+        }
+    }
+
     pub fn run(&mut self, command: &str) -> Result<()> {
         self.stdout.clear();
         self.stderr.clear();

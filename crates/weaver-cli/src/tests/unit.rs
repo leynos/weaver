@@ -10,7 +10,7 @@ use super::support::accept_unix_connection;
 
 use std::cell::RefCell;
 use std::ffi::OsString;
-use std::io::Cursor;
+use std::io::{self, Cursor};
 use std::net::TcpListener;
 use std::process::ExitCode;
 use std::thread;
@@ -18,7 +18,7 @@ use std::thread;
 use crate::{
     AppError, Cli, CliCommand, CommandDescriptor, CommandInvocation, CommandRequest, ConfigLoader,
     DaemonAction, EMPTY_LINE_LIMIT, IoStreams, connect, exit_code_from_status,
-    read_daemon_messages, run_with_loader,
+    is_daemon_not_running, read_daemon_messages, run_with_loader,
 };
 use clap::Parser;
 use rstest::rstest;
@@ -299,4 +299,34 @@ fn connect_supports_unix_sockets() {
 
         (SocketEndpoint::unix(socket_display), handle)
     });
+}
+
+#[rstest]
+#[case(io::ErrorKind::ConnectionRefused, true, "connection refused")]
+#[case(io::ErrorKind::NotFound, true, "socket not found")]
+#[case(io::ErrorKind::AddrNotAvailable, true, "address unavailable")]
+#[case(io::ErrorKind::PermissionDenied, false, "permission denied")]
+#[case(io::ErrorKind::TimedOut, false, "timed out")]
+fn is_daemon_not_running_classifies_errors(
+    #[case] kind: io::ErrorKind,
+    #[case] expected: bool,
+    #[case] _description: &str,
+) {
+    let error = AppError::Connect {
+        endpoint: String::from("test:1234"),
+        source: io::Error::new(kind, "test error"),
+    };
+    assert_eq!(is_daemon_not_running(&error), expected);
+}
+
+#[test]
+fn is_daemon_not_running_rejects_non_connect_errors() {
+    let error = AppError::MissingDomain;
+    assert!(!is_daemon_not_running(&error));
+
+    let error = AppError::MissingOperation;
+    assert!(!is_daemon_not_running(&error));
+
+    let error = AppError::MissingExit;
+    assert!(!is_daemon_not_running(&error));
 }

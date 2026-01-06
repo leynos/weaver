@@ -68,6 +68,13 @@ fn given_daemon_with_empty_lines(world: &RefCell<TestWorld>) {
         .expect("failed to start daemon with empty lines");
 }
 
+#[given("auto-start will be triggered")]
+fn given_auto_start_triggered(world: &RefCell<TestWorld>) {
+    // Configure to use a non-existent daemon binary so auto-start fails quickly
+    // and produces the "Waiting for daemon start..." message before erroring.
+    world.borrow_mut().configure_auto_start_failure();
+}
+
 #[when("the operator runs {command}")]
 fn when_operator_runs(world: &RefCell<TestWorld>, command: String) {
     world

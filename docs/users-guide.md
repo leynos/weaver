@@ -169,6 +169,30 @@ Lifecycle commands never contact the daemon's JSONL transport. They operate on
 shared runtime files from `weaver-config`, so the CLI and daemon use the same
 directory layout even when the daemon socket is overridden.
 
+### Automatic daemon startup
+
+When a domain command is issued and the daemon is not running, the CLI
+automatically attempts to start the daemon rather than failing immediately. The
+message `Waiting for daemon start...` appears on stderr while the CLI waits for
+the daemon to become ready. The timeout for automatic startup is 30 seconds; if
+the daemon fails to start within this period, the CLI reports the failure and
+exits.
+
+This behaviour allows operators to run commands without explicitly starting the
+daemon first:
+
+```sh
+weaver observe get-definition --uri file:///src/main.rs --position 10:5
+```
+
+If the daemon is not running, it will be started automatically before the
+command executes. The automatic startup uses the same configuration flags
+(`--config-path`, `--daemon-socket`, etc.) passed to the command.
+
+Errors that prevent connection but are not related to the daemon being offline
+(such as permission denied or network timeouts) bypass automatic startup and
+are reported immediately.
+
 ## Command reference
 
 `weaver` exposes three command families: the `--capabilities` probe, daemon

@@ -13,9 +13,9 @@ use weaver_config::RuntimePaths;
 use super::error::LifecycleError;
 use super::types::{LifecycleCommand, LifecycleContext, LifecycleInvocation, LifecycleOutput};
 use super::utils::{
-    ensure_no_extra_arguments, ensure_socket_available, prepare_runtime, read_health, read_pid,
-    signal_daemon, socket_is_reachable, spawn_daemon, wait_for_ready, wait_for_shutdown,
-    write_startup_banner,
+    STARTUP_TIMEOUT, ensure_no_extra_arguments, ensure_socket_available, prepare_runtime,
+    read_health, read_pid, signal_daemon, socket_is_reachable, spawn_daemon, wait_for_ready,
+    wait_for_shutdown, write_startup_banner,
 };
 
 /// Production lifecycle controller.
@@ -47,7 +47,7 @@ impl SystemLifecycle {
         let paths = prepare_runtime(context)?;
         let mut child = spawn_daemon(context.config_arguments)?;
         let started_at = SystemTime::now();
-        let snapshot = wait_for_ready(&paths, &mut child, started_at)?;
+        let snapshot = wait_for_ready(&paths, &mut child, started_at, STARTUP_TIMEOUT)?;
         write_startup_banner(output, context, &snapshot, &paths)?;
         Ok(ExitCode::SUCCESS)
     }

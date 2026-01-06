@@ -23,7 +23,8 @@ use super::types::{LifecycleContext, LifecycleInvocation};
 #[cfg(unix)]
 use libc::{SIGTERM, kill};
 
-const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
+pub(super) const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
+pub(super) const AUTO_START_TIMEOUT: Duration = Duration::from_secs(30);
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
 const POLL_INTERVAL: Duration = Duration::from_millis(200);
 const SOCKET_PROBE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -72,8 +73,9 @@ pub(super) fn wait_for_ready(
     paths: &RuntimePaths,
     child: &mut Child,
     started_at: SystemTime,
+    timeout: Duration,
 ) -> Result<HealthSnapshot, LifecycleError> {
-    let deadline = Instant::now() + STARTUP_TIMEOUT;
+    let deadline = Instant::now() + timeout;
     let expected_pid = child.id();
     while Instant::now() < deadline {
         if let Some(snapshot) = read_health(paths.health_path())? {
@@ -105,7 +107,7 @@ pub(super) fn wait_for_ready(
     }
     Err(LifecycleError::StartupTimeout {
         health_path: paths.health_path().to_path_buf(),
-        timeout_ms: STARTUP_TIMEOUT.as_millis() as u64,
+        timeout_ms: timeout.as_millis() as u64,
     })
 }
 
@@ -270,6 +272,23 @@ fn snapshot_is_recent(snapshot: &HealthSnapshot, started_at: SystemTime) -> bool
         Some(snapshot_time) => snapshot_time >= started_at,
         None => false,
     }
+}
+
+/// Attempts to start the daemon automatically when a connection fails.
+///
+/// Prints a status message to stderr, spawns the daemon process, and waits for
+/// it to report ready status. Uses `AUTO_START_TIMEOUT` (30 seconds) to allow
+/// sufficient time for daemon initialisation.
+pub fn try_auto_start_daemon<E: Write>(
+    context: LifecycleContext<'_>,
+    stderr: &mut E,
+) -> Result<(), LifecycleError> {
+    writeln!(stderr, "Waiting for daemon start...").map_err(LifecycleError::Io)?;
+    let paths = prepare_runtime(context)?;
+    let mut child = spawn_daemon(context.config_arguments)?;
+    let started_at = SystemTime::now();
+    wait_for_ready(&paths, &mut child, started_at, AUTO_START_TIMEOUT)?;
+    Ok(())
 }
 
 pub(super) fn write_startup_banner<W: Write, E: Write>(

@@ -15,3 +15,4 @@ mod utils;
 pub use controller::SystemLifecycle;
 pub use error::LifecycleError;
 pub use types::{LifecycleCommand, LifecycleContext, LifecycleInvocation, LifecycleOutput};
+pub use utils::try_auto_start_daemon;

@@ -27,6 +27,7 @@ use config::{ConfigArgumentSplit, split_config_arguments};
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader};
 use lifecycle::{
     LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput, SystemLifecycle,
+    try_auto_start_daemon,
 };
 use transport::connect;
 /// CLI flags recognised by the configuration loader.
@@ -125,7 +126,12 @@ where
                 }
 
                 let invocation = CommandInvocation::try_from(cli)?;
-                Ok(execute_daemon_command(invocation, &config, self.io))
+                Ok(execute_daemon_command(
+                    invocation,
+                    &config,
+                    &split.config_arguments,
+                    self.io,
+                ))
             });
 
         match result {
@@ -186,6 +192,7 @@ where
 fn execute_daemon_command<W, E>(
     invocation: CommandInvocation,
     config: &Config,
+    config_arguments: &[OsString],
     io: &mut IoStreams<'_, W, E>,
 ) -> ExitCode
 where
@@ -195,6 +202,24 @@ where
     let request = CommandRequest::from(invocation);
     let mut connection = match connect(config.daemon_socket()) {
         Ok(connection) => connection,
+        Err(error) if is_daemon_not_running(&error) => {
+            let context = LifecycleContext {
+                config,
+                config_arguments,
+            };
+            if let Err(start_error) = try_auto_start_daemon(context, &mut *io.stderr) {
+                let _ = writeln!(io.stderr, "{start_error}");
+                return ExitCode::FAILURE;
+            }
+            // Retry connection after daemon started successfully.
+            match connect(config.daemon_socket()) {
+                Ok(connection) => connection,
+                Err(retry_error) => {
+                    let _ = writeln!(io.stderr, "{retry_error}");
+                    return ExitCode::FAILURE;
+                }
+            }
+        }
         Err(error) => {
             let _ = writeln!(io.stderr, "{error}");
             return ExitCode::FAILURE;
@@ -269,6 +294,22 @@ fn exit_code_from_status(status: i32) -> ExitCode {
         ExitCode::from(status as u8)
     } else {
         ExitCode::FAILURE
+    }
+}
+
+/// Determines whether an error indicates the daemon is not running.
+///
+/// Returns true for connection-refused, socket-not-found, and address-unavailable
+/// errors, which typically indicate the daemon process is not listening.
+fn is_daemon_not_running(error: &AppError) -> bool {
+    match error {
+        AppError::Connect { source, .. } => matches!(
+            source.kind(),
+            io::ErrorKind::ConnectionRefused
+                | io::ErrorKind::NotFound
+                | io::ErrorKind::AddrNotAvailable
+        ),
+        _ => false,
     }
 }
 
