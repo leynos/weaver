@@ -4,7 +4,7 @@
 //! daemon, monitoring health snapshots, and coordinating shutdown sequences.
 
 use std::env;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io::{self, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
@@ -49,8 +49,11 @@ pub(super) fn prepare_runtime(
     RuntimePaths::from_config(config).map_err(LifecycleError::from)
 }
 
-pub(super) fn spawn_daemon(config_arguments: &[OsString]) -> Result<Child, LifecycleError> {
-    let binary = daemon_binary();
+pub(super) fn spawn_daemon(
+    config_arguments: &[OsString],
+    binary_override: Option<&OsStr>,
+) -> Result<Child, LifecycleError> {
+    let binary = resolve_daemon_binary(binary_override);
     let mut command = Command::new(&binary);
     if config_arguments.len() > 1 {
         // Skip argv[0], which is the binary name, and forward the remaining CLI
@@ -65,8 +68,11 @@ pub(super) fn spawn_daemon(config_arguments: &[OsString]) -> Result<Child, Lifec
         .map_err(|source| LifecycleError::LaunchDaemon { binary, source })
 }
 
-fn daemon_binary() -> OsString {
-    env::var_os("WEAVERD_BIN").unwrap_or_else(|| OsString::from("weaverd"))
+fn resolve_daemon_binary(binary_override: Option<&OsStr>) -> OsString {
+    binary_override
+        .map(OsString::from)
+        .or_else(|| env::var_os("WEAVERD_BIN"))
+        .unwrap_or_else(|| OsString::from("weaverd"))
 }
 
 pub(super) fn wait_for_ready(
@@ -97,8 +103,12 @@ pub(super) fn wait_for_ready(
             // Spawned process exited cleanly; daemon has forked to a new PID.
             daemonized = true;
         }
-        if let Some(result) = check_health_snapshot(paths, started_at, expected_pid, daemonized)? {
-            return result;
+        match check_health_snapshot(paths, started_at, expected_pid, daemonized)? {
+            HealthCheckOutcome::Ready(snapshot) => return Ok(snapshot),
+            HealthCheckOutcome::Aborted { path } => {
+                return Err(LifecycleError::StartupAborted { path });
+            }
+            HealthCheckOutcome::Continue => {}
         }
         thread::sleep(POLL_INTERVAL);
     }
@@ -264,30 +274,38 @@ fn snapshot_matches_process(snapshot: &HealthSnapshot, expected_pid: u32) -> boo
     snapshot.pid == expected_pid
 }
 
+/// Result of evaluating a health snapshot during daemon startup.
+#[derive(Debug)]
+enum HealthCheckOutcome {
+    /// Daemon is ready; startup succeeded with the given snapshot.
+    Ready(HealthSnapshot),
+    /// Daemon reported stopping status; startup was aborted.
+    Aborted { path: std::path::PathBuf },
+    /// No actionable snapshot yet; polling should continue.
+    Continue,
+}
+
 /// Evaluates a health snapshot for readiness or failure conditions.
-///
-/// Returns `Some(Ok(snapshot))` if daemon is ready, `Some(Err(...))` if startup
-/// was aborted, or `None` if polling should continue.
 fn check_health_snapshot(
     paths: &RuntimePaths,
     started_at: SystemTime,
     expected_pid: u32,
     daemonized: bool,
-) -> Result<Option<Result<HealthSnapshot, LifecycleError>>, LifecycleError> {
+) -> Result<HealthCheckOutcome, LifecycleError> {
     let Some(snapshot) = read_health(paths.health_path())? else {
-        return Ok(None);
+        return Ok(HealthCheckOutcome::Continue);
     };
     let pid_ok = daemonized || snapshot_matches_process(&snapshot, expected_pid);
     let recent = snapshot_is_recent(&snapshot, started_at);
     if !pid_ok || !recent {
-        return Ok(None);
+        return Ok(HealthCheckOutcome::Continue);
     }
     match snapshot.status.as_str() {
-        "ready" => Ok(Some(Ok(snapshot))),
-        "stopping" => Ok(Some(Err(LifecycleError::StartupAborted {
+        "ready" => Ok(HealthCheckOutcome::Ready(snapshot)),
+        "stopping" => Ok(HealthCheckOutcome::Aborted {
             path: paths.health_path().to_path_buf(),
-        }))),
-        _ => Ok(None),
+        }),
+        _ => Ok(HealthCheckOutcome::Continue),
     }
 }
 
@@ -313,7 +331,7 @@ pub fn try_auto_start_daemon<E: Write>(
 ) -> Result<(), LifecycleError> {
     writeln!(stderr, "Waiting for daemon start...").map_err(LifecycleError::Io)?;
     let paths = prepare_runtime(context)?;
-    let mut child = spawn_daemon(context.config_arguments)?;
+    let mut child = spawn_daemon(context.config_arguments, context.daemon_binary)?;
     let started_at = SystemTime::now();
     wait_for_ready(&paths, &mut child, started_at, AUTO_START_TIMEOUT)?;
     Ok(())

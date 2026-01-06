@@ -22,7 +22,7 @@ use std::os::unix::net::UnixStream;
 use crate::lifecycle::{
     LifecycleCommand, LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput,
 };
-use crate::{AppError, ConfigLoader, IoStreams, run_with_loader_with_handler};
+use crate::{AppError, ConfigLoader, IoStreams, run_with_daemon_binary};
 use anyhow::{Context, Result, anyhow, ensure};
 use rstest::fixture;
 use weaver_config::{CapabilityDirective, CapabilityOverride, Config, SocketEndpoint};
@@ -52,6 +52,8 @@ pub(super) struct TestWorld {
     pub exit_code: Option<ExitCode>,
     pub requests: Vec<String>,
     pub lifecycle: TestLifecycle,
+    /// Optional override for daemon binary path, used instead of env var mutation.
+    pub daemon_binary: Option<OsString>,
 }
 
 impl TestWorld {
@@ -84,11 +86,7 @@ impl TestWorld {
         // The CLI will try to connect, fail, then attempt auto-start.
         self.config.daemon_socket = SocketEndpoint::tcp("127.0.0.1", 1);
         // Point to a non-existent binary so spawn fails quickly.
-        // SAFETY: Tests run single-threaded via cargo test, so modifying env
-        // vars is safe. The variable affects only daemon binary lookup.
-        unsafe {
-            std::env::set_var("WEAVERD_BIN", "/nonexistent/weaverd");
-        }
+        self.daemon_binary = Some(OsString::from("/nonexistent/weaverd"));
     }
 
     pub fn run(&mut self, command: &str) -> Result<()> {
@@ -97,11 +95,15 @@ impl TestWorld {
         self.requests.clear();
         let args = Self::build_args(command);
         let loader = StaticConfigLoader::new(self.config.clone());
+        let daemon_binary = self.daemon_binary.as_deref();
         let mut io = IoStreams::new(&mut self.stdout, &mut self.stderr);
-        let exit =
-            run_with_loader_with_handler(args, &mut io, &loader, |invocation, context, output| {
-                self.lifecycle.handle(invocation, context, output)
-            });
+        let exit = run_with_daemon_binary(
+            args,
+            &mut io,
+            &loader,
+            daemon_binary,
+            |invocation, context, output| self.lifecycle.handle(invocation, context, output),
+        );
         self.exit_code = Some(exit);
         if let Some(daemon) = self.daemon.as_mut() {
             self.requests = daemon.take_requests()?;

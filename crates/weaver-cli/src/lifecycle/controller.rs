@@ -45,7 +45,7 @@ impl SystemLifecycle {
         ensure_no_extra_arguments(invocation)?;
         ensure_socket_available(context.config.daemon_socket())?;
         let paths = prepare_runtime(context)?;
-        let mut child = spawn_daemon(context.config_arguments)?;
+        let mut child = spawn_daemon(context.config_arguments, context.daemon_binary)?;
         let started_at = SystemTime::now();
         let snapshot = wait_for_ready(&paths, &mut child, started_at, STARTUP_TIMEOUT)?;
         write_startup_banner(output, context, &snapshot, &paths)?;

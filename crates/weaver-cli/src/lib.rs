@@ -5,7 +5,7 @@
 //! to be exercised both from the binary entrypoint and from tests where
 //! configuration loading and IO streams can be substituted.
 
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::io::{self, Write};
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -64,6 +64,7 @@ impl<'a, W: Write, E: Write> IoStreams<'a, W, E> {
 struct CliRunner<'a, W: Write, E: Write, L: ConfigLoader> {
     io: &'a mut IoStreams<'a, W, E>,
     loader: &'a L,
+    daemon_binary: Option<&'a OsStr>,
 }
 
 impl<'a, W, E, L> CliRunner<'a, W, E, L>
@@ -73,7 +74,17 @@ where
     L: ConfigLoader,
 {
     fn new(io: &'a mut IoStreams<'a, W, E>, loader: &'a L) -> Self {
-        Self { io, loader }
+        Self {
+            io,
+            loader,
+            daemon_binary: None,
+        }
+    }
+
+    #[cfg(test)]
+    fn with_daemon_binary(mut self, daemon_binary: Option<&'a OsStr>) -> Self {
+        self.daemon_binary = daemon_binary;
+        self
     }
 
     fn run<I>(&mut self, args: I) -> ExitCode
@@ -119,6 +130,7 @@ where
                     let context = LifecycleContext {
                         config: &config,
                         config_arguments: &split.config_arguments,
+                        daemon_binary: self.daemon_binary,
                     };
                     let mut output =
                         LifecycleOutput::new(&mut *self.io.stdout, &mut *self.io.stderr);
@@ -126,12 +138,12 @@ where
                 }
 
                 let invocation = CommandInvocation::try_from(cli)?;
-                Ok(execute_daemon_command(
-                    invocation,
-                    &config,
-                    &split.config_arguments,
-                    self.io,
-                ))
+                let context = LifecycleContext {
+                    config: &config,
+                    config_arguments: &split.config_arguments,
+                    daemon_binary: self.daemon_binary,
+                };
+                Ok(execute_daemon_command(invocation, context, self.io))
             });
 
         match result {
@@ -191,8 +203,7 @@ where
 
 fn execute_daemon_command<W, E>(
     invocation: CommandInvocation,
-    config: &Config,
-    config_arguments: &[OsString],
+    context: LifecycleContext<'_>,
     io: &mut IoStreams<'_, W, E>,
 ) -> ExitCode
 where
@@ -200,19 +211,15 @@ where
     E: Write,
 {
     let request = CommandRequest::from(invocation);
-    let mut connection = match connect(config.daemon_socket()) {
+    let mut connection = match connect(context.config.daemon_socket()) {
         Ok(connection) => connection,
         Err(error) if is_daemon_not_running(&error) => {
-            let context = LifecycleContext {
-                config,
-                config_arguments,
-            };
             if let Err(start_error) = try_auto_start_daemon(context, &mut *io.stderr) {
                 let _ = writeln!(io.stderr, "{start_error}");
                 return ExitCode::FAILURE;
             }
             // Retry connection after daemon started successfully.
-            match connect(config.daemon_socket()) {
+            match connect(context.config.daemon_socket()) {
                 Ok(connection) => connection,
                 Err(retry_error) => {
                     let _ = writeln!(io.stderr, "{retry_error}");
@@ -257,10 +264,15 @@ where
 }
 
 #[cfg(test)]
-pub(crate) fn run_with_loader_with_handler<'a, I, W, E, L, F>(
+#[expect(
+    clippy::too_many_arguments,
+    reason = "test-only function requires full parameter set for dependency injection"
+)]
+pub(crate) fn run_with_daemon_binary<'a, I, W, E, L, F>(
     args: I,
     io: &'a mut IoStreams<'a, W, E>,
     loader: &'a L,
+    daemon_binary: Option<&'a OsStr>,
     handler: F,
 ) -> ExitCode
 where
@@ -274,7 +286,9 @@ where
         &mut LifecycleOutput<&mut W, &mut E>,
     ) -> Result<ExitCode, LifecycleError>,
 {
-    CliRunner::new(io, loader).run_with_handler(args, handler)
+    CliRunner::new(io, loader)
+        .with_daemon_binary(daemon_binary)
+        .run_with_handler(args, handler)
 }
 
 fn emit_capabilities<W>(config: &Config, stdout: &mut W) -> Result<(), AppError>
