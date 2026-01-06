@@ -347,9 +347,7 @@ mod auto_start_decision {
         }
     }
 
-    #[test]
-    fn triggers_auto_start_on_connection_refused() {
-        // Socket that refuses connections (nothing listening).
+    fn test_auto_start_behavior(expected_stderr_substring: &str) {
         let config = Config {
             daemon_socket: SocketEndpoint::tcp("127.0.0.1", 1),
             ..Config::default()
@@ -366,40 +364,23 @@ mod auto_start_decision {
 
         let exit = execute_daemon_command(invocation, context, &mut io);
 
-        // Should fail because auto-start spawn fails, but stderr should contain
-        // the waiting message proving auto-start was triggered.
         assert_eq!(exit, std::process::ExitCode::FAILURE);
         let stderr_text = decode_utf8(stderr, "stderr").expect("stderr utf8");
         assert!(
-            stderr_text.contains("Waiting for daemon start..."),
-            "auto-start was not triggered: {stderr_text:?}"
+            stderr_text.contains(expected_stderr_substring),
+            "expected stderr to contain {expected_stderr_substring:?}, got: {stderr_text:?}"
         );
+    }
+
+    // Socket that refuses connections (nothing listening).
+    #[test]
+    fn triggers_auto_start_on_connection_refused() {
+        test_auto_start_behavior("Waiting for daemon start...");
     }
 
     #[test]
     fn reports_auto_start_spawn_failure() {
-        let config = Config {
-            daemon_socket: SocketEndpoint::tcp("127.0.0.1", 1),
-            ..Config::default()
-        };
-        let context = LifecycleContext {
-            config: &config,
-            config_arguments: &[],
-            daemon_binary: Some(OsStr::new("/nonexistent/weaverd")),
-        };
-        let invocation = make_invocation();
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let mut io = IoStreams::new(&mut stdout, &mut stderr);
-
-        let exit = execute_daemon_command(invocation, context, &mut io);
-
-        assert_eq!(exit, std::process::ExitCode::FAILURE);
-        let stderr_text = decode_utf8(stderr, "stderr").expect("stderr utf8");
-        assert!(
-            stderr_text.contains("failed to spawn"),
-            "expected spawn failure message: {stderr_text:?}"
-        );
+        test_auto_start_behavior("failed to spawn");
     }
 
     #[test]
