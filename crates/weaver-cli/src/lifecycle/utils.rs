@@ -443,4 +443,83 @@ pub(crate) mod tests {
         let start = UNIX_EPOCH + Duration::from_secs(100) + Duration::from_nanos(500_000_000);
         assert!(snapshot_is_recent(&snapshot, start));
     }
+
+    fn write_health_snapshot(paths: &RuntimePaths, status: &str, pid: u32, timestamp: u64) {
+        let snapshot = format!(
+            r#"{{"status":"{}","pid":{},"timestamp":{}}}"#,
+            status, pid, timestamp
+        );
+        fs::write(paths.health_path(), snapshot).expect("write health");
+    }
+
+    #[test]
+    fn check_health_snapshot_returns_continue_when_missing() {
+        let (_dir, paths) = temp_paths();
+        let started_at = UNIX_EPOCH + Duration::from_secs(100);
+        let outcome = check_health_snapshot(&paths, started_at, 42, false).expect("check health");
+        assert!(matches!(outcome, HealthCheckOutcome::Continue));
+    }
+
+    #[test]
+    fn check_health_snapshot_returns_continue_when_pid_mismatch() {
+        let (_dir, paths) = temp_paths();
+        write_health_snapshot(&paths, "ready", 99, 100);
+        let started_at = UNIX_EPOCH + Duration::from_secs(100);
+        // Expected PID 42, but snapshot has PID 99 and daemonized is false.
+        let outcome = check_health_snapshot(&paths, started_at, 42, false).expect("check health");
+        assert!(matches!(outcome, HealthCheckOutcome::Continue));
+    }
+
+    #[test]
+    fn check_health_snapshot_returns_continue_when_stale() {
+        let (_dir, paths) = temp_paths();
+        write_health_snapshot(&paths, "ready", 42, 50);
+        // Snapshot timestamp 50 is before started_at timestamp 100.
+        let started_at = UNIX_EPOCH + Duration::from_secs(100);
+        let outcome = check_health_snapshot(&paths, started_at, 42, false).expect("check health");
+        assert!(matches!(outcome, HealthCheckOutcome::Continue));
+    }
+
+    #[test]
+    fn check_health_snapshot_returns_ready_when_valid() {
+        let (_dir, paths) = temp_paths();
+        write_health_snapshot(&paths, "ready", 42, 100);
+        let started_at = UNIX_EPOCH + Duration::from_secs(100);
+        let outcome = check_health_snapshot(&paths, started_at, 42, false).expect("check health");
+        match outcome {
+            HealthCheckOutcome::Ready(snapshot) => {
+                assert_eq!(snapshot.status, "ready");
+                assert_eq!(snapshot.pid, 42);
+            }
+            other => panic!("expected Ready, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn check_health_snapshot_skips_pid_check_when_daemonized() {
+        let (_dir, paths) = temp_paths();
+        write_health_snapshot(&paths, "ready", 99, 100);
+        let started_at = UNIX_EPOCH + Duration::from_secs(100);
+        // Expected PID 42, but daemonized=true skips PID check.
+        let outcome = check_health_snapshot(&paths, started_at, 42, true).expect("check health");
+        assert!(matches!(outcome, HealthCheckOutcome::Ready(_)));
+    }
+
+    #[test]
+    fn check_health_snapshot_returns_aborted_when_stopping() {
+        let (_dir, paths) = temp_paths();
+        write_health_snapshot(&paths, "stopping", 42, 100);
+        let started_at = UNIX_EPOCH + Duration::from_secs(100);
+        let outcome = check_health_snapshot(&paths, started_at, 42, false).expect("check health");
+        assert!(matches!(outcome, HealthCheckOutcome::Aborted { .. }));
+    }
+
+    #[test]
+    fn check_health_snapshot_continues_on_starting_status() {
+        let (_dir, paths) = temp_paths();
+        write_health_snapshot(&paths, "starting", 42, 100);
+        let started_at = UNIX_EPOCH + Duration::from_secs(100);
+        let outcome = check_health_snapshot(&paths, started_at, 42, false).expect("check health");
+        assert!(matches!(outcome, HealthCheckOutcome::Continue));
+    }
 }
