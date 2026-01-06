@@ -330,3 +330,95 @@ fn is_daemon_not_running_rejects_non_connect_errors() {
     let error = AppError::MissingExit;
     assert!(!is_daemon_not_running(&error));
 }
+
+/// Tests for execute_daemon_command auto-start decision logic.
+mod auto_start_decision {
+    use super::*;
+    use crate::lifecycle::LifecycleContext;
+    use crate::{CommandInvocation, IoStreams, execute_daemon_command};
+    use std::ffi::OsStr;
+    use weaver_config::SocketEndpoint;
+
+    fn make_invocation() -> CommandInvocation {
+        CommandInvocation {
+            domain: String::from("observe"),
+            operation: String::from("test"),
+            arguments: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn triggers_auto_start_on_connection_refused() {
+        // Socket that refuses connections (nothing listening).
+        let config = Config {
+            daemon_socket: SocketEndpoint::tcp("127.0.0.1", 1),
+            ..Config::default()
+        };
+        let context = LifecycleContext {
+            config: &config,
+            config_arguments: &[],
+            daemon_binary: Some(OsStr::new("/nonexistent/weaverd")),
+        };
+        let invocation = make_invocation();
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let mut io = IoStreams::new(&mut stdout, &mut stderr);
+
+        let exit = execute_daemon_command(invocation, context, &mut io);
+
+        // Should fail because auto-start spawn fails, but stderr should contain
+        // the waiting message proving auto-start was triggered.
+        assert_eq!(exit, std::process::ExitCode::FAILURE);
+        let stderr_text = decode_utf8(stderr, "stderr").expect("stderr utf8");
+        assert!(
+            stderr_text.contains("Waiting for daemon start..."),
+            "auto-start was not triggered: {stderr_text:?}"
+        );
+    }
+
+    #[test]
+    fn reports_auto_start_spawn_failure() {
+        let config = Config {
+            daemon_socket: SocketEndpoint::tcp("127.0.0.1", 1),
+            ..Config::default()
+        };
+        let context = LifecycleContext {
+            config: &config,
+            config_arguments: &[],
+            daemon_binary: Some(OsStr::new("/nonexistent/weaverd")),
+        };
+        let invocation = make_invocation();
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let mut io = IoStreams::new(&mut stdout, &mut stderr);
+
+        let exit = execute_daemon_command(invocation, context, &mut io);
+
+        assert_eq!(exit, std::process::ExitCode::FAILURE);
+        let stderr_text = decode_utf8(stderr, "stderr").expect("stderr utf8");
+        assert!(
+            stderr_text.contains("failed to spawn"),
+            "expected spawn failure message: {stderr_text:?}"
+        );
+    }
+
+    #[test]
+    fn does_not_auto_start_on_non_connection_errors() {
+        // This test verifies that auto-start is only triggered for specific
+        // connection errors (refused, not found, addr unavailable), not for
+        // other error types. We test this indirectly through is_daemon_not_running.
+        let other_errors = [
+            AppError::MissingDomain,
+            AppError::MissingOperation,
+            AppError::MissingExit,
+            AppError::SerialiseRequest(serde_json::from_str::<()>("bad").unwrap_err()),
+        ];
+
+        for error in other_errors {
+            assert!(
+                !is_daemon_not_running(&error),
+                "should not trigger auto-start for: {error:?}"
+            );
+        }
+    }
+}

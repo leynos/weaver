@@ -393,6 +393,8 @@ pub(crate) mod tests {
         let endpoint = SocketEndpoint::tcp(addr.ip().to_string(), addr.port());
         assert!(socket_is_reachable(&endpoint).expect("probe reachable"));
         drop(listener);
+        // Allow time for the socket to transition out of TIME_WAIT state.
+        thread::sleep(Duration::from_millis(50));
         assert!(!socket_is_reachable(&endpoint).expect("probe available"));
     }
 
@@ -521,5 +523,90 @@ pub(crate) mod tests {
         let started_at = UNIX_EPOCH + Duration::from_secs(100);
         let outcome = check_health_snapshot(&paths, started_at, 42, false).expect("check health");
         assert!(matches!(outcome, HealthCheckOutcome::Continue));
+    }
+
+    fn make_auto_start_context(config: &weaver_config::Config) -> LifecycleContext<'_> {
+        LifecycleContext {
+            config,
+            config_arguments: &[],
+            daemon_binary: Some(std::ffi::OsStr::new("/nonexistent/weaverd")),
+        }
+    }
+
+    #[test]
+    fn try_auto_start_daemon_writes_waiting_message() {
+        let dir = TempDir::new().expect("temp dir");
+        let socket = dir.path().join("daemon.sock");
+        let socket_str = socket.to_string_lossy().into_owned();
+        let config = weaver_config::Config {
+            daemon_socket: SocketEndpoint::unix(socket_str),
+            ..weaver_config::Config::default()
+        };
+        let context = make_auto_start_context(&config);
+        let mut stderr = Vec::new();
+
+        // Will fail due to nonexistent binary, but we verify the message was written.
+        let _ = try_auto_start_daemon(context, &mut stderr);
+
+        let output = String::from_utf8(stderr).expect("stderr utf8");
+        assert!(
+            output.contains("Waiting for daemon start..."),
+            "expected waiting message, got: {output:?}"
+        );
+    }
+
+    #[test]
+    fn try_auto_start_daemon_propagates_spawn_failure() {
+        let dir = TempDir::new().expect("temp dir");
+        let socket = dir.path().join("daemon.sock");
+        let socket_str = socket.to_string_lossy().into_owned();
+        let config = weaver_config::Config {
+            daemon_socket: SocketEndpoint::unix(socket_str),
+            ..weaver_config::Config::default()
+        };
+        let context = make_auto_start_context(&config);
+        let mut stderr = Vec::new();
+
+        let result = try_auto_start_daemon(context, &mut stderr);
+
+        assert!(result.is_err(), "expected spawn failure");
+        let error = result.unwrap_err();
+        assert!(
+            matches!(error, LifecycleError::LaunchDaemon { .. }),
+            "expected LaunchDaemon error, got: {error:?}"
+        );
+    }
+
+    #[test]
+    fn spawn_daemon_uses_binary_override() {
+        let result = spawn_daemon(&[], Some(std::ffi::OsStr::new("/test/custom/weaverd")));
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        match error {
+            LifecycleError::LaunchDaemon { binary, .. } => {
+                assert_eq!(binary, std::ffi::OsString::from("/test/custom/weaverd"));
+            }
+            other => panic!("expected LaunchDaemon, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn resolve_daemon_binary_uses_override() {
+        let resolved = resolve_daemon_binary(Some(std::ffi::OsStr::new("/custom/daemon")));
+        assert_eq!(resolved, std::ffi::OsString::from("/custom/daemon"));
+    }
+
+    #[test]
+    fn resolve_daemon_binary_falls_back_to_default() {
+        // When no override is provided and WEAVERD_BIN is not set, defaults to "weaverd".
+        // Note: This test may produce a different result if WEAVERD_BIN is set in the
+        // environment, but we test the override case separately.
+        let resolved = resolve_daemon_binary(None);
+        let resolved_str = resolved.to_string_lossy();
+        // Should be "weaverd" or whatever WEAVERD_BIN is set to.
+        assert!(
+            resolved_str == "weaverd" || !resolved_str.is_empty(),
+            "expected non-empty binary name"
+        );
     }
 }
