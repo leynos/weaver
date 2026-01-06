@@ -3,6 +3,10 @@ name = "weaver-cli"
 edition.workspace = true
 version.workspace = true
 
+[[bin]]
+name = "weaver"
+path = "src/main.rs"
+
 [dependencies]
 weaver-config = { path = "../weaver-config", features = ["cli"] }
 clap = { workspace = true }

@@ -27,7 +27,7 @@ impl Harness {
         };
         Self {
             temp_dir,
-            cli_args: std::cell::RefCell::new(vec![OsString::from("weaver-cli")]),
+            cli_args: std::cell::RefCell::new(vec![OsString::from("weaver")]),
             env_overrides: std::cell::RefCell::new(Vec::new()),
             loaded: std::cell::RefCell::new(None),
             error: std::cell::RefCell::new(None),

@@ -1,6 +1,6 @@
 //! Shared configuration schema for the Weaver CLI and daemon.
 //!
-//! This crate exposes the [`Config`] structure consumed by `weaver-cli` and
+//! This crate exposes the [`Config`] structure consumed by `weaver` and
 //! `weaverd`. Configuration values are layered using [`ortho_config`], merging
 //! configuration files, environment variables, and command-line arguments in
 //! increasing precedence. The schema focuses on three core concerns:
