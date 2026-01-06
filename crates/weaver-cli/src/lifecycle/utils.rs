@@ -77,31 +77,28 @@ pub(super) fn wait_for_ready(
 ) -> Result<HealthSnapshot, LifecycleError> {
     let deadline = Instant::now() + timeout;
     let expected_pid = child.id();
+    // Track whether the spawned process has exited cleanly, indicating that
+    // the daemon has daemonized to a new PID. Once daemonized, we skip the
+    // PID check and rely solely on the timestamp to identify fresh snapshots.
+    let mut daemonized = false;
     while Instant::now() < deadline {
-        if let Some(snapshot) = read_health(paths.health_path())? {
-            if !snapshot_matches_process(&snapshot, expected_pid)
-                || !snapshot_is_recent(&snapshot, started_at)
-            {
-                thread::sleep(POLL_INTERVAL);
-                continue;
-            }
-            if snapshot.status == "ready" {
-                return Ok(snapshot);
-            }
-            if snapshot.status == "stopping" {
-                return Err(LifecycleError::StartupAborted {
-                    path: paths.health_path().to_path_buf(),
-                });
-            }
-        }
+        // Check child status FIRST so we detect daemonization before checking
+        // the health snapshot. Otherwise the PID mismatch causes a continue
+        // before we can update the daemonized flag.
         if let Some(status) = child
             .try_wait()
             .map_err(|source| LifecycleError::MonitorChild { source })?
-            .filter(|status| !status.success())
         {
-            return Err(LifecycleError::StartupFailed {
-                exit_status: status.code(),
-            });
+            if !status.success() {
+                return Err(LifecycleError::StartupFailed {
+                    exit_status: status.code(),
+                });
+            }
+            // Spawned process exited cleanly; daemon has forked to a new PID.
+            daemonized = true;
+        }
+        if let Some(result) = check_health_snapshot(paths, started_at, expected_pid, daemonized)? {
+            return result;
         }
         thread::sleep(POLL_INTERVAL);
     }
@@ -267,11 +264,42 @@ fn snapshot_matches_process(snapshot: &HealthSnapshot, expected_pid: u32) -> boo
     snapshot.pid == expected_pid
 }
 
-fn snapshot_is_recent(snapshot: &HealthSnapshot, started_at: SystemTime) -> bool {
-    match UNIX_EPOCH.checked_add(Duration::from_secs(snapshot.timestamp)) {
-        Some(snapshot_time) => snapshot_time >= started_at,
-        None => false,
+/// Evaluates a health snapshot for readiness or failure conditions.
+///
+/// Returns `Some(Ok(snapshot))` if daemon is ready, `Some(Err(...))` if startup
+/// was aborted, or `None` if polling should continue.
+fn check_health_snapshot(
+    paths: &RuntimePaths,
+    started_at: SystemTime,
+    expected_pid: u32,
+    daemonized: bool,
+) -> Result<Option<Result<HealthSnapshot, LifecycleError>>, LifecycleError> {
+    let Some(snapshot) = read_health(paths.health_path())? else {
+        return Ok(None);
+    };
+    let pid_ok = daemonized || snapshot_matches_process(&snapshot, expected_pid);
+    let recent = snapshot_is_recent(&snapshot, started_at);
+    if !pid_ok || !recent {
+        return Ok(None);
     }
+    match snapshot.status.as_str() {
+        "ready" => Ok(Some(Ok(snapshot))),
+        "stopping" => Ok(Some(Err(LifecycleError::StartupAborted {
+            path: paths.health_path().to_path_buf(),
+        }))),
+        _ => Ok(None),
+    }
+}
+
+fn snapshot_is_recent(snapshot: &HealthSnapshot, started_at: SystemTime) -> bool {
+    // Truncate started_at to seconds since snapshot.timestamp has no sub-second
+    // precision. Without this, a snapshot written in the same second as started_at
+    // would be considered stale due to nanosecond differences.
+    let started_secs = started_at
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    snapshot.timestamp >= started_secs
 }
 
 /// Attempts to start the daemon automatically when a connection fails.
@@ -382,6 +410,19 @@ pub(crate) mod tests {
         let start = UNIX_EPOCH + Duration::from_secs(20);
         assert!(!snapshot_is_recent(&snapshot, start));
         let start = UNIX_EPOCH + Duration::from_secs(5);
+        assert!(snapshot_is_recent(&snapshot, start));
+    }
+
+    #[test]
+    fn snapshot_is_recent_ignores_subsecond_precision() {
+        // Snapshot timestamp has second precision only. When started_at is in the
+        // same second (with nanoseconds), the snapshot should still be recent.
+        let snapshot = HealthSnapshot {
+            status: String::from("ready"),
+            pid: 1,
+            timestamp: 100,
+        };
+        let start = UNIX_EPOCH + Duration::from_secs(100) + Duration::from_nanos(500_000_000);
         assert!(snapshot_is_recent(&snapshot, start));
     }
 }
