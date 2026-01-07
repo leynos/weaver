@@ -334,4 +334,5 @@ fn is_daemon_not_running_rejects_non_connect_errors() {
     assert!(!is_daemon_not_running(&error));
 }
 
+/// Tests for automatic daemon startup behaviour and error handling.
 mod auto_start;

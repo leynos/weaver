@@ -8,6 +8,7 @@ use crate::tests::support::decode_utf8;
 use crate::{CommandInvocation, IoStreams, execute_daemon_command};
 use rstest::rstest;
 use std::ffi::OsStr;
+use std::process::ExitCode;
 use weaver_config::{Config, SocketEndpoint};
 
 fn make_invocation() -> CommandInvocation {
@@ -34,7 +35,9 @@ fn auto_start_failure_paths(
     #[case] expected_substring: &str,
     #[case] _description: &str,
 ) {
-    // Socket on port 1 refuses connections, triggering auto-start attempt.
+    // Socket on loopback port 1 reliably refuses connections on Unix
+    // (privileged port, no service listening), triggering auto-start without
+    // requiring daemon setup or mock servers.
     let config = Config {
         daemon_socket: SocketEndpoint::tcp("127.0.0.1", 1),
         ..Config::default()
@@ -51,7 +54,7 @@ fn auto_start_failure_paths(
 
     let exit = execute_daemon_command(invocation, context, &mut io);
 
-    assert_eq!(exit, std::process::ExitCode::FAILURE);
+    assert_eq!(exit, ExitCode::FAILURE);
     let stderr_text = decode_utf8(stderr, "stderr").expect("stderr utf8");
     assert!(
         stderr_text.contains("Waiting for daemon start..."),
