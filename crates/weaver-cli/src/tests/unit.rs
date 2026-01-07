@@ -329,6 +329,9 @@ fn is_daemon_not_running_rejects_non_connect_errors() {
 
     let error = AppError::MissingExit;
     assert!(!is_daemon_not_running(&error));
+
+    let error = AppError::SerialiseRequest(serde_json::from_str::<()>("bad").unwrap_err());
+    assert!(!is_daemon_not_running(&error));
 }
 
 /// Tests for execute_daemon_command auto-start decision logic.
@@ -347,7 +350,11 @@ mod auto_start_decision {
         }
     }
 
-    fn test_auto_start_behavior(expected_stderr_substring: &str) {
+    // Socket that refuses connections (nothing listening).
+    #[rstest]
+    #[case("Waiting for daemon start...", "auto-start triggered")]
+    #[case("failed to spawn", "spawn failure reported")]
+    fn auto_start_behavior(#[case] expected_substring: &str, #[case] _description: &str) {
         let config = Config {
             daemon_socket: SocketEndpoint::tcp("127.0.0.1", 1),
             ..Config::default()
@@ -367,39 +374,8 @@ mod auto_start_decision {
         assert_eq!(exit, std::process::ExitCode::FAILURE);
         let stderr_text = decode_utf8(stderr, "stderr").expect("stderr utf8");
         assert!(
-            stderr_text.contains(expected_stderr_substring),
-            "expected stderr to contain {expected_stderr_substring:?}, got: {stderr_text:?}"
+            stderr_text.contains(expected_substring),
+            "expected stderr to contain {expected_substring:?}, got: {stderr_text:?}"
         );
-    }
-
-    // Socket that refuses connections (nothing listening).
-    #[test]
-    fn triggers_auto_start_on_connection_refused() {
-        test_auto_start_behavior("Waiting for daemon start...");
-    }
-
-    #[test]
-    fn reports_auto_start_spawn_failure() {
-        test_auto_start_behavior("failed to spawn");
-    }
-
-    #[test]
-    fn does_not_auto_start_on_non_connection_errors() {
-        // This test verifies that auto-start is only triggered for specific
-        // connection errors (refused, not found, addr unavailable), not for
-        // other error types. We test this indirectly through is_daemon_not_running.
-        let other_errors = [
-            AppError::MissingDomain,
-            AppError::MissingOperation,
-            AppError::MissingExit,
-            AppError::SerialiseRequest(serde_json::from_str::<()>("bad").unwrap_err()),
-        ];
-
-        for error in other_errors {
-            assert!(
-                !is_daemon_not_running(&error),
-                "should not trigger auto-start for: {error:?}"
-            );
-        }
     }
 }

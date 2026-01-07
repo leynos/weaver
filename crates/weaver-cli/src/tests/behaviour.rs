@@ -70,8 +70,10 @@ fn given_daemon_with_empty_lines(world: &RefCell<TestWorld>) {
 
 #[given("auto-start will be triggered")]
 fn given_auto_start_triggered(world: &RefCell<TestWorld>) {
-    // Configure to use a non-existent daemon binary so auto-start fails quickly
-    // and produces the "Waiting for daemon start..." message before erroring.
+    // Configures a socket endpoint on an unreachable port (127.0.0.1:1) so
+    // connection fails, triggering auto-start. Also sets the daemon binary to
+    // a non-existent path so spawn fails quickly, producing the "Waiting for
+    // daemon start..." message before erroring.
     world.borrow_mut().configure_auto_start_failure();
 }
 
