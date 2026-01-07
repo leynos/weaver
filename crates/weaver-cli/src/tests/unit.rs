@@ -354,11 +354,22 @@ mod auto_start_decision {
         }
     }
 
-    // Socket that refuses connections (nothing listening).
+    /// Exercises distinct auto-start failure paths:
+    /// - Spawn failure: binary doesn't exist → LaunchDaemon error
+    /// - Startup failure: binary exits with non-zero status → StartupFailed error
     #[rstest]
-    #[case("Waiting for daemon start...", "auto-start triggered")]
-    #[case("failed to spawn", "spawn failure reported")]
-    fn auto_start_behavior(#[case] expected_substring: &str, #[case] _description: &str) {
+    #[case("/nonexistent/weaverd", "failed to spawn", "spawn failure")]
+    #[case(
+        "/bin/false",
+        "daemon exited before reporting ready",
+        "startup failure"
+    )]
+    fn auto_start_failure_paths(
+        #[case] daemon_binary: &str,
+        #[case] expected_substring: &str,
+        #[case] _description: &str,
+    ) {
+        // Socket on port 1 refuses connections, triggering auto-start attempt.
         let config = Config {
             daemon_socket: SocketEndpoint::tcp("127.0.0.1", 1),
             ..Config::default()
@@ -366,7 +377,7 @@ mod auto_start_decision {
         let context = LifecycleContext {
             config: &config,
             config_arguments: &[],
-            daemon_binary: Some(OsStr::new("/nonexistent/weaverd")),
+            daemon_binary: Some(OsStr::new(daemon_binary)),
         };
         let invocation = make_invocation();
         let mut stdout = Vec::new();
@@ -377,6 +388,10 @@ mod auto_start_decision {
 
         assert_eq!(exit, std::process::ExitCode::FAILURE);
         let stderr_text = decode_utf8(stderr, "stderr").expect("stderr utf8");
+        assert!(
+            stderr_text.contains("Waiting for daemon start..."),
+            "auto-start should write waiting message: {stderr_text:?}"
+        );
         assert!(
             stderr_text.contains(expected_substring),
             "expected stderr to contain {expected_substring:?}, got: {stderr_text:?}"
