@@ -334,8 +334,12 @@ fn is_daemon_not_running_rejects_non_connect_errors() {
     assert!(!is_daemon_not_running(&error));
 }
 
-/// Tests for execute_daemon_command auto-start decision logic.
 mod auto_start_decision {
+    //! Tests for `execute_daemon_command` auto-start decision logic.
+    //!
+    //! Verifies that the CLI automatically starts the daemon when it detects
+    //! connection-refused errors, and that spawn failures are reported appropriately.
+
     use super::*;
     use crate::lifecycle::LifecycleContext;
     use crate::{CommandInvocation, IoStreams, execute_daemon_command};
