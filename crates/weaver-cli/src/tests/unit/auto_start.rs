@@ -81,11 +81,13 @@ fn auto_start_failure_paths(
 /// Writes a health snapshot JSON file to the specified path.
 #[cfg(unix)]
 fn write_health_snapshot(path: &std::path::Path, status: &str, pid: u32, timestamp: u64) {
-    let snapshot = format!(
-        r#"{{"status":"{}","pid":{},"timestamp":{}}}"#,
-        status, pid, timestamp
-    );
-    fs::write(path, snapshot).expect("write health snapshot");
+    let snapshot = serde_json::json!({
+        "status": status,
+        "pid": pid,
+        "timestamp": timestamp
+    });
+    let json = serde_json::to_string(&snapshot).expect("serialize health snapshot");
+    fs::write(path, json).expect("write health snapshot");
 }
 
 /// Success path: daemon starts, becomes ready, and CLI proceeds with command.
