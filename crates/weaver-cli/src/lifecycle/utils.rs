@@ -609,4 +609,46 @@ pub(crate) mod tests {
             "expected non-empty binary name"
         );
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn wait_for_ready_succeeds_when_health_snapshot_ready() {
+        use std::process::Command;
+
+        let (_dir, paths) = temp_paths();
+        // /bin/true exits immediately with success, simulating daemonization.
+        let mut child = Command::new("/bin/true").spawn().expect("spawn /bin/true");
+        let started_at = std::time::UNIX_EPOCH + Duration::from_secs(100);
+        // Pre-write a valid health snapshot so wait_for_ready finds it.
+        write_health_snapshot(&paths, "ready", child.id(), 100);
+
+        let result = wait_for_ready(&paths, &mut child, started_at, Duration::from_secs(1));
+
+        match result {
+            Ok(snapshot) => {
+                assert_eq!(snapshot.status, "ready");
+            }
+            Err(error) => panic!("expected success, got: {error:?}"),
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn wait_for_ready_returns_timeout_when_no_snapshot() {
+        use std::process::Command;
+
+        let (_dir, paths) = temp_paths();
+        // /bin/true exits immediately; no health snapshot written.
+        let mut child = Command::new("/bin/true").spawn().expect("spawn /bin/true");
+        let started_at = std::time::SystemTime::now();
+
+        // Use a very short timeout to avoid slow tests.
+        let result = wait_for_ready(&paths, &mut child, started_at, Duration::from_millis(50));
+
+        match result {
+            Err(LifecycleError::StartupTimeout { .. }) => {}
+            Ok(snapshot) => panic!("expected timeout, got snapshot: {snapshot:?}"),
+            Err(other) => panic!("expected StartupTimeout, got: {other:?}"),
+        }
+    }
 }

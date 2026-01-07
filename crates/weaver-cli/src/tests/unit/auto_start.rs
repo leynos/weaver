@@ -11,6 +11,7 @@ use std::ffi::OsStr;
 use std::process::ExitCode;
 use weaver_config::{Config, SocketEndpoint};
 
+/// Creates a minimal test invocation for daemon command tests.
 fn make_invocation() -> CommandInvocation {
     CommandInvocation {
         domain: String::from("observe"),
