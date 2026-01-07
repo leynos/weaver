@@ -357,6 +357,7 @@ mod auto_start_decision {
     /// Exercises distinct auto-start failure paths:
     /// - Spawn failure: binary doesn't exist → LaunchDaemon error
     /// - Startup failure: binary exits with non-zero status → StartupFailed error
+    #[cfg(unix)]
     #[rstest]
     #[case("/nonexistent/weaverd", "failed to spawn", "spawn failure")]
     #[case(
