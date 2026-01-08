@@ -82,9 +82,11 @@ impl TestWorld {
     /// daemon binary lookup will fail, allowing us to observe the "Waiting for
     /// daemon start..." message before the failure error.
     pub fn configure_auto_start_failure(&mut self) {
-        // Use a TCP endpoint on a port that's definitely not listening.
+        // Use a TCP endpoint on a high unprivileged port that's not listening.
+        // Port 1 is privileged and may return PermissionDenied rather than
+        // ConnectionRefused on some systems, so we use a high port instead.
         // The CLI will try to connect, fail, then attempt auto-start.
-        self.config.daemon_socket = SocketEndpoint::tcp("127.0.0.1", 1);
+        self.config.daemon_socket = SocketEndpoint::tcp("127.0.0.1", 65535);
         // Point to a non-existent binary so spawn fails quickly.
         self.daemon_binary = Some(OsString::from("/nonexistent/weaverd"));
     }

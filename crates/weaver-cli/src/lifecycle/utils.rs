@@ -92,33 +92,13 @@ mod tests {
         }
     }
 
+    /// Tests for try_auto_start_daemon failure paths using a nonexistent daemon binary.
+    ///
+    /// Both cases verify that when the daemon binary doesn't exist:
+    /// 1. The "Waiting for daemon start..." message is written to stderr
+    /// 2. A LaunchDaemon error is propagated
     #[rstest]
-    fn try_auto_start_daemon_writes_waiting_message(temp_paths: (TempDir, RuntimePaths)) {
-        let (dir, _paths) = temp_paths;
-        let config = weaver_config::Config {
-            daemon_socket: weaver_config::SocketEndpoint::unix(
-                dir.path()
-                    .join("daemon.sock")
-                    .to_string_lossy()
-                    .into_owned(),
-            ),
-            ..weaver_config::Config::default()
-        };
-        let context = make_failing_context(&config);
-        let mut stderr = Vec::new();
-
-        // Will fail due to nonexistent binary, but we verify the message was written.
-        let _ = try_auto_start_daemon(context, &mut stderr);
-
-        let output = String::from_utf8(stderr).expect("stderr utf8");
-        assert!(
-            output.contains("Waiting for daemon start..."),
-            "expected waiting message, got: {output:?}"
-        );
-    }
-
-    #[rstest]
-    fn try_auto_start_daemon_propagates_spawn_failure(temp_paths: (TempDir, RuntimePaths)) {
+    fn try_auto_start_daemon_failure_behaviour(temp_paths: (TempDir, RuntimePaths)) {
         let (dir, _paths) = temp_paths;
         let config = weaver_config::Config {
             daemon_socket: weaver_config::SocketEndpoint::unix(
@@ -134,6 +114,14 @@ mod tests {
 
         let result = try_auto_start_daemon(context, &mut stderr);
 
+        // Verify the waiting message was written before the failure.
+        let output = String::from_utf8(stderr).expect("stderr utf8");
+        assert!(
+            output.contains("Waiting for daemon start..."),
+            "expected waiting message, got: {output:?}"
+        );
+
+        // Verify the spawn failure is propagated.
         assert!(result.is_err(), "expected spawn failure");
         let error = result.unwrap_err();
         assert!(
