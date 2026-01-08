@@ -13,14 +13,29 @@ use cap_std::fs::Dir;
 use weaver_config::RuntimePaths;
 
 use super::error::LifecycleError;
+use super::utils::open_runtime_dir;
 
 const POLL_INTERVAL: Duration = Duration::from_millis(200);
 
 /// Health snapshot data read from the daemon's health file.
+///
+/// The daemon writes this JSON structure to `weaverd.health` to communicate its
+/// current state. The CLI reads this file to determine readiness during startup
+/// and to report status.
+///
+/// # Fields
+///
+/// * `status` - Current daemon state: `"starting"`, `"ready"`, or `"stopping"`.
+/// * `pid` - Process ID of the running daemon.
+/// * `timestamp` - Unix timestamp (seconds since epoch) when the snapshot was
+///   written. Used to distinguish fresh snapshots from stale ones.
 #[derive(Debug, serde::Deserialize, PartialEq, Eq)]
 pub(crate) struct HealthSnapshot {
+    /// Current daemon state: `"starting"`, `"ready"`, or `"stopping"`.
     pub status: String,
+    /// Process ID of the running daemon.
     pub pid: u32,
+    /// Unix timestamp (seconds since epoch) when the snapshot was written.
     pub timestamp: u64,
 }
 
@@ -40,18 +55,35 @@ pub(crate) enum HealthCheckOutcome {
 ///
 /// Monitors the health snapshot file and child process status, returning when
 /// the daemon reports ready or an error occurs.
+///
+/// # Arguments
+///
+/// * `paths` - Runtime paths containing the location of health and PID files.
+/// * `child` - Handle to the spawned daemon process.
+/// * `started_at` - Timestamp when the daemon was started, used to validate
+///   that health snapshots are fresh (not stale from a previous run).
+/// * `timeout` - Maximum duration to wait for the daemon to become ready.
+///
+/// # Returns
+///
+/// Returns the health snapshot on success. Returns an error if:
+/// - The daemon process exits with a non-zero status (`StartupFailed`)
+/// - The timeout expires before the daemon reports ready (`StartupTimeout`)
+/// - The daemon reports `"stopping"` status (`StartupAborted`)
+/// - Any I/O error occurs while reading health files
+///
+/// # Daemonization Handling
+///
+/// If the spawned process exits cleanly (status 0), it indicates the daemon
+/// has forked to a new PID. In this case, the PID check is skipped and only
+/// the timestamp is used to validate snapshot freshness.
 pub(super) fn wait_for_ready(
     paths: &RuntimePaths,
     child: &mut Child,
     started_at: SystemTime,
     timeout: Duration,
 ) -> Result<HealthSnapshot, LifecycleError> {
-    let dir = Dir::open_ambient_dir(paths.runtime_dir(), cap_std::ambient_authority()).map_err(
-        |source| LifecycleError::OpenRuntimeDir {
-            path: paths.runtime_dir().to_path_buf(),
-            source,
-        },
-    )?;
+    let dir = open_runtime_dir(paths)?;
     let deadline = Instant::now() + timeout;
     let expected_pid = child.id();
     // Track whether the spawned process has exited cleanly, indicating that
@@ -95,6 +127,22 @@ pub(super) fn wait_for_ready(
 }
 
 /// Reads the health snapshot from the runtime directory.
+///
+/// Attempts to read and parse the health JSON file from the daemon's runtime
+/// directory.
+///
+/// # Arguments
+///
+/// * `dir` - Capability-based directory handle for the runtime directory.
+/// * `filename` - Name of the health file (typically `"weaverd.health"`).
+/// * `full_path` - Full path to the health file, used for error messages.
+///
+/// # Returns
+///
+/// * `Ok(Some(snapshot))` - Health file exists and was parsed successfully.
+/// * `Ok(None)` - Health file does not exist (normal during startup).
+/// * `Err(ReadHealth)` - I/O error reading the file.
+/// * `Err(ParseHealth)` - File exists but contains invalid JSON.
 pub(super) fn read_health(
     dir: &Dir,
     filename: &str,
@@ -118,6 +166,22 @@ pub(super) fn read_health(
 }
 
 /// Reads the PID from the runtime directory.
+///
+/// Attempts to read and parse the PID file from the daemon's runtime directory.
+/// The PID file contains a single integer representing the daemon's process ID.
+///
+/// # Arguments
+///
+/// * `dir` - Capability-based directory handle for the runtime directory.
+/// * `filename` - Name of the PID file (typically `"weaverd.pid"`).
+/// * `full_path` - Full path to the PID file, used for error messages.
+///
+/// # Returns
+///
+/// * `Ok(Some(pid))` - PID file exists and contains a valid integer.
+/// * `Ok(None)` - PID file does not exist or is empty.
+/// * `Err(ReadPid)` - I/O error reading the file.
+/// * `Err(ParsePid)` - File exists but does not contain a valid integer.
 pub(super) fn read_pid(
     dir: &Dir,
     filename: &str,

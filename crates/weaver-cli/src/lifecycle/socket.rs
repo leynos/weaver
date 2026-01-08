@@ -68,11 +68,23 @@ fn connect_unix(_path: &str) -> io::Result<()> {
     ))
 }
 
+/// Determines whether an I/O error indicates the socket is available (not in use).
+///
+/// Returns `true` for errors that indicate no process is listening:
+/// - `ConnectionRefused`: OS rejected connection (nothing listening)
+/// - `NotFound`: Unix socket file does not exist
+/// - `AddrNotAvailable`: Address cannot be assigned (e.g., invalid bind)
+///
+/// Returns `false` for other errors (e.g., `PermissionDenied`, `TimedOut`),
+/// which should be propagated rather than treated as availability signals.
+///
+/// Note: `ConnectionReset` is intentionally excluded because it indicates a
+/// connection was established and then closed by the peer, meaning a process
+/// was listening (the socket is in use, not available).
 fn is_socket_available(error: &io::Error) -> bool {
     matches!(
         error.kind(),
         io::ErrorKind::ConnectionRefused
-            | io::ErrorKind::ConnectionReset
             | io::ErrorKind::NotFound
             | io::ErrorKind::AddrNotAvailable
     )
@@ -81,6 +93,7 @@ fn is_socket_available(error: &io::Error) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
     use std::net::TcpListener;
     use std::thread;
 
@@ -107,5 +120,48 @@ mod tests {
         // Allow time for the socket to transition out of TIME_WAIT state.
         thread::sleep(Duration::from_millis(50));
         ensure_socket_available(&endpoint).expect("socket becomes available");
+    }
+
+    /// Tests that is_socket_available correctly classifies error kinds indicating
+    /// the socket is available (no process listening).
+    #[rstest]
+    #[case::connection_refused(io::ErrorKind::ConnectionRefused, true)]
+    #[case::not_found(io::ErrorKind::NotFound, true)]
+    #[case::addr_not_available(io::ErrorKind::AddrNotAvailable, true)]
+    fn is_socket_available_returns_true_for_availability_errors(
+        #[case] kind: io::ErrorKind,
+        #[case] expected: bool,
+    ) {
+        let error = io::Error::new(kind, "test error");
+        assert_eq!(is_socket_available(&error), expected);
+    }
+
+    /// Tests that is_socket_available correctly rejects error kinds that do NOT
+    /// indicate availability (socket may be in use or other issues).
+    #[rstest]
+    #[case::permission_denied(io::ErrorKind::PermissionDenied)]
+    #[case::timed_out(io::ErrorKind::TimedOut)]
+    #[case::connection_reset(io::ErrorKind::ConnectionReset)]
+    #[case::other(io::ErrorKind::Other)]
+    fn is_socket_available_returns_false_for_non_availability_errors(#[case] kind: io::ErrorKind) {
+        let error = io::Error::new(kind, "test error");
+        assert!(!is_socket_available(&error));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_socket_reachability_tracks_listener() {
+        use std::os::unix::net::UnixListener;
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().expect("create temp dir");
+        let socket_path = dir.path().join("test.sock");
+        let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
+        let endpoint = SocketEndpoint::unix(socket_path.to_str().expect("path to str").to_string());
+
+        assert!(socket_is_reachable(&endpoint).expect("probe reachable"));
+        drop(listener);
+        thread::sleep(Duration::from_millis(50));
+        assert!(!socket_is_reachable(&endpoint).expect("probe available"));
     }
 }

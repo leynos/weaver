@@ -6,6 +6,7 @@
 use std::io::Write;
 use std::time::{Duration, SystemTime};
 
+use cap_std::fs::Dir;
 use weaver_config::RuntimePaths;
 
 use super::LifecycleOutput;
@@ -37,6 +38,23 @@ pub(super) fn prepare_runtime(
     let config = context.config;
     config.daemon_socket().prepare_filesystem()?;
     RuntimePaths::from_config(config).map_err(LifecycleError::from)
+}
+
+/// Opens the runtime directory using capability-based filesystem access.
+///
+/// Uses `cap_std::ambient_authority()` to obtain a directory handle, enabling
+/// subsequent file operations to use relative paths within the runtime directory.
+///
+/// # Errors
+///
+/// Returns `LifecycleError::OpenRuntimeDir` if the directory cannot be opened.
+pub(super) fn open_runtime_dir(paths: &RuntimePaths) -> Result<Dir, LifecycleError> {
+    Dir::open_ambient_dir(paths.runtime_dir(), cap_std::ambient_authority()).map_err(|source| {
+        LifecycleError::OpenRuntimeDir {
+            path: paths.runtime_dir().to_path_buf(),
+            source,
+        }
+    })
 }
 
 /// Attempts to start the daemon automatically when a connection fails.

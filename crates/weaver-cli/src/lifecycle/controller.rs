@@ -8,7 +8,6 @@ use std::io::Write;
 use std::process::ExitCode;
 use std::time::SystemTime;
 
-use cap_std::fs::Dir;
 use weaver_config::RuntimePaths;
 
 use super::error::LifecycleError;
@@ -18,7 +17,8 @@ use super::socket::{ensure_socket_available, socket_is_reachable};
 use super::spawning::spawn_daemon;
 use super::types::{LifecycleCommand, LifecycleContext, LifecycleInvocation, LifecycleOutput};
 use super::utils::{
-    STARTUP_TIMEOUT, ensure_no_extra_arguments, prepare_runtime, write_startup_banner,
+    STARTUP_TIMEOUT, ensure_no_extra_arguments, open_runtime_dir, prepare_runtime,
+    write_startup_banner,
 };
 
 /// Production lifecycle controller.
@@ -145,14 +145,4 @@ impl SystemLifecycle {
         }
         Ok(ExitCode::SUCCESS)
     }
-}
-
-/// Opens the runtime directory using capability-based filesystem access.
-fn open_runtime_dir(paths: &RuntimePaths) -> Result<Dir, LifecycleError> {
-    Dir::open_ambient_dir(paths.runtime_dir(), cap_std::ambient_authority()).map_err(|source| {
-        LifecycleError::OpenRuntimeDir {
-            path: paths.runtime_dir().to_path_buf(),
-            source,
-        }
-    })
 }
