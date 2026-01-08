@@ -14,6 +14,8 @@
 mod controller;
 mod error;
 mod monitoring;
+#[cfg(test)]
+mod monitoring_tests;
 mod shutdown;
 mod socket;
 mod spawning;
