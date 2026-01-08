@@ -8,6 +8,7 @@ use std::io::Write;
 use std::process::ExitCode;
 use std::time::SystemTime;
 
+use cap_std::fs::Dir;
 use weaver_config::RuntimePaths;
 
 use super::error::LifecycleError;
@@ -62,7 +63,8 @@ impl SystemLifecycle {
     ) -> Result<ExitCode, LifecycleError> {
         ensure_no_extra_arguments(invocation)?;
         let paths = prepare_runtime(context)?;
-        let pid = read_pid(paths.pid_path())?;
+        let dir = open_runtime_dir(&paths)?;
+        let pid = read_pid(&dir, "weaverd.pid", paths.pid_path())?;
         let Some(pid) = pid else {
             if socket_is_reachable(context.config.daemon_socket())? {
                 return Err(LifecycleError::MissingPidWithSocket {
@@ -108,7 +110,8 @@ impl SystemLifecycle {
             ))?;
             return Ok(ExitCode::SUCCESS);
         }
-        let snapshot = read_health(paths.health_path())?;
+        let dir = open_runtime_dir(&paths)?;
+        let snapshot = read_health(&dir, "weaverd.health", paths.health_path())?;
         if let Some(snapshot) = snapshot {
             output.stdout_line(format_args!(
                 "daemon status: {} (pid {}) via {}",
@@ -119,7 +122,7 @@ impl SystemLifecycle {
             return Ok(ExitCode::SUCCESS);
         }
         let reachable = socket_is_reachable(context.config.daemon_socket())?;
-        let pid = read_pid(paths.pid_path())?;
+        let pid = read_pid(&dir, "weaverd.pid", paths.pid_path())?;
         match pid {
             Some(pid) => {
                 output.stdout_line(format_args!(
@@ -142,4 +145,14 @@ impl SystemLifecycle {
         }
         Ok(ExitCode::SUCCESS)
     }
+}
+
+/// Opens the runtime directory using capability-based filesystem access.
+fn open_runtime_dir(paths: &RuntimePaths) -> Result<Dir, LifecycleError> {
+    Dir::open_ambient_dir(paths.runtime_dir(), cap_std::ambient_authority()).map_err(|source| {
+        LifecycleError::OpenRuntimeDir {
+            path: paths.runtime_dir().to_path_buf(),
+            source,
+        }
+    })
 }

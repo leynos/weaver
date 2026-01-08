@@ -3,13 +3,13 @@
 //! Provides helpers for reading and evaluating health snapshots, waiting for
 //! the daemon to become ready, and reading PID files.
 
-use std::fs;
 use std::io;
 use std::path::Path;
+use std::process::Child;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use std::process::Child;
+use cap_std::fs::Dir;
 use weaver_config::RuntimePaths;
 
 use super::error::LifecycleError;
@@ -45,6 +45,12 @@ pub(super) fn wait_for_ready(
     started_at: SystemTime,
     timeout: Duration,
 ) -> Result<HealthSnapshot, LifecycleError> {
+    let dir = Dir::open_ambient_dir(paths.runtime_dir(), cap_std::ambient_authority()).map_err(
+        |source| LifecycleError::OpenRuntimeDir {
+            path: paths.runtime_dir().to_path_buf(),
+            source,
+        },
+    )?;
     let deadline = Instant::now() + timeout;
     let expected_pid = child.id();
     // Track whether the spawned process has exited cleanly, indicating that
@@ -67,7 +73,7 @@ pub(super) fn wait_for_ready(
             // Spawned process exited cleanly; daemon has forked to a new PID.
             daemonized = true;
         }
-        match check_health_snapshot(paths, started_at, expected_pid, daemonized)? {
+        match check_health_snapshot(&dir, paths, started_at, expected_pid, daemonized)? {
             HealthCheckOutcome::Ready(snapshot) => return Ok(snapshot),
             HealthCheckOutcome::Aborted { path } => {
                 return Err(LifecycleError::StartupAborted { path });
@@ -82,28 +88,36 @@ pub(super) fn wait_for_ready(
     })
 }
 
-/// Reads the health snapshot from the given path.
-pub(super) fn read_health(path: &Path) -> Result<Option<HealthSnapshot>, LifecycleError> {
-    match fs::read_to_string(path) {
+/// Reads the health snapshot from the runtime directory.
+pub(super) fn read_health(
+    dir: &Dir,
+    filename: &str,
+    full_path: &Path,
+) -> Result<Option<HealthSnapshot>, LifecycleError> {
+    match dir.read_to_string(filename) {
         Ok(content) => {
             serde_json::from_str(&content)
                 .map(Some)
                 .map_err(|source| LifecycleError::ParseHealth {
-                    path: path.to_path_buf(),
+                    path: full_path.to_path_buf(),
                     source,
                 })
         }
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(source) => Err(LifecycleError::ReadHealth {
-            path: path.to_path_buf(),
+            path: full_path.to_path_buf(),
             source,
         }),
     }
 }
 
-/// Reads the PID from the given path.
-pub(super) fn read_pid(path: &Path) -> Result<Option<u32>, LifecycleError> {
-    match fs::read_to_string(path) {
+/// Reads the PID from the runtime directory.
+pub(super) fn read_pid(
+    dir: &Dir,
+    filename: &str,
+    full_path: &Path,
+) -> Result<Option<u32>, LifecycleError> {
+    match dir.read_to_string(filename) {
         Ok(content) => {
             let trimmed = content.trim();
             if trimmed.is_empty() {
@@ -113,26 +127,36 @@ pub(super) fn read_pid(path: &Path) -> Result<Option<u32>, LifecycleError> {
                 .parse::<u32>()
                 .map(Some)
                 .map_err(|source| LifecycleError::ParsePid {
-                    path: path.to_path_buf(),
+                    path: full_path.to_path_buf(),
                     source,
                 })
         }
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(source) => Err(LifecycleError::ReadPid {
-            path: path.to_path_buf(),
+            path: full_path.to_path_buf(),
             source,
         }),
     }
 }
 
 /// Evaluates a health snapshot for readiness or failure conditions.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "parameters are semantically distinct; grouping would hurt readability"
+)]
 fn check_health_snapshot(
+    dir: &Dir,
     paths: &RuntimePaths,
     started_at: SystemTime,
     expected_pid: u32,
     daemonized: bool,
 ) -> Result<HealthCheckOutcome, LifecycleError> {
-    let Some(snapshot) = read_health(paths.health_path())? else {
+    let health_filename = paths
+        .health_path()
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("weaverd.health");
+    let Some(snapshot) = read_health(dir, health_filename, paths.health_path())? else {
         return Ok(HealthCheckOutcome::Continue);
     };
     let pid_ok = daemonized || snapshot_matches_process(&snapshot, expected_pid);
@@ -169,19 +193,34 @@ mod tests {
     use super::*;
     use crate::tests::support::{temp_paths, write_health_snapshot};
     use rstest::rstest;
+    use std::fs as std_fs;
     use tempfile::TempDir;
+
+    /// Opens a `Dir` handle for tests using ambient authority.
+    fn open_test_dir(paths: &RuntimePaths) -> Dir {
+        Dir::open_ambient_dir(paths.runtime_dir(), cap_std::ambient_authority())
+            .expect("open test dir")
+    }
 
     #[rstest]
     fn read_pid_handles_missing_file(temp_paths: (TempDir, RuntimePaths)) {
         let (_dir, paths) = temp_paths;
-        assert_eq!(read_pid(paths.pid_path()).unwrap(), None);
+        let dir = open_test_dir(&paths);
+        assert_eq!(
+            read_pid(&dir, "weaverd.pid", paths.pid_path()).unwrap(),
+            None
+        );
     }
 
     #[rstest]
     fn read_pid_parses_integer(temp_paths: (TempDir, RuntimePaths)) {
         let (_dir, paths) = temp_paths;
-        fs::write(paths.pid_path(), b"42\n").expect("write pid");
-        assert_eq!(read_pid(paths.pid_path()).unwrap(), Some(42));
+        std_fs::write(paths.pid_path(), b"42\n").expect("write pid");
+        let dir = open_test_dir(&paths);
+        assert_eq!(
+            read_pid(&dir, "weaverd.pid", paths.pid_path()).unwrap(),
+            Some(42)
+        );
     }
 
     #[test]
@@ -224,8 +263,10 @@ mod tests {
     #[rstest]
     fn check_health_snapshot_returns_continue_when_missing(temp_paths: (TempDir, RuntimePaths)) {
         let (_dir, paths) = temp_paths;
+        let dir = open_test_dir(&paths);
         let started_at = UNIX_EPOCH + Duration::from_secs(100);
-        let outcome = check_health_snapshot(&paths, started_at, 42, false).expect("check health");
+        let outcome =
+            check_health_snapshot(&dir, &paths, started_at, 42, false).expect("check health");
         assert!(matches!(outcome, HealthCheckOutcome::Continue));
     }
 
@@ -235,9 +276,11 @@ mod tests {
     ) {
         let (_dir, paths) = temp_paths;
         write_health_snapshot(&paths, "ready", 99, 100);
+        let dir = open_test_dir(&paths);
         let started_at = UNIX_EPOCH + Duration::from_secs(100);
         // Expected PID 42, but snapshot has PID 99 and daemonized is false.
-        let outcome = check_health_snapshot(&paths, started_at, 42, false).expect("check health");
+        let outcome =
+            check_health_snapshot(&dir, &paths, started_at, 42, false).expect("check health");
         assert!(matches!(outcome, HealthCheckOutcome::Continue));
     }
 
@@ -245,9 +288,11 @@ mod tests {
     fn check_health_snapshot_returns_continue_when_stale(temp_paths: (TempDir, RuntimePaths)) {
         let (_dir, paths) = temp_paths;
         write_health_snapshot(&paths, "ready", 42, 50);
+        let dir = open_test_dir(&paths);
         // Snapshot timestamp 50 is before started_at timestamp 100.
         let started_at = UNIX_EPOCH + Duration::from_secs(100);
-        let outcome = check_health_snapshot(&paths, started_at, 42, false).expect("check health");
+        let outcome =
+            check_health_snapshot(&dir, &paths, started_at, 42, false).expect("check health");
         assert!(matches!(outcome, HealthCheckOutcome::Continue));
     }
 
@@ -255,8 +300,10 @@ mod tests {
     fn check_health_snapshot_returns_ready_when_valid(temp_paths: (TempDir, RuntimePaths)) {
         let (_dir, paths) = temp_paths;
         write_health_snapshot(&paths, "ready", 42, 100);
+        let dir = open_test_dir(&paths);
         let started_at = UNIX_EPOCH + Duration::from_secs(100);
-        let outcome = check_health_snapshot(&paths, started_at, 42, false).expect("check health");
+        let outcome =
+            check_health_snapshot(&dir, &paths, started_at, 42, false).expect("check health");
         match outcome {
             HealthCheckOutcome::Ready(snapshot) => {
                 assert_eq!(snapshot.status, "ready");
@@ -270,9 +317,11 @@ mod tests {
     fn check_health_snapshot_skips_pid_check_when_daemonized(temp_paths: (TempDir, RuntimePaths)) {
         let (_dir, paths) = temp_paths;
         write_health_snapshot(&paths, "ready", 99, 100);
+        let dir = open_test_dir(&paths);
         let started_at = UNIX_EPOCH + Duration::from_secs(100);
         // Expected PID 42, but daemonized=true skips PID check.
-        let outcome = check_health_snapshot(&paths, started_at, 42, true).expect("check health");
+        let outcome =
+            check_health_snapshot(&dir, &paths, started_at, 42, true).expect("check health");
         assert!(matches!(outcome, HealthCheckOutcome::Ready(_)));
     }
 
@@ -280,8 +329,10 @@ mod tests {
     fn check_health_snapshot_returns_aborted_when_stopping(temp_paths: (TempDir, RuntimePaths)) {
         let (_dir, paths) = temp_paths;
         write_health_snapshot(&paths, "stopping", 42, 100);
+        let dir = open_test_dir(&paths);
         let started_at = UNIX_EPOCH + Duration::from_secs(100);
-        let outcome = check_health_snapshot(&paths, started_at, 42, false).expect("check health");
+        let outcome =
+            check_health_snapshot(&dir, &paths, started_at, 42, false).expect("check health");
         assert!(matches!(outcome, HealthCheckOutcome::Aborted { .. }));
     }
 
@@ -289,8 +340,10 @@ mod tests {
     fn check_health_snapshot_continues_on_starting_status(temp_paths: (TempDir, RuntimePaths)) {
         let (_dir, paths) = temp_paths;
         write_health_snapshot(&paths, "starting", 42, 100);
+        let dir = open_test_dir(&paths);
         let started_at = UNIX_EPOCH + Duration::from_secs(100);
-        let outcome = check_health_snapshot(&paths, started_at, 42, false).expect("check health");
+        let outcome =
+            check_health_snapshot(&dir, &paths, started_at, 42, false).expect("check health");
         assert!(matches!(outcome, HealthCheckOutcome::Continue));
     }
 

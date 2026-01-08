@@ -1,2 +1,2 @@
 [no_std_fs_operations]
-excluded_crates = ["weaver_sandbox", "weaver_config", "weaver_cli", "weaverd"]
+excluded_crates = ["weaver_sandbox", "weaver_config", "weaverd"]

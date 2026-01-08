@@ -1,3 +1,5 @@
+//! Error types for daemon lifecycle operations.
+
 use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
@@ -90,5 +92,11 @@ pub enum LifecycleError {
     Socket {
         #[from]
         source: SocketPreparationError,
+    },
+    #[error("failed to open runtime directory {path:?}: {source}")]
+    OpenRuntimeDir {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
     },
 }
