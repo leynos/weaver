@@ -77,13 +77,14 @@ pub(super) fn write_startup_banner<W: Write, E: Write>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-    use std::path::Path;
+    use crate::tests::support::{temp_paths, write_health_json};
+    use rstest::rstest;
     use std::time::UNIX_EPOCH;
     use tempfile::TempDir;
-    use weaver_config::SocketEndpoint;
+    use weaver_config::RuntimePaths;
 
-    fn make_auto_start_context(config: &weaver_config::Config) -> LifecycleContext<'_> {
+    /// Creates a context configured to fail daemon spawn (nonexistent binary).
+    fn make_failing_context(config: &weaver_config::Config) -> LifecycleContext<'_> {
         LifecycleContext {
             config,
             config_arguments: &[],
@@ -91,27 +92,19 @@ mod tests {
         }
     }
 
-    /// Writes a health snapshot JSON file to the specified path.
-    fn write_health_json(path: &Path, status: &str, pid: u32, timestamp: u64) {
-        let snapshot = serde_json::json!({
-            "status": status,
-            "pid": pid,
-            "timestamp": timestamp
-        });
-        let json = serde_json::to_string(&snapshot).expect("serialize health snapshot");
-        fs::write(path, json).expect("write health snapshot");
-    }
-
-    #[test]
-    fn try_auto_start_daemon_writes_waiting_message() {
-        let dir = TempDir::new().expect("temp dir");
-        let socket = dir.path().join("daemon.sock");
-        let socket_str = socket.to_string_lossy().into_owned();
+    #[rstest]
+    fn try_auto_start_daemon_writes_waiting_message(temp_paths: (TempDir, RuntimePaths)) {
+        let (dir, _paths) = temp_paths;
         let config = weaver_config::Config {
-            daemon_socket: SocketEndpoint::unix(socket_str),
+            daemon_socket: weaver_config::SocketEndpoint::unix(
+                dir.path()
+                    .join("daemon.sock")
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
             ..weaver_config::Config::default()
         };
-        let context = make_auto_start_context(&config);
+        let context = make_failing_context(&config);
         let mut stderr = Vec::new();
 
         // Will fail due to nonexistent binary, but we verify the message was written.
@@ -124,16 +117,19 @@ mod tests {
         );
     }
 
-    #[test]
-    fn try_auto_start_daemon_propagates_spawn_failure() {
-        let dir = TempDir::new().expect("temp dir");
-        let socket = dir.path().join("daemon.sock");
-        let socket_str = socket.to_string_lossy().into_owned();
+    #[rstest]
+    fn try_auto_start_daemon_propagates_spawn_failure(temp_paths: (TempDir, RuntimePaths)) {
+        let (dir, _paths) = temp_paths;
         let config = weaver_config::Config {
-            daemon_socket: SocketEndpoint::unix(socket_str),
+            daemon_socket: weaver_config::SocketEndpoint::unix(
+                dir.path()
+                    .join("daemon.sock")
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
             ..weaver_config::Config::default()
         };
-        let context = make_auto_start_context(&config);
+        let context = make_failing_context(&config);
         let mut stderr = Vec::new();
 
         let result = try_auto_start_daemon(context, &mut stderr);
@@ -153,14 +149,17 @@ mod tests {
     /// prepare_runtime → spawn_daemon → wait_for_ready, verifying that the function
     /// returns Ok(()) when the daemon becomes ready.
     #[cfg(unix)]
-    #[test]
-    fn try_auto_start_daemon_succeeds_when_ready() {
-        let dir = TempDir::new().expect("temp dir");
-        let socket = dir.path().join("daemon.sock");
-        let socket_str = socket.to_string_lossy().into_owned();
+    #[rstest]
+    fn try_auto_start_daemon_succeeds_when_ready(temp_paths: (TempDir, RuntimePaths)) {
+        let (dir, _paths) = temp_paths;
         let health_path = dir.path().join("weaverd.health");
         let config = weaver_config::Config {
-            daemon_socket: SocketEndpoint::unix(socket_str),
+            daemon_socket: weaver_config::SocketEndpoint::unix(
+                dir.path()
+                    .join("daemon.sock")
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
             ..weaver_config::Config::default()
         };
 
@@ -197,13 +196,16 @@ mod tests {
     /// It verifies the complete timeout flow through try_auto_start_daemon.
     #[cfg(unix)]
     #[ignore = "takes 30 seconds due to AUTO_START_TIMEOUT"]
-    #[test]
-    fn try_auto_start_daemon_times_out_when_daemon_slow() {
-        let dir = TempDir::new().expect("temp dir");
-        let socket = dir.path().join("daemon.sock");
-        let socket_str = socket.to_string_lossy().into_owned();
+    #[rstest]
+    fn try_auto_start_daemon_times_out_when_daemon_slow(temp_paths: (TempDir, RuntimePaths)) {
+        let (dir, _paths) = temp_paths;
         let config = weaver_config::Config {
-            daemon_socket: SocketEndpoint::unix(socket_str),
+            daemon_socket: weaver_config::SocketEndpoint::unix(
+                dir.path()
+                    .join("daemon.sock")
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
             ..weaver_config::Config::default()
         };
 
