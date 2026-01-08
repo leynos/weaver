@@ -76,6 +76,15 @@ pub(crate) enum HealthCheckOutcome {
     Continue,
 }
 
+/// Helper to read an optional runtime file, returning None if not found.
+fn read_optional_file(dir: &Dir, filename: &str) -> Result<Option<String>, io::Error> {
+    match dir.read_to_string(filename) {
+        Ok(content) => Ok(Some(content)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
 /// Waits for the daemon to report ready status within the given timeout.
 ///
 /// Monitors the health snapshot file and child process status, returning when
@@ -173,21 +182,20 @@ pub(super) fn read_health(
     filename: &str,
     full_path: &Path,
 ) -> Result<Option<HealthSnapshot>, LifecycleError> {
-    match dir.read_to_string(filename) {
-        Ok(content) => {
-            serde_json::from_str(&content)
-                .map(Some)
-                .map_err(|source| LifecycleError::ParseHealth {
-                    path: full_path.to_path_buf(),
-                    source,
-                })
-        }
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(source) => Err(LifecycleError::ReadHealth {
+    let Some(content) =
+        read_optional_file(dir, filename).map_err(|source| LifecycleError::ReadHealth {
             path: full_path.to_path_buf(),
             source,
-        }),
-    }
+        })?
+    else {
+        return Ok(None);
+    };
+    serde_json::from_str(&content)
+        .map(Some)
+        .map_err(|source| LifecycleError::ParseHealth {
+            path: full_path.to_path_buf(),
+            source,
+        })
 }
 
 /// Reads the PID from the runtime directory.
@@ -212,26 +220,25 @@ pub(super) fn read_pid(
     filename: &str,
     full_path: &Path,
 ) -> Result<Option<u32>, LifecycleError> {
-    match dir.read_to_string(filename) {
-        Ok(content) => {
-            let trimmed = content.trim();
-            if trimmed.is_empty() {
-                return Ok(None);
-            }
-            trimmed
-                .parse::<u32>()
-                .map(Some)
-                .map_err(|source| LifecycleError::ParsePid {
-                    path: full_path.to_path_buf(),
-                    source,
-                })
-        }
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(source) => Err(LifecycleError::ReadPid {
+    let Some(content) =
+        read_optional_file(dir, filename).map_err(|source| LifecycleError::ReadPid {
             path: full_path.to_path_buf(),
             source,
-        }),
+        })?
+    else {
+        return Ok(None);
+    };
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
     }
+    trimmed
+        .parse::<u32>()
+        .map(Some)
+        .map_err(|source| LifecycleError::ParsePid {
+            path: full_path.to_path_buf(),
+            source,
+        })
 }
 
 /// Context for monitoring daemon process startup.
