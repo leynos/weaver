@@ -1,2 +1,7 @@
+# Crates excluded from the no_std_fs_operations lint because they legitimately
+# require std::fs access:
+# - weaver_sandbox: provides filesystem isolation and sandboxing capabilities
+# - weaver_config: performs configuration file I/O operations
+# - weaverd: daemon requires direct filesystem access for runtime operations
 [no_std_fs_operations]
 excluded_crates = ["weaver_sandbox", "weaver_config", "weaverd"]

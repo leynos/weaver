@@ -62,7 +62,7 @@ pub(super) fn open_runtime_dir(paths: &RuntimePaths) -> Result<Dir, LifecycleErr
 /// Prints a status message to stderr, spawns the daemon process, and waits for
 /// it to report ready status. Uses `AUTO_START_TIMEOUT` (30 seconds) to allow
 /// sufficient time for daemon initialisation.
-pub fn try_auto_start_daemon<E: Write>(
+pub(crate) fn try_auto_start_daemon<E: Write>(
     context: LifecycleContext<'_>,
     stderr: &mut E,
 ) -> Result<(), LifecycleError> {
