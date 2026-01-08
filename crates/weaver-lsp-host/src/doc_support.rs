@@ -85,10 +85,15 @@ impl LanguageServer for DocStubServer {
 }
 
 /// Builds an [`LspHost`] with a registered Rust stub server.
+///
+/// # Panics
+///
+/// Panics if stub server registration fails, which should never occur.
 #[must_use]
 pub fn doc_host() -> LspHost {
     let mut host = LspHost::new(weaver_config::CapabilityMatrix::default());
-    host.register_language(Language::Rust, Box::new(DocStubServer))
-        .expect("doc host registration failed");
+    if let Err(error) = host.register_language(Language::Rust, Box::new(DocStubServer)) {
+        panic!("doc host registration failed: {error}");
+    }
     host
 }

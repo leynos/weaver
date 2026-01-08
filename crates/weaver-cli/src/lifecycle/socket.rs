@@ -104,6 +104,8 @@ mod tests {
         let error = ensure_socket_available(&endpoint).expect_err("socket should be reported busy");
         assert!(matches!(error, LifecycleError::SocketInUse { .. }));
         drop(listener);
+        // Allow time for the socket to transition out of TIME_WAIT state.
+        thread::sleep(Duration::from_millis(50));
         ensure_socket_available(&endpoint).expect("socket becomes available");
     }
 }
