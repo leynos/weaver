@@ -85,6 +85,28 @@ fn read_optional_file(dir: &Dir, filename: &str) -> Result<Option<String>, io::E
     }
 }
 
+/// Reads and parses an optional runtime file with customisable error handling.
+///
+/// Combines file reading with parsing, handling the common pattern of:
+/// 1. Read file (returning None if not found)
+/// 2. Map I/O errors using the provided constructor
+/// 3. Parse content using the provided parsing function
+fn read_and_parse<T, R, P>(
+    dir: &Dir,
+    filename: &str,
+    read_error: R,
+    parse: P,
+) -> Result<Option<T>, LifecycleError>
+where
+    R: FnOnce(io::Error) -> LifecycleError,
+    P: FnOnce(&str) -> Result<Option<T>, LifecycleError>,
+{
+    let Some(content) = read_optional_file(dir, filename).map_err(read_error)? else {
+        return Ok(None);
+    };
+    parse(&content)
+}
+
 /// Waits for the daemon to report ready status within the given timeout.
 ///
 /// Monitors the health snapshot file and child process status, returning when
@@ -182,20 +204,21 @@ pub(super) fn read_health(
     filename: &str,
     full_path: &Path,
 ) -> Result<Option<HealthSnapshot>, LifecycleError> {
-    let Some(content) =
-        read_optional_file(dir, filename).map_err(|source| LifecycleError::ReadHealth {
-            path: full_path.to_path_buf(),
-            source,
-        })?
-    else {
-        return Ok(None);
-    };
-    serde_json::from_str(&content)
-        .map(Some)
-        .map_err(|source| LifecycleError::ParseHealth {
-            path: full_path.to_path_buf(),
-            source,
-        })
+    let path = full_path.to_path_buf();
+    let parse_path = path.clone();
+    read_and_parse(
+        dir,
+        filename,
+        |source| LifecycleError::ReadHealth { path, source },
+        |content| {
+            serde_json::from_str(content)
+                .map(Some)
+                .map_err(|source| LifecycleError::ParseHealth {
+                    path: parse_path,
+                    source,
+                })
+        },
+    )
 }
 
 /// Reads the PID from the runtime directory.
@@ -220,25 +243,26 @@ pub(super) fn read_pid(
     filename: &str,
     full_path: &Path,
 ) -> Result<Option<u32>, LifecycleError> {
-    let Some(content) =
-        read_optional_file(dir, filename).map_err(|source| LifecycleError::ReadPid {
-            path: full_path.to_path_buf(),
-            source,
-        })?
-    else {
-        return Ok(None);
-    };
-    let trimmed = content.trim();
-    if trimmed.is_empty() {
-        return Ok(None);
-    }
-    trimmed
-        .parse::<u32>()
-        .map(Some)
-        .map_err(|source| LifecycleError::ParsePid {
-            path: full_path.to_path_buf(),
-            source,
-        })
+    let path = full_path.to_path_buf();
+    let parse_path = path.clone();
+    read_and_parse(
+        dir,
+        filename,
+        |source| LifecycleError::ReadPid { path, source },
+        |content| {
+            let trimmed = content.trim();
+            if trimmed.is_empty() {
+                return Ok(None);
+            }
+            trimmed
+                .parse::<u32>()
+                .map(Some)
+                .map_err(|source| LifecycleError::ParsePid {
+                    path: parse_path,
+                    source,
+                })
+        },
+    )
 }
 
 /// Context for monitoring daemon process startup.
