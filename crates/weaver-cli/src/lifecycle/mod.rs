@@ -4,11 +4,19 @@
 //! testable:
 //! - [`types`] defines the user-facing command models and IO helpers.
 //! - [`error`] captures the error surface exposed to the CLI.
-//! - [`utils`] houses the filesystem/process helpers shared across commands.
+//! - [`spawning`] handles daemon process spawning.
+//! - [`monitoring`] provides health snapshot reading and readiness polling.
+//! - [`shutdown`] manages daemon termination and shutdown waiting.
+//! - [`socket`] handles socket availability probing.
+//! - [`utils`] houses high-level orchestration helpers.
 //! - [`controller`] implements the high-level start/stop/status flows.
 
 mod controller;
 mod error;
+mod monitoring;
+mod shutdown;
+mod socket;
+mod spawning;
 mod types;
 mod utils;
 

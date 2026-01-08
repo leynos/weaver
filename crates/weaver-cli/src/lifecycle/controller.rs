@@ -11,11 +11,13 @@ use std::time::SystemTime;
 use weaver_config::RuntimePaths;
 
 use super::error::LifecycleError;
+use super::monitoring::{read_health, read_pid, wait_for_ready};
+use super::shutdown::{signal_daemon, wait_for_shutdown};
+use super::socket::{ensure_socket_available, socket_is_reachable};
+use super::spawning::spawn_daemon;
 use super::types::{LifecycleCommand, LifecycleContext, LifecycleInvocation, LifecycleOutput};
 use super::utils::{
-    STARTUP_TIMEOUT, ensure_no_extra_arguments, ensure_socket_available, prepare_runtime,
-    read_health, read_pid, signal_daemon, socket_is_reachable, spawn_daemon, wait_for_ready,
-    wait_for_shutdown, write_startup_banner,
+    STARTUP_TIMEOUT, ensure_no_extra_arguments, prepare_runtime, write_startup_banner,
 };
 
 /// Production lifecycle controller.
