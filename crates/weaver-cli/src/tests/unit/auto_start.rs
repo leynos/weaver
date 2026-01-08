@@ -4,7 +4,7 @@
 //! connection-refused errors, and that spawn failures are reported appropriately.
 
 use crate::lifecycle::LifecycleContext;
-use crate::tests::support::decode_utf8;
+use crate::tests::support::{decode_utf8, default_daemon_lines, respond_to_request};
 use crate::{CommandInvocation, IoStreams, execute_daemon_command};
 use rstest::rstest;
 use std::ffi::OsStr;
@@ -101,8 +101,6 @@ fn write_health_snapshot(path: &std::path::Path, status: &str, pid: u32, timesta
 #[cfg(unix)]
 #[test]
 fn auto_start_succeeds_and_proceeds() {
-    use crate::tests::support::{default_daemon_lines, respond_to_request};
-
     let dir = TempDir::new().expect("tempdir");
     let socket_path = dir.path().join("daemon.sock");
     let health_path = dir.path().join("weaverd.health");
@@ -119,9 +117,15 @@ fn auto_start_succeeds_and_proceeds() {
     // Spawn a thread that binds the Unix socket after a brief delay.
     // This ensures the initial connect fails (triggering auto-start) but the
     // retry succeeds after wait_for_ready completes.
+    //
+    // Timing coordination: The 100ms delay is chosen to be longer than the
+    // initial connection attempt but shorter than AUTO_START_TIMEOUT. The CLI's
+    // connection attempt takes ~5 seconds (SOCKET_PROBE_TIMEOUT) before failing,
+    // so the socket bind reliably happens before the CLI retries. This is not a
+    // precise synchronisation mechanism, but the wide timing margins make it
+    // robust under typical test loads.
     let socket_path_for_thread = socket_path.clone();
     let listener_handle = thread::spawn(move || {
-        // Wait for auto-start to begin (initial connect fails, daemon spawns).
         thread::sleep(Duration::from_millis(100));
         let listener = UnixListener::bind(&socket_path_for_thread).expect("bind unix socket");
         let (stream, _) = listener.accept().expect("accept connection");

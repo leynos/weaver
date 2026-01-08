@@ -447,11 +447,13 @@ pub(crate) mod tests {
     }
 
     fn write_health_snapshot(paths: &RuntimePaths, status: &str, pid: u32, timestamp: u64) {
-        let snapshot = format!(
-            r#"{{"status":"{}","pid":{},"timestamp":{}}}"#,
-            status, pid, timestamp
-        );
-        fs::write(paths.health_path(), snapshot).expect("write health");
+        let snapshot = serde_json::json!({
+            "status": status,
+            "pid": pid,
+            "timestamp": timestamp
+        });
+        let json = serde_json::to_string(&snapshot).expect("serialize health snapshot");
+        fs::write(paths.health_path(), json).expect("write health");
     }
 
     #[test]
@@ -650,5 +652,102 @@ pub(crate) mod tests {
             Ok(snapshot) => panic!("expected timeout, got snapshot: {snapshot:?}"),
             Err(other) => panic!("expected StartupTimeout, got: {other:?}"),
         }
+    }
+
+    /// Writes a health snapshot JSON file for try_auto_start_daemon tests.
+    #[cfg(unix)]
+    fn write_health_json(path: &std::path::Path, status: &str, pid: u32, timestamp: u64) {
+        let snapshot = serde_json::json!({
+            "status": status,
+            "pid": pid,
+            "timestamp": timestamp
+        });
+        let json = serde_json::to_string(&snapshot).expect("serialize health snapshot");
+        fs::write(path, json).expect("write health snapshot");
+    }
+
+    /// Success path: try_auto_start_daemon spawns daemon and returns Ok when
+    /// health snapshot indicates ready.
+    ///
+    /// This test exercises the complete auto-start flow through try_auto_start_daemon:
+    /// prepare_runtime → spawn_daemon → wait_for_ready, verifying that the function
+    /// returns Ok(()) when the daemon becomes ready.
+    #[cfg(unix)]
+    #[test]
+    fn try_auto_start_daemon_succeeds_when_ready() {
+        let dir = TempDir::new().expect("temp dir");
+        let socket = dir.path().join("daemon.sock");
+        let socket_str = socket.to_string_lossy().into_owned();
+        let health_path = dir.path().join("weaverd.health");
+        let config = weaver_config::Config {
+            daemon_socket: SocketEndpoint::unix(socket_str),
+            ..weaver_config::Config::default()
+        };
+
+        // Pre-write health snapshot with ready status and recent timestamp.
+        // The PID check is skipped when daemonized=true (child exits with 0).
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_secs();
+        write_health_json(&health_path, "ready", 12345, timestamp);
+
+        let context = LifecycleContext {
+            config: &config,
+            config_arguments: &[],
+            // /bin/true exits immediately with success, simulating daemonization.
+            daemon_binary: Some(std::ffi::OsStr::new("/bin/true")),
+        };
+        let mut stderr = Vec::new();
+
+        let result = try_auto_start_daemon(context, &mut stderr);
+
+        assert!(result.is_ok(), "expected success, got: {result:?}");
+        let output = String::from_utf8(stderr).expect("stderr utf8");
+        assert!(
+            output.contains("Waiting for daemon start..."),
+            "expected waiting message, got: {output:?}"
+        );
+    }
+
+    /// Timeout path: try_auto_start_daemon returns StartupTimeout when daemon
+    /// spawns but never becomes ready.
+    ///
+    /// This test is marked #[ignore] because AUTO_START_TIMEOUT is 30 seconds.
+    /// It verifies the complete timeout flow through try_auto_start_daemon.
+    #[cfg(unix)]
+    #[ignore = "takes 30 seconds due to AUTO_START_TIMEOUT"]
+    #[test]
+    fn try_auto_start_daemon_times_out_when_daemon_slow() {
+        let dir = TempDir::new().expect("temp dir");
+        let socket = dir.path().join("daemon.sock");
+        let socket_str = socket.to_string_lossy().into_owned();
+        let config = weaver_config::Config {
+            daemon_socket: SocketEndpoint::unix(socket_str),
+            ..weaver_config::Config::default()
+        };
+
+        // No health snapshot written - daemon "hangs" without becoming ready.
+        let context = LifecycleContext {
+            config: &config,
+            config_arguments: &[],
+            // /bin/cat blocks indefinitely waiting for stdin, simulating a slow daemon.
+            daemon_binary: Some(std::ffi::OsStr::new("/bin/cat")),
+        };
+        let mut stderr = Vec::new();
+
+        let result = try_auto_start_daemon(context, &mut stderr);
+
+        assert!(result.is_err(), "expected timeout error");
+        let error = result.unwrap_err();
+        assert!(
+            matches!(error, LifecycleError::StartupTimeout { .. }),
+            "expected StartupTimeout, got: {error:?}"
+        );
+        let output = String::from_utf8(stderr).expect("stderr utf8");
+        assert!(
+            output.contains("Waiting for daemon start..."),
+            "expected waiting message, got: {output:?}"
+        );
     }
 }
