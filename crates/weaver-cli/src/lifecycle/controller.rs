@@ -5,6 +5,12 @@
 //! interacting with `weaverd`.
 
 use std::io::Write;
+
+/// Filename for the daemon's PID file within the runtime directory.
+const PID_FILENAME: &str = "weaverd.pid";
+/// Filename for the daemon's health snapshot within the runtime directory.
+const HEALTH_FILENAME: &str = "weaverd.health";
+
 use std::process::ExitCode;
 use std::time::SystemTime;
 
@@ -64,7 +70,7 @@ impl SystemLifecycle {
         ensure_no_extra_arguments(invocation)?;
         let paths = prepare_runtime(context)?;
         let dir = open_runtime_dir(&paths)?;
-        let pid = read_pid(&dir, "weaverd.pid", paths.pid_path())?;
+        let pid = read_pid(&dir, PID_FILENAME, paths.pid_path())?;
         let Some(pid) = pid else {
             if socket_is_reachable(context.config.daemon_socket())? {
                 return Err(LifecycleError::MissingPidWithSocket {
@@ -111,7 +117,7 @@ impl SystemLifecycle {
             return Ok(ExitCode::SUCCESS);
         }
         let dir = open_runtime_dir(&paths)?;
-        let snapshot = read_health(&dir, "weaverd.health", paths.health_path())?;
+        let snapshot = read_health(&dir, HEALTH_FILENAME, paths.health_path())?;
         if let Some(snapshot) = snapshot {
             output.stdout_line(format_args!(
                 "daemon status: {} (pid {}) via {}",
@@ -122,7 +128,7 @@ impl SystemLifecycle {
             return Ok(ExitCode::SUCCESS);
         }
         let reachable = socket_is_reachable(context.config.daemon_socket())?;
-        let pid = read_pid(&dir, "weaverd.pid", paths.pid_path())?;
+        let pid = read_pid(&dir, PID_FILENAME, paths.pid_path())?;
         match pid {
             Some(pid) => {
                 output.stdout_line(format_args!(

@@ -10,8 +10,8 @@ use weaver_config::RuntimePaths;
 
 use crate::lifecycle::LifecycleError;
 use crate::lifecycle::monitoring::{
-    HealthCheckOutcome, HealthSnapshot, ProcessMonitorContext, check_health_snapshot, read_pid,
-    snapshot_is_recent, snapshot_matches_process, wait_for_ready,
+    DaemonStatus, HealthCheckOutcome, HealthSnapshot, ProcessMonitorContext, check_health_snapshot,
+    read_pid, snapshot_is_recent, snapshot_matches_process, wait_for_ready,
 };
 use crate::tests::support::{temp_paths, write_health_snapshot};
 
@@ -44,7 +44,7 @@ fn read_pid_parses_integer(temp_paths: (TempDir, RuntimePaths)) {
 #[test]
 fn snapshot_validation_requires_matching_pid() {
     let snapshot = HealthSnapshot {
-        status: String::from("ready"),
+        status: DaemonStatus::Ready,
         pid: 42,
         timestamp: 0,
     };
@@ -55,7 +55,7 @@ fn snapshot_validation_requires_matching_pid() {
 #[test]
 fn snapshot_validation_requires_recent_timestamp() {
     let snapshot = HealthSnapshot {
-        status: String::from("ready"),
+        status: DaemonStatus::Ready,
         pid: 1,
         timestamp: 10,
     };
@@ -70,7 +70,7 @@ fn snapshot_is_recent_ignores_subsecond_precision() {
     // Snapshot timestamp has second precision only. When started_at is in the
     // same second (with nanoseconds), the snapshot should still be recent.
     let snapshot = HealthSnapshot {
-        status: String::from("ready"),
+        status: DaemonStatus::Ready,
         pid: 1,
         timestamp: 100,
     };
@@ -134,7 +134,7 @@ fn check_health_snapshot_returns_ready_when_valid(temp_paths: (TempDir, RuntimeP
     let outcome = check_health_snapshot(&dir, &paths, monitor).expect("check health");
     match outcome {
         HealthCheckOutcome::Ready(snapshot) => {
-            assert_eq!(snapshot.status, "ready");
+            assert_eq!(snapshot.status, DaemonStatus::Ready);
             assert_eq!(snapshot.pid, 42);
         }
         other => panic!("expected Ready, got {other:?}"),
@@ -200,7 +200,7 @@ fn wait_for_ready_succeeds_when_health_snapshot_ready(temp_paths: (TempDir, Runt
 
     match result {
         Ok(snapshot) => {
-            assert_eq!(snapshot.status, "ready");
+            assert_eq!(snapshot.status, DaemonStatus::Ready);
         }
         Err(error) => panic!("expected success, got: {error:?}"),
     }

@@ -17,6 +17,31 @@ use super::utils::open_runtime_dir;
 
 const POLL_INTERVAL: Duration = Duration::from_millis(200);
 
+/// Current operational state of the daemon.
+///
+/// The daemon reports its state through the health snapshot file, transitioning
+/// through these states during its lifecycle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum DaemonStatus {
+    /// Daemon is initialising and not yet ready to accept connections.
+    Starting,
+    /// Daemon is fully operational and accepting connections.
+    Ready,
+    /// Daemon is shutting down gracefully.
+    Stopping,
+}
+
+impl std::fmt::Display for DaemonStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Starting => write!(f, "starting"),
+            Self::Ready => write!(f, "ready"),
+            Self::Stopping => write!(f, "stopping"),
+        }
+    }
+}
+
 /// Health snapshot data read from the daemon's health file.
 ///
 /// The daemon writes this JSON structure to `weaverd.health` to communicate its
@@ -25,14 +50,14 @@ const POLL_INTERVAL: Duration = Duration::from_millis(200);
 ///
 /// # Fields
 ///
-/// * `status` - Current daemon state: `"starting"`, `"ready"`, or `"stopping"`.
+/// * `status` - Current daemon state as a [`DaemonStatus`] enum variant.
 /// * `pid` - Process ID of the running daemon.
 /// * `timestamp` - Unix timestamp (seconds since epoch) when the snapshot was
 ///   written. Used to distinguish fresh snapshots from stale ones.
 #[derive(Debug, serde::Deserialize, PartialEq, Eq)]
 pub(crate) struct HealthSnapshot {
-    /// Current daemon state: `"starting"`, `"ready"`, or `"stopping"`.
-    pub status: String,
+    /// Current daemon state.
+    pub status: DaemonStatus,
     /// Process ID of the running daemon.
     pub pid: u32,
     /// Unix timestamp (seconds since epoch) when the snapshot was written.
@@ -236,12 +261,12 @@ pub(crate) fn check_health_snapshot(
     if !pid_ok || !recent {
         return Ok(HealthCheckOutcome::Continue);
     }
-    match snapshot.status.as_str() {
-        "ready" => Ok(HealthCheckOutcome::Ready(snapshot)),
-        "stopping" => Ok(HealthCheckOutcome::Aborted {
+    match snapshot.status {
+        DaemonStatus::Ready => Ok(HealthCheckOutcome::Ready(snapshot)),
+        DaemonStatus::Stopping => Ok(HealthCheckOutcome::Aborted {
             path: paths.health_path().to_path_buf(),
         }),
-        _ => Ok(HealthCheckOutcome::Continue),
+        DaemonStatus::Starting => Ok(HealthCheckOutcome::Continue),
     }
 }
 
