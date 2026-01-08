@@ -73,7 +73,12 @@ pub(super) fn wait_for_ready(
             // Spawned process exited cleanly; daemon has forked to a new PID.
             daemonized = true;
         }
-        match check_health_snapshot(&dir, paths, started_at, expected_pid, daemonized)? {
+        let monitor = ProcessMonitorContext {
+            started_at,
+            expected_pid,
+            daemonized,
+        };
+        match check_health_snapshot(&dir, paths, monitor)? {
             HealthCheckOutcome::Ready(snapshot) => return Ok(snapshot),
             HealthCheckOutcome::Aborted { path } => {
                 return Err(LifecycleError::StartupAborted { path });
@@ -139,17 +144,19 @@ pub(super) fn read_pid(
     }
 }
 
-/// Evaluates a health snapshot for readiness or failure conditions.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "parameters are semantically distinct; grouping would hurt readability"
-)]
-fn check_health_snapshot(
-    dir: &Dir,
-    paths: &RuntimePaths,
+/// Context for monitoring daemon process startup.
+#[derive(Debug, Clone, Copy)]
+struct ProcessMonitorContext {
     started_at: SystemTime,
     expected_pid: u32,
     daemonized: bool,
+}
+
+/// Evaluates a health snapshot for readiness or failure conditions.
+fn check_health_snapshot(
+    dir: &Dir,
+    paths: &RuntimePaths,
+    monitor: ProcessMonitorContext,
 ) -> Result<HealthCheckOutcome, LifecycleError> {
     let health_filename = paths
         .health_path()
@@ -159,8 +166,8 @@ fn check_health_snapshot(
     let Some(snapshot) = read_health(dir, health_filename, paths.health_path())? else {
         return Ok(HealthCheckOutcome::Continue);
     };
-    let pid_ok = daemonized || snapshot_matches_process(&snapshot, expected_pid);
-    let recent = snapshot_is_recent(&snapshot, started_at);
+    let pid_ok = monitor.daemonized || snapshot_matches_process(&snapshot, monitor.expected_pid);
+    let recent = snapshot_is_recent(&snapshot, monitor.started_at);
     if !pid_ok || !recent {
         return Ok(HealthCheckOutcome::Continue);
     }
@@ -264,9 +271,12 @@ mod tests {
     fn check_health_snapshot_returns_continue_when_missing(temp_paths: (TempDir, RuntimePaths)) {
         let (_dir, paths) = temp_paths;
         let dir = open_test_dir(&paths);
-        let started_at = UNIX_EPOCH + Duration::from_secs(100);
-        let outcome =
-            check_health_snapshot(&dir, &paths, started_at, 42, false).expect("check health");
+        let monitor = ProcessMonitorContext {
+            started_at: UNIX_EPOCH + Duration::from_secs(100),
+            expected_pid: 42,
+            daemonized: false,
+        };
+        let outcome = check_health_snapshot(&dir, &paths, monitor).expect("check health");
         assert!(matches!(outcome, HealthCheckOutcome::Continue));
     }
 
@@ -277,10 +287,13 @@ mod tests {
         let (_dir, paths) = temp_paths;
         write_health_snapshot(&paths, "ready", 99, 100);
         let dir = open_test_dir(&paths);
-        let started_at = UNIX_EPOCH + Duration::from_secs(100);
         // Expected PID 42, but snapshot has PID 99 and daemonized is false.
-        let outcome =
-            check_health_snapshot(&dir, &paths, started_at, 42, false).expect("check health");
+        let monitor = ProcessMonitorContext {
+            started_at: UNIX_EPOCH + Duration::from_secs(100),
+            expected_pid: 42,
+            daemonized: false,
+        };
+        let outcome = check_health_snapshot(&dir, &paths, monitor).expect("check health");
         assert!(matches!(outcome, HealthCheckOutcome::Continue));
     }
 
@@ -290,9 +303,12 @@ mod tests {
         write_health_snapshot(&paths, "ready", 42, 50);
         let dir = open_test_dir(&paths);
         // Snapshot timestamp 50 is before started_at timestamp 100.
-        let started_at = UNIX_EPOCH + Duration::from_secs(100);
-        let outcome =
-            check_health_snapshot(&dir, &paths, started_at, 42, false).expect("check health");
+        let monitor = ProcessMonitorContext {
+            started_at: UNIX_EPOCH + Duration::from_secs(100),
+            expected_pid: 42,
+            daemonized: false,
+        };
+        let outcome = check_health_snapshot(&dir, &paths, monitor).expect("check health");
         assert!(matches!(outcome, HealthCheckOutcome::Continue));
     }
 
@@ -301,9 +317,12 @@ mod tests {
         let (_dir, paths) = temp_paths;
         write_health_snapshot(&paths, "ready", 42, 100);
         let dir = open_test_dir(&paths);
-        let started_at = UNIX_EPOCH + Duration::from_secs(100);
-        let outcome =
-            check_health_snapshot(&dir, &paths, started_at, 42, false).expect("check health");
+        let monitor = ProcessMonitorContext {
+            started_at: UNIX_EPOCH + Duration::from_secs(100),
+            expected_pid: 42,
+            daemonized: false,
+        };
+        let outcome = check_health_snapshot(&dir, &paths, monitor).expect("check health");
         match outcome {
             HealthCheckOutcome::Ready(snapshot) => {
                 assert_eq!(snapshot.status, "ready");
@@ -318,10 +337,13 @@ mod tests {
         let (_dir, paths) = temp_paths;
         write_health_snapshot(&paths, "ready", 99, 100);
         let dir = open_test_dir(&paths);
-        let started_at = UNIX_EPOCH + Duration::from_secs(100);
         // Expected PID 42, but daemonized=true skips PID check.
-        let outcome =
-            check_health_snapshot(&dir, &paths, started_at, 42, true).expect("check health");
+        let monitor = ProcessMonitorContext {
+            started_at: UNIX_EPOCH + Duration::from_secs(100),
+            expected_pid: 42,
+            daemonized: true,
+        };
+        let outcome = check_health_snapshot(&dir, &paths, monitor).expect("check health");
         assert!(matches!(outcome, HealthCheckOutcome::Ready(_)));
     }
 
@@ -330,9 +352,12 @@ mod tests {
         let (_dir, paths) = temp_paths;
         write_health_snapshot(&paths, "stopping", 42, 100);
         let dir = open_test_dir(&paths);
-        let started_at = UNIX_EPOCH + Duration::from_secs(100);
-        let outcome =
-            check_health_snapshot(&dir, &paths, started_at, 42, false).expect("check health");
+        let monitor = ProcessMonitorContext {
+            started_at: UNIX_EPOCH + Duration::from_secs(100),
+            expected_pid: 42,
+            daemonized: false,
+        };
+        let outcome = check_health_snapshot(&dir, &paths, monitor).expect("check health");
         assert!(matches!(outcome, HealthCheckOutcome::Aborted { .. }));
     }
 
@@ -341,9 +366,12 @@ mod tests {
         let (_dir, paths) = temp_paths;
         write_health_snapshot(&paths, "starting", 42, 100);
         let dir = open_test_dir(&paths);
-        let started_at = UNIX_EPOCH + Duration::from_secs(100);
-        let outcome =
-            check_health_snapshot(&dir, &paths, started_at, 42, false).expect("check health");
+        let monitor = ProcessMonitorContext {
+            started_at: UNIX_EPOCH + Duration::from_secs(100),
+            expected_pid: 42,
+            daemonized: false,
+        };
+        let outcome = check_health_snapshot(&dir, &paths, monitor).expect("check health");
         assert!(matches!(outcome, HealthCheckOutcome::Continue));
     }
 
