@@ -446,14 +446,19 @@ pub(crate) mod tests {
         assert!(snapshot_is_recent(&snapshot, start));
     }
 
-    fn write_health_snapshot(paths: &RuntimePaths, status: &str, pid: u32, timestamp: u64) {
+    /// Writes a health snapshot JSON file to the specified path.
+    fn write_health_json(path: &Path, status: &str, pid: u32, timestamp: u64) {
         let snapshot = serde_json::json!({
             "status": status,
             "pid": pid,
             "timestamp": timestamp
         });
         let json = serde_json::to_string(&snapshot).expect("serialize health snapshot");
-        fs::write(paths.health_path(), json).expect("write health");
+        fs::write(path, json).expect("write health snapshot");
+    }
+
+    fn write_health_snapshot(paths: &RuntimePaths, status: &str, pid: u32, timestamp: u64) {
+        write_health_json(paths.health_path(), status, pid, timestamp);
     }
 
     #[test]
@@ -600,16 +605,18 @@ pub(crate) mod tests {
 
     #[test]
     fn resolve_daemon_binary_falls_back_to_default() {
-        // When no override is provided and WEAVERD_BIN is not set, defaults to "weaverd".
-        // Note: This test may produce a different result if WEAVERD_BIN is set in the
-        // environment, but we test the override case separately.
+        // When no override is provided, falls back to WEAVERD_BIN or "weaverd".
         let resolved = resolve_daemon_binary(None);
-        let resolved_str = resolved.to_string_lossy();
-        // Should be "weaverd" or whatever WEAVERD_BIN is set to.
-        assert!(
-            resolved_str == "weaverd" || !resolved_str.is_empty(),
-            "expected non-empty binary name"
-        );
+        // WEAVERD_BIN may be set in the environment; accept either outcome.
+        if let Some(weaverd_bin) = env::var_os("WEAVERD_BIN") {
+            assert_eq!(resolved, weaverd_bin, "expected WEAVERD_BIN value");
+        } else {
+            assert_eq!(
+                resolved,
+                OsString::from("weaverd"),
+                "expected default binary name"
+            );
+        }
     }
 
     #[cfg(unix)]
@@ -652,18 +659,6 @@ pub(crate) mod tests {
             Ok(snapshot) => panic!("expected timeout, got snapshot: {snapshot:?}"),
             Err(other) => panic!("expected StartupTimeout, got: {other:?}"),
         }
-    }
-
-    /// Writes a health snapshot JSON file for try_auto_start_daemon tests.
-    #[cfg(unix)]
-    fn write_health_json(path: &std::path::Path, status: &str, pid: u32, timestamp: u64) {
-        let snapshot = serde_json::json!({
-            "status": status,
-            "pid": pid,
-            "timestamp": timestamp
-        });
-        let json = serde_json::to_string(&snapshot).expect("serialize health snapshot");
-        fs::write(path, json).expect("write health snapshot");
     }
 
     /// Success path: try_auto_start_daemon spawns daemon and returns Ok when
