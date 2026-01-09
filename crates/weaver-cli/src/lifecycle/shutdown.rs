@@ -3,15 +3,17 @@
 //! Provides helpers for signalling the daemon to stop and waiting for the
 //! shutdown sequence to complete.
 
-use std::fs;
 use std::io::{self, ErrorKind};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use cap_std::fs::Dir;
 use weaver_config::{RuntimePaths, SocketEndpoint};
 
 use super::error::LifecycleError;
+use super::monitoring::PID_FILENAME;
 use super::socket::socket_is_reachable;
+use super::utils::open_runtime_dir;
 
 #[cfg(unix)]
 use libc::{SIGTERM, kill};
@@ -45,14 +47,21 @@ pub(super) fn wait_for_shutdown(
     paths: &RuntimePaths,
     endpoint: &SocketEndpoint,
 ) -> Result<(), LifecycleError> {
+    let dir = open_runtime_dir(paths)?;
     let deadline = Instant::now() + SHUTDOWN_TIMEOUT;
-    while Instant::now() < deadline {
-        let pid_exists = pid_file_exists(paths)?;
+    loop {
+        let now = Instant::now();
+        if now >= deadline {
+            break;
+        }
+        let pid_exists = pid_file_exists(&dir, paths)?;
         let socket_busy = socket_is_reachable(endpoint)?;
         if !pid_exists && !socket_busy {
             return Ok(());
         }
-        thread::sleep(POLL_INTERVAL);
+        // Cap sleep to remaining time to avoid exceeding the timeout.
+        let remaining = deadline.saturating_duration_since(now);
+        thread::sleep(remaining.min(POLL_INTERVAL));
     }
     Err(LifecycleError::ShutdownTimeout {
         pid_path: paths.pid_path().to_path_buf(),
@@ -60,12 +69,12 @@ pub(super) fn wait_for_shutdown(
     })
 }
 
-/// Checks whether the PID file exists, propagating I/O errors.
+/// Checks whether the PID file exists using capability-based filesystem access.
 ///
-/// Unlike `Path::exists()`, this function does not silently swallow I/O errors
-/// such as permission denied. Only `NotFound` is treated as "file does not exist".
-fn pid_file_exists(paths: &RuntimePaths) -> Result<bool, LifecycleError> {
-    match fs::metadata(paths.pid_path()) {
+/// Uses the runtime directory handle to check file existence, propagating I/O
+/// errors. Only `NotFound` is treated as "file does not exist".
+fn pid_file_exists(dir: &Dir, paths: &RuntimePaths) -> Result<bool, LifecycleError> {
+    match dir.metadata(PID_FILENAME) {
         Ok(_) => Ok(true),
         Err(e) if e.kind() == ErrorKind::NotFound => Ok(false),
         Err(source) => Err(LifecycleError::ReadPid {

@@ -5,6 +5,7 @@ use std::net::TcpListener;
 use std::thread;
 use std::time::Duration;
 
+use rstest::rstest;
 use tempfile::TempDir;
 use weaver_config::{Config, RuntimePaths, SocketEndpoint};
 
@@ -55,26 +56,19 @@ fn signal_daemon_returns_unsupported_platform() {
     assert!(matches!(result, Err(LifecycleError::UnsupportedPlatform)));
 }
 
-#[test]
-fn signal_daemon_rejects_pid_zero() {
-    let result = signal_daemon(0);
+#[rstest]
+#[case::pid_zero(0, "process group")]
+#[case::pid_exceeds_i32_max((i32::MAX as u32) + 1, "exceeds")]
+fn signal_daemon_rejects_invalid_pid(#[case] invalid_pid: u32, #[case] expected_reason: &str) {
+    let result = signal_daemon(invalid_pid);
     let Err(LifecycleError::InvalidPid { pid, reason }) = result else {
         panic!("expected InvalidPid, got {result:?}");
     };
-    assert_eq!(pid, 0);
-    assert!(reason.contains("process group"));
-}
-
-#[test]
-fn signal_daemon_rejects_pid_exceeding_i32_max() {
-    // PID larger than i32::MAX would overflow when cast to pid_t.
-    let large_pid = (i32::MAX as u32) + 1;
-    let result = signal_daemon(large_pid);
-    let Err(LifecycleError::InvalidPid { pid, reason }) = result else {
-        panic!("expected InvalidPid, got {result:?}");
-    };
-    assert_eq!(pid, large_pid);
-    assert!(reason.contains("exceeds"));
+    assert_eq!(pid, invalid_pid);
+    assert!(
+        reason.contains(expected_reason),
+        "expected reason to contain '{expected_reason}', got '{reason}'"
+    );
 }
 
 /// Creates RuntimePaths for testing using a temporary directory.
@@ -86,7 +80,7 @@ fn create_temp_runtime_paths() -> (TempDir, RuntimePaths) {
     let temp_dir = TempDir::new().expect("create temp dir");
     let socket_path = temp_dir.path().join("test.sock");
     let config = Config {
-        daemon_socket: SocketEndpoint::unix(socket_path.to_str().expect("path to str").to_string()),
+        daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().into_owned()),
         ..Config::default()
     };
     let paths = RuntimePaths::from_config(&config).expect("derive runtime paths");
@@ -148,7 +142,7 @@ fn wait_for_shutdown_propagates_socket_probe_errors() {
     fs::set_permissions(&restricted_dir, perms).expect("set restrictive permissions");
 
     let socket_path = restricted_dir.join("daemon.sock");
-    let endpoint = SocketEndpoint::unix(socket_path.to_str().expect("path to str").to_string());
+    let endpoint = SocketEndpoint::unix(socket_path.to_string_lossy().into_owned());
 
     let result = wait_for_shutdown(&paths, &endpoint);
 
@@ -199,13 +193,19 @@ fn wait_for_shutdown_times_out_when_conditions_persist() {
 #[cfg(unix)]
 #[test]
 fn signal_daemon_succeeds_for_child_process() {
+    use std::io::ErrorKind;
+    use std::os::unix::process::ExitStatusExt;
     use std::process::Command;
 
     // Spawn a child process that sleeps indefinitely.
-    let mut child = Command::new("sleep")
-        .arg("60")
-        .spawn()
-        .expect("spawn sleep process");
+    let mut child = match Command::new("sleep").arg("60").spawn() {
+        Ok(child) => child,
+        Err(e) if e.kind() == ErrorKind::NotFound => {
+            eprintln!("skipping test: sleep command not found");
+            return;
+        }
+        Err(e) => panic!("failed to spawn sleep process: {e}"),
+    };
     let pid = child.id();
 
     // Signal the child process.
@@ -215,15 +215,9 @@ fn signal_daemon_succeeds_for_child_process() {
     // Wait for the child to terminate and verify it received the signal.
     let status = child.wait().expect("wait for child");
 
-    // On Unix, SIGTERM typically results in an exit without a normal exit code.
-    // The process is terminated by the signal.
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::ExitStatusExt;
-        // The child should have been terminated by SIGTERM (signal 15).
-        assert!(
-            status.signal() == Some(libc::SIGTERM) || !status.success(),
-            "child should have been terminated by signal, status: {status:?}"
-        );
-    }
+    // The child should have been terminated by SIGTERM (signal 15).
+    assert!(
+        status.signal() == Some(libc::SIGTERM) || !status.success(),
+        "child should have been terminated by signal, status: {status:?}"
+    );
 }
