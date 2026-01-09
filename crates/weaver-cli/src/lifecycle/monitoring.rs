@@ -353,7 +353,7 @@ pub(crate) fn check_health_snapshot(
 ///
 /// Used to verify that a health snapshot belongs to the daemon instance we
 /// spawned rather than a stale snapshot from a previous run.
-pub(crate) fn snapshot_matches_process(snapshot: &HealthSnapshot, expected_pid: u32) -> bool {
+pub(crate) const fn snapshot_matches_process(snapshot: &HealthSnapshot, expected_pid: u32) -> bool {
     snapshot.pid == expected_pid
 }
 
