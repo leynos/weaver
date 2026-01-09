@@ -3,7 +3,7 @@
 use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use thiserror::Error;
 use weaver_config::{RuntimePathsError, SocketPreparationError};
@@ -36,10 +36,10 @@ pub enum LifecycleError {
     StartupFailed { exit_status: Option<i32> },
     #[error("daemon reported 'stopping' before reaching ready; check health snapshot at {path:?}")]
     StartupAborted { path: PathBuf },
-    #[error("timed out waiting for ready snapshot in {timeout_ms} ms at {health_path:?}")]
+    #[error("timed out waiting for ready snapshot in {timeout:?} at {health_path:?}")]
     StartupTimeout {
         health_path: PathBuf,
-        timeout_ms: u64,
+        timeout: Duration,
     },
     #[error("failed to monitor daemon launch: {source}")]
     MonitorChild {

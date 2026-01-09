@@ -207,10 +207,7 @@ pub(super) fn wait_for_ready(
     }
     Err(LifecycleError::StartupTimeout {
         health_path: paths.health_path().to_path_buf(),
-        timeout_ms: timeout
-            .as_millis()
-            .try_into()
-            .expect("timeout within u64 range"),
+        timeout,
     })
 }
 
