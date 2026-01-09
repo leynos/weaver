@@ -82,8 +82,11 @@ pub enum LifecycleError {
         #[source]
         source: io::Error,
     },
-    #[error("daemon shutdown did not complete within {timeout_ms} ms; check {pid_path:?}")]
-    ShutdownTimeout { pid_path: PathBuf, timeout_ms: u64 },
+    #[error("daemon shutdown did not complete within {timeout:?}; check {pid_path:?}")]
+    ShutdownTimeout {
+        pid_path: PathBuf,
+        timeout: Duration,
+    },
     #[cfg(not(unix))]
     #[error("platform does not support daemon lifecycle signalling")]
     UnsupportedPlatform,

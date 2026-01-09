@@ -36,7 +36,7 @@ pub(super) fn wait_for_shutdown(
     }
     Err(LifecycleError::ShutdownTimeout {
         pid_path: paths.pid_path().to_path_buf(),
-        timeout_ms: SHUTDOWN_TIMEOUT.as_millis() as u64,
+        timeout: SHUTDOWN_TIMEOUT,
     })
 }
 
