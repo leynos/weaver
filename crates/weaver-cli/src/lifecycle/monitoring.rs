@@ -128,6 +128,50 @@ where
     parse(&content)
 }
 
+/// Macro to define a runtime file reader with custom parsing logic.
+macro_rules! define_reader {
+    (
+        $(#[$attr:meta])*
+        $vis:vis fn $name:ident(
+            dir: &Dir,
+            filename: &str,
+            full_path: &Path,
+        ) -> Result<Option<$ret_ty:ty>, LifecycleError> {
+            read_error: $read_variant:ident,
+            parse_error: $parse_variant:ident,
+            parse: $parse_expr:expr
+        }
+    ) => {
+        $(#[$attr])*
+        $vis fn $name(
+            dir: &Dir,
+            filename: &str,
+            full_path: &Path,
+        ) -> Result<Option<$ret_ty>, LifecycleError> {
+            read_and_parse(
+                dir,
+                filename,
+                |source| LifecycleError::$read_variant {
+                    path: full_path.to_path_buf(),
+                    source,
+                },
+                |content| {
+                    let trimmed = content.trim();
+                    if trimmed.is_empty() {
+                        return Ok(None);
+                    }
+                    $parse_expr(trimmed)
+                        .map(Some)
+                        .map_err(|source| LifecycleError::$parse_variant {
+                            path: full_path.to_path_buf(),
+                            source,
+                        })
+                },
+            )
+        }
+    };
+}
+
 /// Waits for the daemon to report ready status within the given timeout.
 ///
 /// Monitors the health snapshot file and child process status, returning when
@@ -213,92 +257,42 @@ pub(super) fn wait_for_ready(
     })
 }
 
-/// Reads the health snapshot from the runtime directory.
-///
-/// Attempts to read and parse the health JSON file from the daemon's runtime
-/// directory.
-///
-/// # Arguments
-///
-/// * `dir` - Capability-based directory handle for the runtime directory.
-/// * `filename` - Name of the health file (typically `"weaverd.health"`).
-/// * `full_path` - Full path to the health file, used for error messages.
-///
-/// # Returns
-///
-/// * `Ok(Some(snapshot))` - Health file exists and was parsed successfully.
-/// * `Ok(None)` - Health file does not exist or is empty (normal during startup).
-/// * `Err(ReadHealth)` - I/O error reading the file.
-/// * `Err(ParseHealth)` - File exists but contains invalid JSON.
-pub(super) fn read_health(
-    dir: &Dir,
-    filename: &str,
-    full_path: &Path,
-) -> Result<Option<HealthSnapshot>, LifecycleError> {
-    read_and_parse(
-        dir,
-        filename,
-        |source| LifecycleError::ReadHealth {
-            path: full_path.to_path_buf(),
-            source,
-        },
-        |content| {
-            if content.trim().is_empty() {
-                return Ok(None);
-            }
-            serde_json::from_str(content)
-                .map(Some)
-                .map_err(|source| LifecycleError::ParseHealth {
-                    path: full_path.to_path_buf(),
-                    source,
-                })
-        },
-    )
+define_reader! {
+    /// Reads and parses the daemon health snapshot from the runtime directory.
+    ///
+    /// Returns:
+    /// * `Ok(Some(snapshot))` - Health snapshot was successfully read and parsed.
+    /// * `Ok(None)` - Health file does not exist.
+    /// * `Err(ReadHealth)` - I/O error reading the file.
+    /// * `Err(ParseHealth)` - File exists but contains invalid JSON.
+    pub(super) fn read_health(
+        dir: &Dir,
+        filename: &str,
+        full_path: &Path,
+    ) -> Result<Option<HealthSnapshot>, LifecycleError> {
+        read_error: ReadHealth,
+        parse_error: ParseHealth,
+        parse: serde_json::from_str
+    }
 }
 
-/// Reads the PID from the runtime directory.
-///
-/// Attempts to read and parse the PID file from the daemon's runtime directory.
-/// The PID file contains a single integer representing the daemon's process ID.
-///
-/// # Arguments
-///
-/// * `dir` - Capability-based directory handle for the runtime directory.
-/// * `filename` - Name of the PID file (typically `"weaverd.pid"`).
-/// * `full_path` - Full path to the PID file, used for error messages.
-///
-/// # Returns
-///
-/// * `Ok(Some(pid))` - PID file exists and contains a valid integer.
-/// * `Ok(None)` - PID file does not exist or is empty.
-/// * `Err(ReadPid)` - I/O error reading the file.
-/// * `Err(ParsePid)` - File exists but does not contain a valid integer.
-pub(super) fn read_pid(
-    dir: &Dir,
-    filename: &str,
-    full_path: &Path,
-) -> Result<Option<u32>, LifecycleError> {
-    read_and_parse(
-        dir,
-        filename,
-        |source| LifecycleError::ReadPid {
-            path: full_path.to_path_buf(),
-            source,
-        },
-        |content| {
-            let trimmed = content.trim();
-            if trimmed.is_empty() {
-                return Ok(None);
-            }
-            trimmed
-                .parse::<u32>()
-                .map(Some)
-                .map_err(|source| LifecycleError::ParsePid {
-                    path: full_path.to_path_buf(),
-                    source,
-                })
-        },
-    )
+define_reader! {
+    /// Reads and parses the daemon PID from the runtime directory.
+    ///
+    /// Returns:
+    /// * `Ok(Some(pid))` - PID was successfully read and parsed.
+    /// * `Ok(None)` - PID file does not exist or is empty.
+    /// * `Err(ReadPid)` - I/O error reading the file.
+    /// * `Err(ParsePid)` - File exists but does not contain a valid integer.
+    pub(super) fn read_pid(
+        dir: &Dir,
+        filename: &str,
+        full_path: &Path,
+    ) -> Result<Option<u32>, LifecycleError> {
+        read_error: ReadPid,
+        parse_error: ParsePid,
+        parse: |s: &str| s.parse::<u32>()
+    }
 }
 
 /// Context for monitoring daemon process startup.
