@@ -29,7 +29,7 @@ const POLL_INTERVAL: Duration = Duration::from_millis(200);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum DaemonStatus {
-    /// Daemon is initialising and not yet ready to accept connections.
+    /// Daemon is initializing and not yet ready to accept connections.
     Starting,
     /// Daemon is fully operational and accepting connections.
     Ready,
@@ -94,7 +94,7 @@ fn read_optional_file(dir: &Dir, filename: &str) -> Result<Option<String>, io::E
     }
 }
 
-/// Reads and parses an optional runtime file with customisable error handling.
+/// Reads and parses an optional runtime file with customizable error handling.
 ///
 /// Combines file reading with parsing, handling the common pattern of:
 /// 1. Read file (returning `Ok(None)` if not found)
