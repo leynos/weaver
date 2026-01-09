@@ -76,7 +76,11 @@ pub(crate) enum HealthCheckOutcome {
     Continue,
 }
 
-/// Helper to read an optional runtime file, returning None if not found.
+/// Reads a file from the runtime directory, treating `NotFound` as `Ok(None)`.
+///
+/// This encapsulates the common pattern where a missing file is a valid state
+/// (e.g., during daemon startup before health or PID files are written) rather
+/// than an error. Other I/O errors are propagated.
 fn read_optional_file(dir: &Dir, filename: &str) -> Result<Option<String>, io::Error> {
     match dir.read_to_string(filename) {
         Ok(content) => Ok(Some(content)),
@@ -301,17 +305,29 @@ pub(crate) fn check_health_snapshot(
     }
 }
 
+/// Checks whether the snapshot's PID matches the expected daemon process.
+///
+/// Used to verify that a health snapshot belongs to the daemon instance we
+/// spawned rather than a stale snapshot from a previous run.
 pub(crate) fn snapshot_matches_process(snapshot: &HealthSnapshot, expected_pid: u32) -> bool {
     snapshot.pid == expected_pid
 }
 
+/// Checks whether the snapshot was written after the daemon was started.
+///
+/// Compares the snapshot's Unix timestamp against `started_at`, truncating
+/// `started_at` to whole seconds since snapshot timestamps lack sub-second
+/// precision. Without this truncation, a snapshot written in the same second
+/// as `started_at` would incorrectly appear stale due to nanosecond differences.
+///
+/// # Errors
+///
+/// Returns `InvalidSystemClock` if `started_at` is before the Unix epoch,
+/// indicating an invalid system clock configuration.
 pub(crate) fn snapshot_is_recent(
     snapshot: &HealthSnapshot,
     started_at: SystemTime,
 ) -> Result<bool, LifecycleError> {
-    // Truncate started_at to seconds since snapshot.timestamp has no sub-second
-    // precision. Without this, a snapshot written in the same second as started_at
-    // would be considered stale due to nanosecond differences.
     let started_secs = started_at
         .duration_since(UNIX_EPOCH)
         .map_err(|_| LifecycleError::InvalidSystemClock { time: started_at })?
