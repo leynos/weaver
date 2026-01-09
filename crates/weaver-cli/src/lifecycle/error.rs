@@ -82,6 +82,8 @@ pub enum LifecycleError {
         #[source]
         source: io::Error,
     },
+    #[error("invalid daemon pid {pid}: {reason}")]
+    InvalidPid { pid: u32, reason: &'static str },
     #[error("daemon shutdown did not complete within {timeout:?}; check {pid_path:?}")]
     ShutdownTimeout {
         pid_path: PathBuf,
