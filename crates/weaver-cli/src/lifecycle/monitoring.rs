@@ -233,17 +233,18 @@ pub(super) fn read_health(
     filename: &str,
     full_path: &Path,
 ) -> Result<Option<HealthSnapshot>, LifecycleError> {
-    let path = full_path.to_path_buf();
-    let parse_path = path.clone();
     read_and_parse(
         dir,
         filename,
-        |source| LifecycleError::ReadHealth { path, source },
+        |source| LifecycleError::ReadHealth {
+            path: full_path.to_path_buf(),
+            source,
+        },
         |content| {
             serde_json::from_str(content)
                 .map(Some)
                 .map_err(|source| LifecycleError::ParseHealth {
-                    path: parse_path,
+                    path: full_path.to_path_buf(),
                     source,
                 })
         },
@@ -272,12 +273,13 @@ pub(super) fn read_pid(
     filename: &str,
     full_path: &Path,
 ) -> Result<Option<u32>, LifecycleError> {
-    let path = full_path.to_path_buf();
-    let parse_path = path.clone();
     read_and_parse(
         dir,
         filename,
-        |source| LifecycleError::ReadPid { path, source },
+        |source| LifecycleError::ReadPid {
+            path: full_path.to_path_buf(),
+            source,
+        },
         |content| {
             let trimmed = content.trim();
             if trimmed.is_empty() {
@@ -287,7 +289,7 @@ pub(super) fn read_pid(
                 .parse::<u32>()
                 .map(Some)
                 .map_err(|source| LifecycleError::ParsePid {
-                    path: parse_path,
+                    path: full_path.to_path_buf(),
                     source,
                 })
         },
