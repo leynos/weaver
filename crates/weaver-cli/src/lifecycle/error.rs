@@ -102,4 +102,6 @@ pub enum LifecycleError {
     },
     #[error("system clock error: time {time:?} is before UNIX epoch")]
     InvalidSystemClock { time: SystemTime },
+    #[error("health path {path:?} has no valid filename")]
+    InvalidHealthPath { path: PathBuf },
 }

@@ -329,7 +329,8 @@ pub(crate) struct ProcessMonitorContext {
 /// # Errors
 ///
 /// Returns an error if the health file exists but cannot be read or parsed,
-/// or if the system clock is invalid.
+/// if the system clock is invalid, or if the health path has no valid UTF-8
+/// filename.
 pub(crate) fn check_health_snapshot(
     dir: &Dir,
     paths: &RuntimePaths,
@@ -339,7 +340,9 @@ pub(crate) fn check_health_snapshot(
         .health_path()
         .file_name()
         .and_then(|n| n.to_str())
-        .unwrap_or("weaverd.health");
+        .ok_or_else(|| LifecycleError::InvalidHealthPath {
+            path: paths.health_path().to_path_buf(),
+        })?;
     let Some(snapshot) = read_health(dir, health_filename, paths.health_path())? else {
         return Ok(HealthCheckOutcome::Continue);
     };
