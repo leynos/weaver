@@ -15,6 +15,11 @@ use weaver_config::RuntimePaths;
 use super::error::LifecycleError;
 use super::utils::open_runtime_dir;
 
+/// Filename for the daemon's PID file within the runtime directory.
+pub(super) const PID_FILENAME: &str = "weaverd.pid";
+/// Filename for the daemon's health snapshot within the runtime directory.
+pub(super) const HEALTH_FILENAME: &str = "weaverd.health";
+
 /// Interval between health snapshot checks during daemon startup polling.
 ///
 /// A 200ms interval balances responsiveness (detecting ready state quickly)
@@ -202,7 +207,10 @@ pub(super) fn wait_for_ready(
     }
     Err(LifecycleError::StartupTimeout {
         health_path: paths.health_path().to_path_buf(),
-        timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
+        timeout_ms: timeout
+            .as_millis()
+            .try_into()
+            .expect("timeout within u64 range"),
     })
 }
 
@@ -329,21 +337,13 @@ pub(crate) struct ProcessMonitorContext {
 /// # Errors
 ///
 /// Returns an error if the health file exists but cannot be read or parsed,
-/// if the system clock is invalid, or if the health path has no valid UTF-8
-/// filename.
+/// or if the system clock is invalid.
 pub(crate) fn check_health_snapshot(
     dir: &Dir,
     paths: &RuntimePaths,
     monitor: ProcessMonitorContext,
 ) -> Result<HealthCheckOutcome, LifecycleError> {
-    let health_filename = paths
-        .health_path()
-        .file_name()
-        .and_then(|n| n.to_str())
-        .ok_or_else(|| LifecycleError::InvalidHealthPath {
-            path: paths.health_path().to_path_buf(),
-        })?;
-    let Some(snapshot) = read_health(dir, health_filename, paths.health_path())? else {
+    let Some(snapshot) = read_health(dir, HEALTH_FILENAME, paths.health_path())? else {
         return Ok(HealthCheckOutcome::Continue);
     };
     let pid_ok = monitor.daemonized || snapshot_matches_process(&snapshot, monitor.expected_pid);

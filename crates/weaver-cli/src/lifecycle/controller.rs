@@ -5,19 +5,13 @@
 //! interacting with `weaverd`.
 
 use std::io::Write;
-
-/// Filename for the daemon's PID file within the runtime directory.
-const PID_FILENAME: &str = "weaverd.pid";
-/// Filename for the daemon's health snapshot within the runtime directory.
-const HEALTH_FILENAME: &str = "weaverd.health";
-
 use std::process::ExitCode;
 use std::time::SystemTime;
 
 use weaver_config::RuntimePaths;
 
 use super::error::LifecycleError;
-use super::monitoring::{read_health, read_pid, wait_for_ready};
+use super::monitoring::{HEALTH_FILENAME, PID_FILENAME, read_health, read_pid, wait_for_ready};
 use super::shutdown::{signal_daemon, wait_for_shutdown};
 use super::socket::{ensure_socket_available, socket_is_reachable};
 use super::spawning::spawn_daemon;
