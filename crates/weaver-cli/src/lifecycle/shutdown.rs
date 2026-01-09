@@ -21,6 +21,25 @@ const POLL_INTERVAL: Duration = Duration::from_millis(200);
 /// Waits for the daemon to shut down within the timeout period.
 ///
 /// Polls the PID file and socket until both indicate the daemon has stopped.
+/// The function succeeds when both conditions are met:
+/// - The PID file no longer exists
+/// - The socket is no longer reachable
+///
+/// # Arguments
+///
+/// * `paths` - Runtime paths containing the location of the PID file.
+/// * `endpoint` - Socket endpoint to check for daemon reachability.
+///
+/// # Returns
+///
+/// Returns `Ok(())` if the daemon shuts down within the timeout period.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - A socket probe fails with an I/O error (propagated from [`socket_is_reachable`])
+/// - The timeout of 10 seconds expires before both conditions are met
+///   (`ShutdownTimeout`)
 pub(super) fn wait_for_shutdown(
     paths: &RuntimePaths,
     endpoint: &SocketEndpoint,
@@ -41,6 +60,27 @@ pub(super) fn wait_for_shutdown(
 }
 
 /// Sends SIGTERM to the daemon process.
+///
+/// On Unix platforms, sends the SIGTERM signal to request graceful shutdown.
+/// The daemon is expected to handle this signal by completing in-flight work
+/// and cleaning up resources before exiting.
+///
+/// # Platform Support
+///
+/// - **Unix**: Uses `kill(2)` to send SIGTERM to the process.
+/// - **Non-Unix**: Returns `UnsupportedPlatform` error.
+///
+/// # Arguments
+///
+/// * `pid` - Process ID of the daemon to signal.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The platform does not support signalling (`UnsupportedPlatform`)
+/// - The signal cannot be delivered (`SignalFailed`), which may occur if:
+///   - The process does not exist (ESRCH)
+///   - Permission is denied (EPERM)
 pub(super) fn signal_daemon(pid: u32) -> Result<(), LifecycleError> {
     #[cfg(unix)]
     {
