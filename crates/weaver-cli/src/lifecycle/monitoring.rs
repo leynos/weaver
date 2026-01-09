@@ -15,6 +15,11 @@ use weaver_config::RuntimePaths;
 use super::error::LifecycleError;
 use super::utils::open_runtime_dir;
 
+/// Interval between health snapshot checks during daemon startup polling.
+///
+/// A 200ms interval balances responsiveness (detecting ready state quickly)
+/// against CPU usage and filesystem pressure. This is used by [`wait_for_ready`]
+/// to periodically check the daemon's health file.
 const POLL_INTERVAL: Duration = Duration::from_millis(200);
 
 /// Current operational state of the daemon.
@@ -92,9 +97,16 @@ fn read_optional_file(dir: &Dir, filename: &str) -> Result<Option<String>, io::E
 /// Reads and parses an optional runtime file with customisable error handling.
 ///
 /// Combines file reading with parsing, handling the common pattern of:
-/// 1. Read file (returning None if not found)
-/// 2. Map I/O errors using the provided constructor
-/// 3. Parse content using the provided parsing function
+/// 1. Read file (returning `Ok(None)` if not found)
+/// 2. Map I/O errors using the provided `read_error` constructor
+/// 3. Parse content using the provided `parse` function
+///
+/// # Parse Function Contract
+///
+/// The `parse` closure should return:
+/// - `Ok(Some(value))` when content is valid and successfully parsed
+/// - `Ok(None)` when content is empty or indicates absence (e.g., empty PID file)
+/// - `Err(...)` when content is malformed and cannot be parsed
 fn read_and_parse<T, R, P>(
     dir: &Dir,
     filename: &str,
@@ -270,14 +282,46 @@ pub(super) fn read_pid(
 }
 
 /// Context for monitoring daemon process startup.
+///
+/// Bundles the parameters needed to validate health snapshots during the
+/// startup polling loop, determining whether a snapshot is fresh and belongs
+/// to the daemon instance we spawned.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ProcessMonitorContext {
+    /// Timestamp when the daemon spawn was initiated, used to filter out
+    /// stale snapshots from previous runs.
     pub started_at: SystemTime,
+    /// PID of the spawned daemon process, used to verify snapshot ownership
+    /// unless `daemonized` is true.
     pub expected_pid: u32,
+    /// Whether the spawned process has exited cleanly (status 0), indicating
+    /// the daemon forked to a new PID. When true, PID matching is skipped
+    /// and only timestamp validation is performed.
     pub daemonized: bool,
 }
 
 /// Evaluates a health snapshot for readiness or failure conditions.
+///
+/// Reads the daemon's health file and determines the appropriate action based
+/// on the snapshot's validity and status.
+///
+/// # Arguments
+///
+/// * `dir` - Capability-based directory handle for the runtime directory.
+/// * `paths` - Runtime paths containing the health file location.
+/// * `monitor` - Context containing PID and timestamp for snapshot validation.
+///
+/// # Returns
+///
+/// * [`HealthCheckOutcome::Ready`] - Snapshot is valid and daemon reports ready.
+/// * [`HealthCheckOutcome::Aborted`] - Snapshot is valid but daemon is stopping.
+/// * [`HealthCheckOutcome::Continue`] - No valid snapshot yet (missing, stale,
+///   PID mismatch, or daemon still starting); polling should continue.
+///
+/// # Errors
+///
+/// Returns an error if the health file exists but cannot be read or parsed,
+/// or if the system clock is invalid.
 pub(crate) fn check_health_snapshot(
     dir: &Dir,
     paths: &RuntimePaths,
