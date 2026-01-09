@@ -17,6 +17,8 @@ mod monitoring;
 #[cfg(test)]
 mod monitoring_tests;
 mod shutdown;
+#[cfg(test)]
+mod shutdown_tests;
 mod socket;
 mod spawning;
 mod types;
