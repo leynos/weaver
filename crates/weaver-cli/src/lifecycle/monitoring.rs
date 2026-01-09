@@ -173,10 +173,12 @@ pub(super) fn wait_for_ready(
     while deadline.is_none_or(|d| Instant::now() < d) {
         // Check child status FIRST so we detect daemonization before checking
         // the health snapshot. Otherwise the PID mismatch causes a continue
-        // before we can update the daemonized flag.
-        if let Some(status) = child
-            .try_wait()
-            .map_err(|source| LifecycleError::MonitorChild { source })?
+        // before we can update the daemonized flag. Skip this check once
+        // daemonized is true since the child has already been reaped.
+        if !daemonized
+            && let Some(status) = child
+                .try_wait()
+                .map_err(|source| LifecycleError::MonitorChild { source })?
         {
             if !status.success() {
                 return Err(LifecycleError::StartupFailed {
@@ -225,7 +227,7 @@ pub(super) fn wait_for_ready(
 /// # Returns
 ///
 /// * `Ok(Some(snapshot))` - Health file exists and was parsed successfully.
-/// * `Ok(None)` - Health file does not exist (normal during startup).
+/// * `Ok(None)` - Health file does not exist or is empty (normal during startup).
 /// * `Err(ReadHealth)` - I/O error reading the file.
 /// * `Err(ParseHealth)` - File exists but contains invalid JSON.
 pub(super) fn read_health(
@@ -241,6 +243,9 @@ pub(super) fn read_health(
             source,
         },
         |content| {
+            if content.trim().is_empty() {
+                return Ok(None);
+            }
             serde_json::from_str(content)
                 .map(Some)
                 .map_err(|source| LifecycleError::ParseHealth {
