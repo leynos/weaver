@@ -156,13 +156,16 @@ pub(super) fn wait_for_ready(
     timeout: Duration,
 ) -> Result<HealthSnapshot, LifecycleError> {
     let dir = open_runtime_dir(paths)?;
-    let deadline = Instant::now() + timeout;
+    // Use checked_add to avoid panic on overflow. If overflow occurs (deadline
+    // would be beyond Instant's representable range), use None to indicate an
+    // effectively infinite deadline.
+    let deadline = Instant::now().checked_add(timeout);
     let expected_pid = child.id();
     // Track whether the spawned process has exited cleanly, indicating that
     // the daemon has daemonized to a new PID. Once daemonized, we skip the
     // PID check and rely solely on the timestamp to identify fresh snapshots.
     let mut daemonized = false;
-    while Instant::now() < deadline {
+    while deadline.is_none_or(|d| Instant::now() < d) {
         // Check child status FIRST so we detect daemonization before checking
         // the health snapshot. Otherwise the PID mismatch causes a continue
         // before we can update the daemonized flag.
@@ -190,11 +193,16 @@ pub(super) fn wait_for_ready(
             }
             HealthCheckOutcome::Continue => {}
         }
-        thread::sleep(POLL_INTERVAL);
+        // Cap sleep to remaining time to avoid exceeding the timeout by up to
+        // POLL_INTERVAL. When deadline is None (overflow), always use full interval.
+        let sleep_duration = deadline
+            .and_then(|d| d.checked_duration_since(Instant::now()))
+            .map_or(POLL_INTERVAL, |remaining| remaining.min(POLL_INTERVAL));
+        thread::sleep(sleep_duration);
     }
     Err(LifecycleError::StartupTimeout {
         health_path: paths.health_path().to_path_buf(),
-        timeout_ms: timeout.as_millis() as u64,
+        timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
     })
 }
 
