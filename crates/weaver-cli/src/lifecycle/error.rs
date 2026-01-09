@@ -100,8 +100,8 @@ pub enum LifecycleError {
         #[source]
         source: io::Error,
     },
-    #[error("system clock error: time {time:?} is before UNIX epoch")]
+    #[error(
+        "system clock error: time {time:?} is before UNIX epoch; daemon readiness cannot be validated"
+    )]
     InvalidSystemClock { time: SystemTime },
-    #[error("health path {path:?} has no valid filename")]
-    InvalidHealthPath { path: PathBuf },
 }
