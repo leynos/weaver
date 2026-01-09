@@ -60,9 +60,9 @@ fn snapshot_validation_requires_recent_timestamp() {
         timestamp: 10,
     };
     let start = UNIX_EPOCH + Duration::from_secs(20);
-    assert!(!snapshot_is_recent(&snapshot, start));
+    assert!(!snapshot_is_recent(&snapshot, start).expect("valid time"));
     let start = UNIX_EPOCH + Duration::from_secs(5);
-    assert!(snapshot_is_recent(&snapshot, start));
+    assert!(snapshot_is_recent(&snapshot, start).expect("valid time"));
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn snapshot_is_recent_ignores_subsecond_precision() {
         timestamp: 100,
     };
     let start = UNIX_EPOCH + Duration::from_secs(100) + Duration::from_nanos(500_000_000);
-    assert!(snapshot_is_recent(&snapshot, start));
+    assert!(snapshot_is_recent(&snapshot, start).expect("valid time"));
 }
 
 #[rstest]

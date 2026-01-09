@@ -288,7 +288,7 @@ pub(crate) fn check_health_snapshot(
         return Ok(HealthCheckOutcome::Continue);
     };
     let pid_ok = monitor.daemonized || snapshot_matches_process(&snapshot, monitor.expected_pid);
-    let recent = snapshot_is_recent(&snapshot, monitor.started_at);
+    let recent = snapshot_is_recent(&snapshot, monitor.started_at)?;
     if !pid_ok || !recent {
         return Ok(HealthCheckOutcome::Continue);
     }
@@ -305,13 +305,16 @@ pub(crate) fn snapshot_matches_process(snapshot: &HealthSnapshot, expected_pid: 
     snapshot.pid == expected_pid
 }
 
-pub(crate) fn snapshot_is_recent(snapshot: &HealthSnapshot, started_at: SystemTime) -> bool {
+pub(crate) fn snapshot_is_recent(
+    snapshot: &HealthSnapshot,
+    started_at: SystemTime,
+) -> Result<bool, LifecycleError> {
     // Truncate started_at to seconds since snapshot.timestamp has no sub-second
     // precision. Without this, a snapshot written in the same second as started_at
     // would be considered stale due to nanosecond differences.
     let started_secs = started_at
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    snapshot.timestamp >= started_secs
+        .map_err(|_| LifecycleError::InvalidSystemClock { time: started_at })?
+        .as_secs();
+    Ok(snapshot.timestamp >= started_secs)
 }

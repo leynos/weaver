@@ -3,6 +3,7 @@
 use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
+use std::time::SystemTime;
 
 use thiserror::Error;
 use weaver_config::{RuntimePathsError, SocketPreparationError};
@@ -99,4 +100,6 @@ pub enum LifecycleError {
         #[source]
         source: io::Error,
     },
+    #[error("system clock error: time {time:?} is before UNIX epoch")]
+    InvalidSystemClock { time: SystemTime },
 }
