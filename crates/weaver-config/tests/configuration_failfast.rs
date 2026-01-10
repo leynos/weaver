@@ -64,7 +64,7 @@ fn malformed_configs_return_aggregated_error() {
     let _env = EnvOverride::set_var("WEAVER_CONFIG_PATH", env_path.as_os_str());
 
     let args = vec![
-        OsString::from("weaver-cli"),
+        OsString::from("weaver"),
         OsString::from("--config-path"),
         cli_path.clone().into_os_string(),
     ];

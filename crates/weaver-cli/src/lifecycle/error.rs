@@ -1,6 +1,9 @@
+//! Error types for daemon lifecycle operations.
+
 use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
+use std::time::{Duration, SystemTime};
 
 use thiserror::Error;
 use weaver_config::{RuntimePathsError, SocketPreparationError};
@@ -33,10 +36,10 @@ pub enum LifecycleError {
     StartupFailed { exit_status: Option<i32> },
     #[error("daemon reported 'stopping' before reaching ready; check health snapshot at {path:?}")]
     StartupAborted { path: PathBuf },
-    #[error("timed out waiting for ready snapshot in {timeout_ms} ms at {health_path:?}")]
+    #[error("timed out waiting for ready snapshot in {timeout:?} at {health_path:?}")]
     StartupTimeout {
         health_path: PathBuf,
-        timeout_ms: u64,
+        timeout: Duration,
     },
     #[error("failed to monitor daemon launch: {source}")]
     MonitorChild {
@@ -79,8 +82,13 @@ pub enum LifecycleError {
         #[source]
         source: io::Error,
     },
-    #[error("daemon shutdown did not complete within {timeout_ms} ms; check {pid_path:?}")]
-    ShutdownTimeout { pid_path: PathBuf, timeout_ms: u64 },
+    #[error("invalid daemon pid {pid}: {reason}")]
+    InvalidPid { pid: u32, reason: &'static str },
+    #[error("daemon shutdown did not complete within {timeout:?}; check {pid_path:?}")]
+    ShutdownTimeout {
+        pid_path: PathBuf,
+        timeout: Duration,
+    },
     #[cfg(not(unix))]
     #[error("platform does not support daemon lifecycle signalling")]
     UnsupportedPlatform,
@@ -91,4 +99,14 @@ pub enum LifecycleError {
         #[from]
         source: SocketPreparationError,
     },
+    #[error("failed to open runtime directory {path:?}: {source}")]
+    OpenRuntimeDir {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
+    #[error(
+        "system clock error: time {time:?} is before UNIX epoch; daemon readiness cannot be validated"
+    )]
+    InvalidSystemClock { time: SystemTime },
 }

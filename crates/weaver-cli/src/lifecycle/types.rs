@@ -3,7 +3,7 @@
 //! Defines the payloads and IO wrappers shared across lifecycle commands so the
 //! controller can remain agnostic of concrete writers.
 
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::io::Write;
 
@@ -42,6 +42,11 @@ pub struct LifecycleInvocation {
 pub struct LifecycleContext<'a> {
     pub config: &'a Config,
     pub config_arguments: &'a [OsString],
+    /// Optional override for the daemon binary path, primarily for testing.
+    ///
+    /// When `None`, the daemon binary is resolved from the `WEAVERD_BIN`
+    /// environment variable or defaults to `"weaverd"`.
+    pub daemon_binary: Option<&'a OsStr>,
 }
 
 /// Output handle abstracting over stdout/stderr writers.

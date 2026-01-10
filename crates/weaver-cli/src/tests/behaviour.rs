@@ -68,6 +68,15 @@ fn given_daemon_with_empty_lines(world: &RefCell<TestWorld>) {
         .expect("failed to start daemon with empty lines");
 }
 
+#[given("auto-start will be triggered")]
+fn given_auto_start_triggered(world: &RefCell<TestWorld>) {
+    // Configures a socket endpoint on an unreachable port (127.0.0.1:1) so
+    // connection fails, triggering auto-start. Also sets the daemon binary to
+    // a non-existent path so spawn fails quickly, producing the "Waiting for
+    // daemon start..." message before erroring.
+    world.borrow_mut().configure_auto_start_failure();
+}
+
 #[when("the operator runs {command}")]
 fn when_operator_runs(world: &RefCell<TestWorld>, command: String) {
     world

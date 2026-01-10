@@ -58,3 +58,13 @@ Feature: Weaver CLI behaviour
     Then the lifecycle stub recorded "stop"
     And no daemon command was sent
     And the CLI exits with code 0
+
+  # Auto-start scenarios: When a domain command is issued and the daemon is not
+  # running, the CLI attempts to start it automatically.
+
+  Scenario: Auto-start shows waiting message before spawn failure
+    Given auto-start will be triggered
+    When the operator runs "observe get-definition --symbol main"
+    Then stderr contains "Waiting for daemon start..."
+    And stderr contains "failed to spawn"
+    And the CLI fails

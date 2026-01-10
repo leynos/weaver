@@ -429,7 +429,75 @@ Because lifecycle commands operate exclusively on shared filesystem artefacts
 they remain side-effect free with respect to the JSONL transport and can be
 used safely from automation tooling.
 
-#### 2.1.3. Human-readable output and code context blocks
+#### 2.1.3. Automatic daemon startup
+
+When a domain command is invoked and the daemon is not running, the CLI
+automatically attempts to start the daemon rather than failing immediately.
+This removes friction for operators who expect commands to "just work" without
+explicit daemon management. The CLI prints "Waiting for daemon start…" to
+stderr while waiting, and uses a 30-second timeout to allow sufficient time for
+daemon initialisation. If the daemon fails to start, the CLI reports the
+failure and exits; if it starts successfully, the original command proceeds.
+
+The following sequence diagram illustrates the auto-start flow within
+`execute_daemon_command()`:
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant WeaverCLI
+    participant Config
+    participant DaemonSocket
+    participant DaemonSpawner as DaemonSpawner_utils
+
+    User->>WeaverCLI: invoke domain command
+    WeaverCLI->>Config: load configuration
+    Config-->>WeaverCLI: Config
+    WeaverCLI->>DaemonSocket: connect(daemon_socket)
+    alt connection succeeds
+        DaemonSocket-->>WeaverCLI: Ok(connection)
+        WeaverCLI->>DaemonSocket: send CommandRequest
+        DaemonSocket-->>WeaverCLI: responses
+        WeaverCLI-->>User: exit code from daemon response
+    else error indicates daemon not running
+        DaemonSocket-->>WeaverCLI: Err(AppError::Connect)
+        WeaverCLI->>WeaverCLI: is_daemon_not_running(error) == true
+        WeaverCLI->>DaemonSpawner: try_auto_start_daemon(LifecycleContext, stderr)
+        DaemonSpawner->>DaemonSpawner: prepare_runtime(context)
+        DaemonSpawner->>DaemonSpawner: spawn_daemon(config_arguments)
+        DaemonSpawner->>DaemonSpawner: wait_for_ready(paths, child, started_at, AUTO_START_TIMEOUT)
+        DaemonSpawner-->>WeaverCLI: Ok(()) or LifecycleError
+        alt daemon started successfully
+            WeaverCLI->>DaemonSocket: connect(daemon_socket) retry
+            alt retry succeeds
+                DaemonSocket-->>WeaverCLI: Ok(connection)
+                WeaverCLI->>DaemonSocket: send CommandRequest
+                DaemonSocket-->>WeaverCLI: responses
+                WeaverCLI-->>User: exit code from daemon response
+            else retry fails
+                DaemonSocket-->>WeaverCLI: Err(retry_error)
+                WeaverCLI->>User: print retry_error to stderr
+                WeaverCLI-->>User: ExitCode::FAILURE
+            end
+        else auto start fails
+            DaemonSpawner-->>WeaverCLI: Err(start_error)
+            WeaverCLI->>User: print start_error to stderr
+            WeaverCLI-->>User: ExitCode::FAILURE
+        end
+    else other connection error
+        DaemonSocket-->>WeaverCLI: Err(other_error)
+        WeaverCLI->>User: print other_error to stderr
+        WeaverCLI-->>User: ExitCode::FAILURE
+    end
+```
+
+The error classification uses `is_daemon_not_running()` to distinguish
+recoverable connection failures (`ConnectionRefused`, `NotFound`,
+`AddrNotAvailable`) from other errors that should fail immediately. This
+ensures the CLI only attempts auto-start when the daemon genuinely isn't
+running, rather than masking configuration errors or network issues.
+
+#### 2.1.4. Human-readable output and code context blocks
 
 Weaver continues to treat JSONL as the canonical, machine-readable transport,
 but the CLI may emit human-readable output when the daemon streams plain text

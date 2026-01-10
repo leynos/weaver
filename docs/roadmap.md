@@ -50,6 +50,28 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
         refuse to start when sockets are bound, and emit recovery guidance for
         the operator.
 
+- [ ] Implement the socket listener in `weaverd` to accept client connections
+      on the configured Unix domain socket (or TCP socket on non-Unix
+      platforms).
+      - Acceptance criteria: Daemon binds to the socket path from configuration,
+        accepts concurrent connections, and gracefully handles connection errors
+        without crashing the daemon.
+
+- [ ] Implement the JSONL request dispatch loop in `weaverd` that reads
+      `CommandRequest` messages from connected clients, routes them to the
+      appropriate domain handler, and streams `CommandResponse` messages back.
+      - Acceptance criteria: Request parsing rejects malformed JSONL with
+        structured errors, domain routing covers `observe` and `act` commands,
+        and responses include the terminal `exit` message with appropriate
+        status codes.
+
+- [ ] Wire end-to-end domain command execution from CLI through daemon to
+      backend, starting with `observe get-definition` as the first complete
+      path.
+      - Acceptance criteria: `weaver observe get-definition` with a running
+        daemon returns LSP definition results, errors propagate with structured
+        messages, and the CLI exits with the daemon-provided status code.
+
 - [x] Build the `weaver-lsp-host` crate with support for initialization,
     capability detection, and core LSP features (definition, references,
     diagnostics) for Rust, Python, and TypeScript.

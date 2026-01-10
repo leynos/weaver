@@ -11,10 +11,13 @@ use std::time::SystemTime;
 use weaver_config::RuntimePaths;
 
 use super::error::LifecycleError;
+use super::monitoring::{HEALTH_FILENAME, PID_FILENAME, read_health, read_pid, wait_for_ready};
+use super::shutdown::{signal_daemon, wait_for_shutdown};
+use super::socket::{ensure_socket_available, socket_is_reachable};
+use super::spawning::spawn_daemon;
 use super::types::{LifecycleCommand, LifecycleContext, LifecycleInvocation, LifecycleOutput};
 use super::utils::{
-    ensure_no_extra_arguments, ensure_socket_available, prepare_runtime, read_health, read_pid,
-    signal_daemon, socket_is_reachable, spawn_daemon, wait_for_ready, wait_for_shutdown,
+    STARTUP_TIMEOUT, ensure_no_extra_arguments, open_runtime_dir, prepare_runtime,
     write_startup_banner,
 };
 
@@ -45,9 +48,9 @@ impl SystemLifecycle {
         ensure_no_extra_arguments(invocation)?;
         ensure_socket_available(context.config.daemon_socket())?;
         let paths = prepare_runtime(context)?;
-        let mut child = spawn_daemon(context.config_arguments)?;
+        let mut child = spawn_daemon(context.config_arguments, context.daemon_binary)?;
         let started_at = SystemTime::now();
-        let snapshot = wait_for_ready(&paths, &mut child, started_at)?;
+        let snapshot = wait_for_ready(&paths, &mut child, started_at, STARTUP_TIMEOUT)?;
         write_startup_banner(output, context, &snapshot, &paths)?;
         Ok(ExitCode::SUCCESS)
     }
@@ -60,7 +63,8 @@ impl SystemLifecycle {
     ) -> Result<ExitCode, LifecycleError> {
         ensure_no_extra_arguments(invocation)?;
         let paths = prepare_runtime(context)?;
-        let pid = read_pid(paths.pid_path())?;
+        let dir = open_runtime_dir(&paths)?;
+        let pid = read_pid(&dir, PID_FILENAME, paths.pid_path())?;
         let Some(pid) = pid else {
             if socket_is_reachable(context.config.daemon_socket())? {
                 return Err(LifecycleError::MissingPidWithSocket {
@@ -106,7 +110,8 @@ impl SystemLifecycle {
             ))?;
             return Ok(ExitCode::SUCCESS);
         }
-        let snapshot = read_health(paths.health_path())?;
+        let dir = open_runtime_dir(&paths)?;
+        let snapshot = read_health(&dir, HEALTH_FILENAME, paths.health_path())?;
         if let Some(snapshot) = snapshot {
             output.stdout_line(format_args!(
                 "daemon status: {} (pid {}) via {}",
@@ -117,7 +122,7 @@ impl SystemLifecycle {
             return Ok(ExitCode::SUCCESS);
         }
         let reachable = socket_is_reachable(context.config.daemon_socket())?;
-        let pid = read_pid(paths.pid_path())?;
+        let pid = read_pid(&dir, PID_FILENAME, paths.pid_path())?;
         match pid {
             Some(pid) => {
                 output.stdout_line(format_args!(

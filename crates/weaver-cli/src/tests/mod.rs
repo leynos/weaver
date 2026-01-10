@@ -2,5 +2,5 @@
 //! supporting harness utilities such as fake daemons.
 
 mod behaviour;
-mod support;
+pub(crate) mod support;
 mod unit;
