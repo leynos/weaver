@@ -1,6 +1,6 @@
 //! Connection handling abstractions for the daemon listener.
 
-use std::io::{self, Read, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
 
 use tracing::warn;
@@ -56,22 +56,67 @@ pub(crate) trait ConnectionHandler: Send + Sync + 'static {
 pub(crate) struct NoopConnectionHandler;
 
 impl ConnectionHandler for NoopConnectionHandler {
-    fn handle(&self, mut stream: ConnectionStream) {
-        let mut buffer = [0_u8; 1024];
-        loop {
-            match stream.read(&mut buffer) {
-                Ok(0) => break,
-                Ok(_) => {}
-                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
-                Err(error) => {
-                    warn!(
-                        target: LISTENER_TARGET,
-                        error = %error,
-                        "connection handler error"
-                    );
-                    break;
-                }
+    fn handle(&self, stream: ConnectionStream) {
+        let mut reader = BufReader::new(stream);
+        let mut line = String::new();
+        match reader.read_line(&mut line) {
+            Ok(0) => return,
+            Ok(_) => {}
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => return,
+            Err(error) => {
+                warn!(
+                    target: LISTENER_TARGET,
+                    error = %error,
+                    "connection handler error"
+                );
+                return;
             }
         }
+
+        let mut stream = reader.into_inner();
+        if let Err(error) = stream.write_all(b"{\"kind\":\"exit\",\"status\":0}\n") {
+            warn!(
+                target: LISTENER_TARGET,
+                error = %error,
+                "connection handler error"
+            );
+            return;
+        }
+        if let Err(error) = stream.flush() {
+            warn!(
+                target: LISTENER_TARGET,
+                error = %error,
+                "connection handler error"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::{TcpListener, TcpStream};
+    use std::thread;
+
+    #[test]
+    fn noop_handler_returns_exit_message() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind listener");
+        let addr = listener.local_addr().expect("listener address");
+        let server = thread::spawn(move || {
+            let (stream, _) = listener.accept().expect("accept connection");
+            NoopConnectionHandler.handle(ConnectionStream::Tcp(stream));
+        });
+
+        let mut client = TcpStream::connect(addr).expect("connect client");
+        client
+            .write_all(b"{\"command\":{\"domain\":\"observe\",\"operation\":\"noop\"}}\n")
+            .expect("write request");
+
+        let mut response = String::new();
+        let mut reader = BufReader::new(&mut client);
+        reader.read_line(&mut response).expect("read response");
+        assert!(response.contains("\"kind\":\"exit\""));
+
+        server.join().expect("join server");
     }
 }
