@@ -115,9 +115,9 @@ where
     let pid = std::process::id();
     guard.write_pid(pid)?;
     guard.write_health(HealthState::Starting)?;
+    let listener = SocketListener::bind(config.daemon_socket())?;
     let static_loader = StaticConfigLoader::new(config.clone());
     let daemon = bootstrap_with(&static_loader, reporter, provider)?;
-    let listener = SocketListener::bind(config.daemon_socket())?;
     let handler = Arc::new(NoopConnectionHandler);
     let listener_handle = listener.start(handler)?;
     guard.write_health(HealthState::Ready)?;

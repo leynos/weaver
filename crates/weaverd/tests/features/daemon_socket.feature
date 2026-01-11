@@ -3,7 +3,7 @@ Feature: Daemon socket listener
   Scenario: Accepting a TCP connection
     Given a TCP socket listener is running
     When a client connects
-    Then the listener records 1 connections
+    Then the listener records 1 connection
 
   Scenario: Accepting concurrent TCP connections
     Given a TCP socket listener is running

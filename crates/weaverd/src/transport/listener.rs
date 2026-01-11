@@ -1,10 +1,12 @@
 //! Listener implementation for daemon transport sockets.
 
 use std::io;
-use std::net::{SocketAddr, TcpListener, ToSocketAddrs};
+#[cfg(test)]
+use std::net::SocketAddr;
+use std::net::{TcpListener, ToSocketAddrs};
 use std::sync::{
     Arc,
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use std::thread;
 use std::time::Duration;
@@ -26,6 +28,7 @@ use std::path::Path;
 
 const ACCEPT_BACKOFF: Duration = Duration::from_millis(25);
 const ERROR_BACKOFF: Duration = Duration::from_millis(150);
+const MAX_HANDLER_THREADS: usize = 128;
 
 /// Listener that binds to a socket endpoint.
 #[derive(Debug)]
@@ -103,6 +106,13 @@ impl SocketListener {
     }
 }
 
+impl Drop for SocketListener {
+    fn drop(&mut self) {
+        #[cfg(unix)]
+        cleanup_unix_socket(&self.endpoint);
+    }
+}
+
 /// Handle to the background listener thread.
 pub(crate) struct ListenerHandle {
     shutdown: Arc<AtomicBool>,
@@ -129,6 +139,62 @@ impl ListenerHandle {
 impl Drop for ListenerHandle {
     fn drop(&mut self) {
         self.shutdown.store(true, Ordering::SeqCst);
+        if let Some(handle) = self.handle.take()
+            && handle.join().is_err()
+        {
+            warn!(
+                target: LISTENER_TARGET,
+                "listener thread panicked during drop"
+            );
+        }
+    }
+}
+
+struct HandlerLimiter {
+    active: Arc<AtomicUsize>,
+    max: usize,
+}
+
+impl HandlerLimiter {
+    fn new(max: usize) -> Self {
+        Self {
+            active: Arc::new(AtomicUsize::new(0)),
+            max,
+        }
+    }
+
+    fn try_acquire(&self) -> Option<HandlerPermit> {
+        let mut current = self.active.load(Ordering::SeqCst);
+        loop {
+            if current >= self.max {
+                return None;
+            }
+            match self.active.compare_exchange(
+                current,
+                current + 1,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => return Some(HandlerPermit::new(Arc::clone(&self.active))),
+                Err(next) => current = next,
+            }
+        }
+    }
+}
+
+struct HandlerPermit {
+    active: Arc<AtomicUsize>,
+}
+
+impl HandlerPermit {
+    fn new(active: Arc<AtomicUsize>) -> Self {
+        Self { active }
+    }
+}
+
+impl Drop for HandlerPermit {
+    fn drop(&mut self) {
+        self.active.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
@@ -143,33 +209,55 @@ fn run_accept_loop(
         "socket listener active"
     );
     let mut last_error = None::<io::ErrorKind>;
+    let limiter = HandlerLimiter::new(MAX_HANDLER_THREADS);
     while !shutdown.load(Ordering::SeqCst) {
-        match accept_connection(listener) {
-            Ok(Some(stream)) => {
-                last_error = None;
-                let handler = Arc::clone(&handler);
-                thread::spawn(move || handler.handle(stream));
-            }
-            Ok(None) => {
-                thread::sleep(ACCEPT_BACKOFF);
-            }
-            Err(error) => {
-                let kind = error.kind();
-                if last_error != Some(kind) {
-                    warn!(
-                        target: LISTENER_TARGET,
-                        error = %error,
-                        "socket accept error"
-                    );
-                }
-                last_error = Some(kind);
-                thread::sleep(ERROR_BACKOFF);
-            }
+        if let Some(delay) = handle_accept_cycle(listener, &handler, &limiter, &mut last_error) {
+            thread::sleep(delay);
         }
     }
 
     #[cfg(unix)]
     cleanup_unix_socket(&listener.endpoint);
+}
+
+fn handle_accept_cycle(
+    listener: &mut SocketListener,
+    handler: &Arc<dyn ConnectionHandler>,
+    limiter: &HandlerLimiter,
+    last_error: &mut Option<io::ErrorKind>,
+) -> Option<Duration> {
+    match accept_connection(listener) {
+        Ok(Some(stream)) => {
+            *last_error = None;
+            if let Some(permit) = limiter.try_acquire() {
+                let handler = Arc::clone(handler);
+                thread::spawn(move || {
+                    let _permit = permit;
+                    handler.handle(stream);
+                });
+            } else {
+                warn!(
+                    target: LISTENER_TARGET,
+                    max_threads = limiter.max,
+                    "listener at capacity, dropping connection"
+                );
+            }
+            None
+        }
+        Ok(None) => Some(ACCEPT_BACKOFF),
+        Err(error) => {
+            let kind = error.kind();
+            if *last_error != Some(kind) {
+                warn!(
+                    target: LISTENER_TARGET,
+                    error = %error,
+                    "socket accept error"
+                );
+            }
+            *last_error = Some(kind);
+            Some(ERROR_BACKOFF)
+        }
+    }
 }
 
 fn accept_connection(listener: &mut SocketListener) -> Result<Option<ConnectionStream>, io::Error> {
@@ -202,12 +290,10 @@ fn bind_tcp(host: &str, port: u16) -> Result<TcpListener, ListenerError> {
             port,
             source,
         })?;
-    let addr = addrs
-        .find(|addr| matches!(addr, SocketAddr::V4(_) | SocketAddr::V6(_)))
-        .ok_or_else(|| ListenerError::ResolveEmpty {
-            host: host.to_string(),
-            port,
-        })?;
+    let addr = addrs.next().ok_or_else(|| ListenerError::ResolveEmpty {
+        host: host.to_string(),
+        port,
+    })?;
     TcpListener::bind(addr).map_err(|source| ListenerError::BindTcp { addr, source })
 }
 
@@ -268,93 +354,5 @@ fn cleanup_unix_socket(endpoint: &SocketEndpoint) {
             path = %path,
             "failed to remove unix socket file"
         );
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::super::NoopConnectionHandler;
-    use super::*;
-    use std::net::TcpStream;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::time::Instant;
-
-    struct CountingHandler {
-        count: Arc<AtomicUsize>,
-    }
-
-    impl ConnectionHandler for CountingHandler {
-        fn handle(&self, _stream: ConnectionStream) {
-            self.count.fetch_add(1, Ordering::SeqCst);
-        }
-    }
-
-    fn wait_for_count(count: &AtomicUsize, expected: usize) -> bool {
-        let deadline = Instant::now() + Duration::from_secs(2);
-        while Instant::now() < deadline {
-            if count.load(Ordering::SeqCst) >= expected {
-                return true;
-            }
-            thread::sleep(Duration::from_millis(10));
-        }
-        false
-    }
-
-    #[test]
-    fn tcp_listener_accepts_connections() {
-        let endpoint = SocketEndpoint::tcp("127.0.0.1", 0);
-        let listener = SocketListener::bind(&endpoint).expect("bind tcp listener");
-        let addr = listener
-            .local_addr()
-            .expect("listener should report local address");
-        let count = Arc::new(AtomicUsize::new(0));
-        let handler = Arc::new(CountingHandler {
-            count: Arc::clone(&count),
-        });
-        let handle = listener.start(handler).expect("start listener");
-
-        TcpStream::connect(addr).expect("connect first client");
-        TcpStream::connect(addr).expect("connect second client");
-
-        assert!(wait_for_count(&count, 2), "expected two connections");
-        handle.shutdown();
-        handle.join().expect("join listener");
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn unix_listener_cleans_stale_socket_files() {
-        let dir = tempfile::tempdir().expect("temp dir");
-        let path = dir.path().join("weaverd.sock");
-        {
-            let _stale = UnixListener::bind(&path).expect("bind stale listener");
-        }
-        assert!(path.exists(), "stale socket should remain");
-
-        let endpoint = SocketEndpoint::unix(path.to_str().expect("utf8 path").to_string());
-        let listener = SocketListener::bind(&endpoint).expect("bind new listener");
-        let handler = Arc::new(NoopConnectionHandler);
-        let handle = listener.start(handler).expect("start listener");
-
-        UnixStream::connect(&path).expect("connect unix client");
-
-        handle.shutdown();
-        handle.join().expect("join listener");
-        assert!(
-            !path.exists(),
-            "listener should remove unix socket on shutdown"
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn unix_listener_rejects_in_use_socket() {
-        let dir = tempfile::tempdir().expect("temp dir");
-        let path = dir.path().join("weaverd.sock");
-        let _existing = UnixListener::bind(&path).expect("bind existing listener");
-
-        let endpoint = SocketEndpoint::unix(path.to_str().expect("utf8 path").to_string());
-        let error = SocketListener::bind(&endpoint).expect_err("should fail bind");
-        assert!(matches!(error, ListenerError::UnixInUse { .. }));
     }
 }

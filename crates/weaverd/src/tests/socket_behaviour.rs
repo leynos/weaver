@@ -13,7 +13,7 @@ use rstest_bdd_macros::{given, scenario, then, when};
 
 use weaver_config::SocketEndpoint;
 
-use crate::transport::{ConnectionHandler, ConnectionStream, ListenerHandle, SocketListener};
+use crate::transport::{CountingHandler, ListenerHandle, SocketListener};
 
 struct ListenerWorld {
     endpoint: SocketEndpoint,
@@ -37,9 +37,8 @@ impl ListenerWorld {
     }
 
     fn start_listener(&mut self) {
-        let handler = Arc::new(CountingHandler {
-            count: Arc::clone(&self.accepted),
-        });
+        let (count, handler) = CountingHandler::new();
+        self.accepted = Arc::clone(&count);
         match SocketListener::bind(&self.endpoint) {
             Ok(listener) => {
                 self.address = listener.local_addr();
@@ -94,16 +93,6 @@ impl Drop for ListenerWorld {
     }
 }
 
-struct CountingHandler {
-    count: Arc<AtomicUsize>,
-}
-
-impl ConnectionHandler for CountingHandler {
-    fn handle(&self, _stream: ConnectionStream) {
-        self.count.fetch_add(1, Ordering::SeqCst);
-    }
-}
-
 #[fixture]
 fn world() -> RefCell<ListenerWorld> {
     RefCell::new(ListenerWorld::new())
@@ -140,7 +129,16 @@ fn when_listener_starts_same_socket(world: &RefCell<ListenerWorld>) {
 }
 
 #[then("the listener records {count} connections")]
-fn then_listener_records(world: &RefCell<ListenerWorld>, count: usize) {
+fn then_listener_records_plural(world: &RefCell<ListenerWorld>, count: usize) {
+    assert_listener_records(world, count);
+}
+
+#[then("the listener records {count} connection")]
+fn then_listener_records_singular(world: &RefCell<ListenerWorld>, count: usize) {
+    assert_listener_records(world, count);
+}
+
+fn assert_listener_records(world: &RefCell<ListenerWorld>, count: usize) {
     assert!(
         world.borrow().wait_for_connections(count),
         "expected {count} connections, got {}",

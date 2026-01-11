@@ -1,8 +1,9 @@
 # Implement the weaverd socket listener (Phase 1)
 
-This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
-`Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+This execution plan (ExecPlan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+proceeds.
 
 Status: COMPLETE
 
@@ -11,13 +12,13 @@ its own.
 
 ## Purpose / Big Picture
 
-We need the daemon to accept client connections over the configured transport
-so the CLI can connect reliably and the rest of the JSONL protocol can be
-layered on top in the next roadmap step. Success is observable when the daemon
-binds to the socket declared in configuration, accepts multiple concurrent
-connections without crashing, and keeps running even when individual
-connections fail. Unit tests and behavioural tests must cover success and
-failure paths using `rstest-bdd` v0.3.2.
+The daemon must accept client connections over the configured transport so the
+command-line interface (CLI) can connect reliably and the rest of the JSON
+Lines (JSONL) protocol can be layered on top in the next roadmap step. Success
+is observable when the daemon binds to the socket declared in configuration,
+accepts multiple concurrent connections without crashing, and keeps running
+even when individual connections fail. Unit tests and behavioural tests must
+cover success and failure paths using `rstest-bdd` v0.3.2.
 
 ## Constraints
 
@@ -103,11 +104,11 @@ failure paths using `rstest-bdd` v0.3.2.
 
 The daemon now binds a socket listener during startup, accepts concurrent
 connections via a non-blocking accept loop, and cleans up Unix socket files on
-shutdown. Unit and BDD coverage validate success, concurrency, and failure
-paths. A small test guard was added for root environments to keep shutdown
-probe behaviour deterministic. The rollout preserved existing configuration and
-CLI interfaces while ensuring `make check-fmt`, `make lint`, and `make test`
-pass.
+shutdown. Unit and behaviour-driven development (BDD) coverage validate
+success, concurrency, and failure paths. A small test guard was added for root
+environments to keep shutdown probe behaviour deterministic. The rollout
+preserved existing configuration and CLI behaviour while ensuring
+`make check-fmt`, `make lint`, and `make test` pass.
 
 ## Context and Orientation
 
@@ -171,7 +172,7 @@ are safe to re-run.
 1. Inventory socket-related code and daemon launch flow.
 
    rg -n "daemon_socket|SocketEndpoint|listener|accept" crates/weaverd rg -n
-   "connect\(" crates/weaver-cli/src/transport.rs rg -n "socket"
+   "connect\\(" crates/weaver-cli/src/transport.rs rg -n "socket"
    docs/users-guide.md docs/weaver-design.md
 
 2. If the workspace still pins `rstest-bdd` to 0.2.x, update the workspace
