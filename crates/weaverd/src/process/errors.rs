@@ -13,6 +13,7 @@ use ortho_config::OrthoError;
 use weaver_config::{RuntimePathsError, SocketPreparationError};
 
 use crate::bootstrap::BootstrapError;
+use crate::transport::ListenerError;
 
 use super::daemonizer::DaemonizeError;
 use super::shutdown::ShutdownError;
@@ -145,6 +146,13 @@ pub enum LaunchError {
         #[source]
         source: BootstrapError,
     },
+    /// Socket listener startup failed.
+    #[error("daemon socket listener failed: {source}")]
+    Listener {
+        /// Underlying listener error.
+        #[source]
+        source: ListenerError,
+    },
 }
 
 impl From<Arc<OrthoError>> for LaunchError {
@@ -185,5 +193,11 @@ impl From<ShutdownError> for LaunchError {
 impl From<BootstrapError> for LaunchError {
     fn from(source: BootstrapError) -> Self {
         Self::Bootstrap { source }
+    }
+}
+
+impl From<ListenerError> for LaunchError {
+    fn from(source: ListenerError) -> Self {
+        Self::Listener { source }
     }
 }

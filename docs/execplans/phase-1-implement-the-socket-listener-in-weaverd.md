@@ -4,7 +4,7 @@ This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
 `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 No `PLANS.md` file exists in the repository root, so this document stands on
 its own.
@@ -51,57 +51,75 @@ failure paths using `rstest-bdd` v0.3.2.
 ## Risks
 
 - Risk: Unix socket files can linger and cause bind failures after crashes.
-  Severity: medium. Likelihood: medium.
-  Mitigation: attempt safe cleanup of stale socket paths when no listener is
-  active and log when cleanup is skipped.
+  Severity: medium. Likelihood: medium. Mitigation: attempt safe cleanup of
+  stale socket paths when no listener is active and log when cleanup is skipped.
 - Risk: Non-blocking accept loops can spin if errors are not throttled.
-  Severity: medium. Likelihood: medium.
-  Mitigation: add bounded sleep/backoff on repeated accept errors.
+  Severity: medium. Likelihood: medium. Mitigation: add bounded sleep/backoff
+  on repeated accept errors.
 - Risk: Updating `rstest-bdd` to 0.3.2 could break existing scenarios across
-  crates. Severity: high. Likelihood: medium.
-  Mitigation: update the workspace dependency first, run the full suite, and
-  adjust any failing scenarios before implementing new steps.
+  crates. Severity: high. Likelihood: medium. Mitigation: update the workspace
+  dependency first, run the full suite, and adjust any failing scenarios before
+  implementing new steps.
 
 ## Progress
 
 - [x] 2026-01-10 Drafted ExecPlan for the daemon socket listener.
-- [ ] Inventory current daemon launch flow and socket-related helpers.
-- [ ] Update workspace `rstest-bdd` dependencies to 0.3.2 (if not already) and
-      confirm existing tests still compile.
-- [ ] Add a socket listener module with a testable connection handler.
-- [ ] Integrate the listener into `run_daemon_with` and graceful shutdown.
-- [ ] Add unit tests for binding, cleanup, and error handling.
-- [ ] Add `rstest-bdd` scenarios covering happy/unhappy connection paths.
-- [ ] Update `docs/weaver-design.md` and `docs/users-guide.md` with design and
-      behaviour notes.
-- [ ] Mark the Phase 1 socket listener roadmap entry as done.
-- [ ] Run `make check-fmt`, `make lint`, and `make test` successfully.
+- [x] 2026-01-10 Inventory current daemon launch flow and socket-related
+      helpers.
+- [x] 2026-01-10 Update workspace `rstest-bdd` dependencies to 0.3.2.
+- [x] 2026-01-10 Add a socket listener module with a testable connection
+      handler.
+- [x] 2026-01-10 Integrate the listener into `run_daemon_with` and graceful
+      shutdown.
+- [x] 2026-01-10 Add unit tests for binding, cleanup, and error handling.
+- [x] 2026-01-10 Add `rstest-bdd` scenarios covering happy/unhappy connection
+      paths.
+- [x] 2026-01-10 Update `docs/weaver-design.md` and `docs/users-guide.md` with
+      design and behaviour notes.
+- [x] 2026-01-10 Mark the Phase 1 socket listener roadmap entry as done.
+- [x] 2026-01-10 Run `make check-fmt`, `make lint`, and `make test`
+      successfully.
 
 ## Surprises & Discoveries
 
-- None yet.
+- Observation: The shutdown probe test in `weaver-cli` assumes EACCES from a
+  restricted directory, which does not trigger when running as root. Evidence:
+  `wait_for_shutdown_propagates_socket_probe_errors` timed out until guarded
+  for root execution. Impact: Added a root skip to keep the test deterministic
+  across environments.
 
 ## Decision Log
 
-- Decision: Pending — record the listener concurrency and cleanup strategy
-  once the implementation approach is finalised.
-  Date/Author: 2026-01-10 / plan author.
+- Decision: Use a non-blocking accept loop with lightweight per-connection
+  handler threads and bounded backoff on repeated accept errors. Rationale:
+  provides concurrent connections without requiring an async runtime and avoids
+  busy loops on transient failures. Date/Author: 2026-01-10 / plan author.
+- Decision: Remove Unix socket files only after confirming no listener responds
+  and clean up the socket file on shutdown. Rationale: avoids removing active
+  sockets while still recovering from stale files after crashes. Date/Author:
+  2026-01-10 / plan author.
 
 ## Outcomes & Retrospective
 
-Not started yet.
+The daemon now binds a socket listener during startup, accepts concurrent
+connections via a non-blocking accept loop, and cleans up Unix socket files on
+shutdown. Unit and BDD coverage validate success, concurrency, and failure
+paths. A small test guard was added for root environments to keep shutdown
+probe behaviour deterministic. The rollout preserved existing configuration and
+CLI interfaces while ensuring `make check-fmt`, `make lint`, and `make test`
+pass.
 
 ## Context and Orientation
 
 `weaverd` currently boots, prepares runtime files, and then blocks on the
 shutdown signal without binding any socket. The daemon launch flow is in
 `crates/weaverd/src/process/launch.rs`, which loads configuration, prepares
-socket directories, acquires the process lock, and then calls
-`bootstrap_with`. The transport contract lives in
-`crates/weaver-config/src/socket.rs` via `SocketEndpoint`, which distinguishes
-Unix domain sockets (filesystem paths) from TCP sockets (host/port). The CLI
-connects using `crates/weaver-cli/src/transport.rs` and expects the daemon to
-accept either Unix or TCP connections.
+socket directories, acquires the process lock, and then calls `bootstrap_with`.
+The transport contract lives in `crates/weaver-config/src/socket.rs` via
+`SocketEndpoint`, which distinguishes Unix domain sockets (filesystem paths)
+from TCP sockets (host/port). The CLI connects using
+`crates/weaver-cli/src/transport.rs` and expects the daemon to accept either
+Unix or TCP connections.
 
 A Unix domain socket is a local, filesystem-backed socket used for
 inter-process communication on Unix-like systems. TCP sockets are network
@@ -152,9 +170,9 @@ are safe to re-run.
 
 1. Inventory socket-related code and daemon launch flow.
 
-   rg -n "daemon_socket|SocketEndpoint|listener|accept" crates/weaverd
-   rg -n "connect\(" crates/weaver-cli/src/transport.rs
-   rg -n "socket" docs/users-guide.md docs/weaver-design.md
+   rg -n "daemon_socket|SocketEndpoint|listener|accept" crates/weaverd rg -n
+   "connect\(" crates/weaver-cli/src/transport.rs rg -n "socket"
+   docs/users-guide.md docs/weaver-design.md
 
 2. If the workspace still pins `rstest-bdd` to 0.2.x, update the workspace
    dependencies in `Cargo.toml` to 0.3.2 and adjust any tests that fail to
@@ -193,18 +211,16 @@ are safe to re-run.
 
 8. Format and validate documentation if any docs changed:
 
-   set -o pipefail
-   make fmt 2>&1 | tee /tmp/weaver-fmt.log
-   make markdownlint 2>&1 | tee /tmp/weaver-markdownlint.log
+   set -o pipefail make fmt 2>&1 | tee /tmp/weaver-fmt.log make markdownlint
+   2>&1 | tee /tmp/weaver-markdownlint.log
 
    Run `make nixie` only if a Mermaid diagram was edited.
 
 9. Run the Rust quality gates:
 
-   set -o pipefail
-   make check-fmt 2>&1 | tee /tmp/weaver-check-fmt.log
-   make lint 2>&1 | tee /tmp/weaver-lint.log
-   make test 2>&1 | tee /tmp/weaver-test.log
+   set -o pipefail make check-fmt 2>&1 | tee /tmp/weaver-check-fmt.log make
+   lint 2>&1 | tee /tmp/weaver-lint.log make test 2>&1 | tee
+   /tmp/weaver-test.log
 
 ## Validation and Acceptance
 
