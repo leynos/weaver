@@ -50,7 +50,7 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
         refuse to start when sockets are bound, and emit recovery guidance for
         the operator.
 
-- [ ] Implement the socket listener in `weaverd` to accept client connections
+- [x] Implement the socket listener in `weaverd` to accept client connections
       on the configured Unix domain socket (or TCP socket on non-Unix
       platforms).
       - Acceptance criteria: Daemon binds to the socket path from configuration,

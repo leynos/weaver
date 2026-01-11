@@ -37,6 +37,7 @@ mod placeholder_provider;
 mod process;
 pub mod safety_harness;
 mod telemetry;
+mod transport;
 
 pub use backends::{
     BackendKind, BackendKindParseError, BackendProvider, BackendStartupError, FusionBackends,
