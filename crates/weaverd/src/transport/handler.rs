@@ -95,26 +95,49 @@ fn read_request_line(stream: &mut ConnectionStream) -> io::Result<Option<Vec<u8>
     let mut buffer = Vec::new();
     let mut chunk = [0_u8; 1024];
     loop {
-        let read = match stream.read(&mut chunk) {
-            Ok(read) => read,
-            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
-            Err(error) => return Err(error),
-        };
-        if read == 0 {
-            return Ok(if buffer.is_empty() {
-                None
-            } else {
-                Some(buffer)
-            });
+        let bytes_read = read_chunk_with_retry(stream, &mut chunk)?;
+
+        if let Some(result) = handle_end_of_stream(bytes_read, &buffer)? {
+            return Ok(result);
         }
-        if let Some(pos) = chunk[..read].iter().position(|byte| *byte == b'\n') {
-            buffer.extend_from_slice(&chunk[..=pos]);
-            enforce_request_limit(buffer.len())?;
-            return Ok(Some(buffer));
+
+        if let Some(line) = extract_line_if_complete(&chunk[..bytes_read], &mut buffer)? {
+            return Ok(Some(line));
         }
-        buffer.extend_from_slice(&chunk[..read]);
+
+        buffer.extend_from_slice(&chunk[..bytes_read]);
         enforce_request_limit(buffer.len())?;
     }
+}
+
+fn read_chunk_with_retry(stream: &mut ConnectionStream, chunk: &mut [u8]) -> io::Result<usize> {
+    loop {
+        match stream.read(chunk) {
+            Ok(read) => return Ok(read),
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+fn handle_end_of_stream(bytes_read: usize, buffer: &[u8]) -> io::Result<Option<Option<Vec<u8>>>> {
+    if bytes_read == 0 {
+        return Ok(Some(if buffer.is_empty() {
+            None
+        } else {
+            Some(buffer.to_vec())
+        }));
+    }
+    Ok(None)
+}
+
+fn extract_line_if_complete(chunk: &[u8], buffer: &mut Vec<u8>) -> io::Result<Option<Vec<u8>>> {
+    if let Some(pos) = chunk.iter().position(|byte| *byte == b'\n') {
+        buffer.extend_from_slice(&chunk[..=pos]);
+        enforce_request_limit(buffer.len())?;
+        return Ok(Some(buffer.clone()));
+    }
+    Ok(None)
 }
 
 fn enforce_request_limit(size: usize) -> io::Result<()> {
