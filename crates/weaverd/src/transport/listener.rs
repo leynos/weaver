@@ -1,4 +1,10 @@
-//! Listener implementation for daemon transport sockets.
+//! Socket listener implementation for the daemon transport.
+//!
+//! The listener binds to a configured [`SocketEndpoint`] and runs a background
+//! accept loop that hands each connection to a [`ConnectionHandler`]. It tracks
+//! the background thread via [`ListenerHandle`], enforces a simple concurrency
+//! limit for handler threads, and cleans up Unix socket files during shutdown
+//! or early error paths.
 
 use std::io;
 #[cfg(test)]
@@ -29,14 +35,16 @@ use std::path::Path;
 const ACCEPT_BACKOFF: Duration = Duration::from_millis(25);
 const ERROR_BACKOFF: Duration = Duration::from_millis(150);
 const MAX_HANDLER_THREADS: usize = 128;
+const READ_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Listener that binds to a socket endpoint.
+/// Listener that binds to a socket endpoint and spawns a background accept loop.
 #[derive(Debug)]
 pub(crate) struct SocketListener {
     endpoint: SocketEndpoint,
     listener: ListenerKind,
 }
 
+/// Bound socket variants backed by TCP or Unix transports.
 #[derive(Debug)]
 enum ListenerKind {
     Tcp(TcpListener),
@@ -45,6 +53,11 @@ enum ListenerKind {
 }
 
 impl SocketListener {
+    /// Binds to the provided socket endpoint.
+    ///
+    /// Returns a listener ready to start an accept loop. Binding can fail due to
+    /// address resolution errors, sockets already in use, or Unix socket
+    /// filesystem conflicts.
     pub(crate) fn bind(endpoint: &SocketEndpoint) -> Result<Self, ListenerError> {
         match endpoint {
             SocketEndpoint::Tcp { host, port } => {
@@ -75,6 +88,10 @@ impl SocketListener {
     }
 
     #[cfg(test)]
+    /// Returns the bound address for TCP listeners in tests.
+    ///
+    /// TCP listeners return `Some(SocketAddr)`, while Unix listeners return
+    /// `None` because they are filesystem-backed.
     pub(crate) fn local_addr(&self) -> Option<SocketAddr> {
         match &self.listener {
             ListenerKind::Tcp(listener) => listener.local_addr().ok(),
@@ -83,6 +100,13 @@ impl SocketListener {
         }
     }
 
+    /// Starts the accept loop in a background thread and returns its handle.
+    ///
+    /// The listener switches into non-blocking mode, spawns the accept loop, and
+    /// hands accepted connections to the supplied [`ConnectionHandler`]. On Unix
+    /// platforms, socket cleanup is attempted if non-blocking configuration
+    /// fails. Returns `ListenerError::NonBlocking` when the listener cannot be
+    /// configured for non-blocking accepts.
     pub(crate) fn start(
         mut self,
         handler: Arc<dyn ConnectionHandler>,
@@ -114,16 +138,22 @@ impl Drop for SocketListener {
 }
 
 /// Handle to the background listener thread.
+///
+/// Use this handle to signal shutdown and wait for the accept loop to stop.
 pub(crate) struct ListenerHandle {
     shutdown: Arc<AtomicBool>,
     handle: Option<thread::JoinHandle<()>>,
 }
 
 impl ListenerHandle {
+    /// Signals the accept loop to shut down.
     pub(crate) fn shutdown(&self) {
         self.shutdown.store(true, Ordering::SeqCst);
     }
 
+    /// Waits for the accept loop to complete.
+    ///
+    /// Returns an error if the background thread panics.
     pub(crate) fn join(mut self) -> Result<(), ListenerError> {
         if let Some(handle) = self.handle.take() {
             match handle.join() {
@@ -265,6 +295,7 @@ fn accept_connection(listener: &mut SocketListener) -> Result<Option<ConnectionS
         ListenerKind::Tcp(tcp) => match tcp.accept() {
             Ok((stream, _)) => {
                 stream.set_nonblocking(false)?;
+                stream.set_read_timeout(Some(READ_TIMEOUT))?;
                 Ok(Some(ConnectionStream::Tcp(stream)))
             }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => Ok(None),
@@ -274,6 +305,7 @@ fn accept_connection(listener: &mut SocketListener) -> Result<Option<ConnectionS
         ListenerKind::Unix(unix) => match unix.accept() {
             Ok((stream, _)) => {
                 stream.set_nonblocking(false)?;
+                stream.set_read_timeout(Some(READ_TIMEOUT))?;
                 Ok(Some(ConnectionStream::Unix(stream)))
             }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => Ok(None),

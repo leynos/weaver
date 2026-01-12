@@ -987,7 +987,7 @@ domain sockets, any stale socket file is removed only after confirming no
 listener responds, and the daemon cleans up the socket file on shutdown to
 avoid lingering bind errors. Until the request loop is fully implemented, the
 placeholder handler reads a single JSONL request line, replies with a minimal
-`exit` message, and closes the connection so CLI clients do not hang while
+`exit` message, and closes the connection, so CLI clients do not hang while
 waiting for a response.
 
 A `SystemShutdownSignal` built on `signal-hook` listens for `SIGTERM`,

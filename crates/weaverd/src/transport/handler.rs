@@ -1,6 +1,6 @@
 //! Connection handling abstractions for the daemon listener.
 
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{self, Read, Write};
 use std::net::TcpStream;
 
 use tracing::warn;
@@ -51,18 +51,18 @@ pub(crate) trait ConnectionHandler: Send + Sync + 'static {
     fn handle(&self, stream: ConnectionStream);
 }
 
-/// Default handler that drains data until the peer disconnects.
+const EXIT_MESSAGE: &[u8] = b"{\"kind\":\"exit\",\"status\":0}\n";
+const MAX_REQUEST_BYTES: usize = 64 * 1024;
+
+/// Default handler that reads a bounded JSONL line and replies with an exit.
 #[derive(Debug, Default)]
 pub(crate) struct NoopConnectionHandler;
 
 impl ConnectionHandler for NoopConnectionHandler {
-    fn handle(&self, stream: ConnectionStream) {
-        let mut reader = BufReader::new(stream);
-        let mut line = String::new();
-        match reader.read_line(&mut line) {
-            Ok(0) => return,
-            Ok(_) => {}
-            Err(error) if error.kind() == io::ErrorKind::Interrupted => return,
+    fn handle(&self, mut stream: ConnectionStream) {
+        match read_request_line(&mut stream) {
+            Ok(Some(_)) => {}
+            Ok(None) => return,
             Err(error) => {
                 warn!(
                     target: LISTENER_TARGET,
@@ -73,8 +73,7 @@ impl ConnectionHandler for NoopConnectionHandler {
             }
         }
 
-        let mut stream = reader.into_inner();
-        if let Err(error) = stream.write_all(b"{\"kind\":\"exit\",\"status\":0}\n") {
+        if let Err(error) = stream.write_all(EXIT_MESSAGE) {
             warn!(
                 target: LISTENER_TARGET,
                 error = %error,
@@ -92,9 +91,46 @@ impl ConnectionHandler for NoopConnectionHandler {
     }
 }
 
+fn read_request_line(stream: &mut ConnectionStream) -> io::Result<Option<Vec<u8>>> {
+    let mut buffer = Vec::new();
+    let mut chunk = [0_u8; 1024];
+    loop {
+        let read = match stream.read(&mut chunk) {
+            Ok(read) => read,
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error),
+        };
+        if read == 0 {
+            return Ok(if buffer.is_empty() {
+                None
+            } else {
+                Some(buffer)
+            });
+        }
+        if let Some(pos) = chunk[..read].iter().position(|byte| *byte == b'\n') {
+            buffer.extend_from_slice(&chunk[..=pos]);
+            enforce_request_limit(buffer.len())?;
+            return Ok(Some(buffer));
+        }
+        buffer.extend_from_slice(&chunk[..read]);
+        enforce_request_limit(buffer.len())?;
+    }
+}
+
+fn enforce_request_limit(size: usize) -> io::Result<()> {
+    if size > MAX_REQUEST_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "request exceeds maximum size",
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::BufRead;
     use std::net::{TcpListener, TcpStream};
     use std::thread;
 
@@ -113,9 +149,10 @@ mod tests {
             .expect("write request");
 
         let mut response = String::new();
-        let mut reader = BufReader::new(&mut client);
+        let mut reader = io::BufReader::new(&mut client);
         reader.read_line(&mut response).expect("read response");
         assert!(response.contains("\"kind\":\"exit\""));
+        assert!(response.contains("\"status\":0"));
 
         server.join().expect("join server");
     }

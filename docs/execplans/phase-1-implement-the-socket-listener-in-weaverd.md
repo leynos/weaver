@@ -212,16 +212,22 @@ are safe to re-run.
 
 8. Format and validate documentation if any docs changed:
 
-   set -o pipefail make fmt 2>&1 | tee /tmp/weaver-fmt.log make markdownlint
-   2>&1 | tee /tmp/weaver-markdownlint.log
+   ```sh
+   set -o pipefail
+   make fmt 2>&1 | tee /tmp/weaver-fmt.log
+   make markdownlint 2>&1 | tee /tmp/weaver-markdownlint.log
+   ```
 
    Run `make nixie` only if a Mermaid diagram was edited.
 
 9. Run the Rust quality gates:
 
-   set -o pipefail make check-fmt 2>&1 | tee /tmp/weaver-check-fmt.log make
-   lint 2>&1 | tee /tmp/weaver-lint.log make test 2>&1 | tee
-   /tmp/weaver-test.log
+   ```sh
+   set -o pipefail
+   make check-fmt 2>&1 | tee /tmp/weaver-check-fmt.log
+   make lint 2>&1 | tee /tmp/weaver-lint.log
+   make test 2>&1 | tee /tmp/weaver-test.log
+   ```
 
 ## Validation and Acceptance
 
@@ -248,12 +254,14 @@ safe cleanup on startup.
 
 Example Gherkin snippet for the listener behaviour:
 
-  Feature: Daemon socket listener
+```gherkin
+Feature: Daemon socket listener
 
-    Scenario: Accepting a client connection
-      Given the daemon is running with a TCP socket
-      When a client connects
-      Then the daemon records the connection
+  Scenario: Accepting a client connection
+    Given the daemon is running with a TCP socket
+    When a client connects
+    Then the daemon records the connection
+```
 
 ## Interfaces and Dependencies
 

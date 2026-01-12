@@ -155,4 +155,6 @@ fn then_listener_fails(world: &RefCell<ListenerWorld>) {
 }
 
 #[scenario(path = "tests/features/daemon_socket.feature")]
-fn daemon_socket_listener(#[from(world)] _: RefCell<ListenerWorld>) {}
+fn daemon_socket_listener(#[from(world)] world: RefCell<ListenerWorld>) {
+    drop(world);
+}
