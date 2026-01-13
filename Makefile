@@ -45,5 +45,5 @@ help: ## Show available targets
 	awk 'BEGIN {FS=":"; printf "Available targets:\n"} {printf "  %-20s %s\n", $$1, $$2}'
 
 install: ## Install weaver and weaverd binaries
-	$(CARGO) install --path crates/weaver-cli
-	$(CARGO) install --path crates/weaverd
+	$(CARGO) install --locked --release --path crates/weaver-cli
+	$(CARGO) install --locked --release --path crates/weaverd
