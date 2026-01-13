@@ -115,6 +115,15 @@ published a PID, the second invocation now reports "launch already in progress"
 instead of removing the lock. If the daemon exited uncleanly, the new instance
 removes the stale files before continuing.
 
+The daemon now binds a socket listener as part of startup. It binds to the
+configured `--daemon-socket` endpoint and accepts multiple client connections
+concurrently. On Unix targets, stale socket files are removed only after
+confirming no listener responds, while actively used sockets cause the daemon
+to fail fast with a clear error. The listener removes the Unix socket file on
+shutdown to avoid lingering bind failures. While the request loop is still a
+placeholder, the daemon replies with a minimal JSONL exit message and closes
+the connection, so clients do not block waiting for a response.
+
 The health snapshot is a single-line JSON document describing the current
 state, enabling operators and automation to poll readiness without speaking the
 daemon protocol. Example:

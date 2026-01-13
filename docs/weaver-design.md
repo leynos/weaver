@@ -976,12 +976,26 @@ JSON health snapshot to `weaverd.health`. Both artefacts are written atomically
 via a temporary file and rename so readers never observe a truncated payload.
 The snapshot records the lifecycle state (`starting`, `ready`, `stopping`), the
 PID, and a UNIX timestamp so external probes can consume the same readiness
-signal as the CLI. A `SystemShutdownSignal` built on `signal-hook` listens for
-`SIGTERM`, `SIGINT`, `SIGQUIT`, and `SIGHUP`, logging the event and giving the
-runtime a ten-second budget to shut down gracefully. Developers can opt into a
-foreground mode for debugging by setting the `WEAVER_FOREGROUND` environment
-variable, which bypasses daemonisation while preserving the same
-PID/lock/health choreography.
+signal as the CLI.
+
+The daemon now binds a socket listener as part of startup. The listener binds
+to the configured `SocketEndpoint`, switches into a non-blocking accept loop,
+and spawns lightweight handler threads so multiple clients can connect
+concurrently without stalling the daemon. Connection and accept failures are
+logged and throttled with backoff rather than crashing the process. For Unix
+domain sockets, any stale socket file is removed only after confirming no
+listener responds, and the daemon cleans up the socket file on shutdown to
+avoid lingering bind errors. Until the request loop is fully implemented, the
+placeholder handler reads a single JSONL request line, replies with a minimal
+`exit` message, and closes the connection, so CLI clients do not hang while
+waiting for a response.
+
+A `SystemShutdownSignal` built on `signal-hook` listens for `SIGTERM`,
+`SIGINT`, `SIGQUIT`, and `SIGHUP`, logging the event and giving the runtime a
+ten-second budget to shut down gracefully. Developers can opt into a foreground
+mode for debugging by setting the `WEAVER_FOREGROUND` environment variable,
+which bypasses daemonisation while preserving the same PID/lock/health
+choreography.
 
 ```mermaid
 erDiagram

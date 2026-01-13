@@ -10,6 +10,7 @@ use crate::backends::BackendProvider;
 use crate::bootstrap::{ConfigLoader, StaticConfigLoader, SystemConfigLoader, bootstrap_with};
 use crate::health::HealthReporter;
 use crate::placeholder_provider::NoopBackendProvider;
+use crate::transport::{NoopConnectionHandler, SocketListener};
 
 use super::daemonizer::{Daemonizer, SystemDaemonizer};
 use super::errors::LaunchError;
@@ -114,11 +115,16 @@ where
     let pid = std::process::id();
     guard.write_pid(pid)?;
     guard.write_health(HealthState::Starting)?;
+    let listener = SocketListener::bind(config.daemon_socket())?;
     let static_loader = StaticConfigLoader::new(config.clone());
     let daemon = bootstrap_with(&static_loader, reporter, provider)?;
+    let handler = Arc::new(NoopConnectionHandler);
+    let listener_handle = listener.start(handler)?;
     guard.write_health(HealthState::Ready)?;
     shutdown.wait()?;
     guard.write_health(HealthState::Stopping)?;
+    listener_handle.shutdown();
+    listener_handle.join()?;
     drop(daemon);
     info!(
         target: PROCESS_TARGET,

@@ -124,6 +124,13 @@ fn wait_for_shutdown_succeeds_when_pid_and_socket_disappear() {
 fn wait_for_shutdown_propagates_socket_probe_errors() {
     use std::os::unix::fs::PermissionsExt;
 
+    // Skip on root to avoid permission errors being bypassed.
+    // SAFETY: geteuid() is always safe to call.
+    if unsafe { libc::geteuid() } == 0 {
+        eprintln!("skipping test: running as root");
+        return;
+    }
+
     let (_temp_dir, paths) = create_temp_runtime_paths();
 
     // Create PID file so we actually need to check the socket.
