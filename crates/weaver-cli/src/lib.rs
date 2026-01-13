@@ -10,15 +10,19 @@ use std::io::{self, Write};
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use serde::Deserialize;
 use thiserror::Error;
 use weaver_config::{CapabilityMatrix, Config};
 
+pub mod cli;
 mod command;
 mod config;
 mod lifecycle;
 mod transport;
+
+pub(crate) use cli::DaemonAction;
+use cli::{Cli, CliCommand};
 
 #[cfg(test)]
 pub(crate) use command::CommandDescriptor;
@@ -378,54 +382,6 @@ where
     stderr.flush().map_err(AppError::ForwardResponse)?;
 
     exit_status.ok_or(AppError::MissingExit)
-}
-
-#[derive(Parser, Debug)]
-#[command(
-    name = "weaver",
-    disable_help_subcommand = true,
-    subcommand_negates_reqs = true
-)]
-struct Cli {
-    /// Prints the negotiated capability matrix and exits.
-    #[arg(long)]
-    capabilities: bool,
-    /// Structured subcommands (for example `daemon start`).
-    #[command(subcommand)]
-    command: Option<CliCommand>,
-    /// The command domain (for example `observe`).
-    #[arg(value_name = "DOMAIN")]
-    domain: Option<String>,
-    /// The command operation (for example `get-definition`).
-    #[arg(value_name = "OPERATION")]
-    operation: Option<String>,
-    /// Additional arguments passed to the daemon.
-    #[arg(
-        value_name = "ARG",
-        num_args = 0..,
-        trailing_var_arg = true,
-        allow_hyphen_values = true
-    )]
-    arguments: Vec<String>,
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum CliCommand {
-    /// Runs daemon lifecycle commands.
-    Daemon {
-        #[command(subcommand)]
-        action: DaemonAction,
-    },
-}
-
-#[derive(Subcommand, Debug, Clone, Copy)]
-enum DaemonAction {
-    /// Starts the daemon and waits for readiness.
-    Start,
-    /// Stops the daemon gracefully.
-    Stop,
-    /// Prints daemon health information.
-    Status,
 }
 
 #[derive(Debug, Deserialize)]

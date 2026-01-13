@@ -1,0 +1,226 @@
+---
+name: Build and Package
+
+'on':
+  workflow_call:
+    inputs:
+      platform:
+        description: Target platform identifier (linux, macos, or freebsd)
+        required: true
+        type: string
+      runner:
+        description: Runner label that should execute the job
+        required: true
+        type: string
+      target:
+        description: Rust target triple to compile for
+        required: true
+        type: string
+      version:
+        description: Version string used for packaging
+        required: true
+        type: string
+      artifact-name:
+        description: Name used when uploading workflow artefacts
+        required: true
+        type: string
+      should-upload-workflow-artifacts:
+        description: Whether workflow artefacts should be uploaded
+        required: true
+        type: boolean
+      package-arch:
+        description: Linux package architecture identifier (e.g. amd64)
+        required: false
+        type: string
+      artifact-suffix:
+        description: Suffix appended to macOS package filenames
+        required: false
+        type: string
+
+jobs:
+  build:
+    name: Build ${{ inputs.platform }} artefacts
+    runs-on: ${{ inputs.runner }}
+    env:
+      VERSION: ${{ inputs.version }}
+      MAINTAINER: "Payton McIntosh <pmcintosh@df12.net>"
+      HOMEPAGE: "https://df12.studio/docs.html"
+      DESCRIPTION: "Semantic editor"
+      MAC_IDENTIFIER: "net.df12.weaver"
+    steps:
+      - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633
+        # v4.1.2
+
+      - name: Install uv
+        if: inputs.platform != 'linux'
+        uses: astral-sh/setup-uv@4cda7d73322c50eac316ad623a716f09a2db2ac7
+        # v3.1.2
+        with:
+          python-version: '3.11'
+
+      # Build weaver-cli
+      - name: Build weaver-cli release binary
+        uses: leynos/shared-actions/.github/actions/rust-build-release@fb861087e1ddbbe32c3f44d7896f1d2364dd7711
+        with:
+          target: ${{ inputs.target }}
+          bin-name: weaver-cli
+          manifest-path: crates/weaver-cli/Cargo.toml
+          version: ${{ inputs.version }}
+
+      # Build weaverd
+      - name: Build weaverd release binary
+        uses: leynos/shared-actions/.github/actions/rust-build-release@fb861087e1ddbbe32c3f44d7896f1d2364dd7711
+        with:
+          target: ${{ inputs.target }}
+          bin-name: weaverd
+          manifest-path: crates/weaverd/Cargo.toml
+          version: ${{ inputs.version }}
+
+      # Linux packaging
+      - name: Package weaver-cli for Linux
+        if: inputs.platform == 'linux'
+        uses: leynos/shared-actions/.github/actions/linux-packages@fb861087e1ddbbe32c3f44d7896f1d2364dd7711
+        with:
+          project-dir: .
+          package-name: weaver-cli
+          bin-name: weaver-cli
+          target: ${{ inputs.target }}
+          version: ${{ inputs.version }}
+          formats: deb,rpm
+          maintainer: ${{ env.MAINTAINER }}
+          homepage: ${{ env.HOMEPAGE }}
+          description: ${{ env.DESCRIPTION }} - CLI client
+          license: ISC
+          man-paths: target/generated-man/${{ inputs.target }}/release/weaver-cli.1
+          outdir: dist
+
+      - name: Package weaverd for Linux
+        if: inputs.platform == 'linux'
+        uses: leynos/shared-actions/.github/actions/linux-packages@fb861087e1ddbbe32c3f44d7896f1d2364dd7711
+        with:
+          project-dir: .
+          package-name: weaverd
+          bin-name: weaverd
+          target: ${{ inputs.target }}
+          version: ${{ inputs.version }}
+          formats: deb,rpm
+          maintainer: ${{ env.MAINTAINER }}
+          homepage: ${{ env.HOMEPAGE }}
+          description: ${{ env.DESCRIPTION }} - daemon
+          license: ISC
+          outdir: dist
+
+      - name: Prune packaging metadata
+        if: inputs.platform == 'linux'
+        shell: bash
+        run: rm -rf dist/.man dist/nfpm.yaml
+
+      # macOS packaging
+      - name: Stage weaver-cli artefacts for macOS
+        if: inputs.platform == 'macos'
+        id: stage-weaver-cli
+        uses: ./.github/actions/stage
+        with:
+          config-file: .github/release-staging.toml
+          target: macos-${{ inputs.artifact-suffix == 'macos-arm64' && 'aarch64' || 'x86_64' }}
+        env:
+          BIN_NAME: weaver-cli
+
+      - name: Build weaver-cli macOS installer package
+        if: inputs.platform == 'macos'
+        id: package-weaver-cli-macos
+        uses: leynos/shared-actions/.github/actions/macos-package@fb861087e1ddbbe32c3f44d7896f1d2364dd7711
+        with:
+          name: weaver-cli
+          identifier: ${{ env.MAC_IDENTIFIER }}.cli
+          binary: ${{ steps.stage-weaver-cli.outputs.binary_path }}
+          manpage: ${{ steps.stage-weaver-cli.outputs.man_path }}
+          license-file: LICENSE
+          version: ${{ inputs.version }}
+
+      - name: Stamp weaver-cli architecture into package name
+        if: inputs.platform == 'macos'
+        shell: bash
+        env:
+          ARCHIVE_SUFFIX: ${{ inputs.artifact-suffix }}
+          PKG_PATH: ${{ steps.package-weaver-cli-macos.outputs.pkg-path }}
+        run: |
+          set -euo pipefail
+          dest="dist/weaver-cli-${VERSION}-${ARCHIVE_SUFFIX}.pkg"
+          mkdir -p "$(dirname "$dest")"
+          mv "$PKG_PATH" "$dest"
+
+      - name: Stage weaverd artefacts for macOS
+        if: inputs.platform == 'macos'
+        id: stage-weaverd
+        uses: ./.github/actions/stage
+        with:
+          config-file: .github/release-staging.toml
+          target: macos-${{ inputs.artifact-suffix == 'macos-arm64' && 'aarch64' || 'x86_64' }}
+        env:
+          BIN_NAME: weaverd
+
+      - name: Build weaverd macOS installer package
+        if: inputs.platform == 'macos'
+        id: package-weaverd-macos
+        uses: leynos/shared-actions/.github/actions/macos-package@fb861087e1ddbbe32c3f44d7896f1d2364dd7711
+        with:
+          name: weaverd
+          identifier: ${{ env.MAC_IDENTIFIER }}.daemon
+          binary: ${{ steps.stage-weaverd.outputs.binary_path }}
+          license-file: LICENSE
+          version: ${{ inputs.version }}
+
+      - name: Stamp weaverd architecture into package name
+        if: inputs.platform == 'macos'
+        shell: bash
+        env:
+          ARCHIVE_SUFFIX: ${{ inputs.artifact-suffix }}
+          PKG_PATH: ${{ steps.package-weaverd-macos.outputs.pkg-path }}
+        run: |
+          set -euo pipefail
+          dest="dist/weaverd-${VERSION}-${ARCHIVE_SUFFIX}.pkg"
+          mkdir -p "$(dirname "$dest")"
+          mv "$PKG_PATH" "$dest"
+
+      # FreeBSD: stage raw binaries with checksums
+      - name: Stage FreeBSD artefacts
+        if: inputs.platform == 'freebsd'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/freebsd-amd64
+
+          for bin in weaver-cli weaverd; do
+            src="target/${{ inputs.target }}/release/${bin}"
+            if [[ -f "$src" ]]; then
+              dest="dist/freebsd-amd64/${bin}"
+              cp "$src" "$dest"
+              sha256sum "$dest" > "${dest}.sha256"
+            fi
+          done
+
+      # Upload artefacts
+      - name: Upload Linux artefacts
+        if: inputs.platform == 'linux' && inputs.should-upload-workflow-artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        # v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: dist
+
+      - name: Upload macOS artefacts
+        if: inputs.platform == 'macos' && inputs.should-upload-workflow-artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        # v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: dist
+
+      - name: Upload FreeBSD artefacts
+        if: inputs.platform == 'freebsd' && inputs.should-upload-workflow-artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        # v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: dist
