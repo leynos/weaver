@@ -5,12 +5,12 @@
 //! to be exercised both from the binary entrypoint and from tests where
 //! configuration loading and IO streams can be substituted.
 
-use clap::{Parser, Subcommand};
 use std::ffi::{OsStr, OsString};
 use std::io::Write;
 use std::process::ExitCode;
 use weaver_config::Config;
 
+pub mod cli;
 mod command;
 mod config;
 mod daemon_output;
@@ -19,6 +19,9 @@ mod lifecycle;
 pub mod output;
 mod runtime_utils;
 mod transport;
+
+pub(crate) use cli::DaemonAction;
+use cli::{Cli, CliCommand};
 
 #[cfg(test)]
 pub(crate) use command::CommandDescriptor;
@@ -322,57 +325,6 @@ where
     CliRunner::new(io, loader)
         .with_daemon_binary(daemon_binary)
         .run_with_handler(args, handler)
-}
-
-#[derive(Parser, Debug)]
-#[command(
-    name = "weaver",
-    disable_help_subcommand = true,
-    subcommand_negates_reqs = true
-)]
-struct Cli {
-    /// Prints the negotiated capability matrix and exits.
-    #[arg(long)]
-    capabilities: bool,
-    /// Controls how daemon output is rendered.
-    #[arg(long, value_enum, default_value_t = OutputFormat::Auto)]
-    output: OutputFormat,
-    /// Structured subcommands (for example `daemon start`).
-    #[command(subcommand)]
-    command: Option<CliCommand>,
-    /// The command domain (for example `observe`).
-    #[arg(value_name = "DOMAIN")]
-    domain: Option<String>,
-    /// The command operation (for example `get-definition`).
-    #[arg(value_name = "OPERATION")]
-    operation: Option<String>,
-    /// Additional arguments passed to the daemon.
-    #[arg(
-        value_name = "ARG",
-        num_args = 0..,
-        trailing_var_arg = true,
-        allow_hyphen_values = true
-    )]
-    arguments: Vec<String>,
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum CliCommand {
-    /// Runs daemon lifecycle commands.
-    Daemon {
-        #[command(subcommand)]
-        action: DaemonAction,
-    },
-}
-
-#[derive(Subcommand, Debug, Clone, Copy)]
-enum DaemonAction {
-    /// Starts the daemon and waits for readiness.
-    Start,
-    /// Stops the daemon gracefully.
-    Stop,
-    /// Prints daemon health information.
-    Status,
 }
 
 #[cfg(test)]

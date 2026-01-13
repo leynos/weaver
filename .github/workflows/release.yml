@@ -1,116 +1,168 @@
-
+---
 name: Release Binary
 
-on:
+'on':
   push:
     tags:
       - 'v*.*.*'
+  workflow_call:
+    inputs:
+      publish:
+        description: >-
+          Whether the workflow should publish artefacts to the GitHub release
+          associated with the tag. Defaults to `false` when invoked as a
+          reusable workflow.
+        required: false
+        type: boolean
+        default: false
+      dry-run:
+        description: >-
+          When `true`, build artefacts without uploading them to GitHub
+          releases or workflow artefacts.
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      version:
+        description: Crate version resolved from Cargo.toml
+        value: ${{ jobs.metadata.outputs.version }}
+      should_publish:
+        description: Whether artefacts should be published to the release
+        value: ${{ jobs.metadata.outputs.should_publish }}
+      dry_run:
+        description: Whether the workflow is running in dry-run mode
+        value: ${{ jobs.metadata.outputs.dry_run }}
+      should_upload_workflow_artifacts:
+        description: Whether workflow artefact uploads are enabled
+        value: ${{ jobs.metadata.outputs.should_upload_workflow_artifacts }}
 
-env:
-  REPO_NAME: ${{ github.event.repository.name }}
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  metadata:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ensure_version.outputs.crate-version }}
+      should_publish: ${{ steps.release_modes.outputs.should_publish }}
+      dry_run: ${{ steps.release_modes.outputs.dry_run }}
+      should_upload_workflow_artifacts: ${{ steps.release_modes.outputs.should_upload_workflow_artifacts }}
+      repo_name: ${{ steps.repo_name.outputs.value }}
+    steps:
+      - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633
+        # v4.1.2
+      - id: repo_name
+        name: Determine repository name
+        run: echo "value=${GITHUB_REPOSITORY#*/}" >>"$GITHUB_OUTPUT"
+      - name: Setup Python 3.11
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        # v5
+        with:
+          python-version: '3.11'
+      - id: release_modes
+        name: Determine release modes
+        run: python3 .github/workflows/scripts/determine_release_modes.py
+      - id: ensure_version
+        name: Read package version from Cargo.toml
+        uses: leynos/shared-actions/.github/actions/ensure-cargo-version@fb861087e1ddbbe32c3f44d7896f1d2364dd7711
+        with:
+          check-tag: ${{ fromJSON(steps.release_modes.outputs.should_publish) }}
+
+  build-linux:
+    needs: metadata
     strategy:
       matrix:
         include:
-          - os: linux
-            arch: x86_64
-            target: x86_64-unknown-linux-gnu
-            ext: ""
-          - os: linux
-            arch: aarch64
-            target: aarch64-unknown-linux-gnu
-            ext: ""
-          - os: windows
-            arch: x86_64
-            target: x86_64-pc-windows-msvc
-            ext: ".exe"
-          - os: windows
-            arch: aarch64
-            target: aarch64-pc-windows-msvc
-            ext: ".exe"
-          - os: macos
-            arch: x86_64
-            target: x86_64-apple-darwin
-            ext: ""
-          - os: macos
-            arch: aarch64
-            target: aarch64-apple-darwin
-            ext: ""
-          - os: freebsd
-            arch: x86_64
-            target: x86_64-unknown-freebsd
-            ext: ""
-          - os: freebsd
-            arch: aarch64
-            target: aarch64-unknown-freebsd
-            ext: ""
-          - os: openbsd
-            arch: x86_64
-            target: x86_64-unknown-openbsd
-            ext: ""
-          - os: openbsd
-            arch: aarch64
-            target: aarch64-unknown-openbsd
-            ext: ""
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@9d7e65c320fdb52dcd45ffaa68deb6c02c8754d9
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-      - name: Cache cross binary
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/bin/cross
-          key: cross-${{ runner.os }}
-      - name: Install cross
-        run: cargo install cross --git https://github.com/cross-rs/cross
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      - name: Build release binary
-        run: cross +stable build --release --target ${{ matrix.target }}
-      - name: Prepare artifact
-        run: |
-          mkdir -p artifacts/${{ matrix.os }}-${{ matrix.arch }}
-          cp target/${{ matrix.target }}/release/${{ env.REPO_NAME }}${{ matrix.ext }} \
-            artifacts/${{ matrix.os }}-${{ matrix.arch }}/${{ env.REPO_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
-          sha256sum artifacts/${{ matrix.os }}-${{ matrix.arch }}/${{ env.REPO_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} > \
-            artifacts/${{ matrix.os }}-${{ matrix.arch }}/${{ env.REPO_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}.sha256
-      - name: Upload release artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.REPO_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
-          path: artifacts/${{ matrix.os }}-${{ matrix.arch }}
+          - target: x86_64-unknown-linux-gnu
+            artifact: linux-amd64
+            package_arch: amd64
+          - target: aarch64-unknown-linux-gnu
+            artifact: linux-arm64
+            package_arch: arm64
+    uses: ./.github/workflows/build-and-package.yml
+    with:
+      platform: linux
+      runner: ubuntu-latest
+      target: ${{ matrix.target }}
+      version: ${{ needs.metadata.outputs.version }}
+      artifact-name: ${{ needs.metadata.outputs.repo_name }}-${{ matrix.artifact }}
+      should-upload-workflow-artifacts: ${{ fromJSON(needs.metadata.outputs.should_upload_workflow_artifacts) }}
+      package-arch: ${{ matrix.package_arch }}
+
+  build-macos:
+    needs: metadata
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            artifact_suffix: macos-x86_64
+          - target: aarch64-apple-darwin
+            artifact_suffix: macos-arm64
+    uses: ./.github/workflows/build-and-package.yml
+    with:
+      platform: macos
+      runner: macos-15
+      target: ${{ matrix.target }}
+      version: ${{ needs.metadata.outputs.version }}
+      artifact-name: ${{ needs.metadata.outputs.repo_name }}-${{ matrix.artifact_suffix }}
+      should-upload-workflow-artifacts: ${{ fromJSON(needs.metadata.outputs.should_upload_workflow_artifacts) }}
+      artifact-suffix: ${{ matrix.artifact_suffix }}
+
+  build-freebsd:
+    needs: metadata
+    uses: ./.github/workflows/build-and-package.yml
+    with:
+      platform: freebsd
+      runner: ubuntu-latest
+      target: x86_64-unknown-freebsd
+      version: ${{ needs.metadata.outputs.version }}
+      artifact-name: ${{ needs.metadata.outputs.repo_name }}-freebsd-amd64
+      should-upload-workflow-artifacts: ${{ fromJSON(needs.metadata.outputs.should_upload_workflow_artifacts) }}
 
   release:
-    needs: build
+    if: needs.metadata.outputs.should_publish == 'true'
+    permissions:
+      contents: write
+    needs:
+      - metadata
+      - build-linux
+      - build-macos
+      - build-freebsd
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: softprops/action-gh-release@v1
-        with:
-          generate_release_notes: true
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-      - run: |
-          for dir in artifacts/${{ env.REPO_NAME }}-*; do
-            for file in "$dir"/*; do
-              gh release upload "${{ github.ref_name }}" "$file"
-            done
-          done
+      - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633
+        # v4.1.2
+      - name: Ensure release exists (draft)
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view "${{ github.ref_name }}" >/dev/null 2>&1 || \
+            gh release create "${{ github.ref_name }}" \
+              --draft \
+              --verify-tag \
+              --generate-notes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        # v4
+        with:
+          path: dist
+          pattern: ${{ needs.metadata.outputs.repo_name }}-*
+      - id: upload_assets
+        name: Upload artefacts to release
+        uses: ./.github/actions/upload-release-assets
+        with:
+          release-tag: ${{ github.ref_name }}
+          bin-name: weaver
+          dist-dir: dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check asset upload errors
+        if: steps.upload_assets.outputs.upload-error == 'true'
+        run: |
+          echo "Error uploading release assets:"
+          printf '%s\n' "${{ steps.upload_assets.outputs.error-message }}"
+          exit 1
