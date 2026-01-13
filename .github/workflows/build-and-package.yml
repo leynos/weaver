@@ -119,7 +119,7 @@ jobs:
       - name: Stage weaver-cli artefacts for macOS
         if: inputs.platform == 'macos'
         id: stage-weaver-cli
-        uses: ./.github/actions/stage
+        uses: leynos/shared-actions/.github/actions/stage-release-artefacts@fb861087e1ddbbe32c3f44d7896f1d2364dd7711
         with:
           config-file: .github/release-staging.toml
           target: macos-${{ inputs.artifact-suffix == 'macos-arm64' && 'aarch64' || 'x86_64' }}
@@ -133,8 +133,8 @@ jobs:
         with:
           name: weaver-cli
           identifier: ${{ env.MAC_IDENTIFIER }}.cli
-          binary: ${{ steps.stage-weaver-cli.outputs.binary_path }}
-          manpage: ${{ steps.stage-weaver-cli.outputs.man_path }}
+          binary: ${{ steps.stage-weaver-cli.outputs.binary-path }}
+          manpage: ${{ steps.stage-weaver-cli.outputs.man-path }}
           license-file: LICENSE
           version: ${{ inputs.version }}
 
@@ -153,7 +153,7 @@ jobs:
       - name: Stage weaverd artefacts for macOS
         if: inputs.platform == 'macos'
         id: stage-weaverd
-        uses: ./.github/actions/stage
+        uses: leynos/shared-actions/.github/actions/stage-release-artefacts@fb861087e1ddbbe32c3f44d7896f1d2364dd7711
         with:
           config-file: .github/release-staging.toml
           target: macos-${{ inputs.artifact-suffix == 'macos-arm64' && 'aarch64' || 'x86_64' }}
@@ -167,7 +167,7 @@ jobs:
         with:
           name: weaverd
           identifier: ${{ env.MAC_IDENTIFIER }}.daemon
-          binary: ${{ steps.stage-weaverd.outputs.binary_path }}
+          binary: ${{ steps.stage-weaverd.outputs.binary-path }}
           license-file: LICENSE
           version: ${{ inputs.version }}
 

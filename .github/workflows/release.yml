@@ -45,9 +45,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.ensure_version.outputs.crate-version }}
-      should_publish: ${{ steps.release_modes.outputs.should_publish }}
-      dry_run: ${{ steps.release_modes.outputs.dry_run }}
-      should_upload_workflow_artifacts: ${{ steps.release_modes.outputs.should_upload_workflow_artifacts }}
+      should_publish: ${{ steps.release_modes.outputs.should-publish }}
+      dry_run: ${{ steps.release_modes.outputs.dry-run }}
+      should_upload_workflow_artifacts: ${{ steps.release_modes.outputs.should-upload-workflow-artifacts }}
       repo_name: ${{ steps.repo_name.outputs.value }}
     steps:
       - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633
@@ -55,19 +55,17 @@ jobs:
       - id: repo_name
         name: Determine repository name
         run: echo "value=${GITHUB_REPOSITORY#*/}" >>"$GITHUB_OUTPUT"
-      - name: Setup Python 3.11
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        # v5
-        with:
-          python-version: '3.11'
       - id: release_modes
         name: Determine release modes
-        run: python3 .github/workflows/scripts/determine_release_modes.py
+        uses: leynos/shared-actions/.github/actions/determine-release-modes@fb861087e1ddbbe32c3f44d7896f1d2364dd7711
+        with:
+          dry-run: ${{ inputs.dry-run }}
+          publish: ${{ inputs.publish }}
       - id: ensure_version
         name: Read package version from Cargo.toml
         uses: leynos/shared-actions/.github/actions/ensure-cargo-version@fb861087e1ddbbe32c3f44d7896f1d2364dd7711
         with:
-          check-tag: ${{ fromJSON(steps.release_modes.outputs.should_publish) }}
+          check-tag: ${{ fromJSON(steps.release_modes.outputs.should-publish) }}
 
   build-linux:
     needs: metadata
@@ -152,14 +150,13 @@ jobs:
           pattern: ${{ needs.metadata.outputs.repo_name }}-*
       - id: upload_assets
         name: Upload artefacts to release
-        uses: ./.github/actions/upload-release-assets
+        uses: leynos/shared-actions/.github/actions/upload-release-assets@fb861087e1ddbbe32c3f44d7896f1d2364dd7711
         with:
           release-tag: ${{ github.ref_name }}
           bin-name: weaver
           dist-dir: dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Check asset upload errors
         if: steps.upload_assets.outputs.upload-error == 'true'
         run: |
