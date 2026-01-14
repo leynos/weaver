@@ -66,7 +66,7 @@ jobs:
         uses: leynos/shared-actions/.github/actions/ensure-cargo-version@fb861087e1ddbbe32c3f44d7896f1d2364dd7711
         with:
           check-tag: ${{ fromJSON(steps.release_modes.outputs.should-publish) }}
-          manifest-path: crates/weaver-cli/Cargo.toml
+          manifests: crates/weaver-cli/Cargo.toml
 
   build-linux:
     needs: metadata
