@@ -89,6 +89,27 @@ impl DomainRouter {
         Self
     }
 
+    /// Known operations for the `observe` domain.
+    const OBSERVE_OPERATIONS: &'static [&'static str] = &[
+        "get-definition",
+        "find-references",
+        "grep",
+        "diagnostics",
+        "call-hierarchy",
+    ];
+
+    /// Known operations for the `act` domain.
+    const ACT_OPERATIONS: &'static [&'static str] = &[
+        "rename-symbol",
+        "apply-edits",
+        "apply-patch",
+        "apply-rewrite",
+        "refactor",
+    ];
+
+    /// Known operations for the `verify` domain.
+    const VERIFY_OPERATIONS: &'static [&'static str] = &["diagnostics", "syntax"];
+
     /// Routes a command request to the appropriate domain handler.
     ///
     /// # Errors
@@ -120,13 +141,7 @@ impl DomainRouter {
         request: &CommandRequest,
         writer: &mut ResponseWriter<W>,
     ) -> Result<DispatchResult, DispatchError> {
-        let operation = request.operation().to_ascii_lowercase();
-        match operation.as_str() {
-            "get-definition" | "find-references" | "grep" | "diagnostics" | "call-hierarchy" => {
-                self.write_not_implemented(writer, "observe", &operation)
-            }
-            _ => Err(DispatchError::unknown_operation("observe", operation)),
-        }
+        self.route_domain(request, writer, "observe", Self::OBSERVE_OPERATIONS)
     }
 
     fn route_act<W: Write>(
@@ -134,13 +149,7 @@ impl DomainRouter {
         request: &CommandRequest,
         writer: &mut ResponseWriter<W>,
     ) -> Result<DispatchResult, DispatchError> {
-        let operation = request.operation().to_ascii_lowercase();
-        match operation.as_str() {
-            "rename-symbol" | "apply-edits" | "apply-patch" | "apply-rewrite" | "refactor" => {
-                self.write_not_implemented(writer, "act", &operation)
-            }
-            _ => Err(DispatchError::unknown_operation("act", operation)),
-        }
+        self.route_domain(request, writer, "act", Self::ACT_OPERATIONS)
     }
 
     fn route_verify<W: Write>(
@@ -148,10 +157,22 @@ impl DomainRouter {
         request: &CommandRequest,
         writer: &mut ResponseWriter<W>,
     ) -> Result<DispatchResult, DispatchError> {
+        self.route_domain(request, writer, "verify", Self::VERIFY_OPERATIONS)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn route_domain<W: Write>(
+        &self,
+        request: &CommandRequest,
+        writer: &mut ResponseWriter<W>,
+        domain: &str,
+        known_operations: &[&str],
+    ) -> Result<DispatchResult, DispatchError> {
         let operation = request.operation().to_ascii_lowercase();
-        match operation.as_str() {
-            "diagnostics" | "syntax" => self.write_not_implemented(writer, "verify", &operation),
-            _ => Err(DispatchError::unknown_operation("verify", operation)),
+        if known_operations.contains(&operation.as_str()) {
+            self.write_not_implemented(writer, domain, &operation)
+        } else {
+            Err(DispatchError::unknown_operation(domain, operation))
         }
     }
 
@@ -181,6 +202,29 @@ mod tests {
         CommandRequest::parse(json.as_bytes()).expect("test request")
     }
 
+    fn assert_routes_operations(domain: &str, operations: &[&str]) {
+        let router = DomainRouter::new();
+        for op in operations {
+            let request = make_request(domain, op);
+            let mut output = Vec::new();
+            let mut writer = ResponseWriter::new(&mut output);
+            let result = router.route(&request, &mut writer);
+            assert!(result.is_ok(), "{domain} {op} should route successfully");
+        }
+    }
+
+    fn assert_rejects_unknown_operation(domain: &str, operation: &str) {
+        let router = DomainRouter::new();
+        let request = make_request(domain, operation);
+        let mut output = Vec::new();
+        let mut writer = ResponseWriter::new(&mut output);
+        let result = router.route(&request, &mut writer);
+        assert!(matches!(
+            result,
+            Err(DispatchError::UnknownOperation { .. })
+        ));
+    }
+
     #[test]
     fn domain_parse_case_insensitive() {
         assert_eq!(Domain::parse("observe").unwrap(), Domain::Observe);
@@ -200,70 +244,39 @@ mod tests {
 
     #[test]
     fn routes_known_observe_operations() {
-        let router = DomainRouter::new();
-        for op in &["get-definition", "find-references", "grep", "diagnostics"] {
-            let request = make_request("observe", op);
-            let mut output = Vec::new();
-            let mut writer = ResponseWriter::new(&mut output);
-            let result = router.route(&request, &mut writer);
-            assert!(result.is_ok(), "observe {op} should route successfully");
-        }
+        assert_routes_operations(
+            "observe",
+            &["get-definition", "find-references", "grep", "diagnostics"],
+        );
     }
 
     #[test]
     fn routes_known_act_operations() {
-        let router = DomainRouter::new();
-        for op in &[
-            "rename-symbol",
-            "apply-edits",
-            "apply-patch",
-            "apply-rewrite",
-            "refactor",
-        ] {
-            let request = make_request("act", op);
-            let mut output = Vec::new();
-            let mut writer = ResponseWriter::new(&mut output);
-            let result = router.route(&request, &mut writer);
-            assert!(result.is_ok(), "act {op} should route successfully");
-        }
+        assert_routes_operations(
+            "act",
+            &[
+                "rename-symbol",
+                "apply-edits",
+                "apply-patch",
+                "apply-rewrite",
+                "refactor",
+            ],
+        );
     }
 
     #[test]
     fn routes_known_verify_operations() {
-        let router = DomainRouter::new();
-        for op in &["diagnostics", "syntax"] {
-            let request = make_request("verify", op);
-            let mut output = Vec::new();
-            let mut writer = ResponseWriter::new(&mut output);
-            let result = router.route(&request, &mut writer);
-            assert!(result.is_ok(), "verify {op} should route successfully");
-        }
+        assert_routes_operations("verify", &["diagnostics", "syntax"]);
     }
 
     #[test]
     fn rejects_unknown_observe_operation() {
-        let router = DomainRouter::new();
-        let request = make_request("observe", "nonexistent");
-        let mut output = Vec::new();
-        let mut writer = ResponseWriter::new(&mut output);
-        let result = router.route(&request, &mut writer);
-        assert!(matches!(
-            result,
-            Err(DispatchError::UnknownOperation { .. })
-        ));
+        assert_rejects_unknown_operation("observe", "nonexistent");
     }
 
     #[test]
     fn rejects_unknown_act_operation() {
-        let router = DomainRouter::new();
-        let request = make_request("act", "bogus");
-        let mut output = Vec::new();
-        let mut writer = ResponseWriter::new(&mut output);
-        let result = router.route(&request, &mut writer);
-        assert!(matches!(
-            result,
-            Err(DispatchError::UnknownOperation { .. })
-        ));
+        assert_rejects_unknown_operation("act", "bogus");
     }
 
     #[test]

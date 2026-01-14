@@ -35,7 +35,7 @@ and streams `CommandResponse` messages back.
 
 ## Module Structure
 
-```
+```text
 crates/weaverd/src/
   dispatch/
     mod.rs           # Module exports (~30 lines)
@@ -51,6 +51,7 @@ crates/weaverd/src/
 ### Step 1: Create dispatch/errors.rs
 
 Define `DispatchError` enum with variants:
+
 - `MalformedJsonl { message, source }` - Invalid JSON
 - `InvalidStructure { message }` - Missing/empty fields
 - `UnknownDomain { domain }` - Unrecognised domain
@@ -64,6 +65,7 @@ Implement `exit_status()` returning non-zero codes for all variants.
 
 Define `CommandRequest` and `CommandDescriptor` structs with serde derive.
 Implement:
+
 - `CommandRequest::parse(line: &[u8]) -> Result<Self, DispatchError>`
 - `CommandRequest::validate() -> Result<(), DispatchError>`
 - Helper `trim_trailing_whitespace(bytes: &[u8]) -> &[u8]`
@@ -71,6 +73,7 @@ Implement:
 ### Step 3: Create dispatch/response.rs
 
 Define `DaemonMessage` enum:
+
 ```rust
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum DaemonMessage {
@@ -80,6 +83,7 @@ enum DaemonMessage {
 ```
 
 Implement `ResponseWriter<W: Write>` with methods:
+
 - `write_message(&mut self, msg: &DaemonMessage)`
 - `write_stdout(&mut self, data: impl Into<String>)`
 - `write_stderr(&mut self, data: impl Into<String>)`
@@ -91,12 +95,14 @@ Implement `ResponseWriter<W: Write>` with methods:
 Define `Domain` enum (`Observe`, `Act`, `Verify`) with `parse()` method.
 
 Implement `DomainRouter` with:
+
 - `route(&self, request, writer) -> Result<DispatchResult, DispatchError>`
 - `route_observe()` - Routes known observe operations
 - `route_act()` - Routes known act operations
 - `route_verify()` - Routes known verify operations
 
 Known operations (MVP returns "not implemented"):
+
 - **observe**: `get-definition`, `find-references`, `grep`, `diagnostics`,
   `call-hierarchy`
 - **act**: `rename-symbol`, `apply-edits`, `apply-patch`, `apply-rewrite`,
@@ -106,6 +112,7 @@ Known operations (MVP returns "not implemented"):
 ### Step 5: Create dispatch/handler.rs
 
 Implement `DispatchConnectionHandler`:
+
 ```rust
 impl ConnectionHandler for DispatchConnectionHandler {
     fn handle(&self, stream: ConnectionStream) {
@@ -127,11 +134,13 @@ Export public types and declare the module structure.
 ### Step 7: Wire into launch sequence
 
 Modify `crates/weaverd/src/process/launch.rs`:
+
 - Add `use crate::dispatch::DispatchConnectionHandler;`
 - Replace: `let handler = Arc::new(NoopConnectionHandler);`
 - With: `let handler = Arc::new(DispatchConnectionHandler::new());`
 
 Modify `crates/weaverd/src/lib.rs`:
+
 - Add `mod dispatch;`
 
 ### Step 8: Create BDD feature file
@@ -177,6 +186,7 @@ Feature: Daemon JSONL request dispatch
 File: `crates/weaverd/src/tests/dispatch_behaviour.rs`
 
 Implement:
+
 - `DispatchWorld` struct with listener, address, response storage
 - Fixture: `world() -> RefCell<DispatchWorld>`
 - Given steps: connection establishment
@@ -190,6 +200,7 @@ Update `crates/weaverd/src/tests/mod.rs` to include `dispatch_behaviour`.
 
 Modify `docs/users-guide.md` to update the description of the daemon request
 handling:
+
 - Request parsing validates JSONL structure
 - Domain routing supports `observe`, `act`, `verify`
 - Unknown domains/operations return structured errors
@@ -198,11 +209,14 @@ handling:
 ### Step 11: Mark roadmap entry as done
 
 Update `docs/roadmap.md`, changing:
-```
+
+```markdown
 - [ ] Implement the JSONL request dispatch loop...
 ```
+
 To:
-```
+
+```markdown
 - [x] Implement the JSONL request dispatch loop...
 ```
 
