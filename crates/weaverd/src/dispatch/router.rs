@@ -75,6 +75,44 @@ impl DispatchResult {
     }
 }
 
+/// Context for routing operations within a domain.
+pub struct DomainRoutingContext {
+    domain: &'static str,
+    known_operations: &'static [&'static str],
+}
+
+impl DomainRoutingContext {
+    /// Routing context for the `observe` domain.
+    const OBSERVE: Self = Self {
+        domain: "observe",
+        known_operations: &[
+            "get-definition",
+            "find-references",
+            "grep",
+            "diagnostics",
+            "call-hierarchy",
+        ],
+    };
+
+    /// Routing context for the `act` domain.
+    const ACT: Self = Self {
+        domain: "act",
+        known_operations: &[
+            "rename-symbol",
+            "apply-edits",
+            "apply-patch",
+            "apply-rewrite",
+            "refactor",
+        ],
+    };
+
+    /// Routing context for the `verify` domain.
+    const VERIFY: Self = Self {
+        domain: "verify",
+        known_operations: &["diagnostics", "syntax"],
+    };
+}
+
 /// Routes commands to domain handlers.
 ///
 /// The router parses the domain from the request, validates the operation, and
@@ -88,27 +126,6 @@ impl DomainRouter {
     pub fn new() -> Self {
         Self
     }
-
-    /// Known operations for the `observe` domain.
-    const OBSERVE_OPERATIONS: &'static [&'static str] = &[
-        "get-definition",
-        "find-references",
-        "grep",
-        "diagnostics",
-        "call-hierarchy",
-    ];
-
-    /// Known operations for the `act` domain.
-    const ACT_OPERATIONS: &'static [&'static str] = &[
-        "rename-symbol",
-        "apply-edits",
-        "apply-patch",
-        "apply-rewrite",
-        "refactor",
-    ];
-
-    /// Known operations for the `verify` domain.
-    const VERIFY_OPERATIONS: &'static [&'static str] = &["diagnostics", "syntax"];
 
     /// Routes a command request to the appropriate domain handler.
     ///
@@ -141,7 +158,7 @@ impl DomainRouter {
         request: &CommandRequest,
         writer: &mut ResponseWriter<W>,
     ) -> Result<DispatchResult, DispatchError> {
-        self.route_domain(request, writer, "observe", Self::OBSERVE_OPERATIONS)
+        self.route_domain(request, writer, &DomainRoutingContext::OBSERVE)
     }
 
     fn route_act<W: Write>(
@@ -149,7 +166,7 @@ impl DomainRouter {
         request: &CommandRequest,
         writer: &mut ResponseWriter<W>,
     ) -> Result<DispatchResult, DispatchError> {
-        self.route_domain(request, writer, "act", Self::ACT_OPERATIONS)
+        self.route_domain(request, writer, &DomainRoutingContext::ACT)
     }
 
     fn route_verify<W: Write>(
@@ -157,22 +174,20 @@ impl DomainRouter {
         request: &CommandRequest,
         writer: &mut ResponseWriter<W>,
     ) -> Result<DispatchResult, DispatchError> {
-        self.route_domain(request, writer, "verify", Self::VERIFY_OPERATIONS)
+        self.route_domain(request, writer, &DomainRoutingContext::VERIFY)
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn route_domain<W: Write>(
         &self,
         request: &CommandRequest,
         writer: &mut ResponseWriter<W>,
-        domain: &str,
-        known_operations: &[&str],
+        context: &DomainRoutingContext,
     ) -> Result<DispatchResult, DispatchError> {
         let operation = request.operation().to_ascii_lowercase();
-        if known_operations.contains(&operation.as_str()) {
-            self.write_not_implemented(writer, domain, &operation)
+        if context.known_operations.contains(&operation.as_str()) {
+            self.write_not_implemented(writer, context.domain, &operation)
         } else {
-            Err(DispatchError::unknown_operation(domain, operation))
+            Err(DispatchError::unknown_operation(context.domain, operation))
         }
     }
 
