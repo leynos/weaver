@@ -44,7 +44,7 @@ impl Domain {
     }
 
     /// Returns the canonical string representation.
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Observe => "observe",
             Self::Act => "act",
@@ -65,12 +65,12 @@ impl DispatchResult {
     /// Currently unused pending backend wiring, but available for operations
     /// that complete successfully.
     #[expect(dead_code, reason = "planned for use in future dispatch backends")]
-    pub fn success() -> Self {
+    pub const fn success() -> Self {
         Self { status: 0 }
     }
 
     /// Creates a result with the given status code.
-    pub fn with_status(status: i32) -> Self {
+    pub const fn with_status(status: i32) -> Self {
         Self { status }
     }
 }
@@ -123,7 +123,7 @@ pub struct DomainRouter;
 
 impl DomainRouter {
     /// Creates a new domain router.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self
     }
 
@@ -251,7 +251,7 @@ mod tests {
     #[case::verify_lower("verify", Domain::Verify)]
     #[case::verify_upper("VERIFY", Domain::Verify)]
     fn domain_parse_case_insensitive(#[case] input: &str, #[case] expected: Domain) {
-        assert_eq!(Domain::parse(input).unwrap(), expected);
+        assert_eq!(Domain::parse(input).expect("parse domain"), expected);
     }
 
     #[test]
