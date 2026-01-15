@@ -18,9 +18,9 @@ and streams `CommandResponse` messages back.
    separation of concerns (errors, request parsing, response writing, routing,
    and connection handling). Each file remains under 400 lines per AGENTS.md.
 
-2. **Minimum viable product (MVP) placeholder handlers**: Known operations return "not implemented"
-   responses with exit status 1. This establishes the routing infrastructure
-   without requiring full backend integration.
+2. **Minimum viable product (MVP) placeholder handlers**: Known operations
+   return "not implemented" responses with exit status 1. This establishes
+   the routing infrastructure without requiring full backend integration.
 
 3. **Structured error responses**: All errors (malformed JSONL, unknown domain,
    unknown operation) are written to stderr as structured messages before the
@@ -236,7 +236,7 @@ make test 2>&1 | tee /tmp/test.log
 ## Files Modified
 
 | File | Action |
-|------|--------|
+| ---- | ------ |
 | `crates/weaverd/src/dispatch/mod.rs` | Created |
 | `crates/weaverd/src/dispatch/errors.rs` | Created |
 | `crates/weaverd/src/dispatch/request.rs` | Created |
