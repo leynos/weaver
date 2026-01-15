@@ -94,6 +94,8 @@ fn trim_trailing_whitespace(bytes: &[u8]) -> &[u8] {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
 
     #[test]
@@ -121,38 +123,19 @@ mod tests {
         assert_eq!(request.domain(), "observe");
     }
 
-    #[test]
-    fn rejects_empty_input() {
-        let result = CommandRequest::parse(b"");
+    #[rstest]
+    #[case::empty_input(b"")]
+    #[case::whitespace_only(b"   \n")]
+    #[case::invalid_json(b"not json")]
+    fn rejects_malformed_input(#[case] input: &[u8]) {
+        let result = CommandRequest::parse(input);
         assert!(matches!(result, Err(DispatchError::MalformedJsonl { .. })));
     }
 
-    #[test]
-    fn rejects_whitespace_only() {
-        let result = CommandRequest::parse(b"   \n");
-        assert!(matches!(result, Err(DispatchError::MalformedJsonl { .. })));
-    }
-
-    #[test]
-    fn rejects_invalid_json() {
-        let result = CommandRequest::parse(b"not json");
-        assert!(matches!(result, Err(DispatchError::MalformedJsonl { .. })));
-    }
-
-    #[test]
-    fn validates_empty_domain() {
-        let input = br#"{"command":{"domain":"","operation":"test"}}"#;
-        let request = CommandRequest::parse(input).expect("parse");
-        let result = request.validate();
-        assert!(matches!(
-            result,
-            Err(DispatchError::InvalidStructure { .. })
-        ));
-    }
-
-    #[test]
-    fn validates_empty_operation() {
-        let input = br#"{"command":{"domain":"observe","operation":""}}"#;
+    #[rstest]
+    #[case::empty_domain(br#"{"command":{"domain":"","operation":"test"}}"#)]
+    #[case::empty_operation(br#"{"command":{"domain":"observe","operation":""}}"#)]
+    fn validates_empty_fields(#[case] input: &[u8]) {
         let request = CommandRequest::parse(input).expect("parse");
         let result = request.validate();
         assert!(matches!(

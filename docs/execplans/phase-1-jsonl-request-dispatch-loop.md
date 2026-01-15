@@ -183,7 +183,7 @@ Feature: Daemon JSONL request dispatch
 
 ### Step 9: Create BDD step definitions
 
-File: `crates/weaverd/tests/dispatch_behaviour.rs`
+File: `crates/weaverd/src/tests/dispatch_behaviour.rs`
 
 Implement:
 
@@ -194,7 +194,7 @@ Implement:
 - Then steps: verify response content and exit codes
 - Scenario binding with `#[scenario]` macro
 
-Update `crates/weaverd/tests/mod.rs` to include `dispatch_behaviour`.
+Update `crates/weaverd/src/tests/mod.rs` to include `dispatch_behaviour`.
 
 ### Step 10: Update user's guide
 
@@ -242,8 +242,8 @@ make test 2>&1 | tee /tmp/test.log
 | `crates/weaverd/src/lib.rs` | Modified (add `mod dispatch;`) |
 | `crates/weaverd/src/process/launch.rs` | Modified (use DispatchConnectionHandler) |
 | `crates/weaverd/tests/features/daemon_dispatch.feature` | Created |
-| `crates/weaverd/tests/dispatch_behaviour.rs` | Created |
-| `crates/weaverd/tests/mod.rs` | Modified (add `mod dispatch_behaviour;`) |
+| `crates/weaverd/src/tests/dispatch_behaviour.rs` | Created |
+| `crates/weaverd/src/tests/mod.rs` | Modified (add `mod dispatch_behaviour;`) |
 | `docs/users-guide.md` | Modified (update daemon description) |
 | `docs/roadmap.md` | Modified (mark entry done) |
 | `docs/execplans/phase-1-jsonl-request-dispatch-loop.md` | Created |

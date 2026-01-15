@@ -206,6 +206,8 @@ impl DomainRouter {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
     use crate::dispatch::request::CommandRequest;
 
@@ -240,15 +242,16 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn domain_parse_case_insensitive() {
-        assert_eq!(Domain::parse("observe").unwrap(), Domain::Observe);
-        assert_eq!(Domain::parse("OBSERVE").unwrap(), Domain::Observe);
-        assert_eq!(Domain::parse("Observe").unwrap(), Domain::Observe);
-        assert_eq!(Domain::parse("act").unwrap(), Domain::Act);
-        assert_eq!(Domain::parse("ACT").unwrap(), Domain::Act);
-        assert_eq!(Domain::parse("verify").unwrap(), Domain::Verify);
-        assert_eq!(Domain::parse("VERIFY").unwrap(), Domain::Verify);
+    #[rstest]
+    #[case::observe_lower("observe", Domain::Observe)]
+    #[case::observe_upper("OBSERVE", Domain::Observe)]
+    #[case::observe_mixed("Observe", Domain::Observe)]
+    #[case::act_lower("act", Domain::Act)]
+    #[case::act_upper("ACT", Domain::Act)]
+    #[case::verify_lower("verify", Domain::Verify)]
+    #[case::verify_upper("VERIFY", Domain::Verify)]
+    fn domain_parse_case_insensitive(#[case] input: &str, #[case] expected: Domain) {
+        assert_eq!(Domain::parse(input).unwrap(), expected);
     }
 
     #[test]
