@@ -275,14 +275,29 @@ mod tests {
         assert_routes_operations("verify", DomainRoutingContext::VERIFY.known_operations);
     }
 
-    #[test]
-    fn rejects_unknown_observe_operation() {
-        assert_rejects_unknown_operation("observe", "nonexistent");
+    #[rstest]
+    #[case::observe("observe", "nonexistent")]
+    #[case::act("act", "bogus")]
+    #[case::verify("verify", "unknown")]
+    fn rejects_unknown_operation(#[case] domain: &str, #[case] operation: &str) {
+        assert_rejects_unknown_operation(domain, operation);
     }
 
-    #[test]
-    fn rejects_unknown_act_operation() {
-        assert_rejects_unknown_operation("act", "bogus");
+    #[rstest]
+    #[case::upper("observe", "GET-DEFINITION")]
+    #[case::mixed("observe", "Get-Definition")]
+    #[case::title("act", "Apply-Patch")]
+    #[case::screaming("verify", "DIAGNOSTICS")]
+    fn routes_operations_case_insensitively(#[case] domain: &str, #[case] operation: &str) {
+        let router = DomainRouter::new();
+        let request = make_request(domain, operation);
+        let mut output = Vec::new();
+        let mut writer = ResponseWriter::new(&mut output);
+        let result = router.route(&request, &mut writer);
+        assert!(
+            result.is_ok(),
+            "{domain} {operation} should route successfully despite case"
+        );
     }
 
     #[test]
