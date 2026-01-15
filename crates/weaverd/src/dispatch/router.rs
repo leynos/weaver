@@ -77,8 +77,8 @@ impl DispatchResult {
 
 /// Context for routing operations within a domain.
 pub struct DomainRoutingContext {
-    domain: &'static str,
-    known_operations: &'static [&'static str],
+    pub(crate) domain: &'static str,
+    pub(crate) known_operations: &'static [&'static str],
 }
 
 impl DomainRoutingContext {
@@ -259,35 +259,17 @@ mod tests {
 
     #[test]
     fn routes_known_observe_operations() {
-        assert_routes_operations(
-            "observe",
-            &[
-                "get-definition",
-                "find-references",
-                "grep",
-                "diagnostics",
-                "call-hierarchy",
-            ],
-        );
+        assert_routes_operations("observe", DomainRoutingContext::OBSERVE.known_operations);
     }
 
     #[test]
     fn routes_known_act_operations() {
-        assert_routes_operations(
-            "act",
-            &[
-                "rename-symbol",
-                "apply-edits",
-                "apply-patch",
-                "apply-rewrite",
-                "refactor",
-            ],
-        );
+        assert_routes_operations("act", DomainRoutingContext::ACT.known_operations);
     }
 
     #[test]
     fn routes_known_verify_operations() {
-        assert_routes_operations("verify", &["diagnostics", "syntax"]);
+        assert_routes_operations("verify", DomainRoutingContext::VERIFY.known_operations);
     }
 
     #[test]
