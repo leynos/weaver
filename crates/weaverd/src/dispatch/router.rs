@@ -261,7 +261,13 @@ mod tests {
     fn routes_known_observe_operations() {
         assert_routes_operations(
             "observe",
-            &["get-definition", "find-references", "grep", "diagnostics"],
+            &[
+                "get-definition",
+                "find-references",
+                "grep",
+                "diagnostics",
+                "call-hierarchy",
+            ],
         );
     }
 

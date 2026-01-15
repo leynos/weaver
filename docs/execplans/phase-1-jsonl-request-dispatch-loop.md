@@ -9,7 +9,7 @@ and streams `CommandResponse` messages back.
 ## Acceptance Criteria
 
 - Request parsing rejects malformed JSONL with structured errors
-- Domain routing covers `observe` and `act` commands
+- Domain routing covers `observe`, `act`, and `verify` commands
 - Responses include the terminal `exit` message with appropriate status codes
 
 ## Design Decisions
@@ -54,8 +54,8 @@ Define `DispatchError` enum with variants:
 
 - `MalformedJsonl { message, source }` - Invalid JSON
 - `InvalidStructure { message }` - Missing/empty fields
-- `UnknownDomain { domain }` - Unrecognised domain
-- `UnknownOperation { domain, operation }` - Unrecognised operation
+- `UnknownDomain { domain }` - Unrecognized domain
+- `UnknownOperation { domain, operation }` - Unrecognized operation
 - `Io(io::Error)` - IO failures
 - `SerializeResponse(serde_json::Error)` - Response serialization
 
@@ -195,6 +195,10 @@ Implement:
 - Scenario binding with `#[scenario]` macro
 
 Update `crates/weaverd/src/tests/mod.rs` to include `dispatch_behaviour`.
+
+Note: The step definitions file is placed in `src/tests/` because `rstest-bdd-macros`
+requires the step definitions to be in the same crate as the code under test for
+proper macro expansion. The feature file remains in `tests/features/`.
 
 ### Step 10: Update user's guide
 

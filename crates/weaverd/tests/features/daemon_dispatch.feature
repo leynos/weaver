@@ -33,3 +33,9 @@ Feature: Daemon JSONL request dispatch
     When a valid act apply-patch request is sent
     Then the response includes an exit message with status 1
     And the response includes a not implemented message
+
+  Scenario: Dispatching a valid verify command
+    Given a daemon connection is established
+    When a valid verify diagnostics request is sent
+    Then the response includes an exit message with status 1
+    And the response includes a not implemented message

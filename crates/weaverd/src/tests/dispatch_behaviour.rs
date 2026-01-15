@@ -41,7 +41,9 @@ impl DispatchWorld {
     fn send_request(&mut self, request: &str) {
         let addr = self.address.expect("address set");
         let mut stream = TcpStream::connect(addr).expect("connect");
-        stream.set_read_timeout(Some(Duration::from_secs(2))).ok();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .expect("set read timeout");
 
         stream.write_all(request.as_bytes()).expect("write request");
         stream.write_all(b"\n").expect("write newline");
@@ -117,6 +119,13 @@ fn when_valid_act_request(world: &RefCell<DispatchWorld>) {
     world
         .borrow_mut()
         .send_request(r#"{"command":{"domain":"act","operation":"apply-patch"}}"#);
+}
+
+#[when("a valid verify diagnostics request is sent")]
+fn when_valid_verify_request(world: &RefCell<DispatchWorld>) {
+    world
+        .borrow_mut()
+        .send_request(r#"{"command":{"domain":"verify","operation":"diagnostics"}}"#);
 }
 
 #[when("a malformed JSONL request is sent")]
