@@ -14,12 +14,6 @@ use super::errors::DispatchError;
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StreamTarget {
-    /// Standard output stream.
-    ///
-    /// Currently unused pending backend wiring, but required for protocol
-    /// completeness with `weaver-cli`.
-    #[allow(dead_code)]
-    Stdout,
     /// Standard error stream.
     Stderr,
 }
@@ -47,18 +41,6 @@ pub enum DaemonMessage {
 }
 
 impl DaemonMessage {
-    /// Creates a stdout stream message.
-    ///
-    /// Currently unused pending backend wiring, but required for protocol
-    /// completeness with `weaver-cli`.
-    #[allow(dead_code)]
-    pub fn stdout(data: impl Into<String>) -> Self {
-        Self::Stream {
-            stream: StreamTarget::Stdout,
-            data: data.into(),
-        }
-    }
-
     /// Creates a stderr stream message.
     pub fn stderr(data: impl Into<String>) -> Self {
         Self::Stream {
@@ -98,19 +80,6 @@ impl<W: Write> ResponseWriter<W> {
         Ok(())
     }
 
-    /// Writes a stream message to stdout.
-    ///
-    /// Currently unused pending backend wiring, but required for protocol
-    /// completeness with `weaver-cli`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if writing fails.
-    #[allow(dead_code)]
-    pub fn write_stdout(&mut self, data: impl Into<String>) -> Result<(), DispatchError> {
-        self.write_message(&DaemonMessage::stdout(data))
-    }
-
     /// Writes a stream message to stderr.
     ///
     /// # Errors
@@ -143,19 +112,6 @@ impl<W: Write> ResponseWriter<W> {
         self.write_stderr(format!("error: {error}\n"))?;
         self.write_exit(error.exit_status())
     }
-
-    /// Flushes the underlying writer.
-    ///
-    /// Currently unused but available for future use.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if flushing fails.
-    #[allow(dead_code)]
-    pub fn flush(&mut self) -> Result<(), DispatchError> {
-        self.writer.flush()?;
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -172,18 +128,6 @@ mod tests {
         assert!(response.contains(r#""kind":"exit""#));
         assert!(response.contains(r#""status":0"#));
         assert!(response.ends_with('\n'));
-    }
-
-    #[test]
-    fn writes_stdout_stream() {
-        let mut output = Vec::new();
-        let mut writer = ResponseWriter::new(&mut output);
-        writer.write_stdout("hello").expect("write stdout");
-
-        let response = String::from_utf8(output).expect("valid utf8");
-        assert!(response.contains(r#""kind":"stream""#));
-        assert!(response.contains(r#""stream":"stdout""#));
-        assert!(response.contains(r#""data":"hello""#));
     }
 
     #[test]

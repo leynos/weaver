@@ -17,7 +17,7 @@ use super::response::ResponseWriter;
 use super::router::{DISPATCH_TARGET, DomainRouter};
 
 /// Maximum size of a single request line in bytes.
-const MAX_REQUEST_BYTES: usize = 64 * 1024;
+pub(crate) const MAX_REQUEST_BYTES: usize = 64 * 1024;
 
 /// Connection handler that parses and dispatches JSONL commands.
 ///
@@ -49,8 +49,7 @@ impl DispatchConnectionHandler {
             Err(error) => {
                 warn!(target: DISPATCH_TARGET, %error, "failed to read request");
                 let mut writer = ResponseWriter::new(&mut stream);
-                let dispatch_error = DispatchError::Io(error);
-                let _ = writer.write_error(&dispatch_error);
+                let _ = writer.write_error(&error);
                 return;
             }
         };
@@ -108,7 +107,7 @@ impl ConnectionHandler for DispatchConnectionHandler {
 /// Returns `Ok(Some(bytes))` when a complete line (or EOF with partial data)
 /// is received. Returns an error if reading fails or the request exceeds the
 /// maximum size.
-fn read_request_line(stream: &mut ConnectionStream) -> io::Result<Option<Vec<u8>>> {
+fn read_request_line(stream: &mut ConnectionStream) -> Result<Option<Vec<u8>>, DispatchError> {
     let mut buffer = Vec::new();
     let mut chunk = [0_u8; 1024];
 
@@ -146,12 +145,9 @@ fn read_with_retry(stream: &mut ConnectionStream, buf: &mut [u8]) -> io::Result<
 }
 
 /// Enforces the maximum request size limit.
-fn enforce_limit(size: usize) -> io::Result<()> {
+fn enforce_limit(size: usize) -> Result<(), DispatchError> {
     if size > MAX_REQUEST_BYTES {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "request exceeds maximum size",
-        ));
+        return Err(DispatchError::request_too_large(size, MAX_REQUEST_BYTES));
     }
     Ok(())
 }
@@ -159,100 +155,96 @@ fn enforce_limit(size: usize) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use std::io::{BufRead, BufReader, Write};
-    use std::net::{TcpListener, TcpStream};
-    use std::thread;
+    use std::net::{SocketAddr, TcpListener, TcpStream};
+    use std::thread::{self, JoinHandle};
+
+    use rstest::{fixture, rstest};
 
     use super::*;
 
-    #[test]
-    fn handler_responds_to_valid_request() {
+    /// Test fixture providing a TCP server/client pair for dispatch handler testing.
+    struct HandlerTestHarness {
+        client: TcpStream,
+        server_handle: JoinHandle<()>,
+    }
+
+    impl HandlerTestHarness {
+        /// Sends request bytes and retrieves all response lines.
+        fn send_and_collect(&mut self, request: &[u8]) -> Vec<String> {
+            self.client.write_all(request).expect("write request");
+            self.client.flush().expect("flush");
+
+            let mut reader = BufReader::new(&mut self.client);
+            let mut lines = Vec::new();
+            let mut line = String::new();
+            while reader.read_line(&mut line).expect("read") > 0 {
+                lines.push(line.clone());
+                line.clear();
+            }
+            lines
+        }
+
+        /// Waits for the server thread to complete.
+        fn join(self) {
+            self.server_handle.join().expect("server join");
+        }
+    }
+
+    /// Creates a TCP listener and returns the listener and its address.
+    fn create_listener() -> (TcpListener, SocketAddr) {
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
         let addr = listener.local_addr().expect("addr");
+        (listener, addr)
+    }
 
-        let server = thread::spawn(move || {
+    #[fixture]
+    fn harness() -> HandlerTestHarness {
+        let (listener, addr) = create_listener();
+
+        let server_handle = thread::spawn(move || {
             let (stream, _) = listener.accept().expect("accept");
             DispatchConnectionHandler::new().handle(ConnectionStream::Tcp(stream));
         });
 
-        let mut client = TcpStream::connect(addr).expect("connect");
-        client
-            .write_all(br#"{"command":{"domain":"observe","operation":"get-definition"}}"#)
-            .expect("write");
-        client.write_all(b"\n").expect("newline");
-        client.flush().expect("flush");
-
-        let mut reader = BufReader::new(&mut client);
-        let mut lines = Vec::new();
-        let mut line = String::new();
-        while reader.read_line(&mut line).expect("read") > 0 {
-            lines.push(line.clone());
-            line.clear();
+        let client = TcpStream::connect(addr).expect("connect");
+        HandlerTestHarness {
+            client,
+            server_handle,
         }
+    }
+
+    #[rstest]
+    fn handler_responds_to_valid_request(mut harness: HandlerTestHarness) {
+        let lines = harness.send_and_collect(
+            b"{\"command\":{\"domain\":\"observe\",\"operation\":\"get-definition\"}}\n",
+        );
 
         // Should have stderr message and exit message
         assert!(lines.iter().any(|l| l.contains("not yet implemented")));
         assert!(lines.iter().any(|l| l.contains(r#""kind":"exit""#)));
 
-        server.join().expect("join");
+        harness.join();
     }
 
-    #[test]
-    fn handler_rejects_malformed_json() {
-        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
-        let addr = listener.local_addr().expect("addr");
-
-        let server = thread::spawn(move || {
-            let (stream, _) = listener.accept().expect("accept");
-            DispatchConnectionHandler::new().handle(ConnectionStream::Tcp(stream));
-        });
-
-        let mut client = TcpStream::connect(addr).expect("connect");
-        client.write_all(b"not valid json\n").expect("write");
-        client.flush().expect("flush");
-
-        let mut reader = BufReader::new(&mut client);
-        let mut lines = Vec::new();
-        let mut line = String::new();
-        while reader.read_line(&mut line).expect("read") > 0 {
-            lines.push(line.clone());
-            line.clear();
-        }
+    #[rstest]
+    fn handler_rejects_malformed_json(mut harness: HandlerTestHarness) {
+        let lines = harness.send_and_collect(b"not valid json\n");
 
         // Should have error message
         assert!(lines.iter().any(|l| l.contains("error:")));
         assert!(lines.iter().any(|l| l.contains(r#""status":1"#)));
 
-        server.join().expect("join");
+        harness.join();
     }
 
-    #[test]
-    fn handler_rejects_unknown_domain() {
-        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
-        let addr = listener.local_addr().expect("addr");
-
-        let server = thread::spawn(move || {
-            let (stream, _) = listener.accept().expect("accept");
-            DispatchConnectionHandler::new().handle(ConnectionStream::Tcp(stream));
-        });
-
-        let mut client = TcpStream::connect(addr).expect("connect");
-        client
-            .write_all(br#"{"command":{"domain":"bogus","operation":"test"}}"#)
-            .expect("write");
-        client.write_all(b"\n").expect("newline");
-        client.flush().expect("flush");
-
-        let mut reader = BufReader::new(&mut client);
-        let mut lines = Vec::new();
-        let mut line = String::new();
-        while reader.read_line(&mut line).expect("read") > 0 {
-            lines.push(line.clone());
-            line.clear();
-        }
+    #[rstest]
+    fn handler_rejects_unknown_domain(mut harness: HandlerTestHarness) {
+        let lines = harness
+            .send_and_collect(b"{\"command\":{\"domain\":\"bogus\",\"operation\":\"test\"}}\n");
 
         assert!(lines.iter().any(|l| l.contains("unknown domain")));
         assert!(lines.iter().any(|l| l.contains(r#""status":1"#)));
 
-        server.join().expect("join");
+        harness.join();
     }
 }

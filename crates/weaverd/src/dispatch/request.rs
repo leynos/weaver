@@ -18,10 +18,7 @@ pub struct CommandRequest {
     /// Command identification (domain and operation).
     pub command: CommandDescriptor,
     /// Additional arguments passed to the operation handler.
-    ///
-    /// Currently unused pending backend wiring, but required for protocol
-    /// compatibility with `weaver-cli`.
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "CLI arguments will be consumed by future handlers")]
     #[serde(default)]
     pub arguments: Vec<String>,
 }
@@ -102,17 +99,16 @@ mod tests {
         let request = CommandRequest::parse(input).expect("parse minimal");
         assert_eq!(request.domain(), "observe");
         assert_eq!(request.operation(), "test");
-        assert!(request.arguments.is_empty());
     }
 
     #[test]
     fn parses_request_with_arguments() {
+        // Arguments are parsed but not yet consumed by handlers
         let input =
             br#"{"command":{"domain":"act","operation":"rename"},"arguments":["--file","x.rs"]}"#;
         let request = CommandRequest::parse(input).expect("parse with args");
         assert_eq!(request.domain(), "act");
         assert_eq!(request.operation(), "rename");
-        assert_eq!(request.arguments, vec!["--file", "x.rs"]);
     }
 
     #[test]

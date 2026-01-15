@@ -31,6 +31,10 @@ pub enum DispatchError {
     #[error("unknown operation '{operation}' for domain '{domain}'")]
     UnknownOperation { domain: String, operation: String },
 
+    /// Request exceeds the maximum allowed size.
+    #[error("request too large: {size} bytes exceeds {max_size} byte limit")]
+    RequestTooLarge { size: usize, max_size: usize },
+
     /// IO error during read or write.
     #[error("IO error: {0}")]
     Io(#[from] io::Error),
@@ -51,7 +55,8 @@ impl DispatchError {
             Self::MalformedJsonl { .. }
             | Self::InvalidStructure { .. }
             | Self::UnknownDomain { .. }
-            | Self::UnknownOperation { .. } => 1,
+            | Self::UnknownOperation { .. }
+            | Self::RequestTooLarge { .. } => 1,
             Self::Io(_) | Self::SerializeResponse(_) => 2,
         }
     }
@@ -92,5 +97,10 @@ impl DispatchError {
             domain: domain.into(),
             operation: operation.into(),
         }
+    }
+
+    /// Creates a request too large error.
+    pub fn request_too_large(size: usize, max_size: usize) -> Self {
+        Self::RequestTooLarge { size, max_size }
     }
 }

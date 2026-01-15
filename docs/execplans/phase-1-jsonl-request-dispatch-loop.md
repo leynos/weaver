@@ -1,4 +1,4 @@
-# Phase 1: JSONL Request Dispatch Loop
+# Phase 1: JSON Lines (JSONL) Request Dispatch Loop
 
 ## Goal
 
@@ -18,7 +18,7 @@ and streams `CommandResponse` messages back.
    separation of concerns (errors, request parsing, response writing, routing,
    and connection handling). Each file remains under 400 lines per AGENTS.md.
 
-2. **MVP placeholder handlers**: Known operations return "not implemented"
+2. **Minimum viable product (MVP) placeholder handlers**: Known operations return "not implemented"
    responses with exit status 1. This establishes the routing infrastructure
    without requiring full backend integration.
 
@@ -143,7 +143,7 @@ Modify `crates/weaverd/src/lib.rs`:
 
 - Add `mod dispatch;`
 
-### Step 8: Create BDD feature file
+### Step 8: Create behaviour-driven development (BDD) feature file
 
 File: `crates/weaverd/tests/features/daemon_dispatch.feature`
 

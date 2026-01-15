@@ -64,7 +64,7 @@ impl DispatchResult {
     ///
     /// Currently unused pending backend wiring, but available for operations
     /// that complete successfully.
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "planned for use in future dispatch backends")]
     pub fn success() -> Self {
         Self { status: 0 }
     }
