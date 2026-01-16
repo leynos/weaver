@@ -32,6 +32,7 @@
 
 mod backends;
 mod bootstrap;
+mod dispatch;
 mod health;
 mod placeholder_provider;
 mod process;

@@ -120,9 +120,16 @@ configured `--daemon-socket` endpoint and accepts multiple client connections
 concurrently. On Unix targets, stale socket files are removed only after
 confirming no listener responds, while actively used sockets cause the daemon
 to fail fast with a clear error. The listener removes the Unix socket file on
-shutdown to avoid lingering bind failures. While the request loop is still a
-placeholder, the daemon replies with a minimal JSONL exit message and closes
-the connection, so clients do not block waiting for a response.
+shutdown to avoid lingering bind failures.
+
+The daemon implements a JSONL request dispatch loop that reads `CommandRequest`
+messages from connected clients, routes them to the appropriate domain handler,
+and streams `DaemonMessage` responses back. Request parsing validates the JSONL
+structure and rejects malformed input with structured error messages. Domain
+routing supports `observe`, `act`, and `verify` commands. Unknown domains or
+operations return structured errors with exit status 1. Known operations
+currently return "not yet implemented" responses (pending backend wiring) with
+exit status 1; future phases will connect these to the semantic fusion backends.
 
 The health snapshot is a single-line JSON document describing the current
 state, enabling operators and automation to poll readiness without speaking the

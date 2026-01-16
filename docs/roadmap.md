@@ -57,7 +57,7 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
         accepts concurrent connections, and gracefully handles connection errors
         without crashing the daemon.
 
-- [ ] Implement the JSONL request dispatch loop in `weaverd` that reads
+- [x] Implement the JSONL request dispatch loop in `weaverd` that reads
       `CommandRequest` messages from connected clients, routes them to the
       appropriate domain handler, and streams `CommandResponse` messages back.
       - Acceptance criteria: Request parsing rejects malformed JSONL with

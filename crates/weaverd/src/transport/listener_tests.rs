@@ -10,7 +10,7 @@ use rstest::{fixture, rstest};
 use weaver_config::SocketEndpoint;
 
 use super::listener::SocketListener;
-use super::{ConnectionHandler, CountingHandler, ListenerError, NoopConnectionHandler};
+use super::{ConnectionHandler, CountingHandler, ListenerError};
 
 #[derive(Clone)]
 struct CountingFixture {
@@ -78,7 +78,7 @@ fn unix_listener_cleans_stale_socket_files(unix_tempdir: tempfile::TempDir) {
 
     let endpoint = SocketEndpoint::unix(path.to_str().expect("utf8 path").to_string());
     let listener = SocketListener::bind(&endpoint).expect("bind new listener");
-    let handler = Arc::new(NoopConnectionHandler);
+    let (_, handler) = CountingHandler::new();
     let handle = listener.start(handler).expect("start listener");
 
     std::os::unix::net::UnixStream::connect(&path).expect("connect unix client");

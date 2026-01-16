@@ -12,7 +12,7 @@ mod listener_tests;
 mod test_utils;
 
 pub(crate) use self::errors::ListenerError;
-pub(crate) use self::handler::{ConnectionHandler, ConnectionStream, NoopConnectionHandler};
+pub(crate) use self::handler::{ConnectionHandler, ConnectionStream};
 #[cfg(test)]
 pub(crate) use self::listener::ListenerHandle;
 pub(crate) use self::listener::SocketListener;
