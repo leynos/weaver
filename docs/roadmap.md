@@ -65,7 +65,7 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
         and responses include the terminal `exit` message with appropriate
         status codes.
 
-- [ ] Wire end-to-end domain command execution from CLI through daemon to
+- [x] Wire end-to-end domain command execution from CLI through daemon to
       backend, starting with `observe get-definition` as the first complete
       path.
       - Acceptance criteria: `weaver observe get-definition` with a running

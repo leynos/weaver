@@ -5,8 +5,11 @@
 //! carries enough context to produce actionable error messages for clients.
 
 use std::io;
+use std::sync::Arc;
 
 use thiserror::Error;
+
+use crate::backends::BackendStartupError;
 
 /// Errors surfaced during request parsing and dispatch.
 #[derive(Debug, Error)]
@@ -42,22 +45,45 @@ pub enum DispatchError {
     /// Response serialization failed.
     #[error("failed to serialize response: {0}")]
     SerializeResponse(#[from] serde_json::Error),
+
+    /// Invalid or missing command arguments.
+    #[error("invalid arguments: {message}")]
+    InvalidArguments { message: String },
+
+    /// Backend failed to start.
+    #[error("backend startup failed: {0}")]
+    BackendStartup(#[source] Arc<BackendStartupError>),
+
+    /// LSP host operation failed.
+    #[error("LSP error for {language}: {message}")]
+    LspHost { language: String, message: String },
+
+    /// File extension does not map to a supported language.
+    #[error("unsupported language for extension: {extension}")]
+    UnsupportedLanguage { extension: String },
+
+    /// Internal error (e.g., lock poisoned).
+    #[error("internal error: {message}")]
+    Internal { message: String },
 }
 
 impl DispatchError {
     /// Returns the exit status code for this error.
     ///
-    /// All parsing and routing errors return status 1. IO and serialization
-    /// errors return status 2 to distinguish infrastructure failures from
-    /// protocol violations.
+    /// Protocol violations and argument errors return status 1. Infrastructure
+    /// failures (IO, serialization, internal) return status 2.
     pub fn exit_status(&self) -> i32 {
         match self {
             Self::MalformedJsonl { .. }
             | Self::InvalidStructure { .. }
             | Self::UnknownDomain { .. }
             | Self::UnknownOperation { .. }
-            | Self::RequestTooLarge { .. } => 1,
-            Self::Io(_) | Self::SerializeResponse(_) => 2,
+            | Self::RequestTooLarge { .. }
+            | Self::InvalidArguments { .. }
+            | Self::BackendStartup(_)
+            | Self::LspHost { .. }
+            | Self::UnsupportedLanguage { .. } => 1,
+            Self::Io(_) | Self::SerializeResponse(_) | Self::Internal { .. } => 2,
         }
     }
 
@@ -102,5 +128,39 @@ impl DispatchError {
     /// Creates a request too large error.
     pub fn request_too_large(size: usize, max_size: usize) -> Self {
         Self::RequestTooLarge { size, max_size }
+    }
+
+    /// Creates an invalid arguments error.
+    pub fn invalid_arguments(message: impl Into<String>) -> Self {
+        Self::InvalidArguments {
+            message: message.into(),
+        }
+    }
+
+    /// Creates a backend startup error.
+    pub fn backend_startup(error: BackendStartupError) -> Self {
+        Self::BackendStartup(Arc::new(error))
+    }
+
+    /// Creates an LSP host error.
+    pub fn lsp_host(language: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::LspHost {
+            language: language.into(),
+            message: message.into(),
+        }
+    }
+
+    /// Creates an unsupported language error.
+    pub fn unsupported_language(extension: impl Into<String>) -> Self {
+        Self::UnsupportedLanguage {
+            extension: extension.into(),
+        }
+    }
+
+    /// Creates an internal error.
+    pub fn internal(message: impl Into<String>) -> Self {
+        Self::Internal {
+            message: message.into(),
+        }
     }
 }

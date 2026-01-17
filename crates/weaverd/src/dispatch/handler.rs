@@ -6,9 +6,12 @@
 //! responses back to the client.
 
 use std::io::{self, Read};
+use std::sync::{Arc, Mutex};
 
 use tracing::{debug, warn};
 
+use crate::backends::FusionBackends;
+use crate::semantic_provider::SemanticBackendProvider;
 use crate::transport::{ConnectionHandler, ConnectionStream};
 
 use super::errors::DispatchError;
@@ -24,16 +27,18 @@ pub(crate) const MAX_REQUEST_BYTES: usize = 64 * 1024;
 /// Each connection is handled synchronously: the handler reads a single JSONL
 /// request line, parses it, routes it to the appropriate domain handler, and
 /// writes the response stream before closing the connection.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct DispatchConnectionHandler {
     router: DomainRouter,
+    backends: Arc<Mutex<FusionBackends<SemanticBackendProvider>>>,
 }
 
 impl DispatchConnectionHandler {
-    /// Creates a new dispatch handler.
-    pub fn new() -> Self {
+    /// Creates a new dispatch handler with shared backends.
+    pub fn new(backends: Arc<Mutex<FusionBackends<SemanticBackendProvider>>>) -> Self {
         Self {
             router: DomainRouter::new(),
+            backends,
         }
     }
 
@@ -80,8 +85,18 @@ impl DispatchConnectionHandler {
             "dispatching request"
         );
 
+        // Acquire backends lock
+        let mut backends = match self.backends.lock() {
+            Ok(guard) => guard,
+            Err(_) => {
+                warn!(target: DISPATCH_TARGET, "backends lock poisoned");
+                let _ = writer.write_error(&DispatchError::internal("backends lock poisoned"));
+                return;
+            }
+        };
+
         // Route and dispatch
-        match self.router.route(&request, &mut writer) {
+        match self.router.route(&request, &mut writer, &mut backends) {
             Ok(result) => {
                 if let Err(error) = writer.write_exit(result.status) {
                     warn!(target: DISPATCH_TARGET, %error, "failed to write exit");
@@ -159,8 +174,18 @@ mod tests {
     use std::thread::{self, JoinHandle};
 
     use rstest::{fixture, rstest};
+    use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
     use super::*;
+
+    fn test_backends() -> Arc<Mutex<FusionBackends<SemanticBackendProvider>>> {
+        let config = Config {
+            daemon_socket: SocketEndpoint::unix("/tmp/weaver-test/socket.sock"),
+            ..Config::default()
+        };
+        let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
+        Arc::new(Mutex::new(FusionBackends::new(config, provider)))
+    }
 
     /// Test fixture providing a TCP server/client pair for dispatch handler testing.
     struct HandlerTestHarness {
@@ -200,10 +225,11 @@ mod tests {
     #[fixture]
     fn harness() -> HandlerTestHarness {
         let (listener, addr) = create_listener();
+        let backends = test_backends();
 
         let server_handle = thread::spawn(move || {
             let (stream, _) = listener.accept().expect("accept");
-            DispatchConnectionHandler::new().handle(ConnectionStream::Tcp(stream));
+            DispatchConnectionHandler::new(backends).handle(ConnectionStream::Tcp(stream));
         });
 
         let client = TcpStream::connect(addr).expect("connect");
@@ -214,13 +240,13 @@ mod tests {
     }
 
     #[rstest]
-    fn handler_responds_to_valid_request(mut harness: HandlerTestHarness) {
+    fn handler_responds_to_get_definition_without_args(mut harness: HandlerTestHarness) {
         let lines = harness.send_and_collect(
             b"{\"command\":{\"domain\":\"observe\",\"operation\":\"get-definition\"}}\n",
         );
 
-        // Should have stderr message and exit message
-        assert!(lines.iter().any(|l| l.contains("not yet implemented")));
+        // Should have error about missing arguments and exit message
+        assert!(lines.iter().any(|l| l.contains("invalid arguments")));
         assert!(lines.iter().any(|l| l.contains(r#""kind":"exit""#)));
 
         harness.join();
@@ -244,6 +270,19 @@ mod tests {
 
         assert!(lines.iter().any(|l| l.contains("unknown domain")));
         assert!(lines.iter().any(|l| l.contains(r#""status":1"#)));
+
+        harness.join();
+    }
+
+    #[rstest]
+    fn handler_responds_to_not_implemented_operation(mut harness: HandlerTestHarness) {
+        let lines = harness.send_and_collect(
+            b"{\"command\":{\"domain\":\"observe\",\"operation\":\"find-references\"}}\n",
+        );
+
+        // find-references is not yet implemented
+        assert!(lines.iter().any(|l| l.contains("not yet implemented")));
+        assert!(lines.iter().any(|l| l.contains(r#""kind":"exit""#)));
 
         harness.join();
     }

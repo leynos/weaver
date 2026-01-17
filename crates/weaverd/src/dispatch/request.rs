@@ -18,10 +18,6 @@ pub struct CommandRequest {
     /// Command identification (domain and operation).
     pub command: CommandDescriptor,
     /// Additional arguments passed to the operation handler.
-    #[expect(
-        dead_code,
-        reason = "CLI arguments will be consumed by future handlers"
-    )]
     #[serde(default)]
     pub arguments: Vec<String>,
 }

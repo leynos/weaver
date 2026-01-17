@@ -1,16 +1,16 @@
 //! Supervises daemon launch sequencing and runtime orchestration.
 
 use std::env;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use tracing::info;
 
 use crate::StructuredHealthReporter;
-use crate::backends::BackendProvider;
+use crate::backends::{BackendProvider, FusionBackends};
 use crate::bootstrap::{ConfigLoader, StaticConfigLoader, SystemConfigLoader, bootstrap_with};
 use crate::dispatch::DispatchConnectionHandler;
 use crate::health::HealthReporter;
-use crate::placeholder_provider::NoopBackendProvider;
+use crate::semantic_provider::SemanticBackendProvider;
 use crate::transport::SocketListener;
 
 use super::daemonizer::{Daemonizer, SystemDaemonizer};
@@ -63,7 +63,9 @@ pub(crate) struct LaunchPlan<L, P, D, S> {
 pub fn run_daemon() -> Result<(), LaunchError> {
     let mode = LaunchMode::detect();
     let reporter = Arc::new(StructuredHealthReporter::new());
-    let provider = NoopBackendProvider;
+    // Load config early to get capability matrix for the semantic provider
+    let config = SystemConfigLoader.load()?;
+    let provider = SemanticBackendProvider::new(config.capability_matrix().clone());
     let daemonizer = SystemDaemonizer::new();
     let shutdown = SystemShutdownSignal::new(SHUTDOWN_TIMEOUT);
     let plan = LaunchPlan {
@@ -84,7 +86,7 @@ pub fn run_daemon() -> Result<(), LaunchError> {
 /// Runs the daemon with injected collaborators.
 pub(crate) fn run_daemon_with<L, P, D, S>(plan: LaunchPlan<L, P, D, S>) -> Result<(), LaunchError>
 where
-    P: BackendProvider,
+    P: BackendProvider + Send + 'static,
     L: ConfigLoader,
     D: Daemonizer,
     S: ShutdownSignal,
@@ -119,7 +121,15 @@ where
     let listener = SocketListener::bind(config.daemon_socket())?;
     let static_loader = StaticConfigLoader::new(config.clone());
     let daemon = bootstrap_with(&static_loader, reporter, provider)?;
-    let handler = Arc::new(DispatchConnectionHandler::new());
+
+    // Create backends and handler for the dispatch loop
+    let semantic_provider = SemanticBackendProvider::new(config.capability_matrix().clone());
+    let backends = Arc::new(Mutex::new(FusionBackends::new(
+        config.clone(),
+        semantic_provider,
+    )));
+    let handler = Arc::new(DispatchConnectionHandler::new(backends));
+
     let listener_handle = listener.start(handler)?;
     guard.write_health(HealthState::Ready)?;
     shutdown.wait()?;

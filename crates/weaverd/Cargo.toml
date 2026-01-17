@@ -6,6 +6,7 @@ version.workspace = true
 [dependencies]
 daemonize-me = "2.0.2"
 dirs = "5.0"
+lsp-types = "0.97"
 nix = { version = "0.28", features = ["signal", "user"] }
 once_cell.workspace = true
 ortho_config.workspace = true
@@ -16,6 +17,7 @@ thiserror.workspace = true
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json", "time"] }
 weaver-config = { path = "../weaver-config", features = ["cli"] }
+weaver-lsp-host = { path = "../weaver-lsp-host" }
 weaver-syntax = { path = "../weaver-syntax" }
 tempfile.workspace = true
 

@@ -3,15 +3,17 @@
 use std::cell::RefCell;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpStream};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
-use weaver_config::SocketEndpoint;
+use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
+use crate::backends::FusionBackends;
 use crate::dispatch::DispatchConnectionHandler;
+use crate::semantic_provider::SemanticBackendProvider;
 use crate::transport::{ListenerHandle, SocketListener};
 
 struct DispatchWorld {
@@ -32,7 +34,13 @@ impl DispatchWorld {
     }
 
     fn start_listener(&mut self) {
-        let handler = Arc::new(DispatchConnectionHandler::new());
+        let config = Config {
+            daemon_socket: SocketEndpoint::unix("/tmp/weaver-bdd-test/socket.sock"),
+            ..Config::default()
+        };
+        let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
+        let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
+        let handler = Arc::new(DispatchConnectionHandler::new(backends));
         let listener = SocketListener::bind(&self.endpoint).expect("bind listener");
         self.address = listener.local_addr();
         self.listener = Some(listener.start(handler).expect("start listener"));
@@ -85,6 +93,12 @@ impl DispatchWorld {
         self.response_lines
             .iter()
             .any(|line| line.contains("unknown operation"))
+    }
+
+    fn has_invalid_arguments_error(&self) -> bool {
+        self.response_lines
+            .iter()
+            .any(|line| line.contains("invalid arguments"))
     }
 }
 
@@ -191,6 +205,15 @@ fn then_unknown_operation_error(world: &RefCell<DispatchWorld>) {
     assert!(
         world.borrow().has_unknown_operation_error(),
         "expected unknown operation error, got: {:?}",
+        world.borrow().response_lines
+    );
+}
+
+#[then("the response includes an invalid arguments error")]
+fn then_invalid_arguments_error(world: &RefCell<DispatchWorld>) {
+    assert!(
+        world.borrow().has_invalid_arguments_error(),
+        "expected invalid arguments error, got: {:?}",
         world.borrow().response_lines
     );
 }

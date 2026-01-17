@@ -2,9 +2,9 @@
 
 ## Goal
 
-Implement the JSONL request dispatch loop in `weaverd` that reads `CommandRequest`
-messages from connected clients, routes them to the appropriate domain handler,
-and streams `CommandResponse` messages back.
+Implement the JSONL request dispatch loop in `weaverd` that reads
+`CommandRequest` messages from connected clients, routes them to the
+appropriate domain handler, and streams `CommandResponse` messages back.
 
 ## Acceptance Criteria
 
@@ -19,8 +19,8 @@ and streams `CommandResponse` messages back.
    and connection handling). Each file remains under 400 lines per AGENTS.md.
 
 2. **Minimum viable product (MVP) placeholder handlers**: Known operations
-   return "not implemented" responses with exit status 1. This establishes
-   the routing infrastructure without requiring full backend integration.
+   return "not implemented" responses with exit status 1. This establishes the
+   routing infrastructure without requiring full backend integration.
 
 3. **Structured error responses**: All errors (malformed JSONL, unknown domain,
    unknown operation) are written to stderr as structured messages before the
@@ -231,22 +231,22 @@ make test 2>&1 | tee /tmp/test.log
 
 ## Files Modified
 
-| File | Action |
-| ---- | ------ |
-| `crates/weaverd/src/dispatch/mod.rs` | Created |
-| `crates/weaverd/src/dispatch/errors.rs` | Created |
-| `crates/weaverd/src/dispatch/request.rs` | Created |
-| `crates/weaverd/src/dispatch/response.rs` | Created |
-| `crates/weaverd/src/dispatch/router.rs` | Created |
-| `crates/weaverd/src/dispatch/handler.rs` | Created |
-| `crates/weaverd/src/lib.rs` | Modified (add `mod dispatch;`) |
-| `crates/weaverd/src/process/launch.rs` | Modified (use DispatchConnectionHandler) |
-| `crates/weaverd/tests/features/daemon_dispatch.feature` | Created |
-| `crates/weaverd/src/tests/dispatch_behaviour.rs` | Created |
-| `crates/weaverd/src/tests/mod.rs` | Modified (add `mod dispatch_behaviour;`) |
-| `docs/users-guide.md` | Modified (update daemon description) |
-| `docs/roadmap.md` | Modified (mark entry done) |
-| `docs/execplans/phase-1-jsonl-request-dispatch-loop.md` | Created |
+| File                                                    | Action                                   |
+| ------------------------------------------------------- | ---------------------------------------- |
+| `crates/weaverd/src/dispatch/mod.rs`                    | Created                                  |
+| `crates/weaverd/src/dispatch/errors.rs`                 | Created                                  |
+| `crates/weaverd/src/dispatch/request.rs`                | Created                                  |
+| `crates/weaverd/src/dispatch/response.rs`               | Created                                  |
+| `crates/weaverd/src/dispatch/router.rs`                 | Created                                  |
+| `crates/weaverd/src/dispatch/handler.rs`                | Created                                  |
+| `crates/weaverd/src/lib.rs`                             | Modified (add `mod dispatch;`)           |
+| `crates/weaverd/src/process/launch.rs`                  | Modified (use DispatchConnectionHandler) |
+| `crates/weaverd/tests/features/daemon_dispatch.feature` | Created                                  |
+| `crates/weaverd/src/tests/dispatch_behaviour.rs`        | Created                                  |
+| `crates/weaverd/src/tests/mod.rs`                       | Modified (add `mod dispatch_behaviour;`) |
+| `docs/users-guide.md`                                   | Modified (update daemon description)     |
+| `docs/roadmap.md`                                       | Modified (mark entry done)               |
+| `docs/execplans/phase-1-jsonl-request-dispatch-loop.md` | Created                                  |
 
 ## Dependencies
 

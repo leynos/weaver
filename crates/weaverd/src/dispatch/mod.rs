@@ -29,6 +29,7 @@
 
 mod errors;
 mod handler;
+pub mod observe;
 mod request;
 mod response;
 mod router;
