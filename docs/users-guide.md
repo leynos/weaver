@@ -129,12 +129,12 @@ structure and rejects malformed input with structured error messages. Domain
 routing supports `observe`, `act`, and `verify` commands. Unknown domains or
 operations return structured errors with exit status 1.
 
-The `observe get-definition` operation is fully implemented: it accepts
-`--uri` and `--position` arguments, infers the language from the file
-extension, initialises the appropriate language server, and returns definition
-locations as JSON. Missing or malformed arguments return structured error
-messages with exit status 1. Other operations within the `observe`, `act`, and
-`verify` domains return "not yet implemented" responses while backend wiring is
+The `observe get-definition` operation is fully implemented: it accepts `--uri`
+and `--position` arguments, infers the language from the file extension,
+initialises the appropriate language server, and returns definition locations
+as JSON. Missing or malformed arguments return structured error messages with
+exit status 1. Other operations within the `observe`, `act`, and `verify`
+domains return "not yet implemented" responses while backend wiring is
 completed.
 
 The health snapshot is a single-line JSON document describing the current

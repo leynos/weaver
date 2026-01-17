@@ -17,7 +17,7 @@ starting with `observe get-definition` as the first complete path.
 - `make check-fmt`, `make lint`, `make test` all pass
 - Roadmap entry marked as done
 
----
+______________________________________________________________________
 
 ## Design Decisions
 
@@ -43,27 +43,27 @@ starting with `observe get-definition` as the first complete path.
 6. **Error propagation**: New `DispatchError` variants for argument validation,
    backend startup failures, and LSP host errors. All return exit status 1.
 
----
+______________________________________________________________________
 
 ## Critical Files
 
-| File                                                       | Purpose                      |
-|------------------------------------------------------------|------------------------------|
-| `crates/weaverd/src/dispatch/response.rs`                  | Add `Stdout` stream target   |
-| `crates/weaverd/src/dispatch/router.rs`                    | Wire observe ops to handlers |
-| `crates/weaverd/src/dispatch/handler.rs`                   | Pass backends to router      |
-| `crates/weaverd/src/dispatch/errors.rs`                    | New error variants           |
-| `crates/weaverd/src/dispatch/observe/mod.rs`               | New observe handler module   |
-| `crates/weaverd/src/dispatch/observe/get_definition.rs`    | Handler implementation       |
-| `crates/weaverd/src/dispatch/observe/arguments.rs`         | Argument parsing             |
-| `crates/weaverd/src/dispatch/observe/responses.rs`         | Response serialization       |
-| `crates/weaverd/src/semantic_provider.rs`                  | LSP host backend provider    |
-| `crates/weaverd/tests/features/daemon_dispatch.feature`    | BDD scenarios                |
-| `crates/weaverd/src/tests/dispatch_behaviour.rs`           | Step definitions             |
-| `docs/users-guide.md`                                      | Documentation updates        |
-| `docs/roadmap.md`                                          | Mark task complete           |
+| File                                                    | Purpose                      |
+| ------------------------------------------------------- | ---------------------------- |
+| `crates/weaverd/src/dispatch/response.rs`               | Add `Stdout` stream target   |
+| `crates/weaverd/src/dispatch/router.rs`                 | Wire observe ops to handlers |
+| `crates/weaverd/src/dispatch/handler.rs`                | Pass backends to router      |
+| `crates/weaverd/src/dispatch/errors.rs`                 | New error variants           |
+| `crates/weaverd/src/dispatch/observe/mod.rs`            | New observe handler module   |
+| `crates/weaverd/src/dispatch/observe/get_definition.rs` | Handler implementation       |
+| `crates/weaverd/src/dispatch/observe/arguments.rs`      | Argument parsing             |
+| `crates/weaverd/src/dispatch/observe/responses.rs`      | Response serialization       |
+| `crates/weaverd/src/semantic_provider.rs`               | LSP host backend provider    |
+| `crates/weaverd/tests/features/daemon_dispatch.feature` | BDD scenarios                |
+| `crates/weaverd/src/tests/dispatch_behaviour.rs`        | Step definitions             |
+| `docs/users-guide.md`                                   | Documentation updates        |
+| `docs/roadmap.md`                                       | Mark task complete           |
 
----
+______________________________________________________________________
 
 ## Implementation Steps
 
@@ -99,7 +99,7 @@ impl<W: Write> ResponseWriter<W> {
 
 Add unit tests for stdout message serialization.
 
----
+______________________________________________________________________
 
 ### Step 2: Extend dispatch errors
 
@@ -129,7 +129,7 @@ pub enum DispatchError {
 Implement constructors and ensure `exit_status()` returns 1 for all new
 variants.
 
----
+______________________________________________________________________
 
 ### Step 3: Create argument parsing module
 
@@ -194,7 +194,7 @@ Add unit tests for:
 - Language inference for each supported extension
 - Unsupported extension error
 
----
+______________________________________________________________________
 
 ### Step 4: Create response serialization module
 
@@ -250,7 +250,7 @@ pub fn extract_locations(response: GotoDefinitionResponse) -> Vec<DefinitionLoca
 
 Add unit tests for each `GotoDefinitionResponse` variant.
 
----
+______________________________________________________________________
 
 ### Step 5: Create semantic backend provider
 
@@ -305,7 +305,7 @@ impl BackendProvider for SemanticBackendProvider {
 }
 ```
 
----
+______________________________________________________________________
 
 ### Step 6: Create get-definition handler
 
@@ -375,7 +375,7 @@ pub fn handle<W: Write>(
 }
 ```
 
----
+______________________________________________________________________
 
 ### Step 7: Create observe module
 
@@ -398,7 +398,7 @@ Update `crates/weaverd/src/dispatch/mod.rs` to include the new module:
 pub mod observe;
 ```
 
----
+______________________________________________________________________
 
 ### Step 8: Wire router to observe handler
 
@@ -447,7 +447,7 @@ impl DomainRouter {
 }
 ```
 
----
+______________________________________________________________________
 
 ### Step 9: Wire handler to use backends
 
@@ -495,7 +495,7 @@ impl DispatchConnectionHandler {
 }
 ```
 
----
+______________________________________________________________________
 
 ### Step 10: Update daemon bootstrap
 
@@ -512,7 +512,7 @@ let backends = Arc::new(Mutex::new(FusionBackends::new(config.clone(), provider)
 let handler = Arc::new(DispatchConnectionHandler::new(Arc::clone(&backends)));
 ```
 
----
+______________________________________________________________________
 
 ### Step 11: Add BDD feature scenarios
 
@@ -528,7 +528,7 @@ Scenario: Observe get-definition without arguments returns error
   And the response includes an invalid arguments error
 ```
 
----
+______________________________________________________________________
 
 ### Step 12: Implement BDD step definitions
 
@@ -559,7 +559,7 @@ fn then_invalid_arguments_error(world: &RefCell<DispatchWorld>) {
 }
 ```
 
----
+______________________________________________________________________
 
 ### Step 13: Update documentation
 
@@ -582,7 +582,7 @@ Mark the task as complete:
       path.
 ```
 
----
+______________________________________________________________________
 
 ### Step 14: Run quality gates
 
@@ -595,7 +595,7 @@ make test 2>&1 | tee /tmp/test.log
 
 Fix any issues before committing.
 
----
+______________________________________________________________________
 
 ## Dependency Graph
 
@@ -617,7 +617,7 @@ Steps 11-12 (tests) can proceed after Step 10
 Steps 13-14 (docs, gates) are final
 ```
 
----
+______________________________________________________________________
 
 ## Test Plan
 
@@ -638,13 +638,13 @@ Steps 13-14 (docs, gates) are final
 - Full CLI → daemon → mock LSP → response flow
 - Verify CLI exit code matches daemon status
 
----
+______________________________________________________________________
 
 ## Risks and Mitigations
 
-| Risk                              | Mitigation                           |
-|-----------------------------------|--------------------------------------|
-| LSP host initialisation slow      | Lazy initialisation already in place |
-| Thread safety with shared backends| Use `Arc<Mutex<>>` pattern           |
-| Argument parsing edge cases       | Comprehensive unit tests             |
-| Response format mismatch          | Review docs before implementation    |
+| Risk                               | Mitigation                           |
+| ---------------------------------- | ------------------------------------ |
+| LSP host initialisation slow       | Lazy initialisation already in place |
+| Thread safety with shared backends | Use `Arc<Mutex<>>` pattern           |
+| Argument parsing edge cases        | Comprehensive unit tests             |
+| Response format mismatch           | Review docs before implementation    |

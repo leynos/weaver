@@ -163,6 +163,23 @@ mod tests {
         items.iter().map(|s| (*s).to_string()).collect()
     }
 
+    /// Asserts that parsing the given arguments fails with `InvalidArguments`
+    /// and the error message contains the expected substring.
+    #[track_caller]
+    fn assert_invalid_arguments(arg_list: &[&str], expected_substring: &str) {
+        let arguments = args(arg_list);
+        let error = GetDefinitionArgs::parse(&arguments).expect_err("should fail");
+
+        assert!(
+            matches!(error, DispatchError::InvalidArguments { .. }),
+            "expected InvalidArguments, got: {error:?}"
+        );
+        assert!(
+            error.to_string().contains(expected_substring),
+            "expected error to contain {expected_substring:?}, got: {error}"
+        );
+    }
+
     #[test]
     fn parses_valid_arguments() {
         let arguments = args(&["--uri", "file:///src/main.rs", "--position", "10:5"]);
@@ -185,53 +202,39 @@ mod tests {
 
     #[test]
     fn rejects_missing_uri() {
-        let arguments = args(&["--position", "10:5"]);
-        let error = GetDefinitionArgs::parse(&arguments).expect_err("should fail");
-
-        assert!(matches!(error, DispatchError::InvalidArguments { .. }));
-        assert!(error.to_string().contains("--uri"));
+        assert_invalid_arguments(&["--position", "10:5"], "--uri");
     }
 
     #[test]
     fn rejects_missing_position() {
-        let arguments = args(&["--uri", "file:///main.rs"]);
-        let error = GetDefinitionArgs::parse(&arguments).expect_err("should fail");
-
-        assert!(matches!(error, DispatchError::InvalidArguments { .. }));
-        assert!(error.to_string().contains("--position"));
+        assert_invalid_arguments(&["--uri", "file:///main.rs"], "--position");
     }
 
     #[test]
     fn rejects_malformed_position() {
-        let arguments = args(&["--uri", "file:///main.rs", "--position", "10"]);
-        let error = GetDefinitionArgs::parse(&arguments).expect_err("should fail");
-
-        assert!(matches!(error, DispatchError::InvalidArguments { .. }));
-        assert!(error.to_string().contains("LINE:COL"));
+        assert_invalid_arguments(
+            &["--uri", "file:///main.rs", "--position", "10"],
+            "LINE:COL",
+        );
     }
 
     #[test]
     fn rejects_zero_line() {
-        let arguments = args(&["--uri", "file:///main.rs", "--position", "0:5"]);
-        let error = GetDefinitionArgs::parse(&arguments).expect_err("should fail");
-
-        assert!(matches!(error, DispatchError::InvalidArguments { .. }));
-        assert!(error.to_string().contains("line"));
+        assert_invalid_arguments(&["--uri", "file:///main.rs", "--position", "0:5"], "line");
     }
 
     #[test]
     fn rejects_unknown_argument() {
-        let arguments = args(&[
-            "--uri",
-            "file:///main.rs",
-            "--position",
-            "10:5",
-            "--unknown",
-        ]);
-        let error = GetDefinitionArgs::parse(&arguments).expect_err("should fail");
-
-        assert!(matches!(error, DispatchError::InvalidArguments { .. }));
-        assert!(error.to_string().contains("unknown"));
+        assert_invalid_arguments(
+            &[
+                "--uri",
+                "file:///main.rs",
+                "--position",
+                "10:5",
+                "--unknown",
+            ],
+            "unknown",
+        );
     }
 
     #[rstest]
