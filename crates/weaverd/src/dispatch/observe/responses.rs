@@ -104,40 +104,68 @@ mod tests {
         }
     }
 
-    #[rstest]
-    fn extracts_scalar_location(sample_uri: Uri) {
-        let response = GotoDefinitionResponse::Scalar(make_location(&sample_uri, 9, 4));
-        let locations = extract_locations(response);
+    /// Response variant for parameterised extraction tests.
+    enum ResponseVariant {
+        Scalar { line: u32, character: u32 },
+        Array { positions: Vec<(u32, u32)> },
+        Link { line: u32, character: u32 },
+    }
 
-        assert_eq!(locations.len(), 1);
-        assert_eq!(locations[0].uri, "file:///src/main.rs");
-        assert_eq!(locations[0].line, 10); // 9 + 1
-        assert_eq!(locations[0].column, 5); // 4 + 1
+    fn build_response(uri: &Uri, variant: ResponseVariant) -> GotoDefinitionResponse {
+        match variant {
+            ResponseVariant::Scalar { line, character } => {
+                GotoDefinitionResponse::Scalar(make_location(uri, line, character))
+            }
+            ResponseVariant::Array { positions } => GotoDefinitionResponse::Array(
+                positions
+                    .into_iter()
+                    .map(|(line, character)| make_location(uri, line, character))
+                    .collect(),
+            ),
+            ResponseVariant::Link { line, character } => {
+                GotoDefinitionResponse::Link(vec![make_location_link(uri, line, character)])
+            }
+        }
     }
 
     #[rstest]
-    fn extracts_array_of_locations(sample_uri: Uri) {
-        let response = GotoDefinitionResponse::Array(vec![
-            make_location(&sample_uri, 0, 0),
-            make_location(&sample_uri, 41, 16),
-        ]);
+    #[case::scalar(
+        ResponseVariant::Scalar { line: 9, character: 4 },
+        &[(10, 5)]  // 0-indexed (9, 4) -> 1-indexed (10, 5)
+    )]
+    #[case::array(
+        ResponseVariant::Array { positions: vec![(0, 0), (41, 16)] },
+        &[(1, 1), (42, 17)]
+    )]
+    #[case::link(
+        ResponseVariant::Link { line: 99, character: 9 },
+        &[(100, 10)]
+    )]
+    fn extracts_locations_from_response_variants(
+        sample_uri: Uri,
+        #[case] variant: ResponseVariant,
+        #[case] expected: &[(u32, u32)],
+    ) {
+        let response = build_response(&sample_uri, variant);
         let locations = extract_locations(response);
 
-        assert_eq!(locations.len(), 2);
-        assert_eq!(locations[0].line, 1);
-        assert_eq!(locations[0].column, 1);
-        assert_eq!(locations[1].line, 42);
-        assert_eq!(locations[1].column, 17);
-    }
-
-    #[rstest]
-    fn extracts_location_links(sample_uri: Uri) {
-        let response = GotoDefinitionResponse::Link(vec![make_location_link(&sample_uri, 99, 9)]);
-        let locations = extract_locations(response);
-
-        assert_eq!(locations.len(), 1);
-        assert_eq!(locations[0].line, 100);
-        assert_eq!(locations[0].column, 10);
+        assert_eq!(
+            locations.len(),
+            expected.len(),
+            "expected {} locations, got {}",
+            expected.len(),
+            locations.len()
+        );
+        for (i, (expected_line, expected_column)) in expected.iter().enumerate() {
+            assert_eq!(
+                locations[i].line, *expected_line,
+                "location[{i}].line mismatch"
+            );
+            assert_eq!(
+                locations[i].column, *expected_column,
+                "location[{i}].column mismatch"
+            );
+        }
     }
 
     #[test]

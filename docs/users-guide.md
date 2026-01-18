@@ -110,7 +110,7 @@ under the same directory as the Unix socket (for example
 (`weaverd.health`). PID and health files are written atomically, so observers
 never see a partially written payload. Attempts to start a second copy while
 one is running fail fast with an "already running" error that reports the
-existing PID. When the original launch is still initialising and has not yet
+existing PID. When the original launch is still initializing and has not yet
 published a PID, the second invocation now reports "launch already in progress"
 instead of removing the lock. If the daemon exited uncleanly, the new instance
 removes the stale files before continuing.

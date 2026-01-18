@@ -16,8 +16,9 @@ use crate::dispatch::{BackendManager, DispatchConnectionHandler};
 use crate::semantic_provider::SemanticBackendProvider;
 use crate::transport::{ListenerHandle, SocketListener};
 
-/// Creates a configured `DispatchConnectionHandler` with test backends.
-fn create_test_handler() -> Arc<DispatchConnectionHandler> {
+/// Test fixture providing a configured `DispatchConnectionHandler` with test backends.
+#[fixture]
+fn test_handler() -> Arc<DispatchConnectionHandler> {
     let config = Config {
         daemon_socket: SocketEndpoint::unix("/tmp/weaver-bdd-test/socket.sock"),
         ..Config::default()
@@ -30,15 +31,17 @@ fn create_test_handler() -> Arc<DispatchConnectionHandler> {
 
 struct DispatchWorld {
     endpoint: SocketEndpoint,
+    handler: Arc<DispatchConnectionHandler>,
     listener: Option<ListenerHandle>,
     address: Option<SocketAddr>,
     response_lines: Vec<String>,
 }
 
 impl DispatchWorld {
-    fn new() -> Self {
+    fn with_handler(handler: Arc<DispatchConnectionHandler>) -> Self {
         Self {
             endpoint: SocketEndpoint::tcp("127.0.0.1", 0),
+            handler,
             listener: None,
             address: None,
             response_lines: Vec::new(),
@@ -46,10 +49,13 @@ impl DispatchWorld {
     }
 
     fn start_listener(&mut self) {
-        let handler = create_test_handler();
         let listener = SocketListener::bind(&self.endpoint).expect("bind listener");
         self.address = listener.local_addr();
-        self.listener = Some(listener.start(handler).expect("start listener"));
+        self.listener = Some(
+            listener
+                .start(self.handler.clone())
+                .expect("start listener"),
+        );
     }
 
     fn send_request(&mut self, request: &str) {
@@ -118,8 +124,8 @@ impl Drop for DispatchWorld {
 }
 
 #[fixture]
-fn world() -> RefCell<DispatchWorld> {
-    RefCell::new(DispatchWorld::new())
+fn world(test_handler: Arc<DispatchConnectionHandler>) -> RefCell<DispatchWorld> {
+    RefCell::new(DispatchWorld::with_handler(test_handler))
 }
 
 #[given("a daemon connection is established")]
