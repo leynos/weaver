@@ -56,13 +56,9 @@ impl fmt::Display for HostOperation {
 pub enum LspHostError {
     /// The requested language has not been registered.
     ///
-    /// This typically occurs when no language server adapter has been
-    /// configured for the language. Process-based language server adapters
-    /// (for rust-analyzer, pyright, etc.) are not yet implemented.
-    #[error(
-        "no language server registered for '{language}'; \
-         process-based language server adapters are not yet implemented"
-    )]
+    /// This occurs when no language server has been registered for the
+    /// requested language via [`crate::LspHost::register_language`].
+    #[error("no language server registered for '{language}'")]
     UnknownLanguage {
         /// Language requested by the caller.
         language: Language,
