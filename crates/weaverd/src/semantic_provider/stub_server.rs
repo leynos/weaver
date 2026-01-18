@@ -25,7 +25,7 @@ pub struct StubLanguageServer {
 
 impl StubLanguageServer {
     /// Creates a stub server for the given language.
-    pub fn new(language: Language) -> Self {
+    pub const fn new(language: Language) -> Self {
         Self { language }
     }
 
@@ -125,7 +125,7 @@ mod tests {
         let params = GotoDefinitionParams {
             text_document_position_params: lsp_types::TextDocumentPositionParams {
                 text_document: lsp_types::TextDocumentIdentifier {
-                    uri: "file:///test.rs".parse().unwrap(),
+                    uri: "file:///test.rs".parse().expect("failed to parse test URI"),
                 },
                 position: lsp_types::Position::new(0, 0),
             },
@@ -136,7 +136,8 @@ mod tests {
         let result = server.goto_definition(params);
         assert!(result.is_err());
 
-        let error = result.unwrap_err();
+        let error =
+            result.expect_err("goto_definition should return an Err for unimplemented feature");
         assert!(error.message().contains("not yet implemented"));
         assert!(error.message().contains("rust"));
     }
@@ -148,7 +149,7 @@ mod tests {
         // did_open should succeed
         let open_params = DidOpenTextDocumentParams {
             text_document: lsp_types::TextDocumentItem {
-                uri: "file:///test.py".parse().unwrap(),
+                uri: "file:///test.py".parse().expect("failed to parse test URI"),
                 language_id: "python".to_string(),
                 version: 1,
                 text: "print('hello')".to_string(),
@@ -159,7 +160,7 @@ mod tests {
         // did_close should succeed
         let close_params = DidCloseTextDocumentParams {
             text_document: lsp_types::TextDocumentIdentifier {
-                uri: "file:///test.py".parse().unwrap(),
+                uri: "file:///test.py".parse().expect("failed to parse test URI"),
             },
         };
         assert!(server.did_close(close_params).is_ok());

@@ -109,6 +109,7 @@ mod tests {
         Scalar { line: u32, character: u32 },
         Array { positions: Vec<(u32, u32)> },
         Link { line: u32, character: u32 },
+        MultiLink { positions: Vec<(u32, u32)> },
     }
 
     fn build_response(uri: &Uri, variant: ResponseVariant) -> GotoDefinitionResponse {
@@ -125,6 +126,12 @@ mod tests {
             ResponseVariant::Link { line, character } => {
                 GotoDefinitionResponse::Link(vec![make_location_link(uri, line, character)])
             }
+            ResponseVariant::MultiLink { positions } => GotoDefinitionResponse::Link(
+                positions
+                    .into_iter()
+                    .map(|(line, character)| make_location_link(uri, line, character))
+                    .collect(),
+            ),
         }
     }
 
@@ -140,6 +147,10 @@ mod tests {
     #[case::link(
         ResponseVariant::Link { line: 99, character: 9 },
         &[(100, 10)]
+    )]
+    #[case::multi_link(
+        ResponseVariant::MultiLink { positions: vec![(4, 7), (19, 0), (50, 12)] },
+        &[(5, 8), (20, 1), (51, 13)]
     )]
     fn extracts_locations_from_response_variants(
         sample_uri: Uri,
