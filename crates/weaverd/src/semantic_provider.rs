@@ -16,6 +16,18 @@ use crate::backends::{BackendKind, BackendProvider, BackendStartupError};
 
 const BACKEND_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::backends::semantic");
 
+/// Error returned when the LSP host mutex is poisoned.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LspHostPoisonedError;
+
+impl fmt::Display for LspHostPoisonedError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LSP host mutex poisoned")
+    }
+}
+
+impl std::error::Error for LspHostPoisonedError {}
+
 /// Backend provider that manages the LSP host for semantic operations.
 ///
 /// The provider lazily creates the `LspHost` when the `Semantic` backend is
@@ -58,40 +70,52 @@ impl SemanticBackendProvider {
 
     /// Executes a closure with a reference to the initialized LSP host.
     ///
-    /// Returns `None` if the host has not been started or if the lock is
-    /// poisoned.
+    /// Returns `Ok(None)` if the host has not been started, or
+    /// `Err(LspHostPoisonedError)` if the lock is poisoned.
+    ///
+    /// # Errors
+    ///
+    /// Returns `LspHostPoisonedError` if the mutex is poisoned.
     ///
     /// # Example
     ///
     /// ```ignore
     /// provider.with_lsp_host(|host| {
     ///     host.goto_definition(language, params)
-    /// });
+    /// })?;
     /// ```
-    pub fn with_lsp_host<F, R>(&self, f: F) -> Option<R>
+    pub fn with_lsp_host<F, R>(&self, f: F) -> Result<Option<R>, LspHostPoisonedError>
     where
         F: FnOnce(&LspHost) -> R,
     {
-        let guard = self.lsp_host.lock().ok()?;
-        guard.as_ref().map(f)
+        let guard = self.lsp_host.lock().map_err(|_| LspHostPoisonedError)?;
+        Ok(guard.as_ref().map(f))
     }
 
     /// Executes a closure with a mutable reference to the initialized LSP host.
     ///
-    /// Returns `None` if the host has not been started or if the lock is
-    /// poisoned.
-    pub fn with_lsp_host_mut<F, R>(&self, f: F) -> Option<R>
+    /// Returns `Ok(None)` if the host has not been started, or
+    /// `Err(LspHostPoisonedError)` if the lock is poisoned.
+    ///
+    /// # Errors
+    ///
+    /// Returns `LspHostPoisonedError` if the mutex is poisoned.
+    pub fn with_lsp_host_mut<F, R>(&self, f: F) -> Result<Option<R>, LspHostPoisonedError>
     where
         F: FnOnce(&mut LspHost) -> R,
     {
-        let mut guard = self.lsp_host.lock().ok()?;
-        guard.as_mut().map(f)
+        let mut guard = self.lsp_host.lock().map_err(|_| LspHostPoisonedError)?;
+        Ok(guard.as_mut().map(f))
     }
 
     /// Returns whether the LSP host has been initialized.
-    #[must_use]
-    pub fn is_initialized(&self) -> bool {
-        self.lsp_host.lock().map(|g| g.is_some()).unwrap_or(false)
+    ///
+    /// # Errors
+    ///
+    /// Returns `LspHostPoisonedError` if the mutex is poisoned.
+    pub fn is_initialized(&self) -> Result<bool, LspHostPoisonedError> {
+        let guard = self.lsp_host.lock().map_err(|_| LspHostPoisonedError)?;
+        Ok(guard.is_some())
     }
 }
 
@@ -133,37 +157,38 @@ impl BackendProvider for SemanticBackendProvider {
 
 #[cfg(test)]
 mod tests {
+    use rstest::{fixture, rstest};
     use weaver_config::SocketEndpoint;
 
     use super::*;
 
-    fn test_config() -> Config {
+    #[fixture]
+    fn config() -> Config {
         Config {
             daemon_socket: SocketEndpoint::unix("/tmp/weaver-test/socket.sock"),
             ..Config::default()
         }
     }
 
-    #[test]
-    fn creates_lsp_host_on_semantic_start() {
-        let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
-        let config = test_config();
+    #[fixture]
+    fn provider() -> SemanticBackendProvider {
+        SemanticBackendProvider::new(CapabilityMatrix::default())
+    }
 
+    #[rstest]
+    fn creates_lsp_host_on_semantic_start(provider: SemanticBackendProvider, config: Config) {
         provider
             .start_backend(BackendKind::Semantic, &config)
             .expect("start backend");
 
         assert!(
-            provider.is_initialized(),
+            provider.is_initialized().expect("lock not poisoned"),
             "LSP host should be created after starting semantic backend"
         );
     }
 
-    #[test]
-    fn semantic_start_is_idempotent() {
-        let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
-        let config = test_config();
-
+    #[rstest]
+    fn semantic_start_is_idempotent(provider: SemanticBackendProvider, config: Config) {
         provider
             .start_backend(BackendKind::Semantic, &config)
             .expect("first start");
@@ -171,14 +196,11 @@ mod tests {
             .start_backend(BackendKind::Semantic, &config)
             .expect("second start");
 
-        assert!(provider.is_initialized());
+        assert!(provider.is_initialized().expect("lock not poisoned"));
     }
 
-    #[test]
-    fn syntactic_backend_succeeds_with_warning() {
-        let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
-        let config = test_config();
-
+    #[rstest]
+    fn syntactic_backend_succeeds_with_warning(provider: SemanticBackendProvider, config: Config) {
         // Should succeed even though not implemented
         provider
             .start_backend(BackendKind::Syntactic, &config)

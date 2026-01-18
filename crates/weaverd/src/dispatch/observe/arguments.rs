@@ -72,12 +72,12 @@ impl GetDefinitionArgs {
     ///
     /// # Errors
     ///
-    /// Returns `UnsupportedLanguage` if the file extension is not recognised.
+    /// Returns `UnsupportedLanguage` if the file extension is not recognized.
     pub fn language(&self) -> Result<Language, DispatchError> {
         let path = self.uri.path().as_str();
         let extension = path
-            .rsplit('.')
-            .next()
+            .rsplit_once('.')
+            .and_then(|(_, ext)| if ext.is_empty() { None } else { Some(ext) })
             .ok_or_else(|| DispatchError::unsupported_language("(no extension)"))?;
 
         match extension.to_ascii_lowercase().as_str() {
@@ -200,41 +200,14 @@ mod tests {
         assert_eq!(parsed.column, 17);
     }
 
-    #[test]
-    fn rejects_missing_uri() {
-        assert_invalid_arguments(&["--position", "10:5"], "--uri");
-    }
-
-    #[test]
-    fn rejects_missing_position() {
-        assert_invalid_arguments(&["--uri", "file:///main.rs"], "--position");
-    }
-
-    #[test]
-    fn rejects_malformed_position() {
-        assert_invalid_arguments(
-            &["--uri", "file:///main.rs", "--position", "10"],
-            "LINE:COL",
-        );
-    }
-
-    #[test]
-    fn rejects_zero_line() {
-        assert_invalid_arguments(&["--uri", "file:///main.rs", "--position", "0:5"], "line");
-    }
-
-    #[test]
-    fn rejects_unknown_argument() {
-        assert_invalid_arguments(
-            &[
-                "--uri",
-                "file:///main.rs",
-                "--position",
-                "10:5",
-                "--unknown",
-            ],
-            "unknown",
-        );
+    #[rstest]
+    #[case::missing_uri(&["--position", "10:5"], "--uri")]
+    #[case::missing_position(&["--uri", "file:///main.rs"], "--position")]
+    #[case::malformed_position(&["--uri", "file:///main.rs", "--position", "10"], "LINE:COL")]
+    #[case::zero_line(&["--uri", "file:///main.rs", "--position", "0:5"], "line")]
+    #[case::unknown_argument(&["--uri", "file:///main.rs", "--position", "10:5", "--unknown"], "unknown")]
+    fn rejects_invalid_arguments(#[case] arg_list: &[&str], #[case] expected_substring: &str) {
+        assert_invalid_arguments(arg_list, expected_substring);
     }
 
     #[rstest]

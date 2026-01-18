@@ -61,16 +61,18 @@ pub fn extract_locations(response: GotoDefinitionResponse) -> Vec<DefinitionLoca
 #[cfg(test)]
 mod tests {
     use lsp_types::{Position, Range, Uri};
+    use rstest::{fixture, rstest};
 
     use super::*;
 
+    #[fixture]
     fn sample_uri() -> Uri {
         "file:///src/main.rs".parse().expect("valid uri")
     }
 
-    fn make_location(line: u32, character: u32) -> Location {
+    fn make_location(uri: &Uri, line: u32, character: u32) -> Location {
         Location {
-            uri: sample_uri(),
+            uri: uri.clone(),
             range: Range {
                 start: Position { line, character },
                 end: Position {
@@ -81,10 +83,10 @@ mod tests {
         }
     }
 
-    fn make_location_link(line: u32, character: u32) -> LocationLink {
+    fn make_location_link(uri: &Uri, line: u32, character: u32) -> LocationLink {
         LocationLink {
             origin_selection_range: None,
-            target_uri: sample_uri(),
+            target_uri: uri.clone(),
             target_range: Range {
                 start: Position { line, character },
                 end: Position {
@@ -102,9 +104,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn extracts_scalar_location() {
-        let response = GotoDefinitionResponse::Scalar(make_location(9, 4));
+    #[rstest]
+    fn extracts_scalar_location(sample_uri: Uri) {
+        let response = GotoDefinitionResponse::Scalar(make_location(&sample_uri, 9, 4));
         let locations = extract_locations(response);
 
         assert_eq!(locations.len(), 1);
@@ -113,10 +115,12 @@ mod tests {
         assert_eq!(locations[0].column, 5); // 4 + 1
     }
 
-    #[test]
-    fn extracts_array_of_locations() {
-        let response =
-            GotoDefinitionResponse::Array(vec![make_location(0, 0), make_location(41, 16)]);
+    #[rstest]
+    fn extracts_array_of_locations(sample_uri: Uri) {
+        let response = GotoDefinitionResponse::Array(vec![
+            make_location(&sample_uri, 0, 0),
+            make_location(&sample_uri, 41, 16),
+        ]);
         let locations = extract_locations(response);
 
         assert_eq!(locations.len(), 2);
@@ -126,9 +130,9 @@ mod tests {
         assert_eq!(locations[1].column, 17);
     }
 
-    #[test]
-    fn extracts_location_links() {
-        let response = GotoDefinitionResponse::Link(vec![make_location_link(99, 9)]);
+    #[rstest]
+    fn extracts_location_links(sample_uri: Uri) {
+        let response = GotoDefinitionResponse::Link(vec![make_location_link(&sample_uri, 99, 9)]);
         let locations = extract_locations(response);
 
         assert_eq!(locations.len(), 1);

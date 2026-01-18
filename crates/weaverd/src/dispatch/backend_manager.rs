@@ -73,7 +73,9 @@ mod tests {
     fn backend_manager_is_cloneable(backend_manager: BackendManager) {
         let cloned = backend_manager.clone();
         // Both should access the same underlying backends
-        let result = cloned.with_backends(|_| 42);
-        assert_eq!(result.unwrap(), 42);
+        let result = cloned
+            .with_backends(|_| 42)
+            .expect("cloned BackendManager should access same underlying backends and return 42");
+        assert_eq!(result, 42);
     }
 }

@@ -16,6 +16,18 @@ use crate::dispatch::{BackendManager, DispatchConnectionHandler};
 use crate::semantic_provider::SemanticBackendProvider;
 use crate::transport::{ListenerHandle, SocketListener};
 
+/// Creates a configured `DispatchConnectionHandler` with test backends.
+fn create_test_handler() -> Arc<DispatchConnectionHandler> {
+    let config = Config {
+        daemon_socket: SocketEndpoint::unix("/tmp/weaver-bdd-test/socket.sock"),
+        ..Config::default()
+    };
+    let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
+    let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
+    let backend_manager = BackendManager::new(backends);
+    Arc::new(DispatchConnectionHandler::new(backend_manager))
+}
+
 struct DispatchWorld {
     endpoint: SocketEndpoint,
     listener: Option<ListenerHandle>,
@@ -34,14 +46,7 @@ impl DispatchWorld {
     }
 
     fn start_listener(&mut self) {
-        let config = Config {
-            daemon_socket: SocketEndpoint::unix("/tmp/weaver-bdd-test/socket.sock"),
-            ..Config::default()
-        };
-        let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
-        let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
-        let backend_manager = BackendManager::new(backends);
-        let handler = Arc::new(DispatchConnectionHandler::new(backend_manager));
+        let handler = create_test_handler();
         let listener = SocketListener::bind(&self.endpoint).expect("bind listener");
         self.address = listener.local_addr();
         self.listener = Some(listener.start(handler).expect("start listener"));
@@ -122,8 +127,8 @@ fn given_daemon_connection(world: &RefCell<DispatchWorld>) {
     world.borrow_mut().start_listener();
 }
 
-#[when("a valid observe get-definition request is sent")]
-fn when_valid_observe_request(world: &RefCell<DispatchWorld>) {
+#[when("an observe get-definition request is sent without arguments")]
+fn when_observe_request_without_args(world: &RefCell<DispatchWorld>) {
     world
         .borrow_mut()
         .send_request(r#"{"command":{"domain":"observe","operation":"get-definition"}}"#);

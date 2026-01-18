@@ -6,7 +6,6 @@ use std::sync::{Arc, Mutex};
 use tracing::info;
 
 use crate::StructuredHealthReporter;
-use crate::backends::{BackendProvider, FusionBackends};
 use crate::bootstrap::{ConfigLoader, StaticConfigLoader, SystemConfigLoader, bootstrap_with};
 use crate::dispatch::{BackendManager, DispatchConnectionHandler};
 use crate::health::HealthReporter;
@@ -47,25 +46,21 @@ pub(crate) struct ProcessControl<D, S> {
 }
 
 /// Service dependencies required to construct the daemon runtime.
-pub(crate) struct ServiceDeps<L, P> {
+pub(crate) struct ServiceDeps<L> {
     pub(crate) loader: L,
     pub(crate) reporter: Arc<dyn HealthReporter>,
-    pub(crate) provider: P,
 }
 
 /// Collaborators required to launch the daemon runtime.
-pub(crate) struct LaunchPlan<L, P, D, S> {
+pub(crate) struct LaunchPlan<L, D, S> {
     pub(crate) process: ProcessControl<D, S>,
-    pub(crate) services: ServiceDeps<L, P>,
+    pub(crate) services: ServiceDeps<L>,
 }
 
 /// Runs the daemon using the production collaborators.
 pub fn run_daemon() -> Result<(), LaunchError> {
     let mode = LaunchMode::detect();
     let reporter = Arc::new(StructuredHealthReporter::new());
-    // Load config early to get capability matrix for the semantic provider
-    let config = SystemConfigLoader.load()?;
-    let provider = SemanticBackendProvider::new(config.capability_matrix().clone());
     let daemonizer = SystemDaemonizer::new();
     let shutdown = SystemShutdownSignal::new(SHUTDOWN_TIMEOUT);
     let plan = LaunchPlan {
@@ -77,16 +72,14 @@ pub fn run_daemon() -> Result<(), LaunchError> {
         services: ServiceDeps {
             loader: SystemConfigLoader,
             reporter,
-            provider,
         },
     };
     run_daemon_with(plan)
 }
 
 /// Runs the daemon with injected collaborators.
-pub(crate) fn run_daemon_with<L, P, D, S>(plan: LaunchPlan<L, P, D, S>) -> Result<(), LaunchError>
+pub(crate) fn run_daemon_with<L, D, S>(plan: LaunchPlan<L, D, S>) -> Result<(), LaunchError>
 where
-    P: BackendProvider + Send + 'static,
     L: ConfigLoader,
     D: Daemonizer,
     S: ShutdownSignal,
@@ -97,11 +90,7 @@ where
         daemonizer,
         shutdown,
     } = process;
-    let ServiceDeps {
-        loader,
-        reporter,
-        provider,
-    } = services;
+    let ServiceDeps { loader, reporter } = services;
 
     info!(
         target: PROCESS_TARGET,
@@ -119,15 +108,14 @@ where
     guard.write_pid(pid)?;
     guard.write_health(HealthState::Starting)?;
     let listener = SocketListener::bind(config.daemon_socket())?;
+
+    // Create a single provider and backends instance shared by daemon and dispatch
+    let provider = SemanticBackendProvider::new(config.capability_matrix().clone());
     let static_loader = StaticConfigLoader::new(config.clone());
     let daemon = bootstrap_with(&static_loader, reporter, provider)?;
 
-    // Create backends and handler for the dispatch loop
-    let semantic_provider = SemanticBackendProvider::new(config.capability_matrix().clone());
-    let backends = Arc::new(Mutex::new(FusionBackends::new(
-        config.clone(),
-        semantic_provider,
-    )));
+    // Create backend manager using the same backends from the daemon
+    let backends = Arc::new(Mutex::new(daemon.into_backends()));
     let backend_manager = BackendManager::new(backends);
     let handler = Arc::new(DispatchConnectionHandler::new(backend_manager));
 
@@ -137,7 +125,6 @@ where
     guard.write_health(HealthState::Stopping)?;
     listener_handle.shutdown();
     listener_handle.join()?;
-    drop(daemon);
     info!(
         target: PROCESS_TARGET,
         "shutdown sequence completed"

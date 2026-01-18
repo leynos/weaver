@@ -6,7 +6,7 @@ Feature: Daemon JSONL request dispatch
 
   Scenario: Observe get-definition without arguments returns error
     Given a daemon connection is established
-    When a valid observe get-definition request is sent
+    When an observe get-definition request is sent without arguments
     Then the response includes an exit message with status 1
     And the response includes an invalid arguments error
 

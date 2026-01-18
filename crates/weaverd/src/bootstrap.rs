@@ -109,6 +109,11 @@ impl<P> Daemon<P> {
         }
     }
 
+    /// Consumes the daemon and returns the backends for shared use.
+    pub fn into_backends(self) -> FusionBackends<P> {
+        self.backends
+    }
+
     /// Accessor for the resolved configuration.
     #[must_use]
     pub fn config(&self) -> &Config {

@@ -646,7 +646,7 @@ ______________________________________________________________________
 
 | Risk                               | Mitigation                           |
 | ---------------------------------- | ------------------------------------ |
-| LSP host initialisation slow       | Lazy initialisation already in place |
+| LSP host initialization slow       | Lazy initialization already in place |
 | Thread safety with shared backends | Use `Arc<Mutex<>>` pattern           |
 | Argument parsing edge cases        | Comprehensive unit tests             |
 | Response format mismatch           | Review docs before implementation    |

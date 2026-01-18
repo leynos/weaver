@@ -14,9 +14,7 @@ use crate::process::daemonizer::{DaemonizeError, Daemonizer};
 use crate::process::launch::{LaunchPlan, ProcessControl, ServiceDeps, run_daemon_with};
 use crate::process::shutdown::{ShutdownError, ShutdownSignal};
 use crate::process::{LaunchError, LaunchMode, test_support};
-use crate::tests::support::{
-    FailingConfigLoader, RecordingBackendProvider, RecordingHealthReporter, TestConfigLoader,
-};
+use crate::tests::support::{FailingConfigLoader, RecordingHealthReporter, TestConfigLoader};
 use weaver_config::RuntimePaths;
 
 pub const WAIT_TIMEOUT: Duration = Duration::from_secs(2);
@@ -27,7 +25,6 @@ pub type StepResult = Result<(), String>;
 pub struct ProcessTestWorld {
     loader: TestConfigLoader,
     reporter: Arc<RecordingHealthReporter>,
-    provider: RecordingBackendProvider,
     daemonizer: TestDaemonizer,
     shutdown: TestShutdownSignal,
     handle: Option<thread::JoinHandle<Result<(), LaunchError>>>,
@@ -48,7 +45,6 @@ impl ProcessTestWorld {
         let world = Self {
             loader,
             reporter: Arc::new(RecordingHealthReporter::default()),
-            provider: RecordingBackendProvider::default(),
             daemonizer: TestDaemonizer::default(),
             shutdown: TestShutdownSignal::new(),
             handle: None,
@@ -67,7 +63,6 @@ impl ProcessTestWorld {
         self.reset_observations();
         let loader = self.loader.clone();
         let reporter = self.reporter.clone() as Arc<dyn crate::health::HealthReporter>;
-        let provider = self.provider.clone();
         let daemonizer = self.daemonizer.clone();
         let shutdown = self.shutdown.clone();
         self.handle = Some(thread::spawn(move || {
@@ -77,11 +72,7 @@ impl ProcessTestWorld {
                     daemonizer,
                     shutdown,
                 },
-                services: ServiceDeps {
-                    loader,
-                    reporter,
-                    provider,
-                },
+                services: ServiceDeps { loader, reporter },
             };
             run_daemon_with(plan)
         }));
@@ -110,7 +101,6 @@ impl ProcessTestWorld {
             services: ServiceDeps {
                 loader: self.loader.clone(),
                 reporter,
-                provider: self.provider.clone(),
             },
         };
         let result = run_daemon_with(plan);
@@ -133,7 +123,6 @@ impl ProcessTestWorld {
             services: ServiceDeps {
                 loader: FailingConfigLoader,
                 reporter,
-                provider: self.provider.clone(),
             },
         };
         let result = run_daemon_with(plan);

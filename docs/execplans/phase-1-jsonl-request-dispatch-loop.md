@@ -18,9 +18,12 @@ appropriate domain handler, and streams `CommandResponse` messages back.
    separation of concerns (errors, request parsing, response writing, routing,
    and connection handling). Each file remains under 400 lines per AGENTS.md.
 
-2. **Minimum viable product (MVP) placeholder handlers**: Known operations
-   return "not implemented" responses with exit status 1. This establishes the
-   routing infrastructure without requiring full backend integration.
+2. **Minimum viable product (MVP) placeholder handlers**: The `get-definition`
+   operation in the `observe` domain is fully implemented with LSP integration.
+   Other known operations (`find-references`, `grep`, `diagnostics`,
+   `call-hierarchy` in `observe`; all operations in `act` and `verify`) return
+   "not implemented" responses with exit status 1 while backend wiring is
+   completed.
 
 3. **Structured error responses**: All errors (malformed JSONL, unknown domain,
    unknown operation) are written to stderr as structured messages before the

@@ -34,7 +34,7 @@ use super::responses::extract_locations;
 ///
 /// Returns a `DispatchError` if:
 /// - Required arguments are missing or malformed
-/// - The file extension is not recognised
+/// - The file extension is not recognized
 /// - The semantic backend fails to start
 /// - The LSP host returns an error
 pub fn handle<W: Write>(
@@ -75,6 +75,7 @@ pub fn handle<W: Write>(
                 DispatchError::lsp_host(language.as_str(), format!("goto_definition failed: {e}"))
             })
         })
+        .map_err(|_| DispatchError::internal("LSP host lock poisoned"))?
         .ok_or_else(|| DispatchError::internal("LSP host not initialized after backend start"))??;
 
     // 4. Serialize response

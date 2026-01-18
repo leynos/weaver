@@ -131,7 +131,7 @@ operations return structured errors with exit status 1.
 
 The `observe get-definition` operation is fully implemented: it accepts `--uri`
 and `--position` arguments, infers the language from the file extension,
-initialises the appropriate language server, and returns definition locations
+initializes the appropriate language server, and returns definition locations
 as JSON. Missing or malformed arguments return structured error messages with
 exit status 1. Other operations within the `observe`, `act`, and `verify`
 domains return "not yet implemented" responses while backend wiring is

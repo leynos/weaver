@@ -76,6 +76,16 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
     capability detection, and core LSP features (definition, references,
     diagnostics) for Rust, Python, and TypeScript.
 
+- [ ] Implement process-based language server adapters for `weaver-lsp-host`.
+    The `LspHost` currently requires external callers to register
+    `LanguageServer` implementations via `register_language()`. This step adds
+    concrete adapters that spawn real language server processes (e.g.,
+    `rust-analyzer`, `pyright`, `typescript-language-server`).
+  - Acceptance criteria: `SemanticBackendProvider::start_backend()` registers
+    adapters for configured languages, adapters spawn server processes and
+    communicate via stdio, server shutdown is handled gracefully on daemon
+    stop, and missing server binaries produce clear diagnostic errors.
+
 - [ ] Add human-readable output rendering for commands that return code
     locations or diagnostics, using `miette` or a compatible renderer to
     show context blocks.

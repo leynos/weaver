@@ -6,7 +6,7 @@ version.workspace = true
 [dependencies]
 daemonize-me = "2.0.2"
 dirs = "5.0"
-lsp-types = "0.97"
+lsp-types.workspace = true
 nix = { version = "0.28", features = ["signal", "user"] }
 once_cell.workspace = true
 ortho_config.workspace = true
