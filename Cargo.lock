@@ -2632,6 +2632,7 @@ dependencies = [
  "daemonize-me",
  "derive_more 1.0.0",
  "dirs 5.0.1",
+ "lsp-types",
  "nix 0.28.0",
  "once_cell",
  "ortho_config",
@@ -2646,6 +2647,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "weaver-config",
+ "weaver-lsp-host",
  "weaver-syntax",
 ]
 

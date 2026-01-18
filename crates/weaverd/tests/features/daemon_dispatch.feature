@@ -4,11 +4,11 @@ Feature: Daemon JSONL request dispatch
   appropriate domain handler, and streams responses back. Malformed requests
   and unknown domains or operations result in structured error responses.
 
-  Scenario: Dispatching a valid observe command
+  Scenario: Observe get-definition without arguments returns error
     Given a daemon connection is established
-    When a valid observe get-definition request is sent
+    When an observe get-definition request is sent without arguments
     Then the response includes an exit message with status 1
-    And the response includes a not implemented message
+    And the response includes an invalid arguments error
 
   Scenario: Rejecting malformed JSONL
     Given a daemon connection is established

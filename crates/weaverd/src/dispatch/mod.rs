@@ -27,10 +27,13 @@
 //! operation within each domain. Unknown domains or operations result in
 //! structured error responses.
 
+mod backend_manager;
 mod errors;
 mod handler;
+pub mod observe;
 mod request;
 mod response;
 mod router;
 
+pub(crate) use self::backend_manager::BackendManager;
 pub(crate) use self::handler::DispatchConnectionHandler;

@@ -142,6 +142,12 @@ impl<P> FusionBackends<P> {
         &self.config
     }
 
+    /// Returns a reference to the backend provider.
+    #[must_use]
+    pub fn provider(&self) -> &P {
+        &self.provider
+    }
+
     /// Returns a mutable reference to the backend provider.
     #[must_use]
     pub fn provider_mut(&mut self) -> &mut P {

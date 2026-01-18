@@ -34,9 +34,9 @@ mod backends;
 mod bootstrap;
 mod dispatch;
 mod health;
-mod placeholder_provider;
 mod process;
 pub mod safety_harness;
+mod semantic_provider;
 mod telemetry;
 mod transport;
 
@@ -48,6 +48,7 @@ pub use bootstrap::{
 };
 pub use health::{HealthReporter, StructuredHealthReporter};
 pub use process::{LaunchError, LaunchMode, run_daemon};
+pub use semantic_provider::SemanticBackendProvider;
 pub use telemetry::{TelemetryError, TelemetryHandle};
 
 #[cfg(test)]
