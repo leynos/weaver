@@ -218,7 +218,7 @@ impl DomainRouter {
 
 #[cfg(test)]
 mod tests {
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
     use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
     use super::*;
@@ -232,7 +232,18 @@ mod tests {
         CommandRequest::parse(json.as_bytes()).expect("test request")
     }
 
-    fn test_backends() -> FusionBackends<SemanticBackendProvider> {
+    #[fixture]
+    fn backends() -> FusionBackends<SemanticBackendProvider> {
+        let config = Config {
+            daemon_socket: SocketEndpoint::unix("/tmp/weaver-test/socket.sock"),
+            ..Config::default()
+        };
+        let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
+        FusionBackends::new(config, provider)
+    }
+
+    /// Creates backends for tests that iterate (can't use fixtures in loops).
+    fn create_backends() -> FusionBackends<SemanticBackendProvider> {
         let config = Config {
             daemon_socket: SocketEndpoint::unix("/tmp/weaver-test/socket.sock"),
             ..Config::default()
@@ -247,15 +258,15 @@ mod tests {
             let request = make_request(domain, op);
             let mut output = Vec::new();
             let mut writer = ResponseWriter::new(&mut output);
-            let mut backends = test_backends();
+            let mut backends = create_backends();
             let result = router.route(&request, &mut writer, &mut backends);
-            // get-definition requires LSP and will fail without server setup,
-            // but should still be recognized as a valid operation
+            // get-definition requires --uri/--position args, so it will fail
+            // with InvalidArguments when called without them, but this still
+            // proves the operation is recognized and routed correctly
             if domain == "observe" && *op == "get-definition" {
-                // get-definition will fail because no --uri/--position args
                 assert!(
-                    result.is_err() || result.is_ok(),
-                    "{domain} {op} should be recognized"
+                    matches!(result, Err(DispatchError::InvalidArguments { .. })),
+                    "{domain} {op} should fail with InvalidArguments (no args provided)"
                 );
             } else {
                 assert!(result.is_ok(), "{domain} {op} should route successfully");
@@ -268,7 +279,7 @@ mod tests {
         let request = make_request(domain, operation);
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
-        let mut backends = test_backends();
+        let mut backends = create_backends();
         let result = router.route(&request, &mut writer, &mut backends);
         assert!(matches!(
             result,
@@ -295,6 +306,11 @@ mod tests {
     }
 
     #[test]
+    fn routes_known_observe_operations() {
+        assert_routes_operations("observe", DomainRoutingContext::OBSERVE.known_operations);
+    }
+
+    #[test]
     fn routes_known_act_operations() {
         assert_routes_operations("act", DomainRoutingContext::ACT.known_operations);
     }
@@ -315,12 +331,15 @@ mod tests {
     #[rstest]
     #[case::title("act", "Apply-Patch")]
     #[case::screaming("verify", "DIAGNOSTICS")]
-    fn routes_operations_case_insensitively(#[case] domain: &str, #[case] operation: &str) {
+    fn routes_operations_case_insensitively(
+        #[case] domain: &str,
+        #[case] operation: &str,
+        mut backends: FusionBackends<SemanticBackendProvider>,
+    ) {
         let router = DomainRouter::new();
         let request = make_request(domain, operation);
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
-        let mut backends = test_backends();
         let result = router.route(&request, &mut writer, &mut backends);
         assert!(
             result.is_ok(),
@@ -328,13 +347,12 @@ mod tests {
         );
     }
 
-    #[test]
-    fn get_definition_requires_arguments() {
+    #[rstest]
+    fn get_definition_requires_arguments(mut backends: FusionBackends<SemanticBackendProvider>) {
         let router = DomainRouter::new();
         let request = make_request("observe", "get-definition");
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
-        let mut backends = test_backends();
         let result = router.route(&request, &mut writer, &mut backends);
 
         // Should fail with InvalidArguments because no --uri/--position
@@ -344,13 +362,12 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn find_references_not_implemented() {
+    #[rstest]
+    fn find_references_not_implemented(mut backends: FusionBackends<SemanticBackendProvider>) {
         let router = DomainRouter::new();
         let request = make_request("observe", "find-references");
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
-        let mut backends = test_backends();
         let result = router
             .route(&request, &mut writer, &mut backends)
             .expect("route");

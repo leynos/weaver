@@ -12,7 +12,7 @@ use rstest_bdd_macros::{given, scenario, then, when};
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
 use crate::backends::FusionBackends;
-use crate::dispatch::DispatchConnectionHandler;
+use crate::dispatch::{BackendManager, DispatchConnectionHandler};
 use crate::semantic_provider::SemanticBackendProvider;
 use crate::transport::{ListenerHandle, SocketListener};
 
@@ -40,7 +40,8 @@ impl DispatchWorld {
         };
         let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
         let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
-        let handler = Arc::new(DispatchConnectionHandler::new(backends));
+        let backend_manager = BackendManager::new(backends);
+        let handler = Arc::new(DispatchConnectionHandler::new(backend_manager));
         let listener = SocketListener::bind(&self.endpoint).expect("bind listener");
         self.address = listener.local_addr();
         self.listener = Some(listener.start(handler).expect("start listener"));

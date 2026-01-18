@@ -6,14 +6,12 @@
 //! responses back to the client.
 
 use std::io::{self, Read};
-use std::sync::{Arc, Mutex};
 
 use tracing::{debug, warn};
 
-use crate::backends::FusionBackends;
-use crate::semantic_provider::SemanticBackendProvider;
 use crate::transport::{ConnectionHandler, ConnectionStream};
 
+use super::backend_manager::BackendManager;
 use super::errors::DispatchError;
 use super::request::CommandRequest;
 use super::response::ResponseWriter;
@@ -30,12 +28,12 @@ pub(crate) const MAX_REQUEST_BYTES: usize = 64 * 1024;
 #[derive(Debug)]
 pub struct DispatchConnectionHandler {
     router: DomainRouter,
-    backends: Arc<Mutex<FusionBackends<SemanticBackendProvider>>>,
+    backends: BackendManager,
 }
 
 impl DispatchConnectionHandler {
-    /// Creates a new dispatch handler with shared backends.
-    pub fn new(backends: Arc<Mutex<FusionBackends<SemanticBackendProvider>>>) -> Self {
+    /// Creates a new dispatch handler with a backend manager.
+    pub fn new(backends: BackendManager) -> Self {
         Self {
             router: DomainRouter::new(),
             backends,
@@ -85,26 +83,26 @@ impl DispatchConnectionHandler {
             "dispatching request"
         );
 
-        // Acquire backends lock
-        let mut backends = match self.backends.lock() {
-            Ok(guard) => guard,
-            Err(_) => {
-                warn!(target: DISPATCH_TARGET, "backends lock poisoned");
-                let _ = writer.write_error(&DispatchError::internal("backends lock poisoned"));
-                return;
-            }
-        };
+        // Route and dispatch using backend manager
+        let route_result = self
+            .backends
+            .with_backends(|backends| self.router.route(&request, &mut writer, backends));
 
-        // Route and dispatch
-        match self.router.route(&request, &mut writer, &mut backends) {
-            Ok(result) => {
+        match route_result {
+            Ok(Ok(result)) => {
                 if let Err(error) = writer.write_exit(result.status) {
                     warn!(target: DISPATCH_TARGET, %error, "failed to write exit");
                 }
             }
-            Err(error) => {
+            Ok(Err(error)) => {
                 warn!(target: DISPATCH_TARGET, %error, "dispatch failed");
                 let _ = writer.write_error(&error);
+            }
+            Err(error) => {
+                // Backend manager error (e.g., lock poisoned)
+                warn!(target: DISPATCH_TARGET, %error, "backend manager error");
+                let _ = writer.write_error(&error);
+                let _ = writer.write_exit(error.exit_status());
             }
         }
     }
@@ -171,20 +169,26 @@ fn enforce_limit(size: usize) -> Result<(), DispatchError> {
 mod tests {
     use std::io::{BufRead, BufReader, Write};
     use std::net::{SocketAddr, TcpListener, TcpStream};
+    use std::sync::{Arc, Mutex};
     use std::thread::{self, JoinHandle};
 
     use rstest::{fixture, rstest};
     use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
+    use crate::backends::FusionBackends;
+    use crate::semantic_provider::SemanticBackendProvider;
+
     use super::*;
 
-    fn test_backends() -> Arc<Mutex<FusionBackends<SemanticBackendProvider>>> {
+    #[fixture]
+    fn backend_manager() -> BackendManager {
         let config = Config {
             daemon_socket: SocketEndpoint::unix("/tmp/weaver-test/socket.sock"),
             ..Config::default()
         };
         let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
-        Arc::new(Mutex::new(FusionBackends::new(config, provider)))
+        let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
+        BackendManager::new(backends)
     }
 
     /// Test fixture providing a TCP server/client pair for dispatch handler testing.
@@ -223,13 +227,12 @@ mod tests {
     }
 
     #[fixture]
-    fn harness() -> HandlerTestHarness {
+    fn harness(backend_manager: BackendManager) -> HandlerTestHarness {
         let (listener, addr) = create_listener();
-        let backends = test_backends();
 
         let server_handle = thread::spawn(move || {
             let (stream, _) = listener.accept().expect("accept");
-            DispatchConnectionHandler::new(backends).handle(ConnectionStream::Tcp(stream));
+            DispatchConnectionHandler::new(backend_manager).handle(ConnectionStream::Tcp(stream));
         });
 
         let client = TcpStream::connect(addr).expect("connect");

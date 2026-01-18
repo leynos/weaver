@@ -60,27 +60,24 @@ pub fn handle<W: Write>(
         .ensure_started(BackendKind::Semantic)
         .map_err(DispatchError::backend_startup)?;
 
-    // 3. Get LSP host and prepare for the call
-    let lsp_host_arc = backends.provider_mut().lsp_host();
-    let mut lsp_guard = lsp_host_arc
-        .lock()
-        .map_err(|_| DispatchError::internal("LSP host lock poisoned"))?;
-    let lsp_host = lsp_guard
-        .as_mut()
-        .ok_or_else(|| DispatchError::internal("LSP host not initialized after backend start"))?;
-
-    // 4. Initialize language server if needed
-    lsp_host.initialize(language).map_err(|e| {
-        DispatchError::lsp_host(language.as_str(), format!("initialization failed: {e}"))
-    })?;
-
-    // 5. Call goto_definition
+    // 3. Get LSP host and perform definition lookup
     let params = args.into_params();
-    let response = lsp_host.goto_definition(language, params).map_err(|e| {
-        DispatchError::lsp_host(language.as_str(), format!("goto_definition failed: {e}"))
-    })?;
+    let response = backends
+        .provider()
+        .with_lsp_host_mut(|lsp_host| {
+            // Initialize language server if needed
+            lsp_host.initialize(language).map_err(|e| {
+                DispatchError::lsp_host(language.as_str(), format!("initialization failed: {e}"))
+            })?;
 
-    // 6. Serialize response
+            // Call goto_definition
+            lsp_host.goto_definition(language, params).map_err(|e| {
+                DispatchError::lsp_host(language.as_str(), format!("goto_definition failed: {e}"))
+            })
+        })
+        .ok_or_else(|| DispatchError::internal("LSP host not initialized after backend start"))??;
+
+    // 4. Serialize response
     let locations = extract_locations(response);
     let json = serde_json::to_string(&locations)?;
     writer.write_stdout(json)?;

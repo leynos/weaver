@@ -2,17 +2,19 @@
 
 ## Summary
 
-Wire end-to-end domain command execution from CLI through daemon to backend,
-starting with `observe get-definition` as the first complete path.
+Wire End-to-End (E2E) domain command execution from command-line interface (CLI)
+through daemon to backend, starting with `observe get-definition` as the first
+complete path.
 
 **Acceptance Criteria:**
 
-- `weaver observe get-definition` with a running daemon returns LSP definition
-  results
+- `weaver observe get-definition` with a running daemon returns Language Server
+  Protocol (LSP) definition results
 - Errors propagate with structured messages
 - CLI exits with the daemon-provided status code
 - E2E tests exercise the client/daemon pipeline
-- BDD tests cover happy and unhappy paths using rstest-bdd v0.3.2
+- Behaviour-Driven Development (BDD) tests cover happy and unhappy paths using
+  rstest-bdd v0.3.2
 - `docs/users-guide.md` updated with behaviour changes
 - `make check-fmt`, `make lint`, `make test` all pass
 - Roadmap entry marked as done
@@ -35,7 +37,7 @@ ______________________________________________________________________
 
 4. **Language inference**: Derive language from URI file extension:
    `.rs` → Rust, `.py` → Python, `.ts`/`.tsx` → TypeScript. Unknown extensions
-   return structured error.
+   return a structured error.
 
 5. **Response format**: JSON payload per users-guide.md:
    `{"uri":"<URI>","line":42,"column":17}` for each definition location.

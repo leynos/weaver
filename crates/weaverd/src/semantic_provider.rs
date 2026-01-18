@@ -6,7 +6,7 @@
 //! backend is first requested.
 
 use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use tracing::debug;
 use weaver_config::{CapabilityMatrix, Config};
@@ -23,7 +23,7 @@ const BACKEND_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::backends::semant
 /// capability overrides.
 pub struct SemanticBackendProvider {
     capability_matrix: CapabilityMatrix,
-    lsp_host: Arc<Mutex<Option<LspHost>>>,
+    lsp_host: Mutex<Option<LspHost>>,
 }
 
 impl fmt::Debug for SemanticBackendProvider {
@@ -52,18 +52,46 @@ impl SemanticBackendProvider {
     pub fn new(capability_matrix: CapabilityMatrix) -> Self {
         Self {
             capability_matrix,
-            lsp_host: Arc::new(Mutex::new(None)),
+            lsp_host: Mutex::new(None),
         }
     }
 
-    /// Returns a shared reference to the LSP host mutex.
+    /// Executes a closure with a reference to the initialized LSP host.
     ///
-    /// Callers must acquire the lock before accessing the host. The host is
-    /// only `Some` after `start_backend(BackendKind::Semantic, _)` has been
-    /// called successfully.
+    /// Returns `None` if the host has not been started or if the lock is
+    /// poisoned.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// provider.with_lsp_host(|host| {
+    ///     host.goto_definition(language, params)
+    /// });
+    /// ```
+    pub fn with_lsp_host<F, R>(&self, f: F) -> Option<R>
+    where
+        F: FnOnce(&LspHost) -> R,
+    {
+        let guard = self.lsp_host.lock().ok()?;
+        guard.as_ref().map(f)
+    }
+
+    /// Executes a closure with a mutable reference to the initialized LSP host.
+    ///
+    /// Returns `None` if the host has not been started or if the lock is
+    /// poisoned.
+    pub fn with_lsp_host_mut<F, R>(&self, f: F) -> Option<R>
+    where
+        F: FnOnce(&mut LspHost) -> R,
+    {
+        let mut guard = self.lsp_host.lock().ok()?;
+        guard.as_mut().map(f)
+    }
+
+    /// Returns whether the LSP host has been initialized.
     #[must_use]
-    pub fn lsp_host(&self) -> Arc<Mutex<Option<LspHost>>> {
-        Arc::clone(&self.lsp_host)
+    pub fn is_initialized(&self) -> bool {
+        self.lsp_host.lock().map(|g| g.is_some()).unwrap_or(false)
     }
 }
 
@@ -125,9 +153,10 @@ mod tests {
             .start_backend(BackendKind::Semantic, &config)
             .expect("start backend");
 
-        let lsp_host_arc = provider.lsp_host();
-        let guard = lsp_host_arc.lock().expect("lock");
-        assert!(guard.is_some(), "LSP host should be created");
+        assert!(
+            provider.is_initialized(),
+            "LSP host should be created after starting semantic backend"
+        );
     }
 
     #[test]
@@ -142,9 +171,7 @@ mod tests {
             .start_backend(BackendKind::Semantic, &config)
             .expect("second start");
 
-        let lsp_host_arc = provider.lsp_host();
-        let guard = lsp_host_arc.lock().expect("lock");
-        assert!(guard.is_some());
+        assert!(provider.is_initialized());
     }
 
     #[test]

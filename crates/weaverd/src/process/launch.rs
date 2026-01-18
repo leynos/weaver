@@ -8,7 +8,7 @@ use tracing::info;
 use crate::StructuredHealthReporter;
 use crate::backends::{BackendProvider, FusionBackends};
 use crate::bootstrap::{ConfigLoader, StaticConfigLoader, SystemConfigLoader, bootstrap_with};
-use crate::dispatch::DispatchConnectionHandler;
+use crate::dispatch::{BackendManager, DispatchConnectionHandler};
 use crate::health::HealthReporter;
 use crate::semantic_provider::SemanticBackendProvider;
 use crate::transport::SocketListener;
@@ -128,7 +128,8 @@ where
         config.clone(),
         semantic_provider,
     )));
-    let handler = Arc::new(DispatchConnectionHandler::new(backends));
+    let backend_manager = BackendManager::new(backends);
+    let handler = Arc::new(DispatchConnectionHandler::new(backend_manager));
 
     let listener_handle = listener.start(handler)?;
     guard.write_health(HealthState::Ready)?;
