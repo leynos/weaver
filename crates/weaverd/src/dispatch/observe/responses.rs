@@ -28,8 +28,8 @@ impl From<&Location> for DefinitionLocation {
         Self {
             uri: loc.uri.to_string(),
             // Convert from 0-indexed (LSP) to 1-indexed (user-facing)
-            line: loc.range.start.line + 1,
-            column: loc.range.start.character + 1,
+            line: loc.range.start.line.saturating_add(1),
+            column: loc.range.start.character.saturating_add(1),
         }
     }
 }
@@ -39,8 +39,12 @@ impl From<&LocationLink> for DefinitionLocation {
         Self {
             uri: link.target_uri.to_string(),
             // Use selection range for precise definition location
-            line: link.target_selection_range.start.line + 1,
-            column: link.target_selection_range.start.character + 1,
+            line: link.target_selection_range.start.line.saturating_add(1),
+            column: link
+                .target_selection_range
+                .start
+                .character
+                .saturating_add(1),
         }
     }
 }
@@ -167,7 +171,9 @@ mod tests {
             expected.len(),
             locations.len()
         );
+        let expected_uri = sample_uri.to_string();
         for (i, (expected_line, expected_column)) in expected.iter().enumerate() {
+            assert_eq!(locations[i].uri, expected_uri, "location[{i}].uri mismatch");
             assert_eq!(
                 locations[i].line, *expected_line,
                 "location[{i}].line mismatch"

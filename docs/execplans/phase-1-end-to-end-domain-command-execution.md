@@ -2,9 +2,9 @@
 
 ## Summary
 
-Wire End-to-End (E2E) domain command execution from command-line interface (CLI)
-through daemon to backend, starting with `observe get-definition` as the first
-complete path.
+Wire End-to-End (E2E) domain command execution from command-line interface
+(CLI) through daemon to backend, starting with `observe get-definition` as the
+first complete path.
 
 **Acceptance Criteria:**
 

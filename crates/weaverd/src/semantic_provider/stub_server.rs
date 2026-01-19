@@ -31,8 +31,11 @@ impl StubLanguageServer {
 
     fn not_implemented(&self, operation: &str) -> LanguageServerError {
         LanguageServerError::new(format!(
-            "{operation} for {language} is not yet implemented; \
-             process-based language server adapters are pending",
+            concat!(
+                "{operation} for {language} is not yet implemented; ",
+                "process-based language server adapters are pending"
+            ),
+            operation = operation,
             language = self.language
         ))
     }
@@ -106,12 +109,25 @@ impl LanguageServer for StubLanguageServer {
 
 #[cfg(test)]
 mod tests {
+    use rstest::{fixture, rstest};
+
     use super::*;
 
-    #[test]
-    fn initialize_succeeds_with_full_capabilities() {
-        let mut server = StubLanguageServer::new(Language::Rust);
-        let caps = server.initialize().expect("initialization should succeed");
+    #[fixture]
+    fn rust_server() -> StubLanguageServer {
+        StubLanguageServer::new(Language::Rust)
+    }
+
+    #[fixture]
+    fn python_server() -> StubLanguageServer {
+        StubLanguageServer::new(Language::Python)
+    }
+
+    #[rstest]
+    fn initialize_succeeds_with_full_capabilities(mut rust_server: StubLanguageServer) {
+        let caps = rust_server
+            .initialize()
+            .expect("initialization should succeed");
 
         assert!(caps.supports_definition());
         assert!(caps.supports_references());
@@ -119,9 +135,8 @@ mod tests {
         assert!(caps.supports_call_hierarchy());
     }
 
-    #[test]
-    fn goto_definition_returns_not_implemented_error() {
-        let mut server = StubLanguageServer::new(Language::Rust);
+    #[rstest]
+    fn goto_definition_returns_not_implemented_error(mut rust_server: StubLanguageServer) {
         let params = GotoDefinitionParams {
             text_document_position_params: lsp_types::TextDocumentPositionParams {
                 text_document: lsp_types::TextDocumentIdentifier {
@@ -133,7 +148,7 @@ mod tests {
             partial_result_params: Default::default(),
         };
 
-        let result = server.goto_definition(params);
+        let result = rust_server.goto_definition(params);
         assert!(result.is_err());
 
         let error =
@@ -142,10 +157,8 @@ mod tests {
         assert!(error.message().contains("rust"));
     }
 
-    #[test]
-    fn document_sync_notifications_succeed() {
-        let mut server = StubLanguageServer::new(Language::Python);
-
+    #[rstest]
+    fn document_sync_notifications_succeed(mut python_server: StubLanguageServer) {
         // did_open should succeed
         let open_params = DidOpenTextDocumentParams {
             text_document: lsp_types::TextDocumentItem {
@@ -155,7 +168,7 @@ mod tests {
                 text: "print('hello')".to_string(),
             },
         };
-        assert!(server.did_open(open_params).is_ok());
+        assert!(python_server.did_open(open_params).is_ok());
 
         // did_close should succeed
         let close_params = DidCloseTextDocumentParams {
@@ -163,6 +176,6 @@ mod tests {
                 uri: "file:///test.py".parse().expect("failed to parse test URI"),
             },
         };
-        assert!(server.did_close(close_params).is_ok());
+        assert!(python_server.did_close(close_params).is_ok());
     }
 }
