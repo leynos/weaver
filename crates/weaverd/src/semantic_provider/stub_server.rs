@@ -159,10 +159,12 @@ mod tests {
 
     #[rstest]
     fn document_sync_notifications_succeed(mut python_server: StubLanguageServer) {
+        let test_uri: lsp_types::Uri = "file:///test.py".parse().expect("failed to parse test URI");
+
         // did_open should succeed
         let open_params = DidOpenTextDocumentParams {
             text_document: lsp_types::TextDocumentItem {
-                uri: "file:///test.py".parse().expect("failed to parse test URI"),
+                uri: test_uri.clone(),
                 language_id: "python".to_string(),
                 version: 1,
                 text: "print('hello')".to_string(),
@@ -170,11 +172,23 @@ mod tests {
         };
         assert!(python_server.did_open(open_params).is_ok());
 
+        // did_change should succeed
+        let change_params = DidChangeTextDocumentParams {
+            text_document: lsp_types::VersionedTextDocumentIdentifier {
+                uri: test_uri.clone(),
+                version: 2,
+            },
+            content_changes: vec![lsp_types::TextDocumentContentChangeEvent {
+                range: None,
+                range_length: None,
+                text: "print('world')".to_string(),
+            }],
+        };
+        assert!(python_server.did_change(change_params).is_ok());
+
         // did_close should succeed
         let close_params = DidCloseTextDocumentParams {
-            text_document: lsp_types::TextDocumentIdentifier {
-                uri: "file:///test.py".parse().expect("failed to parse test URI"),
-            },
+            text_document: lsp_types::TextDocumentIdentifier { uri: test_uri },
         };
         assert!(python_server.did_close(close_params).is_ok());
     }

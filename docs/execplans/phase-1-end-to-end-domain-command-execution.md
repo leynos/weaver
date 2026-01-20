@@ -220,8 +220,8 @@ impl From<&Location> for DefinitionLocation {
     fn from(loc: &Location) -> Self {
         Self {
             uri: loc.uri.to_string(),
-            line: loc.range.start.line + 1,      // 0-indexed to 1-indexed
-            column: loc.range.start.character + 1,
+            line: loc.range.start.line.saturating_add(1),      // 0-indexed to 1-indexed
+            column: loc.range.start.character.saturating_add(1),
         }
     }
 }
@@ -230,8 +230,8 @@ impl From<&LocationLink> for DefinitionLocation {
     fn from(link: &LocationLink) -> Self {
         Self {
             uri: link.target_uri.to_string(),
-            line: link.target_selection_range.start.line + 1,
-            column: link.target_selection_range.start.character + 1,
+            line: link.target_selection_range.start.line.saturating_add(1),
+            column: link.target_selection_range.start.character.saturating_add(1),
         }
     }
 }
