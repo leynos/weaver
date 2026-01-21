@@ -12,7 +12,7 @@ use rstest_bdd_macros::{given, scenario, then, when};
 
 use crate::Language;
 use crate::adapter::{AdapterError, LspServerConfig, ProcessLanguageServer};
-use crate::server::LanguageServer;
+use crate::server::{LanguageServer, LanguageServerError};
 
 /// Test world for adapter BDD scenarios.
 struct AdapterTestWorld {
@@ -22,7 +22,7 @@ struct AdapterTestWorld {
     python_adapter: Option<ProcessLanguageServer>,
     typescript_adapter: Option<ProcessLanguageServer>,
     /// Last error observed during operations.
-    last_error: Option<String>,
+    last_error: Option<LanguageServerError>,
     /// Captured error details.
     error_is_binary_not_found: bool,
 }
@@ -90,7 +90,7 @@ fn given_rust_adapter_with_custom_command(world: &RefCell<AdapterTestWorld>) {
 // --- When steps ---
 
 #[allow(clippy::collapsible_if)]
-fn is_binary_not_found_error(error: &dyn Error) -> bool {
+fn is_binary_not_found_error(error: &LanguageServerError) -> bool {
     if let Some(source) = error.source() {
         if let Some(adapter_error) = source.downcast_ref::<AdapterError>() {
             if matches!(adapter_error, AdapterError::BinaryNotFound { .. }) {
@@ -99,11 +99,7 @@ fn is_binary_not_found_error(error: &dyn Error) -> bool {
         }
     }
 
-    // Also check the error message for hints
-    let error_string = error.to_string();
-    error_string.contains("spawn")
-        || error_string.contains("not found")
-        || error_string.contains("No such file")
+    false
 }
 
 #[when("the adapter is initialized")]
@@ -112,8 +108,9 @@ fn when_adapter_initialized(world: &RefCell<AdapterTestWorld>) {
     if let Some(ref mut adapter) = borrow.adapter
         && let Err(e) = adapter.initialize()
     {
-        borrow.last_error = Some(e.to_string());
-        borrow.error_is_binary_not_found = is_binary_not_found_error(&e);
+        let is_binary_not_found = is_binary_not_found_error(&e);
+        borrow.last_error = Some(e);
+        borrow.error_is_binary_not_found = is_binary_not_found;
     }
 }
 
@@ -122,14 +119,30 @@ fn when_adapter_initialized(world: &RefCell<AdapterTestWorld>) {
 #[then("the error indicates binary not found")]
 fn then_error_indicates_binary_not_found(world: &RefCell<AdapterTestWorld>) {
     let borrow = world.borrow();
-    assert!(
-        borrow.last_error.is_some(),
-        "expected an error but got none"
-    );
+
+    let error = borrow
+        .last_error
+        .as_ref()
+        .expect("expected an error but got none");
+
     assert!(
         borrow.error_is_binary_not_found,
-        "expected binary not found error, got: {:?}",
-        borrow.last_error
+        "expected binary not found error flag to be set, got: {:?}",
+        error
+    );
+
+    let source = error
+        .source()
+        .expect("LanguageServerError is expected to wrap an AdapterError source");
+
+    let adapter_error = source
+        .downcast_ref::<AdapterError>()
+        .expect("LanguageServerError source should be an AdapterError");
+
+    assert!(
+        matches!(adapter_error, AdapterError::BinaryNotFound { .. }),
+        "expected AdapterError::BinaryNotFound, got: {:?}",
+        adapter_error
     );
 }
 
@@ -137,13 +150,14 @@ fn then_error_indicates_binary_not_found(world: &RefCell<AdapterTestWorld>) {
 fn then_error_contains_command_path(world: &RefCell<AdapterTestWorld>) {
     let borrow = world.borrow();
     let error = borrow.last_error.as_ref().expect("expected an error");
+    let error_string = error.to_string();
     // The error should mention the command that failed or language server
     assert!(
-        error.contains("language server")
-            || error.contains("spawn")
-            || error.contains("/nonexistent/"),
+        error_string.contains("language server")
+            || error_string.contains("spawn")
+            || error_string.contains("/nonexistent/"),
         "error message should contain relevant context, got: {}",
-        error
+        error_string
     );
 }
 

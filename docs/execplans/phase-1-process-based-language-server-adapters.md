@@ -6,20 +6,22 @@
 | ----------------- | ---------------------------- |
 | **Status**        | Complete                     |
 | **Created**       | 2026-01-21                   |
-| **Target**        | Phase 1 MVP                  |
+| **Target**        | Phase 1 Minimum Viable Product (MVP)                  |
 | **Roadmap Entry** | `docs/roadmap.md` line 79-87 |
 
 ## Big Picture
 
 Implement process-based language server adapters for `weaver-lsp-host` that
 spawn real language server processes (`rust-analyzer`, `pyrefly lsp`,
-`tsgo --lsp`) and communicate via JSON-RPC 2.0 over stdio. This replaces the
-current `StubLanguageServer` with production-ready adapters.
+`tsgo --lsp`) and communicate via JavaScript Object Notation – Remote Procedure
+Call (JSON-RPC) 2.0 over stdio. This replaces the current `StubLanguageServer`
+with production-ready adapters.
 
 ## Constraints
 
 1. **Must implement `Send`**: Required by `LanguageServer` trait bound
-2. **Synchronous interface**: All trait methods block on process I/O
+2. **Synchronous interface**: All trait methods block on process input/output
+   (I/O)
 3. **Single initialization**: `initialize()` called once per language, result
    cached by `LspHost`
 4. **Graceful degradation**: Missing binaries produce clear diagnostic errors,
@@ -76,7 +78,7 @@ ______________________________________________________________________
 
 ### Task 4: Implement stdio transport (`adapter/transport.rs`)
 
-Implement LSP header-framed transport.
+Implement Language Server Protocol (LSP) header-framed transport.
 
 **Verification:** `make test` passes transport unit tests
 
@@ -107,7 +109,7 @@ Create `ProcessSpawner` trait for testability.
 
 ______________________________________________________________________
 
-### Task 8: Write BDD tests for adapter lifecycle
+### Task 8: Write Behaviour-Driven Development (BDD) tests for adapter lifecycle
 
 **Feature file:**
 `crates/weaver-lsp-host/tests/features/process_adapter.feature`
@@ -132,8 +134,8 @@ ______________________________________________________________________
 
 ### Task 11: Implement graceful shutdown integration
 
-**Verification:** Manual test - start daemon, stop with SIGTERM, verify child
-processes exit
+**Verification:** Manual test - start daemon, stop with the POSIX termination
+signal SIGTERM, verify child processes exit
 
 ______________________________________________________________________
 

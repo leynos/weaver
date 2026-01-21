@@ -46,13 +46,6 @@ pub enum AdapterError {
         message: String,
     },
 
-    /// Request timed out.
-    #[error("request timed out after {timeout_secs}s")]
-    Timeout {
-        /// The timeout duration in seconds.
-        timeout_secs: u64,
-    },
-
     /// Initialization handshake failed.
     #[error("initialization failed: {message}")]
     InitializationFailed {

@@ -12,6 +12,42 @@ use std::process::{ChildStdin, ChildStdout};
 
 use super::error::TransportError;
 
+/// Writes an LSP-framed message to any writer.
+fn write_framed<W: Write>(mut writer: W, message: &[u8]) -> Result<(), TransportError> {
+    let header = format!("Content-Length: {}\r\n\r\n", message.len());
+    writer.write_all(header.as_bytes())?;
+    writer.write_all(message)?;
+    writer.flush()?;
+    Ok(())
+}
+
+/// Reads headers and extracts the Content-Length value from any reader.
+fn read_content_length<R: BufRead>(reader: &mut R) -> Result<usize, TransportError> {
+    let mut content_length: Option<usize> = None;
+
+    loop {
+        let mut line = String::new();
+        let bytes_read = reader.read_line(&mut line)?;
+        if bytes_read == 0 {
+            return Err(TransportError::Io(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "connection closed while reading headers",
+            )));
+        }
+
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            break;
+        }
+
+        if let Some(value) = trimmed.strip_prefix("Content-Length: ") {
+            content_length = Some(value.parse().map_err(|_| TransportError::InvalidHeader)?);
+        }
+    }
+
+    content_length.ok_or(TransportError::MissingContentLength)
+}
+
 /// Reads and writes LSP-framed messages over process stdio.
 ///
 /// The transport handles the LSP header framing protocol, which prefixes
@@ -37,11 +73,7 @@ impl StdioTransport {
     ///
     /// Returns `TransportError::Io` if writing to the process fails.
     pub fn send(&mut self, message: &[u8]) -> Result<(), TransportError> {
-        let header = format!("Content-Length: {}\r\n\r\n", message.len());
-        self.writer.write_all(header.as_bytes())?;
-        self.writer.write_all(message)?;
-        self.writer.flush()?;
-        Ok(())
+        write_framed(&mut self.writer, message)
     }
 
     /// Receives an LSP-framed message (blocks until complete).
@@ -51,40 +83,10 @@ impl StdioTransport {
     /// Returns `TransportError::MissingContentLength` if no Content-Length header is found.
     /// Returns `TransportError::Io` if reading from the process fails.
     pub fn receive(&mut self) -> Result<Vec<u8>, TransportError> {
-        let content_length = self.read_headers()?;
+        let content_length = read_content_length(&mut self.reader)?;
         let mut content = vec![0u8; content_length];
         self.reader.read_exact(&mut content)?;
         Ok(content)
-    }
-
-    /// Reads headers and extracts the Content-Length value.
-    fn read_headers(&mut self) -> Result<usize, TransportError> {
-        let mut content_length: Option<usize> = None;
-
-        loop {
-            let mut line = String::new();
-            let bytes_read = self.reader.read_line(&mut line)?;
-            if bytes_read == 0 {
-                // EOF reached
-                return Err(TransportError::Io(std::io::Error::new(
-                    std::io::ErrorKind::UnexpectedEof,
-                    "connection closed while reading headers",
-                )));
-            }
-
-            let trimmed = line.trim();
-            if trimmed.is_empty() {
-                // Empty line marks end of headers
-                break;
-            }
-
-            if let Some(value) = trimmed.strip_prefix("Content-Length: ") {
-                content_length = Some(value.parse().map_err(|_| TransportError::InvalidHeader)?);
-            }
-            // Ignore other headers (e.g., Content-Type)
-        }
-
-        content_length.ok_or(TransportError::MissingContentLength)
     }
 }
 
@@ -118,70 +120,16 @@ mod tests {
         }
 
         fn send(&mut self, message: &[u8]) -> Result<(), TransportError> {
-            let header = format!("Content-Length: {}\r\n\r\n", message.len());
-            self.write_buffer.extend_from_slice(header.as_bytes());
-            self.write_buffer.extend_from_slice(message);
-            Ok(())
+            write_framed(&mut self.write_buffer, message)
         }
 
         fn receive(&mut self) -> Result<Vec<u8>, TransportError> {
-            let content_length = self.read_headers()?;
+            let content_length = read_content_length(&mut self.read_buffer)?;
             let mut content = vec![0u8; content_length];
             self.read_buffer.read_exact(&mut content)?;
             Ok(content)
         }
 
-        #[expect(
-            clippy::excessive_nesting,
-            reason = "test helper with acceptable nesting for readability"
-        )]
-        fn read_headers(&mut self) -> Result<usize, TransportError> {
-            let mut content_length: Option<usize> = None;
-
-            loop {
-                let (bytes_read, line) = self.read_header_line()?;
-                if bytes_read == 0 {
-                    return Err(eof_error());
-                }
-
-                let trimmed = line.trim();
-                if trimmed.is_empty() {
-                    break;
-                }
-
-                if let Some(len) = parse_content_length(trimmed)? {
-                    content_length = Some(len);
-                }
-            }
-
-            content_length.ok_or(TransportError::MissingContentLength)
-        }
-
-        fn read_header_line(&mut self) -> Result<(usize, String), TransportError> {
-            let mut line = String::new();
-            let bytes_read = self.read_buffer.read_line(&mut line)?;
-            Ok((bytes_read, line))
-        }
-    }
-
-    fn eof_error() -> TransportError {
-        TransportError::Io(std::io::Error::new(
-            std::io::ErrorKind::UnexpectedEof,
-            "connection closed",
-        ))
-    }
-
-    fn parse_content_length(header_line: &str) -> Result<Option<usize>, TransportError> {
-        match header_line.strip_prefix("Content-Length: ") {
-            Some(value) => value
-                .parse()
-                .map(Some)
-                .map_err(|_| TransportError::InvalidHeader),
-            None => Ok(None),
-        }
-    }
-
-    impl MockTransport {
         fn written_bytes(&self) -> &[u8] {
             &self.write_buffer
         }
