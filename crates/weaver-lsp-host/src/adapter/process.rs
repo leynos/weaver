@@ -1,7 +1,7 @@
 //! Process-based language server adapter implementing the `LanguageServer` trait.
 
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use tracing::{debug, warn};
@@ -9,27 +9,13 @@ use tracing::{debug, warn};
 use super::config::LspServerConfig;
 use super::error::AdapterError;
 use super::jsonrpc::{JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
+use super::state::ProcessState;
 use super::transport::StdioTransport;
-use crate::Language;
 use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
+use crate::Language;
 
 /// Log target for adapter operations.
 const ADAPTER_TARGET: &str = "weaver_lsp_host::adapter";
-
-/// Internal state of the language server process.
-enum ProcessState {
-    /// Process has not been started.
-    NotStarted,
-    /// Process is running and ready for communication.
-    Running {
-        /// The child process handle.
-        child: Child,
-        /// The transport for JSON-RPC communication.
-        transport: StdioTransport,
-    },
-    /// Process has been stopped.
-    Stopped,
-}
 
 /// A language server adapter that spawns and communicates with an external process.
 ///
@@ -301,8 +287,23 @@ impl ProcessLanguageServer {
             "initiating graceful shutdown"
         );
 
-        let _ = self.send_request::<_, Value>("shutdown", ());
-        let _ = self.send_notification("exit", ());
+        if let Err(e) = self.send_request::<_, Value>("shutdown", ()) {
+            debug!(
+                target: ADAPTER_TARGET,
+                language = %self.language,
+                error = %e,
+                "exit notification failed (best effort)"
+            );
+        }
+
+        if let Err(e) = self.send_notification("exit", ()) {
+            debug!(
+                target: ADAPTER_TARGET,
+                language = %self.language,
+                error = %e,
+                "exit notification failed (best effort)"
+            );
+        }
 
         let mut state = self
             .state

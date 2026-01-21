@@ -31,10 +31,12 @@ mod config;
 mod error;
 mod jsonrpc;
 mod process;
+mod state;
 mod transport;
 
 pub use config::LspServerConfig;
 pub use error::{AdapterError, TransportError};
 pub use jsonrpc::{JsonRpcError, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
 pub use process::ProcessLanguageServer;
+pub use state::ProcessState;
 pub use transport::StdioTransport;
