@@ -110,7 +110,7 @@ under the same directory as the Unix socket (for example
 (`weaverd.health`). PID and health files are written atomically, so observers
 never see a partially written payload. Attempts to start a second copy while
 one is running fail fast with an "already running" error that reports the
-existing PID. When the original launch is still initialising and has not yet
+existing PID. When the original launch is still initializing and has not yet
 published a PID, the second invocation now reports "launch already in progress"
 instead of removing the lock. If the daemon exited uncleanly, the new instance
 removes the stale files before continuing.
@@ -127,9 +127,15 @@ messages from connected clients, routes them to the appropriate domain handler,
 and streams `DaemonMessage` responses back. Request parsing validates the JSONL
 structure and rejects malformed input with structured error messages. Domain
 routing supports `observe`, `act`, and `verify` commands. Unknown domains or
-operations return structured errors with exit status 1. Known operations
-currently return "not yet implemented" responses (pending backend wiring) with
-exit status 1; future phases will connect these to the semantic fusion backends.
+operations return structured errors with exit status 1.
+
+The `observe get-definition` operation is fully implemented: it accepts `--uri`
+and `--position` arguments, infers the language from the file extension,
+initializes the appropriate language server, and returns definition locations
+as JSON. Missing or malformed arguments return structured error messages with
+exit status 1. Other operations within the `observe`, `act`, and `verify`
+domains return "not yet implemented" responses while backend wiring is
+completed.
 
 The health snapshot is a single-line JSON document describing the current
 state, enabling operators and automation to poll readiness without speaking the
@@ -307,17 +313,26 @@ Syntax:
 weaver observe get-definition --uri <URI> --position <LINE:COL>
 ```
 
+Both `--uri` and `--position` are required. The position uses 1-indexed line
+and column numbers (matching editor conventions). The language is inferred from
+the file extension: `.rs` for Rust, `.py` for Python, and `.ts`/`.tsx` for
+TypeScript. Unsupported extensions return an error.
+
 Human output:
 
 ```text
 definition: <URI>:<LINE>:<COL>
 ```
 
-JSON payload:
+JSON payload (written to stdout stream):
 
 ```json
-{"uri":"<URI>","line":42,"column":17}
+[{"uri":"file:///path/to/file.rs","line":42,"column":17}]
 ```
+
+The response is an array of definition locations. Each location includes the
+target URI, line number, and column (all 1-indexed). The array may be empty if
+no definition is found, or contain multiple entries for overloaded symbols.
 
 #### observe find-references
 

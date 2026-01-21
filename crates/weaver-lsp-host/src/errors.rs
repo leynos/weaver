@@ -55,7 +55,10 @@ impl fmt::Display for HostOperation {
 #[derive(Debug, Error)]
 pub enum LspHostError {
     /// The requested language has not been registered.
-    #[error("language '{language}' is not registered with the LSP host")]
+    ///
+    /// This occurs when no language server has been registered for the
+    /// requested language via [`crate::LspHost::register_language`].
+    #[error("no language server registered for '{language}'")]
     UnknownLanguage {
         /// Language requested by the caller.
         language: Language,
