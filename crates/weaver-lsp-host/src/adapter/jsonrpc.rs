@@ -61,14 +61,14 @@ impl JsonRpcRequest {
 }
 
 /// A JSON-RPC 2.0 notification (no response expected).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonRpcNotification {
     /// Protocol version, always "2.0".
-    pub jsonrpc: &'static str,
+    pub jsonrpc: String,
     /// The method to invoke.
     pub method: String,
     /// Optional parameters.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub params: Option<Value>,
 }
 
@@ -77,7 +77,7 @@ impl JsonRpcNotification {
     #[must_use]
     pub fn new(method: impl Into<String>, params: Option<Value>) -> Self {
         Self {
-            jsonrpc: "2.0",
+            jsonrpc: "2.0".to_string(),
             method: method.into(),
             params,
         }
@@ -97,6 +97,52 @@ pub struct JsonRpcResponse {
     /// The error on failure.
     #[serde(default)]
     pub error: Option<JsonRpcError>,
+}
+
+/// A JSON-RPC 2.0 server-initiated request.
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+pub struct JsonRpcServerRequest {
+    /// Protocol version.
+    pub jsonrpc: String,
+    /// Request identifier.
+    pub id: i64,
+    /// The method to invoke.
+    pub method: String,
+    /// Optional parameters.
+    #[serde(default)]
+    pub params: Option<Value>,
+}
+
+/// Any JSON-RPC 2.0 message received from server.
+#[derive(Debug, Clone)]
+pub enum JsonRpcMessage {
+    /// A response to a client request.
+    Response(JsonRpcResponse),
+    /// A server-initiated request.
+    ServerRequest(JsonRpcServerRequest),
+    /// A notification (no response expected).
+    Notification(JsonRpcNotification),
+}
+
+impl JsonRpcMessage {
+    /// Parses a JSON-RPC message from bytes, handling all message types.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, serde_json::Error> {
+        let json: Value = serde_json::from_slice(bytes)?;
+
+        if json.get("method").is_some() {
+            if json.get("id").is_some() {
+                let request: JsonRpcServerRequest = serde_json::from_value(json)?;
+                Ok(Self::ServerRequest(request))
+            } else {
+                let notification: JsonRpcNotification = serde_json::from_value(json)?;
+                Ok(Self::Notification(notification))
+            }
+        } else {
+            let response: JsonRpcResponse = serde_json::from_value(json)?;
+            Ok(Self::Response(response))
+        }
+    }
 }
 
 /// A JSON-RPC 2.0 error object.

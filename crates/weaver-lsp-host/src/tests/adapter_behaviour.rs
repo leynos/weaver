@@ -55,9 +55,9 @@ fn create_rust_adapter_with_command(
         command: command.into(),
         args: Vec::new(),
         working_dir: None,
-        init_timeout: Duration::from_secs(30),
-        request_timeout: Duration::from_secs(10),
-        shutdown_timeout: Duration::from_secs(5),
+        
+        
+        
     };
     let adapter = ProcessLanguageServer::with_config(Language::Rust, config);
     world.borrow_mut().adapter = Some(adapter);

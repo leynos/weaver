@@ -1,18 +1,8 @@
 //! Configuration for process-based language server adapters.
 
 use std::path::PathBuf;
-use std::time::Duration;
 
 use crate::Language;
-
-/// Default timeout for initialization handshake.
-const DEFAULT_INIT_TIMEOUT: Duration = Duration::from_secs(30);
-
-/// Default timeout for individual requests.
-const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
-
-/// Default timeout for graceful shutdown.
-const DEFAULT_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Configuration for spawning a language server process.
 #[derive(Debug, Clone)]
@@ -23,12 +13,6 @@ pub struct LspServerConfig {
     pub args: Vec<String>,
     /// Working directory for the spawned process.
     pub working_dir: Option<PathBuf>,
-    /// Timeout for the initialization handshake.
-    pub init_timeout: Duration,
-    /// Timeout for individual requests.
-    pub request_timeout: Duration,
-    /// Timeout for graceful shutdown.
-    pub shutdown_timeout: Duration,
 }
 
 impl LspServerConfig {
@@ -37,9 +21,6 @@ impl LspServerConfig {
             command: command.into(),
             args,
             working_dir: None,
-            init_timeout: DEFAULT_INIT_TIMEOUT,
-            request_timeout: DEFAULT_REQUEST_TIMEOUT,
-            shutdown_timeout: DEFAULT_SHUTDOWN_TIMEOUT,
         }
     }
 
@@ -81,27 +62,6 @@ impl LspServerConfig {
     #[must_use]
     pub fn with_working_dir(mut self, dir: impl Into<PathBuf>) -> Self {
         self.working_dir = Some(dir.into());
-        self
-    }
-
-    /// Sets a custom initialization timeout.
-    #[must_use]
-    pub const fn with_init_timeout(mut self, timeout: Duration) -> Self {
-        self.init_timeout = timeout;
-        self
-    }
-
-    /// Sets a custom request timeout.
-    #[must_use]
-    pub const fn with_request_timeout(mut self, timeout: Duration) -> Self {
-        self.request_timeout = timeout;
-        self
-    }
-
-    /// Sets a custom shutdown timeout.
-    #[must_use]
-    pub const fn with_shutdown_timeout(mut self, timeout: Duration) -> Self {
-        self.shutdown_timeout = timeout;
         self
     }
 }
@@ -148,15 +108,8 @@ mod tests {
 
     #[rstest]
     fn builder_methods_work() {
-        let config = LspServerConfig::rust_default()
-            .with_working_dir("/workspace")
-            .with_init_timeout(Duration::from_secs(60))
-            .with_request_timeout(Duration::from_secs(20))
-            .with_shutdown_timeout(Duration::from_secs(10));
+        let config = LspServerConfig::rust_default().with_working_dir("/workspace");
 
         assert_eq!(config.working_dir, Some(PathBuf::from("/workspace")));
-        assert_eq!(config.init_timeout, Duration::from_secs(60));
-        assert_eq!(config.request_timeout, Duration::from_secs(20));
-        assert_eq!(config.shutdown_timeout, Duration::from_secs(10));
     }
 }
