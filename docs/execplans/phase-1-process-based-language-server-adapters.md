@@ -2,12 +2,12 @@
 
 ## Metadata
 
-| Field             | Value                        |
-| ----------------- | ---------------------------- |
-| **Status**        | Complete                     |
-| **Created**       | 2026-01-21                   |
+| Field             | Value                                |
+| ----------------- | ------------------------------------ |
+| **Status**        | Complete                             |
+| **Created**       | 2026-01-21                           |
 | **Target**        | Phase 1 Minimum Viable Product (MVP) |
-| **Roadmap Entry** | `docs/roadmap.md` line 79-87 |
+| **Roadmap Entry** | `docs/roadmap.md` line 79-87         |
 
 ## Big Picture
 
@@ -167,13 +167,13 @@ All must pass before committing.
 
 ## Critical Files
 
-| File                                                          | Purpose                    |
-| ------------------------------------------------------------- | --------------------------- |
+| File                                                            | Purpose                           |
+| --------------------------------------------------------------- | --------------------------------- |
 | `crates/weaver-lsp-host/src/server.rs`                          | `LanguageServer` trait definition |
-| `crates/weaver-lsp-host/src/adapter/process.rs`                 | Main adapter implementation |
-| `crates/weaverd/src/semantic_provider/mod.rs`                   | Integration point |
-| `crates/weaver-lsp-host/tests/features/process_adapter.feature` | BDD scenarios |
-| `docs/users-guide.md`                                           | User documentation |
+| `crates/weaver-lsp-host/src/adapter/process.rs`                 | Main adapter implementation       |
+| `crates/weaverd/src/semantic_provider/mod.rs`                   | Integration point                 |
+| `crates/weaver-lsp-host/tests/features/process_adapter.feature` | BDD scenarios                     |
+| `docs/users-guide.md`                                           | User documentation                |
 
 ## Design Decisions
 

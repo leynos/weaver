@@ -151,7 +151,11 @@ fn then_error_contains_command_path(world: &RefCell<AdapterTestWorld>) {
 }
 
 #[then("the <language> adapter command is <command>")]
-fn then_language_adapter_command_is(_world: &RefCell<AdapterTestWorld>, language: Language, command: &str) {
+fn then_language_adapter_command_is(
+    _world: &RefCell<AdapterTestWorld>,
+    language: Language,
+    command: &str,
+) {
     let config = LspServerConfig::for_language(language);
     assert_eq!(
         config.command.file_name().and_then(|s| s.to_str()),

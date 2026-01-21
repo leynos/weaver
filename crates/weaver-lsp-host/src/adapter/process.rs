@@ -1,19 +1,9 @@
 //! Process-based language server adapter implementing the `LanguageServer` trait.
 
-use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
-
-use lsp_types::{
-    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
-    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentDiagnosticParams, DocumentDiagnosticReport, GotoDefinitionParams,
-    GotoDefinitionResponse, InitializeParams, InitializeResult, InitializedParams, ReferenceParams,
-    TextDocumentIdentifier, Uri,
-};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use serde_json::Value;
+use std::process::{Child, Command, Stdio};
+use std::sync::Mutex;
 use tracing::{debug, warn};
 
 use super::config::LspServerConfig;
@@ -25,6 +15,21 @@ use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 
 /// Log target for adapter operations.
 const ADAPTER_TARGET: &str = "weaver_lsp_host::adapter";
+
+/// Internal state of the language server process.
+enum ProcessState {
+    /// Process has not been started.
+    NotStarted,
+    /// Process is running and ready for communication.
+    Running {
+        /// The child process handle.
+        child: Child,
+        /// The transport for JSON-RPC communication.
+        transport: StdioTransport,
+    },
+    /// Process has been stopped.
+    Stopped,
+}
 
 /// A language server adapter that spawns and communicates with an external process.
 ///
@@ -44,21 +49,6 @@ pub struct ProcessLanguageServer {
     language: Language,
     config: LspServerConfig,
     state: Mutex<ProcessState>,
-}
-
-/// Internal state of the language server process.
-enum ProcessState {
-    /// Process has not been started.
-    NotStarted,
-    /// Process is running and ready for communication.
-    Running {
-        /// The child process handle.
-        child: Child,
-        /// The transport for JSON-RPC communication.
-        transport: StdioTransport,
-    },
-    /// Process has been stopped.
-    Stopped,
 }
 
 impl ProcessLanguageServer {
@@ -113,12 +103,12 @@ impl ProcessLanguageServer {
             if e.kind() == std::io::ErrorKind::NotFound {
                 AdapterError::BinaryNotFound {
                     command: self.config.command.display().to_string(),
-                    source: e,
+                    source: std::sync::Arc::new(e),
                 }
             } else {
                 AdapterError::SpawnFailed {
                     message: format!("failed to start {}", self.config.command.display()),
-                    source: e,
+                    source: std::sync::Arc::new(e),
                 }
             }
         })?;
@@ -128,7 +118,7 @@ impl ProcessLanguageServer {
             .take()
             .ok_or_else(|| AdapterError::SpawnFailed {
                 message: "failed to capture stdin".to_string(),
-                source: std::io::Error::other("no stdin"),
+                source: std::sync::Arc::new(std::io::Error::other("no stdin")),
             })?;
 
         let stdout = child
@@ -136,7 +126,7 @@ impl ProcessLanguageServer {
             .take()
             .ok_or_else(|| AdapterError::SpawnFailed {
                 message: "failed to capture stdout".to_string(),
-                source: std::io::Error::other("no stdout"),
+                source: std::sync::Arc::new(std::io::Error::other("no stdout")),
             })?;
 
         let transport = StdioTransport::new(stdout, stdin);
@@ -160,6 +150,7 @@ impl ProcessLanguageServer {
             .state
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
+        // Recover from poisoning to attempt graceful shutdown even after a panic
 
         let transport = match &mut *state {
             ProcessState::Running { transport, .. } => transport,
@@ -315,6 +306,7 @@ impl ProcessLanguageServer {
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
 
+        // Recover from poisoning to attempt graceful shutdown even after a panic
         if let ProcessState::Running { mut child, .. } =
             std::mem::replace(&mut *state, ProcessState::Stopped)
         {
@@ -358,6 +350,16 @@ impl ProcessLanguageServer {
     }
 }
 
+use lsp_types::{
+    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
+    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
+    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DocumentDiagnosticParams, DocumentDiagnosticReport, GotoDefinitionParams,
+    GotoDefinitionResponse, InitializeParams, InitializeResult, InitializedParams, ReferenceParams,
+    TextDocumentIdentifier, Uri,
+};
+use serde_json::Value;
+
 impl LanguageServer for ProcessLanguageServer {
     fn initialize(&mut self) -> Result<ServerCapabilitySet, LanguageServerError> {
         debug!(
@@ -379,6 +381,8 @@ impl LanguageServer for ProcessLanguageServer {
                 .state
                 .lock()
                 .unwrap_or_else(|poison| poison.into_inner());
+
+            // Recover from poisoning to attempt graceful shutdown even after a panic
             *state = ProcessState::Running { child, transport };
         }
 
@@ -516,6 +520,7 @@ impl Drop for ProcessLanguageServer {
             Err(poison) => poison.into_inner(),
         };
 
+        // Recover from poisoning to attempt graceful shutdown even after a panic
         if let ProcessState::Running { mut child, .. } =
             std::mem::replace(&mut *state, ProcessState::Stopped)
         {

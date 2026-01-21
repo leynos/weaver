@@ -73,37 +73,24 @@ mod tests {
     use super::*;
 
     #[rstest]
-    fn rust_default_uses_rust_analyzer() {
-        let config = LspServerConfig::rust_default();
-
-        assert_eq!(config.command, PathBuf::from("rust-analyzer"));
-        assert!(config.args.is_empty());
-    }
-
-    #[rstest]
-    fn python_default_uses_pyrefly_lsp() {
-        let config = LspServerConfig::python_default();
-
-        assert_eq!(config.command, PathBuf::from("pyrefly"));
-        assert_eq!(config.args, vec!["lsp"]);
-    }
-
-    #[rstest]
-    fn typescript_default_uses_tsgo_lsp() {
-        let config = LspServerConfig::typescript_default();
-
-        assert_eq!(config.command, PathBuf::from("tsgo"));
-        assert_eq!(config.args, vec!["--lsp"]);
-    }
-
-    #[rstest]
-    #[case(Language::Rust, "rust-analyzer")]
-    #[case(Language::Python, "pyrefly")]
-    #[case(Language::TypeScript, "tsgo")]
-    fn for_language_returns_correct_command(#[case] language: Language, #[case] expected: &str) {
+    #[case(Language::Rust, "rust-analyzer", &[] as &[&str])]
+    #[case(Language::Python, "pyrefly", &["lsp"])]
+    #[case(Language::TypeScript, "tsgo", &["--lsp"])]
+    fn default_config_for_language(
+        #[case] language: Language,
+        #[case] expected_command: &str,
+        #[case] expected_args: &[&str],
+    ) {
         let config = LspServerConfig::for_language(language);
 
-        assert_eq!(config.command, PathBuf::from(expected));
+        assert_eq!(config.command, PathBuf::from(expected_command));
+        assert_eq!(
+            config.args,
+            expected_args
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>()
+        );
     }
 
     #[rstest]

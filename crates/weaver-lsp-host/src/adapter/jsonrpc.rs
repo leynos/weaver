@@ -16,12 +16,6 @@ pub fn next_request_id() -> i64 {
     REQUEST_ID.fetch_add(1, Ordering::SeqCst)
 }
 
-/// Resets the request ID counter (for testing only).
-#[cfg(test)]
-pub(crate) fn reset_request_id() {
-    REQUEST_ID.store(1, Ordering::SeqCst);
-}
-
 /// A JSON-RPC 2.0 request message.
 #[derive(Debug, Clone, Serialize)]
 pub struct JsonRpcRequest {
@@ -101,7 +95,10 @@ pub struct JsonRpcResponse {
 
 /// A JSON-RPC 2.0 server-initiated request.
 #[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
+#[expect(
+    dead_code,
+    reason = "struct fields comprise the public JSON-RPC 2.0 protocol interface"
+)]
 pub struct JsonRpcServerRequest {
     /// Protocol version.
     pub jsonrpc: String,
@@ -116,20 +113,17 @@ pub struct JsonRpcServerRequest {
 
 /// Any JSON-RPC 2.0 message received from server.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub enum JsonRpcMessage {
     /// A response to a client request.
     Response(JsonRpcResponse),
 
     /// A server-initiated request.
-    #[allow(dead_code)]
     ServerRequest(JsonRpcServerRequest),
 
     /// A notification (no response expected).
     Notification(JsonRpcNotification),
 }
 
-#[allow(dead_code)]
 impl JsonRpcMessage {
     /// Parses a JSON-RPC message from bytes, handling all message types.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, serde_json::Error> {
@@ -170,8 +164,7 @@ mod tests {
     use super::*;
 
     #[rstest]
-    fn serialises_request_with_params() {
-        reset_request_id();
+    fn serializes_request_with_params() {
         let request = JsonRpcRequest::new(
             "textDocument/definition",
             Some(json!({"uri": "file:///test.rs"})),
@@ -180,12 +173,11 @@ mod tests {
 
         assert!(json.contains(r#""jsonrpc":"2.0""#));
         assert!(json.contains(r#""method":"textDocument/definition""#));
-        assert!(json.contains(r#""id":1"#));
         assert!(json.contains(r#""params""#));
     }
 
     #[rstest]
-    fn serialises_request_without_params() {
+    fn serializes_request_without_params() {
         let request = JsonRpcRequest::with_id(42, "shutdown", None);
         let json = serde_json::to_string(&request).expect("serialization failed");
 
@@ -195,7 +187,7 @@ mod tests {
     }
 
     #[rstest]
-    fn serialises_notification() {
+    fn serializes_notification() {
         let notification = JsonRpcNotification::new("initialized", Some(json!({})));
         let json = serde_json::to_string(&notification).expect("serialization failed");
 
@@ -205,7 +197,7 @@ mod tests {
     }
 
     #[rstest]
-    fn deserialises_success_response() {
+    fn deserializes_success_response() {
         let json = r#"{"jsonrpc":"2.0","id":1,"result":{"contents":"test"}}"#;
         let response: JsonRpcResponse = serde_json::from_str(json).expect("parse failed");
 
@@ -216,7 +208,7 @@ mod tests {
     }
 
     #[rstest]
-    fn deserialises_error_response() {
+    fn deserializes_error_response() {
         let json =
             r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"Invalid request"}}"#;
         let response: JsonRpcResponse = serde_json::from_str(json).expect("parse failed");
@@ -230,7 +222,7 @@ mod tests {
     }
 
     #[rstest]
-    fn deserialises_error_response_with_data() {
+    fn deserializes_error_response_with_data() {
         let json = r#"{"jsonrpc":"2.0","id":2,"error":{"code":-32602,"message":"Invalid params","data":{"details":"missing field"}}}"#;
         let response: JsonRpcResponse = serde_json::from_str(json).expect("parse failed");
 
@@ -241,13 +233,11 @@ mod tests {
 
     #[rstest]
     fn request_ids_are_unique() {
-        reset_request_id();
         let id1 = next_request_id();
         let id2 = next_request_id();
         let id3 = next_request_id();
 
-        assert_eq!(id1, 1);
-        assert_eq!(id2, 2);
-        assert_eq!(id3, 3);
+        assert!(id1 < id2);
+        assert!(id2 < id3);
     }
 }

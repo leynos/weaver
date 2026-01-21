@@ -120,7 +120,7 @@ impl SemanticBackendProvider {
     }
 }
 
-/// Languages for which stub servers are registered.
+/// Languages for which process-based adapters are registered.
 const SUPPORTED_LANGUAGES: [Language; 3] = [Language::Rust, Language::Python, Language::TypeScript];
 
 /// Creates and configures an LSP host with process-based adapters.

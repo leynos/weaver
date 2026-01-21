@@ -1,6 +1,7 @@
 //! Error types for process-based language server adapters.
 
 use std::io;
+use std::sync::Arc;
 
 use thiserror::Error;
 
@@ -16,7 +17,7 @@ pub enum AdapterError {
         command: String,
         /// The underlying I/O error.
         #[source]
-        source: io::Error,
+        source: Arc<io::Error>,
     },
 
     /// Failed to spawn the language server process.
@@ -26,7 +27,7 @@ pub enum AdapterError {
         message: String,
         /// The underlying I/O error.
         #[source]
-        source: io::Error,
+        source: Arc<io::Error>,
     },
 
     /// Transport-level I/O error.
