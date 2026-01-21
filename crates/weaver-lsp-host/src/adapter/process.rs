@@ -303,7 +303,6 @@ impl ProcessLanguageServer {
                 target: ADAPTER_TARGET,
                 language = %self.language,
                 operation = "shutdown",
-                request_id = None,
                 error = ?e,
                 "shutdown request failed"
             );
