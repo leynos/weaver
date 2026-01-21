@@ -6,13 +6,15 @@ Feature: Process-based language server adapter
     Then the error indicates binary not found
     And the error message contains the command path
 
-  Scenario: Adapter uses default configuration for each language
-    Given a default rust adapter
-    Then the adapter command is rust-analyzer
-    And a default python adapter
-    Then the python adapter command is pyrefly
-    And a default typescript adapter
-    Then the typescript adapter command is tsgo
+  Scenario Outline: Adapter uses default configuration for each language
+    Given a default <language> adapter
+    Then the <language> adapter command is <command>
+
+    Examples:
+      | language   | command        |
+      | rust       | rust-analyzer  |
+      | python     | pyrefly        |
+      | typescript | tsgo           |
 
   Scenario: Adapter accepts custom configuration
     Given a rust adapter with custom command my-rust-analyzer
