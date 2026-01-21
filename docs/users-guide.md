@@ -484,11 +484,11 @@ The daemon spawns real language server processes for each language and
 communicates via JSON-RPC 2.0 over stdio. The following binaries must be
 available in `PATH`:
 
-| Language   | Binary            | Example invocation     |
-|------------|-------------------|------------------------|
-| Rust       | `rust-analyzer`   | `rust-analyzer`        |
-| Python     | `pyrefly`         | `pyrefly lsp`          |
-| TypeScript | `tsgo`            | `tsgo --lsp`           |
+| Language   | Binary          | Example invocation |
+| ---------- | --------------- | ------------------ |
+| Rust       | `rust-analyzer` | `rust-analyzer`    |
+| Python     | `pyrefly`       | `pyrefly lsp`      |
+| TypeScript | `tsgo`          | `tsgo --lsp`       |
 
 When a language server binary is not found, the daemon returns a clear error
 message identifying the missing command. This allows operators to install the
@@ -499,9 +499,9 @@ failed to spawn rust language server: command 'rust-analyzer' not found
 ```
 
 Language servers are initialised lazily when the first operation for that
-language is requested. The daemon sends the LSP `initialize` handshake
-followed by `initialized`, then routes subsequent requests through the
-established session.
+language is requested. The daemon sends the LSP `initialize` handshake followed
+by `initialized`, then routes subsequent requests through the established
+session.
 
 Graceful shutdown is performed when the daemon stops: a `shutdown` request is
 sent to each running language server, followed by an `exit` notification. If a

@@ -47,10 +47,12 @@ fn world() -> RefCell<AdapterTestWorld> {
 
 // --- Given steps ---
 
-#[given("a process adapter for rust with a nonexistent binary")]
-fn given_adapter_with_nonexistent_binary(world: &RefCell<AdapterTestWorld>) {
+fn create_rust_adapter_with_command(
+    world: &RefCell<AdapterTestWorld>,
+    command: impl Into<PathBuf>,
+) {
     let config = LspServerConfig {
-        command: PathBuf::from("/nonexistent/path/to/language-server"),
+        command: command.into(),
         args: Vec::new(),
         working_dir: None,
         init_timeout: Duration::from_secs(30),
@@ -59,6 +61,11 @@ fn given_adapter_with_nonexistent_binary(world: &RefCell<AdapterTestWorld>) {
     };
     let adapter = ProcessLanguageServer::with_config(Language::Rust, config);
     world.borrow_mut().adapter = Some(adapter);
+}
+
+#[given("a process adapter for rust with a nonexistent binary")]
+fn given_adapter_with_nonexistent_binary(world: &RefCell<AdapterTestWorld>) {
+    create_rust_adapter_with_command(world, "/nonexistent/path/to/language-server");
 }
 
 #[given("a default rust adapter")]
@@ -81,45 +88,33 @@ fn given_default_typescript_adapter(world: &RefCell<AdapterTestWorld>) {
 
 #[given("a rust adapter with custom command my-rust-analyzer")]
 fn given_rust_adapter_with_custom_command(world: &RefCell<AdapterTestWorld>) {
-    let config = LspServerConfig {
-        command: PathBuf::from("my-rust-analyzer"),
-        args: Vec::new(),
-        working_dir: None,
-        init_timeout: Duration::from_secs(30),
-        request_timeout: Duration::from_secs(10),
-        shutdown_timeout: Duration::from_secs(5),
-    };
-    let adapter = ProcessLanguageServer::with_config(Language::Rust, config);
-    world.borrow_mut().adapter = Some(adapter);
+    create_rust_adapter_with_command(world, "my-rust-analyzer");
 }
 
 // --- When steps ---
 
+fn is_binary_not_found_error(error: &dyn Error) -> bool {
+    if let Some(source) = error.source()
+        && let Some(adapter_error) = source.downcast_ref::<AdapterError>()
+        && matches!(adapter_error, AdapterError::BinaryNotFound { .. })
+    {
+        return true;
+    }
+
+    let error_string = error.to_string();
+    error_string.contains("spawn")
+        || error_string.contains("not found")
+        || error_string.contains("No such file")
+}
+
 #[when("the adapter is initialized")]
 fn when_adapter_initialized(world: &RefCell<AdapterTestWorld>) {
     let mut borrow = world.borrow_mut();
-    if let Some(ref mut adapter) = borrow.adapter {
-        match adapter.initialize() {
-            Ok(_) => {}
-            Err(e) => {
-                let error_string = e.to_string();
-                // Check if the underlying source is BinaryNotFound
-                if let Some(source) = e.source()
-                    && let Some(adapter_error) = source.downcast_ref::<AdapterError>()
-                    && matches!(adapter_error, AdapterError::BinaryNotFound { .. })
-                {
-                    borrow.error_is_binary_not_found = true;
-                }
-                // Also check the error message for hints
-                if error_string.contains("spawn")
-                    || error_string.contains("not found")
-                    || error_string.contains("No such file")
-                {
-                    borrow.error_is_binary_not_found = true;
-                }
-                borrow.last_error = Some(error_string);
-            }
-        }
+    if let Some(ref mut adapter) = borrow.adapter
+        && let Err(e) = adapter.initialize()
+    {
+        borrow.last_error = Some(e.to_string());
+        borrow.error_is_binary_not_found = is_binary_not_found_error(&e);
     }
 }
 

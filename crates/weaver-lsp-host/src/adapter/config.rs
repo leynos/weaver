@@ -32,19 +32,23 @@ pub struct LspServerConfig {
 }
 
 impl LspServerConfig {
-    /// Default configuration for Rust (`rust-analyzer`).
-    ///
-    /// Expects `rust-analyzer` to be available in PATH.
-    #[must_use]
-    pub fn rust_default() -> Self {
+    fn default_config(command: impl Into<PathBuf>, args: Vec<String>) -> Self {
         Self {
-            command: PathBuf::from("rust-analyzer"),
-            args: Vec::new(),
+            command: command.into(),
+            args,
             working_dir: None,
             init_timeout: DEFAULT_INIT_TIMEOUT,
             request_timeout: DEFAULT_REQUEST_TIMEOUT,
             shutdown_timeout: DEFAULT_SHUTDOWN_TIMEOUT,
         }
+    }
+
+    /// Default configuration for Rust (`rust-analyzer`).
+    ///
+    /// Expects `rust-analyzer` to be available in PATH.
+    #[must_use]
+    pub fn rust_default() -> Self {
+        Self::default_config("rust-analyzer", Vec::new())
     }
 
     /// Default configuration for Python (`pyrefly lsp`).
@@ -52,14 +56,7 @@ impl LspServerConfig {
     /// Expects `pyrefly` to be available in PATH.
     #[must_use]
     pub fn python_default() -> Self {
-        Self {
-            command: PathBuf::from("pyrefly"),
-            args: vec!["lsp".to_string()],
-            working_dir: None,
-            init_timeout: DEFAULT_INIT_TIMEOUT,
-            request_timeout: DEFAULT_REQUEST_TIMEOUT,
-            shutdown_timeout: DEFAULT_SHUTDOWN_TIMEOUT,
-        }
+        Self::default_config("pyrefly", vec!["lsp".to_string()])
     }
 
     /// Default configuration for TypeScript (`tsgo --lsp`).
@@ -67,14 +64,7 @@ impl LspServerConfig {
     /// Expects `tsgo` to be available in PATH.
     #[must_use]
     pub fn typescript_default() -> Self {
-        Self {
-            command: PathBuf::from("tsgo"),
-            args: vec!["--lsp".to_string()],
-            working_dir: None,
-            init_timeout: DEFAULT_INIT_TIMEOUT,
-            request_timeout: DEFAULT_REQUEST_TIMEOUT,
-            shutdown_timeout: DEFAULT_SHUTDOWN_TIMEOUT,
-        }
+        Self::default_config("tsgo", vec!["--lsp".to_string()])
     }
 
     /// Returns the default configuration for a given language.
