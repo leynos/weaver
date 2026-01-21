@@ -1,7 +1,7 @@
 //! Process-based language server adapter implementing the `LanguageServer` trait.
 
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use tracing::{debug, warn};
@@ -10,8 +10,8 @@ use super::config::LspServerConfig;
 use super::error::AdapterError;
 use super::jsonrpc::{JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
 use super::transport::StdioTransport;
-use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 use crate::Language;
+use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 
 /// Log target for adapter operations.
 const ADAPTER_TARGET: &str = "weaver_lsp_host::adapter";
