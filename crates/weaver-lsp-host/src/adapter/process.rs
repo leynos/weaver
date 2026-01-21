@@ -368,7 +368,6 @@ impl ProcessLanguageServer {
 
     /// Waits for the shutdown timeout then kills the process if still running.
     fn wait_with_timeout_then_kill(&self, child: &mut Child) {
-        std::thread::sleep(self.config.shutdown_timeout);
         match child.try_wait() {
             Ok(Some(_)) => {}
             _ => {
