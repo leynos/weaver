@@ -129,6 +129,7 @@ pub enum JsonRpcMessage {
     Notification(JsonRpcNotification),
 }
 
+#[allow(dead_code)]
 impl JsonRpcMessage {
     /// Parses a JSON-RPC message from bytes, handling all message types.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, serde_json::Error> {
