@@ -1,7 +1,7 @@
 //! Process-based language server adapter implementing the `LanguageServer` trait.
 
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use tracing::{debug, warn};
@@ -10,8 +10,8 @@ use super::config::LspServerConfig;
 use super::error::AdapterError;
 use super::jsonrpc::{JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
 use super::transport::StdioTransport;
-use crate::Language;
 use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
+use crate::Language;
 
 /// Log target for adapter operations.
 const ADAPTER_TARGET: &str = "weaver_lsp_host::adapter";
@@ -163,6 +163,9 @@ impl ProcessLanguageServer {
     }
 
     /// Receives messages from transport until a matching response is found.
+    ///
+    /// Handles interleaved JSON-RPC messages (notifications, server requests, and responses)
+    /// by looping and processing each message until the response with matching ID is found.
     #[expect(
         clippy::excessive_nesting,
         reason = "nested match arms required to handle multiple JSON-RPC message types"
