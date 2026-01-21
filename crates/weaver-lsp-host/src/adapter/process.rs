@@ -18,7 +18,7 @@ use tracing::{debug, warn};
 
 use super::config::LspServerConfig;
 use super::error::AdapterError;
-use super::jsonrpc::{JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
+use super::jsonrpc::{JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
 use super::transport::StdioTransport;
 use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 use crate::Language;
@@ -171,6 +171,49 @@ impl ProcessLanguageServer {
         f(transport)
     }
 
+    /// Receives messages from transport until a matching response is found.
+    #[expect(
+        clippy::excessive_nesting,
+        reason = "nested match arms required to handle multiple JSON-RPC message types"
+    )]
+    fn receive_response_for_request(
+        transport: &mut StdioTransport,
+        request_id: i64,
+    ) -> Result<JsonRpcResponse, AdapterError> {
+        loop {
+            let message_bytes = transport.receive()?;
+
+            match JsonRpcMessage::from_bytes(&message_bytes)? {
+                JsonRpcMessage::Response(resp) => {
+                    if resp.id == Some(request_id) {
+                        return Ok(resp);
+                    }
+                    warn!(
+                        target: ADAPTER_TARGET,
+                        expected = request_id,
+                        received = ?resp.id,
+                        "skipping response with non-matching ID"
+                    );
+                }
+                JsonRpcMessage::ServerRequest(req) => {
+                    warn!(
+                        target: ADAPTER_TARGET,
+                        method = %req.method,
+                        id = req.id,
+                        "ignoring server-initiated request (not yet implemented)"
+                    );
+                }
+                JsonRpcMessage::Notification(notif) => {
+                    debug!(
+                        target: ADAPTER_TARGET,
+                        method = %notif.method,
+                        "skipping server notification"
+                    );
+                }
+            }
+        }
+    }
+
     /// Sends a request and receives the raw JSON-RPC response.
     fn send_request_raw<P>(&self, method: &str, params: P) -> Result<JsonRpcResponse, AdapterError>
     where
@@ -190,17 +233,7 @@ impl ProcessLanguageServer {
             );
 
             transport.send(&payload)?;
-            let response_bytes = transport.receive()?;
-            let response: JsonRpcResponse = serde_json::from_slice(&response_bytes)?;
-
-            if response.id != Some(request_id) {
-                return Err(AdapterError::InitializationFailed {
-                    message: format!(
-                        "response ID mismatch: expected {}, got {:?}",
-                        request_id, response.id
-                    ),
-                });
-            }
+            let response = Self::receive_response_for_request(transport, request_id)?;
 
             if let Some(error) = response.error {
                 return Err(AdapterError::from_jsonrpc(error));
