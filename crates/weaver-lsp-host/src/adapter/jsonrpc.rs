@@ -116,11 +116,15 @@ pub struct JsonRpcServerRequest {
 
 /// Any JSON-RPC 2.0 message received from server.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum JsonRpcMessage {
     /// A response to a client request.
     Response(JsonRpcResponse),
+
     /// A server-initiated request.
+    #[allow(dead_code)]
     ServerRequest(JsonRpcServerRequest),
+
     /// A notification (no response expected).
     Notification(JsonRpcNotification),
 }
