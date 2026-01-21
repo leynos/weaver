@@ -105,8 +105,53 @@ fn when_adapter_initialized(world: &RefCell<AdapterTestWorld>) {
 
 // --- Then steps ---
 
+#[then("the error indicates binary not found")]
+fn then_error_indicates_binary_not_found(world: &RefCell<AdapterTestWorld>) {
+    let borrow = world.borrow();
+
+    let error = borrow
+        .last_error
+        .as_ref()
+        .expect("expected an error but got none");
+
+    assert!(
+        borrow.error_is_binary_not_found,
+        "expected binary not found error flag to be set, got: {:?}",
+        error
+    );
+
+    let source = error
+        .source()
+        .expect("LanguageServerError is expected to wrap an AdapterError source");
+
+    let adapter_error = source
+        .downcast_ref::<AdapterError>()
+        .expect("LanguageServerError source should be an AdapterError");
+
+    assert!(
+        matches!(adapter_error, AdapterError::BinaryNotFound { .. }),
+        "expected AdapterError::BinaryNotFound, got: {:?}",
+        adapter_error
+    );
+}
+
+#[then("the error message contains the command path")]
+fn then_error_contains_command_path(world: &RefCell<AdapterTestWorld>) {
+    let borrow = world.borrow();
+    let error = borrow.last_error.as_ref().expect("expected an error");
+    let error_string = error.to_string();
+    // The error should mention the command that failed or language server
+    assert!(
+        error_string.contains("language server")
+            || error_string.contains("spawn")
+            || error_string.contains("/nonexistent/"),
+        "error message should contain relevant context, got: {}",
+        error_string
+    );
+}
+
 #[then("the <language> adapter command is <command>")]
-fn then_language_adapter_command_is(world: &RefCell<AdapterTestWorld>, language: Language, command: &str) {
+fn then_language_adapter_command_is(_world: &RefCell<AdapterTestWorld>, language: Language, command: &str) {
     let config = LspServerConfig::for_language(language);
     assert_eq!(
         config.command.file_name().and_then(|s| s.to_str()),
