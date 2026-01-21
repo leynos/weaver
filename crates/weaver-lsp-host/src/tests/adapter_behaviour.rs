@@ -93,14 +93,17 @@ fn given_rust_adapter_with_custom_command(world: &RefCell<AdapterTestWorld>) {
 
 // --- When steps ---
 
+#[allow(clippy::collapsible_if)]
 fn is_binary_not_found_error(error: &dyn Error) -> bool {
-    if let Some(source) = error.source()
-        && let Some(adapter_error) = source.downcast_ref::<AdapterError>()
-        && matches!(adapter_error, AdapterError::BinaryNotFound { .. })
-    {
-        return true;
+    if let Some(source) = error.source() {
+        if let Some(adapter_error) = source.downcast_ref::<AdapterError>() {
+            if matches!(adapter_error, AdapterError::BinaryNotFound { .. }) {
+                return true;
+            }
+        }
     }
 
+    // Also check the error message for hints
     let error_string = error.to_string();
     error_string.contains("spawn")
         || error_string.contains("not found")
