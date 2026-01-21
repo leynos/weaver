@@ -6,7 +6,6 @@
 use std::cell::RefCell;
 use std::error::Error;
 use std::path::PathBuf;
-use std::time::Duration;
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
@@ -55,9 +54,6 @@ fn create_rust_adapter_with_command(
         command: command.into(),
         args: Vec::new(),
         working_dir: None,
-        
-        
-        
     };
     let adapter = ProcessLanguageServer::with_config(Language::Rust, config);
     world.borrow_mut().adapter = Some(adapter);
