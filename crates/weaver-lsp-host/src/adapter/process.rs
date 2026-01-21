@@ -1,7 +1,7 @@
 //! Process-based language server adapter implementing the `LanguageServer` trait.
 
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use tracing::{debug, warn};
@@ -11,11 +11,14 @@ use super::error::AdapterError;
 use super::jsonrpc::{JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
 use super::state::ProcessState;
 use super::transport::StdioTransport;
-use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 use crate::Language;
+use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 
 /// Log target for adapter operations.
 const ADAPTER_TARGET: &str = "weaver_lsp_host::adapter";
+
+/// Maximum number of iterations to wait for a matching JSON-RPC response.
+const MAX_RESPONSE_ITERATIONS: usize = 100;
 
 /// A language server adapter that spawns and communicates with an external process.
 ///
@@ -151,7 +154,9 @@ impl ProcessLanguageServer {
     /// Receives messages from transport until a matching response is found.
     ///
     /// Handles interleaved JSON-RPC messages (notifications, server requests, and responses)
-    /// by looping and processing each message until the response with matching ID is found.
+    /// by looping and processing each message until a response with matching ID is found.
+    ///
+    /// Uses a bounded iteration limit to prevent blocking indefinitely on interleaved messages.
     #[expect(
         clippy::excessive_nesting,
         reason = "nested match arms required to handle multiple JSON-RPC message types"
@@ -160,7 +165,13 @@ impl ProcessLanguageServer {
         transport: &mut StdioTransport,
         request_id: i64,
     ) -> Result<JsonRpcResponse, AdapterError> {
+        let mut iteration_count = 0;
         loop {
+            if iteration_count >= MAX_RESPONSE_ITERATIONS {
+                return Err(AdapterError::ProcessExited);
+            }
+            iteration_count += 1;
+
             let message_bytes = transport.receive()?;
 
             match JsonRpcMessage::from_bytes(&message_bytes)? {
@@ -287,12 +298,14 @@ impl ProcessLanguageServer {
             "initiating graceful shutdown"
         );
 
-        if let Err(e) = self.send_request::<_, Value>("shutdown", ()) {
+        if let Err(e) = self.send_request::<_, serde_json::Value>("shutdown", ()) {
             debug!(
                 target: ADAPTER_TARGET,
                 language = %self.language,
-                error = %e,
-                "exit notification failed (best effort)"
+                operation = "shutdown",
+                request_id = None,
+                error = ?e,
+                "shutdown request failed"
             );
         }
 
@@ -300,8 +313,9 @@ impl ProcessLanguageServer {
             debug!(
                 target: ADAPTER_TARGET,
                 language = %self.language,
-                error = %e,
-                "exit notification failed (best effort)"
+                operation = "exit",
+                error = ?e,
+                "exit notification failed"
             );
         }
 
