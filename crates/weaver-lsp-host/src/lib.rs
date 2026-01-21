@@ -8,6 +8,7 @@
 //! higher-level crates can inject lightweight implementations without spawning
 //! real language servers.
 
+pub mod adapter;
 mod capability;
 #[doc(hidden)]
 pub mod doc_support;
