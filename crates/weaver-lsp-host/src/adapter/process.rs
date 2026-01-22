@@ -1,7 +1,7 @@
 //! Process-based language server adapter.
 
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
