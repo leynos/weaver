@@ -57,6 +57,13 @@ pub enum AdapterError {
     /// Process exited unexpectedly.
     #[error("language server process exited unexpectedly")]
     ProcessExited,
+
+    /// Maximum response iterations reached while waiting for response.
+    #[error("maximum response iterations reached while waiting for response (id: {request_id})")]
+    MaxResponseIterations {
+        /// The request ID that was being waited for.
+        request_id: i64,
+    },
 }
 
 impl AdapterError {

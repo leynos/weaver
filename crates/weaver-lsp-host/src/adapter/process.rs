@@ -168,7 +168,13 @@ impl ProcessLanguageServer {
         let mut iteration_count = 0;
         loop {
             if iteration_count >= MAX_RESPONSE_ITERATIONS {
-                return Err(AdapterError::ProcessExited);
+                warn!(
+                    target: ADAPTER_TARGET,
+                    request_id,
+                    max_iterations = MAX_RESPONSE_ITERATIONS,
+                    "giving up on response after reaching maximum iterations"
+                );
+                return Err(AdapterError::MaxResponseIterations { request_id });
             }
             iteration_count += 1;
 
