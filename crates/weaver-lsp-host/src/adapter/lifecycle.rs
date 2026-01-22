@@ -10,18 +10,13 @@ use crate::Language;
 /// Log target for adapter operations.
 pub(crate) const ADAPTER_TARGET: &str = "weaver_lsp_host::adapter";
 
-/// Attempts a graceful shutdown of a child process with a grace period.
+/// Waits for a child process to exit during a grace period, killing it if necessary.
 ///
-/// This helper implements the retry logic for graceful process termination:
-/// 1. Checks if the process has already exited
-/// 2. If not, waits for a grace period (200ms)
-/// 3. Checks again, and if still running, forcibly kills the process
-fn try_graceful_shutdown(child: &mut Child, language: Language) {
-    warn!(
-        target: ADAPTER_TARGET,
-        language = %language,
-        "language server did not exit gracefully, waiting before killing"
-    );
+/// This helper performs the grace period logic:
+/// 1. Sleeps for 200ms
+/// 2. Checks if the process has exited
+/// 3. If still running, kills it and waits
+fn wait_during_grace_period(child: &mut Child, language: Language) {
     thread::sleep(Duration::from_millis(200));
     match child.try_wait() {
         Ok(Some(status)) => {
@@ -61,7 +56,12 @@ pub(super) fn terminate_child(child: &mut Child, language: Language) {
             );
         }
         Ok(None) => {
-            try_graceful_shutdown(child, language);
+            warn!(
+                target: ADAPTER_TARGET,
+                language = %language,
+                "language server did not exit gracefully, waiting before killing"
+            );
+            wait_during_grace_period(child, language);
         }
         Err(e) => {
             warn!(
@@ -70,21 +70,7 @@ pub(super) fn terminate_child(child: &mut Child, language: Language) {
                 error = %e,
                 "failed to check process status, waiting before killing"
             );
-            thread::sleep(Duration::from_millis(200));
-            match child.try_wait() {
-                Ok(Some(status)) => {
-                    debug!(
-                        target: ADAPTER_TARGET,
-                        language = %language,
-                        ?status,
-                        "language server exited during grace period"
-                    );
-                }
-                Ok(None) | Err(_) => {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                }
-            }
+            wait_during_grace_period(child, language);
         }
     }
 }
