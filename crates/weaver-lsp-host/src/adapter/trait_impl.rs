@@ -103,7 +103,7 @@ impl LanguageServer for ProcessLanguageServer {
     fn diagnostics(&mut self, uri: Uri) -> Result<Vec<Diagnostic>, LanguageServerError> {
         // Use pull-based diagnostics (textDocument/diagnostic)
         let params = DocumentDiagnosticParams {
-            text_document: TextDocumentIdentifier { uri },
+            text_document: TextDocumentIdentifier { uri: uri.clone() },
             identifier: None,
             previous_result_id: None,
             work_done_progress_params: Default::default(),
@@ -117,7 +117,16 @@ impl LanguageServer for ProcessLanguageServer {
         // Extract diagnostics from report
         let diagnostics = match result {
             DocumentDiagnosticReport::Full(full) => full.full_document_diagnostic_report.items,
-            DocumentDiagnosticReport::Unchanged(_) => Vec::new(),
+            DocumentDiagnosticReport::Unchanged(_) => {
+                debug!(
+                    target: ADAPTER_TARGET,
+                    language = %self.language(),
+                    ?uri,
+                    previous_result_id = ?None::<String>,
+                    "DocumentDiagnosticReport::Unchanged (unexpected: previous_result_id is None)"
+                );
+                Vec::new()
+            }
         };
 
         Ok(diagnostics)
