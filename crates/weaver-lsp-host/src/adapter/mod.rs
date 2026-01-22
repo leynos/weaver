@@ -32,6 +32,7 @@ mod error;
 mod jsonrpc;
 mod process;
 mod state;
+mod trait_impl;
 mod transport;
 
 pub use config::LspServerConfig;

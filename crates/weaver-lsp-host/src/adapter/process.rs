@@ -2,6 +2,7 @@
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde_json::Value;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::thread;
@@ -14,10 +15,9 @@ use super::jsonrpc::{JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRp
 use super::state::ProcessState;
 use super::transport::StdioTransport;
 use crate::Language;
-use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 
 /// Log target for adapter operations.
-const ADAPTER_TARGET: &str = "weaver_lsp_host::adapter";
+pub(super) const ADAPTER_TARGET: &str = "weaver_lsp_host::adapter";
 
 /// Maximum number of iterations to wait for a matching JSON-RPC response.
 const MAX_RESPONSE_ITERATIONS: usize = 100;
@@ -70,7 +70,7 @@ impl ProcessLanguageServer {
     }
 
     /// Spawns the language server process.
-    fn spawn_process(&self) -> Result<(Child, StdioTransport), AdapterError> {
+    pub(super) fn spawn_process(&self) -> Result<(Child, StdioTransport), AdapterError> {
         debug!(
             target: ADAPTER_TARGET,
             language = %self.language,
@@ -133,7 +133,7 @@ impl ProcessLanguageServer {
     }
 
     /// Accesses the running transport with the state lock held.
-    fn with_running_transport<F, T>(&self, f: F) -> Result<T, AdapterError>
+    pub(super) fn with_running_transport<F, T>(&self, f: F) -> Result<T, AdapterError>
     where
         F: FnOnce(&mut StdioTransport) -> Result<T, AdapterError>,
     {
@@ -163,7 +163,7 @@ impl ProcessLanguageServer {
         clippy::excessive_nesting,
         reason = "nested match arms required to handle multiple JSON-RPC message types"
     )]
-    fn receive_response_for_request(
+    pub(super) fn receive_response_for_request(
         transport: &mut StdioTransport,
         request_id: i64,
     ) -> Result<JsonRpcResponse, AdapterError> {
@@ -214,7 +214,11 @@ impl ProcessLanguageServer {
     }
 
     /// Sends a request and receives the raw JSON-RPC response.
-    fn send_request_raw<P>(&self, method: &str, params: P) -> Result<JsonRpcResponse, AdapterError>
+    pub(super) fn send_request_raw<P>(
+        &self,
+        method: &str,
+        params: P,
+    ) -> Result<JsonRpcResponse, AdapterError>
     where
         P: Serialize,
     {
@@ -243,7 +247,7 @@ impl ProcessLanguageServer {
     }
 
     /// Sends a request and waits for a response.
-    fn send_request<P, R>(&self, method: &str, params: P) -> Result<R, AdapterError>
+    pub(super) fn send_request<P, R>(&self, method: &str, params: P) -> Result<R, AdapterError>
     where
         P: Serialize,
         R: DeserializeOwned,
@@ -258,7 +262,7 @@ impl ProcessLanguageServer {
     }
 
     /// Sends a notification (no response expected).
-    fn send_notification<P>(&self, method: &str, params: P) -> Result<(), AdapterError>
+    pub(super) fn send_notification<P>(&self, method: &str, params: P) -> Result<(), AdapterError>
     where
         P: Serialize,
     {
@@ -279,7 +283,7 @@ impl ProcessLanguageServer {
     }
 
     /// Sends a request that may return null as a valid response.
-    fn send_request_optional<P, R>(
+    pub(super) fn send_request_optional<P, R>(
         &self,
         method: &str,
         params: P,
@@ -341,6 +345,16 @@ impl ProcessLanguageServer {
         Ok(())
     }
 
+    /// Sets the process to running state with given child and transport.
+    pub(super) fn set_running_state(&self, child: Child, transport: StdioTransport) {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+
+        *state = ProcessState::Running { child, transport };
+    }
+
     /// Waits for the child process to exit, killing it if necessary.
     fn terminate_child(&self, child: &mut Child) {
         match child.try_wait() {
@@ -398,169 +412,6 @@ impl ProcessLanguageServer {
                 }
             }
         }
-    }
-}
-
-use lsp_types::{
-    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
-    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentDiagnosticParams, DocumentDiagnosticReport, GotoDefinitionParams,
-    GotoDefinitionResponse, InitializeParams, InitializeResult, InitializedParams, ReferenceParams,
-    TextDocumentIdentifier, Uri,
-};
-use serde_json::Value;
-
-impl LanguageServer for ProcessLanguageServer {
-    fn initialize(&mut self) -> Result<ServerCapabilitySet, LanguageServerError> {
-        debug!(
-            target: ADAPTER_TARGET,
-            language = %self.language,
-            "initializing language server"
-        );
-
-        // Spawn process
-        let (child, transport) = self.spawn_process().map_err(|e| {
-            LanguageServerError::with_source(
-                format!("failed to spawn {} language server", self.language),
-                e,
-            )
-        })?;
-
-        {
-            let mut state = self
-                .state
-                .lock()
-                .unwrap_or_else(|poison| poison.into_inner());
-
-            // Recover from poisoning to attempt graceful shutdown even after a panic
-            *state = ProcessState::Running { child, transport };
-        }
-
-        // Send initialize request
-        let params = InitializeParams {
-            process_id: Some(std::process::id()),
-            capabilities: lsp_types::ClientCapabilities::default(),
-            ..Default::default()
-        };
-
-        let result: InitializeResult = self
-            .send_request("initialize", params)
-            .map_err(|e| LanguageServerError::with_source("initialization handshake failed", e))?;
-
-        // Send initialized notification
-        self.send_notification("initialized", InitializedParams {})
-            .map_err(|e| {
-                LanguageServerError::with_source("failed to send initialized notification", e)
-            })?;
-
-        // Extract capabilities
-        let caps = &result.capabilities;
-
-        let definition_supported = caps.definition_provider.is_some();
-        let references_supported = caps.references_provider.is_some();
-        let diagnostics_supported = caps.diagnostic_provider.is_some();
-        let call_hierarchy_supported = caps.call_hierarchy_provider.is_some();
-
-        debug!(
-            target: ADAPTER_TARGET,
-            language = %self.language,
-            definition = definition_supported,
-            references = references_supported,
-            diagnostics = diagnostics_supported,
-            call_hierarchy = call_hierarchy_supported,
-            "language server initialized with capabilities"
-        );
-
-        Ok(ServerCapabilitySet::new(
-            definition_supported,
-            references_supported,
-            diagnostics_supported,
-        )
-        .with_call_hierarchy(call_hierarchy_supported))
-    }
-
-    fn goto_definition(
-        &mut self,
-        params: GotoDefinitionParams,
-    ) -> Result<GotoDefinitionResponse, LanguageServerError> {
-        self.send_request_optional("textDocument/definition", params)
-            .map(|opt| opt.unwrap_or(GotoDefinitionResponse::Array(vec![])))
-            .map_err(|e| LanguageServerError::with_source("definition request failed", e))
-    }
-
-    fn references(
-        &mut self,
-        params: ReferenceParams,
-    ) -> Result<Vec<lsp_types::Location>, LanguageServerError> {
-        self.send_request_optional("textDocument/references", params)
-            .map(|opt| opt.unwrap_or_default())
-            .map_err(|e| LanguageServerError::with_source("references request failed", e))
-    }
-
-    fn diagnostics(&mut self, uri: Uri) -> Result<Vec<Diagnostic>, LanguageServerError> {
-        // Use pull-based diagnostics (textDocument/diagnostic)
-        let params = DocumentDiagnosticParams {
-            text_document: TextDocumentIdentifier { uri },
-            identifier: None,
-            previous_result_id: None,
-            work_done_progress_params: Default::default(),
-            partial_result_params: Default::default(),
-        };
-
-        let result: DocumentDiagnosticReport = self
-            .send_request("textDocument/diagnostic", params)
-            .map_err(|e| LanguageServerError::with_source("diagnostics request failed", e))?;
-
-        // Extract diagnostics from the report
-        let diagnostics = match result {
-            DocumentDiagnosticReport::Full(full) => full.full_document_diagnostic_report.items,
-            DocumentDiagnosticReport::Unchanged(_) => Vec::new(),
-        };
-
-        Ok(diagnostics)
-    }
-
-    fn did_open(&mut self, params: DidOpenTextDocumentParams) -> Result<(), LanguageServerError> {
-        self.send_notification("textDocument/didOpen", params)
-            .map_err(|e| LanguageServerError::with_source("didOpen notification failed", e))
-    }
-
-    fn did_change(
-        &mut self,
-        params: DidChangeTextDocumentParams,
-    ) -> Result<(), LanguageServerError> {
-        self.send_notification("textDocument/didChange", params)
-            .map_err(|e| LanguageServerError::with_source("didChange notification failed", e))
-    }
-
-    fn did_close(&mut self, params: DidCloseTextDocumentParams) -> Result<(), LanguageServerError> {
-        self.send_notification("textDocument/didClose", params)
-            .map_err(|e| LanguageServerError::with_source("didClose notification failed", e))
-    }
-
-    fn prepare_call_hierarchy(
-        &mut self,
-        params: CallHierarchyPrepareParams,
-    ) -> Result<Option<Vec<CallHierarchyItem>>, LanguageServerError> {
-        self.send_request_optional("textDocument/prepareCallHierarchy", params)
-            .map_err(|e| LanguageServerError::with_source("prepareCallHierarchy request failed", e))
-    }
-
-    fn incoming_calls(
-        &mut self,
-        params: CallHierarchyIncomingCallsParams,
-    ) -> Result<Option<Vec<CallHierarchyIncomingCall>>, LanguageServerError> {
-        self.send_request_optional("callHierarchy/incomingCalls", params)
-            .map_err(|e| LanguageServerError::with_source("incomingCalls request failed", e))
-    }
-
-    fn outgoing_calls(
-        &mut self,
-        params: CallHierarchyOutgoingCallsParams,
-    ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, LanguageServerError> {
-        self.send_request_optional("callHierarchy/outgoingCalls", params)
-            .map_err(|e| LanguageServerError::with_source("outgoingCalls request failed", e))
     }
 }
 
