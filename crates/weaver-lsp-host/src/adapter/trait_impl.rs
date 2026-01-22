@@ -1,11 +1,12 @@
 //! Implementation of [`LanguageServer`] trait for [`ProcessLanguageServer`].
 
 use lsp_types::{
-    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
-    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentDiagnosticParams, DocumentDiagnosticReport, GotoDefinitionParams,
-    GotoDefinitionResponse, InitializeParams, InitializeResult, InitializedParams, ReferenceParams,
+    CallHierarchyClientCapabilities, CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams,
+    CallHierarchyItem, CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams, ClientCapabilities, Diagnostic, DidChangeTextDocumentParams,
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentDiagnosticParams,
+    DocumentDiagnosticReport, GotoDefinitionParams, GotoDefinitionResponse, InitializeParams,
+    InitializeResult, InitializedParams, ReferenceParams, TextDocumentClientCapabilities,
     TextDocumentIdentifier, Uri,
 };
 use tracing::debug;
@@ -35,7 +36,13 @@ impl LanguageServer for ProcessLanguageServer {
         // Send initialize request
         let params = InitializeParams {
             process_id: Some(std::process::id()),
-            capabilities: lsp_types::ClientCapabilities::default(),
+            capabilities: ClientCapabilities {
+                text_document: Some(TextDocumentClientCapabilities {
+                    call_hierarchy: Some(CallHierarchyClientCapabilities::default()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
             ..Default::default()
         };
 
