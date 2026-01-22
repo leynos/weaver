@@ -144,13 +144,27 @@ impl ProcessLanguageServer {
         f(transport)
     }
 
+    /// Generic helper to execute a messaging operation with running transport.
+    fn execute_messaging_operation<P, R, F>(
+        &self,
+        method: &str,
+        params: P,
+        operation: F,
+    ) -> Result<R, AdapterError>
+    where
+        P: serde::Serialize,
+        F: FnOnce(&mut StdioTransport, &str, P) -> Result<R, AdapterError>,
+    {
+        self.with_running_transport(|transport| operation(transport, method, params))
+    }
+
     /// Sends a request and waits for a response.
     pub(super) fn send_request<P, R>(&self, method: &str, params: P) -> Result<R, AdapterError>
     where
         P: serde::Serialize,
         R: DeserializeOwned,
     {
-        self.with_running_transport(|transport| messaging::send_request(transport, method, params))
+        self.execute_messaging_operation(method, params, messaging::send_request)
     }
 
     /// Sends a notification (no response expected).
@@ -173,9 +187,7 @@ impl ProcessLanguageServer {
         P: serde::Serialize,
         R: DeserializeOwned,
     {
-        self.with_running_transport(|transport| {
-            messaging::send_request_optional(transport, method, params)
-        })
+        self.execute_messaging_operation(method, params, messaging::send_request_optional)
     }
 
     /// Performs graceful shutdown of the language server.
