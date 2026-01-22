@@ -1,0 +1,243 @@
+//! JSON-RPC 2.0 message types for LSP communication.
+
+use std::sync::atomic::{AtomicI64, Ordering};
+
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+/// Thread-safe request ID generator.
+static REQUEST_ID: AtomicI64 = AtomicI64::new(1);
+
+/// Generates a unique request ID.
+///
+/// IDs are monotonically increasing and thread-safe.
+#[must_use]
+pub fn next_request_id() -> i64 {
+    REQUEST_ID.fetch_add(1, Ordering::SeqCst)
+}
+
+/// A JSON-RPC 2.0 request message.
+#[derive(Debug, Clone, Serialize)]
+pub struct JsonRpcRequest {
+    /// Protocol version, always "2.0".
+    pub jsonrpc: &'static str,
+    /// Unique request identifier.
+    pub id: i64,
+    /// The method to invoke.
+    pub method: String,
+    /// Optional parameters.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<Value>,
+}
+
+impl JsonRpcRequest {
+    /// Creates a new request with an auto-generated ID.
+    #[must_use]
+    pub fn new(method: impl Into<String>, params: Option<Value>) -> Self {
+        Self {
+            jsonrpc: "2.0",
+            id: next_request_id(),
+            method: method.into(),
+            params,
+        }
+    }
+
+    /// Creates a new request with a specific ID.
+    #[must_use]
+    pub fn with_id(id: i64, method: impl Into<String>, params: Option<Value>) -> Self {
+        Self {
+            jsonrpc: "2.0",
+            id,
+            method: method.into(),
+            params,
+        }
+    }
+}
+
+/// A JSON-RPC 2.0 notification (no response expected).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JsonRpcNotification {
+    /// Protocol version, always "2.0".
+    pub jsonrpc: String,
+    /// The method to invoke.
+    pub method: String,
+    /// Optional parameters.
+    #[serde(default)]
+    pub params: Option<Value>,
+}
+
+impl JsonRpcNotification {
+    /// Creates a new notification.
+    #[must_use]
+    pub fn new(method: impl Into<String>, params: Option<Value>) -> Self {
+        Self {
+            jsonrpc: "2.0".to_string(),
+            method: method.into(),
+            params,
+        }
+    }
+}
+
+/// A JSON-RPC 2.0 response message.
+#[derive(Debug, Clone, Deserialize)]
+pub struct JsonRpcResponse {
+    /// Protocol version.
+    pub jsonrpc: String,
+    /// Request identifier this response corresponds to.
+    pub id: Option<i64>,
+    /// The result on success.
+    #[serde(default)]
+    pub result: Option<Value>,
+    /// The error on failure.
+    #[serde(default)]
+    pub error: Option<JsonRpcError>,
+}
+
+/// A JSON-RPC 2.0 server-initiated request.
+#[derive(Debug, Clone, Deserialize)]
+#[expect(
+    dead_code,
+    reason = "struct fields comprise the public JSON-RPC 2.0 protocol interface"
+)]
+pub struct JsonRpcServerRequest {
+    /// Protocol version.
+    pub jsonrpc: String,
+    /// Request identifier.
+    pub id: i64,
+    /// The method to invoke.
+    pub method: String,
+    /// Optional parameters.
+    #[serde(default)]
+    pub params: Option<Value>,
+}
+
+/// Any JSON-RPC 2.0 message received from server.
+#[derive(Debug, Clone)]
+pub enum JsonRpcMessage {
+    /// A response to a client request.
+    Response(JsonRpcResponse),
+
+    /// A server-initiated request.
+    ServerRequest(JsonRpcServerRequest),
+
+    /// A notification (no response expected).
+    Notification(JsonRpcNotification),
+}
+
+impl JsonRpcMessage {
+    /// Parses a JSON-RPC message from bytes, handling all message types.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, serde_json::Error> {
+        let json: Value = serde_json::from_slice(bytes)?;
+
+        if json.get("method").is_some() {
+            if json.get("id").is_some() {
+                let request: JsonRpcServerRequest = serde_json::from_value(json)?;
+                Ok(Self::ServerRequest(request))
+            } else {
+                let notification: JsonRpcNotification = serde_json::from_value(json)?;
+                Ok(Self::Notification(notification))
+            }
+        } else {
+            let response: JsonRpcResponse = serde_json::from_value(json)?;
+            Ok(Self::Response(response))
+        }
+    }
+}
+
+/// A JSON-RPC 2.0 error object.
+#[derive(Debug, Clone, Deserialize)]
+pub struct JsonRpcError {
+    /// Error code.
+    pub code: i64,
+    /// Human-readable error message.
+    pub message: String,
+    /// Optional additional data.
+    #[serde(default)]
+    pub data: Option<Value>,
+}
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+    use serde_json::json;
+
+    use super::*;
+
+    #[rstest]
+    fn serializes_request_with_params() {
+        let request = JsonRpcRequest::new(
+            "textDocument/definition",
+            Some(json!({"uri": "file:///test.rs"})),
+        );
+        let json = serde_json::to_string(&request).expect("serialization failed");
+
+        assert!(json.contains(r#""jsonrpc":"2.0""#));
+        assert!(json.contains(r#""method":"textDocument/definition""#));
+        assert!(json.contains(r#""params""#));
+    }
+
+    #[rstest]
+    fn serializes_request_without_params() {
+        let request = JsonRpcRequest::with_id(42, "shutdown", None);
+        let json = serde_json::to_string(&request).expect("serialization failed");
+
+        assert!(json.contains(r#""id":42"#));
+        assert!(json.contains(r#""method":"shutdown""#));
+        assert!(!json.contains("params"));
+    }
+
+    #[rstest]
+    fn serializes_notification() {
+        let notification = JsonRpcNotification::new("initialized", Some(json!({})));
+        let json = serde_json::to_string(&notification).expect("serialization failed");
+
+        assert!(json.contains(r#""jsonrpc":"2.0""#));
+        assert!(json.contains(r#""method":"initialized""#));
+        assert!(!json.contains("id"));
+    }
+
+    #[rstest]
+    fn deserializes_success_response() {
+        let json = r#"{"jsonrpc":"2.0","id":1,"result":{"contents":"test"}}"#;
+        let response: JsonRpcResponse = serde_json::from_str(json).expect("parse failed");
+
+        assert_eq!(response.jsonrpc, "2.0");
+        assert_eq!(response.id, Some(1));
+        assert!(response.result.is_some());
+        assert!(response.error.is_none());
+    }
+
+    #[rstest]
+    fn deserializes_error_response() {
+        let json =
+            r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32600,"message":"Invalid request"}}"#;
+        let response: JsonRpcResponse = serde_json::from_str(json).expect("parse failed");
+
+        assert_eq!(response.id, Some(1));
+        assert!(response.result.is_none());
+
+        let error = response.error.expect("error missing");
+        assert_eq!(error.code, -32600);
+        assert_eq!(error.message, "Invalid request");
+    }
+
+    #[rstest]
+    fn deserializes_error_response_with_data() {
+        let json = r#"{"jsonrpc":"2.0","id":2,"error":{"code":-32602,"message":"Invalid params","data":{"details":"missing field"}}}"#;
+        let response: JsonRpcResponse = serde_json::from_str(json).expect("parse failed");
+
+        let error = response.error.expect("error missing");
+        assert_eq!(error.code, -32602);
+        assert!(error.data.is_some());
+    }
+
+    #[rstest]
+    fn request_ids_are_unique() {
+        let id1 = next_request_id();
+        let id2 = next_request_id();
+        let id3 = next_request_id();
+
+        assert!(id1 < id2);
+        assert!(id2 < id3);
+    }
+}

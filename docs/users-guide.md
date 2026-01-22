@@ -466,8 +466,8 @@ JSON payload:
 
 ## Language server capability detection
 
-The new `weaver-lsp-host` crate initialises the LSP servers for Rust, Python,
-and TypeScript and records which core requests each server advertises:
+The `weaver-lsp-host` crate initialises the LSP servers for Rust, Python, and
+TypeScript and records which core requests each server advertises:
 `textDocument/definition`, `textDocument/references`, diagnostics, and call
 hierarchy (`textDocument/prepareCallHierarchy` plus incoming/outgoing calls).
 These advertised capabilities are merged with any overrides provided via
@@ -477,6 +477,35 @@ the request regardless of the server report. When a request is rejected, the
 error explains whether the feature was disabled by configuration or simply
 absent from the server so operators and agents can adjust their plans without
 guesswork.
+
+### Process-based language server adapters
+
+The daemon spawns real language server processes for each language and
+communicates via JSON-RPC 2.0 over stdio. The following binaries must be
+available in `PATH`:
+
+| Language   | Binary          | Example invocation |
+| ---------- | --------------- | ------------------ |
+| Rust       | `rust-analyzer` | `rust-analyzer`    |
+| Python     | `pyrefly`       | `pyrefly lsp`      |
+| TypeScript | `tsgo`          | `tsgo --lsp`       |
+
+When a language server binary is not found, the daemon returns a clear error
+message identifying the missing command. This allows operators to install the
+required tooling before retrying. Example:
+
+```text
+failed to spawn rust language server: command 'rust-analyzer' not found
+```
+
+Language servers are initialised lazily when the first operation for that
+language is requested. The daemon sends the LSP `initialize` handshake followed
+by `initialized`, then routes subsequent requests through the established
+session.
+
+Graceful shutdown is performed when the daemon stops: a `shutdown` request is
+sent to each running language server, followed by an `exit` notification. If a
+server does not exit within five seconds, it is terminated forcefully.
 
 ## Double-Lock safety harness
 

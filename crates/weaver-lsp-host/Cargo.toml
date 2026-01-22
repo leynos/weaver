@@ -6,7 +6,10 @@ version.workspace = true
 [dependencies]
 weaver-config = { path = "../weaver-config" }
 lsp-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
+tracing = "0.1"
 
 [dev-dependencies]
 weaver-config = { path = "../weaver-config", features = ["cli"] }

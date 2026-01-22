@@ -5,17 +5,15 @@
 //! finding. The provider lazily initializes the LSP host when the semantic
 //! backend is first requested.
 
-mod stub_server;
-
 use std::fmt;
 use std::sync::Mutex;
 
 use tracing::debug;
 use weaver_config::{CapabilityMatrix, Config};
+use weaver_lsp_host::adapter::ProcessLanguageServer;
 use weaver_lsp_host::{Language, LspHost};
 
 use crate::backends::{BackendKind, BackendProvider, BackendStartupError};
-use stub_server::StubLanguageServer;
 
 const BACKEND_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::backends::semantic");
 
@@ -122,26 +120,25 @@ impl SemanticBackendProvider {
     }
 }
 
-/// Languages for which stub servers are registered.
+/// Languages for which process-based adapters are registered.
 const SUPPORTED_LANGUAGES: [Language; 3] = [Language::Rust, Language::Python, Language::TypeScript];
 
-/// Creates and configures an LSP host with stub servers for supported languages.
+/// Creates and configures an LSP host with process-based adapters.
 fn create_lsp_host(capability_matrix: &CapabilityMatrix) -> Result<LspHost, BackendStartupError> {
     debug!(
         target: BACKEND_TARGET,
-        "initializing LSP host with capability overrides"
+        "initializing LSP host with process-based language server adapters"
     );
     let mut host = LspHost::new(capability_matrix.clone());
 
-    // Register stub servers for supported languages.
-    // These will be replaced with process-based adapters in a future phase.
+    // Register process-based adapters that spawn real language servers.
     for language in SUPPORTED_LANGUAGES {
         debug!(
             target: BACKEND_TARGET,
             %language,
-            "registering stub language server"
+            "registering process-based language server adapter"
         );
-        host.register_language(language, Box::new(StubLanguageServer::new(language)))
+        host.register_language(language, Box::new(ProcessLanguageServer::new(language)))
             .map_err(|e| {
                 BackendStartupError::new(
                     BackendKind::Semantic,
