@@ -4,6 +4,8 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
+use std::thread;
+use std::time::Duration;
 use tracing::{debug, warn};
 
 use super::config::LspServerConfig;
@@ -354,20 +356,46 @@ impl ProcessLanguageServer {
                 warn!(
                     target: ADAPTER_TARGET,
                     language = %self.language,
-                    "language server did not exit gracefully, killing"
+                    "language server did not exit gracefully, waiting before killing"
                 );
-                let _ = child.kill();
-                let _ = child.wait();
+                thread::sleep(Duration::from_millis(200));
+                match child.try_wait() {
+                    Ok(Some(status)) => {
+                        debug!(
+                            target: ADAPTER_TARGET,
+                            language = %self.language,
+                            ?status,
+                            "language server exited during grace period"
+                        );
+                    }
+                    Ok(None) | Err(_) => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                    }
+                }
             }
             Err(e) => {
                 warn!(
                     target: ADAPTER_TARGET,
                     language = %self.language,
                     error = %e,
-                    "failed to check process status, killing"
+                    "failed to check process status, waiting before killing"
                 );
-                let _ = child.kill();
-                let _ = child.wait();
+                thread::sleep(Duration::from_millis(200));
+                match child.try_wait() {
+                    Ok(Some(status)) => {
+                        debug!(
+                            target: ADAPTER_TARGET,
+                            language = %self.language,
+                            ?status,
+                            "language server exited during grace period"
+                        );
+                    }
+                    Ok(None) | Err(_) => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                    }
+                }
             }
         }
     }
