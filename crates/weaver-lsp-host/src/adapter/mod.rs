@@ -10,7 +10,7 @@
 //!
 //! The adapter module is organized into several components:
 //!
-//! - [`LspServerConfig`]: Server configuration including command paths and timeouts
+//! - [`LspServerConfig`]: Server configuration including command paths
 //! - [`AdapterError`] and [`TransportError`]: Error types for adapter operations
 //! - [`JsonRpcRequest`], [`JsonRpcResponse`]: JSON-RPC 2.0 message encoding/decoding
 //! - [`StdioTransport`]: LSP header-framed stdio transport
