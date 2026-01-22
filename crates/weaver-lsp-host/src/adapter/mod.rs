@@ -30,6 +30,7 @@
 mod config;
 mod error;
 mod jsonrpc;
+mod lifecycle;
 mod messaging;
 mod process;
 mod state;

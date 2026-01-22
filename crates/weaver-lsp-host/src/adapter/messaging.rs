@@ -7,7 +7,7 @@ use tracing::{debug, warn};
 
 use super::error::AdapterError;
 use super::jsonrpc::{JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
-use super::process::ADAPTER_TARGET;
+use super::lifecycle::ADAPTER_TARGET;
 use super::transport::StdioTransport;
 
 /// Maximum number of iterations to wait for a matching JSON-RPC response.

@@ -3,19 +3,15 @@
 use serde::de::DeserializeOwned;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
-use std::thread;
-use std::time::Duration;
 use tracing::{debug, warn};
 
 use super::config::LspServerConfig;
 use super::error::AdapterError;
+use super::lifecycle::{ADAPTER_TARGET, terminate_child};
 use super::messaging;
 use super::state::ProcessState;
 use super::transport::StdioTransport;
 use crate::Language;
-
-/// Log target for adapter operations.
-pub(super) const ADAPTER_TARGET: &str = "weaver_lsp_host::adapter";
 
 /// A language server adapter that spawns and communicates with an external process.
 ///
@@ -222,7 +218,7 @@ impl ProcessLanguageServer {
         if let ProcessState::Running { mut child, .. } =
             std::mem::replace(&mut *state, ProcessState::Stopped)
         {
-            self.terminate_child(&mut child);
+            terminate_child(&mut child, self.language);
         }
 
         Ok(())
@@ -236,65 +232,6 @@ impl ProcessLanguageServer {
             .unwrap_or_else(|poison| poison.into_inner());
 
         *state = ProcessState::Running { child, transport };
-    }
-
-    /// Waits for the child process to exit, killing it if necessary.
-    fn terminate_child(&self, child: &mut Child) {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                debug!(
-                    target: ADAPTER_TARGET,
-                    language = %self.language,
-                    ?status,
-                    "language server exited"
-                );
-            }
-            Ok(None) => {
-                warn!(
-                    target: ADAPTER_TARGET,
-                    language = %self.language,
-                    "language server did not exit gracefully, waiting before killing"
-                );
-                thread::sleep(Duration::from_millis(200));
-                match child.try_wait() {
-                    Ok(Some(status)) => {
-                        debug!(
-                            target: ADAPTER_TARGET,
-                            language = %self.language,
-                            ?status,
-                            "language server exited during grace period"
-                        );
-                    }
-                    Ok(None) | Err(_) => {
-                        let _ = child.kill();
-                        let _ = child.wait();
-                    }
-                }
-            }
-            Err(e) => {
-                warn!(
-                    target: ADAPTER_TARGET,
-                    language = %self.language,
-                    error = %e,
-                    "failed to check process status, waiting before killing"
-                );
-                thread::sleep(Duration::from_millis(200));
-                match child.try_wait() {
-                    Ok(Some(status)) => {
-                        debug!(
-                            target: ADAPTER_TARGET,
-                            language = %self.language,
-                            ?status,
-                            "language server exited during grace period"
-                        );
-                    }
-                    Ok(None) | Err(_) => {
-                        let _ = child.kill();
-                        let _ = child.wait();
-                    }
-                }
-            }
-        }
     }
 }
 

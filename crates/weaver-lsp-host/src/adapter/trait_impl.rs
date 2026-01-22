@@ -10,7 +10,8 @@ use lsp_types::{
 };
 use tracing::debug;
 
-use super::process::{ADAPTER_TARGET, ProcessLanguageServer};
+use super::lifecycle::ADAPTER_TARGET;
+use super::process::ProcessLanguageServer;
 use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 
 impl LanguageServer for ProcessLanguageServer {
