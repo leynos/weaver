@@ -30,6 +30,7 @@
 mod config;
 mod error;
 mod jsonrpc;
+mod messaging;
 mod process;
 mod state;
 mod trait_impl;
