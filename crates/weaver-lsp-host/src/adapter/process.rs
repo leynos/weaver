@@ -1,7 +1,7 @@
-//! Process-based language server adapter implementing the `LanguageServer` trait.
+//! Process-based language server adapter.
 
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use serde_json::Value;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
@@ -24,8 +24,8 @@ const MAX_RESPONSE_ITERATIONS: usize = 100;
 
 /// A language server adapter that spawns and communicates with an external process.
 ///
-/// This adapter implements the [`LanguageServer`] trait by spawning a child process
-/// and communicating via JSON-RPC 2.0 over stdin/stdout with LSP header framing.
+/// This adapter spawns a child process and communicates via JSON-RPC 2.0
+/// over stdin/stdout with LSP header framing.
 ///
 /// # Example
 ///
@@ -159,10 +159,6 @@ impl ProcessLanguageServer {
     /// by looping and processing each message until a response with matching ID is found.
     ///
     /// Uses a bounded iteration limit to prevent blocking indefinitely on interleaved messages.
-    #[expect(
-        clippy::excessive_nesting,
-        reason = "nested match arms required to handle multiple JSON-RPC message types"
-    )]
     pub(super) fn receive_response_for_request(
         transport: &mut StdioTransport,
         request_id: i64,
@@ -182,33 +178,48 @@ impl ProcessLanguageServer {
 
             let message_bytes = transport.receive()?;
 
-            match JsonRpcMessage::from_bytes(&message_bytes)? {
-                JsonRpcMessage::Response(resp) => {
-                    if resp.id == Some(request_id) {
-                        return Ok(resp);
-                    }
-                    warn!(
-                        target: ADAPTER_TARGET,
-                        expected = request_id,
-                        received = ?resp.id,
-                        "skipping response with non-matching ID"
-                    );
+            let message = JsonRpcMessage::from_bytes(&message_bytes)?;
+
+            if let Some(response) = Self::process_received_message(message, request_id) {
+                return Ok(response);
+            }
+        }
+    }
+
+    /// Process a received JSON-RPC message, returning the response if it matches the expected request ID.
+    fn process_received_message(
+        message: JsonRpcMessage,
+        expected_request_id: i64,
+    ) -> Option<JsonRpcResponse> {
+        match message {
+            JsonRpcMessage::Response(resp) => {
+                if resp.id == Some(expected_request_id) {
+                    return Some(resp);
                 }
-                JsonRpcMessage::ServerRequest(req) => {
-                    warn!(
-                        target: ADAPTER_TARGET,
-                        method = %req.method,
-                        id = req.id,
-                        "ignoring server-initiated request (not yet implemented)"
-                    );
-                }
-                JsonRpcMessage::Notification(notif) => {
-                    debug!(
-                        target: ADAPTER_TARGET,
-                        method = %notif.method,
-                        "skipping server notification"
-                    );
-                }
+                warn!(
+                    target: ADAPTER_TARGET,
+                    expected = expected_request_id,
+                    received = ?resp.id,
+                    "skipping response with non-matching ID"
+                );
+                None
+            }
+            JsonRpcMessage::ServerRequest(req) => {
+                warn!(
+                    target: ADAPTER_TARGET,
+                    method = %req.method,
+                    id = req.id,
+                    "ignoring server-initiated request (not yet implemented)"
+                );
+                None
+            }
+            JsonRpcMessage::Notification(notif) => {
+                debug!(
+                    target: ADAPTER_TARGET,
+                    method = %notif.method,
+                    "skipping server notification"
+                );
+                None
             }
         }
     }
