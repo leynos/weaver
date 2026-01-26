@@ -78,15 +78,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-env-changed=HOST");
     println!("cargo:rerun-if-env-changed=PROFILE");
 
-    // When cross-compiling, skip man page generation to avoid build issues.
-    if is_cross_compiling() {
-        println!("cargo:warning=Skipping man page generation during cross-compilation");
-        return Ok(());
-    }
-
-    // Packagers expect man pages under target/generated-man/<target>/<profile>.
-    let out_dir = out_dir_for_target_profile();
-
     // The top-level page documents the entire command interface.
     let cmd = cli::Cli::command();
     let default_name = cmd
@@ -106,7 +97,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut buf = Vec::new();
     man.render(&mut buf)?;
     let page_name = format!("{binary_name}.1");
-    write_man_page(&buf, &out_dir, &page_name)?;
+
+    // Packagers expect man pages under target/generated-man/<target>/<profile>.
+    if is_cross_compiling() {
+        println!(
+            "cargo:warning=Skipping target man page staging during cross-compilation; \
+             relying on OUT_DIR instead"
+        );
+    } else {
+        let out_dir = out_dir_for_target_profile();
+        write_man_page(&buf, &out_dir, &page_name)?;
+    }
 
     // Also write to OUT_DIR if available for build script consumers.
     if let Some(extra_dir) = env::var_os("OUT_DIR") {
