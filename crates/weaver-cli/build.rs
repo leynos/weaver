@@ -47,6 +47,12 @@ fn out_dir_for_target_profile() -> PathBuf {
     PathBuf::from(format!("target/generated-man/{target}/{profile}"))
 }
 
+fn is_cross_compiling() -> bool {
+    let target = env::var("TARGET").ok();
+    let host = env::var("HOST").ok();
+    target.is_some() && host.is_some() && target != host
+}
+
 fn write_man_page(data: &[u8], dir: &std::path::Path, page_name: &str) -> std::io::Result<PathBuf> {
     fs::create_dir_all(dir)?;
     let destination = dir.join(page_name);
@@ -69,7 +75,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-env-changed=CARGO_PKG_AUTHORS");
     println!("cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH");
     println!("cargo:rerun-if-env-changed=TARGET");
+    println!("cargo:rerun-if-env-changed=HOST");
     println!("cargo:rerun-if-env-changed=PROFILE");
+
+    // When cross-compiling, skip man page generation to avoid build issues.
+    if is_cross_compiling() {
+        println!("cargo:warning=Skipping man page generation during cross-compilation");
+        return Ok(());
+    }
 
     // Packagers expect man pages under target/generated-man/<target>/<profile>.
     let out_dir = out_dir_for_target_profile();
