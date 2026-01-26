@@ -63,7 +63,7 @@ jobs:
         uses: leynos/shared-actions/.github/actions/rust-build-release@98246364002def859ab550fe01ab3bca55dcfd61
         with:
           target: ${{ inputs.target }}
-          bin-name: weaver-cli
+          bin-name: weaver
           manifest-path: crates/weaver-cli/Cargo.toml
 
       # Build weaverd
@@ -81,7 +81,7 @@ jobs:
         with:
           project-dir: .
           package-name: weaver-cli
-          bin-name: weaver-cli
+          bin-name: weaver
           target: ${{ inputs.target }}
           version: ${{ inputs.version }}
           formats: deb,rpm
@@ -89,7 +89,7 @@ jobs:
           homepage: ${{ env.HOMEPAGE }}
           description: ${{ env.DESCRIPTION }} - CLI client
           license: ISC
-          man-paths: target/generated-man/${{ inputs.target }}/release/weaver-cli.1
+          man-paths: target/generated-man/${{ inputs.target }}/release/weaver.1
           outdir: dist
 
       - name: Package weaverd for Linux
@@ -122,7 +122,7 @@ jobs:
           config-file: .github/release-staging.toml
           target: macos-${{ inputs.artifact-suffix == 'macos-arm64' && 'aarch64' || 'x86_64' }}
         env:
-          BIN_NAME: weaver-cli
+          BIN_NAME: weaver
 
       - name: Build weaver-cli macOS installer package
         if: inputs.platform == 'macos'
@@ -189,7 +189,7 @@ jobs:
           set -euo pipefail
           mkdir -p dist/freebsd-amd64
 
-          for bin in weaver-cli weaverd; do
+          for bin in weaver weaverd; do
             src="target/${{ inputs.target }}/release/${bin}"
             if [[ -f "$src" ]]; then
               dest="dist/freebsd-amd64/${bin}"
