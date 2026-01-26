@@ -89,13 +89,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // The top-level page documents the entire command interface.
     let cmd = cli::Cli::command();
-    let name = cmd
+    let default_name = cmd
         .get_bin_name()
         .unwrap_or_else(|| cmd.get_name())
         .to_owned();
-    let cargo_bin = env::var("CARGO_BIN_NAME")
-        .or_else(|_| env::var("CARGO_PKG_NAME"))
-        .unwrap_or_else(|_| name.clone());
+    let binary_name = env::var("CARGO_BIN_NAME").unwrap_or(default_name);
 
     let version = env::var("CARGO_PKG_VERSION").map_err(
         |_| "CARGO_PKG_VERSION must be set by Cargo; cannot render manual page without it.",
@@ -103,11 +101,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let man = Man::new(cmd)
         .section("1")
-        .source(format!("{cargo_bin} {version}"))
+        .source(format!("{binary_name} {version}"))
         .date(manual_date());
     let mut buf = Vec::new();
     man.render(&mut buf)?;
-    let page_name = format!("{cargo_bin}.1");
+    let page_name = format!("{binary_name}.1");
     write_man_page(&buf, &out_dir, &page_name)?;
 
     // Also write to OUT_DIR if available for build script consumers.
