@@ -113,6 +113,9 @@ impl TestWorld {
     fn prepare_source_location(filename: &str) -> Result<(TempDir, PathBuf, String)> {
         let temp_dir = tempfile::tempdir()?;
         let path = temp_dir.path().join(filename);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
         let uri = Url::from_file_path(&path)
             .map_err(|_| anyhow::anyhow!("failed to convert path to URI"))?
             .to_string();
