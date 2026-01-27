@@ -186,7 +186,7 @@ fn render_diagnostics(payload: &str, context: &OutputContext) -> Option<String> 
 fn render_verification_failures(payload: &str) -> Option<String> {
     let failures = parse_verification_failures(payload)?;
     if failures.is_empty() {
-        return None;
+        return Some(String::from("no verification failures reported\n"));
     }
     let locations: Vec<SourceLocation> = failures
         .into_iter()

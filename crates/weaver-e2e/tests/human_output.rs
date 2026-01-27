@@ -57,8 +57,8 @@ fn first_location(response: Option<GotoDefinitionResponse>) -> Option<Location> 
     let definition = response?;
     match definition {
         GotoDefinitionResponse::Scalar(location) => Some(location),
-        GotoDefinitionResponse::Array(mut locations) => locations.pop(),
-        GotoDefinitionResponse::Link(mut links) => links.pop().map(|link| Location {
+        GotoDefinitionResponse::Array(locations) => locations.into_iter().next(),
+        GotoDefinitionResponse::Link(links) => links.into_iter().next().map(|link| Location {
             uri: link.target_uri,
             range: link.target_selection_range,
         }),

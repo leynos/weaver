@@ -1,6 +1,7 @@
 //! Human-readable rendering of source locations.
 
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::fmt::Write as _;
 use std::fs;
 
@@ -37,10 +38,15 @@ fn group_locations_by_source(
 
     for location in locations {
         let key = location.source.display();
-        if !grouped.contains_key(&key) {
-            order.push(key.clone());
+        match grouped.entry(key.clone()) {
+            Entry::Vacant(entry) => {
+                order.push(key);
+                entry.insert(vec![location]);
+            }
+            Entry::Occupied(mut entry) => {
+                entry.get_mut().push(location);
+            }
         }
-        grouped.entry(key).or_default().push(location);
     }
 
     (order, grouped)
@@ -163,7 +169,7 @@ fn render_context(
 }
 
 fn render_caret_line(output: &mut String, context: CaretContext<'_>) {
-    let line_len = context.text.chars().count();
+    let line_len = context.text.encode_utf16().count();
     let column_index = context.column.saturating_sub(1) as usize;
     let caret_pos = column_index.min(line_len);
     let mut caret_line = String::new();

@@ -98,28 +98,31 @@ impl TestWorld {
     }
 
     pub fn create_source_file(&mut self, filename: &str, content: &str) -> Result<()> {
-        let temp_dir = tempfile::tempdir()?;
-        let path = temp_dir.path().join(filename);
+        let (temp_dir, path, uri) = Self::prepare_source_location(filename)?;
         fs::write(&path, content)?;
-        let uri = Url::from_file_path(&path)
-            .map_err(|_| anyhow::anyhow!("failed to convert path to URI"))?
-            .to_string();
-        self.temp_dir = Some(temp_dir);
-        self.source_uri = Some(uri);
-        self.source_path = Some(path);
+        self.store_source_location(temp_dir, path, uri);
         Ok(())
     }
 
     pub fn create_missing_source(&mut self, filename: &str) -> Result<()> {
+        let (temp_dir, path, uri) = Self::prepare_source_location(filename)?;
+        self.store_source_location(temp_dir, path, uri);
+        Ok(())
+    }
+
+    fn prepare_source_location(filename: &str) -> Result<(TempDir, PathBuf, String)> {
         let temp_dir = tempfile::tempdir()?;
         let path = temp_dir.path().join(filename);
         let uri = Url::from_file_path(&path)
             .map_err(|_| anyhow::anyhow!("failed to convert path to URI"))?
             .to_string();
+        Ok((temp_dir, path, uri))
+    }
+
+    fn store_source_location(&mut self, temp_dir: TempDir, path: PathBuf, uri: String) {
         self.temp_dir = Some(temp_dir);
         self.source_uri = Some(uri);
         self.source_path = Some(path);
-        Ok(())
     }
 
     pub fn source_uri(&self) -> Result<&str> {
