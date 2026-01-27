@@ -103,18 +103,24 @@ crates/weaver-cli/src/
 - Implement or extend step definitions in `crates/weaver-cli/src/tests/` to
   drive a fake daemon with JSONL responses and assert rendered output.
 
-### Step 8: Update documentation
+### Step 8: Update end-to-end (e2e) tests
+
+- Extend `crates/weaver-e2e` to validate human-readable rendering for
+  definitions and diagnostics with real language server responses.
+- Add unhappy-path coverage that exercises missing source content fallbacks.
+
+### Step 9: Update documentation
 
 - Record the output-format decision and renderer behaviour in
   `docs/weaver-design.md` (section 2.1.4).
 - Update `docs/users-guide.md` output format section to describe `--output`,
   the TTY-driven default, and the new context block format.
 
-### Step 9: Mark roadmap entry done
+### Step 10: Mark roadmap entry done
 
 - Update `docs/roadmap.md` to mark the human-readable output item complete.
 
-### Step 10: Run quality gates
+### Step 11: Run quality gates
 
 ```bash
 set -o pipefail
@@ -140,6 +146,7 @@ updates, per `AGENTS.md`.
 | `crates/weaver-cli/tests/features/weaver_cli_output.feature` | Create                                          |
 | `crates/weaver-cli/src/tests/behaviour.rs`                   | Extend steps for new scenarios                  |
 | `crates/weaver-cli/src/tests/support/`                       | Add fixtures for rendered output                |
+| `crates/weaver-e2e/tests/`                                   | Extend for human-readable output validation     |
 | `docs/weaver-design.md`                                      | Record design decisions                         |
 | `docs/users-guide.md`                                        | Document output format changes                  |
 | `docs/roadmap.md`                                            | Mark entry done                                 |
