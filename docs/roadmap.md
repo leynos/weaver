@@ -86,7 +86,7 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
     communicate via stdio, server shutdown is handled gracefully on daemon
     stop, and missing server binaries produce clear diagnostic errors.
 
-- [ ] Add human-readable output rendering for commands that return code
+- [x] Add human-readable output rendering for commands that return code
     locations or diagnostics, using `miette` or a compatible renderer to
     show context blocks.
   - Acceptance criteria: Definition, reference, diagnostics, and safety

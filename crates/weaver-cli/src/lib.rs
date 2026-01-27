@@ -6,7 +6,7 @@
 //! configuration loading and IO streams can be substituted.
 
 use std::ffi::{OsStr, OsString};
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 use std::process::ExitCode;
 use std::sync::Arc;
 
@@ -18,6 +18,7 @@ use weaver_config::{CapabilityMatrix, Config};
 mod command;
 mod config;
 mod lifecycle;
+pub mod output;
 mod transport;
 
 #[cfg(test)]
@@ -29,6 +30,7 @@ use lifecycle::{
     LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput, SystemLifecycle,
     try_auto_start_daemon,
 };
+pub use output::{OutputContext, OutputFormat, ResolvedOutputFormat, render_human_output};
 use transport::connect;
 /// CLI flags recognised by the configuration loader.
 ///
@@ -53,11 +55,33 @@ const EMPTY_LINE_LIMIT: usize = 10;
 pub(crate) struct IoStreams<'a, W: Write, E: Write> {
     pub(crate) stdout: &'a mut W,
     pub(crate) stderr: &'a mut E,
+    stdout_is_terminal: bool,
 }
 
 impl<'a, W: Write, E: Write> IoStreams<'a, W, E> {
     pub(crate) fn new(stdout: &'a mut W, stderr: &'a mut E) -> Self {
-        Self { stdout, stderr }
+        Self {
+            stdout,
+            stderr,
+            stdout_is_terminal: io::stdout().is_terminal(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_terminal_status(
+        stdout: &'a mut W,
+        stderr: &'a mut E,
+        stdout_is_terminal: bool,
+    ) -> Self {
+        Self {
+            stdout,
+            stderr,
+            stdout_is_terminal,
+        }
+    }
+
+    pub(crate) const fn stdout_is_terminal(&self) -> bool {
+        self.stdout_is_terminal
     }
 }
 
@@ -137,13 +161,19 @@ where
                     return handler(invocation, context, &mut output).map_err(AppError::from);
                 }
 
+                let output_format = cli.output.resolve(self.io.stdout_is_terminal());
                 let invocation = CommandInvocation::try_from(cli)?;
                 let context = LifecycleContext {
                     config: &config,
                     config_arguments: &split.config_arguments,
                     daemon_binary: self.daemon_binary,
                 };
-                Ok(execute_daemon_command(invocation, context, self.io))
+                Ok(execute_daemon_command(
+                    invocation,
+                    context,
+                    self.io,
+                    output_format,
+                ))
             });
 
         match result {
@@ -205,11 +235,17 @@ fn execute_daemon_command<W, E>(
     invocation: CommandInvocation,
     context: LifecycleContext<'_>,
     io: &mut IoStreams<'_, W, E>,
+    output_format: ResolvedOutputFormat,
 ) -> ExitCode
 where
     W: Write,
     E: Write,
 {
+    let output_context = OutputContext::new(
+        invocation.domain.clone(),
+        invocation.operation.clone(),
+        invocation.arguments.clone(),
+    );
     let request = CommandRequest::from(invocation);
     let mut connection = match connect(context.config.daemon_socket()) {
         Ok(connection) => connection,
@@ -238,7 +274,14 @@ where
         return ExitCode::FAILURE;
     }
 
-    match read_daemon_messages(&mut connection, &mut *io.stdout, &mut *io.stderr) {
+    match read_daemon_messages(
+        &mut connection,
+        io,
+        OutputSettings {
+            format: output_format,
+            context: &output_context,
+        },
+    ) {
         Ok(status) => exit_code_from_status(status),
         Err(error) => {
             let _ = writeln!(io.stderr, "{error}");
@@ -327,10 +370,16 @@ fn is_daemon_not_running(error: &AppError) -> bool {
     }
 }
 
+/// Settings for rendering daemon output.
+pub(crate) struct OutputSettings<'a> {
+    pub(crate) format: ResolvedOutputFormat,
+    pub(crate) context: &'a OutputContext,
+}
+
 fn read_daemon_messages<R, W, E>(
     connection: &mut R,
-    stdout: &mut W,
-    stderr: &mut E,
+    io: &mut IoStreams<'_, W, E>,
+    settings: OutputSettings<'_>,
 ) -> Result<i32, AppError>
 where
     R: io::Read,
@@ -352,7 +401,10 @@ where
         if line.trim().is_empty() {
             consecutive_empty_lines += 1;
             if consecutive_empty_lines >= EMPTY_LINE_LIMIT {
-                writeln!(stderr, "Warning: received {EMPTY_LINE_LIMIT} consecutive empty lines from daemon; aborting.")
+                writeln!(
+                    io.stderr,
+                    "Warning: received {EMPTY_LINE_LIMIT} consecutive empty lines from daemon; aborting."
+                )
                     .map_err(AppError::ForwardResponse)?;
                 break;
             }
@@ -363,9 +415,14 @@ where
         let message: DaemonMessage = serde_json::from_str(&line).map_err(AppError::ParseMessage)?;
         match message {
             DaemonMessage::Stream { stream, data } => {
+                let rendered = match settings.format {
+                    ResolvedOutputFormat::Human => render_human_output(settings.context, &data),
+                    ResolvedOutputFormat::Json => None,
+                };
+                let payload = rendered.as_deref().unwrap_or(&data);
                 match stream {
-                    StreamTarget::Stdout => stdout.write_all(data.as_bytes()),
-                    StreamTarget::Stderr => stderr.write_all(data.as_bytes()),
+                    StreamTarget::Stdout => io.stdout.write_all(payload.as_bytes()),
+                    StreamTarget::Stderr => io.stderr.write_all(payload.as_bytes()),
                 }
                 .map_err(AppError::ForwardResponse)?;
             }
@@ -374,8 +431,8 @@ where
         line.clear();
     }
 
-    stdout.flush().map_err(AppError::ForwardResponse)?;
-    stderr.flush().map_err(AppError::ForwardResponse)?;
+    io.stdout.flush().map_err(AppError::ForwardResponse)?;
+    io.stderr.flush().map_err(AppError::ForwardResponse)?;
 
     exit_status.ok_or(AppError::MissingExit)
 }
@@ -390,6 +447,9 @@ struct Cli {
     /// Prints the negotiated capability matrix and exits.
     #[arg(long)]
     capabilities: bool,
+    /// Controls how daemon output is rendered.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Auto)]
+    output: OutputFormat,
     /// Structured subcommands (for example `daemon start`).
     #[command(subcommand)]
     command: Option<CliCommand>,

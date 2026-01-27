@@ -23,9 +23,8 @@ blocks while keeping the JSONL protocol payloads intact for machine use.
 2. **Output format selection**: Add an `--output` flag with `auto`, `human`, and
    `json` values. `auto` defaults to `human` when stdout is a TTY and `json`
    when stdout is redirected, ensuring machine pipelines remain stable.
-3. **`miette` renderer configuration**: Use `miette::GraphicalReportHandler`
-   with Unicode disabled to produce ASCII-only context blocks matching the
-   design doc examples.
+3. **Miette-style renderer configuration**: Emit ASCII-only context blocks
+   modelled on `miette` output to match the design doc examples.
 4. **Lightweight response models**: Define CLI-side response structs mirroring
    `docs/users-guide.md` JSON shapes for definitions, references, diagnostics,
    and safety harness failures to avoid cross-crate coupling.
@@ -48,8 +47,6 @@ crates/weaver-cli/src/
 
 ### Step 1: Update dependencies
 
-- Add `miette` (and any required helpers) to the workspace dependencies and
-  `crates/weaver-cli/Cargo.toml`.
 - Upgrade `rstest-bdd` and `rstest-bdd-macros` to v0.4.0 across the workspace,
   updating uses if required by the new API.
 
@@ -68,12 +65,12 @@ crates/weaver-cli/src/
   - Safety harness failures (path + optional line/column + message)
 - Implement `serde` parsing helpers that fail fast with clear errors.
 
-### Step 4: Build the `miette` renderer
+### Step 4: Build the context renderer
 
 - Convert URI + line/column (1-indexed) to byte offsets, handling multi-line
   spans and range end defaults for point locations.
-- Use `miette::NamedSource` to load file content and render context blocks with
-  caret spans; group multiple spans per file under a shared header.
+- Render ASCII context blocks with caret spans and group multiple spans per
+  file under a shared header.
 - Provide fallback rendering for unreadable or missing files, including the
   reason (e.g., "file missing" or "invalid URI").
 
@@ -136,8 +133,8 @@ updates, per `AGENTS.md`.
 
 | File                                                         | Action                                         |
 | ------------------------------------------------------------ | ---------------------------------------------- |
-| `Cargo.toml`                                                 | Bump `rstest-bdd` deps, add `miette`            |
-| `crates/weaver-cli/Cargo.toml`                               | Add `miette` dependency                        |
+| `Cargo.toml`                                                 | Bump `rstest-bdd` deps                          |
+| `crates/weaver-cli/Cargo.toml`                               | Add output rendering deps                       |
 | `crates/weaver-cli/src/lib.rs`                               | Add `--output` and renderer integration         |
 | `crates/weaver-cli/src/output/mod.rs`                        | Create                                          |
 | `crates/weaver-cli/src/output/models.rs`                     | Create                                          |
@@ -154,5 +151,4 @@ updates, per `AGENTS.md`.
 
 ## Dependencies
 
-- `miette` (rendering context blocks)
 - `rstest-bdd` v0.4.0 + `rstest-bdd-macros` v0.4.0
