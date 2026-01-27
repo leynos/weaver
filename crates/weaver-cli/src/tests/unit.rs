@@ -111,23 +111,28 @@ fn exit_code_from_status_out_of_range_defaults_to_failure() {
     assert_eq!(exit_code_from_status(300), ExitCode::FAILURE);
 }
 
-#[test]
-fn read_daemon_messages_errors_without_exit() {
-    let input = b"{\"kind\":\"stream\",\"stream\":\"stdout\",\"data\":\"hi\"}\n";
-    let mut cursor = Cursor::new(&input[..]);
+fn test_read_daemon_messages(input: Vec<u8>) -> (Result<i32, AppError>, Vec<u8>, Vec<u8>) {
+    let mut cursor = Cursor::new(input);
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let mut io = IoStreams::with_terminal_status(&mut stdout, &mut stderr, false);
     let context = OutputContext::new("observe", "get-definition", Vec::new());
-    let error = read_daemon_messages(
+    let result = read_daemon_messages(
         &mut cursor,
         &mut io,
         OutputSettings {
             format: ResolvedOutputFormat::Json,
             context: &context,
         },
-    )
-    .unwrap_err();
+    );
+    (result, stdout, stderr)
+}
+
+#[test]
+fn read_daemon_messages_errors_without_exit() {
+    let input = b"{\"kind\":\"stream\",\"stream\":\"stdout\",\"data\":\"hi\"}\n".to_vec();
+    let (error, stdout, _stderr) = test_read_daemon_messages(input);
+    let error = error.unwrap_err();
     assert!(matches!(error, AppError::MissingExit));
     let stdout_text = decode_utf8(stdout, "stdout").expect("decode stdout");
     assert_eq!(stdout_text, "hi");
@@ -139,20 +144,8 @@ fn read_daemon_messages_warns_after_empty_lines() {
     for _ in 0..EMPTY_LINE_LIMIT {
         payload.extend_from_slice(b"\n");
     }
-    let mut cursor = Cursor::new(payload);
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let mut io = IoStreams::with_terminal_status(&mut stdout, &mut stderr, false);
-    let context = OutputContext::new("observe", "get-definition", Vec::new());
-    let error = read_daemon_messages(
-        &mut cursor,
-        &mut io,
-        OutputSettings {
-            format: ResolvedOutputFormat::Json,
-            context: &context,
-        },
-    )
-    .unwrap_err();
+    let (error, _stdout, stderr) = test_read_daemon_messages(payload);
+    let error = error.unwrap_err();
     assert!(matches!(error, AppError::MissingExit));
     let warning = decode_utf8(stderr, "stderr").expect("decode stderr");
     assert!(warning.contains("Warning: received"));
@@ -160,20 +153,8 @@ fn read_daemon_messages_warns_after_empty_lines() {
 
 #[test]
 fn read_daemon_messages_fails_on_malformed_json() {
-    let mut cursor = Cursor::new(Vec::from("this is not json\n"));
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let mut io = IoStreams::with_terminal_status(&mut stdout, &mut stderr, false);
-    let context = OutputContext::new("observe", "get-definition", Vec::new());
-    let error = read_daemon_messages(
-        &mut cursor,
-        &mut io,
-        OutputSettings {
-            format: ResolvedOutputFormat::Json,
-            context: &context,
-        },
-    )
-    .unwrap_err();
+    let (error, _stdout, _stderr) = test_read_daemon_messages(Vec::from("this is not json\n"));
+    let error = error.unwrap_err();
     assert!(matches!(error, AppError::ParseMessage(_)));
 }
 
