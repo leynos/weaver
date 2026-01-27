@@ -22,7 +22,7 @@ pub(crate) fn render_locations(locations: &[SourceLocation]) -> String {
             output.push('\n');
         }
         if let Some(group) = grouped.get(key) {
-            render_source_group(&mut output, key, group);
+            render_group(&mut output, key, group);
         }
     }
 
@@ -46,7 +46,7 @@ fn group_locations_by_source(
     (order, grouped)
 }
 
-fn render_source_group(output: &mut String, key: &str, group: &[&SourceLocation]) {
+fn render_group(output: &mut String, key: &str, group: &[&SourceLocation]) {
     if group.is_empty() {
         return;
     }
