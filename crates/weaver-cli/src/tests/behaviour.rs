@@ -14,6 +14,48 @@ use serde_json::json;
 
 const SAMPLE_RUST_SOURCE: &str = "fn main() {\n    let value = 1;\n    value\n}\n";
 
+fn assert_output_contains<F>(
+    world: &RefCell<TestWorld>,
+    get_text: F,
+    snippet: String,
+    should_contain: bool,
+    stream_name: &str,
+) where
+    F: FnOnce(&TestWorld) -> anyhow::Result<String>,
+{
+    let world = world.borrow();
+    let text = get_text(&world).unwrap_or_else(|_| panic!("{stream_name} text missing"));
+    let snippet = snippet.trim_matches('"');
+    if should_contain {
+        assert!(
+            text.contains(snippet),
+            "{stream_name} {:?} did not contain {:?}",
+            text,
+            snippet
+        );
+    } else {
+        assert!(
+            !text.contains(snippet),
+            "{stream_name} {:?} unexpectedly contained {:?}",
+            text,
+            snippet
+        );
+    }
+}
+
+fn run_uri_command<F>(world: &RefCell<TestWorld>, command_fn: F, error_msg: &str)
+where
+    F: FnOnce(&str) -> String,
+{
+    let uri = world
+        .borrow()
+        .source_uri()
+        .expect("source uri missing")
+        .to_owned();
+    let command = command_fn(&uri);
+    world.borrow_mut().run(&command).expect(error_msg);
+}
+
 #[given("a running fake daemon")]
 fn given_running_daemon(world: &RefCell<TestWorld>) {
     world
@@ -143,44 +185,29 @@ fn when_operator_runs(world: &RefCell<TestWorld>, command: String) {
 
 #[when("the operator runs the definition command")]
 fn when_operator_runs_definition(world: &RefCell<TestWorld>) {
-    let uri = world
-        .borrow()
-        .source_uri()
-        .expect("source uri missing")
-        .to_owned();
-    let command = format!("--output human observe get-definition --uri {uri} --position 2:5");
-    world
-        .borrow_mut()
-        .run(&command)
-        .expect("failed to run definition command");
+    run_uri_command(
+        world,
+        |uri| format!("--output human observe get-definition --uri {uri} --position 2:5"),
+        "failed to run definition command",
+    );
 }
 
 #[when("the operator runs the diagnostics command")]
 fn when_operator_runs_diagnostics(world: &RefCell<TestWorld>) {
-    let uri = world
-        .borrow()
-        .source_uri()
-        .expect("source uri missing")
-        .to_owned();
-    let command = format!("--output human verify diagnostics --uri {uri}");
-    world
-        .borrow_mut()
-        .run(&command)
-        .expect("failed to run diagnostics command");
+    run_uri_command(
+        world,
+        |uri| format!("--output human verify diagnostics --uri {uri}"),
+        "failed to run diagnostics command",
+    );
 }
 
 #[when("the operator runs the json definition command")]
 fn when_operator_runs_json_definition(world: &RefCell<TestWorld>) {
-    let uri = world
-        .borrow()
-        .source_uri()
-        .expect("source uri missing")
-        .to_owned();
-    let command = format!("--output json observe get-definition --uri {uri} --position 2:5");
-    world
-        .borrow_mut()
-        .run(&command)
-        .expect("failed to run json definition command");
+    run_uri_command(
+        world,
+        |uri| format!("--output json observe get-definition --uri {uri} --position 2:5"),
+        "failed to run json definition command",
+    );
 }
 
 #[then("the daemon receives {fixture}")]
@@ -229,40 +256,34 @@ fn then_stderr_is(world: &RefCell<TestWorld>, expected: String) {
 
 #[then("stderr contains {snippet}")]
 fn then_stderr_contains(world: &RefCell<TestWorld>, snippet: String) {
-    let world = world.borrow();
-    let stderr = world.stderr_text().expect("stderr text missing");
-    let snippet = snippet.trim_matches('"');
-    assert!(
-        stderr.contains(snippet),
-        "stderr {:?} did not contain {:?}",
-        stderr,
-        snippet
+    assert_output_contains(
+        world,
+        |world| world.stderr_text(),
+        snippet,
+        true,
+        "stderr",
     );
 }
 
 #[then("stdout contains {snippet}")]
 fn then_stdout_contains(world: &RefCell<TestWorld>, snippet: String) {
-    let world = world.borrow();
-    let stdout = world.stdout_text().expect("stdout text missing");
-    let snippet = snippet.trim_matches('"');
-    assert!(
-        stdout.contains(snippet),
-        "stdout {:?} did not contain {:?}",
-        stdout,
-        snippet
+    assert_output_contains(
+        world,
+        |world| world.stdout_text(),
+        snippet,
+        true,
+        "stdout",
     );
 }
 
 #[then("stdout does not contain {snippet}")]
 fn then_stdout_does_not_contain(world: &RefCell<TestWorld>, snippet: String) {
-    let world = world.borrow();
-    let stdout = world.stdout_text().expect("stdout text missing");
-    let snippet = snippet.trim_matches('"');
-    assert!(
-        !stdout.contains(snippet),
-        "stdout {:?} unexpectedly contained {:?}",
-        stdout,
-        snippet
+    assert_output_contains(
+        world,
+        |world| world.stdout_text(),
+        snippet,
+        false,
+        "stdout",
     );
 }
 
