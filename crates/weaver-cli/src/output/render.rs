@@ -16,7 +16,23 @@ pub(crate) fn render_locations(locations: &[SourceLocation]) -> String {
     }
 
     let mut output = String::new();
-    let mut order: Vec<String> = Vec::new();
+    let (order, grouped) = group_locations_by_source(locations);
+    for (group_index, key) in order.iter().enumerate() {
+        if group_index > 0 {
+            output.push('\n');
+        }
+        if let Some(group) = grouped.get(key) {
+            render_source_group(&mut output, key, group);
+        }
+    }
+
+    output
+}
+
+fn group_locations_by_source(
+    locations: &[SourceLocation],
+) -> (Vec<String>, HashMap<String, Vec<&SourceLocation>>) {
+    let mut order = Vec::new();
     let mut grouped: HashMap<String, Vec<&SourceLocation>> = HashMap::new();
 
     for location in locations {
@@ -27,39 +43,41 @@ pub(crate) fn render_locations(locations: &[SourceLocation]) -> String {
         grouped.entry(key).or_default().push(location);
     }
 
-    for (group_index, key) in order.iter().enumerate() {
-        if group_index > 0 {
-            output.push('\n');
-        }
-        let Some(group) = grouped.get(key) else {
-            continue;
-        };
-        let source = &group[0].source;
-        writeln!(output, "{key}").expect("write header");
+    (order, grouped)
+}
 
-        let content_result = source
-            .as_path()
-            .map(|path| fs::read_to_string(path).map_err(|err| err.to_string()));
-
-        for (index, location) in group.iter().enumerate() {
-            if index > 0 {
-                output.push('\n');
-            }
-            match content_result.as_ref() {
-                Some(Ok(content)) => render_location_block(&mut output, location, Some(content)),
-                Some(Err(error)) => {
-                    render_unresolved(
-                        &mut output,
-                        location,
-                        format!("source unavailable: {error}"),
-                    );
-                }
-                None => render_location_block(&mut output, location, None),
-            }
-        }
+fn render_source_group(output: &mut String, key: &str, group: &[&SourceLocation]) {
+    if group.is_empty() {
+        return;
     }
 
-    output
+    let source = &group[0].source;
+    writeln!(output, "{key}").expect("write header");
+
+    let content_result = source
+        .as_path()
+        .map(|path| fs::read_to_string(path).map_err(|err| err.to_string()));
+
+    for (index, location) in group.iter().enumerate() {
+        if index > 0 {
+            output.push('\n');
+        }
+        render_single_location(output, location, content_result.as_ref());
+    }
+}
+
+fn render_single_location(
+    output: &mut String,
+    location: &SourceLocation,
+    content_result: Option<&Result<String, String>>,
+) {
+    match content_result {
+        Some(Ok(content)) => render_location_block(output, location, Some(content)),
+        Some(Err(error)) => {
+            render_unresolved(output, location, format!("source unavailable: {error}"));
+        }
+        None => render_location_block(output, location, None),
+    }
 }
 
 fn render_location_block(output: &mut String, location: &SourceLocation, content: Option<&str>) {

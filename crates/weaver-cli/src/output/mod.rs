@@ -11,8 +11,8 @@ mod source;
 use clap::ValueEnum;
 
 use crate::output::models::{
-    DiagnosticItem, DiagnosticsResponse, ReferenceResponse, VerificationFailure, parse_definitions,
-    parse_verification_failures,
+    DefinitionLocation, DiagnosticItem, DiagnosticsResponse, ReferenceResponse,
+    VerificationFailure, parse_definitions, parse_verification_failures,
 };
 use crate::output::source::{
     SourceLocation, SourcePosition, extract_uri_argument, from_path_or_uri, from_uri,
@@ -106,43 +106,67 @@ pub fn render_human_output(context: &OutputContext, data: &str) -> Option<String
     }
 }
 
-fn render_definitions(payload: &str) -> Option<String> {
-    let definitions = parse_definitions(payload)?;
-    if definitions.is_empty() {
-        return Some(String::from("no definitions found\n"));
+struct LocationItemAccessors<FUri, FLine, FColumn> {
+    uri: FUri,
+    line: FLine,
+    column: FColumn,
+}
+
+fn render_location_items<T, FUri, FLine, FColumn>(
+    items: Vec<T>,
+    empty_message: &str,
+    label: &str,
+    accessors: LocationItemAccessors<FUri, FLine, FColumn>,
+) -> String
+where
+    FUri: Fn(&T) -> String,
+    FLine: Fn(&T) -> u32,
+    FColumn: Fn(&T) -> u32,
+{
+    if items.is_empty() {
+        return String::from(empty_message);
     }
-    let locations: Vec<SourceLocation> = definitions
+    let locations: Vec<SourceLocation> = items
         .into_iter()
-        .map(|definition| {
+        .map(|item| {
+            let uri = (accessors.uri)(&item);
             from_uri(
-                &definition.uri,
-                Some(definition.line),
-                Some(definition.column),
-                "definition",
+                &uri,
+                Some((accessors.line)(&item)),
+                Some((accessors.column)(&item)),
+                label,
             )
         })
         .collect();
-    Some(render::render_locations(&locations))
+    render::render_locations(&locations)
+}
+
+fn render_definitions(payload: &str) -> Option<String> {
+    let definitions = parse_definitions(payload)?;
+    Some(render_location_items(
+        definitions,
+        "no definitions found\n",
+        "definition",
+        LocationItemAccessors {
+            uri: |definition: &DefinitionLocation| definition.uri.clone(),
+            line: |definition: &DefinitionLocation| definition.line,
+            column: |definition: &DefinitionLocation| definition.column,
+        },
+    ))
 }
 
 fn render_references(payload: &str) -> Option<String> {
     let response: ReferenceResponse = serde_json::from_str(payload).ok()?;
-    if response.references.is_empty() {
-        return Some(String::from("no references found\n"));
-    }
-    let locations: Vec<SourceLocation> = response
-        .references
-        .into_iter()
-        .map(|reference| {
-            from_uri(
-                &reference.uri,
-                Some(reference.line),
-                Some(reference.column),
-                "reference",
-            )
-        })
-        .collect();
-    Some(render::render_locations(&locations))
+    Some(render_location_items(
+        response.references,
+        "no references found\n",
+        "reference",
+        LocationItemAccessors {
+            uri: |reference: &DefinitionLocation| reference.uri.clone(),
+            line: |reference: &DefinitionLocation| reference.line,
+            column: |reference: &DefinitionLocation| reference.column,
+        },
+    ))
 }
 
 fn render_diagnostics(payload: &str, context: &OutputContext) -> Option<String> {

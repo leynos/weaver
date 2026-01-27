@@ -131,23 +131,23 @@ updates, per `AGENTS.md`.
 
 ## Files Modified
 
-| File                                                         | Action                                         |
-| ------------------------------------------------------------ | ---------------------------------------------- |
-| `Cargo.toml`                                                 | Bump `rstest-bdd` deps                          |
-| `crates/weaver-cli/Cargo.toml`                               | Add output rendering deps                       |
-| `crates/weaver-cli/src/lib.rs`                               | Add `--output` and renderer integration         |
-| `crates/weaver-cli/src/output/mod.rs`                        | Create                                          |
-| `crates/weaver-cli/src/output/models.rs`                     | Create                                          |
-| `crates/weaver-cli/src/output/render.rs`                     | Create                                          |
-| `crates/weaver-cli/src/output/source.rs`                     | Create                                          |
-| `crates/weaver-cli/tests/features/weaver_cli_output.feature` | Create                                          |
-| `crates/weaver-cli/src/tests/behaviour.rs`                   | Extend steps for new scenarios                  |
-| `crates/weaver-cli/src/tests/support/`                       | Add fixtures for rendered output                |
-| `crates/weaver-e2e/tests/`                                   | Extend for human-readable output validation     |
-| `docs/weaver-design.md`                                      | Record design decisions                         |
-| `docs/users-guide.md`                                        | Document output format changes                  |
-| `docs/roadmap.md`                                            | Mark entry done                                 |
-| `docs/execplans/phase-1-human-readable-output.md`            | Create                                          |
+| File                                                         | Action                                      |
+| ------------------------------------------------------------ | ------------------------------------------- |
+| `Cargo.toml`                                                 | Bump `rstest-bdd` deps                      |
+| `crates/weaver-cli/Cargo.toml`                               | Add output rendering deps                   |
+| `crates/weaver-cli/src/lib.rs`                               | Add `--output` and renderer integration     |
+| `crates/weaver-cli/src/output/mod.rs`                        | Create                                      |
+| `crates/weaver-cli/src/output/models.rs`                     | Create                                      |
+| `crates/weaver-cli/src/output/render.rs`                     | Create                                      |
+| `crates/weaver-cli/src/output/source.rs`                     | Create                                      |
+| `crates/weaver-cli/tests/features/weaver_cli_output.feature` | Create                                      |
+| `crates/weaver-cli/src/tests/behaviour.rs`                   | Extend steps for new scenarios              |
+| `crates/weaver-cli/src/tests/support/`                       | Add fixtures for rendered output            |
+| `crates/weaver-e2e/tests/`                                   | Extend for human-readable output validation |
+| `docs/weaver-design.md`                                      | Record design decisions                     |
+| `docs/users-guide.md`                                        | Document output format changes              |
+| `docs/roadmap.md`                                            | Mark entry done                             |
+| `docs/execplans/phase-1-human-readable-output.md`            | Create                                      |
 
 ## Dependencies
 

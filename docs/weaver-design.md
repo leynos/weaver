@@ -511,9 +511,9 @@ surfaced by the safety harness.
 
 The CLI exposes an `--output` flag with `auto`, `human`, and `json` values.
 `auto` selects `human` when stdout is a TTY and `json` when output is
-redirected, ensuring pipelines remain stable while still providing rich
-context for interactive use. The human renderer follows `miette`-style ASCII
-output even when a direct `miette` dependency is not used.
+redirected, ensuring pipelines remain stable while still providing rich context
+for interactive use. The human renderer follows `miette`-style ASCII output
+even when a direct `miette` dependency is not used.
 
 Context blocks are required because line-and-column tuples alone are
 insufficient for fast triage. The renderer should show a labelled header with

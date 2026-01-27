@@ -235,8 +235,8 @@ The CLI accepts `--output` with `auto` (default), `human`, and `json` values.
 `auto` selects `human` when stdout is a TTY and `json` when output is
 redirected, so JSON pipelines remain stable. Place `--output` before the
 command domain and operation because arguments after the operation are passed
-directly to the daemon (for example, `weaver --output human observe
-get-definition ...`).
+directly to the daemon (for example,
+`weaver --output human observe get-definition ...`).
 
 When `--output human` is active, commands that return code locations or
 diagnostics render context blocks with file headers, line-numbered source
