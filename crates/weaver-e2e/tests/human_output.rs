@@ -92,12 +92,13 @@ fn renders_definition_output_with_context() -> Result<(), TestError> {
     let rendered = render_human_output(&context, &json).ok_or(TestError::RenderFailed)?;
     let normalised = rendered.replace(temp_dir.path().to_string_lossy().as_ref(), "<temp>");
 
-    let mut result = Ok(());
-    if !normalised.contains("def b():") {
-        result = Err(TestError::MissingOutput(String::from("def b():")));
+    let result = if !normalised.contains("def b():") {
+        Err(TestError::MissingOutput(String::from("def b():")))
     } else if !normalised.contains("^ definition") {
-        result = Err(TestError::MissingOutput(String::from("^ definition")));
-    }
+        Err(TestError::MissingOutput(String::from("^ definition")))
+    } else {
+        Ok(())
+    };
 
     let shutdown_result = client.shutdown();
     if let Err(error) = result {

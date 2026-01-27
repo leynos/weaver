@@ -10,7 +10,7 @@ mod lifecycle;
 use std::cell::RefCell;
 use std::ffi::OsString;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Component, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::{Context, Result, ensure};
@@ -51,14 +51,19 @@ pub(super) struct TestWorld {
     pub config: Config,
     pub daemon: Option<FakeDaemon>,
     pub stdout: Vec<u8>,
+    /// Controls whether stdout is treated as a terminal for output selection.
+    pub stdout_is_terminal: bool,
     pub stderr: Vec<u8>,
     pub exit_code: Option<ExitCode>,
     pub requests: Vec<String>,
     pub lifecycle: TestLifecycle,
     /// Optional override for daemon binary path, used instead of env var mutation.
     pub daemon_binary: Option<OsString>,
+    /// Temporary directory holding the latest source fixture.
     pub temp_dir: Option<TempDir>,
+    /// URI for the latest source fixture.
     pub source_uri: Option<String>,
+    /// Filesystem path for the latest source fixture.
     pub source_path: Option<PathBuf>,
 }
 
@@ -111,8 +116,19 @@ impl TestWorld {
     }
 
     fn prepare_source_location(filename: &str) -> Result<(TempDir, PathBuf, String)> {
+        let candidate = PathBuf::from(filename);
+        ensure!(
+            !candidate.is_absolute(),
+            "source filename must be relative: {filename}"
+        );
+        ensure!(
+            !candidate
+                .components()
+                .any(|component| matches!(component, Component::ParentDir | Component::Prefix(_))),
+            "source filename must not traverse outside the temp dir: {filename}"
+        );
         let temp_dir = tempfile::tempdir()?;
-        let path = temp_dir.path().join(filename);
+        let path = temp_dir.path().join(candidate);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
@@ -141,7 +157,7 @@ impl TestWorld {
         let args = Self::build_args(command);
         let loader = StaticConfigLoader::new(self.config.clone());
         let daemon_binary = self.daemon_binary.as_deref();
-        let mut io = IoStreams::new(&mut self.stdout, &mut self.stderr, false);
+        let mut io = IoStreams::new(&mut self.stdout, &mut self.stderr, self.stdout_is_terminal);
         let exit = run_with_daemon_binary(
             args,
             &mut io,

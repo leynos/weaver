@@ -20,7 +20,7 @@ where
 }
 
 pub(crate) fn exit_code_from_status(status: i32) -> ExitCode {
-    if (0..=255).contains(&status) {
+    if status >= 0 && status <= u8::MAX as i32 {
         ExitCode::from(status as u8)
     } else {
         ExitCode::FAILURE
