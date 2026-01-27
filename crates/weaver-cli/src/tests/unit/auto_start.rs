@@ -62,7 +62,7 @@ fn auto_start_failure_paths(
     let invocation = make_invocation();
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::with_terminal_status(&mut stdout, &mut stderr, false);
+    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
 
     let exit = execute_daemon_command(invocation, context, &mut io, ResolvedOutputFormat::Json);
 
@@ -145,7 +145,7 @@ fn auto_start_succeeds_and_proceeds() {
     let invocation = make_invocation();
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::with_terminal_status(&mut stdout, &mut stderr, false);
+    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
 
     let exit = execute_daemon_command(invocation, context, &mut io, ResolvedOutputFormat::Json);
 
@@ -205,7 +205,7 @@ fn auto_start_times_out_when_daemon_slow() {
     let invocation = make_invocation();
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::with_terminal_status(&mut stdout, &mut stderr, false);
+    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
 
     let exit = execute_daemon_command(invocation, context, &mut io, ResolvedOutputFormat::Json);
 

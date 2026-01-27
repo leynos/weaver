@@ -6,6 +6,7 @@ use std::fmt::Write as _;
 use std::fs;
 
 use super::source::SourceLocation;
+use unicode_width::UnicodeWidthChar;
 
 const CONTEXT_LINES: u32 = 2;
 
@@ -169,9 +170,9 @@ fn render_context(
 }
 
 fn render_caret_line(output: &mut String, context: CaretContext<'_>) {
-    let line_len = context.text.encode_utf16().count();
-    let column_index = context.column.saturating_sub(1) as usize;
-    let caret_pos = column_index.min(line_len);
+    let line_len = context.text.encode_utf16().count() as u32;
+    let target_units = context.column.saturating_sub(1).min(line_len);
+    let caret_pos = caret_display_offset(context.text, target_units);
     let mut caret_line = String::new();
     caret_line.extend(std::iter::repeat_n(' ', caret_pos));
     caret_line.push('^');
@@ -186,6 +187,22 @@ fn render_caret_line(output: &mut String, context: CaretContext<'_>) {
         line_width = context.line_width
     )
     .expect("write caret");
+}
+
+fn caret_display_offset(text: &str, target_units: u32) -> usize {
+    let mut units_consumed = 0u32;
+    let mut width = 0usize;
+
+    for ch in text.chars() {
+        let next_units = units_consumed + ch.len_utf16() as u32;
+        if next_units > target_units {
+            break;
+        }
+        units_consumed = next_units;
+        width += UnicodeWidthChar::width(ch).unwrap_or(0);
+    }
+
+    width
 }
 
 fn num_digits(value: u32) -> usize {

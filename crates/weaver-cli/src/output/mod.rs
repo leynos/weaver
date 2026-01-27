@@ -41,7 +41,7 @@ pub enum ResolvedOutputFormat {
 impl OutputFormat {
     /// Resolves the output format based on whether stdout is a terminal.
     #[must_use]
-    pub fn resolve(self, stdout_is_terminal: bool) -> ResolvedOutputFormat {
+    pub const fn resolve(self, stdout_is_terminal: bool) -> ResolvedOutputFormat {
         match self {
             Self::Auto => {
                 if stdout_is_terminal {
@@ -239,15 +239,20 @@ fn verification_failure_to_location(failure: VerificationFailure) -> SourceLocat
 mod tests {
     use super::*;
 
-    #[test]
-    fn resolves_auto_output_format() {
-        assert_eq!(
-            OutputFormat::Auto.resolve(true),
-            ResolvedOutputFormat::Human
-        );
-        assert_eq!(
-            OutputFormat::Auto.resolve(false),
-            ResolvedOutputFormat::Json
-        );
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(OutputFormat::Auto, true, ResolvedOutputFormat::Human)]
+    #[case(OutputFormat::Auto, false, ResolvedOutputFormat::Json)]
+    #[case(OutputFormat::Human, true, ResolvedOutputFormat::Human)]
+    #[case(OutputFormat::Human, false, ResolvedOutputFormat::Human)]
+    #[case(OutputFormat::Json, true, ResolvedOutputFormat::Json)]
+    #[case(OutputFormat::Json, false, ResolvedOutputFormat::Json)]
+    fn resolves_output_format(
+        #[case] format: OutputFormat,
+        #[case] stdout_is_terminal: bool,
+        #[case] expected: ResolvedOutputFormat,
+    ) {
+        assert_eq!(format.resolve(stdout_is_terminal), expected);
     }
 }

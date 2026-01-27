@@ -9,7 +9,6 @@ use url::Url;
 use weaver_cli::{OutputContext, render_human_output};
 use weaver_e2e::fixtures;
 use weaver_e2e::lsp_client::{LspClient, LspClientError};
-use weaver_e2e::pyrefly_available;
 
 /// Test error type for human output rendering.
 #[derive(Debug, thiserror::Error)]
@@ -66,11 +65,8 @@ fn first_location(response: Option<GotoDefinitionResponse>) -> Option<Location> 
 }
 
 #[test]
+#[ignore = "requires pyrefly tooling to be available on PATH"]
 fn renders_definition_output_with_context() -> Result<(), TestError> {
-    if !pyrefly_available() {
-        return Ok(());
-    }
-
     let temp_dir = TempDir::new()?;
     let file_path = temp_dir.path().join("test.py");
     std::fs::write(&file_path, fixtures::LINEAR_CHAIN)?;

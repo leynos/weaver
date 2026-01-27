@@ -70,19 +70,6 @@ impl<'a, W: Write, E: Write> IoStreams<'a, W, E> {
         }
     }
 
-    #[cfg(test)]
-    pub(crate) fn with_terminal_status(
-        stdout: &'a mut W,
-        stderr: &'a mut E,
-        stdout_is_terminal: bool,
-    ) -> Self {
-        Self {
-            stdout,
-            stderr,
-            stdout_is_terminal,
-        }
-    }
-
     pub(crate) const fn stdout_is_terminal(&self) -> bool {
         self.stdout_is_terminal
     }

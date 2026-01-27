@@ -115,7 +115,7 @@ fn test_read_daemon_messages(input: Vec<u8>) -> (Result<i32, AppError>, Vec<u8>,
     let mut cursor = Cursor::new(input);
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::with_terminal_status(&mut stdout, &mut stderr, false);
+    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
     let context = OutputContext::new("observe", "get-definition", Vec::new());
     let result = read_daemon_messages(
         &mut cursor,
@@ -170,7 +170,7 @@ fn run_with_loader_reports_configuration_failures() {
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::with_terminal_status(&mut stdout, &mut stderr, false);
+    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
     let exit = run_with_loader(vec![OsString::from("weaver")], &mut io, &FailingLoader);
     assert_eq!(exit, ExitCode::FAILURE);
     let stderr_text = decode_utf8(stderr, "stderr").expect("decode stderr");
@@ -201,7 +201,7 @@ fn run_with_loader_filters_configuration_arguments() {
     let loader = RecordingLoader::new();
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::with_terminal_status(&mut stdout, &mut stderr, false);
+    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
     let exit = run_with_loader(
         vec![
             OsString::from("weaver"),
@@ -265,7 +265,7 @@ where
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::with_terminal_status(&mut stdout, &mut stderr, false);
+    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
     let context = OutputContext::new("observe", "noop", Vec::new());
     let status = read_daemon_messages(
         &mut connection,

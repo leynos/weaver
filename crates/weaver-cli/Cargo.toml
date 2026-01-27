@@ -16,6 +16,7 @@ ortho_config = { workspace = true }
 thiserror = { workspace = true }
 cap-std = { workspace = true }
 url = { workspace = true }
+unicode-width = "0.2.2"
 
 [target.'cfg(unix)'.dependencies]
 socket2 = { version = "0.5" }

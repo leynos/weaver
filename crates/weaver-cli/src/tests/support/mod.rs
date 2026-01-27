@@ -138,7 +138,7 @@ impl TestWorld {
         let args = Self::build_args(command);
         let loader = StaticConfigLoader::new(self.config.clone());
         let daemon_binary = self.daemon_binary.as_deref();
-        let mut io = IoStreams::with_terminal_status(&mut self.stdout, &mut self.stderr, false);
+        let mut io = IoStreams::new(&mut self.stdout, &mut self.stderr, false);
         let exit = run_with_daemon_binary(
             args,
             &mut io,

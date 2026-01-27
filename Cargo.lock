@@ -2533,6 +2533,7 @@ dependencies = [
  "socket2",
  "tempfile",
  "thiserror 2.0.17",
+ "unicode-width",
  "url",
  "weaver-config",
 ]
