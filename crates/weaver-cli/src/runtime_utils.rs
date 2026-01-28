@@ -19,7 +19,7 @@ where
     stdout.flush().map_err(AppError::EmitCapabilities)
 }
 
-pub(crate) fn exit_code_from_status(status: i32) -> ExitCode {
+pub(crate) const fn exit_code_from_status(status: i32) -> ExitCode {
     if status >= 0 && status <= u8::MAX as i32 {
         ExitCode::from(status as u8)
     } else {
