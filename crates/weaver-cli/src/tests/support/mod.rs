@@ -287,6 +287,10 @@ pub(super) fn default_daemon_lines() -> Vec<String> {
     ]
 }
 
+/// Builds a stdout stream entry plus exit record for a custom payload.
+///
+/// This mirrors the structure of `default_daemon_lines` so sibling test helpers
+/// can emit deterministic stdout-only sequences with a trailing exit event.
 pub(super) fn daemon_lines_for_stdout(payload: &str) -> Vec<String> {
     let stream = serde_json::json!({
         "kind": "stream",
