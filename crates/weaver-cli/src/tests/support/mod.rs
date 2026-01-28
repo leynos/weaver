@@ -102,6 +102,7 @@ impl TestWorld {
         self.daemon_binary = Some(OsString::from("/nonexistent/weaverd"));
     }
 
+    /// Creates a source file fixture and stores its location metadata.
     pub fn create_source_file(&mut self, filename: &str, content: &str) -> Result<()> {
         let (temp_dir, path, uri) = Self::prepare_source_location(filename)?;
         fs::write(&path, content)?;
@@ -109,6 +110,7 @@ impl TestWorld {
         Ok(())
     }
 
+    /// Stores a missing source fixture so callers can reference its URI.
     pub fn create_missing_source(&mut self, filename: &str) -> Result<()> {
         let (temp_dir, path, uri) = Self::prepare_source_location(filename)?;
         self.store_source_location(temp_dir, path, uri);
@@ -144,6 +146,7 @@ impl TestWorld {
         self.source_path = Some(path);
     }
 
+    /// Returns the most recent source URI recorded for the test world.
     pub fn source_uri(&self) -> Result<&str> {
         self.source_uri
             .as_deref()
