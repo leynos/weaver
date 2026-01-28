@@ -17,8 +17,9 @@ use std::thread;
 
 use crate::{
     AppError, Cli, CliCommand, CommandDescriptor, CommandInvocation, CommandRequest, ConfigLoader,
-    DaemonAction, EMPTY_LINE_LIMIT, IoStreams, connect, exit_code_from_status,
-    is_daemon_not_running, read_daemon_messages, run_with_loader,
+    DaemonAction, EMPTY_LINE_LIMIT, IoStreams, OutputContext, OutputFormat, OutputSettings,
+    ResolvedOutputFormat, connect, exit_code_from_status, is_daemon_not_running,
+    read_daemon_messages, run_with_loader,
 };
 use clap::Parser;
 use rstest::rstest;
@@ -70,6 +71,7 @@ fn command_invocation_validation(
 ) {
     let cli = Cli {
         capabilities: false,
+        output: OutputFormat::Auto,
         command: None,
         domain,
         operation,
@@ -109,13 +111,28 @@ fn exit_code_from_status_out_of_range_defaults_to_failure() {
     assert_eq!(exit_code_from_status(300), ExitCode::FAILURE);
 }
 
-#[test]
-fn read_daemon_messages_errors_without_exit() {
-    let input = b"{\"kind\":\"stream\",\"stream\":\"stdout\",\"data\":\"hi\"}\n";
-    let mut cursor = Cursor::new(&input[..]);
+fn test_read_daemon_messages(input: Vec<u8>) -> (Result<i32, AppError>, Vec<u8>, Vec<u8>) {
+    let mut cursor = Cursor::new(input);
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let error = read_daemon_messages(&mut cursor, &mut stdout, &mut stderr).unwrap_err();
+    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
+    let context = OutputContext::new("observe", "get-definition", Vec::new());
+    let result = read_daemon_messages(
+        &mut cursor,
+        &mut io,
+        OutputSettings {
+            format: ResolvedOutputFormat::Json,
+            context: &context,
+        },
+    );
+    (result, stdout, stderr)
+}
+
+#[test]
+fn read_daemon_messages_errors_without_exit() {
+    let input = b"{\"kind\":\"stream\",\"stream\":\"stdout\",\"data\":\"hi\"}\n".to_vec();
+    let (error, stdout, _stderr) = test_read_daemon_messages(input);
+    let error = error.unwrap_err();
     assert!(matches!(error, AppError::MissingExit));
     let stdout_text = decode_utf8(stdout, "stdout").expect("decode stdout");
     assert_eq!(stdout_text, "hi");
@@ -127,10 +144,8 @@ fn read_daemon_messages_warns_after_empty_lines() {
     for _ in 0..EMPTY_LINE_LIMIT {
         payload.extend_from_slice(b"\n");
     }
-    let mut cursor = Cursor::new(payload);
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let error = read_daemon_messages(&mut cursor, &mut stdout, &mut stderr).unwrap_err();
+    let (error, _stdout, stderr) = test_read_daemon_messages(payload);
+    let error = error.unwrap_err();
     assert!(matches!(error, AppError::MissingExit));
     let warning = decode_utf8(stderr, "stderr").expect("decode stderr");
     assert!(warning.contains("Warning: received"));
@@ -138,10 +153,8 @@ fn read_daemon_messages_warns_after_empty_lines() {
 
 #[test]
 fn read_daemon_messages_fails_on_malformed_json() {
-    let mut cursor = Cursor::new(Vec::from("this is not json\n"));
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let error = read_daemon_messages(&mut cursor, &mut stdout, &mut stderr).unwrap_err();
+    let (error, _stdout, _stderr) = test_read_daemon_messages(Vec::from("this is not json\n"));
+    let error = error.unwrap_err();
     assert!(matches!(error, AppError::ParseMessage(_)));
 }
 
@@ -157,7 +170,7 @@ fn run_with_loader_reports_configuration_failures() {
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::new(&mut stdout, &mut stderr);
+    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
     let exit = run_with_loader(vec![OsString::from("weaver")], &mut io, &FailingLoader);
     assert_eq!(exit, ExitCode::FAILURE);
     let stderr_text = decode_utf8(stderr, "stderr").expect("decode stderr");
@@ -188,7 +201,7 @@ fn run_with_loader_filters_configuration_arguments() {
     let loader = RecordingLoader::new();
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::new(&mut stdout, &mut stderr);
+    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
     let exit = run_with_loader(
         vec![
             OsString::from("weaver"),
@@ -252,8 +265,17 @@ where
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let status = read_daemon_messages(&mut connection, &mut stdout, &mut stderr)
-        .unwrap_or_else(|error| panic!("read responses: {error}"));
+    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
+    let context = OutputContext::new("observe", "noop", Vec::new());
+    let status = read_daemon_messages(
+        &mut connection,
+        &mut io,
+        OutputSettings {
+            format: ResolvedOutputFormat::Json,
+            context: &context,
+        },
+    )
+    .unwrap_or_else(|error| panic!("read responses: {error}"));
     assert_eq!(status, 17);
 
     handle.join().expect("listener thread panicked");

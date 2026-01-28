@@ -1,11 +1,5 @@
 //! Behavioural tests for the process-based language server adapter.
 
-// rstest-bdd macros generate some non-snake-case identifiers
-#![expect(
-    non_snake_case,
-    reason = "rstest-bdd macros generate non-snake-case identifiers"
-)]
-
 use std::cell::RefCell;
 use std::error::Error;
 use std::path::PathBuf;

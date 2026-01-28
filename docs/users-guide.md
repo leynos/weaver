@@ -229,7 +229,21 @@ messages include a `stream` field (`stdout` or `stderr`) plus a `data` payload;
 exit messages contain a numeric `status`. The CLI writes each `data` payload to
 the matching host stream and terminates using the exit status provided by the
 final exit message. The `data` payload can be plain text (human-readable) or a
-JSON document (machine-readable). Example JSONL envelope:
+JSON document (machine-readable).
+
+The CLI accepts `--output` with `auto` (default), `human`, and `json` values.
+`auto` selects `human` when stdout is a TTY and `json` when output is
+redirected, so JSON pipelines remain stable. Place `--output` before the
+command domain and operation because arguments after the operation are passed
+directly to the daemon (for example,
+`weaver --output human observe get-definition ...`).
+
+When `--output human` is active, commands that return code locations or
+diagnostics render context blocks with file headers, line-numbered source
+context, and caret spans. If source content is unavailable, the CLI falls back
+to the path and range with an explanation of why context could not be shown.
+
+Example JSONL envelope:
 
 ```json
 {"kind":"stream","stream":"stdout","data":"definition: file:///path/main.rs:42:17\n"}
@@ -321,7 +335,11 @@ TypeScript. Unsupported extensions return an error.
 Human output:
 
 ```text
-definition: <URI>:<LINE>:<COL>
+<PATH>
+  --> <LINE>:<COL>
+   |
+<LINE> | <CODE>
+       | ^ definition
 ```
 
 JSON payload (written to stdout stream):
@@ -345,7 +363,11 @@ weaver observe find-references --uri <URI> --position <LINE:COL>
 Human output:
 
 ```text
-reference: <URI>:<LINE>:<COL>
+<PATH>
+  --> <LINE>:<COL>
+   |
+<LINE> | <CODE>
+       | ^ reference
 ```
 
 JSON payload:
@@ -435,7 +457,11 @@ weaver verify diagnostics --uri <URI>
 Human output:
 
 ```text
-diagnostic: <URI>:<LINE>:<COL> <MESSAGE>
+<PATH>
+  --> <LINE>:<COL>
+   |
+<LINE> | <CODE>
+       | ^ <MESSAGE>
 ```
 
 JSON payload:

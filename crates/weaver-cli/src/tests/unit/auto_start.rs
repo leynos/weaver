@@ -5,7 +5,7 @@
 
 use crate::lifecycle::LifecycleContext;
 use crate::tests::support::{decode_utf8, default_daemon_lines, respond_to_request};
-use crate::{CommandInvocation, IoStreams, execute_daemon_command};
+use crate::{CommandInvocation, IoStreams, ResolvedOutputFormat, execute_daemon_command};
 use rstest::rstest;
 use std::ffi::OsStr;
 use std::process::ExitCode;
@@ -62,9 +62,9 @@ fn auto_start_failure_paths(
     let invocation = make_invocation();
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::new(&mut stdout, &mut stderr);
+    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
 
-    let exit = execute_daemon_command(invocation, context, &mut io);
+    let exit = execute_daemon_command(invocation, context, &mut io, ResolvedOutputFormat::Json);
 
     assert_eq!(exit, ExitCode::FAILURE);
     let stderr_text = decode_utf8(stderr, "stderr").expect("stderr utf8");
@@ -145,9 +145,9 @@ fn auto_start_succeeds_and_proceeds() {
     let invocation = make_invocation();
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::new(&mut stdout, &mut stderr);
+    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
 
-    let exit = execute_daemon_command(invocation, context, &mut io);
+    let exit = execute_daemon_command(invocation, context, &mut io, ResolvedOutputFormat::Json);
 
     listener_handle.join().expect("listener thread");
     let stderr_text = decode_utf8(stderr, "stderr").expect("stderr utf8");
@@ -205,9 +205,9 @@ fn auto_start_times_out_when_daemon_slow() {
     let invocation = make_invocation();
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::new(&mut stdout, &mut stderr);
+    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
 
-    let exit = execute_daemon_command(invocation, context, &mut io);
+    let exit = execute_daemon_command(invocation, context, &mut io, ResolvedOutputFormat::Json);
 
     let stderr_text = decode_utf8(stderr, "stderr").expect("stderr utf8");
     assert_eq!(exit, ExitCode::FAILURE);

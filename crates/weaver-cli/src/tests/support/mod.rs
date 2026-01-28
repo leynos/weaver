@@ -10,11 +10,13 @@ mod lifecycle;
 use std::cell::RefCell;
 use std::ffi::OsString;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Component, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::{Context, Result, ensure};
 use rstest::fixture;
+use tempfile::TempDir;
+use url::Url;
 use weaver_config::{CapabilityDirective, CapabilityOverride, Config, SocketEndpoint};
 
 use crate::lifecycle::LifecycleError;
@@ -49,12 +51,20 @@ pub(super) struct TestWorld {
     pub config: Config,
     pub daemon: Option<FakeDaemon>,
     pub stdout: Vec<u8>,
+    /// Controls whether stdout is treated as a terminal for output selection.
+    pub stdout_is_terminal: bool,
     pub stderr: Vec<u8>,
     pub exit_code: Option<ExitCode>,
     pub requests: Vec<String>,
     pub lifecycle: TestLifecycle,
     /// Optional override for daemon binary path, used instead of env var mutation.
     pub daemon_binary: Option<OsString>,
+    /// Temporary directory holding the latest source fixture.
+    pub temp_dir: Option<TempDir>,
+    /// URI for the latest source fixture.
+    pub source_uri: Option<String>,
+    /// Filesystem path for the latest source fixture.
+    pub source_path: Option<PathBuf>,
 }
 
 impl TestWorld {
@@ -92,6 +102,57 @@ impl TestWorld {
         self.daemon_binary = Some(OsString::from("/nonexistent/weaverd"));
     }
 
+    /// Creates a source file fixture and stores its location metadata.
+    pub fn create_source_file(&mut self, filename: &str, content: &str) -> Result<()> {
+        let (temp_dir, path, uri) = Self::prepare_source_location(filename)?;
+        fs::write(&path, content)?;
+        self.store_source_location(temp_dir, path, uri);
+        Ok(())
+    }
+
+    /// Stores a missing source fixture so callers can reference its URI.
+    pub fn create_missing_source(&mut self, filename: &str) -> Result<()> {
+        let (temp_dir, path, uri) = Self::prepare_source_location(filename)?;
+        self.store_source_location(temp_dir, path, uri);
+        Ok(())
+    }
+
+    fn prepare_source_location(filename: &str) -> Result<(TempDir, PathBuf, String)> {
+        let candidate = PathBuf::from(filename);
+        ensure!(
+            !candidate.is_absolute(),
+            "source filename must be relative: {filename}"
+        );
+        ensure!(
+            !candidate
+                .components()
+                .any(|component| matches!(component, Component::ParentDir | Component::Prefix(_))),
+            "source filename must not traverse outside the temp dir: {filename}"
+        );
+        let temp_dir = tempfile::tempdir()?;
+        let path = temp_dir.path().join(candidate);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let uri = Url::from_file_path(&path)
+            .map_err(|_| anyhow::anyhow!("failed to convert path to URI"))?
+            .to_string();
+        Ok((temp_dir, path, uri))
+    }
+
+    fn store_source_location(&mut self, temp_dir: TempDir, path: PathBuf, uri: String) {
+        self.temp_dir = Some(temp_dir);
+        self.source_uri = Some(uri);
+        self.source_path = Some(path);
+    }
+
+    /// Returns the most recent source URI recorded for the test world.
+    pub fn source_uri(&self) -> Result<&str> {
+        self.source_uri
+            .as_deref()
+            .context("source URI missing from test world")
+    }
+
     pub fn run(&mut self, command: &str) -> Result<()> {
         self.stdout.clear();
         self.stderr.clear();
@@ -99,7 +160,7 @@ impl TestWorld {
         let args = Self::build_args(command);
         let loader = StaticConfigLoader::new(self.config.clone());
         let daemon_binary = self.daemon_binary.as_deref();
-        let mut io = IoStreams::new(&mut self.stdout, &mut self.stderr);
+        let mut io = IoStreams::new(&mut self.stdout, &mut self.stderr, self.stdout_is_terminal);
         let exit = run_with_daemon_binary(
             args,
             &mut io,
@@ -223,6 +284,22 @@ pub(super) fn default_daemon_lines() -> Vec<String> {
         "{\"kind\":\"stream\",\"stream\":\"stdout\",\"data\":\"daemon says hello\"}".to_string(),
         "{\"kind\":\"stream\",\"stream\":\"stderr\",\"data\":\"daemon complains\"}".to_string(),
         "{\"kind\":\"exit\",\"status\":17}".to_string(),
+    ]
+}
+
+/// Builds a stdout stream entry plus exit record for a custom payload.
+///
+/// This mirrors the structure of `default_daemon_lines` so sibling test helpers
+/// can emit deterministic stdout-only sequences with a trailing exit event.
+pub(super) fn daemon_lines_for_stdout(payload: &str) -> Vec<String> {
+    let stream = serde_json::json!({
+        "kind": "stream",
+        "stream": "stdout",
+        "data": payload,
+    });
+    vec![
+        serde_json::to_string(&stream).expect("serialize stream"),
+        "{\"kind\":\"exit\",\"status\":0}".to_string(),
     ]
 }
 

@@ -10,6 +10,61 @@ use crate::lifecycle::{LifecycleCommand, LifecycleError};
 use std::cell::RefCell;
 
 use rstest_bdd_macros::{given, scenario, then, when};
+use serde_json::json;
+
+const SAMPLE_RUST_SOURCE: &str = "fn main() {\n    let value = 1;\n    value\n}\n";
+
+fn run_command_with_source_uri(
+    world: &RefCell<TestWorld>,
+    command_template: &str,
+    error_msg: &str,
+) {
+    let uri = world
+        .borrow()
+        .source_uri()
+        .expect("source uri missing")
+        .to_owned();
+    let command = command_template.replace("{uri}", &uri);
+    world.borrow_mut().run(&command).expect(error_msg);
+}
+
+fn assert_output_contains<F>(
+    world: &RefCell<TestWorld>,
+    output_getter: F,
+    snippet: String,
+    output_name: &str,
+) where
+    F: FnOnce(&TestWorld) -> anyhow::Result<String>,
+{
+    let world = world.borrow();
+    let text = output_getter(&world).unwrap_or_else(|_| panic!("{output_name} text missing"));
+    let snippet = snippet.trim_matches('"');
+    assert!(
+        text.contains(snippet),
+        "{output_name} {:?} did not contain {:?}",
+        text,
+        snippet
+    );
+}
+
+fn assert_output_does_not_contain<F>(
+    world: &RefCell<TestWorld>,
+    output_getter: F,
+    snippet: String,
+    output_name: &str,
+) where
+    F: FnOnce(&TestWorld) -> anyhow::Result<String>,
+{
+    let world = world.borrow();
+    let text = output_getter(&world).unwrap_or_else(|_| panic!("{output_name} text missing"));
+    let snippet = snippet.trim_matches('"');
+    assert!(
+        !text.contains(snippet),
+        "{output_name} {:?} unexpectedly contained {:?}",
+        text,
+        snippet
+    );
+}
 
 #[given("a running fake daemon")]
 fn given_running_daemon(world: &RefCell<TestWorld>) {
@@ -77,12 +132,92 @@ fn given_auto_start_triggered(world: &RefCell<TestWorld>) {
     world.borrow_mut().configure_auto_start_failure();
 }
 
+#[given("a source file named {filename}")]
+fn given_source_file(world: &RefCell<TestWorld>, filename: String) {
+    let filename = filename.trim_matches('"');
+    world
+        .borrow_mut()
+        .create_source_file(filename, SAMPLE_RUST_SOURCE)
+        .expect("failed to create source file");
+}
+
+#[given("a missing source file named {filename}")]
+fn given_missing_source_file(world: &RefCell<TestWorld>, filename: String) {
+    let filename = filename.trim_matches('"');
+    world
+        .borrow_mut()
+        .create_missing_source(filename)
+        .expect("failed to prepare missing source");
+}
+
+#[given("a running fake daemon emitting definition output")]
+fn given_daemon_definition_output(world: &RefCell<TestWorld>) {
+    let uri = world
+        .borrow()
+        .source_uri()
+        .expect("source uri missing")
+        .to_owned();
+    let payload = serde_json::to_string(&vec![json!({
+        "uri": uri,
+        "line": 2,
+        "column": 5
+    })])
+    .expect("serialize definition payload");
+    let lines = daemon_lines_for_stdout(&payload);
+    world
+        .borrow_mut()
+        .start_daemon_with_lines(lines)
+        .expect("failed to start daemon");
+}
+
+#[given("a running fake daemon emitting diagnostics output")]
+fn given_daemon_diagnostics_output(world: &RefCell<TestWorld>) {
+    let payload = serde_json::to_string(&json!({
+        "diagnostics": [
+            { "line": 2, "column": 5, "message": "boom" }
+        ]
+    }))
+    .expect("serialize diagnostics payload");
+    let lines = daemon_lines_for_stdout(&payload);
+    world
+        .borrow_mut()
+        .start_daemon_with_lines(lines)
+        .expect("failed to start daemon");
+}
+
 #[when("the operator runs {command}")]
 fn when_operator_runs(world: &RefCell<TestWorld>, command: String) {
     world
         .borrow_mut()
         .run(&command)
         .expect("failed to run CLI command");
+}
+
+#[when("the operator runs the definition command")]
+fn when_operator_runs_definition(world: &RefCell<TestWorld>) {
+    run_command_with_source_uri(
+        world,
+        "--output human observe get-definition --uri {uri} --position 2:5",
+        "failed to run definition command",
+    );
+}
+
+#[when("the operator runs the diagnostics command")]
+fn when_operator_runs_diagnostics(world: &RefCell<TestWorld>) {
+    run_command_with_source_uri(
+        world,
+        "--output human verify diagnostics --uri {uri}",
+        "failed to run diagnostics command",
+    );
+}
+
+#[when("the operator runs the json definition command")]
+fn when_operator_runs_json_definition(world: &RefCell<TestWorld>) {
+    run_command_with_source_uri(
+        world,
+        "--output json observe get-definition --uri {uri} --position 2:5",
+        "failed to run json definition command",
+    );
 }
 
 #[then("the daemon receives {fixture}")]
@@ -131,15 +266,17 @@ fn then_stderr_is(world: &RefCell<TestWorld>, expected: String) {
 
 #[then("stderr contains {snippet}")]
 fn then_stderr_contains(world: &RefCell<TestWorld>, snippet: String) {
-    let world = world.borrow();
-    let stderr = world.stderr_text().expect("stderr text missing");
-    let snippet = snippet.trim_matches('"');
-    assert!(
-        stderr.contains(snippet),
-        "stderr {:?} did not contain {:?}",
-        stderr,
-        snippet
-    );
+    assert_output_contains(world, |world| world.stderr_text(), snippet, "stderr");
+}
+
+#[then("stdout contains {snippet}")]
+fn then_stdout_contains(world: &RefCell<TestWorld>, snippet: String) {
+    assert_output_contains(world, |world| world.stdout_text(), snippet, "stdout");
+}
+
+#[then("stdout does not contain {snippet}")]
+fn then_stdout_does_not_contain(world: &RefCell<TestWorld>, snippet: String) {
+    assert_output_does_not_contain(world, |world| world.stdout_text(), snippet, "stdout");
 }
 
 #[then("the CLI exits with code {status}")]
@@ -168,6 +305,11 @@ fn then_capabilities(world: &RefCell<TestWorld>, fixture: String) {
 
 #[scenario(path = "tests/features/weaver_cli.feature")]
 fn weaver_cli_behaviour(world: RefCell<TestWorld>) {
+    let _ = world;
+}
+
+#[scenario(path = "tests/features/weaver_cli_output.feature")]
+fn weaver_cli_output_behaviour(world: RefCell<TestWorld>) {
     let _ = world;
 }
 
