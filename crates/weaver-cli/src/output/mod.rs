@@ -8,8 +8,7 @@ mod models;
 mod render;
 mod source;
 
-use clap::ValueEnum;
-
+pub use crate::cli::OutputFormat;
 use crate::output::models::{
     DefinitionLocation, DiagnosticItem, DiagnosticsResponse, ReferenceResponse,
     VerificationFailure, parse_definitions, parse_verification_failures,
@@ -17,17 +16,6 @@ use crate::output::models::{
 use crate::output::source::{
     SourceLocation, SourcePosition, extract_uri_argument, from_path_or_uri, from_uri,
 };
-
-/// Output format selection for domain command responses.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
-pub enum OutputFormat {
-    /// Selects `human` for terminal output and `json` for redirected output.
-    Auto,
-    /// Always render human-readable output.
-    Human,
-    /// Always emit raw JSON payloads from the daemon.
-    Json,
-}
 
 /// Output format after resolving `auto` based on TTY detection.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

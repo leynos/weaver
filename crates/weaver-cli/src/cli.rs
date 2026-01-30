@@ -3,9 +3,19 @@
 //! This module defines the command-line interface structure used by
 //! both the runtime parser and the build script for manpage generation.
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
-use crate::output::OutputFormat;
+/// Output format selection for domain command responses.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+pub enum OutputFormat {
+    /// Selects `human` for terminal output and `json` for redirected output.
+    #[default]
+    Auto,
+    /// Always render human-readable output.
+    Human,
+    /// Always emit raw JSON payloads from the daemon.
+    Json,
+}
 
 /// Command-line interface for the Weaver semantic code tool.
 #[derive(Parser, Debug)]

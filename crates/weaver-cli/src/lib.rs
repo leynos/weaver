@@ -5,6 +5,7 @@
 //! to be exercised both from the binary entrypoint and from tests where
 //! configuration loading and IO streams can be substituted.
 
+use clap::Parser;
 use std::ffi::{OsStr, OsString};
 use std::io::Write;
 use std::process::ExitCode;
@@ -23,6 +24,7 @@ mod transport;
 pub(crate) use cli::DaemonAction;
 use cli::{Cli, CliCommand};
 
+pub use cli::OutputFormat;
 #[cfg(test)]
 pub(crate) use command::CommandDescriptor;
 pub(crate) use command::{CommandInvocation, CommandRequest};
@@ -34,7 +36,7 @@ use lifecycle::{
     LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput, SystemLifecycle,
     try_auto_start_daemon,
 };
-pub use output::{OutputContext, OutputFormat, ResolvedOutputFormat, render_human_output};
+pub use output::{OutputContext, ResolvedOutputFormat, render_human_output};
 use runtime_utils::emit_capabilities;
 pub(crate) use runtime_utils::exit_code_from_status;
 use transport::connect;
