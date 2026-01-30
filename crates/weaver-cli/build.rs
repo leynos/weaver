@@ -41,10 +41,28 @@ fn manual_date() -> String {
     })
 }
 
+/// Derive the workspace target directory from OUT_DIR.
+///
+/// OUT_DIR has the structure: `{workspace_root}/target/{profile}/build/{crate}-{hash}/out`
+/// We navigate up to find the `target` directory, which is the workspace target root.
+fn workspace_target_dir() -> Option<PathBuf> {
+    let out_dir = PathBuf::from(env::var_os("OUT_DIR")?);
+    // out -> {crate}-{hash} -> build -> {profile} -> target
+    out_dir
+        .parent()?
+        .parent()?
+        .parent()?
+        .parent()
+        .map(PathBuf::from)
+}
+
 fn out_dir_for_target_profile() -> PathBuf {
     let target = env::var("TARGET").unwrap_or_else(|_| "unknown-target".into());
     let profile = env::var("PROFILE").unwrap_or_else(|_| "unknown-profile".into());
-    PathBuf::from(format!("target/generated-man/{target}/{profile}"))
+
+    // Use workspace target directory if available, otherwise fall back to relative path
+    let base = workspace_target_dir().unwrap_or_else(|| PathBuf::from("target"));
+    base.join(format!("generated-man/{target}/{profile}"))
 }
 
 fn write_man_page(data: &[u8], dir: &std::path::Path, page_name: &str) -> std::io::Result<PathBuf> {

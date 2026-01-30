@@ -35,16 +35,28 @@ fn manual_date() -> String {
     })
 }
 
-fn is_cross_compiling() -> bool {
-    let target = env::var("TARGET").ok();
-    let host = env::var("HOST").ok();
-    target.is_some() && host.is_some() && target != host
+/// Derive the workspace target directory from OUT_DIR.
+///
+/// OUT_DIR has the structure: `{workspace_root}/target/{profile}/build/{crate}-{hash}/out`
+/// We navigate up to find the `target` directory, which is the workspace target root.
+fn workspace_target_dir() -> Option<PathBuf> {
+    let out_dir = PathBuf::from(env::var_os("OUT_DIR")?);
+    // out -> {crate}-{hash} -> build -> {profile} -> target
+    out_dir
+        .parent()?
+        .parent()?
+        .parent()?
+        .parent()
+        .map(PathBuf::from)
 }
 
 fn out_dir_for_target_profile() -> PathBuf {
     let target = env::var("TARGET").unwrap_or_else(|_| "unknown-target".into());
     let profile = env::var("PROFILE").unwrap_or_else(|_| "unknown-profile".into());
-    PathBuf::from(format!("target/generated-man/{target}/{profile}"))
+
+    // Use workspace target directory if available, otherwise fall back to relative path
+    let base = workspace_target_dir().unwrap_or_else(|| PathBuf::from("target"));
+    base.join(format!("generated-man/{target}/{profile}"))
 }
 
 fn write_man_page(data: &[u8], dir: &std::path::Path, page_name: &str) -> io::Result<PathBuf> {
@@ -65,7 +77,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-env-changed=CARGO_BIN_NAME");
     println!("cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH");
     println!("cargo:rerun-if-env-changed=TARGET");
-    println!("cargo:rerun-if-env-changed=HOST");
     println!("cargo:rerun-if-env-changed=PROFILE");
 
     let binary_name = env::var("CARGO_BIN_NAME")
@@ -89,20 +100,21 @@ coordinates language tooling.\n"
     );
     let page_name = format!("{binary_name}.1");
 
-    if let Some(extra_dir) = env::var_os("OUT_DIR") {
-        write_man_page(man_page.as_bytes(), &PathBuf::from(extra_dir), &page_name)?;
-    }
-
-    if is_cross_compiling() {
-        println!(
-            "cargo:warning=Skipping target man page staging during cross-compilation; \
-             relying on OUT_DIR instead"
-        );
-        return Ok(());
-    }
-
+    // Packagers expect man pages under target/generated-man/<target>/<profile>.
+    // Man page generation is pure file output, so it works during cross-compilation.
     let out_dir = out_dir_for_target_profile();
     write_man_page(man_page.as_bytes(), &out_dir, &page_name)?;
+
+    // Also write to OUT_DIR if available for build script consumers.
+    if let Some(extra_dir) = env::var_os("OUT_DIR") {
+        let extra_dir_path = PathBuf::from(extra_dir);
+        if let Err(err) = write_man_page(man_page.as_bytes(), &extra_dir_path, &page_name) {
+            println!(
+                "cargo:warning=Failed to stage manual page in OUT_DIR ({}): {err}",
+                extra_dir_path.display()
+            );
+        }
+    }
 
     Ok(())
 }
