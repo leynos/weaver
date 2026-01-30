@@ -47,12 +47,6 @@ fn out_dir_for_target_profile() -> PathBuf {
     PathBuf::from(format!("target/generated-man/{target}/{profile}"))
 }
 
-fn is_cross_compiling() -> bool {
-    let target = env::var("TARGET").ok();
-    let host = env::var("HOST").ok();
-    target.is_some() && host.is_some() && target != host
-}
-
 fn write_man_page(data: &[u8], dir: &std::path::Path, page_name: &str) -> std::io::Result<PathBuf> {
     fs::create_dir_all(dir)?;
     let destination = dir.join(page_name);
@@ -75,7 +69,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-env-changed=CARGO_PKG_AUTHORS");
     println!("cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH");
     println!("cargo:rerun-if-env-changed=TARGET");
-    println!("cargo:rerun-if-env-changed=HOST");
     println!("cargo:rerun-if-env-changed=PROFILE");
 
     // The top-level page documents the entire command interface.
@@ -99,15 +92,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let page_name = format!("{binary_name}.1");
 
     // Packagers expect man pages under target/generated-man/<target>/<profile>.
-    if is_cross_compiling() {
-        println!(
-            "cargo:warning=Skipping target man page staging during cross-compilation; \
-             relying on OUT_DIR instead"
-        );
-    } else {
-        let out_dir = out_dir_for_target_profile();
-        write_man_page(&buf, &out_dir, &page_name)?;
-    }
+    // Man page generation is pure file output, so it works during cross-compilation.
+    let out_dir = out_dir_for_target_profile();
+    write_man_page(&buf, &out_dir, &page_name)?;
 
     // Also write to OUT_DIR if available for build script consumers.
     if let Some(extra_dir) = env::var_os("OUT_DIR") {
