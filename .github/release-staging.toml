@@ -1,4 +1,5 @@
 [common]
+bin_name = "${BIN_NAME}"
 dist_dir = "dist"
 checksum_algorithm = "sha256"
 staging_dir_template = "{bin_name}_{platform}_{arch}"
