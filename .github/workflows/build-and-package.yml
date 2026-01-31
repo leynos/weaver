@@ -28,10 +28,6 @@ name: Build and Package
         description: Whether workflow artefacts should be uploaded
         required: true
         type: boolean
-      package-arch:
-        description: Linux package architecture identifier (e.g. amd64)
-        required: false
-        type: string
       artifact-suffix:
         description: Suffix appended to macOS package filenames
         required: false
@@ -106,6 +102,7 @@ jobs:
           homepage: ${{ env.HOMEPAGE }}
           description: ${{ env.DESCRIPTION }} - daemon
           license: ISC
+          man-paths: target/generated-man/${{ inputs.target }}/release/weaverd.1
           outdir: dist
 
       - name: Prune packaging metadata
@@ -114,13 +111,34 @@ jobs:
         run: rm -rf dist/.man dist/nfpm.yaml
 
       # macOS packaging
+      - name: Resolve macOS staging target
+        if: inputs.platform == 'macos'
+        id: macos-target
+        shell: bash
+        env:
+          ARTIFACT_SUFFIX: ${{ inputs.artifact-suffix }}
+        run: |
+          set -euo pipefail
+          case "$ARTIFACT_SUFFIX" in
+            macos-arm64)
+              echo "target=macos-aarch64" >>"$GITHUB_OUTPUT"
+              ;;
+            macos-x86_64)
+              echo "target=macos-x86_64" >>"$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unsupported artifact suffix: $ARTIFACT_SUFFIX" >&2
+              exit 1
+              ;;
+          esac
+
       - name: Stage weaver-cli artefacts for macOS
         if: inputs.platform == 'macos'
         id: stage-weaver-cli
         uses: leynos/shared-actions/.github/actions/stage-release-artefacts@98246364002def859ab550fe01ab3bca55dcfd61
         with:
           config-file: .github/release-staging.toml
-          target: macos-${{ inputs.artifact-suffix == 'macos-arm64' && 'aarch64' || 'x86_64' }}
+          target: ${{ steps.macos-target.outputs.target }}
 
       - name: Build weaver-cli macOS installer package
         if: inputs.platform == 'macos'
@@ -152,7 +170,7 @@ jobs:
         uses: leynos/shared-actions/.github/actions/stage-release-artefacts@98246364002def859ab550fe01ab3bca55dcfd61
         with:
           config-file: .github/release-staging-weaverd.toml
-          target: macos-${{ inputs.artifact-suffix == 'macos-arm64' && 'aarch64' || 'x86_64' }}
+          target: ${{ steps.macos-target.outputs.target }}
 
       - name: Build weaverd macOS installer package
         if: inputs.platform == 'macos'
@@ -195,24 +213,12 @@ jobs:
           done
 
       # Upload artefacts
-      - name: Upload Linux artefacts
-        if: inputs.platform == 'linux' && inputs.should-upload-workflow-artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        # v4
-        with:
-          name: ${{ inputs.artifact-name }}
-          path: dist
-
-      - name: Upload macOS artefacts
-        if: inputs.platform == 'macos' && inputs.should-upload-workflow-artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        # v4
-        with:
-          name: ${{ inputs.artifact-name }}
-          path: dist
-
-      - name: Upload FreeBSD artefacts
-        if: inputs.platform == 'freebsd' && inputs.should-upload-workflow-artifacts
+      - name: Upload artefacts
+        if: >-
+          inputs.should-upload-workflow-artifacts &&
+          (inputs.platform == 'linux' ||
+          inputs.platform == 'macos' ||
+          inputs.platform == 'freebsd')
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         # v4
         with:

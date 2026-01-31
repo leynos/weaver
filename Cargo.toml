@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/weaver-build-util",
     "crates/weaver-cli",
     "crates/weaver-config",
     "crates/weaver-e2e",

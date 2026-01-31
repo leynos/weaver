@@ -75,10 +75,8 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             artifact: linux-amd64
-            package_arch: amd64
           - target: aarch64-unknown-linux-gnu
             artifact: linux-arm64
-            package_arch: arm64
     uses: ./.github/workflows/build-and-package.yml
     with:
       platform: linux
@@ -87,7 +85,6 @@ jobs:
       version: ${{ needs.metadata.outputs.version }}
       artifact-name: ${{ needs.metadata.outputs.repo_name }}-${{ matrix.artifact }}
       should-upload-workflow-artifacts: ${{ fromJSON(needs.metadata.outputs.should_upload_workflow_artifacts) }}
-      package-arch: ${{ matrix.package_arch }}
 
   build-macos:
     needs: metadata
@@ -160,7 +157,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Check asset upload errors
         if: steps.upload_assets.outputs.upload-error == 'true'
+        env:
+          ERROR_MESSAGE: ${{ steps.upload_assets.outputs.error-message }}
         run: |
           echo "Error uploading release assets:"
-          printf '%s\n' "${{ steps.upload_assets.outputs.error-message }}"
+          printf '%s\n' "$ERROR_MESSAGE"
           exit 1

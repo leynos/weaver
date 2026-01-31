@@ -2531,6 +2531,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "weaver-build-util"
+version = "0.1.0"
+dependencies = [
+ "time",
+]
+
+[[package]]
 name = "weaver-cli"
 version = "0.1.0"
 dependencies = [
@@ -2550,9 +2557,9 @@ dependencies = [
  "socket2",
  "tempfile",
  "thiserror 2.0.18",
- "time",
  "unicode-width",
  "url",
+ "weaver-build-util",
  "weaver-config",
 ]
 
@@ -2675,9 +2682,9 @@ dependencies = [
  "signal-hook",
  "tempfile",
  "thiserror 2.0.18",
- "time",
  "tracing",
  "tracing-subscriber",
+ "weaver-build-util",
  "weaver-config",
  "weaver-lsp-host",
  "weaver-syntax",

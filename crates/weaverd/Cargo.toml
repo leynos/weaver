@@ -28,4 +28,4 @@ rstest-bdd.workspace = true
 rstest-bdd-macros.workspace = true
 
 [build-dependencies]
-time = { version = "0.3", features = ["formatting"] }
+weaver-build-util = { path = "../weaver-build-util" }

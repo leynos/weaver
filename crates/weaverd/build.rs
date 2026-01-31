@@ -1,81 +1,7 @@
 //! Build script: generate a minimal weaverd man page for packaging.
 
-use std::{env, fs, io, path::PathBuf};
-use time::{OffsetDateTime, format_description::well_known::Iso8601};
-
-const FALLBACK_DATE: &str = "1970-01-01";
-
-fn manual_date() -> String {
-    let Ok(raw) = env::var("SOURCE_DATE_EPOCH") else {
-        return FALLBACK_DATE.into();
-    };
-
-    let Ok(ts) = raw.parse::<i64>() else {
-        println!(
-            "cargo:warning=Invalid SOURCE_DATE_EPOCH '{raw}'; expected integer seconds since \
-             Unix epoch; falling back to {FALLBACK_DATE}"
-        );
-        return FALLBACK_DATE.into();
-    };
-
-    let Ok(dt) = OffsetDateTime::from_unix_timestamp(ts) else {
-        println!(
-            "cargo:warning=Invalid SOURCE_DATE_EPOCH '{raw}'; not a valid Unix timestamp; \
-             falling back to {FALLBACK_DATE}"
-        );
-        return FALLBACK_DATE.into();
-    };
-
-    dt.format(&Iso8601::DATE).unwrap_or_else(|_| {
-        println!(
-            "cargo:warning=Invalid SOURCE_DATE_EPOCH '{raw}'; formatting failed; falling back \
-             to {FALLBACK_DATE}"
-        );
-        FALLBACK_DATE.into()
-    })
-}
-
-/// Derive the workspace target directory from OUT_DIR.
-///
-/// OUT_DIR structure varies based on build type:
-/// - Native:      `{workspace}/target/{profile}/build/{crate}-{hash}/out`
-/// - Cross-build: `{workspace}/target/{target}/{profile}/build/{crate}-{hash}/out`
-///
-/// We find the `target` directory by searching up the path for a component named "target".
-fn workspace_target_dir() -> Option<PathBuf> {
-    let out_dir = PathBuf::from(env::var_os("OUT_DIR")?);
-
-    // Walk up the path until we find a directory named "target"
-    let mut current = out_dir.as_path();
-    while let Some(parent) = current.parent() {
-        if current.file_name().and_then(|n| n.to_str()) == Some("target") {
-            return Some(current.to_path_buf());
-        }
-        current = parent;
-    }
-    None
-}
-
-fn out_dir_for_target_profile() -> PathBuf {
-    let target = env::var("TARGET").unwrap_or_else(|_| "unknown-target".into());
-    let profile = env::var("PROFILE").unwrap_or_else(|_| "unknown-profile".into());
-
-    // Use workspace target directory if available, otherwise fall back to relative path
-    let base = workspace_target_dir().unwrap_or_else(|| PathBuf::from("target"));
-    base.join(format!("generated-man/{target}/{profile}"))
-}
-
-fn write_man_page(data: &[u8], dir: &std::path::Path, page_name: &str) -> io::Result<PathBuf> {
-    fs::create_dir_all(dir)?;
-    let destination = dir.join(page_name);
-    let tmp = dir.join(format!("{page_name}.tmp"));
-    fs::write(&tmp, data)?;
-    if destination.exists() {
-        fs::remove_file(&destination)?;
-    }
-    fs::rename(&tmp, &destination)?;
-    Ok(destination)
-}
+use std::{env, path::PathBuf};
+use weaver_build_util::{manual_date, out_dir_for_target_profile, write_man_page};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-env-changed=CARGO_PKG_VERSION");
@@ -92,8 +18,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         |_| "CARGO_PKG_VERSION must be set by Cargo; cannot render manual page without it.",
     )?;
 
+    let mut warnings = Vec::new();
+    let date = manual_date(&mut warnings);
+    for warning in warnings {
+        println!("cargo:warning={warning}");
+    }
+
     let title = binary_name.to_uppercase();
-    let date = manual_date();
     let man_page = format!(
         ".TH \"{title}\" \"1\" \"{date}\" \"{binary_name} {version}\" \"Weaver Daemon\"\n\
 .SH NAME\n\
