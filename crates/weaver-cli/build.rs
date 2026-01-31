@@ -43,17 +43,23 @@ fn manual_date() -> String {
 
 /// Derive the workspace target directory from OUT_DIR.
 ///
-/// OUT_DIR has the structure: `{workspace_root}/target/{profile}/build/{crate}-{hash}/out`
-/// We navigate up to find the `target` directory, which is the workspace target root.
+/// OUT_DIR structure varies based on build type:
+/// - Native:      `{workspace}/target/{profile}/build/{crate}-{hash}/out`
+/// - Cross-build: `{workspace}/target/{target}/{profile}/build/{crate}-{hash}/out`
+///
+/// We find the `target` directory by searching up the path for a component named "target".
 fn workspace_target_dir() -> Option<PathBuf> {
     let out_dir = PathBuf::from(env::var_os("OUT_DIR")?);
-    // out -> {crate}-{hash} -> build -> {profile} -> target
-    out_dir
-        .parent()?
-        .parent()?
-        .parent()?
-        .parent()
-        .map(PathBuf::from)
+
+    // Walk up the path until we find a directory named "target"
+    let mut current = out_dir.as_path();
+    while let Some(parent) = current.parent() {
+        if current.file_name().and_then(|n| n.to_str()) == Some("target") {
+            return Some(current.to_path_buf());
+        }
+        current = parent;
+    }
+    None
 }
 
 fn out_dir_for_target_profile() -> PathBuf {
