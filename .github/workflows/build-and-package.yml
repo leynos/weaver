@@ -121,8 +121,6 @@ jobs:
         with:
           config-file: .github/release-staging.toml
           target: macos-${{ inputs.artifact-suffix == 'macos-arm64' && 'aarch64' || 'x86_64' }}
-        env:
-          BIN_NAME: weaver
 
       - name: Build weaver-cli macOS installer package
         if: inputs.platform == 'macos'
@@ -153,10 +151,8 @@ jobs:
         id: stage-weaverd
         uses: leynos/shared-actions/.github/actions/stage-release-artefacts@98246364002def859ab550fe01ab3bca55dcfd61
         with:
-          config-file: .github/release-staging.toml
+          config-file: .github/release-staging-weaverd.toml
           target: macos-${{ inputs.artifact-suffix == 'macos-arm64' && 'aarch64' || 'x86_64' }}
-        env:
-          BIN_NAME: weaverd
 
       - name: Build weaverd macOS installer package
         if: inputs.platform == 'macos'

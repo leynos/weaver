@@ -1,5 +1,5 @@
 [common]
-bin_name = "weaver"
+bin_name = "weaverd"
 dist_dir = "dist"
 checksum_algorithm = "sha256"
 staging_dir_template = "{bin_name}_{platform}_{arch}"
