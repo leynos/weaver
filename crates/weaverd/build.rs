@@ -26,14 +26,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let title = binary_name.to_uppercase();
     let man_page = format!(
-        ".TH \"{title}\" \"1\" \"{date}\" \"{binary_name} {version}\" \"Weaver Daemon\"\n\
-.SH NAME\n\
-{binary_name} \\- Weaver daemon\n\
-.SH SYNOPSIS\n\
-.B {binary_name}\n\
-.SH DESCRIPTION\n\
-Weaverd runs the Weaver background service that accepts JSONL commands and\n\
-coordinates language tooling.\n"
+        concat!(
+            ".TH \"{title}\" \"1\" \"{date}\" \"{binary_name} {version}\" \"Weaver Daemon\"\n",
+            ".SH NAME\n",
+            "{binary_name} \\- Weaver daemon\n",
+            ".SH SYNOPSIS\n",
+            ".B {binary_name}\n",
+            ".SH DESCRIPTION\n",
+            "Weaverd runs the Weaver background service that accepts JSONL commands and\n",
+            "coordinates language tooling.\n",
+        ),
+        title = title,
+        date = date,
+        binary_name = binary_name,
+        version = version
     );
     let page_name = format!("{binary_name}.1");
 
