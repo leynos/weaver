@@ -52,14 +52,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write_man_page(man_page.as_bytes(), &out_dir, &page_name)?;
 
     // Also write to OUT_DIR if available for build script consumers.
-    if let Some(extra_dir) = env::var_os("OUT_DIR") {
-        let extra_dir_path = PathBuf::from(extra_dir);
-        if let Err(err) = write_man_page(man_page.as_bytes(), &extra_dir_path, &page_name) {
-            println!(
-                "cargo:warning=Failed to stage manual page in OUT_DIR ({}): {err}",
-                extra_dir_path.display()
-            );
-        }
+    if let Some(ref extra_dir_path) = out_dir_env
+        && let Err(err) = write_man_page(man_page.as_bytes(), extra_dir_path, &page_name)
+    {
+        println!(
+            "cargo:warning=Failed to stage manual page in OUT_DIR ({}): {err}",
+            extra_dir_path.display()
+        );
     }
 
     Ok(())
