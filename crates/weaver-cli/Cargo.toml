@@ -22,6 +22,11 @@ unicode-width = { workspace = true }
 socket2 = { version = "0.5" }
 libc = "0.2"
 
+[build-dependencies]
+clap = { workspace = true }
+clap_mangen = "0.2"
+weaver-build-util = { path = "../weaver-build-util" }
+
 [dev-dependencies]
 anyhow = { workspace = true }
 rstest = { workspace = true }

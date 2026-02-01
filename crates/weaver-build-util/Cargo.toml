@@ -1,0 +1,10 @@
+[package]
+name = "weaver-build-util"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+time = { version = "0.3", features = ["formatting"] }
+
+[lints]
+workspace = true
