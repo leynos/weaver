@@ -3,7 +3,7 @@
 //! Owns parsing daemon messages and forwarding rendered output to the CLI
 //! streams.
 
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 
 use serde::Deserialize;
 
@@ -17,13 +17,14 @@ pub(crate) struct OutputSettings<'a> {
     pub(crate) context: &'a OutputContext,
 }
 
-pub(crate) fn read_daemon_messages<R, W, E>(
+pub(crate) fn read_daemon_messages<R, W, E, S>(
     connection: &mut R,
-    io: &mut IoStreams<'_, W, E>,
+    io: &mut IoStreams<'_, S, W, E>,
     settings: OutputSettings<'_>,
 ) -> Result<i32, AppError>
 where
     R: io::Read,
+    S: Read,
     W: Write,
     E: Write,
 {

@@ -7,7 +7,9 @@ use std::path::PathBuf;
 use rstest::rstest;
 use tempfile::TempDir;
 
-use super::{EditTransaction, SafetyHarnessError, TransactionOutcome};
+use super::{
+    ContentChange, ContentTransaction, EditTransaction, SafetyHarnessError, TransactionOutcome,
+};
 use crate::safety_harness::edit::{FileEdit, Position, TextEdit};
 use crate::safety_harness::error::VerificationFailure;
 use crate::safety_harness::verification::{
@@ -190,6 +192,46 @@ fn successful_transaction_commits_changes() {
 
     let content = fs::read_to_string(&paths[0]).expect("read file");
     assert_eq!(content, "greetings world");
+}
+
+#[test]
+fn content_transaction_commits_writes_and_deletes() {
+    let dir = TempDir::new().expect("temp dir");
+    let keep_path = temp_file(&dir, "keep.txt", "hello");
+    let delete_path = temp_file(&dir, "delete.txt", "goodbye");
+
+    let syntactic = ConfigurableSyntacticLock::passing();
+    let semantic = ConfigurableSemanticLock::passing();
+
+    let mut transaction = ContentTransaction::new(&syntactic, &semantic);
+    transaction.add_change(ContentChange::write(
+        keep_path.clone(),
+        String::from("hello world"),
+    ));
+    transaction.add_change(ContentChange::delete(delete_path.clone()));
+
+    let outcome = transaction.execute().expect("transaction should succeed");
+    assert!(matches!(outcome, TransactionOutcome::Committed { .. }));
+    assert_eq!(
+        fs::read_to_string(&keep_path).expect("read keep file"),
+        "hello world"
+    );
+    assert!(!delete_path.exists(), "delete file should be removed");
+}
+
+#[test]
+fn content_transaction_rejects_missing_delete() {
+    let dir = TempDir::new().expect("temp dir");
+    let missing = dir.path().join("missing.txt");
+
+    let syntactic = ConfigurableSyntacticLock::passing();
+    let semantic = ConfigurableSemanticLock::passing();
+
+    let mut transaction = ContentTransaction::new(&syntactic, &semantic);
+    transaction.add_change(ContentChange::delete(missing.clone()));
+
+    let error = transaction.execute().expect_err("should error");
+    assert!(matches!(error, SafetyHarnessError::FileReadError { .. }));
 }
 
 /// Lock failure type for parameterised testing.

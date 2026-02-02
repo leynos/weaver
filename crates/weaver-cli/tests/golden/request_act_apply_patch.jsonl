@@ -1,0 +1,1 @@
+{"command":{"domain":"act","operation":"apply-patch"},"arguments":[],"patch":"diff --git a/src/main.rs b/src/main.rs\n<<<<<<< SEARCH\nfn main() {\n    println!(\"Old Message\");\n}\n=======\nfn main() {\n    println!(\"New Message\");\n}\n>>>>>>> REPLACE\n"}

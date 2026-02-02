@@ -57,6 +57,120 @@ impl TransactionOutcome {
     }
 }
 
+/// Full-content change to be applied through the safety harness.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ContentChange {
+    /// Write the full content to the target path (create or replace).
+    Write { path: PathBuf, content: String },
+    /// Delete the target path.
+    Delete { path: PathBuf },
+}
+
+impl ContentChange {
+    /// Creates a write change.
+    #[must_use]
+    pub fn write(path: PathBuf, content: String) -> Self {
+        Self::Write { path, content }
+    }
+
+    /// Creates a delete change.
+    #[must_use]
+    pub fn delete(path: PathBuf) -> Self {
+        Self::Delete { path }
+    }
+
+    /// Path targeted by this change.
+    #[must_use]
+    pub fn path(&self) -> &PathBuf {
+        match self {
+            Self::Write { path, .. } | Self::Delete { path } => path,
+        }
+    }
+}
+
+/// Builder for applying full-content changes through the Double-Lock harness.
+pub struct ContentTransaction<'a> {
+    changes: Vec<ContentChange>,
+    syntactic_lock: &'a dyn SyntacticLock,
+    semantic_lock: &'a dyn SemanticLock,
+}
+
+impl<'a> ContentTransaction<'a> {
+    /// Creates a new content transaction with the specified locks.
+    #[must_use]
+    pub fn new(syntactic_lock: &'a dyn SyntacticLock, semantic_lock: &'a dyn SemanticLock) -> Self {
+        Self {
+            changes: Vec::new(),
+            syntactic_lock,
+            semantic_lock,
+        }
+    }
+
+    /// Adds a content change to the transaction.
+    pub fn add_change(&mut self, change: ContentChange) {
+        self.changes.push(change);
+    }
+
+    /// Adds multiple content changes to the transaction.
+    pub fn add_changes(&mut self, changes: impl IntoIterator<Item = ContentChange>) {
+        for change in changes {
+            self.add_change(change);
+        }
+    }
+
+    /// Executes the transaction, validating and committing if successful.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when:
+    /// - A file cannot be read or written.
+    /// - The semantic backend is unavailable.
+    pub fn execute(self) -> Result<TransactionOutcome, SafetyHarnessError> {
+        if self.changes.is_empty() {
+            return Ok(TransactionOutcome::NoChanges);
+        }
+
+        let mut context = VerificationContext::new();
+        let mut paths_to_write: Vec<PathBuf> = Vec::new();
+        let mut deletions: Vec<DeletePlan> = Vec::new();
+
+        for change in &self.changes {
+            match change {
+                ContentChange::Write { path, content } => {
+                    let original = read_file(path)?;
+                    context.add_original(path.clone(), original);
+                    context.add_modified(path.clone(), content.clone());
+                    paths_to_write.push(path.clone());
+                }
+                ContentChange::Delete { path } => {
+                    let original = read_existing_file(path)?;
+                    deletions.push(DeletePlan {
+                        path: path.clone(),
+                        original,
+                        existed: true,
+                    });
+                }
+            }
+        }
+
+        let syntactic_result = self.syntactic_lock.validate(&context);
+        if let SyntacticLockResult::Failed { failures } = syntactic_result {
+            return Ok(TransactionOutcome::SyntacticLockFailed { failures });
+        }
+
+        let semantic_result = self.semantic_lock.validate(&context)?;
+        if let SemanticLockResult::Failed { failures } = semantic_result {
+            return Ok(TransactionOutcome::SemanticLockFailed { failures });
+        }
+
+        commit_changes_with_deletes(&context, &paths_to_write, &deletions)?;
+
+        Ok(TransactionOutcome::Committed {
+            files_modified: paths_to_write.len(),
+        })
+    }
+}
+
 /// Builder for coordinating the Double-Lock verification process.
 pub struct EditTransaction<'a> {
     file_edits: Vec<FileEdit>,
@@ -159,6 +273,11 @@ fn read_file(path: &std::path::Path) -> Result<String, SafetyHarnessError> {
     }
 }
 
+/// Reads file content, returning an error if the file does not exist.
+fn read_existing_file(path: &std::path::Path) -> Result<String, SafetyHarnessError> {
+    fs::read_to_string(path).map_err(|err| SafetyHarnessError::file_read(path.to_path_buf(), err))
+}
+
 /// Writes all modified content to the filesystem using two-phase commit.
 ///
 /// # Atomicity Guarantee
@@ -177,6 +296,19 @@ fn commit_changes(
     context: &VerificationContext,
     paths: &[PathBuf],
 ) -> Result<(), SafetyHarnessError> {
+    commit_changes_with_deletes(context, paths, &[])
+}
+#[derive(Debug)]
+struct DeletePlan {
+    path: PathBuf,
+    original: String,
+    existed: bool,
+}
+fn commit_changes_with_deletes(
+    context: &VerificationContext,
+    paths: &[PathBuf],
+    deletions: &[DeletePlan],
+) -> Result<(), SafetyHarnessError> {
     // Phase 1: Prepare all files (write to temps)
     let mut prepared: Vec<(PathBuf, tempfile::NamedTempFile, String, bool)> = Vec::new();
 
@@ -190,18 +322,28 @@ fn commit_changes(
         let temp_file = prepare_file(path, content)?;
         prepared.push((path.clone(), temp_file, original, existed));
     }
-
     // Phase 2: Commit all files (atomic renames)
     let mut committed: Vec<(PathBuf, String, bool)> = Vec::new();
 
     for (path, temp_file, original, existed) in prepared {
         if let Err(err) = temp_file.persist(&path) {
-            rollback(&committed);
+            rollback_writes(&committed);
             return Err(SafetyHarnessError::file_write(path, err.error));
         }
         committed.push((path, original, existed));
     }
-
+    let mut deleted: Vec<DeletePlan> = Vec::new();
+    for deletion in deletions {
+        if let Err(err) = fs::remove_file(&deletion.path) {
+            rollback_deletes_and_writes(&deleted, &committed);
+            return Err(SafetyHarnessError::file_delete(deletion.path.clone(), err));
+        }
+        deleted.push(DeletePlan {
+            path: deletion.path.clone(),
+            original: deletion.original.clone(),
+            existed: deletion.existed,
+        });
+    }
     Ok(())
 }
 
@@ -234,7 +376,7 @@ fn prepare_file(
 ///
 /// This is a best-effort operation: if restoration fails for any file,
 /// we continue attempting to restore the remaining files.
-fn rollback(committed: &[(PathBuf, String, bool)]) {
+fn rollback_writes(committed: &[(PathBuf, String, bool)]) {
     for (path, original, existed) in committed {
         if !existed {
             // File was newly created, remove it
@@ -244,4 +386,15 @@ fn rollback(committed: &[(PathBuf, String, bool)]) {
             let _ = std::fs::write(path, original);
         }
     }
+}
+
+fn rollback_deletes_and_writes(deleted: &[DeletePlan], committed: &[(PathBuf, String, bool)]) {
+    for deletion in deleted {
+        if deletion.existed {
+            let _ = std::fs::write(&deletion.path, &deletion.original);
+        } else {
+            let _ = std::fs::remove_file(&deletion.path);
+        }
+    }
+    rollback_writes(committed);
 }

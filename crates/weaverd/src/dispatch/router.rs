@@ -12,6 +12,7 @@ use tracing::debug;
 use crate::backends::FusionBackends;
 use crate::semantic_provider::SemanticBackendProvider;
 
+use super::act;
 use super::errors::DispatchError;
 use super::observe;
 use super::request::CommandRequest;
@@ -149,7 +150,7 @@ impl DomainRouter {
 
         match domain {
             Domain::Observe => self.route_observe(request, writer, backends),
-            Domain::Act => self.route_act(request, writer),
+            Domain::Act => self.route_act(request, writer, backends),
             Domain::Verify => self.route_verify(request, writer),
         }
     }
@@ -177,8 +178,19 @@ impl DomainRouter {
         &self,
         request: &CommandRequest,
         writer: &mut ResponseWriter<W>,
+        backends: &mut FusionBackends<SemanticBackendProvider>,
     ) -> Result<DispatchResult, DispatchError> {
-        self.route_domain(request, writer, &DomainRoutingContext::ACT)
+        let operation = request.operation().to_ascii_lowercase();
+        match operation.as_str() {
+            "apply-patch" => act::apply_patch::handle(request, writer, backends),
+            _ if DomainRoutingContext::ACT
+                .known_operations
+                .contains(&operation.as_str()) =>
+            {
+                self.write_not_implemented(writer, "act", &operation)
+            }
+            _ => Err(DispatchError::unknown_operation("act", operation)),
+        }
     }
 
     fn route_verify<W: Write>(
@@ -268,6 +280,11 @@ mod tests {
                     matches!(result, Err(DispatchError::InvalidArguments { .. })),
                     "{domain} {op} should fail with InvalidArguments (no args provided)"
                 );
+            } else if domain == "act" && *op == "apply-patch" {
+                assert!(
+                    matches!(result, Err(DispatchError::InvalidArguments { .. })),
+                    "{domain} {op} should fail with InvalidArguments (missing patch)"
+                );
             } else {
                 assert!(result.is_ok(), "{domain} {op} should route successfully");
             }
@@ -341,10 +358,17 @@ mod tests {
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
         let result = router.route(&request, &mut writer, &mut backends);
-        assert!(
-            result.is_ok(),
-            "{domain} {operation} should route successfully despite case"
-        );
+        if domain.eq_ignore_ascii_case("act") && operation.eq_ignore_ascii_case("apply-patch") {
+            assert!(
+                matches!(result, Err(DispatchError::InvalidArguments { .. })),
+                "{domain} {operation} should fail with InvalidArguments (missing patch)"
+            );
+        } else {
+            assert!(
+                result.is_ok(),
+                "{domain} {operation} should route successfully despite case"
+            );
+        }
     }
 
     #[rstest]

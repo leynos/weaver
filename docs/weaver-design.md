@@ -387,6 +387,15 @@ following:
 {"command":{"domain":"observe","operation":"get-definition"},"arguments":["--symbol","main"]}
 ```
 
+The `act apply-patch` command extends the envelope with an optional `patch`
+field that carries the raw patch stream as a JSON string (newline characters
+are escaped in the serialized form). The CLI only sets this field for
+`act apply-patch`, preserving backward compatibility for other commands.
+
+The daemon enforces a 1 MiB limit per JSONL request line to keep memory usage
+bounded. Large patch streams must be split across multiple `act apply-patch`
+invocations.
+
 The CLI uses `clap`'s trailing argument capture to ensure any flag-like values
 (`--uri`, `--range`, and similar) are forwarded without interpretation. Daemon
 responses are consumed line by line, expecting each JSON object to specify the
@@ -1642,6 +1651,25 @@ Only if both locks pass does the daemon commit the changes atomically. Paths
 are normalised and rejected if they escape the workspace root (for example,
 `../..` traversal or absolute paths), preventing patch-based directory
 traversal attacks.
+
+#### 4.3.7. Apply-patch response payloads and limits
+
+`act apply-patch` returns a compact success payload and structured error
+envelopes that align with other safety-harness responses:
+
+- Success responses are JSON objects with `status: "ok"` and counts for
+  `files_written` and `files_deleted`.
+- Patch parsing and application failures return a JSON error envelope with
+  `type: "ApplyPatchError"` and details about the failure, including the
+  operation and path when available.
+- Lock failures reuse the `VerificationError` envelope with a `phase` and
+  per-file diagnostics.
+- Backend or I/O failures return a generic error envelope with a dedicated
+  `type` and exit status 2; patch and verification failures exit with status 1.
+
+The request line size limit for JSONL requests is set to 1 MiB to accommodate
+patch payloads without allowing unbounded memory growth. Callers with larger
+patch streams must split them into multiple apply-patch commands.
 
 ## 5. Security by Design: A Zero-Trust Sandboxing Model
 

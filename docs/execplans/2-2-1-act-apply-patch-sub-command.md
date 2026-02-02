@@ -4,7 +4,7 @@ This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
 `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: IN PROGRESS
 
 PLANS.md is not present in the repository, so no additional plan governance
 applies beyond AGENTS.md and this ExecPlan.
@@ -22,8 +22,8 @@ failure, without partial filesystem writes.
 ## Constraints
 
 - Follow the `act apply-patch` semantics in `docs/weaver-design.md` section
-  4.3, including SEARCH/REPLACE behaviour, line-ending handling, and
-  traversal checks.
+  4.3, including SEARCH/REPLACE behaviour, line-ending handling, and traversal
+  checks.
 - The JSONL protocol must remain backward-compatible for existing commands.
 - All `act` edits must pass the Double-Lock harness with no on-disk writes on
   syntactic or semantic lock failure.
@@ -53,55 +53,70 @@ failure, without partial filesystem writes.
 ## Risks
 
 - Risk: the daemon request size cap (64 KiB) rejects realistic patch payloads.
-  Severity: medium. Likelihood: medium.
-  Mitigation: decide on and document a higher limit or a streaming strategy
-  before implementing the request path.
+  Severity: medium. Likelihood: medium. Mitigation: decide on and document a
+  higher limit or a streaming strategy before implementing the request path.
 - Risk: semantic lock integration requires additional LSP wiring beyond the
-  placeholder lock.
-  Severity: high. Likelihood: medium.
-  Mitigation: implement a dedicated LSP-backed `SemanticLock` adapter and
-  isolate it behind a trait for test doubles.
+  placeholder lock. Severity: high. Likelihood: medium. Mitigation: implement a
+  dedicated LSP-backed `SemanticLock` adapter and isolate it behind a trait for
+  test doubles.
 - Risk: fuzzy match behaviour could misapply if not cursor-scoped.
-  Severity: high. Likelihood: medium.
-  Mitigation: follow the cursor-based algorithm from the design doc and test
-  no-match failure paths.
+  Severity: high. Likelihood: medium. Mitigation: follow the cursor-based
+  algorithm from the design doc and test no-match failure paths.
 - Risk: CLI stdin handling could block non apply-patch commands.
-  Severity: medium. Likelihood: low.
-  Mitigation: only read STDIN when `domain=act` and `operation=apply-patch`.
+  Severity: medium. Likelihood: low. Mitigation: only read STDIN when
+  `domain=act` and `operation=apply-patch`.
 
 ## Progress
 
 - [x] (2026-01-28 00:00Z) Drafted ExecPlan.
-- [ ] Add JSONL request/response types for apply-patch and update CLI stdin
-      handling.
-- [ ] Implement patch parsing, matching, and safety harness integration in
-      `weaverd`.
-- [ ] Add unit and BDD tests (rstest + rstest-bdd) for happy/unhappy paths.
-- [ ] Update design doc, user guide, and roadmap; run quality gates.
+- [x] (2026-02-02 00:00Z) Plan approved; implementation started.
+- [x] (2026-02-02 00:00Z) Add JSONL request/response types for apply-patch and
+      update CLI stdin handling.
+- [x] (2026-02-02 00:00Z) Implement patch parsing, matching, and safety harness
+      integration in `weaverd`.
+- [x] (2026-02-02 00:00Z) Add unit and BDD tests (rstest + rstest-bdd) for
+      happy/unhappy paths.
+- [x] (2026-02-02 00:00Z) Update design doc, user guide, and roadmap; run
+      quality gates.
 
 ## Surprises & discoveries
 
 - Observation: Qdrant notes store was unreachable during planning.
-  Evidence: `qdrant-find` returned connection failures.
-  Impact: no historical project notes were available for this plan.
+  Evidence: `qdrant-find` returned connection failures. Impact: no historical
+  project notes were available for this plan.
 
 ## Decision log
 
 - Decision: Extend the existing JSONL `CommandRequest` with an optional
   `patch` payload field (only populated for `act apply-patch`) to preserve
-  backward compatibility.
-  Rationale: avoids a breaking protocol change while still carrying raw patch
-  content in a single JSONL line.
-  Date/Author: 2026-01-28 / Codex
+  backward compatibility. Rationale: avoids a breaking protocol change while
+  still carrying raw patch content in a single JSONL line. Date/Author:
+  2026-01-28 / Codex
 - Decision: Keep request/response structs in `weaver-cli` and `weaverd` for
-  this step instead of introducing a new shared crate.
-  Rationale: limits scope creep; revisit if protocol drift becomes painful.
-  Date/Author: 2026-01-28 / Codex
+  this step instead of introducing a new shared crate. Rationale: limits scope
+  creep; revisit if protocol drift becomes painful. Date/Author: 2026-01-28 /
+  Codex
+- Decision: Raise the JSONL request size limit to 1 MiB to accommodate
+  apply-patch payloads while keeping memory usage bounded. Rationale: typical
+  agent patches exceed 64 KiB; 1 MiB covers common usage without unbounded
+  growth. Date/Author: 2026-02-02 / Codex
+- Decision: Emit apply-patch success payloads with file counts and standardise
+  error envelopes (`ApplyPatchError`, `VerificationError`, or backend/I/O
+  errors) with status 1 for patch/lock failures and status 2 for backend/I/O
+  failures. Rationale: keeps CLI and agent consumers aligned with existing
+  harness conventions while providing clear outcomes. Date/Author: 2026-02-02 /
+  Codex
 
 ## Outcomes & retrospective
 
-Pending execution. Populate after implementation with outcomes, gaps, and
-lessons learned.
+Outcome: apply-patch is implemented end-to-end with CLI stdin streaming, daemon
+parsing/matching, Double-Lock enforcement, and structured error responses.
+`make check-fmt`, `make lint`, `make test`, `make markdownlint`, and
+`make nixie` all succeed (with existing long-running tests intentionally
+ignored).
+
+Gaps/risks: none identified beyond the documented 1 MiB request size limit and
+dependency on language servers for semantic verification.
 
 ## Context and orientation
 
@@ -131,18 +146,18 @@ doc's decision log for section 4.3.
 
 Stage B (CLI and JSONL protocol): extend `CommandRequest` in
 `crates/weaver-cli/src/command.rs` to carry an optional patch payload and
-update `execute_daemon_command` to read STDIN only for
-`act apply-patch`. Update the test harness to inject stdin (likely by adding a
-reader to `IoStreams` or passing a reader into `CliRunner`) so the BDD tests
-can assert the JSONL request contains the expected patch content. Add or update
-golden fixtures under `crates/weaver-cli/tests/golden/`.
+update `execute_daemon_command` to read STDIN only for `act apply-patch`.
+Update the test harness to inject stdin (likely by adding a reader to
+`IoStreams` or passing a reader into `CliRunner`) so the BDD tests can assert
+the JSONL request contains the expected patch content. Add or update golden
+fixtures under `crates/weaver-cli/tests/golden/`.
 
 Stage C (daemon request parsing and handler wiring): extend
 `crates/weaverd/src/dispatch/request.rs` to deserialize the optional patch
 field and validate it for `act apply-patch` (non-empty, text-only). Add a new
 `dispatch::act` module with an `apply_patch` handler, and route it from
-`DomainRouter::route_act`. Ensure the handler starts required backends and
-uses the safety harness.
+`DomainRouter::route_act`. Ensure the handler starts required backends and uses
+the safety harness.
 
 Stage D (patch parsing and matching): implement a dedicated patch parser in
 `crates/weaverd/src/dispatch/act/apply_patch/` (split into modules as needed)
@@ -154,25 +169,25 @@ binary or NUL bytes rejection.
 Stage E (Double-Lock integration): map parsed operations into a transaction
 that produces modified buffers for syntactic and semantic locks and performs
 atomic commits. Extend the safety harness if necessary to support delete
-operations and full-content replacements. Implement an LSP-backed semantic
-lock adapter that uses `did_open`, `did_change`, `did_close`, and
-`diagnostics` to compare baseline vs modified diagnostics, returning
-`SafetyHarnessError::SemanticBackendUnavailable` when the LSP backend cannot
-be started.
+operations and full-content replacements. Implement an LSP-backed semantic lock
+adapter that uses `did_open`, `did_change`, `did_close`, and `diagnostics` to
+compare baseline vs modified diagnostics, returning
+`SafetyHarnessError::SemanticBackendUnavailable` when the LSP backend cannot be
+started.
 
-Stage F (tests): add unit tests for patch parsing, path validation, line
-ending preservation, and transaction mapping. Add rstest-bdd scenarios for
-happy path (patch applies and commits) and unhappy paths (no match, invalid
-header, traversal attempt, syntactic lock failure, semantic lock failure).
+Stage F (tests): add unit tests for patch parsing, path validation, line ending
+preservation, and transaction mapping. Add rstest-bdd scenarios for happy path
+(patch applies and commits) and unhappy paths (no match, invalid header,
+traversal attempt, syntactic lock failure, semantic lock failure).
 
-Stage G (docs and roadmap): update `docs/weaver-design.md` with decisions
-made (request schema, error envelope, request size limit), update
+Stage G (docs and roadmap): update `docs/weaver-design.md` with decisions made
+(request schema, error envelope, request size limit), update
 `docs/users-guide.md` with CLI usage and behaviour changes, and mark the
 apply-patch entry as done in `docs/roadmap.md`.
 
 Stage H (quality gates): run `make check-fmt`, `make lint`, `make test`,
-`make markdownlint`, `make fmt`, and `make nixie` as required, using `tee`
-and `set -o pipefail` to preserve exit codes.
+`make markdownlint`, `make fmt`, and `make nixie` as required, using `tee` and
+`set -o pipefail` to preserve exit codes.
 
 ## Concrete steps
 
@@ -213,10 +228,10 @@ The feature is complete when:
 
 ## Idempotence and recovery
 
-All steps are re-runnable. If apply-patch parsing or lock validation fails,
-the transaction must leave the filesystem unchanged, so re-running with a
-corrected patch is safe. If documentation formatting fails, run `make fmt`
-and `make markdownlint` again before re-running the Rust checks.
+All steps are re-runnable. If apply-patch parsing or lock validation fails, the
+transaction must leave the filesystem unchanged, so re-running with a corrected
+patch is safe. If documentation formatting fails, run `make fmt` and
+`make markdownlint` again before re-running the Rust checks.
 
 ## Artifacts and notes
 

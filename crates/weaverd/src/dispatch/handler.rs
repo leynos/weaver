@@ -18,7 +18,7 @@ use super::response::ResponseWriter;
 use super::router::{DISPATCH_TARGET, DomainRouter};
 
 /// Maximum size of a single request line in bytes.
-pub(crate) const MAX_REQUEST_BYTES: usize = 64 * 1024;
+pub(crate) const MAX_REQUEST_BYTES: usize = 1024 * 1024;
 
 /// Connection handler that parses and dispatches JSONL commands.
 ///

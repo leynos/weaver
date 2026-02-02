@@ -8,6 +8,7 @@ use crate::tests::support::{decode_utf8, default_daemon_lines, respond_to_reques
 use crate::{CommandInvocation, IoStreams, ResolvedOutputFormat, execute_daemon_command};
 use rstest::rstest;
 use std::ffi::OsStr;
+use std::io::Cursor;
 use std::process::ExitCode;
 use weaver_config::{Config, SocketEndpoint};
 
@@ -62,7 +63,8 @@ fn auto_start_failure_paths(
     let invocation = make_invocation();
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
+    let mut stdin = Cursor::new(Vec::new());
+    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
 
     let exit = execute_daemon_command(invocation, context, &mut io, ResolvedOutputFormat::Json);
 
@@ -145,7 +147,8 @@ fn auto_start_succeeds_and_proceeds() {
     let invocation = make_invocation();
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
+    let mut stdin = Cursor::new(Vec::new());
+    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
 
     let exit = execute_daemon_command(invocation, context, &mut io, ResolvedOutputFormat::Json);
 
@@ -205,7 +208,8 @@ fn auto_start_times_out_when_daemon_slow() {
     let invocation = make_invocation();
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
+    let mut stdin = Cursor::new(Vec::new());
+    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
 
     let exit = execute_daemon_command(invocation, context, &mut io, ResolvedOutputFormat::Json);
 

@@ -13,6 +13,18 @@ use rstest_bdd_macros::{given, scenario, then, when};
 use serde_json::json;
 
 const SAMPLE_RUST_SOURCE: &str = "fn main() {\n    let value = 1;\n    value\n}\n";
+const SAMPLE_PATCH: &str = concat!(
+    "diff --git a/src/main.rs b/src/main.rs\n",
+    "<<<<<<< SEARCH\n",
+    "fn main() {\n",
+    "    println!(\"Old Message\");\n",
+    "}\n",
+    "=======\n",
+    "fn main() {\n",
+    "    println!(\"New Message\");\n",
+    "}\n",
+    ">>>>>>> REPLACE\n",
+);
 
 fn run_command_with_source_uri(
     world: &RefCell<TestWorld>,
@@ -72,6 +84,11 @@ fn given_running_daemon(world: &RefCell<TestWorld>) {
         .borrow_mut()
         .start_daemon()
         .expect("failed to start fake daemon");
+}
+
+#[given("patch input is available")]
+fn given_patch_input(world: &RefCell<TestWorld>) {
+    world.borrow_mut().set_stdin(SAMPLE_PATCH);
 }
 
 #[given("lifecycle responses succeed")]

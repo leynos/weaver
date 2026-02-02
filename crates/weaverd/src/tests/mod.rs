@@ -1,5 +1,6 @@
 //! Test suites for the Weaver daemon bootstrap.
 
+mod apply_patch_behaviour;
 mod behaviour;
 mod dispatch_behaviour;
 mod lib_api;

@@ -8,6 +8,12 @@ Feature: Weaver CLI behaviour
     And stderr is "daemon complains"
     And the CLI exits with code 17
 
+  Scenario: Streaming an apply-patch request with stdin
+    Given a running fake daemon
+    And patch input is available
+    When the operator runs "act apply-patch"
+    Then the daemon receives "request_act_apply_patch.jsonl"
+
   Scenario: Probing capability output
     Given capability overrides force python rename
     When the operator runs "--capabilities"

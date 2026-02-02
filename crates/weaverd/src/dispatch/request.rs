@@ -20,6 +20,9 @@ pub struct CommandRequest {
     /// Additional arguments passed to the operation handler.
     #[serde(default)]
     pub arguments: Vec<String>,
+    /// Optional patch payload for `act apply-patch`.
+    #[serde(default)]
+    pub patch: Option<String>,
 }
 
 /// Command identification within a request.
@@ -75,6 +78,11 @@ impl CommandRequest {
     /// Returns the normalised operation (trimmed).
     pub fn operation(&self) -> &str {
         self.command.operation.trim()
+    }
+
+    /// Returns the patch payload, if provided.
+    pub fn patch(&self) -> Option<&str> {
+        self.patch.as_deref()
     }
 }
 

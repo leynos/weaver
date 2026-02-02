@@ -3,10 +3,9 @@
 //! Exercises command serialisation, daemon message parsing, configuration
 //! loading, and socket connection establishment (TCP and Unix domain sockets).
 
-use super::support::{accept_tcp_connection, decode_utf8, default_daemon_lines, read_fixture};
-
 #[cfg(unix)]
 use super::support::accept_unix_connection;
+use super::support::{accept_tcp_connection, decode_utf8, default_daemon_lines, read_fixture};
 
 use std::cell::RefCell;
 use std::ffi::OsString;
@@ -18,7 +17,7 @@ use std::thread;
 use crate::{
     AppError, Cli, CliCommand, CommandDescriptor, CommandInvocation, CommandRequest, ConfigLoader,
     DaemonAction, EMPTY_LINE_LIMIT, IoStreams, OutputContext, OutputFormat, OutputSettings,
-    ResolvedOutputFormat, connect, exit_code_from_status, is_daemon_not_running,
+    ResolvedOutputFormat, build_request, connect, exit_code_from_status, is_daemon_not_running,
     read_daemon_messages, run_with_loader,
 };
 use clap::Parser;
@@ -41,6 +40,47 @@ fn serialises_command_request_matches_golden() {
     let expected =
         read_fixture("request_observe_get_definition.jsonl").expect("load golden request");
     assert_eq!(actual, expected);
+}
+
+#[test]
+fn serialises_apply_patch_request_with_patch_payload() {
+    let invocation = CommandInvocation {
+        domain: String::from("act"),
+        operation: String::from("apply-patch"),
+        arguments: Vec::new(),
+    };
+    let patch = concat!(
+        "diff --git a/src/main.rs b/src/main.rs\n",
+        "<<<<<<< SEARCH\n",
+        "fn main() {\n",
+        "    println!(\"Old Message\");\n",
+        "}\n",
+        "=======\n",
+        "fn main() {\n",
+        "    println!(\"New Message\");\n",
+        "}\n",
+        ">>>>>>> REPLACE\n",
+    );
+    let request = CommandRequest::with_patch(invocation, patch.to_string());
+    let mut buffer: Vec<u8> = Vec::new();
+    request
+        .write_jsonl(&mut buffer)
+        .expect("serialises request");
+    let actual = decode_utf8(buffer, "request").expect("decode request to utf8");
+    let expected = read_fixture("request_act_apply_patch.jsonl").expect("load golden request");
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn build_request_rejects_missing_patch_input() {
+    let invocation = CommandInvocation {
+        domain: String::from("act"),
+        operation: String::from("apply-patch"),
+        arguments: Vec::new(),
+    };
+    let mut stdin = Cursor::new(Vec::new());
+    let error = build_request(invocation, &mut stdin).expect_err("missing patch should fail");
+    assert!(matches!(error, AppError::MissingPatchInput));
 }
 
 #[rstest]
@@ -113,9 +153,10 @@ fn exit_code_from_status_out_of_range_defaults_to_failure() {
 
 fn test_read_daemon_messages(input: Vec<u8>) -> (Result<i32, AppError>, Vec<u8>, Vec<u8>) {
     let mut cursor = Cursor::new(input);
+    let mut stdin = Cursor::new(Vec::new());
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
+    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
     let context = OutputContext::new("observe", "get-definition", Vec::new());
     let result = read_daemon_messages(
         &mut cursor,
@@ -170,7 +211,8 @@ fn run_with_loader_reports_configuration_failures() {
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
+    let mut stdin = Cursor::new(Vec::new());
+    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
     let exit = run_with_loader(vec![OsString::from("weaver")], &mut io, &FailingLoader);
     assert_eq!(exit, ExitCode::FAILURE);
     let stderr_text = decode_utf8(stderr, "stderr").expect("decode stderr");
@@ -201,7 +243,8 @@ fn run_with_loader_filters_configuration_arguments() {
     let loader = RecordingLoader::new();
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
+    let mut stdin = Cursor::new(Vec::new());
+    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
     let exit = run_with_loader(
         vec![
             OsString::from("weaver"),
@@ -258,6 +301,7 @@ where
             operation: "noop".into(),
         },
         arguments: Vec::new(),
+        patch: None,
     };
     request
         .write_jsonl(&mut connection)
@@ -265,7 +309,8 @@ where
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
-    let mut io = IoStreams::new(&mut stdout, &mut stderr, false);
+    let mut stdin = Cursor::new(Vec::new());
+    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
     let context = OutputContext::new("observe", "noop", Vec::new());
     let status = read_daemon_messages(
         &mut connection,
@@ -280,7 +325,6 @@ where
 
     handle.join().expect("listener thread panicked");
 }
-
 #[test]
 fn connect_successfully_establishes_tcp_connection() {
     test_daemon_connection(|| {
@@ -296,7 +340,6 @@ fn connect_successfully_establishes_tcp_connection() {
         (SocketEndpoint::tcp("127.0.0.1", port), handle)
     });
 }
-
 #[cfg(unix)]
 #[test]
 fn connect_supports_unix_sockets() {
@@ -322,7 +365,6 @@ fn connect_supports_unix_sockets() {
         (SocketEndpoint::unix(socket_display), handle)
     });
 }
-
 #[rstest]
 #[case(io::ErrorKind::ConnectionRefused, true, "connection refused")]
 #[case(io::ErrorKind::NotFound, true, "socket not found")]
@@ -340,7 +382,6 @@ fn is_daemon_not_running_classifies_errors(
     };
     assert_eq!(is_daemon_not_running(&error), expected);
 }
-
 #[test]
 fn is_daemon_not_running_rejects_non_connect_errors() {
     let error = AppError::MissingDomain;
@@ -355,6 +396,5 @@ fn is_daemon_not_running_rejects_non_connect_errors() {
     let error = AppError::SerialiseRequest(serde_json::from_str::<()>("bad").unwrap_err());
     assert!(!is_daemon_not_running(&error));
 }
-
 /// Tests for automatic daemon startup behaviour and error handling.
 mod auto_start;
