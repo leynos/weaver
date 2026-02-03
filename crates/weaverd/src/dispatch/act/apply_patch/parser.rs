@@ -55,56 +55,146 @@ fn parse_operation(chunk: &str) -> Result<PatchOperation, ApplyPatchError> {
         let trimmed = trim_line(line);
         let line_type = classify_line(trimmed);
 
-        match line_type {
-            LineType::SearchMarker => {
-                mode = mode.promote(OperationMode::Modify);
-                search_replace.handle_search_marker(line_end);
-                offset = line_end;
-                continue;
-            }
-            LineType::Separator => {
-                search_replace.handle_separator(chunk, line_start);
-                offset = line_end;
-                continue;
-            }
-            LineType::ReplaceMarker => {
-                search_replace.handle_replace_marker(chunk, line_start, path.as_str())?;
-                offset = line_end;
-                continue;
-            }
-            _ => {}
+        if process_search_replace_marker(
+            line_type,
+            &mut mode,
+            &mut search_replace,
+            &mut offset,
+            line_end,
+            chunk,
+            line_start,
+            &path,
+        )? {
+            continue;
         }
 
-        if trimmed.starts_with("new file mode ") {
-            mode = mode.promote(OperationMode::Create);
-        }
-        if trimmed.starts_with("deleted file mode ") {
-            mode = mode.promote(OperationMode::Delete);
-        }
-
-        match line_type {
-            LineType::HunkHeader => {
-                if mode == OperationMode::Create {
-                    create_capture.handle_hunk_header();
-                }
-            }
-            LineType::DiffHeader => {
-                return Err(ApplyPatchError::InvalidDiffHeader {
-                    line: trimmed.to_string(),
-                });
-            }
-            _ => {}
-        }
-
-        if mode == OperationMode::Create && line_type == LineType::CreateContent {
-            create_capture.capture_line(line);
-        }
+        mode = detect_operation_mode(mode, trimmed);
+        process_secondary_line(line_type, mode, &mut create_capture, line, trimmed)?;
 
         offset = line_end;
     }
 
-    search_replace.validate_complete(path.as_str())?;
+    search_replace.validate_complete(&path)?;
     construct_operation(mode, path, search_replace, create_capture)
+}
+
+/// Processes SEARCH/REPLACE marker lines and updates parser state.
+// Required to keep parse_operation shallow while carrying all marker context.
+#[allow(clippy::too_many_arguments)]
+fn process_search_replace_marker(
+    line_type: LineType,
+    mode: &mut OperationMode,
+    search_replace: &mut SearchReplaceParser,
+    offset: &mut usize,
+    line_end: usize,
+    chunk: &str,
+    line_start: usize,
+    path: &FilePath,
+) -> Result<bool, ApplyPatchError> {
+    let handled = handle_search_replace_marker(
+        line_type,
+        mode,
+        search_replace,
+        chunk,
+        line_start,
+        line_end,
+        path,
+    )?;
+    if handled {
+        *offset = line_end;
+    }
+    Ok(handled)
+}
+
+/// Handles SEARCH/REPLACE marker lines without mutating the cursor offset.
+// Required to pass explicit marker context without threading local structs.
+#[allow(clippy::too_many_arguments)]
+fn handle_search_replace_marker(
+    line_type: LineType,
+    mode: &mut OperationMode,
+    search_replace: &mut SearchReplaceParser,
+    chunk: &str,
+    line_start: usize,
+    line_end: usize,
+    path: &FilePath,
+) -> Result<bool, ApplyPatchError> {
+    match line_type {
+        LineType::SearchMarker => {
+            *mode = mode.promote(OperationMode::Modify);
+            search_replace.handle_search_marker(line_end);
+            Ok(true)
+        }
+        LineType::Separator => {
+            search_replace.handle_separator(chunk, line_start);
+            Ok(true)
+        }
+        LineType::ReplaceMarker => {
+            search_replace.handle_replace_marker(chunk, line_start, path)?;
+            Ok(true)
+        }
+        _ => Ok(false),
+    }
+}
+
+/// Detects mode transitions based on diff metadata lines.
+fn detect_operation_mode(current: OperationMode, trimmed: &str) -> OperationMode {
+    detect_mode_transition(trimmed, current)
+}
+
+/// Applies mode transitions for create/delete markers.
+fn detect_mode_transition(trimmed: &str, current: OperationMode) -> OperationMode {
+    let mut mode = current;
+    if trimmed.starts_with("new file mode ") {
+        mode = mode.promote(OperationMode::Create);
+    }
+    if trimmed.starts_with("deleted file mode ") {
+        mode = mode.promote(OperationMode::Delete);
+    }
+    mode
+}
+
+/// Processes hunk headers, diff headers, and create content lines.
+// Required to keep line context explicit while delegating to small helpers.
+#[allow(clippy::too_many_arguments)]
+fn process_secondary_line(
+    line_type: LineType,
+    mode: OperationMode,
+    create_capture: &mut CreateContentCapture,
+    line: &str,
+    trimmed: &str,
+) -> Result<(), ApplyPatchError> {
+    match line_type {
+        LineType::HunkHeader | LineType::DiffHeader | LineType::CreateContent => {
+            validate_line_type(line_type, trimmed)?;
+            handle_mode_specific_capture(mode, line_type, line, create_capture);
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Validates line types that may raise parse errors.
+fn validate_line_type(line_type: LineType, trimmed: &str) -> Result<(), ApplyPatchError> {
+    if line_type == LineType::DiffHeader {
+        return Err(ApplyPatchError::InvalidDiffHeader {
+            line: trimmed.to_string(),
+        });
+    }
+    Ok(())
+}
+
+/// Captures create-mode hunk metadata and added lines.
+fn handle_mode_specific_capture(
+    mode: OperationMode,
+    line_type: LineType,
+    line: &str,
+    create_capture: &mut CreateContentCapture,
+) {
+    match (mode, line_type) {
+        (OperationMode::Create, LineType::HunkHeader) => create_capture.handle_hunk_header(),
+        (OperationMode::Create, LineType::CreateContent) => create_capture.capture_line(line),
+        _ => {}
+    }
 }
 
 fn parse_header(chunk: &str) -> Result<(String, usize), ApplyPatchError> {
@@ -194,12 +284,10 @@ impl SearchReplaceParser {
         &mut self,
         chunk: &str,
         line_start: usize,
-        path: &str,
+        path: &FilePath,
     ) -> Result<(), ApplyPatchError> {
         let Some(start) = self.replace_start else {
-            return Err(ApplyPatchError::UnclosedSearchBlock {
-                path: FilePath::new(path),
-            });
+            return Err(ApplyPatchError::UnclosedSearchBlock { path: path.clone() });
         };
         let replace = &chunk[start..line_start];
         if let Some(last) = self.blocks.last_mut() {
@@ -210,16 +298,12 @@ impl SearchReplaceParser {
         Ok(())
     }
 
-    fn validate_complete(&self, path: &str) -> Result<(), ApplyPatchError> {
+    fn validate_complete(&self, path: &FilePath) -> Result<(), ApplyPatchError> {
         if self.search_start.is_some() && self.replace_start.is_none() {
-            return Err(ApplyPatchError::UnclosedSearchBlock {
-                path: FilePath::new(path),
-            });
+            return Err(ApplyPatchError::UnclosedSearchBlock { path: path.clone() });
         }
         if self.replace_start.is_some() {
-            return Err(ApplyPatchError::UnclosedReplaceBlock {
-                path: FilePath::new(path),
-            });
+            return Err(ApplyPatchError::UnclosedReplaceBlock { path: path.clone() });
         }
         Ok(())
     }
@@ -265,11 +349,9 @@ impl CreateContentCapture {
         self.content.push_str(ending);
     }
 
-    fn validate_and_finish(self, path: &str) -> Result<String, ApplyPatchError> {
+    fn validate_and_finish(self, path: &FilePath) -> Result<String, ApplyPatchError> {
         if !self.saw_hunk {
-            return Err(ApplyPatchError::MissingHunk {
-                path: FilePath::new(path),
-            });
+            return Err(ApplyPatchError::MissingHunk { path: path.clone() });
         }
         Ok(self.content)
     }
@@ -290,7 +372,7 @@ fn construct_operation(
             Ok(PatchOperation::Modify { path, blocks })
         }
         OperationMode::Create => {
-            let content = create_capture.validate_and_finish(path.as_str())?;
+            let content = create_capture.validate_and_finish(&path)?;
             Ok(PatchOperation::Create { path, content })
         }
         OperationMode::Delete => Ok(PatchOperation::Delete { path }),
