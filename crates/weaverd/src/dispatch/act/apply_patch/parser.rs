@@ -5,6 +5,38 @@ use crate::dispatch::act::apply_patch::types::{
     DiffHeaderLine, FilePath, PatchOperation, PatchText, SearchPattern, SearchReplaceBlock,
 };
 
+/// Line processing context containing type and position information.
+struct LineInfo {
+    line_type: LineType,
+    start: usize,
+    end: usize,
+}
+
+impl LineInfo {
+    fn new(line_type: LineType, start: usize, end: usize) -> Self {
+        Self {
+            line_type,
+            start,
+            end,
+        }
+    }
+}
+
+/// Mutable parser state for search/replace operations.
+struct ParserState<'a> {
+    mode: &'a mut OperationMode,
+    search_replace: &'a mut SearchReplaceParser,
+}
+
+impl<'a> ParserState<'a> {
+    fn new(mode: &'a mut OperationMode, search_replace: &'a mut SearchReplaceParser) -> Self {
+        Self {
+            mode,
+            search_replace,
+        }
+    }
+}
+
 pub(crate) fn parse_patch(patch: &PatchText) -> Result<Vec<PatchOperation>, ApplyPatchError> {
     let patch = patch.as_str();
     if patch.trim().is_empty() {
@@ -54,22 +86,16 @@ fn parse_operation(chunk: &str) -> Result<PatchOperation, ApplyPatchError> {
         let line_end = offset + line.len();
         let trimmed = trim_line(line);
         let line_type = classify_line(trimmed);
+        let line_info = LineInfo::new(line_type, line_start, line_end);
+        let state = ParserState::new(&mut mode, &mut search_replace);
 
-        if process_search_replace_marker(
-            line_type,
-            &mut mode,
-            &mut search_replace,
-            &mut offset,
-            line_end,
-            chunk,
-            line_start,
-            &path,
-        )? {
+        if process_search_replace_marker(&line_info, state, chunk, &path)? {
+            offset = line_info.end;
             continue;
         }
 
         mode = detect_operation_mode(mode, trimmed);
-        process_secondary_line(line_type, mode, &mut create_capture, line, trimmed)?;
+        process_secondary_line(line_type, mode, &mut create_capture, line)?;
 
         offset = line_end;
     }
@@ -80,56 +106,39 @@ fn parse_operation(chunk: &str) -> Result<PatchOperation, ApplyPatchError> {
 
 /// Processes SEARCH/REPLACE marker lines and updates parser state.
 // Required to keep parse_operation shallow while carrying all marker context.
-#[allow(clippy::too_many_arguments)]
 fn process_search_replace_marker(
-    line_type: LineType,
-    mode: &mut OperationMode,
-    search_replace: &mut SearchReplaceParser,
-    offset: &mut usize,
-    line_end: usize,
+    line_info: &LineInfo,
+    state: ParserState<'_>,
     chunk: &str,
-    line_start: usize,
     path: &FilePath,
 ) -> Result<bool, ApplyPatchError> {
-    let handled = handle_search_replace_marker(
-        line_type,
-        mode,
-        search_replace,
-        chunk,
-        line_start,
-        line_end,
-        path,
-    )?;
-    if handled {
-        *offset = line_end;
-    }
-    Ok(handled)
+    handle_search_replace_marker(line_info, state, chunk, path)
 }
 
 /// Handles SEARCH/REPLACE marker lines without mutating the cursor offset.
 // Required to pass explicit marker context without threading local structs.
-#[allow(clippy::too_many_arguments)]
 fn handle_search_replace_marker(
-    line_type: LineType,
-    mode: &mut OperationMode,
-    search_replace: &mut SearchReplaceParser,
+    line_info: &LineInfo,
+    state: ParserState<'_>,
     chunk: &str,
-    line_start: usize,
-    line_end: usize,
     path: &FilePath,
 ) -> Result<bool, ApplyPatchError> {
-    match line_type {
+    match line_info.line_type {
         LineType::SearchMarker => {
-            *mode = mode.promote(OperationMode::Modify);
-            search_replace.handle_search_marker(line_end);
+            *state.mode = state.mode.promote(OperationMode::Modify);
+            state.search_replace.handle_search_marker(line_info.end);
             Ok(true)
         }
         LineType::Separator => {
-            search_replace.handle_separator(chunk, line_start);
+            state
+                .search_replace
+                .handle_separator(chunk, line_info.start);
             Ok(true)
         }
         LineType::ReplaceMarker => {
-            search_replace.handle_replace_marker(chunk, line_start, path)?;
+            state
+                .search_replace
+                .handle_replace_marker(chunk, line_info.start, path)?;
             Ok(true)
         }
         _ => Ok(false),
@@ -155,16 +164,15 @@ fn detect_mode_transition(trimmed: &str, current: OperationMode) -> OperationMod
 
 /// Processes hunk headers, diff headers, and create content lines.
 // Required to keep line context explicit while delegating to small helpers.
-#[allow(clippy::too_many_arguments)]
 fn process_secondary_line(
     line_type: LineType,
     mode: OperationMode,
     create_capture: &mut CreateContentCapture,
     line: &str,
-    trimmed: &str,
 ) -> Result<(), ApplyPatchError> {
     match line_type {
         LineType::HunkHeader | LineType::DiffHeader | LineType::CreateContent => {
+            let trimmed = trim_line(line);
             validate_line_type(line_type, trimmed)?;
             handle_mode_specific_capture(mode, line_type, line, create_capture);
             Ok(())
