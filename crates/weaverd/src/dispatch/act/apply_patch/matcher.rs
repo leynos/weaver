@@ -21,7 +21,7 @@ pub(crate) fn apply_search_replace(
             found
         } else {
             return Err(ApplyPatchError::SearchBlockNotFound {
-                path: path.as_str().to_string(),
+                path: path.clone(),
                 block_index: index + 1,
             });
         };
@@ -218,7 +218,7 @@ mod tests {
         let error = apply_search_replace(&path, &original, &blocks).expect_err("error");
         match error {
             ApplyPatchError::SearchBlockNotFound { path, block_index } => {
-                assert_eq!(path, "file.txt");
+                assert_eq!(path.as_str(), "file.txt");
                 assert_eq!(block_index, 1);
             }
             other => panic!("unexpected error: {other:?}"),

@@ -2,13 +2,14 @@
 
 use super::{ApplyPatchExecutor, resolve_path};
 use crate::dispatch::act::apply_patch::ApplyPatchFailure;
+use crate::dispatch::act::apply_patch::types::FilePath;
 use crate::safety_harness::{ConfigurableSemanticLock, ConfigurableSyntacticLock};
 use tempfile::TempDir;
 
 #[test]
 fn resolve_path_rejects_parent_dir() {
     let dir = TempDir::new().expect("temp dir");
-    let result = resolve_path(dir.path(), "../escape.txt");
+    let result = resolve_path(dir.path(), &FilePath::new("../escape.txt"));
     assert!(result.is_err(), "parent traversal should fail");
 }
 

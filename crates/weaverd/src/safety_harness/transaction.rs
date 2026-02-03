@@ -323,6 +323,15 @@ fn commit_changes_with_deletes(
         prepared.push((path.clone(), temp_file, original, existed));
     }
     // Phase 2: Commit all files (atomic renames)
+    let committed = persist_prepared_files(prepared)?;
+    apply_deletions(deletions, &committed)?;
+    Ok(())
+}
+
+/// Persists prepared temp files, rolling back if any commit fails.
+fn persist_prepared_files(
+    prepared: Vec<(PathBuf, tempfile::NamedTempFile, String, bool)>,
+) -> Result<Vec<(PathBuf, String, bool)>, SafetyHarnessError> {
     let mut committed: Vec<(PathBuf, String, bool)> = Vec::new();
 
     for (path, temp_file, original, existed) in prepared {
@@ -332,10 +341,20 @@ fn commit_changes_with_deletes(
         }
         committed.push((path, original, existed));
     }
+
+    Ok(committed)
+}
+
+/// Removes files slated for deletion, rolling back changes on failure.
+fn apply_deletions(
+    deletions: &[DeletePlan],
+    committed: &[(PathBuf, String, bool)],
+) -> Result<(), SafetyHarnessError> {
     let mut deleted: Vec<DeletePlan> = Vec::new();
+
     for deletion in deletions {
         if let Err(err) = fs::remove_file(&deletion.path) {
-            rollback_deletes_and_writes(&deleted, &committed);
+            rollback_deletes_and_writes(&deleted, committed);
             return Err(SafetyHarnessError::file_delete(deletion.path.clone(), err));
         }
         deleted.push(DeletePlan {
@@ -344,6 +363,7 @@ fn commit_changes_with_deletes(
             existed: deletion.existed,
         });
     }
+
     Ok(())
 }
 

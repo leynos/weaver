@@ -9,6 +9,58 @@ pub(crate) enum LineEnding {
     CrLf,
 }
 
+/// Raw patch input text.
+#[derive(Debug, Clone)]
+pub(crate) struct PatchText(String);
+
+impl PatchText {
+    pub(crate) fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for PatchText {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl From<String> for PatchText {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+impl From<&str> for PatchText {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
+/// Diff header line from a patch stream.
+#[derive(Debug, Clone)]
+pub(crate) struct DiffHeaderLine(String);
+
+impl DiffHeaderLine {
+    pub(crate) fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for DiffHeaderLine {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
 /// Path for a patch operation target.
 #[derive(Debug, Clone)]
 pub(crate) struct FilePath(String);
@@ -20,6 +72,10 @@ impl FilePath {
 
     pub(crate) fn as_str(&self) -> &str {
         &self.0
+    }
+
+    pub(crate) fn into_string(self) -> String {
+        self.0
     }
 }
 
@@ -88,14 +144,14 @@ pub(crate) struct SearchReplaceBlock {
 #[derive(Debug, Clone)]
 pub(crate) enum PatchOperation {
     Modify {
-        path: String,
+        path: FilePath,
         blocks: Vec<SearchReplaceBlock>,
     },
     Create {
-        path: String,
+        path: FilePath,
         content: String,
     },
     Delete {
-        path: String,
+        path: FilePath,
     },
 }

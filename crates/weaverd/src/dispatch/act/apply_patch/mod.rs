@@ -30,7 +30,7 @@ use self::matcher::apply_search_replace;
 use self::parser::parse_patch;
 use self::payloads::{ApplyPatchSummary, GenericErrorEnvelope, VerificationErrorEnvelope};
 use self::semantic_lock::LspSemanticLockAdapter;
-use self::types::{FileContent, FilePath, PatchOperation, SearchReplaceBlock};
+use self::types::{FileContent, FilePath, PatchOperation, PatchText, SearchReplaceBlock};
 
 /// Handles `act apply-patch` requests.
 pub fn handle<W: Write>(
@@ -99,7 +99,8 @@ impl<'a> ApplyPatchExecutor<'a> {
     }
 
     pub(crate) fn execute(&self, patch: &str) -> Result<ApplyPatchSummary, ApplyPatchFailure> {
-        let operations = parse_patch(patch).map_err(ApplyPatchFailure::Patch)?;
+        let patch = PatchText::new(patch);
+        let operations = parse_patch(&patch).map_err(ApplyPatchFailure::Patch)?;
         let changes = self
             .build_changes(&operations)
             .map_err(ApplyPatchFailure::Patch)?;
@@ -157,37 +158,32 @@ impl<'a> ApplyPatchExecutor<'a> {
 
     fn build_modify_change(
         &self,
-        path: &str,
+        path: &FilePath,
         blocks: &[SearchReplaceBlock],
     ) -> Result<ContentChange, ApplyPatchError> {
         let resolved = resolve_path(&self.workspace_root, path)?;
         let original = read_patch_target(&resolved, path)?;
-        let file_path = FilePath::new(path);
         let original = FileContent::new(original);
-        let modified = apply_search_replace(&file_path, &original, blocks)?;
+        let modified = apply_search_replace(path, &original, blocks)?;
         Ok(ContentChange::write(resolved, modified.into_string()))
     }
 
     fn build_create_change(
         &self,
-        path: &str,
+        path: &FilePath,
         content: &str,
     ) -> Result<ContentChange, ApplyPatchError> {
         let resolved = resolve_path(&self.workspace_root, path)?;
         if resolved.exists() {
-            return Err(ApplyPatchError::FileAlreadyExists {
-                path: path.to_string(),
-            });
+            return Err(ApplyPatchError::FileAlreadyExists { path: path.clone() });
         }
         Ok(ContentChange::write(resolved, content.to_string()))
     }
 
-    fn build_delete_change(&self, path: &str) -> Result<ContentChange, ApplyPatchError> {
+    fn build_delete_change(&self, path: &FilePath) -> Result<ContentChange, ApplyPatchError> {
         let resolved = resolve_path(&self.workspace_root, path)?;
         if !resolved.exists() {
-            return Err(ApplyPatchError::DeleteMissing {
-                path: path.to_string(),
-            });
+            return Err(ApplyPatchError::DeleteMissing { path: path.clone() });
         }
         Ok(ContentChange::delete(resolved))
     }
@@ -216,17 +212,17 @@ fn map_harness_error(error: SafetyHarnessError) -> ApplyPatchFailure {
     }
 }
 
-fn resolve_path(workspace_root: &Path, path: &str) -> Result<PathBuf, ApplyPatchError> {
-    if path.trim().is_empty() {
+fn resolve_path(workspace_root: &Path, path: &FilePath) -> Result<PathBuf, ApplyPatchError> {
+    if path.as_str().trim().is_empty() {
         return Err(ApplyPatchError::InvalidPath {
-            path: path.to_string(),
+            path: path.clone(),
             reason: String::from("path is empty"),
         });
     }
-    let candidate = Path::new(path);
+    let candidate = Path::new(path.as_str());
     if candidate.is_absolute() {
         return Err(ApplyPatchError::InvalidPath {
-            path: path.to_string(),
+            path: path.clone(),
             reason: String::from("absolute paths are not allowed"),
         });
     }
@@ -234,7 +230,7 @@ fn resolve_path(workspace_root: &Path, path: &str) -> Result<PathBuf, ApplyPatch
         match component {
             std::path::Component::ParentDir | std::path::Component::Prefix(_) => {
                 return Err(ApplyPatchError::InvalidPath {
-                    path: path.to_string(),
+                    path: path.clone(),
                     reason: String::from("path traversal is not allowed"),
                 });
             }
@@ -244,10 +240,9 @@ fn resolve_path(workspace_root: &Path, path: &str) -> Result<PathBuf, ApplyPatch
     Ok(workspace_root.join(candidate))
 }
 
-fn read_patch_target(resolved: &Path, path: &str) -> Result<String, ApplyPatchError> {
-    std::fs::read_to_string(resolved).map_err(|_| ApplyPatchError::FileNotFound {
-        path: path.to_string(),
-    })
+fn read_patch_target(resolved: &Path, path: &FilePath) -> Result<String, ApplyPatchError> {
+    std::fs::read_to_string(resolved)
+        .map_err(|_| ApplyPatchError::FileNotFound { path: path.clone() })
 }
 
 fn write_patch_error<W: Write>(

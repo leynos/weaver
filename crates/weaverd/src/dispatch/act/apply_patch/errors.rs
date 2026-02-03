@@ -2,21 +2,23 @@
 
 use serde::Serialize;
 
+use crate::dispatch::act::apply_patch::types::FilePath;
+
 #[derive(Debug)]
 pub(crate) enum ApplyPatchError {
     EmptyPatch,
     BinaryPatch,
     MissingDiffHeader,
     InvalidDiffHeader { line: String },
-    MissingSearchReplace { path: String },
-    MissingHunk { path: String },
-    UnclosedSearchBlock { path: String },
-    UnclosedReplaceBlock { path: String },
-    InvalidPath { path: String, reason: String },
-    FileNotFound { path: String },
-    FileAlreadyExists { path: String },
-    DeleteMissing { path: String },
-    SearchBlockNotFound { path: String, block_index: usize },
+    MissingSearchReplace { path: FilePath },
+    MissingHunk { path: FilePath },
+    UnclosedSearchBlock { path: FilePath },
+    UnclosedReplaceBlock { path: FilePath },
+    InvalidPath { path: FilePath, reason: String },
+    FileNotFound { path: FilePath },
+    FileAlreadyExists { path: FilePath },
+    DeleteMissing { path: FilePath },
+    SearchBlockNotFound { path: FilePath, block_index: usize },
 }
 
 impl ApplyPatchError {

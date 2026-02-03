@@ -1,9 +1,12 @@
 //! Patch parser for the apply-patch command.
 
 use crate::dispatch::act::apply_patch::errors::ApplyPatchError;
-use crate::dispatch::act::apply_patch::types::{PatchOperation, SearchPattern, SearchReplaceBlock};
+use crate::dispatch::act::apply_patch::types::{
+    DiffHeaderLine, FilePath, PatchOperation, PatchText, SearchPattern, SearchReplaceBlock,
+};
 
-pub(crate) fn parse_patch(patch: &str) -> Result<Vec<PatchOperation>, ApplyPatchError> {
+pub(crate) fn parse_patch(patch: &PatchText) -> Result<Vec<PatchOperation>, ApplyPatchError> {
+    let patch = patch.as_str();
     if patch.trim().is_empty() {
         return Err(ApplyPatchError::EmptyPatch);
     }
@@ -12,12 +15,7 @@ pub(crate) fn parse_patch(patch: &str) -> Result<Vec<PatchOperation>, ApplyPatch
     }
 
     let chunks = split_operations(patch)?;
-    let mut operations = Vec::new();
-    for chunk in chunks {
-        operations.push(parse_operation(chunk)?);
-    }
-
-    Ok(operations)
+    chunks.into_iter().map(parse_operation).collect()
 }
 
 fn split_operations(patch: &str) -> Result<Vec<&str>, ApplyPatchError> {
@@ -45,69 +43,36 @@ fn split_operations(patch: &str) -> Result<Vec<&str>, ApplyPatchError> {
 }
 
 fn parse_operation(chunk: &str) -> Result<PatchOperation, ApplyPatchError> {
-    let mut offset = 0;
-    let mut header_seen = false;
-    let mut path = String::new();
+    let (path, mut offset) = parse_header(chunk)?;
+    let path = FilePath::new(path);
     let mut mode = OperationMode::Unknown;
-    let mut blocks: Vec<SearchReplaceBlock> = Vec::new();
-    let mut create_content = String::new();
-    let mut in_hunk = false;
-    let mut capture_hunk = false;
-    let mut saw_hunk = false;
-    let mut search_start: Option<usize> = None;
-    let mut replace_start: Option<usize> = None;
+    let mut search_replace = SearchReplaceParser::new();
+    let mut create_capture = CreateContentCapture::new();
 
-    for line in chunk.split_inclusive('\n') {
+    for line in chunk[offset..].split_inclusive('\n') {
         let line_start = offset;
         let line_end = offset + line.len();
         let trimmed = trim_line(line);
+        let line_type = classify_line(trimmed);
 
-        if !header_seen {
-            if !trimmed.starts_with("diff --git ") {
-                return Err(ApplyPatchError::InvalidDiffHeader {
-                    line: trimmed.to_string(),
-                });
+        match line_type {
+            LineType::SearchMarker => {
+                mode = mode.promote(OperationMode::Modify);
+                search_replace.handle_search_marker(line_end);
+                offset = line_end;
+                continue;
             }
-            let (_, b_path) = parse_diff_paths(trimmed)?;
-            path = strip_prefix(b_path);
-            header_seen = true;
-            offset = line_end;
-            continue;
-        }
-
-        if trimmed == "<<<<<<< SEARCH" {
-            mode = mode.promote(OperationMode::Modify);
-            search_start = Some(line_end);
-            replace_start = None;
-            offset = line_end;
-            continue;
-        }
-
-        if trimmed == "=======" {
-            if let Some(start) = search_start {
-                let search = &chunk[start..line_start];
-                replace_start = Some(line_end);
-                blocks.push(SearchReplaceBlock {
-                    search: SearchPattern::new(search),
-                    replace: String::new(),
-                });
+            LineType::Separator => {
+                search_replace.handle_separator(chunk, line_start);
+                offset = line_end;
+                continue;
             }
-            offset = line_end;
-            continue;
-        }
-
-        if trimmed == ">>>>>>> REPLACE" {
-            let Some(start) = replace_start else {
-                return Err(ApplyPatchError::UnclosedSearchBlock { path });
-            };
-            let replace = &chunk[start..line_start];
-            if let Some(last) = blocks.last_mut() {
-                last.replace = replace.to_string();
+            LineType::ReplaceMarker => {
+                search_replace.handle_replace_marker(chunk, line_start, path.as_str())?;
+                offset = line_end;
+                continue;
             }
-            search_start = None;
-            replace_start = None;
-            offset = line_end;
-            continue;
+            _ => {}
         }
 
         if trimmed.starts_with("new file mode ") {
@@ -117,55 +82,227 @@ fn parse_operation(chunk: &str) -> Result<PatchOperation, ApplyPatchError> {
             mode = mode.promote(OperationMode::Delete);
         }
 
-        if trimmed.starts_with("@@") {
-            saw_hunk = true;
-            if mode == OperationMode::Create && !in_hunk {
-                in_hunk = true;
-                capture_hunk = true;
-            } else if mode == OperationMode::Create {
-                capture_hunk = false;
+        match line_type {
+            LineType::HunkHeader => {
+                if mode == OperationMode::Create {
+                    create_capture.handle_hunk_header();
+                }
             }
-        } else if trimmed.starts_with("diff --git ") {
-            return Err(ApplyPatchError::InvalidDiffHeader {
-                line: trimmed.to_string(),
-            });
+            LineType::DiffHeader => {
+                return Err(ApplyPatchError::InvalidDiffHeader {
+                    line: trimmed.to_string(),
+                });
+            }
+            _ => {}
         }
 
-        if mode == OperationMode::Create && capture_hunk && trimmed.starts_with('+') {
-            let (content, ending) = split_line_content(line);
-            create_content.push_str(content);
-            create_content.push_str(ending);
+        if mode == OperationMode::Create && line_type == LineType::CreateContent {
+            create_capture.capture_line(line);
         }
 
         offset = line_end;
     }
 
-    if search_start.is_some() && replace_start.is_none() {
-        return Err(ApplyPatchError::UnclosedSearchBlock { path });
-    }
-    if replace_start.is_some() {
-        return Err(ApplyPatchError::UnclosedReplaceBlock { path });
+    search_replace.validate_complete(path.as_str())?;
+    construct_operation(mode, path, search_replace, create_capture)
+}
+
+fn parse_header(chunk: &str) -> Result<(String, usize), ApplyPatchError> {
+    if chunk.is_empty() {
+        return Err(ApplyPatchError::MissingDiffHeader);
     }
 
+    let mut lines = chunk.split_inclusive('\n');
+    let Some(line) = lines.next() else {
+        return Err(ApplyPatchError::MissingDiffHeader);
+    };
+    let line_end = line.len();
+    let trimmed = trim_line(line);
+    if !trimmed.starts_with("diff --git ") {
+        return Err(ApplyPatchError::InvalidDiffHeader {
+            line: trimmed.to_string(),
+        });
+    }
+
+    let header = DiffHeaderLine::new(trimmed);
+    let (_, b_path) = parse_diff_paths(header.as_str())?;
+    let path = strip_prefix(b_path).into_string();
+    Ok((path, line_end))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LineType {
+    SearchMarker,
+    Separator,
+    ReplaceMarker,
+    HunkHeader,
+    DiffHeader,
+    CreateContent,
+    Other,
+}
+
+fn classify_line(trimmed: &str) -> LineType {
+    if trimmed == "<<<<<<< SEARCH" {
+        LineType::SearchMarker
+    } else if trimmed == "=======" {
+        LineType::Separator
+    } else if trimmed == ">>>>>>> REPLACE" {
+        LineType::ReplaceMarker
+    } else if trimmed.starts_with("@@") {
+        LineType::HunkHeader
+    } else if trimmed.starts_with("diff --git ") {
+        LineType::DiffHeader
+    } else if trimmed.starts_with('+') {
+        LineType::CreateContent
+    } else {
+        LineType::Other
+    }
+}
+
+struct SearchReplaceParser {
+    blocks: Vec<SearchReplaceBlock>,
+    search_start: Option<usize>,
+    replace_start: Option<usize>,
+}
+
+impl SearchReplaceParser {
+    fn new() -> Self {
+        Self {
+            blocks: Vec::new(),
+            search_start: None,
+            replace_start: None,
+        }
+    }
+
+    fn handle_search_marker(&mut self, offset: usize) {
+        self.search_start = Some(offset);
+        self.replace_start = None;
+    }
+
+    fn handle_separator(&mut self, chunk: &str, line_start: usize) {
+        if let Some(start) = self.search_start {
+            let search = &chunk[start..line_start];
+            self.replace_start = Some(line_end_from_chunk(chunk, line_start));
+            self.blocks.push(SearchReplaceBlock {
+                search: SearchPattern::new(search),
+                replace: String::new(),
+            });
+        }
+    }
+
+    fn handle_replace_marker(
+        &mut self,
+        chunk: &str,
+        line_start: usize,
+        path: &str,
+    ) -> Result<(), ApplyPatchError> {
+        let Some(start) = self.replace_start else {
+            return Err(ApplyPatchError::UnclosedSearchBlock {
+                path: FilePath::new(path),
+            });
+        };
+        let replace = &chunk[start..line_start];
+        if let Some(last) = self.blocks.last_mut() {
+            last.replace = replace.to_string();
+        }
+        self.search_start = None;
+        self.replace_start = None;
+        Ok(())
+    }
+
+    fn validate_complete(&self, path: &str) -> Result<(), ApplyPatchError> {
+        if self.search_start.is_some() && self.replace_start.is_none() {
+            return Err(ApplyPatchError::UnclosedSearchBlock {
+                path: FilePath::new(path),
+            });
+        }
+        if self.replace_start.is_some() {
+            return Err(ApplyPatchError::UnclosedReplaceBlock {
+                path: FilePath::new(path),
+            });
+        }
+        Ok(())
+    }
+
+    fn into_blocks(self) -> Vec<SearchReplaceBlock> {
+        self.blocks
+    }
+}
+
+struct CreateContentCapture {
+    content: String,
+    in_hunk: bool,
+    capture_hunk: bool,
+    saw_hunk: bool,
+}
+
+impl CreateContentCapture {
+    fn new() -> Self {
+        Self {
+            content: String::new(),
+            in_hunk: false,
+            capture_hunk: false,
+            saw_hunk: false,
+        }
+    }
+
+    fn handle_hunk_header(&mut self) {
+        self.saw_hunk = true;
+        if !self.in_hunk {
+            self.in_hunk = true;
+            self.capture_hunk = true;
+        } else {
+            self.capture_hunk = false;
+        }
+    }
+
+    fn capture_line(&mut self, line: &str) {
+        if !self.capture_hunk {
+            return;
+        }
+        let (content, ending) = split_line_content(line);
+        self.content.push_str(content);
+        self.content.push_str(ending);
+    }
+
+    fn validate_and_finish(self, path: &str) -> Result<String, ApplyPatchError> {
+        if !self.saw_hunk {
+            return Err(ApplyPatchError::MissingHunk {
+                path: FilePath::new(path),
+            });
+        }
+        Ok(self.content)
+    }
+}
+
+fn construct_operation(
+    mode: OperationMode,
+    path: FilePath,
+    search_replace: SearchReplaceParser,
+    create_capture: CreateContentCapture,
+) -> Result<PatchOperation, ApplyPatchError> {
     match mode {
         OperationMode::Modify => {
+            let blocks = search_replace.into_blocks();
             if blocks.is_empty() {
                 return Err(ApplyPatchError::MissingSearchReplace { path });
             }
             Ok(PatchOperation::Modify { path, blocks })
         }
         OperationMode::Create => {
-            if !saw_hunk {
-                return Err(ApplyPatchError::MissingHunk { path });
-            }
-            Ok(PatchOperation::Create {
-                path,
-                content: create_content,
-            })
+            let content = create_capture.validate_and_finish(path.as_str())?;
+            Ok(PatchOperation::Create { path, content })
         }
         OperationMode::Delete => Ok(PatchOperation::Delete { path }),
         OperationMode::Unknown => Err(ApplyPatchError::MissingDiffHeader),
     }
+}
+
+fn line_end_from_chunk(chunk: &str, line_start: usize) -> usize {
+    chunk[line_start..]
+        .find('\n')
+        .map(|offset| line_start + offset + 1)
+        .unwrap_or(chunk.len())
 }
 
 fn trim_line(line: &str) -> &str {
@@ -234,11 +371,13 @@ fn read_unquoted_token(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> 
     value
 }
 
-fn strip_prefix(path: String) -> String {
-    path.strip_prefix("b/")
-        .or_else(|| path.strip_prefix("b\\"))
-        .unwrap_or(path.as_str())
-        .to_string()
+fn strip_prefix(path: String) -> FilePath {
+    FilePath::new(
+        path.strip_prefix("b/")
+            .or_else(|| path.strip_prefix("b\\"))
+            .unwrap_or(path.as_str())
+            .to_string(),
+    )
 }
 
 fn split_line_content(line: &str) -> (&str, &str) {
@@ -276,6 +415,7 @@ impl OperationMode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dispatch::act::apply_patch::types::PatchText;
 
     #[test]
     fn parses_modify_operation() {
@@ -287,11 +427,11 @@ mod tests {
             "fn main() { println!(\"hi\"); }\n",
             ">>>>>>> REPLACE\n",
         );
-        let ops = parse_patch(patch).expect("parse patch");
+        let ops = parse_patch(&PatchText::from(patch)).expect("parse patch");
         assert_eq!(ops.len(), 1);
         match &ops[0] {
             PatchOperation::Modify { path, blocks } => {
-                assert_eq!(path, "src/lib.rs");
+                assert_eq!(path.as_str(), "src/lib.rs");
                 assert_eq!(blocks.len(), 1);
             }
             other => panic!("unexpected operation: {other:?}"),
@@ -309,7 +449,7 @@ mod tests {
             "+fn hello() {}\n",
             "+fn world() {}\n",
         );
-        let ops = parse_patch(patch).expect("parse patch");
+        let ops = parse_patch(&PatchText::from(patch)).expect("parse patch");
         match &ops[0] {
             PatchOperation::Create { content, .. } => {
                 assert!(content.contains("fn hello()"));
@@ -329,7 +469,7 @@ mod tests {
             "@@ -0,0 +1,1 @@\n",
             "++++hello\n",
         );
-        let ops = parse_patch(patch).expect("parse patch");
+        let ops = parse_patch(&PatchText::from(patch)).expect("parse patch");
         match &ops[0] {
             PatchOperation::Create { content, .. } => {
                 assert!(content.contains("+++hello"));
@@ -344,10 +484,10 @@ mod tests {
             "diff --git a/src/remove.rs b/src/remove.rs\n",
             "deleted file mode 100644\n",
         );
-        let ops = parse_patch(patch).expect("parse patch");
+        let ops = parse_patch(&PatchText::from(patch)).expect("parse patch");
         match &ops[0] {
             PatchOperation::Delete { path } => {
-                assert_eq!(path, "src/remove.rs");
+                assert_eq!(path.as_str(), "src/remove.rs");
             }
             other => panic!("unexpected operation: {other:?}"),
         }
@@ -355,7 +495,7 @@ mod tests {
 
     #[test]
     fn rejects_missing_diff_header() {
-        let error = parse_patch("not a patch").expect_err("should fail");
+        let error = parse_patch(&PatchText::from("not a patch")).expect_err("should fail");
         assert!(matches!(error, ApplyPatchError::MissingDiffHeader));
     }
 
@@ -366,7 +506,7 @@ mod tests {
             "<<<<<<< SEARCH\n",
             "fn main() {}\n",
         );
-        let error = parse_patch(patch).expect_err("should fail");
+        let error = parse_patch(&PatchText::from(patch)).expect_err("should fail");
         assert!(matches!(error, ApplyPatchError::UnclosedSearchBlock { .. }));
     }
 }
