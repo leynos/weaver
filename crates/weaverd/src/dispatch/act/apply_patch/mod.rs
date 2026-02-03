@@ -161,7 +161,7 @@ impl<'a> ApplyPatchExecutor<'a> {
         path: &FilePath,
         blocks: &[SearchReplaceBlock],
     ) -> Result<ContentChange, ApplyPatchError> {
-        let resolved = resolve_path(&self.workspace_root, path)?;
+        let resolved = self.resolve_and_validate(path)?;
         let original = read_patch_target(&resolved, path)?;
         let original = FileContent::new(original);
         let modified = apply_search_replace(path, &original, blocks)?;
@@ -173,7 +173,7 @@ impl<'a> ApplyPatchExecutor<'a> {
         path: &FilePath,
         content: &str,
     ) -> Result<ContentChange, ApplyPatchError> {
-        let resolved = resolve_path(&self.workspace_root, path)?;
+        let resolved = self.resolve_and_validate(path)?;
         if resolved.exists() {
             return Err(ApplyPatchError::FileAlreadyExists { path: path.clone() });
         }
@@ -181,11 +181,16 @@ impl<'a> ApplyPatchExecutor<'a> {
     }
 
     fn build_delete_change(&self, path: &FilePath) -> Result<ContentChange, ApplyPatchError> {
-        let resolved = resolve_path(&self.workspace_root, path)?;
+        let resolved = self.resolve_and_validate(path)?;
         if !resolved.exists() {
             return Err(ApplyPatchError::DeleteMissing { path: path.clone() });
         }
         Ok(ContentChange::delete(resolved))
+    }
+
+    /// Resolves and validates a patch path within the workspace.
+    fn resolve_and_validate(&self, path: &FilePath) -> Result<PathBuf, ApplyPatchError> {
+        resolve_path(&self.workspace_root, path)
     }
 }
 
@@ -245,6 +250,17 @@ fn read_patch_target(resolved: &Path, path: &FilePath) -> Result<String, ApplyPa
         .map_err(|_| ApplyPatchError::FileNotFound { path: path.clone() })
 }
 
+/// Generic helper to write serialisable error payloads to stderr.
+fn write_error_payload<W: Write, T: serde::Serialize>(
+    writer: &mut ResponseWriter<W>,
+    payload: &T,
+    status: i32,
+) -> Result<DispatchResult, DispatchError> {
+    let json = serde_json::to_string(payload)?;
+    writer.write_stderr(json)?;
+    Ok(DispatchResult::with_status(status))
+}
+
 fn write_patch_error<W: Write>(
     writer: &mut ResponseWriter<W>,
     error: ApplyPatchError,
@@ -260,9 +276,7 @@ fn write_verification_error<W: Write>(
     failures: Vec<VerificationFailure>,
 ) -> Result<DispatchResult, DispatchError> {
     let payload = VerificationErrorEnvelope::from_failures(phase, failures);
-    let json = serde_json::to_string(&payload)?;
-    writer.write_stderr(json)?;
-    Ok(DispatchResult::with_status(1))
+    write_error_payload(writer, &payload, 1)
 }
 
 fn write_backend_error<W: Write>(
@@ -272,9 +286,7 @@ fn write_backend_error<W: Write>(
     status: i32,
 ) -> Result<DispatchResult, DispatchError> {
     let payload = GenericErrorEnvelope::new(kind, message);
-    let json = serde_json::to_string(&payload)?;
-    writer.write_stderr(json)?;
-    Ok(DispatchResult::with_status(status))
+    write_error_payload(writer, &payload, status)
 }
 
 #[cfg(test)]
