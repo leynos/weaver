@@ -1,7 +1,7 @@
 //! Patch parser for the apply-patch command.
 
 use crate::dispatch::act::apply_patch::errors::ApplyPatchError;
-use crate::dispatch::act::apply_patch::types::{PatchOperation, SearchReplaceBlock};
+use crate::dispatch::act::apply_patch::types::{PatchOperation, SearchPattern, SearchReplaceBlock};
 
 pub(crate) fn parse_patch(patch: &str) -> Result<Vec<PatchOperation>, ApplyPatchError> {
     if patch.trim().is_empty() {
@@ -88,7 +88,7 @@ fn parse_operation(chunk: &str) -> Result<PatchOperation, ApplyPatchError> {
                 let search = &chunk[start..line_start];
                 replace_start = Some(line_end);
                 blocks.push(SearchReplaceBlock {
-                    search: search.to_string(),
+                    search: SearchPattern::new(search),
                     replace: String::new(),
                 });
             }

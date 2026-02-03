@@ -30,7 +30,7 @@ use self::matcher::apply_search_replace;
 use self::parser::parse_patch;
 use self::payloads::{ApplyPatchSummary, GenericErrorEnvelope, VerificationErrorEnvelope};
 use self::semantic_lock::LspSemanticLockAdapter;
-use self::types::{PatchOperation, SearchReplaceBlock};
+use self::types::{FileContent, FilePath, PatchOperation, SearchReplaceBlock};
 
 /// Handles `act apply-patch` requests.
 pub fn handle<W: Write>(
@@ -162,8 +162,10 @@ impl<'a> ApplyPatchExecutor<'a> {
     ) -> Result<ContentChange, ApplyPatchError> {
         let resolved = resolve_path(&self.workspace_root, path)?;
         let original = read_patch_target(&resolved, path)?;
-        let modified = apply_search_replace(path, &original, blocks)?;
-        Ok(ContentChange::write(resolved, modified))
+        let file_path = FilePath::new(path);
+        let original = FileContent::new(original);
+        let modified = apply_search_replace(&file_path, &original, blocks)?;
+        Ok(ContentChange::write(resolved, modified.into_string()))
     }
 
     fn build_create_change(

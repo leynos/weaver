@@ -1,16 +1,18 @@
 //! Search/replace matching helpers for apply-patch modifications.
 
 use crate::dispatch::act::apply_patch::errors::ApplyPatchError;
-use crate::dispatch::act::apply_patch::types::{LineEnding, SearchReplaceBlock};
+use crate::dispatch::act::apply_patch::types::{
+    FileContent, FilePath, LineEnding, SearchPattern, SearchReplaceBlock,
+};
 
 pub(crate) fn apply_search_replace(
-    path: &str,
-    original: &str,
+    path: &FilePath,
+    original: &FileContent,
     blocks: &[SearchReplaceBlock],
-) -> Result<String, ApplyPatchError> {
-    let mut content = original.to_string();
+) -> Result<FileContent, ApplyPatchError> {
+    let mut content = FileContent::new(original.as_str());
     let mut cursor = 0;
-    let line_ending = dominant_line_ending(original);
+    let line_ending = dominant_line_ending(original.as_str());
 
     for (index, block) in blocks.iter().enumerate() {
         let (start, end) = if let Some(found) = find_exact(&content, cursor, &block.search) {
@@ -19,12 +21,12 @@ pub(crate) fn apply_search_replace(
             found
         } else {
             return Err(ApplyPatchError::SearchBlockNotFound {
-                path: path.to_string(),
+                path: path.as_str().to_string(),
                 block_index: index + 1,
             });
         };
 
-        let replacement = normalise_line_endings(&block.replace, line_ending);
+        let replacement = normalise_line_endings(block.replace.as_str(), line_ending);
         content.replace_range(start..end, &replacement);
         cursor = start + replacement.len();
     }
@@ -32,7 +34,13 @@ pub(crate) fn apply_search_replace(
     Ok(content)
 }
 
-fn find_exact(content: &str, cursor: usize, search: &str) -> Option<(usize, usize)> {
+fn find_exact(
+    content: &FileContent,
+    cursor: usize,
+    search: &SearchPattern,
+) -> Option<(usize, usize)> {
+    let content = content.as_str();
+    let search = search.as_str();
     content[cursor..].find(search).map(|offset| {
         let start = cursor + offset;
         let end = start + search.len();
@@ -40,9 +48,13 @@ fn find_exact(content: &str, cursor: usize, search: &str) -> Option<(usize, usiz
     })
 }
 
-fn find_fuzzy(content: &str, cursor: usize, search: &str) -> Option<(usize, usize)> {
-    let normalized_content = NormalizedContent::new(content);
-    let normalized_search = normalise_line_endings(search, LineEnding::Lf);
+fn find_fuzzy(
+    content: &FileContent,
+    cursor: usize,
+    search: &SearchPattern,
+) -> Option<(usize, usize)> {
+    let normalized_content = NormalizedContent::new(content.as_str());
+    let normalized_search = normalise_line_endings(search.as_str(), LineEnding::Lf);
     let trimmed_search = trim_fuzzy_whitespace(&normalized_search);
     if trimmed_search.is_empty() {
         return None;
@@ -149,13 +161,15 @@ mod tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::dispatch::act::apply_patch::types::SearchReplaceBlock;
+    use crate::dispatch::act::apply_patch::types::{
+        FileContent, FilePath, SearchPattern, SearchReplaceBlock,
+    };
 
     #[rstest]
     #[case::exact_match(
         "alpha\nbeta\ngamma\n",
         vec![SearchReplaceBlock {
-            search: "beta\n".to_string(),
+            search: SearchPattern::new("beta\n"),
             replace: "delta\n".to_string(),
         }],
         "alpha\ndelta\ngamma\n",
@@ -163,7 +177,7 @@ mod tests {
     #[case::fuzzy_line_endings(
         "alpha\r\nbeta\r\ngamma\r\n",
         vec![SearchReplaceBlock {
-            search: "beta\n".to_string(),
+            search: SearchPattern::new("beta\n"),
             replace: "delta\n".to_string(),
         }],
         "alpha\r\ndelta\r\ngamma\r\n",
@@ -172,11 +186,11 @@ mod tests {
         "one two one two",
         vec![
             SearchReplaceBlock {
-                search: "one".to_string(),
+                search: SearchPattern::new("one"),
                 replace: "ONE".to_string(),
             },
             SearchReplaceBlock {
-                search: "one".to_string(),
+                search: SearchPattern::new("one"),
                 replace: "UNO".to_string(),
             },
         ],
@@ -187,17 +201,21 @@ mod tests {
         #[case] blocks: Vec<SearchReplaceBlock>,
         #[case] expected: &str,
     ) {
-        let result = apply_search_replace("file.txt", original, &blocks).expect("apply");
-        assert_eq!(result, expected);
+        let path = FilePath::new("file.txt");
+        let original = FileContent::new(original);
+        let result = apply_search_replace(&path, &original, &blocks).expect("apply");
+        assert_eq!(result.as_str(), expected);
     }
 
     #[test]
     fn apply_search_replace_rejects_missing_block() {
         let blocks = vec![SearchReplaceBlock {
-            search: "missing".to_string(),
+            search: SearchPattern::new("missing"),
             replace: "new".to_string(),
         }];
-        let error = apply_search_replace("file.txt", "content", &blocks).expect_err("error");
+        let path = FilePath::new("file.txt");
+        let original = FileContent::new("content");
+        let error = apply_search_replace(&path, &original, &blocks).expect_err("error");
         match error {
             ApplyPatchError::SearchBlockNotFound { path, block_index } => {
                 assert_eq!(path, "file.txt");
