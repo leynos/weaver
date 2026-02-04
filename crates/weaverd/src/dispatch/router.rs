@@ -135,27 +135,6 @@ impl<'a, W: Write> RouteContext<'a, W> {
     }
 }
 
-/// Inputs required to build a routing context.
-struct RouteInputs<'a, W: Write> {
-    request: &'a CommandRequest,
-    writer: &'a mut ResponseWriter<W>,
-    backends: &'a mut FusionBackends<SemanticBackendProvider>,
-}
-
-impl<'a, W: Write> RouteInputs<'a, W> {
-    fn new(
-        request: &'a CommandRequest,
-        writer: &'a mut ResponseWriter<W>,
-        backends: &'a mut FusionBackends<SemanticBackendProvider>,
-    ) -> Self {
-        Self {
-            request,
-            writer,
-            backends,
-        }
-    }
-}
-
 /// Routes commands to domain handlers.
 ///
 /// The router parses the domain from the request, validates the operation, and
@@ -200,18 +179,15 @@ impl DomainRouter {
     /// Generic routing for domains with specific operation handlers.
     fn route_with_handlers<W: Write, F>(
         &self,
-        inputs: RouteInputs<'_, W>,
+        request: &CommandRequest,
+        writer: &mut ResponseWriter<W>,
+        backends: &mut FusionBackends<SemanticBackendProvider>,
         routing: &DomainRoutingContext,
         handler: F,
     ) -> Result<DispatchResult, DispatchError>
     where
         F: FnOnce(&str, &mut RouteContext<'_, W>) -> Option<Result<DispatchResult, DispatchError>>,
     {
-        let RouteInputs {
-            request,
-            writer,
-            backends,
-        } = inputs;
         let mut context = RouteContext::new(request, writer, backends);
         let operation = context.request.operation().to_ascii_lowercase();
 
@@ -232,9 +208,10 @@ impl DomainRouter {
         writer: &mut ResponseWriter<W>,
         backends: &mut FusionBackends<SemanticBackendProvider>,
     ) -> Result<DispatchResult, DispatchError> {
-        let inputs = RouteInputs::new(request, writer, backends);
         self.route_with_handlers(
-            inputs,
+            request,
+            writer,
+            backends,
             &DomainRoutingContext::OBSERVE,
             |operation, context| match operation {
                 "get-definition" => Some(observe::get_definition::handle(
@@ -253,17 +230,20 @@ impl DomainRouter {
         writer: &mut ResponseWriter<W>,
         backends: &mut FusionBackends<SemanticBackendProvider>,
     ) -> Result<DispatchResult, DispatchError> {
-        let inputs = RouteInputs::new(request, writer, backends);
-        self.route_with_handlers(inputs, &DomainRoutingContext::ACT, |operation, context| {
-            match operation {
+        self.route_with_handlers(
+            request,
+            writer,
+            backends,
+            &DomainRoutingContext::ACT,
+            |operation, context| match operation {
                 "apply-patch" => Some(act::apply_patch::handle(
                     context.request,
                     context.writer,
                     context.backends,
                 )),
                 _ => None,
-            }
-        })
+            },
+        )
     }
 
     fn route_verify<W: Write>(
