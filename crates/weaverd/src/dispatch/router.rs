@@ -114,6 +114,27 @@ impl DomainRoutingContext {
     };
 }
 
+/// Request context for routing and executing domain handlers.
+struct RouteContext<'a, W: Write> {
+    request: &'a CommandRequest,
+    writer: &'a mut ResponseWriter<W>,
+    backends: &'a mut FusionBackends<SemanticBackendProvider>,
+}
+
+impl<'a, W: Write> RouteContext<'a, W> {
+    fn new(
+        request: &'a CommandRequest,
+        writer: &'a mut ResponseWriter<W>,
+        backends: &'a mut FusionBackends<SemanticBackendProvider>,
+    ) -> Self {
+        Self {
+            request,
+            writer,
+            backends,
+        }
+    }
+}
+
 /// Routes commands to domain handlers.
 ///
 /// The router parses the domain from the request, validates the operation, and
@@ -155,23 +176,48 @@ impl DomainRouter {
         }
     }
 
+    /// Generic routing for domains with specific operation handlers.
+    fn route_with_handlers<W: Write, F>(
+        &self,
+        context: &mut RouteContext<'_, W>,
+        routing: &DomainRoutingContext,
+        handler: F,
+    ) -> Result<DispatchResult, DispatchError>
+    where
+        F: FnOnce(&str, &mut RouteContext<'_, W>) -> Option<Result<DispatchResult, DispatchError>>,
+    {
+        let operation = context.request.operation().to_ascii_lowercase();
+
+        if let Some(result) = handler(operation.as_str(), context) {
+            return result;
+        }
+
+        if routing.known_operations.contains(&operation.as_str()) {
+            return self.write_not_implemented(context.writer, routing.domain, &operation);
+        }
+
+        Err(DispatchError::unknown_operation(routing.domain, operation))
+    }
+
     fn route_observe<W: Write>(
         &self,
         request: &CommandRequest,
         writer: &mut ResponseWriter<W>,
         backends: &mut FusionBackends<SemanticBackendProvider>,
     ) -> Result<DispatchResult, DispatchError> {
-        let operation = request.operation().to_ascii_lowercase();
-        match operation.as_str() {
-            "get-definition" => observe::get_definition::handle(request, writer, backends),
-            _ if DomainRoutingContext::OBSERVE
-                .known_operations
-                .contains(&operation.as_str()) =>
-            {
-                self.write_not_implemented(writer, "observe", &operation)
-            }
-            _ => Err(DispatchError::unknown_operation("observe", operation)),
-        }
+        let mut context = RouteContext::new(request, writer, backends);
+        self.route_with_handlers(
+            &mut context,
+            &DomainRoutingContext::OBSERVE,
+            |operation, context| match operation {
+                "get-definition" => Some(observe::get_definition::handle(
+                    context.request,
+                    context.writer,
+                    context.backends,
+                )),
+                _ => None,
+            },
+        )
     }
 
     fn route_act<W: Write>(
@@ -180,17 +226,19 @@ impl DomainRouter {
         writer: &mut ResponseWriter<W>,
         backends: &mut FusionBackends<SemanticBackendProvider>,
     ) -> Result<DispatchResult, DispatchError> {
-        let operation = request.operation().to_ascii_lowercase();
-        match operation.as_str() {
-            "apply-patch" => act::apply_patch::handle(request, writer, backends),
-            _ if DomainRoutingContext::ACT
-                .known_operations
-                .contains(&operation.as_str()) =>
-            {
-                self.write_not_implemented(writer, "act", &operation)
-            }
-            _ => Err(DispatchError::unknown_operation("act", operation)),
-        }
+        let mut context = RouteContext::new(request, writer, backends);
+        self.route_with_handlers(
+            &mut context,
+            &DomainRoutingContext::ACT,
+            |operation, context| match operation {
+                "apply-patch" => Some(act::apply_patch::handle(
+                    context.request,
+                    context.writer,
+                    context.backends,
+                )),
+                _ => None,
+            },
+        )
     }
 
     fn route_verify<W: Write>(

@@ -21,8 +21,8 @@ pub mod output;
 mod runtime_utils;
 mod transport;
 
-pub(crate) use cli::{Cli, CliCommand, DaemonAction};
 pub use cli::OutputFormat;
+pub(crate) use cli::{Cli, CliCommand, DaemonAction};
 #[cfg(test)]
 pub(crate) use command::CommandDescriptor;
 pub(crate) use command::{CommandInvocation, CommandRequest};

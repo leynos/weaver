@@ -85,6 +85,12 @@ pub(crate) struct ApplyPatchExecutor<'a> {
     semantic_lock: &'a dyn SemanticLock,
 }
 
+/// Represents the kind of file system change to validate and construct.
+enum ChangeKind {
+    Create(String),
+    Delete,
+}
+
 impl<'a> ApplyPatchExecutor<'a> {
     pub(crate) fn new(
         workspace_root: PathBuf,
@@ -173,24 +179,40 @@ impl<'a> ApplyPatchExecutor<'a> {
         path: &FilePath,
         content: &str,
     ) -> Result<ContentChange, ApplyPatchError> {
-        let resolved = self.resolve_and_validate(path)?;
-        if resolved.exists() {
-            return Err(ApplyPatchError::FileAlreadyExists { path: path.clone() });
-        }
-        Ok(ContentChange::write(resolved, content.to_string()))
+        self.build_validated_change(path, ChangeKind::Create(content.to_string()))
     }
 
     fn build_delete_change(&self, path: &FilePath) -> Result<ContentChange, ApplyPatchError> {
-        let resolved = self.resolve_and_validate(path)?;
-        if !resolved.exists() {
-            return Err(ApplyPatchError::DeleteMissing { path: path.clone() });
-        }
-        Ok(ContentChange::delete(resolved))
+        self.build_validated_change(path, ChangeKind::Delete)
     }
 
     /// Resolves and validates a patch path within the workspace.
     fn resolve_and_validate(&self, path: &FilePath) -> Result<PathBuf, ApplyPatchError> {
         resolve_path(&self.workspace_root, path)
+    }
+
+    /// Builds a validated content change after checking existence constraints.
+    fn build_validated_change(
+        &self,
+        path: &FilePath,
+        kind: ChangeKind,
+    ) -> Result<ContentChange, ApplyPatchError> {
+        let resolved = self.resolve_and_validate(path)?;
+
+        match kind {
+            ChangeKind::Create(content) => {
+                if resolved.exists() {
+                    return Err(ApplyPatchError::FileAlreadyExists { path: path.clone() });
+                }
+                Ok(ContentChange::write(resolved, content))
+            }
+            ChangeKind::Delete => {
+                if !resolved.exists() {
+                    return Err(ApplyPatchError::DeleteMissing { path: path.clone() });
+                }
+                Ok(ContentChange::delete(resolved))
+            }
+        }
     }
 }
 
