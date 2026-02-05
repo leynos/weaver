@@ -179,19 +179,16 @@ impl DomainRouter {
     /// Generic routing for domains with specific operation handlers.
     fn route_with_handlers<W: Write, F>(
         &self,
-        request: &CommandRequest,
-        writer: &mut ResponseWriter<W>,
-        backends: &mut FusionBackends<SemanticBackendProvider>,
+        context: &mut RouteContext<'_, W>,
         routing: &DomainRoutingContext,
         handler: F,
     ) -> Result<DispatchResult, DispatchError>
     where
         F: FnOnce(&str, &mut RouteContext<'_, W>) -> Option<Result<DispatchResult, DispatchError>>,
     {
-        let mut context = RouteContext::new(request, writer, backends);
         let operation = context.request.operation().to_ascii_lowercase();
 
-        if let Some(result) = handler(operation.as_str(), &mut context) {
+        if let Some(result) = handler(operation.as_str(), context) {
             return result;
         }
 
@@ -208,10 +205,9 @@ impl DomainRouter {
         writer: &mut ResponseWriter<W>,
         backends: &mut FusionBackends<SemanticBackendProvider>,
     ) -> Result<DispatchResult, DispatchError> {
+        let mut context = RouteContext::new(request, writer, backends);
         self.route_with_handlers(
-            request,
-            writer,
-            backends,
+            &mut context,
             &DomainRoutingContext::OBSERVE,
             |operation, context| match operation {
                 "get-definition" => Some(observe::get_definition::handle(
@@ -230,10 +226,9 @@ impl DomainRouter {
         writer: &mut ResponseWriter<W>,
         backends: &mut FusionBackends<SemanticBackendProvider>,
     ) -> Result<DispatchResult, DispatchError> {
+        let mut context = RouteContext::new(request, writer, backends);
         self.route_with_handlers(
-            request,
-            writer,
-            backends,
+            &mut context,
             &DomainRoutingContext::ACT,
             |operation, context| match operation {
                 "apply-patch" => Some(act::apply_patch::handle(
