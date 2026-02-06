@@ -7,10 +7,15 @@ use std::path::{Path, PathBuf};
 use super::super::error::SafetyHarnessError;
 use super::super::verification::VerificationContext;
 
-/// Tracks files slated for deletion with their original content.
+/// Planned file deletion with rollback context.
+///
+/// Captures the original content so the deletion can be reversed if a later
+/// operation in the transaction fails.
 #[derive(Debug)]
 pub(super) struct DeletePlan {
+    /// Path of the file to delete.
     pub(super) path: PathBuf,
+    /// Original file content for rollback.
     pub(super) original: String,
 }
 
