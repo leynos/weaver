@@ -13,6 +13,7 @@ Feature: Weaver CLI behaviour
     And patch input is available
     When the operator runs "act apply-patch"
     Then the daemon receives "request_act_apply_patch.jsonl"
+    And the CLI exits with code 0
 
   Scenario: Probing capability output
     Given capability overrides force python rename

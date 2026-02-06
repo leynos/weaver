@@ -85,6 +85,12 @@ impl AsRef<str> for FilePath {
     }
 }
 
+impl std::fmt::Display for FilePath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// Content of a file involved in patch operations.
 #[derive(Debug, Clone)]
 pub(crate) struct FileContent(String);

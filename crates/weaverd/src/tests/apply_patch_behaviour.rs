@@ -127,7 +127,11 @@ fn given_default_source(world: &RefCell<ApplyPatchWorld>) {
 }
 
 #[given("an empty workspace")]
-fn given_empty_workspace(_world: &RefCell<ApplyPatchWorld>) {}
+#[expect(
+    unused_variables,
+    reason = "BDD step intentionally relies on the default empty workspace"
+)]
+fn given_empty_workspace(world: &RefCell<ApplyPatchWorld>) {}
 
 #[given("a patch that replaces the main message")]
 fn given_patch_replace(world: &RefCell<ApplyPatchWorld>) {

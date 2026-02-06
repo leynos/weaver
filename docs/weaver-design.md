@@ -375,7 +375,7 @@ environment.^1^
 
 #### 2.1.1. JSONL command envelope and capability probe
 
-The initial CLI implementation serialises every invocation into a single JSONL
+The initial CLI implementation serializes every invocation into a single JSONL
 object. The object contains a `command` descriptor comprising the command
 `domain` (such as `observe`) and `operation` (for example `get-definition`),
 alongside an `arguments` array carrying the remaining tokens verbatim. This
@@ -785,7 +785,7 @@ sequenceDiagram
     Parser-->>User: ParseResult (tree + SyntaxErrorInfo?)
 
     User->>Pattern: compile(pattern_src, language)
-    Pattern->>Parser: parse(wrapped_or_normalised_pattern)
+    Pattern->>Parser: parse(wrapped_or_normalized_pattern)
     Parser-->>Pattern: ParseResult (pattern AST + metavariables)
 
     User->>Matcher: find_all(pattern, parsed_source)
@@ -1648,7 +1648,7 @@ Instead, it returns a structured backend-unavailable error and exits with a
 non-zero status after leaving the filesystem untouched.
 
 Only if both locks pass does the daemon commit the changes atomically. Paths
-are normalised and rejected if they escape the workspace root (for example,
+are normalized and rejected if they escape the workspace root (for example,
 `../..` traversal or absolute paths), preventing patch-based directory
 traversal attacks.
 

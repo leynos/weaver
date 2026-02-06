@@ -106,10 +106,8 @@ impl<'a> ApplyPatchExecutor<'a> {
 
     pub(crate) fn execute(&self, patch: &str) -> Result<ApplyPatchSummary, ApplyPatchFailure> {
         let patch = PatchText::new(patch);
-        let operations = parse_patch(&patch).map_err(ApplyPatchFailure::Patch)?;
-        let changes = self
-            .build_changes(&operations)
-            .map_err(ApplyPatchFailure::Patch)?;
+        let operations = parse_patch(&patch).map_err(map_patch_error)?;
+        let changes = self.build_changes(&operations).map_err(map_patch_error)?;
 
         let mut transaction = ContentTransaction::new(self.syntactic_lock, self.semantic_lock);
         transaction.add_changes(changes.iter().cloned());
@@ -239,6 +237,13 @@ fn map_harness_error(error: SafetyHarnessError) -> ApplyPatchFailure {
     }
 }
 
+fn map_patch_error(error: ApplyPatchError) -> ApplyPatchFailure {
+    match error {
+        error @ ApplyPatchError::Io { .. } => ApplyPatchFailure::Io(error.to_string()),
+        other => ApplyPatchFailure::Patch(other),
+    }
+}
+
 fn resolve_path(workspace_root: &Path, path: &FilePath) -> Result<PathBuf, ApplyPatchError> {
     if path.as_str().trim().is_empty() {
         return Err(ApplyPatchError::InvalidPath {
@@ -253,6 +258,7 @@ fn resolve_path(workspace_root: &Path, path: &FilePath) -> Result<PathBuf, Apply
             reason: String::from("absolute paths are not allowed"),
         });
     }
+    let mut resolved = workspace_root.to_path_buf();
     for component in candidate.components() {
         match component {
             std::path::Component::ParentDir | std::path::Component::Prefix(_) => {
@@ -261,18 +267,49 @@ fn resolve_path(workspace_root: &Path, path: &FilePath) -> Result<PathBuf, Apply
                     reason: String::from("path traversal is not allowed"),
                 });
             }
-            _ => {}
+            std::path::Component::Normal(part) => {
+                resolved.push(part);
+                match std::fs::symlink_metadata(&resolved) {
+                    Ok(metadata) if metadata.file_type().is_symlink() => {
+                        return Err(ApplyPatchError::InvalidPath {
+                            path: path.clone(),
+                            reason: String::from("symlink traversal is not allowed"),
+                        });
+                    }
+                    Ok(_) => {}
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(err) => {
+                        return Err(ApplyPatchError::InvalidPath {
+                            path: path.clone(),
+                            reason: format!("failed to inspect path component: {err}"),
+                        });
+                    }
+                }
+            }
+            std::path::Component::CurDir => {}
+            std::path::Component::RootDir => {
+                return Err(ApplyPatchError::InvalidPath {
+                    path: path.clone(),
+                    reason: String::from("absolute paths are not allowed"),
+                });
+            }
         }
     }
-    Ok(workspace_root.join(candidate))
+    Ok(resolved)
 }
 
 fn read_patch_target(resolved: &Path, path: &FilePath) -> Result<String, ApplyPatchError> {
-    std::fs::read_to_string(resolved)
-        .map_err(|_| ApplyPatchError::FileNotFound { path: path.clone() })
+    std::fs::read_to_string(resolved).map_err(|err| match err.kind() {
+        std::io::ErrorKind::NotFound => ApplyPatchError::FileNotFound { path: path.clone() },
+        _ => ApplyPatchError::Io {
+            path: path.clone(),
+            kind: err.kind(),
+            message: err.to_string(),
+        },
+    })
 }
 
-/// Generic helper to write serialisable error payloads to stderr.
+/// Generic helper to write serializable error payloads to stderr.
 fn write_error_payload<W: Write, T: serde::Serialize>(
     writer: &mut ResponseWriter<W>,
     payload: &T,

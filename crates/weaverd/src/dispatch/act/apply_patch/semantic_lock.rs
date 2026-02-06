@@ -16,9 +16,8 @@ pub(crate) struct LspSemanticLockAdapter<'a> {
 }
 
 impl<'a> LspSemanticLockAdapter<'a> {
-    pub(crate) fn new(provider: &'a SemanticBackendProvider) -> Self {
-        Self { provider }
-    }
+    #[rustfmt::skip]
+    pub(crate) fn new(provider: &'a SemanticBackendProvider) -> Self { Self { provider } }
 }
 
 impl<'a> SemanticLock for LspSemanticLockAdapter<'a> {
@@ -95,6 +94,7 @@ fn collect_failures(
     let mut failures = Vec::new();
     for (path, modified) in context.modified_files() {
         let Some(language) = infer_language(path) else {
+            // Skip files without a supported language to avoid noisy LSP errors.
             continue;
         };
         let input = FileValidation {
@@ -247,15 +247,11 @@ impl From<&lsp_types::Diagnostic> for DiagnosticSignature {
 }
 
 fn severity_code(severity: lsp_types::DiagnosticSeverity) -> u32 {
-    if severity == lsp_types::DiagnosticSeverity::ERROR {
-        1
-    } else if severity == lsp_types::DiagnosticSeverity::WARNING {
-        2
-    } else if severity == lsp_types::DiagnosticSeverity::INFORMATION {
-        3
-    } else if severity == lsp_types::DiagnosticSeverity::HINT {
-        4
-    } else {
-        0
+    match severity {
+        lsp_types::DiagnosticSeverity::ERROR => 1,
+        lsp_types::DiagnosticSeverity::WARNING => 2,
+        lsp_types::DiagnosticSeverity::INFORMATION => 3,
+        lsp_types::DiagnosticSeverity::HINT => 4,
+        _ => 0,
     }
 }

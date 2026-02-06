@@ -221,4 +221,13 @@ mod tests {
         let extracted = error.io_source().expect("io source should exist");
         assert_eq!(extracted.to_string(), "kaboom");
     }
+
+    #[test]
+    fn file_delete_constructor_preserves_source() {
+        let io_error = std::io::Error::other("oops");
+        let error = SafetyHarnessError::file_delete(PathBuf::from("/tmp/file"), io_error);
+
+        let extracted = error.io_source().expect("io source should exist");
+        assert_eq!(extracted.to_string(), "oops");
+    }
 }

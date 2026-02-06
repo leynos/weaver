@@ -43,8 +43,8 @@ Feature: Apply patch
 
   Scenario: Reject missing create hunks
     Given a patch that omits the create hunk
-    And a syntactic lock that passes
-    And a semantic lock that passes
+    And an apply-patch syntactic lock that passes
+    And an apply-patch semantic lock that passes
     When the patch is applied
     Then the apply-patch fails with "MissingHunk"
 

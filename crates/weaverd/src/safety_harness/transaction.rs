@@ -9,10 +9,12 @@
 #[cfg(test)]
 mod tests;
 
-use std::fs;
-use std::io::Write as IoWrite;
-use std::path::PathBuf;
+mod commit;
 
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use self::commit::{DeletePlan, commit_changes_with_deletes};
 use super::edit::FileEdit;
 use super::error::{SafetyHarnessError, VerificationFailure};
 use super::locks::{SemanticLockResult, SyntacticLockResult};
@@ -81,9 +83,9 @@ impl ContentChange {
 
     /// Path targeted by this change.
     #[must_use]
-    pub fn path(&self) -> &PathBuf {
+    pub fn path(&self) -> &Path {
         match self {
-            Self::Write { path, .. } | Self::Delete { path } => path,
+            Self::Write { path, .. } | Self::Delete { path } => path.as_path(),
         }
     }
 }
@@ -147,26 +149,17 @@ impl<'a> ContentTransaction<'a> {
                     deletions.push(DeletePlan {
                         path: path.clone(),
                         original,
-                        existed: true,
                     });
                 }
             }
         }
 
-        let syntactic_result = self.syntactic_lock.validate(&context);
-        if let SyntacticLockResult::Failed { failures } = syntactic_result {
-            return Ok(TransactionOutcome::SyntacticLockFailed { failures });
-        }
-
-        let semantic_result = self.semantic_lock.validate(&context)?;
-        if let SemanticLockResult::Failed { failures } = semantic_result {
-            return Ok(TransactionOutcome::SemanticLockFailed { failures });
-        }
-
-        commit_changes_with_deletes(&context, &paths_to_write, &deletions)?;
-
-        Ok(TransactionOutcome::Committed {
-            files_modified: paths_to_write.len(),
+        execute_with_locks(TransactionExecution {
+            context: &context,
+            paths_to_write: &paths_to_write,
+            deletions: &deletions,
+            syntactic_lock: self.syntactic_lock,
+            semantic_lock: self.semantic_lock,
         })
     }
 }
@@ -240,23 +233,12 @@ impl<'a> EditTransaction<'a> {
             paths_to_write.push(path.to_path_buf());
         }
 
-        // Step 3: Syntactic lock
-        let syntactic_result = self.syntactic_lock.validate(&context);
-        if let SyntacticLockResult::Failed { failures } = syntactic_result {
-            return Ok(TransactionOutcome::SyntacticLockFailed { failures });
-        }
-
-        // Step 4: Semantic lock
-        let semantic_result = self.semantic_lock.validate(&context)?;
-        if let SemanticLockResult::Failed { failures } = semantic_result {
-            return Ok(TransactionOutcome::SemanticLockFailed { failures });
-        }
-
-        // Step 5: Commit changes atomically
-        commit_changes(&context, &paths_to_write)?;
-
-        Ok(TransactionOutcome::Committed {
-            files_modified: paths_to_write.len(),
+        execute_with_locks(TransactionExecution {
+            context: &context,
+            paths_to_write: &paths_to_write,
+            deletions: &[],
+            syntactic_lock: self.syntactic_lock,
+            semantic_lock: self.semantic_lock,
         })
     }
 }
@@ -278,143 +260,36 @@ fn read_existing_file(path: &std::path::Path) -> Result<String, SafetyHarnessErr
     fs::read_to_string(path).map_err(|err| SafetyHarnessError::file_read(path.to_path_buf(), err))
 }
 
-/// Writes all modified content to the filesystem using two-phase commit.
-///
-/// # Atomicity Guarantee
-///
-/// Phase 1 (prepare): All modified content is written to temporary files.
-/// Phase 2 (commit): Temporary files are atomically renamed to targets.
-///
-/// If any rename fails, all previously renamed files are rolled back to
-/// their original content. This provides multi-file transaction semantics.
-///
-/// # Rollback Limitations
-///
-/// Rollback is best-effort: if a catastrophic failure occurs during rollback
-/// (e.g., disk removed), some files may remain in an inconsistent state.
-fn commit_changes(
-    context: &VerificationContext,
-    paths: &[PathBuf],
-) -> Result<(), SafetyHarnessError> {
-    commit_changes_with_deletes(context, paths, &[])
-}
-#[derive(Debug)]
-struct DeletePlan {
-    path: PathBuf,
-    original: String,
-    existed: bool,
-}
-fn commit_changes_with_deletes(
-    context: &VerificationContext,
-    paths: &[PathBuf],
-    deletions: &[DeletePlan],
-) -> Result<(), SafetyHarnessError> {
-    // Phase 1: Prepare all files (write to temps)
-    let mut prepared: Vec<(PathBuf, tempfile::NamedTempFile, String, bool)> = Vec::new();
-
-    for path in paths {
-        let content = context
-            .modified(path)
-            .ok_or_else(|| SafetyHarnessError::ModifiedContentMissing { path: path.clone() })?;
-
-        let original = context.original(path).cloned().unwrap_or_default();
-        let existed = path.exists();
-        let temp_file = prepare_file(path, content)?;
-        prepared.push((path.clone(), temp_file, original, existed));
-    }
-    // Phase 2: Commit all files (atomic renames)
-    let committed = persist_prepared_files(prepared)?;
-    apply_deletions(deletions, &committed)?;
-    Ok(())
-}
-
-/// Persists prepared temp files, rolling back if any commit fails.
-fn persist_prepared_files(
-    prepared: Vec<(PathBuf, tempfile::NamedTempFile, String, bool)>,
-) -> Result<Vec<(PathBuf, String, bool)>, SafetyHarnessError> {
-    let mut committed: Vec<(PathBuf, String, bool)> = Vec::new();
-
-    for (path, temp_file, original, existed) in prepared {
-        if let Err(err) = temp_file.persist(&path) {
-            rollback_writes(&committed);
-            return Err(SafetyHarnessError::file_write(path, err.error));
-        }
-        committed.push((path, original, existed));
+/// Executes the Double-Lock validation pipeline and commits changes on success.
+fn execute_with_locks(
+    execution: TransactionExecution<'_>,
+) -> Result<TransactionOutcome, SafetyHarnessError> {
+    let syntactic_result = execution.syntactic_lock.validate(execution.context);
+    if let SyntacticLockResult::Failed { failures } = syntactic_result {
+        return Ok(TransactionOutcome::SyntacticLockFailed { failures });
     }
 
-    Ok(committed)
-}
-
-/// Removes files slated for deletion, rolling back changes on failure.
-fn apply_deletions(
-    deletions: &[DeletePlan],
-    committed: &[(PathBuf, String, bool)],
-) -> Result<(), SafetyHarnessError> {
-    let mut deleted: Vec<DeletePlan> = Vec::new();
-
-    for deletion in deletions {
-        if let Err(err) = fs::remove_file(&deletion.path) {
-            rollback_deletes_and_writes(&deleted, committed);
-            return Err(SafetyHarnessError::file_delete(deletion.path.clone(), err));
-        }
-        deleted.push(DeletePlan {
-            path: deletion.path.clone(),
-            original: deletion.original.clone(),
-            existed: deletion.existed,
-        });
+    let semantic_result = execution.semantic_lock.validate(execution.context)?;
+    if let SemanticLockResult::Failed { failures } = semantic_result {
+        return Ok(TransactionOutcome::SemanticLockFailed { failures });
     }
 
-    Ok(())
+    commit_changes_with_deletes(
+        execution.context,
+        execution.paths_to_write,
+        execution.deletions,
+    )?;
+
+    Ok(TransactionOutcome::Committed {
+        files_modified: execution.paths_to_write.len(),
+    })
 }
 
-/// Prepares a file for commit by writing content to a temporary file.
-///
-/// The temp file is created in the same directory as the target to ensure
-/// atomic rename is possible (same filesystem). Parent directories are
-/// created if they don't exist.
-fn prepare_file(
-    path: &std::path::Path,
-    content: &str,
-) -> Result<tempfile::NamedTempFile, SafetyHarnessError> {
-    let parent = path.parent().unwrap_or_else(|| std::path::Path::new("."));
-
-    // Create parent directories if they don't exist (for nested new files)
-    fs::create_dir_all(parent)
-        .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
-
-    let mut temp_file = tempfile::NamedTempFile::new_in(parent)
-        .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
-
-    temp_file
-        .write_all(content.as_bytes())
-        .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
-
-    Ok(temp_file)
-}
-
-/// Rolls back committed files to their original content.
-///
-/// This is a best-effort operation: if restoration fails for any file,
-/// we continue attempting to restore the remaining files.
-fn rollback_writes(committed: &[(PathBuf, String, bool)]) {
-    for (path, original, existed) in committed {
-        if !existed {
-            // File was newly created, remove it
-            let _ = std::fs::remove_file(path);
-        } else {
-            // Restore original content (best effort)
-            let _ = std::fs::write(path, original);
-        }
-    }
-}
-
-fn rollback_deletes_and_writes(deleted: &[DeletePlan], committed: &[(PathBuf, String, bool)]) {
-    for deletion in deleted {
-        if deletion.existed {
-            let _ = std::fs::write(&deletion.path, &deletion.original);
-        } else {
-            let _ = std::fs::remove_file(&deletion.path);
-        }
-    }
-    rollback_writes(committed);
+/// Parameter object for executing the Double-Lock pipeline.
+struct TransactionExecution<'a> {
+    context: &'a VerificationContext,
+    paths_to_write: &'a [PathBuf],
+    deletions: &'a [DeletePlan],
+    syntactic_lock: &'a dyn SyntacticLock,
+    semantic_lock: &'a dyn SemanticLock,
 }

@@ -12,12 +12,12 @@ applies beyond AGENTS.md and this ExecPlan.
 ## Purpose / big picture
 
 Implement the `weaver act apply-patch` command end-to-end so an operator can
-stream a patch via STDIN, have the daemon validate it through the Double-Lock
-harness, and see a deterministic success or structured failure. The observable
-success is: piping a patch into `weaver act apply-patch` results in a JSONL
-request containing the patch, the daemon applies it atomically, and the CLI
-exits with status 0 on success or non-zero with structured error output on
-failure, without partial filesystem writes.
+stream a patch via standard input (STDIN), have the daemon validate it through
+the Double-Lock harness, and see a deterministic success or structured failure.
+The observable success is: piping a patch into `weaver act apply-patch` results
+in a JSONL request containing the patch, the daemon applies it atomically, and
+the command-line interface (CLI) exits with status 0 on success or non-zero
+with structured error output on failure, without partial filesystem writes.
 
 ## Constraints
 
@@ -28,8 +28,8 @@ failure, without partial filesystem writes.
 - All `act` edits must pass the Double-Lock harness with no on-disk writes on
   syntactic or semantic lock failure.
 - Patch application must be atomic per command (all-or-nothing).
-- Tests must include unit coverage and rstest-bdd scenarios using
-  `rstest-bdd` v0.4.0 and `rstest` fixtures.
+- Tests must include unit coverage and behaviour-driven development (BDD)
+  scenarios using `rstest-bdd` v0.4.0 and `rstest` fixtures.
 - Every new Rust module starts with a `//!` module doc comment and stays under
   400 lines; extract helpers where needed per
   `docs/complexity-antipatterns-and-refactoring-strategies.md`.
@@ -55,10 +55,10 @@ failure, without partial filesystem writes.
 - Risk: the daemon request size cap (64 KiB) rejects realistic patch payloads.
   Severity: medium. Likelihood: medium. Mitigation: decide on and document a
   higher limit or a streaming strategy before implementing the request path.
-- Risk: semantic lock integration requires additional LSP wiring beyond the
-  placeholder lock. Severity: high. Likelihood: medium. Mitigation: implement a
-  dedicated LSP-backed `SemanticLock` adapter and isolate it behind a trait for
-  test doubles.
+- Risk: semantic lock integration requires additional Language Server Protocol
+  (LSP) wiring beyond the placeholder lock. Severity: high. Likelihood: medium.
+  Mitigation: implement a dedicated LSP-backed `SemanticLock` adapter and
+  isolate it behind a trait for test doubles.
 - Risk: fuzzy match behaviour could misapply if not cursor-scoped.
   Severity: high. Likelihood: medium. Mitigation: follow the cursor-based
   algorithm from the design doc and test no-match failure paths.
@@ -96,16 +96,16 @@ failure, without partial filesystem writes.
   this step instead of introducing a new shared crate. Rationale: limits scope
   creep; revisit if protocol drift becomes painful. Date/Author: 2026-01-28 /
   Codex
-- Decision: Raise the JSONL request size limit to 1 MiB to accommodate
-  apply-patch payloads while keeping memory usage bounded. Rationale: typical
-  agent patches exceed 64 KiB; 1 MiB covers common usage without unbounded
-  growth. Date/Author: 2026-02-02 / Codex
-- Decision: Emit apply-patch success payloads with file counts and standardise
-  error envelopes (`ApplyPatchError`, `VerificationError`, or backend/I/O
-  errors) with status 1 for patch/lock failures and status 2 for backend/I/O
-  failures. Rationale: keeps CLI and agent consumers aligned with existing
-  harness conventions while providing clear outcomes. Date/Author: 2026-02-02 /
-  Codex
+- Decision: Raise the JSONL request size limit to 1 mebibyte (MiB) to
+  accommodate apply-patch payloads while keeping memory usage bounded.
+  Rationale: typical agent patches exceed 64 KiB; 1 MiB covers common usage
+  without unbounded growth. Date/Author: 2026-02-02 / Codex
+- Decision: Emit apply-patch success payloads with file counts and standardize
+  error envelopes (`ApplyPatchError`, `VerificationError`, or backend
+  input/output (I/O) errors) with status 1 for patch/lock failures and status 2
+  for backend/I/O failures. Rationale: keeps CLI and agent consumers aligned
+  with existing harness conventions while providing clear outcomes.
+  Date/Author: 2026-02-02 / Codex
 
 ## Outcomes & retrospective
 

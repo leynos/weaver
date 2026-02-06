@@ -14,8 +14,7 @@ fn make_request(domain: &str, operation: &str) -> CommandRequest {
     CommandRequest::parse(json.as_bytes()).expect("test request")
 }
 
-#[fixture]
-fn backends() -> FusionBackends<SemanticBackendProvider> {
+fn build_backends() -> FusionBackends<SemanticBackendProvider> {
     let config = Config {
         daemon_socket: SocketEndpoint::unix("/tmp/weaver-test/socket.sock"),
         ..Config::default()
@@ -24,14 +23,21 @@ fn backends() -> FusionBackends<SemanticBackendProvider> {
     FusionBackends::new(config, provider)
 }
 
-/// Creates backends for tests that iterate (can't use fixtures in loops).
-fn create_backends() -> FusionBackends<SemanticBackendProvider> {
-    let config = Config {
-        daemon_socket: SocketEndpoint::unix("/tmp/weaver-test/socket.sock"),
-        ..Config::default()
-    };
-    let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
-    FusionBackends::new(config, provider)
+#[fixture]
+fn backends() -> FusionBackends<SemanticBackendProvider> {
+    build_backends()
+}
+
+fn invalid_arguments_message(domain: &str, operation: &str) -> Option<&'static str> {
+    match (domain, operation) {
+        ("observe", "get-definition") => {
+            Some("observe get-definition should fail with InvalidArguments (no args provided)")
+        }
+        ("act", "apply-patch") => {
+            Some("act apply-patch should fail with InvalidArguments (missing patch)")
+        }
+        _ => None,
+    }
 }
 
 fn assert_routes_operations(domain: &str, operations: &[&str]) {
@@ -40,20 +46,15 @@ fn assert_routes_operations(domain: &str, operations: &[&str]) {
         let request = make_request(domain, op);
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
-        let mut backends = create_backends();
+        let mut backends = build_backends();
         let result = router.route(&request, &mut writer, &mut backends);
         // get-definition requires --uri/--position args, so it will fail
         // with InvalidArguments when called without them, but this still
         // proves the operation is recognized and routed correctly
-        if domain == "observe" && *op == "get-definition" {
+        if let Some(message) = invalid_arguments_message(domain, op) {
             assert!(
                 matches!(result, Err(DispatchError::InvalidArguments { .. })),
-                "{domain} {op} should fail with InvalidArguments (no args provided)"
-            );
-        } else if domain == "act" && *op == "apply-patch" {
-            assert!(
-                matches!(result, Err(DispatchError::InvalidArguments { .. })),
-                "{domain} {op} should fail with InvalidArguments (missing patch)"
+                "{message}"
             );
         } else {
             assert!(result.is_ok(), "{domain} {op} should route successfully");
@@ -66,7 +67,7 @@ fn assert_rejects_unknown_operation(domain: &str, operation: &str) {
     let request = make_request(domain, operation);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
-    let mut backends = create_backends();
+    let mut backends = build_backends();
     let result = router.route(&request, &mut writer, &mut backends);
     assert!(matches!(
         result,
@@ -92,19 +93,12 @@ fn domain_parse_rejects_unknown() {
     assert!(matches!(result, Err(DispatchError::UnknownDomain { .. })));
 }
 
-#[test]
-fn routes_known_observe_operations() {
-    assert_routes_operations("observe", DomainRoutingContext::OBSERVE.known_operations);
-}
-
-#[test]
-fn routes_known_act_operations() {
-    assert_routes_operations("act", DomainRoutingContext::ACT.known_operations);
-}
-
-#[test]
-fn routes_known_verify_operations() {
-    assert_routes_operations("verify", DomainRoutingContext::VERIFY.known_operations);
+#[rstest]
+#[case::observe("observe", DomainRoutingContext::OBSERVE.known_operations)]
+#[case::act("act", DomainRoutingContext::ACT.known_operations)]
+#[case::verify("verify", DomainRoutingContext::VERIFY.known_operations)]
+fn routes_known_operations(#[case] domain: &str, #[case] operations: &'static [&'static str]) {
+    assert_routes_operations(domain, operations);
 }
 
 #[rstest]
@@ -128,10 +122,12 @@ fn routes_operations_case_insensitively(
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
     let result = router.route(&request, &mut writer, &mut backends);
-    if domain.eq_ignore_ascii_case("act") && operation.eq_ignore_ascii_case("apply-patch") {
+    let domain_norm = domain.to_ascii_lowercase();
+    let operation_norm = operation.to_ascii_lowercase();
+    if let Some(message) = invalid_arguments_message(&domain_norm, &operation_norm) {
         assert!(
             matches!(result, Err(DispatchError::InvalidArguments { .. })),
-            "{domain} {operation} should fail with InvalidArguments (missing patch)"
+            "{message}"
         );
     } else {
         assert!(

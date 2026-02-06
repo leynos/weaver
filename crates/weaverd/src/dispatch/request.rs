@@ -121,6 +121,15 @@ mod tests {
     }
 
     #[test]
+    fn parses_request_with_patch_payload() {
+        let input = br#"{"command":{"domain":"act","operation":"apply-patch"},"patch":"diff"}"#;
+        let request = CommandRequest::parse(input).expect("parse patch");
+        assert_eq!(request.domain(), "act");
+        assert_eq!(request.operation(), "apply-patch");
+        assert_eq!(request.patch(), Some("diff"));
+    }
+
+    #[test]
     fn trims_trailing_whitespace() {
         let input = b"{\"command\":{\"domain\":\"observe\",\"operation\":\"test\"}}  \n";
         let request = CommandRequest::parse(input).expect("parse with whitespace");

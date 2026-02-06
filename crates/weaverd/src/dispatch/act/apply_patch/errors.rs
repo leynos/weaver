@@ -1,24 +1,44 @@
 //! Error types for apply-patch parsing and application.
 
 use serde::Serialize;
+use thiserror::Error;
 
 use crate::dispatch::act::apply_patch::types::FilePath;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub(crate) enum ApplyPatchError {
+    #[error("patch input was empty")]
     EmptyPatch,
+    #[error("patch contains binary data")]
     BinaryPatch,
+    #[error("patch is missing diff headers")]
     MissingDiffHeader,
+    #[error("invalid diff header: {line}")]
     InvalidDiffHeader { line: String },
+    #[error("modify operation missing SEARCH/REPLACE blocks")]
     MissingSearchReplace { path: FilePath },
+    #[error("create operation missing diff hunk content")]
     MissingHunk { path: FilePath },
+    #[error("SEARCH block was not closed before end of patch")]
     UnclosedSearchBlock { path: FilePath },
+    #[error("REPLACE block was not closed before end of patch")]
     UnclosedReplaceBlock { path: FilePath },
+    #[error("invalid path: {reason}")]
     InvalidPath { path: FilePath, reason: String },
+    #[error("target file does not exist")]
     FileNotFound { path: FilePath },
+    #[error("target file already exists")]
     FileAlreadyExists { path: FilePath },
+    #[error("delete target does not exist")]
     DeleteMissing { path: FilePath },
+    #[error("SEARCH block {block_index} did not match")]
     SearchBlockNotFound { path: FilePath, block_index: usize },
+    #[error("I/O error for {path}: {message} ({kind:?})")]
+    Io {
+        path: FilePath,
+        kind: std::io::ErrorKind,
+        message: String,
+    },
 }
 
 impl ApplyPatchError {
@@ -28,7 +48,7 @@ impl ApplyPatchError {
 
     pub(crate) fn to_json(&self) -> Result<String, serde_json::Error> {
         let details = ApplyPatchErrorDetails {
-            message: self.message(),
+            message: self.to_string(),
             path: self.path().map(str::to_string),
             operation: self.operation().map(str::to_string),
         };
@@ -38,32 +58,6 @@ impl ApplyPatchError {
             details,
         };
         serde_json::to_string(&envelope)
-    }
-
-    fn message(&self) -> String {
-        match self {
-            Self::EmptyPatch => String::from("patch input was empty"),
-            Self::BinaryPatch => String::from("patch contains binary data"),
-            Self::MissingDiffHeader => String::from("patch is missing diff headers"),
-            Self::InvalidDiffHeader { line } => format!("invalid diff header: {line}"),
-            Self::MissingSearchReplace { .. } => {
-                String::from("modify operation missing SEARCH/REPLACE blocks")
-            }
-            Self::MissingHunk { .. } => String::from("create operation missing diff hunk content"),
-            Self::UnclosedSearchBlock { .. } => {
-                String::from("SEARCH block was not closed before end of patch")
-            }
-            Self::UnclosedReplaceBlock { .. } => {
-                String::from("REPLACE block was not closed before end of patch")
-            }
-            Self::InvalidPath { reason, .. } => format!("invalid path: {reason}"),
-            Self::FileNotFound { .. } => String::from("target file does not exist"),
-            Self::FileAlreadyExists { .. } => String::from("target file already exists"),
-            Self::DeleteMissing { .. } => String::from("delete target does not exist"),
-            Self::SearchBlockNotFound { block_index, .. } => {
-                format!("SEARCH block {block_index} did not match")
-            }
-        }
     }
 
     fn path(&self) -> Option<&str> {
@@ -76,7 +70,8 @@ impl ApplyPatchError {
             | Self::FileNotFound { path }
             | Self::FileAlreadyExists { path }
             | Self::DeleteMissing { path }
-            | Self::SearchBlockNotFound { path, .. } => Some(path.as_str()),
+            | Self::SearchBlockNotFound { path, .. }
+            | Self::Io { path, .. } => Some(path.as_str()),
             Self::EmptyPatch
             | Self::BinaryPatch
             | Self::MissingDiffHeader
@@ -94,6 +89,7 @@ impl ApplyPatchError {
             Self::DeleteMissing { .. } => Some("delete"),
             Self::InvalidPath { .. }
             | Self::FileNotFound { .. }
+            | Self::Io { .. }
             | Self::EmptyPatch
             | Self::BinaryPatch
             | Self::MissingDiffHeader

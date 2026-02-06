@@ -118,23 +118,25 @@ impl NormalizedContent {
         let mut orig_to_norm = vec![0; input.len() + 1];
 
         let mut norm_index = 0;
-        let mut idx = 0;
-        while idx < input.len() {
-            let ch = input[idx..].chars().next().expect("valid utf8 char");
+        let mut iter = input.char_indices().peekable();
+        while let Some((idx, ch)) = iter.next() {
             let ch_len = ch.len_utf8();
             norm_to_orig.push(idx);
             for entry in orig_to_norm.iter_mut().skip(idx).take(ch_len) {
                 *entry = norm_index;
             }
 
-            if ch == '\r' && input.as_bytes().get(idx + ch_len) == Some(&b'\n') {
+            if ch == '\r'
+                && let Some(&(next_idx, '\n')) = iter.peek()
+            {
+                map_crlf_indices(&mut orig_to_norm, next_idx, norm_index);
                 normalized.push('\n');
-                orig_to_norm[idx + ch_len] = norm_index;
-                idx += ch_len + 1;
-            } else {
-                normalized.push(ch);
-                idx += ch_len;
+                iter.next();
+                norm_index += 1;
+                continue;
             }
+
+            normalized.push(ch);
             norm_index += 1;
         }
         orig_to_norm[input.len()] = norm_index;
@@ -153,6 +155,13 @@ impl NormalizedContent {
 
     fn orig_to_norm(&self, index: usize) -> Option<usize> {
         self.orig_to_norm.get(index).copied()
+    }
+}
+
+fn map_crlf_indices(orig_to_norm: &mut [usize], next_idx: usize, norm_index: usize) {
+    let next_len = '\n'.len_utf8();
+    for entry in orig_to_norm.iter_mut().skip(next_idx).take(next_len) {
+        *entry = norm_index;
     }
 }
 

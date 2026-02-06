@@ -114,27 +114,6 @@ impl DomainRoutingContext {
     };
 }
 
-/// Request context for routing and executing domain handlers.
-struct RouteContext<'a, W: Write> {
-    request: &'a CommandRequest,
-    writer: &'a mut ResponseWriter<W>,
-    backends: &'a mut FusionBackends<SemanticBackendProvider>,
-}
-
-impl<'a, W: Write> RouteContext<'a, W> {
-    fn new(
-        request: &'a CommandRequest,
-        writer: &'a mut ResponseWriter<W>,
-        backends: &'a mut FusionBackends<SemanticBackendProvider>,
-    ) -> Self {
-        Self {
-            request,
-            writer,
-            backends,
-        }
-    }
-}
-
 /// Routes commands to domain handlers.
 ///
 /// The router parses the domain from the request, validates the operation, and
@@ -176,48 +155,17 @@ impl DomainRouter {
         }
     }
 
-    /// Generic routing for domains with specific operation handlers.
-    fn route_with_handlers<W: Write, F>(
-        &self,
-        context: &mut RouteContext<'_, W>,
-        routing: &DomainRoutingContext,
-        handler: F,
-    ) -> Result<DispatchResult, DispatchError>
-    where
-        F: FnOnce(&str, &mut RouteContext<'_, W>) -> Option<Result<DispatchResult, DispatchError>>,
-    {
-        let operation = context.request.operation().to_ascii_lowercase();
-
-        if let Some(result) = handler(operation.as_str(), context) {
-            return result;
-        }
-
-        if routing.known_operations.contains(&operation.as_str()) {
-            return self.write_not_implemented(context.writer, routing.domain, &operation);
-        }
-
-        Err(DispatchError::unknown_operation(routing.domain, operation))
-    }
-
     fn route_observe<W: Write>(
         &self,
         request: &CommandRequest,
         writer: &mut ResponseWriter<W>,
         backends: &mut FusionBackends<SemanticBackendProvider>,
     ) -> Result<DispatchResult, DispatchError> {
-        let mut context = RouteContext::new(request, writer, backends);
-        self.route_with_handlers(
-            &mut context,
-            &DomainRoutingContext::OBSERVE,
-            |operation, context| match operation {
-                "get-definition" => Some(observe::get_definition::handle(
-                    context.request,
-                    context.writer,
-                    context.backends,
-                )),
-                _ => None,
-            },
-        )
+        let operation = request.operation().to_ascii_lowercase();
+        match operation.as_str() {
+            "get-definition" => observe::get_definition::handle(request, writer, backends),
+            _ => self.route_fallback(&DomainRoutingContext::OBSERVE, operation.as_str(), writer),
+        }
     }
 
     fn route_act<W: Write>(
@@ -226,19 +174,11 @@ impl DomainRouter {
         writer: &mut ResponseWriter<W>,
         backends: &mut FusionBackends<SemanticBackendProvider>,
     ) -> Result<DispatchResult, DispatchError> {
-        let mut context = RouteContext::new(request, writer, backends);
-        self.route_with_handlers(
-            &mut context,
-            &DomainRoutingContext::ACT,
-            |operation, context| match operation {
-                "apply-patch" => Some(act::apply_patch::handle(
-                    context.request,
-                    context.writer,
-                    context.backends,
-                )),
-                _ => None,
-            },
-        )
+        let operation = request.operation().to_ascii_lowercase();
+        match operation.as_str() {
+            "apply-patch" => act::apply_patch::handle(request, writer, backends),
+            _ => self.route_fallback(&DomainRoutingContext::ACT, operation.as_str(), writer),
+        }
     }
 
     fn route_verify<W: Write>(
@@ -256,10 +196,23 @@ impl DomainRouter {
         context: &DomainRoutingContext,
     ) -> Result<DispatchResult, DispatchError> {
         let operation = request.operation().to_ascii_lowercase();
-        if context.known_operations.contains(&operation.as_str()) {
-            self.write_not_implemented(writer, context.domain, &operation)
+        self.route_fallback(context, operation.as_str(), writer)
+    }
+
+    /// Handles routing fallbacks for known-but-unimplemented and unknown operations.
+    fn route_fallback<W: Write>(
+        &self,
+        routing: &DomainRoutingContext,
+        operation: &str,
+        writer: &mut ResponseWriter<W>,
+    ) -> Result<DispatchResult, DispatchError> {
+        if routing.known_operations.contains(&operation) {
+            self.write_not_implemented(writer, routing.domain, operation)
         } else {
-            Err(DispatchError::unknown_operation(context.domain, operation))
+            Err(DispatchError::unknown_operation(
+                routing.domain,
+                operation.to_string(),
+            ))
         }
     }
 
