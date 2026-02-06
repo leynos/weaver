@@ -11,7 +11,7 @@ applies beyond AGENTS.md and this ExecPlan.
 
 ## Purpose / big picture
 
-Implement the `weaver act apply-patch` command end-to-end so an operator can
+Implement the `weaver act apply-patch` command end-to-end, so an operator can
 stream a patch via standard input (STDIN), have the daemon validate it through
 the Double-Lock harness, and see a deterministic success or structured failure.
 The observable success is: piping a patch into `weaver act apply-patch` results
@@ -105,7 +105,7 @@ with structured error output on failure, without partial filesystem writes.
   input/output (I/O) errors) with status 1 for patch/lock failures and status 2
   for backend/I/O failures. Rationale: keeps CLI and agent consumers aligned
   with existing harness conventions while providing clear outcomes.
-  Date/Author: 2026-02-02 / Codex
+  Date/Author: 2026-02-02 / Codex.
 
 ## Outcomes & retrospective
 

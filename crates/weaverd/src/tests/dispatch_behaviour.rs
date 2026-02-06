@@ -26,7 +26,11 @@ fn test_handler() -> Arc<DispatchConnectionHandler> {
     let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
     let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
     let backend_manager = BackendManager::new(backends);
-    Arc::new(DispatchConnectionHandler::new(backend_manager))
+    let workspace_root = std::env::current_dir().expect("workspace root");
+    Arc::new(DispatchConnectionHandler::new(
+        backend_manager,
+        workspace_root,
+    ))
 }
 
 struct DispatchWorld {

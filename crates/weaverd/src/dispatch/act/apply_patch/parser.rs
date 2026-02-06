@@ -97,11 +97,16 @@ fn parse_operation(chunk: &str) -> Result<PatchOperation, ApplyPatchError> {
         let trimmed = trim_line(line);
         let line_type = classify_line(trimmed);
         let line_info = LineInfo::new(line_type, line_start, line_end);
-        let state = ParserState::new(&mut mode, &mut search_replace);
 
-        if handle_search_replace_marker(&line_info, state, chunk, &path)? {
-            offset = line_info.end;
-            continue;
+        if matches!(
+            line_type,
+            LineType::SearchMarker | LineType::Separator | LineType::ReplaceMarker
+        ) {
+            let state = ParserState::new(&mut mode, &mut search_replace);
+            if handle_search_replace_marker(&line_info, state, chunk, &path)? {
+                offset = line_info.end;
+                continue;
+            }
         }
         if search_replace.is_open() {
             offset = line_end;
@@ -109,7 +114,13 @@ fn parse_operation(chunk: &str) -> Result<PatchOperation, ApplyPatchError> {
         }
 
         mode = detect_mode_transition(trimmed, mode);
-        process_secondary_line(line_type, mode, &mut create_capture, line)?;
+        if matches!(
+            line_type,
+            LineType::HunkHeader | LineType::DiffHeader | LineType::CreateContent
+        ) {
+            validate_line_type(line_type, trimmed)?;
+            process_secondary_line(line_type, mode, &mut create_capture, line);
+        }
 
         offset = line_end;
     }
@@ -153,8 +164,7 @@ fn detect_mode_transition(trimmed: &str, current: OperationMode) -> OperationMod
     let mut mode = current;
     if trimmed.starts_with("new file mode ") {
         mode = mode.promote(OperationMode::Create);
-    }
-    if trimmed.starts_with("deleted file mode ") {
+    } else if trimmed.starts_with("deleted file mode ") {
         mode = mode.promote(OperationMode::Delete);
     }
     mode
@@ -167,15 +177,12 @@ fn process_secondary_line(
     mode: OperationMode,
     create_capture: &mut CreateContentCapture,
     line: &str,
-) -> Result<(), ApplyPatchError> {
+) {
     match line_type {
         LineType::HunkHeader | LineType::DiffHeader | LineType::CreateContent => {
-            let trimmed = trim_line(line);
-            validate_line_type(line_type, trimmed)?;
             handle_mode_specific_capture(mode, line_type, line, create_capture);
-            Ok(())
         }
-        _ => Ok(()),
+        _ => {}
     }
 }
 
@@ -222,7 +229,7 @@ fn parse_header(chunk: &str) -> Result<(String, usize), ApplyPatchError> {
 
     let header = DiffHeaderLine::new(trimmed);
     let (_, b_path) = parse_diff_paths(header.as_str())?;
-    let path = strip_prefix(b_path).into_string();
+    let path = strip_b_prefix(&b_path);
     Ok((path, line_end))
 }
 
@@ -292,8 +299,10 @@ fn parse_diff_paths(line: &str) -> Result<(String, String), ApplyPatchError> {
     let mut tokens = Vec::new();
 
     while tokens.len() < 2 {
-        let token = parse_next_token(&mut chars);
-        let Some(token) = token else { break };
+        let token = parse_next_token(&mut chars, line)?;
+        let Some(token) = token else {
+            break;
+        };
         if !token.is_empty() {
             tokens.push(token);
         }
@@ -305,17 +314,26 @@ fn parse_diff_paths(line: &str) -> Result<(String, String), ApplyPatchError> {
         });
     }
 
-    Ok((tokens[0].clone(), tokens[1].clone()))
+    let mut iter = tokens.into_iter();
+    let first = iter.next().expect("first token");
+    let second = iter.next().expect("second token");
+    Ok((first, second))
 }
 
-fn parse_next_token(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> Option<String> {
+fn parse_next_token(
+    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    line: &str,
+) -> Result<Option<String>, ApplyPatchError> {
     consume_whitespace(chars);
-    let next = chars.peek().copied()?;
+    let next = match chars.peek().copied() {
+        Some(next) => next,
+        None => return Ok(None),
+    };
     if next == '"' {
         chars.next();
-        Some(read_quoted_token(chars))
+        read_quoted_token(chars, line).map(Some)
     } else {
-        Some(read_unquoted_token(chars))
+        Ok(Some(read_unquoted_token(chars)))
     }
 }
 
@@ -325,11 +343,20 @@ fn consume_whitespace(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) {
     }
 }
 
-fn read_quoted_token(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> String {
-    chars
-        .by_ref()
-        .take_while(|ch| *ch != '"')
-        .collect::<String>()
+fn read_quoted_token(
+    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    line: &str,
+) -> Result<String, ApplyPatchError> {
+    let mut value = String::new();
+    for ch in chars.by_ref() {
+        if ch == '"' {
+            return Ok(value);
+        }
+        value.push(ch);
+    }
+    Err(ApplyPatchError::InvalidDiffHeader {
+        line: line.to_string(),
+    })
 }
 
 fn read_unquoted_token(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> String {
@@ -344,13 +371,11 @@ fn read_unquoted_token(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> 
     value
 }
 
-fn strip_prefix(path: String) -> FilePath {
-    FilePath::new(
-        path.strip_prefix("b/")
-            .or_else(|| path.strip_prefix("b\\"))
-            .unwrap_or(path.as_str())
-            .to_string(),
-    )
+fn strip_b_prefix(path: &str) -> String {
+    path.strip_prefix("b/")
+        .or_else(|| path.strip_prefix("b\\"))
+        .unwrap_or(path)
+        .to_string()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -362,10 +387,12 @@ enum OperationMode {
 }
 
 impl OperationMode {
-    fn promote(self, next: Self) -> Self {
+    const fn promote(self, next: Self) -> Self {
         match (self, next) {
             (Self::Unknown, other) => other,
-            (current, other) if current == other => current,
+            (Self::Modify, Self::Modify) => Self::Modify,
+            (Self::Create, Self::Create) => Self::Create,
+            (Self::Delete, Self::Delete) => Self::Delete,
             (current, _) => current,
         }
     }

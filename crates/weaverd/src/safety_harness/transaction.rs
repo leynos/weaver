@@ -128,7 +128,12 @@ impl<'a> ContentTransaction<'a> {
     /// - A file cannot be read or written.
     /// - The semantic backend is unavailable.
     pub fn execute(self) -> Result<TransactionOutcome, SafetyHarnessError> {
-        if self.changes.is_empty() {
+        let ContentTransaction {
+            changes,
+            syntactic_lock,
+            semantic_lock,
+        } = self;
+        if changes.is_empty() {
             return Ok(TransactionOutcome::NoChanges);
         }
 
@@ -136,20 +141,17 @@ impl<'a> ContentTransaction<'a> {
         let mut paths_to_write: Vec<PathBuf> = Vec::new();
         let mut deletions: Vec<DeletePlan> = Vec::new();
 
-        for change in &self.changes {
+        for change in changes {
             match change {
                 ContentChange::Write { path, content } => {
-                    let original = read_file(path)?;
+                    let original = read_file(&path)?;
                     context.add_original(path.clone(), original);
-                    context.add_modified(path.clone(), content.clone());
-                    paths_to_write.push(path.clone());
+                    context.add_modified(path.clone(), content);
+                    paths_to_write.push(path);
                 }
                 ContentChange::Delete { path } => {
-                    let original = read_existing_file(path)?;
-                    deletions.push(DeletePlan {
-                        path: path.clone(),
-                        original,
-                    });
+                    let original = read_existing_file(&path)?;
+                    deletions.push(DeletePlan { path, original });
                 }
             }
         }
@@ -158,8 +160,8 @@ impl<'a> ContentTransaction<'a> {
             context: &context,
             paths_to_write: &paths_to_write,
             deletions: &deletions,
-            syntactic_lock: self.syntactic_lock,
-            semantic_lock: self.semantic_lock,
+            syntactic_lock,
+            semantic_lock,
         })
     }
 }
@@ -281,7 +283,7 @@ fn execute_with_locks(
     )?;
 
     Ok(TransactionOutcome::Committed {
-        files_modified: execution.paths_to_write.len(),
+        files_modified: execution.paths_to_write.len() + execution.deletions.len(),
     })
 }
 

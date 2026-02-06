@@ -23,6 +23,11 @@ fn build_backends() -> FusionBackends<SemanticBackendProvider> {
     FusionBackends::new(config, provider)
 }
 
+fn build_router() -> DomainRouter {
+    let workspace_root = std::env::current_dir().expect("workspace root");
+    DomainRouter::new(workspace_root)
+}
+
 #[fixture]
 fn backends() -> FusionBackends<SemanticBackendProvider> {
     build_backends()
@@ -41,7 +46,7 @@ fn invalid_arguments_message(domain: &str, operation: &str) -> Option<&'static s
 }
 
 fn assert_routes_operations(domain: &str, operations: &[&str]) {
-    let router = DomainRouter::new();
+    let router = build_router();
     for op in operations {
         let request = make_request(domain, op);
         let mut output = Vec::new();
@@ -63,7 +68,7 @@ fn assert_routes_operations(domain: &str, operations: &[&str]) {
 }
 
 fn assert_rejects_unknown_operation(domain: &str, operation: &str) {
-    let router = DomainRouter::new();
+    let router = build_router();
     let request = make_request(domain, operation);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
@@ -117,7 +122,7 @@ fn routes_operations_case_insensitively(
     #[case] operation: &str,
     mut backends: FusionBackends<SemanticBackendProvider>,
 ) {
-    let router = DomainRouter::new();
+    let router = build_router();
     let request = make_request(domain, operation);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
@@ -139,7 +144,7 @@ fn routes_operations_case_insensitively(
 
 #[rstest]
 fn get_definition_requires_arguments(mut backends: FusionBackends<SemanticBackendProvider>) {
-    let router = DomainRouter::new();
+    let router = build_router();
     let request = make_request("observe", "get-definition");
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
@@ -154,7 +159,7 @@ fn get_definition_requires_arguments(mut backends: FusionBackends<SemanticBacken
 
 #[rstest]
 fn find_references_not_implemented(mut backends: FusionBackends<SemanticBackendProvider>) {
-    let router = DomainRouter::new();
+    let router = build_router();
     let request = make_request("observe", "find-references");
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);

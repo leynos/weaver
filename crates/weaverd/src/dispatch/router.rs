@@ -6,6 +6,7 @@
 //! with structured errors.
 
 use std::io::Write;
+use std::path::PathBuf;
 
 use tracing::debug;
 
@@ -119,13 +120,15 @@ impl DomainRoutingContext {
 /// The router parses the domain from the request, validates the operation, and
 /// delegates to the appropriate handler. MVP handlers return "not implemented"
 /// responses for all known operations.
-#[derive(Debug, Default)]
-pub struct DomainRouter;
+#[derive(Debug)]
+pub struct DomainRouter {
+    workspace_root: PathBuf,
+}
 
 impl DomainRouter {
-    /// Creates a new domain router.
-    pub const fn new() -> Self {
-        Self
+    /// Creates a new domain router with the workspace root.
+    pub fn new(workspace_root: PathBuf) -> Self {
+        Self { workspace_root }
     }
 
     /// Routes a command request to the appropriate domain handler.
@@ -176,7 +179,9 @@ impl DomainRouter {
     ) -> Result<DispatchResult, DispatchError> {
         let operation = request.operation().to_ascii_lowercase();
         match operation.as_str() {
-            "apply-patch" => act::apply_patch::handle(request, writer, backends),
+            "apply-patch" => {
+                act::apply_patch::handle(request, writer, backends, &self.workspace_root)
+            }
             _ => self.route_fallback(&DomainRoutingContext::ACT, operation.as_str(), writer),
         }
     }

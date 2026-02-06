@@ -53,6 +53,10 @@ fn find_fuzzy(
     cursor: usize,
     search: &SearchPattern,
 ) -> Option<(usize, usize)> {
+    debug_assert!(
+        cursor <= content.as_str().len(),
+        "fuzzy search cursor out of bounds"
+    );
     let normalized_content = NormalizedContent::new(content.as_str());
     let normalized_search = normalise_line_endings(search.as_str(), LineEnding::Lf);
     let trimmed_search = trim_fuzzy_whitespace(&normalized_search);
@@ -91,6 +95,7 @@ fn dominant_line_ending(content: &str) -> LineEnding {
         idx += 1;
     }
 
+    // Tie-breaker: when counts are equal and CRLF is present, prefer CRLF.
     if crlf > 0 && crlf >= lf {
         LineEnding::CrLf
     } else {
@@ -101,8 +106,30 @@ fn dominant_line_ending(content: &str) -> LineEnding {
 pub(crate) fn normalise_line_endings(input: &str, line_ending: LineEnding) -> String {
     match line_ending {
         LineEnding::Lf => input.replace("\r\n", "\n"),
-        LineEnding::CrLf => input.replace("\r\n", "\n").replace('\n', "\r\n"),
+        LineEnding::CrLf => normalise_line_endings_crlf(input),
     }
+}
+
+fn normalise_line_endings_crlf(input: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '\r' {
+            if let Some('\n') = chars.peek().copied() {
+                chars.next();
+                output.push_str("\r\n");
+                continue;
+            }
+            output.push('\r');
+            continue;
+        }
+        if ch == '\n' {
+            output.push_str("\r\n");
+        } else {
+            output.push(ch);
+        }
+    }
+    output
 }
 
 struct NormalizedContent {

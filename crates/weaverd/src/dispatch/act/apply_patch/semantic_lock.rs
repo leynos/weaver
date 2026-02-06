@@ -132,6 +132,23 @@ fn validate_file(
     )
     .map_err(|e| lsp_error("did_open", e))?;
 
+    let result = validate_open_document(host, &input, uri.clone());
+    let close_result = host
+        .did_close(input.language, did_close_params(uri))
+        .map_err(|e| lsp_error("did_close", e));
+
+    match (result, close_result) {
+        (Err(err), _) => Err(err),
+        (Ok(_), Err(err)) => Err(err),
+        (Ok(failures), Ok(())) => Ok(failures),
+    }
+}
+
+fn validate_open_document(
+    host: &mut LspHost,
+    input: &FileValidation<'_>,
+    uri: lsp_types::Uri,
+) -> Result<Vec<VerificationFailure>, SafetyHarnessError> {
     let baseline = fetch_diagnostics(host, input.language, uri.clone())?;
 
     host.did_change(
@@ -140,10 +157,7 @@ fn validate_file(
     )
     .map_err(|e| lsp_error("did_change", e))?;
 
-    let updated = fetch_diagnostics(host, input.language, uri.clone())?;
-
-    host.did_close(input.language, did_close_params(uri))
-        .map_err(|e| lsp_error("did_close", e))?;
+    let updated = fetch_diagnostics(host, input.language, uri)?;
 
     Ok(filter_new_failures(input.path, baseline, updated))
 }

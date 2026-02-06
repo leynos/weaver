@@ -37,6 +37,7 @@ pub fn handle<W: Write>(
     request: &CommandRequest,
     writer: &mut ResponseWriter<W>,
     backends: &mut FusionBackends<SemanticBackendProvider>,
+    workspace_root: &Path,
 ) -> Result<DispatchResult, DispatchError> {
     let patch = request.patch().ok_or_else(|| {
         DispatchError::invalid_arguments("apply-patch requires patch content in the request")
@@ -52,13 +53,13 @@ pub fn handle<W: Write>(
         .ensure_started(BackendKind::Semantic)
         .map_err(DispatchError::backend_startup)?;
 
-    let workspace_root = std::env::current_dir().map_err(|error| {
-        DispatchError::internal(format!("failed to resolve workspace: {error}"))
-    })?;
-
     let semantic_lock = LspSemanticLockAdapter::new(backends.provider());
     let syntactic_lock = TreeSitterSyntacticLockAdapter::new();
-    let executor = ApplyPatchExecutor::new(workspace_root, &syntactic_lock, &semantic_lock);
+    let executor = ApplyPatchExecutor::new(
+        workspace_root.to_path_buf(),
+        &syntactic_lock,
+        &semantic_lock,
+    );
 
     match executor.execute(patch) {
         Ok(summary) => {
@@ -113,14 +114,17 @@ impl<'a> ApplyPatchExecutor<'a> {
         transaction.add_changes(changes.iter().cloned());
 
         match transaction.execute() {
-            Ok(TransactionOutcome::Committed { files_modified }) => Ok(ApplyPatchSummary {
-                status: "ok",
-                files_written: files_modified,
-                files_deleted: changes
+            Ok(TransactionOutcome::Committed { files_modified }) => {
+                let files_deleted = changes
                     .iter()
                     .filter(|change| matches!(change, ContentChange::Delete { .. }))
-                    .count(),
-            }),
+                    .count();
+                Ok(ApplyPatchSummary {
+                    status: "ok",
+                    files_written: files_modified.saturating_sub(files_deleted),
+                    files_deleted,
+                })
+            }
             Ok(TransactionOutcome::SyntacticLockFailed { failures }) => {
                 Err(ApplyPatchFailure::Verification {
                     phase: "SyntacticLock",
@@ -244,6 +248,25 @@ fn map_patch_error(error: ApplyPatchError) -> ApplyPatchFailure {
     }
 }
 
+/// Validates that a path component is safe (not a symlink).
+fn validate_path_component(
+    resolved: &Path,
+    original_path: &FilePath,
+) -> Result<(), ApplyPatchError> {
+    match std::fs::symlink_metadata(resolved) {
+        Ok(metadata) if metadata.file_type().is_symlink() => Err(ApplyPatchError::InvalidPath {
+            path: original_path.clone(),
+            reason: String::from("symlink traversal is not allowed"),
+        }),
+        Ok(_) => Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(ApplyPatchError::InvalidPath {
+            path: original_path.clone(),
+            reason: format!("failed to inspect path component: {err}"),
+        }),
+    }
+}
+
 fn resolve_path(workspace_root: &Path, path: &FilePath) -> Result<PathBuf, ApplyPatchError> {
     if path.as_str().trim().is_empty() {
         return Err(ApplyPatchError::InvalidPath {
@@ -269,22 +292,7 @@ fn resolve_path(workspace_root: &Path, path: &FilePath) -> Result<PathBuf, Apply
             }
             std::path::Component::Normal(part) => {
                 resolved.push(part);
-                match std::fs::symlink_metadata(&resolved) {
-                    Ok(metadata) if metadata.file_type().is_symlink() => {
-                        return Err(ApplyPatchError::InvalidPath {
-                            path: path.clone(),
-                            reason: String::from("symlink traversal is not allowed"),
-                        });
-                    }
-                    Ok(_) => {}
-                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-                    Err(err) => {
-                        return Err(ApplyPatchError::InvalidPath {
-                            path: path.clone(),
-                            reason: format!("failed to inspect path component: {err}"),
-                        });
-                    }
-                }
+                validate_path_component(&resolved, path)?;
             }
             std::path::Component::CurDir => {}
             std::path::Component::RootDir => {

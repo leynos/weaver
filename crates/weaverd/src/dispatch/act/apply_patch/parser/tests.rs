@@ -36,6 +36,7 @@ fn parses_create_operation() {
         "+fn world() {}\n",
     );
     let ops = parse_patch(&PatchText::from(patch)).expect("parse patch");
+    assert_eq!(ops.len(), 1);
     match &ops[0] {
         PatchOperation::Create { content, .. } => {
             assert!(content.contains("fn hello()"));
@@ -56,6 +57,7 @@ fn create_operation_keeps_plus_prefixed_content() {
         "++++hello\n",
     );
     let ops = parse_patch(&PatchText::from(patch)).expect("parse patch");
+    assert_eq!(ops.len(), 1);
     match &ops[0] {
         PatchOperation::Create { content, .. } => {
             assert!(content.contains("+++hello"));
@@ -71,6 +73,7 @@ fn parses_delete_operation() {
         "deleted file mode 100644\n",
     );
     let ops = parse_patch(&PatchText::from(patch)).expect("parse patch");
+    assert_eq!(ops.len(), 1);
     match &ops[0] {
         PatchOperation::Delete { path } => {
             assert_eq!(path.as_str(), "src/remove.rs");

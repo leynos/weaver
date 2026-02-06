@@ -6,6 +6,7 @@
 //! responses back to the client.
 
 use std::io::{self, Read};
+use std::path::PathBuf;
 
 use tracing::{debug, warn};
 
@@ -32,10 +33,10 @@ pub struct DispatchConnectionHandler {
 }
 
 impl DispatchConnectionHandler {
-    /// Creates a new dispatch handler with a backend manager.
-    pub fn new(backends: BackendManager) -> Self {
+    /// Creates a new dispatch handler with a backend manager and workspace root.
+    pub fn new(backends: BackendManager, workspace_root: PathBuf) -> Self {
         Self {
-            router: DomainRouter::new(),
+            router: DomainRouter::new(workspace_root),
             backends,
         }
     }
@@ -229,10 +230,12 @@ mod tests {
     #[fixture]
     fn harness(backend_manager: BackendManager) -> HandlerTestHarness {
         let (listener, addr) = create_listener();
+        let workspace_root = std::env::current_dir().expect("workspace root");
 
         let server_handle = thread::spawn(move || {
             let (stream, _) = listener.accept().expect("accept");
-            DispatchConnectionHandler::new(backend_manager).handle(ConnectionStream::Tcp(stream));
+            DispatchConnectionHandler::new(backend_manager, workspace_root)
+                .handle(ConnectionStream::Tcp(stream));
         });
 
         let client = TcpStream::connect(addr).expect("connect");

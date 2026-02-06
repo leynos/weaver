@@ -212,6 +212,7 @@ fn content_transaction_commits_writes_and_deletes() {
 
     let outcome = transaction.execute().expect("transaction should succeed");
     assert!(matches!(outcome, TransactionOutcome::Committed { .. }));
+    assert_eq!(outcome.files_modified(), Some(2));
     assert_eq!(
         fs::read_to_string(&keep_path).expect("read keep file"),
         "hello world"
@@ -231,15 +232,25 @@ fn build_content_transaction<'a>(
     transaction
 }
 
-#[test]
-fn content_transaction_rejects_syntactic_lock_failure() {
+#[rstest]
+#[case::syntactic(LockFailureKind::Syntactic, "syntax error")]
+#[case::semantic(LockFailureKind::Semantic, "type error")]
+fn content_transaction_rejects_lock_failure(#[case] kind: LockFailureKind, #[case] message: &str) {
     let dir = TempDir::new().expect("temp dir");
     let keep_path = temp_file(&dir, "keep.txt", "hello");
     let delete_path = temp_file(&dir, "delete.txt", "goodbye");
-    let failure = VerificationFailure::new(keep_path.clone(), "syntax error");
+    let failure = VerificationFailure::new(keep_path.clone(), message);
 
-    let syntactic = ConfigurableSyntacticLock::failing(vec![failure]);
-    let semantic = ConfigurableSemanticLock::passing();
+    let (syntactic, semantic) = match kind {
+        LockFailureKind::Syntactic => (
+            ConfigurableSyntacticLock::failing(vec![failure]),
+            ConfigurableSemanticLock::passing(),
+        ),
+        LockFailureKind::Semantic => (
+            ConfigurableSyntacticLock::passing(),
+            ConfigurableSemanticLock::failing(vec![failure]),
+        ),
+    };
 
     let transaction = build_content_transaction(
         &syntactic,
@@ -248,38 +259,20 @@ fn content_transaction_rejects_syntactic_lock_failure() {
         delete_path.clone(),
     );
     let outcome = transaction.execute().expect("transaction should succeed");
-    assert!(matches!(
-        outcome,
-        TransactionOutcome::SyntacticLockFailed { .. }
-    ));
-    assert_eq!(
-        fs::read_to_string(&keep_path).expect("read keep file"),
-        "hello"
-    );
-    assert!(delete_path.exists(), "delete file should remain");
-}
-
-#[test]
-fn content_transaction_rejects_semantic_lock_failure() {
-    let dir = TempDir::new().expect("temp dir");
-    let keep_path = temp_file(&dir, "keep.txt", "hello");
-    let delete_path = temp_file(&dir, "delete.txt", "goodbye");
-    let failure = VerificationFailure::new(keep_path.clone(), "type error");
-
-    let syntactic = ConfigurableSyntacticLock::passing();
-    let semantic = ConfigurableSemanticLock::failing(vec![failure]);
-
-    let transaction = build_content_transaction(
-        &syntactic,
-        &semantic,
-        keep_path.clone(),
-        delete_path.clone(),
-    );
-    let outcome = transaction.execute().expect("transaction should succeed");
-    assert!(matches!(
-        outcome,
-        TransactionOutcome::SemanticLockFailed { .. }
-    ));
+    match kind {
+        LockFailureKind::Syntactic => {
+            assert!(matches!(
+                outcome,
+                TransactionOutcome::SyntacticLockFailed { .. }
+            ));
+        }
+        LockFailureKind::Semantic => {
+            assert!(matches!(
+                outcome,
+                TransactionOutcome::SemanticLockFailed { .. }
+            ));
+        }
+    }
     assert_eq!(
         fs::read_to_string(&keep_path).expect("read keep file"),
         "hello"

@@ -14,6 +14,23 @@ pub(super) struct DeletePlan {
     pub(super) original: String,
 }
 
+/// Tracks files prepared for commit with their original content.
+#[derive(Debug)]
+struct PreparedFile {
+    path: PathBuf,
+    temp_file: tempfile::NamedTempFile,
+    original: String,
+    existed: bool,
+}
+
+/// Tracks files committed during the transaction.
+#[derive(Debug)]
+struct CommittedFile {
+    path: PathBuf,
+    original: String,
+    existed: bool,
+}
+
 /// Writes all modified content to the filesystem using two-phase commit.
 ///
 /// # Atomicity Guarantee
@@ -34,7 +51,7 @@ pub(super) fn commit_changes_with_deletes(
     deletions: &[DeletePlan],
 ) -> Result<(), SafetyHarnessError> {
     // Phase 1: Prepare all files (write to temps)
-    let mut prepared: Vec<(PathBuf, tempfile::NamedTempFile, String, bool)> = Vec::new();
+    let mut prepared: Vec<PreparedFile> = Vec::new();
 
     for path in paths {
         let content = context
@@ -44,7 +61,12 @@ pub(super) fn commit_changes_with_deletes(
         let original = context.original(path).cloned().unwrap_or_default();
         let existed = path.exists();
         let temp_file = prepare_file(path, content)?;
-        prepared.push((path.clone(), temp_file, original, existed));
+        prepared.push(PreparedFile {
+            path: path.clone(),
+            temp_file,
+            original,
+            existed,
+        });
     }
     // Phase 2: Commit all files (atomic renames)
     let committed = persist_prepared_files(prepared)?;
@@ -54,16 +76,20 @@ pub(super) fn commit_changes_with_deletes(
 
 /// Persists prepared temp files, rolling back if any commit fails.
 fn persist_prepared_files(
-    prepared: Vec<(PathBuf, tempfile::NamedTempFile, String, bool)>,
-) -> Result<Vec<(PathBuf, String, bool)>, SafetyHarnessError> {
-    let mut committed: Vec<(PathBuf, String, bool)> = Vec::new();
+    prepared: Vec<PreparedFile>,
+) -> Result<Vec<CommittedFile>, SafetyHarnessError> {
+    let mut committed: Vec<CommittedFile> = Vec::new();
 
-    for (path, temp_file, original, existed) in prepared {
-        if let Err(err) = temp_file.persist(&path) {
+    for prepared in prepared {
+        if let Err(err) = prepared.temp_file.persist(&prepared.path) {
             rollback_writes(&committed);
-            return Err(SafetyHarnessError::file_write(path, err.error));
+            return Err(SafetyHarnessError::file_write(prepared.path, err.error));
         }
-        committed.push((path, original, existed));
+        committed.push(CommittedFile {
+            path: prepared.path,
+            original: prepared.original,
+            existed: prepared.existed,
+        });
     }
 
     Ok(committed)
@@ -72,7 +98,7 @@ fn persist_prepared_files(
 /// Removes files slated for deletion, rolling back changes on failure.
 fn apply_deletions(
     deletions: &[DeletePlan],
-    committed: &[(PathBuf, String, bool)],
+    committed: &[CommittedFile],
 ) -> Result<(), SafetyHarnessError> {
     let mut deleted: Vec<DeletePlan> = Vec::new();
 
@@ -116,19 +142,19 @@ fn prepare_file(path: &Path, content: &str) -> Result<tempfile::NamedTempFile, S
 ///
 /// This is a best-effort operation: if restoration fails for any file,
 /// we continue attempting to restore the remaining files.
-fn rollback_writes(committed: &[(PathBuf, String, bool)]) {
-    for (path, original, existed) in committed {
-        if !existed {
+fn rollback_writes(committed: &[CommittedFile]) {
+    for committed in committed {
+        if !committed.existed {
             // File was newly created, remove it
-            let _ = std::fs::remove_file(path);
+            let _ = std::fs::remove_file(&committed.path);
         } else {
             // Restore original content (best effort)
-            let _ = std::fs::write(path, original);
+            let _ = std::fs::write(&committed.path, &committed.original);
         }
     }
 }
 
-fn rollback_deletes_and_writes(deleted: &[DeletePlan], committed: &[(PathBuf, String, bool)]) {
+fn rollback_deletes_and_writes(deleted: &[DeletePlan], committed: &[CommittedFile]) {
     for deletion in deleted {
         let _ = std::fs::write(&deletion.path, &deletion.original);
     }

@@ -9,25 +9,31 @@ pub(crate) enum LineEnding {
     CrLf,
 }
 
-/// Raw patch input text.
-#[derive(Debug, Clone)]
-pub(crate) struct PatchText(String);
+macro_rules! string_newtype {
+    ($vis:vis struct $name:ident, $doc:literal) => {
+        #[doc = $doc]
+        #[derive(Debug, Clone)]
+        $vis struct $name(String);
 
-impl PatchText {
-    pub(crate) fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
-    }
+        impl $name {
+            $vis fn new(value: impl Into<String>) -> Self {
+                Self(value.into())
+            }
 
-    pub(crate) fn as_str(&self) -> &str {
-        &self.0
-    }
+            $vis fn as_str(&self) -> &str {
+                &self.0
+            }
+        }
+
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                self.as_str()
+            }
+        }
+    };
 }
 
-impl AsRef<str> for PatchText {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
+string_newtype!(pub(crate) struct PatchText, "Raw patch input text.");
 
 impl From<String> for PatchText {
     fn from(value: String) -> Self {
@@ -41,47 +47,13 @@ impl From<&str> for PatchText {
     }
 }
 
-/// Diff header line from a patch stream.
-#[derive(Debug, Clone)]
-pub(crate) struct DiffHeaderLine(String);
+string_newtype!(pub(crate) struct DiffHeaderLine, "Diff header line from a patch stream.");
 
-impl DiffHeaderLine {
-    pub(crate) fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
-    }
-
-    pub(crate) fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl AsRef<str> for DiffHeaderLine {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
-/// Path for a patch operation target.
-#[derive(Debug, Clone)]
-pub(crate) struct FilePath(String);
+string_newtype!(pub(crate) struct FilePath, "Path for a patch operation target.");
 
 impl FilePath {
-    pub(crate) fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
-    }
-
-    pub(crate) fn as_str(&self) -> &str {
-        &self.0
-    }
-
     pub(crate) fn into_string(self) -> String {
         self.0
-    }
-}
-
-impl AsRef<str> for FilePath {
-    fn as_ref(&self) -> &str {
-        self.as_str()
     }
 }
 
@@ -119,25 +91,10 @@ impl AsRef<str> for FileContent {
     }
 }
 
-/// Search block content extracted from a patch.
-#[derive(Debug, Clone)]
-pub(crate) struct SearchPattern(String);
-
-impl SearchPattern {
-    pub(crate) fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
-    }
-
-    pub(crate) fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl AsRef<str> for SearchPattern {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
+string_newtype!(
+    pub(crate) struct SearchPattern,
+    "Search block content extracted from a patch."
+);
 
 /// Search/replace block for modify operations.
 #[derive(Debug, Clone)]

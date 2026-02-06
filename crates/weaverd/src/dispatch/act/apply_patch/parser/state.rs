@@ -62,7 +62,7 @@ impl SearchReplaceParser {
         Ok(())
     }
 
-    pub(super) fn is_open(&self) -> bool {
+    pub(super) const fn is_open(&self) -> bool {
         self.search_start.is_some() || self.replace_start.is_some()
     }
 

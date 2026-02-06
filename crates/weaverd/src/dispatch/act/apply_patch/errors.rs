@@ -33,7 +33,7 @@ pub(crate) enum ApplyPatchError {
     DeleteMissing { path: FilePath },
     #[error("SEARCH block {block_index} did not match")]
     SearchBlockNotFound { path: FilePath, block_index: usize },
-    #[error("I/O error for {path}: {message} ({kind:?})")]
+    #[error("I/O error for {path}: {message} ({kind})")]
     Io {
         path: FilePath,
         kind: std::io::ErrorKind,
@@ -49,7 +49,7 @@ impl ApplyPatchError {
     pub(crate) fn to_json(&self) -> Result<String, serde_json::Error> {
         let details = ApplyPatchErrorDetails {
             message: self.to_string(),
-            path: self.path().map(str::to_string),
+            path: self.path(),
             operation: self.operation().map(str::to_string),
         };
         let envelope = ApplyPatchErrorEnvelope {
@@ -60,7 +60,7 @@ impl ApplyPatchError {
         serde_json::to_string(&envelope)
     }
 
-    fn path(&self) -> Option<&str> {
+    fn path(&self) -> Option<String> {
         match self {
             Self::MissingSearchReplace { path }
             | Self::MissingHunk { path }
@@ -71,7 +71,7 @@ impl ApplyPatchError {
             | Self::FileAlreadyExists { path }
             | Self::DeleteMissing { path }
             | Self::SearchBlockNotFound { path, .. }
-            | Self::Io { path, .. } => Some(path.as_str()),
+            | Self::Io { path, .. } => Some(path.clone().into_string()),
             Self::EmptyPatch
             | Self::BinaryPatch
             | Self::MissingDiffHeader
