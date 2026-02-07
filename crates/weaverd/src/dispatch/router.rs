@@ -191,17 +191,8 @@ impl DomainRouter {
         request: &CommandRequest,
         writer: &mut ResponseWriter<W>,
     ) -> Result<DispatchResult, DispatchError> {
-        self.route_domain(request, writer, &DomainRoutingContext::VERIFY)
-    }
-
-    fn route_domain<W: Write>(
-        &self,
-        request: &CommandRequest,
-        writer: &mut ResponseWriter<W>,
-        context: &DomainRoutingContext,
-    ) -> Result<DispatchResult, DispatchError> {
         let operation = request.operation().to_ascii_lowercase();
-        self.route_fallback(context, operation.as_str(), writer)
+        self.route_fallback(&DomainRoutingContext::VERIFY, operation.as_str(), writer)
     }
 
     /// Handles routing fallbacks for known-but-unimplemented and unknown operations.
