@@ -173,9 +173,10 @@ fn given_syntactic_passes(world: &RefCell<ApplyPatchWorld>) {
     world.borrow_mut().syntactic_lock = ConfigurableSyntacticLock::passing();
 }
 
-#[given("an apply-patch syntactic lock that fails with {message}")]
-fn given_syntactic_fails(world: &RefCell<ApplyPatchWorld>, message: String) {
-    let failure = VerificationFailure::new(PathBuf::from("src/main.rs"), message.as_str());
+#[given("an apply-patch syntactic lock on {path} that fails with {message}")]
+fn given_syntactic_fails(world: &RefCell<ApplyPatchWorld>, path: String, message: String) {
+    let path = PathBuf::from(strip_quotes(&path));
+    let failure = VerificationFailure::new(path, message.as_str());
     world.borrow_mut().syntactic_lock = ConfigurableSyntacticLock::failing(vec![failure]);
 }
 
@@ -184,9 +185,10 @@ fn given_semantic_passes(world: &RefCell<ApplyPatchWorld>) {
     world.borrow_mut().semantic_lock = ConfigurableSemanticLock::passing();
 }
 
-#[given("an apply-patch semantic lock that fails with {message}")]
-fn given_semantic_fails(world: &RefCell<ApplyPatchWorld>, message: String) {
-    let failure = VerificationFailure::new(PathBuf::from("src/main.rs"), message.as_str());
+#[given("an apply-patch semantic lock on {path} that fails with {message}")]
+fn given_semantic_fails(world: &RefCell<ApplyPatchWorld>, path: String, message: String) {
+    let path = PathBuf::from(strip_quotes(&path));
+    let failure = VerificationFailure::new(path, message.as_str());
     world.borrow_mut().semantic_lock = ConfigurableSemanticLock::failing(vec![failure]);
 }
 

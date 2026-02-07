@@ -119,6 +119,10 @@ impl<'a> ApplyPatchExecutor<'a> {
                     .iter()
                     .filter(|change| matches!(change, ContentChange::Delete { .. }))
                     .count();
+                debug_assert!(
+                    files_modified >= files_deleted,
+                    "files_modified ({files_modified}) smaller than files_deleted ({files_deleted})",
+                );
                 Ok(ApplyPatchSummary {
                     status: "ok",
                     files_written: files_modified.saturating_sub(files_deleted),

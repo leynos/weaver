@@ -6,14 +6,13 @@
 //! rollback to ensure multi-file atomicity: either all files are updated or
 //! none are (barring catastrophic failures during rollback itself).
 
+mod commit;
 #[cfg(test)]
 mod content_transaction_tests;
 #[cfg(test)]
 mod test_support;
 #[cfg(test)]
 mod tests;
-
-mod commit;
 
 use std::fs;
 use std::path::{Path, PathBuf};

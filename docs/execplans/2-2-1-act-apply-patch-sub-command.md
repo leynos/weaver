@@ -220,7 +220,7 @@ The feature is complete when:
 - Daemon responses include structured JSON error payloads for parse failures
   and verification failures, and the CLI surfaces them with non-zero status.
 - The patch parser enforces modify/create/delete semantics, rejects missing
-  hunks and binary content, and normalises line endings per the design doc.
+  hunks and binary content, and normalizes line endings per the design doc.
 - Syntactic and semantic locks run on modified/new files; failures leave the
   filesystem untouched.
 - Unit tests and rstest-bdd scenarios cover happy and unhappy paths.
@@ -264,7 +264,7 @@ consistent and small, splitting modules as needed):
   - `PatchParseError` and `PatchOperation` enums (Modify/Create/Delete).
   - `ParsedPatch` holding ordered operations.
   - `PatchMatcher` functions that apply SEARCH/REPLACE blocks with cursor
-    logic and line-ending normalisation.
+    logic and line-ending normalization.
   - `ApplyPatchHandler::handle(request, writer, backends)` that starts
     backends, applies the patch in-memory, and commits via the harness.
 - In `crates/weaverd/src/safety_harness`:

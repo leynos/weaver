@@ -119,7 +119,7 @@ fn parse_operation(chunk: &str) -> Result<PatchOperation, ApplyPatchError> {
             LineType::HunkHeader | LineType::DiffHeader | LineType::CreateContent
         ) {
             validate_line_type(line_type, trimmed)?;
-            process_secondary_line(line_type, mode, &mut create_capture, line);
+            handle_mode_specific_capture(mode, line_type, line, &mut create_capture);
         }
 
         offset = line_end;
@@ -168,22 +168,6 @@ fn detect_mode_transition(trimmed: &str, current: OperationMode) -> OperationMod
         mode = mode.promote(OperationMode::Delete);
     }
     mode
-}
-
-/// Processes hunk headers, diff headers, and create content lines.
-// Required to keep line context explicit while delegating to small helpers.
-fn process_secondary_line(
-    line_type: LineType,
-    mode: OperationMode,
-    create_capture: &mut CreateContentCapture,
-    line: &str,
-) {
-    match line_type {
-        LineType::HunkHeader | LineType::DiffHeader | LineType::CreateContent => {
-            handle_mode_specific_capture(mode, line_type, line, create_capture);
-        }
-        _ => {}
-    }
 }
 
 /// Validates line types that may raise parse errors.
@@ -306,12 +290,6 @@ fn parse_diff_paths(line: &str) -> Result<(String, String), ApplyPatchError> {
         if !token.is_empty() {
             tokens.push(token);
         }
-    }
-
-    if tokens.len() != 2 {
-        return Err(ApplyPatchError::InvalidDiffHeader {
-            line: line.to_string(),
-        });
     }
 
     let [first, second] =

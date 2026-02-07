@@ -87,11 +87,11 @@ impl ApplyPatchError {
             Self::MissingSearchReplace { .. }
             | Self::UnclosedSearchBlock { .. }
             | Self::UnclosedReplaceBlock { .. }
-            | Self::SearchBlockNotFound { .. } => Some("modify"),
+            | Self::SearchBlockNotFound { .. }
+            | Self::FileNotFound { .. } => Some("modify"),
             Self::MissingHunk { .. } | Self::FileAlreadyExists { .. } => Some("create"),
             Self::DeleteMissing { .. } => Some("delete"),
             Self::InvalidPath { .. }
-            | Self::FileNotFound { .. }
             | Self::Io { .. }
             | Self::EmptyPatch
             | Self::BinaryPatch

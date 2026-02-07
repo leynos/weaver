@@ -51,7 +51,7 @@ Feature: Apply patch
   Scenario: Reject syntactic lock failure
     Given a workspace with the default source file
     And a patch that replaces the main message
-    And an apply-patch syntactic lock that fails with "syntax error"
+    And an apply-patch syntactic lock on "src/main.rs" that fails with "syntax error"
     And an apply-patch semantic lock that passes
     When the patch is applied
     Then the apply-patch file "src/main.rs" contains "Old Message"
@@ -61,7 +61,7 @@ Feature: Apply patch
     Given a workspace with the default source file
     And a patch that replaces the main message
     And an apply-patch syntactic lock that passes
-    And an apply-patch semantic lock that fails with "type error"
+    And an apply-patch semantic lock on "src/main.rs" that fails with "type error"
     When the patch is applied
     Then the apply-patch file "src/main.rs" contains "Old Message"
     And the apply-patch fails with "SemanticLock"

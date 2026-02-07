@@ -39,6 +39,10 @@ fn find_exact(
     cursor: usize,
     search: &SearchPattern,
 ) -> Option<(usize, usize)> {
+    debug_assert!(
+        cursor <= content.as_str().len(),
+        "exact search cursor out of bounds"
+    );
     let content = content.as_str();
     let search = search.as_str();
     content[cursor..].find(search).map(|offset| {

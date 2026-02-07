@@ -231,7 +231,7 @@ mod tests {
     #[fixture]
     fn harness(backend_manager: BackendManager) -> HandlerTestHarness {
         let (listener, addr) = create_listener();
-        let workspace_root = std::env::current_dir().expect("workspace root");
+        let workspace_root = PathBuf::from("/tmp/weaver-test-workspace");
 
         let server_handle = thread::spawn(move || {
             let (stream, _) = listener.accept().expect("accept");
