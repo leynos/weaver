@@ -314,9 +314,10 @@ fn parse_diff_paths(line: &str) -> Result<(String, String), ApplyPatchError> {
         });
     }
 
-    let mut iter = tokens.into_iter();
-    let first = iter.next().expect("first token");
-    let second = iter.next().expect("second token");
+    let [first, second] =
+        <[String; 2]>::try_from(tokens).map_err(|_| ApplyPatchError::InvalidDiffHeader {
+            line: line.to_string(),
+        })?;
     Ok((first, second))
 }
 

@@ -1,7 +1,9 @@
 //! Parser state helpers for apply-patch operations.
 
 use crate::dispatch::act::apply_patch::errors::ApplyPatchError;
-use crate::dispatch::act::apply_patch::types::{FilePath, SearchPattern, SearchReplaceBlock};
+use crate::dispatch::act::apply_patch::types::{
+    FileContent, FilePath, ReplacementText, SearchPattern, SearchReplaceBlock,
+};
 
 pub(super) struct SearchReplaceParser {
     blocks: Vec<SearchReplaceBlock>,
@@ -29,7 +31,7 @@ impl SearchReplaceParser {
             self.replace_start = Some(line_end_from_chunk(chunk, line_start));
             self.blocks.push(SearchReplaceBlock {
                 search: SearchPattern::new(search),
-                replace: String::new(),
+                replace: ReplacementText::new(""),
             });
         }
     }
@@ -45,7 +47,7 @@ impl SearchReplaceParser {
         };
         let replace = &chunk[start..line_start];
         if let Some(last) = self.blocks.last_mut() {
-            last.replace = replace.to_string();
+            last.replace = ReplacementText::new(replace);
         }
         self.search_start = None;
         self.replace_start = None;
@@ -100,11 +102,14 @@ impl CreateContentCapture {
         self.content.push_str(ending);
     }
 
-    pub(super) fn validate_and_finish(self, path: &FilePath) -> Result<String, ApplyPatchError> {
+    pub(super) fn validate_and_finish(
+        self,
+        path: &FilePath,
+    ) -> Result<FileContent, ApplyPatchError> {
         if !self.saw_hunk {
             return Err(ApplyPatchError::MissingHunk { path: path.clone() });
         }
-        Ok(self.content)
+        Ok(FileContent::new(self.content))
     }
 }
 

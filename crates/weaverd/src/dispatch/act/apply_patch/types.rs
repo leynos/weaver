@@ -63,19 +63,12 @@ impl std::fmt::Display for FilePath {
     }
 }
 
-/// Content of a file involved in patch operations.
-#[derive(Debug, Clone)]
-pub(crate) struct FileContent(String);
+string_newtype!(
+    pub(crate) struct FileContent,
+    "Content of a file involved in patch operations."
+);
 
 impl FileContent {
-    pub(crate) fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
-    }
-
-    pub(crate) fn as_str(&self) -> &str {
-        &self.0
-    }
-
     pub(crate) fn into_string(self) -> String {
         self.0
     }
@@ -85,22 +78,21 @@ impl FileContent {
     }
 }
 
-impl AsRef<str> for FileContent {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
 string_newtype!(
     pub(crate) struct SearchPattern,
     "Search block content extracted from a patch."
+);
+
+string_newtype!(
+    pub(crate) struct ReplacementText,
+    "Replacement text extracted from a patch."
 );
 
 /// Search/replace block for modify operations.
 #[derive(Debug, Clone)]
 pub(crate) struct SearchReplaceBlock {
     pub(crate) search: SearchPattern,
-    pub(crate) replace: String,
+    pub(crate) replace: ReplacementText,
 }
 
 /// Parsed patch operation.
@@ -112,7 +104,7 @@ pub(crate) enum PatchOperation {
     },
     Create {
         path: FilePath,
-        content: String,
+        content: FileContent,
     },
     Delete {
         path: FilePath,

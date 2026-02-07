@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use super::super::error::SafetyHarnessError;
 use super::super::verification::VerificationContext;
+use tracing::warn;
 
 /// Planned file deletion with rollback context.
 ///
@@ -63,7 +64,10 @@ pub(super) fn commit_changes_with_deletes(
             .modified(path)
             .ok_or_else(|| SafetyHarnessError::ModifiedContentMissing { path: path.clone() })?;
 
-        let original = context.original(path).cloned().unwrap_or_default();
+        let original = context
+            .original(path)
+            .cloned()
+            .ok_or_else(|| SafetyHarnessError::OriginalContentMissing { path: path.clone() })?;
         let existed = path.exists();
         let temp_file = prepare_file(path, content)?;
         prepared.push(PreparedFile {
@@ -85,15 +89,18 @@ fn persist_prepared_files(
 ) -> Result<Vec<CommittedFile>, SafetyHarnessError> {
     let mut committed: Vec<CommittedFile> = Vec::new();
 
-    for prepared in prepared {
-        if let Err(err) = prepared.temp_file.persist(&prepared.path) {
+    for prepared_file in prepared {
+        if let Err(err) = prepared_file.temp_file.persist(&prepared_file.path) {
             rollback_writes(&committed);
-            return Err(SafetyHarnessError::file_write(prepared.path, err.error));
+            return Err(SafetyHarnessError::file_write(
+                prepared_file.path,
+                err.error,
+            ));
         }
         committed.push(CommittedFile {
-            path: prepared.path,
-            original: prepared.original,
-            existed: prepared.existed,
+            path: prepared_file.path,
+            original: prepared_file.original,
+            existed: prepared_file.existed,
         });
     }
 
@@ -105,17 +112,14 @@ fn apply_deletions(
     deletions: &[DeletePlan],
     committed: &[CommittedFile],
 ) -> Result<(), SafetyHarnessError> {
-    let mut deleted: Vec<DeletePlan> = Vec::new();
+    let mut deleted: Vec<&DeletePlan> = Vec::new();
 
     for deletion in deletions {
         if let Err(err) = fs::remove_file(&deletion.path) {
             rollback_deletes_and_writes(&deleted, committed);
             return Err(SafetyHarnessError::file_delete(deletion.path.clone(), err));
         }
-        deleted.push(DeletePlan {
-            path: deletion.path.clone(),
-            original: deletion.original.clone(),
-        });
+        deleted.push(deletion);
     }
 
     Ok(())
@@ -148,20 +152,39 @@ fn prepare_file(path: &Path, content: &str) -> Result<tempfile::NamedTempFile, S
 /// This is a best-effort operation: if restoration fails for any file,
 /// we continue attempting to restore the remaining files.
 fn rollback_writes(committed: &[CommittedFile]) {
-    for committed in committed {
-        if !committed.existed {
+    for committed_file in committed {
+        if !committed_file.existed {
             // File was newly created, remove it
-            let _ = std::fs::remove_file(&committed.path);
+            if let Err(err) = std::fs::remove_file(&committed_file.path) {
+                warn!(
+                    path = %committed_file.path.display(),
+                    error = %err,
+                    "failed to rollback newly created file",
+                );
+            }
         } else {
             // Restore original content (best effort)
-            let _ = std::fs::write(&committed.path, &committed.original);
+            if let Err(err) = std::fs::write(&committed_file.path, &committed_file.original) {
+                warn!(
+                    path = %committed_file.path.display(),
+                    error = %err,
+                    "failed to rollback modified file",
+                );
+            }
         }
     }
 }
 
-fn rollback_deletes_and_writes(deleted: &[DeletePlan], committed: &[CommittedFile]) {
+/// Restores deleted files before rolling back committed writes.
+fn rollback_deletes_and_writes(deleted: &[&DeletePlan], committed: &[CommittedFile]) {
     for deletion in deleted {
-        let _ = std::fs::write(&deletion.path, &deletion.original);
+        if let Err(err) = std::fs::write(&deletion.path, &deletion.original) {
+            warn!(
+                path = %deletion.path.display(),
+                error = %err,
+                "failed to rollback deleted file",
+            );
+        }
     }
     rollback_writes(committed);
 }

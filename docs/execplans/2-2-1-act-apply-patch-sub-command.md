@@ -15,9 +15,10 @@ Implement the `weaver act apply-patch` command end-to-end, so an operator can
 stream a patch via standard input (STDIN), have the daemon validate it through
 the Double-Lock harness, and see a deterministic success or structured failure.
 The observable success is: piping a patch into `weaver act apply-patch` results
-in a JSONL request containing the patch, the daemon applies it atomically, and
-the command-line interface (CLI) exits with status 0 on success or non-zero
-with structured error output on failure, without partial filesystem writes.
+in a JSON Lines (JSONL) request containing the patch, the daemon applies it
+atomically, and the command-line interface (CLI) exits with status 0 on success
+or non-zero with structured error output on failure, without partial filesystem
+writes.
 
 ## Constraints
 
@@ -201,12 +202,14 @@ Stage H (quality gates): run `make check-fmt`, `make lint`, `make test`,
 
 Commands (run from repo root, using `tee` + `pipefail`):
 
-    set -o pipefail && make check-fmt 2>&1 | tee /tmp/make-check-fmt.log
-    set -o pipefail && make lint 2>&1 | tee /tmp/make-lint.log
-    set -o pipefail && make test 2>&1 | tee /tmp/make-test.log
-    set -o pipefail && make markdownlint 2>&1 | tee /tmp/make-markdownlint.log
-    set -o pipefail && make fmt 2>&1 | tee /tmp/make-fmt.log
-    set -o pipefail && make nixie 2>&1 | tee /tmp/make-nixie.log
+```sh
+set -o pipefail && make check-fmt 2>&1 | tee /tmp/make-check-fmt.log
+set -o pipefail && make lint 2>&1 | tee /tmp/make-lint.log
+set -o pipefail && make test 2>&1 | tee /tmp/make-test.log
+set -o pipefail && make markdownlint 2>&1 | tee /tmp/make-markdownlint.log
+set -o pipefail && make fmt 2>&1 | tee /tmp/make-fmt.log
+set -o pipefail && make nixie 2>&1 | tee /tmp/make-nixie.log
+```
 
 ## Validation and acceptance
 

@@ -261,9 +261,8 @@ fn then_patch_fails(world: &RefCell<ApplyPatchWorld>, kind: String) {
     }
 }
 
-fn strip_quotes(value: &str) -> &str {
-    value.trim_matches('"')
-}
+#[rustfmt::skip]
+fn strip_quotes(value: &str) -> &str { value.trim_matches('"') }
 
 #[scenario(path = "tests/features/apply_patch.feature")]
 fn apply_patch_scenarios(#[from(world)] world: RefCell<ApplyPatchWorld>) {

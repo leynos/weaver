@@ -1,5 +1,7 @@
 //! Tests for apply-patch parsing.
 
+use rstest::rstest;
+
 use super::*;
 use crate::dispatch::act::apply_patch::types::PatchText;
 
@@ -38,9 +40,10 @@ fn parses_create_operation() {
     let ops = parse_patch(&PatchText::from(patch)).expect("parse patch");
     assert_eq!(ops.len(), 1);
     match &ops[0] {
-        PatchOperation::Create { content, .. } => {
-            assert!(content.contains("fn hello()"));
-            assert!(content.contains("fn world()"));
+        PatchOperation::Create { path, content } => {
+            assert_eq!(path.as_str(), "src/new.rs");
+            assert!(content.as_str().contains("fn hello()"));
+            assert!(content.as_str().contains("fn world()"));
         }
         other => panic!("unexpected operation: {other:?}"),
     }
@@ -59,8 +62,9 @@ fn create_operation_keeps_plus_prefixed_content() {
     let ops = parse_patch(&PatchText::from(patch)).expect("parse patch");
     assert_eq!(ops.len(), 1);
     match &ops[0] {
-        PatchOperation::Create { content, .. } => {
-            assert!(content.contains("+++hello"));
+        PatchOperation::Create { path, content } => {
+            assert_eq!(path.as_str(), "src/new.rs");
+            assert!(content.as_str().contains("+++hello"));
         }
         other => panic!("unexpected operation: {other:?}"),
     }
@@ -82,19 +86,30 @@ fn parses_delete_operation() {
     }
 }
 
-#[test]
-fn rejects_missing_diff_header() {
-    let error = parse_patch(&PatchText::from("not a patch")).expect_err("should fail");
-    assert!(matches!(error, ApplyPatchError::MissingDiffHeader));
+#[derive(Debug, Clone, Copy)]
+enum ParseErrorCase {
+    MissingDiffHeader,
+    UnclosedSearchBlock,
 }
 
-#[test]
-fn rejects_unclosed_search_block() {
-    let patch = concat!(
+#[rstest]
+#[case::missing_diff_header("not a patch", ParseErrorCase::MissingDiffHeader)]
+#[case::unclosed_search_block(
+    concat!(
         "diff --git a/src/lib.rs b/src/lib.rs\n",
         "<<<<<<< SEARCH\n",
         "fn main() {}\n",
-    );
+    ),
+    ParseErrorCase::UnclosedSearchBlock,
+)]
+fn rejects_invalid_patch(#[case] patch: &str, #[case] expected: ParseErrorCase) {
     let error = parse_patch(&PatchText::from(patch)).expect_err("should fail");
-    assert!(matches!(error, ApplyPatchError::UnclosedSearchBlock { .. }));
+    match expected {
+        ParseErrorCase::MissingDiffHeader => {
+            assert!(matches!(error, ApplyPatchError::MissingDiffHeader));
+        }
+        ParseErrorCase::UnclosedSearchBlock => {
+            assert!(matches!(error, ApplyPatchError::UnclosedSearchBlock { .. }));
+        }
+    }
 }

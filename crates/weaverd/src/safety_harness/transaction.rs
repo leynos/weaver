@@ -7,6 +7,10 @@
 //! none are (barring catastrophic failures during rollback itself).
 
 #[cfg(test)]
+mod content_transaction_tests;
+#[cfg(test)]
+mod test_support;
+#[cfg(test)]
 mod tests;
 
 mod commit;
@@ -144,6 +148,7 @@ impl<'a> ContentTransaction<'a> {
         for change in changes {
             match change {
                 ContentChange::Write { path, content } => {
+                    // Allow create operations by treating missing files as empty content.
                     let original = read_file(&path)?;
                     context.add_original(path.clone(), original);
                     context.add_modified(path.clone(), content);

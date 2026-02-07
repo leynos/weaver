@@ -88,7 +88,7 @@ pub(crate) struct ApplyPatchExecutor<'a> {
 
 /// Represents the kind of file system change to validate and construct.
 enum ChangeKind {
-    Create(String),
+    Create(FileContent),
     Delete,
 }
 
@@ -138,7 +138,7 @@ impl<'a> ApplyPatchExecutor<'a> {
                 })
             }
             Ok(TransactionOutcome::NoChanges) => {
-                Err(ApplyPatchFailure::Patch(ApplyPatchError::MissingDiffHeader))
+                Err(ApplyPatchFailure::Patch(ApplyPatchError::EmptyTransaction))
             }
             Err(error) => Err(map_harness_error(error)),
         }
@@ -179,9 +179,9 @@ impl<'a> ApplyPatchExecutor<'a> {
     fn build_create_change(
         &self,
         path: &FilePath,
-        content: &str,
+        content: &FileContent,
     ) -> Result<ContentChange, ApplyPatchError> {
-        self.build_validated_change(path, ChangeKind::Create(content.to_string()))
+        self.build_validated_change(path, ChangeKind::Create(content.clone()))
     }
 
     fn build_delete_change(&self, path: &FilePath) -> Result<ContentChange, ApplyPatchError> {
@@ -206,7 +206,7 @@ impl<'a> ApplyPatchExecutor<'a> {
                 if resolved.exists() {
                     return Err(ApplyPatchError::FileAlreadyExists { path: path.clone() });
                 }
-                Ok(ContentChange::write(resolved, content))
+                Ok(ContentChange::write(resolved, content.into_string()))
             }
             ChangeKind::Delete => {
                 if !resolved.exists() {

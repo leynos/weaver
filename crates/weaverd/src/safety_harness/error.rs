@@ -123,6 +123,12 @@ pub enum SafetyHarnessError {
         /// Path whose modified content was unexpectedly absent.
         path: PathBuf,
     },
+    /// Original content for a path was not available in the context.
+    #[error("original content missing from context for {path}")]
+    OriginalContentMissing {
+        /// Path whose original content was unexpectedly absent.
+        path: PathBuf,
+    },
 
     /// Failed to apply edits to the in-memory buffer.
     #[error("edit application failed for {path}: {message}")]

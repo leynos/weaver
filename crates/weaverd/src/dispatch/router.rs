@@ -212,7 +212,7 @@ impl DomainRouter {
         writer: &mut ResponseWriter<W>,
     ) -> Result<DispatchResult, DispatchError> {
         if routing.known_operations.contains(&operation) {
-            self.write_not_implemented(writer, routing.domain, operation)
+            Self::write_not_implemented(writer, routing.domain, operation)
         } else {
             Err(DispatchError::unknown_operation(
                 routing.domain,
@@ -222,7 +222,6 @@ impl DomainRouter {
     }
 
     fn write_not_implemented<W: Write>(
-        &self,
         writer: &mut ResponseWriter<W>,
         domain: &str,
         operation: &str,

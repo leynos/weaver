@@ -198,7 +198,7 @@ mod tests {
 
     use super::*;
     use crate::dispatch::act::apply_patch::types::{
-        FileContent, FilePath, SearchPattern, SearchReplaceBlock,
+        FileContent, FilePath, ReplacementText, SearchPattern, SearchReplaceBlock,
     };
 
     #[rstest]
@@ -206,7 +206,7 @@ mod tests {
         "alpha\nbeta\ngamma\n",
         vec![SearchReplaceBlock {
             search: SearchPattern::new("beta\n"),
-            replace: "delta\n".to_string(),
+            replace: ReplacementText::new("delta\n"),
         }],
         "alpha\ndelta\ngamma\n",
     )]
@@ -214,7 +214,7 @@ mod tests {
         "alpha\r\nbeta\r\ngamma\r\n",
         vec![SearchReplaceBlock {
             search: SearchPattern::new("beta\n"),
-            replace: "delta\n".to_string(),
+            replace: ReplacementText::new("delta\n"),
         }],
         "alpha\r\ndelta\r\ngamma\r\n",
     )]
@@ -223,11 +223,11 @@ mod tests {
         vec![
             SearchReplaceBlock {
                 search: SearchPattern::new("one"),
-                replace: "ONE".to_string(),
+                replace: ReplacementText::new("ONE"),
             },
             SearchReplaceBlock {
                 search: SearchPattern::new("one"),
-                replace: "UNO".to_string(),
+                replace: ReplacementText::new("UNO"),
             },
         ],
         "ONE two UNO two",
@@ -247,7 +247,7 @@ mod tests {
     fn apply_search_replace_rejects_missing_block() {
         let blocks = vec![SearchReplaceBlock {
             search: SearchPattern::new("missing"),
-            replace: "new".to_string(),
+            replace: ReplacementText::new("new"),
         }];
         let path = FilePath::new("file.txt");
         let original = FileContent::new("content");

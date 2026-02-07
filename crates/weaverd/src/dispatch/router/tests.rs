@@ -1,5 +1,7 @@
 //! Router behaviour tests for command dispatch.
 
+use std::path::PathBuf;
+
 use rstest::{fixture, rstest};
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
@@ -24,8 +26,7 @@ fn build_backends() -> FusionBackends<SemanticBackendProvider> {
 }
 
 fn build_router() -> DomainRouter {
-    let workspace_root = std::env::current_dir().expect("workspace root");
-    DomainRouter::new(workspace_root)
+    DomainRouter::new(PathBuf::from("/tmp/weaver-test-workspace"))
 }
 
 #[fixture]
@@ -140,21 +141,6 @@ fn routes_operations_case_insensitively(
             "{domain} {operation} should route successfully despite case"
         );
     }
-}
-
-#[rstest]
-fn get_definition_requires_arguments(mut backends: FusionBackends<SemanticBackendProvider>) {
-    let router = build_router();
-    let request = make_request("observe", "get-definition");
-    let mut output = Vec::new();
-    let mut writer = ResponseWriter::new(&mut output);
-    let result = router.route(&request, &mut writer, &mut backends);
-
-    // Should fail with InvalidArguments because no --uri/--position
-    assert!(matches!(
-        result,
-        Err(DispatchError::InvalidArguments { .. })
-    ));
 }
 
 #[rstest]

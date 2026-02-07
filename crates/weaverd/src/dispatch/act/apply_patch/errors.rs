@@ -13,6 +13,8 @@ pub(crate) enum ApplyPatchError {
     BinaryPatch,
     #[error("patch is missing diff headers")]
     MissingDiffHeader,
+    #[error("patch parsed successfully but produced no changes")]
+    EmptyTransaction,
     #[error("invalid diff header: {line}")]
     InvalidDiffHeader { line: String },
     #[error("modify operation missing SEARCH/REPLACE blocks")]
@@ -42,7 +44,7 @@ pub(crate) enum ApplyPatchError {
 }
 
 impl ApplyPatchError {
-    pub(crate) fn exit_status(&self) -> i32 {
+    pub(crate) const fn exit_status(&self) -> i32 {
         1
     }
 
@@ -75,6 +77,7 @@ impl ApplyPatchError {
             Self::EmptyPatch
             | Self::BinaryPatch
             | Self::MissingDiffHeader
+            | Self::EmptyTransaction
             | Self::InvalidDiffHeader { .. } => None,
         }
     }
@@ -93,6 +96,7 @@ impl ApplyPatchError {
             | Self::EmptyPatch
             | Self::BinaryPatch
             | Self::MissingDiffHeader
+            | Self::EmptyTransaction
             | Self::InvalidDiffHeader { .. } => None,
         }
     }
