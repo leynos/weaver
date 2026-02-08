@@ -124,14 +124,19 @@ pub(crate) fn normalise_line_endings(input: &str, line_ending: LineEnding) -> St
     }
 }
 
-/// Processes a single character for CRLF normalisation.
-/// Returns the string to append and whether to skip the next char.
-fn process_char_for_crlf(ch: char, next_char: Option<char>) -> (&'static str, bool) {
+enum CrlfAction {
+    EmitAndSkip(&'static str),
+    Emit(&'static str),
+    EmitChar(char),
+}
+
+/// Processes a single character for CRLF normalisation and returns the action.
+fn process_char_for_crlf(ch: char, next_char: Option<char>) -> CrlfAction {
     match (ch, next_char) {
-        ('\r', Some('\n')) => ("\r\n", true),
-        ('\r', _) => ("\r", false),
-        ('\n', _) => ("\r\n", false),
-        _ => ("", false),
+        ('\r', Some('\n')) => CrlfAction::EmitAndSkip("\r\n"),
+        ('\r', _) => CrlfAction::Emit("\r"),
+        ('\n', _) => CrlfAction::Emit("\r\n"),
+        (ch, _) => CrlfAction::EmitChar(ch),
     }
 }
 
@@ -152,14 +157,13 @@ fn normalise_line_endings_crlf(input: &str) -> String {
     let mut chars = input.chars().peekable();
     while let Some(ch) = chars.next() {
         let next = chars.peek().copied();
-        let (line_ending, skip_next) = process_char_for_crlf(ch, next);
-        if !line_ending.is_empty() {
-            output.push_str(line_ending);
-            if skip_next {
+        match process_char_for_crlf(ch, next) {
+            CrlfAction::EmitAndSkip(value) => {
+                output.push_str(value);
                 chars.next();
             }
-        } else {
-            output.push(ch);
+            CrlfAction::Emit(value) => output.push_str(value),
+            CrlfAction::EmitChar(value) => output.push(value),
         }
     }
     output
