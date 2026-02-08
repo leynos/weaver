@@ -208,12 +208,20 @@ fn map_crlf_indices(orig_to_norm: &mut [usize], next_idx: usize, norm_index: usi
 
 #[cfg(test)]
 mod tests {
+    //! Tests for apply-patch matcher helpers.
+
+    use rstest::fixture;
     use rstest::rstest;
 
     use super::*;
     use crate::dispatch::act::apply_patch::types::{
         FileContent, FilePath, ReplacementText, SearchPattern, SearchReplaceBlock,
     };
+
+    #[fixture]
+    fn path() -> FilePath {
+        FilePath::new("file.txt")
+    }
 
     #[rstest]
     #[case::exact_match(
@@ -247,23 +255,22 @@ mod tests {
         "ONE two UNO two",
     )]
     fn apply_search_replace_succeeds(
+        path: FilePath,
         #[case] original: &str,
         #[case] blocks: Vec<SearchReplaceBlock>,
         #[case] expected: &str,
     ) {
-        let path = FilePath::new("file.txt");
         let original = FileContent::new(original);
         let result = apply_search_replace(&path, &original, &blocks).expect("apply");
         assert_eq!(result.as_str(), expected);
     }
 
-    #[test]
-    fn apply_search_replace_rejects_missing_block() {
+    #[rstest]
+    fn apply_search_replace_rejects_missing_block(path: FilePath) {
         let blocks = vec![SearchReplaceBlock {
             search: SearchPattern::new("missing"),
             replace: ReplacementText::new("new"),
         }];
-        let path = FilePath::new("file.txt");
         let original = FileContent::new("content");
         let error = apply_search_replace(&path, &original, &blocks).expect_err("error");
         match error {
