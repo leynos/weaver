@@ -115,7 +115,17 @@ pub(crate) fn normalise_line_endings(input: &str, line_ending: LineEnding) -> St
 }
 
 fn normalise_line_endings_crlf(input: &str) -> String {
-    let mut output = String::with_capacity(input.len());
+    let mut extra = 0;
+    let mut prev_cr = false;
+    for byte in input.as_bytes() {
+        let is_lf = *byte == b'\n';
+        if is_lf && !prev_cr {
+            extra += 1;
+        }
+        prev_cr = *byte == b'\r';
+    }
+
+    let mut output = String::with_capacity(input.len() + extra);
     let mut chars = input.chars().peekable();
     while let Some(ch) = chars.next() {
         if ch == '\r' {

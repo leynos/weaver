@@ -118,9 +118,7 @@ impl<'a> ContentTransaction<'a> {
 
     /// Adds multiple content changes to the transaction.
     pub fn add_changes(&mut self, changes: impl IntoIterator<Item = ContentChange>) {
-        for change in changes {
-            self.add_change(change);
-        }
+        self.changes.extend(changes);
     }
 
     /// Executes the transaction, validating and committing if successful.
@@ -292,6 +290,9 @@ fn execute_with_locks(
 }
 
 /// Parameter object for executing the Double-Lock pipeline.
+///
+/// Bundles the verification context, files to write, planned deletions, and
+/// the syntactic/semantic lock interfaces used by the pipeline.
 struct TransactionExecution<'a> {
     context: &'a VerificationContext,
     paths_to_write: &'a [PathBuf],

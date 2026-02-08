@@ -167,7 +167,7 @@ impl DomainRouter {
         let operation = request.operation().to_ascii_lowercase();
         match operation.as_str() {
             "get-definition" => observe::get_definition::handle(request, writer, backends),
-            _ => self.route_fallback(&DomainRoutingContext::OBSERVE, operation.as_str(), writer),
+            _ => Self::route_fallback(&DomainRoutingContext::OBSERVE, operation.as_str(), writer),
         }
     }
 
@@ -182,7 +182,7 @@ impl DomainRouter {
             "apply-patch" => {
                 act::apply_patch::handle(request, writer, backends, &self.workspace_root)
             }
-            _ => self.route_fallback(&DomainRoutingContext::ACT, operation.as_str(), writer),
+            _ => Self::route_fallback(&DomainRoutingContext::ACT, operation.as_str(), writer),
         }
     }
 
@@ -192,12 +192,11 @@ impl DomainRouter {
         writer: &mut ResponseWriter<W>,
     ) -> Result<DispatchResult, DispatchError> {
         let operation = request.operation().to_ascii_lowercase();
-        self.route_fallback(&DomainRoutingContext::VERIFY, operation.as_str(), writer)
+        Self::route_fallback(&DomainRoutingContext::VERIFY, operation.as_str(), writer)
     }
 
     /// Handles routing fallbacks for known-but-unimplemented and unknown operations.
     fn route_fallback<W: Write>(
-        &self,
         routing: &DomainRoutingContext,
         operation: &str,
         writer: &mut ResponseWriter<W>,
