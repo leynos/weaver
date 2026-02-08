@@ -5,6 +5,16 @@ use crate::dispatch::act::apply_patch::types::{
     FileContent, FilePath, LineEnding, SearchPattern, SearchReplaceBlock,
 };
 
+/// Applies SEARCH/REPLACE blocks to the provided file content in order.
+///
+/// Uses the patch path and block index to report errors when a block cannot be
+/// matched, normalises replacement line endings to the dominant line ending in
+/// the original content, and updates the match cursor after each replacement.
+///
+/// # Errors
+///
+/// Returns `ApplyPatchError::SearchBlockNotFound` when a search block does not
+/// match the remaining content in sequence.
 pub(crate) fn apply_search_replace(
     path: &FilePath,
     original: &FileContent,
@@ -15,16 +25,12 @@ pub(crate) fn apply_search_replace(
     let line_ending = dominant_line_ending(original.as_str());
 
     for (index, block) in blocks.iter().enumerate() {
-        let (start, end) = if let Some(found) = find_exact(&content, cursor, &block.search) {
-            found
-        } else if let Some(found) = find_fuzzy(&content, cursor, &block.search) {
-            found
-        } else {
-            return Err(ApplyPatchError::SearchBlockNotFound {
+        let (start, end) = find_exact(&content, cursor, &block.search)
+            .or_else(|| find_fuzzy(&content, cursor, &block.search))
+            .ok_or_else(|| ApplyPatchError::SearchBlockNotFound {
                 path: path.clone(),
                 block_index: index + 1,
-            });
-        };
+            })?;
 
         let replacement = normalise_line_endings(block.replace.as_str(), line_ending);
         content.replace_range(start..end, &replacement);
@@ -107,6 +113,10 @@ fn dominant_line_ending(content: &str) -> LineEnding {
     }
 }
 
+/// Normalises line endings in text to the specified line ending style.
+///
+/// Converts CRLF to LF when targeting `LineEnding::Lf` and converts bare LF to
+/// CRLF when targeting `LineEnding::CrLf`. Other characters are preserved.
 pub(crate) fn normalise_line_endings(input: &str, line_ending: LineEnding) -> String {
     match line_ending {
         LineEnding::Lf => input.replace("\r\n", "\n"),
@@ -114,7 +124,19 @@ pub(crate) fn normalise_line_endings(input: &str, line_ending: LineEnding) -> St
     }
 }
 
+/// Processes a single character for CRLF normalisation.
+/// Returns the string to append and whether to skip the next char.
+fn process_char_for_crlf(ch: char, next_char: Option<char>) -> (&'static str, bool) {
+    match (ch, next_char) {
+        ('\r', Some('\n')) => ("\r\n", true),
+        ('\r', _) => ("\r", false),
+        ('\n', _) => ("\r\n", false),
+        _ => ("", false),
+    }
+}
+
 fn normalise_line_endings_crlf(input: &str) -> String {
+    // Phase 1: Calculate required capacity
     let mut extra = 0;
     let mut prev_cr = false;
     for byte in input.as_bytes() {
@@ -125,20 +147,17 @@ fn normalise_line_endings_crlf(input: &str) -> String {
         prev_cr = *byte == b'\r';
     }
 
+    // Phase 2: Build normalised output
     let mut output = String::with_capacity(input.len() + extra);
     let mut chars = input.chars().peekable();
     while let Some(ch) = chars.next() {
-        if ch == '\r' {
-            if let Some('\n') = chars.peek().copied() {
+        let next = chars.peek().copied();
+        let (line_ending, skip_next) = process_char_for_crlf(ch, next);
+        if !line_ending.is_empty() {
+            output.push_str(line_ending);
+            if skip_next {
                 chars.next();
-                output.push_str("\r\n");
-                continue;
             }
-            output.push('\r');
-            continue;
-        }
-        if ch == '\n' {
-            output.push_str("\r\n");
         } else {
             output.push(ch);
         }
