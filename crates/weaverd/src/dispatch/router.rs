@@ -127,9 +127,8 @@ pub struct DomainRouter {
 
 impl DomainRouter {
     /// Creates a new domain router with the workspace root.
-    pub fn new(workspace_root: PathBuf) -> Self {
-        Self { workspace_root }
-    }
+    #[rustfmt::skip]
+    pub fn new(workspace_root: PathBuf) -> Self { Self { workspace_root } }
 
     /// Routes a command request to the appropriate domain handler.
     ///
