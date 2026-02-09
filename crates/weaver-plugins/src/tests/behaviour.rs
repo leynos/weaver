@@ -87,6 +87,20 @@ fn world() -> RefCell<TestWorld> {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+fn register_plugin(registry: &mut PluginRegistry, name: &str, language: &str, kind: PluginKind) {
+    let meta = PluginMetadata::new(name, "1.0", kind);
+    let manifest = PluginManifest::new(
+        meta,
+        vec![language.into()],
+        PathBuf::from(format!("/usr/bin/{name}")),
+    );
+    registry.register(manifest).expect("register plugin");
+}
+
+// ---------------------------------------------------------------------------
 // Given steps
 // ---------------------------------------------------------------------------
 
@@ -94,34 +108,24 @@ fn world() -> RefCell<TestWorld> {
 fn given_actuator(world: &RefCell<TestWorld>, name: String, language: String) {
     let plugin_name = strip_quotes(&name);
     let lang = strip_quotes(&language);
-    let meta = PluginMetadata::new(plugin_name, "1.0", PluginKind::Actuator);
-    let manifest = PluginManifest::new(
-        meta,
-        vec![lang.into()],
-        PathBuf::from(format!("/usr/bin/{plugin_name}")),
+    register_plugin(
+        &mut world.borrow_mut().registry,
+        plugin_name,
+        lang,
+        PluginKind::Actuator,
     );
-    world
-        .borrow_mut()
-        .registry
-        .register(manifest)
-        .expect("register actuator");
 }
 
 #[given("a registry with a sensor plugin {name} for {language}")]
 fn given_sensor(world: &RefCell<TestWorld>, name: String, language: String) {
     let plugin_name = strip_quotes(&name);
     let lang = strip_quotes(&language);
-    let meta = PluginMetadata::new(plugin_name, "1.0", PluginKind::Sensor);
-    let manifest = PluginManifest::new(
-        meta,
-        vec![lang.into()],
-        PathBuf::from(format!("/usr/bin/{plugin_name}")),
+    register_plugin(
+        &mut world.borrow_mut().registry,
+        plugin_name,
+        lang,
+        PluginKind::Sensor,
     );
-    world
-        .borrow_mut()
-        .registry
-        .register(manifest)
-        .expect("register sensor");
 }
 
 #[given("a mock executor that returns a diff")]

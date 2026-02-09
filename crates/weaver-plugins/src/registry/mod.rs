@@ -89,15 +89,9 @@ impl PluginRegistry {
     /// Returns actuator plugins that declare support for the given language.
     #[must_use]
     pub fn find_actuator_for_language(&self, language: &str) -> Vec<&PluginManifest> {
-        let lower = language.to_ascii_lowercase();
-        self.manifests
-            .values()
-            .filter(|m| {
-                m.kind() == PluginKind::Actuator
-                    && m.languages()
-                        .iter()
-                        .any(|l| l.to_ascii_lowercase() == lower)
-            })
+        self.find_for_language(language)
+            .into_iter()
+            .filter(|m| m.kind() == PluginKind::Actuator)
             .collect()
     }
 

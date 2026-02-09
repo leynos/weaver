@@ -66,26 +66,30 @@ fn file_payload_accessors() {
 // PluginResponse round-trip serialisation
 // ---------------------------------------------------------------------------
 
-#[test]
-fn success_response_round_trip() {
-    let response = PluginResponse::success(PluginOutput::Diff {
-        content: "--- a/f\n+++ b/f\n".into(),
-    });
+#[rstest]
+#[case::success(
+    PluginResponse::success(PluginOutput::Diff { content: "--- a/f\n+++ b/f\n".into() }),
+    true
+)]
+#[case::failure(
+    PluginResponse::failure(vec![PluginDiagnostic::new(DiagnosticSeverity::Error, "something went wrong")]),
+    false
+)]
+fn response_round_trip(#[case] response: PluginResponse, #[case] is_success: bool) {
     let json = serde_json::to_string(&response).expect("serialise");
     let back: PluginResponse = serde_json::from_str(&json).expect("deserialise");
-    assert!(back.is_success());
+    assert_eq!(back.is_success(), is_success);
     assert_eq!(back, response);
 }
 
 #[test]
-fn failure_response_round_trip() {
+fn failure_response_preserves_diagnostics() {
     let response = PluginResponse::failure(vec![PluginDiagnostic::new(
         DiagnosticSeverity::Error,
         "something went wrong",
     )]);
     let json = serde_json::to_string(&response).expect("serialise");
     let back: PluginResponse = serde_json::from_str(&json).expect("deserialise");
-    assert!(!back.is_success());
     assert_eq!(back.diagnostics().len(), 1);
 }
 

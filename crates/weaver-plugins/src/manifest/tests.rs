@@ -83,26 +83,24 @@ fn validate_accepts_valid_manifest() {
     assert!(m.validate().is_ok());
 }
 
-#[test]
-fn validate_rejects_empty_name() {
-    let meta = PluginMetadata::new("  ", "1.0", PluginKind::Sensor);
-    let m = PluginManifest::new(meta, vec!["python".into()], PathBuf::from("/usr/bin/jedi"));
-    let err = m.validate().expect_err("should reject empty name");
+#[rstest]
+#[case::empty_name("  ", "/usr/bin/jedi", "name")]
+#[case::relative_executable("rope", "relative/path/rope", "absolute")]
+fn validate_rejects_invalid_manifest(
+    #[case] name: &str,
+    #[case] executable: &str,
+    #[case] error_substring: &str,
+) {
+    let meta = PluginMetadata::new(name, "1.0", PluginKind::Sensor);
+    let manifest = PluginManifest::new(meta, vec!["python".into()], PathBuf::from(executable));
+    let err = manifest
+        .validate()
+        .expect_err("should reject invalid manifest");
     assert!(matches!(err, PluginError::Manifest { .. }));
-    assert!(err.to_string().contains("name"));
-}
-
-#[test]
-fn validate_rejects_relative_executable() {
-    let meta = PluginMetadata::new("rope", "1.0", PluginKind::Actuator);
-    let m = PluginManifest::new(
-        meta,
-        vec!["python".into()],
-        PathBuf::from("relative/path/rope"),
+    assert!(
+        err.to_string().contains(error_substring),
+        "expected '{error_substring}' in: {err}"
     );
-    let err = m.validate().expect_err("should reject relative path");
-    assert!(matches!(err, PluginError::Manifest { .. }));
-    assert!(err.to_string().contains("absolute"));
 }
 
 // ---------------------------------------------------------------------------

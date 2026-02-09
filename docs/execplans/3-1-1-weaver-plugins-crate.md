@@ -230,6 +230,7 @@ routes correctly. Plugin execution returns "not yet available" pending
 Phase 3.2 when the daemon runtime will hold a `PluginRunner` instance.
 
 Key metrics:
+
 - 14 new files created across `crates/weaver-plugins/` and
   `crates/weaverd/src/dispatch/act/refactor/`.
 - 3 documentation files updated (`weaver-design.md`, `users-guide.md`,
@@ -599,7 +600,10 @@ The broker closes stdin after writing to signal no more input.
 
 Direction: plugin -> weaverd (stdout). A single JSONL line:
 
-    {"success":true,"output":{"kind":"diff","content":"--- a/src/main.py\n+++ b/src/main.py\n@@ -1 +1 @@\n-def old():\n+def new_func():\n"},"diagnostics":[]}\n
+    {"success":true,"output":{"kind":"diff",
+    "content":"--- a/src/main.py\n+++ b/src/main.py\n
+    @@ -1 +1 @@\n-def old():\n+def new_func():\n"},
+    "diagnostics":[]}\n
 
 Plugin stderr is captured for diagnostic logging but is not part of the
 protocol.
