@@ -100,6 +100,19 @@ fn register_plugin(registry: &mut PluginRegistry, name: &str, language: &str, ki
     registry.register(manifest).expect("register plugin");
 }
 
+/// Extracts a successful `PluginResponse` from the test world.
+/// Panics if no response was captured or if the response was an error.
+fn get_successful_response(world: &RefCell<TestWorld>) -> std::cell::Ref<'_, PluginResponse> {
+    let borrowed = world.borrow();
+    std::cell::Ref::map(borrowed, |w| {
+        w.response
+            .as_ref()
+            .expect("no response captured")
+            .as_ref()
+            .expect("expected success but got error")
+    })
+}
+
 // ---------------------------------------------------------------------------
 // Given steps
 // ---------------------------------------------------------------------------
@@ -197,25 +210,13 @@ fn when_query_actuators(world: &RefCell<TestWorld>, language: String) {
 
 #[then("the response is successful")]
 fn then_success(world: &RefCell<TestWorld>) {
-    let w = world.borrow();
-    let response = w
-        .response
-        .as_ref()
-        .expect("no response captured")
-        .as_ref()
-        .expect("expected success but got error");
+    let response = get_successful_response(world);
     assert!(response.is_success(), "response should be successful");
 }
 
 #[then("the response output is a diff")]
 fn then_output_is_diff(world: &RefCell<TestWorld>) {
-    let w = world.borrow();
-    let response = w
-        .response
-        .as_ref()
-        .expect("no response captured")
-        .as_ref()
-        .expect("expected success");
+    let response = get_successful_response(world);
     assert!(
         matches!(response.output(), PluginOutput::Diff { .. }),
         "expected diff output, got {:?}",
@@ -225,13 +226,7 @@ fn then_output_is_diff(world: &RefCell<TestWorld>) {
 
 #[then("the response output is empty")]
 fn then_output_is_empty(world: &RefCell<TestWorld>) {
-    let w = world.borrow();
-    let response = w
-        .response
-        .as_ref()
-        .expect("no response captured")
-        .as_ref()
-        .expect("expected success");
+    let response = get_successful_response(world);
     assert_eq!(response.output(), &PluginOutput::Empty);
 }
 

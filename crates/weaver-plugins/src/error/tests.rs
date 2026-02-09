@@ -3,6 +3,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use rstest::rstest;
+
 use super::*;
 
 #[test]
@@ -39,29 +41,26 @@ fn spawn_failed_error_message_includes_details() {
     );
 }
 
-#[test]
-fn timeout_error_message_includes_duration() {
-    let error = PluginError::Timeout {
+#[rstest]
+#[case::timeout(
+    PluginError::Timeout {
         name: "slow".into(),
         timeout_secs: 42,
-    };
-    let message = error.to_string();
-    assert!(
-        message.contains("42"),
-        "expected timeout duration in message: {message}"
-    );
-}
-
-#[test]
-fn non_zero_exit_error_includes_status() {
-    let error = PluginError::NonZeroExit {
+    },
+    "42"
+)]
+#[case::non_zero_exit(
+    PluginError::NonZeroExit {
         name: "buggy".into(),
         status: 127,
-    };
+    },
+    "127"
+)]
+fn error_message_includes_numeric_field(#[case] error: PluginError, #[case] expected_value: &str) {
     let message = error.to_string();
     assert!(
-        message.contains("127"),
-        "expected status in message: {message}"
+        message.contains(expected_value),
+        "expected {expected_value} in message: {message}"
     );
 }
 
