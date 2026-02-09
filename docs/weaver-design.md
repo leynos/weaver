@@ -1621,6 +1621,86 @@ sequenceDiagram
 *Figure: `act apply-patch` sequence with Double-Lock verification and atomic
 commit.*
 
+The following sequence captures the CLI-to-daemon flow for `act apply-patch`,
+from request construction to structured success or failure responses.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant CliMain as Cli_main
+    participant IoStreams as IoStreams
+    participant CliRunner as Cli_runner
+    participant DaemonConn as Daemon_connection
+    participant DaemonRouter as DomainRouter
+    participant ApplyPatch as apply_patch_handler
+    participant Harness as ContentTransaction
+    participant Syntactic as SyntacticLock
+    participant Semantic as LspSemanticLockAdapter
+
+    User->>CliMain: invoke weaver act apply-patch < patch.diff
+    CliMain->>IoStreams: create IoStreams(stdin, stdout, stderr)
+    CliMain->>CliRunner: run(args, IoStreams)
+
+    CliRunner->>CliRunner: parse Cli arguments
+    CliRunner->>CliRunner: build CommandInvocation(domain=act, operation=apply-patch)
+    CliRunner->>IoStreams: build_request(invocation, stdin)
+    IoStreams->>IoStreams: read_to_string(patch)
+    IoStreams-->>CliRunner: patch content
+
+    CliRunner->>CliRunner: CommandRequest::with_patch(invocation, patch)
+    CliRunner->>DaemonConn: connect(daemon_socket)
+    CliRunner->>DaemonConn: send JSONL CommandRequest (includes patch)
+
+    DaemonConn->>DaemonRouter: route(request)
+    DaemonRouter->>DaemonRouter: route_act(request, writer, backends)
+    DaemonRouter->>ApplyPatch: handle(request, writer, backends)
+
+    ApplyPatch->>ApplyPatch: request.patch().ok_or(InvalidArguments)
+    ApplyPatch->>backends: ensure_started(Semantic)
+    ApplyPatch->>ApplyPatch: create ApplyPatchExecutor(workspace_root,<br/>TreeSitterSyntacticLockAdapter, LspSemanticLockAdapter)
+    ApplyPatch->>ApplyPatch: executor.execute(patch)
+
+    rect rgb(230,250,230)
+        ApplyPatch->>ApplyPatch: parse_patch(patch)
+        ApplyPatch->>ApplyPatch: build_changes(PatchOperation[])
+        ApplyPatch->>Harness: ContentTransaction::new(syntactic_lock, semantic_lock)
+        Harness->>Harness: add_changes(ContentChange[])
+
+        Harness->>Syntactic: validate(VerificationContext)
+        Syntactic-->>Harness: SyntacticLockResult
+
+        alt syntactic lock failed
+            Harness-->>ApplyPatch: TransactionOutcome::SyntacticLockFailed
+        else syntactic lock passed
+            Harness->>Semantic: validate(VerificationContext)
+            Semantic-->>Harness: SemanticLockResult
+
+            alt semantic lock failed
+                Harness-->>ApplyPatch: TransactionOutcome::SemanticLockFailed
+            else all locks passed
+                Harness->>Harness: commit_changes_with_deletes
+                Harness-->>ApplyPatch: TransactionOutcome::Committed
+            end
+        end
+    end
+
+    alt committed
+        ApplyPatch->>ApplyPatch: build ApplyPatchSummary(status=ok,<br/>files_written, files_deleted)
+        ApplyPatch->>DaemonRouter: DispatchResult::success()
+        ApplyPatch->>DaemonConn: writer.write_stdout(summary_json)
+        DaemonConn-->>CliRunner: JSONL success payload
+        CliRunner-->>User: exit status 0
+    else patch or verification error
+        ApplyPatch->>ApplyPatch: map error to envelope (ApplyPatchError or VerificationError)
+        ApplyPatch->>DaemonConn: writer.write_stderr(error_json)
+        ApplyPatch-->>DaemonRouter: DispatchResult::with_status(1 or 2)
+        DaemonConn-->>CliRunner: JSONL error payload
+        CliRunner-->>User: non_zero exit status
+    end
+```
+
+*Figure: `act apply-patch` CLI-to-daemon execution sequence.*
+
 #### 4.3.5. Creation and deletion semantics
 
 For `new file mode` operations, the tool extracts the added (`+`) lines from

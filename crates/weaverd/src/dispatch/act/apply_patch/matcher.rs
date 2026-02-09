@@ -8,7 +8,7 @@ use crate::dispatch::act::apply_patch::types::{
 /// Applies SEARCH/REPLACE blocks to the provided file content in order.
 ///
 /// Uses the patch path and block index to report errors when a block cannot be
-/// matched, normalises replacement line endings to the dominant line ending in
+/// matched, normalizes replacement line endings to the dominant line ending in
 /// the original content, and updates the match cursor after each replacement.
 ///
 /// # Errors
@@ -130,7 +130,7 @@ enum CrlfAction {
     EmitChar(char),
 }
 
-/// Processes a single character for CRLF normalisation and returns the action.
+/// Processes a single character for CRLF normalization and returns the action.
 fn process_char_for_crlf(ch: char, next_char: Option<char>) -> CrlfAction {
     match (ch, next_char) {
         ('\r', Some('\n')) => CrlfAction::EmitAndSkip("\r\n"),
@@ -140,8 +140,8 @@ fn process_char_for_crlf(ch: char, next_char: Option<char>) -> CrlfAction {
     }
 }
 
-fn normalise_line_endings_crlf(input: &str) -> String {
-    // Phase 1: Calculate required capacity
+/// Calculates the additional capacity needed for CRLF normalization.
+fn calculate_crlf_capacity(input: &str) -> usize {
     let mut extra = 0;
     let mut prev_cr = false;
     for byte in input.as_bytes() {
@@ -151,8 +151,12 @@ fn normalise_line_endings_crlf(input: &str) -> String {
         }
         prev_cr = *byte == b'\r';
     }
+    extra
+}
 
-    // Phase 2: Build normalised output
+fn normalise_line_endings_crlf(input: &str) -> String {
+    let extra = calculate_crlf_capacity(input);
+    // Phase 2: Build normalized output
     let mut output = String::with_capacity(input.len() + extra);
     let mut chars = input.chars().peekable();
     while let Some(ch) = chars.next() {
