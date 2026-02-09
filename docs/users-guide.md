@@ -516,6 +516,93 @@ JSON payload:
 {"path":"<PATH>","replacements":2,"changed":true}
 ```
 
+#### act refactor
+
+Delegates a refactoring operation to a registered plugin. The plugin runs in a
+sandboxed process and produces a unified diff that is validated by the
+Double-Lock safety harness before any filesystem change is committed.
+
+Syntax:
+
+```sh
+weaver act refactor --provider <PLUGIN> --refactoring <OP> --file <PATH> [KEY=VALUE...]
+```
+
+Arguments:
+
+| Flag | Description |
+|------|-------------|
+| `--provider` | Name of the registered plugin (e.g. `rope`). |
+| `--refactoring` | Refactoring operation to request (e.g. `rename`, `extract_method`). |
+| `--file` | Path to the target file (relative to workspace root). |
+| `KEY=VALUE` | Extra key-value arguments forwarded to the plugin. |
+
+The plugin receives the file content in-band as part of the JSONL request and
+does not need filesystem access. The daemon validates the resulting diff through
+both the syntactic (Tree-sitter) and semantic (LSP) locks before writing to
+disk.
+
+> **Note:** Full plugin execution requires a configured plugin registry. The
+> `act refactor` command validates arguments and builds the plugin request in
+> Phase 3.1.1; end-to-end plugin invocation is wired in Phase 3.2.
+
+## Plugin system
+
+The `weaver-plugins` crate provides the plugin orchestration layer that enables
+`weaverd` to delegate specialist tasks to external tools running in sandboxed
+processes.
+
+### Plugin categories
+
+Plugins are categorised as either **sensors** or **actuators**:
+
+- **Sensors** provide data to the intelligence engine (e.g. `jedi` for Python
+  static analysis). They produce structured JSON output.
+- **Actuators** perform actions on the codebase (e.g. `rope` for Python
+  refactoring, `srgn` for structural rewriting). They produce unified diffs.
+
+### Plugin manifest
+
+Each plugin is described by a manifest containing:
+
+| Field | Description |
+|-------|-------------|
+| `name` | Unique plugin identifier (e.g. `rope`). |
+| `version` | Plugin version string. |
+| `kind` | `sensor` or `actuator`. |
+| `languages` | List of supported languages (case-insensitive). |
+| `executable` | Absolute path to the plugin binary. |
+| `args` | Default arguments passed to the executable (optional). |
+| `timeout_secs` | Maximum execution time in seconds (default: 30). |
+
+### IPC protocol
+
+Plugins communicate with the broker via a single-line JSONL exchange over
+standard I/O:
+
+1. The broker writes one JSONL request line to the plugin's stdin and closes
+   stdin.
+2. The plugin writes one JSONL response line to stdout and exits.
+3. Plugin stderr is captured for diagnostic logging but is not part of the
+   protocol.
+
+File content is passed in-band as part of the request body, so sandboxed
+plugins do not need filesystem access.
+
+### Plugin registry
+
+The daemon maintains a `PluginRegistry` that stores validated plugin manifests
+keyed by name. Plugins can be looked up by name, kind, language, or a
+combination thereof (e.g. "find all actuator plugins for Python").
+
+### Safety harness integration
+
+Actuator plugin output (unified diffs) flows through the same Double-Lock
+safety harness used by `act apply-patch`. Changes are validated by both the
+syntactic (Tree-sitter) and semantic (LSP) locks before any filesystem write is
+committed. If verification fails, the filesystem is left untouched and a
+structured error is returned to the caller.
+
 ## Language server capability detection
 
 The `weaver-lsp-host` crate initialises the LSP servers for Rust, Python, and

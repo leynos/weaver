@@ -165,8 +165,9 @@ and relational understanding of code.*
 *Goal: Build the plugin architecture to enable orchestration of best-in-class,
 language-specific tools.*
 
-- [ ] Design and implement the `weaver-plugins` crate, including the secure
+- [x] Design and implement the `weaver-plugins` crate, including the secure
     IPC protocol between the `weaverd` broker and sandboxed plugin processes.
+    *(Phase 3.1.1 — see `docs/execplans/3-1-1-weaver-plugins-crate.md`)*
 
 - [ ] Develop the first set of actuator plugins:
 
