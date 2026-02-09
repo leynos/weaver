@@ -1,25 +1,18 @@
-//! Tests for edit transaction management.
+//! Tests for edit and content transaction management.
 
 use std::fs;
-use std::io::Write;
 use std::path::PathBuf;
 
 use rstest::rstest;
 use tempfile::TempDir;
 
+use super::test_support::{LockFailureKind, temp_file};
 use super::{EditTransaction, SafetyHarnessError, TransactionOutcome};
 use crate::safety_harness::edit::{FileEdit, Position, TextEdit};
 use crate::safety_harness::error::VerificationFailure;
 use crate::safety_harness::verification::{
     ConfigurableSemanticLock, ConfigurableSyntacticLock, SemanticLock, SyntacticLock,
 };
-
-fn temp_file(dir: &TempDir, name: &str, content: &str) -> PathBuf {
-    let path = dir.path().join(name);
-    let mut file = fs::File::create(&path).expect("create temp file");
-    file.write_all(content.as_bytes()).expect("write temp file");
-    path
-}
 
 /// Creates a standard failure scenario builder with a test file and replacement edit.
 fn failure_scenario_builder() -> TransactionTestBuilder {
@@ -190,13 +183,6 @@ fn successful_transaction_commits_changes() {
 
     let content = fs::read_to_string(&paths[0]).expect("read file");
     assert_eq!(content, "greetings world");
-}
-
-/// Lock failure type for parameterised testing.
-#[derive(Debug, Clone, Copy)]
-enum LockFailureKind {
-    Syntactic,
-    Semantic,
 }
 
 #[rstest]

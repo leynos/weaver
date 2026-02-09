@@ -107,10 +107,26 @@ pub enum SafetyHarnessError {
         source: Arc<std::io::Error>,
     },
 
+    /// An I/O error occurred while deleting a file.
+    #[error("failed to delete file {path}: {source}")]
+    FileDeleteError {
+        /// Path to the file that could not be deleted.
+        path: PathBuf,
+        /// Underlying I/O error.
+        #[source]
+        source: Arc<std::io::Error>,
+    },
+
     /// Modified content for a path was not available in the context.
     #[error("modified content missing from context for {path}")]
     ModifiedContentMissing {
         /// Path whose modified content was unexpectedly absent.
+        path: PathBuf,
+    },
+    /// Original content for a path was not available in the context.
+    #[error("original content missing from context for {path}")]
+    OriginalContentMissing {
+        /// Path whose original content was unexpectedly absent.
         path: PathBuf,
     },
 
@@ -155,13 +171,21 @@ impl SafetyHarnessError {
         }
     }
 
+    /// Creates a file delete error.
+    pub fn file_delete(path: PathBuf, error: std::io::Error) -> Self {
+        Self::FileDeleteError {
+            path,
+            source: Arc::new(error),
+        }
+    }
+
     /// Returns the underlying I/O source for read/write errors, if any.
     #[must_use]
     pub fn io_source(&self) -> Option<&std::io::Error> {
         match self {
-            Self::FileReadError { source, .. } | Self::FileWriteError { source, .. } => {
-                Some(source.as_ref())
-            }
+            Self::FileReadError { source, .. }
+            | Self::FileWriteError { source, .. }
+            | Self::FileDeleteError { source, .. } => Some(source.as_ref()),
             _ => None,
         }
     }
@@ -202,5 +226,14 @@ mod tests {
 
         let extracted = error.io_source().expect("io source should exist");
         assert_eq!(extracted.to_string(), "kaboom");
+    }
+
+    #[test]
+    fn file_delete_constructor_preserves_source() {
+        let io_error = std::io::Error::other("oops");
+        let error = SafetyHarnessError::file_delete(PathBuf::from("/tmp/file"), io_error);
+
+        let extracted = error.io_source().expect("io source should exist");
+        assert_eq!(extracted.to_string(), "oops");
     }
 }

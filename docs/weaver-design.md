@@ -375,7 +375,7 @@ environment.^1^
 
 #### 2.1.1. JSONL command envelope and capability probe
 
-The initial CLI implementation serialises every invocation into a single JSONL
+The initial CLI implementation serializes every invocation into a single JSONL
 object. The object contains a `command` descriptor comprising the command
 `domain` (such as `observe`) and `operation` (for example `get-definition`),
 alongside an `arguments` array carrying the remaining tokens verbatim. This
@@ -386,6 +386,15 @@ following:
 ```json
 {"command":{"domain":"observe","operation":"get-definition"},"arguments":["--symbol","main"]}
 ```
+
+The `act apply-patch` command extends the envelope with an optional `patch`
+field that carries the raw patch stream as a JSON string (newline characters
+are escaped in the serialized form). The CLI only sets this field for
+`act apply-patch`, preserving backward compatibility for other commands.
+
+The daemon enforces a 1 MiB limit per JSONL request line to keep memory usage
+bounded. Large patch streams must be split across multiple `act apply-patch`
+invocations.
 
 The CLI uses `clap`'s trailing argument capture to ensure any flag-like values
 (`--uri`, `--range`, and similar) are forwarded without interpretation. Daemon
@@ -776,7 +785,7 @@ sequenceDiagram
     Parser-->>User: ParseResult (tree + SyntaxErrorInfo?)
 
     User->>Pattern: compile(pattern_src, language)
-    Pattern->>Parser: parse(wrapped_or_normalised_pattern)
+    Pattern->>Parser: parse(wrapped_or_normalized_pattern)
     Parser-->>Pattern: ParseResult (pattern AST + metavariables)
 
     User->>Matcher: find_all(pattern, parsed_source)
@@ -1612,6 +1621,86 @@ sequenceDiagram
 *Figure: `act apply-patch` sequence with Double-Lock verification and atomic
 commit.*
 
+The following sequence captures the CLI-to-daemon flow for `act apply-patch`,
+from request construction to structured success or failure responses.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant CliMain as Cli_main
+    participant IoStreams as IoStreams
+    participant CliRunner as Cli_runner
+    participant DaemonConn as Daemon_connection
+    participant DaemonRouter as DomainRouter
+    participant ApplyPatch as apply_patch_handler
+    participant Harness as ContentTransaction
+    participant Syntactic as SyntacticLock
+    participant Semantic as LspSemanticLockAdapter
+
+    User->>CliMain: invoke weaver act apply-patch < patch.diff
+    CliMain->>IoStreams: create IoStreams(stdin, stdout, stderr)
+    CliMain->>CliRunner: run(args, IoStreams)
+
+    CliRunner->>CliRunner: parse Cli arguments
+    CliRunner->>CliRunner: build CommandInvocation(domain=act, operation=apply-patch)
+    CliRunner->>IoStreams: build_request(invocation, stdin)
+    IoStreams->>IoStreams: read_to_string(patch)
+    IoStreams-->>CliRunner: patch content
+
+    CliRunner->>CliRunner: CommandRequest::with_patch(invocation, patch)
+    CliRunner->>DaemonConn: connect(daemon_socket)
+    CliRunner->>DaemonConn: send JSONL CommandRequest (includes patch)
+
+    DaemonConn->>DaemonRouter: route(request)
+    DaemonRouter->>DaemonRouter: route_act(request, writer, backends)
+    DaemonRouter->>ApplyPatch: handle(request, writer, backends)
+
+    ApplyPatch->>ApplyPatch: request.patch().ok_or(InvalidArguments)
+    ApplyPatch->>backends: ensure_started(Semantic)
+    ApplyPatch->>ApplyPatch: create ApplyPatchExecutor(workspace_root,<br/>TreeSitterSyntacticLockAdapter, LspSemanticLockAdapter)
+    ApplyPatch->>ApplyPatch: executor.execute(patch)
+
+    rect rgb(230,250,230)
+        ApplyPatch->>ApplyPatch: parse_patch(patch)
+        ApplyPatch->>ApplyPatch: build_changes(PatchOperation[])
+        ApplyPatch->>Harness: ContentTransaction::new(syntactic_lock, semantic_lock)
+        Harness->>Harness: add_changes(ContentChange[])
+
+        Harness->>Syntactic: validate(VerificationContext)
+        Syntactic-->>Harness: SyntacticLockResult
+
+        alt syntactic lock failed
+            Harness-->>ApplyPatch: TransactionOutcome::SyntacticLockFailed
+        else syntactic lock passed
+            Harness->>Semantic: validate(VerificationContext)
+            Semantic-->>Harness: SemanticLockResult
+
+            alt semantic lock failed
+                Harness-->>ApplyPatch: TransactionOutcome::SemanticLockFailed
+            else all locks passed
+                Harness->>Harness: commit_changes_with_deletes
+                Harness-->>ApplyPatch: TransactionOutcome::Committed
+            end
+        end
+    end
+
+    alt committed
+        ApplyPatch->>ApplyPatch: build ApplyPatchSummary(status=ok,<br/>files_written, files_deleted)
+        ApplyPatch->>DaemonRouter: DispatchResult::success()
+        ApplyPatch->>DaemonConn: writer.write_stdout(summary_json)
+        DaemonConn-->>CliRunner: JSONL success payload
+        CliRunner-->>User: exit status 0
+    else patch or verification error
+        ApplyPatch->>ApplyPatch: map error to envelope (ApplyPatchError or VerificationError)
+        ApplyPatch->>DaemonConn: writer.write_stderr(error_json)
+        ApplyPatch-->>DaemonRouter: DispatchResult::with_status(1 or 2)
+        DaemonConn-->>CliRunner: JSONL error payload
+        CliRunner-->>User: non_zero exit status
+    end
+```
+
+*Figure: `act apply-patch` CLI-to-daemon execution sequence.*
+
 #### 4.3.5. Creation and deletion semantics
 
 For `new file mode` operations, the tool extracts the added (`+`) lines from
@@ -1639,9 +1728,28 @@ Instead, it returns a structured backend-unavailable error and exits with a
 non-zero status after leaving the filesystem untouched.
 
 Only if both locks pass does the daemon commit the changes atomically. Paths
-are normalised and rejected if they escape the workspace root (for example,
+are normalized and rejected if they escape the workspace root (for example,
 `../..` traversal or absolute paths), preventing patch-based directory
 traversal attacks.
+
+#### 4.3.7. Apply-patch response payloads and limits
+
+`act apply-patch` returns a compact success payload and structured error
+envelopes that align with other safety-harness responses:
+
+- Success responses are JSON objects with `status: "ok"` and counts for
+  `files_written` and `files_deleted`.
+- Patch parsing and application failures return a JSON error envelope with
+  `type: "ApplyPatchError"` and details about the failure, including the
+  operation and path when available.
+- Lock failures reuse the `VerificationError` envelope with a `phase` and
+  per-file diagnostics.
+- Backend or I/O failures return a generic error envelope with a dedicated
+  `type` and exit status 2; patch and verification failures exit with status 1.
+
+The request line size limit for JSONL requests is set to 1 MiB to accommodate
+patch payloads without allowing unbounded memory growth. Callers with larger
+patch streams must split them into multiple apply-patch commands.
 
 ## 5. Security by Design: A Zero-Trust Sandboxing Model
 

@@ -24,22 +24,22 @@ pub enum OutputFormat {
     disable_help_subcommand = true,
     subcommand_negates_reqs = true
 )]
-pub struct Cli {
+pub(crate) struct Cli {
     /// Prints the negotiated capability matrix and exits.
     #[arg(long)]
-    pub capabilities: bool,
+    pub(crate) capabilities: bool,
     /// Controls how daemon output is rendered.
     #[arg(long, value_enum, default_value_t = OutputFormat::Auto)]
-    pub output: OutputFormat,
+    pub(crate) output: OutputFormat,
     /// Structured subcommands (for example `daemon start`).
     #[command(subcommand)]
-    pub command: Option<CliCommand>,
+    pub(crate) command: Option<CliCommand>,
     /// The command domain (for example `observe`).
     #[arg(value_name = "DOMAIN")]
-    pub domain: Option<String>,
+    pub(crate) domain: Option<String>,
     /// The command operation (for example `get-definition`).
     #[arg(value_name = "OPERATION")]
-    pub operation: Option<String>,
+    pub(crate) operation: Option<String>,
     /// Additional arguments passed to the daemon.
     #[arg(
         value_name = "ARG",
@@ -47,12 +47,12 @@ pub struct Cli {
         trailing_var_arg = true,
         allow_hyphen_values = true
     )]
-    pub arguments: Vec<String>,
+    pub(crate) arguments: Vec<String>,
 }
 
 /// Structured subcommands for the Weaver CLI.
 #[derive(Subcommand, Debug, Clone)]
-pub enum CliCommand {
+pub(crate) enum CliCommand {
     /// Runs daemon lifecycle commands.
     Daemon {
         /// The lifecycle action to perform.
@@ -63,7 +63,7 @@ pub enum CliCommand {
 
 /// Daemon lifecycle actions.
 #[derive(Subcommand, Debug, Clone, Copy)]
-pub enum DaemonAction {
+pub(crate) enum DaemonAction {
     /// Starts the daemon and waits for readiness.
     Start,
     /// Stops the daemon gracefully.

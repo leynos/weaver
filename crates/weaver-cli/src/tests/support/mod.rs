@@ -50,6 +50,7 @@ impl ConfigLoader for StaticConfigLoader {
 pub(super) struct TestWorld {
     pub config: Config,
     pub daemon: Option<FakeDaemon>,
+    pub stdin: Vec<u8>,
     pub stdout: Vec<u8>,
     /// Controls whether stdout is treated as a terminal for output selection.
     pub stdout_is_terminal: bool,
@@ -160,7 +161,13 @@ impl TestWorld {
         let args = Self::build_args(command);
         let loader = StaticConfigLoader::new(self.config.clone());
         let daemon_binary = self.daemon_binary.as_deref();
-        let mut io = IoStreams::new(&mut self.stdout, &mut self.stderr, self.stdout_is_terminal);
+        let mut input = std::io::Cursor::new(self.stdin.clone());
+        let mut io = IoStreams::new(
+            &mut input,
+            &mut self.stdout,
+            &mut self.stderr,
+            self.stdout_is_terminal,
+        );
         let exit = run_with_daemon_binary(
             args,
             &mut io,
@@ -174,6 +181,10 @@ impl TestWorld {
         }
         self.daemon = None;
         Ok(())
+    }
+
+    pub fn set_stdin(&mut self, data: &str) {
+        self.stdin = data.as_bytes().to_vec();
     }
 
     fn build_args(command: &str) -> Vec<OsString> {

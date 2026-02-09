@@ -101,6 +101,8 @@ where
     config.daemon_socket().prepare_filesystem()?;
     let runtime_paths = RuntimePaths::from_config(&config)?;
     let mut guard = ProcessGuard::acquire(runtime_paths)?;
+    let workspace_root =
+        env::current_dir().map_err(|source| LaunchError::WorkspaceRoot { source })?;
     if matches!(mode, LaunchMode::Background) {
         daemonizer.daemonize(guard.paths())?;
     }
@@ -117,7 +119,10 @@ where
     // Create backend manager using the same backends from the daemon
     let backends = Arc::new(Mutex::new(daemon.into_backends()));
     let backend_manager = BackendManager::new(backends);
-    let handler = Arc::new(DispatchConnectionHandler::new(backend_manager));
+    let handler = Arc::new(DispatchConnectionHandler::new(
+        backend_manager,
+        workspace_root,
+    ));
 
     let listener_handle = listener.start(handler)?;
     guard.write_health(HealthState::Ready)?;

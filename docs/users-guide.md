@@ -470,6 +470,32 @@ JSON payload:
 {"diagnostics":[{"line":12,"column":5,"message":"..."}]}
 ```
 
+#### act apply-patch
+
+Syntax:
+
+```sh
+weaver act apply-patch < patch.diff
+```
+
+`act apply-patch` reads a Git-style patch stream from STDIN. The patch may
+include SEARCH/REPLACE blocks for modifications, `new file mode` hunks for file
+creation, or `deleted file mode` entries for deletions. Binary patches are
+rejected, and an empty STDIN payload is treated as an error by the CLI.
+
+JSON payload:
+
+```json
+{"status":"ok","files_written":1,"files_deleted":0}
+```
+
+Failures return structured error envelopes on stderr and a non-zero exit
+status. Verification failures are rendered with the same human-readable output
+as other `act` commands when `--output human` is selected.
+
+The daemon rejects JSONL request lines larger than 1 MiB, so large patch
+streams should be split into multiple `act apply-patch` invocations.
+
 #### act apply-rewrite
 
 Syntax:

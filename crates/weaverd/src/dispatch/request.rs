@@ -20,6 +20,9 @@ pub struct CommandRequest {
     /// Additional arguments passed to the operation handler.
     #[serde(default)]
     pub arguments: Vec<String>,
+    /// Optional patch payload for `act apply-patch`.
+    #[serde(default)]
+    pub patch: Option<String>,
 }
 
 /// Command identification within a request.
@@ -76,6 +79,11 @@ impl CommandRequest {
     pub fn operation(&self) -> &str {
         self.command.operation.trim()
     }
+
+    /// Returns the patch payload, if provided.
+    pub fn patch(&self) -> Option<&str> {
+        self.patch.as_deref()
+    }
 }
 
 /// Trims trailing ASCII whitespace from a byte slice.
@@ -110,6 +118,15 @@ mod tests {
         let request = CommandRequest::parse(input).expect("parse with args");
         assert_eq!(request.domain(), "act");
         assert_eq!(request.operation(), "rename");
+    }
+
+    #[test]
+    fn parses_request_with_patch_payload() {
+        let input = br#"{"command":{"domain":"act","operation":"apply-patch"},"patch":"diff"}"#;
+        let request = CommandRequest::parse(input).expect("parse patch");
+        assert_eq!(request.domain(), "act");
+        assert_eq!(request.operation(), "apply-patch");
+        assert_eq!(request.patch(), Some("diff"));
     }
 
     #[test]

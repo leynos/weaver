@@ -16,6 +16,7 @@ signal-hook = "0.3"
 thiserror.workspace = true
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json", "time"] }
+url.workspace = true
 weaver-config = { path = "../weaver-config", features = ["cli"] }
 weaver-lsp-host = { path = "../weaver-lsp-host" }
 weaver-syntax = { path = "../weaver-syntax" }

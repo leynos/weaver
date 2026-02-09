@@ -6,12 +6,14 @@
 //! with structured errors.
 
 use std::io::Write;
+use std::path::PathBuf;
 
 use tracing::debug;
 
 use crate::backends::FusionBackends;
 use crate::semantic_provider::SemanticBackendProvider;
 
+use super::act;
 use super::errors::DispatchError;
 use super::observe;
 use super::request::CommandRequest;
@@ -118,14 +120,15 @@ impl DomainRoutingContext {
 /// The router parses the domain from the request, validates the operation, and
 /// delegates to the appropriate handler. MVP handlers return "not implemented"
 /// responses for all known operations.
-#[derive(Debug, Default)]
-pub struct DomainRouter;
+#[derive(Debug)]
+pub struct DomainRouter {
+    workspace_root: PathBuf,
+}
 
 impl DomainRouter {
-    /// Creates a new domain router.
-    pub const fn new() -> Self {
-        Self
-    }
+    /// Creates a new domain router with the workspace root.
+    #[rustfmt::skip]
+    pub fn new(workspace_root: PathBuf) -> Self { Self { workspace_root } }
 
     /// Routes a command request to the appropriate domain handler.
     ///
@@ -149,7 +152,7 @@ impl DomainRouter {
 
         match domain {
             Domain::Observe => self.route_observe(request, writer, backends),
-            Domain::Act => self.route_act(request, writer),
+            Domain::Act => self.route_act(request, writer, backends),
             Domain::Verify => self.route_verify(request, writer),
         }
     }
@@ -163,13 +166,7 @@ impl DomainRouter {
         let operation = request.operation().to_ascii_lowercase();
         match operation.as_str() {
             "get-definition" => observe::get_definition::handle(request, writer, backends),
-            _ if DomainRoutingContext::OBSERVE
-                .known_operations
-                .contains(&operation.as_str()) =>
-            {
-                self.write_not_implemented(writer, "observe", &operation)
-            }
-            _ => Err(DispatchError::unknown_operation("observe", operation)),
+            _ => Self::route_fallback(&DomainRoutingContext::OBSERVE, operation.as_str(), writer),
         }
     }
 
@@ -177,8 +174,15 @@ impl DomainRouter {
         &self,
         request: &CommandRequest,
         writer: &mut ResponseWriter<W>,
+        backends: &mut FusionBackends<SemanticBackendProvider>,
     ) -> Result<DispatchResult, DispatchError> {
-        self.route_domain(request, writer, &DomainRoutingContext::ACT)
+        let operation = request.operation().to_ascii_lowercase();
+        match operation.as_str() {
+            "apply-patch" => {
+                act::apply_patch::handle(request, writer, backends, &self.workspace_root)
+            }
+            _ => Self::route_fallback(&DomainRoutingContext::ACT, operation.as_str(), writer),
+        }
     }
 
     fn route_verify<W: Write>(
@@ -186,25 +190,27 @@ impl DomainRouter {
         request: &CommandRequest,
         writer: &mut ResponseWriter<W>,
     ) -> Result<DispatchResult, DispatchError> {
-        self.route_domain(request, writer, &DomainRoutingContext::VERIFY)
+        let operation = request.operation().to_ascii_lowercase();
+        Self::route_fallback(&DomainRoutingContext::VERIFY, operation.as_str(), writer)
     }
 
-    fn route_domain<W: Write>(
-        &self,
-        request: &CommandRequest,
+    /// Handles routing fallbacks for known-but-unimplemented and unknown operations.
+    fn route_fallback<W: Write>(
+        routing: &DomainRoutingContext,
+        operation: &str,
         writer: &mut ResponseWriter<W>,
-        context: &DomainRoutingContext,
     ) -> Result<DispatchResult, DispatchError> {
-        let operation = request.operation().to_ascii_lowercase();
-        if context.known_operations.contains(&operation.as_str()) {
-            self.write_not_implemented(writer, context.domain, &operation)
+        if routing.known_operations.contains(&operation) {
+            Self::write_not_implemented(writer, routing.domain, operation)
         } else {
-            Err(DispatchError::unknown_operation(context.domain, operation))
+            Err(DispatchError::unknown_operation(
+                routing.domain,
+                operation.to_string(),
+            ))
         }
     }
 
     fn write_not_implemented<W: Write>(
-        &self,
         writer: &mut ResponseWriter<W>,
         domain: &str,
         operation: &str,
@@ -217,163 +223,4 @@ impl DomainRouter {
 }
 
 #[cfg(test)]
-mod tests {
-    use rstest::{fixture, rstest};
-    use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
-
-    use super::*;
-    use crate::dispatch::request::CommandRequest;
-
-    fn make_request(domain: &str, operation: &str) -> CommandRequest {
-        let json = format!(
-            r#"{{"command":{{"domain":"{}","operation":"{}"}}}}"#,
-            domain, operation
-        );
-        CommandRequest::parse(json.as_bytes()).expect("test request")
-    }
-
-    #[fixture]
-    fn backends() -> FusionBackends<SemanticBackendProvider> {
-        let config = Config {
-            daemon_socket: SocketEndpoint::unix("/tmp/weaver-test/socket.sock"),
-            ..Config::default()
-        };
-        let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
-        FusionBackends::new(config, provider)
-    }
-
-    /// Creates backends for tests that iterate (can't use fixtures in loops).
-    fn create_backends() -> FusionBackends<SemanticBackendProvider> {
-        let config = Config {
-            daemon_socket: SocketEndpoint::unix("/tmp/weaver-test/socket.sock"),
-            ..Config::default()
-        };
-        let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
-        FusionBackends::new(config, provider)
-    }
-
-    fn assert_routes_operations(domain: &str, operations: &[&str]) {
-        let router = DomainRouter::new();
-        for op in operations {
-            let request = make_request(domain, op);
-            let mut output = Vec::new();
-            let mut writer = ResponseWriter::new(&mut output);
-            let mut backends = create_backends();
-            let result = router.route(&request, &mut writer, &mut backends);
-            // get-definition requires --uri/--position args, so it will fail
-            // with InvalidArguments when called without them, but this still
-            // proves the operation is recognized and routed correctly
-            if domain == "observe" && *op == "get-definition" {
-                assert!(
-                    matches!(result, Err(DispatchError::InvalidArguments { .. })),
-                    "{domain} {op} should fail with InvalidArguments (no args provided)"
-                );
-            } else {
-                assert!(result.is_ok(), "{domain} {op} should route successfully");
-            }
-        }
-    }
-
-    fn assert_rejects_unknown_operation(domain: &str, operation: &str) {
-        let router = DomainRouter::new();
-        let request = make_request(domain, operation);
-        let mut output = Vec::new();
-        let mut writer = ResponseWriter::new(&mut output);
-        let mut backends = create_backends();
-        let result = router.route(&request, &mut writer, &mut backends);
-        assert!(matches!(
-            result,
-            Err(DispatchError::UnknownOperation { .. })
-        ));
-    }
-
-    #[rstest]
-    #[case::observe_lower("observe", Domain::Observe)]
-    #[case::observe_upper("OBSERVE", Domain::Observe)]
-    #[case::observe_mixed("Observe", Domain::Observe)]
-    #[case::act_lower("act", Domain::Act)]
-    #[case::act_upper("ACT", Domain::Act)]
-    #[case::verify_lower("verify", Domain::Verify)]
-    #[case::verify_upper("VERIFY", Domain::Verify)]
-    fn domain_parse_case_insensitive(#[case] input: &str, #[case] expected: Domain) {
-        assert_eq!(Domain::parse(input).expect("parse domain"), expected);
-    }
-
-    #[test]
-    fn domain_parse_rejects_unknown() {
-        let result = Domain::parse("bogus");
-        assert!(matches!(result, Err(DispatchError::UnknownDomain { .. })));
-    }
-
-    #[test]
-    fn routes_known_observe_operations() {
-        assert_routes_operations("observe", DomainRoutingContext::OBSERVE.known_operations);
-    }
-
-    #[test]
-    fn routes_known_act_operations() {
-        assert_routes_operations("act", DomainRoutingContext::ACT.known_operations);
-    }
-
-    #[test]
-    fn routes_known_verify_operations() {
-        assert_routes_operations("verify", DomainRoutingContext::VERIFY.known_operations);
-    }
-
-    #[rstest]
-    #[case::observe("observe", "nonexistent")]
-    #[case::act("act", "bogus")]
-    #[case::verify("verify", "unknown")]
-    fn rejects_unknown_operation(#[case] domain: &str, #[case] operation: &str) {
-        assert_rejects_unknown_operation(domain, operation);
-    }
-
-    #[rstest]
-    #[case::title("act", "Apply-Patch")]
-    #[case::screaming("verify", "DIAGNOSTICS")]
-    fn routes_operations_case_insensitively(
-        #[case] domain: &str,
-        #[case] operation: &str,
-        mut backends: FusionBackends<SemanticBackendProvider>,
-    ) {
-        let router = DomainRouter::new();
-        let request = make_request(domain, operation);
-        let mut output = Vec::new();
-        let mut writer = ResponseWriter::new(&mut output);
-        let result = router.route(&request, &mut writer, &mut backends);
-        assert!(
-            result.is_ok(),
-            "{domain} {operation} should route successfully despite case"
-        );
-    }
-
-    #[rstest]
-    fn get_definition_requires_arguments(mut backends: FusionBackends<SemanticBackendProvider>) {
-        let router = DomainRouter::new();
-        let request = make_request("observe", "get-definition");
-        let mut output = Vec::new();
-        let mut writer = ResponseWriter::new(&mut output);
-        let result = router.route(&request, &mut writer, &mut backends);
-
-        // Should fail with InvalidArguments because no --uri/--position
-        assert!(matches!(
-            result,
-            Err(DispatchError::InvalidArguments { .. })
-        ));
-    }
-
-    #[rstest]
-    fn find_references_not_implemented(mut backends: FusionBackends<SemanticBackendProvider>) {
-        let router = DomainRouter::new();
-        let request = make_request("observe", "find-references");
-        let mut output = Vec::new();
-        let mut writer = ResponseWriter::new(&mut output);
-        let result = router
-            .route(&request, &mut writer, &mut backends)
-            .expect("route");
-        assert_eq!(result.status, 1);
-
-        let response = String::from_utf8(output).expect("utf8");
-        assert!(response.contains("not yet implemented"));
-    }
-}
+mod tests;

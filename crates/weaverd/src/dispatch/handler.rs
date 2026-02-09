@@ -6,6 +6,7 @@
 //! responses back to the client.
 
 use std::io::{self, Read};
+use std::path::PathBuf;
 
 use tracing::{debug, warn};
 
@@ -18,7 +19,8 @@ use super::response::ResponseWriter;
 use super::router::{DISPATCH_TARGET, DomainRouter};
 
 /// Maximum size of a single request line in bytes.
-pub(crate) const MAX_REQUEST_BYTES: usize = 64 * 1024;
+/// Increased to 1 MiB to accommodate apply-patch payloads.
+pub(crate) const MAX_REQUEST_BYTES: usize = 1024 * 1024;
 
 /// Connection handler that parses and dispatches JSONL commands.
 ///
@@ -32,10 +34,10 @@ pub struct DispatchConnectionHandler {
 }
 
 impl DispatchConnectionHandler {
-    /// Creates a new dispatch handler with a backend manager.
-    pub fn new(backends: BackendManager) -> Self {
+    /// Creates a new dispatch handler with a backend manager and workspace root.
+    pub fn new(backends: BackendManager, workspace_root: PathBuf) -> Self {
         Self {
-            router: DomainRouter::new(),
+            router: DomainRouter::new(workspace_root),
             backends,
         }
     }
@@ -229,10 +231,12 @@ mod tests {
     #[fixture]
     fn harness(backend_manager: BackendManager) -> HandlerTestHarness {
         let (listener, addr) = create_listener();
+        let workspace_root = PathBuf::from("/tmp/weaver-test-workspace");
 
         let server_handle = thread::spawn(move || {
             let (stream, _) = listener.accept().expect("accept");
-            DispatchConnectionHandler::new(backend_manager).handle(ConnectionStream::Tcp(stream));
+            DispatchConnectionHandler::new(backend_manager, workspace_root)
+                .handle(ConnectionStream::Tcp(stream));
         });
 
         let client = TcpStream::connect(addr).expect("connect");

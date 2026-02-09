@@ -34,6 +34,10 @@ pub(crate) enum AppError {
     ParseMessage(serde_json::Error),
     #[error("failed to forward daemon output: {0}")]
     ForwardResponse(io::Error),
+    #[error("failed to read patch input: {0}")]
+    ReadPatch(io::Error),
+    #[error("apply-patch requires patch content on stdin")]
+    MissingPatchInput,
     #[error("daemon closed the stream without sending an exit status")]
     MissingExit,
     #[error("failed to serialise capability matrix: {0}")]

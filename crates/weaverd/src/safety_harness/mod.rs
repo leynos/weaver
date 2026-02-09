@@ -35,7 +35,7 @@ mod verification;
 pub use edit::{FileEdit, Position, TextEdit, TextRange};
 pub use error::{SafetyHarnessError, VerificationFailure};
 pub use locks::{SemanticLockResult, SyntacticLockResult};
-pub use transaction::{EditTransaction, TransactionOutcome};
+pub use transaction::{ContentChange, ContentTransaction, EditTransaction, TransactionOutcome};
 pub use verification::{
     ConfigurableSemanticLock, ConfigurableSyntacticLock, PlaceholderSemanticLock,
     PlaceholderSyntacticLock, SemanticLock, SyntacticLock, TreeSitterSyntacticLockAdapter,

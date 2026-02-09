@@ -28,6 +28,13 @@ pub enum LaunchError {
         #[source]
         source: Arc<OrthoError>,
     },
+    /// Resolving the workspace root failed.
+    #[error("failed to resolve workspace root: {source}")]
+    WorkspaceRoot {
+        /// Underlying IO error.
+        #[source]
+        source: io::Error,
+    },
     /// Preparing the socket filesystem failed.
     #[error("failed to prepare daemon socket: {source}")]
     Socket {

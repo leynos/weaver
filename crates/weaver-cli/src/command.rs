@@ -45,6 +45,8 @@ impl TryFrom<Cli> for CommandInvocation {
 pub(crate) struct CommandRequest {
     pub(crate) command: CommandDescriptor,
     pub(crate) arguments: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) patch: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -61,11 +63,23 @@ impl From<CommandInvocation> for CommandRequest {
                 operation: invocation.operation,
             },
             arguments: invocation.arguments,
+            patch: None,
         }
     }
 }
 
 impl CommandRequest {
+    pub(crate) fn with_patch(invocation: CommandInvocation, patch: String) -> Self {
+        Self {
+            command: CommandDescriptor {
+                domain: invocation.domain,
+                operation: invocation.operation,
+            },
+            arguments: invocation.arguments,
+            patch: Some(patch),
+        }
+    }
+
     pub(crate) fn write_jsonl<W>(&self, writer: &mut W) -> Result<(), AppError>
     where
         W: Write,

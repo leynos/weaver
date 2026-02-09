@@ -7,11 +7,11 @@
 
 use clap::Parser;
 use std::ffi::{OsStr, OsString};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::process::ExitCode;
 use weaver_config::Config;
 
-pub mod cli;
+mod cli;
 mod command;
 mod config;
 mod daemon_output;
@@ -21,10 +21,8 @@ pub mod output;
 mod runtime_utils;
 mod transport;
 
-pub(crate) use cli::DaemonAction;
-use cli::{Cli, CliCommand};
-
 pub use cli::OutputFormat;
+pub(crate) use cli::{Cli, CliCommand, DaemonAction};
 #[cfg(test)]
 pub(crate) use command::CommandDescriptor;
 pub(crate) use command::{CommandInvocation, CommandRequest};
@@ -57,18 +55,25 @@ pub(crate) const EMPTY_LINE_LIMIT: usize = 10;
 /// Bundles the IO streams provided to the CLI runtime.
 ///
 /// `IoStreams` owns the long-lived writers used while parsing CLI arguments.
-/// Lifecycle commands receive a short-lived [`LifecycleOutput`] wrapper that
-/// borrows these streams so helpers can flush individual messages without
+/// Lifecycle commands receive a short-lived output wrapper that borrows these
+/// streams so helpers can flush individual messages without
 /// threading the CLI runtime through every call.
-pub(crate) struct IoStreams<'a, W: Write, E: Write> {
+pub struct IoStreams<'a, R: Read, W: Write, E: Write> {
+    pub(crate) stdin: &'a mut R,
     pub(crate) stdout: &'a mut W,
     pub(crate) stderr: &'a mut E,
     stdout_is_terminal: bool,
 }
 
-impl<'a, W: Write, E: Write> IoStreams<'a, W, E> {
-    pub(crate) fn new(stdout: &'a mut W, stderr: &'a mut E, stdout_is_terminal: bool) -> Self {
+impl<'a, R: Read, W: Write, E: Write> IoStreams<'a, R, W, E> {
+    pub fn new(
+        stdin: &'a mut R,
+        stdout: &'a mut W,
+        stderr: &'a mut E,
+        stdout_is_terminal: bool,
+    ) -> Self {
         Self {
+            stdin,
             stdout,
             stderr,
             stdout_is_terminal,
@@ -80,19 +85,20 @@ impl<'a, W: Write, E: Write> IoStreams<'a, W, E> {
     }
 }
 
-struct CliRunner<'a, W: Write, E: Write, L: ConfigLoader> {
-    io: &'a mut IoStreams<'a, W, E>,
+struct CliRunner<'a, R: Read, W: Write, E: Write, L: ConfigLoader> {
+    io: &'a mut IoStreams<'a, R, W, E>,
     loader: &'a L,
     daemon_binary: Option<&'a OsStr>,
 }
 
-impl<'a, W, E, L> CliRunner<'a, W, E, L>
+impl<'a, R, W, E, L> CliRunner<'a, R, W, E, L>
 where
+    R: Read,
     W: Write,
     E: Write,
     L: ConfigLoader,
 {
-    fn new(io: &'a mut IoStreams<'a, W, E>, loader: &'a L) -> Self {
+    fn new(io: &'a mut IoStreams<'a, R, W, E>, loader: &'a L) -> Self {
         Self {
             io,
             loader,
@@ -183,14 +189,14 @@ where
 
 /// Runs the CLI using the provided arguments and IO handles.
 #[must_use]
-pub fn run<I, W, E>(args: I, stdout: &mut W, stderr: &mut E, stdout_is_terminal: bool) -> ExitCode
+pub fn run<'a, I, R, W, E>(args: I, io: &'a mut IoStreams<'a, R, W, E>) -> ExitCode
 where
     I: IntoIterator<Item = OsString>,
+    R: Read,
     W: Write,
     E: Write,
 {
-    let mut io = IoStreams::new(stdout, stderr, stdout_is_terminal);
-    run_with_loader(args, &mut io, &OrthoConfigLoader)
+    run_with_loader(args, io, &OrthoConfigLoader)
 }
 
 fn prepare_cli_arguments(args: &[OsString], split: &ConfigArgumentSplit) -> Vec<OsString> {
@@ -204,12 +210,13 @@ fn prepare_cli_arguments(args: &[OsString], split: &ConfigArgumentSplit) -> Vec<
     cli_arguments
 }
 
-fn handle_capabilities_mode<W, E>(
+fn handle_capabilities_mode<R, W, E>(
     cli: &Cli,
     config: &Config,
-    io: &mut IoStreams<'_, W, E>,
+    io: &mut IoStreams<'_, R, W, E>,
 ) -> Option<ExitCode>
 where
+    R: Read,
     W: Write,
     E: Write,
 {
@@ -226,13 +233,14 @@ where
     }
 }
 
-fn execute_daemon_command<W, E>(
+fn execute_daemon_command<R, W, E>(
     invocation: CommandInvocation,
     context: LifecycleContext<'_>,
-    io: &mut IoStreams<'_, W, E>,
+    io: &mut IoStreams<'_, R, W, E>,
     output_format: ResolvedOutputFormat,
 ) -> ExitCode
 where
+    R: Read,
     W: Write,
     E: Write,
 {
@@ -241,7 +249,13 @@ where
         invocation.operation.clone(),
         invocation.arguments.clone(),
     );
-    let request = CommandRequest::from(invocation);
+    let request = match build_request(invocation, &mut *io.stdin) {
+        Ok(request) => request,
+        Err(error) => {
+            let _ = writeln!(io.stderr, "{error}");
+            return ExitCode::FAILURE;
+        }
+    };
     let mut connection = match connect(context.config.daemon_socket()) {
         Ok(connection) => connection,
         Err(error) if is_daemon_not_running(&error) => {
@@ -285,15 +299,42 @@ where
     }
 }
 
+fn build_request<R: Read>(
+    invocation: CommandInvocation,
+    stdin: &mut R,
+) -> Result<CommandRequest, AppError> {
+    if is_apply_patch(&invocation) {
+        let mut patch = String::new();
+        stdin
+            .read_to_string(&mut patch)
+            .map_err(AppError::ReadPatch)?;
+        if patch.trim().is_empty() {
+            return Err(AppError::MissingPatchInput);
+        }
+        Ok(CommandRequest::with_patch(invocation, patch))
+    } else {
+        Ok(CommandRequest::from(invocation))
+    }
+}
+
+fn is_apply_patch(invocation: &CommandInvocation) -> bool {
+    invocation.domain.trim().eq_ignore_ascii_case("act")
+        && invocation
+            .operation
+            .trim()
+            .eq_ignore_ascii_case("apply-patch")
+}
+
 /// Runs the CLI with a custom configuration loader.
 #[must_use]
-pub(crate) fn run_with_loader<'a, I, W, E, L>(
+pub(crate) fn run_with_loader<'a, I, R, W, E, L>(
     args: I,
-    io: &'a mut IoStreams<'a, W, E>,
+    io: &'a mut IoStreams<'a, R, W, E>,
     loader: &'a L,
 ) -> ExitCode
 where
     I: IntoIterator<Item = OsString>,
+    R: Read,
     W: Write,
     E: Write,
     L: ConfigLoader,
@@ -306,15 +347,16 @@ where
     clippy::too_many_arguments,
     reason = "test-only function requires full parameter set for dependency injection"
 )]
-pub(crate) fn run_with_daemon_binary<'a, I, W, E, L, F>(
+pub(crate) fn run_with_daemon_binary<'a, I, R, W, E, L, F>(
     args: I,
-    io: &'a mut IoStreams<'a, W, E>,
+    io: &'a mut IoStreams<'a, R, W, E>,
     loader: &'a L,
     daemon_binary: Option<&'a OsStr>,
     handler: F,
 ) -> ExitCode
 where
     I: IntoIterator<Item = OsString>,
+    R: Read,
     W: Write,
     E: Write,
     L: ConfigLoader,

@@ -27,6 +27,7 @@
 //! operation within each domain. Unknown domains or operations result in
 //! structured error responses.
 
+pub mod act;
 mod backend_manager;
 mod errors;
 mod handler;
