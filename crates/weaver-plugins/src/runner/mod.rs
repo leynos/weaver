@@ -59,7 +59,7 @@ pub trait PluginExecutor {
 ///
 /// ```
 /// use weaver_plugins::{
-///     PluginRunner, PluginRegistry, PluginManifest, PluginKind,
+///     PluginRunner, PluginRegistry, PluginManifest, PluginMetadata, PluginKind,
 ///     PluginRequest, PluginResponse, PluginOutput, PluginError,
 /// };
 /// use weaver_plugins::runner::PluginExecutor;
@@ -79,9 +79,11 @@ pub trait PluginExecutor {
 /// }
 ///
 /// let mut registry = PluginRegistry::new();
+/// let meta = PluginMetadata::new("rope", "1.0", PluginKind::Actuator);
 /// registry.register(PluginManifest::new(
-///     "rope", "1.0", PluginKind::Actuator,
-///     vec!["python".into()], PathBuf::from("/usr/bin/rope"),
+///     meta,
+///     vec!["python".into()],
+///     PathBuf::from("/usr/bin/rope"),
 /// )).unwrap();
 ///
 /// let runner = PluginRunner::new(registry, MockExecutor);

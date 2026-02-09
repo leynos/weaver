@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use crate::error::PluginError;
-use crate::manifest::{PluginKind, PluginManifest};
+use crate::manifest::{PluginKind, PluginManifest, PluginMetadata};
 use crate::protocol::{PluginOutput, PluginRequest, PluginResponse};
 use crate::registry::PluginRegistry;
 use crate::runner::{PluginExecutor, PluginRunner};
@@ -25,11 +25,10 @@ impl PluginExecutor for StubExecutor {
 #[test]
 fn end_to_end_runner_with_stub() {
     let mut registry = PluginRegistry::new();
+    let meta = PluginMetadata::new("rope", "1.0", PluginKind::Actuator);
     registry
         .register(PluginManifest::new(
-            "rope",
-            "1.0",
-            PluginKind::Actuator,
+            meta,
             vec!["python".into()],
             PathBuf::from("/usr/bin/rope"),
         ))

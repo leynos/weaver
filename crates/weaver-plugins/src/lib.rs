@@ -21,14 +21,15 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use weaver_plugins::{PluginManifest, PluginKind, PluginRegistry, PluginRunner};
+//! use weaver_plugins::{
+//!     PluginManifest, PluginMetadata, PluginKind, PluginRegistry, PluginRunner,
+//! };
 //! use weaver_plugins::process::SandboxExecutor;
 //! use std::path::PathBuf;
 //!
+//! let meta = PluginMetadata::new("rope", "1.0.0", PluginKind::Actuator);
 //! let manifest = PluginManifest::new(
-//!     "rope",
-//!     "1.0.0",
-//!     PluginKind::Actuator,
+//!     meta,
 //!     vec!["python".into()],
 //!     PathBuf::from("/usr/bin/rope-plugin"),
 //! );
@@ -51,7 +52,7 @@ pub mod runner;
 mod tests;
 
 pub use self::error::PluginError;
-pub use self::manifest::{PluginKind, PluginManifest};
+pub use self::manifest::{PluginKind, PluginManifest, PluginMetadata};
 pub use self::protocol::{
     DiagnosticSeverity, FilePayload, PluginDiagnostic, PluginOutput, PluginRequest, PluginResponse,
 };

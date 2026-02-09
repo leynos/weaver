@@ -114,35 +114,33 @@ fn parse_refactor_args(arguments: &[String]) -> Result<RefactorArgs, DispatchErr
 
     while let Some(arg) = iter.next() {
         match arg.as_str() {
-            "--provider" => {
-                provider = Some(
-                    iter.next()
-                        .ok_or_else(|| {
-                            DispatchError::invalid_arguments("--provider requires a value")
-                        })?
-                        .clone(),
-                );
-            }
-            "--refactoring" => {
-                refactoring = Some(
-                    iter.next()
-                        .ok_or_else(|| {
-                            DispatchError::invalid_arguments("--refactoring requires a value")
-                        })?
-                        .clone(),
-                );
-            }
-            "--file" => {
-                file = Some(
-                    iter.next()
-                        .ok_or_else(|| DispatchError::invalid_arguments("--file requires a value"))?
-                        .clone(),
-                );
-            }
+            "--provider" => provider = Some(parse_flag_value(&mut iter, "--provider")?),
+            "--refactoring" => refactoring = Some(parse_flag_value(&mut iter, "--refactoring")?),
+            "--file" => file = Some(parse_flag_value(&mut iter, "--file")?),
             other => extra.push(other.to_owned()),
         }
     }
 
+    validate_required_args(provider, refactoring, file, extra)
+}
+
+/// Consumes the next element from the iterator as the value for a flag.
+fn parse_flag_value<'a>(
+    iter: &mut impl Iterator<Item = &'a String>,
+    flag: &str,
+) -> Result<String, DispatchError> {
+    iter.next()
+        .cloned()
+        .ok_or_else(|| DispatchError::invalid_arguments(format!("{flag} requires a value")))
+}
+
+/// Validates that all required arguments are present and builds the result.
+fn validate_required_args(
+    provider: Option<String>,
+    refactoring: Option<String>,
+    file: Option<String>,
+    extra: Vec<String>,
+) -> Result<RefactorArgs, DispatchError> {
     Ok(RefactorArgs {
         provider: provider.ok_or_else(|| {
             DispatchError::invalid_arguments("act refactor requires --provider <plugin-name>")

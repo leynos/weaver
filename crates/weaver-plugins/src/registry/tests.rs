@@ -6,23 +6,21 @@ use rstest::{fixture, rstest};
 
 use super::*;
 use crate::error::PluginError;
-use crate::manifest::{PluginKind, PluginManifest};
+use crate::manifest::{PluginKind, PluginManifest, PluginMetadata};
 
 fn make_actuator(name: &str, lang: &str) -> PluginManifest {
+    let meta = PluginMetadata::new(name, "1.0", PluginKind::Actuator);
     PluginManifest::new(
-        name,
-        "1.0",
-        PluginKind::Actuator,
+        meta,
         vec![lang.into()],
         PathBuf::from(format!("/usr/bin/{name}")),
     )
 }
 
 fn make_sensor(name: &str, lang: &str) -> PluginManifest {
+    let meta = PluginMetadata::new(name, "1.0", PluginKind::Sensor);
     PluginManifest::new(
-        name,
-        "1.0",
-        PluginKind::Sensor,
+        meta,
         vec![lang.into()],
         PathBuf::from(format!("/usr/bin/{name}")),
     )
@@ -80,13 +78,8 @@ fn register_rejects_duplicate() {
 #[test]
 fn register_rejects_invalid_manifest() {
     let mut r = PluginRegistry::new();
-    let bad = PluginManifest::new(
-        "  ",
-        "1.0",
-        PluginKind::Sensor,
-        vec!["python".into()],
-        PathBuf::from("/usr/bin/jedi"),
-    );
+    let meta = PluginMetadata::new("  ", "1.0", PluginKind::Sensor);
+    let bad = PluginManifest::new(meta, vec!["python".into()], PathBuf::from("/usr/bin/jedi"));
     let err = r.register(bad).expect_err("should reject invalid manifest");
     assert!(matches!(err, PluginError::Manifest { .. }));
 }

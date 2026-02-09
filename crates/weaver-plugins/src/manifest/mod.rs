@@ -50,6 +50,57 @@ impl std::fmt::Display for PluginKind {
     }
 }
 
+/// Identity fields shared across plugin types.
+///
+/// Groups the name, version, and category of a plugin into a single
+/// parameter object, reducing the argument count of
+/// [`PluginManifest::new`].
+///
+/// # Example
+///
+/// ```
+/// use weaver_plugins::{PluginMetadata, PluginKind};
+///
+/// let meta = PluginMetadata::new("rope", "1.0.0", PluginKind::Actuator);
+/// assert_eq!(meta.name(), "rope");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PluginMetadata {
+    name: String,
+    version: String,
+    kind: PluginKind,
+}
+
+impl PluginMetadata {
+    /// Creates a new metadata bundle.
+    #[must_use]
+    pub fn new(name: impl Into<String>, version: impl Into<String>, kind: PluginKind) -> Self {
+        Self {
+            name: name.into(),
+            version: version.into(),
+            kind,
+        }
+    }
+
+    /// Returns the plugin name.
+    #[must_use]
+    pub const fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    /// Returns the plugin version.
+    #[must_use]
+    pub const fn version(&self) -> &str {
+        self.version.as_str()
+    }
+
+    /// Returns the plugin category.
+    #[must_use]
+    pub const fn kind(&self) -> PluginKind {
+        self.kind
+    }
+}
+
 /// Declarative description of a plugin's identity and capabilities.
 ///
 /// Manifests are constructed via [`PluginManifest::new`] or the builder
@@ -59,13 +110,12 @@ impl std::fmt::Display for PluginKind {
 /// # Example
 ///
 /// ```
-/// use weaver_plugins::{PluginManifest, PluginKind};
+/// use weaver_plugins::{PluginManifest, PluginMetadata, PluginKind};
 /// use std::path::PathBuf;
 ///
+/// let meta = PluginMetadata::new("rope", "1.0.0", PluginKind::Actuator);
 /// let manifest = PluginManifest::new(
-///     "rope",
-///     "1.0.0",
-///     PluginKind::Actuator,
+///     meta,
 ///     vec!["python".into()],
 ///     PathBuf::from("/usr/bin/rope-plugin"),
 /// );
@@ -94,21 +144,11 @@ const fn default_timeout_secs() -> u64 {
 impl PluginManifest {
     /// Creates a new manifest with default timeout and no extra arguments.
     #[must_use]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "manifest construction requires all identity fields"
-    )]
-    pub fn new(
-        name: impl Into<String>,
-        version: impl Into<String>,
-        kind: PluginKind,
-        languages: Vec<String>,
-        executable: PathBuf,
-    ) -> Self {
+    pub fn new(metadata: PluginMetadata, languages: Vec<String>, executable: PathBuf) -> Self {
         Self {
-            name: name.into(),
-            version: version.into(),
-            kind,
+            name: metadata.name,
+            version: metadata.version,
+            kind: metadata.kind,
             languages,
             executable,
             args: Vec::new(),

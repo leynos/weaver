@@ -7,7 +7,7 @@ use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
 use crate::error::PluginError;
-use crate::manifest::{PluginKind, PluginManifest};
+use crate::manifest::{PluginKind, PluginManifest, PluginMetadata};
 use crate::protocol::{PluginOutput, PluginRequest, PluginResponse};
 use crate::registry::PluginRegistry;
 use crate::runner::{PluginExecutor, PluginRunner};
@@ -94,10 +94,9 @@ fn world() -> RefCell<TestWorld> {
 fn given_actuator(world: &RefCell<TestWorld>, name: String, language: String) {
     let plugin_name = strip_quotes(&name);
     let lang = strip_quotes(&language);
+    let meta = PluginMetadata::new(plugin_name, "1.0", PluginKind::Actuator);
     let manifest = PluginManifest::new(
-        plugin_name,
-        "1.0",
-        PluginKind::Actuator,
+        meta,
         vec![lang.into()],
         PathBuf::from(format!("/usr/bin/{plugin_name}")),
     );
@@ -112,10 +111,9 @@ fn given_actuator(world: &RefCell<TestWorld>, name: String, language: String) {
 fn given_sensor(world: &RefCell<TestWorld>, name: String, language: String) {
     let plugin_name = strip_quotes(&name);
     let lang = strip_quotes(&language);
+    let meta = PluginMetadata::new(plugin_name, "1.0", PluginKind::Sensor);
     let manifest = PluginManifest::new(
-        plugin_name,
-        "1.0",
-        PluginKind::Sensor,
+        meta,
         vec![lang.into()],
         PathBuf::from(format!("/usr/bin/{plugin_name}")),
     );

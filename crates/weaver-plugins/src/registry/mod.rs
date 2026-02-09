@@ -14,13 +14,15 @@ use crate::manifest::{PluginKind, PluginManifest};
 /// # Example
 ///
 /// ```
-/// use weaver_plugins::{PluginRegistry, PluginManifest, PluginKind};
+/// use weaver_plugins::{PluginRegistry, PluginManifest, PluginMetadata, PluginKind};
 /// use std::path::PathBuf;
 ///
 /// let mut registry = PluginRegistry::new();
+/// let meta = PluginMetadata::new("rope", "1.0.0", PluginKind::Actuator);
 /// let manifest = PluginManifest::new(
-///     "rope", "1.0.0", PluginKind::Actuator,
-///     vec!["python".into()], PathBuf::from("/usr/bin/rope"),
+///     meta,
+///     vec!["python".into()],
+///     PathBuf::from("/usr/bin/rope"),
 /// );
 /// registry.register(manifest).expect("registration succeeds");
 /// assert!(registry.get("rope").is_some());

@@ -33,13 +33,15 @@ const PLUGIN_TARGET: &str = "weaver_plugins::process";
 /// ```rust,no_run
 /// use weaver_plugins::process::SandboxExecutor;
 /// use weaver_plugins::runner::PluginExecutor;
-/// use weaver_plugins::{PluginManifest, PluginKind, PluginRequest};
+/// use weaver_plugins::{PluginManifest, PluginMetadata, PluginKind, PluginRequest};
 /// use std::path::PathBuf;
 ///
 /// let executor = SandboxExecutor;
+/// let meta = PluginMetadata::new("example", "0.1.0", PluginKind::Actuator);
 /// let manifest = PluginManifest::new(
-///     "example", "0.1.0", PluginKind::Actuator,
-///     vec!["python".into()], PathBuf::from("/usr/bin/example-plugin"),
+///     meta,
+///     vec!["python".into()],
+///     PathBuf::from("/usr/bin/example-plugin"),
 /// );
 /// let request = PluginRequest::new("rename", vec![]);
 /// // let response = executor.execute(&manifest, &request);

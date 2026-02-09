@@ -6,7 +6,7 @@ use rstest::{fixture, rstest};
 
 use super::*;
 use crate::error::PluginError;
-use crate::manifest::{PluginKind, PluginManifest};
+use crate::manifest::{PluginKind, PluginManifest, PluginMetadata};
 use crate::protocol::{PluginOutput, PluginRequest, PluginResponse};
 use crate::registry::PluginRegistry;
 
@@ -48,13 +48,8 @@ impl PluginExecutor for ErrorExecutor {
 // ---------------------------------------------------------------------------
 
 fn make_manifest() -> PluginManifest {
-    PluginManifest::new(
-        "rope",
-        "1.0",
-        PluginKind::Actuator,
-        vec!["python".into()],
-        PathBuf::from("/usr/bin/rope"),
-    )
+    let meta = PluginMetadata::new("rope", "1.0", PluginKind::Actuator);
+    PluginManifest::new(meta, vec!["python".into()], PathBuf::from("/usr/bin/rope"))
 }
 
 #[fixture]
@@ -103,13 +98,9 @@ fn registry_accessor(registry_with_rope: PluginRegistry) {
 #[rstest]
 fn registry_mut_accessor(registry_with_rope: PluginRegistry) {
     let mut runner = PluginRunner::new(registry_with_rope, SuccessExecutor);
-    let new_manifest = PluginManifest::new(
-        "jedi",
-        "1.0",
-        PluginKind::Sensor,
-        vec!["python".into()],
-        PathBuf::from("/usr/bin/jedi"),
-    );
+    let meta = PluginMetadata::new("jedi", "1.0", PluginKind::Sensor);
+    let new_manifest =
+        PluginManifest::new(meta, vec!["python".into()], PathBuf::from("/usr/bin/jedi"));
     runner
         .registry_mut()
         .register(new_manifest)

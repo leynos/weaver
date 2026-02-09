@@ -6,6 +6,7 @@ use rstest::rstest;
 
 use super::*;
 use crate::error::PluginError;
+use crate::manifest::PluginMetadata;
 
 // ---------------------------------------------------------------------------
 // PluginKind
@@ -40,10 +41,9 @@ fn kind_serde_round_trip(#[case] json: &str, #[case] expected: PluginKind) {
 // ---------------------------------------------------------------------------
 
 fn make_manifest() -> PluginManifest {
+    let meta = PluginMetadata::new("rope", "1.0.0", PluginKind::Actuator);
     PluginManifest::new(
-        "rope",
-        "1.0.0",
-        PluginKind::Actuator,
+        meta,
         vec!["python".into()],
         PathBuf::from("/usr/bin/rope-plugin"),
     )
@@ -85,13 +85,8 @@ fn validate_accepts_valid_manifest() {
 
 #[test]
 fn validate_rejects_empty_name() {
-    let m = PluginManifest::new(
-        "  ",
-        "1.0",
-        PluginKind::Sensor,
-        vec!["python".into()],
-        PathBuf::from("/usr/bin/jedi"),
-    );
+    let meta = PluginMetadata::new("  ", "1.0", PluginKind::Sensor);
+    let m = PluginManifest::new(meta, vec!["python".into()], PathBuf::from("/usr/bin/jedi"));
     let err = m.validate().expect_err("should reject empty name");
     assert!(matches!(err, PluginError::Manifest { .. }));
     assert!(err.to_string().contains("name"));
@@ -99,10 +94,9 @@ fn validate_rejects_empty_name() {
 
 #[test]
 fn validate_rejects_relative_executable() {
+    let meta = PluginMetadata::new("rope", "1.0", PluginKind::Actuator);
     let m = PluginManifest::new(
-        "rope",
-        "1.0",
-        PluginKind::Actuator,
+        meta,
         vec!["python".into()],
         PathBuf::from("relative/path/rope"),
     );
