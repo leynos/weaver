@@ -38,6 +38,7 @@ use crate::registry::PluginRegistry;
 ///     }
 /// }
 /// ```
+#[cfg_attr(test, mockall::automock)]
 pub trait PluginExecutor {
     /// Executes a plugin described by the manifest with the given request.
     ///

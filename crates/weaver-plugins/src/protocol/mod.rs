@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 /// Request sent from the `weaverd` broker to a plugin on stdin.
 ///
-/// Serialised as a single JSONL line terminated by a newline character.
+/// Serialized as a single JSONL line terminated by a newline character.
 ///
 /// # Example
 ///
@@ -117,7 +117,7 @@ impl FilePayload {
 
 /// Response sent from a plugin to the `weaverd` broker on stdout.
 ///
-/// Serialised as a single JSONL line terminated by a newline character.
+/// Serialized as a single JSONL line terminated by a newline character.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PluginResponse {
     success: bool,
@@ -168,7 +168,7 @@ impl PluginResponse {
 
 /// Output payload from a plugin.
 ///
-/// The `kind` field acts as a discriminator for JSON serialisation so the
+/// The `kind` field acts as a discriminator for JSON serialization so the
 /// broker can distinguish between diff output (from actuator plugins) and
 /// structured analysis data (from sensor plugins).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -79,7 +79,7 @@ pub fn handle<W: Write>(
 
     let _plugin_request = PluginRequest::with_arguments(
         &args.refactoring,
-        vec![FilePayload::new(file_path.clone(), file_content)],
+        vec![FilePayload::new(file_path, file_content)],
         plugin_args,
     );
 

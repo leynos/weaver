@@ -49,11 +49,11 @@ pub enum PluginError {
         status: i32,
     },
 
-    /// The plugin request could not be serialised to JSON.
+    /// The plugin request could not be serialized to JSON.
     #[error("failed to serialise plugin request: {0}")]
     SerializeRequest(#[source] serde_json::Error),
 
-    /// The plugin response could not be deserialised from JSON.
+    /// The plugin response could not be deserialized from JSON.
     #[error("failed to deserialise plugin response: {message}")]
     DeserializeResponse {
         /// Human-readable description of the parse failure.

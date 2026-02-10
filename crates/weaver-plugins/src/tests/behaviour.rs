@@ -11,15 +11,11 @@ use crate::protocol::{PluginOutput, PluginRequest, PluginResponse};
 use crate::registry::PluginRegistry;
 use crate::runner::PluginRunner;
 
-use super::{DiffExecutor, EmptyExecutor, NonZeroExitExecutor};
+use super::{diff_executor, empty_executor, non_zero_exit_executor};
 
 // ---------------------------------------------------------------------------
 // Test world
 // ---------------------------------------------------------------------------
-
-fn strip_quotes(value: &str) -> &str {
-    value.trim_matches('"')
-}
 
 #[derive(Default)]
 struct TestWorld {
@@ -73,15 +69,15 @@ fn get_successful_response(world: &TestWorld) -> &PluginResponse {
 
 #[given("a registry with an actuator plugin {name} for {language}")]
 fn given_actuator(world: &mut TestWorld, name: String, language: String) {
-    let plugin_name = strip_quotes(&name);
-    let lang = strip_quotes(&language);
+    let plugin_name = name.trim_matches('"');
+    let lang = language.trim_matches('"');
     register_plugin(&mut world.registry, plugin_name, lang, PluginKind::Actuator);
 }
 
 #[given("a registry with a sensor plugin {name} for {language}")]
 fn given_sensor(world: &mut TestWorld, name: String, language: String) {
-    let plugin_name = strip_quotes(&name);
-    let lang = strip_quotes(&language);
+    let plugin_name = name.trim_matches('"');
+    let lang = language.trim_matches('"');
     register_plugin(&mut world.registry, plugin_name, lang, PluginKind::Sensor);
 }
 
@@ -106,33 +102,23 @@ fn given_empty_executor(world: &mut TestWorld) {
 
 #[when("plugin {name} is executed with operation {operation}")]
 fn when_execute(world: &mut TestWorld, name: String, operation: String) {
-    let plugin_name = strip_quotes(&name);
-    let op = strip_quotes(&operation);
+    let plugin_name = name.trim_matches('"');
+    let op = operation.trim_matches('"');
     let request = PluginRequest::new(op, vec![]);
     let registry_clone = world.registry.clone();
-    let executor_kind = world.executor_kind;
 
-    let result = match executor_kind {
-        ExecutorKind::Diff => {
-            let runner = PluginRunner::new(registry_clone, DiffExecutor);
-            runner.execute(plugin_name, &request)
-        }
-        ExecutorKind::Empty => {
-            let runner = PluginRunner::new(registry_clone, EmptyExecutor);
-            runner.execute(plugin_name, &request)
-        }
-        ExecutorKind::NonZeroExit => {
-            let runner = PluginRunner::new(registry_clone, NonZeroExitExecutor);
-            runner.execute(plugin_name, &request)
-        }
+    let mock = match world.executor_kind {
+        ExecutorKind::Diff => diff_executor(),
+        ExecutorKind::Empty => empty_executor(),
+        ExecutorKind::NonZeroExit => non_zero_exit_executor(),
     };
-
-    world.response = Some(result);
+    let runner = PluginRunner::new(registry_clone, mock);
+    world.response = Some(runner.execute(plugin_name, &request));
 }
 
 #[when("actuator plugins for {language} are queried")]
 fn when_query_actuators(world: &mut TestWorld, language: String) {
-    let lang = strip_quotes(&language);
+    let lang = language.trim_matches('"');
     let results: Vec<String> = world
         .registry
         .find_actuator_for_language(lang)
@@ -176,7 +162,7 @@ fn then_execution_fails(world: &mut TestWorld, error_kind: String) {
         .expect("no response captured")
         .as_ref()
         .expect_err("expected error but got success");
-    let kind = strip_quotes(&error_kind);
+    let kind = error_kind.trim_matches('"');
     match kind {
         "not_found" => {
             assert!(
@@ -212,7 +198,7 @@ fn then_count_plugins(world: &mut TestWorld, count: usize) {
 
 #[then("the returned plugin is named {name}")]
 fn then_plugin_named(world: &mut TestWorld, name: String) {
-    let expected = strip_quotes(&name);
+    let expected = name.trim_matches('"');
     assert!(
         world.query_results.iter().any(|n| n == expected),
         "expected plugin named '{expected}' in results: {:?}",

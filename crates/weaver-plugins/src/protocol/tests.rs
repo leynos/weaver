@@ -8,41 +8,38 @@ use rstest::rstest;
 use super::*;
 
 // ---------------------------------------------------------------------------
-// PluginRequest round-trip serialisation
+// PluginRequest round-trip serialization
 // ---------------------------------------------------------------------------
 
-#[test]
-fn request_round_trip_no_files() {
-    let request = PluginRequest::new("rename", vec![]);
-    let json = serde_json::to_string(&request).expect("serialise");
-    let back: PluginRequest = serde_json::from_str(&json).expect("deserialise");
-    assert_eq!(back, request);
-}
-
-#[test]
-fn request_round_trip_with_files() {
-    let request = PluginRequest::new(
+#[rstest]
+#[case::no_files(PluginRequest::new("rename", vec![]), 0, 0)]
+#[case::with_files(
+    PluginRequest::new(
         "refactor",
-        vec![FilePayload::new(
-            PathBuf::from("/src/main.py"),
-            "print('hello')\n",
-        )],
-    );
-    let json = serde_json::to_string(&request).expect("serialise");
-    let back: PluginRequest = serde_json::from_str(&json).expect("deserialise");
+        vec![FilePayload::new(PathBuf::from("/src/main.py"), "print('hello')\n")],
+    ),
+    1,
+    0
+)]
+#[case::with_arguments(
+    PluginRequest::with_arguments(
+        "rename",
+        vec![],
+        HashMap::from([("new_name".into(), serde_json::Value::String("foo".into()))]),
+    ),
+    0,
+    1
+)]
+fn request_round_trip(
+    #[case] request: PluginRequest,
+    #[case] expected_files: usize,
+    #[case] expected_args: usize,
+) {
+    let json = serde_json::to_string(&request).expect("serialize");
+    let back: PluginRequest = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(back, request);
-    assert_eq!(back.files().len(), 1);
-}
-
-#[test]
-fn request_round_trip_with_arguments() {
-    let mut args = HashMap::new();
-    args.insert("new_name".into(), serde_json::Value::String("foo".into()));
-    let request = PluginRequest::with_arguments("rename", vec![], args);
-    let json = serde_json::to_string(&request).expect("serialise");
-    let back: PluginRequest = serde_json::from_str(&json).expect("deserialise");
-    assert_eq!(back, request);
-    assert!(back.arguments().contains_key("new_name"));
+    assert_eq!(back.files().len(), expected_files);
+    assert_eq!(back.arguments().len(), expected_args);
 }
 
 #[test]
@@ -63,7 +60,7 @@ fn file_payload_accessors() {
 }
 
 // ---------------------------------------------------------------------------
-// PluginResponse round-trip serialisation
+// PluginResponse round-trip serialization
 // ---------------------------------------------------------------------------
 
 #[rstest]
@@ -128,7 +125,7 @@ fn diagnostics_defaults_to_empty_when_omitted(#[case] json: &str) {
 }
 
 // ---------------------------------------------------------------------------
-// PluginOutput tagged serialisation
+// PluginOutput tagged serialization
 // ---------------------------------------------------------------------------
 
 #[rstest]

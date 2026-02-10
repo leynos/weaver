@@ -23,20 +23,36 @@ fn not_found_error_message_includes_name() {
     );
 }
 
-#[test]
-fn spawn_failed_error_message_includes_details() {
-    let error = PluginError::SpawnFailed {
+#[rstest]
+#[case::spawn_failed(
+    PluginError::SpawnFailed {
         name: "jedi".into(),
         message: "permission denied".into(),
         source: None,
-    };
+    },
+    "jedi",
+    "permission denied"
+)]
+#[case::invalid_output(
+    PluginError::InvalidOutput {
+        name: "noisy".into(),
+        message: "plugin produced no output on stdout".into(),
+    },
+    "noisy",
+    "no output on stdout"
+)]
+fn error_message_includes_name_and_detail(
+    #[case] error: PluginError,
+    #[case] expected_name: &str,
+    #[case] expected_detail: &str,
+) {
     let message = error.to_string();
     assert!(
-        message.contains("jedi"),
-        "expected name in message: {message}"
+        message.contains(expected_name),
+        "expected plugin name in message: {message}"
     );
     assert!(
-        message.contains("permission denied"),
+        message.contains(expected_detail),
         "expected detail in message: {message}"
     );
 }
@@ -118,23 +134,6 @@ fn deserialize_response_includes_message() {
     );
     assert!(
         message.contains("invalid JSON"),
-        "expected detail in message: {message}"
-    );
-}
-
-#[test]
-fn invalid_output_includes_name_and_detail() {
-    let error = PluginError::InvalidOutput {
-        name: "noisy".into(),
-        message: "plugin produced no output on stdout".into(),
-    };
-    let message = error.to_string();
-    assert!(
-        message.contains("noisy"),
-        "expected plugin name in message: {message}"
-    );
-    assert!(
-        message.contains("no output on stdout"),
         "expected detail in message: {message}"
     );
 }

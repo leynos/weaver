@@ -114,7 +114,7 @@ fn execute_in_sandbox(
     parse_response(name, &response_line)
 }
 
-/// Writes the serialised request to the plugin's stdin and closes it.
+/// Writes the serialized request to the plugin's stdin and closes it.
 fn write_request(
     name: &str,
     mut stdin: impl Write,
