@@ -50,11 +50,11 @@ pub enum PluginError {
     },
 
     /// The plugin request could not be serialized to JSON.
-    #[error("failed to serialise plugin request: {0}")]
+    #[error("failed to serialize plugin request: {0}")]
     SerializeRequest(#[source] serde_json::Error),
 
     /// The plugin response could not be deserialized from JSON.
-    #[error("failed to deserialise plugin response: {message}")]
+    #[error("failed to deserialize plugin response: {message}")]
     DeserializeResponse {
         /// Human-readable description of the parse failure.
         message: String,

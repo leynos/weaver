@@ -182,7 +182,9 @@ fn then_execution_fails(world: &mut TestWorld, error_kind: String) {
                 "expected Timeout, got: {err}"
             );
         }
-        other => panic!("unknown error kind: {other}"),
+        other => panic!(
+            "unsupported error kind: '{other}' (supported: not_found, non_zero_exit, timeout)"
+        ),
     }
 }
 
