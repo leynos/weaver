@@ -4,3 +4,4 @@
 //! Double-Lock safety harness before writing to disk.
 
 pub mod apply_patch;
+pub mod refactor;

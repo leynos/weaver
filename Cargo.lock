@@ -529,6 +529,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "downcast"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
+
+[[package]]
 name = "dunce"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -670,6 +676,12 @@ checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
 ]
+
+[[package]]
+name = "fragile"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "28dd6caf6059519a65843af8fe2a3ae298b14b80179855aeb4adc2c1934ee619"
 
 [[package]]
 name = "fs-set-times"
@@ -1148,6 +1160,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
+name = "mockall"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f58d964098a5f9c6b63d0798e5372fd04708193510a7af313c22e9f29b7b620b"
+dependencies = [
+ "cfg-if",
+ "downcast",
+ "fragile",
+ "mockall_derive",
+ "predicates",
+ "predicates-tree",
+]
+
+[[package]]
+name = "mockall_derive"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca41ce716dda6a9be188b385aa78ee5260fc25cd3802cb2a8afdc6afbe6b6dbf"
+dependencies = [
+ "cfg-if",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.111",
+]
+
+[[package]]
 name = "newt-hype"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1556,9 +1594,9 @@ dependencies = [
 
 [[package]]
 name = "rstest-bdd"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e741d97bce6ea0a7d0f074716041e0d0eebe6ab9edcd243e7d12f9fd2b5e8b6"
+checksum = "138d8e4f97e16906ebeb0bfb12d2c94f0b05913a96fc522111bec62ca8328522"
 dependencies = [
  "ctor",
  "derive_more 0.99.20",
@@ -1578,9 +1616,9 @@ dependencies = [
 
 [[package]]
 name = "rstest-bdd-macros"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7e3b51c032a6174f82d87843a5e62cfd08ce4606005eafde07ed12561d73196"
+checksum = "fe104196f61dc8911a8da1b10005e9401e7c2e14ad9302e2de6688311c0beec7"
 dependencies = [
  "camino",
  "cap-std 3.4.5",
@@ -1602,9 +1640,9 @@ dependencies = [
 
 [[package]]
 name = "rstest-bdd-patterns"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75d730afd8727e5b18bd276ebf5ea4c881760138762d0cd7d415dc6b6662c6c6"
+checksum = "39abaa69316cdbbad0512dc0f37b704b09e4cdb5018d80f197cbdb77a2269d06"
 dependencies = [
  "gherkin",
  "regex",
@@ -1613,9 +1651,9 @@ dependencies = [
 
 [[package]]
 name = "rstest-bdd-policy"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d256efeb01f08e281cef9cd1e54dab33d8778e871090f5fa49b7a9a70f0caf81"
+checksum = "88f2ca584f7d9d359a09f616900be015302c959d58c2c2da6c075573352dfa0d"
 
 [[package]]
 name = "rstest_macros"
@@ -2633,6 +2671,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "weaver-plugins"
+version = "0.1.0"
+dependencies = [
+ "mockall",
+ "rstest",
+ "rstest-bdd",
+ "rstest-bdd-macros",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tracing",
+ "weaver-sandbox",
+]
+
+[[package]]
 name = "weaver-sandbox"
 version = "0.1.0"
 dependencies = [
@@ -2688,6 +2742,7 @@ dependencies = [
  "weaver-build-util",
  "weaver-config",
  "weaver-lsp-host",
+ "weaver-plugins",
  "weaver-syntax",
 ]
 

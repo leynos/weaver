@@ -181,6 +181,7 @@ impl DomainRouter {
             "apply-patch" => {
                 act::apply_patch::handle(request, writer, backends, &self.workspace_root)
             }
+            "refactor" => act::refactor::handle(request, writer, backends, &self.workspace_root),
             _ => Self::route_fallback(&DomainRoutingContext::ACT, operation.as_str(), writer),
         }
     }

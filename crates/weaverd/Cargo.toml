@@ -19,6 +19,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json",
 url.workspace = true
 weaver-config = { path = "../weaver-config", features = ["cli"] }
 weaver-lsp-host = { path = "../weaver-lsp-host" }
+weaver-plugins = { path = "../weaver-plugins" }
 weaver-syntax = { path = "../weaver-syntax" }
 tempfile.workspace = true
 
