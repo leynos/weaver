@@ -1,6 +1,7 @@
 //! Behaviour-driven tests for plugin execution.
 
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
@@ -12,6 +13,53 @@ use crate::registry::PluginRegistry;
 use crate::runner::PluginRunner;
 
 use super::{diff_executor, empty_executor, non_zero_exit_executor};
+
+// ---------------------------------------------------------------------------
+// Typed wrappers for Gherkin step parameters
+// ---------------------------------------------------------------------------
+
+/// A quoted string value from a Gherkin feature file.
+/// Automatically strips surrounding quotes during parsing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct QuotedString(String);
+
+impl FromStr for QuotedString {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.trim_matches('"').to_owned()))
+    }
+}
+
+impl QuotedString {
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Error kind discriminator for BDD assertions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ErrorKind {
+    NotFound,
+    NonZeroExit,
+    Timeout,
+}
+
+impl FromStr for ErrorKind {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim_matches('"') {
+            "not_found" => Ok(Self::NotFound),
+            "non_zero_exit" => Ok(Self::NonZeroExit),
+            "timeout" => Ok(Self::Timeout),
+            other => Err(format!(
+                "unsupported error kind: '{other}' \
+                 (supported: not_found, non_zero_exit, timeout)"
+            )),
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Test world
@@ -67,19 +115,22 @@ fn get_successful_response(world: &TestWorld) -> &PluginResponse {
 // Given steps
 // ---------------------------------------------------------------------------
 
-fn given_plugin(world: &mut TestWorld, name: &str, language: &str, kind: PluginKind) {
-    let plugin_name = name.trim_matches('"');
-    let lang = language.trim_matches('"');
-    register_plugin(&mut world.registry, plugin_name, lang, kind);
+fn given_plugin(
+    world: &mut TestWorld,
+    name: &QuotedString,
+    language: &QuotedString,
+    kind: PluginKind,
+) {
+    register_plugin(&mut world.registry, name.as_str(), language.as_str(), kind);
 }
 
 #[given("a registry with an actuator plugin {name} for {language}")]
-fn given_actuator(world: &mut TestWorld, name: String, language: String) {
+fn given_actuator(world: &mut TestWorld, name: QuotedString, language: QuotedString) {
     given_plugin(world, &name, &language, PluginKind::Actuator);
 }
 
 #[given("a registry with a sensor plugin {name} for {language}")]
-fn given_sensor(world: &mut TestWorld, name: String, language: String) {
+fn given_sensor(world: &mut TestWorld, name: QuotedString, language: QuotedString) {
     given_plugin(world, &name, &language, PluginKind::Sensor);
 }
 
@@ -103,10 +154,8 @@ fn given_empty_executor(world: &mut TestWorld) {
 // ---------------------------------------------------------------------------
 
 #[when("plugin {name} is executed with operation {operation}")]
-fn when_execute(world: &mut TestWorld, name: String, operation: String) {
-    let plugin_name = name.trim_matches('"');
-    let op = operation.trim_matches('"');
-    let request = PluginRequest::new(op, vec![]);
+fn when_execute(world: &mut TestWorld, name: QuotedString, operation: QuotedString) {
+    let request = PluginRequest::new(operation.as_str(), vec![]);
     let registry_clone = world.registry.clone();
 
     let mock = match world.executor_kind {
@@ -115,15 +164,14 @@ fn when_execute(world: &mut TestWorld, name: String, operation: String) {
         ExecutorKind::NonZeroExit => non_zero_exit_executor(),
     };
     let runner = PluginRunner::new(registry_clone, mock);
-    world.response = Some(runner.execute(plugin_name, &request));
+    world.response = Some(runner.execute(name.as_str(), &request));
 }
 
 #[when("actuator plugins for {language} are queried")]
-fn when_query_actuators(world: &mut TestWorld, language: String) {
-    let lang = language.trim_matches('"');
+fn when_query_actuators(world: &mut TestWorld, language: QuotedString) {
     let results: Vec<String> = world
         .registry
-        .find_actuator_for_language(lang)
+        .find_actuator_for_language(language.as_str())
         .iter()
         .map(|m| m.name().to_owned())
         .collect();
@@ -157,36 +205,32 @@ fn then_output_is_empty(world: &mut TestWorld) {
 }
 
 #[then("the execution fails with {error_kind}")]
-fn then_execution_fails(world: &mut TestWorld, error_kind: String) {
+fn then_execution_fails(world: &mut TestWorld, error_kind: ErrorKind) {
     let err = world
         .response
         .as_ref()
         .expect("no response captured")
         .as_ref()
         .expect_err("expected error but got success");
-    let kind = error_kind.trim_matches('"');
-    match kind {
-        "not_found" => {
+    match error_kind {
+        ErrorKind::NotFound => {
             assert!(
                 matches!(err, PluginError::NotFound { .. }),
                 "expected NotFound, got: {err}"
             );
         }
-        "non_zero_exit" => {
+        ErrorKind::NonZeroExit => {
             assert!(
                 matches!(err, PluginError::NonZeroExit { .. }),
                 "expected NonZeroExit, got: {err}"
             );
         }
-        "timeout" => {
+        ErrorKind::Timeout => {
             assert!(
                 matches!(err, PluginError::Timeout { .. }),
                 "expected Timeout, got: {err}"
             );
         }
-        other => panic!(
-            "unsupported error kind: '{other}' (supported: not_found, non_zero_exit, timeout)"
-        ),
     }
 }
 
@@ -201,11 +245,11 @@ fn then_count_plugins(world: &mut TestWorld, count: usize) {
 }
 
 #[then("the returned plugin is named {name}")]
-fn then_plugin_named(world: &mut TestWorld, name: String) {
-    let expected = name.trim_matches('"');
+fn then_plugin_named(world: &mut TestWorld, name: QuotedString) {
     assert!(
-        world.query_results.iter().any(|n| n == expected),
-        "expected plugin named '{expected}' in results: {:?}",
+        world.query_results.iter().any(|n| n == name.as_str()),
+        "expected plugin named '{}' in results: {:?}",
+        name.as_str(),
         world.query_results
     );
 }

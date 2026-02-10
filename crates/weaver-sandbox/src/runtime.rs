@@ -1,14 +1,16 @@
 //! Platform helpers for sandbox defaults and preflight checks.
 
-use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// Returns standard Linux library paths that should be readable by default.
 #[must_use]
 pub fn linux_runtime_roots() -> Vec<PathBuf> {
     #[cfg(target_os = "linux")]
     {
+        use std::fs;
+        use std::path::Path;
+
         let candidates = [
             "/lib",
             "/lib64",
@@ -42,7 +44,7 @@ pub fn linux_runtime_roots() -> Vec<PathBuf> {
 pub fn thread_count() -> io::Result<usize> {
     #[cfg(target_os = "linux")]
     {
-        let status = fs::read_to_string("/proc/self/status")?;
+        let status = std::fs::read_to_string("/proc/self/status")?;
         let (_, tail) = status
             .split_once("Threads:")
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "missing thread count"))?;
