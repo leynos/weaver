@@ -530,17 +530,17 @@ weaver act refactor --provider <PLUGIN> --refactoring <OP> --file <PATH> [KEY=VA
 
 Arguments:
 
-| Flag | Description |
-|------|-------------|
-| `--provider` | Name of the registered plugin (e.g. `rope`). |
+| Flag            | Description                                                         |
+| --------------- | ------------------------------------------------------------------- |
+| `--provider`    | Name of the registered plugin (e.g. `rope`).                        |
 | `--refactoring` | Refactoring operation to request (e.g. `rename`, `extract_method`). |
-| `--file` | Path to the target file (relative to workspace root). |
-| `KEY=VALUE` | Extra key-value arguments forwarded to the plugin. |
+| `--file`        | Path to the target file (relative to workspace root).               |
+| `KEY=VALUE`     | Extra key-value arguments forwarded to the plugin.                  |
 
 The plugin receives the file content in-band as part of the JSONL request and
-does not need filesystem access. The daemon validates the resulting diff through
-both the syntactic (Tree-sitter) and semantic (LSP) locks before writing to
-disk.
+does not need filesystem access. The daemon validates the resulting diff
+through both the syntactic (Tree-sitter) and semantic (LSP) locks before
+writing to disk.
 
 > **Note:** Full plugin execution requires a configured plugin registry. The
 > `act refactor` command validates arguments and builds the plugin request in
@@ -554,7 +554,7 @@ processes.
 
 ### Plugin categories
 
-Plugins are categorised as either **sensors** or **actuators**:
+Plugins are categorized as either **sensors** or **actuators**:
 
 - **Sensors** provide data to the intelligence engine (e.g. `jedi` for Python
   static analysis). They produce structured JSON output.
@@ -565,15 +565,15 @@ Plugins are categorised as either **sensors** or **actuators**:
 
 Each plugin is described by a manifest containing:
 
-| Field | Description |
-|-------|-------------|
-| `name` | Unique plugin identifier (e.g. `rope`). |
-| `version` | Plugin version string. |
-| `kind` | `sensor` or `actuator`. |
-| `languages` | List of supported languages (case-insensitive). |
-| `executable` | Absolute path to the plugin binary. |
-| `args` | Default arguments passed to the executable (optional). |
-| `timeout_secs` | Maximum execution time in seconds (default: 30). |
+| Field          | Description                                            |
+| -------------- | ------------------------------------------------------ |
+| `name`         | Unique plugin identifier (e.g. `rope`).                |
+| `version`      | Plugin version string.                                 |
+| `kind`         | `sensor` or `actuator`.                                |
+| `languages`    | List of supported languages (case-insensitive).        |
+| `executable`   | Absolute path to the plugin binary.                    |
+| `args`         | Default arguments passed to the executable (optional). |
+| `timeout_secs` | Maximum execution time in seconds (default: 30).       |
 
 ### IPC protocol
 

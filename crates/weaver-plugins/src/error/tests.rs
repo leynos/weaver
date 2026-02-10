@@ -104,3 +104,37 @@ fn manifest_error_message_is_passthrough() {
         "expected passthrough message: {message}"
     );
 }
+
+#[test]
+fn deserialize_response_includes_message() {
+    let error = PluginError::DeserializeResponse {
+        message: "plugin 'rope' produced invalid JSON: expected value".into(),
+        source: None,
+    };
+    let message = error.to_string();
+    assert!(
+        message.contains("rope"),
+        "expected plugin name in message: {message}"
+    );
+    assert!(
+        message.contains("invalid JSON"),
+        "expected detail in message: {message}"
+    );
+}
+
+#[test]
+fn invalid_output_includes_name_and_detail() {
+    let error = PluginError::InvalidOutput {
+        name: "noisy".into(),
+        message: "plugin produced no output on stdout".into(),
+    };
+    let message = error.to_string();
+    assert!(
+        message.contains("noisy"),
+        "expected plugin name in message: {message}"
+    );
+    assert!(
+        message.contains("no output on stdout"),
+        "expected detail in message: {message}"
+    );
+}

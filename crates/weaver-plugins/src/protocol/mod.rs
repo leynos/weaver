@@ -104,7 +104,7 @@ impl FilePayload {
 
     /// Returns the file path.
     #[must_use]
-    pub const fn path(&self) -> &PathBuf {
+    pub fn path(&self) -> &std::path::Path {
         &self.path
     }
 

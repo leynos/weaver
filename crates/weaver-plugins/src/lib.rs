@@ -5,7 +5,7 @@
 //! are short-lived, sandboxed processes that communicate with the broker via
 //! a single-line JSONL protocol over standard I/O.
 //!
-//! Plugins are categorised as either **sensors** (data providers) or
+//! Plugins are categorized as either **sensors** (data providers) or
 //! **actuators** (action performers). Actuator plugins produce unified diffs
 //! that flow through the Double-Lock safety harness before any filesystem
 //! change is committed. Sensor plugins produce structured JSON analysis data.

@@ -58,7 +58,7 @@ fn request_operation_accessor() {
 #[test]
 fn file_payload_accessors() {
     let payload = FilePayload::new(PathBuf::from("/a/b.py"), "content");
-    assert_eq!(payload.path(), &PathBuf::from("/a/b.py"));
+    assert_eq!(payload.path(), std::path::Path::new("/a/b.py"));
     assert_eq!(payload.content(), "content");
 }
 
@@ -109,6 +109,22 @@ fn analysis_output_round_trip() {
     let json = serde_json::to_string(&response).expect("serialise");
     let back: PluginResponse = serde_json::from_str(&json).expect("deserialise");
     assert_eq!(back.output(), &PluginOutput::Analysis { data });
+}
+
+// ---------------------------------------------------------------------------
+// PluginResponse diagnostics defaults
+// ---------------------------------------------------------------------------
+
+#[rstest]
+#[case::success(r#"{"success":true,"output":{"kind":"empty"}}"#)]
+#[case::failure(r#"{"success":false,"output":{"kind":"empty"}}"#)]
+fn diagnostics_defaults_to_empty_when_omitted(#[case] json: &str) {
+    let response: PluginResponse = serde_json::from_str(json).expect("deserialise");
+    assert!(
+        response.diagnostics().is_empty(),
+        "expected empty diagnostics, got {:?}",
+        response.diagnostics()
+    );
 }
 
 // ---------------------------------------------------------------------------

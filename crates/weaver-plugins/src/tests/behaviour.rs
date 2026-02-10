@@ -1,6 +1,5 @@
 //! Behaviour-driven tests for plugin execution.
 
-use std::cell::RefCell;
 use std::path::PathBuf;
 
 use rstest::fixture;
@@ -10,52 +9,9 @@ use crate::error::PluginError;
 use crate::manifest::{PluginKind, PluginManifest, PluginMetadata};
 use crate::protocol::{PluginOutput, PluginRequest, PluginResponse};
 use crate::registry::PluginRegistry;
-use crate::runner::{PluginExecutor, PluginRunner};
+use crate::runner::PluginRunner;
 
-// ---------------------------------------------------------------------------
-// Mock executors
-// ---------------------------------------------------------------------------
-
-struct DiffExecutor;
-
-impl PluginExecutor for DiffExecutor {
-    fn execute(
-        &self,
-        _manifest: &PluginManifest,
-        _request: &PluginRequest,
-    ) -> Result<PluginResponse, PluginError> {
-        Ok(PluginResponse::success(PluginOutput::Diff {
-            content: "--- a/f\n+++ b/f\n".into(),
-        }))
-    }
-}
-
-struct EmptyExecutor;
-
-impl PluginExecutor for EmptyExecutor {
-    fn execute(
-        &self,
-        _manifest: &PluginManifest,
-        _request: &PluginRequest,
-    ) -> Result<PluginResponse, PluginError> {
-        Ok(PluginResponse::success(PluginOutput::Empty))
-    }
-}
-
-struct NonZeroExitExecutor;
-
-impl PluginExecutor for NonZeroExitExecutor {
-    fn execute(
-        &self,
-        manifest: &PluginManifest,
-        _request: &PluginRequest,
-    ) -> Result<PluginResponse, PluginError> {
-        Err(PluginError::NonZeroExit {
-            name: manifest.name().to_owned(),
-            status: 1,
-        })
-    }
-}
+use super::{DiffExecutor, EmptyExecutor, NonZeroExitExecutor};
 
 // ---------------------------------------------------------------------------
 // Test world
@@ -82,8 +38,8 @@ enum ExecutorKind {
 }
 
 #[fixture]
-fn world() -> RefCell<TestWorld> {
-    RefCell::new(TestWorld::default())
+fn world() -> TestWorld {
+    TestWorld::default()
 }
 
 // ---------------------------------------------------------------------------
@@ -102,15 +58,13 @@ fn register_plugin(registry: &mut PluginRegistry, name: &str, language: &str, ki
 
 /// Extracts a successful `PluginResponse` from the test world.
 /// Panics if no response was captured or if the response was an error.
-fn get_successful_response(world: &RefCell<TestWorld>) -> std::cell::Ref<'_, PluginResponse> {
-    let borrowed = world.borrow();
-    std::cell::Ref::map(borrowed, |w| {
-        w.response
-            .as_ref()
-            .expect("no response captured")
-            .as_ref()
-            .expect("expected success but got error")
-    })
+fn get_successful_response(world: &TestWorld) -> &PluginResponse {
+    world
+        .response
+        .as_ref()
+        .expect("no response captured")
+        .as_ref()
+        .expect("expected success but got error")
 }
 
 // ---------------------------------------------------------------------------
@@ -118,42 +72,32 @@ fn get_successful_response(world: &RefCell<TestWorld>) -> std::cell::Ref<'_, Plu
 // ---------------------------------------------------------------------------
 
 #[given("a registry with an actuator plugin {name} for {language}")]
-fn given_actuator(world: &RefCell<TestWorld>, name: String, language: String) {
+fn given_actuator(world: &mut TestWorld, name: String, language: String) {
     let plugin_name = strip_quotes(&name);
     let lang = strip_quotes(&language);
-    register_plugin(
-        &mut world.borrow_mut().registry,
-        plugin_name,
-        lang,
-        PluginKind::Actuator,
-    );
+    register_plugin(&mut world.registry, plugin_name, lang, PluginKind::Actuator);
 }
 
 #[given("a registry with a sensor plugin {name} for {language}")]
-fn given_sensor(world: &RefCell<TestWorld>, name: String, language: String) {
+fn given_sensor(world: &mut TestWorld, name: String, language: String) {
     let plugin_name = strip_quotes(&name);
     let lang = strip_quotes(&language);
-    register_plugin(
-        &mut world.borrow_mut().registry,
-        plugin_name,
-        lang,
-        PluginKind::Sensor,
-    );
+    register_plugin(&mut world.registry, plugin_name, lang, PluginKind::Sensor);
 }
 
 #[given("a mock executor that returns a diff")]
-fn given_diff_executor(world: &RefCell<TestWorld>) {
-    world.borrow_mut().executor_kind = ExecutorKind::Diff;
+fn given_diff_executor(world: &mut TestWorld) {
+    world.executor_kind = ExecutorKind::Diff;
 }
 
 #[given("a mock executor that returns a non-zero exit error")]
-fn given_error_executor(world: &RefCell<TestWorld>) {
-    world.borrow_mut().executor_kind = ExecutorKind::NonZeroExit;
+fn given_error_executor(world: &mut TestWorld) {
+    world.executor_kind = ExecutorKind::NonZeroExit;
 }
 
 #[given("a mock executor that returns empty output")]
-fn given_empty_executor(world: &RefCell<TestWorld>) {
-    world.borrow_mut().executor_kind = ExecutorKind::Empty;
+fn given_empty_executor(world: &mut TestWorld) {
+    world.executor_kind = ExecutorKind::Empty;
 }
 
 // ---------------------------------------------------------------------------
@@ -161,16 +105,12 @@ fn given_empty_executor(world: &RefCell<TestWorld>) {
 // ---------------------------------------------------------------------------
 
 #[when("plugin {name} is executed with operation {operation}")]
-fn when_execute(world: &RefCell<TestWorld>, name: String, operation: String) {
+fn when_execute(world: &mut TestWorld, name: String, operation: String) {
     let plugin_name = strip_quotes(&name);
     let op = strip_quotes(&operation);
-    let mut w = world.borrow_mut();
     let request = PluginRequest::new(op, vec![]);
-
-    // Clone the registry to move into the runner while retaining the world.
-    // The runner takes ownership of the registry, so we use a temporary clone.
-    let registry_clone = w.registry.clone();
-    let executor_kind = w.executor_kind;
+    let registry_clone = world.registry.clone();
+    let executor_kind = world.executor_kind;
 
     let result = match executor_kind {
         ExecutorKind::Diff => {
@@ -187,21 +127,19 @@ fn when_execute(world: &RefCell<TestWorld>, name: String, operation: String) {
         }
     };
 
-    w.response = Some(result);
+    world.response = Some(result);
 }
 
 #[when("actuator plugins for {language} are queried")]
-fn when_query_actuators(world: &RefCell<TestWorld>, language: String) {
+fn when_query_actuators(world: &mut TestWorld, language: String) {
     let lang = strip_quotes(&language);
-    let w = world.borrow();
-    let results: Vec<String> = w
+    let results: Vec<String> = world
         .registry
         .find_actuator_for_language(lang)
         .iter()
         .map(|m| m.name().to_owned())
         .collect();
-    drop(w);
-    world.borrow_mut().query_results = results;
+    world.query_results = results;
 }
 
 // ---------------------------------------------------------------------------
@@ -209,13 +147,13 @@ fn when_query_actuators(world: &RefCell<TestWorld>, language: String) {
 // ---------------------------------------------------------------------------
 
 #[then("the response is successful")]
-fn then_success(world: &RefCell<TestWorld>) {
+fn then_success(world: &mut TestWorld) {
     let response = get_successful_response(world);
     assert!(response.is_success(), "response should be successful");
 }
 
 #[then("the response output is a diff")]
-fn then_output_is_diff(world: &RefCell<TestWorld>) {
+fn then_output_is_diff(world: &mut TestWorld) {
     let response = get_successful_response(world);
     assert!(
         matches!(response.output(), PluginOutput::Diff { .. }),
@@ -225,15 +163,14 @@ fn then_output_is_diff(world: &RefCell<TestWorld>) {
 }
 
 #[then("the response output is empty")]
-fn then_output_is_empty(world: &RefCell<TestWorld>) {
+fn then_output_is_empty(world: &mut TestWorld) {
     let response = get_successful_response(world);
     assert_eq!(response.output(), &PluginOutput::Empty);
 }
 
 #[then("the execution fails with {error_kind}")]
-fn then_execution_fails(world: &RefCell<TestWorld>, error_kind: String) {
-    let w = world.borrow();
-    let err = w
+fn then_execution_fails(world: &mut TestWorld, error_kind: String) {
+    let err = world
         .response
         .as_ref()
         .expect("no response captured")
@@ -264,24 +201,22 @@ fn then_execution_fails(world: &RefCell<TestWorld>, error_kind: String) {
 }
 
 #[then("{count} plugin is returned")]
-fn then_count_plugins(world: &RefCell<TestWorld>, count: usize) {
-    let w = world.borrow();
+fn then_count_plugins(world: &mut TestWorld, count: usize) {
     assert_eq!(
-        w.query_results.len(),
+        world.query_results.len(),
         count,
         "expected {count} plugins, got {}",
-        w.query_results.len()
+        world.query_results.len()
     );
 }
 
 #[then("the returned plugin is named {name}")]
-fn then_plugin_named(world: &RefCell<TestWorld>, name: String) {
+fn then_plugin_named(world: &mut TestWorld, name: String) {
     let expected = strip_quotes(&name);
-    let w = world.borrow();
     assert!(
-        w.query_results.iter().any(|n| n == expected),
+        world.query_results.iter().any(|n| n == expected),
         "expected plugin named '{expected}' in results: {:?}",
-        w.query_results
+        world.query_results
     );
 }
 
@@ -290,6 +225,6 @@ fn then_plugin_named(world: &RefCell<TestWorld>, name: String) {
 // ---------------------------------------------------------------------------
 
 #[scenario(path = "tests/features/plugin_execution.feature")]
-fn plugin_execution_behaviour(world: RefCell<TestWorld>) {
+fn plugin_execution_behaviour(world: TestWorld) {
     let _ = world;
 }

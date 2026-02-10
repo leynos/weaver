@@ -1292,15 +1292,15 @@ during the initial implementation:
 - **IPC protocol: JSONL over stdio (one-shot).** Plugins are short-lived,
   one-shot processes. The broker writes a single JSONL line to the plugin's
   stdin, closes stdin, reads a single JSONL line from stdout, and waits for
-  exit. This is simpler than the JSON-RPC 2.0 framing used by LSP servers
-  (in `weaver-lsp-host`) and aligns with the existing CLI-to-daemon JSONL
+  exit. This is simpler than the JSON-RPC 2.0 framing used by LSP servers (in
+  `weaver-lsp-host`) and aligns with the existing CLI-to-daemon JSONL
   convention.
 
 - **File content passed in-band.** File content is passed inline in the JSON
-  request body as `FilePayload` objects (path + full text content). This
-  avoids requiring the sandboxed plugin to have filesystem access and is
-  consistent with how `act apply-patch` passes patch content. File descriptor
-  passing can be added as a future optimisation.
+  request body as `FilePayload` objects (path + full text content). This avoids
+  requiring the sandboxed plugin to have filesystem access and is consistent
+  with how `act apply-patch` passes patch content. File descriptor passing can
+  be added as a future optimisation.
 
 - **Plugin trait with process-based implementation.** A `PluginExecutor` trait
   defines the execution contract. `SandboxExecutor` provides the concrete
@@ -1309,10 +1309,10 @@ during the initial implementation:
   tests without spawning real processes.
 
 - **Safety harness integration via `ContentTransaction`.** Actuator plugin diff
-  output will be parsed into `ContentChange::Write` values and fed through
-  the existing `ContentTransaction` pipeline (syntactic + semantic locks).
-  No new safety harness code is needed — the plugin system reuses the
-  Double-Lock infrastructure established in Phase 2.
+  output will be parsed into `ContentChange::Write` values and fed through the
+  existing `ContentTransaction` pipeline (syntactic + semantic locks). No new
+  safety harness code is needed — the plugin system reuses the Double-Lock
+  infrastructure established in Phase 2.
 
 ### 4.2. The "Double-Lock" Safety Harness: Ensuring Syntactic and Semantic Integrity
 

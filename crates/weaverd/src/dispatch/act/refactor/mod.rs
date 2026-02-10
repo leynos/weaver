@@ -105,54 +105,79 @@ struct RefactorArgs {
     extra: Vec<String>,
 }
 
-fn parse_refactor_args(arguments: &[String]) -> Result<RefactorArgs, DispatchError> {
-    let mut provider = None;
-    let mut refactoring = None;
-    let mut file = None;
-    let mut extra = Vec::new();
-    let mut iter = arguments.iter();
-
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--provider" => provider = Some(parse_flag_value(&mut iter, "--provider")?),
-            "--refactoring" => refactoring = Some(parse_flag_value(&mut iter, "--refactoring")?),
-            "--file" => file = Some(parse_flag_value(&mut iter, "--file")?),
-            other => extra.push(other.to_owned()),
-        }
-    }
-
-    validate_required_args(provider, refactoring, file, extra)
-}
-
-/// Consumes the next element from the iterator as the value for a flag.
-fn parse_flag_value<'a>(
-    iter: &mut impl Iterator<Item = &'a String>,
-    flag: &str,
-) -> Result<String, DispatchError> {
-    iter.next()
-        .cloned()
-        .ok_or_else(|| DispatchError::invalid_arguments(format!("{flag} requires a value")))
-}
-
-/// Validates that all required arguments are present and builds the result.
-fn validate_required_args(
+/// Accumulates parsed flag values during argument iteration.
+#[derive(Default)]
+struct RefactorArgsBuilder {
     provider: Option<String>,
     refactoring: Option<String>,
     file: Option<String>,
     extra: Vec<String>,
-) -> Result<RefactorArgs, DispatchError> {
-    Ok(RefactorArgs {
-        provider: provider.ok_or_else(|| {
-            DispatchError::invalid_arguments("act refactor requires --provider <plugin-name>")
-        })?,
-        refactoring: refactoring.ok_or_else(|| {
-            DispatchError::invalid_arguments("act refactor requires --refactoring <operation>")
-        })?,
-        file: file.ok_or_else(|| {
-            DispatchError::invalid_arguments("act refactor requires --file <path>")
-        })?,
-        extra,
-    })
+}
+
+impl RefactorArgsBuilder {
+    /// Finalizes the builder, requiring all mandatory fields.
+    fn build(self) -> Result<RefactorArgs, DispatchError> {
+        Ok(RefactorArgs {
+            provider: self.provider.ok_or_else(|| {
+                DispatchError::invalid_arguments("act refactor requires --provider <plugin-name>")
+            })?,
+            refactoring: self.refactoring.ok_or_else(|| {
+                DispatchError::invalid_arguments("act refactor requires --refactoring <operation>")
+            })?,
+            file: self.file.ok_or_else(|| {
+                DispatchError::invalid_arguments("act refactor requires --file <path>")
+            })?,
+            extra: self.extra,
+        })
+    }
+}
+
+fn parse_refactor_args(arguments: &[String]) -> Result<RefactorArgs, DispatchError> {
+    let mut builder = RefactorArgsBuilder::default();
+    let mut iter = arguments.iter();
+
+    while let Some(arg) = iter.next() {
+        apply_flag(arg, &mut iter, &mut builder)?;
+    }
+
+    builder.build()
+}
+
+/// Classifies a single argument token, consuming the next token as the
+/// value when the argument is a recognised flag.
+fn apply_flag<'a>(
+    arg: &str,
+    iter: &mut impl Iterator<Item = &'a String>,
+    builder: &mut RefactorArgsBuilder,
+) -> Result<(), DispatchError> {
+    match arg {
+        "--provider" => {
+            builder.provider =
+                Some(iter.next().cloned().ok_or_else(|| {
+                    DispatchError::invalid_arguments("--provider requires a value")
+                })?);
+        }
+        "--refactoring" => {
+            builder.refactoring = Some(iter.next().cloned().ok_or_else(|| {
+                DispatchError::invalid_arguments("--refactoring requires a value")
+            })?);
+        }
+        "--file" => {
+            builder.file = Some(
+                iter.next()
+                    .cloned()
+                    .ok_or_else(|| DispatchError::invalid_arguments("--file requires a value"))?,
+            );
+        }
+        other => builder.extra.push(other.to_owned()),
+    }
+    Ok(())
+}
+
+/// Returns `true` if any component of `path` is a parent-directory reference.
+fn contains_parent_traversal(path: &Path) -> bool {
+    path.components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
 }
 
 /// Resolves a file path relative to the workspace root.
@@ -161,6 +186,11 @@ fn resolve_file(workspace_root: &Path, file: &str) -> Result<std::path::PathBuf,
     if path.is_absolute() {
         return Err(DispatchError::invalid_arguments(
             "absolute file paths are not allowed; use a path relative to the workspace root",
+        ));
+    }
+    if contains_parent_traversal(path) {
+        return Err(DispatchError::invalid_arguments(
+            "path traversal is not allowed",
         ));
     }
     let resolved = workspace_root.join(path);

@@ -10,9 +10,29 @@ use crate::runner::{PluginExecutor, PluginRunner};
 
 mod behaviour;
 
-struct StubExecutor;
+// ---------------------------------------------------------------------------
+// Shared mock executors
+// ---------------------------------------------------------------------------
 
-impl PluginExecutor for StubExecutor {
+/// Returns a successful diff response.
+pub(crate) struct DiffExecutor;
+
+impl PluginExecutor for DiffExecutor {
+    fn execute(
+        &self,
+        _manifest: &PluginManifest,
+        _request: &PluginRequest,
+    ) -> Result<PluginResponse, PluginError> {
+        Ok(PluginResponse::success(PluginOutput::Diff {
+            content: "--- a/f\n+++ b/f\n".into(),
+        }))
+    }
+}
+
+/// Returns a successful empty response.
+pub(crate) struct EmptyExecutor;
+
+impl PluginExecutor for EmptyExecutor {
     fn execute(
         &self,
         _manifest: &PluginManifest,
@@ -21,6 +41,26 @@ impl PluginExecutor for StubExecutor {
         Ok(PluginResponse::success(PluginOutput::Empty))
     }
 }
+
+/// Returns a `NonZeroExit` error.
+pub(crate) struct NonZeroExitExecutor;
+
+impl PluginExecutor for NonZeroExitExecutor {
+    fn execute(
+        &self,
+        manifest: &PluginManifest,
+        _request: &PluginRequest,
+    ) -> Result<PluginResponse, PluginError> {
+        Err(PluginError::NonZeroExit {
+            name: manifest.name().to_owned(),
+            status: 1,
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Integration test
+// ---------------------------------------------------------------------------
 
 #[test]
 fn end_to_end_runner_with_stub() {
@@ -34,7 +74,7 @@ fn end_to_end_runner_with_stub() {
         ))
         .expect("register");
 
-    let runner = PluginRunner::new(registry, StubExecutor);
+    let runner = PluginRunner::new(registry, EmptyExecutor);
     let request = PluginRequest::new("rename", vec![]);
     let response = runner.execute("rope", &request).expect("execute");
     assert!(response.is_success());

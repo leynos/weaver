@@ -108,7 +108,7 @@ fn execute_in_sandbox(
     let stderr = child.stderr.take();
 
     write_request(name, stdin, request)?;
-    let response_line = read_response(name, stdout, manifest.timeout_secs())?;
+    let response_line = read_response(name, stdout)?;
     drain_stderr(name, stderr);
     wait_for_exit(name, &mut child, manifest.timeout_secs())?;
     parse_response(name, &response_line)
@@ -151,14 +151,16 @@ fn write_request(
 }
 
 /// Reads a single JSONL line from the plugin's stdout.
-fn read_response(name: &str, stdout: impl Read, timeout_secs: u64) -> Result<String, PluginError> {
+///
+/// This function blocks until the plugin writes a newline or closes stdout.
+/// Timeout enforcement is handled by [`wait_for_exit`], which kills the
+/// child process if it exceeds the deadline. Keeping timeout logic in one
+/// place ensures the child is always reaped on timeout.
+fn read_response(name: &str, stdout: impl Read) -> Result<String, PluginError> {
     let start = Instant::now();
-    let timeout = Duration::from_secs(timeout_secs);
     let mut reader = BufReader::new(stdout);
     let mut line = String::new();
 
-    // Read until newline or EOF. The read itself may block if the plugin is
-    // slow, but the timeout is enforced by the wait_for_exit step.
     let bytes_read = reader.read_line(&mut line).map_err(|err| PluginError::Io {
         name: name.to_owned(),
         source: Arc::new(err),
@@ -180,18 +182,11 @@ fn read_response(name: &str, stdout: impl Read, timeout_secs: u64) -> Result<Str
         });
     }
 
-    if elapsed > timeout {
-        return Err(PluginError::Timeout {
-            name: name.to_owned(),
-            timeout_secs,
-        });
-    }
-
     Ok(line)
 }
 
 /// Drains stderr to avoid blocking the child on a full pipe buffer.
-fn drain_stderr(name: &str, stderr_handle: Option<impl Read>) {
+fn drain_stderr<R: Read>(name: &str, stderr_handle: Option<R>) {
     let Some(reader) = stderr_handle else {
         return;
     };
@@ -206,6 +201,29 @@ fn drain_stderr(name: &str, stderr_handle: Option<impl Read>) {
     }
 }
 
+/// Result of a single `try_wait()` poll on the child process.
+enum ChildPollResult {
+    /// The child exited with the given status.
+    Exited(std::process::ExitStatus),
+    /// The child is still running.
+    StillRunning,
+}
+
+/// Polls the child process once and classifies the outcome.
+fn poll_child(
+    name: &str,
+    child: &mut weaver_sandbox::SandboxChild,
+) -> Result<ChildPollResult, PluginError> {
+    match child.try_wait() {
+        Ok(Some(status)) => Ok(ChildPollResult::Exited(status)),
+        Ok(None) => Ok(ChildPollResult::StillRunning),
+        Err(err) => Err(PluginError::Io {
+            name: name.to_owned(),
+            source: Arc::new(err),
+        }),
+    }
+}
+
 /// Waits for the child process to exit, enforcing the timeout.
 fn wait_for_exit(
     name: &str,
@@ -217,8 +235,8 @@ fn wait_for_exit(
     let poll_interval = Duration::from_millis(50);
 
     loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
+        match poll_child(name, child)? {
+            ChildPollResult::Exited(status) => {
                 debug!(
                     target: PLUGIN_TARGET,
                     plugin = name,
@@ -233,7 +251,7 @@ fn wait_for_exit(
                     status: status.code().unwrap_or(-1),
                 });
             }
-            Ok(None) => {
+            ChildPollResult::StillRunning => {
                 if start.elapsed() > timeout {
                     warn!(
                         target: PLUGIN_TARGET,
@@ -249,12 +267,6 @@ fn wait_for_exit(
                     });
                 }
                 std::thread::sleep(poll_interval);
-            }
-            Err(err) => {
-                return Err(PluginError::Io {
-                    name: name.to_owned(),
-                    source: Arc::new(err),
-                });
             }
         }
     }

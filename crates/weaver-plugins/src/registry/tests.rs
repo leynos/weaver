@@ -110,15 +110,11 @@ fn find_by_kind_sensors(populated_registry: PluginRegistry) {
 }
 
 #[rstest]
-fn find_for_language_python(populated_registry: PluginRegistry) {
-    let python = populated_registry.find_for_language("python");
-    assert_eq!(python.len(), 2);
-}
-
-#[rstest]
-fn find_for_language_case_insensitive(populated_registry: PluginRegistry) {
-    let python = populated_registry.find_for_language("Python");
-    assert_eq!(python.len(), 2);
+#[case::lowercase("python")]
+#[case::capitalised("Python")]
+fn find_for_language_is_case_insensitive(populated_registry: PluginRegistry, #[case] query: &str) {
+    let results = populated_registry.find_for_language(query);
+    assert_eq!(results.len(), 2, "expected 2 plugins for '{query}'");
 }
 
 #[rstest]
