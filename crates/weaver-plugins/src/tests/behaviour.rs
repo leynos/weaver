@@ -67,18 +67,20 @@ fn get_successful_response(world: &TestWorld) -> &PluginResponse {
 // Given steps
 // ---------------------------------------------------------------------------
 
-#[given("a registry with an actuator plugin {name} for {language}")]
-fn given_actuator(world: &mut TestWorld, name: String, language: String) {
+fn given_plugin(world: &mut TestWorld, name: &str, language: &str, kind: PluginKind) {
     let plugin_name = name.trim_matches('"');
     let lang = language.trim_matches('"');
-    register_plugin(&mut world.registry, plugin_name, lang, PluginKind::Actuator);
+    register_plugin(&mut world.registry, plugin_name, lang, kind);
+}
+
+#[given("a registry with an actuator plugin {name} for {language}")]
+fn given_actuator(world: &mut TestWorld, name: String, language: String) {
+    given_plugin(world, &name, &language, PluginKind::Actuator);
 }
 
 #[given("a registry with a sensor plugin {name} for {language}")]
 fn given_sensor(world: &mut TestWorld, name: String, language: String) {
-    let plugin_name = name.trim_matches('"');
-    let lang = language.trim_matches('"');
-    register_plugin(&mut world.registry, plugin_name, lang, PluginKind::Sensor);
+    given_plugin(world, &name, &language, PluginKind::Sensor);
 }
 
 #[given("a mock executor that returns a diff")]
@@ -188,7 +190,7 @@ fn then_execution_fails(world: &mut TestWorld, error_kind: String) {
     }
 }
 
-#[then("{count} plugin is returned")]
+#[then("{count} plugin(s) are returned")]
 fn then_count_plugins(world: &mut TestWorld, count: usize) {
     assert_eq!(
         world.query_results.len(),

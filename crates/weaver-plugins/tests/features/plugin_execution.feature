@@ -30,5 +30,5 @@ Feature: Plugin execution via the runner
     Given a registry with an actuator plugin "rope" for "python"
     And a registry with a sensor plugin "jedi" for "python"
     When actuator plugins for "python" are queried
-    Then 1 plugin is returned
+    Then 1 plugin(s) are returned
     And the returned plugin is named "rope"
