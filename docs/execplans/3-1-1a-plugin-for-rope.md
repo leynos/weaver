@@ -26,8 +26,8 @@ Observable success:
   modifies files only after lock verification.
 - Unsupported operations, missing arguments, timeout, plugin protocol errors,
   and lock failures return structured failures and leave files unchanged.
-- Unit and behavioural tests (`rstest-bdd` v0.5.0) cover happy paths,
-  unhappy paths, and edge cases.
+- Unit, behavioural, and end-to-end tests cover happy paths, unhappy paths,
+  and edge cases.
 - `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
   reflect the shipped behaviour.
 - `make check-fmt`, `make lint`, and `make test` succeed.
@@ -40,6 +40,8 @@ Observable success:
 - Do not bypass the Double-Lock harness for plugin-produced edits.
 - Continue using `rstest-bdd` v0.5.0 and write new behavioural tests with
   mutable world fixtures (`&mut World`) for new scenarios.
+- Add e2e command ergonomics tests in `crates/weaver-e2e/` using `assert_cmd`
+  and `insta` snapshots for CLI usage flows.
 - Keep module-level `//!` comments and rustdoc for public items; follow
   guidance in `docs/rust-doctest-dry-guide.md`.
 - Keep files under 400 lines by splitting modules where needed.
@@ -232,7 +234,7 @@ Go/no-go check:
 - syntactic/semantic failures leave files unchanged,
 - invalid plugin responses fail safely.
 
-### Stage E: tests (unit + behavioural)
+### Stage E: tests (unit + behavioural + e2e)
 
 Add or update tests in both plugin and daemon layers.
 
@@ -252,12 +254,23 @@ Behavioural tests (`rstest-bdd` v0.5.0, `&mut` worlds):
 - edge: plugin returns malformed/empty diff and filesystem remains unchanged,
 - edge: lock rejection rolls back changes.
 
+End-to-end tests (`assert_cmd` + `insta`) in `crates/weaver-e2e`:
+
+- ergonomics: actuator command in isolation, demonstrating the expected
+  `act refactor --provider rope ...` usage shape and user-visible output,
+- pipeline ergonomics: `observe` query output piped through `jq` and then used
+  to invoke the actuator command, snapshotting the full command transcript and
+  resulting output for discoverable usage examples.
+
 Likely files:
 
 - `crates/weaver-plugin-rope/tests/features/rope_plugin.feature`
 - `crates/weaver-plugin-rope/src/tests/behaviour.rs`
 - `crates/weaverd/tests/features/refactor_rope.feature`
 - `crates/weaverd/src/tests/refactor_rope_behaviour.rs`
+- `crates/weaver-e2e/Cargo.toml` (add `assert_cmd` dev-dependency)
+- `crates/weaver-e2e/tests/refactor_rope_cli_snapshots.rs`
+- `crates/weaver-e2e/tests/snapshots/refactor_rope_cli_snapshots__*.snap`
 
 ### Stage F: documentation and roadmap updates
 
@@ -282,8 +295,9 @@ Run formatting, lint, tests, and markdown checks with `tee` and
 4. Implement plugin runtime bootstrap in `weaverd` and inject into dispatch.
 5. Replace refactor stub with plugin execution and shared patch application.
 6. Add `weaverd` unit tests and BDD scenarios for refactor behaviour.
-7. Update design docs, user docs, and roadmap status.
-8. Run quality gates and inspect logs.
+7. Add `assert_cmd` + `insta` e2e tests for isolated and pipeline ergonomics.
+8. Update design docs, user docs, and roadmap status.
+9. Run quality gates and inspect logs.
 
 Commands (run from repository root):
 
@@ -298,6 +312,7 @@ Targeted test loops while implementing:
 
     set -o pipefail && cargo test -p weaver-plugin-rope 2>&1 | tee /tmp/3-1-1a-rope-plugin-test.log
     set -o pipefail && cargo test -p weaverd refactor 2>&1 | tee /tmp/3-1-1a-weaverd-refactor-test.log
+    set -o pipefail && cargo test -p weaver-e2e refactor_rope_cli 2>&1 | tee /tmp/3-1-1a-weaver-e2e-refactor.log
 
 ## Validation and acceptance
 
@@ -310,6 +325,11 @@ The feature is accepted when all items below are true:
 - Unit tests cover request validation, runtime error mapping, and diff handoff
   to the Double-Lock path.
 - BDD tests cover happy/unhappy/edge scenarios using `rstest-bdd` v0.5.0.
+- E2E tests in `crates/weaver-e2e` use `assert_cmd` and `insta` to document
+  and verify:
+  - actuator command ergonomics in isolation,
+  - a pipeline flow chaining `observe` output through `jq` into actuator
+    invocation.
 - `docs/weaver-design.md` records the decisions made by this implementation.
 - `docs/users-guide.md` documents user-visible behaviour and configuration.
 - `docs/roadmap.md` marks rope plugin entry as done.
