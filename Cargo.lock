@@ -2625,6 +2625,7 @@ dependencies = [
 name = "weaver-e2e"
 version = "0.1.0"
 dependencies = [
+ "assert_cmd",
  "camino",
  "insta",
  "lsp-types",
@@ -2668,6 +2669,19 @@ dependencies = [
  "thiserror 2.0.17",
  "tracing",
  "weaver-config",
+]
+
+[[package]]
+name = "weaver-plugin-rope"
+version = "0.1.0"
+dependencies = [
+ "rstest",
+ "rstest-bdd",
+ "rstest-bdd-macros",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.17",
+ "weaver-plugins",
 ]
 
 [[package]]

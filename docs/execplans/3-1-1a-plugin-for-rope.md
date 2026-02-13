@@ -4,7 +4,7 @@ This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
 `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: COMPLETE (2026-02-13)
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
@@ -91,12 +91,19 @@ Observable success:
 
 - [x] (2026-02-12 00:00Z) Drafted ExecPlan at
       `docs/execplans/3-1-1a-plugin-for-rope.md`.
-- [ ] Validate assumptions about plugin bootstrap and executable discovery.
-- [ ] Implement rope plugin crate and protocol adapter.
-- [ ] Wire `act refactor` to execute plugin and pass diff through Double-Lock.
-- [ ] Add unit and `rstest-bdd` behavioural tests for happy/unhappy/edge paths.
-- [ ] Update design/user docs and mark roadmap item done.
-- [ ] Run `make check-fmt`, `make lint`, and `make test` successfully.
+- [x] (2026-02-13 01:30Z) Validated plugin bootstrap assumptions and added
+      executable override via `WEAVER_ROPE_PLUGIN_PATH`.
+- [x] (2026-02-13 02:00Z) Implemented `crates/weaver-plugin-rope/` with
+      protocol handling, rope adapter boundary, and error mapping.
+- [x] (2026-02-13 02:20Z) Wired `act refactor` to execute plugins and route
+      diff output through the existing Double-Lock apply-patch flow.
+- [x] (2026-02-13 02:50Z) Added unit, behavioural (`rstest-bdd` 0.5.0), and
+      e2e (`assert_cmd` + `insta`) tests for happy, unhappy, and edge paths.
+- [x] (2026-02-13 03:00Z) Updated design and user documentation and marked the
+      roadmap rope entry as done.
+- [x] (2026-02-13 03:20Z) Ran full quality gates successfully:
+      `make fmt`, `make check-fmt`, `make lint`, `make test`,
+      `make markdownlint`, and `make nixie`.
 
 ## Surprises & Discoveries
 
@@ -123,9 +130,30 @@ Observable success:
   Rationale: deterministic tests with clear unhappy-path coverage. Date/Author:
   2026-02-12 / Codex
 
+- Decision: add e2e command-ergonomics snapshots with a fake daemon instead of
+  requiring a real rope runtime in e2e tests. Rationale: validates CLI usage
+  and JSONL command shapes deterministically while keeping tests hermetic.
+  Date/Author: 2026-02-13 / Codex
+
 ## Outcomes & Retrospective
 
-Pending implementation.
+- `act refactor --provider rope` now executes a sandboxed plugin runtime in
+  `weaverd`, requiring `PluginOutput::Diff` and forwarding diff application to
+  the existing `act apply-patch` Double-Lock path.
+- Added `crates/weaver-plugin-rope/` as the first concrete actuator plugin.
+  The first shipped operation is `rename`, with required arguments `offset` and
+  `new_name`.
+- Added daemon/runtime unit tests and behavioural tests to cover success,
+  runtime failures, malformed diff responses, missing arguments, and no-change
+  edge cases.
+- Added end-to-end ergonomics tests in `crates/weaver-e2e/` using
+  `assert_cmd` and `insta` for:
+  - isolated `act refactor` invocation;
+  - pipeline invocation chaining `observe` output through `jq`.
+- Updated `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
+  to reflect shipped behaviour and configuration.
+- Full repository quality gates passed after implementation and documentation
+  updates.
 
 ## Context and orientation
 
@@ -157,8 +185,7 @@ Testing and style references:
 
 Define the concrete scope for Phase 3.1.1a:
 
-- supported rope operations for first release (`rename` and one additional
-  rope-native operation, e.g. `extract_method`),
+- supported rope operations for first release (`rename` only),
 - required operation arguments and error envelopes,
 - plugin executable discovery/bootstrap strategy for `weaverd`.
 

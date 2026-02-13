@@ -5,40 +5,147 @@
 //! through the Double-Lock safety harness before any filesystem change is
 //! committed.
 //!
-//! In this initial Phase 3.1.1 implementation the handler validates the
-//! request arguments, resolves the target file, and builds a
-//! [`PluginRequest`]. Full plugin execution and safety harness integration
-//! will be wired in Phase 3.2 when the daemon runtime holds a
-//! [`PluginRunner`] instance.
+//! The handler validates the request arguments, resolves the target file, and
+//! builds a [`PluginRequest`]. Successful plugin responses with diff output are
+//! forwarded to the existing `act apply-patch` pipeline so syntactic and
+//! semantic locks are reused without duplicating safety-critical logic.
 
+use std::ffi::OsString;
 use std::io::Write;
 use std::path::Path;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use tracing::debug;
 
-use weaver_plugins::PluginRequest;
+use weaver_plugins::manifest::{PluginKind, PluginManifest, PluginMetadata};
+use weaver_plugins::process::SandboxExecutor;
 use weaver_plugins::protocol::FilePayload;
+use weaver_plugins::runner::PluginRunner;
+use weaver_plugins::{PluginError, PluginOutput, PluginRegistry, PluginRequest, PluginResponse};
 
 use crate::backends::{BackendKind, FusionBackends};
+use crate::dispatch::act::apply_patch;
 use crate::dispatch::errors::DispatchError;
-use crate::dispatch::request::CommandRequest;
+use crate::dispatch::request::{CommandDescriptor, CommandRequest};
 use crate::dispatch::response::ResponseWriter;
 use crate::dispatch::router::{DISPATCH_TARGET, DispatchResult};
 use crate::semantic_provider::SemanticBackendProvider;
+
+/// Environment variable overriding the rope plugin executable path.
+pub(crate) const ROPE_PLUGIN_PATH_ENV: &str = "WEAVER_ROPE_PLUGIN_PATH";
+const DEFAULT_ROPE_PLUGIN_PATH: &str = "/usr/bin/weaver-plugin-rope";
+const ROPE_PLUGIN_NAME: &str = "rope";
+const ROPE_PLUGIN_VERSION: &str = "0.1.0";
+
+/// Runtime abstraction for executing refactor plugins.
+pub(crate) trait RefactorPluginRuntime {
+    /// Executes the named plugin with the provided request.
+    fn execute(
+        &self,
+        provider: &str,
+        request: &PluginRequest,
+    ) -> Result<PluginResponse, PluginError>;
+}
+
+/// Dependencies required by the `act refactor` handler.
+pub(crate) struct RefactorDependencies<'a> {
+    workspace_root: &'a Path,
+    runtime: &'a (dyn RefactorPluginRuntime + Send + Sync),
+}
+
+impl<'a> RefactorDependencies<'a> {
+    /// Creates a dependency bundle for handler execution.
+    pub(crate) const fn new(
+        workspace_root: &'a Path,
+        runtime: &'a (dyn RefactorPluginRuntime + Send + Sync),
+    ) -> Self {
+        Self {
+            workspace_root,
+            runtime,
+        }
+    }
+}
+
+/// Sandbox-backed runtime that resolves plugins from a registry.
+pub(crate) struct SandboxRefactorRuntime {
+    runner: Option<PluginRunner<SandboxExecutor>>,
+    startup_error: Option<String>,
+}
+
+impl SandboxRefactorRuntime {
+    /// Builds the default runtime from environment configuration.
+    #[must_use]
+    pub fn from_environment() -> Self {
+        let mut registry = PluginRegistry::new();
+        let executable = resolve_rope_plugin_path(std::env::var_os(ROPE_PLUGIN_PATH_ENV));
+        let metadata =
+            PluginMetadata::new(ROPE_PLUGIN_NAME, ROPE_PLUGIN_VERSION, PluginKind::Actuator);
+        let manifest = PluginManifest::new(metadata, vec![String::from("python")], executable);
+
+        match registry.register(manifest) {
+            Ok(()) => Self {
+                runner: Some(PluginRunner::new(registry, SandboxExecutor)),
+                startup_error: None,
+            },
+            Err(error) => Self {
+                runner: None,
+                startup_error: Some(format!("failed to initialise refactor runtime: {error}")),
+            },
+        }
+    }
+}
+
+impl RefactorPluginRuntime for SandboxRefactorRuntime {
+    fn execute(
+        &self,
+        provider: &str,
+        request: &PluginRequest,
+    ) -> Result<PluginResponse, PluginError> {
+        let runner = self.runner.as_ref().ok_or_else(|| PluginError::Manifest {
+            message: self
+                .startup_error
+                .clone()
+                .unwrap_or_else(|| String::from("refactor runtime is unavailable")),
+        })?;
+        runner.execute(provider, request)
+    }
+}
+
+/// Constructs the default refactor plugin runtime for daemon dispatch.
+#[must_use]
+pub(crate) fn default_runtime() -> Arc<dyn RefactorPluginRuntime + Send + Sync> {
+    Arc::new(SandboxRefactorRuntime::from_environment())
+}
+
+/// Converts an optional executable override to an absolute plugin path.
+fn resolve_rope_plugin_path(raw_override: Option<OsString>) -> PathBuf {
+    let candidate = raw_override
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(DEFAULT_ROPE_PLUGIN_PATH));
+    if candidate.is_absolute() {
+        return candidate;
+    }
+
+    match std::env::current_dir() {
+        Ok(cwd) => cwd.join(candidate),
+        Err(_) => PathBuf::from(DEFAULT_ROPE_PLUGIN_PATH),
+    }
+}
 
 /// Handles `act refactor` requests.
 ///
 /// Expects `--provider <plugin>` and `--refactoring <operation>` in the
 /// request arguments, plus `--file <path>` identifying the target file.
 ///
-/// The handler reads the file content, builds a [`PluginRequest`], and will
-/// execute the plugin via a [`PluginRunner`] once the daemon runtime holds
-/// a plugin registry (Phase 3.2).
+/// The handler reads the file content, executes the plugin, and forwards
+/// successful diff output through `act apply-patch` for Double-Lock
+/// verification and atomic commit.
 pub fn handle<W: Write>(
     request: &CommandRequest,
     writer: &mut ResponseWriter<W>,
     backends: &mut FusionBackends<SemanticBackendProvider>,
-    workspace_root: &Path,
+    dependencies: RefactorDependencies<'_>,
 ) -> Result<DispatchResult, DispatchError> {
     let args = parse_refactor_args(&request.arguments)?;
 
@@ -55,12 +162,11 @@ pub fn handle<W: Write>(
         .map_err(DispatchError::backend_startup)?;
 
     // Resolve the target file within the workspace.
-    let file_path = resolve_file(workspace_root, &args.file)?;
+    let file_path = resolve_file(dependencies.workspace_root, &args.file)?;
     let file_content = std::fs::read_to_string(&file_path).map_err(|err| {
         DispatchError::invalid_arguments(format!("cannot read file '{}': {err}", args.file))
     })?;
 
-    // Build the plugin request with in-band file content.
     let mut plugin_args = std::collections::HashMap::new();
     plugin_args.insert(
         "refactoring".into(),
@@ -77,21 +183,27 @@ pub fn handle<W: Write>(
         }
     }
 
-    let _plugin_request = PluginRequest::with_arguments(
+    let plugin_request = PluginRequest::with_arguments(
         &args.refactoring,
-        vec![FilePayload::new(file_path, file_content)],
+        vec![FilePayload::new(PathBuf::from(&args.file), file_content)],
         plugin_args,
     );
 
-    // Phase 3.2 will wire in PluginRunner::execute() here.
-    // For now return "not yet available" so the operation is routed correctly
-    // but does not attempt execution without a runtime registry.
-    writer.write_stderr(format!(
-        "act refactor: plugin execution not yet available \
-         (provider={}, refactoring={}, file={})\n",
-        args.provider, args.refactoring, args.file
-    ))?;
-    Ok(DispatchResult::with_status(1))
+    match dependencies
+        .runtime
+        .execute(&args.provider, &plugin_request)
+    {
+        Ok(response) => {
+            handle_plugin_response(response, writer, backends, dependencies.workspace_root)
+        }
+        Err(error) => {
+            writer.write_stderr(format!(
+                "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
+                args.provider, args.refactoring, args.file
+            ))?;
+            Ok(DispatchResult::with_status(1))
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -201,3 +313,59 @@ fn resolve_file(workspace_root: &Path, file: &str) -> Result<std::path::PathBuf,
     }
     Ok(resolved)
 }
+
+fn handle_plugin_response<W: Write>(
+    response: PluginResponse,
+    writer: &mut ResponseWriter<W>,
+    backends: &mut FusionBackends<SemanticBackendProvider>,
+    workspace_root: &Path,
+) -> Result<DispatchResult, DispatchError> {
+    if !response.is_success() {
+        let diagnostics: Vec<String> = response
+            .diagnostics()
+            .iter()
+            .map(|diag| diag.message().to_owned())
+            .collect();
+        let message = if diagnostics.is_empty() {
+            String::from("plugin reported failure without diagnostics")
+        } else {
+            diagnostics.join("; ")
+        };
+        writer.write_stderr(format!("act refactor failed: {message}\n"))?;
+        return Ok(DispatchResult::with_status(1));
+    }
+
+    match response.output() {
+        PluginOutput::Diff { content } => {
+            forward_diff_to_apply_patch(content, writer, backends, workspace_root)
+        }
+        PluginOutput::Analysis { .. } | PluginOutput::Empty => {
+            writer.write_stderr(
+                "act refactor failed: plugin succeeded but did not return diff output\n",
+            )?;
+            Ok(DispatchResult::with_status(1))
+        }
+    }
+}
+
+fn forward_diff_to_apply_patch<W: Write>(
+    patch: &str,
+    writer: &mut ResponseWriter<W>,
+    backends: &mut FusionBackends<SemanticBackendProvider>,
+    workspace_root: &Path,
+) -> Result<DispatchResult, DispatchError> {
+    let patch_request = CommandRequest {
+        command: CommandDescriptor {
+            domain: String::from("act"),
+            operation: String::from("apply-patch"),
+        },
+        arguments: Vec::new(),
+        patch: Some(patch.to_owned()),
+    };
+    apply_patch::handle(&patch_request, writer, backends, workspace_root)
+}
+
+#[cfg(test)]
+mod behaviour;
+#[cfg(test)]
+mod tests;

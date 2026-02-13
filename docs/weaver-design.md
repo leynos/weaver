@@ -1314,6 +1314,34 @@ during the initial implementation:
   safety harness code is needed — the plugin system reuses the Double-Lock
   infrastructure established in Phase 2.
 
+#### 4.1.2. Implementation decisions (Phase 3.1.1a — rope actuator)
+
+The first concrete actuator plugin for Python refactoring is now implemented as
+`weaver-plugin-rope` (`crates/weaver-plugin-rope/`). The following decisions
+govern this rollout:
+
+- **Dedicated executable plugin crate.** Rope-specific refactoring logic lives
+  in its own executable crate rather than in `weaverd`. This keeps specialist
+  tool logic replaceable and preserves the broker/plugin boundary.
+
+- **Default runtime registration in `weaverd`.** The daemon registers a `rope`
+  actuator manifest at startup. The executable path defaults to
+  `/usr/bin/weaver-plugin-rope` and can be overridden with
+  `WEAVER_ROPE_PLUGIN_PATH`.
+
+- **Refactor diff handoff reuses `act apply-patch`.** Successful
+  `PluginOutput::Diff` from `act refactor` is forwarded into the existing
+  apply-patch handler, ensuring one safety-critical path for patch parsing,
+  syntactic verification, semantic verification, and atomic commit.
+
+- **One-shot rope operation support.** The first operation is `rename`, taking
+  `offset` and `new_name` arguments. Unsupported operations and invalid
+  arguments return plugin diagnostics without filesystem mutation.
+
+- **Ergonomics-tested CLI workflows.** End-to-end tests now snapshot actuator
+  usage in isolation and an operator pipeline (`observe` query piped through
+  `jq` into `act refactor`) using `assert_cmd` and `insta`.
+
 ### 4.2. The "Double-Lock" Safety Harness: Ensuring Syntactic and Semantic Integrity
 
 The "Double-Lock" safety harness is the single most critical feature for
