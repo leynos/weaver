@@ -69,7 +69,7 @@ impl FakeDaemon {
     }
 
     fn join(self) {
-        std::mem::drop(self.join_handle.join());
+        self.join_handle.join().ok();
     }
 }
 
@@ -202,10 +202,11 @@ fn refactor_actuator_isolation_cli_snapshot() {
 fn refactor_pipeline_with_observe_and_jq_snapshot() {
     let jq_available = Command::new("jq").arg("--version").output().is_ok();
     if !jq_available {
-        std::mem::drop(writeln!(
+        writeln!(
             std::io::stderr().lock(),
             "Skipping test: jq not available on PATH"
-        ));
+        )
+        .ok();
         return;
     }
 

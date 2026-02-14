@@ -110,7 +110,8 @@ impl RefactorWorld {
             &self.request,
             &mut writer,
             &mut backends,
-            RefactorDependencies::new(self.workspace.path(), &runtime),
+            self.workspace.path(),
+            &runtime,
         )
         .map(|dispatch| dispatch.status);
 

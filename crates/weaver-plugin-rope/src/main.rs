@@ -11,7 +11,7 @@ fn main() {
     let mut writer = stdout.lock();
 
     if let Err(error) = run(&mut reader, &mut writer) {
-        std::mem::drop(writeln!(io::stderr().lock(), "{error}"));
+        writeln!(io::stderr().lock(), "{error}").ok();
         std::process::exit(1);
     }
 }

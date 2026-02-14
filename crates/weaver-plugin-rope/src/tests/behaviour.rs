@@ -6,15 +6,15 @@ use std::path::PathBuf;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use weaver_plugins::protocol::{
-    DiagnosticSeverity, FilePayload, PluginDiagnostic, PluginOutput, PluginRequest, PluginResponse,
+    DiagnosticSeverity, FilePayload, PluginOutput, PluginRequest, PluginResponse,
 };
 
-use crate::{RopeAdapter, RopeAdapterError, execute_request};
+use crate::{RopeAdapter, RopeAdapterError, execute_request, failure_response};
 
 #[derive(Default)]
 struct World {
     request: Option<PluginRequest>,
-    response: Option<PluginResponse>,
+    execute_result: Option<Result<PluginResponse, String>>,
     adapter_mode: AdapterMode,
 }
 
@@ -108,21 +108,34 @@ fn when_execute(world: &mut World) {
     let adapter = BehaviourAdapter {
         mode: world.adapter_mode,
     };
-    world.response = Some(execute_request(&adapter, request));
+    world.execute_result = Some(execute_request(&adapter, request));
+}
+
+/// Resolves the world's execute result to a `PluginResponse`, converting
+/// `Err` outcomes to failure responses for assertion consistency.
+fn resolved_response(world: &World) -> PluginResponse {
+    match world
+        .execute_result
+        .as_ref()
+        .expect("execute result should be present")
+    {
+        Ok(resp) => resp.clone(),
+        Err(msg) => failure_response(msg.clone()),
+    }
 }
 
 #[then("the plugin returns successful diff output")]
 fn then_successful_diff(world: &mut World) {
-    let response = world.response.as_ref().expect("response should be present");
+    let response = resolved_response(world);
     assert!(response.is_success());
     assert!(matches!(response.output(), PluginOutput::Diff { .. }));
 }
 
 #[then("the plugin returns failure diagnostics")]
 fn then_failure_diagnostics(world: &mut World) {
-    let response = world.response.as_ref().expect("response should be present");
+    let response = resolved_response(world);
     assert!(!response.is_success());
-    assert!(response.output() == &PluginOutput::Empty);
+    assert_eq!(response.output(), &PluginOutput::Empty);
     assert!(
         response
             .diagnostics()
@@ -134,17 +147,13 @@ fn then_failure_diagnostics(world: &mut World) {
 #[then("the failure message contains {text}")]
 fn then_failure_contains(world: &mut World, text: String) {
     let needle = text.trim_matches('"');
-    let response = world.response.as_ref().expect("response should be present");
-    let diagnostics: Vec<&PluginDiagnostic> = response.diagnostics().iter().collect();
+    let response = resolved_response(world);
+    let diagnostics = response.diagnostics();
     assert!(
         diagnostics
             .iter()
             .any(|diagnostic| diagnostic.message().contains(needle)),
-        "expected diagnostics to contain '{needle}', got: {:?}",
-        diagnostics
-            .iter()
-            .map(|diagnostic| diagnostic.message())
-            .collect::<Vec<&str>>()
+        "expected diagnostics to contain '{needle}', got: {diagnostics:?}",
     );
 }
 

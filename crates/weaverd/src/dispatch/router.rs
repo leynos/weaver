@@ -143,6 +143,22 @@ impl DomainRouter {
         }
     }
 
+    /// Creates a domain router with a custom refactor runtime.
+    #[cfg(test)]
+    #[expect(
+        dead_code,
+        reason = "builder for test-injected runtimes; used by future tests"
+    )]
+    pub fn with_runtime(
+        workspace_root: PathBuf,
+        runtime: Arc<dyn act::refactor::RefactorPluginRuntime + Send + Sync>,
+    ) -> Self {
+        Self {
+            workspace_root,
+            refactor_runtime: runtime,
+        }
+    }
+
     /// Routes a command request to the appropriate domain handler.
     ///
     /// # Errors
@@ -198,10 +214,8 @@ impl DomainRouter {
                 request,
                 writer,
                 backends,
-                act::refactor::RefactorDependencies::new(
-                    &self.workspace_root,
-                    self.refactor_runtime.as_ref(),
-                ),
+                &self.workspace_root,
+                self.refactor_runtime.as_ref(),
             ),
             _ => Self::route_fallback(&DomainRoutingContext::ACT, operation.as_str(), writer),
         }

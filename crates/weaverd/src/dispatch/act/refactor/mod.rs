@@ -48,51 +48,31 @@ pub(crate) trait RefactorPluginRuntime {
     ) -> Result<PluginResponse, PluginError>;
 }
 
-/// Dependencies required by the `act refactor` handler.
-pub(crate) struct RefactorDependencies<'a> {
-    workspace_root: &'a Path,
-    runtime: &'a (dyn RefactorPluginRuntime + Send + Sync),
-}
-
-impl<'a> RefactorDependencies<'a> {
-    /// Creates a dependency bundle for handler execution.
-    pub(crate) const fn new(
-        workspace_root: &'a Path,
-        runtime: &'a (dyn RefactorPluginRuntime + Send + Sync),
-    ) -> Self {
-        Self {
-            workspace_root,
-            runtime,
-        }
-    }
-}
-
 /// Sandbox-backed runtime that resolves plugins from a registry.
 pub(crate) struct SandboxRefactorRuntime {
-    runner: Option<PluginRunner<SandboxExecutor>>,
-    startup_error: Option<String>,
+    runner: PluginRunner<SandboxExecutor>,
 }
 
 impl SandboxRefactorRuntime {
-    /// Builds the default runtime from environment configuration.
-    #[must_use]
-    pub fn from_environment() -> Self {
+    /// Builds the runtime from environment configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error description if plugin registration fails.
+    pub fn from_environment() -> Result<Self, String> {
         let mut registry = PluginRegistry::new();
         let executable = resolve_rope_plugin_path(std::env::var_os(ROPE_PLUGIN_PATH_ENV));
         let metadata =
             PluginMetadata::new(ROPE_PLUGIN_NAME, ROPE_PLUGIN_VERSION, PluginKind::Actuator);
         let manifest = PluginManifest::new(metadata, vec![String::from("python")], executable);
 
-        match registry.register(manifest) {
-            Ok(()) => Self {
-                runner: Some(PluginRunner::new(registry, SandboxExecutor)),
-                startup_error: None,
-            },
-            Err(error) => Self {
-                runner: None,
-                startup_error: Some(format!("failed to initialise refactor runtime: {error}")),
-            },
-        }
+        registry
+            .register(manifest)
+            .map_err(|error| format!("failed to initialize refactor runtime: {error}"))?;
+
+        Ok(Self {
+            runner: PluginRunner::new(registry, SandboxExecutor),
+        })
     }
 }
 
@@ -102,20 +82,34 @@ impl RefactorPluginRuntime for SandboxRefactorRuntime {
         provider: &str,
         request: &PluginRequest,
     ) -> Result<PluginResponse, PluginError> {
-        let runner = self.runner.as_ref().ok_or_else(|| PluginError::Manifest {
-            message: self
-                .startup_error
-                .clone()
-                .unwrap_or_else(|| String::from("refactor runtime is unavailable")),
-        })?;
-        runner.execute(provider, request)
+        self.runner.execute(provider, request)
+    }
+}
+
+/// Runtime that reports an initialization error on every execution attempt.
+struct NoopRefactorRuntime {
+    message: String,
+}
+
+impl RefactorPluginRuntime for NoopRefactorRuntime {
+    fn execute(
+        &self,
+        _provider: &str,
+        _request: &PluginRequest,
+    ) -> Result<PluginResponse, PluginError> {
+        Err(PluginError::Manifest {
+            message: self.message.clone(),
+        })
     }
 }
 
 /// Constructs the default refactor plugin runtime for daemon dispatch.
 #[must_use]
 pub(crate) fn default_runtime() -> Arc<dyn RefactorPluginRuntime + Send + Sync> {
-    Arc::new(SandboxRefactorRuntime::from_environment())
+    match SandboxRefactorRuntime::from_environment() {
+        Ok(runtime) => Arc::new(runtime),
+        Err(message) => Arc::new(NoopRefactorRuntime { message }),
+    }
 }
 
 /// Converts an optional executable override to an absolute plugin path.
@@ -129,7 +123,15 @@ fn resolve_rope_plugin_path(raw_override: Option<OsString>) -> PathBuf {
 
     match std::env::current_dir() {
         Ok(cwd) => cwd.join(candidate),
-        Err(_) => PathBuf::from(DEFAULT_ROPE_PLUGIN_PATH),
+        Err(error) => {
+            tracing::warn!(
+                target: DISPATCH_TARGET,
+                path = %candidate.display(),
+                %error,
+                "cannot resolve relative plugin path against working directory; using path as-is"
+            );
+            candidate
+        }
     }
 }
 
@@ -141,11 +143,16 @@ fn resolve_rope_plugin_path(raw_override: Option<OsString>) -> PathBuf {
 /// The handler reads the file content, executes the plugin, and forwards
 /// successful diff output through `act apply-patch` for Double-Lock
 /// verification and atomic commit.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "workspace_root and runtime were previously bundled in RefactorDependencies; unbundled per review"
+)]
 pub fn handle<W: Write>(
     request: &CommandRequest,
     writer: &mut ResponseWriter<W>,
     backends: &mut FusionBackends<SemanticBackendProvider>,
-    dependencies: RefactorDependencies<'_>,
+    workspace_root: &Path,
+    runtime: &dyn RefactorPluginRuntime,
 ) -> Result<DispatchResult, DispatchError> {
     let args = parse_refactor_args(&request.arguments)?;
 
@@ -162,7 +169,7 @@ pub fn handle<W: Write>(
         .map_err(DispatchError::backend_startup)?;
 
     // Resolve the target file within the workspace.
-    let file_path = resolve_file(dependencies.workspace_root, &args.file)?;
+    let file_path = resolve_file(workspace_root, &args.file)?;
     let file_content = std::fs::read_to_string(&file_path).map_err(|err| {
         DispatchError::invalid_arguments(format!("cannot read file '{}': {err}", args.file))
     })?;
@@ -189,13 +196,8 @@ pub fn handle<W: Write>(
         plugin_args,
     );
 
-    match dependencies
-        .runtime
-        .execute(&args.provider, &plugin_request)
-    {
-        Ok(response) => {
-            handle_plugin_response(response, writer, backends, dependencies.workspace_root)
-        }
+    match runtime.execute(&args.provider, &plugin_request) {
+        Ok(response) => handle_plugin_response(response, writer, backends, workspace_root),
         Err(error) => {
             writer.write_stderr(format!(
                 "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",

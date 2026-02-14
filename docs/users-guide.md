@@ -545,7 +545,7 @@ writing to disk.
 For the built-in `rope` actuator, `rename` requires `offset=<BYTE_OFFSET>` and
 `new_name=<IDENTIFIER>` in the trailing `KEY=VALUE` arguments.
 
-The daemon ships with a default `rope` actuator registration. By default it
+The daemon ships with a default `rope` actuator registration. By default, it
 expects the plugin executable at `/usr/bin/weaver-plugin-rope`. Override the
 path with:
 

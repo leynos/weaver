@@ -66,7 +66,7 @@ impl RopeAdapter for PythonRopeAdapter {
 
         let workspace =
             TempDir::new().map_err(|source| RopeAdapterError::WorkspaceCreate { source })?;
-        let absolute_path = write_workspace_file(workspace.path(), file.path(), file.content())?;
+        let _absolute_path = write_workspace_file(workspace.path(), file.path(), file.content())?;
 
         let relative_path = path_to_slash(file.path());
         let mut command = Command::new(PYTHON_BINARY);
@@ -97,7 +97,6 @@ impl RopeAdapter for PythonRopeAdapter {
                 message: source.to_string(),
             })?;
 
-        let _ = absolute_path;
         Ok(modified)
     }
 }
@@ -112,7 +111,7 @@ pub enum PluginDispatchError {
         #[source]
         source: std::io::Error,
     },
-    /// Serialising the response payload failed.
+    /// Serializing the response payload failed.
     #[error("failed to serialize plugin response: {source}")]
     Serialize {
         /// Underlying serialization error.
@@ -177,8 +176,9 @@ pub fn run_with_adapter<R: RopeAdapter>(
     stdout: &mut impl Write,
     adapter: &R,
 ) -> Result<(), PluginDispatchError> {
-    let response = match read_request(stdin) {
-        Ok(request) => execute_request(adapter, &request),
+    let response = match read_request(stdin).and_then(|request| execute_request(adapter, &request))
+    {
+        Ok(resp) => resp,
         Err(message) => failure_response(message),
     };
 
@@ -218,35 +218,39 @@ fn read_request(stdin: &mut impl BufRead) -> Result<PluginRequest, String> {
         .map_err(|error| format!("invalid plugin request JSON: {error}"))
 }
 
-fn execute_request<R: RopeAdapter>(adapter: &R, request: &PluginRequest) -> PluginResponse {
+fn execute_request<R: RopeAdapter>(
+    adapter: &R,
+    request: &PluginRequest,
+) -> Result<PluginResponse, String> {
     match request.operation() {
         "rename" => execute_rename(adapter, request),
-        other => failure_response(format!("unsupported refactoring operation '{other}'")),
+        other => Err(format!("unsupported refactoring operation '{other}'")),
     }
 }
 
-fn execute_rename<R: RopeAdapter>(adapter: &R, request: &PluginRequest) -> PluginResponse {
-    let operation = parse_rename_arguments(request.arguments());
-    let (offset, new_name) = match operation {
-        Ok(args) => args,
-        Err(message) => return failure_response(message),
-    };
+fn execute_rename<R: RopeAdapter>(
+    adapter: &R,
+    request: &PluginRequest,
+) -> Result<PluginResponse, String> {
+    let (offset, new_name) = parse_rename_arguments(request.arguments())?;
 
-    let Some(file) = request.files().first() else {
-        return failure_response(String::from("rename operation requires one file payload"));
-    };
+    let file = request
+        .files()
+        .first()
+        .ok_or_else(|| String::from("rename operation requires one file payload"))?;
 
-    let modified = match adapter.rename(file, offset, &new_name) {
-        Ok(modified) => modified,
-        Err(error) => return failure_response(error.to_string()),
-    };
+    let modified = adapter
+        .rename(file, offset, &new_name)
+        .map_err(|error| error.to_string())?;
 
     if modified == file.content() {
-        return failure_response(String::from("rename operation produced no content changes"));
+        return Err(String::from("rename operation produced no content changes"));
     }
 
     let patch = build_search_replace_patch(file.path(), file.content(), &modified);
-    PluginResponse::success(PluginOutput::Diff { content: patch })
+    Ok(PluginResponse::success(PluginOutput::Diff {
+        content: patch,
+    }))
 }
 
 fn parse_rename_arguments(
@@ -325,19 +329,24 @@ fn validate_relative_path(path: &Path) -> Result<(), RopeAdapterError> {
 
 fn build_search_replace_patch(path: &Path, original: &str, modified: &str) -> String {
     let unix_path = path_to_slash(path);
-    let original_block = ensure_trailing_newline(original);
-    let modified_block = ensure_trailing_newline(modified);
+    let sep_after_original = if original.ends_with('\n') { "" } else { "\n" };
+    let sep_after_modified = if modified.ends_with('\n') { "" } else { "\n" };
 
     format!(
-        "diff --git a/{unix_path} b/{unix_path}\n<<<<<<< SEARCH\n{original_block}=======\n{modified_block}>>>>>>> REPLACE\n"
+        concat!(
+            "diff --git a/{unix_path} b/{unix_path}\n",
+            "<<<<<<< SEARCH\n",
+            "{original}{sep_a}",
+            "=======\n",
+            "{modified}{sep_b}",
+            ">>>>>>> REPLACE\n",
+        ),
+        unix_path = unix_path,
+        original = original,
+        sep_a = sep_after_original,
+        modified = modified,
+        sep_b = sep_after_modified,
     )
-}
-
-fn ensure_trailing_newline(content: &str) -> String {
-    if content.ends_with('\n') {
-        return content.to_owned();
-    }
-    format!("{content}\n")
 }
 
 fn path_to_slash(path: &Path) -> String {
@@ -350,7 +359,7 @@ fn path_to_slash(path: &Path) -> String {
         .join("/")
 }
 
-fn failure_response(message: String) -> PluginResponse {
+pub(crate) fn failure_response(message: String) -> PluginResponse {
     PluginResponse::failure(vec![PluginDiagnostic::new(
         DiagnosticSeverity::Error,
         message,

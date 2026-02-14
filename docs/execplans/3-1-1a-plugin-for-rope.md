@@ -1,8 +1,9 @@
 # Implement the first actuator plugin for `rope`
 
-This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
-`Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+proceeds.
 
 Status: COMPLETE (2026-02-13)
 
@@ -40,8 +41,8 @@ Observable success:
 - Do not bypass the Double-Lock harness for plugin-produced edits.
 - Continue using `rstest-bdd` v0.5.0 and write new behavioural tests with
   mutable world fixtures (`&mut World`) for new scenarios.
-- Add e2e command ergonomics tests in `crates/weaver-e2e/` using `assert_cmd`
-  and `insta` snapshots for CLI usage flows.
+- Add end-to-end (e2e) command ergonomics tests in `crates/weaver-e2e/` using
+  `assert_cmd` and `insta` snapshots for CLI usage flows.
 - Keep module-level `//!` comments and rustdoc for public items; follow
   guidance in `docs/rust-doctest-dry-guide.md`.
 - Keep files under 400 lines by splitting modules where needed.
@@ -107,10 +108,10 @@ Observable success:
 
 ## Surprises & Discoveries
 
-- Observation: project memory MCP resources were not available in this session
-  (`list_mcp_resources` returned no servers/resources). Evidence: tool output
-  returned empty resource lists. Impact: planning relied on repository docs and
-  code inspection only.
+- Observation: project memory Model Context Protocol (MCP) resources were not
+  available in this session (`list_mcp_resources` returned no
+  servers/resources). Evidence: tool output returned empty resource lists.
+  Impact: planning relied on repository docs and code inspection only.
 
 ## Decision Log
 
@@ -181,7 +182,7 @@ Testing and style references:
 
 ## Plan of work
 
-### Stage A: finalise runtime contract and boundaries
+### Stage A: finalize runtime contract and boundaries
 
 Define the concrete scope for Phase 3.1.1a:
 
@@ -200,7 +201,7 @@ Go/no-go check:
 
 Add new crate `crates/weaver-plugin-rope/` (workspace member) that:
 
-- reads one `PluginRequest` JSONL line from stdin,
+- reads one `PluginRequest` JSON Lines (JSONL) line from stdin,
 - validates operation + arguments,
 - performs rope-backed refactoring via an adapter boundary,
 - emits one `PluginResponse` JSONL line to stdout, with `PluginOutput::Diff`
@@ -222,7 +223,7 @@ Go/no-go check:
 Extend `weaverd` runtime construction so `DomainRouter`/`act refactor` can
 execute plugins, including rope manifest registration.
 
-Likely touch points:
+Likely touchpoints:
 
 - `crates/weaverd/src/process/launch.rs`
 - `crates/weaverd/src/dispatch/handler.rs`

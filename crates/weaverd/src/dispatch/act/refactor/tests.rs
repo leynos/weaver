@@ -8,8 +8,8 @@ use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 
 use super::{
-    DispatchError, FusionBackends, RefactorDependencies, RefactorPluginRuntime, ResponseWriter,
-    default_runtime, handle, resolve_rope_plugin_path,
+    DispatchError, FusionBackends, RefactorPluginRuntime, ResponseWriter, default_runtime, handle,
+    resolve_rope_plugin_path,
 };
 use crate::dispatch::request::{CommandDescriptor, CommandRequest};
 use crate::semantic_provider::SemanticBackendProvider;
@@ -75,7 +75,8 @@ fn handle_returns_error_for_missing_provider() {
         &request,
         &mut writer,
         &mut backends,
-        RefactorDependencies::new(Path::new("/tmp/workspace"), &runtime),
+        Path::new("/tmp/workspace"),
+        &runtime,
     );
 
     assert!(matches!(
@@ -109,7 +110,8 @@ fn handle_runtime_error_returns_status_one() {
         &request,
         &mut writer,
         &mut backends,
-        RefactorDependencies::new(workspace.path(), &runtime),
+        workspace.path(),
+        &runtime,
     )
     .expect("dispatch result");
 
@@ -145,7 +147,8 @@ fn handle_non_diff_output_returns_status_one(#[case] output_variant: PluginOutpu
         &request,
         &mut writer,
         &mut backends,
-        RefactorDependencies::new(workspace.path(), &runtime),
+        workspace.path(),
+        &runtime,
     )
     .expect("dispatch result");
 
@@ -190,7 +193,8 @@ fn handle_diff_output_applies_patch_through_apply_patch_pipeline() {
         &request,
         &mut writer,
         &mut backends,
-        RefactorDependencies::new(workspace.path(), &runtime),
+        workspace.path(),
+        &runtime,
     )
     .expect("dispatch result");
 
