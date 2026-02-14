@@ -1,0 +1,38 @@
+---
+source: crates/weaver-e2e/tests/refactor_rope_cli_snapshots.rs
+expression: transcript
+---
+Transcript {
+    command: "weaver observe get-definition | jq -r '.[0].symbol' | weaver act refactor",
+    status: 0,
+    stdout: "{\"files_deleted\":0,\"files_written\":1,\"status\":\"ok\"}",
+    stderr: "",
+    requests: [
+        Object {
+            "arguments": Array [
+                String("--symbol"),
+                String("old_symbol"),
+            ],
+            "command": Object {
+                "domain": String("observe"),
+                "operation": String("get-definition"),
+            },
+        },
+        Object {
+            "arguments": Array [
+                String("--provider"),
+                String("rope"),
+                String("--refactoring"),
+                String("rename"),
+                String("--file"),
+                String("src/main.py"),
+                String("new_name=renamed_symbol"),
+                String("offset=4"),
+            ],
+            "command": Object {
+                "domain": String("act"),
+                "operation": String("refactor"),
+            },
+        },
+    ],
+}

@@ -14,6 +14,7 @@ camino = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+assert_cmd = { workspace = true }
 rstest = { workspace = true }
 insta = { workspace = true }
 tempfile = { workspace = true }

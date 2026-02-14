@@ -171,7 +171,7 @@ language-specific tools.*
 
 - [ ] Develop the first set of actuator plugins:
 
-  - [ ] A plugin for `rope` to provide advanced Python refactoring.
+  - [x] A plugin for `rope` to provide advanced Python refactoring.
 
   - [ ] A plugin for `rust-analyzer` to provide advanced Rust refactoring.
 
