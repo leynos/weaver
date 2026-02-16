@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+use mockall::mock;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use tempfile::TempDir;
@@ -37,28 +38,49 @@ enum RuntimeMode {
     MalformedDiff,
 }
 
-struct MockRuntime {
-    mode: RuntimeMode,
+mock! {
+    Runtime {}
+    impl RefactorPluginRuntime for Runtime {
+        fn execute(
+            &self,
+            provider: &str,
+            request: &PluginRequest,
+        ) -> Result<PluginResponse, PluginError>;
+    }
 }
 
-impl RefactorPluginRuntime for MockRuntime {
-    fn execute(
-        &self,
-        _provider: &str,
-        _request: &PluginRequest,
-    ) -> Result<PluginResponse, PluginError> {
-        match self.mode {
-            RuntimeMode::DiffSuccess => Ok(PluginResponse::success(PluginOutput::Diff {
-                content: String::from(VALID_DIFF),
-            })),
-            RuntimeMode::RuntimeError => Err(PluginError::NotFound {
-                name: String::from("rope"),
-            }),
-            RuntimeMode::MalformedDiff => Ok(PluginResponse::success(PluginOutput::Diff {
-                content: String::from(MALFORMED_DIFF),
-            })),
-        }
-    }
+fn request_has_required_flags(request: &CommandRequest) -> bool {
+    request
+        .arguments
+        .iter()
+        .any(|argument| argument == "--provider")
+        && request
+            .arguments
+            .iter()
+            .any(|argument| argument == "--refactoring")
+        && request
+            .arguments
+            .iter()
+            .any(|argument| argument == "--file")
+}
+
+fn configure_runtime_for_mode(runtime: &mut MockRuntime, mode: RuntimeMode) {
+    runtime
+        .expect_execute()
+        .once()
+        .returning(
+            move |_provider: &str, _request: &PluginRequest| match mode {
+                RuntimeMode::DiffSuccess => Ok(PluginResponse::success(PluginOutput::Diff {
+                    content: String::from(VALID_DIFF),
+                })),
+                RuntimeMode::RuntimeError => Err(PluginError::NotFound {
+                    name: String::from("rope"),
+                }),
+                RuntimeMode::MalformedDiff => Ok(PluginResponse::success(PluginOutput::Diff {
+                    content: String::from(MALFORMED_DIFF),
+                })),
+            },
+        );
 }
 
 struct RefactorWorld {
@@ -100,9 +122,10 @@ impl RefactorWorld {
     }
 
     fn execute(&mut self) {
-        let runtime = MockRuntime {
-            mode: self.runtime_mode,
-        };
+        let mut runtime = MockRuntime::new();
+        if request_has_required_flags(&self.request) {
+            configure_runtime_for_mode(&mut runtime, self.runtime_mode);
+        }
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
         let mut backends = build_backends();

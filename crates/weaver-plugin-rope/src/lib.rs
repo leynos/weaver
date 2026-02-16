@@ -66,7 +66,7 @@ impl RopeAdapter for PythonRopeAdapter {
 
         let workspace =
             TempDir::new().map_err(|source| RopeAdapterError::WorkspaceCreate { source })?;
-        let _absolute_path = write_workspace_file(workspace.path(), file.path(), file.content())?;
+        write_workspace_file(workspace.path(), file.path(), file.content())?;
 
         let relative_path = path_to_slash(file.path());
         let mut command = Command::new(PYTHON_BINARY);
@@ -317,10 +317,19 @@ fn validate_relative_path(path: &Path) -> Result<(), RopeAdapterError> {
 
     let has_parent_traversal = path
         .components()
-        .any(|component| matches!(component, Component::ParentDir | Component::Prefix(_)));
+        .any(|component| matches!(component, Component::ParentDir));
     if has_parent_traversal {
         return Err(RopeAdapterError::InvalidPath {
             message: String::from("path traversal is not allowed"),
+        });
+    }
+
+    let has_windows_prefix = path
+        .components()
+        .any(|component| matches!(component, Component::Prefix(_)));
+    if has_windows_prefix {
+        return Err(RopeAdapterError::InvalidPath {
+            message: String::from("windows path prefixes are not allowed"),
         });
     }
 

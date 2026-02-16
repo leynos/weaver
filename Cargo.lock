@@ -2675,6 +2675,7 @@ dependencies = [
 name = "weaver-plugin-rope"
 version = "0.1.0"
 dependencies = [
+ "mockall",
  "rstest",
  "rstest-bdd",
  "rstest-bdd-macros",
@@ -2739,6 +2740,7 @@ dependencies = [
  "derive_more 1.0.0",
  "dirs 5.0.1",
  "lsp-types",
+ "mockall",
  "nix 0.28.0",
  "once_cell",
  "ortho_config",

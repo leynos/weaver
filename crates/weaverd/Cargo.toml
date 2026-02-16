@@ -25,6 +25,7 @@ tempfile.workspace = true
 
 [dev-dependencies]
 derive_more = { version = "1.0", features = ["as_ref", "deref"] }
+mockall.workspace = true
 rstest.workspace = true
 rstest-bdd.workspace = true
 rstest-bdd-macros.workspace = true

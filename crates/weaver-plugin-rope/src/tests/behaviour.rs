@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use mockall::mock;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use weaver_plugins::protocol::{
@@ -31,25 +32,35 @@ fn world() -> World {
     World::default()
 }
 
-struct BehaviourAdapter {
-    mode: AdapterMode,
+mock! {
+    BehaviourAdapter {}
+    impl RopeAdapter for BehaviourAdapter {
+        fn rename(
+            &self,
+            file: &FilePayload,
+            offset: usize,
+            new_name: &str,
+        ) -> Result<String, RopeAdapterError>;
+    }
 }
 
-impl RopeAdapter for BehaviourAdapter {
-    fn rename(
-        &self,
-        file: &FilePayload,
-        _offset: usize,
-        _new_name: &str,
-    ) -> Result<String, RopeAdapterError> {
-        match self.mode {
+fn should_invoke_rename(request: &PluginRequest) -> bool {
+    request.operation() == "rename"
+        && !request.files().is_empty()
+        && request.arguments().contains_key("offset")
+        && request.arguments().contains_key("new_name")
+}
+
+fn configure_adapter_for_mode(adapter: &mut MockBehaviourAdapter, mode: AdapterMode) {
+    adapter.expect_rename().once().returning(
+        move |file: &FilePayload, _offset: usize, _new_name: &str| match mode {
             AdapterMode::Success => Ok(file.content().replace("old_name", "new_name")),
             AdapterMode::NoChange => Ok(file.content().to_owned()),
             AdapterMode::Fails => Err(RopeAdapterError::EngineFailed {
                 message: String::from("rope engine failed"),
             }),
-        }
-    }
+        },
+    );
 }
 
 fn build_request(operation: &str, with_offset: bool, with_new_name: bool) -> PluginRequest {
@@ -105,9 +116,10 @@ fn given_no_change_adapter(world: &mut World) {
 #[when("the plugin executes the request")]
 fn when_execute(world: &mut World) {
     let request = world.request.as_ref().expect("request should be present");
-    let adapter = BehaviourAdapter {
-        mode: world.adapter_mode,
-    };
+    let mut adapter = MockBehaviourAdapter::new();
+    if should_invoke_rename(request) {
+        configure_adapter_for_mode(&mut adapter, world.adapter_mode);
+    }
     world.execute_result = Some(execute_request(&adapter, request));
 }
 

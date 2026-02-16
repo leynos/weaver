@@ -5,7 +5,7 @@ mod behaviour;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use rstest::rstest;
+use rstest::{fixture, rstest};
 use weaver_plugins::protocol::{FilePayload, PluginOutput, PluginRequest};
 
 use crate::{RopeAdapter, RopeAdapterError, execute_request, run_with_adapter};
@@ -51,6 +51,20 @@ impl Clone for RopeAdapterError {
     }
 }
 
+#[fixture]
+fn rename_arguments() -> HashMap<String, serde_json::Value> {
+    let mut arguments = HashMap::new();
+    arguments.insert(
+        String::from("offset"),
+        serde_json::Value::String(String::from("4")),
+    );
+    arguments.insert(
+        String::from("new_name"),
+        serde_json::Value::String(String::from("new_name")),
+    );
+    arguments
+}
+
 fn request_with_args(arguments: HashMap<String, serde_json::Value>) -> PluginRequest {
     PluginRequest::with_arguments(
         "rename",
@@ -62,45 +76,53 @@ fn request_with_args(arguments: HashMap<String, serde_json::Value>) -> PluginReq
     )
 }
 
-#[test]
-fn rename_success_returns_diff_output() {
-    let mut arguments = HashMap::new();
-    arguments.insert(
-        String::from("offset"),
-        serde_json::Value::String(String::from("4")),
-    );
-    arguments.insert(
-        String::from("new_name"),
-        serde_json::Value::String(String::from("new_name")),
-    );
-
+#[rstest]
+fn rename_success_returns_diff_output(rename_arguments: HashMap<String, serde_json::Value>) {
     let adapter = MockAdapter {
         result: Ok(String::from("def new_name():\n    return 1\n")),
     };
 
-    let response = execute_request(&adapter, &request_with_args(arguments))
+    let response = execute_request(&adapter, &request_with_args(rename_arguments))
         .expect("execute_request should succeed");
     assert!(response.is_success());
     assert!(matches!(response.output(), PluginOutput::Diff { .. }));
 }
 
-#[test]
-fn rename_missing_offset_returns_error() {
-    let mut arguments = HashMap::new();
+fn remove_offset(arguments: &mut HashMap<String, serde_json::Value>) {
+    drop(arguments.remove("offset"));
+}
+
+fn set_boolean_offset(arguments: &mut HashMap<String, serde_json::Value>) {
+    arguments.insert(String::from("offset"), serde_json::Value::Bool(true));
+}
+
+fn set_negative_offset(arguments: &mut HashMap<String, serde_json::Value>) {
     arguments.insert(
-        String::from("new_name"),
-        serde_json::Value::String(String::from("new_name")),
+        String::from("offset"),
+        serde_json::Value::String(String::from("-1")),
     );
+}
+
+#[rstest]
+#[case::missing_offset(remove_offset, "offset")]
+#[case::boolean_offset(set_boolean_offset, "offset")]
+#[case::negative_offset(set_negative_offset, "non-negative integer")]
+fn rename_invalid_offset_arguments_return_error(
+    #[case] mutate: fn(&mut HashMap<String, serde_json::Value>),
+    #[case] expected_message: &str,
+    mut rename_arguments: HashMap<String, serde_json::Value>,
+) {
+    mutate(&mut rename_arguments);
 
     let adapter = MockAdapter {
         result: Ok(String::from("unused")),
     };
 
-    let err = execute_request(&adapter, &request_with_args(arguments))
-        .expect_err("missing offset should fail");
+    let err = execute_request(&adapter, &request_with_args(rename_arguments))
+        .expect_err("invalid offset arguments should fail");
     assert!(
-        err.contains("offset"),
-        "expected error mentioning 'offset', got: {err}"
+        err.contains(expected_message),
+        "expected error mentioning '{expected_message}', got: {err}"
     );
 }
 
@@ -126,17 +148,10 @@ enum FailureScenario {
 #[rstest]
 #[case::no_change(FailureScenario::NoChange)]
 #[case::adapter_error(FailureScenario::AdapterError)]
-fn rename_non_mutating_or_error_returns_failure(#[case] scenario: FailureScenario) {
-    let mut arguments = HashMap::new();
-    arguments.insert(
-        String::from("offset"),
-        serde_json::Value::String(String::from("4")),
-    );
-    arguments.insert(
-        String::from("new_name"),
-        serde_json::Value::String(String::from("new_name")),
-    );
-
+fn rename_non_mutating_or_error_returns_failure(
+    #[case] scenario: FailureScenario,
+    rename_arguments: HashMap<String, serde_json::Value>,
+) {
     let adapter = match &scenario {
         FailureScenario::AdapterError => MockAdapter {
             result: Err(RopeAdapterError::EngineFailed {
@@ -148,7 +163,7 @@ fn rename_non_mutating_or_error_returns_failure(#[case] scenario: FailureScenari
         },
     };
 
-    let err = execute_request(&adapter, &request_with_args(arguments))
+    let err = execute_request(&adapter, &request_with_args(rename_arguments))
         .expect_err("failure scenario should return Err");
 
     match scenario {
@@ -168,18 +183,7 @@ fn rename_non_mutating_or_error_returns_failure(#[case] scenario: FailureScenari
 // ---------------------------------------------------------------------------
 
 fn valid_request_json() -> String {
-    let request = request_with_args({
-        let mut args = HashMap::new();
-        args.insert(
-            String::from("offset"),
-            serde_json::Value::String(String::from("4")),
-        );
-        args.insert(
-            String::from("new_name"),
-            serde_json::Value::String(String::from("new_name")),
-        );
-        args
-    });
+    let request = request_with_args(rename_arguments());
     serde_json::to_string(&request).expect("serialize request")
 }
 
@@ -236,56 +240,27 @@ fn run_with_adapter_returns_failure_for_invalid_json() {
 // Argument parsing edge cases
 // ---------------------------------------------------------------------------
 
-#[test]
-fn rename_offset_as_number_value_succeeds() {
-    let mut arguments = HashMap::new();
-    arguments.insert(
+#[rstest]
+fn rename_offset_as_number_value_succeeds(
+    mut rename_arguments: HashMap<String, serde_json::Value>,
+) {
+    rename_arguments.insert(
         String::from("offset"),
         serde_json::Value::Number(serde_json::Number::from(4)),
-    );
-    arguments.insert(
-        String::from("new_name"),
-        serde_json::Value::String(String::from("new_name")),
     );
 
     let adapter = MockAdapter {
         result: Ok(String::from("def new_name():\n    return 1\n")),
     };
 
-    let response = execute_request(&adapter, &request_with_args(arguments))
+    let response = execute_request(&adapter, &request_with_args(rename_arguments))
         .expect("numeric offset should succeed");
     assert!(response.is_success());
 }
 
-#[test]
-fn rename_offset_as_boolean_returns_error() {
-    let mut arguments = HashMap::new();
-    arguments.insert(String::from("offset"), serde_json::Value::Bool(true));
-    arguments.insert(
-        String::from("new_name"),
-        serde_json::Value::String(String::from("new_name")),
-    );
-
-    let adapter = MockAdapter {
-        result: Ok(String::from("unused")),
-    };
-
-    let err = execute_request(&adapter, &request_with_args(arguments))
-        .expect_err("boolean offset should fail");
-    assert!(
-        err.contains("offset"),
-        "expected error mentioning 'offset', got: {err}"
-    );
-}
-
-#[test]
-fn rename_empty_new_name_returns_error() {
-    let mut arguments = HashMap::new();
-    arguments.insert(
-        String::from("offset"),
-        serde_json::Value::String(String::from("4")),
-    );
-    arguments.insert(
+#[rstest]
+fn rename_empty_new_name_returns_error(mut rename_arguments: HashMap<String, serde_json::Value>) {
+    rename_arguments.insert(
         String::from("new_name"),
         serde_json::Value::String(String::from("  ")),
     );
@@ -294,34 +269,10 @@ fn rename_empty_new_name_returns_error() {
         result: Ok(String::from("unused")),
     };
 
-    let err = execute_request(&adapter, &request_with_args(arguments))
+    let err = execute_request(&adapter, &request_with_args(rename_arguments))
         .expect_err("empty new_name should fail");
     assert!(
         err.contains("new_name"),
         "expected error mentioning 'new_name', got: {err}"
-    );
-}
-
-#[test]
-fn rename_negative_offset_string_returns_error() {
-    let mut arguments = HashMap::new();
-    arguments.insert(
-        String::from("offset"),
-        serde_json::Value::String(String::from("-1")),
-    );
-    arguments.insert(
-        String::from("new_name"),
-        serde_json::Value::String(String::from("new_name")),
-    );
-
-    let adapter = MockAdapter {
-        result: Ok(String::from("unused")),
-    };
-
-    let err = execute_request(&adapter, &request_with_args(arguments))
-        .expect_err("negative offset should fail");
-    assert!(
-        err.contains("non-negative integer"),
-        "expected error mentioning 'non-negative integer', got: {err}"
     );
 }

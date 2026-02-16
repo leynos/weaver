@@ -69,7 +69,10 @@ impl FakeDaemon {
     }
 
     fn join(self) {
-        self.join_handle.join().ok();
+        assert!(
+            self.join_handle.join().is_ok(),
+            "fake daemon thread should not panic"
+        );
     }
 }
 
