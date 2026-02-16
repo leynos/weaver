@@ -102,11 +102,19 @@ fn set_empty_new_name(arguments: &mut HashMap<String, serde_json::Value>) {
     );
 }
 
+fn set_numeric_new_name(arguments: &mut HashMap<String, serde_json::Value>) {
+    arguments.insert(
+        String::from("new_name"),
+        serde_json::Value::Number(serde_json::Number::from(42)),
+    );
+}
+
 #[rstest]
 #[case::missing_offset(remove_offset as fn(&mut _), Some("offset"))]
 #[case::boolean_offset(set_boolean_offset as fn(&mut _), Some("offset"))]
 #[case::negative_offset(set_negative_offset as fn(&mut _), Some("non-negative integer"))]
 #[case::numeric_offset_succeeds(set_numeric_offset as fn(&mut _), None)]
+#[case::numeric_new_name(set_numeric_new_name as fn(&mut _), Some("new_name argument must be a string"))]
 #[case::empty_new_name(set_empty_new_name as fn(&mut _), Some("new_name"))]
 fn rename_argument_validation(
     #[case] mutate: fn(&mut HashMap<String, serde_json::Value>),

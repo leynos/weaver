@@ -8,7 +8,8 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::process::Output;
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::time::{Duration, Instant};
+use std::{io, thread};
 
 use assert_cmd::Command;
 use insta::assert_debug_snapshot;
@@ -80,17 +81,57 @@ impl FakeDaemon {
     }
 }
 
+const ACCEPT_TIMEOUT: Duration = Duration::from_secs(10);
+const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
+
+#[expect(
+    clippy::expect_used,
+    reason = "non-blocking configuration is fundamental to the deadline mechanism"
+)]
 fn serve_requests(
     listener: &TcpListener,
     expected_requests: usize,
     requests: &Arc<Mutex<Vec<serde_json::Value>>>,
 ) {
+    listener
+        .set_nonblocking(true)
+        .expect("non-blocking mode should be supported");
+
     for _ in 0..expected_requests {
-        let Ok((stream, _)) = listener.accept() else {
+        let Some(stream) = accept_before_deadline(listener) else {
             return;
         };
         if respond_to_request(stream, requests).is_err() {
             return;
+        }
+    }
+}
+
+/// Polls `listener.accept()` until a connection arrives or the deadline elapses.
+#[expect(
+    clippy::expect_used,
+    reason = "restoring blocking mode on accepted stream must succeed for correct I/O"
+)]
+fn accept_before_deadline(listener: &TcpListener) -> Option<TcpStream> {
+    let deadline = Instant::now() + ACCEPT_TIMEOUT;
+
+    loop {
+        match listener.accept() {
+            Ok((stream, _)) => {
+                stream
+                    .set_nonblocking(false)
+                    .expect("blocking mode should be supported");
+                return Some(stream);
+            }
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                assert!(
+                    Instant::now() < deadline,
+                    "fake daemon timed out waiting for CLI connection \
+                     after {ACCEPT_TIMEOUT:?}"
+                );
+                thread::sleep(ACCEPT_POLL_INTERVAL);
+            }
+            Err(_) => return None,
         }
     }
 }

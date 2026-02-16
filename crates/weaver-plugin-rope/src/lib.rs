@@ -275,13 +275,14 @@ fn parse_rename_arguments(
         .parse::<usize>()
         .map_err(|error| format!("offset must be a non-negative integer: {error}"))?;
 
-    let new_name = json_value_to_string(new_name_value)
+    let new_name = new_name_value
+        .as_str()
         .ok_or_else(|| String::from("new_name argument must be a string"))?;
     if new_name.trim().is_empty() {
         return Err(String::from("new_name argument must not be empty"));
     }
 
-    Ok((offset, new_name))
+    Ok((offset, String::from(new_name)))
 }
 
 fn json_value_to_string(value: &serde_json::Value) -> Option<String> {
