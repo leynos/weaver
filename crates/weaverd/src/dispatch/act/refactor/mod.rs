@@ -135,6 +135,16 @@ fn resolve_rope_plugin_path(raw_override: Option<OsString>) -> PathBuf {
     }
 }
 
+/// Context for executing refactor operations.
+pub(crate) struct RefactorContext<'a> {
+    /// Mutable reference to the fusion backends for starting semantic services.
+    pub backends: &'a mut FusionBackends<SemanticBackendProvider>,
+    /// Root directory of the workspace being refactored.
+    pub workspace_root: &'a Path,
+    /// Runtime used to execute the refactor plugin process.
+    pub runtime: &'a dyn RefactorPluginRuntime,
+}
+
 /// Handles `act refactor` requests.
 ///
 /// Expects `--provider <plugin>` and `--refactoring <operation>` in the
@@ -143,16 +153,10 @@ fn resolve_rope_plugin_path(raw_override: Option<OsString>) -> PathBuf {
 /// The handler reads the file content, executes the plugin, and forwards
 /// successful diff output through `act apply-patch` for Double-Lock
 /// verification and atomic commit.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "workspace_root and runtime were previously bundled in RefactorDependencies; unbundled per review"
-)]
 pub fn handle<W: Write>(
     request: &CommandRequest,
     writer: &mut ResponseWriter<W>,
-    backends: &mut FusionBackends<SemanticBackendProvider>,
-    workspace_root: &Path,
-    runtime: &dyn RefactorPluginRuntime,
+    context: RefactorContext<'_>,
 ) -> Result<DispatchResult, DispatchError> {
     let args = parse_refactor_args(&request.arguments)?;
 
@@ -164,12 +168,13 @@ pub fn handle<W: Write>(
         "handling act refactor"
     );
 
-    backends
+    context
+        .backends
         .ensure_started(BackendKind::Semantic)
         .map_err(DispatchError::backend_startup)?;
 
     // Resolve the target file within the workspace.
-    let file_path = resolve_file(workspace_root, &args.file)?;
+    let file_path = resolve_file(context.workspace_root, &args.file)?;
     let file_content = std::fs::read_to_string(&file_path).map_err(|err| {
         DispatchError::invalid_arguments(format!("cannot read file '{}': {err}", args.file))
     })?;
@@ -196,8 +201,10 @@ pub fn handle<W: Write>(
         plugin_args,
     );
 
-    match runtime.execute(&args.provider, &plugin_request) {
-        Ok(response) => handle_plugin_response(response, writer, backends, workspace_root),
+    match context.runtime.execute(&args.provider, &plugin_request) {
+        Ok(response) => {
+            handle_plugin_response(response, writer, context.backends, context.workspace_root)
+        }
         Err(error) => {
             writer.write_stderr(format!(
                 "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",

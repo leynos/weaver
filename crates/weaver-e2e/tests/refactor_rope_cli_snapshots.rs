@@ -61,11 +61,15 @@ impl FakeDaemon {
         format!("tcp://{}", self.address)
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "poisoned mutex in test fixture must surface as panic for clear diagnostics"
+    )]
     fn requests(&self) -> Vec<serde_json::Value> {
         self.requests
             .lock()
-            .map(|items| items.clone())
-            .unwrap_or_default()
+            .expect("request mutex should not be poisoned")
+            .clone()
     }
 
     fn join(self) {
@@ -91,6 +95,23 @@ fn serve_requests(
     }
 }
 
+fn response_payload_for_operation(operation: &str) -> String {
+    match operation {
+        "get-definition" => json!([{ "symbol": "renamed_symbol" }]).to_string(),
+        "refactor" => json!({
+            "status": "ok",
+            "files_written": 1,
+            "files_deleted": 0
+        })
+        .to_string(),
+        _ => json!({ "status": "unexpected", "operation": operation }).to_string(),
+    }
+}
+
+#[expect(
+    clippy::expect_used,
+    reason = "poisoned mutex in test fixture must surface as panic for clear diagnostics"
+)]
 fn respond_to_request(
     stream: TcpStream,
     requests: &Arc<Mutex<Vec<serde_json::Value>>>,
@@ -106,9 +127,10 @@ fn respond_to_request(
             })
         });
 
-    if let Ok(mut guard) = requests.lock() {
-        guard.push(parsed_request.clone());
-    }
+    requests
+        .lock()
+        .expect("request mutex should not be poisoned")
+        .push(parsed_request.clone());
 
     let operation = parsed_request
         .get("command")
@@ -116,16 +138,7 @@ fn respond_to_request(
         .and_then(serde_json::Value::as_str)
         .unwrap_or_default();
 
-    let payload = match operation {
-        "get-definition" => json!([{ "symbol": "renamed_symbol" }]).to_string(),
-        "refactor" => json!({
-            "status": "ok",
-            "files_written": 1,
-            "files_deleted": 0
-        })
-        .to_string(),
-        _ => json!({ "status": "unexpected", "operation": operation }).to_string(),
-    };
+    let payload = response_payload_for_operation(operation);
 
     let mut writer = stream;
     write_json_line(

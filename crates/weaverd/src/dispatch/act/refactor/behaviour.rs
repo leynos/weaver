@@ -49,19 +49,12 @@ mock! {
     }
 }
 
+const REQUIRED_FLAGS: &[&str] = &["--provider", "--refactoring", "--file"];
+
 fn request_has_required_flags(request: &CommandRequest) -> bool {
-    request
-        .arguments
+    REQUIRED_FLAGS
         .iter()
-        .any(|argument| argument == "--provider")
-        && request
-            .arguments
-            .iter()
-            .any(|argument| argument == "--refactoring")
-        && request
-            .arguments
-            .iter()
-            .any(|argument| argument == "--file")
+        .all(|flag| request.arguments.iter().any(|argument| argument == flag))
 }
 
 fn configure_runtime_for_mode(runtime: &mut MockRuntime, mode: RuntimeMode) {
@@ -85,6 +78,7 @@ fn configure_runtime_for_mode(runtime: &mut MockRuntime, mode: RuntimeMode) {
 
 struct RefactorWorld {
     workspace: TempDir,
+    socket_dir: TempDir,
     request: CommandRequest,
     runtime_mode: RuntimeMode,
     dispatch_result: Option<Result<i32, DispatchError>>,
@@ -95,6 +89,7 @@ impl RefactorWorld {
     fn new() -> Self {
         Self {
             workspace: TempDir::new().expect("workspace"),
+            socket_dir: TempDir::new().expect("socket dir"),
             request: command_request(vec![
                 String::from("--provider"),
                 String::from("rope"),
@@ -128,13 +123,16 @@ impl RefactorWorld {
         }
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
-        let mut backends = build_backends();
+        let socket_path = self.socket_dir.path().join("socket.sock");
+        let mut backends = build_backends(&socket_path);
         let result = handle(
             &self.request,
             &mut writer,
-            &mut backends,
-            self.workspace.path(),
-            &runtime,
+            RefactorContext {
+                backends: &mut backends,
+                workspace_root: self.workspace.path(),
+                runtime: &runtime,
+            },
         )
         .map(|dispatch| dispatch.status);
 
@@ -154,9 +152,9 @@ fn command_request(arguments: Vec<String>) -> CommandRequest {
     }
 }
 
-fn build_backends() -> FusionBackends<SemanticBackendProvider> {
+fn build_backends(socket_path: &std::path::Path) -> FusionBackends<SemanticBackendProvider> {
     let config = Config {
-        daemon_socket: SocketEndpoint::unix("/tmp/weaver-test/socket.sock"),
+        daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().as_ref()),
         ..Config::default()
     };
     let provider = SemanticBackendProvider::new(CapabilityMatrix::default());

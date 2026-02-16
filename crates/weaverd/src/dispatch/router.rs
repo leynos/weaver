@@ -213,9 +213,11 @@ impl DomainRouter {
             "refactor" => act::refactor::handle(
                 request,
                 writer,
-                backends,
-                &self.workspace_root,
-                self.refactor_runtime.as_ref(),
+                act::refactor::RefactorContext {
+                    backends,
+                    workspace_root: &self.workspace_root,
+                    runtime: self.refactor_runtime.as_ref(),
+                },
             ),
             _ => Self::route_fallback(&DomainRoutingContext::ACT, operation.as_str(), writer),
         }

@@ -62,8 +62,6 @@ impl RopeAdapter for PythonRopeAdapter {
         offset: usize,
         new_name: &str,
     ) -> Result<String, RopeAdapterError> {
-        validate_relative_path(file.path())?;
-
         let workspace =
             TempDir::new().map_err(|source| RopeAdapterError::WorkspaceCreate { source })?;
         write_workspace_file(workspace.path(), file.path(), file.content())?;
@@ -234,10 +232,18 @@ fn execute_rename<R: RopeAdapter>(
 ) -> Result<PluginResponse, String> {
     let (offset, new_name) = parse_rename_arguments(request.arguments())?;
 
-    let file = request
-        .files()
-        .first()
-        .ok_or_else(|| String::from("rename operation requires one file payload"))?;
+    let files = request.files();
+    let file = match files {
+        [single] => single,
+        other => {
+            return Err(format!(
+                "rename operation requires exactly one file payload, got {}",
+                other.len()
+            ));
+        }
+    };
+
+    validate_relative_path(file.path()).map_err(|error| error.to_string())?;
 
     let modified = adapter
         .rename(file, offset, &new_name)

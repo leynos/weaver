@@ -5,50 +5,37 @@ mod behaviour;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use mockall::mock;
 use rstest::{fixture, rstest};
 use weaver_plugins::protocol::{FilePayload, PluginOutput, PluginRequest};
 
 use crate::{RopeAdapter, RopeAdapterError, execute_request, run_with_adapter};
 
-struct MockAdapter {
-    result: Result<String, RopeAdapterError>,
-}
-
-impl RopeAdapter for MockAdapter {
-    fn rename(
-        &self,
-        _file: &FilePayload,
-        _offset: usize,
-        _new_name: &str,
-    ) -> Result<String, RopeAdapterError> {
-        self.result.clone()
+mock! {
+    Adapter {}
+    impl RopeAdapter for Adapter {
+        fn rename(
+            &self,
+            file: &FilePayload,
+            offset: usize,
+            new_name: &str,
+        ) -> Result<String, RopeAdapterError>;
     }
 }
 
-impl Clone for RopeAdapterError {
-    fn clone(&self) -> Self {
-        match self {
-            Self::WorkspaceCreate { source } => Self::WorkspaceCreate {
-                source: std::io::Error::new(source.kind(), source.to_string()),
-            },
-            Self::WorkspaceWrite { path, source } => Self::WorkspaceWrite {
-                path: path.clone(),
-                source: std::io::Error::new(source.kind(), source.to_string()),
-            },
-            Self::Spawn { source } => Self::Spawn {
-                source: std::io::Error::new(source.kind(), source.to_string()),
-            },
-            Self::EngineFailed { message } => Self::EngineFailed {
-                message: message.clone(),
-            },
-            Self::InvalidOutput { message } => Self::InvalidOutput {
-                message: message.clone(),
-            },
-            Self::InvalidPath { message } => Self::InvalidPath {
-                message: message.clone(),
-            },
-        }
-    }
+/// Builds a `MockAdapter` that expects a single rename call returning `result`.
+fn adapter_returning(result: Result<String, RopeAdapterError>) -> MockAdapter {
+    let mut adapter = MockAdapter::new();
+    adapter
+        .expect_rename()
+        .once()
+        .return_once(move |_file, _offset, _new_name| result);
+    adapter
+}
+
+/// Builds a `MockAdapter` where rename is never expected.
+fn adapter_unused() -> MockAdapter {
+    MockAdapter::new()
 }
 
 #[fixture]
@@ -78,9 +65,7 @@ fn request_with_args(arguments: HashMap<String, serde_json::Value>) -> PluginReq
 
 #[rstest]
 fn rename_success_returns_diff_output(rename_arguments: HashMap<String, serde_json::Value>) {
-    let adapter = MockAdapter {
-        result: Ok(String::from("def new_name():\n    return 1\n")),
-    };
+    let adapter = adapter_returning(Ok(String::from("def new_name():\n    return 1\n")));
 
     let response = execute_request(&adapter, &request_with_args(rename_arguments))
         .expect("execute_request should succeed");
@@ -103,34 +88,52 @@ fn set_negative_offset(arguments: &mut HashMap<String, serde_json::Value>) {
     );
 }
 
+fn set_numeric_offset(arguments: &mut HashMap<String, serde_json::Value>) {
+    arguments.insert(
+        String::from("offset"),
+        serde_json::Value::Number(serde_json::Number::from(4)),
+    );
+}
+
+fn set_empty_new_name(arguments: &mut HashMap<String, serde_json::Value>) {
+    arguments.insert(
+        String::from("new_name"),
+        serde_json::Value::String(String::from("  ")),
+    );
+}
+
 #[rstest]
-#[case::missing_offset(remove_offset, "offset")]
-#[case::boolean_offset(set_boolean_offset, "offset")]
-#[case::negative_offset(set_negative_offset, "non-negative integer")]
-fn rename_invalid_offset_arguments_return_error(
+#[case::missing_offset(remove_offset as fn(&mut _), Some("offset"))]
+#[case::boolean_offset(set_boolean_offset as fn(&mut _), Some("offset"))]
+#[case::negative_offset(set_negative_offset as fn(&mut _), Some("non-negative integer"))]
+#[case::numeric_offset_succeeds(set_numeric_offset as fn(&mut _), None)]
+#[case::empty_new_name(set_empty_new_name as fn(&mut _), Some("new_name"))]
+fn rename_argument_validation(
     #[case] mutate: fn(&mut HashMap<String, serde_json::Value>),
-    #[case] expected_message: &str,
+    #[case] expected_error: Option<&str>,
     mut rename_arguments: HashMap<String, serde_json::Value>,
 ) {
     mutate(&mut rename_arguments);
 
-    let adapter = MockAdapter {
-        result: Ok(String::from("unused")),
-    };
-
-    let err = execute_request(&adapter, &request_with_args(rename_arguments))
-        .expect_err("invalid offset arguments should fail");
-    assert!(
-        err.contains(expected_message),
-        "expected error mentioning '{expected_message}', got: {err}"
-    );
+    if let Some(needle) = expected_error {
+        let adapter = adapter_unused();
+        let err = execute_request(&adapter, &request_with_args(rename_arguments))
+            .expect_err("invalid arguments should fail");
+        assert!(
+            err.contains(needle),
+            "expected error mentioning '{needle}', got: {err}"
+        );
+    } else {
+        let adapter = adapter_returning(Ok(String::from("def new_name():\n    return 1\n")));
+        let response = execute_request(&adapter, &request_with_args(rename_arguments))
+            .expect("valid arguments should succeed");
+        assert!(response.is_success());
+    }
 }
 
 #[test]
 fn unsupported_operation_returns_error() {
-    let adapter = MockAdapter {
-        result: Ok(String::from("unused")),
-    };
+    let adapter = adapter_unused();
     let request = PluginRequest::new("extract_method", Vec::new());
 
     let err = execute_request(&adapter, &request).expect_err("unsupported operation should fail");
@@ -153,14 +156,12 @@ fn rename_non_mutating_or_error_returns_failure(
     rename_arguments: HashMap<String, serde_json::Value>,
 ) {
     let adapter = match &scenario {
-        FailureScenario::AdapterError => MockAdapter {
-            result: Err(RopeAdapterError::EngineFailed {
-                message: String::from("rope failed"),
-            }),
-        },
-        FailureScenario::NoChange => MockAdapter {
-            result: Ok(String::from("def old_name():\n    return 1\n")),
-        },
+        FailureScenario::AdapterError => adapter_returning(Err(RopeAdapterError::EngineFailed {
+            message: String::from("rope failed"),
+        })),
+        FailureScenario::NoChange => {
+            adapter_returning(Ok(String::from("def old_name():\n    return 1\n")))
+        }
     };
 
     let err = execute_request(&adapter, &request_with_args(rename_arguments))
@@ -187,92 +188,28 @@ fn valid_request_json() -> String {
     serde_json::to_string(&request).expect("serialize request")
 }
 
-#[test]
-fn run_with_adapter_writes_success_response_to_stdout() {
-    let input = format!("{}\n", valid_request_json());
-    let mut stdin = std::io::Cursor::new(input.into_bytes());
+/// Dispatches `input` through `run_with_adapter` and parses the response.
+fn dispatch_stdin(input: &[u8], adapter: &MockAdapter) -> weaver_plugins::protocol::PluginResponse {
+    let mut stdin = std::io::Cursor::new(input.to_vec());
     let mut stdout = Vec::new();
-
-    let adapter = MockAdapter {
-        result: Ok(String::from("def new_name():\n    return 1\n")),
-    };
-    run_with_adapter(&mut stdin, &mut stdout, &adapter).expect("dispatch should succeed");
-
+    run_with_adapter(&mut stdin, &mut stdout, adapter).expect("dispatch should succeed");
     let output = String::from_utf8(stdout).expect("utf8 stdout");
-    let response: weaver_plugins::protocol::PluginResponse =
-        serde_json::from_str(output.trim()).expect("parse response");
-    assert!(response.is_success());
+    serde_json::from_str(output.trim()).expect("parse response")
 }
-
-#[test]
-fn run_with_adapter_returns_failure_for_empty_stdin() {
-    let mut stdin = std::io::Cursor::new(Vec::new());
-    let mut stdout = Vec::new();
-
-    let adapter = MockAdapter {
-        result: Ok(String::from("unused")),
-    };
-    run_with_adapter(&mut stdin, &mut stdout, &adapter).expect("dispatch should succeed");
-
-    let output = String::from_utf8(stdout).expect("utf8 stdout");
-    let response: weaver_plugins::protocol::PluginResponse =
-        serde_json::from_str(output.trim()).expect("parse response");
-    assert!(!response.is_success());
-}
-
-#[test]
-fn run_with_adapter_returns_failure_for_invalid_json() {
-    let mut stdin = std::io::Cursor::new(b"not valid json\n".to_vec());
-    let mut stdout = Vec::new();
-
-    let adapter = MockAdapter {
-        result: Ok(String::from("unused")),
-    };
-    run_with_adapter(&mut stdin, &mut stdout, &adapter).expect("dispatch should succeed");
-
-    let output = String::from_utf8(stdout).expect("utf8 stdout");
-    let response: weaver_plugins::protocol::PluginResponse =
-        serde_json::from_str(output.trim()).expect("parse response");
-    assert!(!response.is_success());
-}
-
-// ---------------------------------------------------------------------------
-// Argument parsing edge cases
-// ---------------------------------------------------------------------------
 
 #[rstest]
-fn rename_offset_as_number_value_succeeds(
-    mut rename_arguments: HashMap<String, serde_json::Value>,
+#[case::success(
+    format!("{}\n", valid_request_json()).into_bytes(),
+    adapter_returning(Ok(String::from("def new_name():\n    return 1\n"))),
+    true
+)]
+#[case::empty_stdin(Vec::new(), adapter_unused(), false)]
+#[case::invalid_json(b"not valid json\n".to_vec(), adapter_unused(), false)]
+fn run_with_adapter_dispatch_layer(
+    #[case] input: Vec<u8>,
+    #[case] adapter: MockAdapter,
+    #[case] expect_success: bool,
 ) {
-    rename_arguments.insert(
-        String::from("offset"),
-        serde_json::Value::Number(serde_json::Number::from(4)),
-    );
-
-    let adapter = MockAdapter {
-        result: Ok(String::from("def new_name():\n    return 1\n")),
-    };
-
-    let response = execute_request(&adapter, &request_with_args(rename_arguments))
-        .expect("numeric offset should succeed");
-    assert!(response.is_success());
-}
-
-#[rstest]
-fn rename_empty_new_name_returns_error(mut rename_arguments: HashMap<String, serde_json::Value>) {
-    rename_arguments.insert(
-        String::from("new_name"),
-        serde_json::Value::String(String::from("  ")),
-    );
-
-    let adapter = MockAdapter {
-        result: Ok(String::from("unused")),
-    };
-
-    let err = execute_request(&adapter, &request_with_args(rename_arguments))
-        .expect_err("empty new_name should fail");
-    assert!(
-        err.contains("new_name"),
-        "expected error mentioning 'new_name', got: {err}"
-    );
+    let response = dispatch_stdin(&input, &adapter);
+    assert_eq!(response.is_success(), expect_success);
 }

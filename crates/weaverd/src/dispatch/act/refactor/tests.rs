@@ -2,14 +2,14 @@
 
 use std::path::Path;
 
-use rstest::rstest;
+use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 
 use super::{
-    DispatchError, FusionBackends, RefactorPluginRuntime, ResponseWriter, default_runtime, handle,
-    resolve_rope_plugin_path,
+    DispatchError, FusionBackends, RefactorContext, RefactorPluginRuntime, ResponseWriter,
+    default_runtime, handle, resolve_rope_plugin_path,
 };
 use crate::dispatch::request::{CommandDescriptor, CommandRequest};
 use crate::semantic_provider::SemanticBackendProvider;
@@ -47,24 +47,30 @@ fn command_request(arguments: Vec<String>) -> CommandRequest {
     }
 }
 
-fn build_backends() -> FusionBackends<SemanticBackendProvider> {
+#[fixture]
+fn socket_dir() -> TempDir {
+    TempDir::new().expect("socket dir")
+}
+
+fn build_backends(socket_path: &Path) -> FusionBackends<SemanticBackendProvider> {
     let config = Config {
-        daemon_socket: SocketEndpoint::unix("/tmp/weaver-test/socket.sock"),
+        daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().as_ref()),
         ..Config::default()
     };
     let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
     FusionBackends::new(config, provider)
 }
 
-#[test]
-fn handle_returns_error_for_missing_provider() {
+#[rstest]
+fn handle_returns_error_for_missing_provider(socket_dir: TempDir) {
     let request = command_request(vec![
         String::from("--refactoring"),
         String::from("rename"),
         String::from("--file"),
         String::from("notes.txt"),
     ]);
-    let mut backends = build_backends();
+    let socket_path = socket_dir.path().join("socket.sock");
+    let mut backends = build_backends(&socket_path);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
     let runtime = MockRuntime {
@@ -74,9 +80,11 @@ fn handle_returns_error_for_missing_provider() {
     let result = handle(
         &request,
         &mut writer,
-        &mut backends,
-        Path::new("/tmp/workspace"),
-        &runtime,
+        RefactorContext {
+            backends: &mut backends,
+            workspace_root: Path::new("/tmp/workspace"),
+            runtime: &runtime,
+        },
     );
 
     assert!(matches!(
@@ -85,8 +93,8 @@ fn handle_returns_error_for_missing_provider() {
     ));
 }
 
-#[test]
-fn handle_runtime_error_returns_status_one() {
+#[rstest]
+fn handle_runtime_error_returns_status_one(socket_dir: TempDir) {
     let workspace = TempDir::new().expect("workspace");
     let file_path = workspace.path().join("notes.txt");
     std::fs::write(&file_path, "hello\n").expect("write");
@@ -102,16 +110,19 @@ fn handle_runtime_error_returns_status_one() {
     let runtime = MockRuntime {
         result: MockRuntimeResult::NotFound(String::from("rope")),
     };
-    let mut backends = build_backends();
+    let socket_path = socket_dir.path().join("socket.sock");
+    let mut backends = build_backends(&socket_path);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
 
     let result = handle(
         &request,
         &mut writer,
-        &mut backends,
-        workspace.path(),
-        &runtime,
+        RefactorContext {
+            backends: &mut backends,
+            workspace_root: workspace.path(),
+            runtime: &runtime,
+        },
     )
     .expect("dispatch result");
 
@@ -123,7 +134,10 @@ fn handle_runtime_error_returns_status_one() {
 #[rstest]
 #[case::analysis(PluginOutput::Analysis { data: serde_json::json!({"k": "v"}) })]
 #[case::empty(PluginOutput::Empty)]
-fn handle_non_diff_output_returns_status_one(#[case] output_variant: PluginOutput) {
+fn handle_non_diff_output_returns_status_one(
+    #[case] output_variant: PluginOutput,
+    socket_dir: TempDir,
+) {
     let workspace = TempDir::new().expect("workspace");
     let file_path = workspace.path().join("notes.txt");
     std::fs::write(&file_path, "hello\n").expect("write");
@@ -139,16 +153,19 @@ fn handle_non_diff_output_returns_status_one(#[case] output_variant: PluginOutpu
     let runtime = MockRuntime {
         result: MockRuntimeResult::Success(PluginResponse::success(output_variant)),
     };
-    let mut backends = build_backends();
+    let socket_path = socket_dir.path().join("socket.sock");
+    let mut backends = build_backends(&socket_path);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
 
     let result = handle(
         &request,
         &mut writer,
-        &mut backends,
-        workspace.path(),
-        &runtime,
+        RefactorContext {
+            backends: &mut backends,
+            workspace_root: workspace.path(),
+            runtime: &runtime,
+        },
     )
     .expect("dispatch result");
 
@@ -157,8 +174,8 @@ fn handle_non_diff_output_returns_status_one(#[case] output_variant: PluginOutpu
     assert!(stderr.contains("did not return diff output"));
 }
 
-#[test]
-fn handle_diff_output_applies_patch_through_apply_patch_pipeline() {
+#[rstest]
+fn handle_diff_output_applies_patch_through_apply_patch_pipeline(socket_dir: TempDir) {
     let workspace = TempDir::new().expect("workspace");
     let relative_file = String::from("notes.txt");
     let file_path = workspace.path().join(&relative_file);
@@ -185,16 +202,19 @@ fn handle_diff_output_applies_patch_through_apply_patch_pipeline() {
         String::from("--file"),
         relative_file.clone(),
     ]);
-    let mut backends = build_backends();
+    let socket_path = socket_dir.path().join("socket.sock");
+    let mut backends = build_backends(&socket_path);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
 
     let result = handle(
         &request,
         &mut writer,
-        &mut backends,
-        workspace.path(),
-        &runtime,
+        RefactorContext {
+            backends: &mut backends,
+            workspace_root: workspace.path(),
+            runtime: &runtime,
+        },
     )
     .expect("dispatch result");
 
