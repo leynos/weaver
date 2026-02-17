@@ -74,7 +74,7 @@ fn rename_success_returns_diff_output(rename_arguments: HashMap<String, serde_js
 }
 
 fn remove_offset(arguments: &mut HashMap<String, serde_json::Value>) {
-    drop(arguments.remove("offset"));
+    arguments.remove("offset");
 }
 
 fn set_boolean_offset(arguments: &mut HashMap<String, serde_json::Value>) {

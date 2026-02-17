@@ -280,7 +280,7 @@ fn refactor_pipeline_with_observe_and_jq_snapshot() {
     );
 
     let output = Command::new("bash")
-        .args(["-lc", shell_script])
+        .args(["-c", shell_script])
         .env("WEAVER_BIN", weaver_bin)
         .env("WEAVER_ENDPOINT", endpoint.as_str())
         .output()
