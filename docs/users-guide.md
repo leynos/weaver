@@ -530,21 +530,32 @@ weaver act refactor --provider <PLUGIN> --refactoring <OP> --file <PATH> [KEY=VA
 
 Arguments:
 
-| Flag            | Description                                                         |
-| --------------- | ------------------------------------------------------------------- |
-| `--provider`    | Name of the registered plugin (e.g. `rope`).                        |
-| `--refactoring` | Refactoring operation to request (e.g. `rename`, `extract_method`). |
-| `--file`        | Path to the target file (relative to workspace root).               |
-| `KEY=VALUE`     | Extra key-value arguments forwarded to the plugin.                  |
+| Flag            | Description                                            |
+| --------------- | ------------------------------------------------------ |
+| `--provider`    | Name of the registered plugin (e.g. `rope`).           |
+| `--refactoring` | Refactoring operation to request (currently `rename`). |
+| `--file`        | Path to the target file (relative to workspace root).  |
+| `KEY=VALUE`     | Extra key-value arguments forwarded to the plugin.     |
 
 The plugin receives the file content in-band as part of the JSONL request and
 does not need filesystem access. The daemon validates the resulting diff
 through both the syntactic (Tree-sitter) and semantic (LSP) locks before
 writing to disk.
 
-> **Note:** Full plugin execution requires a configured plugin registry. The
-> `act refactor` command validates arguments and builds the plugin request in
-> Phase 3.1.1; end-to-end plugin invocation is wired in Phase 3.2.
+For the built-in `rope` actuator, `rename` requires `offset=<BYTE_OFFSET>` and
+`new_name=<IDENTIFIER>` in the trailing `KEY=VALUE` arguments.
+
+The daemon ships with a default `rope` actuator registration. By default, it
+expects the plugin executable at `/usr/bin/weaver-plugin-rope`. Override the
+path with:
+
+```sh
+WEAVER_ROPE_PLUGIN_PATH=/absolute/path/to/weaver-plugin-rope
+```
+
+The override path is resolved to an absolute path at daemon startup. If the
+plugin executable cannot be launched, `act refactor` returns a structured
+failure and does not modify the filesystem.
 
 ## Plugin system
 
@@ -594,6 +605,13 @@ plugins do not need filesystem access.
 The daemon maintains a `PluginRegistry` that stores validated plugin manifests
 keyed by name. Plugins can be looked up by name, kind, language, or a
 combination thereof (e.g. "find all actuator plugins for Python").
+
+For the first actuator rollout, `weaverd` registers the `rope` plugin using:
+
+- name: `rope`
+- kind: `actuator`
+- language: `python`
+- executable: `/usr/bin/weaver-plugin-rope` (or `WEAVER_ROPE_PLUGIN_PATH`)
 
 ### Safety harness integration
 

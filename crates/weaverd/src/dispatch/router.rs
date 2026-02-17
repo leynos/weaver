@@ -7,6 +7,7 @@
 
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use tracing::debug;
 
@@ -120,15 +121,43 @@ impl DomainRoutingContext {
 /// The router parses the domain from the request, validates the operation, and
 /// delegates to the appropriate handler. MVP handlers return "not implemented"
 /// responses for all known operations.
-#[derive(Debug)]
 pub struct DomainRouter {
     workspace_root: PathBuf,
+    refactor_runtime: Arc<dyn act::refactor::RefactorPluginRuntime + Send + Sync>,
+}
+
+impl std::fmt::Debug for DomainRouter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DomainRouter")
+            .field("workspace_root", &self.workspace_root)
+            .finish_non_exhaustive()
+    }
 }
 
 impl DomainRouter {
     /// Creates a new domain router with the workspace root.
-    #[rustfmt::skip]
-    pub fn new(workspace_root: PathBuf) -> Self { Self { workspace_root } }
+    pub fn new(workspace_root: PathBuf) -> Self {
+        Self {
+            workspace_root,
+            refactor_runtime: act::refactor::default_runtime(),
+        }
+    }
+
+    /// Creates a domain router with a custom refactor runtime.
+    #[cfg(test)]
+    #[expect(
+        dead_code,
+        reason = "builder for test-injected runtimes; used by future tests"
+    )]
+    pub fn with_runtime(
+        workspace_root: PathBuf,
+        runtime: Arc<dyn act::refactor::RefactorPluginRuntime + Send + Sync>,
+    ) -> Self {
+        Self {
+            workspace_root,
+            refactor_runtime: runtime,
+        }
+    }
 
     /// Routes a command request to the appropriate domain handler.
     ///
@@ -181,7 +210,15 @@ impl DomainRouter {
             "apply-patch" => {
                 act::apply_patch::handle(request, writer, backends, &self.workspace_root)
             }
-            "refactor" => act::refactor::handle(request, writer, backends, &self.workspace_root),
+            "refactor" => act::refactor::handle(
+                request,
+                writer,
+                act::refactor::RefactorContext {
+                    backends,
+                    workspace_root: &self.workspace_root,
+                    runtime: self.refactor_runtime.as_ref(),
+                },
+            ),
             _ => Self::route_fallback(&DomainRoutingContext::ACT, operation.as_str(), writer),
         }
     }
