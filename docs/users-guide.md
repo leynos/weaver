@@ -530,27 +530,36 @@ weaver act refactor --provider <PLUGIN> --refactoring <OP> --file <PATH> [KEY=VA
 
 Arguments:
 
-| Flag            | Description                                            |
-| --------------- | ------------------------------------------------------ |
-| `--provider`    | Name of the registered plugin (e.g. `rope`).           |
-| `--refactoring` | Refactoring operation to request (currently `rename`). |
-| `--file`        | Path to the target file (relative to workspace root).  |
-| `KEY=VALUE`     | Extra key-value arguments forwarded to the plugin.     |
+| Flag            | Description                                                   |
+| --------------- | ------------------------------------------------------------- |
+| `--provider`    | Name of the registered plugin (e.g. `rope`, `rust-analyzer`). |
+| `--refactoring` | Refactoring operation to request (currently `rename`).        |
+| `--file`        | Path to the target file (relative to workspace root).         |
+| `KEY=VALUE`     | Extra key-value arguments forwarded to the plugin.            |
 
 The plugin receives the file content in-band as part of the JSONL request and
 does not need filesystem access. The daemon validates the resulting diff
 through both the syntactic (Tree-sitter) and semantic (LSP) locks before
 writing to disk.
 
-For the built-in `rope` actuator, `rename` requires `offset=<BYTE_OFFSET>` and
+For the built-in actuators, `rename` requires `offset=<BYTE_OFFSET>` and
 `new_name=<IDENTIFIER>` in the trailing `KEY=VALUE` arguments.
 
-The daemon ships with a default `rope` actuator registration. By default, it
-expects the plugin executable at `/usr/bin/weaver-plugin-rope`. Override the
-path with:
+The daemon ships with default actuator registrations:
+
+- `rope` for Python (`timeout_secs = 30`)
+- `rust-analyzer` for Rust (`timeout_secs = 60`)
+
+By default, it expects plugin executables at:
+
+- `/usr/bin/weaver-plugin-rope`
+- `/usr/bin/weaver-plugin-rust-analyzer`
+
+Override these paths with:
 
 ```sh
 WEAVER_ROPE_PLUGIN_PATH=/absolute/path/to/weaver-plugin-rope
+WEAVER_RUST_ANALYZER_PLUGIN_PATH=/absolute/path/to/weaver-plugin-rust-analyzer
 ```
 
 The override path is resolved to an absolute path at daemon startup. If the
@@ -606,12 +615,19 @@ The daemon maintains a `PluginRegistry` that stores validated plugin manifests
 keyed by name. Plugins can be looked up by name, kind, language, or a
 combination thereof (e.g. "find all actuator plugins for Python").
 
-For the first actuator rollout, `weaverd` registers the `rope` plugin using:
+For the current actuator rollout, `weaverd` registers:
 
-- name: `rope`
-- kind: `actuator`
-- language: `python`
-- executable: `/usr/bin/weaver-plugin-rope` (or `WEAVER_ROPE_PLUGIN_PATH`)
+- `rope`
+  - kind: `actuator`
+  - language: `python`
+  - executable: `/usr/bin/weaver-plugin-rope` (or `WEAVER_ROPE_PLUGIN_PATH`)
+  - timeout: `30s`
+- `rust-analyzer`
+  - kind: `actuator`
+  - language: `rust`
+  - executable: `/usr/bin/weaver-plugin-rust-analyzer`
+    (or `WEAVER_RUST_ANALYZER_PLUGIN_PATH`)
+  - timeout: `60s`
 
 ### Safety harness integration
 

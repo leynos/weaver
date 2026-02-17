@@ -1,0 +1,28 @@
+---
+source: crates/weaver-e2e/tests/refactor_rust_analyzer_cli_snapshots.rs
+expression: transcript
+---
+Transcript {
+    command: "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider rust-analyzer --refactoring rename --file src/main.rs new_name=renamed_name offset=3",
+    status: 0,
+    stdout: "{\"files_deleted\":0,\"files_written\":1,\"status\":\"ok\"}",
+    stderr: "",
+    requests: [
+        Object {
+            "arguments": Array [
+                String("--provider"),
+                String("rust-analyzer"),
+                String("--refactoring"),
+                String("rename"),
+                String("--file"),
+                String("src/main.rs"),
+                String("new_name=renamed_name"),
+                String("offset=3"),
+            ],
+            "command": Object {
+                "domain": String("act"),
+                "operation": String("refactor"),
+            },
+        },
+    ],
+}

@@ -2686,6 +2686,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "weaver-plugin-rust-analyzer"
+version = "0.1.0"
+dependencies = [
+ "lsp-types",
+ "mockall",
+ "rstest",
+ "rstest-bdd",
+ "rstest-bdd-macros",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.17",
+ "url",
+ "weaver-plugins",
+]
+
+[[package]]
 name = "weaver-plugins"
 version = "0.1.0"
 dependencies = [

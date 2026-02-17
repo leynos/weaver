@@ -1,0 +1,22 @@
+[package]
+name = "weaver-plugin-rust-analyzer"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+lsp-types.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+url.workspace = true
+weaver-plugins = { path = "../weaver-plugins" }
+
+[dev-dependencies]
+mockall.workspace = true
+rstest.workspace = true
+rstest-bdd.workspace = true
+rstest-bdd-macros.workspace = true
+
+[lints]
+workspace = true
