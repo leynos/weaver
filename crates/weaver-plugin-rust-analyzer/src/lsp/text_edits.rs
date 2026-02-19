@@ -54,7 +54,7 @@ pub(super) fn byte_offset_to_lsp_position(
         });
     }
 
-    let prefix = slice_to_checked(content, offset, "prefix")?;
+    let prefix = slice_checked(content, ..offset, "prefix")?;
     let line =
         u32::try_from(prefix.bytes().filter(|byte| *byte == b'\n').count()).map_err(|source| {
             RustAnalyzerAdapterError::InvalidOutput {
@@ -65,7 +65,7 @@ pub(super) fn byte_offset_to_lsp_position(
     let line_start = prefix
         .rfind('\n')
         .map_or(0, |index| index + '\n'.len_utf8());
-    let line_prefix = slice_range_checked(content, line_start, offset, "line prefix")?;
+    let line_prefix = slice_checked(content, line_start..offset, "line prefix")?;
     let character = u32::try_from(line_prefix.encode_utf16().count()).map_err(|source| {
         RustAnalyzerAdapterError::InvalidOutput {
             message: format!("character offset exceeds u32 range: {source}"),
@@ -214,11 +214,11 @@ fn lsp_position_to_byte_offset(
     position: Position,
 ) -> Result<usize, RustAnalyzerAdapterError> {
     let line_start = find_line_start_offset(content, position.line)?;
-    let from_line_start = slice_from_checked(content, line_start, "line start")?;
+    let from_line_start = slice_checked(content, line_start.., "line start")?;
     let line_end = from_line_start
         .find('\n')
         .map_or(content.len(), |relative| line_start + relative);
-    let line_content = slice_range_checked(content, line_start, line_end, "line content")?;
+    let line_content = slice_checked(content, line_start..line_end, "line content")?;
 
     let mut utf16_units = 0_u32;
     for (index, character) in line_content.char_indices() {
@@ -305,39 +305,18 @@ pub(super) fn path_to_file_uri(path: &Path) -> Result<Uri, RustAnalyzerAdapterEr
         })
 }
 
-fn slice_to_checked<'a>(
+fn slice_checked<'a, R>(
     content: &'a str,
-    end: usize,
+    range: R,
     slice_name: &str,
-) -> Result<&'a str, RustAnalyzerAdapterError> {
+) -> Result<&'a str, RustAnalyzerAdapterError>
+where
+    R: std::slice::SliceIndex<str, Output = str> + std::fmt::Debug,
+{
+    let range_debug = format!("{range:?}");
     content
-        .get(..end)
+        .get(range)
         .ok_or_else(|| RustAnalyzerAdapterError::InvalidOutput {
-            message: format!("invalid UTF-8 slice for {slice_name}: ..{end}"),
-        })
-}
-
-fn slice_from_checked<'a>(
-    content: &'a str,
-    start: usize,
-    slice_name: &str,
-) -> Result<&'a str, RustAnalyzerAdapterError> {
-    content
-        .get(start..)
-        .ok_or_else(|| RustAnalyzerAdapterError::InvalidOutput {
-            message: format!("invalid UTF-8 slice for {slice_name}: {start}.."),
-        })
-}
-
-fn slice_range_checked<'a>(
-    content: &'a str,
-    start: usize,
-    end: usize,
-    slice_name: &str,
-) -> Result<&'a str, RustAnalyzerAdapterError> {
-    content
-        .get(start..end)
-        .ok_or_else(|| RustAnalyzerAdapterError::InvalidOutput {
-            message: format!("invalid UTF-8 slice for {slice_name}: {start}..{end}"),
+            message: format!("invalid UTF-8 slice for {slice_name}: {range_debug}"),
         })
 }
