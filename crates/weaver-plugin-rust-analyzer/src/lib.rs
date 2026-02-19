@@ -20,6 +20,24 @@ use weaver_plugins::protocol::{
 
 pub use lsp::RustAnalyzerLspAdapter;
 
+/// UTF-8 byte offset into a source document.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ByteOffset(usize);
+
+impl ByteOffset {
+    /// Creates a new byte offset value.
+    #[must_use]
+    pub const fn new(offset: usize) -> Self {
+        Self(offset)
+    }
+
+    /// Returns the inner byte offset as `usize`.
+    #[must_use]
+    pub const fn as_usize(self) -> usize {
+        self.0
+    }
+}
+
 /// Refactoring adapter abstraction used to keep behaviour deterministic in tests.
 pub trait RustAnalyzerAdapter {
     /// Executes a rename operation and returns the modified file content.
@@ -30,7 +48,7 @@ pub trait RustAnalyzerAdapter {
     fn rename(
         &self,
         file: &FilePayload,
-        offset: usize,
+        offset: ByteOffset,
         new_name: &str,
     ) -> Result<String, RustAnalyzerAdapterError>;
 }
@@ -197,7 +215,7 @@ fn execute_rename<R: RustAnalyzerAdapter>(
 
 fn parse_rename_arguments(
     arguments: &HashMap<String, serde_json::Value>,
-) -> Result<(usize, String), String> {
+) -> Result<(ByteOffset, String), String> {
     let offset_value = arguments
         .get("offset")
         .ok_or_else(|| String::from("rename operation requires 'offset' argument"))?;
@@ -218,7 +236,7 @@ fn parse_rename_arguments(
         return Err(String::from("new_name argument must not be empty"));
     }
 
-    Ok((offset, String::from(new_name)))
+    Ok((ByteOffset::new(offset), String::from(new_name)))
 }
 
 fn json_value_to_string(value: &serde_json::Value) -> Option<String> {
@@ -229,7 +247,7 @@ fn json_value_to_string(value: &serde_json::Value) -> Option<String> {
     }
 }
 
-fn write_workspace_file(
+pub(crate) fn write_workspace_file(
     workspace_root: &Path,
     relative_path: &Path,
     content: &str,
@@ -262,8 +280,19 @@ fn validate_relative_path(path: &Path) -> Result<(), RustAnalyzerAdapterError> {
         });
     }
 
-    let has_parent_traversal = path
-        .components()
+    let components = path.components().collect::<Vec<_>>();
+    if components.is_empty()
+        || components
+            .iter()
+            .all(|component| matches!(component, Component::CurDir))
+    {
+        return Err(RustAnalyzerAdapterError::InvalidPath {
+            message: String::from("path must not be empty or only '.'"),
+        });
+    }
+
+    let has_parent_traversal = components
+        .iter()
         .any(|component| matches!(component, Component::ParentDir));
     if has_parent_traversal {
         return Err(RustAnalyzerAdapterError::InvalidPath {
@@ -271,8 +300,8 @@ fn validate_relative_path(path: &Path) -> Result<(), RustAnalyzerAdapterError> {
         });
     }
 
-    let has_windows_prefix = path
-        .components()
+    let has_windows_prefix = components
+        .iter()
         .any(|component| matches!(component, Component::Prefix(_)));
     if has_windows_prefix {
         return Err(RustAnalyzerAdapterError::InvalidPath {

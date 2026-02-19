@@ -15,15 +15,16 @@ use serde_json::json;
 use tempfile::TempDir;
 use weaver_plugins::protocol::FilePayload;
 
-use crate::{RustAnalyzerAdapter, RustAnalyzerAdapterError, write_workspace_file};
+use crate::{ByteOffset, RustAnalyzerAdapter, RustAnalyzerAdapterError, write_workspace_file};
 
 use self::jsonrpc::{JsonRpcRequestSpec, send_notification, send_request};
 use self::text_edits::{
-    apply_workspace_edit, byte_offset_to_lsp_position, ensure_response_is_object,
+    PositionEncoding, apply_workspace_edit, byte_offset_to_lsp_position, ensure_response_is_object,
     parse_workspace_edit, path_to_file_uri, write_stub_cargo_toml,
 };
 
 const RUST_ANALYZER_BINARY: &str = "rust-analyzer";
+const RUST_ANALYZER_BINARY_ENV: &str = "WEAVER_RUST_ANALYZER_BINARY";
 const INITIALIZE_REQUEST_ID: i64 = 1;
 const RENAME_REQUEST_ID: i64 = 2;
 const SHUTDOWN_REQUEST_ID: i64 = 3;
@@ -43,30 +44,67 @@ struct RustAnalyzerProcess {
     writer: BufWriter<ChildStdin>,
 }
 
+#[derive(Clone, Copy)]
+struct RenameInputs<'a> {
+    file: &'a FilePayload,
+    offset: ByteOffset,
+    new_name: &'a str,
+}
+
 impl RustAnalyzerAdapter for RustAnalyzerLspAdapter {
     fn rename(
         &self,
         file: &FilePayload,
-        offset: usize,
+        offset: ByteOffset,
         new_name: &str,
     ) -> Result<String, RustAnalyzerAdapterError> {
         let prepared = prepare_workspace(file)?;
         let mut process = start_rust_analyzer(&prepared)?;
+        let rename_inputs = RenameInputs {
+            file,
+            offset,
+            new_name,
+        };
+        let rename_result = run_rename_session(&mut process, &prepared, rename_inputs);
 
-        initialize_session(&mut process, &prepared.workspace_uri)?;
-        open_document(&mut process, &prepared.file_uri, file.content())?;
-
-        let position = byte_offset_to_lsp_position(file.content(), offset)?;
-        let workspace_edit =
-            request_rename_edit(&mut process, &prepared.file_uri, position, new_name)?;
-        let updated_content =
-            apply_workspace_edit(file.content(), workspace_edit, &prepared.file_uri)?;
-
-        shutdown_session(&mut process)?;
-        finish_session(process)?;
-
-        Ok(updated_content)
+        match rename_result {
+            Ok(updated_content) => {
+                close_session(process)?;
+                Ok(updated_content)
+            }
+            Err(error) => {
+                terminate_session(process);
+                Err(error)
+            }
+        }
     }
+}
+
+fn run_rename_session(
+    process: &mut RustAnalyzerProcess,
+    prepared: &PreparedWorkspace,
+    rename_inputs: RenameInputs<'_>,
+) -> Result<String, RustAnalyzerAdapterError> {
+    let position_encoding = initialize_session(process, &prepared.workspace_uri)?;
+    open_document(process, &prepared.file_uri, rename_inputs.file.content())?;
+
+    let position = byte_offset_to_lsp_position(
+        rename_inputs.file.content(),
+        rename_inputs.offset,
+        position_encoding,
+    )?;
+    let workspace_edit = request_rename_edit(
+        process,
+        &prepared.file_uri,
+        position,
+        rename_inputs.new_name,
+    )?;
+    apply_workspace_edit(
+        rename_inputs.file.content(),
+        workspace_edit,
+        &prepared.file_uri,
+        position_encoding,
+    )
 }
 
 fn prepare_workspace(file: &FilePayload) -> Result<PreparedWorkspace, RustAnalyzerAdapterError> {
@@ -88,7 +126,8 @@ fn prepare_workspace(file: &FilePayload) -> Result<PreparedWorkspace, RustAnalyz
 fn start_rust_analyzer(
     prepared: &PreparedWorkspace,
 ) -> Result<RustAnalyzerProcess, RustAnalyzerAdapterError> {
-    let mut child = Command::new(RUST_ANALYZER_BINARY)
+    let binary = resolve_rust_analyzer_binary();
+    let mut child = Command::new(binary)
         .current_dir(prepared.workspace.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -119,7 +158,7 @@ fn start_rust_analyzer(
 fn initialize_session(
     process: &mut RustAnalyzerProcess,
     workspace_uri: &Uri,
-) -> Result<(), RustAnalyzerAdapterError> {
+) -> Result<PositionEncoding, RustAnalyzerAdapterError> {
     let initialize_result = send_request(
         &mut process.writer,
         &mut process.reader,
@@ -135,15 +174,16 @@ fn initialize_session(
                 }],
                 "capabilities": {
                     "general": {
-                        "positionEncodings": ["utf-16"],
+                        "positionEncodings": ["utf-8", "utf-16"],
                     },
                 },
             }),
         },
     )?;
-    ensure_response_is_object(&initialize_result, "initialize")?;
+    let position_encoding = parse_position_encoding(&initialize_result)?;
 
-    send_notification(&mut process.writer, "initialized", Some(json!({})))
+    send_notification(&mut process.writer, "initialized", Some(json!({})))?;
+    Ok(position_encoding)
 }
 
 fn open_document(
@@ -210,16 +250,34 @@ fn shutdown_session(process: &mut RustAnalyzerProcess) -> Result<(), RustAnalyze
     send_notification(&mut process.writer, "exit", None)
 }
 
+fn close_session(mut process: RustAnalyzerProcess) -> Result<(), RustAnalyzerAdapterError> {
+    if let Err(error) = shutdown_session(&mut process) {
+        terminate_session(process);
+        return Err(error);
+    }
+
+    finish_session(process)
+}
+
+fn terminate_session(mut process: RustAnalyzerProcess) {
+    drop(process.writer);
+    drop(process.reader);
+    force_terminate_process(&mut process.child);
+}
+
 fn finish_session(mut process: RustAnalyzerProcess) -> Result<(), RustAnalyzerAdapterError> {
     drop(process.writer);
     drop(process.reader);
 
-    let status = process
-        .child
-        .wait()
-        .map_err(|source| RustAnalyzerAdapterError::EngineFailed {
-            message: format!("failed to wait for rust-analyzer process: {source}"),
-        })?;
+    let status = match process.child.wait() {
+        Ok(status) => status,
+        Err(source) => {
+            force_terminate_process(&mut process.child);
+            return Err(RustAnalyzerAdapterError::EngineFailed {
+                message: format!("failed to wait for rust-analyzer process: {source}"),
+            });
+        }
+    };
 
     if !status.success() {
         return Err(RustAnalyzerAdapterError::EngineFailed {
@@ -228,4 +286,37 @@ fn finish_session(mut process: RustAnalyzerProcess) -> Result<(), RustAnalyzerAd
     }
 
     Ok(())
+}
+
+fn force_terminate_process(child: &mut Child) {
+    drop(child.kill());
+    drop(child.wait());
+}
+
+fn parse_position_encoding(
+    initialize_result: &serde_json::Value,
+) -> Result<PositionEncoding, RustAnalyzerAdapterError> {
+    ensure_response_is_object(initialize_result, "initialize")?;
+
+    let negotiated = initialize_result
+        .get("capabilities")
+        .and_then(serde_json::Value::as_object)
+        .and_then(|capabilities| capabilities.get("positionEncoding"))
+        .and_then(serde_json::Value::as_str);
+
+    match negotiated {
+        Some("utf-8") => Ok(PositionEncoding::Utf8),
+        Some("utf-16") | None => Ok(PositionEncoding::Utf16),
+        Some(other) => Err(RustAnalyzerAdapterError::InvalidOutput {
+            message: format!("unsupported server position encoding '{other}'"),
+        }),
+    }
+}
+
+fn resolve_rust_analyzer_binary() -> String {
+    std::env::var(RUST_ANALYZER_BINARY_ENV)
+        .ok()
+        .map(|candidate| candidate.trim().to_owned())
+        .filter(|candidate| !candidate.is_empty())
+        .unwrap_or_else(|| String::from(RUST_ANALYZER_BINARY))
 }

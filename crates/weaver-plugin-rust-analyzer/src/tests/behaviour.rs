@@ -10,7 +10,9 @@ use weaver_plugins::protocol::{
     DiagnosticSeverity, FilePayload, PluginOutput, PluginRequest, PluginResponse,
 };
 
-use crate::{RustAnalyzerAdapter, RustAnalyzerAdapterError, execute_request, failure_response};
+use crate::{
+    ByteOffset, RustAnalyzerAdapter, RustAnalyzerAdapterError, execute_request, failure_response,
+};
 
 #[derive(Default)]
 struct World {
@@ -38,7 +40,7 @@ mock! {
         fn rename(
             &self,
             file: &FilePayload,
-            offset: usize,
+            offset: ByteOffset,
             new_name: &str,
         ) -> Result<String, RustAnalyzerAdapterError>;
     }
@@ -53,7 +55,7 @@ fn should_invoke_rename(request: &PluginRequest) -> bool {
 
 fn configure_adapter_for_mode(adapter: &mut MockBehaviourAdapter, mode: AdapterMode) {
     adapter.expect_rename().once().returning(
-        move |file: &FilePayload, _offset: usize, _new_name: &str| match mode {
+        move |file: &FilePayload, _offset: ByteOffset, _new_name: &str| match mode {
             AdapterMode::Success => Ok(file.content().replace("old_name", "new_name")),
             AdapterMode::NoChange => Ok(file.content().to_owned()),
             AdapterMode::Fails => Err(RustAnalyzerAdapterError::EngineFailed {

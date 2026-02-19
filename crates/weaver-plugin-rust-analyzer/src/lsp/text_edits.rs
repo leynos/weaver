@@ -7,7 +7,16 @@ use lsp_types::{
     WorkspaceEdit,
 };
 
-use crate::RustAnalyzerAdapterError;
+use crate::{ByteOffset, RustAnalyzerAdapterError};
+
+/// LSP position encoding used for character offsets.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum PositionEncoding {
+    /// UTF-8 code units.
+    Utf8,
+    /// UTF-16 code units.
+    Utf16,
+}
 
 /// Parses a rename result payload to a workspace edit.
 pub(super) fn parse_workspace_edit(
@@ -41,20 +50,25 @@ pub(super) fn ensure_response_is_object(
 /// Converts a byte offset into an LSP UTF-16 position.
 pub(super) fn byte_offset_to_lsp_position(
     content: &str,
-    offset: usize,
+    offset: ByteOffset,
+    encoding: PositionEncoding,
 ) -> Result<Position, RustAnalyzerAdapterError> {
-    if offset > content.len() {
+    let byte_offset = offset.as_usize();
+    if byte_offset > content.len() {
         return Err(RustAnalyzerAdapterError::InvalidOutput {
-            message: format!("offset {offset} is beyond file length {}", content.len()),
+            message: format!(
+                "offset {byte_offset} is beyond file length {}",
+                content.len()
+            ),
         });
     }
-    if !content.is_char_boundary(offset) {
+    if !content.is_char_boundary(byte_offset) {
         return Err(RustAnalyzerAdapterError::InvalidOutput {
-            message: format!("offset {offset} is not at a UTF-8 character boundary"),
+            message: format!("offset {byte_offset} is not at a UTF-8 character boundary"),
         });
     }
 
-    let prefix = slice_checked(content, ..offset, "prefix")?;
+    let prefix = slice_checked(content, ..byte_offset, "prefix")?;
     let line =
         u32::try_from(prefix.bytes().filter(|byte| *byte == b'\n').count()).map_err(|source| {
             RustAnalyzerAdapterError::InvalidOutput {
@@ -65,8 +79,12 @@ pub(super) fn byte_offset_to_lsp_position(
     let line_start = prefix
         .rfind('\n')
         .map_or(0, |index| index + '\n'.len_utf8());
-    let line_prefix = slice_checked(content, line_start..offset, "line prefix")?;
-    let character = u32::try_from(line_prefix.encode_utf16().count()).map_err(|source| {
+    let line_prefix = slice_checked(content, line_start..byte_offset, "line prefix")?;
+    let character_units = match encoding {
+        PositionEncoding::Utf8 => line_prefix.len(),
+        PositionEncoding::Utf16 => line_prefix.encode_utf16().count(),
+    };
+    let character = u32::try_from(character_units).map_err(|source| {
         RustAnalyzerAdapterError::InvalidOutput {
             message: format!("character offset exceeds u32 range: {source}"),
         }
@@ -80,6 +98,7 @@ pub(super) fn apply_workspace_edit(
     original: &str,
     workspace_edit: WorkspaceEdit,
     file_uri: &Uri,
+    encoding: PositionEncoding,
 ) -> Result<String, RustAnalyzerAdapterError> {
     let mut edits = collect_text_edits(workspace_edit, file_uri)?;
     if edits.is_empty() {
@@ -89,8 +108,8 @@ pub(super) fn apply_workspace_edit(
     let mut ranges = edits
         .drain(..)
         .map(|edit| {
-            let start = lsp_position_to_byte_offset(original, edit.range.start)?;
-            let end = lsp_position_to_byte_offset(original, edit.range.end)?;
+            let start = lsp_position_to_byte_offset(original, edit.range.start, encoding)?;
+            let end = lsp_position_to_byte_offset(original, edit.range.end, encoding)?;
             if end < start {
                 return Err(RustAnalyzerAdapterError::InvalidOutput {
                     message: format!("edit range end precedes start (start={start}, end={end})"),
@@ -212,6 +231,7 @@ fn append_document_edits(
 fn lsp_position_to_byte_offset(
     content: &str,
     position: Position,
+    encoding: PositionEncoding,
 ) -> Result<usize, RustAnalyzerAdapterError> {
     let line_start = find_line_start_offset(content, position.line)?;
     let from_line_start = slice_checked(content, line_start.., "line start")?;
@@ -220,33 +240,61 @@ fn lsp_position_to_byte_offset(
         .map_or(content.len(), |relative| line_start + relative);
     let line_content = slice_checked(content, line_start..line_end, "line content")?;
 
-    let mut utf16_units = 0_u32;
-    for (index, character) in line_content.char_indices() {
-        if utf16_units == position.character {
-            return Ok(line_start + index);
-        }
-
-        let char_width = u32::try_from(character.len_utf16()).map_err(|source| {
-            RustAnalyzerAdapterError::InvalidOutput {
-                message: format!("character width conversion failed: {source}"),
+    match encoding {
+        PositionEncoding::Utf8 => {
+            let character_offset = usize::try_from(position.character).map_err(|source| {
+                RustAnalyzerAdapterError::InvalidOutput {
+                    message: format!("UTF-8 character offset conversion failed: {source}"),
+                }
+            })?;
+            let byte_offset = line_start + character_offset;
+            if byte_offset > line_end {
+                return Err(RustAnalyzerAdapterError::InvalidOutput {
+                    message: format!(
+                        "position {position:?} exceeds line UTF-8 width {}",
+                        line_content.len()
+                    ),
+                });
             }
-        })?;
-        utf16_units += char_width;
+            if !content.is_char_boundary(byte_offset) {
+                return Err(RustAnalyzerAdapterError::InvalidOutput {
+                    message: format!("position {position:?} splits a UTF-8 code point"),
+                });
+            }
+            Ok(byte_offset)
+        }
+        PositionEncoding::Utf16 => {
+            let mut utf16_units = 0_u32;
+            for (index, character) in line_content.char_indices() {
+                if utf16_units == position.character {
+                    return Ok(line_start + index);
+                }
 
-        if utf16_units > position.character {
-            return Err(RustAnalyzerAdapterError::InvalidOutput {
-                message: format!("position {position:?} splits a UTF-16 code unit sequence"),
-            });
+                let char_width = u32::try_from(character.len_utf16()).map_err(|source| {
+                    RustAnalyzerAdapterError::InvalidOutput {
+                        message: format!("character width conversion failed: {source}"),
+                    }
+                })?;
+                utf16_units += char_width;
+
+                if utf16_units > position.character {
+                    return Err(RustAnalyzerAdapterError::InvalidOutput {
+                        message: format!(
+                            "position {position:?} splits a UTF-16 code unit sequence"
+                        ),
+                    });
+                }
+            }
+
+            if utf16_units == position.character {
+                return Ok(line_end);
+            }
+
+            Err(RustAnalyzerAdapterError::InvalidOutput {
+                message: format!("position {position:?} exceeds line UTF-16 width {utf16_units}"),
+            })
         }
     }
-
-    if utf16_units == position.character {
-        return Ok(line_end);
-    }
-
-    Err(RustAnalyzerAdapterError::InvalidOutput {
-        message: format!("position {position:?} exceeds line UTF-16 width {utf16_units}"),
-    })
 }
 
 fn find_line_start_offset(

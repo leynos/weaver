@@ -3,6 +3,7 @@
 use std::io::{BufRead, Write};
 
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 use crate::RustAnalyzerAdapterError;
 
@@ -103,10 +104,11 @@ fn acknowledge_server_request(
     request_id: i64,
     method: &str,
 ) -> Result<(), RustAnalyzerAdapterError> {
+    let result = server_request_result(method)?;
     let response = JsonRpcServerResponse {
         jsonrpc: "2.0",
         id: request_id,
-        result: serde_json::Value::Null,
+        result,
     };
     let payload = serde_json::to_string(&response).map_err(|source| {
         RustAnalyzerAdapterError::InvalidOutput {
@@ -116,6 +118,18 @@ fn acknowledge_server_request(
         }
     })?;
     write_lsp_message(writer, &payload)
+}
+
+fn server_request_result(method: &str) -> Result<serde_json::Value, RustAnalyzerAdapterError> {
+    match method {
+        "workspace/configuration" => Ok(json!([])),
+        "client/registerCapability"
+        | "client/unregisterCapability"
+        | "window/workDoneProgress/create" => Ok(serde_json::Value::Null),
+        other => Err(RustAnalyzerAdapterError::EngineFailed {
+            message: format!("unsupported server-initiated JSON-RPC request method '{other}'"),
+        }),
+    }
 }
 
 fn write_lsp_message(

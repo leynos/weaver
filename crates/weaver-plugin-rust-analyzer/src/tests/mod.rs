@@ -7,9 +7,13 @@ use std::path::PathBuf;
 
 use mockall::mock;
 use rstest::{fixture, rstest};
-use weaver_plugins::protocol::{FilePayload, PluginOutput, PluginRequest};
+use weaver_plugins::protocol::{
+    DiagnosticSeverity, FilePayload, PluginOutput, PluginRequest, PluginResponse,
+};
 
-use crate::{RustAnalyzerAdapter, RustAnalyzerAdapterError, execute_request, run_with_adapter};
+use crate::{
+    ByteOffset, RustAnalyzerAdapter, RustAnalyzerAdapterError, execute_request, run_with_adapter,
+};
 
 mock! {
     Adapter {}
@@ -17,7 +21,7 @@ mock! {
         fn rename(
             &self,
             file: &FilePayload,
-            offset: usize,
+            offset: ByteOffset,
             new_name: &str,
         ) -> Result<String, RustAnalyzerAdapterError>;
     }
@@ -199,7 +203,7 @@ fn valid_request_json() -> String {
 }
 
 /// Dispatches `input` through `run_with_adapter` and parses the response.
-fn dispatch_stdin(input: &[u8], adapter: &MockAdapter) -> weaver_plugins::protocol::PluginResponse {
+fn dispatch_stdin(input: &[u8], adapter: &MockAdapter) -> PluginResponse {
     let mut stdin = std::io::Cursor::new(input.to_vec());
     let mut stdout = Vec::new();
     run_with_adapter(&mut stdin, &mut stdout, adapter).expect("dispatch should succeed");
@@ -211,15 +215,65 @@ fn dispatch_stdin(input: &[u8], adapter: &MockAdapter) -> weaver_plugins::protoc
 #[case::success(
     format!("{}\n", valid_request_json()).into_bytes(),
     adapter_returning(Ok(String::from("fn new_name() -> i32 {\n    1\n}\n"))),
-    true
+    true,
+    None
 )]
-#[case::empty_stdin(Vec::new(), adapter_unused(), false)]
-#[case::invalid_json(b"not valid json\n".to_vec(), adapter_unused(), false)]
+#[case::empty_stdin(Vec::new(), adapter_unused(), false, Some("plugin request was empty"))]
+#[case::invalid_json(
+    b"not valid json\n".to_vec(),
+    adapter_unused(),
+    false,
+    Some("invalid plugin request JSON")
+)]
 fn run_with_adapter_dispatch_layer(
     #[case] input: Vec<u8>,
     #[case] adapter: MockAdapter,
     #[case] expect_success: bool,
+    #[case] expected_message: Option<&str>,
 ) {
     let response = dispatch_stdin(&input, &adapter);
     assert_eq!(response.is_success(), expect_success);
+
+    if let Some(needle) = expected_message {
+        assert!(
+            response
+                .diagnostics()
+                .iter()
+                .any(|diagnostic| diagnostic.severity() == DiagnosticSeverity::Error),
+            "expected at least one error diagnostic, got: {:?}",
+            response.diagnostics(),
+        );
+        assert!(
+            response
+                .diagnostics()
+                .iter()
+                .any(|diagnostic| diagnostic.message().contains(needle)),
+            "expected diagnostic mentioning '{needle}', got: {:?}",
+            response.diagnostics(),
+        );
+    }
+}
+
+fn request_with_path(path: &str) -> PluginRequest {
+    PluginRequest::with_arguments(
+        "rename",
+        vec![FilePayload::new(
+            PathBuf::from(path),
+            "fn old_name() -> i32 {\n    1\n}\n",
+        )],
+        rename_arguments(),
+    )
+}
+
+#[rstest]
+#[case::empty_path("")]
+#[case::curdir(".")]
+fn rename_rejects_empty_or_curdir_path(#[case] path: &str) {
+    let adapter = adapter_unused();
+    let error = execute_request(&adapter, &request_with_path(path))
+        .expect_err("invalid path should fail before adapter invocation");
+    assert!(
+        error.contains("path must not be empty or only '.'"),
+        "expected empty-path error, got: {error}",
+    );
 }
