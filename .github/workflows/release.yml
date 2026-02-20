@@ -105,6 +105,19 @@ jobs:
       should-upload-workflow-artifacts: ${{ fromJSON(needs.metadata.outputs.should_upload_workflow_artifacts) }}
       artifact-suffix: ${{ matrix.artifact_suffix }}
 
+  build-freebsd:
+    # Temporarily disabled until FreeBSD release builds can be validated.
+    if: ${{ false }}
+    needs: metadata
+    uses: ./.github/workflows/build-and-package.yml
+    with:
+      platform: freebsd
+      runner: ubuntu-latest
+      target: x86_64-unknown-freebsd
+      version: ${{ needs.metadata.outputs.version }}
+      artifact-name: ${{ needs.metadata.outputs.repo_name }}-freebsd-amd64
+      should-upload-workflow-artifacts: ${{ fromJSON(needs.metadata.outputs.should_upload_workflow_artifacts) }}
+
   release:
     if: needs.metadata.outputs.should_publish == 'true'
     permissions:
