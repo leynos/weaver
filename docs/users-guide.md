@@ -545,6 +545,74 @@ writing to disk.
 For the built-in actuators, `rename` requires `offset=<BYTE_OFFSET>` and
 `new_name=<IDENTIFIER>` in the trailing `KEY=VALUE` arguments.
 
+### Parameter semantics and valid values
+
+The `act refactor` handler accepts the three required flags and forwards any
+additional `KEY=VALUE` pairs to the selected plugin.
+
+| Parameter       | Meaning                                                           | Valid values                                                                             | Failure conditions                                                                          |
+| --------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `--refactoring` | Refactoring operation requested from the plugin.                  | Currently only `rename` is implemented by built-in `rope` and `rust-analyzer` plugins.   | Missing value, or unsupported operation name (for example `extract_method`) causes failure. |
+| `--file`        | Target file to load and refactor.                                 | Workspace-relative path to an existing readable file (for example `src/main.py`).        | Absolute paths, parent traversal (`..`), or unreadable/missing files cause failure.         |
+| `new_name`      | New symbol name used by `rename`.                                 | Non-empty string value.                                                                  | Missing key, non-string value, or empty/whitespace-only value causes failure.               |
+| `offset`        | UTF-8 byte offset of the symbol occurrence used as rename anchor. | Non-negative integer, provided as a number or numeric string (for example `4` or `"4"`). | Missing key, non-numeric value, or negative value causes failure.                           |
+
+For `offset`, count bytes from the start of the file (`0`-based), not line and
+column pairs. This matters when multibyte UTF-8 characters appear before the
+target symbol.
+
+### Expected behaviour of the worked examples
+
+Both examples follow the same execution pipeline:
+
+1. `weaverd` parses `--provider`, `--refactoring`, and `--file`.
+2. The file content is read from the workspace and sent to the plugin in-band.
+3. The plugin executes `rename` using `offset` and `new_name`.
+4. The plugin returns a unified diff for the modified file.
+5. Weaver validates the diff via the Double-Lock safety harness (syntax then
+   semantic checks).
+6. If validation passes, Weaver writes the file atomically and returns:
+   `{"files_deleted":0,"files_written":1,"status":"ok"}`.
+
+When validation fails, parameters are invalid, or the plugin reports an error,
+the command exits non-zero and leaves the filesystem unchanged.
+
+Worked examples:
+
+- Python rename with `rope`:
+
+  ```sh
+  weaver --output json act refactor \
+    --provider rope \
+    --refactoring rename \
+    --file src/main.py \
+    new_name=renamed_symbol \
+    offset=4
+  ```
+
+  Example result:
+
+  ```json
+  {"files_deleted":0,"files_written":1,"status":"ok"}
+  ```
+
+- Rust rename with `rust-analyzer`:
+
+  ```sh
+  weaver --output json act refactor \
+    --provider rust-analyzer \
+    --refactoring rename \
+    --file src/main.rs \
+    new_name=renamed_name \
+    offset=3
+  ```
+
+  Example result:
+
+  ```json
+  {"files_deleted":0,"files_written":1,"status":"ok"}
+  ```
+
 The daemon ships with default actuator registrations:
 
 - `rope` for Python (`timeout_secs = 30`)

@@ -106,6 +106,8 @@ jobs:
       artifact-suffix: ${{ matrix.artifact_suffix }}
 
   build-freebsd:
+    # Temporarily disabled until FreeBSD release builds can be validated.
+    if: ${{ false }}
     needs: metadata
     uses: ./.github/workflows/build-and-package.yml
     with:
@@ -124,7 +126,6 @@ jobs:
       - metadata
       - build-linux
       - build-macos
-      - build-freebsd
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633
