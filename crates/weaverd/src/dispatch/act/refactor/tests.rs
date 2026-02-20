@@ -9,7 +9,7 @@ use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 
 use super::{
     DispatchError, FusionBackends, RefactorContext, RefactorPluginRuntime, ResponseWriter,
-    default_runtime, handle, resolve_rope_plugin_path,
+    default_runtime, handle, resolve_rope_plugin_path, resolve_rust_analyzer_plugin_path,
 };
 use crate::dispatch::request::{CommandDescriptor, CommandRequest};
 use crate::semantic_provider::SemanticBackendProvider;
@@ -228,6 +228,14 @@ fn handle_diff_output_applies_patch_through_apply_patch_pipeline(socket_dir: Tem
 #[test]
 fn resolve_rope_plugin_path_makes_relative_overrides_absolute() {
     let path = resolve_rope_plugin_path(Some(std::ffi::OsString::from("bin/rope")));
+    assert!(path.is_absolute());
+}
+
+#[test]
+fn resolve_rust_analyzer_plugin_path_makes_relative_overrides_absolute() {
+    let path = resolve_rust_analyzer_plugin_path(Some(std::ffi::OsString::from(
+        "bin/rust-analyzer-plugin",
+    )));
     assert!(path.is_absolute());
 }
 

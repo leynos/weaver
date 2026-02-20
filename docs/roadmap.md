@@ -173,7 +173,7 @@ language-specific tools.*
 
   - [x] A plugin for `rope` to provide advanced Python refactoring.
 
-  - [ ] A plugin for `rust-analyzer` to provide advanced Rust refactoring.
+  - [x] A plugin for `rust-analyzer` to provide advanced Rust refactoring.
 
   - [ ] A plugin for `srgn` to provide high-performance, precision
         syntactic editing.

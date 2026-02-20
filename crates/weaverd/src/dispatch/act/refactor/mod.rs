@@ -10,7 +10,6 @@
 //! forwarded to the existing `act apply-patch` pipeline so syntactic and
 //! semantic locks are reused without duplicating safety-critical logic.
 
-use std::ffi::OsString;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
@@ -31,12 +30,13 @@ use crate::dispatch::request::{CommandDescriptor, CommandRequest};
 use crate::dispatch::response::ResponseWriter;
 use crate::dispatch::router::{DISPATCH_TARGET, DispatchResult};
 use crate::semantic_provider::SemanticBackendProvider;
+use plugin_paths::{
+    ROPE_PLUGIN_NAME, ROPE_PLUGIN_PATH_ENV, ROPE_PLUGIN_VERSION, RUST_ANALYZER_PLUGIN_NAME,
+    RUST_ANALYZER_PLUGIN_PATH_ENV, RUST_ANALYZER_PLUGIN_TIMEOUT_SECS, RUST_ANALYZER_PLUGIN_VERSION,
+    resolve_rope_plugin_path, resolve_rust_analyzer_plugin_path,
+};
 
-/// Environment variable overriding the rope plugin executable path.
-pub(crate) const ROPE_PLUGIN_PATH_ENV: &str = "WEAVER_ROPE_PLUGIN_PATH";
-const DEFAULT_ROPE_PLUGIN_PATH: &str = "/usr/bin/weaver-plugin-rope";
-const ROPE_PLUGIN_NAME: &str = "rope";
-const ROPE_PLUGIN_VERSION: &str = "0.1.0";
+mod plugin_paths;
 
 /// Runtime abstraction for executing refactor plugins.
 pub(crate) trait RefactorPluginRuntime {
@@ -61,13 +61,30 @@ impl SandboxRefactorRuntime {
     /// Returns an error description if plugin registration fails.
     pub fn from_environment() -> Result<Self, String> {
         let mut registry = PluginRegistry::new();
-        let executable = resolve_rope_plugin_path(std::env::var_os(ROPE_PLUGIN_PATH_ENV));
-        let metadata =
+        let rope_executable = resolve_rope_plugin_path(std::env::var_os(ROPE_PLUGIN_PATH_ENV));
+        let rope_metadata =
             PluginMetadata::new(ROPE_PLUGIN_NAME, ROPE_PLUGIN_VERSION, PluginKind::Actuator);
-        let manifest = PluginManifest::new(metadata, vec![String::from("python")], executable);
-
+        let rope_manifest =
+            PluginManifest::new(rope_metadata, vec![String::from("python")], rope_executable);
         registry
-            .register(manifest)
+            .register(rope_manifest)
+            .map_err(|error| format!("failed to initialize refactor runtime: {error}"))?;
+
+        let rust_analyzer_executable =
+            resolve_rust_analyzer_plugin_path(std::env::var_os(RUST_ANALYZER_PLUGIN_PATH_ENV));
+        let rust_analyzer_metadata = PluginMetadata::new(
+            RUST_ANALYZER_PLUGIN_NAME,
+            RUST_ANALYZER_PLUGIN_VERSION,
+            PluginKind::Actuator,
+        );
+        let rust_analyzer_manifest = PluginManifest::new(
+            rust_analyzer_metadata,
+            vec![String::from("rust")],
+            rust_analyzer_executable,
+        )
+        .with_timeout_secs(RUST_ANALYZER_PLUGIN_TIMEOUT_SECS);
+        registry
+            .register(rust_analyzer_manifest)
             .map_err(|error| format!("failed to initialize refactor runtime: {error}"))?;
 
         Ok(Self {
@@ -109,29 +126,6 @@ pub(crate) fn default_runtime() -> Arc<dyn RefactorPluginRuntime + Send + Sync> 
     match SandboxRefactorRuntime::from_environment() {
         Ok(runtime) => Arc::new(runtime),
         Err(message) => Arc::new(NoopRefactorRuntime { message }),
-    }
-}
-
-/// Converts an optional executable override to an absolute plugin path.
-fn resolve_rope_plugin_path(raw_override: Option<OsString>) -> PathBuf {
-    let candidate = raw_override
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(DEFAULT_ROPE_PLUGIN_PATH));
-    if candidate.is_absolute() {
-        return candidate;
-    }
-
-    match std::env::current_dir() {
-        Ok(cwd) => cwd.join(candidate),
-        Err(error) => {
-            tracing::warn!(
-                target: DISPATCH_TARGET,
-                path = %candidate.display(),
-                %error,
-                "cannot resolve relative plugin path against working directory; using path as-is"
-            );
-            candidate
-        }
     }
 }
 

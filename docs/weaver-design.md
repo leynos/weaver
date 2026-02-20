@@ -1342,6 +1342,35 @@ govern this rollout:
   usage in isolation and an operator pipeline (`observe` query piped through
   `jq` into `act refactor`) using `assert_cmd` and `insta`.
 
+#### 4.1.3. Implementation decisions (Phase 3.1.1b — rust-analyzer actuator)
+
+The second concrete actuator plugin for Rust refactoring is now implemented as
+`weaver-plugin-rust-analyzer` (`crates/weaver-plugin-rust-analyzer/`). The
+following decisions govern this rollout:
+
+- **Dedicated executable plugin crate mirroring rope.** The crate mirrors the
+  rope plugin structure (dispatch, adapter trait, focused tests) so operator
+  behaviour and maintenance ergonomics remain consistent across providers.
+
+- **LSP-native adapter over stdio JSON-RPC 2.0.** The production adapter runs a
+  short-lived rust-analyzer session (`initialize`, `didOpen`, `rename`,
+  `shutdown`, `exit`) and converts returned `WorkspaceEdit` payloads into
+  updated content.
+
+- **Stub Cargo workspace for semantic context.** Each invocation materializes a
+  temporary workspace with a minimal `Cargo.toml` plus the target file, giving
+  rust-analyzer enough project context to perform semantic rename safely inside
+  the sandbox.
+
+- **Longer timeout budget for startup cost.** `weaverd` now registers the
+  rust-analyzer actuator with a `60` second timeout and executable override via
+  `WEAVER_RUST_ANALYZER_PLUGIN_PATH`.
+
+- **Shared Double-Lock commit path remains unchanged.** As with rope, successful
+  `PluginOutput::Diff` output from rust-analyzer is forwarded to
+  `act apply-patch`, reusing the existing syntactic + semantic verification and
+  atomic transaction machinery.
+
 ### 4.2. The "Double-Lock" Safety Harness: Ensuring Syntactic and Semantic Integrity
 
 The "Double-Lock" safety harness is the single most critical feature for
