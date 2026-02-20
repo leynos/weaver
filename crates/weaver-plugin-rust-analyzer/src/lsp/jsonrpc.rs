@@ -67,7 +67,11 @@ fn read_response_for_id(
     writer: &mut impl Write,
     expected_id: i64,
 ) -> Result<serde_json::Value, RustAnalyzerAdapterError> {
-    loop {
+    const MAX_RESPONSE_ATTEMPTS: usize = 128;
+
+    let mut attempts = 0_usize;
+    while attempts < MAX_RESPONSE_ATTEMPTS {
+        attempts += 1;
         let message = read_lsp_message(reader)?;
         let rpc: JsonRpcMessage = serde_json::from_str(&message).map_err(|source| {
             RustAnalyzerAdapterError::InvalidOutput {
@@ -97,6 +101,13 @@ fn read_response_for_id(
 
         return Ok(rpc.result.unwrap_or(serde_json::Value::Null));
     }
+
+    Err(RustAnalyzerAdapterError::ResponseTimeout {
+        message: format!(
+            "response read loop exhausted while waiting for request id {expected_id} after \
+             {MAX_RESPONSE_ATTEMPTS} attempts"
+        ),
+    })
 }
 
 fn acknowledge_server_request(

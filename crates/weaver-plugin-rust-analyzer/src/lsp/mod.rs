@@ -289,8 +289,8 @@ fn finish_session(mut process: RustAnalyzerProcess) -> Result<(), RustAnalyzerAd
 }
 
 fn force_terminate_process(child: &mut Child) {
-    drop(child.kill());
-    drop(child.wait());
+    child.kill().ok();
+    child.wait().ok();
 }
 
 fn parse_position_encoding(

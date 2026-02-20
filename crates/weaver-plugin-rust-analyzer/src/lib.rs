@@ -104,6 +104,12 @@ pub enum RustAnalyzerAdapterError {
         /// Error details captured from LSP exchange.
         message: String,
     },
+    /// A JSON-RPC response was not received within the bounded read loop.
+    #[error("rust-analyzer response timed out: {message}")]
+    ResponseTimeout {
+        /// Timeout context including expected request ID.
+        message: String,
+    },
     /// rust-analyzer returned malformed output.
     #[error("rust-analyzer adapter returned invalid output: {message}")]
     InvalidOutput {
