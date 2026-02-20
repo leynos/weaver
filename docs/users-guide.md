@@ -545,6 +545,42 @@ writing to disk.
 For the built-in actuators, `rename` requires `offset=<BYTE_OFFSET>` and
 `new_name=<IDENTIFIER>` in the trailing `KEY=VALUE` arguments.
 
+Worked examples:
+
+- Python rename with `rope`:
+
+  ```sh
+  weaver --output json act refactor \
+    --provider rope \
+    --refactoring rename \
+    --file src/main.py \
+    new_name=renamed_symbol \
+    offset=4
+  ```
+
+  Example result:
+
+  ```json
+  {"files_deleted":0,"files_written":1,"status":"ok"}
+  ```
+
+- Rust rename with `rust-analyzer`:
+
+  ```sh
+  weaver --output json act refactor \
+    --provider rust-analyzer \
+    --refactoring rename \
+    --file src/main.rs \
+    new_name=renamed_name \
+    offset=3
+  ```
+
+  Example result:
+
+  ```json
+  {"files_deleted":0,"files_written":1,"status":"ok"}
+  ```
+
 The daemon ships with default actuator registrations:
 
 - `rope` for Python (`timeout_secs = 30`)
