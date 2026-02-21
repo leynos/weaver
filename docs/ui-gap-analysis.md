@@ -13,14 +13,16 @@ The analysis was conducted by:
 
 1. Reading every help surface the binary exposes today (`--help`, `-h`,
    `help`, bare invocation, per-subcommand help).
-2. Tracing the clap definition in `crates/weaver-cli/src/cli.rs` and
-   the domain router in `crates/weaverd/src/dispatch/router.rs`.
+2. Tracing the clap definition in
+   [`crates/weaver-cli/src/cli.rs`](../crates/weaver-cli/src/cli.rs) and the
+   domain router in
+   [`crates/weaverd/src/dispatch/router.rs`](../crates/weaverd/src/dispatch/router.rs).
 3. Exercising error paths for unknown domains, unknown operations,
    missing arguments, and missing operations.
 4. Reviewing the plugin registry, the daemon dispatch table, and the
    output-rendering pipeline.
-5. Cross-referencing against the user's guide (`docs/users-guide.md`)
-   and the generated manual page.
+5. Cross-referencing against the user's guide
+   ([`docs/users-guide.md`](users-guide.md)) and the generated manual page.
 
 The sections below are ordered from the outermost user interaction (bare
 invocation) inward to the deepest (individual operation arguments).
@@ -31,7 +33,7 @@ ______________________________________________________________________
 
 Running `weaver` with no arguments currently produces:
 
-```text
+```plaintext
 the command domain must be provided
 ```
 
@@ -55,7 +57,7 @@ ______________________________________________________________________
 
 Running `weaver --help` currently produces:
 
-```text
+```plaintext
 Command-line interface for the Weaver semantic code tool
 
 Usage: weaver [OPTIONS] [DOMAIN] [OPERATION] [ARG]...
@@ -106,7 +108,7 @@ analysis and remedy.
 The `Cli` struct does not derive or declare a version. Running
 `weaver --version` produces:
 
-```text
+```plaintext
 error: unexpected argument '--version' found
 ```
 
@@ -154,14 +156,15 @@ ______________________________________________________________________
 Running `weaver observe`, `weaver act`, or `weaver verify` without an operation
 currently produces:
 
-```text
+```plaintext
 the command operation must be provided
 ```
 
 Exit code 1. No further guidance.
 
 The user has correctly identified a domain but receives no indication of which
-operations exist within it. The error is generated client-side in `command.rs`
+operations exist within it. The error is generated client-side in
+[`command.rs`](../crates/weaver-cli/src/command.rs)
 (`AppError::MissingOperation`) before any daemon communication occurs, so the
 daemon's knowledge of valid operations is not surfaced.
 
@@ -171,7 +174,7 @@ recommended approach is a hard-coded table in the CLI mirroring the daemon's
 `DomainRoutingContext::known_operations`, since this avoids a daemon
 round-trip. The message should follow the pattern:
 
-```text
+```plaintext
 error: operation required for domain 'observe'
 
 Available operations:
@@ -191,14 +194,14 @@ ______________________________________________________________________
 The CLI sends the request to the daemon (or attempts auto-start). If the daemon
 is not running, the user sees:
 
-```text
+```plaintext
 Waiting for daemon start...
 failed to spawn weaverd binary '"weaverd"': No such file or directory
 ```
 
 If the daemon is running, it returns:
 
-```text
+```plaintext
 unknown domain: bogus
 ```
 
@@ -210,7 +213,7 @@ validate the domain before attempting a daemon connection or auto-start.
 **Recommended remedy.** Validate the domain client-side before connecting to
 the daemon and include the list of valid domains in the error output:
 
-```text
+```plaintext
 error: unknown domain 'obsrve'
 
 Valid domains: observe, act, verify
@@ -227,7 +230,7 @@ ______________________________________________________________________
 
 When the daemon is running, it returns:
 
-```text
+```plaintext
 unknown operation 'nonexistent' for domain 'observe'
 ```
 
@@ -238,7 +241,7 @@ but does not include it in the error response.
 **Remedy.** Extend the `DispatchError::UnknownOperation` path to include the
 known operations list:
 
-```text
+```plaintext
 error: unknown operation 'get-def' for domain 'observe'
 
 Available operations: get-definition, find-references, grep,
@@ -255,7 +258,7 @@ Running `weaver observe get-definition` (without `--uri` and `--position`)
 attempts a daemon connection or auto-start. If the daemon is available, it
 returns:
 
-```text
+```plaintext
 observe get-definition requires --uri and --position arguments
 ```
 
@@ -273,7 +276,7 @@ Two sub-problems exist:
 own subcommands (one per operation). This gives full clap-generated help at
 every level — including `weaver observe get-definition --help` — and is the
 most thorough approach, though it requires significant restructuring of
-`cli.rs`.
+[`cli.rs`](../crates/weaver-cli/src/cli.rs).
 
 *Alternatives (lighter-weight):*
 
@@ -288,7 +291,7 @@ most thorough approach, though it requires significant restructuring of
 
 Running `weaver act refactor` (without flags) produces:
 
-```text
+```plaintext
 act refactor requires --provider <plugin-name>
 ```
 
@@ -299,7 +302,7 @@ providers or refactoring operations.
 **Remedy.** Return a comprehensive error listing all required parameters, valid
 provider names, and valid refactoring operations:
 
-```text
+```plaintext
 error: act refactor requires the following arguments:
 
   --provider <PLUGIN>        Registered plugin name (rope, rust-analyzer)
@@ -322,7 +325,7 @@ correctly at runtime, but are completely absent from all help output.
 
 An operator who runs `weaver --help` to discover how to connect to a
 non-default daemon socket finds no relevant flag listed. The flags are
-documented only in `docs/users-guide.md` and the source code.
+documented only in [`docs/users-guide.md`](users-guide.md) and the source code.
 
 **Recommended remedy.** Register the five flags as clap arguments on `Cli` so
 they appear in `--help`. They do not need to participate in clap's parsing
@@ -349,7 +352,7 @@ exposed through the CLI.
 
 **Remedy.** Add one or more introspection commands:
 
-```text
+```plaintext
 weaver list-plugins               List all registered plugins
 weaver list-plugins --kind actuator   Filter by kind
 weaver list-plugins --language python  Filter by language
@@ -357,7 +360,7 @@ weaver list-plugins --language python  Filter by language
 
 Example output:
 
-```text
+```plaintext
 NAME             KIND      LANGUAGES  VERSION  TIMEOUT
 rope             actuator  python     0.1.0    30s
 rust-analyzer    actuator  rust       0.1.0    60s
@@ -427,7 +430,7 @@ ______________________________________________________________________
 **Remedy.** Each error message should include actionable next steps. A
 consistent pattern would be:
 
-```text
+```plaintext
 error: <what went wrong>
 
 <list of valid alternatives or required arguments>
@@ -457,7 +460,7 @@ ______________________________________________________________________
 `weaver help` is parsed as `DOMAIN = "help"` because
 `disable_help_subcommand = true` is set. This produces:
 
-```text
+```plaintext
 the command operation must be provided
 ```
 
@@ -470,7 +473,7 @@ trap for users who reflexively type `weaver help`.
 *Alternative (enhanced):* extend the re-enabled subcommand to support
 topic-based help:
 
-```text
+```plaintext
 weaver help                 Show general help
 weaver help observe         List operations in the observe domain
 weaver help act refactor    Show act refactor parameter reference
@@ -507,8 +510,9 @@ ______________________________________________________________________
 
 1. **Quick wins (P0):** Add `version` to `Cli`. List domains and
    operations in `after_help`. Improve bare-invocation and missing-operation
-   error messages. These changes touch only `cli.rs`, `command.rs`, and
-   `errors.rs`.
+   error messages. These changes touch only
+   [`cli.rs`](../crates/weaver-cli/src/cli.rs), [`command.rs`](../crates/weaver-cli/src/command.rs),
+    and [`errors.rs`](../crates/weaver-cli/src/errors.rs).
 
 2. **Error message enrichment (P1):** Add valid-alternative listings
    to unknown-domain and unknown-operation errors in both the CLI and the
