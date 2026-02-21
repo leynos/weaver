@@ -1,10 +1,10 @@
-# Weaver CLI user-interface gap analysis
+# Weaver command-line interface (CLI) user-interface gap analysis
 
 This document records a comprehensive audit of the `weaver` CLI's
 discoverability and help surfaces, identifies concrete gaps, and proposes
 remedies for each. The guiding principle is that **a user must never feel at a
 loss as to what to do next**: every level of the command hierarchy must
-advertise the available sub-commands, domains, operations, plugins, and
+advertise the available subcommands, domains, operations, plugins, and
 parameters so that the tool is self-documenting.
 
 ## Methodology
@@ -41,10 +41,12 @@ A newcomer receives only a terse error message. There is no hint that `--help`
 is available, no listing of domains, no mention of `daemon`, and no pointer to
 documentation. The message does not explain what a "domain" is.
 
-**Remedy.** When neither a domain nor a structured subcommand is supplied, emit
-the short help text (`-h` form) automatically instead of an unadorned error
-string. This is the behaviour users expect from every mainstream CLI tool.
-Alternatively, print a purpose-built "getting started" block that lists
+**Recommended remedy.** When neither a domain nor a structured subcommand is
+supplied, emit the short help text (`-h` form) automatically instead of an
+unadorned error string. This is the behaviour users expect from every
+mainstream CLI tool.
+
+*Alternative:* print a purpose-built "getting started" block that lists
 domains, the `daemon` subcommand, and the `--help` flag.
 
 ______________________________________________________________________
@@ -86,21 +88,18 @@ three domains with a one-line description for each.
 Only `get-definition` appears as a parenthetical example. The user cannot
 discover that `find-references`, `apply-patch`, `refactor`, etc. exist.
 
-**Remedy.** Include the full operation list per domain in the same after-help
-block, or add a `weaver list-operations` introspection command.
+**Recommended remedy.** Include the full operation list per domain in the same
+after-help block used for gap 1a.
+
+*Alternative:* add a `weaver list-operations` introspection command.
 
 ### Gap 1c — configuration flags invisible
 
 The five `ortho-config` flags (`--config-path`, `--daemon-socket`,
 `--log-filter`, `--log-format`, `--capability-overrides`) are stripped before
-clap parses and therefore never appear in help output. An operator cannot
-discover how to point the CLI at a non-default daemon socket or enable debug
-logging without reading the source code or the user's guide.
-
-**Remedy.** Either register the five config flags as clap arguments (hidden or
-visible) so they appear in `--help`, or document them explicitly in the
-`after_help` block. The current approach of stripping them before clap parses
-makes them completely invisible.
+clap parses and therefore never appear in help output. See
+[Level 6](#level-6--configuration-flags-invisible-in-help) for the full
+analysis and remedy.
 
 ### Gap 1d — no `--version` flag
 
@@ -132,8 +131,10 @@ and a one-line quick-start example.
 `DOMAIN = "help"`, which fails with "the command operation must be provided".
 Users accustomed to `<tool> help <topic>` patterns get a confusing error.
 
-**Remedy.** Re-enable the `help` subcommand (remove
-`disable_help_subcommand = true`), or intercept the `help` domain and print
+**Recommended remedy.** Re-enable the `help` subcommand (remove
+`disable_help_subcommand = true`).
+
+*Alternative:* intercept the `help` domain token in the CLI and print
 contextual help.
 
 ### Gap 1g — plugin listing absent
@@ -164,12 +165,11 @@ operations exist within it. The error is generated client-side in `command.rs`
 (`AppError::MissingOperation`) before any daemon communication occurs, so the
 daemon's knowledge of valid operations is not surfaced.
 
-**Remedy.** When a domain is provided without an operation, emit a contextual
-help block listing the valid operations for that domain. This could be a
-hard-coded table in the CLI (mirroring the daemon's
-`DomainRoutingContext::known_operations`), a `list-operations` request to the
-daemon, or an `after_help`-style block generated per domain. The message should
-follow the pattern:
+**Recommended remedy.** When a domain is provided without an operation, emit a
+contextual help block listing the valid operations for that domain. The
+recommended approach is a hard-coded table in the CLI mirroring the daemon's
+`DomainRoutingContext::known_operations`, since this avoids a daemon
+round-trip. The message should follow the pattern:
 
 ```text
 error: operation required for domain 'observe'
@@ -207,22 +207,19 @@ vs `obsrve`) produces an opaque rejection with no "did you mean?" hint.
 Additionally, the error is only available at the daemon layer — the CLI could
 validate the domain before attempting a daemon connection or auto-start.
 
-**Remedy.**
+**Recommended remedy.** Validate the domain client-side before connecting to
+the daemon and include the list of valid domains in the error output:
 
-1. **Client-side domain validation.** Parse and validate the domain in
-   the CLI before connecting to the daemon. This avoids unnecessary auto-start
-   attempts for clearly invalid input.
-2. **Suggestion in the error message.** Include the list of valid
-   domains in the error output:
+```text
+error: unknown domain 'obsrve'
 
-   ```text
-   error: unknown domain 'obsrve'
+Valid domains: observe, act, verify
+```
 
-   Valid domains: observe, act, verify
-   ```
+This avoids unnecessary auto-start attempts for clearly invalid input.
 
-3. **Typo correction.** Consider edit-distance matching to suggest the
-   closest valid domain (e.g. "did you mean 'observe'?").
+*Alternative:* additionally apply edit-distance matching to suggest the closest
+valid domain (e.g. "did you mean 'observe'?").
 
 ______________________________________________________________________
 
@@ -272,14 +269,14 @@ Two sub-problems exist:
   `--help` is consumed by clap before the trailing arguments reach the daemon.
   The user has no way to discover operation parameters from the CLI.
 
-**Remedy.** Implement operation-level help via one of:
+**Recommended remedy.** Model each domain as a clap subcommand containing its
+own subcommands (one per operation). This gives full clap-generated help at
+every level — including `weaver observe get-definition --help` — and is the
+most thorough approach, though it requires significant restructuring of
+`cli.rs`.
 
-- **Structured subcommands per domain.** Model each domain as a clap
-  subcommand containing its own subcommands (one per operation). This gives
-  full clap-generated help at every level but requires significant
-  restructuring.
-- **`after_help` blocks.** Add per-operation help text displayed by
-  `weaver help observe get-definition`.
+*Alternatives (lighter-weight):*
+
 - **Daemon-side `--help` interception.** When the daemon receives an
   operation with `--help` in the arguments, respond with a help payload instead
   of executing the operation.
@@ -321,17 +318,19 @@ ______________________________________________________________________
 The five configuration flags (`--config-path`, `--daemon-socket`,
 `--log-filter`, `--log-format`, `--capability-overrides`) are consumed by
 `split_config_arguments` before the remaining tokens reach clap. They work
-correctly at runtime but are completely absent from all help output.
+correctly at runtime, but are completely absent from all help output.
 
 An operator who runs `weaver --help` to discover how to connect to a
 non-default daemon socket finds no relevant flag listed. The flags are
 documented only in `docs/users-guide.md` and the source code.
 
-**Remedy.** Register the five flags as clap arguments on `Cli` so they appear
-in `--help`. They do not need to participate in clap's parsing pipeline (they
-can be `global = true, hide = false` arguments that are read by the config
-splitter), but they must be visible in the help output. Alternatively, document
-them clearly in an `after_help` block.
+**Recommended remedy.** Register the five flags as clap arguments on `Cli` so
+they appear in `--help`. They do not need to participate in clap's parsing
+pipeline (they can be `global = true, hide = false` arguments that are read by
+the config splitter), but they must be visible in the help output.
+
+*Alternative:* document them in an `after_help` block if registering them as
+clap arguments would conflict with the `ortho-config` loader.
 
 ______________________________________________________________________
 
@@ -343,10 +342,10 @@ way to discover which plugins are registered, which languages each plugin
 supports, which refactoring operations a plugin offers, or the version of each
 plugin.
 
-The plugin registry (`PluginRegistry`) has the API surface to answer all of
-these queries (`find_by_kind`, `find_for_language`,
-`find_actuator_for_language`), but this information is not exposed through the
-CLI.
+The plugin registry (`PluginRegistry`) has the application programming
+interface (API) surface to answer all of these queries (`find_by_kind`,
+`find_for_language`, `find_actuator_for_language`), but this information is not
+exposed through the CLI.
 
 **Remedy.** Add one or more introspection commands:
 
@@ -364,9 +363,12 @@ rope             actuator  python     0.1.0    30s
 rust-analyzer    actuator  rust       0.1.0    60s
 ```
 
-This could be implemented as a new daemon operation that queries the live
-registry, a CLI subcommand that constructs the same static registry the daemon
-uses, or a new top-level clap subcommand `list-plugins` alongside `daemon`.
+**Recommended implementation:** add a new top-level clap subcommand
+`list-plugins` alongside `daemon` that constructs the same static registry the
+daemon uses and queries it locally (no daemon round-trip required).
+
+*Alternative:* implement `list-plugins` as a daemon operation so the output
+always reflects the live registry.
 
 ______________________________________________________________________
 
@@ -390,8 +392,8 @@ ______________________________________________________________________
 
 ## Level 9 — `--capabilities` output
 
-`weaver --capabilities` prints a JSON document showing capability overrides.
-When no overrides are configured, it prints:
+`weaver --capabilities` prints a JavaScript Object Notation (JSON) document
+showing capability overrides. When no overrides are configured, it prints:
 
 ```json
 {
@@ -404,10 +406,10 @@ user cannot determine which operations are actually available for which
 languages without starting a daemon and exercising each operation.
 
 **Remedy (lower priority).** Consider extending the capabilities probe to merge
-the server-reported capabilities with the overrides, producing a complete "what
-can I do?" matrix. This requires daemon interaction and is a larger change, so
-it may be deferred. At minimum, the current output should include a note
-explaining that the matrix shows overrides only and that actual capability
+the server-reported capabilities with the overrides, producing a complete
+available-capabilities matrix. This requires daemon interaction and is a larger
+change, so it may be deferred. At minimum, the current output should include a
+note explaining that the matrix shows overrides only and that actual capability
 negotiation occurs at runtime.
 
 ______________________________________________________________________
@@ -462,7 +464,10 @@ the command operation must be provided
 The `help` subcommand is a universal CLI convention. Disabling it creates a
 trap for users who reflexively type `weaver help`.
 
-**Remedy.** Re-enable the help subcommand. Optionally extend it to support
+**Recommended remedy.** Re-enable the help subcommand by removing
+`disable_help_subcommand = true`.
+
+*Alternative (enhanced):* extend the re-enabled subcommand to support
 topic-based help:
 
 ```text
