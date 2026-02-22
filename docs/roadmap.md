@@ -205,3 +205,135 @@ planning and human-in-the-loop workflows.*
 - [ ] Begin research and development for the Dynamic Analysis Ingestion
     provider for `weaver-graph`, allowing it to consume and merge profiling
     data from tools like `gprof` and `callgrind`.
+
+## Phase 5: CLI discoverability and help completion
+
+*Goal: Close every discoverability and help-surface gap identified in
+`docs/ui-gap-analysis.md` so users can discover domains, operations, plugins,
+and arguments without reading source code.*
+
+*In scope: command help surfaces, argument discoverability, actionable errors,
+plugin introspection, and capability introspection messaging.*
+
+*Out of scope: new semantic editing capabilities unrelated to discoverability,
+new plugin runtime engines, and unrelated daemon orchestration changes.*
+
+### 5.1. Deliver baseline guidance and top-level discoverability (P0)
+
+- [ ] 5.1.1. Show short help when `weaver` is invoked without arguments.
+      See `docs/ui-gap-analysis.md` §Level 0 and §Level 10 (10d).
+  - [ ] Replace bare missing-domain output with short help and a clear next
+        step.
+  - [ ] Acceptance criteria: `weaver` with no arguments prints usage, lists
+        valid domains, and includes a pointer to `weaver --help`.
+- [ ] 5.1.2. List all domains and operations in top-level help output.
+      See `docs/ui-gap-analysis.md` §Level 1a and §Level 1b.
+  - [ ] Add an `after_help` catalogue covering `observe`, `act`, and `verify`
+        operations.
+  - [ ] Acceptance criteria: `weaver --help` contains complete domain and
+        operation listings without requiring daemon startup.
+- [ ] 5.1.3. Add top-level version output and long-form CLI description.
+      See `docs/ui-gap-analysis.md` §Level 1d and §Level 1e.
+  - [ ] Enable clap-provided `--version` and `-V` support.
+  - [ ] Add a `long_about` quick-start block aligned with `docs/users-guide.md`.
+  - [ ] Acceptance criteria: `weaver --version` succeeds and help output
+        includes purpose plus a quick-start example.
+- [ ] 5.1.4. Provide contextual guidance when a domain is supplied without an
+      operation. See `docs/ui-gap-analysis.md` §Level 2 and §Level 10 (10e).
+  - [ ] Print available operations for the provided domain and a follow-up help
+        command.
+  - [ ] Acceptance criteria: `weaver observe` lists observe operations and
+        points users to operation-level help.
+
+### 5.2. Enrich validation and actionable error responses (P1)
+
+- [ ] 5.2.1. Validate domains client-side before daemon startup.
+      See `docs/ui-gap-analysis.md` §Level 3 and §Level 10 (10b).
+  - [ ] Reject unknown domains with a valid-domain list.
+  - [ ] Add edit-distance suggestions for close typos.
+  - [ ] Acceptance criteria: invalid domains fail fast without daemon
+        auto-start and include recovery guidance.
+- [ ] 5.2.2. Include valid operation alternatives for unknown operations.
+      See `docs/ui-gap-analysis.md` §Level 4 and §Level 10 (10c).
+  - [ ] Extend daemon and CLI error payloads to include known operations for
+        the domain.
+  - [ ] Acceptance criteria: unknown operation errors include domain-scoped
+        alternatives in both JSON and human-readable output.
+- [ ] 5.2.3. Standardize actionable guidance in startup and routing errors.
+      See `docs/ui-gap-analysis.md` §Level 10 (10a-10e).
+  - [ ] Apply a single error template: problem statement, valid alternatives,
+        and explicit next command.
+  - [ ] Add startup failure guidance for `WEAVERD_BIN` and installation checks.
+  - [ ] Acceptance criteria: all top-level CLI error paths include actionable
+        next steps and stable exit-code semantics.
+- [ ] 5.2.4. Return complete argument requirements for `act refactor`.
+      See `docs/ui-gap-analysis.md` §Level 5b.
+  - [ ] List all required flags, valid provider names, and known refactoring
+        operations.
+  - [ ] Acceptance criteria: `weaver act refactor` without required flags
+        reports the full requirement set in one response.
+
+### 5.3. Expose configuration and operation-level help surfaces (P1-P2)
+
+- [ ] 5.3.1. Surface configuration flags in clap help output.
+      See `docs/ui-gap-analysis.md` §Level 1c and §Level 6.
+  - [ ] Register `--config-path`, `--daemon-socket`, `--log-filter`,
+        `--log-format`, and `--capability-overrides` as visible global flags.
+  - [ ] Acceptance criteria: the five flags appear in `weaver --help` and
+        remain compatible with `ortho-config` precedence handling.
+- [ ] 5.3.2. Extend `daemon start` help with config and environment guidance.
+      See `docs/ui-gap-analysis.md` §Level 8.
+  - [ ] Document `WEAVERD_BIN` and `WEAVER_FOREGROUND` in `long_about` or
+        `after_help`.
+  - [ ] Acceptance criteria: `weaver daemon start --help` includes relevant
+        flag and environment override guidance.
+- [ ] 5.3.3. Re-enable and extend the `help` subcommand.
+      See `docs/ui-gap-analysis.md` §Level 1f and §Level 12.
+  - [ ] Remove `disable_help_subcommand = true`.
+  - [ ] Support topic help for domains and operations (`weaver help <topic>`).
+  - [ ] Acceptance criteria: `weaver help`, `weaver help observe`, and
+        `weaver help act refactor` all return contextual help.
+- [ ] 5.3.4. Deliver operation-level help for required arguments.
+      Requires 5.3.3. See `docs/ui-gap-analysis.md` §Level 5a.
+  - [ ] Implement nested clap subcommands, or an equivalent schema-backed help
+        pipeline, so `weaver <domain> <operation> --help` is operation-specific.
+  - [ ] Acceptance criteria: operation help includes required flags, argument
+        types, and one concrete invocation example per operation.
+
+### 5.4. Deliver plugin and manpage discoverability coverage (P2)
+
+- [ ] 5.4.1. Add plugin introspection commands.
+      See `docs/ui-gap-analysis.md` §Level 1g and §Level 7.
+  - [ ] Implement `weaver list-plugins` with `--kind` and `--language`
+        filters.
+  - [ ] Show plugin name, kind, language support, version, and timeout data.
+  - [ ] Acceptance criteria: users can discover valid `act refactor`
+        providers from CLI output alone.
+- [ ] 5.4.2. Wire plugin introspection into refactor guidance paths.
+      Requires 5.4.1. See `docs/ui-gap-analysis.md` §Level 5b and §Level 7.
+  - [ ] Reference `weaver list-plugins` in refactor-related help and errors.
+  - [ ] Acceptance criteria: every provider-related error points users to a
+        discoverability command.
+- [ ] 5.4.3. Regenerate and validate the manpage from the improved clap model.
+      Requires 5.1.2, 5.3.1, and 5.3.3. See `docs/ui-gap-analysis.md` §Level
+      11.
+  - [ ] Verify that domain listings, operation listings, global config flags,
+        and help-topic text render in troff output.
+  - [ ] Acceptance criteria: generated manpage includes all updated help
+        surfaces with no manual post-processing.
+
+### 5.5. Complete capability probe discoverability (P3)
+
+- [ ] 5.5.1. Clarify current `--capabilities` output semantics.
+      See `docs/ui-gap-analysis.md` §Level 9.
+  - [ ] Annotate output and help text that current data represents overrides
+        unless runtime capability data is merged.
+  - [ ] Acceptance criteria: users can distinguish override configuration from
+        runtime-negotiated capability support.
+- [ ] 5.5.2. Merge runtime capability negotiation into the capabilities probe.
+      Requires daemon capability query support. See `docs/ui-gap-analysis.md`
+      §Level 9.
+  - [ ] Query daemon-supported capabilities and combine them with configured
+        overrides into one matrix.
+  - [ ] Acceptance criteria: `weaver --capabilities` returns a complete matrix
+        for each configured language and operation.
