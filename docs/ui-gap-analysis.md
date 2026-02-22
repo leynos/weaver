@@ -370,7 +370,7 @@ rust-analyzer    actuator  rust       0.1.0    60s
 `list-plugins` alongside `daemon` that constructs the same static registry the
 daemon uses and queries it locally (no daemon round-trip required).
 
-*Alternative:* implement `list-plugins` as a daemon operation so the output
+*Alternative:* implement `list-plugins` as a daemon operation, so the output
 always reflects the live registry.
 
 ______________________________________________________________________
