@@ -229,7 +229,7 @@ Priority labels for Phase 5 align with the
 Section priority mapping (non-scheduling metadata): 5.1=`P0`, 5.2=`P1`,
 5.3=`P1-P2`, 5.4=`P2`, and 5.5=`P3`.
 
-### 5.1. Deliver baseline guidance and top-level discoverability
+### Step 5.1: Deliver baseline guidance and top-level discoverability
 
 - [ ] 5.1.1. Show short help when `weaver` is invoked without arguments.
       See
@@ -274,7 +274,7 @@ Section priority mapping (non-scheduling metadata): 5.1=`P0`, 5.2=`P1`,
         non-zero, lists all operations registered for that domain, and includes
         one concrete `weaver <domain> <operation> --help` hint.
 
-### 5.2. Enrich validation and actionable error responses
+### Step 5.2: Enrich validation and actionable error responses
 
 - [ ] 5.2.1. Validate domains client-side before daemon startup.
       See
@@ -317,7 +317,7 @@ Section priority mapping (non-scheduling metadata): 5.1=`P0`, 5.2=`P1`,
         all three required flags (`--provider`, `--refactoring`, `--file`) in
         one response, plus at least one valid provider and refactoring value.
 
-### 5.3. Expose configuration and operation-level help surfaces
+### Step 5.3: Expose configuration and operation-level help surfaces
 
 - [ ] 5.3.1. Surface configuration flags in clap help output.
       See
@@ -372,7 +372,7 @@ Section priority mapping (non-scheduling metadata): 5.1=`P0`, 5.2=`P1`,
         discovery, and YAML 1.2 semantics; and `make markdownlint`,
         `make fmt`, `make nixie`, and documentation tests pass.
 
-### 5.4. Deliver plugin and manpage discoverability coverage
+### Step 5.4: Deliver plugin and manpage discoverability coverage
 
 - [ ] 5.4.1. Add plugin introspection commands.
       See
@@ -403,7 +403,7 @@ Section priority mapping (non-scheduling metadata): 5.1=`P0`, 5.2=`P1`,
         surfaces with no manual post-processing, including three domain
         listings and all five global config flags.
 
-### 5.5. Complete capability probe discoverability
+### Step 5.5: Complete capability probe discoverability
 
 - [ ] 5.5.1. Clarify current `--capabilities` output semantics.
       See
