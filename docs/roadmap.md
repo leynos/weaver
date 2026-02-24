@@ -208,9 +208,9 @@ planning and human-in-the-loop workflows.*
 
 ## Phase 5: CLI discoverability and help completion
 
-*Goal: Close every discoverability and help-surface gap identified in
-`docs/ui-gap-analysis.md` so users can discover domains, operations, plugins,
-and arguments without reading source code.*
+*Goal: Close every discoverability and help-surface gap identified in the
+[UI gap analysis](docs/ui-gap-analysis.md) so users can discover domains,
+operations, plugins, and arguments without reading source code.*
 
 *In scope: command help surfaces, argument discoverability, actionable errors,
 plugin introspection, and capability introspection messaging.*
@@ -258,7 +258,8 @@ Section priority mapping (non-scheduling metadata): 5.1=`P0`, 5.2=`P1`,
       and
       [Gap 1e](docs/ui-gap-analysis.md#gap-1e--no-long-description-or-after-help-text).
   - [ ] Enable clap-provided `--version` and `-V` support.
-  - [ ] Add a `long_about` quick-start block aligned with `docs/users-guide.md`.
+  - [ ] Add a `long_about` quick-start block aligned with the
+        [users guide](docs/users-guide.md).
   - [ ] Acceptance criteria: `weaver --version` and `weaver -V` both exit 0
         and emit the same version string, and `weaver --help` includes at
         least one runnable quick-start command example.
@@ -355,15 +356,14 @@ Section priority mapping (non-scheduling metadata): 5.1=`P0`, 5.2=`P1`,
   - [ ] Acceptance criteria: every exposed operation supports
         `weaver <domain> <operation> --help` and each help screen includes
         required flags, argument types, and at least one concrete invocation.
-- [ ] 5.3.5. Document `ortho-config` v0.6.0 behaviour across Phase 5 and 5.3
-      guidance. See
-      [`docs/ortho-config-v0-6-0-migration-guide.md`](docs/ortho-config-v0-6-0-migration-guide.md).
+- [ ] 5.3.5. Document ortho-config v0.6.0 behaviour in Step 5.3 guidance. See
+      [ortho-config v0.6.0 migration guide](docs/ortho-config-v0-6-0-migration-guide.md).
   - [ ] Document the new dependency-graph model used by configuration loading
         and precedence resolution.
   - [ ] Document fail-fast discovery behaviour when configuration files exist
         but are invalid.
   - [ ] Document YAML 1.2 parsing semantics via `SaphyrYaml`, including known
-        compatibility caveats.
+        compatibility warnings.
   - [ ] Update internal runbooks and user-facing documentation to reflect
         `ortho-config` v0.6.0 operational behaviour.
   - [ ] Validate documentation quality gates and docs tests after updates.
