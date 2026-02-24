@@ -226,8 +226,8 @@ Priority labels for Phase 5 align with the
 - `P2`: Important discoverability improvements that reduce operator friction.
 - `P3`: Lower-priority capability introspection enhancements.
 
-Section priority mapping (non-scheduling metadata): 5.1=`P0`, 5.2=`P1`,
-5.3=`P1-P2`, 5.4=`P2`, and 5.5=`P3`.
+Section priority mapping (non-scheduling metadata): Step 5.1=`P0`, Step
+5.2=`P1`, Step 5.3=`P1-P2`, Step 5.4=`P2`, and Step 5.5=`P3`.
 
 ### Step 5.1: Deliver baseline guidance and top-level discoverability
 
@@ -298,7 +298,7 @@ Section priority mapping (non-scheduling metadata): 5.1=`P0`, 5.2=`P1`,
         the domain.
   - [ ] Acceptance criteria: unknown-operation errors in both JSON and
         human-readable output include the full known-operation set for the
-        domain, with count equal to the router's `known_operations` length.
+        domain, with a count equal to the router's `known_operations` length.
 - [ ] 5.2.3. Standardize actionable guidance in startup and routing errors.
       See
       [Level 10](docs/ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
