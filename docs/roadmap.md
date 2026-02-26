@@ -231,15 +231,15 @@ Section priority mapping (non-scheduling metadata): Step 5.1=`P0`, Step
 
 ### Step 5.1: Deliver baseline guidance and top-level discoverability
 
-- [ ] 5.1.1. Show short help when `weaver` is invoked without arguments.
+- [x] 5.1.1. Show short help when `weaver` is invoked without arguments.
       See
       [Level 0](docs/ui-gap-analysis.md#level-0--bare-invocation-weaver)
       and
       [Level 10](docs/ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
       (10d).
-  - [ ] Replace bare missing-domain output with short help and a clear next
+  - [x] Replace bare missing-domain output with short help and a clear next
         step.
-  - [ ] Acceptance criteria: `weaver` with no arguments exits non-zero, prints
+  - [x] Acceptance criteria: `weaver` with no arguments exits non-zero, prints
         a `Usage:` line, lists the three valid domains (`observe`, `act`,
         `verify`), and includes exactly one pointer to `weaver --help`.
 - [ ] 5.1.2. List all domains and operations in top-level help output.

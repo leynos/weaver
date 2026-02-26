@@ -17,6 +17,9 @@ pub(crate) enum AppError {
     MissingDomain,
     #[error("the command operation must be provided")]
     MissingOperation,
+    /// Sentinel for bare invocation — help has already been written.
+    #[error("")]
+    BareInvocation,
     #[error("failed to resolve daemon address {endpoint}: {source}")]
     Resolve { endpoint: String, source: io::Error },
     #[error("failed to connect to daemon at {endpoint}: {source}")]

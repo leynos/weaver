@@ -69,6 +69,15 @@ Feature: Weaver CLI behaviour
   # Auto-start scenarios: When a domain command is issued and the daemon is not
   # running, the CLI attempts to start it automatically.
 
+  Scenario: Bare invocation shows short help
+    When the operator runs ""
+    Then the CLI fails
+    And stderr contains "Usage: weaver"
+    And stderr contains "observe"
+    And stderr contains "act"
+    And stderr contains "verify"
+    And stderr contains "weaver --help"
+
   Scenario: Auto-start shows waiting message before spawn failure
     Given auto-start will be triggered
     When the operator runs "observe get-definition --symbol main"
