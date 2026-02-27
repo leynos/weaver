@@ -31,23 +31,26 @@ fn render_help(localizer: &dyn Localizer) -> String {
     String::from_utf8(buf).expect("utf8")
 }
 
-#[test]
-fn bare_invocation_exits_with_failure() {
+/// Runs the CLI with no arguments (bare invocation) using a
+/// [`PanickingLoader`] and returns the exit code plus captured output.
+fn run_bare_invocation() -> (ExitCode, Vec<u8>, Vec<u8>) {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let mut stdin = Cursor::new(Vec::new());
     let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
     let exit = run_with_loader(vec![OsString::from("weaver")], &mut io, &PanickingLoader);
+    (exit, stdout, stderr)
+}
+
+#[test]
+fn bare_invocation_exits_with_failure() {
+    let (exit, _, _) = run_bare_invocation();
     assert_eq!(exit, ExitCode::FAILURE);
 }
 
 #[test]
 fn bare_invocation_emits_help_to_stderr() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let mut stdin = Cursor::new(Vec::new());
-    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
-    let _ = run_with_loader(vec![OsString::from("weaver")], &mut io, &PanickingLoader);
+    let (_, _, stderr) = run_bare_invocation();
     let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
     assert!(stderr_text.contains("Usage: weaver"));
     assert!(stderr_text.contains("observe"));
@@ -58,11 +61,7 @@ fn bare_invocation_emits_help_to_stderr() {
 
 #[test]
 fn bare_invocation_produces_no_stdout() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let mut stdin = Cursor::new(Vec::new());
-    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
-    let _ = run_with_loader(vec![OsString::from("weaver")], &mut io, &PanickingLoader);
+    let (_, stdout, _) = run_bare_invocation();
     assert!(
         stdout.is_empty(),
         "bare invocation must not write to stdout"
