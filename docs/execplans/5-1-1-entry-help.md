@@ -296,6 +296,8 @@ localization.
 | `docs/roadmap.md`                                     | 424   | Roadmap checkboxes                 |
 | `docs/users-guide.md`                                 | 837   | User documentation                 |
 
+_Table 1: Key files involved in this change and their purpose._
+
 ### Test infrastructure
 
 BDD tests use `rstest-bdd` v0.5.0 with `.feature` files in `tests/features/`
@@ -893,3 +895,5 @@ pub(crate) enum AppError {
 | `crates/weaver-cli/tests/features/weaver_cli.feature` | Add BDD scenario                    |
 | `docs/users-guide.md`                                 | Add "Bare invocation" subsection    |
 | `docs/roadmap.md`                                     | Mark 5.1.1 checkboxes as done       |
+
+_Table 2: Files modified and their changes._

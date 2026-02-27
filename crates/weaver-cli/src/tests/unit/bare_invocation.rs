@@ -9,6 +9,7 @@ use std::io::Cursor;
 use std::process::ExitCode;
 
 use ortho_config::{FluentLocalizer, Localizer, NoOpLocalizer};
+use rstest::rstest;
 
 use crate::localizer::{WEAVER_EN_US, write_bare_help};
 use crate::{AppError, ConfigLoader, IoStreams, run_with_loader};
@@ -68,9 +69,9 @@ fn bare_invocation_produces_no_stdout() {
     );
 }
 
-#[test]
-fn write_bare_help_with_noop_produces_english_fallback() {
-    let text = render_help(&NoOpLocalizer);
+/// Asserts that the rendered help block contains the expected fragments.
+fn assert_help_text(localizer: &dyn Localizer) {
+    let text = render_help(localizer);
     assert!(text.contains("Usage: weaver"));
     assert!(text.contains("observe"));
     assert!(text.contains("act"));
@@ -78,16 +79,17 @@ fn write_bare_help_with_noop_produces_english_fallback() {
     assert!(text.contains("weaver --help"));
 }
 
-#[test]
-fn write_bare_help_with_fluent_produces_english() {
-    let localizer = FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])
-        .expect("embedded Fluent catalogue must parse");
-    let text = render_help(&localizer);
-    assert!(text.contains("Usage: weaver"));
-    assert!(text.contains("observe"));
-    assert!(text.contains("act"));
-    assert!(text.contains("verify"));
-    assert!(text.contains("weaver --help"));
+#[rstest]
+#[case::noop_fallback(false)]
+#[case::fluent_catalogue(true)]
+fn write_bare_help_produces_english(#[case] use_fluent: bool) {
+    if use_fluent {
+        let localizer = FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])
+            .expect("embedded Fluent catalogue must parse");
+        assert_help_text(&localizer);
+    } else {
+        assert_help_text(&NoOpLocalizer);
+    }
 }
 
 #[test]
