@@ -148,7 +148,7 @@ where
             .map_err(AppError::CliUsage)
             .and_then(|cli| {
                 if cli.is_bare_invocation() {
-                    let _ = write_bare_help(&mut *self.io.stderr, localizer);
+                    write_bare_help(&mut *self.io.stderr, localizer).ok();
                     return Err(AppError::BareInvocation);
                 }
                 self.loader

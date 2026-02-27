@@ -388,6 +388,7 @@ fn is_daemon_not_running_rejects_non_connect_errors() {
     assert!(!is_daemon_not_running(&AppError::MissingDomain));
     assert!(!is_daemon_not_running(&AppError::MissingOperation));
     assert!(!is_daemon_not_running(&AppError::MissingExit));
+    assert!(!is_daemon_not_running(&AppError::BareInvocation));
     let ser_err = AppError::SerialiseRequest(serde_json::from_str::<()>("bad").unwrap_err());
     assert!(!is_daemon_not_running(&ser_err));
 }

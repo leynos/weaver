@@ -10,7 +10,7 @@ use std::io::Write;
 use ortho_config::{FluentLocalizer, Localizer, NoOpLocalizer};
 
 /// Embedded en-US Fluent catalogue for the Weaver CLI.
-static WEAVER_EN_US: &str = include_str!("../locales/en-US/messages.ftl");
+pub(crate) static WEAVER_EN_US: &str = include_str!("../locales/en-US/messages.ftl");
 
 /// Builds the application localizer.
 ///
@@ -45,8 +45,8 @@ pub(crate) fn build_localizer() -> Box<dyn Localizer> {
 /// ```rust,ignore
 /// let loc = ortho_config::NoOpLocalizer;
 /// let mut buf = Vec::new();
-/// write_bare_help(&mut buf, &loc).unwrap();
-/// assert!(String::from_utf8(buf).unwrap().contains("Usage:"));
+/// write_bare_help(&mut buf, &loc).expect("write bare help");
+/// assert!(String::from_utf8(buf).expect("valid UTF-8").contains("Usage:"));
 /// ```
 pub(crate) fn write_bare_help<W: Write>(
     writer: &mut W,

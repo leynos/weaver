@@ -8,9 +8,9 @@ use std::ffi::OsString;
 use std::io::Cursor;
 use std::process::ExitCode;
 
-use ortho_config::{Localizer, NoOpLocalizer};
+use ortho_config::{FluentLocalizer, Localizer, NoOpLocalizer};
 
-use crate::localizer::{build_localizer, write_bare_help};
+use crate::localizer::{WEAVER_EN_US, write_bare_help};
 use crate::{AppError, ConfigLoader, IoStreams, run_with_loader};
 use weaver_config::Config;
 
@@ -80,8 +80,9 @@ fn write_bare_help_with_noop_produces_english_fallback() {
 
 #[test]
 fn write_bare_help_with_fluent_produces_english() {
-    let localizer = build_localizer();
-    let text = render_help(localizer.as_ref());
+    let localizer = FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])
+        .expect("embedded Fluent catalogue must parse");
+    let text = render_help(&localizer);
     assert!(text.contains("Usage: weaver"));
     assert!(text.contains("observe"));
     assert!(text.contains("act"));

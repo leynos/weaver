@@ -1,4 +1,4 @@
-# 5.1.1 Show short help on bare invocation (Fluent-localised)
+# 5.1.1 Show short help on bare invocation (Fluent-localized)
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
@@ -9,7 +9,8 @@ Status: COMPLETE
 
 ## Purpose / big picture
 
-When an operator runs `weaver` with no arguments today, the CLI prints the
+When an operator runs `weaver` with no arguments today, the command-line
+interface (CLI) prints the
 terse message `the command domain must be provided` to stderr and exits 1.
 There is no hint about what domains exist, no usage line, and no pointer to
 `--help`. A newcomer who has just installed Weaver has no idea what to type
@@ -37,9 +38,9 @@ Run 'weaver --help' for more information.
 ```
 
 This addresses the P0 gap identified in the
-[UI gap analysis Level 0](docs/ui-gap-analysis.md#level-0--bare-invocation-weaver)
- and
-[Level 10d](docs/ui-gap-analysis.md#level-10--error-messages-and-exit-codes),
+[UI gap analysis Level 0](../ui-gap-analysis.md#level-0--bare-invocation-weaver)
+and
+[Level 10d](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes),
 and satisfies roadmap task 5.1.1 in `docs/roadmap.md`.
 
 ## Constraints
@@ -51,7 +52,8 @@ and satisfies roadmap task 5.1.1 in `docs/roadmap.md`.
   `cognitive_complexity`, `missing_docs`, etc.). All new code must comply.
 - Comments and documentation must use en-GB-oxendict spelling
   ("-ize" / "-yse" / "-our").
-- New functionality requires both unit tests and BDD behavioural tests.
+- New functionality requires both unit tests and BDD (behaviour-driven
+  development) behavioural tests.
 - Every module must begin with a `//!` module-level doc comment.
 - The bare invocation help must not require configuration loading or daemon
   connectivity. This is a hard requirement because an operator with no config
@@ -126,10 +128,11 @@ and satisfies roadmap task 5.1.1 in `docs/roadmap.md`.
 - The build script (`build.rs`) includes `cli.rs` via `#[path = "src/cli.rs"]`
   for manpage generation. The new `is_bare_invocation()` method triggered a
   `dead_code` warning in the build script context because it is only called
-  from `lib.rs`. Resolved with a tightly scoped `#[allow(dead_code)]` attribute
+  from `lib.rs`. Resolved with a tightly scoped `#[expect(dead_code)]` attribute
   with a reason string explaining the dual-compilation context.
-- The `#[error("")]` on `BareInvocation` did not trigger any Clippy lint (the
-  low-probability risk from the plan did not materialise).
+- The `#[error("bare invocation")]` on `BareInvocation` provides a non-empty
+  display string for safety in generic `Display` paths while the match arm
+  in `run_with_handler()` suppresses printing for this variant.
 - `unit.rs` compaction required reformatting one test to single-line style and
   collapsing the `is_daemon_not_running_rejects_non_connect_errors` assertions
   to recover lines.
@@ -267,7 +270,7 @@ The hello_world example in ortho-config demonstrates the pattern:
 4. Fall back to `NoOpLocalizer` on error.
 5. Resolve strings via `localizer.message("msg-id", None, "fallback")`.
 
-Fluent message IDs use hyphens (dots are normalised to hyphens by
+Fluent message IDs use hyphens (dots are normalized to hyphens by
 ortho-config's `normalize_identifier()`). The embedded en-US catalogue in
 ortho-config already provides `clap-error-*` messages for clap error
 localization.
@@ -431,7 +434,7 @@ alignment-agnostic in translations.
 Below the `MissingOperation` variant:
 
 ```rust
-    #[error("")]
+    #[error("bare invocation")]
     BareInvocation,
 ```
 
@@ -670,7 +673,7 @@ In the `and_then` chain, after `Cli::try_parse_from`:
 ```rust
 .and_then(|cli| {
     if cli.is_bare_invocation() {
-        let _ = write_bare_help(&mut *self.io.stderr, localizer);
+        write_bare_help(&mut *self.io.stderr, localizer).ok();
         return Err(AppError::BareInvocation);
     }
     self.loader
@@ -869,7 +872,7 @@ In `crates/weaver-cli/src/errors.rs`:
 #[derive(Debug, Error)]
 pub(crate) enum AppError {
     // ... existing variants ...
-    #[error("")]
+    #[error("bare invocation")]
     BareInvocation,
 }
 ```
