@@ -44,7 +44,7 @@ interconnected nature of a parsing pipeline necessitates a nuanced adaptation.
 The components of a parser—lexer, parser rules, and syntax tree—are not
 independent units but stages in a data transformation pipeline. A subtle change
 in a token definition within the lexer can have cascading effects, altering the
-structure of the final syntax tree or the quality of error messages.1
+structure of the final syntax tree or the quality of error messages.[^1]
 
 This interconnectedness suggests that unit tests focusing on individual
 components remain valuable, yet the highest leverage often comes from tests
@@ -64,7 +64,7 @@ interacting components. A round-trip property test, for instance, which asserts
 that parsing the output of a pretty-printer yields the original AST
 (`parse(pretty_print(ast)) == ast`), inherently validates every token
 definition, every parser rule, and the structural integrity of the AST in a
-single, powerful check.2 Therefore, establishing the infrastructure for
+single, powerful check.[^2] Therefore, establishing the infrastructure for
 comprehensive snapshot and property-based testing early in the development
 lifecycle yields a disproportionately high return on investment for ensuring
 the parser's long-term correctness and maintainability.
@@ -72,7 +72,7 @@ the parser's long-term correctness and maintainability.
 ### 1.2 Structuring the test suite
 
 A well-organized test suite is critical for maintainability. Rust's standard
-testing conventions provide a solid foundation.4
+testing conventions provide a solid foundation.[^3]
 
 - **Unit Tests:** Tests covering individual lexer tokens, or isolated parser
   rules, are best placed within a `mod tests` block, annotated with
@@ -83,10 +83,10 @@ testing conventions provide a solid foundation.4
 - **Integration and Corpus-Based Tests:** Larger tests, especially those that
   operate on entire source files, are typically placed in a top-level `tests/`
   directory. Each file in this directory is compiled as a separate crate, which
-  naturally enforces testing only the public API of the library.6 This is the
-  ideal location for snapshot tests that run against a corpus of valid and
+  naturally enforces testing only the public API of the library.[^4] This is
+  the ideal location for snapshot tests that run against a corpus of valid and
   invalid code samples, a common practice for validating parser correctness
-  across a wide range of language features.7 For larger projects, it can be
+  across a wide range of language features.[^5] For larger projects, it can be
   beneficial to move even unit tests to their own files (e.g.,
 
   `src/my_module/tests.rs`) to keep source files from becoming unwieldy with
@@ -121,7 +121,7 @@ stream of tokens. An error at this stage—an incorrect token kind, a
 miscalculated span, or a failure to handle an invalid character—will propagate
 and corrupt all subsequent stages. `logos` is a library designed to create
 exceptionally fast lexers by compiling token definitions into an optimized
-deterministic state machine.15 Testing a
+deterministic state machine.[^6] Testing a
 
 `logos`-based lexer, therefore, involves verifying the correctness of this
 generated state machine across a wide range of inputs.
@@ -131,8 +131,8 @@ generated state machine across a wide range of inputs.
 The most fundamental lexer tests verify that simple, unambiguous inputs produce
 the correct tokens. The `rstest` crate is exceptionally well-suited for this
 task, allowing for the creation of concise, table-driven tests using the
-`#[case]` attribute.10 These tests form the bedrock of the lexer's test suite,
-covering the "happy path" for each token definition.
+`#[case]` attribute.[^7] These tests form the bedrock of the lexer's test
+suite, covering the "happy path" for each token definition.
 
 A typical test will verify that a given input string lexes to a specific
 sequence of expected tokens. For simple tokens like punctuation or keywords,
@@ -189,21 +189,21 @@ mod tests {
 While verifying the token's kind is essential, it is insufficient. The
 downstream components, `chumsky` and `rowan`, critically depend on accurate
 source location information (the span) and the original text (the slice) for
-each token.19
+each token.[^8]
 
 `chumsky` uses spans to generate precise, user-friendly error messages that
-point to the exact location of a syntax error.19
+point to the exact location of a syntax error.[^9]
 
 `rowan` uses the token's text and length to construct a lossless Concrete
 Syntax Tree (CST) that can be perfectly pretty-printed back to the original
-source.21
+source.[^10]
 
 Therefore, a bug in a token's span is not merely a lexer issue; it is a
 critical flaw that will manifest as misleading error diagnostics or a corrupted
 syntax tree. Testing spans, together with slices, must be treated as a
 first-class concern, on par with testing the token kind itself. The
 `logos::Lexer` provides the `span()` and `slice()` methods to access this
-information, and these should be asserted in every relevant test.15
+information, and these should be asserted in every relevant test.[^11]
 
 ```rust,no_run
 // Continuing in #[cfg(test)] mod tests
@@ -239,12 +239,12 @@ A common source of subtle lexer bugs arises from ambiguous token definitions
 where one token is a prefix of another. A classic example is the set of tokens
 for single-character operators versus their two-character counterparts (e.g.,
 `+` vs. `++`, `!` vs. `!=`). `logos` resolves this ambiguity by always
-preferring the longest possible match.1 Test cases must be explicitly designed
-to verify this outcome.
+preferring the longest possible match.[^12] Test cases must be explicitly
+designed to verify this outcome.
 
 Another related issue, highlighted in a user forum post, occurs when multiple
-regexes can match at the same position, such as `r"\\"` and `r"\\begin"`.1 The
-order of declaration in the
+regexes can match at the same position, such as `r"\\"` and `r"\\begin"`.[^13]
+The order of declaration in the
 
 `enum` can influence which token is matched. While `logos` attempts to
 prioritize longer matches, complex regex interactions can sometimes lead to
@@ -301,7 +301,7 @@ strings with escape sequences, or nested delimiters.
 Testing callbacks involves verifying that the logic within the callback is
 correct. This includes testing successful transformations, error conditions,
 and special lexer actions like `logos::Skip`. The `logos` repository's own test
-suite provides excellent examples of these patterns.22
+suite provides excellent examples of these patterns.[^14]
 
 Consider a callback that parses hexadecimal integer literals; it can fail if
 the number is too large:
@@ -362,7 +362,7 @@ To reduce boilerplate and ensure consistency across tests, it is highly
 beneficial to create a reusable test harness. This can be a function or macro
 that takes a source string and an expected sequence of tokens and performs all
 necessary assertions in a loop. This pattern, inspired by helpers like
-`assert_lex` in the `logos` repository 22, centralizes the testing logic and
+`assert_lex` in the `logos` repository [^15], centralizes the testing logic and
 makes the tests themselves much more declarative and readable.
 
 ```rust,no_run
@@ -444,7 +444,7 @@ validated with every test run.
 
 With a correctly tokenized stream from `logos`, the next stage is the `chumsky`
 parser. `chumsky` is a parser combinator library designed for expressiveness,
-performance, and, most notably, high-quality error recovery.23 Testing a
+performance, and, most notably, high-quality error recovery.[^16] Testing a
 
 `chumsky` parser involves verifying not only that it correctly parses valid
 input into an AST but also that it gracefully handles invalid input, reports
@@ -454,7 +454,7 @@ meaningful errors, and recovers to parse the rest of the file.
 
 The combinator-based nature of `chumsky` encourages a bottom-up approach to
 parser construction. Complex parsers are built by combining smaller, simpler
-parsers.23 This modularity is a significant advantage for testing, as each
+parsers.[^17] This modularity is a significant advantage for testing, as each
 small parser can be tested in isolation.
 
 To unit test a specific parser rule, one should feed it a pre-tokenized slice
@@ -462,7 +462,7 @@ To unit test a specific parser rule, one should feed it a pre-tokenized slice
 ensuring that the test is focused solely on how the combinators operate. The
 parser's `parse` method returns a `ParseResult`, which contains either the
 output AST and a vector of non-fatal errors, or just a vector of fatal
-errors.27 Tests should assert against both the output and the error vector.
+errors.[^18] Tests should assert against both the output and the error vector.
 
 ```rust,no_run
 // Assuming an AST definition like this:
@@ -543,21 +543,21 @@ While `assert_eq!` is suitable for simple AST nodes, it quickly becomes
 unwieldy for complex, nested structures. Manually writing out expected ASTs in
 test code is tedious, error-prone, and makes refactoring the grammar a
 nightmare. This is where snapshot testing with the `insta` crate becomes
-indispensable.11
+indispensable.[^19]
 
 `insta` enables asserting that a complex value matches a “snapshot”—a reference
 representation stored in a separate file. On the first run, the snapshot is
 created. On subsequent runs, the test output is compared against the stored
 snapshot. If they differ, the test fails, and a rich diff is presented. The
 developer can then either fix the code or, if the change was intentional,
-update the snapshot with `cargo insta review`.11
+update the snapshot with `cargo insta review`.[^20]
 
 This workflow is transformative for parser development. When the language
 syntax evolves, the AST structure necessarily changes. Instead of manually
 updating dozens of `assert_eq!` calls, a developer can simply update the parser
 logic, run the tests, and then interactively review the new AST structures
 before accepting them as the new "golden" standard. This dramatically
-accelerates iteration and refactoring.12
+accelerates iteration and refactoring.[^21]
 
 The best practice is to snapshot the entire `ParseResult`, which includes both
 the (potentially partial) AST and the list of errors. This provides a complete
@@ -597,7 +597,7 @@ the formatted AST and error output.
 ### 3.3 Mastering error recovery testing
 
 `chumsky`'s most powerful feature is its support for flexible error recovery
-strategies.23 A robust parser should not stop at the first error; it should
+strategies.[^22] A robust parser should not stop at the first error; it should
 report the error, attempt to resynchronize, and continue parsing to find
 subsequent errors. This provides a much better user experience.
 
@@ -635,13 +635,13 @@ and an AST that contains *both* the `let x = 1` and `let y = 2;` statements,
 proving that recovery was successful. Experimenting with different recovery
 strategies (e.g., `recover_with(skip_then_retry_until(…))`), and snapshotting
 the results, is the most effective way to fine-tune how the parser responds to
-invalid input.23
+invalid input.[^23]
 
 ### 3.4 Validating Pratt parsers (expression parsing)
 
 Parsing expressions with operator precedence, as well as associativity, is a
 classic parsing problem. `chumsky` provides a built-in `pratt` parser that
-simplifies this immensely.24 Testing a Pratt parser involves systematically
+simplifies this immensely.[^24] Testing a Pratt parser involves systematically
 verifying that it respects the defined precedence and associativity rules.
 
 `rstest` is again an excellent choice for creating a table of expression inputs
@@ -684,23 +684,25 @@ The final output of the combined `logos` and `chumsky` pipeline is often a
 `rowan` tree. `rowan` provides data structures for creating a Concrete Syntax
 Tree (CST). Unlike a traditional Abstract Syntax Tree (AST), a `rowan` CST is
 "lossless" or "full-fidelity," meaning it represents the source text exactly,
-including all whitespace, comments, and even syntax errors.21 This makes it an
-ideal data structure for tooling that needs to inspect or modify source code
-without losing formatting, such as IDEs, formatters, and refactoring engines.29
+including all whitespace, comments, and even syntax errors.[^25] This makes it
+an ideal data structure for tooling that needs to inspect or modify source code
+without losing formatting, such as IDEs, formatters, and refactoring
+engines.[^26]
 
 ### 4.1 The `rowan` philosophy: losslessness and its testing implications
 
 The core design of `rowan` separates the tree's structure (the "green tree,"
 which is immutable and untyped) from the view or cursor into it (the "red
-tree," which provides a typed, parent-aware API).21 The library itself provides
-the generic tree data structures (`GreenNode`, `SyntaxNode`); the user's parser
-is responsible for correctly constructing the tree using a `GreenNodeBuilder`.31
+tree," which provides a typed, parent-aware API).[^27] The library itself
+provides the generic tree data structures (`GreenNode`, `SyntaxNode`); the
+user's parser is responsible for correctly constructing the tree using a
+`GreenNodeBuilder`.[^28]
 
 This architecture has a profound implication for testing: a bug found in a
 `rowan` CST is rarely a bug in the `rowan` library itself. Rather, it is a bug
 in the parser logic that called `builder.start_node()`, `builder.token()`, or
 `builder.finish_node()` in the wrong sequence. `rowan` is extensively tested
-within its primary use case, `rust-analyzer`.29 Therefore, testing a
+within its primary use case, `rust-analyzer`.[^29] Therefore, testing a
 
 `rowan` tree is the ultimate end-to-end integration test of the entire parsing
 pipeline. The CST represents the final, complete output produced by the parsing
@@ -763,7 +765,7 @@ fn test_losslessness_round_trip() {
 While the losslessness test is vital, it doesn't make the internal structure of
 the CST visible. The `Debug` implementation for `rowan::SyntaxNode` produces a
 beautifully formatted, indented tree. It enumerates the kind and span for every
-node and includes the corresponding tokens.31 This debug representation is a
+node and includes the corresponding tokens.[^30] This debug representation is a
 perfect candidate for snapshot testing with `insta`.
 
 By snapshotting the CST, developers gain a human-readable "golden" record of
@@ -808,7 +810,7 @@ While the raw `SyntaxNode` API is powerful, it is untyped. For semantic
 analysis, it is conventional to build a typed AST layer on top of the CST. This
 involves creating structs that wrap `SyntaxNode` and provide typed accessor
 methods for navigating the tree, as demonstrated in `rowan`'s
-`s_expressions.rs` example.31
+`s_expressions.rs` example.[^31]
 
 For example, a `FunctionDef` struct might wrap a `SyntaxNode` of kind `FN_DEF`
 and provide methods like `name() -> Option<SyntaxToken>` and
@@ -859,11 +861,11 @@ they are limited by the developer's ability to imagine all possible edge cases.
 Property-based testing, implemented in Rust by crates like `proptest`, offers a
 powerful solution to this problem. Instead of testing against specific inputs,
 it tests that certain *properties* or *invariants* of the code hold true for a
-vast range of automatically generated, random inputs.13 If a failing input is
-found,
+vast range of automatically generated, random inputs.[^32] If a failing input
+is found,
 
 `proptest` automatically "shrinks" it to the smallest possible test case that
-still reproduces the failure, making debugging far easier.2
+still reproduces the failure, making debugging far easier.[^33]
 
 ### 5.1 Introduction to property-based testing
 
@@ -912,12 +914,12 @@ proptest! {
 ```
 
 This single, simple test can uncover a wide range of bugs, from out-of-bounds
-access in regexes to infinite loops in recursive descent parsers.13 The failure
-persistence feature of
+access in regexes to infinite loops in recursive descent parsers.[^34] The
+failure persistence feature of
 
 `proptest` ensures that once a failing case is found, it is saved to a
 regression file, and re-run on every subsequent test execution, effectively
-turning a discovered bug into a permanent regression test.13
+turning a discovered bug into a permanent regression test.[^35]
 
 ### 5.3 The ultimate property: AST round-trip testing
 
@@ -927,7 +929,7 @@ result in an identical AST. This can be expressed as
 `parse(pretty_print(ast)) == Ok(ast)`. If this property holds, it provides
 exceptionally strong evidence that the parser can correctly handle any valid
 program construct that the AST is capable of representing. This is a common and
-highly effective strategy used in production-grade systems.2
+highly effective strategy used in production-grade systems.[^36]
 
 Implementing this test involves three steps:
 
@@ -937,7 +939,7 @@ Implementing this test involves three steps:
 This is achieved by implementing the `proptest::arbitrary::Arbitrary` trait for
 each AST node type. While this can be done manually, the `test-strategy` crate
 provides a convenient `#[derive(Arbitrary)]` macro that can handle many cases
-automatically.35
+automatically.[^37]
 
 For a recursive type like an expression tree, manual implementation combined
 with carefully constrained derive attributes is necessary to prevent infinite
@@ -1116,8 +1118,47 @@ the AST round-trip test, can be run nightly, or as a mandatory check before a
 release, ensuring that deeper, more subtle bugs are caught without slowing down
 the primary development loop.
 
-Ultimately, building a language is an iterative process.23 The syntax,
+Ultimately, building a language is an iterative process.[^38] The syntax,
 semantics, and tooling will evolve. A robust, multi-faceted test suite is the
 single most important asset for managing this evolution. It provides the
 confidence needed to refactor, experiment, and extend the language, ensuring
 the long-term health, correctness, and maintainability of the entire project.
+
+[^1]: Original source citation number 1 from the source material.
+[^2]: Original source citation number 2 from the source material.
+[^3]: Original source citation number 4 from the source material.
+[^4]: Original source citation number 6 from the source material.
+[^5]: Original source citation number 7 from the source material.
+[^6]: Original source citation number 15 from the source material.
+[^7]: Original source citation number 10 from the source material.
+[^8]: Original source citation number 19 from the source material.
+[^9]: Original source citation number 19 from the source material.
+[^10]: Original source citation number 21 from the source material.
+[^11]: Original source citation number 15 from the source material.
+[^12]: Original source citation number 1 from the source material.
+[^13]: Original source citation number 1 from the source material.
+[^14]: Original source citation number 22 from the source material.
+[^15]: Original source citation number 22 from the source material.
+[^16]: Original source citation number 23 from the source material.
+[^17]: Original source citation number 23 from the source material.
+[^18]: Original source citation number 27 from the source material.
+[^19]: Original source citation number 11 from the source material.
+[^20]: Original source citation number 11 from the source material.
+[^21]: Original source citation number 12 from the source material.
+[^22]: Original source citation number 23 from the source material.
+[^23]: Original source citation number 23 from the source material.
+[^24]: Original source citation number 24 from the source material.
+[^25]: Original source citation number 21 from the source material.
+[^26]: Original source citation number 29 from the source material.
+[^27]: Original source citation number 21 from the source material.
+[^28]: Original source citation number 31 from the source material.
+[^29]: Original source citation number 29 from the source material.
+[^30]: Original source citation number 31 from the source material.
+[^31]: Original source citation number 31 from the source material.
+[^32]: Original source citation number 13 from the source material.
+[^33]: Original source citation number 2 from the source material.
+[^34]: Original source citation number 13 from the source material.
+[^35]: Original source citation number 13 from the source material.
+[^36]: Original source citation number 2 from the source material.
+[^37]: Original source citation number 35 from the source material.
+[^38]: Original source citation number 23 from the source material.
