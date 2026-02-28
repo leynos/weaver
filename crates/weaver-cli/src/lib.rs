@@ -147,7 +147,7 @@ where
         let result = Cli::try_parse_from(cli_arguments)
             .map_err(AppError::CliUsage)
             .and_then(|cli| {
-                if cli.is_bare_invocation() {
+                if cli.is_bare_invocation() && !split.has_config_flags() {
                     write_bare_help(&mut *self.io.stderr, localizer).ok();
                     return Err(AppError::BareInvocation);
                 }

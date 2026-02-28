@@ -41,7 +41,7 @@ This addresses the P0 gap identified in the
 [UI gap analysis Level 0](../ui-gap-analysis.md#level-0--bare-invocation-weaver)
 and
 [Level 10d](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes),
-and satisfies roadmap task 5.1.1 in `docs/roadmap.md`.
+and satisfies roadmap task 5.1.1 in `../roadmap.md`.
 
 ## Constraints
 
@@ -128,8 +128,10 @@ and satisfies roadmap task 5.1.1 in `docs/roadmap.md`.
 - The build script (`build.rs`) includes `cli.rs` via `#[path = "src/cli.rs"]`
   for manpage generation. The new `is_bare_invocation()` method triggered a
   `dead_code` warning in the build script context because it is only called
-  from `lib.rs`. Resolved with a tightly scoped `#[expect(dead_code)]` attribute
-  with a reason string explaining the dual-compilation context.
+  from `lib.rs`. Resolved with a tightly scoped `#[allow(dead_code)]` attribute
+  with a reason string explaining the dual-compilation context. `#[expect]`
+  cannot be used here because it triggers `unfulfilled_lint_expectations` in
+  the library build where the method is used.
 - The `#[error("bare invocation")]` on `BareInvocation` provides a non-empty
   display string for safety in generic `Display` paths while the match arm
   in `run_with_handler()` suppresses printing for this variant.
@@ -277,6 +279,8 @@ localization.
 
 ### Key files involved in this change
 
+_Table 1: Key files involved in this change and their purpose._
+
 | File                                                  | Lines | Purpose                            |
 | ----------------------------------------------------- | ----- | ---------------------------------- |
 | `Cargo.toml` (workspace)                              | —     | ortho-config version               |
@@ -295,8 +299,6 @@ localization.
 | `crates/weaver-cli/tests/features/weaver_cli.feature` | 77    | BDD scenarios                      |
 | `docs/roadmap.md`                                     | 424   | Roadmap checkboxes                 |
 | `docs/users-guide.md`                                 | 837   | User documentation                 |
-
-_Table 1: Key files involved in this change and their purpose._
 
 ### Test infrastructure
 
@@ -881,6 +883,8 @@ pub(crate) enum AppError {
 
 ## Files modified (summary)
 
+_Table 2: Files modified and their changes._
+
 | File                                                  | Change                              |
 | ----------------------------------------------------- | ----------------------------------- |
 | `Cargo.toml`                                          | Upgrade `ortho_config` to `"0.7.0"` |
@@ -895,5 +899,3 @@ pub(crate) enum AppError {
 | `crates/weaver-cli/tests/features/weaver_cli.feature` | Add BDD scenario                    |
 | `docs/users-guide.md`                                 | Add "Bare invocation" subsection    |
 | `docs/roadmap.md`                                     | Mark 5.1.1 checkboxes as done       |
-
-_Table 2: Files modified and their changes._

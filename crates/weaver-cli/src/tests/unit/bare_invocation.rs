@@ -93,6 +93,46 @@ fn write_bare_help_produces_english(#[case] use_fluent: bool) {
 }
 
 #[test]
+fn config_only_invocation_reports_config_error_not_help() {
+    struct FailingLoader;
+    impl ConfigLoader for FailingLoader {
+        fn load(&self, _args: &[OsString]) -> Result<Config, AppError> {
+            Err(AppError::MissingDomain)
+        }
+    }
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut stdin = Cursor::new(Vec::new());
+    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
+    let args = vec![
+        OsString::from("weaver"),
+        OsString::from("--config-path"),
+        OsString::from("nonexistent.toml"),
+    ];
+    let exit = run_with_loader(args, &mut io, &FailingLoader);
+    let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
+    assert_eq!(exit, ExitCode::FAILURE);
+    assert!(
+        !stderr_text.contains("Usage: weaver"),
+        "config-only invocation must not show bare help"
+    );
+}
+
+/// Verifies that the Fluent catalogue and the hardcoded fallback strings
+/// produce identical output, guarding against desynchronization.
+#[test]
+fn fluent_and_fallback_outputs_are_identical() {
+    let fluent_localizer = FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])
+        .expect("embedded Fluent catalogue must parse");
+    let fluent_output = render_help(&fluent_localizer);
+    let fallback_output = render_help(&NoOpLocalizer);
+    assert_eq!(
+        fluent_output, fallback_output,
+        "Fluent catalogue and fallback strings have diverged"
+    );
+}
+
+#[test]
 fn bare_help_contains_usage_line() {
     let text = render_help(&NoOpLocalizer);
     assert!(text.contains("Usage:"));

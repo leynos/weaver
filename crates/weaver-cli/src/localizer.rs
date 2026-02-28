@@ -35,6 +35,8 @@ pub(crate) fn build_localizer() -> Box<dyn Localizer> {
 ///
 /// Each line is resolved through the localizer with a hardcoded English
 /// fallback, so the output is correct even without Fluent resources.
+/// The fallback strings must match the values in `locales/en-US/messages.ftl`;
+/// the `fluent_and_fallback_outputs_are_identical` test guards against drift.
 ///
 /// # Errors
 ///
