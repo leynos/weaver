@@ -135,3 +135,32 @@ Documentation coverage for parser and Semgrep references is now standardized
 with the style guide, and repository navigation now has explicit index and
 layout documents. Markdown gates (`make markdownlint`, `make fmt`, and
 `make nixie`) passed for the final staged state.
+
+## Sempai routing sequence
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Frontend as "Semgrep Frontend"
+  participant Router as "Rule Router\n(normalizer)"
+  participant AstGrep as "ast-grep Engine"
+  participant Weaver as "Weaver-native Matcher"
+  participant TS as "Tree-sitter\n(backend matcher)"
+
+  Frontend->>Router: Submit rule (Semgrep AST)
+  Router->>Router: Normalize to internal formula
+  alt Rule supported by ast-grep
+    Router->>AstGrep: Route formula
+    AstGrep->>TS: Query tree-sitter graph
+    TS-->>AstGrep: Matches
+    AstGrep-->>Frontend: Results / diagnostics
+  else Unsupported constructs
+    Router->>Weaver: Route to Weaver-native matcher
+    Weaver->>TS: Use Tree-sitter-backed matching
+    TS-->>Weaver: Matches
+    Weaver-->>Frontend: Results + unsupported-construct diagnostics
+  end
+```
+
+_Figure: Sempai rule-routing sequence for ast-grep-capable and fallback
+Weaver-native matching paths._
