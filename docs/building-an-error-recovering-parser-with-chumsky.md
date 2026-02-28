@@ -29,7 +29,7 @@ slice the source first. This yields:
 - The freedom to invent helpful token kinds (e.g. “Indent”, “Dedent”, “Unified
   Field Theory Symbol”)
 
-## 3 Dealing with left-recursion, infinite loops and other things that ate Betelgeuse
+## 3 Dealing with left-recursion, infinite loops, and other things that ate Betelgeuse
 
 Left-recursive rules make top-down parsers seize up like Marvin’s shoulder
 joints. Rewrite them with repetition combinators (`many()`, `foldl()`), or use
@@ -50,8 +50,7 @@ Error recovery is what turns the parser from Vogon poetry into a Babel fish.
 2. **Labels:** Tag sub-parsers with `.labelled("expression")` so the diagnostics
    mention something friendlier than “expected `Unknown(42)`”.
 3. **Tri-state nodes:** Return `Option<AstNode>`; missing bits propagate, but
-   the
-   parser soldiers on.
+   the parser soldiers on.
 
 In practice, it is common to compose the built-ins via
 `recover_with(nested_delimiters())` and `recover_with(skip_until(…))`,
