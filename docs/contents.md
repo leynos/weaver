@@ -37,6 +37,9 @@
   - Patterns for concise, maintainable Rust documentation tests.
 - [Rust parser testing comprehensive guide](rust-parser-testing-comprehensive-guide.md)
   - End-to-end parser testing guidance for `logos`, `chumsky`, and `rowan`.
+- [Rust extricate actuator plugin technical design](rust-extricate-actuator-plugin-technical-design.md)
+  - Proposed design for Rust `extricate-symbol` orchestration, plugin
+    transactions, and semantic verification workflow.
 - [Rust testing with `rstest` fixtures](rust-testing-with-rstest-fixtures.md)
   - Shared fixture and parameterization patterns for Rust test suites.
 - [Semgrep language reference directory](semgrep-language-reference/)
