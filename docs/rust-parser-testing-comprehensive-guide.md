@@ -26,7 +26,7 @@ The intended audience is the experienced Rust developer, already conversant
 with the language's idioms and the `rstest` testing framework, who seeks to
 build a truly resilient and maintainable parsing pipeline.
 
-## Section 1: Foundational testing paradigms for Rust parsers
+## Section 1: foundational testing paradigms for Rust parsers
 
 Before delving into the specifics of testing each component, it is crucial to
 establish a conceptual framework. A parser's testing strategy is not
@@ -678,7 +678,7 @@ fn test_pratt_parser_expressions(#[case] input: &str, #[case] expected: &str) {
 This suite of tests ensures that the core expression parsing logic, a
 notoriously tricky part of any language, matches the specification precisely.
 
-## Section 4: Ensuring the integrity of `rowan` lossless syntax trees
+## Section 4: ensuring the integrity of `rowan` lossless syntax trees
 
 The final output of the combined `logos` and `chumsky` pipeline is often a
 `rowan` tree. `rowan` provides data structures for creating a Concrete Syntax
