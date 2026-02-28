@@ -435,6 +435,17 @@ $defs:
             oneOf:
               - enum: [entropy, entropy_v2, redos]
               - type: object
+        anyOf:
+          - required: [pattern]
+          - required: [regex]
+          - required: [all]
+          - required: [any]
+          - required: [not]
+          - required: [inside]
+          - required: [anywhere]
+          - required: [type]
+          - required: [types]
+          - required: [analyzer]
 
   matchFormula:
     oneOf:
@@ -473,6 +484,79 @@ $defs:
         type: string
       fix:
         type: string
+    oneOf:
+      - required: [pattern]
+      - required: [regex]
+      - required: [all]
+      - required: [any]
+      - required: [not]
+      - required: [inside]
+      - required: [anywhere]
+
+  taintMatchFormulaObject:
+    type: object
+    additionalProperties: false
+    properties:
+      pattern:
+        type: string
+      regex:
+        type: string
+      all:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/matchFormula"
+      any:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/matchFormula"
+      not:
+        $ref: "#/$defs/matchFormula"
+      inside:
+        $ref: "#/$defs/matchFormula"
+      anywhere:
+        $ref: "#/$defs/matchFormula"
+      where:
+        type: array
+        items:
+          $ref: "#/$defs/whereItem"
+      as:
+        type: string
+      fix:
+        type: string
+      exact:
+        oneOf:
+          - type: boolean
+          - enum: ["true", "false"]
+      by-side-effect:
+        oneOf:
+          - type: boolean
+          - enum: ["true", "false", "only"]
+      control:
+        type: boolean
+      label:
+        type: string
+      requires:
+        oneOf:
+          - type: string
+          - type: array
+            minItems: 1
+            items:
+              type: string
+      from:
+        type: string
+      to:
+        type: string
+      replace-labels:
+        type: array
+        minItems: 1
+        items:
+          type: string
+      not-conflicting:
+        type: boolean
+      at-exit:
+        type: boolean
     oneOf:
       - required: [pattern]
       - required: [regex]
@@ -551,41 +635,7 @@ $defs:
   taintNewEntry:
     oneOf:
       - type: string
-      - allOf:
-          - $ref: "#/$defs/matchFormulaObject"
-          - type: object
-            additionalProperties: true
-            properties:
-              exact:
-                oneOf:
-                  - type: boolean
-                  - enum: ["true", "false"]
-              by-side-effect:
-                oneOf:
-                  - type: boolean
-                  - enum: ["true", "false", "only"]
-              control:
-                type: boolean
-              label:
-                type: string
-              requires:
-                oneOf:
-                  - type: string
-                  - type: array
-                    minItems: 1
-              from:
-                type: string
-              to:
-                type: string
-              replace-labels:
-                type: array
-                minItems: 1
-                items:
-                  type: string
-              not-conflicting:
-                type: boolean
-              at-exit:
-                type: boolean
+      - $ref: "#/$defs/taintMatchFormulaObject"
 
   taintObject:
     type: object

@@ -85,8 +85,8 @@ IDE feedback faster than a hyperspace bypass.
 
 - **Continuous Integration (CI) pipeline:** `cargo insta test`,
   `cargo clippy --deny warnings`, and the round-trip parser tests on every push.
-- **Editor integration:** Convert Chumsky’s `Rich` errors into language server
-  protocol (LSP) diagnostics; line/column already sorted.
+- **Editor integration:** Convert Chumsky’s `Rich` errors into Language Server
+  Protocol (LSP) diagnostics; line/column already sorted.
 - **Performance guardrails:** Benchmark on a late-game save. If a commit slows
   parsing or solving by > 20 %, trigger the Heart of Gold and revert reality.
 

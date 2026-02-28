@@ -34,8 +34,8 @@ important unless a deterministic legacy-to-v2 normalization pass is provided.
 
 Recommended sequencing:
 
-- MVP: implement the v2 search subset first (`match` with
-  `pattern`, `regex`, `all`, `any`, `not`, `inside`, and `anywhere`), then
+- Minimum Viable Product (MVP): implement the v2 search subset first (`match`
+  with `pattern`, `regex`, `all`, `any`, `not`, `inside`, and `anywhere`), then
 - compatibility: add legacy `pattern*` parsing and normalize both syntaxes into
   one internal formula representation.
 

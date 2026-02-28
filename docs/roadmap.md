@@ -4,7 +4,8 @@
 
 ### 0.1. Establish foundation and documentation baseline
 
-- [x] 0.1.1. Set up the project workspace, CI/CD pipeline, and core
+- [x] 0.1.1. Set up the project workspace, Continuous Integration and
+      Continuous Deployment (CI/CD) pipeline, and core
       dependencies.
 - [x] 0.1.2. Normalize parser and Semgrep documentation style and navigation,
       including
