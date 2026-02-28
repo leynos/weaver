@@ -63,12 +63,41 @@ Because plugin execution is sandboxed, the plugin cannot assume unrestricted
 filesystem access. The daemon must provide all file payloads required for
 analysis and patch generation.
 
+## ortho_config v0.6.0 impacts
+
+The Rust extricate flow inherits Weaver's current `ortho_config` v0.6.0
+behaviour model:
+
+- dependency-graph updates in v0.6.0 align parser features with the runtime and
+  macro contract,
+- discovery is fail-fast when discovered files are invalid, so configuration
+  load errors must stop orchestration immediately,
+- YAML loading uses `SaphyrYaml` with YAML 1.2 semantics, including strict
+  scalar parsing and duplicate-key failures.
+
+These behaviours directly affect payload and transaction handling:
+
+- file-payload completeness checks must fail early when configuration discovery
+  fails, rather than continuing with partial snapshots,
+- orchestration diagnostics should include discovery and payload context so
+  operators can remediate invalid files deterministically,
+- transaction validation should treat parser and discovery failures as hard
+  preconditions, not recoverable warnings.
+
+Authoritative runbook:
+[Migration guide: v0.5.0 to v0.6.0](ortho-config-v0-6-0-migration-guide.md),
+especially sections:
+
+- [1](ortho-config-v0-6-0-migration-guide.md#1-update-crate-versions-and-feature-flags)
+- [4](ortho-config-v0-6-0-migration-guide.md#4-handle-stricter-discovery-outcomes)
+- [5](ortho-config-v0-6-0-migration-guide.md#5-switch-to-the-new-stricter-yaml-provider)
+
 ## Capability and request contract
 
 ### Command contract
 
 The daemon operation is expected to resolve to capability ID `extricate-symbol`
-and forward a normalised request to the plugin.
+and forward a normalized request to the plugin.
 
 ```plaintext
 weaver act extricate --uri <file:///...> --position <line:col> --to <module>
@@ -100,7 +129,7 @@ all files that may be read or edited during the transaction:
 - source file containing the target symbol,
 - destination module file and destination parent module files,
 - files containing references returned by pre-move reference discovery,
-- relevant `mod` chain files needed to materialise module graph updates,
+- relevant `mod` chain files needed to materialize module graph updates,
 - package `Cargo.toml` and crate roots required for RA workspace loading.
 
 If the payload set is incomplete for deterministic execution, the plugin must
@@ -133,7 +162,7 @@ Diagnostic message convention for deterministic handling:
 
 The implementation uses a transactional refactoring driver with five layers:
 
-- request normalisation and validation,
+- request normalization and validation,
 - RA LSP session manager,
 - move-set planner (syntax + semantic filters),
 - overlay edit transaction engine,
