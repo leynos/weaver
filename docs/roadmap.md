@@ -84,9 +84,14 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
         daemon returns LSP definition results, errors propagate with structured
         messages, and the CLI exits with the daemon-provided status code.
 
-- [x] 1.1.9. Build the `weaver-lsp-host` crate with support for initialization,
-    capability detection, and core LSP features (definition, references,
-    diagnostics) for Rust, Python, and TypeScript.
+- [x] 1.1.9. Deliver the `weaver-lsp-host` crate with language-server
+    initialization, capability detection, and core Language Server Protocol
+    (LSP) operations for Rust, Python, and TypeScript.
+  - Acceptance criteria: `weaver-lsp-host` initializes and advertises
+    capabilities for all three languages; definition, references, and
+    diagnostics requests return structured success responses on valid inputs;
+    unsupported or pre-initialization requests return deterministic errors; and
+    integration tests cover one success case and one failure case per feature.
 
 - [x] 1.1.10. Implement process-based language server adapters for
       `weaver-lsp-host`.
@@ -108,9 +113,12 @@ design contract in `docs/weaver-design.md` and expose the lifecycle expected by
     unchanged; missing source content falls back to path-and-range with a
     clear explanation.
 
-- [x] 1.1.12. Implement the initial version of the `weaver-sandbox` crate, using
-    `birdcage` for its focused scope and production usage, prioritising robust
-    Linux support via namespaces and seccomp-bpf.
+- [x] 1.1.12. Deliver the initial `weaver-sandbox` crate with enforced process
+    isolation for external tool execution.
+  - Acceptance criteria: Linux sandboxing enforces namespaces and seccomp-bpf
+    policies via `birdcage`; platform support matrix is documented for Linux
+    and non-Linux behaviour; forbidden syscalls and filesystem escapes are
+    rejected in tests; and sandbox validation tests run under `make test`.
 
 - [x] 1.1.13. Implement the full "Double-Lock" safety harness logic in
       `weaverd`.
@@ -141,18 +149,34 @@ and relational understanding of code.*
       search
     engine for `observe grep` and `act apply-rewrite`, drawing inspiration from
     ast-grep's pattern language.
+  - Acceptance criteria: `observe grep` and `act apply-rewrite` both execute
+    through `weaver-syntax`; structural queries return deterministic spans and
+    rewrites for Rust, Python, and TypeScript fixtures; invalid query syntax
+    returns structured parse diagnostics; and snapshot tests cover success and
+    failure paths.
 
 - [x] 2.1.2. Integrate the "Syntactic Lock" from `weaver-syntax` into the
     "Double-Lock" harness.
+  - Acceptance criteria: all `act` write paths invoke syntactic verification
+    before commit; lock failures prevent on-disk writes; diagnostics include
+    file path and source location; and behaviour tests cover pass/fail paths.
 
 - [x] 2.1.3. Extend the `LanguageServer` trait with document sync methods
     (`did_open`, `did_change`, `did_close`) to enable semantic validation
     of modified content at real file paths without writing to disk.
+  - Acceptance criteria: trait implementations expose `did_open`,
+    `did_change`, and `did_close`; semantic validation paths use in-memory
+    document sync instead of disk writes; and integration tests verify
+    diagnostics for open-change-close sequences.
 
 - [x] 2.1.4. Create the `weaver-graph` crate and implement the LSP Provider for
       call
     graph generation, using the `textDocument/callHierarchy` request as the
     initial data source.
+  - Acceptance criteria: call hierarchy provider returns incoming and outgoing
+    edges via `textDocument/callHierarchy`; responses include stable node IDs,
+    spans, and relationship direction; provider errors are surfaced as
+    structured diagnostics; and end-to-end tests validate graph output.
 
 ### 2.2. Deliver `act apply-patch` command
 
@@ -230,8 +254,11 @@ and relational understanding of code.*
 - [ ] 2.4.1. Implement language profiles and wrapper registry for Rust, Python,
       TypeScript, and Go, with optional HashiCorp Configuration Language (HCL)
       support.
-  - Acceptance criteria: each supported profile defines wrapper templates, list
-    shapes, and rewrite boundaries, and optional HCL support is feature-gated.
+  - Acceptance criteria: Rust, Python, TypeScript, and Go profiles each define
+    wrapper templates, list-shape mappings, and rewrite boundaries; optional
+    HCL profile loads only when the feature flag is enabled; profile selection
+    failures return deterministic diagnostics; and fixtures validate all profile
+    registrations.
 - [ ] 2.4.2. Implement Semgrep-token rewrite logic with language-safe boundaries
       for metavariables, ellipsis, and deep ellipsis.
   - Acceptance criteria: rewrite logic avoids substitutions in unsafe lexical
@@ -296,8 +323,10 @@ and relational understanding of code.*
     and streaming output remains deterministic.
 - [ ] 2.5.4. Integrate parse-cache adapter keyed by URI, language, and
       revision, aligned with daemon document lifecycle.
-  - Acceptance criteria: repeated queries against unchanged snapshots reuse
-    parse state without semantic drift.
+  - Acceptance criteria: cache keys use URI, language, and revision values;
+    repeated queries against unchanged revisions hit cache in integration tests;
+    revision changes invalidate cached parses deterministically; and cache
+    misses and invalidations preserve semantic correctness.
 - [ ] 2.5.5. Implement actuation handoff contract using focus-first selection
       with span fallback and optional capture targeting. Requires 2.5.3.
   - Acceptance criteria: downstream `act` commands can consume Sempai output
@@ -330,6 +359,11 @@ language-specific tools.*
       secure
     IPC protocol between the `weaverd` broker and sandboxed plugin processes.
     *(Phase 3.1.1 — see `docs/execplans/3-1-1-weaver-plugins-crate.md`)*
+  - Acceptance criteria: plugin broker and sandboxed plugin process establish
+    authenticated IPC sessions; request and response envelopes validate against
+    crate-level schemas; protocol errors return deterministic failure codes; and
+    behaviour tests cover handshake success, schema rejection, and timeout
+    cases.
 
 ### 3.2. Deliver capability-first `act extricate`
 
@@ -420,16 +454,23 @@ initial* *Python delivery and shared failure semantics.*
 
 ### 3.5. Deliver first specialist sensor plugin
 
-- [ ] 3.5.1. Develop the first specialist sensor plugin:
-
-  - [ ] A plugin for `jedi` to provide supplementary static analysis for
-        Python.
+- [ ] 3.5.1. Deliver the `jedi` specialist sensor plugin to provide
+      supplementary Python static-analysis signals through the plugin broker.
+  - Acceptance criteria: plugin loads through `weaver-plugins`, returns
+    deterministic Python analysis payloads for supported files, rejects
+    unsupported languages with structured diagnostics, and integration tests
+    verify success and refusal paths.
 
 ### 3.6. Refine graceful degradation guidance
 
 - [ ] 3.6.1. Refine the graceful degradation logic to suggest specific
       plugin-based
     solutions when core LSP features are missing.
+  - Acceptance criteria: missing core LSP features produce actionable fallback
+    suggestions naming compatible plugins; suggestions include command hints and
+    capability rationale; unavailable plugin paths return deterministic
+    diagnostics; and regression tests cover at least three degradation
+    scenarios.
 
 ### 3.7. Deliver static analysis provider integration
 
@@ -481,19 +522,29 @@ planning and human-in-the-loop workflows.*
 
 ### 4.1. Deliver advanced agent workflow foundations
 
-- [ ] 4.1.1. Implement the `onboard-project` command based on the "Meta-RAG"
-      design,
-    orchestrating other Weaver components to generate the `PROJECT.dna` summary
-    file.
+- [ ] 4.1.1. Deliver the `onboard-project` command that orchestrates existing
+      Weaver components to generate a deterministic `PROJECT.dna` summary
+      artefact.
+  - Acceptance criteria: command ingests repository metadata and analysis
+    outputs into one `PROJECT.dna` file; output schema is versioned and stable;
+    reruns on unchanged inputs produce byte-identical output; and failure paths
+    emit structured diagnostics with actionable remediation hints.
 
-- [ ] 4.1.2. Implement a hybrid interactive mode (`--interactive`) that, in
-      case of
-    a "Double-Lock" verification failure, presents the proposed diff and the
-    resulting errors to a human user for manual review, approval, or rejection.
+- [ ] 4.1.2. Deliver a hybrid interactive mode (`--interactive`) that presents
+      lock-failure diffs and diagnostics for explicit human approval or
+      rejection before write operations continue.
+  - Acceptance criteria: interactive mode displays proposed diff plus syntactic
+    and semantic lock diagnostics; approval resumes execution and rejection
+    aborts without filesystem changes; timeout or non-interactive environments
+    fail closed; and behaviour tests cover approve, reject, and timeout flows.
 
-- [ ] 4.1.3. Begin research and development for the Dynamic Analysis Ingestion
-    provider for `weaver-graph`, allowing it to consume and merge profiling
-    data from tools like `gprof` and `callgrind`.
+- [ ] 4.1.3. Deliver the Dynamic Analysis Ingestion provider for
+      `weaver-graph` to consume and merge profiling data from tools such as
+      `gprof` and `callgrind`.
+  - Acceptance criteria: provider ingests at least `gprof` and `callgrind`
+    traces into a normalized graph schema; merge logic preserves source
+    identity and call-edge attribution; malformed trace inputs return structured
+    ingestion diagnostics; and integration tests validate multi-source merges.
 
 ## 5. CLI discoverability and help completion
 
