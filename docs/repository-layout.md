@@ -12,10 +12,14 @@ System semantics and architecture are defined in
 
 The repository layout is designed to:
 
-- keep runtime roles clear across CLI, daemon, and backend crates,
+- keep runtime roles clear across command-line interface (CLI), daemon, and
+  backend crates,
 - separate security-critical concerns such as sandboxing and safety locks,
 - support testability and deterministic quality gates, and
 - make planned work discoverable without obscuring implemented ownership.
+
+In this document, Language Server Protocol (LSP) and Continuous Integration
+(CI) are expanded here and then used by acronym in later sections.
 
 ## Top-level structure
 
@@ -49,30 +53,30 @@ The repository layout is designed to:
 
 ### Core workspace crates
 
-| Crate                         | Responsibility                                                                          | Status      |
-| ----------------------------- | --------------------------------------------------------------------------------------- | ----------- |
-| `weaver-cli`                  | CLI entrypoint, command parsing, daemon lifecycle commands, and JSONL request streaming | Implemented |
-| `weaverd`                     | Daemon orchestration, command dispatch, and write-operation safety harness              | Implemented |
-| `weaver-config`               | Shared configuration schema and loading for client and daemon                           | Implemented |
-| `weaver-lsp-host`             | Language server lifecycle, capability detection, and semantic operations                | Implemented |
-| `weaver-syntax`               | Tree-sitter parsing and structural search or rewrite functionality                      | Implemented |
-| `weaver-graph`                | Relational graph layer with LSP-backed call hierarchy provider                          | Implemented |
-| `weaver-sandbox`              | Sandbox boundary for external tools and plugin execution                                | Implemented |
-| `weaver-plugins`              | Plugin protocol, lifecycle management, and broker integration                           | Implemented |
-| `weaver-plugin-rope`          | Python specialist plugin integration                                                    | Implemented |
-| `weaver-plugin-rust-analyzer` | Rust specialist plugin integration                                                      | Implemented |
-| `weaver-build-util`           | Shared build-time utilities used across crates                                          | Implemented |
-| `weaver-e2e`                  | End-to-end test support crate and integration scaffolding                               | Implemented |
+| Crate                         | Responsibility                                                                                       | Status      |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------- | ----------- |
+| `weaver-cli`                  | CLI entrypoint, command parsing, daemon lifecycle commands, and JSON Lines (JSONL) request streaming | Implemented |
+| `weaverd`                     | Daemon orchestration, command dispatch, and write-operation safety harness                           | Implemented |
+| `weaver-config`               | Shared configuration schema and loading for client and daemon                                        | Implemented |
+| `weaver-lsp-host`             | Language server lifecycle, capability detection, and semantic operations                             | Implemented |
+| `weaver-syntax`               | Tree-sitter parsing and structural search or rewrite functionality                                   | Implemented |
+| `weaver-graph`                | Relational graph layer with LSP-backed call hierarchy provider                                       | Implemented |
+| `weaver-sandbox`              | Sandbox boundary for external tools and plugin execution                                             | Implemented |
+| `weaver-plugins`              | Plugin protocol, lifecycle management, and broker integration                                        | Implemented |
+| `weaver-plugin-rope`          | Python specialist plugin integration                                                                 | Implemented |
+| `weaver-plugin-rust-analyzer` | Rust specialist plugin integration                                                                   | Implemented |
+| `weaver-build-util`           | Shared build-time utilities used across crates                                                       | Implemented |
+| `weaver-e2e`                  | End-to-end test support crate and integration scaffolding                                            | Implemented |
 
 _Table 1: Implemented crate boundaries and responsibilities._
 
 ### Implemented shared directories
 
-| Path                 | Purpose                                                              | Status      |
-| -------------------- | -------------------------------------------------------------------- | ----------- |
-| `docs/`              | Design docs, ADRs, roadmap, migration guides, and reference material | Implemented |
-| `test_expect/`       | Golden and expectation artefacts used by test suites                 | Implemented |
-| `.github/workflows/` | CI workflows and automation policy                                   | Implemented |
+| Path                 | Purpose                                                                                               | Status      |
+| -------------------- | ----------------------------------------------------------------------------------------------------- | ----------- |
+| `docs/`              | Design docs, architectural decision records (ADRs), roadmap, migration guides, and reference material | Implemented |
+| `test_expect/`       | Golden and expectation artefacts used by test suites                                                  | Implemented |
+| `.github/workflows/` | CI workflows and automation policy                                                                    | Implemented |
 
 _Table 2: Implemented shared directories and their roles._
 

@@ -113,7 +113,7 @@ Then inspect each log tail for failures.
 
 ## Surprises & Discoveries
 
-- Initial `make markdownlint` failed before formatting due violations in
+- Initial `make markdownlint` failed before formatting due to violations in
   `docs/adr-001-plugin-capability-model-and-act-extricate.md`. Running
   `make fmt` applied repository markdownlint autofixes, after which
   `make markdownlint` passed.

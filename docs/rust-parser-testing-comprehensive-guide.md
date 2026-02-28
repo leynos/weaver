@@ -390,9 +390,18 @@ where
             );
         }
 
-        let (expected_token, expected_slice, expected_span) = &expected_tokens[index];
+        let (expected_token, expected_slice, expected_span) =
+            &expected_tokens[index];
+        let token = token_result.unwrap_or_else(|err| {
+            panic!("Unexpected lexer error at index {}: {:?}", index, err)
+        });
 
-        assert_eq!(&token_result, expected_token, "Token kind mismatch at index {}", index);
+        assert_eq!(
+            &token,
+            expected_token,
+            "Token kind mismatch at index {}",
+            index
+        );
         assert_eq!(lexer.slice(), *expected_slice, "Token slice mismatch at index {}", index);
         assert_eq!(lexer.span(), *expected_span, "Token span mismatch at index {}", index);
 

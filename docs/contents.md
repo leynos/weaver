@@ -41,11 +41,13 @@
   - Shared fixture and parameterization patterns for Rust test suites.
 - [Semgrep language reference directory](semgrep-language-reference/)
   - Semgrep grammar notes, schema references, precedence model, and examples.
-- [UI gap analysis](ui-gap-analysis.md)
-  - CLI discoverability and usability gap inventory with priority mapping.
+- [User interface (UI) gap analysis](ui-gap-analysis.md)
+  - Command-line interface (CLI) discoverability and usability gap inventory
+    with priority mapping.
 - [User's guide](users-guide.md)
   - End-user guide for Weaver configuration, daemon lifecycle, and commands.
 - [Weaver design document](weaver-design.md)
   - System architecture, safety model, and phased delivery rationale.
 - [Weaver LSP host v0.1.0 migration guide](weaver-lsp-host-v0-1-0-migration-guide.md)
-  - Migration details for LSP host capability and API changes.
+  - Migration details for Language Server Protocol (LSP) host capability and
+    API changes.
