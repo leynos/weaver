@@ -136,8 +136,9 @@ cases that need grammar-level precision beyond the Semgrep-style subset.
 ## Outstanding decisions
 
 - Which advanced predicates are included in the first public subset?
-- Whether deep-matching semantics are included in the first release?
-- How to represent capability flags per language in user-facing diagnostics?
+- Will deep-matching semantics be included in the first release?
+- How should capability flags per language be represented in user-facing
+  diagnostics?
 
 ## Architectural rationale
 
