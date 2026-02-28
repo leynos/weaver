@@ -3,6 +3,9 @@
 ## Phase 0: Foundation & Tooling (Complete)
 
 - [x] Set up the project workspace, CI/CD pipeline, and core dependencies.
+- [x] Normalize parser and Semgrep documentation style and navigation, including
+      `docs/contents.md` and `docs/repository-layout.md`, as delivered in
+      `docs/execplans/sempai-design.md`.
 
 ## Phase 1: Core MVP & Safety Harness Foundation
 
@@ -160,6 +163,38 @@ and relational understanding of code.*
   - Acceptance criteria: tests pass under `make test` and error messaging is
     asserted for each failure mode.
 
+### Step: Deliver Semgrep-compatible query routing foundation (`sempai`)
+
+*Outcome: Implement the hybrid Semgrep-compatible routing strategy from*
+*`docs/adr-003-sempai-semgrep-compatible-query-engine.md`, with explicit*
+*backend selection and diagnostics across ast-grep and Weaver-native matching.*
+
+- [ ] Define and implement the rule-capability routing matrix for Semgrep-style
+    operators and captures.
+  - Acceptance criteria: each supported operator has an explicit mapped backend
+    class (`ast-grep`, `Weaver-native`, or unsupported), and routing decisions
+    include stable reason codes.
+- [ ] Implement the Semgrep-compatible front-end normalization flow that
+    produces a deterministic internal formula for routing.
+  - Acceptance criteria: equivalent rule forms normalize to the same internal
+    representation, and normalization failures return structured diagnostics.
+- [ ] Implement the ast-grep execution path for rules that map cleanly and
+    return deterministic captures.
+  - Acceptance criteria: mapped fixtures execute through ast-grep with stable
+    capture output and no implicit fallback.
+- [ ] Implement the Weaver-native execution path for supported constructs that
+    do not map cleanly to ast-grep.
+  - Acceptance criteria: fallback execution is explicit in diagnostics and
+    preserves normalized rule semantics for covered operators.
+- [ ] Add conformance and regression suites for mapped and non-mapped operator
+    behaviour, including captures, negation, and deep-matching boundaries.
+  - Acceptance criteria: regression fixtures cover routing parity and mismatch
+    diagnostics across Rust, Python, Go, and TypeScript.
+- [ ] Publish user-facing compatibility boundaries and routing diagnostics in
+    the Semgrep reference documentation.
+  - Acceptance criteria: docs identify guaranteed operators, fallback-only
+    operators, and unsupported constructs with stable terminology.
+
 ## Phase 3: Plugin Ecosystem & Specialist Tools
 
 *Goal: Build the plugin architecture to enable orchestration of best-in-class,
@@ -168,6 +203,46 @@ language-specific tools.*
 - [x] Design and implement the `weaver-plugins` crate, including the secure
     IPC protocol between the `weaverd` broker and sandboxed plugin processes.
     *(Phase 3.1.1 — see `docs/execplans/3-1-1-weaver-plugins-crate.md`)*
+
+### Step: Deliver capability-first `act extricate`
+
+*Outcome: Implement the `extricate-symbol` capability model and command flow*
+*defined in `docs/adr-001-plugin-capability-model-and-act-extricate.md`, using*
+*the Rust implementation strategy in*
+*`docs/rust-extricate-actuator-plugin-technical-design.md`.*
+
+- [ ] Add capability ID scaffolding and resolver policy for actuator
+    capabilities (`rename-symbol`, `extricate-symbol`, `extract-method`,
+    `replace-body`, `extract-predicate`).
+  - Acceptance criteria: capability IDs are strongly typed in daemon routing,
+    and resolution output includes language, selected provider, and policy
+    rationale.
+- [ ] Extend plugin manifest schema and broker loading to support capability
+    declarations and capability-aware selection.
+  - Acceptance criteria: manifest validation enforces capability fields, and
+    provider selection respects language plus capability compatibility.
+- [ ] Add the `weaver act extricate --uri --position --to` command contract and
+    wire capability discovery output for `extricate-symbol`.
+  - Acceptance criteria: CLI request shape is stable across providers, and
+    capability probe output reports extrication support by language.
+- [ ] Extend the Rope plugin with `extricate-symbol` support for Python.
+  - Acceptance criteria: plugin returns unified diffs through existing patch
+    application flow and preserves symbol semantics for supported Python shapes.
+- [ ] Implement Rust `extricate-symbol` orchestration with built-in capability
+    ownership in `weaverd` and plugin-backed execution stages via
+    `weaver-plugin-rust-analyzer`.
+  - Acceptance criteria: flow includes overlay transaction planning, RA
+    definition and references queries, code-action repair, and semantic
+    verification before commit.
+- [ ] Extend plugin and daemon failure schemas with deterministic refusal
+    diagnostics and hard rollback guarantees.
+  - Acceptance criteria: refusal paths emit structured `PluginDiagnostic`
+    payloads, include stable error codes, and leave the filesystem unchanged.
+- [ ] Add unit, behavioural, and end-to-end coverage for Python and Rust
+    extrication, including ambiguous import repair and incomplete payload
+    failures.
+  - Acceptance criteria: tests assert meaning-preservation probes, module graph
+    updates, and deterministic failure semantics.
 
 - [ ] Develop the first set of actuator plugins:
 
