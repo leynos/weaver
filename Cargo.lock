@@ -1805,6 +1805,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16c2f82143577edb4921b71ede051dac62ca3c16084e918bf7b40c96ae10eb33"
 
 [[package]]
+name = "sempai"
+version = "0.1.0"
+dependencies = [
+ "rstest",
+ "rstest-bdd",
+ "rstest-bdd-macros",
+ "sempai_core",
+ "serde_json",
+]
+
+[[package]]
+name = "sempai_core"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "rstest",
+ "rstest-bdd",
+ "rstest-bdd-macros",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "semver"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"

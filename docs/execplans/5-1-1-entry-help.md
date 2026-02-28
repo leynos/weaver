@@ -188,12 +188,12 @@ satisfies roadmap task 5.1.1 in `../roadmap.md`.
   Rationale: This means the English text is always available even when the
   Fluent pipeline fails (via `NoOpLocalizer`), while genuine translations
   override it cleanly. The function composes the help block from individual
-  Fluent messages so translators can work on each line independently.
-  The English fallback values are centralised in a `bare_help` constants
-  module in `localizer.rs` so each string appears exactly once in the Rust
-  source; the `.ftl` file remains the canonical Fluent resource.  The
-  `fluent_and_fallback_outputs_are_identical` test guards against drift
-  between the two. Date/Author: 2026-02-26, updated 2026-02-28
+  Fluent messages so translators can work on each line independently. The
+  English fallback values are centralised in a `bare_help` constants module in
+  `localizer.rs` so each string appears exactly once in the Rust source; the
+  `.ftl` file remains the canonical Fluent resource.  The
+  `fluent_and_fallback_outputs_are_identical` test guards against drift between
+  the two. Date/Author: 2026-02-26, updated 2026-02-28
 
 - Decision: Construct `FluentLocalizer` once at the start of
   `CliRunner::run()`, falling back to `NoOpLocalizer` on error. Rationale: The

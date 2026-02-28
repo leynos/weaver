@@ -854,3 +854,33 @@ inspired by ast-grep. Patterns use metavariables (`$VAR` for single captures,
 enables the future `observe grep` and `act apply-rewrite` commands to perform
 precise, AST-aware search and transformation across the codebase. The engine
 currently supports Rust, Python, and TypeScript.
+
+## Sempai query engine
+
+The `sempai` crate provides a Semgrep-compatible query engine backed by
+Tree-sitter for semantics-aware code pattern matching. It is organized as two
+workspace crates:
+
+- **`sempai_core`** — canonical data model including language identifiers
+  (`Language`), source spans (`Span`, `LineCol`), match results (`Match`),
+  capture bindings (`CaptureValue`, `CapturedNode`), structured diagnostics
+  (`DiagnosticReport`, `Diagnostic`, `DiagnosticCode`), and engine
+  configuration (`EngineConfig`).
+- **`sempai`** — stable facade crate that re-exports all public types from
+  `sempai_core` and provides the `Engine` entrypoint.
+
+The `Engine` struct exposes three methods for query compilation and execution:
+
+- `compile_yaml(yaml)` — compiles a YAML rule file into query plans.
+- `compile_dsl(rule_id, language, dsl)` — compiles a one-liner DSL expression.
+- `execute(plan, uri, source)` — executes a compiled plan against a source
+  snapshot.
+
+All three methods currently return "not implemented" diagnostics. They will be
+wired to the YAML parser, DSL parser, and Tree-sitter backend as those
+components are delivered in subsequent roadmap phases.
+
+All error conditions are reported through `DiagnosticReport`, which carries
+stable `E_SEMPAI_*` error codes suitable for programmatic consumption.
+Diagnostics include a code, message, optional source span, and supplementary
+notes.

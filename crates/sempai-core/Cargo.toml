@@ -1,0 +1,19 @@
+[package]
+name = "sempai_core"
+edition.workspace = true
+version.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
+rstest-bdd = { workspace = true }
+rstest-bdd-macros = { workspace = true }
+insta = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true
