@@ -75,8 +75,10 @@ focus-value            = metavariable | yaml-list1(metavariable) ;
 match-selector         = "match" ":" match-pattern ;
 match-pattern          = pattern-snippet | match-object ;
 
-(* One principal operator + optional decorators (`where`, `as`, `fix`). *)
-match-object           = [ where-clause ] [ as-clause ] [ fix-clause ] match-principal ;
+(* One principal operator + decorators (`where`, `as`, `fix`) in any order. *)
+match-object           = decorator-list match-principal ;
+decorator-list         = { match-decorator } ;
+match-decorator        = where-clause | as-clause | fix-clause ;
 
 match-principal        = match-pattern-op
                        | match-regex-op
