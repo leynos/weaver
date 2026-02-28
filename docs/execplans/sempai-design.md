@@ -138,6 +138,8 @@ layout documents. Markdown gates (`make markdownlint`, `make fmt`, and
 
 ## Sempai routing sequence
 
+Sequence diagram showing the Sempai routing flow between components.
+
 ```mermaid
 sequenceDiagram
   autonumber
