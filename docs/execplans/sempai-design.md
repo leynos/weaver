@@ -41,7 +41,7 @@ Success is observable by reading the updated documents and by running
   `docs/` files referenced by external tooling, stop and escalate.
 - Dependency tolerance: if a new build or lint dependency is required, stop and
   escalate.
-- Iteration tolerance: if markdown gates fail after three fix iterations, stop
+- Iteration tolerance: if markdown gates fail after three fix iterations, stop,
   and report failure mode.
 - Ambiguity tolerance: if style-guide rules conflict with existing project
   standards and no clear precedence exists, stop and escalate with options.
