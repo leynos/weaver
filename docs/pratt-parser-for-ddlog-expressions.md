@@ -305,7 +305,7 @@ ensuring that downstream analyses always observe a concrete expression tree.
 Chained `else if` clauses become nested `Expr::IfElse` nodes so that each
 predicate retains its own branch:
 
-```text
+```plaintext
 if a { x } else if b { y } else { z } ->
     IfElse(cond=a, then=x, else=IfElse(cond=b, then=y, else=z))
 ```

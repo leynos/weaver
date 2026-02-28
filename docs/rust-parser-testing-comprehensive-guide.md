@@ -458,11 +458,12 @@ parsers.[^17] This modularity is a significant advantage for testing, as each
 small parser can be tested in isolation.
 
 To unit test a specific parser rule, one should feed it a pre-tokenized slice
-(`&`) rather than a raw string. This isolates the parser logic from the lexer,
-ensuring that the test is focused solely on how the combinators operate. The
-parser's `parse` method returns a `ParseResult`, which contains either the
-output AST and a vector of non-fatal errors, or just a vector of fatal
-errors.[^18] Tests should assert against both the output and the error vector.
+(`&[(Token<'a>, &'a str, std::ops::Range<usize>)]`) rather than a raw string.
+This isolates the parser logic from the lexer, ensuring that the test is
+focused solely on how the combinators operate. The parser's `parse` method
+returns a `ParseResult`, which contains either the output AST and a vector of
+non-fatal errors, or just a vector of fatal errors.[^18] Tests should assert
+against both the output and the error vector.
 
 ```rust,no_run
 // Assuming an AST definition like this:
@@ -484,7 +485,9 @@ pub enum Expr<'a> {
 use chumsky::prelude::*;
 use crate::lexer::Token; // Token enum defined by the parser
 
-fn let_parser<'a>() -> impl Parser<'a, &'a, Stmt<'a>, extra::Err<Simple<Token<'a>>>> {
+fn let_parser<'a>(
+) -> impl Parser<'a, &'a [(Token<'a>, &'a str, std::ops::Range<usize>)], Stmt<'a>, extra::Err<Simple<Token<'a>>>>
+{
     just(Token::Let)
        .ignore_then(select! { Token::Ident(ident) => ident })
        .then_ignore(just(Token::Assign)) // Assuming Token::Assign exists
