@@ -579,12 +579,17 @@ section 4). The following operators are now included:
 | `>`      | `Gt`               | 30                   | left          |
 | `>=`     | `Gte`              | 30                   | left          |
 
+_Table 2: Binary operators mapped to `BinaryOp` variants with binding powers._
+
 **Unary (prefix) operators:**
 
 | Operator | `UnaryOp` variant | Binding power |
 | -------- | ----------------- | ------------- |
 | `~`      | `BitNot`          | 80            |
 | `&`      | `Ref`             | 80            |
+
+_Table 3: Unary prefix operators mapped to `UnaryOp` variants with binding
+powers._
 
 These binding powers mirror the constants in `src/parser/ast/precedence.rs`.
 When adjusting operator precedence in code, update this table in the same
