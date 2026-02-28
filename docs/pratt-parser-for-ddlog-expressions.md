@@ -1,19 +1,20 @@
-# Pratt parser design for DDlog expressions
+# Illustrative Pratt parser example for DDlog expressions
 
-This design leverages the `chumsky` crate's built-in Pratt parsing
-capabilities, which is the ideal approach given its existing use in the project
-and its powerful, expressive features for handling expression grammars. This
-avoids the need to write a Pratt parser from scratch and ensures cohesion with
-the current parsing pipeline.
+This document is an illustrative example of how a Pratt parser for DDlog-style
+expressions can be structured. It is reference material for parser authors and
+is not a design proposal for a Weaver runtime component or roadmap task.
+
+The example leverages the `chumsky` crate's Pratt parsing capabilities, because
+they provide a concise way to express precedence-driven grammars.
 
 ______________________________________________________________________
 
-## 1. Core concepts and integration strategy
+## 1. Core concepts and illustrative integration approach
 
 The parser will be implemented as a `chumsky` parser combinator that consumes
 the token stream produced by the existing `logos`-based tokenizer. It will
 produce a structured expression Abstract Syntax Tree (AST), which will then be
-integrated as a node (`N_EXPR_NODE`) within the larger `rowan` Concrete Syntax
+integrated as a node (`N_EXPR_NODE`) within a larger `rowan` Concrete Syntax
 Tree (CST).
 
 The key steps are:
@@ -377,7 +378,7 @@ diagnostics.
 
 ______________________________________________________________________
 
-## 4. CST integration
+## 4. Illustrative CST integration
 
 The `chumsky` expression parser produces a structured `ast::Expr`. However, the
 core of `ddlint` is the `rowan` CST, which must remain lossless. The expression
@@ -447,14 +448,17 @@ impl Expression {
 }
 ```
 
-This design provides a clear and robust path forward for implementing a
-complete and correct expression parser that integrates perfectly with the
-established `ddlint` architecture, fulfilling the next major task in the
-project roadmap.
+This example provides a clear and robust reference for implementing a complete
+expression parser that integrates with a `rowan`-based architecture. It should
+be read as an educational implementation sketch, not a committed Weaver design
+decision.
 
 ______________________________________________________________________
 
 ## 5. Implementation notes
+
+These notes describe one illustrative codebase layout and are included as
+worked examples. They are not normative requirements for Weaver components.
 
 The first working parser lives in `src/parser/expression.rs` and is invoked by
 the unit tests. Although the design assumed the availability of
