@@ -135,3 +135,86 @@ fn len_reflects_registration_count(populated_registry: PluginRegistry) {
     assert_eq!(populated_registry.len(), 3);
     assert!(!populated_registry.is_empty());
 }
+
+// ---------------------------------------------------------------------------
+// Capability-based lookup
+// ---------------------------------------------------------------------------
+
+fn make_actuator_with_capabilities(
+    name: &str,
+    lang: &str,
+    caps: Vec<CapabilityId>,
+) -> PluginManifest {
+    let meta = PluginMetadata::new(name, "1.0", PluginKind::Actuator);
+    PluginManifest::new(
+        meta,
+        vec![lang.into()],
+        PathBuf::from(format!("/usr/bin/{name}")),
+    )
+    .with_capabilities(caps)
+}
+
+#[fixture]
+fn capability_registry() -> PluginRegistry {
+    let mut r = PluginRegistry::new();
+    r.register(make_actuator_with_capabilities(
+        "rope",
+        "python",
+        vec![CapabilityId::RenameSymbol],
+    ))
+    .expect("register rope");
+    r.register(make_actuator_with_capabilities(
+        "ra",
+        "rust",
+        vec![CapabilityId::RenameSymbol, CapabilityId::ExtricateSymbol],
+    ))
+    .expect("register ra");
+    r.register(make_sensor("jedi", "python"))
+        .expect("register jedi");
+    r
+}
+
+#[rstest]
+fn find_for_capability_returns_matching(capability_registry: PluginRegistry) {
+    let results = capability_registry.find_for_capability(CapabilityId::RenameSymbol);
+    assert_eq!(results.len(), 2);
+    let names: Vec<&str> = results.iter().map(|m| m.name()).collect();
+    assert!(names.contains(&"rope"));
+    assert!(names.contains(&"ra"));
+}
+
+#[rstest]
+fn find_for_capability_excludes_non_matching(capability_registry: PluginRegistry) {
+    let results = capability_registry.find_for_capability(CapabilityId::ExtricateSymbol);
+    assert_eq!(results.len(), 1);
+    assert_eq!(results.first().expect("one plugin").name(), "ra");
+}
+
+#[rstest]
+fn find_for_capability_returns_empty_for_unused(capability_registry: PluginRegistry) {
+    let results = capability_registry.find_for_capability(CapabilityId::ExtractMethod);
+    assert!(results.is_empty());
+}
+
+#[rstest]
+fn find_for_language_and_capability_intersects(capability_registry: PluginRegistry) {
+    let results =
+        capability_registry.find_for_language_and_capability("python", CapabilityId::RenameSymbol);
+    assert_eq!(results.len(), 1);
+    assert_eq!(results.first().expect("one plugin").name(), "rope");
+}
+
+#[rstest]
+fn find_for_language_and_capability_returns_empty_on_mismatch(capability_registry: PluginRegistry) {
+    let results = capability_registry
+        .find_for_language_and_capability("python", CapabilityId::ExtricateSymbol);
+    assert!(results.is_empty());
+}
+
+#[rstest]
+fn find_for_language_and_capability_is_case_insensitive(capability_registry: PluginRegistry) {
+    let results =
+        capability_registry.find_for_language_and_capability("Rust", CapabilityId::RenameSymbol);
+    assert_eq!(results.len(), 1);
+    assert_eq!(results.first().expect("one plugin").name(), "ra");
+}

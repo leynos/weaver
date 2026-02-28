@@ -175,3 +175,40 @@ fn severity_round_trip(#[case] severity: DiagnosticSeverity, #[case] expected_st
     let back: DiagnosticSeverity = serde_json::from_str(&json).expect("deserialise");
     assert_eq!(back, severity);
 }
+
+// ---------------------------------------------------------------------------
+// PluginDiagnostic reason_code
+// ---------------------------------------------------------------------------
+
+#[test]
+fn diagnostic_with_reason_code_round_trip() {
+    use crate::capability::ReasonCode;
+
+    let diag = PluginDiagnostic::new(DiagnosticSeverity::Error, "symbol not found")
+        .with_reason_code(ReasonCode::SymbolNotFound);
+    assert_eq!(diag.reason_code(), Some(ReasonCode::SymbolNotFound));
+
+    let json = serde_json::to_string(&diag).expect("serialise");
+    assert!(json.contains("\"reason_code\":\"symbol_not_found\""));
+
+    let back: PluginDiagnostic = serde_json::from_str(&json).expect("deserialise");
+    assert_eq!(back.reason_code(), Some(ReasonCode::SymbolNotFound));
+    assert_eq!(back, diag);
+}
+
+#[test]
+fn diagnostic_without_reason_code_omits_field() {
+    let diag = PluginDiagnostic::new(DiagnosticSeverity::Warning, "something");
+    assert!(diag.reason_code().is_none());
+
+    let json = serde_json::to_string(&diag).expect("serialise");
+    assert!(!json.contains("reason_code"));
+}
+
+#[test]
+fn diagnostic_deserialises_without_reason_code() {
+    let json = r#"{"severity":"error","message":"oops"}"#;
+    let diag: PluginDiagnostic = serde_json::from_str(json).expect("deserialise");
+    assert!(diag.reason_code().is_none());
+    assert_eq!(diag.message(), "oops");
+}

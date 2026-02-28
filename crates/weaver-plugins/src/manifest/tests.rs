@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use rstest::rstest;
 
 use super::*;
+use crate::capability::CapabilityId;
 use crate::error::PluginError;
 use crate::manifest::PluginMetadata;
 
@@ -59,6 +60,7 @@ fn new_manifest_has_defaults() {
     assert_eq!(m.executable(), PathBuf::from("/usr/bin/rope-plugin"));
     assert!(m.args().is_empty());
     assert_eq!(m.timeout_secs(), 30);
+    assert!(m.capabilities().is_empty());
 }
 
 #[test]
@@ -129,4 +131,52 @@ fn manifest_deserialise_defaults_timeout() {
     let m: PluginManifest = serde_json::from_str(json).expect("deserialise");
     assert_eq!(m.timeout_secs(), 30);
     assert!(m.args().is_empty());
+}
+
+// ---------------------------------------------------------------------------
+// Capabilities
+// ---------------------------------------------------------------------------
+
+#[test]
+fn with_capabilities_sets_capabilities() {
+    let m = make_manifest().with_capabilities(vec![CapabilityId::RenameSymbol]);
+    assert_eq!(m.capabilities(), &[CapabilityId::RenameSymbol]);
+}
+
+#[test]
+fn manifest_with_capabilities_serde_round_trip() {
+    let m = make_manifest().with_capabilities(vec![CapabilityId::RenameSymbol]);
+    let json = serde_json::to_string(&m).expect("serialise");
+    let back: PluginManifest = serde_json::from_str(&json).expect("deserialise");
+    assert_eq!(back.capabilities(), &[CapabilityId::RenameSymbol]);
+    assert_eq!(back, m);
+}
+
+#[test]
+fn manifest_without_capabilities_deserialises_to_empty() {
+    let json = r#"{
+        "name": "test",
+        "version": "0.1",
+        "kind": "actuator",
+        "languages": ["rust"],
+        "executable": "/bin/test"
+    }"#;
+    let m: PluginManifest = serde_json::from_str(json).expect("deserialise");
+    assert!(m.capabilities().is_empty());
+}
+
+#[test]
+fn validate_rejects_sensor_with_capabilities() {
+    let meta = PluginMetadata::new("jedi", "1.0", PluginKind::Sensor);
+    let manifest = PluginManifest::new(meta, vec!["python".into()], PathBuf::from("/usr/bin/jedi"))
+        .with_capabilities(vec![CapabilityId::RenameSymbol]);
+    let err = manifest.validate().expect_err("should reject");
+    assert!(matches!(err, PluginError::Manifest { .. }));
+    assert!(err.to_string().contains("sensor plugins must not declare"));
+}
+
+#[test]
+fn validate_accepts_actuator_with_capabilities() {
+    let m = make_manifest().with_capabilities(vec![CapabilityId::RenameSymbol]);
+    assert!(m.validate().is_ok());
 }
