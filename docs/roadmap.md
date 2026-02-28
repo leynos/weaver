@@ -446,6 +446,44 @@ initial* *Python delivery and shared failure semantics.*
 - [ ] 3.7.1. Implement the Static Analysis Provider for `weaver-graph` (e.g.,
     wrapping PyCG) as the first major graph plugin.
 
+### 3.8. Migrate existing actuator plugins to `rename-symbol` capability
+
+*Outcome: Bring the existing Python and Rust actuator plugins into the new*
+*plugin architecture as first-class implementations of the `rename-symbol`*
+*capability, with deterministic routing and compatibility guarantees.*
+
+- [ ] 3.8.1. Define the `rename-symbol` capability contract for actuator
+      plugins, including request schema, response schema, and refusal
+      diagnostics. Requires 3.1.1.
+  - Acceptance criteria: capability contract is versioned, broker validation
+    enforces schema shape, and refusal diagnostics use stable reason codes.
+- [ ] 3.8.2. Update `weaver-plugin-rope` manifest and runtime handshake to
+      declare and serve `rename-symbol` through the capability interface.
+      Requires 3.8.1.
+  - Acceptance criteria: plugin advertises `rename-symbol` in capability probes,
+    request and response payloads conform to schema, and legacy provider routing
+    is not required for Python rename flows.
+- [ ] 3.8.3. Update `weaver-plugin-rust-analyzer` manifest and runtime
+      handshake to declare and serve `rename-symbol` through the capability
+      interface. Requires 3.8.1.
+  - Acceptance criteria: plugin advertises `rename-symbol` in capability probes,
+    request and response payloads conform to schema, and Rust rename flows are
+    capability-routed.
+- [ ] 3.8.4. Implement daemon capability resolution for `rename-symbol` so
+      plugin selection is language-aware and policy-driven. Requires 3.8.2 and
+      3.8.3.
+  - Acceptance criteria: routing selects the correct plugin per language,
+    fallback and refusal paths are deterministic, and routing decisions include
+    machine-readable rationale.
+- [ ] 3.8.5. Add unit, behavioural, and end-to-end coverage for Python and Rust
+      `rename-symbol` under the new capability architecture. Requires 3.8.4.
+  - Acceptance criteria: tests cover success paths, refusal paths, and rollback
+    guarantees, and both plugins pass shared contract fixtures.
+- [ ] 3.8.6. Publish migration notes for `rename-symbol` capability routing and
+      deprecate legacy provider-specific command paths. Requires 3.8.5.
+  - Acceptance criteria: docs and CLI guidance identify capability-based
+    behaviour as the default path, and deprecation messaging is stable.
+
 ## 4. Advanced Agent Support & RAG
 
 *Goal: Introduce features specifically designed to support advanced agent
