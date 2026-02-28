@@ -535,7 +535,7 @@ mod tests {
         assert!(ast.is_none());
         // And it should report one error.
         assert_eq!(errs.len(), 1);
-        // We could inspect the error further if needed.
+        // Inspect the error further if needed.
     }
 }
 ```
