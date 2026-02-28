@@ -486,7 +486,12 @@ use chumsky::prelude::*;
 use crate::lexer::Token; // Token enum defined by the parser
 
 fn let_parser<'a>(
-) -> impl Parser<'a, &'a [(Token<'a>, &'a str, std::ops::Range<usize>)], Stmt<'a>, extra::Err<Simple<Token<'a>>>>
+) -> impl Parser<
+    'a,
+    &'a [(Token<'a>, &'a str, std::ops::Range<usize>)],
+    Stmt<'a>,
+    extra::Err<Simple<Token<'a>>>,
+>
 {
     just(Token::Let)
        .ignore_then(select! { Token::Ident(ident) => ident })

@@ -8,16 +8,16 @@ reference assets in this directory:
 
 ## Recommended eight-file pack
 
-| Example file                                                                | What it demonstrates                                                      | Maps to                                                                                             |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `tests/syntax_v2/match.yaml`                                                | v2 `match` formula with `all`, `any`, `not`, and `inside`                 | Extended Backus–Naur Form (EBNF) `match-selector` and schema `match`                                |
-| `tests/syntax_v2/taint.yaml`                                                | New taint syntax with `sources`, `sinks`, `propagators`, and `sanitizers` | Schema `taintObject`                                                                                |
-| `tests/syntax_v2/extract.yaml`                                              | Extract mode with `extract`, `dest-language`, and `reduce`                | Schema extract-mode constraints                                                                     |
-| `cli/tests/default/e2e/rules/match_based_id/join.yaml`                      | Join mode with inline rules and `on` predicates                           | Schema `joinObject`                                                                                 |
-| `cli/tests/default/e2e/rules/message_interpolation/pattern-not-inside.yaml` | Legacy `patterns` with `pattern-not-inside` and `pattern`                 | EBNF legacy operators and schema `legacyFormulaObject`                                              |
-| `cli/tests/default/e2e/rules/metavariable-regex/metavariable-regex.yaml`    | `metavariable-regex` constraint under `patterns`                          | Extended Backus–Naur Form (EBNF) metavariable constraints and schema `metavariableRegex`            |
-| `tests/patterns/rust/metavar_ellipsis_args.sgrep`                           | Rust host snippet with metavariable ellipsis `$...ARGS`                   | EBNF lexical tokens and Rust profile                                                                |
-| `tests/patterns/terraform/deep_expr_operator.sgrep`                         | HCL or Terraform deep ellipsis `<... ...>`                                | Extended Backus–Naur Form (EBNF) deep ellipsis and HashiCorp Configuration Language (HCL) profile   |
+| Example file                                                                | What it demonstrates                                                      | Maps to                                                                |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `tests/syntax_v2/match.yaml`                                                | v2 `match` formula with `all`, `any`, `not`, and `inside`                 | Extended Backus–Naur Form (EBNF) `match-selector` and schema `match`   |
+| `tests/syntax_v2/taint.yaml`                                                | New taint syntax with `sources`, `sinks`, `propagators`, and `sanitizers` | Schema `taintObject`                                                   |
+| `tests/syntax_v2/extract.yaml`                                              | Extract mode with `extract`, `dest-language`, and `reduce`                | Schema extract-mode constraints                                        |
+| `cli/tests/default/e2e/rules/match_based_id/join.yaml`                      | Join mode with inline rules and `on` predicates                           | Schema `joinObject`                                                    |
+| `cli/tests/default/e2e/rules/message_interpolation/pattern-not-inside.yaml` | Legacy `patterns` with `pattern-not-inside` and `pattern`                 | EBNF legacy operators and schema `legacyFormulaObject`                 |
+| `cli/tests/default/e2e/rules/metavariable-regex/metavariable-regex.yaml`    | `metavariable-regex` constraint under `patterns`                          | EBNF metavariable constraints and schema `metavariableRegex`           |
+| `tests/patterns/rust/metavar_ellipsis_args.sgrep`                           | Rust host snippet with metavariable ellipsis `$...ARGS`                   | EBNF lexical tokens and Rust profile                                   |
+| `tests/patterns/terraform/deep_expr_operator.sgrep`                         | HCL or Terraform deep ellipsis `<... ...>`                                | EBNF deep ellipsis and HashiCorp Configuration Language (HCL) profile  |
 
 _Table 1: Recommended examples for validating v2 and legacy Semgrep features._
 

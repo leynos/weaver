@@ -1,6 +1,6 @@
 # Roadmap
 
-## 0. Foundation & Tooling (Complete)
+## 0. Foundation & tooling (complete)
 
 ### 0.1. Establish foundation and documentation baseline
 
@@ -12,7 +12,7 @@
       `docs/contents.md` and `docs/repository-layout.md`, as delivered in
       `docs/execplans/sempai-design.md`.
 
-## 1. Core MVP & Safety Harness Foundation
+## 1. Core MVP & safety harness foundation
 
 *Goal: Establish the core client/daemon architecture, basic LSP integration,
 and the foundational security and verification mechanisms. The MVP must be safe
@@ -234,7 +234,7 @@ does* *not require source inspection or external runbooks.*
         all three required flags (`--provider`, `--refactoring`, `--file`) in
         one response, plus at least one valid provider and refactoring value.
 
-## 2. Syntactic & Relational Intelligence
+## 2. Syntactic & relational intelligence
 
 *Goal: Add the Tree-sitter and call graph layers to provide deeper structural*
 *and relational understanding of code, and pair this with operation-level help*
@@ -512,14 +512,14 @@ new* *capabilities and specialist providers.*
       declare and serve `rename-symbol` through the capability interface.
       Requires 4.2.1.
   - Acceptance criteria: plugin advertises `rename-symbol` in capability probes,
-    request and response payloads conform to schema, and legacy provider routing
-    is not required for Python rename flows.
+    request payloads conform to schema, and response payloads conform to schema.
+    Legacy provider routing is not required for Python rename flows.
 - [ ] 4.2.3. Update `weaver-plugin-rust-analyzer` manifest and runtime
       handshake to declare and serve `rename-symbol` through the capability
       interface. Requires 4.2.1.
   - Acceptance criteria: plugin advertises `rename-symbol` in capability probes,
-    request and response payloads conform to schema, and Rust rename flows are
-    capability-routed.
+    request payloads conform to schema, and response payloads conform to schema.
+    Rust rename flows are capability-routed.
 - [ ] 4.2.4. Implement daemon capability resolution for `rename-symbol` so
       plugin selection is language-aware and policy-driven. Requires 4.2.2 and
       4.2.3.

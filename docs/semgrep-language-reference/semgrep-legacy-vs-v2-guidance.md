@@ -47,7 +47,8 @@ The current grammar covers:
 
 - core v2 search expression operators,
 - lexical Semgrep tokens such as `$X`, `$_`, `$...ARGS`, and `...`, and
-- host-language embedding profiles for Rust, Python, TypeScript, Go, and HCL.
+- host-language embedding profiles for Rust, Python, TypeScript, Go, and
+  HashiCorp Configuration Language (HCL).
 
 It does not fully cover:
 
@@ -94,16 +95,12 @@ Use this option when interoperability with existing Semgrep rules is required.
 ## Source pointers
 
 The following pointers reference upstream Semgrep implementation files and line
-ranges at the time this guide was compiled.
+ranges at the time this guide was compiled.[^1][^2][^3][^4]
 
-- `src/parsing/Parse_rule.ml` around lines `648`, `1011`, and `1026`.
-- `src/parsing/Parse_rule_formula.ml` around lines `315`, `739`, and `954`.
-- `src/rule/Rule.ml` around line `63`.
-
-For schema-level references, see Semgrep interfaces at pinned commit
-`7e509db48c700cae49fe0372e2aa0410fa86d867`:
-
-- <https://raw.githubusercontent.com/semgrep/semgrep-interfaces/7e509db48c700cae49fe0372e2aa0410fa86d867/rule_schema_v1.yaml>
+[^1]: `src/parsing/Parse_rule.ml` — lines `648`, `1011`, and `1026`.
+[^2]: `src/parsing/Parse_rule_formula.ml` — lines `315`, `739`, and `954`.
+[^3]: `src/rule/Rule.ml` — line `63`.
+[^4]: <https://raw.githubusercontent.com/semgrep/semgrep-interfaces/7e509db48c700cae49fe0372e2aa0410fa86d867/rule_schema_v1.yaml>
 
 ## Related documents in this repository
 
