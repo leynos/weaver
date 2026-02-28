@@ -646,7 +646,7 @@ $defs:
   joinObject:
     type: object
     additionalProperties: false
-    required: [on]
+    required: ["on"]
     properties:
       refs:
         type: array
@@ -659,7 +659,7 @@ $defs:
         items:
           type: object
           additionalProperties: true
-      on:
+      "on":
         type: array
         minItems: 1
         items:
