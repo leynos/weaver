@@ -1,0 +1,198 @@
+(* Semgrep query language grammar (parser-aligned, practical EBNF)
+ *
+ * Scope:
+ * - Query operators that appear in Semgrep rule files.
+ * - Legacy formula operators and v2 `match` operators.
+ * - Lexical Semgrep tokens used inside host-language snippets.
+ *
+ * Notes:
+ * - Pattern snippets are host-language code fragments parsed by language parsers.
+ * - This grammar models Semgrep query structure, not full Rust/Python/TypeScript/Go/HCL grammars.
+ * - `mode: extract` currently parses legacy formula operators, not `match`-v2.
+ *)
+
+query-selector         = legacy-root | match-selector ;
+
+(* ----------------------------- *)
+(* Legacy query operators (v1)   *)
+(* ----------------------------- *)
+
+legacy-root            = legacy-pattern
+                       | legacy-pattern-regex
+                       | legacy-patterns
+                       | legacy-pattern-either ;
+
+legacy-pattern         = "pattern" ":" pattern-snippet ;
+legacy-pattern-regex   = "pattern-regex" ":" regex-literal ;
+legacy-patterns        = "patterns" ":" yaml-list1(patterns-item) ;
+legacy-pattern-either  = "pattern-either" ":" yaml-list1(legacy-or-item) ;
+
+legacy-or-item         = legacy-node-object ;
+patterns-item          = legacy-node-object | metavariable-constraint ;
+
+legacy-node-object     = legacy-pattern
+                       | legacy-pattern-regex
+                       | legacy-pattern-not
+                       | legacy-pattern-inside
+                       | legacy-pattern-not-inside
+                       | legacy-pattern-not-regex
+                       | legacy-anywhere
+                       | legacy-pattern-either
+                       | legacy-patterns ;
+
+legacy-operand         = pattern-snippet | legacy-node-object ;
+
+legacy-pattern-not        = "pattern-not" ":" legacy-operand ;
+legacy-pattern-inside     = "pattern-inside" ":" legacy-operand ;
+legacy-pattern-not-inside = "pattern-not-inside" ":" legacy-operand ;
+legacy-pattern-not-regex  = "pattern-not-regex" ":" regex-literal ;
+legacy-anywhere           = "semgrep-internal-pattern-anywhere" ":" legacy-operand ;
+
+metavariable-constraint = focus-metavariable
+                        | metavariable-regex
+                        | metavariable-type
+                        | metavariable-pattern
+                        | metavariable-comparison
+                        | metavariable-analysis
+                        | metavariable-name
+                        | semgrep-internal-metavariable-name ;
+
+focus-metavariable                  = "focus-metavariable" ":" focus-value ;
+metavariable-regex                 = "metavariable-regex" ":" object ;
+metavariable-type                  = "metavariable-type" ":" object ;
+metavariable-pattern               = "metavariable-pattern" ":" object ;
+metavariable-comparison            = "metavariable-comparison" ":" object ;
+metavariable-analysis              = "metavariable-analysis" ":" object ;
+metavariable-name                  = "metavariable-name" ":" object ;
+semgrep-internal-metavariable-name = "semgrep-internal-metavariable-name" ":" object ;
+
+focus-value            = metavariable | yaml-list1(metavariable) ;
+
+(* ----------------------------- *)
+(* Match query operators (v2)    *)
+(* ----------------------------- *)
+
+match-selector         = "match" ":" match-pattern ;
+match-pattern          = pattern-snippet | match-object ;
+
+(* One principal operator + decorators (`where`, `as`, `fix`) in any order. *)
+match-object           = decorator-list match-principal ;
+decorator-list         = { match-decorator } ;
+match-decorator        = where-clause | as-clause | fix-clause ;
+
+match-principal        = match-pattern-op
+                       | match-regex-op
+                       | match-all-op
+                       | match-any-op
+                       | match-not-op
+                       | match-inside-op
+                       | match-anywhere-op ;
+
+match-pattern-op       = "pattern" ":" pattern-snippet ;
+match-regex-op         = "regex" ":" regex-literal ;
+match-all-op           = "all" ":" yaml-list1(match-pattern) ;
+match-any-op           = "any" ":" yaml-list1(match-pattern) ;
+match-not-op           = "not" ":" match-pattern ;
+match-inside-op        = "inside" ":" match-pattern ;
+match-anywhere-op      = "anywhere" ":" match-pattern ;
+
+where-clause           = "where" ":" yaml-list1(where-item) ;
+where-item             = where-focus
+                       | where-comparison
+                       | where-metavariable-pattern
+                       | where-metavariable-analysis
+                       | where-metavariable-type ;
+
+where-focus            = "focus" ":" focus-value ;
+where-comparison       = "comparison" ":" query-string [ "strip" ":" boolean ] [ "base" ":" integer ] ;
+where-metavariable-pattern = "metavariable" ":" metavariable
+                             [ "language" ":" identifier ]
+                             match-principal ;
+where-metavariable-analysis = "metavariable" ":" metavariable
+                              "analyzer" ":" analyzer ;
+where-metavariable-type = "metavariable" ":" metavariable
+                          [ "language" ":" identifier ]
+                          ( "type" ":" query-string | "types" ":" yaml-list1(query-string) ) ;
+
+as-clause              = "as" ":" metavariable ;
+fix-clause             = "fix" ":" query-string ;
+
+(* -------------------------------- *)
+(* Lexical Semgrep pattern features *)
+(* -------------------------------- *)
+
+pattern-snippet        = query-string ;
+regex-literal          = query-string ;
+query-string           = scalar-string | block-string ;
+
+metavariable           = "$" ( "_" | upper-or-underscore { upper-or-digit-or-underscore } ) ;
+anonymous-metavariable = "$_" ;
+metavariable-ellipsis  = "$..." upper-or-underscore { upper-or-digit-or-underscore } ;
+
+ellipsis               = "..." ;
+deep-ellipsis          = "<..." [ ws ] deep-fragment [ ws ] "...>" ;
+deep-fragment          = { host-char | semgrep-token } ;
+
+semgrep-token          = metavariable
+                       | anonymous-metavariable
+                       | metavariable-ellipsis
+                       | ellipsis
+                       | deep-ellipsis ;
+
+(* -------------------------------- *)
+(* Host-language profile variants   *)
+(* -------------------------------- *)
+
+(* These profiles indicate where Semgrep tokens are embedded.
+ * Full host-language grammars are delegated to each language parser.
+ *)
+
+rust-pattern-snippet   = rust-host-fragment { rust-host-fragment | semgrep-token } ;
+python-pattern-snippet = python-host-fragment { python-host-fragment | semgrep-token } ;
+typescript-pattern-snippet = ts-host-fragment { ts-host-fragment | semgrep-token } ;
+go-pattern-snippet     = go-host-fragment { go-host-fragment | semgrep-token } ;
+hcl-pattern-snippet    = hcl-host-fragment { hcl-host-fragment | semgrep-token } ;
+
+(* ----------------------------- *)
+(* YAML carrier and base tokens  *)
+(* ----------------------------- *)
+
+yaml-list1(X)          = NEWLINE INDENT "- " X { NEWLINE INDENT "- " X } ;
+object                 = "{" object-content "}" | yaml-mapping ;
+
+boolean                = "true" | "false" ;
+integer                = digit { digit } ;
+identifier             = letter { letter | digit | "_" | "-" } ;
+
+upper-or-underscore    = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J"
+                       | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T"
+                       | "U" | "V" | "W" | "X" | "Y" | "Z" | "_" ;
+upper-or-digit-or-underscore = upper-or-underscore | digit ;
+digit                  = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+letter                 = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j"
+                       | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t"
+                       | "u" | "v" | "w" | "x" | "y" | "z"
+                       | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J"
+                       | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T"
+                       | "U" | "V" | "W" | "X" | "Y" | "Z" ;
+
+ws                     = " " | "\t" ;
+host-char              = ? any non-control character in host snippet ? ;
+scalar-string          = ? YAML scalar string ? ;
+block-string           = ? YAML block scalar ? ;
+yaml-mapping           = ? YAML key/value mapping ? ;
+object-content         = ? object content ? ;
+
+rust-host-fragment     = ? Rust code token sequence ? ;
+python-host-fragment   = ? Python code token sequence ? ;
+ts-host-fragment       = ? TypeScript code token sequence ? ;
+go-host-fragment       = ? Go code token sequence ? ;
+hcl-host-fragment      = ? HCL/Terraform code token sequence ? ;
+
+analyzer               = "entropy" | "entropy_v2" | "redos" | object ;
+
+(* Semantic constraints enforced by parser (not expressible as pure EBNF):
+ * 1) `pattern-either` rejects negated branches (`pattern-not` in OR).
+ * 2) `patterns` / `all` require at least one positive term, except in metavariable-pattern context.
+ * 3) `mode: extract` consumes legacy query operators, not `match`.
+ *)

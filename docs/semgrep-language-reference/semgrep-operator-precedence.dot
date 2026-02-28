@@ -1,0 +1,29 @@
+digraph semgrep_query_precedence {
+  rankdir=TB;
+  graph [labelloc=t, label="Semgrep Query Operator Precedence (legacy + v2)"];
+  node [shape=box, style="rounded,filled", fillcolor="#f5f9ff", color="#355c8a", fontname="Helvetica"];
+  edge [color="#355c8a", fontname="Helvetica"];
+
+  // Solid edge A -> B means A binds tighter than B in the normalized ladder.
+  // Dashed edges from decorators indicate post-parse formula decoration.
+  // Explicit YAML nesting remains authoritative in Semgrep.
+
+  atomics [label="Atomics\nlegacy: pattern | pattern-regex\nv2: pattern | regex | string"];
+
+  unary [label="Unary wrappers\nlegacy: pattern-not | pattern-inside |\npattern-not-inside | pattern-not-regex |\nsemgrep-internal-pattern-anywhere\nv2: not | inside | anywhere"];
+
+  conjunction [label="Conjunction\nlegacy: patterns\nv2: all"];
+
+  disjunction [label="Disjunction\nlegacy: pattern-either\nv2: any"];
+
+  decorators [shape=component, fillcolor="#fff7e6", color="#9a6b00", label="Decorator layer\nwhere | as | fix"];
+
+  atomics -> unary [label="stronger"];
+  unary -> conjunction [label="stronger"];
+  conjunction -> disjunction [label="stronger"];
+
+  decorators -> atomics [style=dashed, label="decorate"];
+  decorators -> unary [style=dashed, label="decorate"];
+  decorators -> conjunction [style=dashed, label="decorate"];
+  decorators -> disjunction [style=dashed, label="decorate"];
+}
