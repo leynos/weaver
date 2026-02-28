@@ -6,6 +6,7 @@
 //! configuration loading and IO streams can be substituted.
 
 use clap::Parser;
+use ortho_config::Localizer;
 use std::ffi::{OsStr, OsString};
 use std::io::{Read, Write};
 use std::process::ExitCode;
@@ -17,6 +18,7 @@ mod config;
 mod daemon_output;
 mod errors;
 mod lifecycle;
+mod localizer;
 pub mod output;
 mod runtime_utils;
 mod transport;
@@ -34,6 +36,7 @@ use lifecycle::{
     LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput, SystemLifecycle,
     try_auto_start_daemon,
 };
+use localizer::{build_localizer, write_bare_help};
 pub use output::{OutputContext, ResolvedOutputFormat, render_human_output};
 use runtime_utils::emit_capabilities;
 pub(crate) use runtime_utils::exit_code_from_status;
@@ -85,6 +88,14 @@ impl<'a, R: Read, W: Write, E: Write> IoStreams<'a, R, W, E> {
     }
 }
 
+impl Cli {
+    /// Returns true when no domain, subcommand, or probe flag was supplied,
+    /// indicating the operator needs short help guidance.
+    fn is_bare_invocation(&self) -> bool {
+        self.domain.is_none() && self.command.is_none() && !self.capabilities
+    }
+}
+
 struct CliRunner<'a, R: Read, W: Write, E: Write, L: ConfigLoader> {
     io: &'a mut IoStreams<'a, R, W, E>,
     loader: &'a L,
@@ -116,13 +127,19 @@ where
     where
         I: IntoIterator<Item = OsString>,
     {
+        let localizer = build_localizer();
         let mut lifecycle = SystemLifecycle;
-        self.run_with_handler(args, |invocation, context, output| {
+        self.run_with_handler(args, localizer.as_ref(), |invocation, context, output| {
             lifecycle.handle(invocation, context, output)
         })
     }
 
-    fn run_with_handler<I, F>(&mut self, args: I, mut handler: F) -> ExitCode
+    fn run_with_handler<I, F>(
+        &mut self,
+        args: I,
+        localizer: &dyn Localizer,
+        mut handler: F,
+    ) -> ExitCode
     where
         I: IntoIterator<Item = OsString>,
         F: FnMut(
@@ -138,6 +155,10 @@ where
         let result = Cli::try_parse_from(cli_arguments)
             .map_err(AppError::CliUsage)
             .and_then(|cli| {
+                if cli.is_bare_invocation() && !split.has_config_flags() {
+                    write_bare_help(&mut *self.io.stderr, localizer).ok();
+                    return Err(AppError::BareInvocation);
+                }
                 self.loader
                     .load(&split.config_arguments)
                     .map(|config| (cli, config))
@@ -179,6 +200,7 @@ where
 
         match result {
             Ok(exit_code) => exit_code,
+            Err(AppError::BareInvocation) => ExitCode::FAILURE,
             Err(error) => {
                 let _ = writeln!(self.io.stderr, "{error}");
                 ExitCode::FAILURE
@@ -352,6 +374,7 @@ pub(crate) fn run_with_daemon_binary<'a, I, R, W, E, L, F>(
     io: &'a mut IoStreams<'a, R, W, E>,
     loader: &'a L,
     daemon_binary: Option<&'a OsStr>,
+    localizer: &dyn Localizer,
     handler: F,
 ) -> ExitCode
 where
@@ -368,7 +391,7 @@ where
 {
     CliRunner::new(io, loader)
         .with_daemon_binary(daemon_binary)
-        .run_with_handler(args, handler)
+        .run_with_handler(args, localizer, handler)
 }
 
 #[cfg(test)]

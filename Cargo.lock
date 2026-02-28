@@ -1265,9 +1265,9 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "ortho_config"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2e82f7058eab712537b07c5f9e8367da9ade93c42ae08286a5272ae8e5c2435"
+checksum = "2ee9d60c6be312d7c6ce47b7146e3c9b8464c54fc304ef8f7656e29c268faeb1"
 dependencies = [
  "camino",
  "clap",
@@ -1276,20 +1276,24 @@ dependencies = [
  "dirs 5.0.1",
  "dunce",
  "figment",
+ "fluent-bundle",
+ "fluent-syntax",
  "ortho_config_macros",
  "serde",
  "serde_json",
  "thiserror 2.0.17",
  "toml 0.9.8",
+ "tracing",
  "uncased",
+ "unic-langid",
  "xdg",
 ]
 
 [[package]]
 name = "ortho_config_macros"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df57a79d218bae4aa23466dc2156e8f0c2e85ceac788097839d71b38b8c0e9e5"
+checksum = "992d8fc0b33823adb993fe8968614ac0df3964d9e3564f7a147fd253e27a3acd"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",

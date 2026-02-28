@@ -62,6 +62,15 @@ pub(crate) struct ConfigArgumentSplit {
     pub(crate) command_start: usize,
 }
 
+impl ConfigArgumentSplit {
+    /// Returns true when the operator supplied at least one configuration
+    /// flag (e.g. `--config-path`).  The binary name at index 0 is always
+    /// present and does not count.
+    pub(crate) fn has_config_flags(&self) -> bool {
+        self.config_arguments.len() > 1
+    }
+}
+
 pub(crate) fn split_config_arguments(args: &[OsString]) -> ConfigArgumentSplit {
     if args.is_empty() {
         return ConfigArgumentSplit {

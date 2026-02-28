@@ -168,11 +168,13 @@ impl TestWorld {
             &mut self.stderr,
             self.stdout_is_terminal,
         );
+        let localizer = ortho_config::NoOpLocalizer;
         let exit = run_with_daemon_binary(
             args,
             &mut io,
             &loader,
             daemon_binary,
+            &localizer,
             |invocation, context, output| self.lifecycle.handle(invocation, context, output),
         );
         self.exit_code = Some(exit);

@@ -213,7 +213,8 @@ fn run_with_loader_reports_configuration_failures() {
     let mut stderr = Vec::new();
     let mut stdin = Cursor::new(Vec::new());
     let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
-    let exit = run_with_loader(vec![OsString::from("weaver")], &mut io, &FailingLoader);
+    let args = vec![OsString::from("weaver"), OsString::from("observe")];
+    let exit = run_with_loader(args, &mut io, &FailingLoader);
     assert_eq!(exit, ExitCode::FAILURE);
     let stderr_text = decode_utf8(stderr, "stderr").expect("decode stderr");
     assert!(stderr_text.contains("command domain"));
@@ -384,17 +385,12 @@ fn is_daemon_not_running_classifies_errors(
 }
 #[test]
 fn is_daemon_not_running_rejects_non_connect_errors() {
-    let error = AppError::MissingDomain;
-    assert!(!is_daemon_not_running(&error));
-
-    let error = AppError::MissingOperation;
-    assert!(!is_daemon_not_running(&error));
-
-    let error = AppError::MissingExit;
-    assert!(!is_daemon_not_running(&error));
-
-    let error = AppError::SerialiseRequest(serde_json::from_str::<()>("bad").unwrap_err());
-    assert!(!is_daemon_not_running(&error));
+    assert!(!is_daemon_not_running(&AppError::MissingDomain));
+    assert!(!is_daemon_not_running(&AppError::MissingOperation));
+    assert!(!is_daemon_not_running(&AppError::MissingExit));
+    assert!(!is_daemon_not_running(&AppError::BareInvocation));
+    let ser_err = AppError::SerialiseRequest(serde_json::from_str::<()>("bad").unwrap_err());
+    assert!(!is_daemon_not_running(&ser_err));
 }
-/// Tests for automatic daemon startup behaviour and error handling.
 mod auto_start;
+mod bare_invocation;

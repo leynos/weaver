@@ -222,6 +222,26 @@ lifecycle commands, and domain operations (`observe`, `act`, `verify`). Domain
 commands are sent to the daemon as JSONL; any arguments after the operation are
 forwarded verbatim without CLI validation.
 
+### Bare invocation
+
+Running `weaver` without any arguments prints a short help summary to standard
+error and exits with a non-zero status code:
+
+```text
+Usage: weaver <DOMAIN> <OPERATION> [ARG]...
+
+Domains:
+  observe   Query code structure and relationships
+  act       Perform code modifications
+  verify    Validate code correctness
+
+Run 'weaver --help' for more information.
+```
+
+This output does not require a configuration file or a running daemon. Use
+`weaver --help` for the full reference, including global options and the
+`daemon` subcommand.
+
 ### Output formats
 
 Daemon responses are JSON objects with `kind` set to `stream` or `exit`. Stream
