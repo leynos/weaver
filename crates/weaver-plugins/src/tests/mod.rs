@@ -9,6 +9,7 @@ use crate::registry::PluginRegistry;
 use crate::runner::{MockPluginExecutor, PluginRunner};
 
 mod behaviour;
+mod capability_behaviour;
 
 // ---------------------------------------------------------------------------
 // Mock executor factories

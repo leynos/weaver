@@ -41,6 +41,7 @@
 //! // runner.execute("rope", &request) would spawn the plugin in a sandbox.
 //! ```
 
+pub mod capability;
 pub mod error;
 pub mod manifest;
 pub mod process;
@@ -51,6 +52,10 @@ pub mod runner;
 #[cfg(test)]
 mod tests;
 
+pub use self::capability::{
+    CapabilityContract, CapabilityId, ContractVersion, ReasonCode, RenameSymbolContract,
+    RenameSymbolRequest,
+};
 pub use self::error::PluginError;
 pub use self::manifest::{PluginKind, PluginManifest, PluginMetadata};
 pub use self::protocol::{

@@ -10,6 +10,8 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::capability::ReasonCode;
+
 /// Request sent from the `weaverd` broker to a plugin on stdin.
 ///
 /// Serialized as a single JSONL line terminated by a newline character.
@@ -197,6 +199,8 @@ pub struct PluginDiagnostic {
     file: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     line: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reason_code: Option<ReasonCode>,
 }
 
 impl PluginDiagnostic {
@@ -208,6 +212,7 @@ impl PluginDiagnostic {
             message: message.into(),
             file: None,
             line: None,
+            reason_code: None,
         }
     }
 
@@ -235,6 +240,19 @@ impl PluginDiagnostic {
     #[must_use]
     pub const fn message(&self) -> &str {
         self.message.as_str()
+    }
+
+    /// Attaches a stable reason code to the diagnostic.
+    #[must_use]
+    pub const fn with_reason_code(mut self, code: ReasonCode) -> Self {
+        self.reason_code = Some(code);
+        self
+    }
+
+    /// Returns the stable reason code, if present.
+    #[must_use]
+    pub const fn reason_code(&self) -> Option<ReasonCode> {
+        self.reason_code
     }
 }
 
