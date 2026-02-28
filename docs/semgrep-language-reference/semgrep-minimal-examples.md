@@ -17,7 +17,7 @@ reference assets in this directory:
 | `cli/tests/default/e2e/rules/message_interpolation/pattern-not-inside.yaml` | Legacy `patterns` with `pattern-not-inside` and `pattern`                     | EBNF legacy operators and schema `legacyFormulaObject`                 |
 | `cli/tests/default/e2e/rules/metavariable-regex/metavariable-regex.yaml`    | `metavariable-regex` constraint under `patterns`                              | EBNF metavariable constraints and schema `metavariableRegex`           |
 | `tests/patterns/rust/metavar_ellipsis_args.sgrep`                           | Rust host snippet with metavariable ellipsis `$...ARGS`                       | EBNF lexical tokens and Rust profile                                   |
-| `tests/patterns/terraform/deep_expr_operator.sgrep`                         | HashiCorp Configuration Language (HCL) or Terraform deep ellipsis `<... ...>` | EBNF deep ellipsis and HashiCorp Configuration Language (HCL) profile  |
+| `tests/patterns/terraform/deep_expr_operator.sgrep`                         | HashiCorp Configuration Language (HCL) or Terraform deep ellipsis `<... ...>` | EBNF deep ellipsis and HCL profile                                     |
 
 _Table 1: Recommended examples for validating v2 and legacy Semgrep features._
 
