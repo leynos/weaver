@@ -10,11 +10,10 @@ Status: COMPLETE
 ## Purpose / big picture
 
 When an operator runs `weaver` with no arguments today, the command-line
-interface (CLI) prints the
-terse message `the command domain must be provided` to stderr and exits 1.
-There is no hint about what domains exist, no usage line, and no pointer to
-`--help`. A newcomer who has just installed Weaver has no idea what to type
-next.
+interface (CLI) prints the terse message `the command domain must be provided`
+to stderr and exits 1. There is no hint about what domains exist, no usage
+line, and no pointer to `--help`. A newcomer who has just installed Weaver has
+no idea what to type next.
 
 After this change, running `weaver` with no arguments will print a short,
 self-contained help block to stderr listing the three valid domains (`observe`,
@@ -39,9 +38,9 @@ Run 'weaver --help' for more information.
 
 This addresses the P0 gap identified in the
 [UI gap analysis Level 0](../ui-gap-analysis.md#level-0--bare-invocation-weaver)
-and
-[Level 10d](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes),
-and satisfies roadmap task 5.1.1 in `../roadmap.md`.
+ and
+[Level 10d](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes), and
+satisfies roadmap task 5.1.1 in `../roadmap.md`.
 
 ## Constraints
 
@@ -126,15 +125,14 @@ and satisfies roadmap task 5.1.1 in `../roadmap.md`.
 ## Surprises & discoveries
 
 - The build script (`build.rs`) includes `cli.rs` via `#[path = "src/cli.rs"]`
-  for manpage generation. The new `is_bare_invocation()` method triggered a
-  `dead_code` warning in the build script context because it is only called
-  from `lib.rs`. Resolved with a tightly scoped `#[allow(dead_code)]` attribute
-  with a reason string explaining the dual-compilation context. `#[expect]`
-  cannot be used here because it triggers `unfulfilled_lint_expectations` in
-  the library build where the method is used.
+  for manpage generation. The `is_bare_invocation()` method was initially
+  placed in `cli.rs` with `#[allow(dead_code)]` because `#[expect]` triggers
+  `unfulfilled_lint_expectations` in the library build where the method is
+  used. Resolved by moving the `impl Cli` block to `lib.rs`, which `build.rs`
+  never includes, eliminating the dual-compilation issue entirely.
 - The `#[error("bare invocation")]` on `BareInvocation` provides a non-empty
-  display string for safety in generic `Display` paths while the match arm
-  in `run_with_handler()` suppresses printing for this variant.
+  display string for safety in generic `Display` paths while the match arm in
+  `run_with_handler()` suppresses printing for this variant.
 - `unit.rs` compaction required reformatting one test to single-line style and
   collapsing the `is_daemon_not_running_rejects_non_connect_errors` assertions
   to recover lines.
@@ -191,7 +189,11 @@ and satisfies roadmap task 5.1.1 in `../roadmap.md`.
   Fluent pipeline fails (via `NoOpLocalizer`), while genuine translations
   override it cleanly. The function composes the help block from individual
   Fluent messages so translators can work on each line independently.
-  Date/Author: 2026-02-26
+  The English fallback values are centralised in a `bare_help` constants
+  module in `localizer.rs` so each string appears exactly once in the Rust
+  source; the `.ftl` file remains the canonical Fluent resource.  The
+  `fluent_and_fallback_outputs_are_identical` test guards against drift
+  between the two. Date/Author: 2026-02-26, updated 2026-02-28
 
 - Decision: Construct `FluentLocalizer` once at the start of
   `CliRunner::run()`, falling back to `NoOpLocalizer` on error. Rationale: The
@@ -241,9 +243,9 @@ The error is caught at the bottom of `run_with_handler()` (line 180-186 of
 
 ### ortho-config and Fluent localization
 
-The workspace currently uses `ortho_config` v0.6.0 (workspace `Cargo.toml` line
-33). There is no existing Fluent infrastructure: no `.ftl` files, no `locales/`
-directories, no Fluent imports anywhere.
+The workspace used `ortho_config` v0.6.0 (workspace `Cargo.toml` line 33).
+There was no existing Fluent infrastructure: no `.ftl` files, no `locales/`
+directories, and no Fluent imports.
 
 `ortho_config` v0.7.0 (published 2026-01-02) adds:
 
@@ -442,16 +444,18 @@ Below the `MissingOperation` variant:
     BareInvocation,
 ```
 
-**B4. Add `is_bare_invocation()` method to `Cli` in `cli.rs`.**
+**B4. Add `is_bare_invocation()` method to `Cli` in `lib.rs`.**
+
+The method lives in `lib.rs` rather than `cli.rs` because `build.rs`
+`#[path]`-includes `cli.rs` for manpage generation, and an `#[expect]`
+attribute on the method would trigger `unfulfilled_lint_expectations` in the
+library build.
 
 ```rust
 impl Cli {
-    /// Returns true when no domain, subcommand, or probe flag was supplied.
-    ///
-    /// This detects the case where the operator invoked `weaver` with no
-    /// meaningful arguments, so the runner can emit short help guidance
-    /// before attempting configuration loading or daemon contact.
-    pub(crate) fn is_bare_invocation(&self) -> bool {
+    /// Returns true when no domain, subcommand, or probe flag was supplied,
+    /// indicating the operator needs short help guidance.
+    fn is_bare_invocation(&self) -> bool {
         self.domain.is_none() && self.command.is_none() && !self.capabilities
     }
 }
@@ -852,11 +856,11 @@ changes). Brings transitive deps: `fluent-bundle`, `fluent-syntax`,
 
 New `pub(crate)` interfaces:
 
-In `crates/weaver-cli/src/cli.rs`:
+In `crates/weaver-cli/src/lib.rs`:
 
 ```rust
 impl Cli {
-    pub(crate) fn is_bare_invocation(&self) -> bool;
+    fn is_bare_invocation(&self) -> bool;
 }
 ```
 
@@ -885,17 +889,16 @@ pub(crate) enum AppError {
 
 _Table 2: Files modified and their changes._
 
-| File                                                  | Change                              |
-| ----------------------------------------------------- | ----------------------------------- |
-| `Cargo.toml`                                          | Upgrade `ortho_config` to `"0.7.0"` |
-| `crates/weaver-cli/locales/en-US/messages.ftl`        | New: Fluent resources               |
-| `crates/weaver-cli/src/localizer.rs`                  | New: localizer module               |
-| `crates/weaver-cli/src/cli.rs`                        | Add `is_bare_invocation()` method   |
-| `crates/weaver-cli/src/errors.rs`                     | Add `BareInvocation` variant        |
-| `crates/weaver-cli/src/lib.rs`                        | Wire localizer + bare invocation    |
-| `crates/weaver-cli/src/tests/unit.rs`                 | Fix test args; add `mod` decl       |
-| `crates/weaver-cli/src/tests/unit/bare_invocation.rs` | New: unit tests                     |
-| `crates/weaver-cli/src/tests/support/mod.rs`          | Pass `NoOpLocalizer`                |
-| `crates/weaver-cli/tests/features/weaver_cli.feature` | Add BDD scenario                    |
-| `docs/users-guide.md`                                 | Add "Bare invocation" subsection    |
-| `docs/roadmap.md`                                     | Mark 5.1.1 checkboxes as done       |
+| File                                                  | Change                                                    |
+| ----------------------------------------------------- | --------------------------------------------------------- |
+| `Cargo.toml`                                          | Upgrade `ortho_config` to `"0.7.0"`                       |
+| `crates/weaver-cli/locales/en-US/messages.ftl`        | New: Fluent resources                                     |
+| `crates/weaver-cli/src/localizer.rs`                  | New: localizer module                                     |
+| `crates/weaver-cli/src/errors.rs`                     | Add `BareInvocation` variant                              |
+| `crates/weaver-cli/src/lib.rs`                        | Wire localizer + bare invocation + `is_bare_invocation()` |
+| `crates/weaver-cli/src/tests/unit.rs`                 | Fix test args; add `mod` decl                             |
+| `crates/weaver-cli/src/tests/unit/bare_invocation.rs` | New: unit tests                                           |
+| `crates/weaver-cli/src/tests/support/mod.rs`          | Pass `NoOpLocalizer`                                      |
+| `crates/weaver-cli/tests/features/weaver_cli.feature` | Add BDD scenario                                          |
+| `docs/users-guide.md`                                 | Add "Bare invocation" subsection                          |
+| `docs/roadmap.md`                                     | Mark 5.1.1 checkboxes as done                             |

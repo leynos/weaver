@@ -50,21 +50,6 @@ pub(crate) struct Cli {
     pub(crate) arguments: Vec<String>,
 }
 
-impl Cli {
-    /// Returns true when no domain, subcommand, or probe flag was supplied.
-    ///
-    /// This detects the case where the operator invoked `weaver` with no
-    /// meaningful arguments, so the runner can emit short help guidance
-    /// before attempting configuration loading or daemon contact.
-    #[allow(
-        dead_code,
-        reason = "used by lib.rs but not by build.rs which #[path]-includes cli.rs"
-    )]
-    pub(crate) fn is_bare_invocation(&self) -> bool {
-        self.domain.is_none() && self.command.is_none() && !self.capabilities
-    }
-}
-
 /// Structured subcommands for the Weaver CLI.
 #[derive(Subcommand, Debug, Clone)]
 pub(crate) enum CliCommand {

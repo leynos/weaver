@@ -88,6 +88,14 @@ impl<'a, R: Read, W: Write, E: Write> IoStreams<'a, R, W, E> {
     }
 }
 
+impl Cli {
+    /// Returns true when no domain, subcommand, or probe flag was supplied,
+    /// indicating the operator needs short help guidance.
+    fn is_bare_invocation(&self) -> bool {
+        self.domain.is_none() && self.command.is_none() && !self.capabilities
+    }
+}
+
 struct CliRunner<'a, R: Read, W: Write, E: Write, L: ConfigLoader> {
     io: &'a mut IoStreams<'a, R, W, E>,
     loader: &'a L,
