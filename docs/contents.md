@@ -42,6 +42,9 @@
     transactions, and semantic verification workflow.
 - [Rust testing with `rstest` fixtures](rust-testing-with-rstest-fixtures.md)
   - Shared fixture and parameterization patterns for Rust test suites.
+- [Sempai query language technical design](sempai-query-language-design.md)
+  - Proposed architecture for Semgrep-compatible parsing and Tree-sitter
+    execution in Weaver.
 - [Semgrep language reference directory](semgrep-language-reference/)
   - Semgrep grammar notes, schema references, precedence model, and examples.
 - [User interface (UI) gap analysis](ui-gap-analysis.md)

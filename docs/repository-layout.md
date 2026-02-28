@@ -5,7 +5,10 @@ implemented components from planned components.
 
 System semantics and architecture are defined in
 [weaver-design.md](weaver-design.md). Implementation sequencing is defined in
-[roadmap.md](roadmap.md). Documentation conventions are defined in
+[roadmap.md](roadmap.md). Sempai query-language architecture and crate planning
+are defined in
+[sempai-query-language-design.md](sempai-query-language-design.md).
+Documentation conventions are defined in
 [documentation-style-guide.md](documentation-style-guide.md) and `AGENTS.md`.
 
 ## Layout goals
@@ -85,17 +88,19 @@ _Table 2: Implemented shared directories and their roles._
 Planned components are listed in `docs/roadmap.md` and are not yet fully
 implemented in this repository snapshot.
 
-| Planned component                                          | Intended location                                                        | Roadmap reference                                    |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------- |
-| Rust `extricate-symbol` actuator flow                      | `crates/weaver-plugin-rust-analyzer/` and `crates/weaverd/`              | Proposed in Rust extricate actuator technical design |
-| Rust extricate plugin overlay and RA orchestration modules | `crates/weaver-plugin-rust-analyzer/src/lsp/` and related plugin modules | Proposed in Rust extricate actuator technical design |
-| Plugin capability metadata for extrication                 | `crates/weaver-plugins/src/manifest/mod.rs`                              | Proposed in Rust extricate actuator technical design |
-| `srgn` specialist plugin                                   | `crates/weaver-plugin-srgn/` (expected new crate)                        | Phase 3, specialist actuator plugins                 |
-| `jedi` specialist plugin                                   | `crates/weaver-plugin-jedi/` (expected new crate)                        | Phase 3, specialist sensor plugins                   |
-| Static analysis provider for `weaver-graph`                | `crates/weaver-graph/` provider modules                                  | Phase 3, static analysis provider                    |
-| `onboard-project` command flow                             | `crates/weaver-cli/` and `crates/weaverd/` command handlers              | Phase 4, advanced agent support                      |
-| Interactive review mode for lock failures                  | `crates/weaver-cli/` plus daemon confirmation interfaces                 | Phase 4, human-in-the-loop mode                      |
-| Dynamic analysis ingestion provider                        | `crates/weaver-graph/` provider modules                                  | Phase 4, dynamic analysis ingestion                  |
+| Planned component                                          | Intended location                                                                                             | Roadmap reference                                    |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Rust `extricate-symbol` actuator flow                      | `crates/weaver-plugin-rust-analyzer/` and `crates/weaverd/`                                                   | Proposed in Rust extricate actuator technical design |
+| Rust extricate plugin overlay and RA orchestration modules | `crates/weaver-plugin-rust-analyzer/src/lsp/` and related plugin modules                                      | Proposed in Rust extricate actuator technical design |
+| Plugin capability metadata for extrication                 | `crates/weaver-plugins/src/manifest/mod.rs`                                                                   | Proposed in Rust extricate actuator technical design |
+| Sempai Semgrep-compatible query engine crates              | `crates/sempai/`, `crates/sempai-core/`, `crates/sempai-yaml/`, `crates/sempai-dsl/`, and `crates/sempai-ts/` | Proposed in Sempai query language technical design   |
+| Sempai integration command surface (`observe`)             | `crates/weaver-cli/` and `crates/weaverd/`                                                                    | Proposed in Sempai query language technical design   |
+| `srgn` specialist plugin                                   | `crates/weaver-plugin-srgn/` (expected new crate)                                                             | Phase 3, specialist actuator plugins                 |
+| `jedi` specialist plugin                                   | `crates/weaver-plugin-jedi/` (expected new crate)                                                             | Phase 3, specialist sensor plugins                   |
+| Static analysis provider for `weaver-graph`                | `crates/weaver-graph/` provider modules                                                                       | Phase 3, static analysis provider                    |
+| `onboard-project` command flow                             | `crates/weaver-cli/` and `crates/weaverd/` command handlers                                                   | Phase 4, advanced agent support                      |
+| Interactive review mode for lock failures                  | `crates/weaver-cli/` plus daemon confirmation interfaces                                                      | Phase 4, human-in-the-loop mode                      |
+| Dynamic analysis ingestion provider                        | `crates/weaver-graph/` provider modules                                                                       | Phase 4, dynamic analysis ingestion                  |
 
 _Table 3: Planned components and their expected repository placement._
 

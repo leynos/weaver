@@ -182,152 +182,142 @@ and relational understanding of code.*
   - Acceptance criteria: tests pass under `make test` and error messaging is
     asserted for each failure mode.
 
-### 2.3. Deliver Semgrep-compatible query routing foundation (`sempai`)
+### 2.3. Deliver Sempai core infrastructure
 
-*Outcome: Implement the hybrid Semgrep-compatible routing strategy from*
-*`docs/adr-003-sempai-semgrep-compatible-query-engine.md`, with explicit*
-*backend selection and diagnostics across ast-grep and Weaver-native matching,*
-*after parser and normalization outputs are stable.*
+*Outcome: Implement the Sempai front-end and normalization architecture from*
+*`docs/sempai-query-language-design.md`, including YAML parsing, one-liner*
+*domain-specific language (DSL) parsing, semantic validation, and stable*
+*diagnostic contracts.*
 
-- [ ] 2.3.1. Define and implement the rule-capability routing matrix for
-      Semgrep-style operators and captures.
-      Requires 2.4.10 and 2.5.2.
-  - Acceptance criteria: each supported operator has an explicit mapped backend
-    class (`ast-grep`, `Weaver-native`, or unsupported), and routing decisions
-    include stable reason codes.
-- [ ] 2.3.2. Implement the Semgrep-compatible front-end normalization flow that
-    produces a deterministic internal formula for routing. Requires 2.4.11 and
-    2.5.5.
-  - Acceptance criteria: equivalent rule forms normalize to the same internal
-    representation, and normalization failures return structured diagnostics.
-- [ ] 2.3.3. Implement the ast-grep execution path for rules that map cleanly
-    and return deterministic captures. Requires 2.4.11 and 2.5.5.
-  - Acceptance criteria: mapped fixtures execute through ast-grep with stable
-    capture output and no implicit fallback.
-- [ ] 2.3.4. Implement the Weaver-native execution path for supported
-      constructs that do not map cleanly to ast-grep. Requires 2.4.10 and
-      2.5.5.
-  - Acceptance criteria: fallback execution is explicit in diagnostics and
-    preserves normalized rule semantics for covered operators.
-- [ ] 2.3.5. Add conformance and regression suites for mapped and non-mapped
-      operator behaviour, including captures, negation, and deep-matching
-      boundaries. Requires 2.5.1 and 2.5.6.
-  - Acceptance criteria: regression fixtures cover routing parity and mismatch
-    diagnostics across Rust, Python, Go, and TypeScript.
-- [ ] 2.3.6. Publish user-facing compatibility boundaries and routing
-      diagnostics in the Semgrep reference documentation. Requires 2.5.6.
-  - Acceptance criteria: docs identify guaranteed operators, fallback-only
-    operators, and unsupported constructs with stable terminology.
+- [ ] 2.3.1. Scaffold `sempai_core` and `sempai` with stable public types and
+      facade entrypoints.
+  - Acceptance criteria: public API documentation builds for `sempai`, and
+    stable types cover language, span, match, capture, and diagnostics models.
+- [ ] 2.3.2. Define structured diagnostics with stable `E_SEMPAI_*` error
+      codes and report schema.
+  - Acceptance criteria: diagnostics include code, message, primary span, and
+    notes, and JSON snapshots remain stable across parser and validator paths.
+- [ ] 2.3.3. Implement YAML rule parsing via `saphyr` and `serde-saphyr` with
+      schema-aligned rule models.
+  - Acceptance criteria: rule metadata and query principals parse from
+    Semgrep-compatible YAML forms, and parse failures emit structured
+    diagnostics.
+- [ ] 2.3.4. Implement mode-aware validation for `search`, `extract`, `taint`,
+      and `join`, with execution gating to supported modes.
+  - Acceptance criteria: unsupported execution modes return deterministic
+    `UnsupportedMode` diagnostics, and search mode validation enforces required
+    key combinations.
+- [ ] 2.3.5. Implement legacy and v2 normalization into one canonical
+      `Formula` model with semantic constraint checks. Requires 2.3.3.
+  - Acceptance criteria: paired legacy and v2 fixtures normalize to equivalent
+    formulas, and semantic invalid states emit deterministic rule diagnostics.
+- [ ] 2.3.6. Implement `logos` tokenization and Chumsky Pratt parsing for the
+      one-liner DSL with Semgrep precedence mapping.
+  - Acceptance criteria: precedence tests match documented binding order, and
+    parser output round-trips for supported DSL forms.
+- [ ] 2.3.7. Implement DSL error recovery with delimiter anchors and partial
+      abstract syntax tree (AST) emission for best-effort diagnostics. Requires
+      2.3.6.
+  - Acceptance criteria: malformed DSL inputs produce partial parse output and
+    labelled diagnostics without parser panics.
 
-### 2.4. Deliver Semgrep-compatible Chumsky lexer and parser architecture
+### 2.4. Deliver Sempai Tree-sitter backend
 
-*Outcome: Build a production-grade Chumsky lexer/parser architecture for*
-*Semgrep-compatible rules, covering legacy and v2 forms, semantic validation,*
-*and deterministic normalized output that downstream routing can consume.*
+*Outcome: Implement the Tree-sitter-backed Sempai execution engine with*
+*Semgrep-token rewriting, pattern intermediate representation (IR), formula*
+*evaluation, and bounded matching semantics across supported languages.*
 
-- [ ] 2.4.1. Build a grammar inventory and operator compatibility matrix that
-      maps Semgrep language constructs to supported, fallback-only, and
-      unsupported parser semantics.
-  - Acceptance criteria: inventory includes legacy and v2 operators, each item
-    has an owner test fixture, and unsupported classes have explicit reason
-    codes.
-- [ ] 2.4.2. Define the token model, span model, and lexer state machine for
-      Semgrep query syntax, including metavariables, interpolations, and
-      ellipsis forms.
-  - Acceptance criteria: token catalogue and state transitions are documented,
-    token classes are stable, and span behaviour is covered by unit tests.
-- [ ] 2.4.3. Implement the Chumsky lexer pipeline with deterministic token
-      emission, lexical recovery, and byte-accurate source mapping.
-  - Acceptance criteria: lexer returns ordered token streams plus diagnostics,
-    preserves source offsets across multiline constructs, and continues after
-    recoverable lexical faults.
-- [ ] 2.4.4. Implement lexical diagnostic taxonomy and normalization for lexer
-      error messages, including stable error codes and remediation hints.
-  - Acceptance criteria: lexical diagnostics are deterministic, serializable,
-    and reusable by CLI and daemon error presenters.
-- [ ] 2.4.5. Define parser AST and intermediate representation types for
-      Semgrep-compatible query forms with explicit source spans and operator
-      metadata.
-  - Acceptance criteria: AST nodes cover legacy operators, v2 `match`
-    principals, decorators, and capture semantics with typed fields.
-- [ ] 2.4.6. Implement parser rules for v2 `match` objects, including
-      unordered `where`, `as`, and `fix` decorators, nested clauses, and
-      precedence boundaries.
-  - Acceptance criteria: all valid decorator permutations parse, invalid
-    combinations fail with targeted diagnostics, and parse trees are stable.
-- [ ] 2.4.7. Implement parser rules for legacy operator forms (`pattern`,
-      `patterns`, `pattern-either`, and taint clauses) and mixed legacy/v2
-      documents.
-  - Acceptance criteria: mixed-form documents parse deterministically, and
-    invalid cross-form combinations produce explicit conflict diagnostics.
-- [ ] 2.4.8. Implement explicit precedence and associativity handling for unary,
-      binary, and grouped operators, including ambiguity-resolution tests.
-  - Acceptance criteria: precedence table coverage is complete, ambiguous inputs
-    resolve consistently, and precedence regressions fail snapshot tests.
-- [ ] 2.4.9. Implement normalization from parser trees to one canonical internal
-      formula representation with span-preserving node links.
-  - Acceptance criteria: equivalent legacy and v2 inputs normalize to equivalent
-    formulas, and canonicalization is deterministic across runs.
-- [ ] 2.4.10. Implement semantic validation passes for deep matching, ellipsis,
-      negation, and capture constraints, including fallback-only markers for
-      unsupported semantics.
-  - Acceptance criteria: semantic validation emits structured diagnostics with
-    machine-readable reason codes and preserves parse output for partial
-    execution.
-- [ ] 2.4.11. Define versioned parser output contracts consumed by routing and
-      execution layers, including schema fixtures and compatibility policy.
-  - Acceptance criteria: typed contracts are versioned, contract fixtures
-    prevent accidental shape drift, and breaking changes require migration
-    notes.
-- [ ] 2.4.12. Implement parser error-recovery strategy for missing operators,
-      malformed decorators, invalid nesting, and truncated documents.
-  - Acceptance criteria: parser recovers for representative malformed corpora,
-    avoids cascading diagnostic noise, and reports deterministic primary
-    failures.
+- [ ] 2.4.1. Implement language profiles and wrapper registry for Rust, Python,
+      TypeScript, and Go, with optional HashiCorp Configuration Language (HCL)
+      support.
+  - Acceptance criteria: each supported profile defines wrapper templates, list
+    shapes, and rewrite boundaries, and optional HCL support is feature-gated.
+- [ ] 2.4.2. Implement Semgrep-token rewrite logic with language-safe boundaries
+      for metavariables, ellipsis, and deep ellipsis.
+  - Acceptance criteria: rewrite logic avoids substitutions in unsafe lexical
+    regions and produces deterministic placeholder mappings.
+- [ ] 2.4.3. Compile rewritten snippets into `PatNode`-based pattern IR with
+      span traceability.
+  - Acceptance criteria: compiled IR snapshots are stable, and wrapper/root
+    extraction metadata is preserved for diagnostics.
+- [ ] 2.4.4. Implement node-kind matching and metavariable unification over
+      Tree-sitter syntax trees.
+  - Acceptance criteria: repeated metavariables unify across compatible nodes,
+    and mismatches fail deterministically.
+- [ ] 2.4.5. Implement list-context ellipsis and ellipsis-variable matching
+      using bounded dynamic programming.
+  - Acceptance criteria: list-context fixtures pass across supported languages,
+    and runtime avoids exponential backtracking.
+- [ ] 2.4.6. Implement deep-ellipsis matching with bounded traversal controls.
+  - Acceptance criteria: deep matching respects configured node limits and
+    returns bounded, deterministic results.
+- [ ] 2.4.7. Compile normalized formulas into plan nodes with explicit anchor
+      and constraint separation. Requires 2.3.5.
+  - Acceptance criteria: conjunction plans enforce positive-term requirements,
+    and compiled plan shapes remain snapshot-stable.
+- [ ] 2.4.8. Implement conjunction, disjunction, and negative-constraint
+      execution semantics.
+  - Acceptance criteria: `not`, `inside`, and `anywhere` semantics align with
+    documented behaviour and pass regression fixtures.
+- [ ] 2.4.9. Implement metavariable `where`-clause constraint evaluation with
+      supported and unsupported outcomes.
+  - Acceptance criteria: supported constraints execute deterministically, and
+    unsupported constraints return stable diagnostic codes.
+- [ ] 2.4.10. Implement focus selection plus `as` and `fix` projection
+      behaviour in emitted matches.
+  - Acceptance criteria: focus and capture projection follow documented
+    precedence, and `fix` is surfaced as metadata without direct application.
+- [ ] 2.4.11. Implement Tree-sitter query escape hatch with capture-name
+      mapping into Semgrep-style capture keys.
+  - Acceptance criteria: raw Tree-sitter queries emit normalized captures and
+    focus behaviour consistent with Sempai match output contracts.
+- [ ] 2.4.12. Add execution safety controls for match caps, capture text caps,
+      deep-search bounds, and bounded alternation.
+  - Acceptance criteria: safety limits are configurable, deterministic, and
+    enforced across execution paths.
 
-### 2.5. Deliver Semgrep parser conformance and release hardening
+### 2.5. Deliver Sempai Weaver integration and readiness
 
-*Outcome: Prove parser correctness, resilience, and operational readiness*
-*through conformance suites, differential checks, performance baselines, and*
-*release gating required before 2.3 routing defaults can be enabled.*
+*Outcome: Integrate Sempai into Weaver observe flows with stable command and*
+*JSON Lines (JSONL) contracts, cache integration, diagnostics conformance, and*
+*release gates for default enablement.*
 
-- [ ] 2.5.1. Build a language-balanced fixture corpus for Rust, Python, Go,
-      TypeScript, and YAML-carried rule forms across legacy and v2 syntax.
-  - Acceptance criteria: fixture catalogue covers every operator class in 2.4.1
-    and includes positive, negative, and malformed examples.
-- [ ] 2.5.2. Implement differential conformance testing between parser output
-      and Semgrep reference expectations for covered operator subsets.
-  - Acceptance criteria: differential harness reports compatibility deltas by
-    operator class, and deltas are tracked as explicit backlog items.
-- [ ] 2.5.3. Add property and fuzz testing for lexer/parser panic resistance,
-      malformed-input handling, and recovery-path stability.
-  - Acceptance criteria: fuzz/property suites run in CI, parser panics are
-    eliminated for maintained corpora, and crash reproducers become regression
-    fixtures.
-- [ ] 2.5.4. Establish parser performance and memory baselines with
-      representative
-      large-rule corpora and enforce non-regression thresholds.
-  - Acceptance criteria: benchmark suite tracks parse latency and allocation
-    metrics, and threshold breaches fail CI with actionable reports.
-- [ ] 2.5.5. Implement end-to-end integration tests from parser to `sempai`
-      router and both execution engines, including normalized-form contract
-      assertions.
-  - Acceptance criteria: parser, router, and execution layers share one
-    versioned contract fixture set, and integration failures identify owning
-    layer boundaries.
-- [ ] 2.5.6. Publish compatibility matrices, unsupported-construct diagnostics,
-      and migration notes in the Semgrep language reference and users guide.
-  - Acceptance criteria: docs expose supported, fallback-only, and unsupported
-    semantics with stable terminology and cross-links.
-- [ ] 2.5.7. Add rollout controls for parser versions and fallback behaviour,
-      including capability flags and telemetry hooks.
-  - Acceptance criteria: daemon config can pin parser contract versions,
-    capability probes expose parser feature levels, and telemetry reports parser
-    fallback frequency.
-- [ ] 2.5.8. Define release gates for enabling Semgrep parser defaults, with
-      required conformance percentages, zero known crashers, and doc parity.
-  - Acceptance criteria: release checklist is codified in CI policy, gating
-    thresholds are explicit, and failing gates block parser-default promotion.
+- [ ] 2.5.1. Add Sempai execution routing in `weaverd` for `observe.query`.
+      Requires 2.4.12.
+  - Acceptance criteria: daemon execution paths compile and execute Sempai
+    plans for supported languages and return structured match streams.
+- [ ] 2.5.2. Add `weaver observe query` command surface with `--lang`, `--uri`,
+      and `--rule-file|--rule|--q` inputs. Requires 2.5.1.
+  - Acceptance criteria: CLI validates input combinations and supports YAML and
+    one-liner query workflows with stable error messaging.
+- [ ] 2.5.3. Define stable JSONL request and response schemas for Sempai query
+      operations, with snapshot coverage. Requires 2.5.2.
+  - Acceptance criteria: schema fixtures lock field names and payload shapes,
+    and streaming output remains deterministic.
+- [ ] 2.5.4. Integrate parse-cache adapter keyed by URI, language, and
+      revision, aligned with daemon document lifecycle.
+  - Acceptance criteria: repeated queries against unchanged snapshots reuse
+    parse state without semantic drift.
+- [ ] 2.5.5. Implement actuation handoff contract using focus-first selection
+      with span fallback and optional capture targeting. Requires 2.5.3.
+  - Acceptance criteria: downstream `act` commands can consume Sempai output
+    deterministically for target selection.
+- [ ] 2.5.6. Add diagnostics conformance suites for YAML, DSL, semantic,
+      compilation, and execution error categories.
+  - Acceptance criteria: each diagnostic category is covered by deterministic
+    snapshots and stable `E_SEMPAI_*` error codes.
+- [ ] 2.5.7. Add layered quality suites (unit, snapshot, corpus, property, and
+      fuzz) for parser and execution behaviour.
+  - Acceptance criteria: suites run under repository gates and include
+    representative language corpora and malformed-input coverage.
+- [ ] 2.5.8. Publish compatibility boundaries for supported operators, modes,
+      constraints, and escape-hatch behaviour in user-facing docs.
+  - Acceptance criteria: documentation clearly distinguishes supported,
+    unsupported, and parse-only behaviours with stable terminology.
+- [ ] 2.5.9. Define release gates for enabling Sempai by default, including
+      crash-free requirements, diagnostics parity, and documentation parity.
+  - Acceptance criteria: release checklist is codified in CI policy and blocks
+    default enablement when thresholds are not met.
 
 ## 3. Plugin Ecosystem & Specialist Tools
 
