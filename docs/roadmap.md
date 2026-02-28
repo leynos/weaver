@@ -186,38 +186,148 @@ and relational understanding of code.*
 
 *Outcome: Implement the hybrid Semgrep-compatible routing strategy from*
 *`docs/adr-003-sempai-semgrep-compatible-query-engine.md`, with explicit*
-*backend selection and diagnostics across ast-grep and Weaver-native matching.*
+*backend selection and diagnostics across ast-grep and Weaver-native matching,*
+*after parser and normalization outputs are stable.*
 
 - [ ] 2.3.1. Define and implement the rule-capability routing matrix for
-      Semgrep-style
-    operators and captures.
+      Semgrep-style operators and captures.
+      Requires 2.4.10 and 2.5.2.
   - Acceptance criteria: each supported operator has an explicit mapped backend
     class (`ast-grep`, `Weaver-native`, or unsupported), and routing decisions
     include stable reason codes.
 - [ ] 2.3.2. Implement the Semgrep-compatible front-end normalization flow that
-    produces a deterministic internal formula for routing.
+    produces a deterministic internal formula for routing. Requires 2.4.11 and
+    2.5.5.
   - Acceptance criteria: equivalent rule forms normalize to the same internal
     representation, and normalization failures return structured diagnostics.
 - [ ] 2.3.3. Implement the ast-grep execution path for rules that map cleanly
-      and
-    return deterministic captures.
+    and return deterministic captures. Requires 2.4.11 and 2.5.5.
   - Acceptance criteria: mapped fixtures execute through ast-grep with stable
     capture output and no implicit fallback.
 - [ ] 2.3.4. Implement the Weaver-native execution path for supported
-      constructs that
-    do not map cleanly to ast-grep.
+      constructs that do not map cleanly to ast-grep. Requires 2.4.10 and
+      2.5.5.
   - Acceptance criteria: fallback execution is explicit in diagnostics and
     preserves normalized rule semantics for covered operators.
 - [ ] 2.3.5. Add conformance and regression suites for mapped and non-mapped
-      operator
-    behaviour, including captures, negation, and deep-matching boundaries.
+      operator behaviour, including captures, negation, and deep-matching
+      boundaries. Requires 2.5.1 and 2.5.6.
   - Acceptance criteria: regression fixtures cover routing parity and mismatch
     diagnostics across Rust, Python, Go, and TypeScript.
 - [ ] 2.3.6. Publish user-facing compatibility boundaries and routing
-      diagnostics in
-    the Semgrep reference documentation.
+      diagnostics in the Semgrep reference documentation. Requires 2.5.6.
   - Acceptance criteria: docs identify guaranteed operators, fallback-only
     operators, and unsupported constructs with stable terminology.
+
+### 2.4. Deliver Semgrep-compatible Chumsky lexer and parser architecture
+
+*Outcome: Build a production-grade Chumsky lexer/parser architecture for*
+*Semgrep-compatible rules, covering legacy and v2 forms, semantic validation,*
+*and deterministic normalized output that downstream routing can consume.*
+
+- [ ] 2.4.1. Build a grammar inventory and operator compatibility matrix that
+      maps Semgrep language constructs to supported, fallback-only, and
+      unsupported parser semantics.
+  - Acceptance criteria: inventory includes legacy and v2 operators, each item
+    has an owner test fixture, and unsupported classes have explicit reason
+    codes.
+- [ ] 2.4.2. Define the token model, span model, and lexer state machine for
+      Semgrep query syntax, including metavariables, interpolations, and
+      ellipsis forms.
+  - Acceptance criteria: token catalogue and state transitions are documented,
+    token classes are stable, and span behaviour is covered by unit tests.
+- [ ] 2.4.3. Implement the Chumsky lexer pipeline with deterministic token
+      emission, lexical recovery, and byte-accurate source mapping.
+  - Acceptance criteria: lexer returns ordered token streams plus diagnostics,
+    preserves source offsets across multiline constructs, and continues after
+    recoverable lexical faults.
+- [ ] 2.4.4. Implement lexical diagnostic taxonomy and normalization for lexer
+      error messages, including stable error codes and remediation hints.
+  - Acceptance criteria: lexical diagnostics are deterministic, serializable,
+    and reusable by CLI and daemon error presenters.
+- [ ] 2.4.5. Define parser AST and intermediate representation types for
+      Semgrep-compatible query forms with explicit source spans and operator
+      metadata.
+  - Acceptance criteria: AST nodes cover legacy operators, v2 `match`
+    principals, decorators, and capture semantics with typed fields.
+- [ ] 2.4.6. Implement parser rules for v2 `match` objects, including
+      unordered `where`, `as`, and `fix` decorators, nested clauses, and
+      precedence boundaries.
+  - Acceptance criteria: all valid decorator permutations parse, invalid
+    combinations fail with targeted diagnostics, and parse trees are stable.
+- [ ] 2.4.7. Implement parser rules for legacy operator forms (`pattern`,
+      `patterns`, `pattern-either`, and taint clauses) and mixed legacy/v2
+      documents.
+  - Acceptance criteria: mixed-form documents parse deterministically, and
+    invalid cross-form combinations produce explicit conflict diagnostics.
+- [ ] 2.4.8. Implement explicit precedence and associativity handling for unary,
+      binary, and grouped operators, including ambiguity-resolution tests.
+  - Acceptance criteria: precedence table coverage is complete, ambiguous inputs
+    resolve consistently, and precedence regressions fail snapshot tests.
+- [ ] 2.4.9. Implement normalization from parser trees to one canonical internal
+      formula representation with span-preserving node links.
+  - Acceptance criteria: equivalent legacy and v2 inputs normalize to equivalent
+    formulas, and canonicalization is deterministic across runs.
+- [ ] 2.4.10. Implement semantic validation passes for deep matching, ellipsis,
+      negation, and capture constraints, including fallback-only markers for
+      unsupported semantics.
+  - Acceptance criteria: semantic validation emits structured diagnostics with
+    machine-readable reason codes and preserves parse output for partial
+    execution.
+- [ ] 2.4.11. Define versioned parser output contracts consumed by routing and
+      execution layers, including schema fixtures and compatibility policy.
+  - Acceptance criteria: typed contracts are versioned, contract fixtures
+    prevent accidental shape drift, and breaking changes require migration
+    notes.
+- [ ] 2.4.12. Implement parser error-recovery strategy for missing operators,
+      malformed decorators, invalid nesting, and truncated documents.
+  - Acceptance criteria: parser recovers for representative malformed corpora,
+    avoids cascading diagnostic noise, and reports deterministic primary
+    failures.
+
+### 2.5. Deliver Semgrep parser conformance and release hardening
+
+*Outcome: Prove parser correctness, resilience, and operational readiness*
+*through conformance suites, differential checks, performance baselines, and*
+*release gating required before 2.3 routing defaults can be enabled.*
+
+- [ ] 2.5.1. Build a language-balanced fixture corpus for Rust, Python, Go,
+      TypeScript, and YAML-carried rule forms across legacy and v2 syntax.
+  - Acceptance criteria: fixture catalogue covers every operator class in 2.4.1
+    and includes positive, negative, and malformed examples.
+- [ ] 2.5.2. Implement differential conformance testing between parser output
+      and Semgrep reference expectations for covered operator subsets.
+  - Acceptance criteria: differential harness reports compatibility deltas by
+    operator class, and deltas are tracked as explicit backlog items.
+- [ ] 2.5.3. Add property and fuzz testing for lexer/parser panic resistance,
+      malformed-input handling, and recovery-path stability.
+  - Acceptance criteria: fuzz/property suites run in CI, parser panics are
+    eliminated for maintained corpora, and crash reproducers become regression
+    fixtures.
+- [ ] 2.5.4. Establish parser performance and memory baselines with
+      representative
+      large-rule corpora and enforce non-regression thresholds.
+  - Acceptance criteria: benchmark suite tracks parse latency and allocation
+    metrics, and threshold breaches fail CI with actionable reports.
+- [ ] 2.5.5. Implement end-to-end integration tests from parser to `sempai`
+      router and both execution engines, including normalized-form contract
+      assertions.
+  - Acceptance criteria: parser, router, and execution layers share one
+    versioned contract fixture set, and integration failures identify owning
+    layer boundaries.
+- [ ] 2.5.6. Publish compatibility matrices, unsupported-construct diagnostics,
+      and migration notes in the Semgrep language reference and users guide.
+  - Acceptance criteria: docs expose supported, fallback-only, and unsupported
+    semantics with stable terminology and cross-links.
+- [ ] 2.5.7. Add rollout controls for parser versions and fallback behaviour,
+      including capability flags and telemetry hooks.
+  - Acceptance criteria: daemon config can pin parser contract versions,
+    capability probes expose parser feature levels, and telemetry reports parser
+    fallback frequency.
+- [ ] 2.5.8. Define release gates for enabling Semgrep parser defaults, with
+      required conformance percentages, zero known crashers, and doc parity.
+  - Acceptance criteria: release checklist is codified in CI policy, gating
+    thresholds are explicit, and failing gates block parser-default promotion.
 
 ## 3. Plugin Ecosystem & Specialist Tools
 
