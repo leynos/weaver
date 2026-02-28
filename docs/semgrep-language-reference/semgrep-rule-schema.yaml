@@ -820,9 +820,12 @@ $defs:
             extract: false
           allOf:
             - anyOf:
-                - properties: { mode: { const: search } }
+                - properties:
+                    mode:
+                      const: search
                   required: [mode]
-                - properties: { mode: false }
+                - properties:
+                    mode: false
         then:
           required: [id, message, languages, severity]
           anyOf:
