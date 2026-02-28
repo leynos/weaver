@@ -18,6 +18,19 @@ Protocol (LSP) orchestration, edit-planning strategy, semantic verification,
 and test strategy. It aligns with
 [ADR 001](adr-001-plugin-capability-model-and-act-extricate.md).
 
+## Relationship to ADR 001 provider model
+
+ADR 001 defines Rust extrication as a built-in provider responsibility in the
+daemon capability resolver. This document specifies a plugin-backed execution
+path that the built-in provider can delegate to during rollout.
+
+Implementation responsibilities are split as follows:
+
+- `weaverd` owns capability routing, policy, and user-facing contract,
+- the Rust actuator plugin owns staged edit planning and RA orchestration,
+- users still invoke one capability surface (`act extricate`) regardless of
+  execution backend.
+
 ## Problem statement
 
 Rust `extricate-symbol` must move an item to a destination module while keeping
@@ -93,6 +106,29 @@ all files that may be read or edited during the transaction:
 If the payload set is incomplete for deterministic execution, the plugin must
 fail with a structured diagnostic.
 
+### Diagnostic response schema
+
+Rust `extricate-symbol` failures must return `PluginResponse::failure` with one
+or more `PluginDiagnostic` entries.
+
+| Field                    | Type   | Required | Description                                                         |
+| ------------------------ | ------ | -------- | ------------------------------------------------------------------- |
+| `success`                | bool   | Yes      | Must be `false` for refusal or execution failure.                   |
+| `output`                 | enum   | Yes      | Must be `empty` on failure.                                         |
+| `diagnostics[].severity` | enum   | Yes      | `error`, `warning`, or `info`.                                      |
+| `diagnostics[].message`  | string | Yes      | Human-readable failure reason with actionable context.              |
+| `diagnostics[].file`     | path   | No       | Absolute or workspace-relative path for location-specific failures. |
+| `diagnostics[].line`     | u32    | No       | 1-based line for location-specific failures.                        |
+
+_Table 2: Failure payload schema for `extricate-symbol` responses._
+
+Diagnostic message convention for deterministic handling:
+
+- prefix messages with a stable code token, for example
+  `EXTRICATE_UNSUPPORTED_VISIBILITY`,
+- include exactly one primary `error` diagnostic describing refusal cause,
+- include additional `info` diagnostics for remediation hints where relevant.
+
 ## Architecture
 
 The implementation uses a transactional refactoring driver with five layers:
@@ -127,6 +163,24 @@ sequenceDiagram
 
 _Figure 1: Rust `extricate-symbol` orchestration through overlay and RA._
 
+## Canonical execution sequence
+
+The following sequence is normative and is the single source of truth for
+ordering.
+
+1. Validate request arguments and payload completeness.
+2. Start RA session and open overlay documents.
+3. Resolve selected definition and collect pre-move references.
+4. Compute module paths and destination module graph updates.
+5. Build move-set closure for symbol and associated `impl` blocks.
+6. Apply planned move edits to overlay and publish `didChange`.
+7. Rewrite external references and affected `use` trees.
+8. Run import repair via diagnostics plus code actions.
+9. Resolve ambiguous fixes using definition-equivalence checks.
+10. Apply formatting for touched files when enabled.
+11. Run semantic invariants and diagnostics gate checks.
+12. Emit unified diff and return success, or refuse and rollback.
+
 ## LSP surface and behaviour
 
 The plugin uses RA over JSON-RPC 2.0 with stdio transport.[^1]
@@ -145,7 +199,7 @@ The plugin uses RA over JSON-RPC 2.0 with stdio transport.[^1]
 | `experimental/ssr`                | Optional structural rewrite helper for path updates.    |
 | `textDocument/publishDiagnostics` | Primary diagnostics source for fix loops.               |
 
-_Table 2: RA and LSP methods required for extrication.[^2][^3]_
+_Table 3: RA and LSP methods required for extrication.[^2][^3]_
 
 Implementation notes:
 
@@ -159,14 +213,8 @@ Implementation notes:
 ## Transaction model
 
 All edits occur in an in-memory overlay keyed by URI. No filesystem mutation is
-allowed until all checks pass.
-
-1. Build overlay from incoming file payloads.
-2. Apply staged edits to overlay only.
-3. Send corresponding `didChange` updates to RA.
-4. Wait for quiescence and diagnostics stabilisation.
-5. Verify semantic invariants.
-6. Emit one final unified diff from overlay delta.
+allowed until all checks pass. The transaction model spans canonical execution
+steps 2 through 12.
 
 If any stage fails, discard overlay and return failure diagnostics without
 writing changes.
@@ -198,19 +246,10 @@ Destination materialisation rules:
 
 If destination module creation is disabled and required, fail before edits.
 
-## End-to-end execution algorithm
+## End-to-end execution algorithm details
 
-1. Validate request and payload completeness.
-2. Start RA session, open overlay documents, and collect initial diagnostics.
-3. Resolve selected symbol definition and baseline reference set.
-4. Record meaning anchors for external identifiers referenced by moved code.
-5. Plan and apply source removal plus destination insertion edits.
-6. Rewrite external references and affected `use` trees without shims.
-7. Run destination import repair loop using diagnostics and code actions.
-8. Apply unused-import removals for files touched by the transaction.
-9. Format touched files when format mode is `auto` or `on`.
-10. Re-run definition and reference probes for semantic verification.
-11. Emit unified diff and return success.
+This section expands canonical steps 5 through 11 for implementers working on
+the planner and verification layers.
 
 ## Reference rewrite strategy
 
@@ -326,7 +365,7 @@ The following components are expected to change for implementation:
 | Command-only actions without usable edits | Inability to apply fixes        | Implement `workspace/executeCommand` with explicit allow list.   |
 | Destination module policy mismatch        | Broken module graph             | Enforce deterministic module creation policy in planner.         |
 
-_Table 3: Primary implementation risks and mitigations._
+_Table 4: Primary implementation risks and mitigations._
 
 ## References
 

@@ -34,7 +34,8 @@ than required.
 
 - Preserve symbol meaning after transformation.
 - Produce code that is immediately idiomatic, without mandatory repair passes.
-- Keep provider details hidden behind a stable CLI contract.
+- Keep provider details hidden behind a stable Command Line Interface (CLI)
+  contract.
 - Reuse existing safety harness and transaction machinery.
 - Support incremental language rollout without changing command shape.
 - Keep capability policy controllable through configuration.
@@ -115,6 +116,19 @@ infrastructure and rust-analyzer requests.
 
 All final edits will continue to flow through the existing safety harness and
 transaction model.
+
+### Rust implementation split
+
+Rust capability ownership remains in `weaverd` as a built-in provider contract.
+During rollout, the built-in provider may delegate selected execution stages to
+the rust-analyzer actuator plugin while preserving one capability surface for
+users and tests.
+
+This split keeps architecture and implementation aligned:
+
+- capability routing and policy remain in the daemon,
+- plugin execution remains an implementation detail,
+- the command and capability contract remain stable.
 
 ## Goals and non-goals
 
