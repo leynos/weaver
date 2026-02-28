@@ -460,14 +460,17 @@ ______________________________________________________________________
 These notes describe one illustrative codebase layout and are included as
 worked examples. They are not normative requirements for Weaver components.
 
-The first working parser lives in `src/parser/expression.rs` and is invoked by
-the unit tests. Although the design assumed the availability of
-`chumsky::pratt`, the version pinned in the manifest does not yet include that
-module. To keep progress unblocked, the implementation uses a small bespoke
-Pratt parser that walks the token stream directly. Binding powers match the
-operator table analysed from the Haskell parser. Expression spans are now
-recorded by `span_scanner` and emitted as `N_EXPR_NODE` entries when building
-the CST.
+In the Weaver codebase, the parser implementation lives in
+`crates/weaver-syntax/src/parser.rs`. It wraps `tree_sitter::Parser`, sets the
+language grammar through `SupportedLanguage::tree_sitter_language()`, and
+returns a `ParseResult` for parsed source text.
+
+The workspace and crate manifests currently depend on Tree-sitter crates
+(`tree-sitter`, `tree-sitter-rust`, `tree-sitter-python`, and
+`tree-sitter-typescript`) and do not include a `chumsky` dependency. Unit tests
+in `crates/weaver-syntax/src/parser.rs` invoke this Tree-sitter-based parser
+via `Parser::new(...).parse(...)` to validate both successful parses and syntax
+error detection.
 
 Literal tokens are normalized via a dedicated helper, keeping prefix parsing
 readable. The parser maps `T_NUMBER`, `T_STRING`, `K_TRUE`, and `K_FALSE` to
