@@ -343,10 +343,10 @@ language-specific tools.*
 
 ### 3.2. Deliver capability-first `act extricate`
 
-*Outcome: Implement the `extricate-symbol` capability model and command flow*
-*defined in `docs/adr-001-plugin-capability-model-and-act-extricate.md`, using*
-*the Rust implementation strategy in*
-*`docs/rust-extricate-actuator-plugin-technical-design.md`.*
+*Outcome: Implement the cross-language `extricate-symbol` capability model,*
+*command contract, and plugin-selection foundation defined in*
+*`docs/adr-001-plugin-capability-model-and-act-extricate.md`, including
+initial* *Python delivery and shared failure semantics.*
 
 - [ ] 3.2.1. Add capability ID scaffolding and resolver policy for actuator
     capabilities (`rename-symbol`, `extricate-symbol`, `extract-method`,
@@ -367,26 +367,59 @@ language-specific tools.*
 - [ ] 3.2.4. Extend the Rope plugin with `extricate-symbol` support for Python.
   - Acceptance criteria: plugin returns unified diffs through existing patch
     application flow and preserves symbol semantics for supported Python shapes.
-- [ ] 3.2.5. Implement Rust `extricate-symbol` orchestration with built-in
-      capability
-    ownership in `weaverd` and plugin-backed execution stages via
-    `weaver-plugin-rust-analyzer`.
-  - Acceptance criteria: flow includes overlay transaction planning, RA
-    definition and references queries, code-action repair, and semantic
-    verification before commit.
-- [ ] 3.2.6. Extend plugin and daemon failure schemas with deterministic refusal
+- [ ] 3.2.5. Extend plugin and daemon failure schemas with deterministic refusal
     diagnostics and hard rollback guarantees.
   - Acceptance criteria: refusal paths emit structured `PluginDiagnostic`
     payloads, include stable error codes, and leave the filesystem unchanged.
-- [ ] 3.2.7. Add unit, behavioural, and end-to-end coverage for Python and Rust
-    extrication, including ambiguous import repair and incomplete payload
-    failures.
+- [ ] 3.2.6. Add unit, behavioural, and end-to-end coverage for capability
+    resolution and Python extrication baseline paths.
+  - Acceptance criteria: tests assert capability negotiation, refusal behaviour,
+    incomplete payload failures, and deterministic patch output.
+
+### 3.3. Deliver Rust `extricate-symbol` actuator
+
+*Outcome: Implement Rust `extricate-symbol` as a standalone actuator programme*
+*in line with `docs/rust-extricate-actuator-plugin-technical-design.md`, with*
+*safe orchestration, deterministic repair loops, and release-grade validation.*
+
+- [ ] 3.3.1. Define Rust extrication orchestration contracts and transaction
+      boundaries in `weaverd`, including capability ownership and stage
+      interfaces. Requires 3.2.3.
+  - Acceptance criteria: stage boundaries are explicit, rollback semantics are
+    codified per stage, and orchestration contracts are covered by unit tests.
+- [ ] 3.3.2. Implement Rust symbol planning pipeline using rust-analyzer
+      definition, references, and call-site discovery for move planning.
+      Requires 3.3.1.
+  - Acceptance criteria: planner identifies extraction scope deterministically,
+    and unsupported symbol shapes emit structured diagnostics.
+- [ ] 3.3.3. Implement staged Rust transformation execution via
+      `weaver-plugin-rust-analyzer`, including extraction edits, path updates,
+      and patch bundling. Requires 3.3.2.
+  - Acceptance criteria: staged execution emits unified diffs, preserves
+    deterministic operation order, and reports stage-level failures.
+- [ ] 3.3.4. Implement import and module-graph repair loops, including ambiguous
+      import handling and code-action follow-up passes. Requires 3.3.3.
+  - Acceptance criteria: common import breakages are auto-repaired, ambiguous
+    repairs return deterministic refusal diagnostics, and no partial writes are
+    committed.
+- [ ] 3.3.5. Integrate semantic verification and rollback enforcement for Rust
+      extrication transactions before commit. Requires 3.3.4 and 3.2.5.
+  - Acceptance criteria: semantic lock failures abort the transaction, rollback
+    is complete across all touched files, and diagnostics identify failed
+    verification stage.
+- [ ] 3.3.6. Add Rust-specific unit, behavioural, and end-to-end coverage for
+      extrication scenarios, including nested module moves, trait impl updates,
+      and macro-adjacent boundaries. Requires 3.3.5.
   - Acceptance criteria: tests assert meaning-preservation probes, module graph
-    updates, and deterministic failure semantics.
+    updates, rollback guarantees, and deterministic failure semantics.
+- [ ] 3.3.7. Publish Rust `extricate-symbol` compatibility boundaries and
+      operator guidance in docs and capability probe output. Requires 3.3.6.
+  - Acceptance criteria: docs and capability surfaces use stable terminology for
+    supported, partial, and unsupported Rust shapes.
 
-### 3.3. Deliver first actuator plugin wave
+### 3.4. Deliver first actuator plugin wave
 
-- [ ] 3.3.1. Develop the first set of actuator plugins:
+- [ ] 3.4.1. Develop the first set of actuator plugins:
 
   - [x] A plugin for `rope` to provide advanced Python refactoring.
 
@@ -395,22 +428,22 @@ language-specific tools.*
   - [ ] A plugin for `srgn` to provide high-performance, precision
         syntactic editing.
 
-### 3.4. Deliver first specialist sensor plugin
+### 3.5. Deliver first specialist sensor plugin
 
-- [ ] 3.4.1. Develop the first specialist sensor plugin:
+- [ ] 3.5.1. Develop the first specialist sensor plugin:
 
   - [ ] A plugin for `jedi` to provide supplementary static analysis for
         Python.
 
-### 3.5. Refine graceful degradation guidance
+### 3.6. Refine graceful degradation guidance
 
-- [ ] 3.5.1. Refine the graceful degradation logic to suggest specific
+- [ ] 3.6.1. Refine the graceful degradation logic to suggest specific
       plugin-based
     solutions when core LSP features are missing.
 
-### 3.6. Deliver static analysis provider integration
+### 3.7. Deliver static analysis provider integration
 
-- [ ] 3.6.1. Implement the Static Analysis Provider for `weaver-graph` (e.g.,
+- [ ] 3.7.1. Implement the Static Analysis Provider for `weaver-graph` (e.g.,
     wrapping PyCG) as the first major graph plugin.
 
 ## 4. Advanced Agent Support & RAG
