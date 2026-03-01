@@ -38,7 +38,11 @@ impl QueryPlan {
     // real plans — https://github.com/leynos/weaver/issues/67
     #[cfg(test)]
     #[must_use]
-    pub(crate) const fn new(rule_id: String, language: Language) -> Self {
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "heap types cannot be used in const contexts"
+    )]
+    pub(crate) fn new(rule_id: String, language: Language) -> Self {
         Self {
             rule_id,
             language,

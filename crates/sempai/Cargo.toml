@@ -8,6 +8,7 @@ rust-version.workspace = true
 sempai_core = { path = "../sempai-core" }
 
 [dev-dependencies]
+sempai_core = { path = "../sempai-core", features = ["test-support"] }
 rstest = { workspace = true }
 rstest-bdd = { workspace = true }
 rstest-bdd-macros = { workspace = true }

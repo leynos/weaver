@@ -1,6 +1,7 @@
 //! Supported host language identifiers for Sempai queries.
 
 use std::fmt;
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
@@ -42,6 +43,37 @@ impl fmt::Display for Language {
             Self::TypeScript => f.write_str("typescript"),
             Self::Go => f.write_str("go"),
             Self::Hcl => f.write_str("hcl"),
+        }
+    }
+}
+
+/// Error returned when a string does not match any known language name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LanguageParseError {
+    name: String,
+}
+
+impl fmt::Display for LanguageParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unknown language: {}", self.name)
+    }
+}
+
+impl std::error::Error for LanguageParseError {}
+
+impl FromStr for Language {
+    type Err = LanguageParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "rust" => Ok(Self::Rust),
+            "python" => Ok(Self::Python),
+            "typescript" => Ok(Self::TypeScript),
+            "go" => Ok(Self::Go),
+            "hcl" => Ok(Self::Hcl),
+            _ => Err(LanguageParseError {
+                name: String::from(s),
+            }),
         }
     }
 }

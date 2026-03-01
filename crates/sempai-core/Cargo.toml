@@ -4,6 +4,9 @@ edition.workspace = true
 version.workspace = true
 rust-version.workspace = true
 
+[features]
+test-support = []
+
 [dependencies]
 serde = { workspace = true }
 thiserror = { workspace = true }

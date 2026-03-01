@@ -28,6 +28,28 @@ fn language_serde_round_trip(#[case] lang: Language, #[case] expected_json: &str
     assert_eq!(deserialized, lang);
 }
 
+#[rstest]
+#[case::rust("rust", Language::Rust)]
+#[case::python("python", Language::Python)]
+#[case::typescript("typescript", Language::TypeScript)]
+#[case::go("go", Language::Go)]
+#[case::hcl("hcl", Language::Hcl)]
+fn language_from_str(#[case] input: &str, #[case] expected: Language) {
+    let parsed: Language = input.parse().expect("valid language name");
+    assert_eq!(parsed, expected);
+}
+
+#[test]
+fn language_from_str_unknown_returns_error() {
+    let result: Result<Language, _> = "javascript".parse();
+    assert!(result.is_err());
+    let err = result.expect_err("should be error");
+    assert!(
+        err.to_string().contains("javascript"),
+        "error should contain the unknown name"
+    );
+}
+
 #[test]
 fn language_copy_and_eq() {
     let a = Language::Rust;

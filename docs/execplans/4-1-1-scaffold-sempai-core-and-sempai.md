@@ -362,7 +362,7 @@ modules follow the weaver-graph pattern: private `mod` in `lib.rs`, selective
 enum with `#[non_exhaustive]`, all required derives,
 `serde(rename_all = "snake_case")`, and a `Display` impl that produces
 lowercase names matching the serde output (e.g. `"rust"`, `"python"`,
-`"type_script"`, `"go"`, `"hcl"`).
+`"typescript"`, `"go"`, `"hcl"`).
 
 **B2.** Create `crates/sempai-core/src/span.rs` containing `LineCol` and `Span`
 structs with serde derives, `new()` constructors, and accessor methods.

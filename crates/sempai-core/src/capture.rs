@@ -39,7 +39,11 @@ pub struct CapturedNode {
 impl CapturedNode {
     /// Creates a new captured node.
     #[must_use]
-    pub const fn new(span: Span, kind: String, text: Option<String>) -> Self {
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "heap types cannot be used in const contexts"
+    )]
+    pub fn new(span: Span, kind: String, text: Option<String>) -> Self {
         Self { span, kind, text }
     }
 

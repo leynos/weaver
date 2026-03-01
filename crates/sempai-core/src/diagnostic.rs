@@ -105,7 +105,11 @@ pub struct SourceSpan {
 impl SourceSpan {
     /// Creates a new source span.
     #[must_use]
-    pub const fn new(start: u32, end: u32, uri: Option<String>) -> Self {
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "heap types cannot be used in const contexts"
+    )]
+    pub fn new(start: u32, end: u32, uri: Option<String>) -> Self {
         Self { start, end, uri }
     }
 
@@ -158,7 +162,11 @@ pub struct Diagnostic {
 impl Diagnostic {
     /// Creates a new diagnostic.
     #[must_use]
-    pub const fn new(
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "heap types cannot be used in const contexts"
+    )]
+    pub fn new(
         code: DiagnosticCode,
         message: String,
         span: Option<SourceSpan>,
@@ -228,7 +236,11 @@ pub struct DiagnosticReport {
 impl DiagnosticReport {
     /// Creates a report from a vector of diagnostics.
     #[must_use]
-    pub const fn new(diagnostics: Vec<Diagnostic>) -> Self {
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "heap types cannot be used in const contexts"
+    )]
+    pub fn new(diagnostics: Vec<Diagnostic>) -> Self {
         Self { diagnostics }
     }
 

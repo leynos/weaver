@@ -1,48 +1,42 @@
 //! Behaviour-driven tests for `sempai_core` types.
 
-use std::str::FromStr;
-
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
+use crate::test_support::QuotedString;
 use crate::{Diagnostic, DiagnosticCode, DiagnosticReport, Language, LineCol, Span};
-
-// ---------------------------------------------------------------------------
-// Typed wrappers for Gherkin step parameters
-// ---------------------------------------------------------------------------
-
-/// A quoted string value from a Gherkin feature file.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct QuotedString(String);
-
-impl FromStr for QuotedString {
-    type Err = std::convert::Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(s.trim_matches('"').to_owned()))
-    }
-}
-
-impl QuotedString {
-    fn as_str(&self) -> &str {
-        &self.0
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Parses a language name string into a [`Language`] variant.
-fn parse_language(name: &str) -> Language {
-    match name {
-        "rust" => Language::Rust,
-        "python" => Language::Python,
-        "typescript" => Language::TypeScript,
-        "go" => Language::Go,
-        "hcl" => Language::Hcl,
-        other => panic!("unknown language: {other}"),
-    }
+/// Parses a `"start..end"` byte range into a `(start, end)` pair.
+fn parse_byte_range(range: &str) -> (u32, u32) {
+    let parts: Vec<u32> = range
+        .split("..")
+        .map(|s| s.parse().expect("valid byte offset"))
+        .collect();
+    (
+        *parts.first().expect("start byte"),
+        *parts.get(1).expect("end byte"),
+    )
+}
+
+/// Parses a `"line:col..line:col"` range into two [`LineCol`] values.
+fn parse_line_range(range: &str) -> (LineCol, LineCol) {
+    let positions: Vec<&str> = range.split("..").collect();
+    let start_str = positions.first().expect("start position");
+    let end_str = positions.get(1).expect("end position");
+
+    let parse_linecol = |s: &str| -> LineCol {
+        let parts: Vec<u32> = s
+            .split(':')
+            .map(|p| p.parse().expect("valid line:col"))
+            .collect();
+        LineCol::new(*parts.first().expect("line"), *parts.get(1).expect("col"))
+    };
+
+    (parse_linecol(start_str), parse_linecol(end_str))
 }
 
 // ---------------------------------------------------------------------------
@@ -70,45 +64,14 @@ fn world() -> TestWorld {
 
 #[given("a span from bytes {byte_range} at lines {line_range}")]
 fn given_span(world: &mut TestWorld, byte_range: QuotedString, line_range: QuotedString) {
-    // Parse byte range: "10..42"
-    let bytes: Vec<u32> = byte_range
-        .as_str()
-        .split("..")
-        .map(|s| s.parse().expect("valid byte offset"))
-        .collect();
-    let start_byte = *bytes.first().expect("start byte");
-    let end_byte = *bytes.get(1).expect("end byte");
-
-    // Parse line range: "2:0..4:0"
-    let positions: Vec<&str> = line_range.as_str().split("..").collect();
-    let start_str = positions.first().expect("start position");
-    let end_str = positions.get(1).expect("end position");
-    let start: Vec<u32> = start_str
-        .split(':')
-        .map(|s| s.parse().expect("valid line:col"))
-        .collect();
-    let end: Vec<u32> = end_str
-        .split(':')
-        .map(|s| s.parse().expect("valid line:col"))
-        .collect();
-
-    world.span = Some(Span::new(
-        start_byte,
-        end_byte,
-        LineCol::new(
-            *start.first().expect("start line"),
-            *start.get(1).expect("start col"),
-        ),
-        LineCol::new(
-            *end.first().expect("end line"),
-            *end.get(1).expect("end col"),
-        ),
-    ));
+    let (start_byte, end_byte) = parse_byte_range(byte_range.as_str());
+    let (start_lc, end_lc) = parse_line_range(line_range.as_str());
+    world.span = Some(Span::new(start_byte, end_byte, start_lc, end_lc));
 }
 
 #[given("language {name}")]
 fn given_language(world: &mut TestWorld, name: QuotedString) {
-    world.language = Some(parse_language(name.as_str()));
+    world.language = Some(name.as_str().parse().expect("valid language name"));
 }
 
 #[given("a diagnostic with code {code} and message {message}")]

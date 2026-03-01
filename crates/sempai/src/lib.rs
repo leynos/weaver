@@ -13,7 +13,7 @@
 //!
 //! # Core types
 //!
-//! - [`Language`] — supported host language identifiers
+//! - [`Language`] and [`LanguageParseError`] — supported host language identifiers
 //! - [`Span`] and [`LineCol`] — byte and line/column source positions
 //! - [`Match`] — a successful rule binding with captures
 //! - [`CaptureValue`] and [`CapturedNode`] — metavariable bindings
@@ -40,7 +40,7 @@ mod engine;
 // Re-export all stable types from sempai_core.
 pub use sempai_core::{
     CaptureValue, CapturedNode, Diagnostic, DiagnosticCode, DiagnosticReport, EngineConfig,
-    EngineLimits, Language, LineCol, Match, SourceSpan, Span,
+    EngineLimits, Language, LanguageParseError, LineCol, Match, SourceSpan, Span,
 };
 
 pub use engine::{Engine, QueryPlan};
