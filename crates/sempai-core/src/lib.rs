@@ -13,7 +13,7 @@
 //! - [`Match`] — a successful rule binding with captures
 //! - [`CaptureValue`] and [`CapturedNode`] — metavariable bindings
 //! - [`DiagnosticReport`] and [`Diagnostic`] — structured error reporting
-//! - [`EngineConfig`] — performance and safety limits
+//! - [`EngineConfig`] and [`EngineLimits`] — performance and safety limits
 //!
 //! # Example
 //!
@@ -33,7 +33,7 @@ mod match_result;
 mod span;
 
 pub use capture::{CaptureValue, CapturedNode};
-pub use config::EngineConfig;
+pub use config::{EngineConfig, EngineLimits};
 pub use diagnostic::{Diagnostic, DiagnosticCode, DiagnosticReport, SourceSpan};
 pub use language::Language;
 pub use match_result::Match;

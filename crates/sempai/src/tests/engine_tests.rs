@@ -1,6 +1,7 @@
 //! Tests for the `Engine` and `QueryPlan` types.
 
-use crate::{DiagnosticCode, Engine, EngineConfig, Language};
+use crate::engine::QueryPlan;
+use crate::{DiagnosticCode, Engine, EngineConfig, EngineLimits, Language};
 
 #[test]
 fn engine_new_with_default_config() {
@@ -10,7 +11,8 @@ fn engine_new_with_default_config() {
 
 #[test]
 fn engine_new_with_custom_config() {
-    let config = EngineConfig::new(100, 200, 300, true);
+    let limits = EngineLimits::new(100, 200, 300);
+    let config = EngineConfig::new(limits, true);
     let engine = Engine::new(config);
     assert!(engine.config().enable_hcl());
 }
@@ -45,4 +47,20 @@ fn compile_dsl_returns_not_implemented() {
         .expect("at least one diagnostic");
     assert_eq!(first.code(), DiagnosticCode::NotImplemented);
     assert!(first.message().contains("compile_dsl"));
+}
+
+#[test]
+fn execute_returns_not_implemented() {
+    let engine = Engine::new(EngineConfig::default());
+    let plan = QueryPlan::new(String::from("test-rule"), Language::Rust);
+    let result = engine.execute(&plan, "file:///test.rs", "fn main() {}");
+    assert!(result.is_err());
+
+    let report = result.expect_err("should be error");
+    let first = report
+        .diagnostics()
+        .first()
+        .expect("at least one diagnostic");
+    assert_eq!(first.code(), DiagnosticCode::NotImplemented);
+    assert!(first.message().contains("execute"));
 }

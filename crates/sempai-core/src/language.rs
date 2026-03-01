@@ -26,6 +26,7 @@ pub enum Language {
     /// The Python programming language.
     Python,
     /// The TypeScript programming language.
+    #[serde(rename = "typescript")]
     TypeScript,
     /// The Go programming language.
     Go,
@@ -38,7 +39,7 @@ impl fmt::Display for Language {
         match self {
             Self::Rust => f.write_str("rust"),
             Self::Python => f.write_str("python"),
-            Self::TypeScript => f.write_str("type_script"),
+            Self::TypeScript => f.write_str("typescript"),
             Self::Go => f.write_str("go"),
             Self::Hcl => f.write_str("hcl"),
         }

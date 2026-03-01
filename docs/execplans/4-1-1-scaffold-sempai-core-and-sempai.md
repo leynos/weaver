@@ -18,7 +18,8 @@ methods return structured "not yet implemented" diagnostics (never panics).
 
 Running `cargo doc -p sempai --no-deps` produces complete, warning-free public
 API documentation. Unit tests validate type construction, serde round-trips,
-and diagnostic formatting. BDD scenarios exercise the public API surface from a
+and diagnostic formatting. Behaviour-driven development (BDD) scenarios
+exercise the public API surface from a
 consumer's perspective.
 
 Observable outcome: after all stages complete, the following commands succeed:
@@ -57,9 +58,11 @@ This satisfies roadmap task 4.1.1 from `docs/roadmap.md` (lines 347-350).
   (`docs/sempai-query-language-design.md` line 191).
 - Library crates use `thiserror`-derived error enums — no `eyre` or `anyhow`
   (`AGENTS.md` lines 220-227).
-- All dependency versions use SemVer-compatible caret requirements
+- All dependency versions use Semantic Versioning (SemVer)-compatible caret
+  requirements
   (`AGENTS.md` lines 206-216).
-- `rstest-bdd` v0.5.0 must be used for BDD tests
+- `rstest-bdd` v0.5.0 must be used for BDD tests (see above for
+  expansion)
   (workspace `Cargo.toml` line 36).
 - Use `str_to_string = "deny"` — use `String::from(...)` or `.into()` instead
   of `.to_string()` on `&str` values.
@@ -126,7 +129,7 @@ This satisfies roadmap task 4.1.1 from `docs/roadmap.md` (lines 347-350).
 
 ## Surprises & discoveries
 
-- The `result_large_err` risk did not materialise.
+- The `result_large_err` risk did not materialize.
   `DiagnosticReport` is small enough (a single `Vec` pointer)
   that Clippy does not fire the lint.
 - `missing_const_for_fn` fired on nearly every constructor and
@@ -454,7 +457,7 @@ mod span_tests;
 
 **D2.** Create test files for `sempai_core`:
 
-- `language_tests.rs`: `rstest` parameterised tests for `Display` output on
+- `language_tests.rs`: `rstest` parameterized tests for `Display` output on
   each variant, serde JSON round-trip for each variant.
 - `span_tests.rs`: `LineCol` and `Span` construction, serde round-trip.
 - `capture_tests.rs`: `CapturedNode` and `CaptureValue` construction, serde

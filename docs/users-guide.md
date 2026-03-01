@@ -881,6 +881,8 @@ wired to the YAML parser, DSL parser, and Tree-sitter backend as those
 components are delivered in subsequent roadmap phases.
 
 All error conditions are reported through `DiagnosticReport`, which carries
-stable `E_SEMPAI_*` error codes suitable for programmatic consumption.
+stable diagnostic codes suitable for programmatic consumption. Stub methods
+currently return the `NOT_IMPLEMENTED` code; real `E_SEMPAI_*` codes will be
+used once the corresponding backends are implemented.
 Diagnostics include a code, message, optional source span, and supplementary
 notes.

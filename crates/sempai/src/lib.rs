@@ -18,7 +18,7 @@
 //! - [`Match`] — a successful rule binding with captures
 //! - [`CaptureValue`] and [`CapturedNode`] — metavariable bindings
 //! - [`DiagnosticReport`] and [`Diagnostic`] — structured error reporting
-//! - [`EngineConfig`] — performance and safety limits
+//! - [`EngineConfig`] and [`EngineLimits`] — performance and safety limits
 //! - [`Engine`] — the query compilation and execution entrypoint
 //! - [`QueryPlan`] — a compiled query plan
 //!
@@ -40,7 +40,7 @@ mod engine;
 // Re-export all stable types from sempai_core.
 pub use sempai_core::{
     CaptureValue, CapturedNode, Diagnostic, DiagnosticCode, DiagnosticReport, EngineConfig,
-    Language, LineCol, Match, SourceSpan, Span,
+    EngineLimits, Language, LineCol, Match, SourceSpan, Span,
 };
 
 pub use engine::{Engine, QueryPlan};

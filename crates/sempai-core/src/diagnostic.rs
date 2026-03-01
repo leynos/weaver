@@ -28,24 +28,34 @@ use serde::{Deserialize, Serialize};
 #[non_exhaustive]
 pub enum DiagnosticCode {
     /// YAML rule file parse failure.
+    #[serde(rename = "E_SEMPAI_YAML_PARSE")]
     ESempaiYamlParse,
     /// One-liner DSL parse failure.
+    #[serde(rename = "E_SEMPAI_DSL_PARSE")]
     ESempaiDslParse,
     /// Schema validation failure.
+    #[serde(rename = "E_SEMPAI_SCHEMA_INVALID")]
     ESempaiSchemaInvalid,
     /// Unsupported execution mode.
+    #[serde(rename = "E_SEMPAI_UNSUPPORTED_MODE")]
     ESempaiUnsupportedMode,
     /// Negated branch inside `pattern-either` / `any`.
+    #[serde(rename = "E_SEMPAI_INVALID_NOT_IN_OR")]
     ESempaiInvalidNotInOr,
     /// Conjunction with no positive match-producing term.
+    #[serde(rename = "E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND")]
     ESempaiMissingPositiveTermInAnd,
     /// Pattern snippet failed to parse as host language.
+    #[serde(rename = "E_SEMPAI_PATTERN_SNIPPET_PARSE_FAILED")]
     ESempaiPatternSnippetParseFailed,
     /// Unsupported constraint in current context.
+    #[serde(rename = "E_SEMPAI_UNSUPPORTED_CONSTRAINT")]
     ESempaiUnsupportedConstraint,
     /// Invalid Tree-sitter query syntax.
+    #[serde(rename = "E_SEMPAI_TS_QUERY_INVALID")]
     ESempaiTsQueryInvalid,
     /// Feature not yet implemented (used by stub methods).
+    #[serde(rename = "NOT_IMPLEMENTED")]
     NotImplemented,
 }
 
@@ -206,7 +216,8 @@ fn diagnostic_summary(diagnostics: &[Diagnostic]) -> String {
 /// use sempai_core::{DiagnosticCode, DiagnosticReport};
 ///
 /// let report = DiagnosticReport::not_implemented("compile_yaml");
-/// assert_eq!(report.diagnostics()[0].code(), DiagnosticCode::NotImplemented);
+/// let first = report.diagnostics().first().expect("at least one");
+/// assert_eq!(first.code(), DiagnosticCode::NotImplemented);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, thiserror::Error)]
 #[error("{}", diagnostic_summary(&self.diagnostics))]

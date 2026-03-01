@@ -76,3 +76,15 @@ fn capture_value_nodes_serde_round_trip() {
     let deserialized: CaptureValue = serde_json::from_str(&json).expect("deserialize");
     assert!(matches!(deserialized, CaptureValue::Nodes(ref v) if v.len() == 2));
 }
+
+#[test]
+fn capture_value_empty_nodes_serde_round_trip() {
+    let nodes: Vec<CapturedNode> = Vec::new();
+    let value = CaptureValue::Nodes(nodes);
+    let json = serde_json::to_string(&value).expect("serialize");
+
+    assert!(json.contains("\"kind\":\"nodes\""));
+
+    let deserialized: CaptureValue = serde_json::from_str(&json).expect("deserialize");
+    assert!(matches!(deserialized, CaptureValue::Nodes(ref v) if v.is_empty()));
+}

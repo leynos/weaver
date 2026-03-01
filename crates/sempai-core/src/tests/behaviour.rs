@@ -30,6 +30,22 @@ impl QuotedString {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Parses a language name string into a [`Language`] variant.
+fn parse_language(name: &str) -> Language {
+    match name {
+        "rust" => Language::Rust,
+        "python" => Language::Python,
+        "typescript" => Language::TypeScript,
+        "go" => Language::Go,
+        "hcl" => Language::Hcl,
+        other => panic!("unknown language: {other}"),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Test world
 // ---------------------------------------------------------------------------
 
@@ -92,15 +108,7 @@ fn given_span(world: &mut TestWorld, byte_range: QuotedString, line_range: Quote
 
 #[given("language {name}")]
 fn given_language(world: &mut TestWorld, name: QuotedString) {
-    let lang = match name.as_str() {
-        "rust" => Language::Rust,
-        "python" => Language::Python,
-        "type_script" => Language::TypeScript,
-        "go" => Language::Go,
-        "hcl" => Language::Hcl,
-        other => panic!("unknown language: {other}"),
-    };
-    world.language = Some(lang);
+    world.language = Some(parse_language(name.as_str()));
 }
 
 #[given("a diagnostic with code {code} and message {message}")]
@@ -155,10 +163,21 @@ fn when_format_report(world: &mut TestWorld) {
 #[then("the JSON contains key {key} with value {value}")]
 fn then_json_contains(world: &mut TestWorld, key: QuotedString, value: QuotedString) {
     let json = world.json_output.as_ref().expect("JSON should be set");
-    let expected = format!("\"{}\":{}", key.as_str(), value.as_str());
-    assert!(
-        json.contains(&expected),
-        "expected JSON to contain '{expected}', got: {json}"
+    let parsed: serde_json::Value =
+        serde_json::from_str(json).expect("JSON output should be valid");
+    let actual = parsed.get(key.as_str()).unwrap_or_else(|| {
+        panic!(
+            "expected JSON to contain key '{}', got: {json}",
+            key.as_str()
+        )
+    });
+    let expected: serde_json::Value = serde_json::from_str(value.as_str())
+        .unwrap_or_else(|_| serde_json::Value::String(value.as_str().to_owned()));
+    assert_eq!(
+        actual,
+        &expected,
+        "expected JSON key '{}' to have value {expected:?}, got {actual:?}",
+        key.as_str()
     );
 }
 

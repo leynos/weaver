@@ -34,10 +34,9 @@ pub struct QueryPlan {
 
 impl QueryPlan {
     /// Creates a new query plan (crate-internal).
-    #[expect(
-        dead_code,
-        reason = "constructor will be used once compile_yaml and compile_dsl are implemented"
-    )]
+    // FIXME: remove `#[cfg(test)]` when `compile_yaml` / `compile_dsl` produce
+    // real plans — https://github.com/leynos/weaver/issues/67
+    #[cfg(test)]
     #[must_use]
     pub(crate) const fn new(rule_id: String, language: Language) -> Self {
         Self {

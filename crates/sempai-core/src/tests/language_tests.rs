@@ -7,7 +7,7 @@ use crate::Language;
 #[rstest]
 #[case::rust(Language::Rust, "rust")]
 #[case::python(Language::Python, "python")]
-#[case::typescript(Language::TypeScript, "type_script")]
+#[case::typescript(Language::TypeScript, "typescript")]
 #[case::go(Language::Go, "go")]
 #[case::hcl(Language::Hcl, "hcl")]
 fn language_display(#[case] lang: Language, #[case] expected: &str) {
@@ -17,7 +17,7 @@ fn language_display(#[case] lang: Language, #[case] expected: &str) {
 #[rstest]
 #[case::rust(Language::Rust, "\"rust\"")]
 #[case::python(Language::Python, "\"python\"")]
-#[case::typescript(Language::TypeScript, "\"type_script\"")]
+#[case::typescript(Language::TypeScript, "\"typescript\"")]
 #[case::go(Language::Go, "\"go\"")]
 #[case::hcl(Language::Hcl, "\"hcl\"")]
 fn language_serde_round_trip(#[case] lang: Language, #[case] expected_json: &str) {

@@ -5,6 +5,7 @@ use std::str::FromStr;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
+use crate::engine::QueryPlan;
 use crate::{DiagnosticReport, Engine, EngineConfig, Language};
 
 // ---------------------------------------------------------------------------
@@ -30,6 +31,22 @@ impl QuotedString {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Parses a language name string into a [`Language`] variant.
+fn parse_language(name: &str) -> Language {
+    match name {
+        "rust" => Language::Rust,
+        "python" => Language::Python,
+        "typescript" => Language::TypeScript,
+        "go" => Language::Go,
+        "hcl" => Language::Hcl,
+        other => panic!("unknown language: {other}"),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Test world
 // ---------------------------------------------------------------------------
 
@@ -37,6 +54,7 @@ impl QuotedString {
 struct TestWorld {
     engine: Option<Engine>,
     compile_result: Option<Result<(), DiagnosticReport>>,
+    execute_result: Option<Result<(), DiagnosticReport>>,
 }
 
 #[fixture]
@@ -66,17 +84,21 @@ fn when_compile_yaml(world: &mut TestWorld, yaml: QuotedString) {
 #[when("DSL {dsl} is compiled for language {lang}")]
 fn when_compile_dsl(world: &mut TestWorld, dsl: QuotedString, lang: QuotedString) {
     let engine = world.engine.as_ref().expect("engine should be set");
-    let language = match lang.as_str() {
-        "rust" => Language::Rust,
-        "python" => Language::Python,
-        "type_script" => Language::TypeScript,
-        "go" => Language::Go,
-        "hcl" => Language::Hcl,
-        other => panic!("unknown language: {other}"),
-    };
+    let language = parse_language(lang.as_str());
     world.compile_result = Some(
         engine
             .compile_dsl("interactive", language, dsl.as_str())
+            .map(|_| ()),
+    );
+}
+
+#[when("a query plan is executed")]
+fn when_execute(world: &mut TestWorld) {
+    let engine = world.engine.as_ref().expect("engine should be set");
+    let plan = QueryPlan::new(String::from("test-rule"), Language::Rust);
+    world.execute_result = Some(
+        engine
+            .execute(&plan, "file:///t.rs", "fn main() {}")
             .map(|_| ()),
     );
 }
@@ -98,6 +120,26 @@ fn then_compilation_fails(world: &mut TestWorld, code: QuotedString) {
         .as_ref()
         .expect("compile result should be set");
     let report = result.as_ref().expect_err("expected compilation failure");
+    let first = report
+        .diagnostics()
+        .first()
+        .expect("at least one diagnostic");
+    let actual_code = format!("{}", first.code());
+    assert_eq!(
+        actual_code,
+        code.as_str(),
+        "expected code '{}', got '{actual_code}'",
+        code.as_str()
+    );
+}
+
+#[then("execution fails with code {code}")]
+fn then_execution_fails(world: &mut TestWorld, code: QuotedString) {
+    let result = world
+        .execute_result
+        .as_ref()
+        .expect("execute result should be set");
+    let report = result.as_ref().expect_err("expected execution failure");
     let first = report
         .diagnostics()
         .first()

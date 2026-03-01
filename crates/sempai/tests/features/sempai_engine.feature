@@ -13,3 +13,8 @@ Feature: Sempai engine stub behaviour
     Given an engine with default configuration
     When DSL "pattern(\"fn $F\")" is compiled for language "rust"
     Then compilation fails with code "NOT_IMPLEMENTED"
+
+  Scenario: Engine execute returns not-implemented error
+    Given an engine with default configuration
+    When a query plan is executed
+    Then execution fails with code "NOT_IMPLEMENTED"

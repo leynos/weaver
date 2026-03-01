@@ -40,7 +40,9 @@ In this document, Language Server Protocol (LSP) and Continuous Integration
 │   ├── weaver-plugins/
 │   ├── weaver-sandbox/
 │   ├── weaver-syntax/
-│   └── weaverd/
+│   ├── weaverd/
+│   ├── sempai-core/
+│   └── sempai/
 ├── docs/
 ├── test_expect/
 ├── .github/workflows/
@@ -70,6 +72,8 @@ In this document, Language Server Protocol (LSP) and Continuous Integration
 | `weaver-plugin-rust-analyzer` | Rust specialist plugin integration                                                                   | Implemented |
 | `weaver-build-util`           | Shared build-time utilities used across crates                                                       | Implemented |
 | `weaver-e2e`                  | End-to-end test support crate and integration scaffolding                                            | Implemented |
+| `sempai-core`                 | Sempai data model, diagnostics, and planning intermediate representation (IR) types                  | Implemented |
+| `sempai`                      | Sempai facade crate with stable public API, re-exports from `sempai-core`, and stub `Engine`         | Implemented |
 
 _Table 1: Implemented crate boundaries and responsibilities._
 
@@ -93,7 +97,7 @@ implemented in this repository snapshot.
 | Rust `extricate-symbol` actuator flow                      | `crates/weaver-plugin-rust-analyzer/` and `crates/weaverd/`                                                   | Proposed in Rust extricate actuator technical design |
 | Rust extricate plugin overlay and RA orchestration modules | `crates/weaver-plugin-rust-analyzer/src/lsp/` and related plugin modules                                      | Proposed in Rust extricate actuator technical design |
 | Plugin capability metadata for extrication                 | `crates/weaver-plugins/src/manifest/mod.rs`                                                                   | Proposed in Rust extricate actuator technical design |
-| Sempai Semgrep-compatible query engine crates              | `crates/sempai/`, `crates/sempai-core/`, `crates/sempai-yaml/`, `crates/sempai-dsl/`, and `crates/sempai-ts/` | Proposed in Sempai query language technical design   |
+| Sempai YAML, DSL, and Tree-sitter backend crates           | `crates/sempai-yaml/`, `crates/sempai-dsl/`, and `crates/sempai-ts/`                                          | Proposed in Sempai query language technical design   |
 | Sempai integration command surface (`observe`)             | `crates/weaver-cli/` and `crates/weaverd/`                                                                    | Proposed in Sempai query language technical design   |
 | `srgn` specialist plugin                                   | `crates/weaver-plugin-srgn/` (expected new crate)                                                             | Phase 3, specialist actuator plugins                 |
 | `jedi` specialist plugin                                   | `crates/weaver-plugin-jedi/` (expected new crate)                                                             | Phase 3, specialist sensor plugins                   |
