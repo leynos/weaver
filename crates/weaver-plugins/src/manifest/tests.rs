@@ -50,6 +50,15 @@ fn make_manifest() -> PluginManifest {
     )
 }
 
+/// Helper to deserialise a manifest from JSON and run assertions on it.
+fn assert_manifest_from_json<F>(json: &str, assertion: F)
+where
+    F: FnOnce(&PluginManifest),
+{
+    let m: PluginManifest = serde_json::from_str(json).expect("deserialise");
+    assertion(&m);
+}
+
 #[test]
 fn new_manifest_has_defaults() {
     let m = make_manifest();
@@ -128,9 +137,10 @@ fn manifest_deserialise_defaults_timeout() {
         "languages": ["rust"],
         "executable": "/bin/test"
     }"#;
-    let m: PluginManifest = serde_json::from_str(json).expect("deserialise");
-    assert_eq!(m.timeout_secs(), 30);
-    assert!(m.args().is_empty());
+    assert_manifest_from_json(json, |m| {
+        assert_eq!(m.timeout_secs(), 30);
+        assert!(m.args().is_empty());
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -161,8 +171,9 @@ fn manifest_without_capabilities_deserialises_to_empty() {
         "languages": ["rust"],
         "executable": "/bin/test"
     }"#;
-    let m: PluginManifest = serde_json::from_str(json).expect("deserialise");
-    assert!(m.capabilities().is_empty());
+    assert_manifest_from_json(json, |m| {
+        assert!(m.capabilities().is_empty());
+    });
 }
 
 #[test]
