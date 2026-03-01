@@ -503,7 +503,7 @@ new* *capabilities and specialist providers.*
 *plugin architecture as first-class implementations of the `rename-symbol`*
 *capability, with deterministic routing and compatibility guarantees.*
 
-- [ ] 5.2.1. Define the `rename-symbol` capability contract for actuator
+- [x] 5.2.1. Define the `rename-symbol` capability contract for actuator
       plugins, including request schema, response schema, and refusal
       diagnostics. Requires 5.1.1.
   - Acceptance criteria: capability contract is versioned, broker validation

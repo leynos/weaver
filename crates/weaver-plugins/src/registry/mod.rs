@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 
+use crate::capability::CapabilityId;
 use crate::error::PluginError;
 use crate::manifest::{PluginKind, PluginManifest};
 
@@ -92,6 +93,34 @@ impl PluginRegistry {
         self.find_for_language(language)
             .into_iter()
             .filter(|m| m.kind() == PluginKind::Actuator)
+            .collect()
+    }
+
+    /// Returns all plugins that declare the given capability.
+    #[must_use]
+    pub fn find_for_capability(&self, id: CapabilityId) -> Vec<&PluginManifest> {
+        self.manifests
+            .values()
+            .filter(|m| m.capabilities().contains(&id))
+            .collect()
+    }
+
+    /// Returns plugins that declare both the given language and capability.
+    #[must_use]
+    pub fn find_for_language_and_capability(
+        &self,
+        language: &str,
+        id: CapabilityId,
+    ) -> Vec<&PluginManifest> {
+        let lower = language.to_ascii_lowercase();
+        self.manifests
+            .values()
+            .filter(|m| {
+                m.capabilities().contains(&id)
+                    && m.languages()
+                        .iter()
+                        .any(|l| l.to_ascii_lowercase() == lower)
+            })
             .collect()
     }
 
