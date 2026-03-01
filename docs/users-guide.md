@@ -788,8 +788,8 @@ executable = "/usr/bin/weaver-plugin-rope"
 capabilities = ["rename-symbol"]
 ```
 
-Sensor plugins must not declare actuator capabilities. The registry validates
-this constraint during registration and rejects manifests that violate it.
+Sensor plugins must not declare any capabilities. The registry validates this
+constraint during registration and rejects manifests that violate it.
 
 The daemon uses capability declarations to select plugins. For example, when
 routing a `rename-symbol` request for Python, the daemon queries the registry

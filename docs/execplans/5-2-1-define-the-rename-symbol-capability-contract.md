@@ -27,7 +27,7 @@ Observable behaviour after this change:
   regressions.
 - New unit tests in `crates/weaver-plugins/src/capability/` exercise schema
   validation for happy and unhappy paths.
-- New BDD scenarios in
+- New behaviour-driven development (BDD) scenarios in
   `crates/weaver-plugins/tests/features/capability_contract.feature` exercise
   contract validation, refusal diagnostics, and manifest capability
   declarations.
@@ -84,7 +84,8 @@ Observable behaviour after this change:
 - **Line budget:** If any single file approaches 380 lines, split before
   continuing.
 - **Ambiguity:** If the contract shape for rename-symbol requires information
-  not available in the current codebase or ADR, stop and present options.
+  not available in the current codebase or Architecture Decision Record (ADR),
+  stop and present options.
 
 ## Risks
 

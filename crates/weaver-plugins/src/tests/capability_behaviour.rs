@@ -233,6 +233,32 @@ fn then_versions_incompatible(world: &mut CapabilityWorld) {
 }
 
 // ---------------------------------------------------------------------------
+// parse_kv_pairs unit tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parse_kv_pairs_empty_input() {
+    let result = parse_kv_pairs("");
+    assert!(result.is_empty());
+}
+
+#[test]
+fn parse_kv_pairs_multiple_pairs() {
+    let result = parse_kv_pairs(r#"uri="file:///a.rs" position="1:0" new_name="bar""#);
+    assert_eq!(result.len(), 3);
+    assert_eq!(result.get("uri").expect("uri"), "file:///a.rs");
+    assert_eq!(result.get("position").expect("position"), "1:0");
+    assert_eq!(result.get("new_name").expect("new_name"), "bar");
+}
+
+#[test]
+fn parse_kv_pairs_ignores_tokens_without_equals() {
+    let result = parse_kv_pairs(r#"stray uri="ok""#);
+    assert_eq!(result.len(), 1);
+    assert_eq!(result.get("uri").expect("uri"), "ok");
+}
+
+// ---------------------------------------------------------------------------
 // Scenario registration
 // ---------------------------------------------------------------------------
 

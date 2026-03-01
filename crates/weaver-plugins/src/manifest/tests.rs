@@ -183,7 +183,10 @@ fn validate_rejects_sensor_with_capabilities() {
         .with_capabilities(vec![CapabilityId::RenameSymbol]);
     let err = manifest.validate().expect_err("should reject");
     assert!(matches!(err, PluginError::Manifest { .. }));
-    assert!(err.to_string().contains("sensor plugins must not declare"));
+    assert!(
+        err.to_string()
+            .contains("sensor plugins must not declare any")
+    );
 }
 
 #[test]

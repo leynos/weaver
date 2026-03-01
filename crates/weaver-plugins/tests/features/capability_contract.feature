@@ -2,21 +2,39 @@ Feature: Capability contract validation
 
   Scenario: Valid rename request passes validation
     Given a rename-symbol contract
-    And a plugin request with operation "rename" and arguments uri="file:///src/main.py" position="10:5" new_name="foo"
+    And a plugin request with operation "rename-symbol" and arguments uri="file:///src/main.py" position="10:5" new_name="foo"
     When the request is validated
     Then validation succeeds
 
   Scenario: Missing required field rejects request
     Given a rename-symbol contract
-    And a plugin request with operation "rename" and arguments uri="file:///src/main.py" position="10:5"
+    And a plugin request with operation "rename-symbol" and arguments uri="file:///src/main.py" position="10:5"
     When the request is validated
     Then validation fails with "new_name"
 
   Scenario: Empty new_name rejects request
     Given a rename-symbol contract
-    And a plugin request with operation "rename" and arguments uri="file:///src/main.py" position="10:5" new_name=""
+    And a plugin request with operation "rename-symbol" and arguments uri="file:///src/main.py" position="10:5" new_name=""
     When the request is validated
     Then validation fails with "new_name"
+
+  Scenario: Empty uri rejects request
+    Given a rename-symbol contract
+    And a plugin request with operation "rename-symbol" and arguments uri="" position="10:5" new_name="foo"
+    When the request is validated
+    Then validation fails with "uri"
+
+  Scenario: Empty position rejects request
+    Given a rename-symbol contract
+    And a plugin request with operation "rename-symbol" and arguments uri="file:///src/main.py" position="" new_name="foo"
+    When the request is validated
+    Then validation fails with "position"
+
+  Scenario: Wrong operation rejects request
+    Given a rename-symbol contract
+    And a plugin request with operation "extricate-symbol" and arguments uri="file:///src/main.py" position="10:5" new_name="foo"
+    When the request is validated
+    Then validation fails with "operation"
 
   Scenario: Successful diff response passes validation
     Given a rename-symbol contract

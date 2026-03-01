@@ -79,21 +79,14 @@ impl RenameSymbolRequest {
     ///
     /// # Errors
     ///
-    /// Returns [`PluginError::InvalidOutput`] if required fields are
-    /// missing or have invalid types.
+    /// Returns a [`PluginError`] if required fields are missing or
+    /// have invalid types.
     pub fn extract(request: &PluginRequest) -> Result<Self, PluginError> {
         let args = request.arguments();
 
-        let uri = extract_string_field(args, "uri")?;
-        let position = extract_string_field(args, "position")?;
-        let new_name = extract_string_field(args, "new_name")?;
-
-        if new_name.trim().is_empty() {
-            return Err(PluginError::InvalidOutput {
-                name: String::from("rename-symbol"),
-                message: String::from("rename-symbol contract requires 'new_name' to be non-empty"),
-            });
-        }
+        let uri = extract_non_empty_string_field(args, "uri")?;
+        let position = extract_non_empty_string_field(args, "position")?;
+        let new_name = extract_non_empty_string_field(args, "new_name")?;
 
         Ok(Self {
             uri,
@@ -103,8 +96,8 @@ impl RenameSymbolRequest {
     }
 }
 
-/// Extracts a required string field from the arguments map.
-fn extract_string_field(
+/// Extracts a required, non-empty string field from the arguments map.
+fn extract_non_empty_string_field(
     args: &HashMap<String, serde_json::Value>,
     field: &str,
 ) -> Result<String, PluginError> {
@@ -113,13 +106,19 @@ fn extract_string_field(
         message: format!("rename-symbol contract requires '{field}' argument"),
     })?;
 
-    value
-        .as_str()
-        .map(String::from)
-        .ok_or_else(|| PluginError::InvalidOutput {
+    let s = value.as_str().ok_or_else(|| PluginError::InvalidOutput {
+        name: String::from("rename-symbol"),
+        message: format!("rename-symbol contract requires '{field}' to be a string"),
+    })?;
+
+    if s.trim().is_empty() {
+        return Err(PluginError::InvalidOutput {
             name: String::from("rename-symbol"),
-            message: format!("rename-symbol contract requires '{field}' to be a string",),
-        })
+            message: format!("rename-symbol contract requires '{field}' to be non-empty"),
+        });
+    }
+
+    Ok(String::from(s))
 }
 
 /// Validates that a successful response contains diff output.
@@ -167,6 +166,17 @@ impl CapabilityContract for RenameSymbolContract {
     }
 
     fn validate_request(&self, request: &PluginRequest) -> Result<(), PluginError> {
+        let expected = CapabilityId::RenameSymbol.as_str();
+        if request.operation() != expected {
+            return Err(PluginError::InvalidOutput {
+                name: String::from("rename-symbol"),
+                message: format!(
+                    "rename-symbol contract expects operation '{expected}', \
+                     got '{}'",
+                    request.operation(),
+                ),
+            });
+        }
         RenameSymbolRequest::extract(request).map(|_| ())
     }
 

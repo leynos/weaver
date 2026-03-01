@@ -155,15 +155,15 @@ pub trait CapabilityContract {
     ///
     /// # Errors
     ///
-    /// Returns [`PluginError::InvalidOutput`] if the request does not
-    /// conform to the expected schema.
+    /// Returns a [`PluginError`] if the request does not conform to the
+    /// expected schema.
     fn validate_request(&self, request: &PluginRequest) -> Result<(), PluginError>;
 
     /// Validates that a plugin response conforms to the contract schema.
     ///
     /// # Errors
     ///
-    /// Returns [`PluginError::InvalidOutput`] if a successful response
-    /// does not conform to the expected output schema.
+    /// Returns a [`PluginError`] if a successful response does not
+    /// conform to the expected output schema.
     fn validate_response(&self, response: &PluginResponse) -> Result<(), PluginError>;
 }

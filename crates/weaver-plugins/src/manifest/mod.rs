@@ -203,7 +203,7 @@ impl PluginManifest {
         }
         if self.kind == PluginKind::Sensor && !self.capabilities.is_empty() {
             return Err(PluginError::Manifest {
-                message: String::from("sensor plugins must not declare actuator capabilities"),
+                message: String::from("sensor plugins must not declare any capabilities"),
             });
         }
         Ok(())

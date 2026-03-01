@@ -139,12 +139,22 @@ fn extract_missing_field_returns_error(#[case] missing_field: &str) {
     );
 }
 
-#[test]
-fn extract_empty_new_name_returns_error() {
-    let args = make_rename_args("file:///src/main.py", "10:5", "  ");
+#[rstest]
+#[case::empty_uri("", "10:5", "bar", "uri")]
+#[case::empty_position("file:///src/main.py", "", "bar", "position")]
+#[case::empty_new_name("file:///src/main.py", "10:5", "  ", "new_name")]
+fn extract_empty_field_returns_error(
+    #[case] uri: &str,
+    #[case] position: &str,
+    #[case] new_name: &str,
+    #[case] field: &str,
+) {
+    let args = make_rename_args(uri, position, new_name);
     let request = PluginRequest::with_arguments("rename-symbol", vec![], args);
     let err = RenameSymbolRequest::extract(&request).expect_err("should fail");
-    assert!(err.to_string().contains("non-empty"));
+    let msg = err.to_string();
+    assert!(msg.contains("non-empty"), "expected 'non-empty' in: {msg}");
+    assert!(msg.contains(field), "expected '{field}' in: {msg}");
 }
 
 #[test]
@@ -199,6 +209,20 @@ fn contract_validate_invalid_request() {
     let request = PluginRequest::new("rename-symbol", vec![]);
     let contract = RenameSymbolContract;
     assert!(contract.validate_request(&request).is_err());
+}
+
+#[test]
+fn contract_validate_wrong_operation_rejects() {
+    let args = make_rename_args("file:///src/main.py", "10:5", "bar");
+    let request = PluginRequest::with_arguments("extricate-symbol", vec![], args);
+    let contract = RenameSymbolContract;
+    let err = contract
+        .validate_request(&request)
+        .expect_err("should reject wrong operation");
+    assert!(
+        err.to_string().contains("expects operation"),
+        "expected operation mismatch error, got: {err}",
+    );
 }
 
 #[test]
