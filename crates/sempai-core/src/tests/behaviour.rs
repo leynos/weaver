@@ -52,25 +52,41 @@ fn world() -> TestWorld {
 // Given steps
 // ---------------------------------------------------------------------------
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "BDD step macro expands all Gherkin parameters as separate function arguments"
-)]
-#[given("a span from byte {start_byte} to byte {end_byte} on lines {sl}:{sc} to {el}:{ec}")]
-fn given_span(
-    world: &mut TestWorld,
-    start_byte: u32,
-    end_byte: u32,
-    sl: u32,
-    sc: u32,
-    el: u32,
-    ec: u32,
-) {
+#[given("a span from bytes {byte_range} at lines {line_range}")]
+fn given_span(world: &mut TestWorld, byte_range: QuotedString, line_range: QuotedString) {
+    // Parse byte range: "10..42"
+    let bytes: Vec<u32> = byte_range
+        .as_str()
+        .split("..")
+        .map(|s| s.parse().expect("valid byte offset"))
+        .collect();
+    let start_byte = *bytes.first().expect("start byte");
+    let end_byte = *bytes.get(1).expect("end byte");
+
+    // Parse line range: "2:0..4:0"
+    let positions: Vec<&str> = line_range.as_str().split("..").collect();
+    let start_str = positions.first().expect("start position");
+    let end_str = positions.get(1).expect("end position");
+    let start: Vec<u32> = start_str
+        .split(':')
+        .map(|s| s.parse().expect("valid line:col"))
+        .collect();
+    let end: Vec<u32> = end_str
+        .split(':')
+        .map(|s| s.parse().expect("valid line:col"))
+        .collect();
+
     world.span = Some(Span::new(
         start_byte,
         end_byte,
-        LineCol::new(sl, sc),
-        LineCol::new(el, ec),
+        LineCol::new(
+            *start.first().expect("start line"),
+            *start.get(1).expect("start col"),
+        ),
+        LineCol::new(
+            *end.first().expect("end line"),
+            *end.get(1).expect("end col"),
+        ),
     ));
 }
 

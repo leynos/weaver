@@ -1,7 +1,7 @@
 Feature: Sempai core type construction and serialization
 
   Scenario: Span serializes to JSON with byte and line/column fields
-    Given a span from byte 10 to byte 42 on lines 2:0 to 4:0
+    Given a span from bytes "10..42" at lines "2:0..4:0"
     When the span is serialized to JSON
     Then the JSON contains key "start_byte" with value "10"
     And the JSON contains key "end_byte" with value "42"
