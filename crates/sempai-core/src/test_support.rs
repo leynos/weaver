@@ -3,8 +3,6 @@
 //! This module is gated behind the `test-support` Cargo feature and provides
 //! reusable types for behaviour-driven test steps.
 
-use std::fmt;
-use std::num::ParseIntError;
 use std::str::FromStr;
 
 use crate::LineCol;
@@ -32,34 +30,17 @@ impl QuotedString {
 }
 
 /// Error returned when a range string cannot be parsed.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum RangeParseError {
     /// The range string did not contain the expected `..` separator.
+    #[error("range must contain '..': {0}")]
     MissingSeparator(String),
     /// A position component did not contain the expected `:` separator.
+    #[error("position must contain ':': {0}")]
     MissingColon(String),
     /// A numeric component could not be parsed.
-    InvalidNumber(ParseIntError),
-}
-
-impl fmt::Display for RangeParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::MissingSeparator(s) => {
-                write!(f, "range must contain '..': {s}")
-            }
-            Self::MissingColon(s) => {
-                write!(f, "position must contain ':': {s}")
-            }
-            Self::InvalidNumber(e) => write!(f, "invalid number: {e}"),
-        }
-    }
-}
-
-impl From<ParseIntError> for RangeParseError {
-    fn from(err: ParseIntError) -> Self {
-        Self::InvalidNumber(err)
-    }
+    #[error(transparent)]
+    InvalidNumber(#[from] std::num::ParseIntError),
 }
 
 /// Parses a `"start..end"` byte range into a `(start, end)` pair.

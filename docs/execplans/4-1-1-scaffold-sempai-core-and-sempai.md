@@ -188,8 +188,8 @@ No existing crate APIs were modified.
 ## Context and orientation
 
 The Weaver project is a Rust workspace with 12 crates under
-`/home/user/project/crates/`. The workspace root `Cargo.toml` at
-`/home/user/project/Cargo.toml` defines shared edition (2024), version (0.1.0),
+`crates/`. The workspace root `Cargo.toml` defines shared edition (2024),
+version (0.1.0),
 rust-version (1.85), dependencies, and lint configuration. No `sempai` crates
 currently exist.
 
@@ -559,7 +559,7 @@ Must exit 0.
 
 ## Concrete steps
 
-All commands run from the workspace root `/home/user/project`.
+All commands run from the workspace root.
 
 ### Stage A
 
@@ -833,6 +833,8 @@ impl Engine {
 ```
 
 ## Files created and modified (summary)
+
+Summary of files added or modified in this change.
 
 | File                                                      | Change |
 | --------------------------------------------------------- | ------ |

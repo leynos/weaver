@@ -8,7 +8,7 @@
 //!
 //! The `sempai` crate is the only semver-stable entrypoint.  Internal crates
 //! (`sempai_core`, `sempai_yaml`, `sempai_dsl`, `sempai_ts`) may evolve, but
-//! this facade preserves type names, serialisation formats, and method
+//! this facade preserves type names, serialization formats, and method
 //! behaviour within documented constraints.
 //!
 //! # Core types
