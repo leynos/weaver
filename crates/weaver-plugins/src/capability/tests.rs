@@ -42,9 +42,9 @@ fn capability_id_display(#[case] id: CapabilityId, #[case] expected: &str) {
 #[case::replace_body("\"replace-body\"", CapabilityId::ReplaceBody)]
 #[case::extract_predicate("\"extract-predicate\"", CapabilityId::ExtractPredicate)]
 fn capability_id_serde_round_trip(#[case] json: &str, #[case] expected: CapabilityId) {
-    let parsed: CapabilityId = serde_json::from_str(json).expect("deserialize");
+    let parsed: CapabilityId = serde_json::from_str(json).expect("deserialise");
     assert_eq!(parsed, expected);
-    let back = serde_json::to_string(&parsed).expect("serialize");
+    let back = serde_json::to_string(&parsed).expect("serialise");
     assert_eq!(back, json);
 }
 
@@ -83,8 +83,8 @@ fn contract_version_display() {
 #[test]
 fn contract_version_serde_round_trip() {
     let v = ContractVersion::new(1, 0);
-    let json = serde_json::to_string(&v).expect("serialize");
-    let back: ContractVersion = serde_json::from_str(&json).expect("deserialize");
+    let json = serde_json::to_string(&v).expect("serialise");
+    let back: ContractVersion = serde_json::from_str(&json).expect("deserialise");
     assert_eq!(back, v);
 }
 
@@ -286,8 +286,8 @@ fn reason_code_display(#[case] code: ReasonCode, #[case] expected: &str) {
 #[case::name_conflict("\"name_conflict\"", ReasonCode::NameConflict)]
 #[case::operation_not_supported("\"operation_not_supported\"", ReasonCode::OperationNotSupported)]
 fn reason_code_serde_round_trip(#[case] json: &str, #[case] expected: ReasonCode) {
-    let parsed: ReasonCode = serde_json::from_str(json).expect("deserialize");
+    let parsed: ReasonCode = serde_json::from_str(json).expect("deserialise");
     assert_eq!(parsed, expected);
-    let back = serde_json::to_string(&parsed).expect("serialize");
+    let back = serde_json::to_string(&parsed).expect("serialise");
     assert_eq!(back, json);
 }

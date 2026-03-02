@@ -31,7 +31,8 @@ pub use self::rename_symbol::{
 ///
 /// Capability IDs are stable identifiers used for routing, manifest
 /// declarations, and contract lookup. The set is defined by
-/// ADR 001 and extended only through architectural review.
+/// Architecture Decision Record (ADR) 001 and extended only through
+/// architectural review.
 ///
 /// # Example
 ///
