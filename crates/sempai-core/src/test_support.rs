@@ -55,7 +55,7 @@ pub enum RangeParseError {
 /// ```
 /// use sempai_core::test_support::parse_byte_range;
 ///
-/// let (start, end) = parse_byte_range("10..42").unwrap();
+/// let (start, end) = parse_byte_range("10..42").expect("valid byte range");
 /// assert_eq!(start, 10);
 /// assert_eq!(end, 42);
 /// ```
@@ -77,7 +77,7 @@ pub fn parse_byte_range(range: &str) -> Result<(u32, u32), RangeParseError> {
 /// ```
 /// use sempai_core::test_support::parse_line_range;
 ///
-/// let (start, end) = parse_line_range("2:0..4:0").unwrap();
+/// let (start, end) = parse_line_range("2:0..4:0").expect("valid line range");
 /// assert_eq!(start.line(), 2);
 /// assert_eq!(start.column(), 0);
 /// assert_eq!(end.line(), 4);

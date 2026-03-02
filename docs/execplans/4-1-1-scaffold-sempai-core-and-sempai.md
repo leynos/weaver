@@ -171,11 +171,11 @@ All acceptance criteria met:
 
 1. `RUSTDOCFLAGS="-D warnings" cargo doc -p sempai --no-deps` exits 0
    with zero warnings.
-2. All twelve public types are defined in `sempai_core` and re-exported
-   by the `sempai` facade: `Language`, `LineCol`, `Span`,
-   `CapturedNode`, `CaptureValue`, `Match`, `EngineConfig`,
-   `DiagnosticCode`, `SourceSpan`, `Diagnostic`, `DiagnosticReport`,
-   plus `Engine` and `QueryPlan` in the facade.
+2. All fourteen public types are defined in `sempai_core` and re-exported
+   by the `sempai` facade: `Language`, `LanguageParseError`, `LineCol`,
+   `Span`, `CapturedNode`, `CaptureValue`, `Match`, `EngineConfig`,
+   `EngineLimits`, `DiagnosticCode`, `SourceSpan`, `Diagnostic`,
+   `DiagnosticReport`, plus `Engine` and `QueryPlan` in the facade.
 3. 63+ tests pass across both crates (unit, BDD, and doc tests) using
    `rstest-bdd` v0.5.0 with happy and unhappy path scenarios.
 4. `make check-fmt`, `make lint`, and `make test` all exit 0.
@@ -428,8 +428,8 @@ and the `engine` module:
 ```rust
 pub use sempai_core::{
     CaptureValue, CapturedNode, Diagnostic, DiagnosticCode,
-    DiagnosticReport, EngineConfig, Language, LineCol, Match,
-    SourceSpan, Span,
+    DiagnosticReport, EngineConfig, EngineLimits, Language,
+    LanguageParseError, LineCol, Match, SourceSpan, Span,
 };
 pub use engine::{Engine, QueryPlan};
 ```
