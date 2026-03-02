@@ -144,9 +144,11 @@ This satisfies roadmap task 4.1.1 from `docs/roadmap.md` (lines 347-350).
 - `too_many_arguments` fired on `Match::new` (5 params). Used
   `#[expect]` with a reason since the constructor mirrors the
   struct's five fields.
-- `dead_code` fired on `QueryPlan::new` because it is only used
-  `pub(crate)` and no internal callers exist yet. Used
-  `#[expect]` with a reason explaining future use.
+- `dead_code` fired on `QueryPlan::new` because no internal callers
+  exist yet. Gated the constructor behind `#[cfg(test)]` so it
+  compiles only for test targets. A `FIXME` comment with an issue
+  link marks it for removal when `compile_yaml`/`compile_dsl`
+  produce real plans.
 
 ## Decision log
 
@@ -171,11 +173,13 @@ All acceptance criteria met:
 
 1. `RUSTDOCFLAGS="-D warnings" cargo doc -p sempai --no-deps` exits 0
    with zero warnings.
-2. All fourteen public types are defined in `sempai_core` and re-exported
+2. Thirteen public types are defined in `sempai_core` and re-exported
    by the `sempai` facade: `Language`, `LanguageParseError`, `LineCol`,
    `Span`, `CapturedNode`, `CaptureValue`, `Match`, `EngineConfig`,
-   `EngineLimits`, `DiagnosticCode`, `SourceSpan`, `Diagnostic`,
-   `DiagnosticReport`, plus `Engine` and `QueryPlan` in the facade.
+   `EngineLimits`, `DiagnosticCode`, `SourceSpan`, `Diagnostic`, and
+   `DiagnosticReport`. Two additional types, `Engine` and `QueryPlan`,
+   are defined in the `sempai` facade itself, giving fifteen public
+   types in total.
 3. 63+ tests pass across both crates (unit, BDD, and doc tests) using
    `rstest-bdd` v0.5.0 with happy and unhappy path scenarios.
 4. `make check-fmt`, `make lint`, and `make test` all exit 0.
@@ -534,7 +538,8 @@ backend implementation.
 `docs/sempai-query-language-design.md` if any type definitions diverge from the
 design (e.g. serde tagging strategy for `CaptureValue`).
 
-**F4.** Run `make fmt` to format all changed files.
+**F4.** Run `make fmt` to format all changed files, and `make markdownlint`
+to lint any modified Markdown.
 
 ### Stage G: Final validation and commit gating
 
@@ -545,9 +550,10 @@ set -o pipefail
 make check-fmt 2>&1 | tee /tmp/check-fmt.log
 make lint 2>&1 | tee /tmp/lint.log
 make test 2>&1 | tee /tmp/test.log
+make markdownlint 2>&1 | tee /tmp/markdownlint.log
 ```
 
-All three must exit 0.
+All four must exit 0.
 
 **G2.** Verify cargo doc specifically for sempai:
 
