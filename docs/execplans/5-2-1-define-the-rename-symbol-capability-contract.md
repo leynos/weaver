@@ -153,7 +153,8 @@ Observable behaviour after this change:
 ## Decision log
 
 - Decision: Use an enum for `CapabilityId` rather than a string-backed
-  newtype. Rationale: ADR 001 defines exactly five first-party capability IDs
+  newtype. Rationale: Architecture Decision Record (ADR) 001 defines exactly
+  five first-party capability IDs
   (`rename-symbol`, `extricate-symbol`, `extract-method`, `replace-body`,
   `extract-predicate`). An enum provides compile-time exhaustiveness checking,
   reliable `match` coverage, and prevents typos. Third-party extensibility is a

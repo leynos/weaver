@@ -256,6 +256,14 @@ impl PluginManifest {
     pub fn capabilities(&self) -> &[CapabilityId] {
         &self.capabilities
     }
+
+    /// Converts all language entries to ASCII lowercase for
+    /// allocation-free lookups.
+    pub(crate) fn normalise_languages(&mut self) {
+        for lang in &mut self.languages {
+            lang.make_ascii_lowercase();
+        }
+    }
 }
 
 #[cfg(test)]
