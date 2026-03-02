@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use rstest::rstest;
+use rstest::{fixture, rstest};
 
 use crate::capability::reason_code::ReasonCode;
 use crate::capability::rename_symbol::{
@@ -182,40 +182,47 @@ fn rename_symbol_request_accessors() {
 // RenameSymbolContract
 // ---------------------------------------------------------------------------
 
-#[test]
-fn contract_capability_id() {
-    let contract = RenameSymbolContract;
+#[fixture]
+fn contract() -> RenameSymbolContract {
+    RenameSymbolContract
+}
+
+#[fixture]
+fn valid_rename_request() -> PluginRequest {
+    let args = make_rename_args("file:///src/main.py", "10:5", "bar");
+    PluginRequest::with_arguments("rename-symbol", vec![], args)
+}
+
+#[rstest]
+fn contract_capability_id(contract: RenameSymbolContract) {
     assert_eq!(contract.capability_id(), CapabilityId::RenameSymbol);
 }
 
-#[test]
-fn contract_version() {
-    let contract = RenameSymbolContract;
+#[rstest]
+fn contract_version(contract: RenameSymbolContract) {
     assert_eq!(contract.version(), RENAME_SYMBOL_CONTRACT_VERSION);
     assert_eq!(contract.version().major(), 1);
     assert_eq!(contract.version().minor(), 0);
 }
 
-#[test]
-fn contract_validate_valid_request() {
-    let args = make_rename_args("file:///src/main.py", "10:5", "bar");
-    let request = PluginRequest::with_arguments("rename-symbol", vec![], args);
-    let contract = RenameSymbolContract;
-    assert!(contract.validate_request(&request).is_ok());
+#[rstest]
+fn contract_validate_valid_request(
+    contract: RenameSymbolContract,
+    valid_rename_request: PluginRequest,
+) {
+    assert!(contract.validate_request(&valid_rename_request).is_ok());
 }
 
-#[test]
-fn contract_validate_invalid_request() {
+#[rstest]
+fn contract_validate_invalid_request(contract: RenameSymbolContract) {
     let request = PluginRequest::new("rename-symbol", vec![]);
-    let contract = RenameSymbolContract;
     assert!(contract.validate_request(&request).is_err());
 }
 
-#[test]
-fn contract_validate_wrong_operation_rejects() {
+#[rstest]
+fn contract_validate_wrong_operation_rejects(contract: RenameSymbolContract) {
     let args = make_rename_args("file:///src/main.py", "10:5", "bar");
     let request = PluginRequest::with_arguments("extricate-symbol", vec![], args);
-    let contract = RenameSymbolContract;
     let err = contract
         .validate_request(&request)
         .expect_err("should reject wrong operation");
@@ -225,32 +232,32 @@ fn contract_validate_wrong_operation_rejects() {
     );
 }
 
-#[test]
-fn contract_validate_successful_diff_response() {
+#[rstest]
+fn contract_validate_successful_diff_response(contract: RenameSymbolContract) {
     let response = PluginResponse::success(PluginOutput::Diff {
         content: String::from("--- a/f\n+++ b/f\n"),
     });
-    let contract = RenameSymbolContract;
     assert!(contract.validate_response(&response).is_ok());
 }
 
 #[rstest]
 #[case::analysis(PluginOutput::Analysis { data: serde_json::json!({}) })]
 #[case::empty(PluginOutput::Empty)]
-fn contract_validate_successful_non_diff_response_fails(#[case] output: PluginOutput) {
+fn contract_validate_successful_non_diff_response_fails(
+    contract: RenameSymbolContract,
+    #[case] output: PluginOutput,
+) {
     let response = PluginResponse::success(output);
-    let contract = RenameSymbolContract;
     let err = contract
         .validate_response(&response)
         .expect_err("should fail");
     assert!(err.to_string().contains("diff output"));
 }
 
-#[test]
-fn contract_validate_failed_response_passes() {
+#[rstest]
+fn contract_validate_failed_response_passes(contract: RenameSymbolContract) {
     let diag = PluginDiagnostic::new(DiagnosticSeverity::Error, "symbol not found");
     let response = PluginResponse::failure(vec![diag]);
-    let contract = RenameSymbolContract;
     assert!(contract.validate_response(&response).is_ok());
 }
 
