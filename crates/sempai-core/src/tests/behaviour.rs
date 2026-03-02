@@ -3,41 +3,8 @@
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
-use crate::test_support::QuotedString;
-use crate::{Diagnostic, DiagnosticCode, DiagnosticReport, Language, LineCol, Span};
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/// Parses a `"start..end"` byte range into a `(start, end)` pair.
-fn parse_byte_range(range: &str) -> (u32, u32) {
-    let parts: Vec<u32> = range
-        .split("..")
-        .map(|s| s.parse().expect("valid byte offset"))
-        .collect();
-    (
-        *parts.first().expect("start byte"),
-        *parts.get(1).expect("end byte"),
-    )
-}
-
-/// Parses a `"line:col..line:col"` range into two [`LineCol`] values.
-fn parse_line_range(range: &str) -> (LineCol, LineCol) {
-    let positions: Vec<&str> = range.split("..").collect();
-    let start_str = positions.first().expect("start position");
-    let end_str = positions.get(1).expect("end position");
-
-    let parse_linecol = |s: &str| -> LineCol {
-        let parts: Vec<u32> = s
-            .split(':')
-            .map(|p| p.parse().expect("valid line:col"))
-            .collect();
-        LineCol::new(*parts.first().expect("line"), *parts.get(1).expect("col"))
-    };
-
-    (parse_linecol(start_str), parse_linecol(end_str))
-}
+use crate::test_support::{QuotedString, parse_byte_range, parse_line_range};
+use crate::{Diagnostic, DiagnosticCode, DiagnosticReport, Language, Span};
 
 // ---------------------------------------------------------------------------
 // Test world
@@ -64,8 +31,8 @@ fn world() -> TestWorld {
 
 #[given("a span from bytes {byte_range} at lines {line_range}")]
 fn given_span(world: &mut TestWorld, byte_range: QuotedString, line_range: QuotedString) {
-    let (start_byte, end_byte) = parse_byte_range(byte_range.as_str());
-    let (start_lc, end_lc) = parse_line_range(line_range.as_str());
+    let (start_byte, end_byte) = parse_byte_range(byte_range.as_str()).expect("valid byte range");
+    let (start_lc, end_lc) = parse_line_range(line_range.as_str()).expect("valid line range");
     world.span = Some(Span::new(start_byte, end_byte, start_lc, end_lc));
 }
 
