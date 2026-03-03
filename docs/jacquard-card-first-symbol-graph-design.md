@@ -240,7 +240,8 @@ Notes:
   from the card alone.
 - `etag` is a hash of the canonical JSON encoding of the card for cache checks.
 - `doc.summary` remains deterministic by default (e.g., first sentence of
-  docstring or extracted comment). LLM-generated summaries can be added later.
+  docstring or extracted comment). Large Language Model (LLM)-generated
+  summaries can be added later.
 
 ### Edge model
 
