@@ -841,8 +841,9 @@ and “Edge model”.*
       strategy with explicit `max_cards`, `max_edges`, and
       `max_estimated_tokens` enforcement.
   - [ ] Acceptance criteria: traversal never exceeds configured caps; rejection
-    reasons are emitted when `--debug` is enabled; and BDD tests cover fan-out
-    explosion and budget truncation cases.
+    reasons are emitted when `--debug` is enabled; and behaviour-driven
+    development (BDD) tests cover fan-out explosion and budget truncation
+    cases.
 
 ### 7.3. Deliver `observe graph-history` in `snapshots_on_demand` mode
 

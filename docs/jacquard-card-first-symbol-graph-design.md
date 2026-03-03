@@ -67,7 +67,8 @@ operations in Weaver’s daemon protocol.[^4]
 
 ## Non-goals
 
-- Implement an MCP server or replicate SDL-MCP’s tool surface.
+- Implement a Model Context Protocol (MCP) server or replicate SDL-MCP’s tool
+  surface.
 - Provide full-file “code window” gating and audit trails in this phase.
   (Weaver may add proof-of-need gating later, but this document focuses on
   cards, slices, and history.)
@@ -591,6 +592,11 @@ Output includes a “blast radius” score within the slice:
 
 All commands live under `observe` and use Weaver’s existing JSONL envelope.[^7]
 
+The command names, flags, and detail-level values in this section are
+provisional design identifiers. Implementation should align the final CLI
+surface with the routed `observe` operations in `weaverd` and update this
+document when naming or argument contracts change.
+
 ### `observe get-card`
 
 Purpose: return a symbol card at a given location (or by symbol ID).
@@ -731,7 +737,7 @@ Option A reduces daemon coupling and improves testability.
   - Assignment solver should not map two sources to one target unless
     split/merge
     mode is enabled.
-- Integration tests (BDD suite):
+- Integration tests (behaviour-driven development (BDD) suite):
 
   - `observe get-card` returns expected fields for fixture repos.
   - `observe graph-slice` respects budgets and depth limits.
