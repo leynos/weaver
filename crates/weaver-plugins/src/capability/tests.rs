@@ -152,9 +152,16 @@ fn extract_empty_field_returns_error(
     let args = make_rename_args(uri, position, new_name);
     let request = PluginRequest::with_arguments("rename-symbol", vec![], args);
     let err = RenameSymbolRequest::extract(&request).expect_err("should fail");
-    let msg = err.to_string();
-    assert!(msg.contains("non-empty"), "expected 'non-empty' in: {msg}");
-    assert!(msg.contains(field), "expected '{field}' in: {msg}");
+    match err {
+        PluginError::InvalidOutput { ref message, .. } => {
+            assert!(
+                message.contains("non-empty"),
+                "expected 'non-empty' in: {message}"
+            );
+            assert!(message.contains(field), "expected '{field}' in: {message}");
+        }
+        other => panic!("expected InvalidOutput, got: {other}"),
+    }
 }
 
 #[test]
@@ -163,7 +170,15 @@ fn extract_non_string_field_returns_error() {
     args.insert(String::from("uri"), serde_json::Value::Number(42.into()));
     let request = PluginRequest::with_arguments("rename-symbol", vec![], args);
     let err = RenameSymbolRequest::extract(&request).expect_err("should fail");
-    assert!(err.to_string().contains("string"));
+    match err {
+        PluginError::InvalidOutput { ref message, .. } => {
+            assert!(
+                message.contains("string"),
+                "expected 'string' in: {message}"
+            );
+        }
+        other => panic!("expected InvalidOutput, got: {other}"),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -216,7 +231,13 @@ fn contract_validate_valid_request(
 #[rstest]
 fn contract_validate_invalid_request(contract: RenameSymbolContract) {
     let request = PluginRequest::new("rename-symbol", vec![]);
-    assert!(contract.validate_request(&request).is_err());
+    let err = contract
+        .validate_request(&request)
+        .expect_err("should reject empty arguments");
+    assert!(
+        matches!(err, PluginError::InvalidOutput { .. }),
+        "expected InvalidOutput, got: {err}",
+    );
 }
 
 #[rstest]
