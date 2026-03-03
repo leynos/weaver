@@ -162,7 +162,7 @@ Proposed types:
     - `kind`
     - `canonical_name` (best-known qualified name)
     - `signature_fingerprint`
-    - `syntactic_fingerprint` (AST shape features)
+    - `syntactic_fingerprint` (Abstract Syntax Tree (AST) shape features)
     - `file_path_hint` (normalized path, low weight)
   - The hash must remain stable under whitespace-only edits.
 
