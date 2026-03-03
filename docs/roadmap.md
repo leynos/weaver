@@ -783,8 +783,7 @@ design in
 
 *Outcome: Provide a deterministic, cacheable symbol card payload that defaults
 to Tree-sitter extraction and optionally enriches via LSP when available. See
-`docs/jacquard-card-first-symbol-graph-design.md` “Symbol card” and
-“Progressive discovery and enhancement”.*
+`docs/jacquard-card-first-symbol-graph-design.md` §8.2 and §9.*
 
 - [ ] 7.1.1. Define stable JSONL request and response schemas for
       `observe get-card`, including versioning, provenance fields, and
@@ -818,8 +817,7 @@ to Tree-sitter extraction and optionally enriches via LSP when available. See
 
 *Outcome: Return a bounded subgraph rooted at an entry symbol, with typed edges
 (`call`, `import`, and `config`) and explicit budget constraints. See
-`docs/jacquard-card-first-symbol-graph-design.md` “Graph slice construction”
-and “Edge model”.*
+`docs/jacquard-card-first-symbol-graph-design.md` §10 and §8.3.*
 
 - [ ] 7.2.1. Define stable JSONL request and response schemas for
       `observe graph-slice`, including budgets, spillover metadata, and
@@ -849,8 +847,7 @@ and “Edge model”.*
 
 *Outcome: Diff a slice over the last N commits without requiring a working tree
 checkout, producing deterministic output suitable for caching and regression
-tests. See `docs/jacquard-card-first-symbol-graph-design.md` “Time-travel diff”
-and “Git integration strategy”.*
+tests. See `docs/jacquard-card-first-symbol-graph-design.md` §11 and §11.2.*
 
 - [ ] 7.3.1. Implement git-backed blob loading for historical revisions without
       checkout, scoped to only the files required by the slice budget.
@@ -873,8 +870,7 @@ and “Git integration strategy”.*
 
 *Outcome: Map symbols across commits probabilistically when identifiers drift,
 exposing confidence and alternates rather than hiding ambiguity. See
-`docs/jacquard-card-first-symbol-graph-design.md` “Probabilistic symbol
-matching”.*
+`docs/jacquard-card-first-symbol-graph-design.md` §12.*
 
 - [ ] 7.4.1. Implement feature extraction for cross-commit matching using
       signature, AST-shape, docstring fingerprints, and neighbourhood sketches.
@@ -897,8 +893,8 @@ matching”.*
 *Outcome: Add a persisted ledger keyed by commit hash for faster history
 queries and broader edge coverage once `snapshots_on_demand` is proven
 reliable. This step is intentionally staged behind the on-demand
-implementation. See `docs/jacquard-card-first-symbol-graph-design.md` “Git
-integration strategy” (`ledger_cache`) and “Rollout plan”.*
+implementation. See `docs/jacquard-card-first-symbol-graph-design.md` §11.2
+(`ledger_cache`) and §18.*
 
 - [ ] 7.5.1. Define a versioned on-disk ledger format for cards, edges, and
       deltas keyed by commit hash. Requires 7.3.2.

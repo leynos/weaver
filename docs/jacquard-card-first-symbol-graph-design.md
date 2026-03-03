@@ -17,16 +17,16 @@ The design extends Weaver’s existing “Semantic Fusion” approach by combini
 The goal is to make high-signal context cheap by default, and make “read more”
 an explicit escalation step rather than a reflex.
 
-The approach mirrors the core claims of Symbol Delta Ledger (SDL) systems[^3]:
+The approach mirrors the core claims of Symbol Delta Ledger (SDL) systems[^1]:
 cards, typed edges (call/import/config), budgeted slices, and semantic deltas,
 but fits Weaver’s JSON Lines (JSONL) command model and daemon-backed
-architecture.[^1]
+architecture.[^2]
 
 ## Problem statement
 
 Weaver already has the primitives for semantic inspection (via LSP) and
 structural parsing (via Tree-sitter) and a call graph module using LSP call
-hierarchy.[^2]
+hierarchy.[^3]
 
 However, common agent workflows still tend to overfetch:
 
@@ -101,7 +101,7 @@ Relevant existing components:
 - `weaver-graph`:
 
   - Provides an LSP call-hierarchy-based call graph provider with depth-limited
-    exploration.[^2]
+    exploration.[^3]
 - `weaverd` dispatch and routing:
 
   - Already recognises operations including `call-hierarchy` (not implemented
@@ -244,7 +244,7 @@ Notes:
 
 ### Edge model
 
-Edge types follow the baseline SDL vocabulary: `call`, `import`, `config`.[^3]
+Edge types follow the baseline SDL vocabulary: `call`, `import`, `config`.[^1]
 
 Edge object:
 
@@ -399,7 +399,7 @@ A later iteration can plug in model-specific tokenizers if required.
 
 `weaver-graph` already constructs a depth-limited call graph using LSP call
 hierarchy (`textDocument/callHierarchy`) and adds nodes/edges as it
-explores.[^2]
+explores.[^3]
 
 The slice builder should:
 
@@ -802,16 +802,16 @@ Option A reduces daemon coupling and improves testability.
 
 ## Footnotes
 
-[^1]: Weaver’s design explicitly frames “Semantic Fusion” as the combination of
+[^1]: SDL systems describe slices connected by `call`, `import`, and `config`
+    edges, bounded by budgets, and refreshed via symbol-level deltas. See [6].
+
+[^2]: Weaver’s design explicitly frames “Semantic Fusion” as the combination of
     Tree-sitter, LSP, and a graph module, exposed as composable JSONL commands.
     See [1].
 
-[^2]: Weaver already contains an LSP call-hierarchy-based call graph provider
+[^3]: Weaver already contains an LSP call-hierarchy-based call graph provider
     with depth-limited exploration, suitable as a high-confidence `call` edge
     source. See [5].
-
-[^3]: SDL systems describe slices connected by `call`, `import`, and `config`
-    edges, bounded by budgets, and refreshed via symbol-level deltas. See [6].
 
 [^4]: `weaverd`’s routing layer is responsible for dispatching `observe` and
     `act` operations over the JSONL protocol. See [2].
@@ -830,9 +830,11 @@ Option A reduces daemon coupling and improves testability.
 
 ## References
 
-[1]: weaver-design.md [2]: ../crates/weaverd/src/dispatch/router.rs [3]:
-../crates/weaverd/src/backends.rs [4]:
-../crates/weaverd/src/semantic_provider/mod.rs [5]:
-../crates/weaver-graph/src/provider.rs [6]:
-<https://github.com/GlitterKill/sdl-mcp> [7]:
-../crates/weaverd/src/dispatch/request.rs [8]: ../crates/weaver-graph/src/uri.rs
+[1]: weaver-design.md
+[2]: ../crates/weaverd/src/dispatch/router.rs
+[3]: ../crates/weaverd/src/backends.rs
+[4]: ../crates/weaverd/src/semantic_provider/mod.rs
+[5]: ../crates/weaver-graph/src/provider.rs
+[6]: <https://github.com/GlitterKill/sdl-mcp>
+[7]: ../crates/weaverd/src/dispatch/request.rs
+[8]: ../crates/weaver-graph/src/uri.rs
