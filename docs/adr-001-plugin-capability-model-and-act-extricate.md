@@ -149,30 +149,23 @@ This split keeps architecture and implementation aligned:
 ## Migration plan
 
 1. Capability scaffolding
-
-- Add capability ID types and registry definitions.
-- Extend plugin manifest schema with capability declarations.
-- Add resolver logic for language and capability selection.
-- Expose capability discovery output.
-
-1. Python provider rollout
-
-- Extend Rope plugin with `extricate-symbol` handling.
-- Map `uri`, `position`, and `to` arguments to Rope move operations.
-- Emit unified diffs compatible with existing patch apply flow.
-
-1. Rust provider rollout
-
-- Add built-in extrication orchestration and overlay edit planning.
-- Integrate LSP requests for definition, references, and code actions.
-- Integrate rust-analyzer extension requests where available.
-- Add meaning-preservation verification before final commit.
-
-1. Hardening and expansion
-
-- Add behavioural and end-to-end tests for Python and Rust.
-- Add diagnostics and explanation output for capability resolution.
-- Expand additional capabilities incrementally behind the same model.
+   - Add capability ID types and registry definitions.
+   - Extend plugin manifest schema with capability declarations.
+   - Add resolver logic for language and capability selection.
+   - Expose capability discovery output.
+2. Python provider rollout
+   - Extend Rope plugin with `extricate-symbol` handling.
+   - Map `uri`, `position`, and `to` arguments to Rope move operations.
+   - Emit unified diffs compatible with existing patch apply flow.
+3. Rust provider rollout
+   - Add built-in extrication orchestration and overlay edit planning.
+   - Integrate LSP requests for definition, references, and code actions.
+   - Integrate rust-analyzer extension requests where available.
+   - Add meaning-preservation verification before final commit.
+4. Hardening and expansion
+   - Add behavioural and end-to-end tests for Python and Rust.
+   - Add diagnostics and explanation output for capability resolution.
+   - Expand additional capabilities incrementally behind the same model.
 
 ## Known risks and limitations
 

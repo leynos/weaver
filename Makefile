@@ -38,7 +38,21 @@ markdownlint: ## Lint Markdown files
 	$(MDLINT) "**/*.md"
 
 nixie: ## Validate Mermaid diagrams
-	$(NIXIE) --no-sandbox
+	@browser=""; \
+	if command -v chromium-browser >/dev/null 2>&1; then \
+		browser="$$(command -v chromium-browser)"; \
+	elif command -v chromium >/dev/null 2>&1; then \
+		browser="$$(command -v chromium)"; \
+	elif command -v google-chrome-stable >/dev/null 2>&1; then \
+		browser="$$(command -v google-chrome-stable)"; \
+	elif command -v google-chrome >/dev/null 2>&1; then \
+		browser="$$(command -v google-chrome)"; \
+	fi; \
+	if [ -n "$$browser" ]; then \
+		PUPPETEER_EXECUTABLE_PATH="$$browser" $(NIXIE) --no-sandbox; \
+	else \
+		$(NIXIE) --no-sandbox; \
+	fi
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \
