@@ -190,7 +190,7 @@ satisfies roadmap task 5.1.1 in `../roadmap.md`.
   override it cleanly. The function composes the help block from individual
   Fluent messages, so translators can work on each line independently. The
   English fallback values are centralized in a `bare_help` constants module in
-  `localizer.rs` so each string appears exactly once in the Rust source; the
+  `localizer.rs`, so each string appears exactly once in the Rust source; the
   `.ftl` file remains the canonical Fluent resource. The
   `fluent_and_fallback_outputs_are_identical` test guards against drift between
   the two. Date/Author: 2026-02-26, updated 2026-02-28

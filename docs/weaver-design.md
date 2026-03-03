@@ -584,6 +584,12 @@ The engine is built on three distinct layers of analysis:
     static analysis plugins, and potentially the output of dynamic profiling
     tools to construct a more complete and accurate call graph.^15^
 
+> **Related design:** The call graph is intentionally treated as one relational
+> view. A richer, “cards-first” symbol context layer (symbol cards, typed edges,
+> budgeted graph slices, and optional time-travel diffs) is specified in
+> [jacquard-card-first-symbol-graph-design.md](jacquard-card-first-symbol-graph-design.md)
+> as an extension of this fusion engine.
+
 The following class diagram captures the structure of the `weaver-syntax`
 module, showing how language detection, parsing, pattern matching, rewriting,
 and syntactic lock validation fit together:
@@ -1216,6 +1222,13 @@ provenance (e.g., `{source: "lsp", confidence: 0.8}` or
 `{source: "dynamic", execution_id: "test-run-123"}`). This allows the agent to
 reason about the completeness and accuracy of the graph and to make more
 informed decisions based on the available relational data.
+
+> **Jacquard extension:** The cards-first symbol graph design builds on
+> `weaver-graph` output but extends it with typed edges beyond `call` (for
+> example, `import` and `config`), budgeted slice traversal, and history diffs
+> over recent commits. See
+> [jacquard-card-first-symbol-graph-design.md](jacquard-card-first-symbol-graph-design.md)
+> for the request/response schemas and rollout plan.
 
 #### Phase 2 implementation notes (LSP provider)
 
