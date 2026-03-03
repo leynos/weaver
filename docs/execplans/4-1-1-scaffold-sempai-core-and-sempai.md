@@ -200,7 +200,8 @@ currently exist.
 The design document at `docs/sempai-query-language-design.md` specifies six
 Sempai crates (Table 1, lines 67-74). This task scaffolds only the first two:
 
-- `crates/sempai-core` (`sempai_core`): Data model, diagnostics, planning IR.
+- `crates/sempai-core` (`sempai_core`): Data model, diagnostics, planning
+  intermediate representation (IR).
 - `crates/sempai` (`sempai`): Facade crate, stable API. Re-exports from
   `sempai_core` and provides the `Engine` struct.
 

@@ -111,3 +111,61 @@ pub fn parse_line_range(range: &str) -> Result<(LineCol, LineCol), RangeParseErr
 
     Ok((parse_linecol(start_str)?, parse_linecol(end_str)?))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn quoted_string_parses_valid_input() {
+        let qs: QuotedString = "\"foo\"".parse().expect("valid quoted string");
+        assert_eq!(qs.as_str(), "foo");
+    }
+
+    #[test]
+    fn quoted_string_parses_empty_quoted_content() {
+        let qs: QuotedString = "\"\"".parse().expect("valid empty quoted string");
+        assert_eq!(qs.as_str(), "");
+    }
+
+    #[test]
+    fn quoted_string_rejects_missing_opening_quote() {
+        let result = "foo\"".parse::<QuotedString>();
+        assert!(result.is_err());
+        let err = result.expect_err("should be error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("foo\""),
+            "error should include original input, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn quoted_string_rejects_missing_closing_quote() {
+        let result = "\"foo".parse::<QuotedString>();
+        assert!(result.is_err());
+        let err = result.expect_err("should be error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("\"foo"),
+            "error should include original input, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn quoted_string_rejects_unquoted_input() {
+        let result = "bare".parse::<QuotedString>();
+        assert!(result.is_err());
+        let err = result.expect_err("should be error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("bare"),
+            "error should include original input, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn quoted_string_rejects_single_quote() {
+        assert!("'foo'".parse::<QuotedString>().is_err());
+    }
+}

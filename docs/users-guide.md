@@ -872,7 +872,8 @@ workspace crates:
 The `Engine` struct exposes three methods for query compilation and execution:
 
 - `compile_yaml(yaml)` — compiles a YAML rule file into query plans.
-- `compile_dsl(rule_id, language, dsl)` — compiles a one-liner DSL expression.
+- `compile_dsl(rule_id, language, dsl)` — compiles a one-liner domain-specific
+  language (DSL) expression.
 - `execute(plan, uri, source)` — executes a compiled plan against a source
   snapshot.
 

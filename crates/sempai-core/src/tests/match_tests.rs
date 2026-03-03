@@ -62,6 +62,80 @@ fn match_serde_round_trip() {
     assert_eq!(deserialized.uri(), "file:///test.py");
 }
 
+/// Builds a [`Match`] with both `Node` and `Nodes` captures, serializes it
+/// to JSON, and deserializes it back.  Returns the deserialized instance for
+/// per-field assertions in individual tests.
+fn round_trip_match_with_captures() -> Match {
+    let span = sample_span();
+    let node = CapturedNode::new(
+        span.clone(),
+        String::from("identifier"),
+        Some(String::from("MyClass")),
+    );
+    let nodes = vec![
+        CapturedNode::new(
+            span.clone(),
+            String::from("identifier"),
+            Some(String::from("a")),
+        ),
+        CapturedNode::new(
+            Span::new(50, 60, LineCol::new(5, 0), LineCol::new(5, 10)),
+            String::from("string_literal"),
+            Some(String::from("b")),
+        ),
+    ];
+
+    let mut captures = BTreeMap::new();
+    captures.insert(String::from("$node"), CaptureValue::Node(node));
+    captures.insert(String::from("$nodes"), CaptureValue::Nodes(nodes));
+
+    let m = Match::new(
+        String::from("test-rule"),
+        String::from("file:///test.py"),
+        span,
+        None,
+        captures,
+    );
+
+    let json = serde_json::to_string(&m).expect("serialize with captures");
+    serde_json::from_str(&json).expect("deserialize with captures")
+}
+
+#[test]
+fn match_serde_round_trip_preserves_node_capture() {
+    let deserialized = round_trip_match_with_captures();
+
+    assert_eq!(deserialized.rule_id(), "test-rule");
+    assert_eq!(deserialized.uri(), "file:///test.py");
+    assert_eq!(deserialized.captures().len(), 2);
+
+    match deserialized.captures().get("$node") {
+        Some(CaptureValue::Node(n)) => {
+            assert_eq!(n.kind(), "identifier");
+            assert_eq!(n.text(), Some("MyClass"));
+        }
+        other => panic!("expected CaptureValue::Node for `$node`, got {other:?}"),
+    }
+}
+
+#[test]
+fn match_serde_round_trip_preserves_nodes_capture() {
+    let deserialized = round_trip_match_with_captures();
+
+    match deserialized.captures().get("$nodes") {
+        Some(CaptureValue::Nodes(ns)) => {
+            assert_eq!(ns.len(), 2);
+            let first = ns.first().expect("first node");
+            assert_eq!(first.kind(), "identifier");
+            assert_eq!(first.text(), Some("a"));
+            let second = ns.get(1).expect("second node");
+            assert_eq!(second.kind(), "string_literal");
+            assert_eq!(second.text(), Some("b"));
+        }
+        other => panic!("expected CaptureValue::Nodes for `$nodes`, got {other:?}"),
+    }
+}
+
 #[test]
 fn match_captures_preserve_btreemap_ordering() {
     let span = sample_span();
