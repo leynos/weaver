@@ -12,6 +12,8 @@ members = [
     "crates/weaver-plugins",
     "crates/weaver-sandbox",
     "crates/weaver-syntax",
+    "crates/sempai-core",
+    "crates/sempai",
 ]
 resolver = "2"
 

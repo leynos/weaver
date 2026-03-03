@@ -344,7 +344,7 @@ phase* *with explicit parser, backend, and Weaver-integration milestones.*
 *domain-specific language (DSL) parsing, semantic validation, and stable*
 *diagnostic contracts.*
 
-- [ ] 4.1.1. Scaffold `sempai_core` and `sempai` with stable public types and
+- [x] 4.1.1. Scaffold `sempai_core` and `sempai` with stable public types and
       facade entrypoints.
   - Acceptance criteria: public API documentation builds for `sempai`, and
     stable types cover language, span, match, capture, and diagnostics models.
