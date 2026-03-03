@@ -104,7 +104,7 @@ Relevant existing components:
     exploration.[^3]
 - `weaverd` dispatch and routing:
 
-  - Already recognises operations including `call-hierarchy` (not implemented
+  - Already recognizes operations including `call-hierarchy` (not implemented
     yet) and performs request parsing and response streaming over JSONL.[^4]
 
 This extension adds:
@@ -163,7 +163,7 @@ Proposed types:
     - `canonical_name` (best-known qualified name)
     - `signature_fingerprint`
     - `syntactic_fingerprint` (AST shape features)
-    - `file_path_hint` (normalised path, low weight)
+    - `file_path_hint` (normalized path, low weight)
   - The hash must remain stable under whitespace-only edits.
 
 Symbol IDs are not expected to survive semantic changes. Time-travel uses
@@ -312,7 +312,7 @@ Proposed detail levels:
 | `minimal`   | identity only              | none             | lowest           |
 | `signature` | signature fingerprint      | Tree-sitter      | low              |
 | `structure` | locals/branches/cyclomatic | Tree-sitter      | low–medium       |
-| `semantic`  | hover/types                | LSP initialised  | medium           |
+| `semantic`  | hover/types                | LSP initialized  | medium           |
 | `full`      | deps + fan metrics         | relational graph | medium–high      |
 
 *Table 2: Progressive card enhancement layers.*
@@ -490,10 +490,10 @@ For each symbol at a given commit:
   - AST node-kind histogram
   - control-flow skeleton signature (e.g., sequence of branch constructs)
   - cyclomatic complexity estimate
-  - literal/constant fingerprint (normalised)
+  - literal/constant fingerprint (normalized)
 - Text features:
 
-  - docstring/comment fingerprint (normalised)
+  - docstring/comment fingerprint (normalized)
 - Graph neighbourhood features:
 
   - outgoing call set (resolved IDs where possible, otherwise names)
@@ -511,7 +511,7 @@ To keep matching tractable:
   - same file (or renamed file) first,
   - else same directory/module,
   - else global top-N by name token similarity.
-- Use git diff metadata (where available) to prioritise changed files/ranges.
+- Use git diff metadata (where available) to prioritize changed files/ranges.
 
 ### Scoring model
 
@@ -749,7 +749,7 @@ Option A reduces daemon coupling and improves testability.
 - Emit structured tracing spans for:
 
   - card extraction time,
-  - LSP requests (initialise, hover, call hierarchy),
+  - LSP requests (initialize, hover, call hierarchy),
   - slice build iterations (frontier size, accepted/rejected expansions),
   - history commit processing time,
   - matching outcomes (entropy, collision rate).
@@ -760,7 +760,7 @@ Option A reduces daemon coupling and improves testability.
 
 ## Failure modes and mitigations
 
-- LSP not available or fails to initialise:
+- LSP not available or fails to initialize:
 
   - `get-card` still works up to `structure`.
   - `graph-slice` falls back to Tree-sitter heuristic call edges and lowers
