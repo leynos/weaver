@@ -227,6 +227,10 @@ fn contract_validate_wrong_operation_rejects(contract: RenameSymbolContract) {
         .validate_request(&request)
         .expect_err("should reject wrong operation");
     assert!(
+        matches!(err, PluginError::InvalidOutput { .. }),
+        "expected InvalidOutput, got: {err}",
+    );
+    assert!(
         err.to_string().contains("expects operation"),
         "expected operation mismatch error, got: {err}",
     );
@@ -251,7 +255,14 @@ fn contract_validate_successful_non_diff_response_fails(
     let err = contract
         .validate_response(&response)
         .expect_err("should fail");
-    assert!(err.to_string().contains("diff output"));
+    assert!(
+        matches!(err, PluginError::InvalidOutput { .. }),
+        "expected InvalidOutput, got: {err}",
+    );
+    assert!(
+        err.to_string().contains("diff output"),
+        "expected diff output error, got: {err}",
+    );
 }
 
 #[rstest]
