@@ -727,6 +727,8 @@ on both the requested capability and the target language.
 
 The following capability identifiers are defined:
 
+Table: Code transformation capabilities.
+
 | Identifier          | Description                                          |
 | ------------------- | ---------------------------------------------------- |
 | `rename-symbol`     | Rename a symbol across a codebase.                   |
@@ -740,6 +742,8 @@ The following capability identifiers are defined:
 The `rename-symbol` capability is the first fully specified contract. Plugins
 that declare this capability must accept requests containing three required
 fields in the `arguments` map:
+
+Table: Required fields for `rename-symbol` requests.
 
 | Field      | Type   | Description                                      |
 | ---------- | ------ | ------------------------------------------------ |
@@ -761,6 +765,8 @@ contract version is `1.0`.
 When a plugin cannot perform a requested operation, it returns a failure
 response with diagnostics. Each diagnostic may include a `reason_code` for
 programmatic matching:
+
+Table: Refusal reason codes for plugin diagnostics.
 
 | Reason code               | Meaning                                              |
 | ------------------------- | ---------------------------------------------------- |

@@ -407,6 +407,9 @@ deleted or renamed.
 
 ### Line budget analysis
 
+Table: Line-budget projection for files modified by the rename-symbol
+capability.
+
 | File                          | Current lines | Planned additions | Projected total |
 | ----------------------------- | ------------- | ----------------- | --------------- |
 | `protocol/mod.rs`             | 254           | +20               | 274             |
