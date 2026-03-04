@@ -155,14 +155,14 @@ does* *not require source inspection or external runbooks.*
   - [x] Acceptance criteria: `weaver` with no arguments exits non-zero, prints
         a `Usage:` line, lists the three valid domains (`observe`, `act`,
         `verify`), and includes exactly one pointer to `weaver --help`.
-- [ ] 2.2.2. List all domains and operations in top-level help output.
+- [x] 2.2.2. List all domains and operations in top-level help output.
       See
       [Gap 1a](ui-gap-analysis.md#gap-1a--domains-not-enumerated)
       and
       [Gap 1b](ui-gap-analysis.md#gap-1b--operations-not-enumerated).
-  - [ ] Add an `after_help` catalogue covering `observe`, `act`, and `verify`
+  - [x] Add an `after_help` catalogue covering `observe`, `act`, and `verify`
         operations.
-  - [ ] Acceptance criteria: `weaver --help` lists all three domains and every
+  - [x] Acceptance criteria: `weaver --help` lists all three domains and every
         CLI-supported operation for each domain, and completes without daemon
         startup or socket access.
 - [ ] 2.2.3. Add top-level version output and long-form CLI description.
