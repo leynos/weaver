@@ -785,14 +785,14 @@ design in
 to Tree-sitter extraction and optionally enriches via LSP when available. See
 `docs/jacquard-card-first-symbol-graph-design.md` §9.1-§9.3 and §10.1-§10.3.*
 
-- [ ] 7.1.1. Define stable JSONL request and response schemas for
+- [x] 7.1.1. Define stable JSONL request and response schemas for
       `observe get-card`, including versioning, provenance fields, and
       progressive detail levels. Requires 2.1.7 and 3.1.1.
   - [ ] Include attachment bundling and interstitial payloads in the schema
         (doc comments, decorators, import blocks, and bundle rules).
-  - [ ] Add schema fixtures and snapshot coverage for success and refusal
+  - [x] Add schema fixtures and snapshot coverage for success and refusal
         payloads.
-  - [ ] Acceptance criteria: schema fixtures lock field names and payload
+  - [x] Acceptance criteria: schema fixtures lock field names and payload
         shapes, including attachments and interstitials; responses include
         provenance for non-trivial fields; and the default output is stable
         (byte-identical) for unchanged inputs.

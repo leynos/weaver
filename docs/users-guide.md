@@ -441,6 +441,95 @@ captures the caller, callee, provenance, and optional call-site position.
 }
 ```
 
+#### observe get-card
+
+Syntax:
+
+```sh
+weaver observe get-card --uri <URI> --position <LINE:COL> [--detail <LEVEL>]
+```
+
+Arguments:
+
+- `--uri` (required) — file URI of the source file containing the symbol.
+- `--position` (required) — 1-indexed `LINE:COL` position within the
+  symbol.
+- `--detail` (optional) — progressive detail level controlling how much
+  information the card contains. One of `minimal`, `signature`, `structure`
+  (default), `semantic`, or `full`.
+- `--format` (optional) — output format. Currently only `json` (the
+  default) is supported.
+
+Response:
+
+The response is a JSON object with a `"status"` field. On success the status
+is `"success"` and the payload wraps a `SymbolCard` object:
+
+```json
+{
+  "status": "success",
+  "card": {
+    "card_version": 1,
+    "symbol": {
+      "symbol_id": "sym_abc123",
+      "ref": {
+        "uri": "file:///src/main.rs",
+        "range": {
+          "start": { "line": 10, "column": 0 },
+          "end": { "line": 42, "column": 1 }
+        },
+        "language": "rust",
+        "kind": "function",
+        "name": "process_request",
+        "container": "handlers"
+      }
+    },
+    "signature": {
+      "display": "fn process_request(req: &Request) -> Response",
+      "params": [{ "name": "req", "type": "&Request" }],
+      "returns": "Response"
+    },
+    "doc": {
+      "docstring": "Processes an incoming request.",
+      "summary": "Processes an incoming request.",
+      "source": "tree_sitter"
+    },
+    "structure": {
+      "locals": [{ "name": "result", "kind": "variable", "decl_line": 15 }],
+      "branches": [{ "kind": "if", "line": 18 }]
+    },
+    "metrics": { "lines": 33, "cyclomatic": 5 },
+    "provenance": {
+      "extracted_at": "2026-03-03T12:34:56Z",
+      "sources": ["tree_sitter"]
+    }
+  }
+}
+```
+
+When the operation cannot produce a card the status is `"refusal"`:
+
+```json
+{
+  "status": "refusal",
+  "refusal": {
+    "reason": "not_yet_implemented",
+    "message": "observe get-card: Tree-sitter card extraction is not yet implemented",
+    "requested_detail": "structure"
+  }
+}
+```
+
+Card fields beyond identity are progressively included based on the detail
+level. `minimal` returns only the `symbol` and `provenance` fields;
+`structure` (the default) adds `signature`, `doc`, `structure`, and basic
+`metrics`; `semantic` adds LSP hover/type information; `full` adds
+dependency edges and fan-in/out metrics.
+
+Note: Tree-sitter card extraction is not yet implemented. The operation
+currently returns a structured refusal. See the Jacquard roadmap (7.1.2)
+for the extraction milestone.
+
 #### observe grep
 
 Syntax:

@@ -1,0 +1,74 @@
+---
+source: crates/weaver-cards/src/tests/snapshot_tests.rs
+expression: json
+---
+{
+  "status": "success",
+  "card": {
+    "card_version": 1,
+    "symbol": {
+      "symbol_id": "sym_abc123",
+      "ref": {
+        "uri": "file:///src/main.rs",
+        "range": {
+          "start": {
+            "line": 10,
+            "column": 0
+          },
+          "end": {
+            "line": 42,
+            "column": 1
+          }
+        },
+        "language": "rust",
+        "kind": "function",
+        "name": "process_request",
+        "container": "handlers"
+      }
+    },
+    "signature": {
+      "display": "fn process_request(req: &Request) -> Response",
+      "params": [
+        {
+          "name": "req",
+          "type": "&Request"
+        }
+      ],
+      "returns": "Response"
+    },
+    "doc": {
+      "docstring": "Processes an incoming request and returns a response.",
+      "summary": "Processes an incoming request and returns a response.",
+      "source": "tree_sitter"
+    },
+    "structure": {
+      "locals": [
+        {
+          "name": "result",
+          "kind": "variable",
+          "decl_line": 15
+        }
+      ],
+      "branches": [
+        {
+          "kind": "if",
+          "line": 18
+        },
+        {
+          "kind": "match",
+          "line": 25
+        }
+      ]
+    },
+    "metrics": {
+      "lines": 33,
+      "cyclomatic": 5
+    },
+    "provenance": {
+      "extracted_at": "2026-03-03T12:34:56Z",
+      "sources": [
+        "tree_sitter"
+      ]
+    }
+  }
+}
