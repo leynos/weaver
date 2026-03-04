@@ -81,6 +81,10 @@ operations in Weaver’s daemon protocol.[^4]
   documentation, local structure, and selected semantic metadata.
 - Symbol ref: A location-based reference to a symbol (URI + range + language +
   kind), used as an input handle even when stable IDs are unavailable.
+- Entity region: A source range that defines a symbol Jacquard models as a card.
+- Interstitial region: The syntactic span between entity regions, including
+  import blocks, decorator stacks, module headers, and file-level configuration
+  constructs.
 - Slice: A bounded subgraph rooted at one or more entry symbols, built under
   traversal and budget constraints.
 - Ledger: A persisted store of symbol cards and edges for a given version of a
@@ -133,6 +137,23 @@ flowchart TD
 *Figure 1: Card/slice requests flow through Weaver’s daemon and fuse LSP,
 Tree-sitter, and relational indexing.*
 
+## Entities and interstitial regions
+
+Jacquard models each file as alternating entity and interstitial regions,
+mirroring the region-first extraction approach used by weave.[^7]
+
+- Entity regions: symbol ranges that Jacquard turns into cards (functions,
+  classes, methods, types, modules, and similar constructs).
+- Interstitial regions: syntactic “between” spans such as import/use/include
+  blocks, decorator/annotation stacks, module headers, file-level configuration
+  constructs, and whitespace runs.
+
+Interstitials matter because they dominate diffs and often carry dependency
+signals. Treating them explicitly keeps card identities stable under
+reformatting, feeds `import` and some `config` edges directly from interstitial
+data, and lets time-travel deltas classify interstitial churn separately from
+entity edits.
+
 ## Data model
 
 ### Symbol identity
@@ -163,7 +184,7 @@ Proposed types:
     - `canonical_name` (best-known qualified name)
     - `signature_fingerprint`
     - `syntactic_fingerprint` (Abstract Syntax Tree (AST) shape features)
-    - `file_path_hint` (normalized path, low weight)
+    - `file_path_hint` (normalised path, low weight)
   - The hash must remain stable under whitespace-only edits.
 
 Symbol IDs are not expected to survive semantic changes. Time-travel uses
@@ -200,6 +221,12 @@ A card is a JSON object. It supports progressive enrichment by “detail level�
     "summary": "…",
     "source": "tree_sitter"
   },
+  "attachments": {
+    "doc_comments": ["…"],
+    "decorators": ["@dataclass"],
+    "normalised": { "decorators": ["dataclass"] },
+    "bundle_rule": "leading_trivia"
+  },
   "structure": {
     "locals": [
       { "name": "tmp", "kind": "variable", "decl_line": 15 }
@@ -226,6 +253,14 @@ A card is a JSON object. It supports progressive enrichment by “detail level�
     "imports": ["mod_…"],
     "config": ["cfg_…"]
   },
+  "interstitial": {
+    "imports": {
+      "raw": "import os\nimport sys\n",
+      "normalised": ["os", "sys"],
+      "groups": [["os", "sys"]],
+      "source": "tree_sitter"
+    }
+  },
   "provenance": {
     "extracted_at": "2026-03-03T12:34:56Z",
     "sources": ["tree_sitter", "lsp"]
@@ -238,16 +273,30 @@ Notes:
 
 - `metrics.fan_in/fan_out` are computed from the relational layer, not guessed
   from the card alone.
+- `attachments` store bundled doc comments and decorators/annotations so they
+  move with the symbol card and can be diffed as stable inputs.[^8]
 - `etag` is a hash of the canonical JSON encoding of the card for cache checks.
 - `doc.summary` remains deterministic by default (e.g., first sentence of
   docstring or extracted comment). Large Language Model (LLM)-generated
   summaries can be added later.
+- `interstitial` is present on file/module cards and interstitial cards,
+  carrying both raw text and normalised sets for import blocks.
+
+Attachment bundling rule:
+
+- For each language family, scan backwards from the symbol start over trivia
+  until a non-comment, non-decorator token is found. Attach the contiguous doc
+  comments and decorator/annotation tokens to the card, and record the applied
+  rule in `attachments.bundle_rule`.
 
 ### Edge model
 
 Edge types follow the baseline SDL vocabulary: `call`, `import`, `config`.[^1]
 
 Edge object:
+
+Edges include a `resolution` field to capture whether the match used a full
+symbol table, a partial table, or an LSP-provided identifier.
 
 ```json
 {
@@ -257,6 +306,7 @@ Edge object:
   "to": "sym_…",
   "confidence": 0.92,
   "direction": "out",
+  "resolution": "full_symbol_table",
   "provenance": {
     "source": "lsp_call_hierarchy",
     "details": { "call_site": { "uri": "file:///…", "line": 123, "column": 8 } }
@@ -273,17 +323,59 @@ modes or dynamic languages), `to` becomes an external node reference:
   "from": "sym_…",
   "to_external": { "language": "python", "name": "requests.get" },
   "confidence": 0.35,
+  "resolution": "partial_symbol_table",
   "provenance": { "source": "tree_sitter_heuristic" }
 }
 ```
 
-| Edge type | Semantics                         | Primary provider                       | Fallback provider                              | Typical confidence |
-| --------- | --------------------------------- | -------------------------------------- | ---------------------------------------------- | ------------------ |
-| `call`    | caller → callee                   | LSP call hierarchy                     | Tree-sitter call-site heuristic                | 0.6–0.99           |
-| `import`  | symbol/file depends on module     | Tree-sitter import queries             | LSP document symbols + imports (lang-specific) | 0.7–0.95           |
-| `config`  | symbol depends on config key/flag | Tree-sitter literal/identifier queries | grep-based heuristics (optional)               | 0.3–0.9            |
+| Edge type | Semantics                         | Primary provider                     | Fallback provider                              | Typical confidence |
+| --------- | --------------------------------- | ------------------------------------ | ---------------------------------------------- | ------------------ |
+| `call`    | caller → callee                   | LSP call hierarchy                   | Tree-sitter call-site heuristic                | 0.6–0.99           |
+| `import`  | symbol/file depends on module     | Tree-sitter interstitial import pass | LSP document symbols + imports (lang-specific) | 0.7–0.95           |
+| `config`  | symbol depends on config key/flag | Tree-sitter interstitial config pass | grep-based heuristics (optional)               | 0.3–0.9            |
 
 *Table 1: Baseline edge types and the initial extraction strategy.*
+
+### Two-pass extraction and resolution scope
+
+Tree-sitter-derived graphs use a default two-pass pipeline:
+
+1. Extract entity regions into a symbol table (plus interstitial regions for
+   import/config scanning).
+2. Extract references and resolve them into edges using the symbol table.
+
+When `snapshots_on_demand` loads only a subset of files, the symbol table is
+partial by design. Edge records must carry `resolution` alongside `confidence`
+to distinguish `full_symbol_table`, `partial_symbol_table`, and `lsp`
+resolution so clients can treat missing edges as uncertainty rather than
+silence.
+
+## Tree-sitter extraction
+
+Tree-sitter extraction follows a deterministic pipeline so cards and deltas
+remain stable under formatting churn.
+
+### Region pass
+
+- Build alternating entity and interstitial regions for each file.
+- Record interstitials (imports, module headers, decorators not bundled to a
+  symbol, configuration constructs, and whitespace runs) as first-class records.
+
+### Attachment bundling
+
+- Bundle doc comments and decorator/annotation blocks with the following
+  deterministic rule: scan backwards from the symbol start over trivia until a
+  non-comment, non-decorator token is found, then attach the contiguous block.
+- Persist the chosen bundling rule in `attachments.bundle_rule` so downstream
+  tooling can reason about portability across languages.
+
+### Nested entity filtering
+
+- Exclude nested entities that are fully contained inside another entity
+  region unless the language model requires them (for example, include class
+  members but exclude local functions and closures by default).
+- Persist `structure.locals` as explicitly non-entity so the extraction
+  pipeline cannot promote locals into the entity table.
 
 ## Progressive discovery and enhancement
 
@@ -300,7 +392,8 @@ Proposed detail levels:
   - Add signature (Tree-sitter + optional LSP signature help)
 - `structure`
 
-  - Add docstring, locals, branches, basic metrics (lines, cyclomatic)
+  - Add docstring, attachments, locals, branches, basic metrics (lines,
+    cyclomatic)
 - `semantic`
 
   - Add LSP hover/type info, definition/refs counts where available
@@ -308,13 +401,13 @@ Proposed detail levels:
 
   - Add deps (typed edges), fan-in/out metrics, canonical test mapping (future)
 
-| Detail      | Adds                       | Requires         | Expected latency |
-| ----------- | -------------------------- | ---------------- | ---------------- |
-| `minimal`   | identity only              | none             | lowest           |
-| `signature` | signature fingerprint      | Tree-sitter      | low              |
-| `structure` | locals/branches/cyclomatic | Tree-sitter      | low–medium       |
-| `semantic`  | hover/types                | LSP initialized  | medium           |
-| `full`      | deps + fan metrics         | relational graph | medium–high      |
+| Detail      | Adds                            | Requires         | Expected latency |
+| ----------- | ------------------------------- | ---------------- | ---------------- |
+| `minimal`   | identity only                   | none             | lowest           |
+| `signature` | signature fingerprint           | Tree-sitter      | low              |
+| `structure` | doc/attachments/locals/branches | Tree-sitter      | low–medium       |
+| `semantic`  | hover/types                     | LSP initialized  | medium           |
+| `full`      | deps + fan metrics              | relational graph | medium–high      |
 
 *Table 2: Progressive card enhancement layers.*
 
@@ -396,6 +489,16 @@ slice_build(entry, constraints):
 
 A later iteration can plug in model-specific tokenizers if required.
 
+### Partial graph construction
+
+When history queries load only a subset of files, slices must explicitly carry
+partiality. The slice builder should:
+
+- Preserve edges with `resolution = partial_symbol_table` rather than dropping
+  them outright.
+- Surface provenance and confidence for unresolved edges so consumers can
+  widen the scope or fall back to alternative resolution.
+
 ### Using existing call graph capability
 
 `weaver-graph` already constructs a depth-limited call graph using LSP call
@@ -426,11 +529,13 @@ Given an entry symbol in the working tree, the system returns:
   - node changes (added/removed/changed cards),
   - edge changes (added/removed/changed confidence/source),
   - mapping confidence for symbol correspondences.
+- A change taxonomy and semantic risk warnings for each delta.
 
 The output must expose ambiguity:
 
 - Multiple candidate mappings for a symbol if no clear winner exists.
 - Confidence values and “reason codes” for debugging.
+- Explicit “ambiguous mapping” responses when `max_duplicates` is exceeded.
 
 ### Git integration strategy
 
@@ -443,6 +548,17 @@ Two modes:
     - Load relevant file blobs directly from git (no checkout).
     - Parse with Tree-sitter to extract cards and heuristic edges for only the
       files/symbols required by the slice budget.
+  - Enforce operational limits:
+
+    - Maximum blob size (per file).
+    - Maximum parse time (per file and per commit).
+    - Maximum total files parsed per commit.
+  - Fallback behaviour:
+
+    - Degrade to coarse chunk diffs for oversized or timed-out files, or
+      return “slice unavailable” for that commit when limits are exceeded.
+    - Emit explicit quality metadata in `graph-history` output when a fallback
+      triggers (including the reason and the affected scope).
   - LSP enrichment is optional and disabled by default for history queries.
 
 - `history_mode = ledger_cache` (future)
@@ -470,6 +586,23 @@ The matcher returns:
 - `best_match`: candidate symbol with `p` probability.
 - `alternates`: top-K candidates with probabilities.
 - `features`: top contributing features for the score.
+- `phase`: the winning match phase and its confidence band.
+
+### Matching pipeline (multi-phase)
+
+Jacquard uses a staged matcher inspired by existing entity-diff systems,
+including Sem’s phased approach to rename and move detection.[^9] Each phase
+defines its own confidence band and rejection threshold; matches below the
+phase threshold are rejected rather than force-assigned.
+
+1. Phase 1: stable identity match (type + name + parent/container + file hint).
+2. Phase 2: body hash or name-stripped hash (rename detection).
+3. Phase 3: structural hash on AST-normalised shapes.
+4. Phase 4: fuzzy similarity (token overlap, shingles, and doc fingerprints).
+5. Phase 5: graph neighbourhood refinement plus global assignment.
+
+The output must record the winning phase, confidence, and any rejected
+alternates to support debugging and downstream policy decisions.
 
 ### Feature extraction
 
@@ -491,10 +624,11 @@ For each symbol at a given commit:
   - AST node-kind histogram
   - control-flow skeleton signature (e.g., sequence of branch constructs)
   - cyclomatic complexity estimate
-  - literal/constant fingerprint (normalized)
+  - literal/constant fingerprint (normalised)
 - Text features:
 
-  - docstring/comment fingerprint (normalized)
+  - docstring/comment fingerprint (normalised)
+  - attachment and decorator fingerprints (normalised)
 - Graph neighbourhood features:
 
   - outgoing call set (resolved IDs where possible, otherwise names)
@@ -512,9 +646,9 @@ To keep matching tractable:
   - same file (or renamed file) first,
   - else same directory/module,
   - else global top-N by name token similarity.
-- Use git diff metadata (where available) to prioritize changed files/ranges.
+- Use git diff metadata (where available) to prioritise changed files/ranges.
 
-### Scoring model
+### Scoring model (phase 4/5)
 
 Start with a weighted similarity function, then map to a calibrated probability
 via logistic transform.
@@ -538,6 +672,17 @@ Probability:
 
 Initial weights are heuristic, then tuned on a small labelled dataset collected
 from real refactors.
+
+### Duplicate and ambiguity guardrail
+
+If a scope contains more than `max_duplicates` entities with the same name,
+strong identity matching must short-circuit. In that case:
+
+- Fall back to structural/graph features only, or
+- Return an explicit “ambiguous mapping” outcome.
+
+The guardrail is configured via `--max-duplicates` on `observe graph-history`
+and emits an observability counter when triggered.
 
 ### Global consistency (assignment)
 
@@ -573,25 +718,62 @@ Given two slices `G_t` and `G_{t+1}` and a symbol mapping `M`:
 
   - `added`: nodes in `G_{t+1}` not matched from `G_t`
   - `removed`: nodes in `G_t` with no match
-  - `changed`: matched nodes whose cards differ beyond a threshold
-
-    - signature change
-    - docstring change
-    - structure change (branches/locals/cyclomatic)
+  - `changed`: matched nodes whose cards differ beyond a threshold, with an
+    attached change taxonomy (`text`, `syntax`, or `functional`) and
+    confidence.
 - Edge delta:
 
   - compare edges after remapping endpoints via `M`
-  - track changes in `confidence`, `provenance.source`, and call-site ranges
+  - track changes in `confidence`, `provenance.source`, `resolution`, and
+    call-site ranges
+
+### Normalisation rules
+
+To minimise churn noise:
+
+- Treat import/use/include blocks as unordered sets for delta purposes, with
+  optional grouping by blank lines to preserve import groups.
+- Treat decorators/annotations as unordered sets attached to the symbol card.
+- Persist both raw interstitial text and the normalised representation so
+  clients can choose which view to display.
+
+### Change taxonomy
+
+Classify each changed node (and optionally each edge) using a small taxonomy
+with confidence:
+
+- `text`: comment, docstring, or whitespace-only change (including interstitial
+  import reordering).
+- `syntax`: signature or structural change without strong body-change signals.
+- `functional`: likely behaviour change inferred from body, control flow, or
+  semantic edges.
+
+Primary signals include `signature`, `structure.branches`, `attachments`,
+normalised interstitials, and AST/token fingerprints. The classifier must emit
+confidence and the dominant signals used.
+
+### Semantic risk warnings
+
+`graph-history` deltas include explicit warnings for semantic risk patterns:
+
+- `DependencyAlsoModified`: symbol A changed and it depends on symbol B that
+  also changed.
+- `DependentAlsoModified`: symbol A changed and a dependent symbol changed too.
+
+Warnings are scoped to the default slice neighbourhood (depth 2) unless
+overridden, include the triggering edge paths and edge confidence, and weigh
+`functional` changes higher than `text`.
 
 Output includes a “blast radius” score within the slice:
 
 - Start with changed nodes.
 - Propagate along edges with decay by graph distance.
-- Amplify by fan-in growth where available (future ledger_cache mode).
+- Amplify by fan-in growth where available (future ledger_cache mode) and
+  weight `functional` changes more heavily than `text`.
 
 ## Command surface
 
-All commands live under `observe` and use Weaver’s existing JSONL envelope.[^7]
+All commands live under `observe` and use Weaver’s existing JSONL envelope.[^10]
 
 The command names, flags, and detail-level values in this section are
 provisional design identifiers. Implementation should align the final CLI
@@ -659,6 +841,8 @@ Arguments:
 - `--history-mode <snapshots_on_demand|ledger_cache>` (default snapshots)
 - `--match-threshold <0..1>` (default 0.6)
 - `--alternates <k>` (default 3)
+- `--max-duplicates <n>` (default 8)
+- `--warning-depth <n>` (default 2)
 
 Response:
 
@@ -669,14 +853,41 @@ Response:
   "commits": [
     {
       "commit": "…",
-      "slice": { /* slice */ }
+      "slice": { /* slice */ },
+      "quality": {
+        "resolution_scope": "full_symbol_table",
+        "fallbacks": []
+      }
     },
     {
       "commit": "…",
+      "quality": {
+        "resolution_scope": "partial_symbol_table",
+        "fallbacks": ["timeout"]
+      },
       "delta_from_prev": {
         "mapping": [ /* symbol matches with p and alternates */ ],
-        "nodes": { "added": [], "removed": [], "changed": [] },
-        "edges": { "added": [], "removed": [], "changed": [] }
+        "nodes": {
+          "added": [],
+          "removed": [],
+          "changed": [
+            {
+              "symbol_id": "sym_…",
+              "taxonomy": { "class": "syntax", "confidence": 0.72 },
+              "reasons": ["signature"]
+            }
+          ]
+        },
+        "edges": { "added": [], "removed": [], "changed": [] },
+        "warnings": [
+          {
+            "kind": "DependencyAlsoModified",
+            "source": "sym_…",
+            "path": ["sym_…", "sym_…"],
+            "edge_confidence": 0.81,
+            "taxonomy": { "class": "functional", "confidence": 0.62 }
+          }
+        ]
       }
     }
   ]
@@ -725,16 +936,37 @@ Option B (incremental modules inside `weaverd`):
 
 Option A reduces daemon coupling and improves testability.
 
+## Performance considerations
+
+Implementation should meet the following performance expectations.[^8]
+
+- Reuse Tree-sitter parser registries across requests to avoid rebuild costs.
+- Cache extracted entity tables with an LRU keyed by repo, ref, file path, and
+  blob hash.
+- Avoid unnecessary string cloning by keeping slice lifetimes or interning
+  where practical.
+- Use bounded concurrency for multi-file extraction in history mode so large
+  ranges do not starve other requests.
+- Define cache invalidation boundaries per repo, ref, and file path + blob
+  hash, with explicit eviction metrics.
+
 ## Testing strategy
+
+These fixtures mirror the benchmark-driven regression posture documented by
+weave.[^11]
 
 - Unit tests:
 
   - Tree-sitter queries for symbol kinds, locals, and branches per language.
+  - Attachment bundling stability for doc comments and decorators.
   - Card fingerprint stability under whitespace-only edits.
+  - Import block normalisation with blank-line grouping.
+  - Nested entity filtering for locals and closures.
   - Edge extraction confidence calibration (basic invariants).
 - Property tests:
 
   - Matching should remain stable under alpha-renaming of locals.
+  - Duplicate-name fixtures should trigger `max_duplicates` guardrails.
   - Assignment solver should not map two sources to one target unless
     split/merge
     mode is enabled.
@@ -744,6 +976,8 @@ Option A reduces daemon coupling and improves testability.
   - `observe graph-slice` respects budgets and depth limits.
   - `observe graph-history --commits 5` produces deterministic deltas for a
     curated git fixture repository with scripted refactors.
+  - Risk warnings are correct for a curated commit history with known
+    dependency changes.
 
 ## Observability and debugging
 
@@ -758,6 +992,10 @@ Option A reduces daemon coupling and improves testability.
   `--debug-matching` is set:
 
   - `name_tokens`, `signature`, `ast_shape`, `neighbourhood_overlap`, …
+- Emit counters for:
+
+  - `max_duplicates` guardrail triggers,
+  - history fallbacks by reason (timeout, blob too large, unsupported grammar).
 
 ## Failure modes and mitigations
 
@@ -774,9 +1012,18 @@ Option A reduces daemon coupling and improves testability.
   - Return alternates and low confidence.
   - Mark delta entries as “uncertain” when mapping confidence is below
     threshold.
+- Duplicate-name overload:
+
+  - Enforce `max_duplicates` and return explicit “ambiguous mapping” outcomes
+    rather than picking a weak identity match.
+- Time-travel extraction limits:
+
+  - When blob size, parse time, or file count limits trigger, fall back to
+    coarse chunk diffs or mark the slice unavailable for that commit.
+  - Record the fallback reason and data quality in `graph-history` output.
 - Non-UTF-8 paths/URIs:
 
-  - Continue using existing URI conversion utilities and fallbacks.[^8]
+  - Continue using existing URI conversion utilities and fallbacks.[^12]
 
 ## Rollout plan
 
@@ -823,19 +1070,34 @@ Option A reduces daemon coupling and improves testability.
 [^6]: `SemanticBackendProvider` defines the LSP-backed semantic backend startup
     path and supported language list. See [4].
 
-[^7]: The JSONL request/response envelope types live alongside request parsing
+[^7]: weave documents a region-first extraction model that separates entity and
+    interstitial spans. See [9].
+
+[^8]: weave’s changelog highlights attachment bundling and performance wins
+    from parser reuse and reduced cloning. See [10].
+
+[^9]: Sem documents a staged matching approach combining exact, structural, and
+    fuzzy similarity phases. See [11].
+
+[^10]: The JSONL request/response envelope types live alongside request parsing
     and validation logic. See [7].
 
-[^8]: URI parsing and path conversion utilities are shared by graph and history
-    components and must handle non-UTF-8 inputs gracefully. See [8].
+[^11]: weave’s public documentation emphasises benchmark-driven regression
+    testing for entity-level tooling. See [12].
+
+[^12]: URI parsing and path conversion utilities are shared by graph and
+    history components and must handle non-UTF-8 inputs gracefully. See [8].
 
 ## References
 
-[1]: weaver-design.md
-[2]: ../crates/weaverd/src/dispatch/router.rs
-[3]: ../crates/weaverd/src/backends.rs
-[4]: ../crates/weaverd/src/semantic_provider/mod.rs
-[5]: ../crates/weaver-graph/src/provider.rs
-[6]: <https://github.com/GlitterKill/sdl-mcp>
-[7]: ../crates/weaverd/src/dispatch/request.rs
-[8]: ../crates/weaver-graph/src/uri.rs
+[1]: weaver-design.md [2]: ../crates/weaverd/src/dispatch/router.rs [3]:
+../crates/weaverd/src/backends.rs [4]:
+../crates/weaverd/src/semantic_provider/mod.rs [5]:
+../crates/weaver-graph/src/provider.rs [6]:
+<https://github.com/GlitterKill/sdl-mcp> [7]:
+../crates/weaverd/src/dispatch/request.rs [8]:
+../crates/weaver-graph/src/uri.rs [9]:
+<https://ataraxy-labs.github.io/weave/docs.html> [10]:
+<https://ataraxy-labs.github.io/weave/changelog.html> [11]:
+<https://github.com/Ataraxy-Labs/sem> [12]:
+<https://ataraxy-labs.github.io/weave/>
