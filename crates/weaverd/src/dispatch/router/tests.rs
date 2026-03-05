@@ -150,6 +150,24 @@ fn routes_operations_case_insensitively(
 }
 
 #[rstest]
+fn get_card_returns_structured_refusal(mut backends: FusionBackends<SemanticBackendProvider>) {
+    let router = build_router();
+    let json = r#"{"command":{"domain":"observe","operation":"get-card"},"arguments":["--uri","file:///src/main.rs","--position","10:5"]}"#;
+    let request = CommandRequest::parse(json.as_bytes()).expect("test request");
+    let mut output = Vec::new();
+    let mut writer = ResponseWriter::new(&mut output);
+    let result = router
+        .route(&request, &mut writer, &mut backends)
+        .expect("route");
+    assert_eq!(result.status, 1);
+
+    let response = String::from_utf8(output).expect("utf8");
+    assert!(response.contains("not_yet_implemented"));
+    assert!(response.contains("refusal"));
+    assert!(response.contains("structure"));
+}
+
+#[rstest]
 fn find_references_not_implemented(mut backends: FusionBackends<SemanticBackendProvider>) {
     let router = build_router();
     let request = make_request("observe", "find-references");

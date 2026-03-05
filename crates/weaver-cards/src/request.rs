@@ -1,7 +1,7 @@
 //! Request types for the `observe get-card` operation.
 //!
 //! The [`GetCardRequest`] struct captures the parsed arguments from a
-//! `get-card` command. It is serialisable for logging and testability,
+//! `get-card` command. It is serializable for logging and testability,
 //! and provides a [`parse`](GetCardRequest::parse) constructor that
 //! accepts the raw argument vector from the daemon's `CommandRequest`.
 
@@ -66,7 +66,7 @@ impl GetCardRequest {
                 }
                 "--detail" => {
                     let value = require_arg_value(&mut iter, "--detail")?;
-                    detail = parse_detail_level(value)?;
+                    detail = parse_detail(value)?;
                 }
                 "--format" => {
                     let value = require_arg_value(&mut iter, "--format")?;
@@ -106,6 +106,16 @@ where
         .ok_or_else(|| GetCardError::InvalidValue {
             flag: String::from(flag),
             message: String::from("requires a value"),
+        })
+}
+
+/// Parses a detail level string via [`DetailLevel::from_str`].
+fn parse_detail(value: &str) -> Result<DetailLevel, GetCardError> {
+    value
+        .parse()
+        .map_err(|e: crate::DetailLevelParseError| GetCardError::InvalidValue {
+            flag: String::from("--detail"),
+            message: e.to_string(),
         })
 }
 
@@ -152,24 +162,6 @@ fn parse_position(value: &str) -> Result<(u32, u32), GetCardError> {
     }
 
     Ok((line, column))
-}
-
-/// Parses a detail level string into a [`DetailLevel`].
-fn parse_detail_level(value: &str) -> Result<DetailLevel, GetCardError> {
-    match value {
-        "minimal" => Ok(DetailLevel::Minimal),
-        "signature" => Ok(DetailLevel::Signature),
-        "structure" => Ok(DetailLevel::Structure),
-        "semantic" => Ok(DetailLevel::Semantic),
-        "full" => Ok(DetailLevel::Full),
-        other => Err(GetCardError::InvalidValue {
-            flag: String::from("--detail"),
-            message: format!(
-                "unknown detail level: {other}; \
-                 expected one of: minimal, signature, structure, semantic, full"
-            ),
-        }),
-    }
 }
 
 #[cfg(test)]

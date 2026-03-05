@@ -164,7 +164,7 @@ pub struct Provenance {
 /// structure, semantic, metrics, and dependency information.
 ///
 /// Fields beyond identity are optional to support progressive detail levels.
-/// When serialised, absent fields are omitted from the JSON output.
+/// When serialized, absent fields are omitted from the JSON output.
 ///
 /// # Example
 ///

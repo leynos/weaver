@@ -7,6 +7,9 @@
 //! See `docs/jacquard-card-first-symbol-graph-design.md` §7 for the full
 //! detail-level taxonomy and latency expectations.
 
+use std::fmt;
+use std::str::FromStr;
+
 use serde::{Deserialize, Serialize};
 
 /// Progressive detail level for symbol card extraction.
@@ -41,4 +44,40 @@ pub enum DetailLevel {
     Semantic,
     /// Adds dependency edges and fan-in/out metrics.
     Full,
+}
+
+/// Error returned when a string does not match any known detail level.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DetailLevelParseError {
+    /// The input string that could not be parsed.
+    pub name: String,
+}
+
+impl fmt::Display for DetailLevelParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "unknown detail level: {}; expected one of: minimal, signature, structure, semantic, full",
+            self.name
+        )
+    }
+}
+
+impl std::error::Error for DetailLevelParseError {}
+
+impl FromStr for DetailLevel {
+    type Err = DetailLevelParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "minimal" => Ok(Self::Minimal),
+            "signature" => Ok(Self::Signature),
+            "structure" => Ok(Self::Structure),
+            "semantic" => Ok(Self::Semantic),
+            "full" => Ok(Self::Full),
+            _ => Err(DetailLevelParseError {
+                name: String::from(s),
+            }),
+        }
+    }
 }

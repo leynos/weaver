@@ -1,7 +1,7 @@
 //! Insta snapshot tests that lock down the JSON shapes of symbol cards
 //! and `get-card` responses.
 //!
-//! Each test serialises a fixture to pretty-printed JSON and asserts that
+//! Each test serializes a fixture to pretty-printed JSON and asserts that
 //! the output matches a stored snapshot file. These snapshots guarantee
 //! byte-identical output for unchanged inputs across runs.
 
@@ -210,6 +210,32 @@ fn snapshot_refusal_no_symbol() {
             reason: RefusalReason::NoSymbolAtPosition,
             message: String::from("no symbol found at the requested position"),
             requested_detail: DetailLevel::Structure,
+        },
+    };
+    let json = serde_json::to_string_pretty(&response).expect("serialise");
+    assert_snapshot!(json);
+}
+
+#[test]
+fn snapshot_refusal_unsupported_language() {
+    let response = GetCardResponse::Refusal {
+        refusal: CardRefusal {
+            reason: RefusalReason::UnsupportedLanguage,
+            message: String::from("the requested language is not supported"),
+            requested_detail: DetailLevel::Structure,
+        },
+    };
+    let json = serde_json::to_string_pretty(&response).expect("serialise");
+    assert_snapshot!(json);
+}
+
+#[test]
+fn snapshot_refusal_backend_unavailable() {
+    let response = GetCardResponse::Refusal {
+        refusal: CardRefusal {
+            reason: RefusalReason::BackendUnavailable,
+            message: String::from("the required backend is not available"),
+            requested_detail: DetailLevel::Semantic,
         },
     };
     let json = serde_json::to_string_pretty(&response).expect("serialise");

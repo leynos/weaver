@@ -40,7 +40,7 @@ pub use card::{
     BranchInfo, DepsInfo, DocInfo, LocalInfo, LspInfo, MetricsInfo, ParamInfo, Provenance,
     SignatureInfo, StructureInfo, SymbolCard,
 };
-pub use detail::DetailLevel;
+pub use detail::{DetailLevel, DetailLevelParseError};
 pub use error::GetCardError;
 pub use request::GetCardRequest;
 pub use response::{CardRefusal, GetCardResponse, RefusalReason};

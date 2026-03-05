@@ -1,0 +1,12 @@
+---
+source: crates/weaver-cards/src/tests/snapshot_tests.rs
+expression: json
+---
+{
+  "status": "refusal",
+  "refusal": {
+    "reason": "unsupported_language",
+    "message": "the requested language is not supported",
+    "requested_detail": "structure"
+  }
+}

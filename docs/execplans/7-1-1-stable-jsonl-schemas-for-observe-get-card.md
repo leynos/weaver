@@ -1,4 +1,4 @@
-# 7.1.1 Define stable JSONL request and response schemas for `observe get-card`
+# 7.1.1 Define stable JSON Lines (JSONL) request and response schemas for `observe get-card`
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
@@ -36,11 +36,11 @@ Specifically:
 2. Insta snapshot tests in `weaver-cards` lock the JSON shape of a fully
    populated success card, a minimal card, and a refusal payload. These
    snapshots are byte-identical across runs for unchanged inputs.
-3. BDD feature scenarios in `weaver-cards` exercise the request parsing and
+3. Behaviour-driven development (BDD) feature scenarios in `weaver-cards` exercise the request parsing and
    response construction via `rstest-bdd` v0.5.0.
 4. `weaverd` adds `"get-card"` to the
    `DomainRoutingContext::OBSERVE.known_operations` list so that
-   `observe get-card` is recognised by the router.
+   `observe get-card` is recognized by the router.
 5. Because no Tree-sitter extraction exists yet (that is 7.1.2), the handler
    in `weaverd` returns a structured refusal response (a
    `GetCardResponse::Refusal` variant) rather than a bare "not yet
@@ -109,8 +109,8 @@ and closes #75.
 - Risk: `result_large_err = "deny"` lint may fire if `GetCardResponse` or
   `SymbolCard` is large as a `Result` error type.
   Severity: low. Likelihood: low. Mitigation: `GetCardResponse` is not used
-  as an error type; it is serialised directly. The card types themselves are
-  serialised to JSON strings, not returned as `Err(...)`.
+  as an error type; it is serialized directly. The card types themselves are
+  serialized to JSON strings, not returned as `Err(...)`.
 
 - Risk: `missing_const_for_fn = "deny"` fires on constructors taking
   `String`, `Vec`, or `Option<String>`.
@@ -149,11 +149,11 @@ and closes #75.
 ## Surprises & discoveries
 
 - `CardLanguage::TypeScript` with `#[serde(rename_all = "snake_case")]`
-  serialised as `"type_script"` instead of the design document's
+  serialized as `"type_script"` instead of the design document's
   `"typescript"`. Fixed by adding an explicit `#[serde(rename =
   "typescript")]` on the `TypeScript` variant.
 
-- `cargo-insta` CLI was not installed in the environment. Snapshot tests
+- `cargo-insta` command-line interface (CLI) was not installed in the environment. Snapshot tests
   failed on first run because no snapshot files existed. Resolved by running
   with `INSTA_UPDATE=always` environment variable to auto-accept new
   snapshots.
@@ -175,7 +175,7 @@ and closes #75.
 - Decision: Use `String` for timestamps rather than `time::OffsetDateTime`.
   Rationale: Neither `chrono` nor `time` is a workspace dependency. Adding
   one solely for a schema definition crate is unnecessary. The
-  `extracted_at` field is serialised as an ISO 8601 string.
+  `extracted_at` field is serialized as an ISO 8601 string.
 
 - Decision: Model progressive detail levels via `Option` fields on a single
   `SymbolCard` struct rather than separate structs per detail level.
@@ -397,7 +397,7 @@ All types derive `Debug, Clone, PartialEq, Eq, Serialize, Deserialize`.
   GetCardError>` method follows the pattern from
   `crates/weaverd/src/dispatch/observe/arguments.rs`:
   - Iterates with a peekable iterator
-  - Recognises `--uri`, `--position`, `--detail`, `--format`
+  - Recognizes `--uri`, `--position`, `--detail`, `--format`
   - `--position` parsed with `split_once(':')` (not indexing)
   - `--detail` matched against known variant names
   - `--format` accepted but only `"json"` supported
@@ -452,15 +452,15 @@ Fixture builders construct example payloads and snapshot via
 6. `snapshot_success_response` — `GetCardResponse::Success` wrapping a
    structure-level card.
 
-Each test serialises to JSON via `serde_json::to_string_pretty` and
+Each test serializes to JSON via `serde_json::to_string_pretty` and
 snapshots the result. Snapshot files auto-generated in
 `crates/weaver-cards/src/tests/snapshots/`.
 
 **New file: `crates/weaver-cards/src/tests/round_trip_tests.rs`** (~80 lines)
 
 Tests serialise and deserialise each type to confirm serde compatibility.
-Uses `rstest` parameterisation for detail levels. Verifies byte-identical
-re-serialisation.
+Uses `rstest` parameterization for detail levels. Verifies byte-identical
+re-serialization.
 
 **Validation:** `cargo test -p weaver-cards` passes. Snapshot files created.
 
@@ -474,7 +474,7 @@ Feature: Symbol card schema contracts
 
   Scenario: Minimal detail card omits optional sections
     Given a symbol card at "minimal" detail level
-    When the card is serialised to JSON
+    When the card is serialized to JSON
     Then the JSON contains a "card_version" field
     And the JSON contains a "symbol" field
     And the JSON contains a "provenance" field
@@ -483,7 +483,7 @@ Feature: Symbol card schema contracts
 
   Scenario: Structure detail card includes signature and doc
     Given a symbol card at "structure" detail level
-    When the card is serialised to JSON
+    When the card is serialized to JSON
     Then the JSON contains a "signature" field
     And the JSON contains a "doc" field
     And the JSON contains a "structure" field
@@ -491,14 +491,14 @@ Feature: Symbol card schema contracts
 
   Scenario: Refusal response includes reason code
     Given a refusal response with reason "not_yet_implemented"
-    When the response is serialised to JSON
+    When the response is serialized to JSON
     Then the JSON contains "status" with value "refusal"
     And the JSON contains a "refusal" field
     And the refusal contains "reason" with value "not_yet_implemented"
 
   Scenario: Success response wraps a card
     Given a success response with a "structure" detail card
-    When the response is serialised to JSON
+    When the response is serialized to JSON
     Then the JSON contains "status" with value "success"
     And the JSON contains a "card" field
 
@@ -512,7 +512,7 @@ Feature: Symbol card schema contracts
 BDD step implementations using `rstest-bdd-macros`, following the pattern
 from `crates/weaver-plugins/src/tests/behaviour.rs`:
 
-- `TestWorld` struct holding the current card, response, serialised JSON,
+- `TestWorld` struct holding the current card, response, serialized JSON,
   and request.
 - `#[given]`, `#[when]`, `#[then]` step functions with parameter parsing.
 - Fixture builders for cards at each detail level and for refusal/success
@@ -581,7 +581,7 @@ Add a case to `invalid_arguments_message()` (line 37-50):
 ```
 
 **Validation:** `cargo test -p weaverd -- router` passes. The `get-card`
-operation is recognised and returns a structured refusal.
+operation is recognized and returns a structured refusal.
 
 ### Stage H: Update documentation
 
@@ -611,7 +611,7 @@ main task and both sub-tasks).
 
 **Write: `docs/execplans/7-1-1-stable-jsonl-schemas-for-observe-get-card.md`**
 
-Copy the finalised ExecPlan to the execplans directory.
+Copy the finalized ExecPlan to the execplans directory.
 
 **Validation:** `make fmt` passes. `make markdownlint` passes (if
 available).
@@ -631,7 +631,7 @@ All three must exit 0. Additionally verify:
 
 - `cargo doc -p weaver-cards --no-deps` produces zero warnings.
 - Insta snapshot files exist and are committed.
-- The `observe get-card` operation is recognised by the router.
+- The `observe get-card` operation is recognized by the router.
 
 ## Concrete steps
 
@@ -698,7 +698,7 @@ Quality criteria (what "done" means):
   produces zero warnings.
 - Formatting: `make check-fmt` passes.
 - Schema stability: The JSON output for each detail level is deterministic.
-  Repeated serialisation of the same fixture produces byte-identical output.
+  Repeated serialization of the same fixture produces byte-identical output.
 - Refusal payload: Dispatching `observe get-card --uri file:///foo.rs
   --position 10:5` returns a JSONL response containing a
   `GetCardResponse::Refusal` with reason `"not_yet_implemented"` and
@@ -711,7 +711,7 @@ Quality criteria (what "done" means):
   command.
 - Roadmap: 7.1.1 is marked complete in `docs/roadmap.md`.
 
-Quality method (how we check):
+Quality method (how checks are performed):
 
 - Run `make check-fmt && make lint && make test` and confirm exit 0.
 - Inspect snapshot files in `crates/weaver-cards/src/tests/snapshots/` to
@@ -827,16 +827,16 @@ because they are `None` at `structure` detail level.
 
 Dependencies (all from `[workspace.dependencies]`):
 
-- `serde` (with `derive` feature) — serialisation
+- `serde` (with `derive` feature) — serialization
 - `thiserror` — error types
 
 Dev-dependencies (all from `[workspace.dependencies]`):
 
-- `rstest` — parameterised tests
+- `rstest` — parameterized tests
 - `rstest-bdd` — BDD framework
 - `rstest-bdd-macros` — BDD macros
 - `insta` — snapshot testing
-- `serde_json` — JSON serialisation in tests
+- `serde_json` — JSON serialization in tests
 
 Public API surface (types exported from `lib.rs`):
 
@@ -893,7 +893,7 @@ New files (~15):
 Plus insta snapshot files auto-generated in
 `crates/weaver-cards/src/tests/snapshots/`.
 
-Modified files (7):
+Modified files (8):
 
 1. `Cargo.toml` (workspace root) — add member
 2. `crates/weaverd/Cargo.toml` — add dependency

@@ -1,16 +1,17 @@
 //! Serde round-trip tests for `weaver-cards` types.
 //!
-//! These tests serialise and deserialise each type to confirm that the
-//! serde configuration is self-consistent and that re-serialisation
+//! These tests serialize and deserialize each type to confirm that the
+//! serde configuration is self-consistent and that re-serialization
 //! produces byte-identical output.
 
-use rstest::rstest;
+use rstest::{fixture, rstest};
 
 use crate::{
     CardLanguage, CardSymbolKind, DetailLevel, GetCardResponse, Provenance, SourcePosition,
     SourceRange, SymbolCard, SymbolIdentity, SymbolRef,
 };
 
+#[fixture]
 fn minimal_card() -> SymbolCard {
     SymbolCard {
         card_version: 1,
@@ -42,18 +43,16 @@ fn minimal_card() -> SymbolCard {
     }
 }
 
-#[test]
-fn symbol_card_round_trips() {
-    let card = minimal_card();
-    let json = serde_json::to_string(&card).expect("serialise");
+#[rstest]
+fn symbol_card_round_trips(minimal_card: SymbolCard) {
+    let json = serde_json::to_string(&minimal_card).expect("serialise");
     let deserialized: SymbolCard = serde_json::from_str(&json).expect("deserialise");
-    assert_eq!(card, deserialized);
+    assert_eq!(minimal_card, deserialized);
 }
 
-#[test]
-fn symbol_card_re_serialisation_is_stable() {
-    let card = minimal_card();
-    let json1 = serde_json::to_string(&card).expect("serialise 1");
+#[rstest]
+fn symbol_card_re_serialisation_is_stable(minimal_card: SymbolCard) {
+    let json1 = serde_json::to_string(&minimal_card).expect("serialise 1");
     let deserialized: SymbolCard = serde_json::from_str(&json1).expect("deserialise");
     let json2 = serde_json::to_string(&deserialized).expect("serialise 2");
     assert_eq!(json1, json2, "re-serialisation must be byte-identical");
@@ -71,10 +70,10 @@ fn detail_level_round_trips(#[case] level: DetailLevel) {
     assert_eq!(level, deserialized);
 }
 
-#[test]
-fn success_response_round_trips() {
+#[rstest]
+fn success_response_round_trips(minimal_card: SymbolCard) {
     let response = GetCardResponse::Success {
-        card: Box::new(minimal_card()),
+        card: Box::new(minimal_card),
     };
     let json = serde_json::to_string(&response).expect("serialise");
     let deserialized: GetCardResponse = serde_json::from_str(&json).expect("deserialise");
