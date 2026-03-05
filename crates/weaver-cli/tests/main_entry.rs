@@ -27,22 +27,33 @@ fn missing_operation_exits_with_failure() {
 fn help_output_lists_all_domains_and_operations() {
     let mut command = cargo_bin_cmd!("weaver");
     command.arg("--help");
-    // clap --help is routed through CliUsage, so output goes to stderr.
-    let assertion = command.assert().failure();
-    assertion
-        .stderr(contains("Domains and operations:"))
-        .stderr(contains("observe"))
-        .stderr(contains("act"))
-        .stderr(contains("verify"))
-        .stderr(contains("get-definition"))
-        .stderr(contains("find-references"))
-        .stderr(contains("grep"))
-        .stderr(contains("diagnostics"))
-        .stderr(contains("call-hierarchy"))
-        .stderr(contains("rename-symbol"))
-        .stderr(contains("apply-edits"))
-        .stderr(contains("apply-patch"))
-        .stderr(contains("apply-rewrite"))
-        .stderr(contains("refactor"))
-        .stderr(contains("syntax"));
+    // clap --help is currently routed through CliUsage (stderr, exit 1).
+    // We intentionally avoid asserting on the exit code so this test
+    // remains valid if --help is later changed to exit 0.
+    let output = command.output().expect("failed to execute weaver --help");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let combined = format!("{stdout}{stderr}");
+    for token in [
+        "Domains and operations:",
+        "observe",
+        "act",
+        "verify",
+        "get-definition",
+        "find-references",
+        "grep",
+        "diagnostics",
+        "call-hierarchy",
+        "rename-symbol",
+        "apply-edits",
+        "apply-patch",
+        "apply-rewrite",
+        "refactor",
+        "syntax",
+    ] {
+        assert!(
+            combined.contains(token),
+            "weaver --help output missing {token:?}"
+        );
+    }
 }

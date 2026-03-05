@@ -530,8 +530,8 @@ backend implementation.
 `docs/sempai-query-language-design.md` if any type definitions diverge from the
 design (e.g. serde tagging strategy for `CaptureValue`).
 
-**F4.** Run `make fmt` to format all changed files, and `make markdownlint` to
-lint any modified Markdown.
+**F4.** Run `make fmt` to format all changed files, `make markdownlint` to
+lint any modified Markdown, and `make nixie` to validate Mermaid diagrams.
 
 ### Stage G: Final validation and commit gating
 
@@ -543,9 +543,10 @@ make check-fmt 2>&1 | tee /tmp/check-fmt.log
 make lint 2>&1 | tee /tmp/lint.log
 make test 2>&1 | tee /tmp/test.log
 make markdownlint 2>&1 | tee /tmp/markdownlint.log
+make nixie 2>&1 | tee /tmp/nixie.log
 ```
 
-All four must exit 0.
+All five must exit 0.
 
 **G2.** Verify cargo doc specifically for sempai:
 

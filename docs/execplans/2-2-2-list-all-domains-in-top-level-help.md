@@ -156,7 +156,7 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
 - Decision: Place the `after_help` Fluent constants in a new `after_help`
   submodule within `localizer.rs`, alongside the existing `bare_help` module.
   Add a `render_after_help()` function for test use. Rationale: This keeps all
-  localised help text in one place (`localizer.rs`) and follows the established
+  localized help text in one place (`localizer.rs`) and follows the established
   pattern. The `render_after_help()` function is used by tests to verify Fluent
   and fallback consistency, and to validate that the static `concat!` in
   `cli.rs` matches. Date/Author: 2026-03-03
@@ -190,7 +190,7 @@ All acceptance criteria met:
 1. `weaver --help` lists all three domains (`observe`, `act`, `verify`).
 2. `weaver --help` lists every CLI-supported operation for each domain.
 3. `weaver --help` completes without daemon startup or socket access.
-4. Static clap text and Fluent resources are synchronised (guarded by
+4. Static clap text and Fluent resources are synchronized (guarded by
    `clap_after_help_matches_fluent_render` test).
 5. Fluent and fallback paths produce identical output (guarded by
    `after_help_fluent_and_fallback_are_identical` test).
@@ -402,7 +402,7 @@ Acceptance criteria (from roadmap):
    verified by tests checking for all 11 unique operations.
 3. `weaver --help` completes without daemon startup or socket access —
    verified by integration test (runs binary with no daemon).
-4. Static clap text and Fluent resources remain synchronised — verified by
+4. Static clap text and Fluent resources remain synchronized — verified by
    unit test `clap_after_help_matches_fluent_render`.
 5. Fluent and fallback paths produce identical output — verified by unit test
    `after_help_fluent_and_fallback_are_identical`.

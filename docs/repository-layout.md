@@ -95,7 +95,7 @@ implemented in this repository snapshot.
 | Planned component                                          | Intended location                                                        | Roadmap reference                                    |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------- |
 | Rust `extricate-symbol` actuator flow                      | `crates/weaver-plugin-rust-analyzer/` and `crates/weaverd/`              | Proposed in Rust extricate actuator technical design |
-| Rust extricate plugin overlay and RA orchestration modules | `crates/weaver-plugin-rust-analyzer/src/lsp/` and related plugin modules | Proposed in Rust extricate actuator technical design |
+| Rust extricate plugin overlay and Rust Analyzer (RA) orchestration modules | `crates/weaver-plugin-rust-analyzer/src/lsp/` and related plugin modules | Proposed in Rust extricate actuator technical design |
 | Plugin capability metadata for extrication                 | `crates/weaver-plugins/src/manifest/mod.rs`                              | Proposed in Rust extricate actuator technical design |
 | Sempai YAML, DSL, and Tree-sitter backend crates           | `crates/sempai-yaml/`, `crates/sempai-dsl/`, and `crates/sempai-ts/`     | Proposed in Sempai query language technical design   |
 | Sempai integration command surface (`observe`)             | `crates/weaver-cli/` and `crates/weaverd/`                               | Proposed in Sempai query language technical design   |

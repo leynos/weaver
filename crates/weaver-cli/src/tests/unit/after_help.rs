@@ -2,7 +2,7 @@
 //!
 //! Verifies that `weaver --help` includes a catalogue listing all three
 //! domains and every CLI-supported operation, and that the static clap
-//! text and Fluent resources remain synchronised.
+//! text and Fluent resources remain synchronized.
 
 use clap::CommandFactory;
 use ortho_config::{FluentLocalizer, NoOpLocalizer};
@@ -11,38 +11,52 @@ use crate::cli::Cli;
 use crate::localizer::WEAVER_EN_US;
 use crate::localizer::after_help::render_after_help;
 
-/// All operations that must appear in the after-help catalogue.
+/// Expected domain-to-operation mapping for the after-help catalogue.
 /// Sourced from `DomainRoutingContext` in
 /// `crates/weaverd/src/dispatch/router.rs`.
-const ALL_OPERATIONS: &[&str] = &[
-    "get-definition",
-    "find-references",
-    "grep",
-    "diagnostics",
-    "call-hierarchy",
-    "rename-symbol",
-    "apply-edits",
-    "apply-patch",
-    "apply-rewrite",
-    "refactor",
-    "syntax",
+const DOMAIN_OPERATIONS: &[(&str, &[&str])] = &[
+    (
+        "observe",
+        &[
+            "get-definition",
+            "find-references",
+            "grep",
+            "diagnostics",
+            "call-hierarchy",
+        ],
+    ),
+    (
+        "act",
+        &[
+            "rename-symbol",
+            "apply-edits",
+            "apply-patch",
+            "apply-rewrite",
+            "refactor",
+        ],
+    ),
+    ("verify", &["diagnostics", "syntax"]),
 ];
 
-/// All domain names that must appear in the after-help catalogue.
-const ALL_DOMAINS: &[&str] = &["observe", "act", "verify"];
-
+/// Splits the catalogue text into domain sections (separated by blank lines)
+/// and verifies that each operation appears in the section belonging to its
+/// domain. This catches false positives from operations like `diagnostics`
+/// that appear in multiple domains.
 fn assert_catalogue_complete(text: &str) {
-    for domain in ALL_DOMAINS {
-        assert!(
-            text.contains(domain),
-            "after-help missing domain {domain:?}"
-        );
-    }
-    for operation in ALL_OPERATIONS {
-        assert!(
-            text.contains(operation),
-            "after-help missing operation {operation:?}"
-        );
+    // Split into sections on blank lines. Each section after the header
+    // starts with a domain heading (e.g. "  observe — …").
+    let sections: Vec<&str> = text.split("\n\n").collect();
+    for (domain, operations) in DOMAIN_OPERATIONS {
+        let section = sections
+            .iter()
+            .find(|s| s.contains(domain))
+            .unwrap_or_else(|| panic!("after-help missing domain {domain:?}"));
+        for op in *operations {
+            assert!(
+                section.contains(op),
+                "after-help: operation {op:?} not found under domain {domain:?}"
+            );
+        }
     }
 }
 
