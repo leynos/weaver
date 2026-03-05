@@ -3,6 +3,10 @@ name = "weaverd"
 edition.workspace = true
 version.workspace = true
 
+[[bin]]
+name = "weaverd"
+path = "src/main.rs"
+
 [dependencies]
 daemonize-me = "2.0.2"
 dirs = "5.0"

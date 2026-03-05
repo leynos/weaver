@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 
+use crate::capability::CapabilityId;
 use crate::error::PluginError;
 use crate::manifest::{PluginKind, PluginManifest};
 
@@ -45,7 +46,7 @@ impl PluginRegistry {
     ///
     /// Returns [`PluginError::Manifest`] if validation fails or if a plugin
     /// with the same name is already registered.
-    pub fn register(&mut self, manifest: PluginManifest) -> Result<(), PluginError> {
+    pub fn register(&mut self, mut manifest: PluginManifest) -> Result<(), PluginError> {
         manifest.validate()?;
         let name = manifest.name().to_owned();
         if self.manifests.contains_key(&name) {
@@ -53,6 +54,7 @@ impl PluginRegistry {
                 message: format!("plugin '{name}' is already registered"),
             });
         }
+        manifest.normalise_languages();
         self.manifests.insert(name, manifest);
         Ok(())
     }
@@ -73,16 +75,15 @@ impl PluginRegistry {
     }
 
     /// Returns all plugins that declare support for the given language.
+    ///
+    /// Languages are normalised to ASCII lowercase at registration time,
+    /// so this method only allocates once for the query string.
     #[must_use]
     pub fn find_for_language(&self, language: &str) -> Vec<&PluginManifest> {
         let lower = language.to_ascii_lowercase();
         self.manifests
             .values()
-            .filter(|m| {
-                m.languages()
-                    .iter()
-                    .any(|l| l.to_ascii_lowercase() == lower)
-            })
+            .filter(|m| m.languages().contains(&lower))
             .collect()
     }
 
@@ -92,6 +93,32 @@ impl PluginRegistry {
         self.find_for_language(language)
             .into_iter()
             .filter(|m| m.kind() == PluginKind::Actuator)
+            .collect()
+    }
+
+    /// Returns all plugins that declare the given capability.
+    #[must_use]
+    pub fn find_for_capability(&self, id: CapabilityId) -> Vec<&PluginManifest> {
+        self.manifests
+            .values()
+            .filter(|m| m.capabilities().contains(&id))
+            .collect()
+    }
+
+    /// Returns plugins that declare both the given language and capability.
+    ///
+    /// Languages are normalised to ASCII lowercase at registration time,
+    /// so this method only allocates once for the query string.
+    #[must_use]
+    pub fn find_for_language_and_capability(
+        &self,
+        language: &str,
+        id: CapabilityId,
+    ) -> Vec<&PluginManifest> {
+        let lower = language.to_ascii_lowercase();
+        self.manifests
+            .values()
+            .filter(|m| m.capabilities().contains(&id) && m.languages().contains(&lower))
             .collect()
     }
 
