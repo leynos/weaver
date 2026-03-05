@@ -820,7 +820,10 @@ to Tree-sitter extraction and optionally enriches via LSP when available. See
 - [ ] 7.1.4. Add cache integration for card extraction keyed by URI, language,
       and document revision. Requires 4.3.4.
   - [ ] Reuse Tree-sitter parser registries and cache extracted entity tables
-        keyed by repo, ref, file path, and blob hash.
+        with a Least Recently Used (LRU) policy keyed by repo, ref, file path,
+        and blob hash.
+  - [ ] Avoid unnecessary string cloning in card and region extraction; prefer
+        borrowing or interning for hot paths.
   - [ ] Acceptance criteria: repeated `get-card` requests for unchanged
         revisions hit cache in integration tests; revision changes invalidate
         deterministically; and cache misses preserve correctness.
@@ -871,26 +874,31 @@ diff over last N commits” and “Failure modes and mitigations”.*
 
 - [ ] 7.3.1. Implement git-backed blob loading for historical revisions without
       checkout, scoped to only the files required by the slice budget.
-  - [ ] Add explicit operational limits for blob size, parse time per file, and
-        total files per commit, with fallback behaviour recorded in the output.
+  - [ ] Add explicit operational limits for blob size, parse time per file,
+        total files per commit, and partial-parse thresholds, with fallback
+        reasons recorded in the output (`timeout`, `blob_too_large`,
+        `partial_parse`, `unsupported_grammar`).
   - [ ] Acceptance criteria: history queries never invoke `git checkout`;
     missing blobs return structured diagnostics; and the file loader is covered
     by unit tests for typical path and revision scenarios.
 - [ ] 7.3.2. Implement slice reconstruction per commit with explicit data
       quality metadata and partial symbol table resolution. Requires 7.2.5.
   - [ ] Acceptance criteria: `--commits 5` returns a stable set of commits and
-    per-commit slice payloads; delta payloads include added/removed/changed
-    nodes and edges; and BDD tests validate output against a curated git fixture
+    per-commit slice payloads with `quality.resolution_scope` and
+    `quality.fallbacks`; delta payloads include added/removed/changed nodes and
+    edges; and BDD tests validate output against a curated git fixture
     repository.
-- [ ] 7.3.3. Implement delta computation normalisation and change taxonomy
+- [ ] 7.3.3. Implement delta computation normalization and change taxonomy
       classification for nodes and edges.
   - [ ] Treat import blocks and decorators as commutative sets for deltas and
-        persist normalised representations alongside raw text.
+        persist normalized representations alongside raw text.
   - [ ] Acceptance criteria: import/decorator reordering is classified as
         `text` change; taxonomy output includes confidence; and fixtures cover
         comment-only and signature-only edits.
 - [ ] 7.3.4. Implement semantic risk warnings on history deltas for
       dependency/dependent changes in the slice neighbourhood.
+  - [ ] Expose `--warning-depth` to widen the dependency neighbourhood scanned
+        for warnings.
   - [ ] Acceptance criteria: warnings include edge paths and confidence;
     `text`-only deltas emit lower-risk warnings; and curated fixtures validate
     both warning types.
