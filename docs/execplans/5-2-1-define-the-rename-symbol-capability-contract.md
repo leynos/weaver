@@ -23,8 +23,8 @@ messages.
 
 Observable behaviour after this change:
 
-- Running `make check-fmt && make lint && make test` passes with no
-  regressions.
+- Running `make check-fmt && make lint && make test && make markdownlint`
+  passes with no regressions.
 - New unit tests in `crates/weaver-plugins/src/capability/` exercise schema
   validation for happy and unhappy paths.
 - New behaviour-driven development (BDD) scenarios in
@@ -353,7 +353,8 @@ capability IDs, the rename-symbol request schema, and refusal reason codes.
 Update `lib.rs` re-exports and ensure all rustdoc examples compile. Run full
 quality gates. Mark roadmap entry as done.
 
-Validation: `make check-fmt && make lint && make test` all pass.
+Validation: `make check-fmt && make lint && make test && make markdownlint`
+all pass.
 
 ## Validation and acceptance
 
@@ -365,6 +366,7 @@ Quality criteria (what "done" means):
   end-to-end through the validation layer.
 - Lint: `make lint` passes with no warnings.
 - Format: `make check-fmt` passes.
+- Markdown: `make markdownlint` passes for all changed documentation.
 - Backwards compatibility: Existing plugin manifest JSON without a
   `capabilities` field deserializes correctly. Existing diagnostic JSON without
   a `reason_code` field deserializes correctly. All pre-existing tests pass
@@ -377,6 +379,7 @@ set -o pipefail
 make check-fmt 2>&1 | tee /tmp/check-fmt.log
 make lint 2>&1 | tee /tmp/lint.log
 make test 2>&1 | tee /tmp/test.log
+make markdownlint 2>&1 | tee /tmp/markdownlint.log
 ```
 
 Acceptance criteria from the roadmap:
