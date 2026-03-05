@@ -18,7 +18,7 @@ use crate::{
 // Fixture builders
 // ---------------------------------------------------------------------------
 
-fn minimal_identity() -> SymbolIdentity {
+fn sample_identity(container: Option<&str>) -> SymbolIdentity {
     SymbolIdentity {
         symbol_id: String::from("sym_abc123"),
         symbol_ref: SymbolRef {
@@ -36,45 +36,25 @@ fn minimal_identity() -> SymbolIdentity {
             language: CardLanguage::Rust,
             kind: CardSymbolKind::Function,
             name: String::from("process_request"),
-            container: None,
+            container: container.map(String::from),
         },
     }
+}
+
+fn minimal_identity() -> SymbolIdentity {
+    sample_identity(None)
 }
 
 fn identity_with_container() -> SymbolIdentity {
-    SymbolIdentity {
-        symbol_id: String::from("sym_abc123"),
-        symbol_ref: SymbolRef {
-            uri: String::from("file:///src/main.rs"),
-            range: SourceRange {
-                start: SourcePosition {
-                    line: 10,
-                    column: 0,
-                },
-                end: SourcePosition {
-                    line: 42,
-                    column: 1,
-                },
-            },
-            language: CardLanguage::Rust,
-            kind: CardSymbolKind::Function,
-            name: String::from("process_request"),
-            container: Some(String::from("handlers")),
-        },
-    }
+    sample_identity(Some("handlers"))
 }
 
-fn sample_provenance() -> Provenance {
+fn sample_provenance(extra_sources: &[&str]) -> Provenance {
+    let mut sources = vec![String::from("tree_sitter")];
+    sources.extend(extra_sources.iter().map(|s| String::from(*s)));
     Provenance {
         extracted_at: String::from("2026-03-03T12:34:56Z"),
-        sources: vec![String::from("tree_sitter")],
-    }
-}
-
-fn full_provenance() -> Provenance {
-    Provenance {
-        extracted_at: String::from("2026-03-03T12:34:56Z"),
-        sources: vec![String::from("tree_sitter"), String::from("lsp_hover")],
+        sources,
     }
 }
 
@@ -117,22 +97,21 @@ fn sample_structure() -> StructureInfo {
     }
 }
 
-fn sample_metrics_structure() -> MetricsInfo {
+fn sample_metrics(fan_in: Option<u32>, fan_out: Option<u32>) -> MetricsInfo {
     MetricsInfo {
         lines: 33,
         cyclomatic: 5,
-        fan_in: None,
-        fan_out: None,
+        fan_in,
+        fan_out,
     }
 }
 
+fn sample_metrics_structure() -> MetricsInfo {
+    sample_metrics(None, None)
+}
+
 fn sample_metrics_full() -> MetricsInfo {
-    MetricsInfo {
-        lines: 33,
-        cyclomatic: 5,
-        fan_in: Some(12),
-        fan_out: Some(3),
-    }
+    sample_metrics(Some(12), Some(3))
 }
 
 fn sample_lsp() -> LspInfo {
@@ -167,16 +146,15 @@ fn snapshot_minimal_card() {
         lsp: None,
         metrics: None,
         deps: None,
-        provenance: sample_provenance(),
+        provenance: sample_provenance(&[]),
         etag: None,
     };
     let json = serde_json::to_string_pretty(&card).expect("serialise");
     assert_snapshot!(json);
 }
 
-#[test]
-fn snapshot_structure_card() {
-    let card = SymbolCard {
+fn structure_card() -> SymbolCard {
+    SymbolCard {
         card_version: 1,
         symbol: identity_with_container(),
         signature: Some(sample_signature()),
@@ -185,10 +163,14 @@ fn snapshot_structure_card() {
         lsp: None,
         metrics: Some(sample_metrics_structure()),
         deps: None,
-        provenance: sample_provenance(),
+        provenance: sample_provenance(&[]),
         etag: None,
-    };
-    let json = serde_json::to_string_pretty(&card).expect("serialise");
+    }
+}
+
+#[test]
+fn snapshot_structure_card() {
+    let json = serde_json::to_string_pretty(&structure_card()).expect("serialise");
     assert_snapshot!(json);
 }
 
@@ -203,7 +185,7 @@ fn snapshot_full_card() {
         lsp: Some(sample_lsp()),
         metrics: Some(sample_metrics_full()),
         deps: Some(sample_deps()),
-        provenance: full_provenance(),
+        provenance: sample_provenance(&["lsp_hover"]),
         etag: Some(String::from("etag_abc123")),
     };
     let json = serde_json::to_string_pretty(&card).expect("serialise");
@@ -236,20 +218,8 @@ fn snapshot_refusal_no_symbol() {
 
 #[test]
 fn snapshot_success_response() {
-    let card = SymbolCard {
-        card_version: 1,
-        symbol: identity_with_container(),
-        signature: Some(sample_signature()),
-        doc: Some(sample_doc()),
-        structure: Some(sample_structure()),
-        lsp: None,
-        metrics: Some(sample_metrics_structure()),
-        deps: None,
-        provenance: sample_provenance(),
-        etag: None,
-    };
     let response = GetCardResponse::Success {
-        card: Box::new(card),
+        card: Box::new(structure_card()),
     };
     let json = serde_json::to_string_pretty(&response).expect("serialise");
     assert_snapshot!(json);
