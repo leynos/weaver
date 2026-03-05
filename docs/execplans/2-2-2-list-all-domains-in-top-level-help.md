@@ -256,8 +256,8 @@ From `crates/weaverd/src/dispatch/router.rs` lines 89–116:
 to get the clap `Command` object. Any `after_help` attribute set on `Cli` will
 automatically be included in the manpage. Methods added to `cli.rs` that are
 only used by `lib.rs` trigger `dead_code` warnings in the build script context.
-The solution (from task 5.1.1) is to place such methods in `lib.rs` instead, or
-to use `#[allow(dead_code)]`.
+The solution is to place such methods in `lib.rs` instead, or to use
+`#[expect(dead_code, reason = "used only from lib.rs, not build.rs")]`.
 
 ## Plan of work
 

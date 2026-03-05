@@ -60,7 +60,7 @@ This satisfies roadmap task 4.1.1 from `docs/roadmap.md` (lines 347-350).
 - All dependency versions use Semantic Versioning (SemVer)-compatible caret
   requirements (`AGENTS.md` lines 206-216).
 - `rstest-bdd` v0.5.0 must be used for BDD tests (see above for
-  expansion) (workspace `Cargo.toml` line 36).
+  acronym expansion) (workspace `Cargo.toml` line 36).
 - Use `str_to_string = "deny"` — use `String::from(...)` or `.into()` instead
   of `.to_string()` on `&str` values.
 - Existing crate public APIs must not change.
