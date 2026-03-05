@@ -327,7 +327,8 @@ Syntax:
 weaver <domain> <operation> [ARG ...]
 ```
 
-Current capability keys used for LSP-backed operations:
+Current capability keys used for Language Server Protocol (LSP)-backed
+operations:
 
 - `observe.get-definition`
 - `observe.find-references`
