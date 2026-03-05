@@ -97,26 +97,34 @@ impl GetCardRequest {
 }
 
 /// Extracts the next argument value or returns an error.
+///
+/// Returns an error if the iterator is exhausted or the next token
+/// looks like a flag (starts with `'-'`).
 fn require_arg_value<'a, I>(iter: &mut I, flag: &str) -> Result<&'a str, GetCardError>
 where
     I: Iterator<Item = &'a String>,
 {
-    iter.next()
-        .map(String::as_str)
-        .ok_or_else(|| GetCardError::InvalidValue {
+    match iter.next().map(String::as_str) {
+        Some(value) if value.starts_with('-') => Err(GetCardError::InvalidValue {
             flag: String::from(flag),
             message: String::from("requires a value"),
-        })
+        }),
+        Some(value) => Ok(value),
+        None => Err(GetCardError::InvalidValue {
+            flag: String::from(flag),
+            message: String::from("requires a value"),
+        }),
+    }
 }
 
 /// Parses a detail level string via [`DetailLevel::from_str`].
 fn parse_detail(value: &str) -> Result<DetailLevel, GetCardError> {
-    value
-        .parse()
-        .map_err(|e: crate::DetailLevelParseError| GetCardError::InvalidValue {
+    value.parse().map_err(
+        |e: crate::DetailLevelParseError| GetCardError::InvalidValue {
             flag: String::from("--detail"),
             message: e.to_string(),
-        })
+        },
+    )
 }
 
 /// Validates that the format flag value is `"json"`.
@@ -262,6 +270,14 @@ mod tests {
     #[case::bad_format(
         &["--uri", "file:///main.rs", "--position", "1:1", "--format", "xml"],
         "xml"
+    )]
+    #[case::flag_as_uri_value(
+        &["--uri", "--position", "1:1"],
+        "requires a value"
+    )]
+    #[case::flag_as_position_value(
+        &["--uri", "file:///main.rs", "--position", "--detail"],
+        "requires a value"
     )]
     fn rejects_invalid_arguments(#[case] arg_list: &[&str], #[case] expected_substring: &str) {
         let arguments = args(arg_list);

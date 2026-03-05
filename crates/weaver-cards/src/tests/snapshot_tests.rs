@@ -203,41 +203,45 @@ fn snapshot_refusal_not_implemented() {
     assert_snapshot!(json);
 }
 
+fn refusal_response(reason: RefusalReason, message: &str, detail: DetailLevel) -> GetCardResponse {
+    GetCardResponse::Refusal {
+        refusal: CardRefusal {
+            reason,
+            message: String::from(message),
+            requested_detail: detail,
+        },
+    }
+}
+
 #[test]
 fn snapshot_refusal_no_symbol() {
-    let response = GetCardResponse::Refusal {
-        refusal: CardRefusal {
-            reason: RefusalReason::NoSymbolAtPosition,
-            message: String::from("no symbol found at the requested position"),
-            requested_detail: DetailLevel::Structure,
-        },
-    };
+    let response = refusal_response(
+        RefusalReason::NoSymbolAtPosition,
+        "no symbol found at the requested position",
+        DetailLevel::Structure,
+    );
     let json = serde_json::to_string_pretty(&response).expect("serialise");
     assert_snapshot!(json);
 }
 
 #[test]
 fn snapshot_refusal_unsupported_language() {
-    let response = GetCardResponse::Refusal {
-        refusal: CardRefusal {
-            reason: RefusalReason::UnsupportedLanguage,
-            message: String::from("the requested language is not supported"),
-            requested_detail: DetailLevel::Structure,
-        },
-    };
+    let response = refusal_response(
+        RefusalReason::UnsupportedLanguage,
+        "the requested language is not supported",
+        DetailLevel::Structure,
+    );
     let json = serde_json::to_string_pretty(&response).expect("serialise");
     assert_snapshot!(json);
 }
 
 #[test]
 fn snapshot_refusal_backend_unavailable() {
-    let response = GetCardResponse::Refusal {
-        refusal: CardRefusal {
-            reason: RefusalReason::BackendUnavailable,
-            message: String::from("the required backend is not available"),
-            requested_detail: DetailLevel::Semantic,
-        },
-    };
+    let response = refusal_response(
+        RefusalReason::BackendUnavailable,
+        "the required backend is not available",
+        DetailLevel::Semantic,
+    );
     let json = serde_json::to_string_pretty(&response).expect("serialise");
     assert_snapshot!(json);
 }

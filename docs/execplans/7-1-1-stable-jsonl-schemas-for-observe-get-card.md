@@ -207,7 +207,7 @@ All stages completed successfully. The `weaver-cards` crate exports 25
 public types covering the full `observe get-card` schema. Six insta
 snapshots lock the JSON shapes for minimal, structure, and full detail
 cards, plus refusal and success response envelopes. Five BDD scenarios
-validate schema contracts. The `weaverd` router recognises `observe
+validate schema contracts. The `weaverd` router recognizes `observe
 get-card` and dispatches to a handler that returns a structured
 `GetCardResponse::Refusal` with reason `not_yet_implemented`. All quality
 gates (`make check-fmt`, `make lint`, `make test`) pass. Documentation
@@ -458,7 +458,7 @@ snapshots the result. Snapshot files auto-generated in
 
 **New file: `crates/weaver-cards/src/tests/round_trip_tests.rs`** (~80 lines)
 
-Tests serialise and deserialise each type to confirm serde compatibility.
+Tests serialize and deserialize each type to confirm serde compatibility.
 Uses `rstest` parameterization for detail levels. Verifies byte-identical
 re-serialization.
 
@@ -558,7 +558,7 @@ Handler module that:
    `GetCardError` to `DispatchError::invalid_arguments(...)`.
 2. Constructs a `GetCardResponse::not_yet_implemented(request.detail)`
    refusal.
-3. Serialises the response to JSON via `serde_json::to_string`.
+3. Serializes the response to JSON via `serde_json::to_string`.
 4. Writes the JSON to `writer.write_stdout()`.
 5. Returns `Ok(DispatchResult::with_status(1))`.
 
@@ -919,7 +919,7 @@ files. Within the 25-file tolerance.
 - `crates/sempai-core/src/lib.rs` — pattern to follow for new crate
   scaffolding (module structure, re-exports, lint compliance)
 - `crates/weaverd/src/dispatch/observe/get_definition.rs` — pattern to
-  follow for handler module structure (parse args, serialise response,
+  follow for handler module structure (parse args, serialize response,
   return `DispatchResult`)
 - `crates/weaverd/src/dispatch/router/tests.rs` — existing router test
   structure to extend

@@ -162,9 +162,16 @@ fn get_card_returns_structured_refusal(mut backends: FusionBackends<SemanticBack
     assert_eq!(result.status, 1);
 
     let response = String::from_utf8(output).expect("utf8");
-    assert!(response.contains("not_yet_implemented"));
-    assert!(response.contains("refusal"));
-    assert!(response.contains("structure"));
+    let stream_line = response.lines().next().expect("stream line");
+    let envelope: serde_json::Value = serde_json::from_str(stream_line).expect("parse envelope");
+    assert_eq!(envelope["kind"], "stream");
+    assert_eq!(envelope["stream"], "stdout");
+
+    let data_str = envelope["data"].as_str().expect("data string");
+    let card: serde_json::Value = serde_json::from_str(data_str).expect("parse card");
+    assert_eq!(card["status"], "refusal");
+    assert_eq!(card["refusal"]["reason"], "not_yet_implemented");
+    assert_eq!(card["refusal"]["requested_detail"], "structure");
 }
 
 #[rstest]

@@ -94,8 +94,14 @@ fn sample_provenance() -> Provenance {
 }
 
 fn build_card(detail: &str) -> SymbolCard {
-    match detail {
-        "minimal" => SymbolCard {
+    let level: DetailLevel = detail.parse().expect("valid detail level in feature file");
+    build_card_at_level(level)
+        .expect("BDD fixture should be defined for the requested detail level")
+}
+
+fn build_card_at_level(level: DetailLevel) -> Option<SymbolCard> {
+    match level {
+        DetailLevel::Minimal => Some(SymbolCard {
             card_version: 1,
             symbol: sample_identity(),
             signature: None,
@@ -106,8 +112,8 @@ fn build_card(detail: &str) -> SymbolCard {
             deps: None,
             provenance: sample_provenance(),
             etag: None,
-        },
-        "structure" => SymbolCard {
+        }),
+        DetailLevel::Structure => Some(SymbolCard {
             card_version: 1,
             symbol: sample_identity(),
             signature: Some(SignatureInfo {
@@ -144,8 +150,8 @@ fn build_card(detail: &str) -> SymbolCard {
             deps: None,
             provenance: sample_provenance(),
             etag: None,
-        },
-        other => panic!("unsupported detail level for fixture: {other}"),
+        }),
+        _ => None,
     }
 }
 
@@ -160,12 +166,13 @@ fn given_card_at_detail(world: &mut TestWorld, detail: QuotedString) {
 
 #[given("a refusal response with reason {reason}")]
 fn given_refusal_response(world: &mut TestWorld, reason: QuotedString) {
+    assert_eq!(
+        reason.as_str(),
+        "not_yet_implemented",
+        "only 'not_yet_implemented' reason is supported in BDD fixtures"
+    );
     let detail = DetailLevel::Structure;
-    let resp = match reason.as_str() {
-        "not_yet_implemented" => GetCardResponse::not_yet_implemented(detail),
-        other => panic!("unsupported refusal reason: {other}"),
-    };
-    world.response = Some(resp);
+    world.response = Some(GetCardResponse::not_yet_implemented(detail));
 }
 
 #[given("a success response with a {detail} detail card")]
@@ -193,13 +200,17 @@ fn given_request_no_detail(world: &mut TestWorld) {
 
 #[when("the card is serialised to JSON")]
 fn when_card_serialised(world: &mut TestWorld) {
-    let json = if let Some(card) = &world.card {
-        serde_json::to_string(card).expect("serialise card")
-    } else if let Some(response) = &world.response {
-        serde_json::to_string(response).expect("serialise response")
-    } else {
-        panic!("neither card nor response is set");
-    };
+    let json = world
+        .card
+        .as_ref()
+        .map(|c| serde_json::to_string(c).expect("serialise card"))
+        .or_else(|| {
+            world
+                .response
+                .as_ref()
+                .map(|r| serde_json::to_string(r).expect("serialise response"))
+        })
+        .expect("either card or response must be set");
     world.json_output = Some(json);
 }
 
@@ -239,12 +250,9 @@ fn then_json_does_not_contain_field(world: &mut TestWorld, field: QuotedString) 
 fn then_json_field_has_value(world: &mut TestWorld, key: QuotedString, value: QuotedString) {
     let json = world.json_output.as_ref().expect("JSON should be set");
     let parsed: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
-    let actual = parsed.get(key.as_str()).unwrap_or_else(|| {
-        panic!(
-            "expected JSON to contain key '{}', got: {json}",
-            key.as_str()
-        )
-    });
+    let actual = parsed
+        .get(key.as_str())
+        .expect("expected JSON to contain key");
     let expected = serde_json::Value::String(String::from(value.as_str()));
     assert_eq!(
         actual,
@@ -259,11 +267,10 @@ fn then_json_field_has_value(world: &mut TestWorld, key: QuotedString, value: Qu
 #[then("the detail level is {level}")]
 fn then_detail_level_is(world: &mut TestWorld, level: QuotedString) {
     let request = world.request.as_ref().expect("request should be set");
-    let expected = match level.as_str() {
-        "structure" => DetailLevel::Structure,
-        "minimal" => DetailLevel::Minimal,
-        other => panic!("unsupported detail level: {other}"),
-    };
+    let expected: DetailLevel = level
+        .as_str()
+        .parse()
+        .expect("valid detail level in feature file");
     assert_eq!(request.detail, expected);
 }
 
