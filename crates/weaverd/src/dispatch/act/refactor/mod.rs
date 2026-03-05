@@ -21,7 +21,9 @@ use weaver_plugins::manifest::{PluginKind, PluginManifest, PluginMetadata};
 use weaver_plugins::process::SandboxExecutor;
 use weaver_plugins::protocol::FilePayload;
 use weaver_plugins::runner::PluginRunner;
-use weaver_plugins::{PluginError, PluginOutput, PluginRegistry, PluginRequest, PluginResponse};
+use weaver_plugins::{
+    CapabilityId, PluginError, PluginOutput, PluginRegistry, PluginRequest, PluginResponse,
+};
 
 use crate::backends::{BackendKind, FusionBackends};
 use crate::dispatch::act::apply_patch;
@@ -65,7 +67,8 @@ impl SandboxRefactorRuntime {
         let rope_metadata =
             PluginMetadata::new(ROPE_PLUGIN_NAME, ROPE_PLUGIN_VERSION, PluginKind::Actuator);
         let rope_manifest =
-            PluginManifest::new(rope_metadata, vec![String::from("python")], rope_executable);
+            PluginManifest::new(rope_metadata, vec![String::from("python")], rope_executable)
+                .with_capabilities(vec![CapabilityId::RenameSymbol]);
         registry
             .register(rope_manifest)
             .map_err(|error| format!("failed to initialize refactor runtime: {error}"))?;
@@ -189,8 +192,26 @@ pub fn handle<W: Write>(
         }
     }
 
+    // Map rename operations to the rename-symbol capability contract.
+    // The CLI still accepts `--refactoring rename`; the handler translates
+    // to the contract operation name and argument schema.
+    let effective_operation = match args.refactoring.as_str() {
+        "rename" => {
+            plugin_args
+                .entry(String::from("uri"))
+                .or_insert_with(|| serde_json::Value::String(args.file.clone()));
+            if let Some(offset_val) = plugin_args.remove("offset") {
+                plugin_args
+                    .entry(String::from("position"))
+                    .or_insert(offset_val);
+            }
+            String::from("rename-symbol")
+        }
+        _ => args.refactoring.clone(),
+    };
+
     let plugin_request = PluginRequest::with_arguments(
-        &args.refactoring,
+        &effective_operation,
         vec![FilePayload::new(PathBuf::from(&args.file), file_content)],
         plugin_args,
     );

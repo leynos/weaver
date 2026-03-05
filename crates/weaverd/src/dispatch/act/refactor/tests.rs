@@ -246,3 +246,100 @@ fn default_runtime_returns_shared_trait_object() {
     let result = runtime.execute("rope", &request);
     assert!(result.is_err());
 }
+
+/// Captures the `PluginRequest` sent to the runtime for inspection.
+struct InspectingRuntime {
+    captured: std::sync::Mutex<Option<PluginRequest>>,
+    response: PluginResponse,
+}
+
+impl RefactorPluginRuntime for InspectingRuntime {
+    fn execute(
+        &self,
+        _provider: &str,
+        request: &PluginRequest,
+    ) -> Result<PluginResponse, PluginError> {
+        *self.captured.lock().expect("lock") = Some(request.clone());
+        Ok(self.response.clone())
+    }
+}
+
+#[rstest]
+fn handler_sends_rename_symbol_contract_conforming_request(socket_dir: TempDir) {
+    let workspace = TempDir::new().expect("workspace");
+    let file_path = workspace.path().join("notes.txt");
+    std::fs::write(&file_path, "hello world\n").expect("write");
+
+    let diff = concat!(
+        "diff --git a/notes.txt b/notes.txt\n",
+        "<<<<<<< SEARCH\n",
+        "hello world\n",
+        "=======\n",
+        "hello woven\n",
+        ">>>>>>> REPLACE\n",
+    );
+    let runtime = InspectingRuntime {
+        captured: std::sync::Mutex::new(None),
+        response: PluginResponse::success(PluginOutput::Diff {
+            content: String::from(diff),
+        }),
+    };
+    let request = command_request(vec![
+        String::from("--provider"),
+        String::from("rope"),
+        String::from("--refactoring"),
+        String::from("rename"),
+        String::from("--file"),
+        String::from("notes.txt"),
+        String::from("offset=4"),
+        String::from("new_name=woven"),
+    ]);
+    let socket_path = socket_dir.path().join("socket.sock");
+    let mut backends = build_backends(&socket_path);
+    let mut output = Vec::new();
+    let mut writer = ResponseWriter::new(&mut output);
+
+    let result = handle(
+        &request,
+        &mut writer,
+        RefactorContext {
+            backends: &mut backends,
+            workspace_root: workspace.path(),
+            runtime: &runtime,
+        },
+    )
+    .expect("dispatch result");
+    assert_eq!(result.status, 0);
+
+    let captured = runtime.captured.lock().expect("lock");
+    let plugin_request = captured.as_ref().expect("request should be captured");
+
+    // The handler must translate "rename" to "rename-symbol".
+    assert_eq!(plugin_request.operation(), "rename-symbol");
+
+    // The handler must inject "uri" from --file when not already present.
+    let args = plugin_request.arguments();
+    assert_eq!(
+        args.get("uri").and_then(|v| v.as_str()),
+        Some("notes.txt"),
+        "uri should be injected from --file"
+    );
+
+    // The handler must map "offset" to "position".
+    assert_eq!(
+        args.get("position").and_then(|v| v.as_str()),
+        Some("4"),
+        "offset should be mapped to position"
+    );
+    assert!(
+        !args.contains_key("offset"),
+        "offset key should be removed after mapping to position"
+    );
+
+    // new_name should be forwarded as-is.
+    assert_eq!(
+        args.get("new_name").and_then(|v| v.as_str()),
+        Some("woven"),
+        "new_name should be forwarded"
+    );
+}

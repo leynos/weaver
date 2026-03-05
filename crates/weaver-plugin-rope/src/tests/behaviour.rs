@@ -15,7 +15,7 @@ use crate::{RopeAdapter, RopeAdapterError, execute_request, failure_response};
 #[derive(Default)]
 struct World {
     request: Option<PluginRequest>,
-    execute_result: Option<Result<PluginResponse, String>>,
+    execute_result: Option<Result<PluginResponse, crate::PluginFailure>>,
     adapter_mode: AdapterMode,
 }
 
@@ -45,10 +45,11 @@ mock! {
 }
 
 fn should_invoke_rename(request: &PluginRequest) -> bool {
-    request.operation() == "rename"
+    request.operation() == "rename-symbol"
         && !request.files().is_empty()
-        && request.arguments().contains_key("offset")
+        && request.arguments().contains_key("position")
         && request.arguments().contains_key("new_name")
+        && request.arguments().contains_key("uri")
 }
 
 fn configure_adapter_for_mode(adapter: &mut MockBehaviourAdapter, mode: AdapterMode) {
@@ -63,11 +64,15 @@ fn configure_adapter_for_mode(adapter: &mut MockBehaviourAdapter, mode: AdapterM
     );
 }
 
-fn build_request(operation: &str, with_offset: bool, with_new_name: bool) -> PluginRequest {
+fn build_request(operation: &str, with_position: bool, with_new_name: bool) -> PluginRequest {
     let mut arguments = HashMap::new();
-    if with_offset {
+    arguments.insert(
+        String::from("uri"),
+        serde_json::Value::String(String::from("src/main.py")),
+    );
+    if with_position {
         arguments.insert(
-            String::from("offset"),
+            String::from("position"),
             serde_json::Value::String(String::from("4")),
         );
     }
@@ -88,14 +93,14 @@ fn build_request(operation: &str, with_offset: bool, with_new_name: bool) -> Plu
     )
 }
 
-#[given("a rename request with required arguments")]
+#[given("a rename-symbol request with required arguments")]
 fn given_valid_rename(world: &mut World) {
-    world.request = Some(build_request("rename", true, true));
+    world.request = Some(build_request("rename-symbol", true, true));
 }
 
-#[given("a rename request missing offset")]
-fn given_missing_offset(world: &mut World) {
-    world.request = Some(build_request("rename", false, true));
+#[given("a rename-symbol request missing position")]
+fn given_missing_position(world: &mut World) {
+    world.request = Some(build_request("rename-symbol", false, true));
 }
 
 #[given("an unsupported extract method request")]
@@ -132,7 +137,10 @@ fn resolved_response(world: &World) -> PluginResponse {
         .expect("execute result should be present")
     {
         Ok(resp) => resp.clone(),
-        Err(msg) => failure_response(msg.clone()),
+        Err(failure) => failure_response(crate::PluginFailure {
+            message: failure.message.clone(),
+            reason_code: failure.reason_code,
+        }),
     }
 }
 
@@ -166,6 +174,19 @@ fn then_failure_contains(world: &mut World, text: String) {
             .iter()
             .any(|diagnostic| diagnostic.message().contains(needle)),
         "expected diagnostics to contain '{needle}', got: {diagnostics:?}",
+    );
+}
+
+#[then("the failure has reason code {code}")]
+fn then_failure_has_reason_code(world: &mut World, code: String) {
+    let needle = code.trim_matches('"');
+    let response = resolved_response(world);
+    let diagnostics = response.diagnostics();
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.reason_code().is_some_and(|rc| rc.as_str() == needle)),
+        "expected reason code '{needle}' in diagnostics: {diagnostics:?}",
     );
 }
 

@@ -508,7 +508,7 @@ new* *capabilities and specialist providers.*
       diagnostics. Requires 5.1.1.
   - Acceptance criteria: capability contract is versioned, broker validation
     enforces schema shape, and refusal diagnostics use stable reason codes.
-- [ ] 5.2.2. Update `weaver-plugin-rope` manifest and runtime handshake to
+- [x] 5.2.2. Update `weaver-plugin-rope` manifest and runtime handshake to
       declare and serve `rename-symbol` through the capability interface.
       Requires 5.2.1.
   - Acceptance criteria: plugin advertises `rename-symbol` in capability probes,
