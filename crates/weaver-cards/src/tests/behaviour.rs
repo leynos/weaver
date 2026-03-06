@@ -5,12 +5,8 @@ use std::str::FromStr;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
-use crate::{
-    BranchInfo, CardLanguage, CardRefusal, CardSymbolKind, DepsInfo, DetailLevel, DocInfo,
-    GetCardRequest, GetCardResponse, LocalInfo, LspInfo, MetricsInfo, ParamInfo, Provenance,
-    RefusalReason, SignatureInfo, SourcePosition, SourceRange, StructureInfo, SymbolCard,
-    SymbolIdentity, SymbolRef,
-};
+use super::fixtures;
+use crate::{CardRefusal, DetailLevel, GetCardRequest, GetCardResponse, RefusalReason, SymbolCard};
 
 // ---------------------------------------------------------------------------
 // QuotedString helper (same pattern as sempai_core::test_support)
@@ -61,38 +57,8 @@ fn world() -> TestWorld {
 }
 
 // ---------------------------------------------------------------------------
-// Fixture builders
+// Fixture builders (delegates to shared fixtures module)
 // ---------------------------------------------------------------------------
-
-fn sample_identity() -> SymbolIdentity {
-    SymbolIdentity {
-        symbol_id: String::from("sym_test"),
-        symbol_ref: SymbolRef {
-            uri: String::from("file:///src/main.rs"),
-            range: SourceRange {
-                start: SourcePosition {
-                    line: 10,
-                    column: 0,
-                },
-                end: SourcePosition {
-                    line: 42,
-                    column: 1,
-                },
-            },
-            language: CardLanguage::Rust,
-            kind: CardSymbolKind::Function,
-            name: String::from("process_request"),
-            container: Some(String::from("handlers")),
-        },
-    }
-}
-
-fn sample_provenance() -> Provenance {
-    Provenance {
-        extracted_at: String::from("2026-03-03T12:34:56Z"),
-        sources: vec![String::from("tree_sitter")],
-    }
-}
 
 fn parse_detail_level(raw: &str) -> Result<DetailLevel, String> {
     raw.parse()
@@ -111,114 +77,7 @@ fn parse_refusal_reason(raw: &str) -> Result<RefusalReason, String> {
 
 fn build_card(detail: &str) -> Result<SymbolCard, String> {
     let level = parse_detail_level(detail)?;
-    Ok(build_card_at_level(level))
-}
-
-fn sample_signature() -> SignatureInfo {
-    SignatureInfo {
-        display: String::from("fn process_request(req: &Request) -> Response"),
-        params: vec![ParamInfo {
-            name: String::from("req"),
-            type_annotation: String::from("&Request"),
-        }],
-        returns: String::from("Response"),
-    }
-}
-
-fn sample_doc() -> DocInfo {
-    DocInfo {
-        docstring: String::from("Processes a request."),
-        summary: String::from("Processes a request."),
-        source: String::from("tree_sitter"),
-    }
-}
-
-fn sample_structure() -> StructureInfo {
-    StructureInfo {
-        locals: vec![LocalInfo {
-            name: String::from("result"),
-            kind: String::from("variable"),
-            decl_line: 15,
-        }],
-        branches: vec![BranchInfo {
-            kind: String::from("if"),
-            line: 18,
-        }],
-    }
-}
-
-fn sample_lsp() -> LspInfo {
-    LspInfo {
-        hover: String::from("fn process_request(req: &Request) -> Response"),
-        type_info: String::from("Callable[[Request], Response]"),
-        deprecated: false,
-        source: String::from("lsp_hover"),
-    }
-}
-
-fn sample_metrics(fan_in: Option<u32>, fan_out: Option<u32>) -> MetricsInfo {
-    MetricsInfo {
-        lines: 33,
-        cyclomatic: 5,
-        fan_in,
-        fan_out,
-    }
-}
-
-fn sample_deps() -> DepsInfo {
-    DepsInfo {
-        calls: vec![String::from("sym_def456")],
-        imports: vec![String::from("mod_std_io")],
-        config: vec![],
-    }
-}
-
-fn build_card_at_level(level: DetailLevel) -> SymbolCard {
-    let base = || SymbolCard {
-        card_version: 1,
-        symbol: sample_identity(),
-        signature: None,
-        doc: None,
-        attachments: None,
-        structure: None,
-        lsp: None,
-        metrics: None,
-        deps: None,
-        interstitial: None,
-        provenance: sample_provenance(),
-        etag: None,
-    };
-    match level {
-        DetailLevel::Minimal => base(),
-        DetailLevel::Signature => SymbolCard {
-            signature: Some(sample_signature()),
-            ..base()
-        },
-        DetailLevel::Structure => SymbolCard {
-            signature: Some(sample_signature()),
-            doc: Some(sample_doc()),
-            structure: Some(sample_structure()),
-            metrics: Some(sample_metrics(None, None)),
-            ..base()
-        },
-        DetailLevel::Semantic => SymbolCard {
-            signature: Some(sample_signature()),
-            doc: Some(sample_doc()),
-            structure: Some(sample_structure()),
-            lsp: Some(sample_lsp()),
-            metrics: Some(sample_metrics(None, None)),
-            ..base()
-        },
-        DetailLevel::Full => SymbolCard {
-            signature: Some(sample_signature()),
-            doc: Some(sample_doc()),
-            structure: Some(sample_structure()),
-            lsp: Some(sample_lsp()),
-            metrics: Some(sample_metrics(Some(12), Some(3))),
-            deps: Some(sample_deps()),
-            ..base()
-        },
-    }
+    Ok(fixtures::build_card_at_level(level))
 }
 
 fn build_refusal_response(reason: RefusalReason, detail: DetailLevel) -> GetCardResponse {
@@ -334,7 +193,8 @@ fn then_json_field_has_value(world: &mut TestWorld, key: QuotedString, value: Qu
     let actual = parsed
         .pointer(&pointer)
         .unwrap_or_else(|| panic!("expected JSON to contain key '{}'", key.as_str()));
-    let expected = serde_json::Value::String(String::from(value.as_str()));
+    let expected: serde_json::Value = serde_json::from_str(value.as_str())
+        .unwrap_or_else(|_| serde_json::Value::String(String::from(value.as_str())));
     assert_eq!(
         actual,
         &expected,

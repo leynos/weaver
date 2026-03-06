@@ -454,7 +454,7 @@ Arguments:
 - `--uri` (required) — file URI of the source file containing the symbol.
 - `--position` (required) — 1-indexed `LINE:COL` position within the
   symbol.
-- `--detail` (optional) — progressive detail level controlling how much
+- `--detail` (optional) — progressive detail level, controlling how much
   information the card contains. One of `minimal`, `signature`, `structure`
   (default), `semantic`, or `full`.
 - `--format` (optional) — output format. Currently, only `json` (the
@@ -534,8 +534,9 @@ object:
 
 Card fields beyond identity are progressively included based on the detail
 level. `minimal` returns only the `symbol` and `provenance` fields;
-`structure` (the default) adds `signature`, `doc`, `attachments`,
-`structure`, and basic `metrics`; `semantic` adds LSP hover/type
+`structure` (the default) adds `signature`, `doc`, `structure`, and basic
+`metrics`; optional `attachments` are included when present. `semantic`
+adds LSP hover/type
 information; `full` adds dependency edges and fan-in/out metrics.
 
 #### observe grep
