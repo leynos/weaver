@@ -175,13 +175,17 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
   `main_entry.rs`) runs the binary as a subprocess and captures its output,
   which is the correct way to test `--help`. Date/Author: 2026-03-03
 
-- Decision: Place `render_after_help()` inside the `#[cfg(test)] mod
-  after_help` module rather than as a separate `#[cfg(test)]` function.
-  Rationale: Clippy's `items_after_test_module` lint fires on any items after
-  a `#[cfg(test)] mod`, even if those items are also `#[cfg(test)]`. Moving
-  the function inside the module avoids the lint. The function calls
-  `super::msg()` to access the parent module's localizer helper.
-  Date/Author: 2026-03-04
+- Decision: Declare the `after_help` module as `pub(crate)` (not
+  `#[cfg(test)]`) with `DOMAIN_OPERATIONS` re-exported as `pub` from
+  `lib.rs` so integration tests can reference it directly. The module
+  uses `#[allow(dead_code)]` because `#[expect]` is not viable:
+  `dead_code` fires for the lib target (where only `DOMAIN_OPERATIONS`
+  is reachable via re-export) but not for the test target (where all
+  symbols are used), so `#[expect]` would be unfulfilled in the test
+  compilation and fail `--all-targets` lint. `render_after_help()` lives
+  inside the `after_help` module to avoid Clippy's
+  `items_after_test_module` lint, and calls `super::msg()` to access the
+  parent module's localizer helper. Date/Author: 2026-03-04
 
 ## Outcomes & retrospective
 

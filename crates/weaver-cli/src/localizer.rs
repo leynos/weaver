@@ -116,7 +116,7 @@ pub(crate) mod after_help {
     /// `DomainRoutingContext` in `crates/weaverd/src/dispatch/router.rs`.
     /// Unit tests import this constant so the operation list is defined
     /// in exactly one place.
-    pub(crate) const DOMAIN_OPERATIONS: &[(&str, &[&str])] = &[
+    pub const DOMAIN_OPERATIONS: &[(&str, &[&str])] = &[
         (
             "observe",
             &[

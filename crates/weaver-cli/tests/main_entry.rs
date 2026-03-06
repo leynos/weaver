@@ -5,6 +5,7 @@
 
 use assert_cmd::cargo::cargo_bin_cmd;
 use predicates::str::contains;
+use weaver_cli::DOMAIN_OPERATIONS;
 
 #[test]
 fn capabilities_probe_succeeds() {
@@ -23,27 +24,6 @@ fn missing_operation_exits_with_failure() {
         .stderr(contains("command operation must be provided"));
 }
 
-/// Tokens the `--help` output must contain.  The canonical list lives in
-/// `localizer::after_help::DOMAIN_OPERATIONS` (`pub(crate)`); this
-/// integration test is a separate crate, so the list is mirrored here.
-const HELP_TOKENS: &[&str] = &[
-    "Domains and operations:",
-    "observe",
-    "act",
-    "verify",
-    "get-definition",
-    "find-references",
-    "grep",
-    "diagnostics",
-    "call-hierarchy",
-    "rename-symbol",
-    "apply-edits",
-    "apply-patch",
-    "apply-rewrite",
-    "refactor",
-    "syntax",
-];
-
 #[test]
 fn help_output_lists_all_domains_and_operations() {
     let mut command = cargo_bin_cmd!("weaver");
@@ -54,10 +34,21 @@ fn help_output_lists_all_domains_and_operations() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
     let combined = format!("{stdout}{stderr}");
-    for token in HELP_TOKENS {
+
+    assert!(
+        combined.contains("Domains and operations:"),
+        "weaver --help output missing header"
+    );
+    for (domain, ops) in DOMAIN_OPERATIONS {
         assert!(
-            combined.contains(token),
-            "weaver --help output missing {token:?}"
+            combined.contains(domain),
+            "weaver --help output missing domain {domain:?}"
         );
+        for op in *ops {
+            assert!(
+                combined.contains(op),
+                "weaver --help output missing operation {op:?}"
+            );
+        }
     }
 }
