@@ -53,11 +53,11 @@ fn symbol_card_round_trips(minimal_card: SymbolCard) {
 }
 
 #[rstest]
-fn symbol_card_re_serialisation_is_stable(minimal_card: SymbolCard) {
+fn symbol_card_re_serialization_is_stable(minimal_card: SymbolCard) {
     let json1 = serde_json::to_string(&minimal_card).expect("serialize 1");
     let deserialized: SymbolCard = serde_json::from_str(&json1).expect("deserialize");
     let json2 = serde_json::to_string(&deserialized).expect("serialize 2");
-    assert_eq!(json1, json2, "re-serialisation must be byte-identical");
+    assert_eq!(json1, json2, "re-serialization must be byte-identical");
 }
 
 #[rstest]

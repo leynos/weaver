@@ -2,7 +2,7 @@ Feature: Symbol card schema contracts
 
   Scenario: Minimal detail card omits optional sections
     Given a symbol card at "minimal" detail level
-    When the card is serialised to JSON
+    When the card is serialized to JSON
     Then the JSON contains a "card_version" field
     And the JSON contains a "symbol" field
     And the JSON contains a "provenance" field
@@ -11,7 +11,7 @@ Feature: Symbol card schema contracts
 
   Scenario: Structure detail card includes signature and doc
     Given a symbol card at "structure" detail level
-    When the card is serialised to JSON
+    When the card is serialized to JSON
     Then the JSON contains a "signature" field
     And the JSON contains a "doc" field
     And the JSON contains a "structure" field
@@ -19,13 +19,13 @@ Feature: Symbol card schema contracts
 
   Scenario: Refusal response includes reason code
     Given a refusal response with reason "not_yet_implemented"
-    When the response is serialised to JSON
+    When the response is serialized to JSON
     Then the JSON field "status" has value "refusal"
     And the JSON contains a "refusal" field
 
   Scenario: Success response wraps a card
     Given a success response with a "structure" detail card
-    When the response is serialised to JSON
+    When the response is serialized to JSON
     Then the JSON field "status" has value "success"
     And the JSON contains a "card" field
 

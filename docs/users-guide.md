@@ -457,7 +457,7 @@ Arguments:
 - `--detail` (optional) — progressive detail level controlling how much
   information the card contains. One of `minimal`, `signature`, `structure`
   (default), `semantic`, or `full`.
-- `--format` (optional) — output format. Currently only `json` (the
+- `--format` (optional) — output format. Currently, only `json` (the
   default) is supported.
 
 Response:

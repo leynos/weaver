@@ -6,9 +6,10 @@ use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
 use crate::{
-    BranchInfo, CardLanguage, CardRefusal, CardSymbolKind, DetailLevel, DocInfo, GetCardRequest,
-    GetCardResponse, LocalInfo, MetricsInfo, ParamInfo, Provenance, RefusalReason, SignatureInfo,
-    SourcePosition, SourceRange, StructureInfo, SymbolCard, SymbolIdentity, SymbolRef,
+    BranchInfo, CardLanguage, CardRefusal, CardSymbolKind, DepsInfo, DetailLevel, DocInfo,
+    GetCardRequest, GetCardResponse, LocalInfo, LspInfo, MetricsInfo, ParamInfo, Provenance,
+    RefusalReason, SignatureInfo, SourcePosition, SourceRange, StructureInfo, SymbolCard,
+    SymbolIdentity, SymbolRef,
 };
 
 // ---------------------------------------------------------------------------
@@ -110,67 +111,113 @@ fn parse_refusal_reason(raw: &str) -> Result<RefusalReason, String> {
 
 fn build_card(detail: &str) -> Result<SymbolCard, String> {
     let level = parse_detail_level(detail)?;
-    build_card_at_level(level)
-        .ok_or_else(|| format!("BDD fixture not defined for detail level: {detail}"))
+    Ok(build_card_at_level(level))
 }
 
-fn build_card_at_level(level: DetailLevel) -> Option<SymbolCard> {
+fn sample_signature() -> SignatureInfo {
+    SignatureInfo {
+        display: String::from("fn process_request(req: &Request) -> Response"),
+        params: vec![ParamInfo {
+            name: String::from("req"),
+            type_annotation: String::from("&Request"),
+        }],
+        returns: String::from("Response"),
+    }
+}
+
+fn sample_doc() -> DocInfo {
+    DocInfo {
+        docstring: String::from("Processes a request."),
+        summary: String::from("Processes a request."),
+        source: String::from("tree_sitter"),
+    }
+}
+
+fn sample_structure() -> StructureInfo {
+    StructureInfo {
+        locals: vec![LocalInfo {
+            name: String::from("result"),
+            kind: String::from("variable"),
+            decl_line: 15,
+        }],
+        branches: vec![BranchInfo {
+            kind: String::from("if"),
+            line: 18,
+        }],
+    }
+}
+
+fn sample_lsp() -> LspInfo {
+    LspInfo {
+        hover: String::from("fn process_request(req: &Request) -> Response"),
+        type_info: String::from("Callable[[Request], Response]"),
+        deprecated: false,
+        source: String::from("lsp_hover"),
+    }
+}
+
+fn sample_metrics(fan_in: Option<u32>, fan_out: Option<u32>) -> MetricsInfo {
+    MetricsInfo {
+        lines: 33,
+        cyclomatic: 5,
+        fan_in,
+        fan_out,
+    }
+}
+
+fn sample_deps() -> DepsInfo {
+    DepsInfo {
+        calls: vec![String::from("sym_def456")],
+        imports: vec![String::from("mod_std_io")],
+        config: vec![],
+    }
+}
+
+fn build_card_at_level(level: DetailLevel) -> SymbolCard {
+    let base = || SymbolCard {
+        card_version: 1,
+        symbol: sample_identity(),
+        signature: None,
+        doc: None,
+        attachments: None,
+        structure: None,
+        lsp: None,
+        metrics: None,
+        deps: None,
+        interstitial: None,
+        provenance: sample_provenance(),
+        etag: None,
+    };
     match level {
-        DetailLevel::Minimal => Some(SymbolCard {
-            card_version: 1,
-            symbol: sample_identity(),
-            signature: None,
-            doc: None,
-            attachments: None,
-            structure: None,
-            lsp: None,
-            metrics: None,
-            deps: None,
-            interstitial: None,
-            provenance: sample_provenance(),
-            etag: None,
-        }),
-        DetailLevel::Structure => Some(SymbolCard {
-            card_version: 1,
-            symbol: sample_identity(),
-            signature: Some(SignatureInfo {
-                display: String::from("fn process_request(req: &Request) -> Response"),
-                params: vec![ParamInfo {
-                    name: String::from("req"),
-                    type_annotation: String::from("&Request"),
-                }],
-                returns: String::from("Response"),
-            }),
-            doc: Some(DocInfo {
-                docstring: String::from("Processes a request."),
-                summary: String::from("Processes a request."),
-                source: String::from("tree_sitter"),
-            }),
-            attachments: None,
-            structure: Some(StructureInfo {
-                locals: vec![LocalInfo {
-                    name: String::from("result"),
-                    kind: String::from("variable"),
-                    decl_line: 15,
-                }],
-                branches: vec![BranchInfo {
-                    kind: String::from("if"),
-                    line: 18,
-                }],
-            }),
-            lsp: None,
-            metrics: Some(MetricsInfo {
-                lines: 33,
-                cyclomatic: 5,
-                fan_in: None,
-                fan_out: None,
-            }),
-            deps: None,
-            interstitial: None,
-            provenance: sample_provenance(),
-            etag: None,
-        }),
-        _ => None,
+        DetailLevel::Minimal => base(),
+        DetailLevel::Signature => SymbolCard {
+            signature: Some(sample_signature()),
+            ..base()
+        },
+        DetailLevel::Structure => SymbolCard {
+            signature: Some(sample_signature()),
+            doc: Some(sample_doc()),
+            structure: Some(sample_structure()),
+            metrics: Some(sample_metrics(None, None)),
+            ..base()
+        },
+        DetailLevel::Semantic => SymbolCard {
+            signature: Some(sample_signature()),
+            doc: Some(sample_doc()),
+            structure: Some(sample_structure()),
+            lsp: Some(sample_lsp()),
+            metrics: Some(sample_metrics(None, None)),
+            ..base()
+        },
+        DetailLevel::Full => SymbolCard {
+            signature: Some(sample_signature()),
+            doc: Some(sample_doc()),
+            structure: Some(sample_structure()),
+            lsp: Some(sample_lsp()),
+            metrics: Some(sample_metrics(Some(12), Some(3))),
+            deps: Some(sample_deps()),
+            ..base()
+        },
     }
 }
 
@@ -236,26 +283,26 @@ fn given_request_no_detail(world: &mut TestWorld) {
 // When steps
 // ---------------------------------------------------------------------------
 
-#[when("the card is serialised to JSON")]
-fn when_card_serialised(world: &mut TestWorld) {
+#[when("the card is serialized to JSON")]
+fn when_card_serialized(world: &mut TestWorld) {
     let json = world
         .card
         .as_ref()
-        .map(|c| serde_json::to_string(c).expect("serialise card"))
+        .map(|c| serde_json::to_string(c).expect("serialize card"))
         .or_else(|| {
             world
                 .response
                 .as_ref()
-                .map(|r| serde_json::to_string(r).expect("serialise response"))
+                .map(|r| serde_json::to_string(r).expect("serialize response"))
         })
         .expect("either card or response must be set");
     world.json_output = Some(json);
 }
 
-#[when("the response is serialised to JSON")]
-fn when_response_serialised(world: &mut TestWorld) {
+#[when("the response is serialized to JSON")]
+fn when_response_serialized(world: &mut TestWorld) {
     let response = world.response.as_ref().expect("response should be set");
-    world.json_output = Some(serde_json::to_string(response).expect("serialise response"));
+    world.json_output = Some(serde_json::to_string(response).expect("serialize response"));
 }
 
 // ---------------------------------------------------------------------------
