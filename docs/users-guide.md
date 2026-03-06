@@ -970,6 +970,5 @@ components are delivered in subsequent roadmap phases.
 All error conditions are reported through `DiagnosticReport`, which carries
 stable diagnostic codes suitable for programmatic consumption. Stub methods
 currently return the `NOT_IMPLEMENTED` code; real `E_SEMPAI_*` codes will be
-used once the corresponding backends are implemented.
-Diagnostics include a code, message, optional source span, and supplementary
-notes.
+used once the corresponding backends are implemented. Diagnostics include a
+code, message, optional source span, and supplementary notes.

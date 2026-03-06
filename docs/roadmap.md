@@ -783,23 +783,32 @@ design in
 
 *Outcome: Provide a deterministic, cacheable symbol card payload that defaults
 to Tree-sitter extraction and optionally enriches via LSP when available. See
-`docs/jacquard-card-first-symbol-graph-design.md` §8.2 and §9.*
+`docs/jacquard-card-first-symbol-graph-design.md` §9.1-§9.3 and §10.1-§10.3.*
 
 - [ ] 7.1.1. Define stable JSONL request and response schemas for
       `observe get-card`, including versioning, provenance fields, and
       progressive detail levels. Requires 2.1.7 and 3.1.1.
+  - [ ] Include attachment bundling and interstitial payloads in the schema
+        (doc comments, decorators, import blocks, and bundle rules).
   - [ ] Add schema fixtures and snapshot coverage for success and refusal
         payloads.
   - [ ] Acceptance criteria: schema fixtures lock field names and payload
-        shapes; responses include provenance for non-trivial fields; and the
-        default output is stable (byte-identical) for unchanged inputs.
+        shapes, including attachments and interstitials; responses include
+        provenance for non-trivial fields; and the default output is stable
+        (byte-identical) for unchanged inputs.
 - [ ] 7.1.2. Implement Tree-sitter symbol card extraction for the initial
       supported languages (Rust, Python, and TypeScript). Requires 3.1.1.
-  - [ ] Extract identity, signature, doc comments/docstrings, locals, and
-        branch structure using language-specific queries.
+  - [ ] Add an entity/interstitial region pass and attach interstitials to the
+        relevant cards (file/module or interstitial cards).
+  - [ ] Bundle doc comments and decorator/annotation blocks onto symbol cards
+        using deterministic backwards-scanning rules.
+  - [ ] Enforce nested entity filtering so locals/closures do not enter the
+        entity table by default.
   - [ ] Acceptance criteria: unit tests cover at least three symbol kinds per
-        language; extracted ranges are deterministic; and whitespace-only edits
-        do not change `SymbolId` fingerprints.
+        language; extracted ranges are deterministic; comment/decorator
+        bundling is stable under whitespace edits; nested locals never appear
+        as entities; and whitespace-only edits do not change `SymbolId`
+        fingerprints.
 - [ ] 7.1.3. Implement optional LSP enrichment for `observe get-card` when
       `--detail semantic` (or higher) is requested. Requires 2.1.9 and 3.1.3.
   - [ ] Enrich cards with hover/type and deprecation metadata where supported.
@@ -809,6 +818,11 @@ to Tree-sitter extraction and optionally enriches via LSP when available. See
         behaviour.
 - [ ] 7.1.4. Add cache integration for card extraction keyed by URI, language,
       and document revision. Requires 4.3.4.
+  - [ ] Reuse Tree-sitter parser registries and cache extracted entity tables
+        with an LRU (Least Recently Used) policy keyed by repo, ref, file path,
+        and blob hash.
+  - [ ] Avoid unnecessary string cloning in card and region extraction; prefer
+        borrowing or interning for hot paths.
   - [ ] Acceptance criteria: repeated `get-card` requests for unchanged
         revisions hit cache in integration tests; revision changes invalidate
         deterministically; and cache misses preserve correctness.
@@ -817,25 +831,31 @@ to Tree-sitter extraction and optionally enriches via LSP when available. See
 
 *Outcome: Return a bounded subgraph rooted at an entry symbol, with typed edges
 (`call`, `import`, and `config`) and explicit budget constraints. See
-`docs/jacquard-card-first-symbol-graph-design.md` §10 and §8.3.*
+`docs/jacquard-card-first-symbol-graph-design.md` §12.1-§12.3.*
 
 - [ ] 7.2.1. Define stable JSONL request and response schemas for
       `observe graph-slice`, including budgets, spillover metadata, and
       provenance for edges. Requires 2.1.7.
   - [ ] Acceptance criteria: schema fixtures lock `budget` semantics and
     default values; responses are deterministic for a fixed repo revision; and
-    spillover metadata is present when traversal is truncated.
-- [ ] 7.2.2. Implement call-edge slice expansion using the existing LSP call
+    spillover metadata is present when traversal is truncated; and edges carry
+    resolution scope (`full_symbol_table`, `partial_symbol_table`, or `lsp`).
+- [ ] 7.2.2. Implement a two-pass Tree-sitter extraction pipeline that builds a
+      symbol table before resolving edges.
+  - [ ] Acceptance criteria: edge extraction uses a full or partial symbol
+    table and marks resolution scope on each edge; unresolved references are
+    preserved as external nodes with explicit confidence.
+- [ ] 7.2.3. Implement call-edge slice expansion using the existing LSP call
       hierarchy provider via `weaver-graph`. Requires 3.1.4 and 2.1.9.
   - [ ] Acceptance criteria: `call` edges include explicit provenance; depth
     limits are enforced; and end-to-end tests validate a depth-2 traversal on a
     fixture repository.
-- [ ] 7.2.3. Implement baseline `import` and `config` edge extraction using
-      Tree-sitter heuristics and per-language queries. Requires 3.1.1.
+- [ ] 7.2.4. Implement baseline `import` and `config` edge extraction using
+      Tree-sitter interstitial passes and per-language queries. Requires 3.1.1.
   - [ ] Acceptance criteria: extracted edges include confidence values and
     provenance; edge extraction is bounded by the slice budget; and at least
     one test per language asserts both `import` and `config` edge behaviour.
-- [ ] 7.2.4. Implement budgeted traversal using a priority-queue expansion
+- [ ] 7.2.5. Implement budgeted traversal using a priority-queue expansion
       strategy with explicit `max_cards`, `max_edges`, and
       `max_estimated_tokens` enforcement.
   - [ ] Acceptance criteria: traversal never exceeds configured caps; rejection
@@ -847,20 +867,40 @@ to Tree-sitter extraction and optionally enriches via LSP when available. See
 
 *Outcome: Diff a slice over the last N commits without requiring a working tree
 checkout, producing deterministic output suitable for caching and regression
-tests. See `docs/jacquard-card-first-symbol-graph-design.md` §11 and §11.2.*
+tests. See `docs/jacquard-card-first-symbol-graph-design.md` §13.1-§13.2 and
+§22.*
 
 - [ ] 7.3.1. Implement git-backed blob loading for historical revisions without
       checkout, scoped to only the files required by the slice budget.
+  - [ ] Add explicit operational limits for blob size, parse time per file,
+        total files per commit, and partial-parse thresholds, with fallback
+        reasons recorded in the output (`timeout`, `blob_too_large`,
+        `partial_parse`, `unsupported_grammar`).
   - [ ] Acceptance criteria: history queries never invoke `git checkout`;
     missing blobs return structured diagnostics; and the file loader is covered
     by unit tests for typical path and revision scenarios.
-- [ ] 7.3.2. Implement slice reconstruction per commit and a deterministic delta
-      payload between commits. Requires 7.2.4.
+- [ ] 7.3.2. Implement slice reconstruction per commit with explicit data
+      quality metadata and partial symbol table resolution. Requires 7.2.5.
   - [ ] Acceptance criteria: `--commits 5` returns a stable set of commits and
-    per-commit slice payloads; delta payloads include added/removed/changed
-    nodes and edges; and BDD tests validate output against a curated git fixture
+    per-commit slice payloads with `quality.resolution_scope` and
+    `quality.fallbacks`; delta payloads include added/removed/changed nodes and
+    edges; and BDD tests validate output against a curated git fixture
     repository.
-- [ ] 7.3.3. Implement history-mode gating and safe defaults, with LSP
+- [ ] 7.3.3. Implement delta computation normalization and change taxonomy
+      classification for nodes and edges.
+  - [ ] Treat import blocks and decorators as commutative sets for deltas, and
+        persist normalized representations alongside raw text.
+  - [ ] Acceptance criteria: import/decorator reordering is classified as
+        `text` change; taxonomy output includes confidence; and fixtures cover
+        comment-only and signature-only edits.
+- [ ] 7.3.4. Implement semantic risk warnings on history deltas for
+      dependency/dependent changes in the slice neighbourhood.
+  - [ ] Expose `--warning-depth` to widen the dependency neighbourhood scanned
+        for warnings.
+  - [ ] Acceptance criteria: warnings include edge paths and confidence;
+    `text`-only deltas emit lower-risk warnings; and curated fixtures validate
+    both warning types.
+- [ ] 7.3.5. Implement history-mode gating and safe defaults, with LSP
       enrichment disabled by default for history queries.
   - [ ] Acceptance criteria: default mode uses Tree-sitter-only extraction for
     historical commits; enabling enrichment is explicit and documented; and
@@ -870,19 +910,51 @@ tests. See `docs/jacquard-card-first-symbol-graph-design.md` §11 and §11.2.*
 
 *Outcome: Map symbols across commits probabilistically when identifiers drift,
 exposing confidence and alternates rather than hiding ambiguity. See
-`docs/jacquard-card-first-symbol-graph-design.md` §12.*
+`docs/jacquard-card-first-symbol-graph-design.md` §14.1-§14.8.*
 
-- [ ] 7.4.1. Implement feature extraction for cross-commit matching using
-      signature, AST-shape, docstring fingerprints, and neighbourhood sketches.
+- [ ] 7.4.1. Implement phase 1 stable-identity matching (type, name, container,
+      file hint), with explicit confidence output.
+  - [ ] Acceptance criteria: match outputs include the winning phase and
+    confidence; non-matching candidates are rejected rather than forced; and
+    fixtures include rename/move cases that must not match in phase 1.
+- [ ] 7.4.2. Implement phase 2 body-hash matching for rename detection.
+      Requires 7.4.1.
+  - [ ] Acceptance criteria: match outputs include the winning phase and
+    confidence; low-confidence matches are rejected rather than forced; and
+    fixtures cover rename scenarios with unchanged bodies.
+- [ ] 7.4.3. Implement phase 3 structural-hash matching on AST-normalized
+      shapes. Requires 7.4.2.
+  - [ ] Acceptance criteria: match outputs include the winning phase and
+    confidence; low-confidence matches are rejected rather than forced; and
+    fixtures cover move scenarios with formatting-only edits.
+- [ ] 7.4.4. Implement phase 4 fuzzy similarity matching (token overlap and
+      shingles). Requires 7.4.3.
+  - [ ] Acceptance criteria: match outputs include the winning phase and
+    confidence; low-confidence matches are rejected rather than forced; and
+    fixtures cover rename and move scenarios with minor body edits.
+- [ ] 7.4.5. Implement phase 5 graph refinement and global assignment
+      refinement. Requires 7.4.4.
+  - [ ] Acceptance criteria: match outputs include the winning phase and
+    confidence; low-confidence matches are rejected rather than forced; and
+    fixtures cover rename/move scenarios resolved by neighbourhood evidence.
+- [ ] 7.4.6. Implement feature extraction for cross-commit matching using
+      signature, AST-shape, docstring fingerprints, attachments, and
+      neighbourhood sketches.
   - [ ] Acceptance criteria: feature extraction is deterministic for identical
     inputs; unit tests cover feature stability under whitespace-only edits and
     alpha-renaming of locals; and failures emit structured diagnostics.
-- [ ] 7.4.2. Implement candidate generation and scoring with calibrated
-      probabilities, emitting top-K alternates and “reason codes”.
+- [ ] 7.4.7. Implement candidate generation and scoring with calibrated
+      probabilities, emitting top-K alternates and “reason codes”. Requires
+      7.4.6.
   - [ ] Acceptance criteria: response payloads always include `best_match` plus
     alternates up to the requested cap; reason codes are stable enumerations;
     and debug output surfaces the top contributing features.
-- [ ] 7.4.3. Implement assignment across the slice using a solver that avoids
+- [ ] 7.4.8. Implement duplicate-name guardrails (`max_duplicates`) that force
+      ambiguous mappings or fallback matching when homonyms explode.
+  - [ ] Acceptance criteria: `--max-duplicates` returns explicit “ambiguous
+    mapping” responses; observability counters capture guardrail triggers; and
+    fixtures with same-name functions avoid false renames.
+- [ ] 7.4.9. Implement assignment across the slice using a solver that avoids
       mapping multiple sources to one target unless explicitly enabled.
   - [ ] Acceptance criteria: property tests prevent illegal many-to-one
     mappings by default; a feature flag enables split/merge experimentation;
@@ -893,8 +965,8 @@ exposing confidence and alternates rather than hiding ambiguity. See
 *Outcome: Add a persisted ledger keyed by commit hash for faster history
 queries and broader edge coverage once `snapshots_on_demand` is proven
 reliable. This step is intentionally staged behind the on-demand
-implementation. See `docs/jacquard-card-first-symbol-graph-design.md` §11.2
-(`ledger_cache`) and §18.*
+implementation. See `docs/jacquard-card-first-symbol-graph-design.md` §13.2 and
+§18.1-§18.2.*
 
 - [ ] 7.5.1. Define a versioned on-disk ledger format for cards, edges, and
       deltas keyed by commit hash. Requires 7.3.2.

@@ -19,8 +19,7 @@ methods return structured "not yet implemented" diagnostics (never panics).
 Running `cargo doc -p sempai --no-deps` produces complete, warning-free public
 API documentation. Unit tests validate type construction, serde round-trips,
 and diagnostic formatting. Behaviour-driven development (BDD) scenarios
-exercise the public API surface from a
-consumer's perspective.
+exercise the public API surface from a consumer's perspective.
 
 Observable outcome: after all stages complete, the following commands succeed:
 
@@ -59,11 +58,9 @@ This satisfies roadmap task 4.1.1 from `docs/roadmap.md` (lines 347-350).
 - Library crates use `thiserror`-derived error enums — no `eyre` or `anyhow`
   (`AGENTS.md` lines 220-227).
 - All dependency versions use Semantic Versioning (SemVer)-compatible caret
-  requirements
-  (`AGENTS.md` lines 206-216).
+  requirements (`AGENTS.md` lines 206-216).
 - `rstest-bdd` v0.5.0 must be used for BDD tests (see above for
-  expansion)
-  (workspace `Cargo.toml` line 36).
+  expansion) (workspace `Cargo.toml` line 36).
 - Use `str_to_string = "deny"` — use `String::from(...)` or `.into()` instead
   of `.to_string()` on `&str` values.
 - Existing crate public APIs must not change.
@@ -130,42 +127,38 @@ This satisfies roadmap task 4.1.1 from `docs/roadmap.md` (lines 347-350).
 ## Surprises & discoveries
 
 - The `result_large_err` risk did not materialize.
-  `DiagnosticReport` is small enough (a single `Vec` pointer)
-  that Clippy does not fire the lint.
+  `DiagnosticReport` is small enough (a single `Vec` pointer) that Clippy does
+  not fire the lint.
 - `missing_const_for_fn` fired on nearly every constructor and
-  accessor in `sempai_core`. All simple constructors were made
-  `const fn` without issue.
+  accessor in `sempai_core`. All simple constructors were made `const fn`
+  without issue.
 - `doc_markdown` lint fired on "HashiCorp" in doc comments.
-  Rewrote to avoid the proper noun where possible, or used
-  backtick-escaped forms.
+  Rewrote to avoid the proper noun where possible, or used backtick-escaped
+  forms.
 - `option_if_let_else` fired on `match diagnostics.first()` in
-  the `diagnostic_summary` helper. Refactored to
-  `first().map_or_else(...)`.
+  the `diagnostic_summary` helper. Refactored to `first().map_or_else(...)`.
 - `too_many_arguments` fired on `Match::new` (5 params). Used
-  `#[expect]` with a reason since the constructor mirrors the
-  struct's five fields.
+  `#[expect]` with a reason since the constructor mirrors the struct's five
+  fields.
 - `dead_code` fired on `QueryPlan::new` because no internal callers
-  exist yet. Gated the constructor behind `#[cfg(test)]` so it
-  compiles only for test targets. A `FIXME` comment with an issue
-  link marks it for removal when `compile_yaml`/`compile_dsl`
-  produce real plans.
+  exist yet. Gated the constructor behind `#[cfg(test)]` so it compiles only
+  for test targets. A `FIXME` comment with an issue link marks it for removal
+  when `compile_yaml`/`compile_dsl` produce real plans.
 
 ## Decision log
 
 - **CaptureValue serde strategy**: Used adjacently tagged serde
-  (`#[serde(tag = "kind", content = "value")]`) instead of
-  internally tagged, because `CaptureValue` has tuple variants
-  (`Node(CapturedNode)`, `Nodes(Vec<CapturedNode>)`). Internally
-  tagged serde does not support tuple variants. This was
-  identified as a risk in the plan and the adjacently tagged
+  (`#[serde(tag = "kind", content = "value")]`) instead of internally tagged,
+  because `CaptureValue` has tuple variants (`Node(CapturedNode)`,
+  `Nodes(Vec<CapturedNode>)`). Internally tagged serde does not support tuple
+  variants. This was identified as a risk in the plan and the adjacently tagged
   approach was chosen during implementation.
 - **EngineConfig fields**: Made all fields private with `const`
-  accessors to preserve encapsulation. A `const fn new()`
-  constructor accepts all four fields.
+  accessors to preserve encapsulation. A `const fn new()` constructor accepts
+  all four fields.
 - **QueryPlan `_plan` field**: Used `_plan: ()` as a private
-  placeholder to prevent external construction via struct literal
-  syntax. The `pub(crate) new()` constructor is the only way to
-  create instances.
+  placeholder to prevent external construction via struct literal syntax. The
+  `pub(crate) new()` constructor is the only way to create instances.
 
 ## Outcomes & retrospective
 
@@ -174,26 +167,24 @@ All acceptance criteria met:
 1. `RUSTDOCFLAGS="-D warnings" cargo doc -p sempai --no-deps` exits 0
    with zero warnings.
 2. Thirteen public types are defined in `sempai_core` and re-exported
-   by the `sempai` facade: `Language`, `LanguageParseError`, `LineCol`,
-   `Span`, `CapturedNode`, `CaptureValue`, `Match`, `EngineConfig`,
-   `EngineLimits`, `DiagnosticCode`, `SourceSpan`, `Diagnostic`, and
-   `DiagnosticReport`. Two additional types, `Engine` and `QueryPlan`,
-   are defined in the `sempai` facade itself, giving fifteen public
-   types in total.
+   by the `sempai` facade: `Language`, `LanguageParseError`, `LineCol`, `Span`,
+   `CapturedNode`, `CaptureValue`, `Match`, `EngineConfig`, `EngineLimits`,
+   `DiagnosticCode`, `SourceSpan`, `Diagnostic`, and `DiagnosticReport`. Two
+   additional types, `Engine` and `QueryPlan`, are defined in the `sempai`
+   facade itself, giving fifteen public types in total.
 3. 63+ tests pass across both crates (unit, BDD, and doc tests) using
    `rstest-bdd` v0.5.0 with happy and unhappy path scenarios.
 4. `make check-fmt`, `make lint`, and `make test` all exit 0.
 5. `docs/users-guide.md` updated with Sempai query engine section.
 6. Roadmap task 4.1.1 marked as done in `docs/roadmap.md`.
 
-Net new files: 28 (two crates with source, tests, and features).
-No existing crate APIs were modified.
+Net new files: 28 (two crates with source, tests, and features). No existing
+crate APIs were modified.
 
 ## Context and orientation
 
-The Weaver project is a Rust workspace with 12 crates under
-`crates/`. The workspace root `Cargo.toml` defines shared edition (2024),
-version (0.1.0),
+The Weaver project is a Rust workspace with 12 crates under `crates/`. The
+workspace root `Cargo.toml` defines shared edition (2024), version (0.1.0),
 rust-version (1.85), dependencies, and lint configuration. No `sempai` crates
 currently exist.
 
@@ -539,8 +530,8 @@ backend implementation.
 `docs/sempai-query-language-design.md` if any type definitions diverge from the
 design (e.g. serde tagging strategy for `CaptureValue`).
 
-**F4.** Run `make fmt` to format all changed files, and `make markdownlint`
-to lint any modified Markdown.
+**F4.** Run `make fmt` to format all changed files, and `make markdownlint` to
+lint any modified Markdown.
 
 ### Stage G: Final validation and commit gating
 
