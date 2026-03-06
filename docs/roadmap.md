@@ -915,29 +915,49 @@ exposing confidence and alternates rather than hiding ambiguity. See
 `docs/jacquard-card-first-symbol-graph-design.md` under “Probabilistic symbol
 matching”.*
 
-- [ ] 7.4.1. Implement the multi-phase matcher pipeline (stable identity, body
-      hash, structural hash, fuzzy similarity, and graph refinement), with
-      explicit confidence bands per phase.
+- [ ] 7.4.1. Implement phase 1 stable-identity matching (type, name, container,
+      file hint), with explicit confidence output.
+  - [ ] Acceptance criteria: match outputs include the winning phase and
+    confidence; non-matching candidates are rejected rather than forced; and
+    fixtures include rename/move cases that must not match in phase 1.
+- [ ] 7.4.2. Implement phase 2 body-hash matching for rename detection.
+      Requires 7.4.1.
   - [ ] Acceptance criteria: match outputs include the winning phase and
     confidence; low-confidence matches are rejected rather than forced; and
-    fixtures cover rename and move scenarios.
-- [ ] 7.4.2. Implement feature extraction for cross-commit matching using
+    fixtures cover rename scenarios with unchanged bodies.
+- [ ] 7.4.3. Implement phase 3 structural-hash matching on AST-normalized
+      shapes. Requires 7.4.2.
+  - [ ] Acceptance criteria: match outputs include the winning phase and
+    confidence; low-confidence matches are rejected rather than forced; and
+    fixtures cover move scenarios with formatting-only edits.
+- [ ] 7.4.4. Implement phase 4 fuzzy similarity matching (token overlap and
+      shingles). Requires 7.4.3.
+  - [ ] Acceptance criteria: match outputs include the winning phase and
+    confidence; low-confidence matches are rejected rather than forced; and
+    fixtures cover rename and move scenarios with minor body edits.
+- [ ] 7.4.5. Implement phase 5 graph refinement and global assignment
+      refinement. Requires 7.4.4.
+  - [ ] Acceptance criteria: match outputs include the winning phase and
+    confidence; low-confidence matches are rejected rather than forced; and
+    fixtures cover rename/move scenarios resolved by neighbourhood evidence.
+- [ ] 7.4.6. Implement feature extraction for cross-commit matching using
       signature, AST-shape, docstring fingerprints, attachments, and
       neighbourhood sketches.
   - [ ] Acceptance criteria: feature extraction is deterministic for identical
     inputs; unit tests cover feature stability under whitespace-only edits and
     alpha-renaming of locals; and failures emit structured diagnostics.
-- [ ] 7.4.3. Implement candidate generation and scoring with calibrated
-      probabilities, emitting top-K alternates and “reason codes”.
+- [ ] 7.4.7. Implement candidate generation and scoring with calibrated
+      probabilities, emitting top-K alternates and “reason codes”. Requires
+      7.4.6.
   - [ ] Acceptance criteria: response payloads always include `best_match` plus
     alternates up to the requested cap; reason codes are stable enumerations;
     and debug output surfaces the top contributing features.
-- [ ] 7.4.4. Implement duplicate-name guardrails (`max_duplicates`) that force
+- [ ] 7.4.8. Implement duplicate-name guardrails (`max_duplicates`) that force
       ambiguous mappings or fallback matching when homonyms explode.
   - [ ] Acceptance criteria: `--max-duplicates` returns explicit “ambiguous
     mapping” responses; observability counters capture guardrail triggers; and
     fixtures with same-name functions avoid false renames.
-- [ ] 7.4.5. Implement assignment across the slice using a solver that avoids
+- [ ] 7.4.9. Implement assignment across the slice using a solver that avoids
       mapping multiple sources to one target unless explicitly enabled.
   - [ ] Acceptance criteria: property tests prevent illegal many-to-one
     mappings by default; a feature flag enables split/merge experimentation;
