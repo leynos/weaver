@@ -6,9 +6,9 @@ use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
 use crate::{
-    BranchInfo, CardLanguage, CardSymbolKind, DetailLevel, DocInfo, GetCardRequest,
-    GetCardResponse, LocalInfo, MetricsInfo, ParamInfo, Provenance, SignatureInfo, SourcePosition,
-    SourceRange, StructureInfo, SymbolCard, SymbolIdentity, SymbolRef,
+    BranchInfo, CardLanguage, CardRefusal, CardSymbolKind, DetailLevel, DocInfo, GetCardRequest,
+    GetCardResponse, LocalInfo, MetricsInfo, ParamInfo, Provenance, RefusalReason, SignatureInfo,
+    SourcePosition, SourceRange, StructureInfo, SymbolCard, SymbolIdentity, SymbolRef,
 };
 
 // ---------------------------------------------------------------------------
@@ -93,10 +93,25 @@ fn sample_provenance() -> Provenance {
     }
 }
 
-fn build_card(detail: &str) -> SymbolCard {
-    let level: DetailLevel = detail.parse().expect("valid detail level in feature file");
+fn parse_detail_level(raw: &str) -> Result<DetailLevel, String> {
+    raw.parse()
+        .map_err(|e: crate::DetailLevelParseError| e.to_string())
+}
+
+fn parse_refusal_reason(raw: &str) -> Result<RefusalReason, String> {
+    match raw {
+        "no_symbol_at_position" => Ok(RefusalReason::NoSymbolAtPosition),
+        "unsupported_language" => Ok(RefusalReason::UnsupportedLanguage),
+        "not_yet_implemented" => Ok(RefusalReason::NotYetImplemented),
+        "backend_unavailable" => Ok(RefusalReason::BackendUnavailable),
+        other => Err(format!("unknown refusal reason: {other}")),
+    }
+}
+
+fn build_card(detail: &str) -> Result<SymbolCard, String> {
+    let level = parse_detail_level(detail)?;
     build_card_at_level(level)
-        .expect("BDD fixture should be defined for the requested detail level")
+        .ok_or_else(|| format!("BDD fixture not defined for detail level: {detail}"))
 }
 
 fn build_card_at_level(level: DetailLevel) -> Option<SymbolCard> {
@@ -155,29 +170,48 @@ fn build_card_at_level(level: DetailLevel) -> Option<SymbolCard> {
     }
 }
 
+fn build_refusal_response(reason: RefusalReason, detail: DetailLevel) -> GetCardResponse {
+    let message = match reason {
+        RefusalReason::NotYetImplemented => {
+            String::from("observe get-card: Tree-sitter card extraction is not yet implemented")
+        }
+        RefusalReason::NoSymbolAtPosition => {
+            String::from("no symbol found at the requested position")
+        }
+        RefusalReason::UnsupportedLanguage => {
+            String::from("the requested language is not supported")
+        }
+        RefusalReason::BackendUnavailable => String::from("the required backend is not available"),
+    };
+    GetCardResponse::Refusal {
+        refusal: CardRefusal {
+            reason,
+            message,
+            requested_detail: detail,
+        },
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Given steps
 // ---------------------------------------------------------------------------
 
 #[given("a symbol card at {detail} detail level")]
 fn given_card_at_detail(world: &mut TestWorld, detail: QuotedString) {
-    world.card = Some(build_card(detail.as_str()));
+    world.card = Some(build_card(detail.as_str()).expect("valid detail level in feature file"));
 }
 
 #[given("a refusal response with reason {reason}")]
 fn given_refusal_response(world: &mut TestWorld, reason: QuotedString) {
-    assert_eq!(
-        reason.as_str(),
-        "not_yet_implemented",
-        "only 'not_yet_implemented' reason is supported in BDD fixtures"
-    );
+    let parsed_reason =
+        parse_refusal_reason(reason.as_str()).expect("valid refusal reason in feature file");
     let detail = DetailLevel::Structure;
-    world.response = Some(GetCardResponse::not_yet_implemented(detail));
+    world.response = Some(build_refusal_response(parsed_reason, detail));
 }
 
 #[given("a success response with a {detail} detail card")]
 fn given_success_response(world: &mut TestWorld, detail: QuotedString) {
-    let card = build_card(detail.as_str());
+    let card = build_card(detail.as_str()).expect("valid detail level in feature file");
     world.response = Some(GetCardResponse::Success {
         card: Box::new(card),
     });
@@ -267,10 +301,7 @@ fn then_json_field_has_value(world: &mut TestWorld, key: QuotedString, value: Qu
 #[then("the detail level is {level}")]
 fn then_detail_level_is(world: &mut TestWorld, level: QuotedString) {
     let request = world.request.as_ref().expect("request should be set");
-    let expected: DetailLevel = level
-        .as_str()
-        .parse()
-        .expect("valid detail level in feature file");
+    let expected = parse_detail_level(level.as_str()).expect("valid detail level in feature file");
     assert_eq!(request.detail, expected);
 }
 

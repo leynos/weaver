@@ -36,8 +36,9 @@ Specifically:
 2. Insta snapshot tests in `weaver-cards` lock the JSON shape of a fully
    populated success card, a minimal card, and a refusal payload. These
    snapshots are byte-identical across runs for unchanged inputs.
-3. Behaviour-driven development (BDD) feature scenarios in `weaver-cards` exercise the request parsing and
-   response construction via `rstest-bdd` v0.5.0.
+3. Behaviour-driven development (BDD) feature scenarios in
+   `weaver-cards` exercise the request parsing and response
+   construction via `rstest-bdd` v0.5.0.
 4. `weaverd` adds `"get-card"` to the
    `DomainRoutingContext::OBSERVE.known_operations` list so that
    `observe get-card` is recognized by the router.
@@ -153,9 +154,10 @@ and closes #75.
   `"typescript"`. Fixed by adding an explicit `#[serde(rename =
   "typescript")]` on the `TypeScript` variant.
 
-- `cargo-insta` command-line interface (CLI) was not installed in the environment. Snapshot tests
-  failed on first run because no snapshot files existed. Resolved by running
-  with `INSTA_UPDATE=always` environment variable to auto-accept new
+- `cargo-insta` command-line interface (CLI) was not installed
+  in the environment. Snapshot tests failed on first run because
+  no snapshot files existed. Resolved by running with
+  `INSTA_UPDATE=always` environment variable to auto-accept new
   snapshots.
 
 - The `Cargo.toml` edit tool requires a fresh `Read` call before each

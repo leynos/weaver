@@ -6,6 +6,7 @@
 //! byte-identical output for unchanged inputs across runs.
 
 use insta::assert_snapshot;
+use rstest::rstest;
 
 use crate::{
     BranchInfo, CardLanguage, CardRefusal, CardSymbolKind, DepsInfo, DetailLevel, DocInfo,
@@ -213,37 +214,34 @@ fn refusal_response(reason: RefusalReason, message: &str, detail: DetailLevel) -
     }
 }
 
-#[test]
-fn snapshot_refusal_no_symbol() {
-    let response = refusal_response(
-        RefusalReason::NoSymbolAtPosition,
-        "no symbol found at the requested position",
-        DetailLevel::Structure,
-    );
+#[rstest]
+#[case::no_symbol(
+    "refusal_no_symbol",
+    RefusalReason::NoSymbolAtPosition,
+    "no symbol found at the requested position",
+    DetailLevel::Structure
+)]
+#[case::unsupported_language(
+    "refusal_unsupported_language",
+    RefusalReason::UnsupportedLanguage,
+    "the requested language is not supported",
+    DetailLevel::Structure
+)]
+#[case::backend_unavailable(
+    "refusal_backend_unavailable",
+    RefusalReason::BackendUnavailable,
+    "the required backend is not available",
+    DetailLevel::Semantic
+)]
+fn snapshot_refusal_variants(
+    #[case] snapshot_name: &str,
+    #[case] reason: RefusalReason,
+    #[case] message: &str,
+    #[case] requested_detail: DetailLevel,
+) {
+    let response = refusal_response(reason, message, requested_detail);
     let json = serde_json::to_string_pretty(&response).expect("serialise");
-    assert_snapshot!(json);
-}
-
-#[test]
-fn snapshot_refusal_unsupported_language() {
-    let response = refusal_response(
-        RefusalReason::UnsupportedLanguage,
-        "the requested language is not supported",
-        DetailLevel::Structure,
-    );
-    let json = serde_json::to_string_pretty(&response).expect("serialise");
-    assert_snapshot!(json);
-}
-
-#[test]
-fn snapshot_refusal_backend_unavailable() {
-    let response = refusal_response(
-        RefusalReason::BackendUnavailable,
-        "the required backend is not available",
-        DetailLevel::Semantic,
-    );
-    let json = serde_json::to_string_pretty(&response).expect("serialise");
-    assert_snapshot!(json);
+    assert_snapshot!(snapshot_name, json);
 }
 
 #[test]
