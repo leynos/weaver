@@ -322,7 +322,7 @@ workspace = true
 **New file: `crates/weaver-cards/src/lib.rs`**
 
 Crate-level `//!` doc comment explaining the crate's purpose. Declares
-sub-modules (`symbol`, `detail`, `card`, `request`, `response`, `error`).
+submodules (`symbol`, `detail`, `card`, `request`, `response`, `error`).
 Re-exports all public types from `lib.rs`.
 
 **Modify: `Cargo.toml` (workspace root)**
