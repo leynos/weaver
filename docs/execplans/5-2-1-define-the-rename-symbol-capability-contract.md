@@ -139,28 +139,26 @@ Observable behaviour after this change:
 
 - Observation: The workspace Clippy configuration denies `string_slice`, which
   prevents string indexing even in test code. The initial BDD key-value parser
-  used byte-offset indexing into strings.
-  Evidence: `make lint` failed with 6 `string_slice` errors.
-  Impact: Rewrote the parser to use `split_whitespace` + `split_once` instead
-  of positional indexing. No functional change, but a reminder that the strict
-  lints apply uniformly to test code.
+  used byte-offset indexing into strings. Evidence: `make lint` failed with 6
+  `string_slice` errors. Impact: Rewrote the parser to use `split_whitespace` +
+  `split_once` instead of positional indexing. No functional change, but a
+  reminder that the strict lints apply uniformly to test code.
 
 - Observation: The `doc_markdown` Clippy lint requires backticks around
-  identifiers like `snake_case` in doc comments.
-  Evidence: `make lint` flagged two lines in `reason_code.rs`.
-  Impact: Trivial fix; wrapped `snake_case` in backticks.
+  identifiers like `snake_case` in doc comments. Evidence: `make lint` flagged
+  two lines in `reason_code.rs`. Impact: Trivial fix; wrapped `snake_case` in
+  backticks.
 
 ## Decision log
 
 - Decision: Use an enum for `CapabilityId` rather than a string-backed
   newtype. Rationale: Architecture Decision Record (ADR) 001 defines exactly
-  five first-party capability IDs
-  (`rename-symbol`, `extricate-symbol`, `extract-method`, `replace-body`,
-  `extract-predicate`). An enum provides compile-time exhaustiveness checking,
-  reliable `match` coverage, and prevents typos. Third-party extensibility is a
-  non-goal at this stage. The enum follows the precedent set by
-  `CapabilityKind` in `crates/weaver-lsp-host/src/capability.rs`. Date:
-  2026-02-28.
+  five first-party capability IDs (`rename-symbol`, `extricate-symbol`,
+  `extract-method`, `replace-body`, `extract-predicate`). An enum provides
+  compile-time exhaustiveness checking, reliable `match` coverage, and prevents
+  typos. Third-party extensibility is a non-goal at this stage. The enum
+  follows the precedent set by `CapabilityKind` in
+  `crates/weaver-lsp-host/src/capability.rs`. Date: 2026-02-28.
 
 - Decision: Create a new `capability/` module directory rather than adding
   to existing protocol or manifest modules. Rationale: The capability contract
@@ -213,8 +211,8 @@ All acceptance criteria are met:
    variants is serialized as `snake_case` strings. The optional `reason_code`
    field on `PluginDiagnostic` is backwards-compatible via `serde(default)`.
 
-Deliverables: 4 new files in `capability/` module, 3 extended existing types,
-1 BDD feature file with 10 scenarios, 1 BDD step definitions file, user guide
+Deliverables: 4 new files in `capability/` module, 3 extended existing types, 1
+BDD feature file with 10 scenarios, 1 BDD step definitions file, user guide
 documentation, and roadmap update. All 124 `weaver-plugins` tests pass. Full
 workspace `check-fmt`, `lint`, and `test` gates pass.
 
@@ -353,8 +351,8 @@ capability IDs, the rename-symbol request schema, and refusal reason codes.
 Update `lib.rs` re-exports and ensure all rustdoc examples compile. Run full
 quality gates. Mark roadmap entry as done.
 
-Validation: `make check-fmt && make lint && make test && make markdownlint`
-all pass.
+Validation: `make check-fmt && make lint && make test && make markdownlint` all
+pass.
 
 ## Validation and acceptance
 

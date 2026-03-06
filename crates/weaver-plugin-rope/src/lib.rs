@@ -4,19 +4,24 @@
 //! `weaver-plugins`. The plugin reads exactly one JSONL request from stdin,
 //! executes a refactoring operation, and writes one JSONL response to stdout.
 
+mod arguments;
+
 #[cfg(test)]
 mod tests;
 
-use std::collections::HashMap;
+use std::fmt;
 use std::io::{BufRead, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
 use tempfile::TempDir;
 use thiserror::Error;
+use weaver_plugins::capability::ReasonCode;
 use weaver_plugins::protocol::{
     DiagnosticSeverity, FilePayload, PluginDiagnostic, PluginOutput, PluginRequest, PluginResponse,
 };
+
+use crate::arguments::parse_rename_symbol_arguments;
 
 const PYTHON_BINARY: &str = "python3";
 const PYTHON_RENAME_SCRIPT: &str = concat!(
@@ -164,6 +169,37 @@ pub enum RopeAdapterError {
     },
 }
 
+/// Structured failure carrying an optional reason code for diagnostics.
+#[derive(Debug)]
+pub(crate) struct PluginFailure {
+    message: String,
+    reason_code: Option<ReasonCode>,
+}
+
+impl PluginFailure {
+    /// Creates a failure without a reason code.
+    pub(crate) fn plain(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            reason_code: None,
+        }
+    }
+
+    /// Creates a failure with a stable reason code.
+    pub(crate) fn with_reason(message: impl Into<String>, reason: ReasonCode) -> Self {
+        Self {
+            message: message.into(),
+            reason_code: Some(reason),
+        }
+    }
+}
+
+impl fmt::Display for PluginFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
 /// Executes one plugin request from `stdin` and writes one response to `stdout`.
 ///
 /// # Errors
@@ -177,7 +213,7 @@ pub fn run_with_adapter<R: RopeAdapter>(
     let response = match read_request(stdin).and_then(|request| execute_request(adapter, &request))
     {
         Ok(resp) => resp,
-        Err(message) => failure_response(message),
+        Err(failure) => failure_response(failure),
     };
 
     let payload = serde_json::to_string(&response)
@@ -202,95 +238,78 @@ pub fn run(stdin: &mut impl BufRead, stdout: &mut impl Write) -> Result<(), Plug
     run_with_adapter(stdin, stdout, &PythonRopeAdapter)
 }
 
-fn read_request(stdin: &mut impl BufRead) -> Result<PluginRequest, String> {
+fn read_request(stdin: &mut impl BufRead) -> Result<PluginRequest, PluginFailure> {
     let mut line = String::new();
     let bytes_read = stdin
         .read_line(&mut line)
-        .map_err(|error| format!("failed to read request: {error}"))?;
+        .map_err(|error| PluginFailure::plain(format!("failed to read request: {error}")))?;
 
     if bytes_read == 0 {
-        return Err(String::from("plugin request was empty"));
+        return Err(PluginFailure::plain("plugin request was empty"));
     }
 
     serde_json::from_str(line.trim())
-        .map_err(|error| format!("invalid plugin request JSON: {error}"))
+        .map_err(|error| PluginFailure::plain(format!("invalid plugin request JSON: {error}")))
 }
 
 fn execute_request<R: RopeAdapter>(
     adapter: &R,
     request: &PluginRequest,
-) -> Result<PluginResponse, String> {
+) -> Result<PluginResponse, PluginFailure> {
     match request.operation() {
-        "rename" => execute_rename(adapter, request),
-        other => Err(format!("unsupported refactoring operation '{other}'")),
+        "rename-symbol" => execute_rename(adapter, request),
+        other => Err(PluginFailure::with_reason(
+            format!("unsupported refactoring operation '{other}'"),
+            ReasonCode::OperationNotSupported,
+        )),
     }
 }
 
 fn execute_rename<R: RopeAdapter>(
     adapter: &R,
     request: &PluginRequest,
-) -> Result<PluginResponse, String> {
-    let (offset, new_name) = parse_rename_arguments(request.arguments())?;
+) -> Result<PluginResponse, PluginFailure> {
+    let args = parse_rename_symbol_arguments(request.arguments())
+        .map_err(|msg| PluginFailure::with_reason(msg, ReasonCode::IncompletePayload))?;
 
     let files = request.files();
     let file = match files {
         [single] => single,
         other => {
-            return Err(format!(
-                "rename operation requires exactly one file payload, got {}",
-                other.len()
+            return Err(PluginFailure::with_reason(
+                format!(
+                    "rename-symbol operation requires exactly one file payload, got {}",
+                    other.len()
+                ),
+                ReasonCode::IncompletePayload,
             ));
         }
     };
 
-    validate_relative_path(file.path()).map_err(|error| error.to_string())?;
+    validate_relative_path(file.path()).map_err(|error| {
+        PluginFailure::with_reason(error.to_string(), ReasonCode::IncompletePayload)
+    })?;
 
     let modified = adapter
-        .rename(file, offset, &new_name)
-        .map_err(|error| error.to_string())?;
+        .rename(file, args.offset(), args.new_name())
+        .map_err(|error| match &error {
+            RopeAdapterError::EngineFailed { .. } => {
+                PluginFailure::with_reason(error.to_string(), ReasonCode::SymbolNotFound)
+            }
+            _ => PluginFailure::plain(error.to_string()),
+        })?;
 
     if modified == file.content() {
-        return Err(String::from("rename operation produced no content changes"));
+        return Err(PluginFailure::with_reason(
+            String::from("rename operation produced no content changes"),
+            ReasonCode::SymbolNotFound,
+        ));
     }
 
     let patch = build_search_replace_patch(file.path(), file.content(), &modified);
     Ok(PluginResponse::success(PluginOutput::Diff {
         content: patch,
     }))
-}
-
-fn parse_rename_arguments(
-    arguments: &HashMap<String, serde_json::Value>,
-) -> Result<(usize, String), String> {
-    let offset_value = arguments
-        .get("offset")
-        .ok_or_else(|| String::from("rename operation requires 'offset' argument"))?;
-    let new_name_value = arguments
-        .get("new_name")
-        .ok_or_else(|| String::from("rename operation requires 'new_name' argument"))?;
-
-    let offset_string = json_value_to_string(offset_value)
-        .ok_or_else(|| String::from("offset argument must be a string or number"))?;
-    let offset = offset_string
-        .parse::<usize>()
-        .map_err(|error| format!("offset must be a non-negative integer: {error}"))?;
-
-    let new_name = new_name_value
-        .as_str()
-        .ok_or_else(|| String::from("new_name argument must be a string"))?;
-    if new_name.trim().is_empty() {
-        return Err(String::from("new_name argument must not be empty"));
-    }
-
-    Ok((offset, String::from(new_name)))
-}
-
-fn json_value_to_string(value: &serde_json::Value) -> Option<String> {
-    match value {
-        serde_json::Value::String(text) => Some(text.to_owned()),
-        serde_json::Value::Number(number) => Some(number.to_string()),
-        _ => None,
-    }
 }
 
 fn write_workspace_file(
@@ -322,19 +341,12 @@ fn validate_relative_path(path: &Path) -> Result<(), RopeAdapterError> {
         });
     }
 
-    let has_parent_traversal = path
-        .components()
-        .any(|component| matches!(component, Component::ParentDir));
-    if has_parent_traversal {
+    if path.components().any(|c| matches!(c, Component::ParentDir)) {
         return Err(RopeAdapterError::InvalidPath {
             message: String::from("path traversal is not allowed"),
         });
     }
-
-    let has_windows_prefix = path
-        .components()
-        .any(|component| matches!(component, Component::Prefix(_)));
-    if has_windows_prefix {
+    if path.components().any(|c| matches!(c, Component::Prefix(_))) {
         return Err(RopeAdapterError::InvalidPath {
             message: String::from("windows path prefixes are not allowed"),
         });
@@ -375,9 +387,10 @@ fn path_to_slash(path: &Path) -> String {
         .join("/")
 }
 
-pub(crate) fn failure_response(message: String) -> PluginResponse {
-    PluginResponse::failure(vec![PluginDiagnostic::new(
-        DiagnosticSeverity::Error,
-        message,
-    )])
+pub(crate) fn failure_response(failure: PluginFailure) -> PluginResponse {
+    let mut diagnostic = PluginDiagnostic::new(DiagnosticSeverity::Error, failure.message);
+    if let Some(code) = failure.reason_code {
+        diagnostic = diagnostic.with_reason_code(code);
+    }
+    PluginResponse::failure(vec![diagnostic])
 }

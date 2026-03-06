@@ -7,9 +7,10 @@ use std::path::PathBuf;
 
 use mockall::mock;
 use rstest::{fixture, rstest};
+use weaver_plugins::capability::ReasonCode;
 use weaver_plugins::protocol::{FilePayload, PluginOutput, PluginRequest};
 
-use crate::{RopeAdapter, RopeAdapterError, execute_request, run_with_adapter};
+use crate::{PluginFailure, RopeAdapter, RopeAdapterError, execute_request, run_with_adapter};
 
 mock! {
     Adapter {}
@@ -42,7 +43,11 @@ fn adapter_unused() -> MockAdapter {
 fn rename_arguments() -> HashMap<String, serde_json::Value> {
     let mut arguments = HashMap::new();
     arguments.insert(
-        String::from("offset"),
+        String::from("uri"),
+        serde_json::Value::String(String::from("src/main.py")),
+    );
+    arguments.insert(
+        String::from("position"),
         serde_json::Value::String(String::from("4")),
     );
     arguments.insert(
@@ -54,7 +59,7 @@ fn rename_arguments() -> HashMap<String, serde_json::Value> {
 
 fn request_with_args(arguments: HashMap<String, serde_json::Value>) -> PluginRequest {
     PluginRequest::with_arguments(
-        "rename",
+        "rename-symbol",
         vec![FilePayload::new(
             PathBuf::from("src/main.py"),
             "def old_name():\n    return 1\n",
@@ -73,24 +78,39 @@ fn rename_success_returns_diff_output(rename_arguments: HashMap<String, serde_js
     assert!(matches!(response.output(), PluginOutput::Diff { .. }));
 }
 
-fn remove_offset(arguments: &mut HashMap<String, serde_json::Value>) {
-    arguments.remove("offset");
+fn remove_uri(arguments: &mut HashMap<String, serde_json::Value>) {
+    arguments.remove("uri");
 }
 
-fn set_boolean_offset(arguments: &mut HashMap<String, serde_json::Value>) {
-    arguments.insert(String::from("offset"), serde_json::Value::Bool(true));
+fn set_boolean_uri(arguments: &mut HashMap<String, serde_json::Value>) {
+    arguments.insert(String::from("uri"), serde_json::Value::Bool(true));
 }
 
-fn set_negative_offset(arguments: &mut HashMap<String, serde_json::Value>) {
+fn set_empty_uri(arguments: &mut HashMap<String, serde_json::Value>) {
     arguments.insert(
-        String::from("offset"),
+        String::from("uri"),
+        serde_json::Value::String(String::new()),
+    );
+}
+
+fn remove_position(arguments: &mut HashMap<String, serde_json::Value>) {
+    arguments.remove("position");
+}
+
+fn set_boolean_position(arguments: &mut HashMap<String, serde_json::Value>) {
+    arguments.insert(String::from("position"), serde_json::Value::Bool(true));
+}
+
+fn set_negative_position(arguments: &mut HashMap<String, serde_json::Value>) {
+    arguments.insert(
+        String::from("position"),
         serde_json::Value::String(String::from("-1")),
     );
 }
 
-fn set_numeric_offset(arguments: &mut HashMap<String, serde_json::Value>) {
+fn set_numeric_position(arguments: &mut HashMap<String, serde_json::Value>) {
     arguments.insert(
-        String::from("offset"),
+        String::from("position"),
         serde_json::Value::Number(serde_json::Number::from(4)),
     );
 }
@@ -109,11 +129,26 @@ fn set_numeric_new_name(arguments: &mut HashMap<String, serde_json::Value>) {
     );
 }
 
+/// Asserts that a `PluginFailure` error message contains the expected needle.
+fn assert_failure_contains(
+    result: Result<weaver_plugins::PluginResponse, PluginFailure>,
+    needle: &str,
+) {
+    let failure = result.expect_err("invalid arguments should fail");
+    assert!(
+        failure.to_string().contains(needle),
+        "expected error mentioning '{needle}', got: {failure}"
+    );
+}
+
 #[rstest]
-#[case::missing_offset(remove_offset as fn(&mut _), Some("offset"))]
-#[case::boolean_offset(set_boolean_offset as fn(&mut _), Some("offset"))]
-#[case::negative_offset(set_negative_offset as fn(&mut _), Some("non-negative integer"))]
-#[case::numeric_offset_succeeds(set_numeric_offset as fn(&mut _), None)]
+#[case::missing_uri(remove_uri as fn(&mut _), Some("uri"))]
+#[case::boolean_uri(set_boolean_uri as fn(&mut _), Some("uri argument must be a string"))]
+#[case::empty_uri(set_empty_uri as fn(&mut _), Some("uri argument must not be empty"))]
+#[case::missing_position(remove_position as fn(&mut _), Some("position"))]
+#[case::boolean_position(set_boolean_position as fn(&mut _), Some("position"))]
+#[case::negative_position(set_negative_position as fn(&mut _), Some("non-negative integer"))]
+#[case::numeric_position_succeeds(set_numeric_position as fn(&mut _), None)]
 #[case::numeric_new_name(set_numeric_new_name as fn(&mut _), Some("new_name argument must be a string"))]
 #[case::empty_new_name(set_empty_new_name as fn(&mut _), Some("new_name"))]
 fn rename_argument_validation(
@@ -125,11 +160,9 @@ fn rename_argument_validation(
 
     if let Some(needle) = expected_error {
         let adapter = adapter_unused();
-        let err = execute_request(&adapter, &request_with_args(rename_arguments))
-            .expect_err("invalid arguments should fail");
-        assert!(
-            err.contains(needle),
-            "expected error mentioning '{needle}', got: {err}"
+        assert_failure_contains(
+            execute_request(&adapter, &request_with_args(rename_arguments)),
+            needle,
         );
     } else {
         let adapter = adapter_returning(Ok(String::from("def new_name():\n    return 1\n")));
@@ -139,16 +172,20 @@ fn rename_argument_validation(
     }
 }
 
-#[test]
-fn unsupported_operation_returns_error() {
+#[rstest]
+#[case::unsupported_operation("extract_method")]
+#[case::old_rename_rejected("rename")]
+fn unsupported_operations_rejected_with_operation_not_supported(#[case] operation: &str) {
     let adapter = adapter_unused();
-    let request = PluginRequest::new("extract_method", Vec::new());
+    let request = PluginRequest::new(operation, Vec::new());
 
-    let err = execute_request(&adapter, &request).expect_err("unsupported operation should fail");
+    let failure =
+        execute_request(&adapter, &request).expect_err("unsupported operation should fail");
     assert!(
-        err.contains("unsupported"),
-        "expected error mentioning 'unsupported', got: {err}"
+        failure.to_string().contains("unsupported"),
+        "expected error mentioning 'unsupported', got: {failure}"
     );
+    assert_eq!(failure.reason_code, Some(ReasonCode::OperationNotSupported));
 }
 
 enum FailureScenario {
@@ -157,10 +194,11 @@ enum FailureScenario {
 }
 
 #[rstest]
-#[case::no_change(FailureScenario::NoChange)]
-#[case::adapter_error(FailureScenario::AdapterError)]
-fn rename_non_mutating_or_error_returns_failure(
+#[case::no_change(FailureScenario::NoChange, ReasonCode::SymbolNotFound)]
+#[case::adapter_error(FailureScenario::AdapterError, ReasonCode::SymbolNotFound)]
+fn rename_failure_includes_reason_code(
     #[case] scenario: FailureScenario,
+    #[case] expected_reason: ReasonCode,
     rename_arguments: HashMap<String, serde_json::Value>,
 ) {
     let adapter = match &scenario {
@@ -172,19 +210,29 @@ fn rename_non_mutating_or_error_returns_failure(
         }
     };
 
-    let err = execute_request(&adapter, &request_with_args(rename_arguments))
+    let failure = execute_request(&adapter, &request_with_args(rename_arguments))
         .expect_err("failure scenario should return Err");
+    assert_eq!(failure.reason_code, Some(expected_reason));
 
     match scenario {
         FailureScenario::NoChange => assert!(
-            err.contains("no content changes"),
-            "expected no-change diagnostic, got: {err}"
+            failure.to_string().contains("no content changes"),
+            "expected no-change diagnostic, got: {failure}"
         ),
         FailureScenario::AdapterError => assert!(
-            err.contains("rope failed"),
-            "expected adapter error message, got: {err}"
+            failure.to_string().contains("rope failed"),
+            "expected adapter error message, got: {failure}"
         ),
     }
+}
+
+#[rstest]
+fn missing_arguments_include_incomplete_payload_reason_code() {
+    let adapter = adapter_unused();
+    let arguments = HashMap::new();
+    let failure = execute_request(&adapter, &request_with_args(arguments))
+        .expect_err("empty arguments should fail");
+    assert_eq!(failure.reason_code, Some(ReasonCode::IncompletePayload));
 }
 
 // ---------------------------------------------------------------------------
