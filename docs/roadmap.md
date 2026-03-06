@@ -783,8 +783,7 @@ design in
 
 *Outcome: Provide a deterministic, cacheable symbol card payload that defaults
 to Tree-sitter extraction and optionally enriches via LSP when available. See
-`docs/jacquard-card-first-symbol-graph-design.md` under “Data model” and
-“Tree-sitter extraction”.*
+`docs/jacquard-card-first-symbol-graph-design.md` §9.1-§9.3 and §10.1-§10.3.*
 
 - [ ] 7.1.1. Define stable JSONL request and response schemas for
       `observe get-card`, including versioning, provenance fields, and
@@ -832,8 +831,7 @@ to Tree-sitter extraction and optionally enriches via LSP when available. See
 
 *Outcome: Return a bounded subgraph rooted at an entry symbol, with typed edges
 (`call`, `import`, and `config`) and explicit budget constraints. See
-`docs/jacquard-card-first-symbol-graph-design.md` under “Graph slice
-construction”.*
+`docs/jacquard-card-first-symbol-graph-design.md` §12.1-§12.3.*
 
 - [ ] 7.2.1. Define stable JSONL request and response schemas for
       `observe graph-slice`, including budgets, spillover metadata, and
@@ -869,8 +867,8 @@ construction”.*
 
 *Outcome: Diff a slice over the last N commits without requiring a working tree
 checkout, producing deterministic output suitable for caching and regression
-tests. See `docs/jacquard-card-first-symbol-graph-design.md` under “Time-travel
-diff over last N commits” and “Failure modes and mitigations”.*
+tests. See `docs/jacquard-card-first-symbol-graph-design.md` §13.1-§13.2 and
+§22.*
 
 - [ ] 7.3.1. Implement git-backed blob loading for historical revisions without
       checkout, scoped to only the files required by the slice budget.
@@ -912,8 +910,7 @@ diff over last N commits” and “Failure modes and mitigations”.*
 
 *Outcome: Map symbols across commits probabilistically when identifiers drift,
 exposing confidence and alternates rather than hiding ambiguity. See
-`docs/jacquard-card-first-symbol-graph-design.md` under “Probabilistic symbol
-matching”.*
+`docs/jacquard-card-first-symbol-graph-design.md` §14.1-§14.8.*
 
 - [ ] 7.4.1. Implement phase 1 stable-identity matching (type, name, container,
       file hint), with explicit confidence output.
@@ -968,9 +965,8 @@ matching”.*
 *Outcome: Add a persisted ledger keyed by commit hash for faster history
 queries and broader edge coverage once `snapshots_on_demand` is proven
 reliable. This step is intentionally staged behind the on-demand
-implementation. See `docs/jacquard-card-first-symbol-graph-design.md` under
-“Time-travel diff over last N commits” (`ledger_cache`) and “Backend and module
-changes”.*
+implementation. See `docs/jacquard-card-first-symbol-graph-design.md` §13.2 and
+§18.1-§18.2.*
 
 - [ ] 7.5.1. Define a versioned on-disk ledger format for cards, edges, and
       deltas keyed by commit hash. Requires 7.3.2.
