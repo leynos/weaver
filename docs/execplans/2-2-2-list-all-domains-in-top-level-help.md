@@ -175,17 +175,21 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
   `main_entry.rs`) runs the binary as a subprocess and captures its output,
   which is the correct way to test `--help`. Date/Author: 2026-03-03
 
-- Decision: Declare the `after_help` module as `pub(crate)` (not
-  `#[cfg(test)]`) with `DOMAIN_OPERATIONS` re-exported as `pub` from
-  `lib.rs` so integration tests can reference it directly. The module
-  uses `#[allow(dead_code)]` because `#[expect]` is not viable:
-  `dead_code` fires for the lib target (where only `DOMAIN_OPERATIONS`
-  is reachable via re-export) but not for the test target (where all
-  symbols are used), so `#[expect]` would be unfulfilled in the test
-  compilation and fail `--all-targets` lint. `render_after_help()` lives
-  inside the `after_help` module to avoid Clippy's
-  `items_after_test_module` lint, and calls `super::msg()` to access the
-  parent module's localizer helper. Date/Author: 2026-03-04
+- Decision: Declare `localizer::after_help` as `pub(crate)` (not
+  `#[cfg(test)]`). `after_help::DOMAIN_OPERATIONS` is `pub` and
+  re-exported from `lib.rs` (`pub use localizer::after_help::
+  DOMAIN_OPERATIONS`) so integration tests (`tests/main_entry.rs`) can
+  reference it directly. **Exception to `expect`-over-`allow` policy:**
+  the module carries `#[allow(dead_code, reason = "...")]` instead of
+  `#[expect]`. Rationale: `dead_code` fires only for the lib target
+  (where the `pub(super)` constants and `render_after_help()` have no
+  non-test callers) but is satisfied in the test target (where unit
+  tests use every symbol). `#[expect(dead_code)]` therefore triggers
+  `unfulfilled_lint_expectations` during `cargo clippy --all-targets`
+  and fails the `-D warnings` gate. `render_after_help()` lives inside
+  the `after_help` module to avoid Clippy's `items_after_test_module`
+  lint, and calls `super::msg()` to access the parent module's
+  localizer helper. Date/Author: 2026-03-04
 
 ## Outcomes & retrospective
 
