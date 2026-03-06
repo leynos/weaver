@@ -82,6 +82,17 @@ fn remove_uri(arguments: &mut HashMap<String, serde_json::Value>) {
     arguments.remove("uri");
 }
 
+fn set_boolean_uri(arguments: &mut HashMap<String, serde_json::Value>) {
+    arguments.insert(String::from("uri"), serde_json::Value::Bool(true));
+}
+
+fn set_empty_uri(arguments: &mut HashMap<String, serde_json::Value>) {
+    arguments.insert(
+        String::from("uri"),
+        serde_json::Value::String(String::new()),
+    );
+}
+
 fn remove_position(arguments: &mut HashMap<String, serde_json::Value>) {
     arguments.remove("position");
 }
@@ -132,6 +143,8 @@ fn assert_failure_contains(
 
 #[rstest]
 #[case::missing_uri(remove_uri as fn(&mut _), Some("uri"))]
+#[case::boolean_uri(set_boolean_uri as fn(&mut _), Some("uri argument must be a string"))]
+#[case::empty_uri(set_empty_uri as fn(&mut _), Some("uri argument must not be empty"))]
 #[case::missing_position(remove_position as fn(&mut _), Some("position"))]
 #[case::boolean_position(set_boolean_position as fn(&mut _), Some("position"))]
 #[case::negative_position(set_negative_position as fn(&mut _), Some("non-negative integer"))]

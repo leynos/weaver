@@ -292,8 +292,11 @@ fn execute_rename<R: RopeAdapter>(
 
     let modified = adapter
         .rename(file, args.offset(), args.new_name())
-        .map_err(|error| {
-            PluginFailure::with_reason(error.to_string(), ReasonCode::SymbolNotFound)
+        .map_err(|error| match &error {
+            RopeAdapterError::EngineFailed { .. } => {
+                PluginFailure::with_reason(error.to_string(), ReasonCode::SymbolNotFound)
+            }
+            _ => PluginFailure::plain(error.to_string()),
         })?;
 
     if modified == file.content() {
@@ -338,19 +341,12 @@ fn validate_relative_path(path: &Path) -> Result<(), RopeAdapterError> {
         });
     }
 
-    let has_parent_traversal = path
-        .components()
-        .any(|component| matches!(component, Component::ParentDir));
-    if has_parent_traversal {
+    if path.components().any(|c| matches!(c, Component::ParentDir)) {
         return Err(RopeAdapterError::InvalidPath {
             message: String::from("path traversal is not allowed"),
         });
     }
-
-    let has_windows_prefix = path
-        .components()
-        .any(|component| matches!(component, Component::Prefix(_)));
-    if has_windows_prefix {
+    if path.components().any(|c| matches!(c, Component::Prefix(_))) {
         return Err(RopeAdapterError::InvalidPath {
             message: String::from("windows path prefixes are not allowed"),
         });

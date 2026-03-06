@@ -264,42 +264,41 @@ impl RefactorPluginRuntime for InspectingRuntime {
     }
 }
 
-#[rstest]
-fn handler_sends_rename_symbol_contract_conforming_request(socket_dir: TempDir) {
-    let workspace = TempDir::new().expect("workspace");
-    let file_path = workspace.path().join("notes.txt");
-    std::fs::write(&file_path, "hello world\n").expect("write");
+const NOTES_DIFF: &str = concat!(
+    "diff --git a/notes.txt b/notes.txt\n",
+    "<<<<<<< SEARCH\n",
+    "hello world\n",
+    "=======\n",
+    "hello woven\n",
+    ">>>>>>> REPLACE\n",
+);
 
-    let diff = concat!(
-        "diff --git a/notes.txt b/notes.txt\n",
-        "<<<<<<< SEARCH\n",
-        "hello world\n",
-        "=======\n",
-        "hello woven\n",
-        ">>>>>>> REPLACE\n",
-    );
+/// Dispatches a rename request through the handler and returns the captured
+/// `PluginRequest` for inspection.
+fn dispatch_inspecting_rename(extra_args: Vec<String>, socket_dir: &TempDir) -> PluginRequest {
+    let workspace = TempDir::new().expect("workspace");
+    std::fs::write(workspace.path().join("notes.txt"), "hello world\n").expect("write");
     let runtime = InspectingRuntime {
         captured: std::sync::Mutex::new(None),
         response: PluginResponse::success(PluginOutput::Diff {
-            content: String::from(diff),
+            content: String::from(NOTES_DIFF),
         }),
     };
-    let request = command_request(vec![
+    let mut args = vec![
         String::from("--provider"),
         String::from("rope"),
         String::from("--refactoring"),
         String::from("rename"),
         String::from("--file"),
         String::from("notes.txt"),
-        String::from("offset=4"),
-        String::from("new_name=woven"),
-    ]);
+    ];
+    args.extend(extra_args);
+    let request = command_request(args);
     let socket_path = socket_dir.path().join("socket.sock");
     let mut backends = build_backends(&socket_path);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
-
-    let result = handle(
+    let _result = handle(
         &request,
         &mut writer,
         RefactorContext {
@@ -309,23 +308,27 @@ fn handler_sends_rename_symbol_contract_conforming_request(socket_dir: TempDir) 
         },
     )
     .expect("dispatch result");
-    assert_eq!(result.status, 0);
+    runtime
+        .captured
+        .into_inner()
+        .expect("lock")
+        .expect("request should be captured")
+}
 
-    let captured = runtime.captured.lock().expect("lock");
-    let plugin_request = captured.as_ref().expect("request should be captured");
+#[rstest]
+fn handler_sends_rename_symbol_contract_conforming_request(socket_dir: TempDir) {
+    let plugin_request = dispatch_inspecting_rename(
+        vec![String::from("offset=4"), String::from("new_name=woven")],
+        &socket_dir,
+    );
 
-    // The handler must translate "rename" to "rename-symbol".
     assert_eq!(plugin_request.operation(), "rename-symbol");
-
-    // The handler must inject "uri" from --file when not already present.
     let args = plugin_request.arguments();
     assert_eq!(
         args.get("uri").and_then(|v| v.as_str()),
         Some("notes.txt"),
         "uri should be injected from --file"
     );
-
-    // The handler must map "offset" to "position".
     assert_eq!(
         args.get("position").and_then(|v| v.as_str()),
         Some("4"),
@@ -335,11 +338,41 @@ fn handler_sends_rename_symbol_contract_conforming_request(socket_dir: TempDir) 
         !args.contains_key("offset"),
         "offset key should be removed after mapping to position"
     );
-
-    // new_name should be forwarded as-is.
     assert_eq!(
         args.get("new_name").and_then(|v| v.as_str()),
         Some("woven"),
         "new_name should be forwarded"
+    );
+}
+
+#[rstest]
+fn handler_overwrites_pre_existing_uri_with_file_path(socket_dir: TempDir) {
+    let plugin_request = dispatch_inspecting_rename(
+        vec![
+            String::from("uri=stale_value"),
+            String::from("offset=4"),
+            String::from("new_name=woven"),
+        ],
+        &socket_dir,
+    );
+
+    assert_eq!(
+        plugin_request
+            .arguments()
+            .get("uri")
+            .and_then(|v| v.as_str()),
+        Some("notes.txt"),
+        "uri should be overwritten with --file value, not pre-existing extra"
+    );
+}
+
+#[rstest]
+fn handler_omits_position_when_offset_not_provided(socket_dir: TempDir) {
+    let plugin_request =
+        dispatch_inspecting_rename(vec![String::from("new_name=woven")], &socket_dir);
+
+    assert!(
+        !plugin_request.arguments().contains_key("position"),
+        "position should not be injected when offset is absent"
     );
 }

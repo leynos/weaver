@@ -333,13 +333,12 @@ fn apply_rename_symbol_mapping(
     plugin_args: &mut std::collections::HashMap<String, serde_json::Value>,
     file: &str,
 ) {
-    plugin_args
-        .entry(String::from("uri"))
-        .or_insert_with(|| serde_json::Value::String(file.to_owned()));
+    plugin_args.insert(
+        String::from("uri"),
+        serde_json::Value::String(file.to_owned()),
+    );
     if let Some(offset_val) = plugin_args.remove("offset") {
-        plugin_args
-            .entry(String::from("position"))
-            .or_insert(offset_val);
+        plugin_args.insert(String::from("position"), offset_val);
     }
 }
 

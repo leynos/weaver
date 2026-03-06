@@ -38,8 +38,8 @@ Observable behaviour after this change:
   failures).
 - The `weaverd` handler maps the user-facing `--refactoring rename` to the
   contract operation `"rename-symbol"` and translates `offset` to `position`
-  internally, preserving CLI backward compatibility.
-- BDD scenarios cover happy path, missing arguments, unsupported operation,
+  internally, preserving command-line interface (CLI) backward compatibility.
+- Behaviour-driven development (BDD) scenarios cover happy path, missing arguments, unsupported operation,
   adapter failure, unchanged output, and reason code verification.
 
 ## Constraints
@@ -148,7 +148,7 @@ Observable behaviour after this change:
 ## Decision log
 
 - Decision: Retire the `"rename"` operation name in the plugin entirely, not
-  keep dual support. Rationale: The acceptance criteria says "Legacy provider
+  keep dual support. Rationale: The acceptance criteria say "Legacy provider
   routing is not required for Python rename flows." Adding dual operation
   support increases complexity and line count, and the `"rename"` name was
   never part of a stable public contract. The weaverd handler maps the
@@ -220,8 +220,8 @@ code analysis and modification. The key crates for this task are:
   updated in roadmap item 5.2.1 and must NOT be modified in 5.2.2.
 
 - `crates/weaver-plugin-rope/` — The Python rope-backed actuator plugin. A
-  standalone binary crate that reads one JSONL request from stdin and writes
-  one JSONL response to stdout. Main logic is in `src/lib.rs` (384 lines).
+  standalone binary crate that reads one JSON Lines (JSONL) request from stdin
+  and writes one JSONL response to stdout. Main logic is in `src/lib.rs` (384 lines).
   Tests are in `src/tests/mod.rs` (224 lines) and `src/tests/behaviour.rs` (176
   lines). BDD feature file is at `tests/features/rope_plugin.feature` (33
   lines).
@@ -482,7 +482,7 @@ All stages are re-runnable. If a stage fails partway, fix the issue and re-run
 from the beginning of that stage. No destructive operations are involved. The
 new `arguments.rs` file is additive; existing files are edited in place.
 
-## Artifacts and notes
+## Artefacts and notes
 
 ### Line budget analysis
 
