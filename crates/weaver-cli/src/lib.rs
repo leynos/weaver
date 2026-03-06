@@ -36,6 +36,7 @@ use lifecycle::{
     LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput, SystemLifecycle,
     try_auto_start_daemon,
 };
+pub use localizer::after_help::DOMAIN_OPERATIONS;
 use localizer::{build_localizer, write_bare_help};
 pub use output::{OutputContext, ResolvedOutputFormat, render_human_output};
 use runtime_utils::emit_capabilities;

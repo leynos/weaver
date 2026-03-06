@@ -242,6 +242,29 @@ This output does not require a configuration file or a running daemon. Use
 `weaver --help` for the full reference, including global options and the
 `daemon` subcommand.
 
+### Top-level help
+
+Running `weaver --help` displays the full command reference, including global
+options, the `daemon` subcommand, and a catalogue of all domains and operations:
+
+```text
+Domains and operations:
+
+  observe — Query code structure and relationships
+    get-definition    find-references    grep
+    diagnostics       call-hierarchy
+
+  act — Perform code modifications
+    rename-symbol     apply-edits        apply-patch
+    apply-rewrite     refactor
+
+  verify — Validate code correctness
+    diagnostics       syntax
+```
+
+This catalogue is built into the binary and does not require a running daemon
+or configuration file.
+
 ### Output formats
 
 Daemon responses are JSON objects with `kind` set to `stream` or `exit`. Stream

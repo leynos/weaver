@@ -22,7 +22,21 @@ pub enum OutputFormat {
 #[command(
     name = "weaver",
     disable_help_subcommand = true,
-    subcommand_negates_reqs = true
+    subcommand_negates_reqs = true,
+    after_help = concat!(
+        "Domains and operations:\n",
+        "\n",
+        "  observe \u{2014} Query code structure and relationships\n",
+        "    get-definition    find-references    grep\n",
+        "    diagnostics       call-hierarchy\n",
+        "\n",
+        "  act \u{2014} Perform code modifications\n",
+        "    rename-symbol     apply-edits        apply-patch\n",
+        "    apply-rewrite     refactor\n",
+        "\n",
+        "  verify \u{2014} Validate code correctness\n",
+        "    diagnostics       syntax",
+    )
 )]
 pub(crate) struct Cli {
     /// Prints the negotiated capability matrix and exits.

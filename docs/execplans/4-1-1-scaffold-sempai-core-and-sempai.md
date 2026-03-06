@@ -60,7 +60,7 @@ This satisfies roadmap task 4.1.1 from `docs/roadmap.md` (lines 347-350).
 - All dependency versions use Semantic Versioning (SemVer)-compatible caret
   requirements (`AGENTS.md` lines 206-216).
 - `rstest-bdd` v0.5.0 must be used for BDD tests (see above for
-  expansion) (workspace `Cargo.toml` line 36).
+  acronym expansion) (workspace `Cargo.toml` line 36).
 - Use `str_to_string = "deny"` — use `String::from(...)` or `.into()` instead
   of `.to_string()` on `&str` values.
 - Existing crate public APIs must not change.
@@ -530,8 +530,8 @@ backend implementation.
 `docs/sempai-query-language-design.md` if any type definitions diverge from the
 design (e.g. serde tagging strategy for `CaptureValue`).
 
-**F4.** Run `make fmt` to format all changed files, and `make markdownlint` to
-lint any modified Markdown.
+**F4.** Run `make fmt` to format all changed files, `make markdownlint` to lint
+any modified Markdown, and `make nixie` to validate Mermaid diagrams.
 
 ### Stage G: Final validation and commit gating
 
@@ -543,9 +543,10 @@ make check-fmt 2>&1 | tee /tmp/check-fmt.log
 make lint 2>&1 | tee /tmp/lint.log
 make test 2>&1 | tee /tmp/test.log
 make markdownlint 2>&1 | tee /tmp/markdownlint.log
+make nixie 2>&1 | tee /tmp/nixie.log
 ```
 
-All four must exit 0.
+All five must exit 0.
 
 **G2.** Verify cargo doc specifically for sempai:
 
