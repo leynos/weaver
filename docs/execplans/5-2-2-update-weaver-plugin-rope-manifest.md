@@ -39,8 +39,9 @@ Observable behaviour after this change:
 - The `weaverd` handler maps the user-facing `--refactoring rename` to the
   contract operation `"rename-symbol"` and translates `offset` to `position`
   internally, preserving command-line interface (CLI) backward compatibility.
-- Behaviour-driven development (BDD) scenarios cover happy path, missing arguments, unsupported operation,
-  adapter failure, unchanged output, and reason code verification.
+- Behaviour-driven development (BDD) scenarios cover happy path,
+  missing arguments, unsupported operation, adapter failure,
+  unchanged output, and reason code verification.
 
 ## Constraints
 
@@ -332,7 +333,7 @@ Update `crates/weaver-plugin-rope/src/tests/mod.rs`:
 1. Update `rename_arguments()` fixture: add `"uri"` key, rename `"offset"` to
    `"position"`.
 2. Update `request_with_args()`: operation `"rename"` → `"rename-symbol"`.
-3. Update parameterised `rename_argument_validation` test cases for new
+3. Update parameterized `rename_argument_validation` test cases for new
    argument names (`position`, `uri`) and `PluginFailure` error type.
 4. Update `unsupported_operation_returns_error` for new return type.
 5. Update `rename_non_mutating_or_error_returns_failure` for new return type.

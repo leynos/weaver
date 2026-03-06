@@ -588,7 +588,7 @@ Both examples follow the same execution pipeline:
 
 1. `weaverd` parses `--provider`, `--refactoring`, and `--file`.
 2. The file content is read from the workspace and sent to the plugin in-band.
-3. The plugin executes `rename` using `offset` and `new_name`.
+3. The plugin executes `rename-symbol` using `position` and `new_name`.
 4. The plugin returns a unified diff for the modified file.
 5. Weaver validates the diff via the Double-Lock safety harness (syntax then
    semantic checks).
@@ -750,7 +750,7 @@ Table: Required fields for `rename-symbol` requests.
 | Field      | Type   | Description                                      |
 | ---------- | ------ | ------------------------------------------------ |
 | `uri`      | string | File URI of the symbol to rename.                |
-| `position` | string | Position of the symbol (e.g. `10:5`).            |
+| `position` | string | Position of the symbol as a UTF-8 byte offset.   |
 | `new_name` | string | The new name for the symbol (must be non-empty). |
 
 Successful responses must contain a `Diff` output with a unified diff patch.
