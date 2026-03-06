@@ -47,7 +47,8 @@ impl GetCardRequest {
     /// # Errors
     ///
     /// Returns [`GetCardError`] if required flags are missing, values are
-    /// malformed, or an unknown flag is encountered.
+    /// malformed, or a non-flag positional token is encountered. Unknown
+    /// `--` prefixed flags are silently skipped for forward compatibility.
     pub fn parse(arguments: &[String]) -> Result<Self, GetCardError> {
         let mut uri: Option<String> = None;
         let mut position: Option<(u32, u32)> = None;
@@ -71,6 +72,11 @@ impl GetCardRequest {
                 "--format" => {
                     let value = require_arg_value(&mut iter, "--format")?;
                     validate_format(value)?;
+                }
+                other if other.starts_with("--") => {
+                    // Skip unrecognised flags and consume their value
+                    // argument (if present) for forward compatibility.
+                    skip_unknown_flag_value(&mut iter);
                 }
                 other => {
                     return Err(GetCardError::UnknownArgument {
@@ -125,6 +131,20 @@ fn parse_detail(value: &str) -> Result<DetailLevel, GetCardError> {
             message: e.to_string(),
         },
     )
+}
+
+/// Consumes the next token if it does not look like a flag.
+///
+/// This allows unknown `--` prefixed flags to consume their value
+/// argument without producing an error.
+fn skip_unknown_flag_value<'a, I>(iter: &mut std::iter::Peekable<I>)
+where
+    I: Iterator<Item = &'a String>,
+{
+    let is_value = iter.peek().is_some_and(|next| !next.starts_with('-'));
+    if is_value {
+        iter.next();
+    }
 }
 
 /// Validates that the format flag value is `"json"`.
@@ -225,6 +245,23 @@ mod tests {
         assert_eq!(request.detail, DetailLevel::Structure);
     }
 
+    #[test]
+    fn skips_unknown_flags() {
+        let arguments = args(&[
+            "--uri",
+            "file:///main.rs",
+            "--position",
+            "1:1",
+            "--bogus",
+            "whatever",
+            "--experimental",
+        ]);
+        let request = GetCardRequest::parse(&arguments).expect("should parse");
+        assert_eq!(request.uri, "file:///main.rs");
+        assert_eq!(request.line, 1);
+        assert_eq!(request.column, 1);
+    }
+
     #[rstest]
     #[case::minimal("minimal", DetailLevel::Minimal)]
     #[case::signature("signature", DetailLevel::Signature)]
@@ -259,9 +296,9 @@ mod tests {
         &["--uri", "file:///main.rs", "--position", "1:0"],
         "column"
     )]
-    #[case::unknown_flag(
-        &["--uri", "file:///main.rs", "--position", "1:1", "--bogus"],
-        "--bogus"
+    #[case::positional_token(
+        &["--uri", "file:///main.rs", "--position", "1:1", "stray"],
+        "stray"
     )]
     #[case::bad_detail(
         &["--uri", "file:///main.rs", "--position", "1:1", "--detail", "extreme"],

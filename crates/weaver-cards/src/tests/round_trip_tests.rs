@@ -31,10 +31,12 @@ fn minimal_card() -> SymbolCard {
         },
         signature: None,
         doc: None,
+        attachments: None,
         structure: None,
         lsp: None,
         metrics: None,
         deps: None,
+        interstitial: None,
         provenance: Provenance {
             extracted_at: String::from("2026-01-01T00:00:00Z"),
             sources: vec![String::from("tree_sitter")],
@@ -45,16 +47,16 @@ fn minimal_card() -> SymbolCard {
 
 #[rstest]
 fn symbol_card_round_trips(minimal_card: SymbolCard) {
-    let json = serde_json::to_string(&minimal_card).expect("serialise");
-    let deserialized: SymbolCard = serde_json::from_str(&json).expect("deserialise");
+    let json = serde_json::to_string(&minimal_card).expect("serialize");
+    let deserialized: SymbolCard = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(minimal_card, deserialized);
 }
 
 #[rstest]
 fn symbol_card_re_serialisation_is_stable(minimal_card: SymbolCard) {
-    let json1 = serde_json::to_string(&minimal_card).expect("serialise 1");
-    let deserialized: SymbolCard = serde_json::from_str(&json1).expect("deserialise");
-    let json2 = serde_json::to_string(&deserialized).expect("serialise 2");
+    let json1 = serde_json::to_string(&minimal_card).expect("serialize 1");
+    let deserialized: SymbolCard = serde_json::from_str(&json1).expect("deserialize");
+    let json2 = serde_json::to_string(&deserialized).expect("serialize 2");
     assert_eq!(json1, json2, "re-serialisation must be byte-identical");
 }
 
@@ -65,8 +67,8 @@ fn symbol_card_re_serialisation_is_stable(minimal_card: SymbolCard) {
 #[case::semantic(DetailLevel::Semantic)]
 #[case::full(DetailLevel::Full)]
 fn detail_level_round_trips(#[case] level: DetailLevel) {
-    let json = serde_json::to_string(&level).expect("serialise");
-    let deserialized: DetailLevel = serde_json::from_str(&json).expect("deserialise");
+    let json = serde_json::to_string(&level).expect("serialize");
+    let deserialized: DetailLevel = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(level, deserialized);
 }
 
@@ -75,16 +77,16 @@ fn success_response_round_trips(minimal_card: SymbolCard) {
     let response = GetCardResponse::Success {
         card: Box::new(minimal_card),
     };
-    let json = serde_json::to_string(&response).expect("serialise");
-    let deserialized: GetCardResponse = serde_json::from_str(&json).expect("deserialise");
+    let json = serde_json::to_string(&response).expect("serialize");
+    let deserialized: GetCardResponse = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(response, deserialized);
 }
 
 #[test]
 fn refusal_response_round_trips() {
     let response = GetCardResponse::not_yet_implemented(DetailLevel::Structure);
-    let json = serde_json::to_string(&response).expect("serialise");
-    let deserialized: GetCardResponse = serde_json::from_str(&json).expect("deserialise");
+    let json = serde_json::to_string(&response).expect("serialize");
+    let deserialized: GetCardResponse = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(response, deserialized);
 }
 
@@ -93,7 +95,7 @@ fn refusal_response_round_trips() {
 #[case::python(CardLanguage::Python, "\"python\"")]
 #[case::typescript(CardLanguage::TypeScript, "\"typescript\"")]
 fn card_language_serialises_as_snake_case(#[case] lang: CardLanguage, #[case] expected: &str) {
-    let json = serde_json::to_string(&lang).expect("serialise");
+    let json = serde_json::to_string(&lang).expect("serialize");
     assert_eq!(json, expected);
 }
 
@@ -107,6 +109,6 @@ fn card_language_serialises_as_snake_case(#[case] lang: CardLanguage, #[case] ex
 #[case::module(CardSymbolKind::Module, "\"module\"")]
 #[case::field(CardSymbolKind::Field, "\"field\"")]
 fn symbol_kind_serialises_as_snake_case(#[case] kind: CardSymbolKind, #[case] expected: &str) {
-    let json = serde_json::to_string(&kind).expect("serialise");
+    let json = serde_json::to_string(&kind).expect("serialize");
     assert_eq!(json, expected);
 }

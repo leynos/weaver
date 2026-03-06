@@ -359,15 +359,19 @@ Types mapped from the design doc lines 147-170:
 
 ### Stage C: Define `SymbolCard` and sub-structures
 
-**New file: `crates/weaver-cards/src/card.rs`** (~220 lines)
+**New file: `crates/weaver-cards/src/card.rs`** (~310 lines)
 
-Types mapped from design doc lines 176-234:
+Types mapped from design doc lines 176-268:
 
 - `ParamInfo` — `{ name: String, #[serde(rename = "type")] type_annotation:
   String }`
 - `SignatureInfo` — `{ display: String, params: Vec<ParamInfo>, returns:
   String }`
 - `DocInfo` — `{ docstring: String, summary: String, source: String }`
+- `NormalizedAttachments` — `{ decorators: Vec<String> }`
+- `AttachmentsInfo` — `{ doc_comments: Vec<String>, decorators:
+  Vec<String>, normalized: NormalizedAttachments, bundle_rule: String }`
+  (present at `structure` detail and above)
 - `LocalInfo` — `{ name: String, kind: String, decl_line: u32 }`
 - `BranchInfo` — `{ kind: String, line: u32 }`
 - `StructureInfo` — `{ locals: Vec<LocalInfo>, branches: Vec<BranchInfo> }`
@@ -378,6 +382,11 @@ Types mapped from design doc lines 176-234:
   populated at `full` detail from the relational graph layer)
 - `DepsInfo` — `{ calls: Vec<String>, imports: Vec<String>, config:
   Vec<String> }`
+- `ImportInterstitialInfo` — `{ raw: String, normalized: Vec<String>,
+  groups: Vec<Vec<String>>, source: String }` (import block data for
+  file/module or interstitial cards)
+- `InterstitialInfo` — `{ imports: ImportInterstitialInfo }` (present on
+  file/module and interstitial cards only)
 - `Provenance` — `{ extracted_at: String, sources: Vec<String> }`
 - `SymbolCard` — top-level struct with `card_version: u32`, `symbol:
   SymbolIdentity`, and all other sections as `Option<T>` with
@@ -402,7 +411,9 @@ All types derive `Debug, Clone, PartialEq, Eq, Serialize, Deserialize`.
   - `--position` parsed with `split_once(':')` (not indexing)
   - `--detail` matched against known variant names
   - `--format` accepted but only `"json"` supported
-  - Unknown arguments produce `GetCardError::UnknownArgument`
+  - Unknown `--` prefixed flags are silently skipped for forward
+    compatibility; non-flag positional tokens produce
+    `GetCardError::UnknownArgument`
   - Missing `--uri`/`--position` produce `GetCardError::MissingArgument`
   - Line and column must be >= 1 (1-indexed user-facing)
 

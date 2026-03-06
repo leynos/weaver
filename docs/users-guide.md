@@ -462,8 +462,27 @@ Arguments:
 
 Response:
 
-The response is a JSON object with a `"status"` field. On success the status
-is `"success"` and the payload wraps a `SymbolCard` object:
+The response is a JSON object with a `"status"` field.
+
+Note: Tree-sitter card extraction is not yet implemented. The operation
+currently returns a structured refusal. See the Jacquard roadmap (7.1.2)
+for the extraction milestone.
+
+When the operation cannot produce a card the status is `"refusal"`:
+
+```json
+{
+  "status": "refusal",
+  "refusal": {
+    "reason": "not_yet_implemented",
+    "message": "observe get-card: Tree-sitter card extraction is not yet implemented",
+    "requested_detail": "structure"
+  }
+}
+```
+
+On success the status is `"success"` and the payload wraps a `SymbolCard`
+object:
 
 ```json
 {
@@ -507,28 +526,11 @@ is `"success"` and the payload wraps a `SymbolCard` object:
 }
 ```
 
-When the operation cannot produce a card the status is `"refusal"`:
-
-```json
-{
-  "status": "refusal",
-  "refusal": {
-    "reason": "not_yet_implemented",
-    "message": "observe get-card: Tree-sitter card extraction is not yet implemented",
-    "requested_detail": "structure"
-  }
-}
-```
-
 Card fields beyond identity are progressively included based on the detail
 level. `minimal` returns only the `symbol` and `provenance` fields;
-`structure` (the default) adds `signature`, `doc`, `structure`, and basic
-`metrics`; `semantic` adds LSP hover/type information; `full` adds
-dependency edges and fan-in/out metrics.
-
-Note: Tree-sitter card extraction is not yet implemented. The operation
-currently returns a structured refusal. See the Jacquard roadmap (7.1.2)
-for the extraction milestone.
+`structure` (the default) adds `signature`, `doc`, `attachments`,
+`structure`, and basic `metrics`; `semantic` adds LSP hover/type
+information; `full` adds dependency edges and fan-in/out metrics.
 
 #### observe grep
 

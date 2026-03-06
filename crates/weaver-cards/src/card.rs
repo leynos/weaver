@@ -126,6 +126,66 @@ pub struct MetricsInfo {
     pub fan_out: Option<u32>,
 }
 
+/// Normalized forms of attachment metadata.
+///
+/// Provides cleaned representations of decorators stripped of syntactic
+/// prefixes (e.g. `@dataclass` normalizes to `dataclass`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NormalizedAttachments {
+    /// Decorator names with syntactic prefixes removed.
+    pub decorators: Vec<String>,
+}
+
+/// Bundled doc comments, decorators, and annotation metadata.
+///
+/// Present at `structure` detail level and above. Attachments capture the
+/// "leading trivia" that belongs to a symbol: doc comments, decorators,
+/// and annotations. The `bundle_rule` records the heuristic used to
+/// associate these fragments with the entity region.
+///
+/// See `docs/jacquard-card-first-symbol-graph-design.md` §5.3 for the
+/// canonical attachment schema.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AttachmentsInfo {
+    /// Raw doc comment strings.
+    pub doc_comments: Vec<String>,
+    /// Decorator or annotation strings as written in source.
+    pub decorators: Vec<String>,
+    /// Normalized forms of the decorators.
+    pub normalized: NormalizedAttachments,
+    /// Rule used to bundle attachments (e.g. `leading_trivia`).
+    pub bundle_rule: String,
+}
+
+/// Import block data carried on file/module or interstitial cards.
+///
+/// Contains both the raw source text and a normalized representation of
+/// the import statements within a single interstitial region.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportInterstitialInfo {
+    /// Raw source text of the import block.
+    pub raw: String,
+    /// Normalized module/package names.
+    pub normalized: Vec<String>,
+    /// Groupings of imports (e.g. stdlib vs third-party).
+    pub groups: Vec<Vec<String>>,
+    /// Provenance source (e.g. `tree_sitter`).
+    pub source: String,
+}
+
+/// Interstitial region data for file/module or interstitial cards.
+///
+/// Carries data from the syntactic spans between entity regions,
+/// such as import blocks, module headers, and file-level configuration.
+///
+/// See `docs/jacquard-card-first-symbol-graph-design.md` §5.3 for the
+/// canonical interstitial schema.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InterstitialInfo {
+    /// Import block data.
+    pub imports: ImportInterstitialInfo,
+}
+
 /// Dependency edges for a symbol.
 ///
 /// Present at `full` detail level only.
@@ -192,10 +252,12 @@ pub struct Provenance {
 ///     },
 ///     signature: None,
 ///     doc: None,
+///     attachments: None,
 ///     structure: None,
 ///     lsp: None,
 ///     metrics: None,
 ///     deps: None,
+///     interstitial: None,
 ///     provenance: Provenance {
 ///         extracted_at: String::from("2026-03-03T12:34:56Z"),
 ///         sources: vec![String::from("tree_sitter")],
@@ -216,6 +278,10 @@ pub struct SymbolCard {
     /// Documentation (present at `structure` detail and above).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doc: Option<DocInfo>,
+    /// Bundled doc comments, decorators, and annotations
+    /// (present at `structure` detail and above).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attachments: Option<AttachmentsInfo>,
     /// Structural analysis (present at `structure` detail and above).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub structure: Option<StructureInfo>,
@@ -229,6 +295,10 @@ pub struct SymbolCard {
     /// Dependency edges (present at `full` detail only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deps: Option<DepsInfo>,
+    /// Interstitial region data (present on file/module and
+    /// interstitial cards only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interstitial: Option<InterstitialInfo>,
     /// Provenance metadata (always present).
     pub provenance: Provenance,
     /// Content hash of the canonical JSON encoding for cache checks.

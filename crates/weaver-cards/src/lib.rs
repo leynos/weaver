@@ -37,8 +37,9 @@ mod response;
 mod symbol;
 
 pub use card::{
-    BranchInfo, DepsInfo, DocInfo, LocalInfo, LspInfo, MetricsInfo, ParamInfo, Provenance,
-    SignatureInfo, StructureInfo, SymbolCard,
+    AttachmentsInfo, BranchInfo, DepsInfo, DocInfo, ImportInterstitialInfo, InterstitialInfo,
+    LocalInfo, LspInfo, MetricsInfo, NormalizedAttachments, ParamInfo, Provenance, SignatureInfo,
+    StructureInfo, SymbolCard,
 };
 pub use detail::{DetailLevel, DetailLevelParseError};
 pub use error::GetCardError;

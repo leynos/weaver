@@ -143,14 +143,16 @@ fn snapshot_minimal_card() {
         symbol: minimal_identity(),
         signature: None,
         doc: None,
+        attachments: None,
         structure: None,
         lsp: None,
         metrics: None,
         deps: None,
+        interstitial: None,
         provenance: sample_provenance(&[]),
         etag: None,
     };
-    let json = serde_json::to_string_pretty(&card).expect("serialise");
+    let json = serde_json::to_string_pretty(&card).expect("serialize");
     assert_snapshot!(json);
 }
 
@@ -160,10 +162,12 @@ fn structure_card() -> SymbolCard {
         symbol: identity_with_container(),
         signature: Some(sample_signature()),
         doc: Some(sample_doc()),
+        attachments: None,
         structure: Some(sample_structure()),
         lsp: None,
         metrics: Some(sample_metrics_structure()),
         deps: None,
+        interstitial: None,
         provenance: sample_provenance(&[]),
         etag: None,
     }
@@ -171,7 +175,7 @@ fn structure_card() -> SymbolCard {
 
 #[test]
 fn snapshot_structure_card() {
-    let json = serde_json::to_string_pretty(&structure_card()).expect("serialise");
+    let json = serde_json::to_string_pretty(&structure_card()).expect("serialize");
     assert_snapshot!(json);
 }
 
@@ -182,14 +186,16 @@ fn snapshot_full_card() {
         symbol: identity_with_container(),
         signature: Some(sample_signature()),
         doc: Some(sample_doc()),
+        attachments: None,
         structure: Some(sample_structure()),
         lsp: Some(sample_lsp()),
         metrics: Some(sample_metrics_full()),
         deps: Some(sample_deps()),
+        interstitial: None,
         provenance: sample_provenance(&["lsp_hover"]),
         etag: Some(String::from("etag_abc123")),
     };
-    let json = serde_json::to_string_pretty(&card).expect("serialise");
+    let json = serde_json::to_string_pretty(&card).expect("serialize");
     assert_snapshot!(json);
 }
 
@@ -200,7 +206,7 @@ fn snapshot_full_card() {
 #[test]
 fn snapshot_refusal_not_implemented() {
     let response = GetCardResponse::not_yet_implemented(DetailLevel::Structure);
-    let json = serde_json::to_string_pretty(&response).expect("serialise");
+    let json = serde_json::to_string_pretty(&response).expect("serialize");
     assert_snapshot!(json);
 }
 
@@ -240,7 +246,7 @@ fn snapshot_refusal_variants(
     #[case] requested_detail: DetailLevel,
 ) {
     let response = refusal_response(reason, message, requested_detail);
-    let json = serde_json::to_string_pretty(&response).expect("serialise");
+    let json = serde_json::to_string_pretty(&response).expect("serialize");
     assert_snapshot!(snapshot_name, json);
 }
 
@@ -249,6 +255,6 @@ fn snapshot_success_response() {
     let response = GetCardResponse::Success {
         card: Box::new(structure_card()),
     };
-    let json = serde_json::to_string_pretty(&response).expect("serialise");
+    let json = serde_json::to_string_pretty(&response).expect("serialize");
     assert_snapshot!(json);
 }

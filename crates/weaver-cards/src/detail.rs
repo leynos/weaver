@@ -37,7 +37,8 @@ pub enum DetailLevel {
     Minimal,
     /// Adds signature (Tree-sitter extraction).
     Signature,
-    /// Adds docstring, locals, branches, basic metrics. This is the default.
+    /// Adds docstring, attachments, locals, branches, basic metrics.
+    /// This is the default.
     #[default]
     Structure,
     /// Adds LSP hover/type information.

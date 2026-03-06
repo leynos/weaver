@@ -788,7 +788,7 @@ to Tree-sitter extraction and optionally enriches via LSP when available. See
 - [x] 7.1.1. Define stable JSONL request and response schemas for
       `observe get-card`, including versioning, provenance fields, and
       progressive detail levels. Requires 2.1.7 and 3.1.1.
-  - [ ] Include attachment bundling and interstitial payloads in the schema
+  - [x] Include attachment bundling and interstitial payloads in the schema
         (doc comments, decorators, import blocks, and bundle rules).
   - [x] Add schema fixtures and snapshot coverage for success and refusal
         payloads.

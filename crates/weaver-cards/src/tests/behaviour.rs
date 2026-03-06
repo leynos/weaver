@@ -121,10 +121,12 @@ fn build_card_at_level(level: DetailLevel) -> Option<SymbolCard> {
             symbol: sample_identity(),
             signature: None,
             doc: None,
+            attachments: None,
             structure: None,
             lsp: None,
             metrics: None,
             deps: None,
+            interstitial: None,
             provenance: sample_provenance(),
             etag: None,
         }),
@@ -144,6 +146,7 @@ fn build_card_at_level(level: DetailLevel) -> Option<SymbolCard> {
                 summary: String::from("Processes a request."),
                 source: String::from("tree_sitter"),
             }),
+            attachments: None,
             structure: Some(StructureInfo {
                 locals: vec![LocalInfo {
                     name: String::from("result"),
@@ -163,6 +166,7 @@ fn build_card_at_level(level: DetailLevel) -> Option<SymbolCard> {
                 fan_out: None,
             }),
             deps: None,
+            interstitial: None,
             provenance: sample_provenance(),
             etag: None,
         }),
@@ -311,5 +315,5 @@ fn then_detail_level_is(world: &mut TestWorld, level: QuotedString) {
 
 #[scenario(path = "tests/features/get_card_schema.feature")]
 fn get_card_schema_behaviour(world: TestWorld) {
-    let _ = world;
+    drop(world);
 }
