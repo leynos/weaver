@@ -52,8 +52,7 @@ Specifically:
    documentation including syntax, arguments, and response format.
 7. Roadmap item 7.1.1 in `docs/roadmap.md` is marked complete.
 
-This satisfies roadmap task 7.1.1 from `docs/roadmap.md`[^1] and closes
-#75.
+This satisfies roadmap task 7.1.1 from `docs/roadmap.md`[^1] and closes #75.
 
 ## Constraints
 
