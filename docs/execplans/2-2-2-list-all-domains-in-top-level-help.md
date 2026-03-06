@@ -176,20 +176,18 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
   which is the correct way to test `--help`. Date/Author: 2026-03-03
 
 - Decision: Declare `localizer::after_help` as `pub(crate)` (not
-  `#[cfg(test)]`). `after_help::DOMAIN_OPERATIONS` is `pub` and
-  re-exported from `lib.rs` (`pub use localizer::after_help::
-  DOMAIN_OPERATIONS`) so integration tests (`tests/main_entry.rs`) can
-  reference it directly. **Exception to `expect`-over-`allow` policy:**
-  the module carries `#[allow(dead_code, reason = "...")]` instead of
-  `#[expect]`. Rationale: `dead_code` fires only for the lib target
-  (where the `pub(super)` constants and `render_after_help()` have no
-  non-test callers) but is satisfied in the test target (where unit
-  tests use every symbol). `#[expect(dead_code)]` therefore triggers
-  `unfulfilled_lint_expectations` during `cargo clippy --all-targets`
-  and fails the `-D warnings` gate. `render_after_help()` lives inside
-  the `after_help` module to avoid Clippy's `items_after_test_module`
-  lint, and calls `super::msg()` to access the parent module's
-  localizer helper. Date/Author: 2026-03-04
+  `#[cfg(test)]`). `after_help::DOMAIN_OPERATIONS` is `pub` and re-exported
+  from `lib.rs` (`pub use localizer::after_help:: DOMAIN_OPERATIONS`) so
+  integration tests (`tests/main_entry.rs`) can reference it directly. The
+  remaining Fluent `(id, fallback)` constants and `render_after_help()` are
+  `#[cfg(test)]`-gated inside a nested `after_help::fluent_entries` submodule.
+  This eliminates `dead_code` entirely without lint suppression: the constants
+  and render function are compiled only for the test target where they are
+  used. No `#[allow]` or `#[expect]` attribute is needed. `render_after_help()`
+  lives inside the `fluent_entries` submodule (rather than as a sibling item)
+  to avoid Clippy's `items_after_test_module` lint, and calls
+  `crate::localizer::msg()` to access the parent module's localizer helper.
+  Date/Author: 2026-03-06
 
 ## Outcomes & retrospective
 
@@ -203,15 +201,15 @@ All acceptance criteria met:
 5. Fluent and fallback paths produce identical output (guarded by
    `after_help_fluent_and_fallback_are_identical` test).
 
-Quality gates passed: `make check-fmt`, `make lint`, and `make test` (all
-tests pass; one pre-existing slow test `auto_start_succeeds_and_proceeds`
-hangs in the CI environment but is unrelated to this change).
+Quality gates passed: `make check-fmt`, `make lint`, and `make test` (all tests
+pass; one pre-existing slow test `auto_start_succeeds_and_proceeds` hangs in
+the CI environment but is unrelated to this change).
 
 Files modified: 9 (within 15-file tolerance).
 
 Key learning: When adding test-only code to a module, place the entire
-`#[cfg(test)]` module (including any helper functions) as a single block at
-the end of the file. Do not place separate `#[cfg(test)]` items after a
+`#[cfg(test)]` module (including any helper functions) as a single block at the
+end of the file. Do not place separate `#[cfg(test)]` items after a
 `#[cfg(test)] mod`, as Clippy's `items_after_test_module` lint will fire.
 
 ## Context and orientation

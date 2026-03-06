@@ -530,8 +530,8 @@ backend implementation.
 `docs/sempai-query-language-design.md` if any type definitions diverge from the
 design (e.g. serde tagging strategy for `CaptureValue`).
 
-**F4.** Run `make fmt` to format all changed files, `make markdownlint` to
-lint any modified Markdown, and `make nixie` to validate Mermaid diagrams.
+**F4.** Run `make fmt` to format all changed files, `make markdownlint` to lint
+any modified Markdown, and `make nixie` to validate Mermaid diagrams.
 
 ### Stage G: Final validation and commit gating
 
