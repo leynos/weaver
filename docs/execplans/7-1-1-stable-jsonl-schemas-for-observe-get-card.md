@@ -52,8 +52,8 @@ Specifically:
    documentation including syntax, arguments, and response format.
 7. Roadmap item 7.1.1 in `docs/roadmap.md` is marked complete.
 
-This satisfies roadmap task 7.1.1 from `docs/roadmap.md` (lines 788-795)
-and closes #75.
+This satisfies roadmap task 7.1.1 from `docs/roadmap.md`[^1] and closes
+#75.
 
 ## Constraints
 
@@ -924,3 +924,5 @@ files. Within the 25-file tolerance.
   return `DispatchResult`)
 - `crates/weaverd/src/dispatch/router/tests.rs` — existing router test
   structure to extend
+
+[^1]: `docs/roadmap.md`, lines 788–795
