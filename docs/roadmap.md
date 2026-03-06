@@ -820,7 +820,7 @@ to Tree-sitter extraction and optionally enriches via LSP when available. See
 - [ ] 7.1.4. Add cache integration for card extraction keyed by URI, language,
       and document revision. Requires 4.3.4.
   - [ ] Reuse Tree-sitter parser registries and cache extracted entity tables
-        with a Least Recently Used (LRU) policy keyed by repo, ref, file path,
+        with an LRU (Least Recently Used) policy keyed by repo, ref, file path,
         and blob hash.
   - [ ] Avoid unnecessary string cloning in card and region extraction; prefer
         borrowing or interning for hot paths.
@@ -890,7 +890,7 @@ diff over last N commits” and “Failure modes and mitigations”.*
     repository.
 - [ ] 7.3.3. Implement delta computation normalization and change taxonomy
       classification for nodes and edges.
-  - [ ] Treat import blocks and decorators as commutative sets for deltas and
+  - [ ] Treat import blocks and decorators as commutative sets for deltas, and
         persist normalized representations alongside raw text.
   - [ ] Acceptance criteria: import/decorator reordering is classified as
         `text` change; taxonomy output includes confidence; and fixtures cover

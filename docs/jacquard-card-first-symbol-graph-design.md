@@ -1021,7 +1021,7 @@ weave.[^11]
   - When blob size, parse time, file count limits, or partial parses trigger,
     fall back to coarse chunk diffs or mark the slice unavailable for that
     commit.
-    - Record the fallback reason and data quality in `graph-history` output.
+  - Record the fallback reason and data quality in `graph-history` output.
 - Non-UTF-8 paths/URIs:
 
   - Continue using existing URI conversion utilities and fallbacks.[^12]
