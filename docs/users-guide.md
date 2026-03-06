@@ -465,10 +465,10 @@ Response:
 The response is a JSON object with a `"status"` field.
 
 Note: Tree-sitter card extraction is not yet implemented. The operation
-currently returns a structured refusal. See the Jacquard roadmap (7.1.2)
-for the extraction milestone.
+currently returns a structured refusal. See the Jacquard roadmap[^1] for
+the extraction milestone.
 
-When the operation cannot produce a card the status is `"refusal"`:
+When the operation cannot produce a card, the status is `"refusal"`:
 
 ```json
 {
@@ -481,7 +481,7 @@ When the operation cannot produce a card the status is `"refusal"`:
 }
 ```
 
-On success the status is `"success"` and the payload wraps a `SymbolCard`
+On success, the status is `"success"` and the payload wraps a `SymbolCard`
 object:
 
 ```json
@@ -1063,3 +1063,5 @@ stable diagnostic codes suitable for programmatic consumption. Stub methods
 currently return the `NOT_IMPLEMENTED` code; real `E_SEMPAI_*` codes will be
 used once the corresponding backends are implemented. Diagnostics include a
 code, message, optional source span, and supplementary notes.
+
+[^1]: Jacquard roadmap section 7.1.2 — extraction milestone.

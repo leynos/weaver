@@ -285,18 +285,11 @@ fn given_request_no_detail(world: &mut TestWorld) {
 
 #[when("the card is serialized to JSON")]
 fn when_card_serialized(world: &mut TestWorld) {
-    let json = world
-        .card
-        .as_ref()
-        .map(|c| serde_json::to_string(c).expect("serialize card"))
-        .or_else(|| {
-            world
-                .response
-                .as_ref()
-                .map(|r| serde_json::to_string(r).expect("serialize response"))
-        })
-        .expect("either card or response must be set");
-    world.json_output = Some(json);
+    if let Some(c) = world.card.as_ref() {
+        world.json_output = Some(serde_json::to_string(c).expect("serialize card"));
+    } else {
+        panic!("card must be set for this step");
+    }
 }
 
 #[when("the response is serialized to JSON")]
@@ -335,9 +328,10 @@ fn then_json_does_not_contain_field(world: &mut TestWorld, field: QuotedString) 
 fn then_json_field_has_value(world: &mut TestWorld, key: QuotedString, value: QuotedString) {
     let json = world.json_output.as_ref().expect("JSON should be set");
     let parsed: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
+    let pointer = format!("/{}", key.as_str().replace('.', "/"));
     let actual = parsed
-        .get(key.as_str())
-        .expect("expected JSON to contain key");
+        .pointer(&pointer)
+        .unwrap_or_else(|| panic!("expected JSON to contain key '{}'", key.as_str()));
     let expected = serde_json::Value::String(String::from(value.as_str()));
     assert_eq!(
         actual,
