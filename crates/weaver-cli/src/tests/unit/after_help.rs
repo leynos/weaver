@@ -9,34 +9,7 @@ use ortho_config::{FluentLocalizer, NoOpLocalizer};
 
 use crate::cli::Cli;
 use crate::localizer::WEAVER_EN_US;
-use crate::localizer::after_help::render_after_help;
-
-/// Expected domain-to-operation mapping for the after-help catalogue.
-/// Sourced from `DomainRoutingContext` in
-/// `crates/weaverd/src/dispatch/router.rs`.
-const DOMAIN_OPERATIONS: &[(&str, &[&str])] = &[
-    (
-        "observe",
-        &[
-            "get-definition",
-            "find-references",
-            "grep",
-            "diagnostics",
-            "call-hierarchy",
-        ],
-    ),
-    (
-        "act",
-        &[
-            "rename-symbol",
-            "apply-edits",
-            "apply-patch",
-            "apply-rewrite",
-            "refactor",
-        ],
-    ),
-    ("verify", &["diagnostics", "syntax"]),
-];
+use crate::localizer::after_help::{DOMAIN_OPERATIONS, render_after_help};
 
 /// Splits the catalogue text into domain sections (separated by blank lines)
 /// and verifies that each operation appears in the section belonging to its

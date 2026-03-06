@@ -26,7 +26,7 @@ operation per domain. The output requires no daemon startup or socket access.
 
 Observable outcome: run `weaver --help` and see, after the standard clap help:
 
-```text
+```plaintext
 Domains and operations:
 
   observe — Query code structure and relationships
@@ -120,12 +120,12 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
 
 ## Surprises & discoveries
 
-- Surprise: The `weaver --help` output goes to stderr (not stdout) and exits
-  with code 1 (not 0). This is because clap's `try_parse_from` returns
-  `--help` as an `Err`, which the CLI maps to `AppError::CliUsage`. The error
-  handler writes to stderr and returns `FAILURE`. The integration test was
-  adjusted to use `.failure()` and `.stderr()` instead of `.success()` and
-  `.stdout()`.
+- Surprise: The `weaver --help` output currently goes to stderr via the
+  `AppError::CliUsage` path, but this is an implementation detail that may
+  change. The integration test uses `command.output()` and checks combined
+  stdout + stderr for the expected tokens, deliberately avoiding any assertion
+  on exit code or output stream so the test remains valid regardless of how
+  `--help` output is routed.
 
 - Surprise: Clippy's `items_after_test_module` lint fires when any item
   appears after a `#[cfg(test)] mod`, even if the subsequent items are also
@@ -212,6 +212,8 @@ The Weaver CLI is a Rust workspace with 12+ crates. The CLI binary lives in
 `crates/weaver-cli/`. It uses clap v4.5 in derive mode for argument parsing.
 
 ### Key files
+
+_Table: Key files referenced in this plan._
 
 | File                                                  | Lines | Purpose                                  |
 | ----------------------------------------------------- | ----- | ---------------------------------------- |
@@ -447,6 +449,8 @@ Modified clap attribute in `crates/weaver-cli/src/cli.rs`:
 ```
 
 ## Files modified (summary)
+
+_Table: Summary of modified files._
 
 | File                                                         | Change                                          |
 | ------------------------------------------------------------ | ----------------------------------------------- |

@@ -104,9 +104,41 @@ pub(crate) fn write_bare_help<W: Write>(
 /// `after_help_fluent_and_fallback_are_identical` test guards against drift.
 /// The authoritative operation list lives in
 /// `crates/weaverd/src/dispatch/router.rs` (`DomainRoutingContext`).
-#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "constants and render fn are used by tests and \
+    will be wired into runtime localization in a future task"
+)]
 pub(crate) mod after_help {
     use ortho_config::Localizer;
+
+    /// Expected domain-to-operation mapping.  Sourced from
+    /// `DomainRoutingContext` in `crates/weaverd/src/dispatch/router.rs`.
+    /// Unit tests import this constant so the operation list is defined
+    /// in exactly one place.
+    pub(crate) const DOMAIN_OPERATIONS: &[(&str, &[&str])] = &[
+        (
+            "observe",
+            &[
+                "get-definition",
+                "find-references",
+                "grep",
+                "diagnostics",
+                "call-hierarchy",
+            ],
+        ),
+        (
+            "act",
+            &[
+                "rename-symbol",
+                "apply-edits",
+                "apply-patch",
+                "apply-rewrite",
+                "refactor",
+            ],
+        ),
+        ("verify", &["diagnostics", "syntax"]),
+    ];
 
     pub(super) const HEADER: (&str, &str) = ("weaver-after-help-header", "Domains and operations:");
     pub(super) const OBSERVE_HEADING: (&str, &str) = (
