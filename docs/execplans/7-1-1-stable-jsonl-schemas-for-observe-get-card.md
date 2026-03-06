@@ -230,7 +230,7 @@ Key learnings:
 
 ### Repository structure
 
-Weaver is a Rust workspace at `/home/user/project/`. The workspace has 14
+Weaver is a Rust workspace rooted at `./`. The workspace has 14
 crates in `crates/`. The main daemon is `crates/weaverd/`. The CLI is
 `crates/weaver-cli/`. Domain-specific logic lives in separate crates:
 `weaver-graph` (call graphs), `weaver-plugins` (plugin orchestration),
@@ -615,8 +615,7 @@ main task and both sub-tasks).
 
 Copy the finalized ExecPlan to the execplans directory.
 
-**Validation:** `make fmt` passes. `make markdownlint` passes (if
-available).
+**Validation:** `make fmt` passes. `make markdownlint` passes.
 
 ### Stage I: Final validation and commit gating
 
@@ -637,7 +636,7 @@ All three must exit 0. Additionally verify:
 
 ## Concrete steps
 
-All commands run from `/home/user/project/`.
+All commands run from the repository root.
 
 ### Stage A verification
 
