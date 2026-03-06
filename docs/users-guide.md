@@ -513,6 +513,12 @@ object:
       "summary": "Processes an incoming request.",
       "source": "tree_sitter"
     },
+    "attachments": {
+      "doc_comments": ["Processes an incoming request."],
+      "decorators": [],
+      "normalized": { "decorators": [] },
+      "bundle_rule": "leading_trivia"
+    },
     "structure": {
       "locals": [{ "name": "result", "kind": "variable", "decl_line": 15 }],
       "branches": [{ "kind": "if", "line": 18 }]

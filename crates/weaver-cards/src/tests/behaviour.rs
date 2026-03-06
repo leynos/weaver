@@ -306,8 +306,9 @@ fn when_response_serialized(world: &mut TestWorld) {
 fn then_json_contains_field(world: &mut TestWorld, field: QuotedString) {
     let json = world.json_output.as_ref().expect("JSON should be set");
     let parsed: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
+    let pointer = format!("/{}", field.as_str().replace('.', "/"));
     assert!(
-        parsed.get(field.as_str()).is_some(),
+        parsed.pointer(&pointer).is_some(),
         "expected JSON to contain field '{}', got: {json}",
         field.as_str()
     );
@@ -317,8 +318,9 @@ fn then_json_contains_field(world: &mut TestWorld, field: QuotedString) {
 fn then_json_does_not_contain_field(world: &mut TestWorld, field: QuotedString) {
     let json = world.json_output.as_ref().expect("JSON should be set");
     let parsed: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
+    let pointer = format!("/{}", field.as_str().replace('.', "/"));
     assert!(
-        parsed.get(field.as_str()).is_none(),
+        parsed.pointer(&pointer).is_none(),
         "expected JSON NOT to contain field '{}', got: {json}",
         field.as_str()
     );
