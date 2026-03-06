@@ -159,27 +159,15 @@ fn rename_argument_validation(
     }
 }
 
-#[test]
-fn unsupported_operation_returns_error_with_reason_code() {
+#[rstest]
+#[case::unsupported_operation("extract_method")]
+#[case::old_rename_rejected("rename")]
+fn unsupported_operations_rejected_with_operation_not_supported(#[case] operation: &str) {
     let adapter = adapter_unused();
-    let request = PluginRequest::new("extract_method", Vec::new());
+    let request = PluginRequest::new(operation, Vec::new());
 
     let failure =
         execute_request(&adapter, &request).expect_err("unsupported operation should fail");
-    assert!(
-        failure.to_string().contains("unsupported"),
-        "expected error mentioning 'unsupported', got: {failure}"
-    );
-    assert_eq!(failure.reason_code, Some(ReasonCode::OperationNotSupported));
-}
-
-#[test]
-fn old_rename_operation_rejected_with_operation_not_supported() {
-    let adapter = adapter_unused();
-    let request = PluginRequest::new("rename", Vec::new());
-
-    let failure =
-        execute_request(&adapter, &request).expect_err("old rename operation should fail");
     assert!(
         failure.to_string().contains("unsupported"),
         "expected error mentioning 'unsupported', got: {failure}"

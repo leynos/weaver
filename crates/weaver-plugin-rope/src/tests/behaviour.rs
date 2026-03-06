@@ -164,29 +164,43 @@ fn then_failure_diagnostics(world: &mut World) {
     );
 }
 
-#[then("the failure message contains {text}")]
-fn then_failure_contains(world: &mut World, text: String) {
-    let needle = text.trim_matches('"');
+fn assert_any_diagnostic(
+    world: &mut World,
+    raw_needle: &str,
+    predicate: impl Fn(&weaver_plugins::protocol::PluginDiagnostic) -> bool,
+    fail_prefix: &str,
+) {
+    let needle = raw_needle.trim_matches('"');
     let response = resolved_response(world);
     let diagnostics = response.diagnostics();
     assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.message().contains(needle)),
-        "expected diagnostics to contain '{needle}', got: {diagnostics:?}",
+        diagnostics.iter().any(&predicate),
+        "{fail_prefix} '{needle}' in diagnostics: {diagnostics:?}",
+    );
+}
+
+#[then("the failure message contains {text}")]
+fn then_failure_contains(world: &mut World, text: String) {
+    let needle = text.trim_matches('"').to_owned();
+    assert_any_diagnostic(
+        world,
+        &needle,
+        |d| d.message().contains(needle.as_str()),
+        "expected diagnostics to contain",
     );
 }
 
 #[then("the failure has reason code {code}")]
 fn then_failure_has_reason_code(world: &mut World, code: String) {
-    let needle = code.trim_matches('"');
-    let response = resolved_response(world);
-    let diagnostics = response.diagnostics();
-    assert!(
-        diagnostics
-            .iter()
-            .any(|d| d.reason_code().is_some_and(|rc| rc.as_str() == needle)),
-        "expected reason code '{needle}' in diagnostics: {diagnostics:?}",
+    let needle = code.trim_matches('"').to_owned();
+    assert_any_diagnostic(
+        world,
+        &needle,
+        |d| {
+            d.reason_code()
+                .is_some_and(|rc| rc.as_str() == needle.as_str())
+        },
+        "expected reason code",
     );
 }
 
