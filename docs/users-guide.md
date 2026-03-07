@@ -485,16 +485,15 @@ Arguments:
 
 Response:
 
-The response is a discriminated-union JSON envelope keyed on the
-`"status"` field. When `"status"` is `"refusal"`, the envelope
-carries a refusal payload indicating why a card could not be
-produced. When `"status"` is `"success"`, the envelope contains
-the card payload. The overall shape of the envelope therefore
-depends on the `"status"` value.
+The response is a discriminated-union JSON envelope keyed on the `"status"`
+field. When `"status"` is `"refusal"`, the envelope carries a refusal payload
+indicating why a card could not be produced. When `"status"` is `"success"`,
+the envelope contains the card payload. The overall shape of the envelope
+therefore depends on the `"status"` value.
 
 Note: Tree-sitter card extraction is not yet implemented. The operation
-currently returns a structured refusal. See the Jacquard roadmap[^1] for
-the extraction milestone.
+currently returns a structured refusal. See the Jacquard roadmap[^1] for the
+extraction milestone.
 
 When the operation cannot produce a card, the status is `"refusal"`:
 
@@ -562,17 +561,17 @@ object:
 
 Note: the `card.symbol.ref.range` uses 0-based line and column numbers in a
 half-open interval — `start` is inclusive and `end` is exclusive (i.e.
-`[start, end)`). This differs from the `--position` request flag, which
-accepts 1-indexed `LINE:COL` values.
+`[start, end)`). This differs from the `--position` request flag, which accepts
+1-indexed `LINE:COL` values.
 
-Card fields beyond identity are progressively included based on the
-detail level:
+Card fields beyond identity are progressively included based on the detail
+level:
 
 - `minimal` — returns only the `symbol` and `provenance` fields.
 - `signature` — adds the `signature` block (for callable symbols)
   exposing the callable display string, parameters, and return type.
-  Non-callable symbols (classes, variables, constants) may omit
-  `signature` or structure it differently.
+  Non-callable symbols (classes, variables, constants) may omit `signature` or
+  structure it differently.
 - `structure` (default) — further adds `doc`, `structure`, and basic
   `metrics`. May include `attachments`.
 - `semantic` — adds LSP hover/type information.
