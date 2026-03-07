@@ -15,8 +15,8 @@ stable, serde-annotated Rust types that describe every field, variant, and
 version marker in the `observe get-card` request and response payloads. These
 types lock down the JSON shapes described in
 `docs/jacquard-card-first-symbol-graph-design.md` so that later tasks (7.1.2
-Tree-sitter extraction, 7.1.3 LSP enrichment) implement against a
-well-defined contract rather than inventing the schema ad hoc.
+Tree-sitter extraction, 7.1.3 LSP enrichment) implement against a well-defined
+contract rather than inventing the schema ad hoc.
 
 Observable outcome after all stages complete:
 
@@ -30,24 +30,22 @@ Specifically:
 
 1. A new crate `weaver-cards` exists in `crates/weaver-cards/` and is
    registered as a workspace member. It exports types for `SymbolCard`,
-   `SymbolRef`, `SymbolId`, `DetailLevel`, `GetCardRequest`,
-   `GetCardResponse` (success and refusal variants), and all nested
-   sub-structures.
+   `SymbolRef`, `SymbolId`, `DetailLevel`, `GetCardRequest`, `GetCardResponse`
+   (success and refusal variants), and all nested sub-structures.
 2. Insta snapshot tests in `weaver-cards` lock the JSON shape of a fully
    populated success card, a minimal card, and a refusal payload. These
    snapshots are byte-identical across runs for unchanged inputs.
 3. Behaviour-driven development (BDD) feature scenarios in
-   `weaver-cards` exercise the request parsing and response
-   construction via `rstest-bdd` v0.5.0.
+   `weaver-cards` exercise the request parsing and response construction via
+   `rstest-bdd` v0.5.0.
 4. `weaverd` adds `"get-card"` to the
    `DomainRoutingContext::OBSERVE.known_operations` list so that
    `observe get-card` is recognized by the router.
 5. Because no Tree-sitter extraction exists yet (that is 7.1.2), the handler
    in `weaverd` returns a structured refusal response (a
-   `GetCardResponse::Refusal` variant) rather than a bare "not yet
-   implemented" string. This exercises the schema types in the dispatch path
-   and produces a JSON payload that tells the caller exactly why no card was
-   produced.
+   `GetCardResponse::Refusal` variant) rather than a bare "not yet implemented"
+   string. This exercises the schema types in the dispatch path and produces a
+   JSON payload that tells the caller exactly why no card was produced.
 6. `docs/users-guide.md` is updated with `observe get-card` command
    documentation including syntax, arguments, and response format.
 7. Roadmap item 7.1.1 in `docs/roadmap.md` is marked complete.
@@ -82,9 +80,9 @@ This satisfies roadmap task 7.1.1 from `docs/roadmap.md`[^1] and closes #75.
 - All dependency versions use caret requirements (`AGENTS.md`
   lines 206-216).
 - No new external dependencies beyond those already in
-  `[workspace.dependencies]`. The needed dependencies (`serde`,
-  `serde_json`, `thiserror`, `rstest`, `rstest-bdd`, `rstest-bdd-macros`,
-  `insta`) are all already workspace dependencies.
+  `[workspace.dependencies]`. The needed dependencies (`serde`, `serde_json`,
+  `thiserror`, `rstest`, `rstest-bdd`, `rstest-bdd-macros`, `insta`) are all
+  already workspace dependencies.
 - Existing crate public APIs must not change.
 - Provenance timestamps use `String` (ISO 8601 format) rather than
   introducing `chrono` or `time`, since neither is a workspace dependency.
@@ -95,8 +93,8 @@ This satisfies roadmap task 7.1.1 from `docs/roadmap.md`[^1] and closes #75.
   and escalate. (Raised from 15 because new-crate scaffolding creates many
   small files plus insta snapshot files.)
 - Interface: if any existing `pub` API signature in any existing crate must
-  change (beyond adding `"get-card"` to the known operations list and adding
-  a new module in `dispatch/observe/`), stop and escalate.
+  change (beyond adding `"get-card"` to the known operations list and adding a
+  new module in `dispatch/observe/`), stop and escalate.
 - Dependencies: if a new external dependency beyond those already in
   `[workspace.dependencies]` is required, stop and escalate.
 - Iterations: if tests still fail after 5 attempts at fixing a given issue,
@@ -107,22 +105,20 @@ This satisfies roadmap task 7.1.1 from `docs/roadmap.md`[^1] and closes #75.
 ## Risks
 
 - Risk: `result_large_err = "deny"` lint may fire if `GetCardResponse` or
-  `SymbolCard` is large as a `Result` error type.
-  Severity: low. Likelihood: low. Mitigation: `GetCardResponse` is not used
-  as an error type; it is serialized directly. The card types themselves are
-  serialized to JSON strings, not returned as `Err(...)`.
+  `SymbolCard` is large as a `Result` error type. Severity: low. Likelihood:
+  low. Mitigation: `GetCardResponse` is not used as an error type; it is
+  serialized directly. The card types themselves are serialized to JSON
+  strings, not returned as `Err(...)`.
 
 - Risk: `missing_const_for_fn = "deny"` fires on constructors taking
-  `String`, `Vec`, or `Option<String>`.
-  Severity: low. Likelihood: high. Mitigation: Use
-  `#[expect(clippy::missing_const_for_fn, reason = "...")]` on such
-  constructors. This is the established pattern from `sempai-core`.
+  `String`, `Vec`, or `Option<String>`. Severity: low. Likelihood: high.
+  Mitigation: Use `#[expect(clippy::missing_const_for_fn, reason = "...")]` on
+  such constructors. This is the established pattern from `sempai-core`.
 
 - Risk: The 400-line file limit may be challenged by the number of struct
-  definitions.
-  Severity: medium. Likelihood: medium. Mitigation: Split the types across
-  multiple modules (`symbol.rs`, `card.rs`, `request.rs`, `response.rs`,
-  `detail.rs`, `error.rs`).
+  definitions. Severity: medium. Likelihood: medium. Mitigation: Split the
+  types across multiple modules (`symbol.rs`, `card.rs`, `request.rs`,
+  `response.rs`, `detail.rs`, `error.rs`).
 
 - Risk: `str_to_string = "deny"` fires on `.to_string()` called on `&str`.
   Severity: low. Likelihood: high. Mitigation: Use `String::from(...)` or
@@ -150,78 +146,74 @@ This satisfies roadmap task 7.1.1 from `docs/roadmap.md`[^1] and closes #75.
 
 - `CardLanguage::TypeScript` with `#[serde(rename_all = "snake_case")]`
   serialized as `"type_script"` instead of the design document's
-  `"typescript"`. Fixed by adding an explicit `#[serde(rename =
-  "typescript")]` on the `TypeScript` variant.
+  `"typescript"`. Fixed by adding an explicit `#[serde(rename = "typescript")]`
+  on the `TypeScript` variant.
 
 - `cargo-insta` command-line interface (CLI) was not installed
-  in the environment. Snapshot tests failed on first run because
-  no snapshot files existed. Resolved by running with
-  `INSTA_UPDATE=always` environment variable to auto-accept new
-  snapshots.
+  in the environment. Snapshot tests failed on first run because no snapshot
+  files existed. Resolved by running with `INSTA_UPDATE=always` environment
+  variable to auto-accept new snapshots.
 
 - The `Cargo.toml` edit tool requires a fresh `Read` call before each
-  `Edit`. An initial attempt to edit the workspace `Cargo.toml` failed due
-  to a stale read cache. Re-reading before editing resolved it.
+  `Edit`. An initial attempt to edit the workspace `Cargo.toml` failed due to a
+  stale read cache. Re-reading before editing resolved it.
 
 ## Decision log
 
 - Decision: Place schema types in a new `weaver-cards` crate rather than
-  inside `weaverd`.
-  Rationale: The design document
-  (`docs/jacquard-card-first-symbol-graph-design.md` lines 709-727)
-  recommends Option A (new crates) for better testability and reduced daemon
-  coupling. The workspace already follows this pattern with `weaver-graph`,
-  `weaver-plugins`, `sempai-core`, etc.
+  inside `weaverd`. Rationale: The design document
+  (`docs/jacquard-card-first-symbol-graph-design.md` lines 709-727) recommends
+  Option A (new crates) for better testability and reduced daemon coupling. The
+  workspace already follows this pattern with `weaver-graph`, `weaver-plugins`,
+  `sempai-core`, etc.
 
 - Decision: Use `String` for timestamps rather than `time::OffsetDateTime`.
-  Rationale: Neither `chrono` nor `time` is a workspace dependency. Adding
-  one solely for a schema definition crate is unnecessary. The
-  `extracted_at` field is serialized as an ISO 8601 string.
+  Rationale: Neither `chrono` nor `time` is a workspace dependency. Adding one
+  solely for a schema definition crate is unnecessary. The `extracted_at` field
+  is serialized as an ISO 8601 string.
 
 - Decision: Model progressive detail levels via `Option` fields on a single
-  `SymbolCard` struct rather than separate structs per detail level.
-  Rationale: The design document defines detail levels as additive layers
-  (`minimal` is a subset of `signature` which is a subset of `structure`,
-  etc.). Using `Option` fields with
-  `#[serde(skip_serializing_if = "Option::is_none")]` naturally produces the
-  right JSON shape for each level. A single struct with optional sections is
-  simpler than maintaining five separate structs with overlapping fields.
+  `SymbolCard` struct rather than separate structs per detail level. Rationale:
+  The design document defines detail levels as additive layers (`minimal` is a
+  subset of `signature` which is a subset of `structure`, etc.). Using `Option`
+  fields with `#[serde(skip_serializing_if = "Option::is_none")]` naturally
+  produces the right JSON shape for each level. A single struct with optional
+  sections is simpler than maintaining five separate structs with overlapping
+  fields.
 
 - Decision: Use internally-tagged enum `#[serde(tag = "status")]` for
-  `GetCardResponse`.
-  Rationale: The response has struct-like variants (`Success { card }` and
-  `Refusal { refusal }`), which are compatible with internally-tagged serde.
-  This produces a clean JSON shape where `"status": "success"` or
-  `"status": "refusal"` appears at the top level alongside the payload
-  fields.
+  `GetCardResponse`. Rationale: The response has struct-like variants
+  (`Success { card }` and `Refusal { refusal }`), which are compatible with
+  internally-tagged serde. This produces a clean JSON shape where
+  `"status": "success"` or `"status": "refusal"` appears at the top level
+  alongside the payload fields.
 
 - Decision: The `get-card` handler in `weaverd` returns a structured refusal
   rather than the existing `route_fallback` text-based "not yet implemented"
-  message.
-  Rationale: The acceptance criteria state "schema fixtures lock field names
-  and payload shapes". Returning a typed refusal exercises the schema in the
-  dispatch path and provides a richer signal to callers.
+  message. Rationale: The acceptance criteria state "schema fixtures lock field
+  names and payload shapes". Returning a typed refusal exercises the schema in
+  the dispatch path and provides a richer signal to callers.
 
 ## Outcomes & retrospective
 
-All stages completed successfully. The `weaver-cards` crate exports 25
-public types covering the full `observe get-card` schema. Six insta
-snapshots lock the JSON shapes for minimal, structure, and full detail
-cards, plus refusal and success response envelopes. Five BDD scenarios
-validate schema contracts. The `weaverd` router recognizes `observe
-get-card` and dispatches to a handler that returns a structured
-`GetCardResponse::Refusal` with reason `not_yet_implemented`. All quality
-gates (`make check-fmt`, `make lint`, `make test`) pass. Documentation
-updated in `users-guide.md`, `repository-layout.md`, and `roadmap.md`.
+All stages completed successfully. The `weaver-cards` crate exports 25 public
+types covering the full `observe get-card` schema. Six insta snapshots lock the
+JSON shapes for minimal, structure, and full detail cards, plus refusal and
+success response envelopes. Five BDD scenarios validate schema contracts. The
+`weaverd` router recognizes `observe get-card` and dispatches to a handler that
+returns a structured `GetCardResponse::Refusal` with reason
+`not_yet_implemented`. All quality gates (`make check-fmt`, `make lint`,
+`make test`) pass. Documentation updated in `users-guide.md`,
+`repository-layout.md`, and `roadmap.md`.
 
 Key learnings:
 
 - Serde `rename_all = "snake_case"` splits on camelCase boundaries, so
-  `TypeScript` becomes `type_script`. Use explicit `#[serde(rename = ...)]`
-  for compound words that should not be split.
+  `TypeScript` becomes `type_script`. Use explicit `#[serde(rename = ...)]` for
+  compound words that should not be split.
 - The `INSTA_UPDATE=always` environment variable is a practical alternative
-  to the `cargo-insta` CLI for accepting new snapshots in environments
-  where the CLI is not installed.
+  to the `cargo-insta` CLI for accepting new snapshots in environments where
+  the CLI is not installed.
 - Splitting types across 6 modules kept every file well under the 400-line
   limit (largest was ~230 lines for `card.rs`).
 
@@ -229,15 +221,15 @@ Key learnings:
 
 ### Repository structure
 
-Weaver is a Rust workspace rooted at `./`. The workspace has 14
-crates in `crates/`. The main daemon is `crates/weaverd/`. The CLI is
+Weaver is a Rust workspace rooted at `./`. The workspace has 14 crates in
+`crates/`. The main daemon is `crates/weaverd/`. The CLI is
 `crates/weaver-cli/`. Domain-specific logic lives in separate crates:
 `weaver-graph` (call graphs), `weaver-plugins` (plugin orchestration),
 `weaver-syntax` (Tree-sitter), `weaver-lsp-host` (LSP management),
 `sempai-core` and `sempai` (query engine).
 
-The workspace `Cargo.toml` at `Cargo.toml` lists all members (lines 2-17)
-and defines shared dependencies (lines 25-51) and lint rules (lines 53-127).
+The workspace `Cargo.toml` at `Cargo.toml` lists all members (lines 2-17) and
+defines shared dependencies (lines 25-51) and lint rules (lines 53-127).
 
 ### JSONL dispatch architecture
 
@@ -340,8 +332,8 @@ Types mapped from the design doc lines 147-170:
   Tree-sitter and LSP internal representation)
 - `SourceRange` — `{ start: SourcePosition, end: SourcePosition }`
 - `CardSymbolKind` — `#[non_exhaustive]` enum with `#[serde(rename_all =
-  "snake_case")]`: `Function`, `Method`, `Class`, `Interface`, `Type`,
-  `Variable`, `Module`, `Field`
+  "snake_case")]`: `Function`, `Method`, `Class`, `Interface`, `Type`, `Variable
+   `, `Module`, `Field`
 - `CardLanguage` — `#[non_exhaustive]` enum: `Rust`, `Python`, `TypeScript`
 - `SymbolRef` — location-based reference: `uri`, `range`, `language`,
   `kind`, `name`, `container` (Option, skip_serializing_if is_none)
@@ -352,8 +344,8 @@ Types mapped from the design doc lines 147-170:
 **New file: `crates/weaver-cards/src/detail.rs`** (~55 lines)
 
 - `DetailLevel` — `#[non_exhaustive]` enum with `#[serde(rename_all =
-  "snake_case")]`: `Minimal`, `Signature`, `Structure` (default),
-  `Semantic`, `Full`. Implements `Default` returning `Structure`.
+  "snake_case")]`: `Minimal`, `Signature`, `Structure` (default), `Semantic`, `
+  Full`. Implements `Default` returning `Structure`.
 
 **Validation:** `cargo check -p weaver-cards` succeeds.
 
@@ -370,29 +362,31 @@ Types mapped from design doc lines 176-268:
 - `DocInfo` — `{ docstring: String, summary: String, source: String }`
 - `NormalizedAttachments` — `{ decorators: Vec<String> }`
 - `AttachmentsInfo` — `{ doc_comments: Vec<String>, decorators:
-  Vec<String>, normalized: NormalizedAttachments, bundle_rule: String }`
-  (present at `structure` detail and above)
+  Vec<String>, normalized: NormalizedAttachments, bundle_rule: String
+  }` (present at `structure` detail and above)
 - `LocalInfo` — `{ name: String, kind: String, decl_line: u32 }`
 - `BranchInfo` — `{ kind: String, line: u32 }`
 - `StructureInfo` — `{ locals: Vec<LocalInfo>, branches: Vec<BranchInfo> }`
 - `LspInfo` — `{ hover: String, #[serde(rename = "type")] type_info:
   String, deprecated: bool, source: String }`
 - `MetricsInfo` — `{ lines: u32, cyclomatic: u32, fan_in: Option<u32>,
-  fan_out: Option<u32> }` (fan metrics are `Option` because they are only
-  populated at `full` detail from the relational graph layer)
+  fan_out: Option<u32>
+  }` (fan metrics are `Option` because they are only populated at `full
+  ` detail from the relational graph layer)
 - `DepsInfo` — `{ calls: Vec<String>, imports: Vec<String>, config:
   Vec<String> }`
 - `ImportInterstitialInfo` — `{ raw: String, normalized: Vec<String>,
-  groups: Vec<Vec<String>>, source: String }` (import block data for
-  file/module or interstitial cards)
+  groups: Vec<Vec<String>>, source: String
+  }` (import block data for file/module or interstitial cards)
 - `InterstitialInfo` — `{ imports: ImportInterstitialInfo }` (present on
   file/module and interstitial cards only)
 - `Provenance` — `{ extracted_at: String, sources: Vec<String> }`
 - `SymbolCard` — top-level struct with `card_version: u32`, `symbol:
-  SymbolIdentity`, and all other sections as `Option<T>` with
-  `#[serde(skip_serializing_if = "Option::is_none")]`. The `provenance`
-  field is not optional (always present). The `etag` field is
-  `Option<String>`.
+  SymbolIdentity`, and all other sections as `Option<T>`. Use `
+  #[serde(skip_serializing_if =
+  "Option::is_none")]` on each optional section. The `provenance
+  ` field is not optional (always present). The `etag` field is `Option<String>
+  `.
 
 All types derive `Debug, Clone, PartialEq, Eq, Serialize, Deserialize`.
 
@@ -404,8 +398,8 @@ All types derive `Debug, Clone, PartialEq, Eq, Serialize, Deserialize`.
 
 - `GetCardRequest` — `{ uri: String, line: u32, column: u32, detail:
   DetailLevel }`. The `parse(arguments: &[String]) -> Result<Self,
-  GetCardError>` method follows the pattern from
-  `crates/weaverd/src/dispatch/observe/arguments.rs`:
+  GetCardError>` method follows the pattern from `
+  crates/weaverd/src/dispatch/observe/arguments.rs`:
   - Iterates with a peekable iterator
   - Recognizes `--uri`, `--position`, `--detail`, `--format`
   - `--position` parsed with `split_once(':')` (not indexing)
@@ -420,8 +414,8 @@ All types derive `Debug, Clone, PartialEq, Eq, Serialize, Deserialize`.
 **New file: `crates/weaver-cards/src/response.rs`** (~100 lines)
 
 - `RefusalReason` — `#[non_exhaustive]` enum with `#[serde(rename_all =
-  "snake_case")]`: `NoSymbolAtPosition`, `UnsupportedLanguage`,
-  `NotYetImplemented`, `BackendUnavailable`
+  "snake_case")]`: `NoSymbolAtPosition`, `UnsupportedLanguage`, `
+  NotYetImplemented`, `BackendUnavailable`
 - `CardRefusal` — `{ reason: RefusalReason, message: String,
   requested_detail: DetailLevel }`
 - `GetCardResponse` — `#[serde(tag = "status", rename_all = "snake_case")]
@@ -433,18 +427,18 @@ All types derive `Debug, Clone, PartialEq, Eq, Serialize, Deserialize`.
 **New file: `crates/weaver-cards/src/error.rs`** (~60 lines)
 
 - `GetCardError` — `#[non_exhaustive] #[derive(thiserror::Error)]`:
-  `MissingArgument { flag: String }`, `InvalidValue { flag: String,
-  message: String }`, `UnknownArgument { argument: String }`
+  `MissingArgument { flag: String }`,
+  `InvalidValue { flag: String, message: String }`,
+  `UnknownArgument { argument: String }`
 
-**Validation:** `cargo check -p weaver-cards` succeeds. Basic serde
-round-trip tests pass.
+**Validation:** `cargo check -p weaver-cards` succeeds. Basic serde round-trip
+tests pass.
 
 ### Stage E: Add insta snapshot tests
 
 **New file: `crates/weaver-cards/src/tests/mod.rs`**
 
-Module declarations for `snapshot_tests`, `round_trip_tests`, and
-`behaviour`.
+Module declarations for `snapshot_tests`, `round_trip_tests`, and `behaviour`.
 
 **New file: `crates/weaver-cards/src/tests/snapshot_tests.rs`** (~180 lines)
 
@@ -464,22 +458,22 @@ Fixture builders construct example payloads and snapshot via
 6. `snapshot_success_response` — `GetCardResponse::Success` wrapping a
    structure-level card.
 
-Each test serializes to JSON via `serde_json::to_string_pretty` and
-snapshots the result. Snapshot files auto-generated in
+Each test serializes to JSON via `serde_json::to_string_pretty` and snapshots
+the result. Snapshot files auto-generated in
 `crates/weaver-cards/src/tests/snapshots/`.
 
 **New file: `crates/weaver-cards/src/tests/round_trip_tests.rs`** (~80 lines)
 
-Tests serialize and deserialize each type to confirm serde compatibility.
-Uses `rstest` parameterization for detail levels. Verifies byte-identical
+Tests serialize and deserialize each type to confirm serde compatibility. Uses
+`rstest` parameterization for detail levels. Verifies byte-identical
 re-serialization.
 
 **Validation:** `cargo test -p weaver-cards` passes. Snapshot files created.
 
 ### Stage F: Add BDD feature file and behaviour tests
 
-**New file: `crates/weaver-cards/tests/features/get_card_schema.feature`**
-(~45 lines)
+**New file: `crates/weaver-cards/tests/features/get_card_schema.feature`** (~45
+lines)
 
 ```gherkin
 Feature: Symbol card schema contracts
@@ -521,8 +515,8 @@ Feature: Symbol card schema contracts
 
 **New file: `crates/weaver-cards/src/tests/behaviour.rs`** (~200 lines)
 
-BDD step implementations using `rstest-bdd-macros`, following the pattern
-from `crates/weaver-plugins/src/tests/behaviour.rs`:
+BDD step implementations using `rstest-bdd-macros`, following the pattern from
+`crates/weaver-plugins/src/tests/behaviour.rs`:
 
 - `TestWorld` struct holding the current card, response, serialized JSON,
   and request.
@@ -532,8 +526,7 @@ from `crates/weaver-plugins/src/tests/behaviour.rs`:
 - `world` parameter named `world` (not `_world`); unused suppressed with
   `let _ = world;`.
 
-**Validation:** `cargo test -p weaver-cards` passes. All BDD scenarios
-green.
+**Validation:** `cargo test -p weaver-cards` passes. All BDD scenarios green.
 
 ### Stage G: Wire `weaverd` dispatch
 
@@ -559,8 +552,8 @@ green.
    "get-card" => observe::get_card::handle(request, writer),
    ```
 
-   The `get-card` handler does NOT take `backends` because it does not
-   start any backend. It returns a structured refusal.
+   The `get-card` handler does NOT take `backends` because it does not start
+   any backend. It returns a structured refusal.
 
 **New file: `crates/weaverd/src/dispatch/observe/get_card.rs`** (~65 lines)
 
@@ -618,8 +611,8 @@ Add `weaver-cards/` to the crate listing in the `crates/` tree (line 31-45).
 
 **Modify: `docs/roadmap.md`**
 
-Mark 7.1.1 as complete: change `- [ ]` to `- [x]` on lines 788-795 (the
-main task and both sub-tasks).
+Mark 7.1.1 as complete: change `- [ ]` to `- [x]` on lines 788-795 (the main
+task and both sub-tasks).
 
 **Write: `docs/execplans/7-1-1-stable-jsonl-schemas-for-observe-get-card.md`**
 
@@ -711,12 +704,12 @@ Quality criteria (what "done" means):
 - Schema stability: The JSON output for each detail level is deterministic.
   Repeated serialization of the same fixture produces byte-identical output.
 - Refusal payload: Dispatching `observe get-card --uri file:///foo.rs
-  --position 10:5` returns a JSONL response containing a
-  `GetCardResponse::Refusal` with reason `"not_yet_implemented"` and
-  status 1.
+  --position
+  10:5` returns a JSONL response containing a `GetCardResponse::Refusal
+  ` with reason `"not_yet_implemented"` and status 1.
 - Field names: JSON field names match the design document
-  (`card_version`, `symbol`, `signature`, `doc`, `structure`, `lsp`,
-  `metrics`, `deps`, `provenance`, `etag`).
+  (`card_version`, `symbol`, `signature`, `doc`, `structure`, `lsp`, `metrics`,
+  `deps`, `provenance`, `etag`).
 - Provenance: every non-trivial field section includes a `source` field.
 - User guide: `docs/users-guide.md` documents the `observe get-card`
   command.
@@ -921,8 +914,8 @@ files. Within the 25-file tolerance.
 ### Critical reference files
 
 - `docs/jacquard-card-first-symbol-graph-design.md` — source of truth for
-  the `SymbolCard` JSON schema, detail levels, and command surface
-  (lines 138-614)
+  the `SymbolCard` JSON schema, detail levels, and command surface (lines
+  138-614)
 - `crates/weaverd/src/dispatch/router.rs` — router where `"get-card"` must
   be added (lines 89-199)
 - `crates/weaverd/src/dispatch/observe/arguments.rs` — pattern to follow
@@ -930,8 +923,8 @@ files. Within the 25-file tolerance.
 - `crates/sempai-core/src/lib.rs` — pattern to follow for new crate
   scaffolding (module structure, re-exports, lint compliance)
 - `crates/weaverd/src/dispatch/observe/get_definition.rs` — pattern to
-  follow for handler module structure (parse args, serialize response,
-  return `DispatchResult`)
+  follow for handler module structure (parse args, serialize response, return
+  `DispatchResult`)
 - `crates/weaverd/src/dispatch/router/tests.rs` — existing router test
   structure to extend
 

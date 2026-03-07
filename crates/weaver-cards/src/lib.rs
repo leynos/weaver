@@ -32,6 +32,7 @@
 mod card;
 mod detail;
 mod error;
+mod extract;
 mod request;
 mod response;
 mod symbol;
@@ -43,6 +44,7 @@ pub use card::{
 };
 pub use detail::{DetailLevel, DetailLevelParseError};
 pub use error::GetCardError;
+pub use extract::{CardExtractionError, CardExtractionInput, TreeSitterCardExtractor};
 pub use request::GetCardRequest;
 pub use response::{CardRefusal, GetCardResponse, RefusalReason};
 pub use symbol::{

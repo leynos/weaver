@@ -129,12 +129,15 @@ structure and rejects malformed input with structured error messages. Domain
 routing supports `observe`, `act`, and `verify` commands. Unknown domains or
 operations return structured errors with exit status 1.
 
-The `observe get-definition` operation is fully implemented: it accepts `--uri`
-and `--position` arguments, infers the language from the file extension,
-initializes the appropriate language server, and returns definition locations
-as JSON. Missing or malformed arguments return structured error messages with
+The `observe get-definition` and `observe get-card` operations are fully
+implemented. `get-definition` accepts `--uri` and `--position`, infers the
+language from the file extension, initializes the appropriate language server,
+and returns definition locations as JSON. `get-card` accepts the same location
+arguments plus `--detail`, reads the target file locally, and returns a
+Tree-sitter-backed symbol card for supported Rust, Python, and TypeScript
+files. Missing or malformed arguments return structured error messages with
 exit status 1. Other operations within the `observe`, `act`, and `verify`
-domains return "not yet implemented" responses while backend wiring is
+domains still return "not yet implemented" responses while backend wiring is
 completed.
 
 The health snapshot is a single-line JSON document describing the current
@@ -485,16 +488,18 @@ Arguments:
 
 Response:
 
-The response is a discriminated-union JSON envelope keyed on the
-`"status"` field. When `"status"` is `"refusal"`, the envelope
-carries a refusal payload indicating why a card could not be
-produced. When `"status"` is `"success"`, the envelope contains
-the card payload. The overall shape of the envelope therefore
-depends on the `"status"` value.
+The response is a discriminated-union JSON envelope keyed on the `"status"`
+field. When `"status"` is `"refusal"`, the envelope carries a refusal payload
+indicating why a card could not be produced. When `"status"` is `"success"`,
+the envelope contains the card payload. The overall shape of the envelope
+therefore depends on the `"status"` value.
 
-Note: Tree-sitter card extraction is not yet implemented. The operation
-currently returns a structured refusal. See the Jacquard roadmap[^1] for
-the extraction milestone.
+`observe get-card` is Tree-sitter-first in this milestone. Supported Rust,
+Python, and TypeScript files return a deterministic card. Requests for
+unsupported file types or positions that do not resolve to a symbol return a
+structured refusal. Requests for `semantic` and `full` detail currently degrade
+to Tree-sitter-only cards with explicit provenance markers rather than starting
+an LSP server.
 
 When the operation cannot produce a card, the status is `"refusal"`:
 
@@ -502,8 +507,8 @@ When the operation cannot produce a card, the status is `"refusal"`:
 {
   "status": "refusal",
   "refusal": {
-    "reason": "not_yet_implemented",
-    "message": "observe get-card: Tree-sitter card extraction is not yet implemented",
+    "reason": "unsupported_language",
+    "message": "observe get-card: unsupported language for path /tmp/example.txt",
     "requested_detail": "structure"
   }
 }
@@ -562,17 +567,17 @@ object:
 
 Note: the `card.symbol.ref.range` uses 0-based line and column numbers in a
 half-open interval — `start` is inclusive and `end` is exclusive (i.e.
-`[start, end)`). This differs from the `--position` request flag, which
-accepts 1-indexed `LINE:COL` values.
+`[start, end)`). This differs from the `--position` request flag, which accepts
+1-indexed `LINE:COL` values.
 
-Card fields beyond identity are progressively included based on the
-detail level:
+Card fields beyond identity are progressively included based on the detail
+level:
 
 - `minimal` — returns only the `symbol` and `provenance` fields.
 - `signature` — adds the `signature` block (for callable symbols)
   exposing the callable display string, parameters, and return type.
-  Non-callable symbols (classes, variables, constants) may omit
-  `signature` or structure it differently.
+  Non-callable symbols (classes, variables, constants) may omit `signature` or
+  structure it differently.
 - `structure` (default) — further adds `doc`, `structure`, and basic
   `metrics`. May include `attachments`.
 - `semantic` — adds LSP hover/type information.
@@ -1099,16 +1104,12 @@ The `Engine` struct exposes three methods for query compilation and execution:
 - `compile_dsl(rule_id, language, dsl)` — compiles a one-liner domain-specific
   language (DSL) expression.
 - `execute(plan, uri, source)` — executes a compiled plan against a source
-  snapshot.
-
-All three methods currently return "not implemented" diagnostics. They will be
-wired to the YAML parser, DSL parser, and Tree-sitter backend as those
-components are delivered in subsequent roadmap phases.
+  snapshot. All three methods currently return "not implemented" diagnostics.
+  They will be wired to the YAML parser, DSL parser, and Tree-sitter backend as
+  those components are delivered in subsequent roadmap phases.
 
 All error conditions are reported through `DiagnosticReport`, which carries
 stable diagnostic codes suitable for programmatic consumption. Stub methods
 currently return the `NOT_IMPLEMENTED` code; real `E_SEMPAI_*` codes will be
 used once the corresponding backends are implemented. Diagnostics include a
 code, message, optional source span, and supplementary notes.
-
-[^1]: Jacquard roadmap section 7.1.2 — extraction milestone.
