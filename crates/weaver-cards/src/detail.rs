@@ -29,7 +29,9 @@ use serde::{Deserialize, Serialize};
 /// let level = DetailLevel::default();
 /// assert_eq!(level, DetailLevel::Structure);
 /// ```
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum DetailLevel {
