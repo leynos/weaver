@@ -322,14 +322,14 @@ does* *not require source inspection or external runbooks.*
         and precedence resolution.
   - [x] Document fail-fast discovery behaviour when configuration files exist
         but are invalid.
-  - [x] Document YAML 2.2 parsing semantics via `SaphyrYaml`, including known
+  - [x] Document YAML 1.2 parsing semantics via `SaphyrYaml`, including known
         compatibility warnings.
   - [x] Update internal runbooks and user-facing documentation to reflect
         `ortho-config` v0.8.0 operational behaviour.
   - [x] Validate documentation quality gates and docs tests after updates.
   - [x] Acceptance criteria: migration guide, runbooks, and user docs are
         updated with explicit sections for dependency graph, fail-fast
-        discovery, and YAML 2.2 semantics; and `make markdownlint`,
+        discovery, and YAML 1.2 semantics; and `make markdownlint`,
         `make fmt`, `make nixie`, and documentation tests pass.
 
 ## 4. Query language infrastructure (Sempai)

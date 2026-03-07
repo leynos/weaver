@@ -252,23 +252,20 @@ Validation completed successfully with captured logs:
 
 The upgrade is concentrated in a small set of files.
 
-- `/home/user/project/Cargo.toml` holds the workspace dependency on
+- `./Cargo.toml` holds the workspace dependency on
   `ortho_config = "0.7.0"` and the current Rust floor `rust-version = "1.85"`.
-- `/home/user/project/crates/weaver-config/src/lib.rs` defines the shared
+- `crates/weaver-config/src/lib.rs` defines the shared
   `Config` struct and the derive-generated loading path used by both binaries.
-- `/home/user/project/crates/weaver-cli/src/localizer.rs` exercises the
+- `crates/weaver-cli/src/localizer.rs` exercises the
   Fluent localisation APIs added in v0.7.0 and must continue to compile after
   the v0.8.0 upgrade.
-- `/home/user/project/crates/weaver-cli/src/config.rs` is a secondary audit
+- `crates/weaver-cli/src/config.rs` is a secondary audit
   point because it forwards CLI flags into `Config::load_from_iter`.
-- `/home/user/project/README.md`,
-  `/home/user/project/docs/users-guide.md`,
-  `/home/user/project/docs/weaver-design.md`,
-  `/home/user/project/docs/ortho-config-users-guide.md`,
-  `/home/user/project/docs/contents.md`, and
-  `/home/user/project/docs/roadmap.md` all describe the current configuration
-  story and will become stale if the migration lands without documentation
-  updates.
+- `./README.md`,
+  `docs/users-guide.md`, `docs/weaver-design.md`,
+  `docs/ortho-config-users-guide.md`, `docs/contents.md`, and `docs/roadmap.md`
+  all describe the current configuration story and will become stale if the
+  migration lands without documentation updates.
 
 The current implementation does not appear to use the migration-note edge
 cases. There is no alias for the `ortho_config` crate, no direct
@@ -317,7 +314,7 @@ the migration and whether any unrelated blockers were already present.
 Make the version and toolchain changes first, then let the compiler and tests
 tell us whether any source edits are needed.
 
-1. In `/home/user/project/Cargo.toml`, change the workspace Rust floor from
+1. In `./Cargo.toml`, change the workspace Rust floor from
    `1.85` to `1.88` and change `ortho_config = "0.7.0"` to
    `ortho_config = "0.8.0"`.
 2. Add `rust-version.workspace = true` to every member manifest that lacks
@@ -378,14 +375,14 @@ non-applicable with concrete evidence.
 
 The code change is small; the documentation clean-up is not optional.
 
-1. Add `/home/user/project/docs/ortho-config-v0-8-0-migration-guide.md`.
+1. Add `docs/ortho-config-v0-8-0-migration-guide.md`.
    This guide should: describe the Weaver-specific move from v0.7.0 to v0.8.0,
    list the upstream migration notes supplied in the user request, call out
    which notes apply here, and record the audit results for the notes that do
    not apply.
-2. Update `/home/user/project/docs/contents.md` to include the new migration
+2. Update `docs/contents.md` to include the new migration
    guide without deleting the v0.6.0 guide.
-3. Replace `/home/user/project/docs/ortho-config-users-guide.md` with the
+3. Replace `docs/ortho-config-users-guide.md` with the
    upstream v0.8.0 guide from:
 
    ```text
@@ -395,15 +392,15 @@ The code change is small; the documentation clean-up is not optional.
    Treat that fetched document as the body of the local file. Only make
    repository-local follow-up edits when they are necessary to keep links,
    formatting, or Markdown tooling valid in this repository.
-4. Update `/home/user/project/docs/users-guide.md` and
-   `/home/user/project/docs/weaver-design.md` so they describe the current
-   Weaver configuration story accurately. These files should say that Weaver
-   now uses `ortho-config` v0.8.0 and Rust 1.88+, and they should not imply
-   that YAML is part of Weaver's runtime config path unless it truly is.
-5. Update `/home/user/project/docs/roadmap.md` item 3.2.5 so it points at
+4. Update `docs/users-guide.md` and
+   `docs/weaver-design.md` so they describe the current Weaver configuration
+   story accurately. These files should say that Weaver now uses `ortho-config`
+   v0.8.0 and Rust 1.88+, and they should not imply that YAML is part of
+   Weaver's runtime config path unless it truly is.
+5. Update `docs/roadmap.md` item 3.2.5 so it points at
    the v0.8.0 guide and no longer asks for already-completed v0.6.0
    documentation work.
-6. Update `/home/user/project/README.md` so the build requirements say
+6. Update `./README.md` so the build requirements say
    Rust 1.88+ instead of Rust 1.85+.
 7. Explicitly record the `orthohelp` conclusion in the new migration guide:
    either it is not applicable because Weaver does not generate ortho-config
@@ -441,8 +438,3 @@ After all edits are in place, run every relevant gate and capture the logs.
 
 Acceptance for Stage 5: all applicable gates pass, or any remaining failure is
 clearly shown to be pre-existing and user-approved for follow-up.
-
-## Approval gate
-
-This document is the draft phase only. Do not start implementing the migration
-until the user explicitly approves this plan or requests changes to it.

@@ -203,8 +203,8 @@ success response envelopes. Five BDD scenarios validate schema contracts. The
 `weaverd` router recognizes `observe get-card` and dispatches to a handler that
 returns a structured `GetCardResponse::Refusal` with reason
 `not_yet_implemented`. All quality gates (`make check-fmt`, `make lint`,
-`make test`) pass. Documentation updated in `users-guide.md`,
-`repository-layout.md`, and `roadmap.md`.
+`make test`, `make markdownlint`, `make nixie`) pass. Documentation updated in
+`users-guide.md`, `repository-layout.md`, and `roadmap.md`.
 
 Key learnings:
 
