@@ -81,10 +81,21 @@ fn build_card(detail: &str) -> Result<SymbolCard, String> {
 }
 
 fn build_refusal_response(reason: RefusalReason, detail: DetailLevel) -> GetCardResponse {
-    let message = match reason {
-        RefusalReason::NotYetImplemented => {
-            String::from("observe get-card: Tree-sitter card extraction is not yet implemented")
-        }
+    if reason == RefusalReason::NotYetImplemented {
+        return GetCardResponse::not_yet_implemented(detail);
+    }
+    let message = refusal_message(&reason);
+    GetCardResponse::Refusal {
+        refusal: CardRefusal {
+            reason,
+            message,
+            requested_detail: detail,
+        },
+    }
+}
+
+fn refusal_message(reason: &RefusalReason) -> String {
+    match reason {
         RefusalReason::NoSymbolAtPosition => {
             String::from("no symbol found at the requested position")
         }
@@ -92,13 +103,7 @@ fn build_refusal_response(reason: RefusalReason, detail: DetailLevel) -> GetCard
             String::from("the requested language is not supported")
         }
         RefusalReason::BackendUnavailable => String::from("the required backend is not available"),
-    };
-    GetCardResponse::Refusal {
-        refusal: CardRefusal {
-            reason,
-            message,
-            requested_detail: detail,
-        },
+        _ => String::from("unknown refusal"),
     }
 }
 

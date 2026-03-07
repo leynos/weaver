@@ -93,20 +93,13 @@ fn snapshot_structure_card() {
 
 #[test]
 fn snapshot_full_card() {
-    let docstring = "Processes an incoming request and returns a response.";
     let card = SymbolCard {
-        card_version: 1,
-        symbol: identity_with_container(),
-        signature: Some(fixtures::sample_signature()),
-        doc: Some(fixtures::sample_doc(docstring)),
-        attachments: None,
-        structure: Some(sample_structure()),
         lsp: Some(fixtures::sample_lsp()),
         metrics: Some(fixtures::sample_metrics(Some(12), Some(3))),
         deps: Some(sample_deps()),
-        interstitial: None,
         provenance: fixtures::sample_provenance(&["lsp_hover"]),
         etag: Some(String::from("etag_abc123")),
+        ..structure_card()
     };
     let json = serde_json::to_string_pretty(&card).expect("serialize");
     assert_snapshot!(json);
