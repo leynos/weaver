@@ -181,6 +181,14 @@ Observable success after implementation:
   guide is still truthful historical documentation, and versioned file names
   should remain accurate. Date: 2026-03-07.
 
+- Decision: Replace `docs/ortho-config-users-guide.md` with the upstream
+  v0.8.0 guide from
+  `https://raw.githubusercontent.com/leynos/ortho-config/refs/tags/v0.8.0/docs/users-guide.md`
+   instead of hand-editing the in-repo copy. Rationale: the user explicitly
+  requested the upstream guide as the replacement artefact, and the fetched
+  file already captures the v0.8.0 material around layer composition,
+  post-merge hooks, localisation, and dependency aliasing. Date: 2026-03-07.
+
 - Decision: Only implement the `orthohelp` metadata flow if a concrete
   repository consumer is found during implementation. Rationale: the current
   tree has no `orthohelp` wiring, and adding speculative metadata would create
@@ -337,10 +345,16 @@ The code change is small; the documentation clean-up is not optional.
    not apply.
 2. Update `/home/user/project/docs/contents.md` to include the new migration
    guide without deleting the v0.6.0 guide.
-3. Update `/home/user/project/docs/ortho-config-users-guide.md` so it no
-   longer claims the crate targets v0.6.0. Refresh examples to prefer
-   `ortho_config::figment` re-exports where relevant, and update any Rust
-   toolchain or YAML-behaviour discussion to match v0.8.0.
+3. Replace `/home/user/project/docs/ortho-config-users-guide.md` with the
+   upstream v0.8.0 guide from:
+
+   ```text
+   https://raw.githubusercontent.com/leynos/ortho-config/refs/tags/v0.8.0/docs/users-guide.md
+   ```
+
+   Treat that fetched document as the body of the local file. Only make
+   repository-local follow-up edits when they are necessary to keep links,
+   formatting, or Markdown tooling valid in this repository.
 4. Update `/home/user/project/docs/users-guide.md` and
    `/home/user/project/docs/weaver-design.md` so they describe the current
    Weaver configuration story accurately. These files should say that Weaver
@@ -357,8 +371,9 @@ The code change is small; the documentation clean-up is not optional.
    required it.
 
 Acceptance for Stage 4: the active repository documentation matches the new
-dependency/toolchain reality, and the migration guide explains every upstream
-note in Weaver terms.
+dependency/toolchain reality, the in-tree `docs/ortho-config-users-guide.md`
+matches the upstream v0.8.0 guide except for minimal repository-local fixes,
+and the migration guide explains every upstream note in Weaver terms.
 
 ### Stage 5: Validate end to end
 
