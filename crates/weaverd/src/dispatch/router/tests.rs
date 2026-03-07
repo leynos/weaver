@@ -39,6 +39,9 @@ fn invalid_arguments_message(domain: &str, operation: &str) -> Option<&'static s
         ("observe", "get-definition") => {
             Some("observe get-definition should fail with InvalidArguments (no args provided)")
         }
+        ("observe", "get-card") => {
+            Some("observe get-card should fail with InvalidArguments (no args provided)")
+        }
         ("act", "apply-patch") => {
             Some("act apply-patch should fail with InvalidArguments (missing patch)")
         }
@@ -144,6 +147,31 @@ fn routes_operations_case_insensitively(
             "{domain} {operation} should route successfully despite case"
         );
     }
+}
+
+#[rstest]
+fn get_card_returns_structured_refusal(mut backends: FusionBackends<SemanticBackendProvider>) {
+    let router = build_router();
+    let json = r#"{"command":{"domain":"observe","operation":"get-card"},"arguments":["--uri","file:///src/main.rs","--position","10:5"]}"#;
+    let request = CommandRequest::parse(json.as_bytes()).expect("test request");
+    let mut output = Vec::new();
+    let mut writer = ResponseWriter::new(&mut output);
+    let result = router
+        .route(&request, &mut writer, &mut backends)
+        .expect("route");
+    assert_eq!(result.status, 1);
+
+    let response = String::from_utf8(output).expect("utf8");
+    let stream_line = response.lines().next().expect("stream line");
+    let envelope: serde_json::Value = serde_json::from_str(stream_line).expect("parse envelope");
+    assert_eq!(envelope["kind"], "stream");
+    assert_eq!(envelope["stream"], "stdout");
+
+    let data_str = envelope["data"].as_str().expect("data string");
+    let card: serde_json::Value = serde_json::from_str(data_str).expect("parse card");
+    assert_eq!(card["status"], "refusal");
+    assert_eq!(card["refusal"]["reason"], "not_yet_implemented");
+    assert_eq!(card["refusal"]["requested_detail"], "structure");
 }
 
 #[rstest]

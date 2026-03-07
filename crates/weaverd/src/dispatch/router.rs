@@ -94,6 +94,7 @@ impl DomainRoutingContext {
             "grep",
             "diagnostics",
             "call-hierarchy",
+            "get-card",
         ],
     };
 
@@ -195,6 +196,7 @@ impl DomainRouter {
         let operation = request.operation().to_ascii_lowercase();
         match operation.as_str() {
             "get-definition" => observe::get_definition::handle(request, writer, backends),
+            "get-card" => observe::get_card::handle(request, writer),
             _ => Self::route_fallback(&DomainRoutingContext::OBSERVE, operation.as_str(), writer),
         }
     }

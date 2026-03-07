@@ -1,0 +1,12 @@
+---
+source: crates/weaver-cards/src/tests/snapshot_tests.rs
+expression: json
+---
+{
+  "status": "refusal",
+  "refusal": {
+    "reason": "backend_unavailable",
+    "message": "the required backend is not available",
+    "requested_detail": "semantic"
+  }
+}

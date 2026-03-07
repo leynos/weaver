@@ -2604,6 +2604,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "weaver-cards"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "rstest",
+ "rstest-bdd",
+ "rstest-bdd-macros",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "weaver-cli"
 version = "0.1.0"
 dependencies = [
@@ -2801,6 +2814,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "weaver-build-util",
+ "weaver-cards",
  "weaver-config",
  "weaver-lsp-host",
  "weaver-plugins",

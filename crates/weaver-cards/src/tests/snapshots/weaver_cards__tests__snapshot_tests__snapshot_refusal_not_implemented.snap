@@ -1,0 +1,12 @@
+---
+source: crates/weaver-cards/src/tests/snapshot_tests.rs
+expression: json
+---
+{
+  "status": "refusal",
+  "refusal": {
+    "reason": "not_yet_implemented",
+    "message": "observe get-card: Tree-sitter card extraction is not yet implemented",
+    "requested_detail": "structure"
+  }
+}

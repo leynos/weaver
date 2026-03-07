@@ -21,6 +21,7 @@ thiserror.workspace = true
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json", "time"] }
 url.workspace = true
+weaver-cards = { path = "../weaver-cards" }
 weaver-config = { path = "../weaver-config", features = ["cli"] }
 weaver-lsp-host = { path = "../weaver-lsp-host" }
 weaver-plugins = { path = "../weaver-plugins" }
