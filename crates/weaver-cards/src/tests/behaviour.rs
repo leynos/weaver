@@ -84,19 +84,7 @@ fn build_refusal_response(reason: RefusalReason, detail: DetailLevel) -> GetCard
     if reason == RefusalReason::NotYetImplemented {
         return GetCardResponse::not_yet_implemented(detail);
     }
-    let message = refusal_message(&reason);
-    GetCardResponse::Refusal {
-        refusal: CardRefusal {
-            reason,
-            message,
-            requested_detail: detail,
-        },
-    }
-}
-
-fn refusal_message(reason: &RefusalReason) -> String {
-    match reason {
-        RefusalReason::NotYetImplemented => String::from("not yet implemented"),
+    let message = match &reason {
         RefusalReason::NoSymbolAtPosition => {
             String::from("no symbol found at the requested position")
         }
@@ -104,6 +92,16 @@ fn refusal_message(reason: &RefusalReason) -> String {
             String::from("the requested language is not supported")
         }
         RefusalReason::BackendUnavailable => String::from("the required backend is not available"),
+        // NotYetImplemented is handled by the early return above; the
+        // wildcard covers future #[non_exhaustive] variants.
+        _ => String::from("card could not be produced"),
+    };
+    GetCardResponse::Refusal {
+        refusal: CardRefusal {
+            reason,
+            message,
+            requested_detail: detail,
+        },
     }
 }
 
@@ -141,6 +139,19 @@ fn given_request_no_detail(world: &mut TestWorld) {
         String::from("10:5"),
     ];
     world.request = Some(GetCardRequest::parse(&args).expect("valid request"));
+}
+
+#[given("a get-card request with an unknown flag")]
+fn given_request_unknown_flag(world: &mut TestWorld) {
+    let args = vec![
+        String::from("--uri"),
+        String::from("file:///src/main.rs"),
+        String::from("--position"),
+        String::from("10:5"),
+        String::from("--some-unknown"),
+        String::from("value"),
+    ];
+    world.request = Some(GetCardRequest::parse(&args).expect("unknown flags should be skipped"));
 }
 
 // ---------------------------------------------------------------------------

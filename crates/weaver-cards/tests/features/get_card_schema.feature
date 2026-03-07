@@ -32,3 +32,7 @@ Feature: Symbol card schema contracts
   Scenario: Default detail level is structure
     Given a get-card request with no detail flag
     Then the detail level is "structure"
+
+  Scenario: Unknown flags are silently skipped
+    Given a get-card request with an unknown flag
+    Then the detail level is "structure"
