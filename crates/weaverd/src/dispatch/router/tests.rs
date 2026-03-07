@@ -3,6 +3,8 @@
 use std::path::PathBuf;
 
 use rstest::{fixture, rstest};
+use tempfile::TempDir;
+use url::Url;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
 use super::*;
@@ -152,7 +154,17 @@ fn routes_operations_case_insensitively(
 #[rstest]
 fn get_card_returns_structured_refusal(mut backends: FusionBackends<SemanticBackendProvider>) {
     let router = build_router();
-    let json = r#"{"command":{"domain":"observe","operation":"get-card"},"arguments":["--uri","file:///src/main.rs","--position","10:5"]}"#;
+    let temp_dir = TempDir::new().expect("temp dir");
+    let path = temp_dir.path().join("empty.py");
+    std::fs::write(&path, "").expect("write fixture");
+    let uri = Url::from_file_path(&path).expect("file uri").to_string();
+    let json = format!(
+        concat!(
+            "{{\"command\":{{\"domain\":\"observe\",\"operation\":\"get-card\"}},",
+            "\"arguments\":[\"--uri\",\"{uri}\",\"--position\",\"1:1\"]}}"
+        ),
+        uri = uri,
+    );
     let request = CommandRequest::parse(json.as_bytes()).expect("test request");
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
@@ -170,7 +182,7 @@ fn get_card_returns_structured_refusal(mut backends: FusionBackends<SemanticBack
     let data_str = envelope["data"].as_str().expect("data string");
     let card: serde_json::Value = serde_json::from_str(data_str).expect("parse card");
     assert_eq!(card["status"], "refusal");
-    assert_eq!(card["refusal"]["reason"], "not_yet_implemented");
+    assert_eq!(card["refusal"]["reason"], "no_symbol_at_position");
     assert_eq!(card["refusal"]["requested_detail"], "structure");
 }
 

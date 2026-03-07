@@ -797,15 +797,15 @@ to Tree-sitter extraction and optionally enriches via LSP when available. See
         shapes, including attachments and interstitials; responses include
         provenance for non-trivial fields; and the default output is stable
         (byte-identical) for unchanged inputs.
-- [ ] 7.1.2. Implement Tree-sitter symbol card extraction for the initial
+- [x] 7.1.2. Implement Tree-sitter symbol card extraction for the initial
       supported languages (Rust, Python, and TypeScript). Requires 3.1.1.
-  - [ ] Add an entity/interstitial region pass and attach interstitials to the
+  - [x] Add an entity/interstitial region pass and attach interstitials to the
         relevant cards (file/module or interstitial cards).
-  - [ ] Bundle doc comments and decorator/annotation blocks onto symbol cards
+  - [x] Bundle doc comments and decorator/annotation blocks onto symbol cards
         using deterministic backwards-scanning rules.
-  - [ ] Enforce nested entity filtering so locals/closures do not enter the
+  - [x] Enforce nested entity filtering so locals/closures do not enter the
         entity table by default.
-  - [ ] Acceptance criteria: unit tests cover at least three symbol kinds per
+  - [x] Acceptance criteria: unit tests cover at least three symbol kinds per
         language; extracted ranges are deterministic; comment/decorator
         bundling is stable under whitespace edits; nested locals never appear
         as entities; and whitespace-only edits do not change `SymbolId`

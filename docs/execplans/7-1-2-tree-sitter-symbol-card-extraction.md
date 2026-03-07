@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
@@ -121,15 +121,16 @@ Observable behaviour after implementation:
 - [x] (2026-03-07 00:00Z) Inspect the current implementation state in
       `weaver-cards`, `weaver-syntax`, and `weaverd`.
 - [x] (2026-03-07 00:00Z) Draft this ExecPlan.
-- [ ] Add extraction modules and deterministic fingerprinting in
-      `crates/weaver-cards/`.
-- [ ] Wire `weaverd` `observe get-card` to the extractor and replace the
-      placeholder refusal on supported inputs.
-- [ ] Add unit and behaviour tests covering happy paths, refusals, and
-      determinism edge cases.
-- [ ] Update the Jacquard design doc, user guide, and roadmap.
-- [ ] Run formatting, lint, test, and Markdown validation gates with logged
-      output.
+- [x] (2026-03-07 00:00Z) Add extraction modules and deterministic
+      fingerprinting in `crates/weaver-cards/`.
+- [x] (2026-03-07 00:00Z) Wire `weaverd` `observe get-card` to the extractor
+      and replace the placeholder refusal on supported inputs.
+- [x] (2026-03-07 00:00Z) Add unit and behaviour tests covering happy paths,
+      refusals, and determinism edge cases.
+- [x] (2026-03-07 00:00Z) Update the Jacquard design doc, user guide, and
+      roadmap.
+- [x] (2026-03-07 00:00Z) Run formatting, lint, test, and Markdown validation
+      gates with logged output.
 
 ## Surprises & Discoveries
 
@@ -143,6 +144,11 @@ Observable behaviour after implementation:
 - The current `docs/users-guide.md` explicitly states that Tree-sitter card
   extraction is not implemented yet. That text must be removed or rewritten
   once the feature lands.
+- The first `SymbolId` implementation drifted under whitespace-only edits
+  because it hashed the human-readable `signature.display`. The fix was to hash
+  canonical parameter and return-shape data instead.
+- `rstest-bdd` coverage is simplest to maintain as a dedicated `get_card`
+  feature rather than by stretching the generic daemon-dispatch feature file.
 
 ## Decision Log
 
@@ -164,13 +170,15 @@ Observable behaviour after implementation:
   sections simply absent and provenance showing only Tree-sitter sources.
   Rationale: the schema is additive, and later milestones are explicitly about
   enrichment rather than about changing request validity.
+- Decision: `SymbolId` must hash canonical structured signature data
+  (`params`, `returns`) rather than the rendered signature string. Rationale:
+  display strings still drift under harmless whitespace edits around
+  punctuation, which violates the roadmap acceptance criteria.
 - Decision: these four decisions must be copied into
   `docs/jacquard-card-first-symbol-graph-design.md` during implementation so
   the design document stays authoritative.
 
 ## Outcomes & Retrospective
-
-This plan is still in draft state. No implementation work has started.
 
 Successful completion will mean:
 
@@ -179,6 +187,19 @@ Successful completion will mean:
 - nested locals remain structural data only and never become entities,
 - the design doc and user guide match the shipped behaviour, and
 - all required repository gates pass with saved logs.
+
+Completed implementation notes:
+
+- `weaver-cards` now owns a pure Tree-sitter extraction pipeline with
+  language-specific modules for Rust, Python, and TypeScript.
+- `weaverd` now resolves `file://` URIs, loads source, and maps unsupported
+  language and no-symbol cases into structured `get-card` refusals.
+- Unit coverage now exercises supported symbol kinds, interstitial module
+  cards, determinism rules, attachment stability, nested-entity filtering, and
+  `semantic` provenance degradation.
+- `rstest-bdd` behaviour coverage now exercises daemon-level success,
+  degraded-semantic success, unsupported-language refusal, and no-symbol
+  refusal scenarios.
 
 ## Context and orientation
 

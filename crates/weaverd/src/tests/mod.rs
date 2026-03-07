@@ -3,6 +3,7 @@
 mod apply_patch_behaviour;
 mod behaviour;
 mod dispatch_behaviour;
+mod get_card_behaviour;
 mod lib_api;
 mod process_behaviour;
 mod safety_harness_behaviour;
