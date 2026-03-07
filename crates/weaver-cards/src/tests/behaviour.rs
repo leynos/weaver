@@ -96,6 +96,7 @@ fn build_refusal_response(reason: RefusalReason, detail: DetailLevel) -> GetCard
 
 fn refusal_message(reason: &RefusalReason) -> String {
     match reason {
+        RefusalReason::NotYetImplemented => String::from("not yet implemented"),
         RefusalReason::NoSymbolAtPosition => {
             String::from("no symbol found at the requested position")
         }
@@ -103,7 +104,6 @@ fn refusal_message(reason: &RefusalReason) -> String {
             String::from("the requested language is not supported")
         }
         RefusalReason::BackendUnavailable => String::from("the required backend is not available"),
-        _ => String::from("unknown refusal"),
     }
 }
 
@@ -166,35 +166,36 @@ fn when_response_serialized(world: &mut TestWorld) {
 // Then steps
 // ---------------------------------------------------------------------------
 
-#[then("the JSON contains a {field} field")]
-fn then_json_contains_field(world: &mut TestWorld, field: QuotedString) {
+fn parse_json_and_pointer(world: &TestWorld, field: &QuotedString) -> (serde_json::Value, String) {
     let json = world.json_output.as_ref().expect("JSON should be set");
     let parsed: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
     let pointer = format!("/{}", field.as_str().replace('.', "/"));
+    (parsed, pointer)
+}
+
+#[then("the JSON contains a {field} field")]
+fn then_json_contains_field(world: &mut TestWorld, field: QuotedString) {
+    let (parsed, pointer) = parse_json_and_pointer(world, &field);
     assert!(
         parsed.pointer(&pointer).is_some(),
-        "expected JSON to contain field '{}', got: {json}",
+        "expected JSON to contain field '{}', got: {parsed}",
         field.as_str()
     );
 }
 
 #[then("the JSON does not contain a {field} field")]
 fn then_json_does_not_contain_field(world: &mut TestWorld, field: QuotedString) {
-    let json = world.json_output.as_ref().expect("JSON should be set");
-    let parsed: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
-    let pointer = format!("/{}", field.as_str().replace('.', "/"));
+    let (parsed, pointer) = parse_json_and_pointer(world, &field);
     assert!(
         parsed.pointer(&pointer).is_none(),
-        "expected JSON NOT to contain field '{}', got: {json}",
+        "expected JSON NOT to contain field '{}', got: {parsed}",
         field.as_str()
     );
 }
 
 #[then("the JSON field {key} has value {value}")]
 fn then_json_field_has_value(world: &mut TestWorld, key: QuotedString, value: QuotedString) {
-    let json = world.json_output.as_ref().expect("JSON should be set");
-    let parsed: serde_json::Value = serde_json::from_str(json).expect("valid JSON");
-    let pointer = format!("/{}", key.as_str().replace('.', "/"));
+    let (parsed, pointer) = parse_json_and_pointer(world, &key);
     let actual = parsed
         .pointer(&pointer)
         .unwrap_or_else(|| panic!("expected JSON to contain key '{}'", key.as_str()));

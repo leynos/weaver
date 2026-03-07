@@ -537,13 +537,16 @@ half-open interval — `start` is inclusive and `end` is exclusive (i.e.
 `[start, end)`). This differs from the `--position` request flag, which
 accepts 1-indexed `LINE:COL` values.
 
-Card fields beyond identity are progressively included based on the detail
-level. `minimal` returns only the `symbol` and `provenance` fields;
-`signature` adds the `signature` block exposing the callable display
-string, parameters, and return type; `structure` (the default) further
-adds `doc`, `structure`, and basic `metrics`; optional `attachments` are
-included when present. `semantic` adds LSP hover/type information; `full`
-adds dependency edges and fan-in/out metrics.
+Card fields beyond identity are progressively included based on the
+detail level:
+
+- `minimal` — returns only the `symbol` and `provenance` fields.
+- `signature` — adds the `signature` block exposing the callable
+  display string, parameters, and return type.
+- `structure` (default) — further adds `doc`, `structure`, and basic
+  `metrics`. Optional `attachments` are included when present.
+- `semantic` — adds LSP hover/type information.
+- `full` — adds dependency edges and fan-in/out metrics.
 
 #### observe grep
 
