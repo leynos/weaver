@@ -242,10 +242,23 @@ This output does not require a configuration file or a running daemon. Use
 `weaver --help` for the full reference, including global options and the
 `daemon` subcommand.
 
+### Version
+
+Running `weaver --version` or `weaver -V` prints the version string to
+standard output and exits with code 0:
+
+```text
+weaver 0.1.0
+```
+
+This output does not require a configuration file or a running daemon.
+
 ### Top-level help
 
-Running `weaver --help` displays the full command reference, including global
-options, the `daemon` subcommand, and a catalogue of all domains and operations:
+Running `weaver --help` displays the full command reference to standard output
+and exits with code 0. The output includes a purpose statement, quick-start
+examples, global options, the `daemon` subcommand, and a catalogue of all
+domains and operations:
 
 ```text
 Domains and operations:
