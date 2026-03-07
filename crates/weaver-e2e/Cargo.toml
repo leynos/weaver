@@ -2,6 +2,7 @@
 name = "weaver-e2e"
 edition.workspace = true
 version.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 weaver-graph = { path = "../weaver-graph" }

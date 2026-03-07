@@ -40,8 +40,8 @@ Observable behaviour after this change:
   contract operation `"rename-symbol"` and translates `offset` to `position`
   internally, preserving command-line interface (CLI) backward compatibility.
 - Behaviour-driven development (BDD) scenarios cover happy path,
-  missing arguments, unsupported operation, adapter failure,
-  unchanged output, and reason code verification.
+  missing arguments, unsupported operation, adapter failure, unchanged output,
+  and reason code verification.
 
 ## Constraints
 
@@ -142,9 +142,9 @@ Observable behaviour after this change:
 ## Surprises & discoveries
 
 - Observation: `PluginFailure` needed `#[derive(Debug)]` because tests use
-  `.expect()` on `Result<_, PluginFailure>`, which requires `Debug`.
-  Evidence: Clippy error `E0277: PluginFailure doesn't implement Debug`.
-  Impact: Added one derive line; file stayed within 400-line budget.
+  `.expect()` on `Result<_, PluginFailure>`, which requires `Debug`. Evidence:
+  rustc error `E0277: PluginFailure doesn't implement Debug`. Impact: Added one
+  derive line; file stayed within 400-line budget.
 
 ## Decision log
 
@@ -196,13 +196,14 @@ its manifest, accepts contract-conforming requests with `uri`/`position`/
 `offset` to `position`, maintaining CLI backward compatibility.
 
 Files created: `crates/weaver-plugin-rope/src/arguments.rs` (98 lines).
-Files modified: `crates/weaver-plugin-rope/src/lib.rs` (400 lines, exactly at
-budget), `crates/weaverd/src/dispatch/act/refactor/mod.rs` (396 lines),
-`crates/weaver-plugin-rope/src/tests/mod.rs`,
+Implementation artefacts: `crates/weaver-plugin-rope/src/lib.rs` (400 lines,
+exactly at budget), `crates/weaverd/src/dispatch/act/refactor/mod.rs` (396
+lines), `crates/weaver-plugin-rope/src/tests/mod.rs`,
 `crates/weaver-plugin-rope/src/tests/behaviour.rs`,
 `crates/weaver-plugin-rope/tests/features/rope_plugin.feature`,
-`crates/weaverd/src/dispatch/act/refactor/tests.rs`,
-`docs/users-guide.md`, `docs/roadmap.md`.
+`crates/weaverd/src/dispatch/act/refactor/tests.rs`, `docs/users-guide.md`,
+`docs/roadmap.md`, and this ExecPlan
+(`docs/execplans/5-2-2-update-weaver-plugin-rope-manifest.md`).
 
 Lessons: Always derive `Debug` on error types that might be used with
 `.expect()` in tests. The 400-line budget required careful extraction of the
@@ -222,10 +223,10 @@ code analysis and modification. The key crates for this task are:
 
 - `crates/weaver-plugin-rope/` — The Python rope-backed actuator plugin. A
   standalone binary crate that reads one JSON Lines (JSONL) request from stdin
-  and writes one JSONL response to stdout. Main logic is in `src/lib.rs` (384 lines).
-  Tests are in `src/tests/mod.rs` (224 lines) and `src/tests/behaviour.rs` (176
-  lines). BDD feature file is at `tests/features/rope_plugin.feature` (33
-  lines).
+  and writes one JSONL response to stdout. Baseline-only line counts before
+  implementation were: `src/lib.rs` (384 lines), `src/tests/mod.rs` (224
+  lines), `src/tests/behaviour.rs` (176 lines), and
+  `tests/features/rope_plugin.feature` (33 lines).
 
 - `crates/weaverd/` — The Weaver daemon. The refactor handler at
   `src/dispatch/act/refactor/mod.rs` (375 lines) registers the rope plugin

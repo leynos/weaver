@@ -20,6 +20,8 @@
     deliverables.
 - [Ortho-config user's guide](ortho-config-users-guide.md)
   - Operational guide for configuration layering and ortho-config usage.
+- [Ortho-config v0.8.0 migration guide](ortho-config-v0-8-0-migration-guide.md)
+  - Weaver-specific adoption notes for the current ortho-config upgrade.
 - [Ortho-config v0.6.0 migration guide](ortho-config-v0-6-0-migration-guide.md)
   - Migration notes and compatibility guidance for ortho-config changes.
 - [Pratt parser design for DDlog expressions](pratt-parser-for-ddlog-expressions.md)

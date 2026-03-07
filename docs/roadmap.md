@@ -316,20 +316,20 @@ does* *not require source inspection or external runbooks.*
   - [ ] Acceptance criteria: every exposed operation supports
         `weaver <domain> <operation> --help` and each help screen includes
         required flags, argument types, and at least one concrete invocation.
-- [ ] 3.2.5. Document ortho-config v0.6.0 behaviour in 3.2 guidance. See
-      [ortho-config v0.6.0 migration guide](ortho-config-v0-6-0-migration-guide.md).
-  - [ ] Document the new dependency-graph model used by configuration loading
+- [x] 3.2.5. Document ortho-config v0.8.0 behaviour in 3.2 guidance. See
+      [ortho-config v0.8.0 migration guide](ortho-config-v0-8-0-migration-guide.md).
+  - [x] Document the new dependency-graph model used by configuration loading
         and precedence resolution.
-  - [ ] Document fail-fast discovery behaviour when configuration files exist
+  - [x] Document fail-fast discovery behaviour when configuration files exist
         but are invalid.
-  - [ ] Document YAML 2.2 parsing semantics via `SaphyrYaml`, including known
+  - [x] Document YAML 1.2 parsing semantics via `SaphyrYaml`, including known
         compatibility warnings.
-  - [ ] Update internal runbooks and user-facing documentation to reflect
-        `ortho-config` v0.6.0 operational behaviour.
-  - [ ] Validate documentation quality gates and docs tests after updates.
-  - [ ] Acceptance criteria: migration guide, runbooks, and user docs are
+  - [x] Update internal runbooks and user-facing documentation to reflect
+        `ortho-config` v0.8.0 operational behaviour.
+  - [x] Validate documentation quality gates and docs tests after updates.
+  - [x] Acceptance criteria: migration guide, runbooks, and user docs are
         updated with explicit sections for dependency graph, fail-fast
-        discovery, and YAML 2.2 semantics; and `make markdownlint`,
+        discovery, and YAML 1.2 semantics; and `make markdownlint`,
         `make fmt`, `make nixie`, and documentation tests pass.
 
 ## 4. Query language infrastructure (Sempai)
