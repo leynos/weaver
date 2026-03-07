@@ -165,15 +165,15 @@ does* *not require source inspection or external runbooks.*
   - [x] Acceptance criteria: `weaver --help` lists all three domains and every
         CLI-supported operation for each domain, and completes without daemon
         startup or socket access.
-- [ ] 2.2.3. Add top-level version output and long-form CLI description.
+- [x] 2.2.3. Add top-level version output and long-form CLI description.
       See
       [Gap 1d](ui-gap-analysis.md#gap-1d--no---version-flag)
       and
       [Gap 1e](ui-gap-analysis.md#gap-1e--no-long-description-or-after-help-text).
-  - [ ] Enable clap-provided `--version` and `-V` support.
-  - [ ] Add a `long_about` quick-start block aligned with the
+  - [x] Enable clap-provided `--version` and `-V` support.
+  - [x] Add a `long_about` quick-start block aligned with the
         [user's guide](users-guide.md).
-  - [ ] Acceptance criteria: `weaver --version` and `weaver -V` both exit 0
+  - [x] Acceptance criteria: `weaver --version` and `weaver -V` both exit 0
         and emit the same version string, and `weaver --help` includes at
         least one runnable quick-start command example.
 - [ ] 2.2.4. Provide contextual guidance when a domain is supplied without an

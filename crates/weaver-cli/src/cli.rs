@@ -21,8 +21,27 @@ pub enum OutputFormat {
 #[derive(Parser, Debug)]
 #[command(
     name = "weaver",
+    version,
     disable_help_subcommand = true,
     subcommand_negates_reqs = true,
+    about = concat!(
+        "Semantic code intelligence tool for observing, ",
+        "acting on, and verifying code",
+    ),
+    long_about = concat!(
+        "Semantic code intelligence tool for observing, ",
+        "acting on, and verifying code.\n",
+        "\n",
+        "Quick start:\n",
+        "\n",
+        "  weaver observe get-definition \\\n",
+        "    --uri file:///src/main.rs --position 10:5\n",
+        "  weaver act apply-patch < changes.patch\n",
+        "  weaver daemon status\n",
+        "\n",
+        "Configuration flags such as --config-path and --daemon-socket\n",
+        "must appear before the command domain.",
+    ),
     after_help = concat!(
         "Domains and operations:\n",
         "\n",

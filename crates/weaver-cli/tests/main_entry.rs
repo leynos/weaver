@@ -1,7 +1,7 @@
 //! Integration tests for the `weaver` binary entry point.
 //!
-//! Verifies the capabilities probe behaviour and user-facing error handling
-//! when required arguments are missing.
+//! Verifies the capabilities probe behaviour, version output, help output,
+//! and user-facing error handling when required arguments are missing.
 
 use assert_cmd::cargo::cargo_bin_cmd;
 use predicates::str::contains;
@@ -51,4 +51,33 @@ fn help_output_lists_all_domains_and_operations() {
             );
         }
     }
+}
+
+#[test]
+fn version_flag_exits_successfully() {
+    let mut command = cargo_bin_cmd!("weaver");
+    command.arg("--version");
+    command
+        .assert()
+        .success()
+        .stdout(contains("weaver"))
+        .stdout(contains(env!("CARGO_PKG_VERSION")));
+}
+
+#[test]
+fn short_version_flag_exits_successfully() {
+    let mut command = cargo_bin_cmd!("weaver");
+    command.arg("-V");
+    command.assert().success().stdout(contains("weaver"));
+}
+
+#[test]
+fn help_flag_exits_successfully_with_quick_start() {
+    let mut command = cargo_bin_cmd!("weaver");
+    command.arg("--help");
+    command
+        .assert()
+        .success()
+        .stdout(contains("Quick start:"))
+        .stdout(contains("weaver observe get-definition"));
 }

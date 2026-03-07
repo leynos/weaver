@@ -395,3 +395,4 @@ fn is_daemon_not_running_rejects_non_connect_errors() {
 mod after_help;
 mod auto_start;
 mod bare_invocation;
+mod version_output;
