@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
@@ -136,17 +136,22 @@ Observable success after implementation:
 
 - [x] (2026-03-07 00:00 UTC) Audit the current workspace state and draft
   this ExecPlan.
-- [ ] Record a clean before-state: dependency versions, Rust floor, and the
-  result of the current quality gates.
-- [ ] Update workspace and member manifests for Rust 1.88+ and
-  `ortho_config` v0.8.0.
-- [ ] Regenerate `Cargo.lock` so `ortho_config` and
+- [x] (2026-03-07 10:40 UTC) Record the before-state. `make check-fmt`,
+  `make lint`, and `make test` all passed on the pre-migration tree.
+- [x] (2026-03-07 10:42 UTC) Update workspace and member manifests for
+  Rust 1.88+ and `ortho_config` v0.8.0.
+- [x] (2026-03-07 10:42 UTC) Regenerate `Cargo.lock` so `ortho_config` and
   `ortho_config_macros` both resolve to `0.8.0`.
-- [ ] Re-audit source for migration-note applicability and make any required
-  code changes in `weaver-config`, `weaver-cli`, or `weaverd`.
-- [ ] Refresh the configuration and migration documentation.
-- [ ] Run all relevant quality gates and capture the command logs.
-- [ ] Summarise the outcome and update this document's living sections.
+- [x] (2026-03-07 10:44 UTC) Re-audit source for migration-note
+  applicability and make the required code changes surfaced by the Rust 1.88
+  lint set.
+- [x] (2026-03-07 10:43 UTC) Refresh the configuration and migration
+  documentation, including replacing the local ortho-config guide with the
+  upstream v0.8.0 guide.
+- [x] (2026-03-07 10:46 UTC) Run all relevant quality gates and capture the
+  command logs.
+- [x] (2026-03-07 10:46 UTC) Summarise the outcome and update this document's
+  living sections.
 
 ## Surprises & Discoveries
 
@@ -166,6 +171,13 @@ Observable success after implementation:
 - The repository does generate manual pages for `weaver` and `weaverd`
   during builds, but that mechanism is implemented with `clap_mangen` and a
   handwritten build script, not ortho-config documentation metadata.
+- Raising the Rust floor from 1.85 to 1.88 surfaced four pre-existing Clippy
+  findings under the stricter toolchain: three trivial accessors that now need
+  `const fn` and one collapsible nested `if` in
+  `crates/weaver-config/src/socket.rs`.
+- Replacing the local ortho-config guide with the upstream v0.8.0 document
+  required only two repository-local link fixes, both pointing README
+  references at the tagged upstream GitHub URLs.
 
 ## Decision Log
 
@@ -200,13 +212,41 @@ Observable success after implementation:
   floor, undermining the requirement to ensure Rust 1.88 or newer. Date:
   2026-03-07.
 
+- Decision: Accept the minimal Rust 1.88 follow-on fixes in
+  `crates/sempai-core/src/diagnostic.rs`,
+  `crates/weaver-syntax/src/pattern.rs`, and
+  `crates/weaver-config/src/socket.rs` as part of this migration. Rationale:
+  these were pre-existing code paths that only became lint failures after the
+  toolchain uplift, and fixing them keeps the workspace green without changing
+  behaviour. Date: 2026-03-07.
+
 ## Outcomes & Retrospective
 
-Not started yet. Success means the workspace resolves `ortho_config` v0.8.0,
-advertises Rust 1.88+, preserves current configuration behaviour, and updates
-the active documentation to match reality. This section must be rewritten after
-implementation with the actual results, command outcomes, and any follow-up
-work.
+The migration completed successfully. The workspace now resolves `ortho_config`
+and `ortho_config_macros` to `0.8.0`, advertises Rust 1.88 at the workspace
+root, and surfaces that floor consistently across member manifests by using
+`rust-version.workspace = true` where it was previously missing.
+
+The code impact was deliberately small. No aliasing, `SelectedSubcommandMerge`,
+`cli_default_as_absent`, or `orthohelp` wiring was needed in Weaver. The only
+code changes beyond manifests were the four toolchain-driven lint fixes noted
+above. Behaviourally, the configuration contract for `weaver-config::Config`
+and the CLI localiser remained unchanged.
+
+Documentation now matches the upgraded state. The repository gained
+`docs/ortho-config-v0-8-0-migration-guide.md`, the local
+`docs/ortho-config-users-guide.md` was replaced with the upstream v0.8.0 guide
+plus minimal local link fixes, and the active Weaver docs no longer describe
+the project as an `ortho-config` v0.6.0 / Rust 1.85 workspace.
+
+Validation completed successfully with captured logs:
+
+- `make check-fmt`
+- `make lint`
+- `make test`
+- `make fmt`
+- `make markdownlint`
+- `make nixie`
 
 ## Context and orientation
 

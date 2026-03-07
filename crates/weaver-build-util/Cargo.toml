@@ -2,6 +2,7 @@
 name = "weaver-build-util"
 edition.workspace = true
 version.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 time = { version = "0.3", features = ["formatting"] }

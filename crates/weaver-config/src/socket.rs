@@ -70,13 +70,13 @@ impl SocketEndpoint {
             builder.mode(0o700);
         }
 
-        if let Err(source) = builder.create(parent.as_std_path()) {
-            if source.kind() != std::io::ErrorKind::AlreadyExists {
-                return Err(SocketPreparationError::CreateDirectory {
-                    path: parent.to_path_buf(),
-                    source,
-                });
-            }
+        if let Err(source) = builder.create(parent.as_std_path())
+            && source.kind() != std::io::ErrorKind::AlreadyExists
+        {
+            return Err(SocketPreparationError::CreateDirectory {
+                path: parent.to_path_buf(),
+                source,
+            });
         }
 
         #[cfg(unix)]

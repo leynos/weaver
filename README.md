@@ -81,7 +81,7 @@ configuration layering, and the complete command reference.
 
 ## Building from source
 
-Weaver requires **Rust 1.85+** (edition 2024). To build:
+Weaver requires **Rust 1.88+** (edition 2024). To build:
 
 ```sh
 cargo build --release

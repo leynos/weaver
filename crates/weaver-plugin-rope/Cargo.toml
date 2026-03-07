@@ -2,6 +2,7 @@
 name = "weaver-plugin-rope"
 edition.workspace = true
 version.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 serde_json.workspace = true

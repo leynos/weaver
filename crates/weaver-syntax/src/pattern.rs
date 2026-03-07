@@ -139,7 +139,7 @@ impl Pattern {
 
     /// Returns whether this pattern has any metavariables.
     #[must_use]
-    pub fn has_metavariables(&self) -> bool {
+    pub const fn has_metavariables(&self) -> bool {
         !self.metavariables.is_empty()
     }
 }

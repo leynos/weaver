@@ -266,13 +266,13 @@ impl DiagnosticReport {
 
     /// Returns `true` if the report contains no diagnostics.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.diagnostics.is_empty()
     }
 
     /// Returns the number of diagnostics in the report.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.diagnostics.len()
     }
 }

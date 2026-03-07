@@ -66,7 +66,7 @@ directive = "force"
 
 ### Validation and error reporting
 
-`weaver` now uses `ortho-config` v0.6.0, which treats invalid configuration
+`weaver` now uses `ortho-config` v0.8.0, which treats invalid configuration
 files as fatal. When `--config-path` points at a broken file—or when discovery
 finds a malformed `weaver.toml`/`.weaver.toml`—, both the CLI and daemon abort
 with a `LoadConfiguration` error that lists every offending path. Remove or fix
