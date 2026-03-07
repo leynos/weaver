@@ -334,21 +334,21 @@ Types mapped from the design doc lines 147-170:
 - `SourcePosition` — `{ line: u32, column: u32 }` (zero-indexed, matching
   Tree-sitter and LSP internal representation)
 - `SourceRange` — `{ start: SourcePosition, end: SourcePosition }`
-- `CardSymbolKind` — `#[non_exhaustive]` enum with `#[serde(rename_all =
-  "snake_case")]`: `Function`, `Method`, `Class`, `Interface`, `Type`, `Variable
-   `, `Module`, `Field`
+- `CardSymbolKind` — `#[non_exhaustive]` enum with
+  `#[serde(rename_all = "snake_case")]`: `Function`, `Method`, `Class`,
+  `Interface`, `Type`, `Variable`, `Module`, `Field`
 - `CardLanguage` — `#[non_exhaustive]` enum: `Rust`, `Python`, `TypeScript`
 - `SymbolRef` — location-based reference: `uri`, `range`, `language`,
   `kind`, `name`, `container` (Option, skip_serializing_if is_none)
 - `SymbolId` — `{ symbol_id: String }`
-- `SymbolIdentity` — `{ symbol_id: String, #[serde(rename = "ref")]
-  symbol_ref: SymbolRef }`
+- `SymbolIdentity` — `{ symbol_id: String, #[serde(rename = "ref")] symbol_ref:
+  SymbolRef }`
 
 **New file: `crates/weaver-cards/src/detail.rs`** (~55 lines)
 
-- `DetailLevel` — `#[non_exhaustive]` enum with `#[serde(rename_all =
-  "snake_case")]`: `Minimal`, `Signature`, `Structure` (default), `Semantic`, `
-  Full`. Implements `Default` returning `Structure`.
+- `DetailLevel` — `#[non_exhaustive]` enum with
+  `#[serde(rename_all = "snake_case")]`: `Minimal`, `Signature`, `Structure`
+  (default), `Semantic`, `Full`. Implements `Default` returning `Structure`.
 
 **Validation:** `cargo check -p weaver-cards` succeeds.
 
@@ -711,10 +711,10 @@ Quality criteria (what "done" means):
 - Documentation: `make markdownlint` and `make nixie` pass.
 - Schema stability: The JSON output for each detail level is deterministic.
   Repeated serialization of the same fixture produces byte-identical output.
-- Refusal payload: Dispatching `observe get-card --uri file:///foo.rs
-  --position
-  10:5` returns a JSONL response containing a `GetCardResponse::Refusal
-  ` with reason `"not_yet_implemented"` and status 1.
+- Refusal payload: Dispatching
+  `observe get-card --uri file:///foo.rs --position 10:5`
+  returns a JSONL response containing a `GetCardResponse::Refusal` with reason
+  `"not_yet_implemented"` and status 1.
 - Field names: JSON field names match the design document
   (`card_version`, `symbol`, `signature`, `doc`, `structure`, `lsp`, `metrics`,
   `deps`, `provenance`, `etag`).
