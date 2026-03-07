@@ -24,6 +24,8 @@ Observable outcome after all stages complete:
 make check-fmt   # exits 0
 make lint         # exits 0 (includes cargo doc --workspace --no-deps -D warnings)
 make test         # exits 0, including all new weaver-cards and weaverd tests
+make markdownlint # exits 0
+make nixie        # exits 0
 ```
 
 Specifically:
@@ -54,9 +56,10 @@ This satisfies roadmap task 7.1.1 from `docs/roadmap.md`[^1] and closes #75.
 
 ## Constraints
 
-- `make check-fmt`, `make lint`, and `make test` must pass after all changes.
-  These are defined in `Makefile` (lines 19-35).
-- The workspace uses `edition = "2024"` and `rust-version = "1.85"`
+- `make check-fmt`, `make lint`, `make test`, `make markdownlint`, and
+  `make nixie` must pass after all changes. These are defined in `Makefile`
+  (lines 19-35).
+- The workspace uses `edition = "2024"` and `rust-version = "1.88"`
   (`Cargo.toml` lines 20-23). The new crate must inherit these via
   `edition.workspace = true`, `version.workspace = true`, and
   `rust-version.workspace = true`.
@@ -617,7 +620,8 @@ task and both sub-tasks).
 
 Copy the finalized ExecPlan to the execplans directory.
 
-**Validation:** `make fmt` passes. `make markdownlint` passes.
+**Validation:** `make fmt` passes. `make markdownlint` passes. `make nixie`
+passes.
 
 ### Stage I: Final validation and commit gating
 
@@ -628,9 +632,11 @@ set -o pipefail
 make check-fmt 2>&1 | tee /tmp/check-fmt.log
 make lint 2>&1 | tee /tmp/lint.log
 make test 2>&1 | tee /tmp/test.log
+make markdownlint 2>&1 | tee /tmp/markdownlint.log
+make nixie 2>&1 | tee /tmp/nixie.log
 ```
 
-All three must exit 0. Additionally verify:
+All five must exit 0. Additionally verify:
 
 - `cargo doc -p weaver-cards --no-deps` produces zero warnings.
 - Insta snapshot files exist and are committed.
@@ -687,9 +693,11 @@ set -o pipefail
 make check-fmt 2>&1 | tee /tmp/check-fmt.log
 make lint 2>&1 | tee /tmp/lint.log
 make test 2>&1 | tee /tmp/test.log
+make markdownlint 2>&1 | tee /tmp/markdownlint.log
+make nixie 2>&1 | tee /tmp/nixie.log
 ```
 
-Expected: all three exit 0.
+Expected: all five exit 0.
 
 ## Validation and acceptance
 
@@ -700,6 +708,7 @@ Quality criteria (what "done" means):
 - Lint/typecheck: `make lint` passes. `cargo doc -p weaver-cards --no-deps`
   produces zero warnings.
 - Formatting: `make check-fmt` passes.
+- Documentation: `make markdownlint` and `make nixie` pass.
 - Schema stability: The JSON output for each detail level is deterministic.
   Repeated serialization of the same fixture produces byte-identical output.
 - Refusal payload: Dispatching `observe get-card --uri file:///foo.rs
@@ -716,7 +725,9 @@ Quality criteria (what "done" means):
 
 Quality method (how checks are performed):
 
-- Run `make check-fmt && make lint && make test` and confirm exit 0.
+- Run
+  `make check-fmt && make lint && make test && make markdownlint && make nixie`
+  and confirm exit 0.
 - Inspect snapshot files in `crates/weaver-cards/src/tests/snapshots/` to
   verify JSON shapes match the design document.
 
