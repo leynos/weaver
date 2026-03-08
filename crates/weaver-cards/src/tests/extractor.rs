@@ -23,8 +23,13 @@ struct SymbolExpectation<'a> {
     expected_container: Option<&'a str>,
 }
 
-fn rust_symbol_cases() -> [SymbolExpectation<'static>; 3] {
-    [
+#[expect(
+    clippy::too_many_lines,
+    reason = "the consolidated fixture list intentionally keeps all requested cases together"
+)]
+fn all_symbol_cases() -> Vec<SymbolExpectation<'static>> {
+    vec![
+        // Rust
         SymbolExpectation {
             request: ExtractRequest {
                 path: Path::new("fixture.rs"),
@@ -61,11 +66,7 @@ fn rust_symbol_cases() -> [SymbolExpectation<'static>; 3] {
             expected_name: "render",
             expected_container: Some("Widget"),
         },
-    ]
-}
-
-fn python_symbol_cases() -> [SymbolExpectation<'static>; 3] {
-    [
+        // Python
         SymbolExpectation {
             request: ExtractRequest {
                 path: Path::new("fixture.py"),
@@ -102,11 +103,7 @@ fn python_symbol_cases() -> [SymbolExpectation<'static>; 3] {
             expected_name: "render",
             expected_container: Some("Widget"),
         },
-    ]
-}
-
-fn typescript_symbol_cases() -> [SymbolExpectation<'static>; 3] {
-    [
+        // TypeScript
         SymbolExpectation {
             request: ExtractRequest {
                 path: Path::new("fixture.ts"),
@@ -160,20 +157,14 @@ fn extract(request: ExtractRequest<'_>) -> crate::SymbolCard {
 
 #[test]
 fn extracts_supported_symbol_kinds() {
-    for cases in [
-        rust_symbol_cases().to_vec(),
-        python_symbol_cases().to_vec(),
-        typescript_symbol_cases().to_vec(),
-    ] {
-        for case in cases {
-            let card = extract(case.request);
-            assert_eq!(card.symbol.symbol_ref.kind, case.expected_kind);
-            assert_eq!(card.symbol.symbol_ref.name, case.expected_name);
-            assert_eq!(
-                card.symbol.symbol_ref.container.as_deref(),
-                case.expected_container
-            );
-        }
+    for case in all_symbol_cases() {
+        let card = extract(case.request);
+        assert_eq!(card.symbol.symbol_ref.kind, case.expected_kind);
+        assert_eq!(card.symbol.symbol_ref.name, case.expected_name);
+        assert_eq!(
+            card.symbol.symbol_ref.container.as_deref(),
+            case.expected_container
+        );
     }
 }
 
