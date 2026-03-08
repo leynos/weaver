@@ -6,7 +6,9 @@
 
 use std::io::{self, Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::thread;
 use std::time::Duration;
+use std::time::Instant;
 
 use weaver_config::SocketEndpoint;
 
@@ -19,9 +21,10 @@ use std::os::fd::{FromRawFd, IntoRawFd, OwnedFd};
 #[cfg(unix)]
 use socket2::{Domain, SockAddr, Socket, Type};
 
-use super::AppError;
+use super::{AppError, is_daemon_not_running};
 
 pub(super) const CONNECTION_TIMEOUT: Duration = Duration::from_secs(5);
+const RETRY_INTERVAL: Duration = Duration::from_millis(25);
 
 pub(super) enum Connection {
     Tcp(TcpStream),
@@ -86,6 +89,28 @@ pub(super) fn connect(endpoint: &SocketEndpoint) -> Result<Connection, AppError>
             {
                 Err(AppError::UnsupportedUnixTransport(endpoint.to_string()))
             }
+        }
+    }
+}
+
+pub(super) fn connect_with_retry(
+    endpoint: &SocketEndpoint,
+    retry_window: Duration,
+) -> Result<Connection, AppError> {
+    let deadline = Instant::now().checked_add(retry_window);
+    loop {
+        match connect(endpoint) {
+            Ok(connection) => return Ok(connection),
+            Err(error)
+                if is_daemon_not_running(&error)
+                    && deadline.is_some_and(|limit| Instant::now() < limit) =>
+            {
+                let sleep_duration = deadline
+                    .and_then(|limit| limit.checked_duration_since(Instant::now()))
+                    .map_or(RETRY_INTERVAL, |remaining| remaining.min(RETRY_INTERVAL));
+                thread::sleep(sleep_duration);
+            }
+            Err(error) => return Err(error),
         }
     }
 }

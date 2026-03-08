@@ -5,12 +5,12 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
 
-Implementation must not begin until this draft is explicitly approved.
+Implementation was approved on 2026-03-07 and is now in progress.
 
 ## Purpose / big picture
 
@@ -137,16 +137,17 @@ Observable success for this roadmap item:
 - [x] (2026-03-06) Inspected the current Rust plugin and daemon refactor
   handler to identify the present contract mismatch and line-budget pressure.
 - [x] (2026-03-06) Drafted this ExecPlan.
-- [ ] Obtain approval for the ExecPlan.
-- [ ] Add failing unit and behavioural tests that assert the
+- [x] (2026-03-07) Obtained approval for the ExecPlan.
+- [x] (2026-03-07) Added unit and behavioural tests that assert the
   `rename-symbol` request/response contract for the rust-analyzer plugin.
-- [ ] Update the rust-analyzer plugin runtime handshake and error mapping.
-- [ ] Update daemon manifest registration and any request-capture tests needed
-  to prove Rust rename requests are capability-routed.
-- [ ] Update `docs/weaver-design.md`, `docs/users-guide.md`, and
-  `docs/roadmap.md`.
-- [ ] Run `make fmt`, `make markdownlint`, `make check-fmt`, `make lint`, and
-  `make test`, each via `tee` with `set -o pipefail`.
+- [x] (2026-03-07) Updated the rust-analyzer plugin runtime handshake and
+  error mapping.
+- [x] (2026-03-07) Updated daemon manifest registration and request-capture
+  tests proving Rust rename requests are capability-routed.
+- [x] (2026-03-07) Updated `docs/weaver-design.md`, `docs/users-guide.md`,
+  and `docs/roadmap.md`.
+- [x] (2026-03-07) Ran `make fmt`, `make markdownlint`, `make check-fmt`,
+  `make lint`, and `make test`, each via `tee` with `set -o pipefail`.
 
 ## Surprises & Discoveries
 
@@ -160,6 +161,19 @@ Observable success for this roadmap item:
   its own. In this repository, “manifest and runtime handshake” means the
   daemon-side registration in `weaverd` plus the plugin’s request/response
   contract at the JSONL boundary.
+
+- Discovery: extracting refactor-plugin manifest builders into a dedicated
+  `manifests.rs` module dropped
+  `crates/weaverd/src/dispatch/act/refactor/mod.rs` from 399 lines to 381
+  lines, creating room for manifest-specific tests without breaking the
+  400-line cap.
+
+- Discovery: the pre-existing workspace test hang in
+  `tests::unit::auto_start::auto_start_succeeds_and_proceeds` was caused by a
+  race between the daemon reporting a healthy auto-start snapshot and the Unix
+  socket becoming connectable. A bounded `connect_with_retry` helper in the CLI
+  transport layer resolved the production race and made `make test`
+  deterministic again.
 
 ## Decision Log
 
@@ -178,11 +192,68 @@ Observable success for this roadmap item:
   headroom, so even documenting the manifest registration logic may force a
   split. Date: 2026-03-06.
 
+- Decision: make `PluginFailure` the rust-analyzer plugin's internal error
+  transport and attach `ReasonCode::OperationNotSupported`,
+  `ReasonCode::IncompletePayload`, and `ReasonCode::SymbolNotFound` for the
+  deterministic failure classes. Rationale: this matches the rope migration,
+  keeps the outer protocol unchanged, and lets tests assert structured
+  diagnostics rather than brittle free-text only. Date: 2026-03-07.
+
+- Decision: fix the daemon auto-start race in production rather than only
+  loosening the test. Rationale: the hanging test exposed a genuine gap where
+  the CLI could observe a healthy daemon snapshot before the Unix socket was
+  ready for connection, so a bounded retry in `weaver-cli` was the correct
+  behavioural fix and not merely test scaffolding. Date: 2026-03-07.
+
 ## Outcomes & Retrospective
 
-This section remains empty until implementation is complete. It must be updated
-with the shipped behaviour, files changed, gate results, and any lessons that
-would help the next contributor.
+Roadmap item 5.2.3 is complete. The rust-analyzer actuator plugin now accepts
+only the capability operation `"rename-symbol"`, parses the shared contract
+arguments `uri`, `position`, and `new_name`, and emits protocol-conforming
+failure diagnostics with stable `ReasonCode` values for unsupported operation,
+incomplete payloads, and symbol-not-found style failures. The daemon now
+registers the rust-analyzer provider through a manifest helper that declares
+`CapabilityId::RenameSymbol`, and regression tests prove Rust rename requests
+are routed through the capability contract rather than the legacy provider-
+specific request shape.
+
+Files created:
+
+- `crates/weaver-plugin-rust-analyzer/src/arguments.rs`
+- `crates/weaverd/src/dispatch/act/refactor/manifests.rs`
+
+Files materially changed:
+
+- `crates/weaver-plugin-rust-analyzer/src/lib.rs`
+- `crates/weaver-plugin-rust-analyzer/src/tests/mod.rs`
+- `crates/weaver-plugin-rust-analyzer/src/tests/behaviour.rs`
+- `crates/weaver-plugin-rust-analyzer/tests/features/rust_analyzer_plugin.feature`
+- `crates/weaverd/src/dispatch/act/refactor/mod.rs`
+- `crates/weaverd/src/dispatch/act/refactor/tests.rs`
+- `crates/weaver-cli/src/transport.rs`
+- `crates/weaver-cli/src/lib.rs`
+- `crates/weaver-cli/src/tests/unit/auto_start.rs`
+- `docs/weaver-design.md`
+- `docs/users-guide.md`
+- `docs/roadmap.md`
+
+Validation results:
+
+- `make fmt` passed.
+- `make markdownlint` passed.
+- `make check-fmt` passed.
+- `make lint` passed.
+- `make test` passed.
+
+Lessons:
+
+- The rope migration from 5.2.2 was the right precedent for the Rust plugin as
+  well; keeping request validation and reason-code mapping structurally aligned
+  across plugins reduced review risk.
+- The auto-start test hang was a useful signal, not mere test fragility. When a
+  behavioural test stalls on orchestration, prefer turning the stall into a
+  bounded failure and fixing the underlying race rather than simply increasing
+  timeouts.
 
 ## Context and orientation
 

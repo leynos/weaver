@@ -1380,6 +1380,13 @@ following decisions govern this rollout:
   rust-analyzer actuator with a `60` second timeout and executable override via
   `WEAVER_RUST_ANALYZER_PLUGIN_PATH`.
 
+- **Shared `rename-symbol` capability contract.** The rust-analyzer actuator
+  now declares `rename-symbol` in its manifest, accepts `uri`, `position`, and
+  `new_name` in plugin requests, and returns protocol-conforming refusal
+  diagnostics with stable reason codes for unsupported operations and malformed
+  payloads. The user-facing CLI still spells the operation as
+  `--refactoring rename`; `weaverd` performs the contract mapping internally.
+
 - **Shared Double-Lock commit path remains unchanged.** As with rope, successful
   `PluginOutput::Diff` output from rust-analyzer is forwarded to
   `act apply-patch`, reusing the existing syntactic + semantic verification and

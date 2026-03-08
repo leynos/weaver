@@ -19,7 +19,7 @@ use std::os::unix::net::UnixListener;
 #[cfg(unix)]
 use std::thread;
 #[cfg(unix)]
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 #[cfg(unix)]
 use tempfile::TempDir;
 
@@ -127,11 +127,38 @@ fn auto_start_succeeds_and_proceeds() {
     // precise synchronisation mechanism, but the wide timing margins make it
     // robust under typical test loads.
     let socket_path_for_thread = socket_path.clone();
-    let listener_handle = thread::spawn(move || {
+    let listener_handle = thread::spawn(move || -> Result<(), String> {
         thread::sleep(Duration::from_millis(100));
-        let listener = UnixListener::bind(&socket_path_for_thread).expect("bind unix socket");
-        let (stream, _) = listener.accept().expect("accept connection");
-        respond_to_request(stream, &default_daemon_lines()).expect("respond to request");
+        let listener = UnixListener::bind(&socket_path_for_thread)
+            .map_err(|error| format!("bind unix socket: {error}"))?;
+        listener
+            .set_nonblocking(true)
+            .map_err(|error| format!("set nonblocking: {error}"))?;
+        let deadline = Instant::now()
+            .checked_add(Duration::from_secs(5))
+            .ok_or_else(|| String::from("listener deadline overflow"))?;
+
+        loop {
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    respond_to_request(stream, &default_daemon_lines())
+                        .map_err(|error| format!("respond to request: {error}"))?;
+                    return Ok(());
+                }
+                Err(error)
+                    if error.kind() == std::io::ErrorKind::WouldBlock
+                        && Instant::now() < deadline =>
+                {
+                    thread::sleep(Duration::from_millis(25));
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    return Err(String::from(
+                        "timed out waiting for CLI retry connection on Unix socket",
+                    ));
+                }
+                Err(error) => return Err(format!("accept connection: {error}")),
+            }
+        }
     });
 
     let config = Config {
@@ -152,7 +179,10 @@ fn auto_start_succeeds_and_proceeds() {
 
     let exit = execute_daemon_command(invocation, context, &mut io, ResolvedOutputFormat::Json);
 
-    listener_handle.join().expect("listener thread");
+    listener_handle
+        .join()
+        .expect("listener thread")
+        .expect("listener should accept connection");
     let stderr_text = decode_utf8(stderr, "stderr").expect("stderr utf8");
     let stdout_text = decode_utf8(stdout, "stdout").expect("stdout utf8");
 
