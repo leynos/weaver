@@ -199,6 +199,10 @@ where
                 ))
             });
 
+        self.map_result_to_exit_code(result)
+    }
+
+    fn map_result_to_exit_code(&mut self, result: Result<ExitCode, AppError>) -> ExitCode {
         match result {
             Ok(exit_code) => exit_code,
             Err(AppError::BareInvocation) => ExitCode::FAILURE,
