@@ -21,7 +21,13 @@ pub(super) fn collect(root: Node<'_>, source: &str) -> Vec<EntityCandidate> {
     let mut cursor = root.walk();
     for child in root.named_children(&mut cursor) {
         match child.kind() {
-            "function_definition" => entities.push(function_candidate(child, source, None)),
+            "function_definition" => entities.push(build_callable(
+                child,
+                source,
+                CardSymbolKind::Function,
+                None,
+                Vec::new(),
+            )),
             "class_definition" => push_class_entities(
                 &mut entities,
                 child,
@@ -38,23 +44,6 @@ pub(super) fn collect(root: Node<'_>, source: &str) -> Vec<EntityCandidate> {
     entities
 }
 
-fn function_candidate(
-    node: Node<'_>,
-    source: &str,
-    decorators: Option<Vec<String>>,
-) -> EntityCandidate {
-    callable_candidate(
-        node,
-        source,
-        CardSymbolKind::Function,
-        CallableMetadata::new(
-            None,
-            decorators.unwrap_or_default(),
-            python_docstring(node, source),
-        ),
-    )
-}
-
 fn push_decorated_entities(entities: &mut Vec<EntityCandidate>, node: Node<'_>, source: &str) {
     let Some(definition) = node.child_by_field_name("definition") else {
         return;
@@ -62,7 +51,13 @@ fn push_decorated_entities(entities: &mut Vec<EntityCandidate>, node: Node<'_>, 
     let decorators = decorator_texts(node, source);
     match definition.kind() {
         "function_definition" => {
-            entities.push(function_candidate(definition, source, Some(decorators)));
+            entities.push(build_callable(
+                definition,
+                source,
+                CardSymbolKind::Function,
+                None,
+                decorators,
+            ));
         }
         "class_definition" => {
             push_class_entities(
@@ -77,6 +72,29 @@ fn push_decorated_entities(entities: &mut Vec<EntityCandidate>, node: Node<'_>, 
         }
         _ => {}
     }
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "requested helper keeps the callable construction contract explicit"
+)]
+fn build_callable(
+    node: Node<'_>,
+    source: &str,
+    kind: CardSymbolKind,
+    container: Option<&str>,
+    decorators: Vec<String>,
+) -> EntityCandidate {
+    callable_candidate(
+        node,
+        source,
+        kind,
+        CallableMetadata::new(
+            container.map(str::to_owned),
+            decorators,
+            python_docstring(node, source),
+        ),
+    )
 }
 
 fn push_class_entities(
@@ -107,7 +125,13 @@ fn class_methods(
     for child in body.named_children(&mut cursor) {
         match child.kind() {
             "function_definition" => {
-                methods.push(method_candidate(child, source, container, Vec::new()));
+                methods.push(build_callable(
+                    child,
+                    source,
+                    CardSymbolKind::Method,
+                    container,
+                    Vec::new(),
+                ));
             }
             "decorated_definition" => {
                 if let Some(method) = decorated_method(child, source, container) {
@@ -126,24 +150,13 @@ fn decorated_method(
     container: Option<&str>,
 ) -> Option<EntityCandidate> {
     let definition = node.child_by_field_name("definition")?;
-    (definition.kind() == "function_definition")
-        .then(|| method_candidate(definition, source, container, decorator_texts(node, source)))
-}
-
-fn method_candidate(
-    node: Node<'_>,
-    source: &str,
-    container: Option<&str>,
-    decorators: Vec<String>,
-) -> EntityCandidate {
-    callable_candidate(
-        node,
-        source,
-        CardSymbolKind::Method,
-        CallableMetadata::new(
-            container.map(str::to_owned),
-            decorators,
-            python_docstring(node, source),
-        ),
-    )
+    (definition.kind() == "function_definition").then(|| {
+        build_callable(
+            definition,
+            source,
+            CardSymbolKind::Method,
+            container,
+            decorator_texts(node, source),
+        )
+    })
 }

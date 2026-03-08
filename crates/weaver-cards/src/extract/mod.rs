@@ -164,6 +164,12 @@ struct LeadingAttachments {
     decorators: Vec<String>,
 }
 
+impl LeadingAttachments {
+    fn is_empty(&self) -> bool {
+        self.doc_comments.is_empty() && self.decorators.is_empty()
+    }
+}
+
 #[derive(Debug, Clone)]
 struct ImportBlock {
     byte_start: usize,
@@ -309,19 +315,14 @@ fn leading_attachments(
     source: &str,
     language: SupportedLanguage,
 ) -> LeadingAttachments {
+    let decorators: Vec<attachments::Decorator> =
+        candidate.decorators.iter().map(Into::into).collect();
     candidate.attachment_anchor.map_or_else(
         || LeadingAttachments {
             doc_comments: Vec::new(),
             decorators: candidate.decorators.clone(),
         },
-        |anchor| {
-            attachments::collect_leading_attachments(
-                source,
-                language,
-                anchor,
-                &candidate.decorators,
-            )
-        },
+        |anchor| attachments::collect_leading_attachments(source, language, anchor, &decorators),
     )
 }
 
@@ -348,17 +349,22 @@ fn build_attachment_info(
     attachments: &LeadingAttachments,
     detail: DetailLevel,
 ) -> Option<AttachmentsInfo> {
-    if detail < DetailLevel::Structure
-        || (attachments.doc_comments.is_empty() && attachments.decorators.is_empty())
-    {
+    if detail < DetailLevel::Structure {
+        return None;
+    }
+    if attachments.is_empty() {
         return None;
     }
 
     Some(AttachmentsInfo {
         doc_comments: attachments.doc_comments.clone(),
         decorators: attachments.decorators.clone(),
-        normalized: NormalizedAttachments {
-            decorators: attachments::normalised_decorators(&attachments.decorators),
+        normalized: {
+            let decorators: Vec<attachments::Decorator> =
+                attachments.decorators.iter().map(Into::into).collect();
+            NormalizedAttachments {
+                decorators: attachments::normalised_decorators(&decorators),
+            }
         },
         bundle_rule: String::from("leading_trivia"),
     })

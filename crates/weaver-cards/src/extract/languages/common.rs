@@ -162,44 +162,15 @@ pub(super) fn top_level_imports(
         SupportedLanguage::TypeScript => &["import_statement"],
     };
 
-    let mut nodes = Vec::new();
     let mut cursor = root.walk();
-    for child in root.named_children(&mut cursor) {
-        if kinds.contains(&child.kind()) {
-            nodes.push(child);
-        }
-    }
+    let nodes: Vec<Node<'_>> = root
+        .named_children(&mut cursor)
+        .filter(|child| kinds.contains(&child.kind()))
+        .collect();
 
-    let mut groups: Vec<Vec<Node<'_>>> = Vec::new();
-    for node in nodes {
-        if let Some(group) = groups.last_mut() {
-            let previous_end = group.last().map_or(0, |item| item.end_position().row);
-            if node.start_position().row <= previous_end + 1 {
-                group.push(node);
-                continue;
-            }
-        }
-        groups.push(vec![node]);
-    }
-
-    groups
+    group_consecutive_nodes(nodes)
         .into_iter()
-        .filter_map(|group| {
-            let start = group.first().map(Node::start_byte)?;
-            let end = group.last().map(Node::end_byte)?;
-            source.get(start..end)?;
-            let normalized = group
-                .iter()
-                .map(|node| {
-                    normalise_import(language, source.get(node.byte_range()).unwrap_or_default())
-                })
-                .collect();
-            Some(ImportBlock {
-                byte_start: start,
-                byte_end: end,
-                normalized,
-            })
-        })
+        .filter_map(|group| import_block_from_group(language, &group, source))
         .collect()
 }
 
@@ -355,23 +326,60 @@ fn normalise_import(language: SupportedLanguage, raw: &str) -> String {
     }
 }
 
+fn group_consecutive_nodes(nodes: Vec<Node<'_>>) -> Vec<Vec<Node<'_>>> {
+    let mut groups: Vec<Vec<Node<'_>>> = Vec::new();
+    for node in nodes {
+        if let Some(group) = groups.last_mut() {
+            let previous_end = group.last().map_or(0, |n| n.end_position().row);
+            if node.start_position().row <= previous_end + 1 {
+                group.push(node);
+                continue;
+            }
+        }
+        groups.push(vec![node]);
+    }
+    groups
+}
+
+fn import_block_from_group(
+    language: SupportedLanguage,
+    group: &[Node<'_>],
+    source: &str,
+) -> Option<ImportBlock> {
+    let start = group.first().map(Node::start_byte)?;
+    let end = group.last().map(Node::end_byte)?;
+    source.get(start..end)?;
+    let normalized = group
+        .iter()
+        .map(|node| normalise_import(language, source.get(node.byte_range()).unwrap_or_default()))
+        .collect();
+    Some(ImportBlock {
+        byte_start: start,
+        byte_end: end,
+        normalized,
+    })
+}
+
+fn is_skippable_param(s: &str) -> bool {
+    const SKIPPABLE: &[&str] = &["", "self", "&self"];
+    SKIPPABLE.contains(&s)
+}
+
 fn parse_parameters(raw: &str) -> Vec<ParamInfo> {
     raw.trim()
         .trim_start_matches('(')
         .trim_end_matches(')')
         .split(',')
-        .filter_map(|param| {
-            let trimmed = param.trim();
-            if trimmed.is_empty() || trimmed == "self" || trimmed == "&self" {
-                return None;
-            }
+        .map(str::trim)
+        .filter(|p| !is_skippable_param(p))
+        .map(|trimmed| {
             let (name, ty) = trimmed
                 .split_once(':')
                 .map_or((trimmed, ""), |(name, ty)| (name.trim(), ty.trim()));
-            Some(ParamInfo {
+            ParamInfo {
                 name: String::from(name),
                 type_annotation: String::from(ty),
-            })
+            }
         })
         .collect()
 }
