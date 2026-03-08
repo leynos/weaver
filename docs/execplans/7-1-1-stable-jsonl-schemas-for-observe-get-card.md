@@ -199,15 +199,15 @@ This satisfies roadmap task 7.1.1 from `docs/roadmap.md`[^1] and closes #75.
 
 ## Outcomes & retrospective
 
-All stages completed successfully. The `weaver-cards` crate exports 25 public
-types covering the full `observe get-card` schema. Six insta snapshots lock the
-JSON shapes for minimal, structure, and full detail cards, plus refusal and
-success response envelopes. Five BDD scenarios validate schema contracts. The
-`weaverd` router recognizes `observe get-card` and dispatches to a handler that
-returns a structured `GetCardResponse::Refusal` with reason
-`not_yet_implemented`. All quality gates (`make check-fmt`, `make lint`,
-`make test`, `make markdownlint`, `make nixie`) pass. Documentation updated in
-`users-guide.md`, `repository-layout.md`, and `roadmap.md`.
+All stages completed successfully. The `weaver-cards` crate exports the full
+public schema surface for `observe get-card`. Six insta snapshots lock the JSON
+shapes for minimal, structure, and full detail cards, plus refusal and success
+response envelopes. Five BDD scenarios validate schema contracts. The `weaverd`
+router recognizes `observe get-card` and dispatches to a handler that returns a
+structured `GetCardResponse::Refusal` with reason `not_yet_implemented`. All
+quality gates (`make check-fmt`, `make lint`, `make test`, `make markdownlint`,
+`make nixie`) pass. Documentation updated in `users-guide.md`,
+`repository-layout.md`, and `roadmap.md`.
 
 Key learnings:
 
@@ -415,9 +415,9 @@ All types derive `Debug, Clone, PartialEq, Eq, Serialize, Deserialize`.
 
 **New file: `crates/weaver-cards/src/response.rs`** (~100 lines)
 
-- `RefusalReason` — `#[non_exhaustive]` enum with `#[serde(rename_all =
-  "snake_case")]`: `NoSymbolAtPosition`, `UnsupportedLanguage`, `
-  NotYetImplemented`, `BackendUnavailable`
+- `RefusalReason` — `#[non_exhaustive]` enum with
+  `#[serde(rename_all = "snake_case")]`: `NoSymbolAtPosition`,
+  `UnsupportedLanguage`, `NotYetImplemented`, `BackendUnavailable`
 - `CardRefusal` — `{ reason: RefusalReason, message: String,
   requested_detail: DetailLevel }`
 - `GetCardResponse` — `#[serde(tag = "status", rename_all = "snake_case")]
@@ -597,8 +597,8 @@ operation is recognized and returns a structured refusal.
 Add an `#### observe get-card` section after the existing
 `observe call-hierarchy` section (around line 440). Content:
 
-- Syntax: `weaver observe get-card --uri <URI> --position <LINE:COL>
-  [--detail <LEVEL>]`
+- Syntax:
+  `weaver observe get-card --uri <URI> --position <LINE:COL> [--detail <LEVEL>]`
 - Arguments: `--uri` (required), `--position` (required, 1-indexed),
   `--detail` (optional, one of `minimal`/`signature`/`structure`
   (default)/`semantic`/`full`)
@@ -712,8 +712,8 @@ Quality criteria (what "done" means):
 - Schema stability: The JSON output for each detail level is deterministic.
   Repeated serialization of the same fixture produces byte-identical output.
 - Refusal payload: Dispatching
-  `observe get-card --uri file:///foo.rs --position 10:5`
-  returns a JSONL response containing a `GetCardResponse::Refusal` with reason
+  `observe get-card --uri file:///foo.rs --position 10:5` returns a JSONL
+  response containing a `GetCardResponse::Refusal` with reason
   `"not_yet_implemented"` and status 1.
 - Field names: JSON field names match the design document
   (`card_version`, `symbol`, `signature`, `doc`, `structure`, `lsp`, `metrics`,
@@ -918,8 +918,8 @@ Modified files (8):
 7. `docs/repository-layout.md` — add crate listing
 8. `docs/users-guide.md` — add `observe get-card` documentation
 
-Total: ~23 file touches (15 new + 8 modified) plus auto-generated snapshot
-files. Within the 25-file tolerance.
+Total: ~23 planned file touches (15 new + 8 modified), excluding the committed
+snapshot outputs from the 25-file tolerance count.
 
 ### Critical reference files
 
