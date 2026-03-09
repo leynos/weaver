@@ -1,4 +1,4 @@
-# Add top-level version output and long-form CLI description
+# Add top-level version output and long-form command-line interface (CLI) description
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
@@ -13,7 +13,8 @@ repository root.
 ## Purpose / big picture
 
 After this change, operators can run `weaver --version` or `weaver -V` to see
-the version string, exiting 0 and printing to stdout. Running `weaver --help`
+the version string, exiting 0 and printing to standard output (stdout).
+Running `weaver --help`
 displays a purpose statement and runnable quick-start examples alongside the
 existing domain/operation catalogue. Both `--help` and `--version` now exit 0
 and write to stdout, matching standard CLI conventions.
@@ -25,8 +26,8 @@ Observable behaviour after this change:
 - `weaver --help` prints to stdout (not stderr), exits 0, and includes a
   "Quick start:" block with at least one runnable command example
   (`weaver observe get-definition`).
-- `weaver` (bare invocation) continues to exit 1 and print to stderr
-  (unchanged).
+- `weaver` (bare invocation) continues to exit 1 and print to standard
+  error (stderr) (unchanged).
 - Running `make check-fmt && make lint && make test` passes with no
   regressions.
 
@@ -46,7 +47,8 @@ Observable behaviour after this change:
    must pass `cargo clippy --workspace --all-targets --all-features -D warnings`.
 4. **en-GB-oxendict spelling.** Comments and documentation use British English
    with Oxford "-ize" / "-yse" / "-our" spelling.
-5. **rstest-bdd v0.5.0.** BDD tests use v0.5.0. The fixture parameter must be
+5. **rstest-bdd v0.5.0.** Behaviour-driven development (BDD) tests use
+   v0.5.0. The fixture parameter must be
    named exactly `world`. Use `let _ = world;` to suppress unused warnings.
 6. **`concat!()` for multi-line strings.** Per AGENTS.md, use `concat!()` to
    combine long string literals rather than escaping newlines with backslash.
@@ -63,8 +65,9 @@ Observable behaviour after this change:
 
 - **Scope:** If implementation requires changes to more than 12 files or more
   than 200 net lines of code, stop and escalate.
-- **Interface:** If a public API signature must change beyond adding the clap
-  attributes, stop and escalate.
+- **Interface:** If a public application programming interface (API)
+  signature must change beyond adding the clap attributes, stop and
+  escalate.
 - **Dependencies:** If a new external dependency is required, stop and
   escalate.
 - **Iterations:** If tests still fail after 3 attempts at fixing, stop and
@@ -87,7 +90,7 @@ Observable behaviour after this change:
   Severity: medium. Likelihood: low.
   Mitigation: The existing test (lines 28-54) intentionally uses combined
   stdout+stderr output (`format!("{stdout}{stderr}")`) and does not assert on
-  exit code. Its comment states "We intentionally avoid asserting on the exit
+  exit code. Its comment states, "We intentionally avoid asserting on the exit
   code so this test remains valid if --help is later changed to exit 0." No
   change is needed.
 
@@ -225,10 +228,9 @@ impl CommandInvocation {
     /// Returns true when this invocation targets the `act apply-patch`
     /// operation.
     pub(crate) fn is_apply_patch(&self) -> bool {
-        self.domain.trim().eq_ignore_ascii_case("act")
+        self.domain.eq_ignore_ascii_case("act")
             && self
                 .operation
-                .trim()
                 .eq_ignore_ascii_case("apply-patch")
     }
 }
@@ -515,7 +517,7 @@ Existing reusable code:
 ## File change summary
 
 | File | Change | Lines before | Lines after |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `src/command.rs` | Add `is_apply_patch` method | 91 | ~98 |
 | `src/lib.rs` | Remove `is_apply_patch`, add exit-code fix | 399 | ~395 |
 | `src/cli.rs` | Add `version`, `about`, `long_about` | 87 | ~102 |
