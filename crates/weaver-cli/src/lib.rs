@@ -199,9 +199,17 @@ where
                 ))
             });
 
+        self.map_result_to_exit_code(result)
+    }
+
+    fn map_result_to_exit_code(&mut self, result: Result<ExitCode, AppError>) -> ExitCode {
         match result {
             Ok(exit_code) => exit_code,
             Err(AppError::BareInvocation) => ExitCode::FAILURE,
+            Err(AppError::CliUsage(ref clap_err)) if !clap_err.use_stderr() => {
+                let _ = write!(self.io.stdout, "{clap_err}");
+                ExitCode::SUCCESS
+            }
             Err(error) => {
                 let _ = writeln!(self.io.stderr, "{error}");
                 ExitCode::FAILURE
@@ -326,7 +334,7 @@ fn build_request<R: Read>(
     invocation: CommandInvocation,
     stdin: &mut R,
 ) -> Result<CommandRequest, AppError> {
-    if is_apply_patch(&invocation) {
+    if invocation.is_apply_patch() {
         let mut patch = String::new();
         stdin
             .read_to_string(&mut patch)
@@ -338,14 +346,6 @@ fn build_request<R: Read>(
     } else {
         Ok(CommandRequest::from(invocation))
     }
-}
-
-fn is_apply_patch(invocation: &CommandInvocation) -> bool {
-    invocation.domain.trim().eq_ignore_ascii_case("act")
-        && invocation
-            .operation
-            .trim()
-            .eq_ignore_ascii_case("apply-patch")
 }
 
 /// Runs the CLI with a custom configuration loader.

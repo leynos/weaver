@@ -330,6 +330,11 @@ fn weaver_cli_output_behaviour(world: RefCell<TestWorld>) {
     let _ = world;
 }
 
+#[scenario(path = "tests/features/weaver_cli_version.feature")]
+fn weaver_cli_version_behaviour(world: RefCell<TestWorld>) {
+    let _ = world;
+}
+
 fn parse_lifecycle_command(label: &str) -> LifecycleCommand {
     match label.trim().to_ascii_lowercase().as_str() {
         "start" => LifecycleCommand::Start,

@@ -68,6 +68,14 @@ impl From<CommandInvocation> for CommandRequest {
     }
 }
 
+impl CommandInvocation {
+    /// Returns true when this invocation targets the `act apply-patch` operation.
+    pub(crate) fn is_apply_patch(&self) -> bool {
+        self.domain.eq_ignore_ascii_case("act")
+            && self.operation.eq_ignore_ascii_case("apply-patch")
+    }
+}
+
 impl CommandRequest {
     pub(crate) fn with_patch(invocation: CommandInvocation, patch: String) -> Self {
         Self {
