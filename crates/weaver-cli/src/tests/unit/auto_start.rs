@@ -92,44 +92,20 @@ fn write_health_snapshot(path: &std::path::Path, status: &str, pid: u32, timesta
     fs::write(path, json).expect("write health snapshot");
 }
 
-/// Success path: daemon starts, becomes ready, and CLI proceeds with command.
+/// Binds a Unix socket shortly after the test starts so the first connect fails
+/// but the retry succeeds once auto-start wait handling completes.
 ///
-/// This test exercises the complete auto-start success flow:
-/// 1. Initial connection fails (Unix socket not yet bound)
-/// 2. CLI spawns daemon binary (/bin/true exits immediately, simulating daemonization)
-/// 3. Health snapshot indicates ready status (pre-written with recent timestamp)
-/// 4. CLI retries connection to the now-listening socket
-/// 5. Daemon responds with valid messages
+/// The 100 ms delay is longer than the initial connection attempt but shorter
+/// than `AUTO_START_TIMEOUT`. The CLI's probe path takes much longer to fail,
+/// so the socket bind reliably happens before the retry without needing precise
+/// cross-thread synchronisation.
 #[cfg(unix)]
-#[test]
-fn auto_start_succeeds_and_proceeds() {
-    let dir = TempDir::new().expect("tempdir");
-    let socket_path = dir.path().join("daemon.sock");
-    let health_path = dir.path().join("weaverd.health");
-    let socket_str = socket_path.to_string_lossy().into_owned();
-
-    // Pre-write health snapshot with ready status and recent timestamp.
-    // The PID check is skipped when daemonized=true (child exits with 0).
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time")
-        .as_secs();
-    write_health_snapshot(&health_path, "ready", 12345, timestamp);
-
-    // Spawn a thread that binds the Unix socket after a brief delay.
-    // This ensures the initial connect fails (triggering auto-start) but the
-    // retry succeeds after wait_for_ready completes.
-    //
-    // Timing coordination: The 100ms delay is chosen to be longer than the
-    // initial connection attempt but shorter than AUTO_START_TIMEOUT. The CLI's
-    // connection attempt takes ~5 seconds (SOCKET_PROBE_TIMEOUT) before failing,
-    // so the socket bind reliably happens before the CLI retries. This is not a
-    // precise synchronisation mechanism, but the wide timing margins make it
-    // robust under typical test loads.
-    let socket_path_for_thread = socket_path.clone();
-    let listener_handle = thread::spawn(move || -> Result<(), String> {
+fn spawn_delayed_unix_listener(
+    socket_path: std::path::PathBuf,
+) -> thread::JoinHandle<Result<(), String>> {
+    thread::spawn(move || -> Result<(), String> {
         thread::sleep(Duration::from_millis(100));
-        let listener = UnixListener::bind(&socket_path_for_thread)
+        let listener = UnixListener::bind(&socket_path)
             .map_err(|error| format!("bind unix socket: {error}"))?;
         listener
             .set_nonblocking(true)
@@ -159,7 +135,62 @@ fn auto_start_succeeds_and_proceeds() {
                 Err(error) => return Err(format!("accept connection: {error}")),
             }
         }
-    });
+    })
+}
+
+#[cfg(unix)]
+fn assert_auto_start_success(exit: ExitCode, stderr_text: &str, stdout_text: &str) {
+    assert_eq!(
+        exit,
+        ExitCode::from(17),
+        "expected exit code 17, got {exit:?}; stderr: {stderr_text:?}"
+    );
+    assert!(
+        stderr_text.contains("Waiting for daemon start..."),
+        "auto-start should write waiting message: {stderr_text:?}"
+    );
+    assert!(
+        !stderr_text.contains("failed to spawn"),
+        "should not contain spawn failure: {stderr_text:?}"
+    );
+    assert!(
+        !stderr_text.contains("exited before"),
+        "should not contain startup failure: {stderr_text:?}"
+    );
+    assert!(
+        stdout_text.contains("daemon says hello"),
+        "should receive daemon stdout: {stdout_text:?}"
+    );
+}
+
+/// Success path: daemon starts, becomes ready, and CLI proceeds with command.
+///
+/// This test exercises the complete auto-start success flow:
+/// 1. Initial connection fails (Unix socket not yet bound)
+/// 2. CLI spawns daemon binary (/bin/true exits immediately, simulating daemonization)
+/// 3. Health snapshot indicates ready status (pre-written with recent timestamp)
+/// 4. CLI retries connection to the now-listening socket
+/// 5. Daemon responds with valid messages
+#[cfg(unix)]
+#[test]
+fn auto_start_succeeds_and_proceeds() {
+    let dir = TempDir::new().expect("tempdir");
+    let socket_path = dir.path().join("daemon.sock");
+    let health_path = dir.path().join("weaverd.health");
+    let socket_str = socket_path.to_string_lossy().into_owned();
+
+    // Pre-write health snapshot with ready status and recent timestamp.
+    // The PID check is skipped when daemonized=true (child exits with 0).
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time")
+        .as_secs();
+    write_health_snapshot(&health_path, "ready", 12345, timestamp);
+
+    // Bind the socket on a short delay so the first connect fails and the retry
+    // succeeds once auto-start wait handling completes. See
+    // `spawn_delayed_unix_listener` for the timing rationale.
+    let listener_handle = spawn_delayed_unix_listener(socket_path);
 
     let config = Config {
         daemon_socket: SocketEndpoint::unix(socket_str),
@@ -186,29 +217,7 @@ fn auto_start_succeeds_and_proceeds() {
     let stderr_text = decode_utf8(stderr, "stderr").expect("stderr utf8");
     let stdout_text = decode_utf8(stdout, "stdout").expect("stdout utf8");
 
-    // Daemon responded with exit code 17 (from default_daemon_lines).
-    assert_eq!(
-        exit,
-        ExitCode::from(17),
-        "expected exit code 17, got {exit:?}; stderr: {stderr_text:?}"
-    );
-    assert!(
-        stderr_text.contains("Waiting for daemon start..."),
-        "auto-start should write waiting message: {stderr_text:?}"
-    );
-    assert!(
-        !stderr_text.contains("failed to spawn"),
-        "should not contain spawn failure: {stderr_text:?}"
-    );
-    assert!(
-        !stderr_text.contains("exited before"),
-        "should not contain startup failure: {stderr_text:?}"
-    );
-    // Verify daemon output was received.
-    assert!(
-        stdout_text.contains("daemon says hello"),
-        "should receive daemon stdout: {stdout_text:?}"
-    );
+    assert_auto_start_success(exit, &stderr_text, &stdout_text);
 }
 
 /// Timeout path: daemon spawns but never becomes ready within AUTO_START_TIMEOUT.
