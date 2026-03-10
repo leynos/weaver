@@ -41,7 +41,7 @@ use localizer::{build_localizer, write_bare_help};
 pub use output::{OutputContext, ResolvedOutputFormat, render_human_output};
 use runtime_utils::emit_capabilities;
 pub(crate) use runtime_utils::exit_code_from_status;
-use transport::connect;
+use transport::{connect, connect_with_retry};
 /// CLI flags recognised by the configuration loader.
 ///
 /// MAINTENANCE: This list must be kept in sync with the configuration flags
@@ -294,8 +294,11 @@ where
                 let _ = writeln!(io.stderr, "{start_error}");
                 return ExitCode::FAILURE;
             }
-            // Retry connection after daemon started successfully.
-            match connect(context.config.daemon_socket()) {
+            // Retry briefly after daemon startup to tolerate socket-bind lag.
+            match connect_with_retry(
+                context.config.daemon_socket(),
+                transport::CONNECTION_TIMEOUT,
+            ) {
                 Ok(connection) => connection,
                 Err(retry_error) => {
                     let _ = writeln!(io.stderr, "{retry_error}");
