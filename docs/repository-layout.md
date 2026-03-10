@@ -75,7 +75,7 @@ In this document, Language Server Protocol (LSP) and Continuous Integration
 | `weaver-e2e`                  | End-to-end test support crate and integration scaffolding                                            | Implemented |
 | `sempai-core`                 | Sempai data model, diagnostics, and planning intermediate representation (IR) types                  | Implemented |
 | `sempai`                      | Sempai facade crate with stable public API, re-exports from `sempai-core`, and stub `Engine`         | Implemented |
-| `weaver-cards`                | Stable JSONL schemas for `observe get-card` symbol card requests and responses                        | Implemented |
+| `weaver-cards`                | Stable JSONL schemas for `observe get-card` symbol card requests and responses                       | Implemented |
 
 _Table 1: Implemented crate boundaries and responsibilities._
 

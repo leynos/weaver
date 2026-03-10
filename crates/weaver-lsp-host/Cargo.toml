@@ -2,6 +2,7 @@
 name = "weaver-lsp-host"
 edition.workspace = true
 version.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 weaver-config = { path = "../weaver-config" }

@@ -2,6 +2,7 @@
 name = "weaver-plugin-rust-analyzer"
 edition.workspace = true
 version.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 lsp-types.workspace = true

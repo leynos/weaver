@@ -2,6 +2,7 @@
 name = "weaver-sandbox"
 edition.workspace = true
 version.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 birdcage.workspace = true
