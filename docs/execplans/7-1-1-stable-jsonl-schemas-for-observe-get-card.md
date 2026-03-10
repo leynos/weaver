@@ -341,8 +341,8 @@ Types mapped from the design doc lines 147-170:
 - `SymbolRef` — location-based reference: `uri`, `range`, `language`,
   `kind`, `name`, `container` (Option, skip_serializing_if is_none)
 - `SymbolId` — `{ symbol_id: String }`
-- `SymbolIdentity` — `{ symbol_id: String, #[serde(rename = "ref")] symbol_ref:
-  SymbolRef }`
+- `SymbolIdentity` —
+  `{ symbol_id: String, #[serde(rename = "ref")] symbol_ref: SymbolRef }`
 
 **New file: `crates/weaver-cards/src/detail.rs`** (~55 lines)
 
@@ -364,23 +364,35 @@ Types mapped from design doc lines 176-268:
   String }`
 - `DocInfo` — `{ docstring: String, summary: String, source: String }`
 - `NormalizedAttachments` — `{ decorators: Vec<String> }`
-- `AttachmentsInfo` — `{ doc_comments: Vec<String>, decorators:
-  Vec<String>, normalized: NormalizedAttachments, bundle_rule: String
-  }` (present at `structure` detail and above)
+- `AttachmentsInfo` —
+
+  ```text
+  { doc_comments: Vec<String>, decorators: Vec<String>, normalized: NormalizedAttachments, bundle_rule: String }
+  ```
+
+  Present at `structure` detail and above.
 - `LocalInfo` — `{ name: String, kind: String, decl_line: u32 }`
 - `BranchInfo` — `{ kind: String, line: u32 }`
 - `StructureInfo` — `{ locals: Vec<LocalInfo>, branches: Vec<BranchInfo> }`
 - `LspInfo` — `{ hover: String, #[serde(rename = "type")] type_info:
   String, deprecated: bool, source: String }`
-- `MetricsInfo` — `{ lines: u32, cyclomatic: u32, fan_in: Option<u32>,
-  fan_out: Option<u32>
-  }` (fan metrics are `Option` because they are only populated at `full
-  ` detail from the relational graph layer)
+- `MetricsInfo` —
+
+  ```text
+  { lines: u32, cyclomatic: u32, fan_in: Option<u32>, fan_out: Option<u32> }
+  ```
+
+  Fan metrics are `Option` because they are only populated at `full` detail
+  from the relational graph layer.
 - `DepsInfo` — `{ calls: Vec<String>, imports: Vec<String>, config:
   Vec<String> }`
-- `ImportInterstitialInfo` — `{ raw: String, normalized: Vec<String>,
-  groups: Vec<Vec<String>>, source: String
-  }` (import block data for file/module or interstitial cards)
+- `ImportInterstitialInfo` —
+
+  ```text
+  { raw: String, normalized: Vec<String>, groups: Vec<Vec<String>>, source: String }
+  ```
+
+  Import block data for file/module or interstitial cards.
 - `InterstitialInfo` — `{ imports: ImportInterstitialInfo }` (present on
   file/module and interstitial cards only)
 - `Provenance` — `{ extracted_at: String, sources: Vec<String> }`
@@ -398,10 +410,10 @@ All types derive `Debug, Clone, PartialEq, Eq, Serialize, Deserialize`.
 
 **New file: `crates/weaver-cards/src/request.rs`** (~110 lines)
 
-- `GetCardRequest` — `{ uri: String, line: u32, column: u32, detail:
-  DetailLevel }`. The `parse(arguments: &[String]) -> Result<Self,
-  GetCardError>` method follows the pattern from `
-  crates/weaverd/src/dispatch/observe/arguments.rs`:
+- `GetCardRequest` —
+  `{ uri: String, line: u32, column: u32, detail: DetailLevel }`. The
+  `parse(arguments: &[String]) -> Result<Self, GetCardError>` method follows
+  the pattern from `crates/weaverd/src/dispatch/observe/arguments.rs`:
   - Iterates with a peekable iterator
   - Recognizes `--uri`, `--position`, `--detail`, `--format`
   - `--position` parsed with `split_once(':')` (not indexing)
