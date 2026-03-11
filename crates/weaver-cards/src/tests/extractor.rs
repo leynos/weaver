@@ -23,131 +23,124 @@ struct SymbolExpectation<'a> {
     expected_container: Option<&'a str>,
 }
 
-fn rust_cases() -> Vec<SymbolExpectation<'static>> {
-    vec![
-        SymbolExpectation {
-            request: ExtractRequest {
-                path: Path::new("fixture.rs"),
-                source: "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = name.len();\n    count\n}\n",
-                line: 2,
-                column: 4,
-                detail: DetailLevel::Structure,
-            },
-            expected_kind: CardSymbolKind::Function,
-            expected_name: "greet",
-            expected_container: None,
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the requested test constructor intentionally centralises the repeated fixture shape"
+)]
+fn make_case(
+    path: &'static Path,
+    source: &'static str,
+    line: u32,
+    column: u32,
+    kind: CardSymbolKind,
+    name: &'static str,
+    container: Option<&'static str>,
+) -> SymbolExpectation<'static> {
+    SymbolExpectation {
+        request: ExtractRequest {
+            path,
+            source,
+            line,
+            column,
+            detail: DetailLevel::Structure,
         },
-        SymbolExpectation {
-            request: ExtractRequest {
-                path: Path::new("fixture.rs"),
-                source: "struct Widget {\n    name: String,\n}\n",
-                line: 1,
-                column: 8,
-                detail: DetailLevel::Structure,
-            },
-            expected_kind: CardSymbolKind::Type,
-            expected_name: "Widget",
-            expected_container: None,
-        },
-        SymbolExpectation {
-            request: ExtractRequest {
-                path: Path::new("fixture.rs"),
-                source: "impl Widget {\n    fn render(&self) {}\n}\n",
-                line: 2,
-                column: 8,
-                detail: DetailLevel::Structure,
-            },
-            expected_kind: CardSymbolKind::Method,
-            expected_name: "render",
-            expected_container: Some("Widget"),
-        },
-    ]
+        expected_kind: kind,
+        expected_name: name,
+        expected_container: container,
+    }
 }
 
-fn python_cases() -> Vec<SymbolExpectation<'static>> {
-    vec![
-        SymbolExpectation {
-            request: ExtractRequest {
-                path: Path::new("fixture.py"),
-                source: "def greet(name: str) -> int:\n    total = len(name)\n    return total\n",
-                line: 1,
-                column: 5,
-                detail: DetailLevel::Structure,
-            },
-            expected_kind: CardSymbolKind::Function,
-            expected_name: "greet",
-            expected_container: None,
-        },
-        SymbolExpectation {
-            request: ExtractRequest {
-                path: Path::new("fixture.py"),
-                source: "class Widget:\n    pass\n",
-                line: 1,
-                column: 7,
-                detail: DetailLevel::Structure,
-            },
-            expected_kind: CardSymbolKind::Class,
-            expected_name: "Widget",
-            expected_container: None,
-        },
-        SymbolExpectation {
-            request: ExtractRequest {
-                path: Path::new("fixture.py"),
-                source: "class Widget:\n    def render(self) -> None:\n        status = True\n        if status:\n            return None\n",
-                line: 2,
-                column: 9,
-                detail: DetailLevel::Structure,
-            },
-            expected_kind: CardSymbolKind::Method,
-            expected_name: "render",
-            expected_container: Some("Widget"),
-        },
-    ]
-}
-
-fn typescript_cases() -> Vec<SymbolExpectation<'static>> {
-    vec![
-        SymbolExpectation {
-            request: ExtractRequest {
-                path: Path::new("fixture.ts"),
-                source: "function greet(name: string): number {\n  const total = name.length;\n  return total;\n}\n",
-                line: 1,
-                column: 10,
-                detail: DetailLevel::Structure,
-            },
-            expected_kind: CardSymbolKind::Function,
-            expected_name: "greet",
-            expected_container: None,
-        },
-        SymbolExpectation {
-            request: ExtractRequest {
-                path: Path::new("fixture.ts"),
-                source: "interface Widget {\n  name: string;\n}\n",
-                line: 1,
-                column: 11,
-                detail: DetailLevel::Structure,
-            },
-            expected_kind: CardSymbolKind::Interface,
-            expected_name: "Widget",
-            expected_container: None,
-        },
-        SymbolExpectation {
-            request: ExtractRequest {
-                path: Path::new("fixture.ts"),
-                source: "class Widget {\n  render(): void {\n    const ready = true;\n    if (ready) {\n      return;\n    }\n  }\n}\n",
-                line: 2,
-                column: 3,
-                detail: DetailLevel::Structure,
-            },
-            expected_kind: CardSymbolKind::Method,
-            expected_name: "render",
-            expected_container: Some("Widget"),
-        },
-    ]
-}
-
+#[expect(
+    clippy::too_many_lines,
+    reason = "the requested consolidated fixture list keeps all symbol-kind cases in one place"
+)]
 fn all_symbol_cases() -> Vec<SymbolExpectation<'static>> {
-    [rust_cases(), python_cases(), typescript_cases()].concat()
+    vec![
+        // Rust
+        make_case(
+            Path::new("fixture.rs"),
+            "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = name.len();\n    count\n}\n",
+            2,
+            4,
+            CardSymbolKind::Function,
+            "greet",
+            None,
+        ),
+        make_case(
+            Path::new("fixture.rs"),
+            "struct Widget {\n    name: String,\n}\n",
+            1,
+            8,
+            CardSymbolKind::Type,
+            "Widget",
+            None,
+        ),
+        make_case(
+            Path::new("fixture.rs"),
+            "impl Widget {\n    fn render(&self) {}\n}\n",
+            2,
+            8,
+            CardSymbolKind::Method,
+            "render",
+            Some("Widget"),
+        ),
+        // Python
+        make_case(
+            Path::new("fixture.py"),
+            "def greet(name: str) -> int:\n    total = len(name)\n    return total\n",
+            1,
+            5,
+            CardSymbolKind::Function,
+            "greet",
+            None,
+        ),
+        make_case(
+            Path::new("fixture.py"),
+            "class Widget:\n    pass\n",
+            1,
+            7,
+            CardSymbolKind::Class,
+            "Widget",
+            None,
+        ),
+        make_case(
+            Path::new("fixture.py"),
+            "class Widget:\n    def render(self) -> None:\n        status = True\n        if status:\n            return None\n",
+            2,
+            9,
+            CardSymbolKind::Method,
+            "render",
+            Some("Widget"),
+        ),
+        // TypeScript
+        make_case(
+            Path::new("fixture.ts"),
+            "function greet(name: string): number {\n  const total = name.length;\n  return total;\n}\n",
+            1,
+            10,
+            CardSymbolKind::Function,
+            "greet",
+            None,
+        ),
+        make_case(
+            Path::new("fixture.ts"),
+            "interface Widget {\n  name: string;\n}\n",
+            1,
+            11,
+            CardSymbolKind::Interface,
+            "Widget",
+            None,
+        ),
+        make_case(
+            Path::new("fixture.ts"),
+            "class Widget {\n  render(): void {\n    const ready = true;\n    if (ready) {\n      return;\n    }\n  }\n}\n",
+            2,
+            3,
+            CardSymbolKind::Method,
+            "render",
+            Some("Widget"),
+        ),
+    ]
 }
 
 fn extract(request: ExtractRequest<'_>) -> crate::SymbolCard {

@@ -31,7 +31,10 @@ pub fn handle<W: Write>(
 ) -> Result<DispatchResult, DispatchError> {
     let card_request = GetCardRequest::parse(&request.arguments)
         .map_err(|error| DispatchError::invalid_arguments(error.to_string()))?;
-    let path = resolve_file_path(&card_request.uri)?;
+    let parsed_uri = Url::parse(&card_request.uri).map_err(|error| {
+        DispatchError::invalid_arguments(format!("invalid URI '{}': {error}", card_request.uri))
+    })?;
+    let path = resolve_file_path(&parsed_uri)?;
     let source = fs::read_to_string(&path)?;
     let extractor = TreeSitterCardExtractor::new();
 
@@ -59,18 +62,15 @@ pub fn handle<W: Write>(
     Ok(DispatchResult::with_status(status))
 }
 
-fn resolve_file_path(uri: &str) -> Result<PathBuf, DispatchError> {
-    let parsed = Url::parse(uri).map_err(|error| {
-        DispatchError::invalid_arguments(format!("invalid URI '{uri}': {error}"))
-    })?;
-    if parsed.scheme() != "file" {
+fn resolve_file_path(uri: &Url) -> Result<PathBuf, DispatchError> {
+    if uri.scheme() != "file" {
         return Err(DispatchError::invalid_arguments(format!(
             "unsupported URI scheme '{}': expected file",
-            parsed.scheme()
+            uri.scheme()
         )));
     }
 
-    parsed.to_file_path().map_err(|_| {
+    uri.to_file_path().map_err(|_| {
         DispatchError::invalid_arguments(format!("URI is not a valid file path: {uri}"))
     })
 }
@@ -115,6 +115,7 @@ mod tests {
     use std::fs;
 
     use tempfile::TempDir;
+    use weaver_cards::{DetailLevel, RefusalReason};
 
     use super::*;
     use crate::dispatch::request::CommandRequest;
@@ -123,13 +124,26 @@ mod tests {
         TempDir::new().expect("temp dir")
     }
 
-    fn write_source(temp_dir: &TempDir, name: &str, source: &str) -> PathBuf {
-        let path = temp_dir.path().join(name);
-        fs::write(&path, source).expect("write source");
+    struct SourceFile<'a> {
+        name: &'a str,
+        content: &'a str,
+    }
+
+    fn write_source(temp_dir: &TempDir, file: SourceFile<'_>) -> PathBuf {
+        let path = temp_dir.path().join(file.name);
+        fs::write(&path, file.content).expect("write source");
         path
     }
 
-    fn make_request(uri: &str, line: u32, column: u32, detail: &str) -> CommandRequest {
+    fn make_request(uri: &str, line: u32, column: u32, detail: DetailLevel) -> CommandRequest {
+        let detail_str = match detail {
+            DetailLevel::Minimal => "minimal",
+            DetailLevel::Signature => "signature",
+            DetailLevel::Structure => "structure",
+            DetailLevel::Semantic => "semantic",
+            DetailLevel::Full => "full",
+            _ => panic!("unsupported detail level in get-card test helper"),
+        };
         CommandRequest::parse(
             format!(
                 concat!(
@@ -140,7 +154,7 @@ mod tests {
                 uri = uri,
                 line = line,
                 column = column,
-                detail = detail,
+                detail = detail_str,
             )
             .as_bytes(),
         )
@@ -159,11 +173,11 @@ mod tests {
         serde_json::from_str(data).expect("payload")
     }
 
-    fn assert_refusal_response(filename: &str, source: &str, expected_reason: &str) {
+    fn assert_refusal_response(file: SourceFile<'_>, expected_reason: RefusalReason) {
         let temp_dir = temp_dir();
-        let path = write_source(&temp_dir, filename, source);
+        let path = write_source(&temp_dir, file);
         let uri = Url::from_file_path(&path).expect("file uri").to_string();
-        let request = make_request(&uri, 1, 1, "structure");
+        let request = make_request(&uri, 1, 1, DetailLevel::Structure);
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
 
@@ -172,7 +186,10 @@ mod tests {
         assert_eq!(result.status, 1);
         let payload = response_payload(output);
         assert_eq!(payload["status"], "refusal");
-        assert_eq!(payload["refusal"]["reason"], expected_reason);
+        assert_eq!(
+            payload["refusal"]["reason"],
+            serde_json::to_value(&expected_reason).expect("serialise reason")
+        );
     }
 
     #[test]
@@ -180,11 +197,13 @@ mod tests {
         let temp_dir = temp_dir();
         let path = write_source(
             &temp_dir,
-            "card.rs",
-            "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = name.len();\n    count\n}\n",
+            SourceFile {
+                name: "card.rs",
+                content: "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = name.len();\n    count\n}\n",
+            },
         );
         let uri = Url::from_file_path(&path).expect("file uri").to_string();
-        let request = make_request(&uri, 2, 4, "structure");
+        let request = make_request(&uri, 2, 4, DetailLevel::Structure);
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
 
@@ -198,17 +217,29 @@ mod tests {
 
     #[test]
     fn handle_returns_unsupported_language_refusal() {
-        assert_refusal_response("notes.txt", "plain text", "unsupported_language");
+        assert_refusal_response(
+            SourceFile {
+                name: "notes.txt",
+                content: "plain text",
+            },
+            RefusalReason::UnsupportedLanguage,
+        );
     }
 
     #[test]
     fn handle_returns_no_symbol_refusal_for_empty_supported_file() {
-        assert_refusal_response("empty.py", "", "no_symbol_at_position");
+        assert_refusal_response(
+            SourceFile {
+                name: "empty.py",
+                content: "",
+            },
+            RefusalReason::NoSymbolAtPosition,
+        );
     }
 
     #[test]
     fn handle_rejects_non_file_uri() {
-        let request = make_request("https://example.com/demo.rs", 1, 1, "minimal");
+        let request = make_request("https://example.com/demo.rs", 1, 1, DetailLevel::Minimal);
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
 
