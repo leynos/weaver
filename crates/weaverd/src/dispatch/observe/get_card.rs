@@ -159,6 +159,22 @@ mod tests {
         serde_json::from_str(data).expect("payload")
     }
 
+    fn assert_refusal_response(filename: &str, source: &str, expected_reason: &str) {
+        let temp_dir = temp_dir();
+        let path = write_source(&temp_dir, filename, source);
+        let uri = Url::from_file_path(&path).expect("file uri").to_string();
+        let request = make_request(&uri, 1, 1, "structure");
+        let mut output = Vec::new();
+        let mut writer = ResponseWriter::new(&mut output);
+
+        let result = handle(&request, &mut writer).expect("handler should succeed");
+
+        assert_eq!(result.status, 1);
+        let payload = response_payload(output);
+        assert_eq!(payload["status"], "refusal");
+        assert_eq!(payload["refusal"]["reason"], expected_reason);
+    }
+
     #[test]
     fn handle_returns_success_for_supported_rust_symbol() {
         let temp_dir = temp_dir();
@@ -182,36 +198,12 @@ mod tests {
 
     #[test]
     fn handle_returns_unsupported_language_refusal() {
-        let temp_dir = temp_dir();
-        let path = write_source(&temp_dir, "notes.txt", "plain text");
-        let uri = Url::from_file_path(&path).expect("file uri").to_string();
-        let request = make_request(&uri, 1, 1, "structure");
-        let mut output = Vec::new();
-        let mut writer = ResponseWriter::new(&mut output);
-
-        let result = handle(&request, &mut writer).expect("handler should succeed");
-
-        assert_eq!(result.status, 1);
-        let payload = response_payload(output);
-        assert_eq!(payload["status"], "refusal");
-        assert_eq!(payload["refusal"]["reason"], "unsupported_language");
+        assert_refusal_response("notes.txt", "plain text", "unsupported_language");
     }
 
     #[test]
     fn handle_returns_no_symbol_refusal_for_empty_supported_file() {
-        let temp_dir = temp_dir();
-        let path = write_source(&temp_dir, "empty.py", "");
-        let uri = Url::from_file_path(&path).expect("file uri").to_string();
-        let request = make_request(&uri, 1, 1, "structure");
-        let mut output = Vec::new();
-        let mut writer = ResponseWriter::new(&mut output);
-
-        let result = handle(&request, &mut writer).expect("handler should succeed");
-
-        assert_eq!(result.status, 1);
-        let payload = response_payload(output);
-        assert_eq!(payload["status"], "refusal");
-        assert_eq!(payload["refusal"]["reason"], "no_symbol_at_position");
+        assert_refusal_response("empty.py", "", "no_symbol_at_position");
     }
 
     #[test]

@@ -23,13 +23,8 @@ struct SymbolExpectation<'a> {
     expected_container: Option<&'a str>,
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "the consolidated fixture list intentionally keeps all requested cases together"
-)]
-fn all_symbol_cases() -> Vec<SymbolExpectation<'static>> {
+fn rust_cases() -> Vec<SymbolExpectation<'static>> {
     vec![
-        // Rust
         SymbolExpectation {
             request: ExtractRequest {
                 path: Path::new("fixture.rs"),
@@ -66,7 +61,11 @@ fn all_symbol_cases() -> Vec<SymbolExpectation<'static>> {
             expected_name: "render",
             expected_container: Some("Widget"),
         },
-        // Python
+    ]
+}
+
+fn python_cases() -> Vec<SymbolExpectation<'static>> {
+    vec![
         SymbolExpectation {
             request: ExtractRequest {
                 path: Path::new("fixture.py"),
@@ -103,7 +102,11 @@ fn all_symbol_cases() -> Vec<SymbolExpectation<'static>> {
             expected_name: "render",
             expected_container: Some("Widget"),
         },
-        // TypeScript
+    ]
+}
+
+fn typescript_cases() -> Vec<SymbolExpectation<'static>> {
+    vec![
         SymbolExpectation {
             request: ExtractRequest {
                 path: Path::new("fixture.ts"),
@@ -141,6 +144,10 @@ fn all_symbol_cases() -> Vec<SymbolExpectation<'static>> {
             expected_container: Some("Widget"),
         },
     ]
+}
+
+fn all_symbol_cases() -> Vec<SymbolExpectation<'static>> {
+    [rust_cases(), python_cases(), typescript_cases()].concat()
 }
 
 fn extract(request: ExtractRequest<'_>) -> crate::SymbolCard {
