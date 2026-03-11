@@ -5,23 +5,23 @@
 //! executes a refactoring operation, and writes one JSONL response to stdout.
 
 mod arguments;
+mod failure;
 
 #[cfg(test)]
 mod tests;
 
 mod lsp;
 
-use std::fmt;
 use std::io::{BufRead, Write};
 use std::path::{Component, Path, PathBuf};
 
 use thiserror::Error;
+use url::Url;
 use weaver_plugins::capability::ReasonCode;
-use weaver_plugins::protocol::{
-    DiagnosticSeverity, FilePayload, PluginDiagnostic, PluginOutput, PluginRequest, PluginResponse,
-};
+use weaver_plugins::protocol::{FilePayload, PluginOutput, PluginRequest, PluginResponse};
 
 use crate::arguments::parse_rename_symbol_arguments;
+use crate::failure::{PluginFailure, failure_response};
 
 pub use lsp::RustAnalyzerLspAdapter;
 
@@ -75,50 +75,6 @@ pub enum PluginDispatchError {
         #[source]
         source: serde_json::Error,
     },
-}
-
-/// Structured failure carrying an optional reason code for diagnostics.
-#[derive(Debug)]
-pub(crate) struct PluginFailure {
-    message: String,
-    reason_code: Option<ReasonCode>,
-}
-
-impl PluginFailure {
-    /// Creates a failure without a reason code.
-    pub(crate) fn plain(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-            reason_code: None,
-        }
-    }
-
-    /// Creates a failure with a stable reason code.
-    pub(crate) fn with_reason(message: impl Into<String>, reason: ReasonCode) -> Self {
-        Self {
-            message: message.into(),
-            reason_code: Some(reason),
-        }
-    }
-}
-
-#[cfg(test)]
-impl PluginFailure {
-    /// Returns the failure message.
-    pub(crate) fn message(&self) -> &str {
-        &self.message
-    }
-
-    /// Returns the failure reason code, if present.
-    pub(crate) const fn reason_code(&self) -> Option<ReasonCode> {
-        self.reason_code
-    }
-}
-
-impl fmt::Display for PluginFailure {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.message)
-    }
 }
 
 /// Errors raised by rust-analyzer adapter implementations.
@@ -264,7 +220,10 @@ fn execute_rename<R: RustAnalyzerAdapter>(
     })?;
 
     let request_path = path_to_slash(file.path());
-    if arguments.uri() != request_path {
+    let uri_path = normalize_request_uri(arguments.uri()).map_err(|error| {
+        PluginFailure::with_reason(error.to_string(), ReasonCode::IncompletePayload)
+    })?;
+    if uri_path != request_path {
         return Err(PluginFailure::with_reason(
             format!(
                 "uri argument '{}' does not match file payload '{}'",
@@ -281,9 +240,7 @@ fn execute_rename<R: RustAnalyzerAdapter>(
             ByteOffset::new(arguments.offset()),
             arguments.new_name(),
         )
-        .map_err(|error| {
-            PluginFailure::with_reason(error.to_string(), ReasonCode::SymbolNotFound)
-        })?;
+        .map_err(|error| PluginFailure::plain(error.to_string()))?;
 
     if modified == file.content() {
         return Err(PluginFailure::with_reason(
@@ -385,6 +342,34 @@ fn build_search_replace_patch(path: &Path, original: &str, modified: &str) -> St
     )
 }
 
+fn normalize_request_uri(uri: &str) -> Result<String, RustAnalyzerAdapterError> {
+    let parsed = Url::parse(uri).map_err(|_| invalid_file_uri_error())?;
+    if parsed.scheme() != "file" || parsed.has_host() {
+        return Err(invalid_file_uri_error());
+    }
+
+    let path = parsed
+        .to_file_path()
+        .map_err(|()| invalid_file_uri_error())?;
+    let relative_path = strip_file_uri_root(&path)?;
+    validate_relative_path(relative_path.as_path())?;
+    Ok(path_to_slash(relative_path.as_path()))
+}
+
+fn invalid_file_uri_error() -> RustAnalyzerAdapterError {
+    RustAnalyzerAdapterError::InvalidPath {
+        message: String::from("uri argument must be a valid file:// URI without an authority"),
+    }
+}
+
+fn strip_file_uri_root(path: &Path) -> Result<PathBuf, RustAnalyzerAdapterError> {
+    let mut components = path.components();
+    if !matches!(components.next(), Some(Component::RootDir)) {
+        return Err(invalid_file_uri_error());
+    }
+    Ok(components.as_path().to_path_buf())
+}
+
 fn path_to_slash(path: &Path) -> String {
     path.components()
         .filter_map(|component| match component {
@@ -393,12 +378,4 @@ fn path_to_slash(path: &Path) -> String {
         })
         .collect::<Vec<String>>()
         .join("/")
-}
-
-pub(crate) fn failure_response(failure: PluginFailure) -> PluginResponse {
-    let mut diagnostic = PluginDiagnostic::new(DiagnosticSeverity::Error, failure.message);
-    if let Some(reason_code) = failure.reason_code {
-        diagnostic = diagnostic.with_reason_code(reason_code);
-    }
-    PluginResponse::failure(vec![diagnostic])
 }

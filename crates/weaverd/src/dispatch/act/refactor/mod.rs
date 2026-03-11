@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use tracing::debug;
+use url::Url;
 
 use weaver_plugins::process::SandboxExecutor;
 use weaver_plugins::protocol::FilePayload;
@@ -175,7 +176,7 @@ pub fn handle<W: Write>(
     // Map `--refactoring rename` to the `rename-symbol` capability contract.
     let effective_operation = match args.refactoring.as_str() {
         "rename" => {
-            apply_rename_symbol_mapping(&mut plugin_args, &args.file);
+            apply_rename_symbol_mapping(&mut plugin_args, &args.file)?;
             String::from("rename-symbol")
         }
         _ => args.refactoring.clone(),
@@ -314,14 +315,30 @@ fn resolve_file(workspace_root: &Path, file: &str) -> Result<std::path::PathBuf,
 fn apply_rename_symbol_mapping(
     plugin_args: &mut std::collections::HashMap<String, serde_json::Value>,
     file: &str,
-) {
+) -> Result<(), DispatchError> {
     plugin_args.insert(
         String::from("uri"),
-        serde_json::Value::String(file.to_owned()),
+        serde_json::Value::String(to_file_uri(file).map_err(|error| {
+            DispatchError::invalid_arguments(format!(
+                "cannot construct file URI for '{file}': {error}"
+            ))
+        })?),
     );
     if let Some(offset_val) = plugin_args.remove("offset") {
         plugin_args.insert(String::from("position"), offset_val);
     }
+    Ok(())
+}
+
+fn to_file_uri(path: &str) -> Result<String, url::ParseError> {
+    let mut url = Url::parse("file:///")?;
+    {
+        let mut segments = url
+            .path_segments_mut()
+            .map_err(|()| url::ParseError::RelativeUrlWithoutBase)?;
+        segments.extend(path.split('/'));
+    }
+    Ok(url.to_string())
 }
 
 fn handle_plugin_response<W: Write>(

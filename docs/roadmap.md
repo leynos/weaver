@@ -175,7 +175,8 @@ does* *not require source inspection or external runbooks.*
         [user's guide](users-guide.md).
   - [x] Acceptance criteria: `weaver --version` and `weaver -V` both exit 0
         and emit the same version string, and `weaver --help` includes at
-        least one runnable quick-start command example.
+        least one runnable quick-start command example, and `make check-fmt`,
+        `make markdownlint`, `make fmt`, `make lint`, and `make test` pass.
 - [ ] 2.2.4. Provide contextual guidance when a domain is supplied without an
       operation. See
       [Level 2](ui-gap-analysis.md#level-2--domain-without-operation-weaver-observe)

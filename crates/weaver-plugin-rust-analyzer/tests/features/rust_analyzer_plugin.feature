@@ -39,3 +39,4 @@ Feature: rust-analyzer actuator plugin
     When the plugin executes the request
     Then the plugin returns failure diagnostics
     And the failure message contains "no content changes"
+    And the failure reason code is "symbol_not_found"

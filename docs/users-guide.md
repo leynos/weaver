@@ -244,8 +244,8 @@ This output does not require a configuration file or a running daemon. Use
 
 ### Version
 
-Running `weaver --version` or `weaver -V` prints the version string to
-standard output and exits with code 0:
+Running `weaver --version` or `weaver -V` prints the version string to standard
+output and exits with code 0:
 
 ```text
 weaver 0.1.0
@@ -785,9 +785,10 @@ Worked examples:
 
 The daemon ships with default actuator registrations:
 
-- `rope` for Python (`timeout_secs = 30`, `capabilities = rename-symbol`)
-- `rust-analyzer` for Rust (`timeout_secs = 60`,
-  `capabilities = rename-symbol`)
+- `rope` for Python
+  (`timeout_secs = 30`, `capabilities = ["rename-symbol"]`)
+- `rust-analyzer` for Rust
+  (`timeout_secs = 60`, `capabilities = ["rename-symbol"]`)
 
 By default, it expects plugin executables at:
 
@@ -863,12 +864,13 @@ For the current actuator rollout, `weaverd` registers:
 - `rope`
   - kind: `actuator`
   - language: `python`
-  - capabilities: `rename-symbol`
+  - capabilities: `["rename-symbol"]`
   - executable: `/usr/bin/weaver-plugin-rope` (or `WEAVER_ROPE_PLUGIN_PATH`)
   - timeout: `30s`
 - `rust-analyzer`
   - kind: `actuator`
   - language: `rust`
+  - capabilities: `["rename-symbol"]`
   - executable: `/usr/bin/weaver-plugin-rust-analyzer`
     (or `WEAVER_RUST_ANALYZER_PLUGIN_PATH`)
   - timeout: `60s`
