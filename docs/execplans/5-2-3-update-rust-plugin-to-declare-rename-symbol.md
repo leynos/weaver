@@ -10,7 +10,7 @@ Status: COMPLETE
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
 
-Implementation was approved on 2026-03-07 and is now in progress.
+Implementation was approved on 2026-03-07 and completed on 2026-03-07.
 
 ## Purpose / big picture
 
@@ -22,7 +22,7 @@ the plugin accepts contract-conforming request payloads using `uri`,
 `position`, and `new_name`, and successful responses still return diff output
 that flows through the existing Double-Lock safety harness.
 
-The user-visible command stays the same:
+The user-visible command-line interface (CLI) stays the same:
 
 ```sh
 weaver act refactor \
@@ -49,8 +49,8 @@ Observable success for this roadmap item:
 - Successful plugin responses still use `PluginOutput::Diff`; failure payloads
   remain protocol-conforming and carry stable reason codes where the failure
   class is known.
-- Unit tests and `rstest-bdd` v0.5.0 behavioural tests cover happy paths,
-  unhappy paths, and edge cases for the contract migration.
+- Unit tests and `rstest-bdd` v0.5.0 behaviour-driven development (BDD) tests
+  cover happy paths, unhappy paths, and edge cases for the contract migration.
 - `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
   reflect the shipped behaviour.
 - `make fmt`, `make markdownlint`, `make check-fmt`, `make lint`, and

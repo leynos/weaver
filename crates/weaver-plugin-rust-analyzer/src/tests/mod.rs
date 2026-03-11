@@ -34,7 +34,11 @@ fn adapter_returning(result: Result<String, RustAnalyzerAdapterError>) -> MockAd
     adapter
         .expect_rename()
         .once()
-        .return_once(move |_file, _offset, _new_name| result);
+        .return_once(move |_file, offset, new_name| {
+            assert_eq!(offset, ByteOffset::new(3));
+            assert_eq!(new_name, "new_name");
+            result
+        });
     adapter
 }
 
@@ -48,7 +52,7 @@ fn rename_arguments() -> HashMap<String, serde_json::Value> {
     let mut arguments = HashMap::new();
     arguments.insert(
         String::from("uri"),
-        serde_json::Value::String(String::from("src/main.rs")),
+        serde_json::Value::String(String::from("file://src/main.rs")),
     );
     arguments.insert(
         String::from("position"),
@@ -187,12 +191,14 @@ enum FailureScenario {
     NoChange,
     AdapterError,
     UriMismatch,
+    RelativeUri,
 }
 
 #[rstest]
 #[case::no_change(FailureScenario::NoChange)]
 #[case::adapter_error(FailureScenario::AdapterError)]
 #[case::uri_mismatch(FailureScenario::UriMismatch)]
+#[case::relative_uri(FailureScenario::RelativeUri)]
 fn rename_non_mutating_or_error_returns_failure(
     #[case] scenario: FailureScenario,
     mut rename_arguments: HashMap<String, serde_json::Value>,
@@ -200,7 +206,13 @@ fn rename_non_mutating_or_error_returns_failure(
     if matches!(scenario, FailureScenario::UriMismatch) {
         rename_arguments.insert(
             String::from("uri"),
-            serde_json::Value::String(String::from("src/other.rs")),
+            serde_json::Value::String(String::from("file://src/other.rs")),
+        );
+    }
+    if matches!(scenario, FailureScenario::RelativeUri) {
+        rename_arguments.insert(
+            String::from("uri"),
+            serde_json::Value::String(String::from("file://./src/main.rs")),
         );
     }
     let adapter = match &scenario {
@@ -210,27 +222,47 @@ fn rename_non_mutating_or_error_returns_failure(
             }))
         }
         FailureScenario::UriMismatch => adapter_unused(),
+        FailureScenario::RelativeUri => {
+            adapter_returning(Ok(String::from("fn new_name() -> i32 {\n    1\n}\n")))
+        }
         FailureScenario::NoChange => {
             adapter_returning(Ok(String::from("fn old_name() -> i32 {\n    1\n}\n")))
         }
     };
 
-    let err = execute_request(&adapter, &request_with_args(rename_arguments))
-        .expect_err("failure scenario should return Err");
-
     match scenario {
-        FailureScenario::NoChange => assert!(
-            err.message().contains("no content changes"),
-            "expected no-change diagnostic, got: {err}"
-        ),
-        FailureScenario::AdapterError => assert!(
-            err.message().contains("rust-analyzer adapter failed"),
-            "expected adapter error message, got: {err}"
-        ),
-        FailureScenario::UriMismatch => assert!(
-            err.message().contains("does not match file payload"),
-            "expected uri mismatch diagnostic, got: {err}"
-        ),
+        FailureScenario::RelativeUri => {
+            let response = execute_request(&adapter, &request_with_args(rename_arguments))
+                .expect("equivalent relative file URI should succeed");
+            assert!(response.is_success());
+        }
+        FailureScenario::NoChange => {
+            let err = execute_request(&adapter, &request_with_args(rename_arguments))
+                .expect_err("failure scenario should return Err");
+            assert!(
+                err.message().contains("no content changes"),
+                "expected no-change diagnostic, got: {err}"
+            );
+            assert_eq!(err.reason_code(), Some(ReasonCode::SymbolNotFound));
+        }
+        FailureScenario::AdapterError => {
+            let err = execute_request(&adapter, &request_with_args(rename_arguments))
+                .expect_err("failure scenario should return Err");
+            assert!(
+                err.message().contains("rust-analyzer adapter failed"),
+                "expected adapter error message, got: {err}"
+            );
+            assert_eq!(err.reason_code(), None);
+        }
+        FailureScenario::UriMismatch => {
+            let err = execute_request(&adapter, &request_with_args(rename_arguments))
+                .expect_err("failure scenario should return Err");
+            assert!(
+                err.message().contains("does not match file payload"),
+                "expected uri mismatch diagnostic, got: {err}"
+            );
+            assert_eq!(err.reason_code(), Some(ReasonCode::IncompletePayload));
+        }
     }
 }
 

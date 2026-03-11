@@ -317,11 +317,15 @@ fn apply_rename_symbol_mapping(
 ) {
     plugin_args.insert(
         String::from("uri"),
-        serde_json::Value::String(file.to_owned()),
+        serde_json::Value::String(to_file_uri(file)),
     );
     if let Some(offset_val) = plugin_args.remove("offset") {
         plugin_args.insert(String::from("position"), offset_val);
     }
+}
+
+fn to_file_uri(path: &str) -> String {
+    format!("file://{path}")
 }
 
 fn handle_plugin_response<W: Write>(

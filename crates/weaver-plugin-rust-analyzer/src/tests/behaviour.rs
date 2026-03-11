@@ -77,7 +77,7 @@ fn build_request(
     if with_uri {
         arguments.insert(
             String::from("uri"),
-            serde_json::Value::String(String::from("src/main.rs")),
+            serde_json::Value::String(String::from("file://src/main.rs")),
         );
     }
     if with_position {
@@ -199,6 +199,7 @@ fn then_failure_reason_code(world: &mut World, text: String) {
     let expected = match text.trim_matches('"') {
         "incomplete_payload" => ReasonCode::IncompletePayload,
         "operation_not_supported" => ReasonCode::OperationNotSupported,
+        "symbol_not_found" => ReasonCode::SymbolNotFound,
         other => panic!("unsupported reason code in feature: {other}"),
     };
     let response = resolved_response(world);
