@@ -116,10 +116,11 @@ Observable behaviour after this change:
 - [x] (2026-03-07) Stage E: Add BDD feature file and register scenario.
 - [x] (2026-03-07) Stage F: Add integration tests in
   `tests/main_entry.rs`.
-- [x] (2026-03-07) Stage G: Update `docs/users-guide.md`.
+- [x] (2026-03-07) Stage G: Update `docs/users-guide.md` and run
+  `make markdownlint` plus `make fmt`.
 - [x] (2026-03-07) Stage H: Mark roadmap 2.2.3 as done.
-- [x] (2026-03-07) Run `make check-fmt && make lint && make test` and
-  verify all pass.
+- [x] (2026-03-07) Run `make markdownlint`, `make fmt`, `make check-fmt`,
+  `make lint`, and `make test`, and verify all pass.
 
 ## Surprises & discoveries
 
@@ -181,9 +182,9 @@ in `src/cli.rs` and is parsed by `src/lib.rs`. The build script at `build.rs`
 includes `cli.rs` via `#[path = "src/cli.rs"]` for manpage generation. This
 dual-compilation means any code in `cli.rs` must compile in both contexts.
 
-The workspace version is `0.1.0` (set in `/home/user/project/Cargo.toml` line
-22). Clap's derive macro reads `CARGO_PKG_VERSION` automatically when the bare
-`version` attribute is present in `#[command()]`.
+The workspace version is `0.1.0` (set in the workspace `Cargo.toml`). Clap's
+derive macro reads `CARGO_PKG_VERSION` automatically when the bare `version`
+attribute is present in `#[command()]`.
 
 Currently, `Cli::try_parse_from()` returns `Err(clap::Error)` for both `--help`
 and `--version`. This error is wrapped in `AppError::CliUsage` and handled in
@@ -401,13 +402,16 @@ fn help_flag_exits_successfully_with_quick_start() {
 }
 ```
 
-### Stage G: Documentation updates
+### Stage G: Documentation updates and Markdown quality gates
 
 **`docs/users-guide.md`** — Insert a "Version" subsection between "Bare
 invocation" (line 243) and "Top-level help" (line 245).
 
 Update the "Top-level help" section to mention exit code 0 and the quick-start
 block.
+
+Run `make markdownlint` and `make fmt` after the documentation edits so the
+guide and plan changes are validated and normalized before the Rust gates run.
 
 ### Stage H: Mark roadmap done
 
@@ -422,7 +426,7 @@ Stage A (refactoring commit):
 
 ```sh
 # After making edits:
-make check-fmt && make lint && set -o pipefail \
+make markdownlint && make fmt && make check-fmt && make lint && set -o pipefail \
   && make test 2>&1 | tee /tmp/2-2-3-test-a.log
 ```
 
@@ -430,7 +434,7 @@ Stage B-H (feature commit):
 
 ```sh
 # After making all edits:
-make check-fmt && make lint && set -o pipefail \
+make markdownlint && make fmt && make check-fmt && make lint && set -o pipefail \
   && make test 2>&1 | tee /tmp/2-2-3-test-b.log
 ```
 
@@ -499,6 +503,8 @@ Existing reusable code:
   unit tests to exercise the CLI without a real binary.
 
 ## File change summary
+
+Table 1. File change summary.
 
 | File                                        | Change                                     | Lines before | Lines after |
 | ------------------------------------------- | ------------------------------------------ | ------------ | ----------- |
