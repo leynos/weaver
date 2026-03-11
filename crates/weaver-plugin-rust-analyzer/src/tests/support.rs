@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use mockall::mock;
+use url::Url;
 use weaver_plugins::protocol::{FilePayload, PluginRequest};
 
 use crate::{ByteOffset, RustAnalyzerAdapter, RustAnalyzerAdapterError};
@@ -83,12 +84,29 @@ pub(crate) fn request_with_args(arguments: HashMap<String, serde_json::Value>) -
 
 /// Builds a request using the provided file payload path.
 pub(crate) fn request_with_path(path: &str) -> PluginRequest {
+    let mut arguments = rename_arguments();
+    arguments.insert(
+        String::from("uri"),
+        serde_json::Value::String(file_uri_for_path(path)),
+    );
+
     PluginRequest::with_arguments(
         "rename-symbol",
         vec![FilePayload::new(
             PathBuf::from(path),
             "fn old_name() -> i32 {\n    1\n}\n",
         )],
-        rename_arguments(),
+        arguments,
     )
+}
+
+fn file_uri_for_path(path: &str) -> String {
+    let mut url = Url::parse("file:///").expect("static file URL should parse");
+    {
+        let mut segments = url
+            .path_segments_mut()
+            .expect("file URL should accept path segments");
+        segments.extend(path.split('/'));
+    }
+    url.to_string()
 }

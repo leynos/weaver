@@ -62,6 +62,10 @@ fn set_numeric_new_name(arguments: &mut HashMap<String, serde_json::Value>) {
     );
 }
 
+fn remove_new_name(arguments: &mut HashMap<String, serde_json::Value>) {
+    arguments.remove("new_name");
+}
+
 #[rstest]
 #[case::missing_uri(remove_uri as fn(&mut _), Some("uri"))]
 #[case::empty_uri(set_empty_uri as fn(&mut _), Some("uri"))]
@@ -70,6 +74,7 @@ fn set_numeric_new_name(arguments: &mut HashMap<String, serde_json::Value>) {
 #[case::boolean_position(set_boolean_position as fn(&mut _), Some("position"))]
 #[case::negative_position(set_negative_position as fn(&mut _), Some("non-negative integer"))]
 #[case::numeric_position_succeeds(set_numeric_position as fn(&mut _), None)]
+#[case::missing_new_name(remove_new_name as fn(&mut _), Some("new_name"))]
 #[case::numeric_new_name(set_numeric_new_name as fn(&mut _), Some("new_name argument must be a string"))]
 #[case::empty_new_name(set_empty_new_name as fn(&mut _), Some("new_name"))]
 fn rename_argument_validation(

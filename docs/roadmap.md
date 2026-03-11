@@ -173,8 +173,6 @@ does* *not require source inspection or external runbooks.*
   - [x] Enable clap-provided `--version` and `-V` support.
   - [x] Add a `long_about` quick-start block aligned with the
         [user's guide](users-guide.md).
-  - [x] Validate the documentation updates with `make markdownlint` and
-        `make fmt` alongside the Rust quality gates.
   - [x] Acceptance criteria: `weaver --version` and `weaver -V` both exit 0
         and emit the same version string, and `weaver --help` includes at
         least one runnable quick-start command example, and `make check-fmt`,

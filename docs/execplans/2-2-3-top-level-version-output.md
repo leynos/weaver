@@ -424,7 +424,7 @@ All commands run from workspace root `/home/user/project`.
 
 Stage A (refactoring commit):
 
-```sh
+```bash
 # After making edits:
 make markdownlint && make fmt && make check-fmt && make lint && set -o pipefail \
   && make test 2>&1 | tee /tmp/2-2-3-test-a.log
@@ -432,7 +432,7 @@ make markdownlint && make fmt && make check-fmt && make lint && set -o pipefail 
 
 Stage B-H (feature commit):
 
-```sh
+```bash
 # After making all edits:
 make markdownlint && make fmt && make check-fmt && make lint && set -o pipefail \
   && make test 2>&1 | tee /tmp/2-2-3-test-b.log
@@ -473,7 +473,7 @@ Quality criteria:
 
 Quality method:
 
-```sh
+```bash
 make check-fmt && make lint && set -o pipefail \
   && make test 2>&1 | tee /tmp/2-2-3-final.log
 ```
