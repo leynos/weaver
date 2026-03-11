@@ -1,12 +1,12 @@
 //! Structured plugin failures and response conversion helpers.
 
-use std::fmt;
-
+use thiserror::Error;
 use weaver_plugins::capability::ReasonCode;
 use weaver_plugins::protocol::{DiagnosticSeverity, PluginDiagnostic, PluginResponse};
 
 /// Structured failure carrying an optional reason code for diagnostics.
-#[derive(Debug)]
+#[derive(Debug, Error, Clone)]
+#[error("{message}")]
 pub(crate) struct PluginFailure {
     message: String,
     reason_code: Option<ReasonCode>,
@@ -39,12 +39,6 @@ impl PluginFailure {
     #[cfg(test)]
     pub(crate) const fn reason_code(&self) -> Option<ReasonCode> {
         self.reason_code
-    }
-}
-
-impl fmt::Display for PluginFailure {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.message)
     }
 }
 

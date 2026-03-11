@@ -88,8 +88,8 @@ Observable behaviour after this change:
   medium. Likelihood: low. Mitigation: The existing test (lines 28-54)
   intentionally uses combined stdout+stderr output
   (`format!("{stdout}{stderr}")`) and does not assert on exit code. Its comment
-  states, "We intentionally avoid asserting on the exit code so this test
-  remains valid if --help is later changed to exit 0." No change is needed.
+  states, "The test intentionally avoids asserting on the exit code so this
+  test remains valid if --help is later changed to exit 0." No change is needed.
 
 - Risk: BDD tests break because `--help`/`--version` now behaves differently.
   Severity: low. Likelihood: low. Mitigation: No existing BDD scenario tests

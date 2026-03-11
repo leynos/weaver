@@ -77,7 +77,7 @@ fn build_request(
     if with_uri {
         arguments.insert(
             String::from("uri"),
-            serde_json::Value::String(String::from("file://src/main.rs")),
+            serde_json::Value::String(String::from("file:///src/main.rs")),
         );
     }
     if with_position {
@@ -152,12 +152,7 @@ fn resolved_response(world: &World) -> PluginResponse {
         .expect("execute result should be present")
     {
         Ok(resp) => resp.clone(),
-        Err(failure) => failure_response(crate::PluginFailure::with_reason(
-            failure.message().to_owned(),
-            failure
-                .reason_code()
-                .expect("behaviour failures should carry a reason code"),
-        )),
+        Err(failure) => failure_response(failure.clone()),
     }
 }
 

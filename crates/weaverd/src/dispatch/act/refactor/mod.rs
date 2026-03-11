@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use tracing::debug;
+use url::Url;
 
 use weaver_plugins::process::SandboxExecutor;
 use weaver_plugins::protocol::FilePayload;
@@ -325,7 +326,11 @@ fn apply_rename_symbol_mapping(
 }
 
 fn to_file_uri(path: &str) -> String {
-    format!("file://{path}")
+    Url::parse("file:///")
+        .expect("static file URI base must parse")
+        .join(path)
+        .expect("validated relative refactor paths should form a file URI")
+        .to_string()
 }
 
 fn handle_plugin_response<W: Write>(

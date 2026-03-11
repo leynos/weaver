@@ -332,7 +332,7 @@ fn handler_sends_rename_symbol_contract_conforming_request(socket_dir: TempDir) 
     let args = plugin_request.arguments();
     assert_eq!(
         args.get("uri").and_then(|v| v.as_str()),
-        Some("file://notes.txt"),
+        Some("file:///notes.txt"),
         "uri should be injected from --file"
     );
     assert_eq!(
@@ -368,7 +368,7 @@ fn handler_overwrites_pre_existing_uri_with_file_path(socket_dir: TempDir) {
             .arguments()
             .get("uri")
             .and_then(|v| v.as_str()),
-        Some("file://notes.txt"),
+        Some("file:///notes.txt"),
         "uri should be overwritten with --file value, not pre-existing extra"
     );
 }
@@ -398,7 +398,7 @@ fn rust_analyzer_provider_uses_rename_symbol_contract(socket_dir: TempDir) {
             .arguments()
             .get("uri")
             .and_then(|value| value.as_str()),
-        Some("file://notes.txt"),
+        Some("file:///notes.txt"),
     );
     assert_eq!(
         plugin_request

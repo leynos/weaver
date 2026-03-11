@@ -16,6 +16,7 @@ use std::io::{BufRead, Write};
 use std::path::{Component, Path, PathBuf};
 
 use thiserror::Error;
+use url::Url;
 use weaver_plugins::capability::ReasonCode;
 use weaver_plugins::protocol::{FilePayload, PluginOutput, PluginRequest, PluginResponse};
 
@@ -342,14 +343,31 @@ fn build_search_replace_patch(path: &Path, original: &str, modified: &str) -> St
 }
 
 fn normalize_request_uri(uri: &str) -> Result<String, RustAnalyzerAdapterError> {
-    let relative_path =
-        uri.strip_prefix("file://")
-            .ok_or_else(|| RustAnalyzerAdapterError::InvalidPath {
-                message: String::from("uri argument must be a file:// URI"),
-            })?;
-    let path = Path::new(relative_path);
-    validate_relative_path(path)?;
-    Ok(path_to_slash(path))
+    let parsed = Url::parse(uri).map_err(|_| invalid_file_uri_error())?;
+    if parsed.scheme() != "file" || parsed.has_host() {
+        return Err(invalid_file_uri_error());
+    }
+
+    let path = parsed
+        .to_file_path()
+        .map_err(|()| invalid_file_uri_error())?;
+    let relative_path = strip_file_uri_root(&path)?;
+    validate_relative_path(relative_path.as_path())?;
+    Ok(path_to_slash(relative_path.as_path()))
+}
+
+fn invalid_file_uri_error() -> RustAnalyzerAdapterError {
+    RustAnalyzerAdapterError::InvalidPath {
+        message: String::from("uri argument must be a valid file:// URI without an authority"),
+    }
+}
+
+fn strip_file_uri_root(path: &Path) -> Result<PathBuf, RustAnalyzerAdapterError> {
+    let mut components = path.components();
+    if !matches!(components.next(), Some(Component::RootDir)) {
+        return Err(invalid_file_uri_error());
+    }
+    Ok(components.as_path().to_path_buf())
 }
 
 fn path_to_slash(path: &Path) -> String {
