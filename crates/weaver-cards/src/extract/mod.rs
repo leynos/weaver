@@ -165,7 +165,7 @@ struct LeadingAttachments {
 }
 
 impl LeadingAttachments {
-    fn is_empty(&self) -> bool {
+    const fn is_empty(&self) -> bool {
         self.doc_comments.is_empty() && self.decorators.is_empty()
     }
 }
