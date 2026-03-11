@@ -785,8 +785,9 @@ Worked examples:
 
 The daemon ships with default actuator registrations:
 
-- `rope` for Python (`timeout_secs = 30`)
-- `rust-analyzer` for Rust (`timeout_secs = 60`)
+- `rope` for Python (`timeout_secs = 30`, `capabilities = rename-symbol`)
+- `rust-analyzer` for Rust (`timeout_secs = 60`,
+  `capabilities = rename-symbol`)
 
 By default, it expects plugin executables at:
 
@@ -803,6 +804,10 @@ WEAVER_RUST_ANALYZER_PLUGIN_PATH=/absolute/path/to/weaver-plugin-rust-analyzer
 The override path is resolved to an absolute path at daemon startup. If the
 plugin executable cannot be launched, `act refactor` returns a structured
 failure and does not modify the filesystem.
+
+The built-in rust-analyzer plugin now declares the same capability contract as
+rope for rename flows, even though the CLI continues to accept
+`--refactoring rename`.
 
 ## Plugin system
 

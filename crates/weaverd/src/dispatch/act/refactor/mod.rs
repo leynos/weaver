@@ -15,13 +15,10 @@ use std::sync::Arc;
 
 use tracing::debug;
 
-use weaver_plugins::manifest::{PluginKind, PluginManifest, PluginMetadata};
 use weaver_plugins::process::SandboxExecutor;
 use weaver_plugins::protocol::FilePayload;
 use weaver_plugins::runner::PluginRunner;
-use weaver_plugins::{
-    CapabilityId, PluginError, PluginOutput, PluginRegistry, PluginRequest, PluginResponse,
-};
+use weaver_plugins::{PluginError, PluginOutput, PluginRegistry, PluginRequest, PluginResponse};
 
 use crate::backends::{BackendKind, FusionBackends};
 use crate::dispatch::act::apply_patch;
@@ -30,12 +27,13 @@ use crate::dispatch::request::{CommandDescriptor, CommandRequest};
 use crate::dispatch::response::ResponseWriter;
 use crate::dispatch::router::{DISPATCH_TARGET, DispatchResult};
 use crate::semantic_provider::SemanticBackendProvider;
+use manifests::{rope_manifest, rust_analyzer_manifest};
 use plugin_paths::{
-    ROPE_PLUGIN_NAME, ROPE_PLUGIN_PATH_ENV, ROPE_PLUGIN_VERSION, RUST_ANALYZER_PLUGIN_NAME,
-    RUST_ANALYZER_PLUGIN_PATH_ENV, RUST_ANALYZER_PLUGIN_TIMEOUT_SECS, RUST_ANALYZER_PLUGIN_VERSION,
-    resolve_rope_plugin_path, resolve_rust_analyzer_plugin_path,
+    ROPE_PLUGIN_PATH_ENV, RUST_ANALYZER_PLUGIN_PATH_ENV, resolve_rope_plugin_path,
+    resolve_rust_analyzer_plugin_path,
 };
 
+mod manifests;
 mod plugin_paths;
 
 /// Runtime abstraction for executing refactor plugins.
@@ -62,30 +60,14 @@ impl SandboxRefactorRuntime {
     pub fn from_environment() -> Result<Self, String> {
         let mut registry = PluginRegistry::new();
         let rope_executable = resolve_rope_plugin_path(std::env::var_os(ROPE_PLUGIN_PATH_ENV));
-        let rope_metadata =
-            PluginMetadata::new(ROPE_PLUGIN_NAME, ROPE_PLUGIN_VERSION, PluginKind::Actuator);
-        let rope_manifest =
-            PluginManifest::new(rope_metadata, vec![String::from("python")], rope_executable)
-                .with_capabilities(vec![CapabilityId::RenameSymbol]);
         registry
-            .register(rope_manifest)
+            .register(rope_manifest(rope_executable))
             .map_err(|error| format!("failed to initialize refactor runtime: {error}"))?;
 
         let rust_analyzer_executable =
             resolve_rust_analyzer_plugin_path(std::env::var_os(RUST_ANALYZER_PLUGIN_PATH_ENV));
-        let rust_analyzer_metadata = PluginMetadata::new(
-            RUST_ANALYZER_PLUGIN_NAME,
-            RUST_ANALYZER_PLUGIN_VERSION,
-            PluginKind::Actuator,
-        );
-        let rust_analyzer_manifest = PluginManifest::new(
-            rust_analyzer_metadata,
-            vec![String::from("rust")],
-            rust_analyzer_executable,
-        )
-        .with_timeout_secs(RUST_ANALYZER_PLUGIN_TIMEOUT_SECS);
         registry
-            .register(rust_analyzer_manifest)
+            .register(rust_analyzer_manifest(rust_analyzer_executable))
             .map_err(|error| format!("failed to initialize refactor runtime: {error}"))?;
 
         Ok(Self {

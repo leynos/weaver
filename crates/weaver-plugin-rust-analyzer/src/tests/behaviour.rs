@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use mockall::mock;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
+use weaver_plugins::capability::ReasonCode;
 use weaver_plugins::protocol::{
     DiagnosticSeverity, FilePayload, PluginOutput, PluginRequest, PluginResponse,
 };
@@ -17,7 +18,7 @@ use crate::{
 #[derive(Default)]
 struct World {
     request: Option<PluginRequest>,
-    execute_result: Option<Result<PluginResponse, String>>,
+    execute_result: Option<Result<PluginResponse, crate::PluginFailure>>,
     adapter_mode: AdapterMode,
 }
 
@@ -47,9 +48,10 @@ mock! {
 }
 
 fn should_invoke_rename(request: &PluginRequest) -> bool {
-    request.operation() == "rename"
+    request.operation() == "rename-symbol"
         && !request.files().is_empty()
-        && request.arguments().contains_key("offset")
+        && request.arguments().contains_key("uri")
+        && request.arguments().contains_key("position")
         && request.arguments().contains_key("new_name")
 }
 
@@ -65,11 +67,22 @@ fn configure_adapter_for_mode(adapter: &mut MockBehaviourAdapter, mode: AdapterM
     );
 }
 
-fn build_request(operation: &str, with_offset: bool, with_new_name: bool) -> PluginRequest {
+fn build_request(
+    operation: &str,
+    with_uri: bool,
+    with_position: bool,
+    with_new_name: bool,
+) -> PluginRequest {
     let mut arguments = HashMap::new();
-    if with_offset {
+    if with_uri {
         arguments.insert(
-            String::from("offset"),
+            String::from("uri"),
+            serde_json::Value::String(String::from("src/main.rs")),
+        );
+    }
+    if with_position {
+        arguments.insert(
+            String::from("position"),
             serde_json::Value::String(String::from("3")),
         );
     }
@@ -90,19 +103,24 @@ fn build_request(operation: &str, with_offset: bool, with_new_name: bool) -> Plu
     )
 }
 
-#[given("a rename request with required arguments")]
+#[given("a rename-symbol request with required arguments")]
 fn given_valid_rename(world: &mut World) {
-    world.request = Some(build_request("rename", true, true));
+    world.request = Some(build_request("rename-symbol", true, true, true));
 }
 
-#[given("a rename request missing offset")]
-fn given_missing_offset(world: &mut World) {
-    world.request = Some(build_request("rename", false, true));
+#[given("a rename-symbol request missing position")]
+fn given_missing_position(world: &mut World) {
+    world.request = Some(build_request("rename-symbol", true, false, true));
+}
+
+#[given("a rename-symbol request missing uri")]
+fn given_missing_uri(world: &mut World) {
+    world.request = Some(build_request("rename-symbol", false, true, true));
 }
 
 #[given("an unsupported extract method request")]
 fn given_unsupported_operation(world: &mut World) {
-    world.request = Some(build_request("extract_method", true, true));
+    world.request = Some(build_request("extract_method", true, true, true));
 }
 
 #[given("a rust analyzer adapter that fails")]
@@ -134,7 +152,12 @@ fn resolved_response(world: &World) -> PluginResponse {
         .expect("execute result should be present")
     {
         Ok(resp) => resp.clone(),
-        Err(msg) => failure_response(msg.clone()),
+        Err(failure) => failure_response(crate::PluginFailure::with_reason(
+            failure.message().to_owned(),
+            failure
+                .reason_code()
+                .expect("behaviour failures should carry a reason code"),
+        )),
     }
 }
 
@@ -168,6 +191,24 @@ fn then_failure_contains(world: &mut World, text: String) {
             .iter()
             .any(|diagnostic| diagnostic.message().contains(needle)),
         "expected diagnostics to contain '{needle}', got: {diagnostics:?}",
+    );
+}
+
+#[then("the failure reason code is {text}")]
+fn then_failure_reason_code(world: &mut World, text: String) {
+    let expected = match text.trim_matches('"') {
+        "incomplete_payload" => ReasonCode::IncompletePayload,
+        "operation_not_supported" => ReasonCode::OperationNotSupported,
+        other => panic!("unsupported reason code in feature: {other}"),
+    };
+    let response = resolved_response(world);
+    assert!(
+        response
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.reason_code() == Some(expected)),
+        "expected reason code {expected:?}, got: {:?}",
+        response.diagnostics(),
     );
 }
 

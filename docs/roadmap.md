@@ -514,7 +514,7 @@ new* *capabilities and specialist providers.*
   - Acceptance criteria: plugin advertises `rename-symbol` in capability probes,
     request payloads conform to schema, and response payloads conform to schema.
     Legacy provider routing is not required for Python rename flows.
-- [ ] 5.2.3. Update `weaver-plugin-rust-analyzer` manifest and runtime
+- [x] 5.2.3. Update `weaver-plugin-rust-analyzer` manifest and runtime
       handshake to declare and serve `rename-symbol` through the capability
       interface. Requires 5.2.1.
   - Acceptance criteria: plugin advertises `rename-symbol` in capability probes,

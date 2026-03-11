@@ -5,11 +5,12 @@ use std::path::Path;
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
-use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
+use weaver_plugins::{CapabilityId, PluginError, PluginOutput, PluginRequest, PluginResponse};
 
 use super::{
     DispatchError, FusionBackends, RefactorContext, RefactorPluginRuntime, ResponseWriter,
     default_runtime, handle, resolve_rope_plugin_path, resolve_rust_analyzer_plugin_path,
+    rust_analyzer_manifest,
 };
 use crate::dispatch::request::{CommandDescriptor, CommandRequest};
 use crate::semantic_provider::SemanticBackendProvider;
@@ -275,7 +276,11 @@ const NOTES_DIFF: &str = concat!(
 
 /// Dispatches a rename request through the handler and returns the captured
 /// `PluginRequest` for inspection.
-fn dispatch_inspecting_rename(extra_args: Vec<String>, socket_dir: &TempDir) -> PluginRequest {
+fn dispatch_inspecting_rename(
+    provider: &str,
+    extra_args: Vec<String>,
+    socket_dir: &TempDir,
+) -> PluginRequest {
     let workspace = TempDir::new().expect("workspace");
     std::fs::write(workspace.path().join("notes.txt"), "hello world\n").expect("write");
     let runtime = InspectingRuntime {
@@ -286,7 +291,7 @@ fn dispatch_inspecting_rename(extra_args: Vec<String>, socket_dir: &TempDir) -> 
     };
     let mut args = vec![
         String::from("--provider"),
-        String::from("rope"),
+        String::from(provider),
         String::from("--refactoring"),
         String::from("rename"),
         String::from("--file"),
@@ -318,6 +323,7 @@ fn dispatch_inspecting_rename(extra_args: Vec<String>, socket_dir: &TempDir) -> 
 #[rstest]
 fn handler_sends_rename_symbol_contract_conforming_request(socket_dir: TempDir) {
     let plugin_request = dispatch_inspecting_rename(
+        "rope",
         vec![String::from("offset=4"), String::from("new_name=woven")],
         &socket_dir,
     );
@@ -348,6 +354,7 @@ fn handler_sends_rename_symbol_contract_conforming_request(socket_dir: TempDir) 
 #[rstest]
 fn handler_overwrites_pre_existing_uri_with_file_path(socket_dir: TempDir) {
     let plugin_request = dispatch_inspecting_rename(
+        "rope",
         vec![
             String::from("uri=stale_value"),
             String::from("offset=4"),
@@ -369,10 +376,44 @@ fn handler_overwrites_pre_existing_uri_with_file_path(socket_dir: TempDir) {
 #[rstest]
 fn handler_omits_position_when_offset_not_provided(socket_dir: TempDir) {
     let plugin_request =
-        dispatch_inspecting_rename(vec![String::from("new_name=woven")], &socket_dir);
+        dispatch_inspecting_rename("rope", vec![String::from("new_name=woven")], &socket_dir);
 
     assert!(
         !plugin_request.arguments().contains_key("position"),
         "position should not be injected when offset is absent"
     );
+}
+
+#[rstest]
+fn rust_analyzer_provider_uses_rename_symbol_contract(socket_dir: TempDir) {
+    let plugin_request = dispatch_inspecting_rename(
+        "rust-analyzer",
+        vec![String::from("offset=4"), String::from("new_name=woven")],
+        &socket_dir,
+    );
+
+    assert_eq!(plugin_request.operation(), "rename-symbol");
+    assert_eq!(
+        plugin_request
+            .arguments()
+            .get("uri")
+            .and_then(|value| value.as_str()),
+        Some("notes.txt"),
+    );
+    assert_eq!(
+        plugin_request
+            .arguments()
+            .get("position")
+            .and_then(|value| value.as_str()),
+        Some("4"),
+    );
+}
+
+#[test]
+fn rust_analyzer_manifest_declares_rename_symbol_capability() {
+    let manifest = rust_analyzer_manifest(std::path::PathBuf::from(
+        "/usr/bin/weaver-plugin-rust-analyzer",
+    ));
+
+    assert_eq!(manifest.capabilities(), &[CapabilityId::RenameSymbol]);
 }
