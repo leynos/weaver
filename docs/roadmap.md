@@ -237,8 +237,8 @@ does* *not require source inspection or external runbooks.*
 ## 3. Syntactic & relational intelligence
 
 *Goal: Add the Tree-sitter and call graph layers to provide deeper structural*
-*and relational understanding of code, and pair this with operation-level help*
-*for dependable day-to-day operation.*
+*and relational understanding of code, and pair this with operation-level and*
+*localized help for dependable day-to-day operation.*
 
 ### 3.1. Deliver syntax and graph foundations
 
@@ -285,9 +285,14 @@ does* *not require source inspection or external runbooks.*
       [Gap 1c](ui-gap-analysis.md#gap-1c--configuration-flags-invisible)
       and
       [Level 6](ui-gap-analysis.md#level-6--configuration-flags-invisible-in-help).
+      See
+      [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces)
+      and
+      [weaver design §2.3.1](weaver-design.md#231-configuration-contract).
   - [ ] Register `--config-path`, `--daemon-socket`, `--log-filter`,
-        `--log-format`, and `--capability-overrides` as visible global flags.
-  - [ ] Acceptance criteria: all five flags appear in both `weaver --help` and
+        `--log-format`, `--capability-overrides`, and `--locale` as visible
+        global flags.
+  - [ ] Acceptance criteria: all six flags appear in both `weaver --help` and
         `weaver daemon start --help`, and existing precedence tests
         (file < env < CLI) continue to pass.
 - [ ] 3.2.2. Extend `daemon start` help with config and environment guidance.
@@ -331,6 +336,58 @@ does* *not require source inspection or external runbooks.*
         updated with explicit sections for dependency graph, fail-fast
         discovery, and YAML 1.2 semantics; and `make markdownlint`,
         `make fmt`, `make nixie`, and documentation tests pass.
+
+### 3.3. Deliver localized CLI and reference outputs
+
+*Outcome: Let operators choose a locale once and receive consistent Fluent-*
+*backed help, error text, and generated reference artefacts across Weaver.*
+
+- [ ] 3.3.1. Introduce locale selection in the shared configuration contract.
+      See
+      [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces)
+      and
+      [weaver design §2.3.1](weaver-design.md#231-configuration-contract).
+  - [ ] Add a `locale` field to `weaver-config`, surfaced as `--locale`,
+        `WEAVER_LOCALE`, and a config-file key.
+  - [ ] Bootstrap locale selection from `LC_ALL`, `LC_MESSAGES`, and `LANG`
+        before full config loading, then rebuild the localizer if the resolved
+        config locale differs.
+  - [ ] Acceptance criteria: invalid locale identifiers fail fast during
+        config loading, `weaver --help` can be rendered through a non-default
+        locale selected by CLI, environment, or config file, and `en-US`
+        remains the guaranteed fallback.
+- [ ] 3.3.2. Localize clap help and parse errors through `ortho_config`.
+      Requires 3.3.1. See
+      [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces).
+  - [ ] Drive clap help with `Cli::command().localize(&localizer)` and route
+        parse failures through `localize_clap_error_with_command`.
+  - [ ] Move bare-invocation help, lifecycle guidance, and other manual
+        operator text to Fluent message IDs with argument-aware rendering.
+  - [ ] Acceptance criteria: bare invocation, `weaver --help`, and common clap
+        validation failures render translated copy for supported locales
+        without changing existing exit-code semantics.
+- [ ] 3.3.3. Centralize the localized command and operation catalogue.
+      Requires 2.2.4 and 3.3.2. See
+      [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces).
+  - [ ] Replace duplicated domain and operation tables with one structured
+        catalogue shared by the router, contextual-help renderer, and test
+        fixtures.
+  - [ ] Store message IDs, examples, and operation descriptions in that
+        catalogue instead of hard-coded padded English strings.
+  - [ ] Acceptance criteria: top-level help, domain-without-operation
+        guidance, and `weaver help <topic>` all read from the same catalogue,
+        and adding a new operation requires one metadata change rather than
+        parallel edits in help, tests, and routing.
+- [ ] 3.3.4. Generate localized reference artefacts from ortho-config
+      metadata. Requires 3.2.4 and 3.3.2. See
+      [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces).
+  - [ ] Add stable documentation IDs to config-backed fields and expose
+        `OrthoConfigDocs` metadata for the generated help schema.
+  - [ ] Add `[package.metadata.ortho_config]` wiring and `cargo orthohelp`
+        generation for at least `en-US` and one secondary locale.
+  - [ ] Acceptance criteria: localized IR files are generated per locale,
+        `en-US` manpage packaging remains intact, and artefact validation
+        proves the generated help text matches the runtime Fluent catalogue.
 
 ## 4. Query language infrastructure (Sempai)
 
@@ -657,14 +714,17 @@ initial* *Python delivery and shared failure semantics.*
   - [ ] Acceptance criteria: every provider-related error points users to a
         discoverability command by including the exact string
         `weaver list-plugins`.
-- [ ] 5.7.3. Regenerate and validate the manpage from the improved clap model.
-      Requires 2.2.2, 3.2.1, and 3.2.3. See
+- [ ] 5.7.3. Regenerate and validate localized manpages from the schema-backed
+      help model. Requires 2.2.2, 3.2.1, 3.2.3, and 3.3.4. See
       [Level 11](ui-gap-analysis.md#level-11--manpage).
+      See
+      [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces).
   - [ ] Verify that domain listings, operation listings, global config flags,
-        and help-topic text render in troff output.
-  - [ ] Acceptance criteria: generated manpage includes all updated help
-        surfaces with no manual post-processing, including three domain
-        listings and all five global config flags.
+        locale-aware help text, and help-topic content render in troff output.
+  - [ ] Acceptance criteria: generated manpages include all updated help
+        surfaces with no manual post-processing, ship `en-US` by default, and
+        can be emitted for additional supported locales including all six
+        global config flags.
 
 Capability probe discoverability tasks:
 

@@ -549,6 +549,60 @@ error: Undefined variable `new_function_name`
    |           ^^^^^^^^^^^^^^^^^ not found in this scope
 ```
 
+#### 2.1.5. Localized help and reference surfaces
+
+Weaver's human-facing text should be localized without changing the JSONL
+protocol or daemon routing semantics. The daemon continues to emit stable
+reason codes and structured payloads; the CLI is responsible for rendering
+those codes into locale-specific prose. This keeps automation, plugin
+contracts, and test fixtures language-neutral while still allowing operators to
+work in their preferred language.
+
+Locale selection belongs to `weaver-config` rather than ad-hoc CLI parsing. The
+shared `Config` schema gains a `locale` field surfaced as `--locale`,
+`WEAVER_LOCALE`, and a config-file key, following the same precedence order as
+the rest of the configuration contract. The CLI still needs a bootstrap locale
+before full configuration loading so `--help`, bare-invocation guidance, and
+parse failures can be localized even when they occur before the full config has
+been merged. The bootstrap order should therefore be `LC_ALL`, `LC_MESSAGES`,
+`LANG`, then `en-US`; once `Config::load` succeeds, the CLI rebuilds the
+localizer if `Config::locale` resolves to a different value. Locale values are
+validated as BCP 47 language identifiers during config loading so malformed
+settings fail fast instead of silently falling back to the wrong language.
+
+Runtime localization should use `ortho_config::FluentLocalizer` with an
+embedded mandatory `en-US` bundle and optional consumer bundles under
+`crates/weaver-cli/locales/<locale>/messages.ftl`. Building the localizer via
+`FluentLocalizer::builder(...)` allows Weaver to layer the selected locale over
+`en-US`, attach an error reporter for Fluent formatting failures, and fall back
+deterministically when a message is missing. `NoOpLocalizer` remains the final
+safety net so the CLI never crashes because of a malformed translation bundle.
+
+Clap integration should use `Cli::command().localize(&localizer)` for help text
+and `localize_clap_error_with_command` for parse and validation errors. Manual
+surfaces such as bare-invocation help, lifecycle guidance, and daemon-side
+human-readable rendering should resolve Fluent IDs through the same helper API
+and pass variable data through `LocalizationArgs`, rather than embedding
+English prose in code. This gives Weaver one message catalogue for static help,
+dynamic errors, and config-derived guidance.
+
+Localization also requires a single structured command catalogue. The current
+hard-coded `after_help` strings are sufficient for English smoke tests, but
+they duplicate router knowledge and will drift as new operations are added.
+Weaver should define one catalogue describing domains, operations, examples,
+and message IDs. The router, contextual-help renderer, `weaver help` topics,
+and test fixtures should all read from that catalogue so adding an operation
+updates validation, localization, and help output in one place.
+
+To take advantage of `ortho_config` v0.8.0 beyond runtime help, `weaver-config`
+should annotate config-backed fields with stable documentation IDs and expose
+`OrthoConfigDocs` metadata. Once the schema-backed operation-help work in the
+roadmap lands, `cargo orthohelp` can render localized intermediate
+representation (IR) files and manpages from the same Fluent catalogues,
+removing the current drift risk between clap-generated roff output and runtime
+help text. The packaging contract should still guarantee an `en-US` manpage,
+while allowing distributors to ship additional locales as optional artefacts.
+
 ### 2.2. Semantic, Syntactic, and Relational Fusion
 
 A core premise of `Weaver` is that a truly robust understanding of a codebase
@@ -957,6 +1011,14 @@ Structured logging is configured through the `--log-filter` flag (or
 uses an `info` filter with JSON output by default, giving operators structured
 events suitable for ingestion by observability stacks while keeping console
 noise predictable.
+
+User-interface localization follows the same shared contract. `Config` gains a
+locale field surfaced as `--locale`, `WEAVER_LOCALE`, and a config-file key.
+The value controls help text, human-readable diagnostics, generated reference
+artefacts, and other operator-facing strings, but does not affect the JSONL
+protocol or plugin execution environment. Invalid locale identifiers are
+reported as configuration errors instead of silently falling back, preserving
+the fail-fast behaviour expected from the rest of the config loader.
 
 The capability override matrix is expressed as a sequence of directives using
 the syntax `language:capability=directive`. The directive may be `allow`,
