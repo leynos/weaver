@@ -88,8 +88,8 @@ Observable behaviour after this change:
   medium. Likelihood: low. Mitigation: The existing test (lines 28-54)
   intentionally uses combined stdout+stderr output
   (`format!("{stdout}{stderr}")`) and does not assert on exit code. Its comment
-  states, "The test intentionally avoids asserting on the exit code so this
-  test remains valid if --help is later changed to exit 0." No change is needed.
+  states, "We intentionally avoid asserting on the exit code so this test
+  remains valid if --help is later changed to exit 0." No change is needed.
 
 - Risk: BDD tests break because `--help`/`--version` now behaves differently.
   Severity: low. Likelihood: low. Mitigation: No existing BDD scenario tests
@@ -182,9 +182,9 @@ in `src/cli.rs` and is parsed by `src/lib.rs`. The build script at `build.rs`
 includes `cli.rs` via `#[path = "src/cli.rs"]` for manpage generation. This
 dual-compilation means any code in `cli.rs` must compile in both contexts.
 
-The workspace version is `0.1.0` (set in the workspace `Cargo.toml`). Clap's
-derive macro reads `CARGO_PKG_VERSION` automatically when the bare `version`
-attribute is present in `#[command()]`.
+The workspace version is `0.1.0` (set in `/home/user/project/Cargo.toml` line
+22). Clap's derive macro reads `CARGO_PKG_VERSION` automatically when the bare
+`version` attribute is present in `#[command()]`.
 
 Currently, `Cli::try_parse_from()` returns `Err(clap::Error)` for both `--help`
 and `--version`. This error is wrapped in `AppError::CliUsage` and handled in
@@ -410,6 +410,8 @@ invocation" (line 243) and "Top-level help" (line 245).
 Update the "Top-level help" section to mention exit code 0 and the quick-start
 block.
 
+Update the "Top-level help" section to mention exit code 0 and the quick-start
+block.
 Run `make markdownlint` and `make fmt` after the documentation edits so the
 guide and plan changes are validated and normalized before the Rust gates run.
 
@@ -503,8 +505,6 @@ Existing reusable code:
   unit tests to exercise the CLI without a real binary.
 
 ## File change summary
-
-Table 1. File change summary.
 
 | File                                        | Change                                     | Lines before | Lines after |
 | ------------------------------------------- | ------------------------------------------ | ------------ | ----------- |
