@@ -46,14 +46,15 @@ Observable behaviour after implementation:
    `crates/weaver-cards/src/{card,detail,request,response,symbol}.rs` and
    completed in roadmap item 7.1.1 is already locked. This task must implement
    extraction against that schema, not redesign it.
-2. This is the Tree-sitter-first milestone only. Do not require LSP startup in
-   7.1.2. Later roadmap item 7.1.3 will enrich cards semantically.
+2. This is the Tree-sitter-first milestone only. Do not require Language
+   Server Protocol (LSP) startup in 7.1.2. Later roadmap item 7.1.3 will enrich
+   cards semantically.
 3. Use the existing syntactic foundation in `crates/weaver-syntax/` as the
    parsing layer. Extraction logic belongs with the card domain, not in
    `weaverd`.
-4. Keep filesystem and URI handling in `crates/weaverd/`; keep card extraction
-   itself pure over provided source text, path, and request position so it is
-   cheap to unit test.
+4. Keep filesystem and uniform resource identifier (URI) handling in
+   `crates/weaverd/`; keep card extraction itself pure over provided source
+   text, path, and request position so it is cheap to unit test.
 5. The workspace enforces strict linting from `Cargo.toml`, including
    `unwrap_used`, `expect_used`, `indexing_slicing`, `string_slice`,
    `allow_attributes`, `missing_docs`, `missing_const_for_fn`,

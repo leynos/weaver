@@ -3,7 +3,8 @@
 use std::path::Path;
 
 use crate::{
-    CardExtractionInput, CardSymbolKind, DetailLevel, GetCardResponse, TreeSitterCardExtractor,
+    CardExtractionError, CardExtractionInput, CardSymbolKind, DetailLevel, GetCardResponse,
+    TreeSitterCardExtractor,
 };
 
 #[derive(Clone, Copy)]
@@ -89,6 +90,18 @@ fn extract(request: ExtractRequest<'_>) -> crate::SymbolCard {
             detail: request.detail,
         })
         .expect("card extraction should succeed")
+}
+
+fn extract_error(request: ExtractRequest<'_>) -> CardExtractionError {
+    TreeSitterCardExtractor::new()
+        .extract(CardExtractionInput {
+            path: request.path,
+            source: request.source,
+            line: request.line,
+            column: request.column,
+            detail: request.detail,
+        })
+        .expect_err("card extraction should fail")
 }
 
 #[test]
@@ -293,4 +306,90 @@ fn get_card_success_payload_can_wrap_extracted_cards() {
     };
 
     assert!(matches!(response, GetCardResponse::Success { .. }));
+}
+
+#[test]
+fn returns_unsupported_language_error_for_unknown_extension() {
+    let err = extract_error(ExtractRequest {
+        path: Path::new("fixture.foobar"),
+        source: "fn main() {}\n",
+        line: 1,
+        column: 1,
+        detail: DetailLevel::Full,
+    });
+
+    assert!(matches!(
+        err,
+        CardExtractionError::UnsupportedLanguage { .. }
+    ));
+}
+
+#[test]
+fn returns_position_out_of_range_error_for_zero_position() {
+    let err = extract_error(ExtractRequest {
+        path: Path::new("fixture.rs"),
+        source: "fn main() {}\n",
+        line: 0,
+        column: 1,
+        detail: DetailLevel::Full,
+    });
+
+    assert!(matches!(
+        err,
+        CardExtractionError::PositionOutOfRange { .. }
+    ));
+}
+
+#[test]
+fn returns_position_out_of_range_error_for_position_beyond_end_of_source() {
+    let err = extract_error(ExtractRequest {
+        path: Path::new("fixture.rs"),
+        source: "fn main() {}\n",
+        line: 10,
+        column: 100,
+        detail: DetailLevel::Full,
+    });
+
+    assert!(matches!(
+        err,
+        CardExtractionError::PositionOutOfRange { .. }
+    ));
+}
+
+#[test]
+fn returns_no_symbol_at_position_error_when_nothing_matches() {
+    let err = extract_error(ExtractRequest {
+        path: Path::new("fixture.rs"),
+        source: "// heading\nfn visible_symbol() {}\n",
+        line: 1,
+        column: 1,
+        detail: DetailLevel::Full,
+    });
+
+    assert!(matches!(
+        err,
+        CardExtractionError::NoSymbolAtPosition { .. }
+    ));
+}
+
+#[test]
+fn returns_parse_error_when_parser_setup_fails() {
+    let err = TreeSitterCardExtractor::extract_with_parser_for_test(
+        CardExtractionInput {
+            path: Path::new("fixture.rs"),
+            source: "fn main() {}\n",
+            line: 1,
+            column: 1,
+            detail: DetailLevel::Full,
+        },
+        |language| {
+            Err(CardExtractionError::Parse {
+                language: String::from(language.as_str()),
+                message: String::from("forced parse failure"),
+            })
+        },
+    )
+    .expect_err("expected parse error");
+
+    assert!(matches!(err, CardExtractionError::Parse { .. }));
 }

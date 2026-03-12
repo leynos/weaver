@@ -8,6 +8,7 @@ rust-version.workspace = true
 serde = { workspace = true }
 thiserror = { workspace = true }
 tree-sitter = { workspace = true }
+url = { workspace = true }
 weaver-syntax = { path = "../weaver-syntax" }
 
 [dev-dependencies]

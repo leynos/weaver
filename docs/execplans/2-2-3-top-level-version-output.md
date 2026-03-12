@@ -88,8 +88,8 @@ Observable behaviour after this change:
   medium. Likelihood: low. Mitigation: The existing test (lines 28-54)
   intentionally uses combined stdout+stderr output
   (`format!("{stdout}{stderr}")`) and does not assert on exit code. Its comment
-  states, "We intentionally avoid asserting on the exit code so this test
-  remains valid if --help is later changed to exit 0." No change is needed.
+  states, "The test intentionally avoids asserting on the exit code so this
+  test remains valid if --help is later changed to exit 0." No change is needed.
 
 - Risk: BDD tests break because `--help`/`--version` now behaves differently.
   Severity: low. Likelihood: low. Mitigation: No existing BDD scenario tests
@@ -411,9 +411,9 @@ Update the "Top-level help" section to mention exit code 0 and the quick-start
 block.
 
 Update the "Top-level help" section to mention exit code 0 and the quick-start
-block.
-Run `make markdownlint` and `make fmt` after the documentation edits so the
-guide and plan changes are validated and normalized before the Rust gates run.
+block. Run `make markdownlint` and `make fmt` after the documentation edits so
+the guide and plan changes are validated and normalized before the Rust gates
+run.
 
 ### Stage H: Mark roadmap done
 

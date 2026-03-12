@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use thiserror::Error;
+use url::Url;
 use weaver_syntax::{Parser, SupportedLanguage};
 
 use crate::{
@@ -95,16 +96,30 @@ impl TreeSitterCardExtractor {
                 path: input.path.to_path_buf(),
             }
         })?;
-        let mut parser = Parser::new(language).map_err(|error| CardExtractionError::Parse {
-            language: String::from(language.as_str()),
-            message: error.to_string(),
-        })?;
-        let parse = parser
-            .parse(input.source)
-            .map_err(|error| CardExtractionError::Parse {
-                language: String::from(language.as_str()),
-                message: error.to_string(),
-            })?;
+        Self::extract_for_language(input, language, |supported_language| {
+            let mut parser =
+                Parser::new(supported_language).map_err(|error| CardExtractionError::Parse {
+                    language: String::from(supported_language.as_str()),
+                    message: error.to_string(),
+                })?;
+            parser
+                .parse(input.source)
+                .map_err(|error| CardExtractionError::Parse {
+                    language: String::from(supported_language.as_str()),
+                    message: error.to_string(),
+                })
+        })
+    }
+
+    fn extract_for_language<F>(
+        input: CardExtractionInput<'_>,
+        language: SupportedLanguage,
+        parser: F,
+    ) -> Result<SymbolCard, CardExtractionError>
+    where
+        F: FnOnce(SupportedLanguage) -> Result<weaver_syntax::ParseResult, CardExtractionError>,
+    {
+        let parse = parser(language)?;
         let position_byte = position_to_byte(input.source, input.line, input.column)?;
         let mut entities = languages::collect_entities(language, parse.root_node(), input.source);
         entities.sort_by_key(|candidate| candidate.byte_range.start);
@@ -127,6 +142,22 @@ impl TreeSitterCardExtractor {
                 source: input.source,
             },
         ))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn extract_with_parser_for_test<F>(
+        input: CardExtractionInput<'_>,
+        parser: F,
+    ) -> Result<SymbolCard, CardExtractionError>
+    where
+        F: FnOnce(SupportedLanguage) -> Result<weaver_syntax::ParseResult, CardExtractionError>,
+    {
+        let language = SupportedLanguage::from_path(input.path).ok_or_else(|| {
+            CardExtractionError::UnsupportedLanguage {
+                path: input.path.to_path_buf(),
+            }
+        })?;
+        Self::extract_for_language(input, language, parser)
     }
 }
 
@@ -441,12 +472,10 @@ fn usize_to_u32(value: usize) -> u32 {
 }
 
 fn file_uri(path: &Path) -> String {
-    let display = path.to_string_lossy().replace('\\', "/");
-    if display.starts_with('/') {
-        format!("file://{display}")
-    } else {
-        format!("file:///{display}")
-    }
+    Url::from_file_path(path).map_or_else(
+        |()| format!("file:///{}", path.to_string_lossy().replace('\\', "/")),
+        |uri| uri.to_string(),
+    )
 }
 
 fn summarise(text: &str) -> String {

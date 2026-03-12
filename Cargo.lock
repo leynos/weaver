@@ -2617,6 +2617,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.17",
  "tree-sitter",
+ "url",
  "weaver-syntax",
 ]
 

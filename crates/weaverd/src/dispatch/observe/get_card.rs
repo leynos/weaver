@@ -100,7 +100,9 @@ fn map_extraction_error(
         CardExtractionError::PositionOutOfRange { line, column } => Ok(GetCardResponse::Refusal {
             refusal: CardRefusal {
                 reason: RefusalReason::NoSymbolAtPosition,
-                message: format!("observe get-card: no symbol found at {line}:{column}"),
+                message: format!(
+                    "observe get-card: position {line}:{column} is outside the bounds of the file"
+                ),
                 requested_detail: detail,
             },
         }),
@@ -114,19 +116,31 @@ fn map_extraction_error(
 mod tests {
     use std::fs;
 
+    use rstest::{fixture, rstest};
     use tempfile::TempDir;
     use weaver_cards::{DetailLevel, RefusalReason};
 
     use super::*;
     use crate::dispatch::request::CommandRequest;
 
+    #[fixture]
     fn temp_dir() -> TempDir {
         TempDir::new().expect("temp dir")
     }
 
+    #[derive(Clone, Copy)]
     struct SourceFile<'a> {
         name: &'a str,
         content: &'a str,
+    }
+
+    #[derive(Clone)]
+    struct RefusalCase<'a> {
+        file: SourceFile<'a>,
+        line: u32,
+        column: u32,
+        expected_reason: RefusalReason,
+        expected_message_substring: &'a str,
     }
 
     fn write_source(temp_dir: &TempDir, file: SourceFile<'_>) -> PathBuf {
@@ -173,11 +187,10 @@ mod tests {
         serde_json::from_str(data).expect("payload")
     }
 
-    fn assert_refusal_response(file: SourceFile<'_>, expected_reason: RefusalReason) {
-        let temp_dir = temp_dir();
-        let path = write_source(&temp_dir, file);
+    fn assert_refusal_response(temp_dir: TempDir, case: RefusalCase<'_>) {
+        let path = write_source(&temp_dir, case.file);
         let uri = Url::from_file_path(&path).expect("file uri").to_string();
-        let request = make_request(&uri, 1, 1, DetailLevel::Structure);
+        let request = make_request(&uri, case.line, case.column, DetailLevel::Structure);
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
 
@@ -188,13 +201,20 @@ mod tests {
         assert_eq!(payload["status"], "refusal");
         assert_eq!(
             payload["refusal"]["reason"],
-            serde_json::to_value(&expected_reason).expect("serialise reason")
+            serde_json::to_value(&case.expected_reason).expect("serialise reason")
+        );
+        let message = payload["refusal"]["message"]
+            .as_str()
+            .expect("refusal message");
+        assert!(
+            message.contains(case.expected_message_substring),
+            "expected message '{message}' to contain '{}'",
+            case.expected_message_substring
         );
     }
 
-    #[test]
-    fn handle_returns_success_for_supported_rust_symbol() {
-        let temp_dir = temp_dir();
+    #[rstest]
+    fn handle_returns_success_for_supported_rust_symbol(temp_dir: TempDir) {
         let path = write_source(
             &temp_dir,
             SourceFile {
@@ -215,26 +235,45 @@ mod tests {
         assert_eq!(payload["card"]["symbol"]["ref"]["name"], "greet");
     }
 
-    #[test]
-    fn handle_returns_unsupported_language_refusal() {
-        assert_refusal_response(
-            SourceFile {
+    #[rstest]
+    #[case(
+        RefusalCase {
+            file: SourceFile {
                 name: "notes.txt",
                 content: "plain text",
             },
-            RefusalReason::UnsupportedLanguage,
-        );
-    }
-
-    #[test]
-    fn handle_returns_no_symbol_refusal_for_empty_supported_file() {
-        assert_refusal_response(
-            SourceFile {
+            line: 1,
+            column: 1,
+            expected_reason: RefusalReason::UnsupportedLanguage,
+            expected_message_substring: "unsupported language for path",
+        }
+    )]
+    #[case(
+        RefusalCase {
+            file: SourceFile {
                 name: "empty.py",
-                content: "",
+                content: "# heading\n\ndef greet() -> None:\n    return None\n",
             },
-            RefusalReason::NoSymbolAtPosition,
-        );
+            line: 1,
+            column: 1,
+            expected_reason: RefusalReason::NoSymbolAtPosition,
+            expected_message_substring: "no symbol found at 1:1",
+        }
+    )]
+    #[case(
+        RefusalCase {
+            file: SourceFile {
+                name: "bounds.rs",
+                content: "fn greet() {}\n",
+            },
+            line: 10,
+            column: 100,
+            expected_reason: RefusalReason::NoSymbolAtPosition,
+            expected_message_substring: "position 10:100 is outside the bounds of the file",
+        }
+    )]
+    fn handle_returns_structured_refusals(temp_dir: TempDir, #[case] case: RefusalCase<'static>) {
+        assert_refusal_response(temp_dir, case);
     }
 
     #[test]
