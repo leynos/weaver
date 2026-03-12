@@ -99,7 +99,7 @@ fn scan_comment_block(
         let line = lines.line_text(line_index);
         let trimmed = line.trim();
         if trimmed.is_empty() {
-            continue;
+            break;
         }
         if let Some(comment) = normalise_comment_line(trimmed, language) {
             comments.push(comment);
