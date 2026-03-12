@@ -182,7 +182,7 @@ in `src/cli.rs` and is parsed by `src/lib.rs`. The build script at `build.rs`
 includes `cli.rs` via `#[path = "src/cli.rs"]` for manpage generation. This
 dual-compilation means any code in `cli.rs` must compile in both contexts.
 
-The workspace version is `0.1.0` (set in `/home/user/project/Cargo.toml` line
+The workspace version is `0.1.0` (set in the workspace `Cargo.toml` at line
 22). Clap's derive macro reads `CARGO_PKG_VERSION` automatically when the bare
 `version` attribute is present in `#[command()]`.
 
@@ -406,9 +406,6 @@ fn help_flag_exits_successfully_with_quick_start() {
 
 **`docs/users-guide.md`** — Insert a "Version" subsection between "Bare
 invocation" (line 243) and "Top-level help" (line 245).
-
-Update the "Top-level help" section to mention exit code 0 and the quick-start
-block.
 
 Update the "Top-level help" section to mention exit code 0 and the quick-start
 block. Run `make markdownlint` and `make fmt` after the documentation edits so

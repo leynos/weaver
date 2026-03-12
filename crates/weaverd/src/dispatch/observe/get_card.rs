@@ -90,6 +90,10 @@ fn map_extraction_error(
                 requested_detail: detail,
             },
         }),
+        CardExtractionError::InvalidPath { path } => Err(DispatchError::internal(format!(
+            "Tree-sitter extractor requires an absolute path: {}",
+            path.display()
+        ))),
         CardExtractionError::NoSymbolAtPosition { line, column } => Ok(GetCardResponse::Refusal {
             refusal: CardRefusal {
                 reason: RefusalReason::NoSymbolAtPosition,

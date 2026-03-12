@@ -5,9 +5,10 @@ use std::path::Path;
 use crate::{CardExtractionError, CardExtractionInput, DetailLevel, TreeSitterCardExtractor};
 
 fn extract(path: &'static Path, source: &'static str, line: u32, column: u32) -> crate::SymbolCard {
+    let absolute_path = super::absolute_test_path(path);
     TreeSitterCardExtractor::new()
         .extract(CardExtractionInput {
-            path,
+            path: &absolute_path,
             source,
             line,
             column,
@@ -22,9 +23,10 @@ fn extract_error(
     line: u32,
     column: u32,
 ) -> CardExtractionError {
+    let absolute_path = super::absolute_test_path(path);
     TreeSitterCardExtractor::new()
         .extract(CardExtractionInput {
-            path,
+            path: &absolute_path,
             source,
             line,
             column,
@@ -69,4 +71,19 @@ fn crlf_positions_map_to_the_correct_symbol() {
     );
 
     assert_eq!(card.symbol.symbol_ref.name, "second");
+}
+
+#[test]
+fn relative_paths_are_rejected_before_card_construction() {
+    let err = TreeSitterCardExtractor::new()
+        .extract(CardExtractionInput {
+            path: Path::new("fixture.rs"),
+            source: "fn greet() {}\n",
+            line: 1,
+            column: 4,
+            detail: DetailLevel::Structure,
+        })
+        .expect_err("relative paths should be rejected");
+
+    assert!(matches!(err, CardExtractionError::InvalidPath { .. }));
 }

@@ -1,21 +1,26 @@
 //! Tree-sitter-backed symbol card extraction.
 
 mod attachments;
+mod candidates;
 mod fingerprint;
 mod languages;
+mod positions;
+mod utils;
 
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
 
 use thiserror::Error;
-use url::Url;
 use weaver_syntax::{Parser, SupportedLanguage};
 
+use crate::Provenance;
 use crate::{
     AttachmentsInfo, DetailLevel, DocInfo, ImportInterstitialInfo, InterstitialInfo, MetricsInfo,
     NormalizedAttachments, SignatureInfo, StructureInfo, SymbolCard, SymbolIdentity, SymbolRef,
 };
-use crate::{CardLanguage, CardSymbolKind, Provenance};
+pub(super) use candidates::{EntityCandidate, InterstitialCandidate};
+use candidates::{build_module_candidate, select_candidate};
+use positions::{position_to_byte, usize_to_u32};
+use utils::{file_uri, provenance_sources, to_card_language};
 
 /// Deterministic placeholder timestamp used until revision-based caching lands.
 const EXTRACTED_AT_PLACEHOLDER: &str = "1970-01-01T00:00:00Z";
@@ -42,6 +47,12 @@ pub enum CardExtractionError {
     #[error("unsupported language for path: {path}")]
     UnsupportedLanguage {
         /// Unsupported source path.
+        path: PathBuf,
+    },
+    /// The source path cannot be represented as a valid file URI.
+    #[error("card extraction requires an absolute path: {path}")]
+    InvalidPath {
+        /// Invalid source path.
         path: PathBuf,
     },
     /// The requested position is outside the source text.
@@ -133,7 +144,7 @@ impl TreeSitterCardExtractor {
                 column: input.column,
             })?;
 
-        Ok(build_card(
+        build_card(
             selected,
             CardBuildContext {
                 language,
@@ -141,7 +152,7 @@ impl TreeSitterCardExtractor {
                 detail: input.detail,
                 source: input.source,
             },
-        ))
+        )
     }
 
     #[cfg(test)]
@@ -159,34 +170,6 @@ impl TreeSitterCardExtractor {
         })?;
         Self::extract_for_language(input, language, parser)
     }
-}
-
-#[derive(Debug, Clone)]
-struct EntityCandidate {
-    kind: CardSymbolKind,
-    name: String,
-    container: Option<String>,
-    byte_range: std::ops::Range<usize>,
-    range: crate::SourceRange,
-    signature_display: Option<String>,
-    params: Vec<crate::ParamInfo>,
-    returns: String,
-    locals: Vec<crate::LocalInfo>,
-    branches: Vec<crate::BranchInfo>,
-    decorators: Vec<String>,
-    attachment_anchor: Option<usize>,
-    docstring: Option<String>,
-    lines: u32,
-    structure_fingerprint: String,
-    interstitial: Option<InterstitialCandidate>,
-}
-
-#[derive(Debug, Clone)]
-struct InterstitialCandidate {
-    byte_range: std::ops::Range<usize>,
-    raw: String,
-    normalized: Vec<String>,
-    groups: Vec<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -215,94 +198,10 @@ struct CardBuildContext<'a> {
     detail: DetailLevel,
     source: &'a str,
 }
-
-fn build_module_candidate(
-    path: &Path,
-    source: &str,
-    interstitial: Option<InterstitialCandidate>,
-) -> Option<EntityCandidate> {
-    if source.is_empty() {
-        return None;
-    }
-
-    let line_count = usize_to_u32(source.lines().count());
-    let end_column = source
-        .lines()
-        .last()
-        .map_or(0, |line| usize_to_u32(line.len()));
-    Some(EntityCandidate {
-        kind: CardSymbolKind::Module,
-        name: module_name(path),
-        container: None,
-        byte_range: 0..source.len(),
-        range: crate::SourceRange {
-            start: crate::SourcePosition { line: 0, column: 0 },
-            end: crate::SourcePosition {
-                line: line_count.saturating_sub(1),
-                column: end_column,
-            },
-        },
-        signature_display: None,
-        params: Vec::new(),
-        returns: String::new(),
-        locals: Vec::new(),
-        branches: Vec::new(),
-        decorators: Vec::new(),
-        attachment_anchor: Some(0),
-        docstring: None,
-        lines: line_count.max(1),
-        structure_fingerprint: String::from("module"),
-        interstitial,
-    })
-}
-
-fn module_name(path: &Path) -> String {
-    path.file_stem()
-        .and_then(|stem| stem.to_str())
-        .map(String::from)
-        .or_else(|| {
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .map(String::from)
-        })
-        .unwrap_or_else(|| String::from("module"))
-}
-
-fn select_candidate<'a>(
-    entities: &'a [EntityCandidate],
-    module_candidate: Option<&'a EntityCandidate>,
-    byte: usize,
-) -> Option<&'a EntityCandidate> {
-    let entity = entities
-        .iter()
-        .filter(|candidate| contains_byte(candidate, byte))
-        .min_by_key(|candidate| {
-            candidate
-                .byte_range
-                .end
-                .saturating_sub(candidate.byte_range.start)
-        });
-    if entity.is_some() {
-        return entity;
-    }
-
-    module_candidate.and_then(|candidate| {
-        candidate
-            .interstitial
-            .as_ref()
-            .filter(|interstitial| {
-                byte >= interstitial.byte_range.start && byte < interstitial.byte_range.end
-            })
-            .map(|_| candidate)
-            .or_else(|| entities.is_empty().then_some(candidate))
-    })
-}
-
-const fn contains_byte(candidate: &EntityCandidate, byte: usize) -> bool {
-    byte >= candidate.byte_range.start && byte < candidate.byte_range.end
-}
-
-fn build_card(candidate: &EntityCandidate, context: CardBuildContext<'_>) -> SymbolCard {
+fn build_card(
+    candidate: &EntityCandidate,
+    context: CardBuildContext<'_>,
+) -> Result<SymbolCard, CardExtractionError> {
     let symbol_id = fingerprint::symbol_id(candidate, context.language, context.path);
     let attachments = leading_attachments(candidate, context.source, context.language);
     let doc = build_doc(candidate, &attachments, context.detail);
@@ -312,12 +211,12 @@ fn build_card(candidate: &EntityCandidate, context: CardBuildContext<'_>) -> Sym
     let metrics = build_metrics(candidate, context.detail);
     let interstitial = build_interstitial(candidate);
 
-    SymbolCard {
+    Ok(SymbolCard {
         card_version: 1,
         symbol: SymbolIdentity {
             symbol_id: symbol_id.clone(),
             symbol_ref: SymbolRef {
-                uri: file_uri(context.path),
+                uri: file_uri(context.path)?,
                 range: candidate.range.clone(),
                 language: to_card_language(context.language),
                 kind: candidate.kind,
@@ -338,7 +237,7 @@ fn build_card(candidate: &EntityCandidate, context: CardBuildContext<'_>) -> Sym
             sources: provenance_sources(context.detail),
         },
         etag: Some(symbol_id),
-    }
+    })
 }
 
 fn leading_attachments(
@@ -446,38 +345,6 @@ fn build_interstitial(candidate: &EntityCandidate) -> Option<InterstitialInfo> {
         })
 }
 
-fn provenance_sources(detail: DetailLevel) -> Vec<String> {
-    static TREE_SITTER_ONLY: OnceLock<Vec<String>> = OnceLock::new();
-    let base = TREE_SITTER_ONLY.get_or_init(|| vec![String::from("tree_sitter")]);
-    let mut sources = base.clone();
-    if detail >= DetailLevel::Semantic {
-        sources.push(String::from("tree_sitter_degraded_semantic"));
-    }
-    if detail >= DetailLevel::Full {
-        sources.push(String::from("tree_sitter_degraded_full"));
-    }
-    sources
-}
-
-const fn to_card_language(language: SupportedLanguage) -> CardLanguage {
-    match language {
-        SupportedLanguage::Rust => CardLanguage::Rust,
-        SupportedLanguage::Python => CardLanguage::Python,
-        SupportedLanguage::TypeScript => CardLanguage::TypeScript,
-    }
-}
-
-fn usize_to_u32(value: usize) -> u32 {
-    u32::try_from(value).unwrap_or(u32::MAX)
-}
-
-fn file_uri(path: &Path) -> String {
-    Url::from_file_path(path).map_or_else(
-        |()| format!("file:///{}", path.to_string_lossy().replace('\\', "/")),
-        |uri| uri.to_string(),
-    )
-}
-
 fn summarise(text: &str) -> String {
     text.lines()
         .find_map(|line| {
@@ -485,42 +352,4 @@ fn summarise(text: &str) -> String {
             (!trimmed.is_empty()).then(|| String::from(trimmed))
         })
         .unwrap_or_else(|| String::from(text.trim()))
-}
-
-fn position_to_byte(source: &str, line: u32, column: u32) -> Result<usize, CardExtractionError> {
-    if line == 0 || column == 0 {
-        return Err(CardExtractionError::PositionOutOfRange { line, column });
-    }
-
-    let Some((line_start, target_line)) = line_entry(source, line) else {
-        return Err(CardExtractionError::PositionOutOfRange { line, column });
-    };
-    let visible_line = trim_line_ending(target_line);
-    if column as usize > visible_line.chars().count().saturating_add(1) {
-        return Err(CardExtractionError::PositionOutOfRange { line, column });
-    }
-
-    let column_offset = visible_line
-        .char_indices()
-        .nth((column - 1) as usize)
-        .map_or(visible_line.len(), |(offset, _)| offset);
-    Ok(line_start.saturating_add(column_offset))
-}
-
-fn line_entry(source: &str, target_line: u32) -> Option<(usize, &str)> {
-    let mut start = 0usize;
-    for (index, line) in source.split_inclusive('\n').enumerate() {
-        if index + 1 == target_line as usize {
-            return Some((start, line));
-        }
-        start = start.saturating_add(line.len());
-    }
-    None
-}
-
-fn trim_line_ending(line: &str) -> &str {
-    let without_newline = line.strip_suffix('\n').unwrap_or(line);
-    without_newline
-        .strip_suffix('\r')
-        .unwrap_or(without_newline)
 }

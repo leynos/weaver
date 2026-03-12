@@ -81,9 +81,10 @@ fn all_symbol_cases() -> Vec<SymbolExpectation<'static>> {
 }
 
 fn extract(request: ExtractRequest<'_>) -> crate::SymbolCard {
+    let path = super::absolute_test_path(request.path);
     TreeSitterCardExtractor::new()
         .extract(CardExtractionInput {
-            path: request.path,
+            path: &path,
             source: request.source,
             line: request.line,
             column: request.column,
@@ -93,9 +94,10 @@ fn extract(request: ExtractRequest<'_>) -> crate::SymbolCard {
 }
 
 fn extract_error(request: ExtractRequest<'_>) -> CardExtractionError {
+    let path = super::absolute_test_path(request.path);
     TreeSitterCardExtractor::new()
         .extract(CardExtractionInput {
-            path: request.path,
+            path: &path,
             source: request.source,
             line: request.line,
             column: request.column,
@@ -374,9 +376,10 @@ fn returns_no_symbol_at_position_error_when_nothing_matches() {
 
 #[test]
 fn returns_parse_error_when_parser_setup_fails() {
+    let path = super::absolute_test_path(Path::new("fixture.rs"));
     let err = TreeSitterCardExtractor::extract_with_parser_for_test(
         CardExtractionInput {
-            path: Path::new("fixture.rs"),
+            path: &path,
             source: "fn main() {}\n",
             line: 1,
             column: 1,
