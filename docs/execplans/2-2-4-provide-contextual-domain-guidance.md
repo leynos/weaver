@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
@@ -57,9 +57,9 @@ with the operation list and hint adapted to the supplied domain.
   `crates/weaver-cli/src/lib.rs` is 399 lines and
   `crates/weaver-cli/src/tests/unit.rs` is 398 lines before this work starts.
 - `crates/weaver-cli/build.rs` includes `src/cli.rs` via
-  `#[path = "src/cli.rs"]`
-  for manpage generation. Do not add helper methods to `cli.rs` that are only
-  used at runtime unless they also compile cleanly in the build-script context.
+  `#[path = "src/cli.rs"]` for manpage generation. Do not add helper methods to
+  `cli.rs` that are only used at runtime unless they also compile cleanly in
+  the build-script context.
 - The current command model deliberately forwards operation arguments verbatim
   after `<domain> <operation>`. Do not restructure the CLI into nested clap
   subcommands as part of this task; operation-specific help belongs to roadmap
@@ -125,15 +125,19 @@ with the operation list and hint adapted to the supplied domain.
       while the daemon router advertises it.
 - [x] (2026-03-10) Write the initial ExecPlan to
       `docs/execplans/2-2-4-provide-contextual-domain-guidance.md`.
-- [ ] Stage A: establish one authoritative client-side domain-operation
-      catalogue for `weaver-cli`.
-- [ ] Stage B: short-circuit known-domain, missing-operation invocations before
+- [x] (2026-03-12) Stage A: established
+      `crates/weaver-cli/src/discoverability.rs` as the canonical client-side
+      domain-operation catalogue and reconciled `observe get-card`.
+- [x] (2026-03-12) Stage B: added a preflight guidance branch in
+      `CliRunner::run_with_handler` that emits contextual guidance before
       config loading, daemon connection, or auto-start.
-- [ ] Stage C: add unit, behavioural, and integration coverage for the new
-      guidance and its boundaries.
-- [ ] Stage D: update `docs/weaver-design.md`, `docs/users-guide.md`, and mark
-      roadmap item 2.2.4 done.
-- [ ] Stage E: run formatting, lint, test, and Markdown validation gates.
+- [x] (2026-03-12) Stage C: added unit, behavioural, and integration coverage
+      for the new guidance and preserved the complete-command config-failure
+      path.
+- [x] (2026-03-12) Stage D: updated `docs/weaver-design.md`,
+      `docs/users-guide.md`, and marked roadmap item 2.2.4 complete.
+- [x] (2026-03-12) Stage E: passed `make fmt`, `make markdownlint`,
+      `make nixie`, `make check-fmt`, `make lint`, and `make test`.
 
 ## Surprises & Discoveries
 
@@ -151,6 +155,11 @@ with the operation list and hint adapted to the supplied domain.
 - The hint command required by the roadmap is ahead of the current help model.
   `weaver observe get-definition --help` is still handled by clap's top-level
   help path, as documented in `docs/ui-gap-analysis.md`.
+
+- The 400-line file cap became a live implementation constraint rather than a
+  planning note. `lib.rs` and `src/tests/unit.rs` both crossed the limit once
+  the first draft landed, so shared helpers had to move into dedicated modules
+  before validation could proceed.
 
 ## Decision Log
 
@@ -184,14 +193,35 @@ with the operation list and hint adapted to the supplied domain.
   hint. Adding descriptive copy would broaden the catalogue surface and
   increase drift risk without being required for acceptance. Date: 2026-03-10.
 
+- Decision: keep the top-level clap `after_help` text static in `cli.rs`, but
+  drive all assertions from the canonical discoverability catalogue and keep
+  the static text synchronized via tests. Rationale: `build.rs` includes
+  `cli.rs` directly for manpage generation, so wiring runtime-only helpers into
+  clap attributes would couple the build-script context unnecessarily. Date:
+  2026-03-12.
+
 ## Outcomes & Retrospective
 
-Implementation has not started. No behavioural outcome has been delivered yet.
+Implemented on 2026-03-12.
 
-The key implementation lesson from planning is that roadmap 2.2.4 is not just
-an error-message tweak. It is the first runtime feature that depends on the
-CLI's domain catalogue, so it must repair the existing catalogue drift and fit
-within the 400-line limit in `lib.rs`.
+Behavioural outcome:
+
+- `weaver <known-domain>` now exits non-zero with a contextual guidance block
+  that lists that domain's registered operations and prints a deterministic
+  `weaver <domain> <first-operation> --help` hint.
+- The guidance is emitted before configuration discovery, daemon startup, or
+  socket connection. Unknown domains still follow the generic missing-operation
+  path until roadmap item 2.3.1.
+- The canonical client-side catalogue now lives in
+  `crates/weaver-cli/src/discoverability.rs`, and the `observe` list now
+  includes `get-card` to match `weaverd`.
+
+Implementation lesson:
+
+- The file-size guardrails were correct. Extracting `discoverability`,
+  `prepare_cli_arguments`, and capability-mode helpers kept the runtime change
+  small enough to stay within the repository-wide 400-line cap while still
+  making the new preflight branch explicit and testable.
 
 ## Context and orientation
 
@@ -211,9 +241,9 @@ The relevant pieces today are:
   `AppError::MissingOperation` whenever `operation` is absent or blank.
 - `crates/weaver-cli/src/errors.rs`
   Owns the user-visible error strings and the sentinel `BareInvocation` path.
-- `crates/weaver-cli/src/localizer.rs`
-  Builds the Fluent localizer and currently contains the `DOMAIN_OPERATIONS`
-  constant used by help-related tests.
+- `crates/weaver-cli/src/discoverability.rs`
+  Holds the canonical client-side domain catalogue and renders the
+  missing-operation guidance block.
 - `crates/weaver-cli/src/tests/unit/bare_invocation.rs`
   Shows the established pattern for asserting a local guidance path that skips
   configuration loading by using a panicking loader.
