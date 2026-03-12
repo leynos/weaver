@@ -291,7 +291,7 @@ fn select_candidate<'a>(
             .interstitial
             .as_ref()
             .filter(|interstitial| {
-                byte >= interstitial.byte_range.start && byte <= interstitial.byte_range.end
+                byte >= interstitial.byte_range.start && byte < interstitial.byte_range.end
             })
             .map(|_| candidate)
             .or_else(|| entities.is_empty().then_some(candidate))
@@ -299,7 +299,7 @@ fn select_candidate<'a>(
 }
 
 const fn contains_byte(candidate: &EntityCandidate, byte: usize) -> bool {
-    byte >= candidate.byte_range.start && byte <= candidate.byte_range.end
+    byte >= candidate.byte_range.start && byte < candidate.byte_range.end
 }
 
 fn build_card(candidate: &EntityCandidate, context: CardBuildContext<'_>) -> SymbolCard {
@@ -492,23 +492,35 @@ fn position_to_byte(source: &str, line: u32, column: u32) -> Result<usize, CardE
         return Err(CardExtractionError::PositionOutOfRange { line, column });
     }
 
-    let Some(target_line) = source.lines().nth((line - 1) as usize) else {
+    let Some((line_start, target_line)) = line_entry(source, line) else {
         return Err(CardExtractionError::PositionOutOfRange { line, column });
     };
-    if column as usize > target_line.chars().count().saturating_add(1) {
+    let visible_line = trim_line_ending(target_line);
+    if column as usize > visible_line.chars().count().saturating_add(1) {
         return Err(CardExtractionError::PositionOutOfRange { line, column });
     }
 
-    let mut byte_offset = 0usize;
-    for current_line in source.lines().take((line - 1) as usize) {
-        byte_offset = byte_offset
-            .saturating_add(current_line.len())
-            .saturating_add(1);
-    }
-
-    let column_offset = target_line
+    let column_offset = visible_line
         .char_indices()
         .nth((column - 1) as usize)
-        .map_or(target_line.len(), |(offset, _)| offset);
-    Ok(byte_offset.saturating_add(column_offset))
+        .map_or(visible_line.len(), |(offset, _)| offset);
+    Ok(line_start.saturating_add(column_offset))
+}
+
+fn line_entry(source: &str, target_line: u32) -> Option<(usize, &str)> {
+    let mut start = 0usize;
+    for (index, line) in source.split_inclusive('\n').enumerate() {
+        if index + 1 == target_line as usize {
+            return Some((start, line));
+        }
+        start = start.saturating_add(line.len());
+    }
+    None
+}
+
+fn trim_line_ending(line: &str) -> &str {
+    let without_newline = line.strip_suffix('\n').unwrap_or(line);
+    without_newline
+        .strip_suffix('\r')
+        .unwrap_or(without_newline)
 }

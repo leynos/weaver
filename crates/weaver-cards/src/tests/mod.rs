@@ -2,6 +2,7 @@
 
 mod behaviour;
 mod extractor;
+mod extractor_boundaries;
 mod fixtures;
 mod round_trip_tests;
 mod snapshot_tests;

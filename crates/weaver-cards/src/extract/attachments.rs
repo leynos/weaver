@@ -29,7 +29,7 @@ impl<'a> SourceLines<'a> {
         self.ranges
             .iter()
             .enumerate()
-            .find_map(|(index, range)| (byte >= range.0 && byte <= range.1).then_some(index))
+            .find_map(|(index, range)| (byte >= range.0 && byte < range.1).then_some(index))
     }
 
     fn line_text(&self, index: usize) -> &str {
