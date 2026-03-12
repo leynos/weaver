@@ -16,6 +16,13 @@ struct ClassMetadata<'a> {
     anchor: usize,
 }
 
+#[derive(Clone)]
+struct CallableSpec<'a> {
+    kind: CardSymbolKind,
+    container: Option<&'a str>,
+    decorators: Vec<String>,
+}
+
 pub(super) fn collect(root: Node<'_>, source: &str) -> Vec<EntityCandidate> {
     let mut entities = Vec::new();
     let mut cursor = root.walk();
@@ -24,9 +31,11 @@ pub(super) fn collect(root: Node<'_>, source: &str) -> Vec<EntityCandidate> {
             "function_definition" => entities.push(build_callable(
                 child,
                 source,
-                CardSymbolKind::Function,
-                None,
-                Vec::new(),
+                CallableSpec {
+                    kind: CardSymbolKind::Function,
+                    container: None,
+                    decorators: Vec::new(),
+                },
             )),
             "class_definition" => push_class_entities(
                 &mut entities,
@@ -54,9 +63,11 @@ fn push_decorated_entities(entities: &mut Vec<EntityCandidate>, node: Node<'_>, 
             entities.push(build_callable(
                 definition,
                 source,
-                CardSymbolKind::Function,
-                None,
-                decorators,
+                CallableSpec {
+                    kind: CardSymbolKind::Function,
+                    container: None,
+                    decorators,
+                },
             ));
         }
         "class_definition" => {
@@ -74,24 +85,14 @@ fn push_decorated_entities(entities: &mut Vec<EntityCandidate>, node: Node<'_>, 
     }
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "requested helper keeps the callable construction contract explicit"
-)]
-fn build_callable(
-    node: Node<'_>,
-    source: &str,
-    kind: CardSymbolKind,
-    container: Option<&str>,
-    decorators: Vec<String>,
-) -> EntityCandidate {
+fn build_callable(node: Node<'_>, source: &str, spec: CallableSpec<'_>) -> EntityCandidate {
     callable_candidate(
         node,
         source,
-        kind,
+        spec.kind,
         CallableMetadata::new(
-            container.map(str::to_owned),
-            decorators,
+            spec.container.map(str::to_owned),
+            spec.decorators,
             python_docstring(node, source),
         ),
     )
@@ -128,9 +129,11 @@ fn class_methods(
                 methods.push(build_callable(
                     child,
                     source,
-                    CardSymbolKind::Method,
-                    container,
-                    Vec::new(),
+                    CallableSpec {
+                        kind: CardSymbolKind::Method,
+                        container,
+                        decorators: Vec::new(),
+                    },
                 ));
             }
             "decorated_definition" => {
@@ -154,9 +157,11 @@ fn decorated_method(
         build_callable(
             definition,
             source,
-            CardSymbolKind::Method,
-            container,
-            decorator_texts(node, source),
+            CallableSpec {
+                kind: CardSymbolKind::Method,
+                container,
+                decorators: decorator_texts(node, source),
+            },
         )
     })
 }
