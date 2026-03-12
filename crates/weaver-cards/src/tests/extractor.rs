@@ -35,24 +35,20 @@ struct CaseSpec {
 }
 
 impl From<CaseSpec> for SymbolExpectation<'static> {
-    fn from(spec: CaseSpec) -> Self {
+    fn from(s: CaseSpec) -> Self {
         SymbolExpectation {
             request: ExtractRequest {
-                path: spec.path,
-                source: spec.source,
-                line: spec.line,
-                column: spec.column,
+                path: s.path,
+                source: s.source,
+                line: s.line,
+                column: s.column,
                 detail: DetailLevel::Structure,
             },
-            expected_kind: spec.kind,
-            expected_name: spec.name,
-            expected_container: spec.container,
+            expected_kind: s.kind,
+            expected_name: s.name,
+            expected_container: s.container,
         }
     }
-}
-
-fn make_case(spec: CaseSpec) -> SymbolExpectation<'static> {
-    spec.into()
 }
 
 fn rust_cases() -> Vec<SymbolExpectation<'static>> {
@@ -60,9 +56,7 @@ fn rust_cases() -> Vec<SymbolExpectation<'static>> {
         CaseSpec { path: Path::new("fixture.rs"), source: "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = name.len();\n    count\n}\n", line: 2, column: 4, kind: CardSymbolKind::Function, name: "greet", container: None },
         CaseSpec { path: Path::new("fixture.rs"), source: "struct Widget {\n    name: String,\n}\n", line: 1, column: 8, kind: CardSymbolKind::Type, name: "Widget", container: None },
         CaseSpec { path: Path::new("fixture.rs"), source: "impl Widget {\n    fn render(&self) {}\n}\n", line: 2, column: 8, kind: CardSymbolKind::Method, name: "render", container: Some("Widget") },
-    ]
-    .map(make_case)
-    .into()
+    ].map(Into::into).to_vec()
 }
 
 fn python_cases() -> Vec<SymbolExpectation<'static>> {
@@ -70,9 +64,7 @@ fn python_cases() -> Vec<SymbolExpectation<'static>> {
         CaseSpec { path: Path::new("fixture.py"), source: "def greet(name: str) -> int:\n    total = len(name)\n    return total\n", line: 1, column: 5, kind: CardSymbolKind::Function, name: "greet", container: None },
         CaseSpec { path: Path::new("fixture.py"), source: "class Widget:\n    pass\n", line: 1, column: 7, kind: CardSymbolKind::Class, name: "Widget", container: None },
         CaseSpec { path: Path::new("fixture.py"), source: "class Widget:\n    def render(self) -> None:\n        status = True\n        if status:\n            return None\n", line: 2, column: 9, kind: CardSymbolKind::Method, name: "render", container: Some("Widget") },
-    ]
-    .map(make_case)
-    .into()
+    ].map(Into::into).to_vec()
 }
 
 fn typescript_cases() -> Vec<SymbolExpectation<'static>> {
@@ -80,9 +72,7 @@ fn typescript_cases() -> Vec<SymbolExpectation<'static>> {
         CaseSpec { path: Path::new("fixture.ts"), source: "function greet(name: string): number {\n  const total = name.length;\n  return total;\n}\n", line: 1, column: 10, kind: CardSymbolKind::Function, name: "greet", container: None },
         CaseSpec { path: Path::new("fixture.ts"), source: "interface Widget {\n  name: string;\n}\n", line: 1, column: 11, kind: CardSymbolKind::Interface, name: "Widget", container: None },
         CaseSpec { path: Path::new("fixture.ts"), source: "class Widget {\n  render(): void {\n    const ready = true;\n    if (ready) {\n      return;\n    }\n  }\n}\n", line: 2, column: 3, kind: CardSymbolKind::Method, name: "render", container: Some("Widget") },
-    ]
-    .map(make_case)
-    .into()
+    ].map(Into::into).to_vec()
 }
 
 fn all_symbol_cases() -> Vec<SymbolExpectation<'static>> {
