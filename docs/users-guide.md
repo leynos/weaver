@@ -138,7 +138,7 @@ Tree-sitter-backed symbol card for supported Rust, Python, and TypeScript
 files. Missing or malformed arguments return structured error messages with
 exit status 1. Other operations within the `observe`, `act`, and `verify`
 domains still return "not yet implemented" responses while backend wiring is
-completed.
+being completed.
 
 The health snapshot is a single-line JSON document describing the current
 state, enabling operators and automation to poll readiness without speaking the

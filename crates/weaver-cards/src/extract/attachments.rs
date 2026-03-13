@@ -42,7 +42,25 @@ impl<'a> SourceLines<'a> {
 
 pub(super) struct Decorator(String);
 
+/// Internal wrapper around a raw decorator token captured during extraction.
+///
+/// The wrapped string is preserved exactly as collected from the language
+/// extractor so callers can still emit the original decorator text in the card
+/// payload. The only invariant relied upon here is that it represents one
+/// decorator-like token from the parse tree rather than an arbitrary block of
+/// source text.
 impl Decorator {
+    /// Normalises the decorator name for attachment fingerprints and payloads.
+    ///
+    /// This returns an owned [`String`] with surrounding whitespace trimmed,
+    /// any leading `@` removed, any argument suffix starting at the first `(`
+    /// discarded, and the remaining name trimmed again.
+    ///
+    /// Examples: `@route("a  b") -> "route"`, `  @sealed  -> "sealed"`,
+    /// `decorator -> "decorator"`.
+    ///
+    /// The implementation never panics; it uses `unwrap_or_default()` when the
+    /// decorator text contains no split segment.
     pub(super) fn normalise(&self) -> String {
         self.0
             .trim()
@@ -121,9 +139,9 @@ fn normalise_comment_line(line: &str, language: SupportedLanguage) -> Option<Str
 }
 
 fn rust_comment(line: &str) -> Option<String> {
-    for prefix in ["///", "//!", "/**", "/*!", "//", "*", "*/"] {
+    for prefix in ["///", "//!", "/**", "/*!", "//", "*/", "*"] {
         if let Some(rest) = line.strip_prefix(prefix) {
-            return Some(rest.trim().to_owned());
+            return trim_comment_body(rest);
         }
     }
     None
@@ -136,8 +154,42 @@ fn python_comment(line: &str) -> Option<String> {
 fn ts_comment(line: &str) -> Option<String> {
     for prefix in ["/**", "/*", "*/", "*", "//"] {
         if let Some(rest) = line.strip_prefix(prefix) {
-            return Some(rest.trim().to_owned());
+            return trim_comment_body(rest);
         }
     }
     None
+}
+
+fn trim_comment_body(rest: &str) -> Option<String> {
+    let trimmed = rest.trim();
+    let without_closer = trimmed
+        .strip_suffix("*/")
+        .map_or(trimmed, str::trim_end)
+        .trim();
+    (!without_closer.is_empty()).then(|| String::from(without_closer))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{rust_comment, ts_comment};
+
+    #[test]
+    fn rust_block_comment_strips_closer() {
+        assert_eq!(rust_comment("/** hello */").as_deref(), Some("hello"));
+    }
+
+    #[test]
+    fn rust_standalone_block_closer_is_ignored() {
+        assert_eq!(rust_comment("*/"), None);
+    }
+
+    #[test]
+    fn ts_block_comment_strips_closer() {
+        assert_eq!(ts_comment("/** hello */").as_deref(), Some("hello"));
+    }
+
+    #[test]
+    fn ts_standalone_block_closer_is_ignored() {
+        assert_eq!(ts_comment("*/"), None);
+    }
 }

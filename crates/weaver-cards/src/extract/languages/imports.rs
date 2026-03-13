@@ -65,7 +65,7 @@ pub(super) fn import_block_from_group(
 pub(super) fn normalise_import(language: SupportedLanguage, raw: &str) -> String {
     let trimmed = raw.trim();
     match language {
-        SupportedLanguage::Rust => trimmed
+        SupportedLanguage::Rust => strip_rust_visibility(trimmed)
             .trim_start_matches("pub ")
             .trim_start_matches("use ")
             .trim_start_matches("extern crate ")
@@ -83,4 +83,32 @@ pub(super) fn normalise_import(language: SupportedLanguage, raw: &str) -> String
             .trim()
             .to_owned(),
     }
+}
+
+fn strip_rust_visibility(raw: &str) -> &str {
+    let Some(after_pub) = raw.strip_prefix("pub") else {
+        return raw;
+    };
+    if let Some(rest) = after_pub.strip_prefix(char::is_whitespace) {
+        return rest.trim_start();
+    }
+    let Some(scoped) = after_pub.strip_prefix('(') else {
+        return raw;
+    };
+
+    let mut depth = 1usize;
+    for (index, ch) in scoped.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return scoped.get(index + 1..).map_or(raw, str::trim_start);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    raw
 }

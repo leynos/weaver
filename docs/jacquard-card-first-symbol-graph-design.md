@@ -372,7 +372,7 @@ remain stable under formatting churn.
   non-comment, non-decorator token is found, then attach the contiguous block.
 - Persist the chosen bundling rule in `attachments.bundle_rule` so downstream
   tooling can reason about portability across languages.
-- Normalize attachment fingerprints independently from display formatting so
+- Normalize attachment fingerprints independently of display formatting so
   whitespace-only edits do not perturb `SymbolId` or downstream diff matching.
 
 ### Nested entity filtering

@@ -14,12 +14,7 @@ pub(super) fn parse_parameters(param_node: Node<'_>, source: &str) -> Vec<ParamI
             let kind = child.kind();
             if matches!(
                 kind,
-                "self_parameter"
-                    | "receiver"
-                    | "list_splat_pattern"
-                    | "dictionary_splat_pattern"
-                    | "positional_separator"
-                    | "keyword_separator"
+                "self_parameter" | "receiver" | "positional_separator" | "keyword_separator"
             ) {
                 return None;
             }

@@ -66,30 +66,23 @@ impl<'a> From<ExtractRequest<'a>> for CardExtractionInput<'a> {
     }
 }
 
-fn extract(request: ExtractRequest<'_>) -> crate::SymbolCard {
+fn extract_result(request: ExtractRequest<'_>) -> Result<crate::SymbolCard, CardExtractionError> {
     let path = super::absolute_test_path(request.path);
-    TreeSitterCardExtractor::new()
-        .extract(
-            ExtractRequest {
-                path: &path,
-                ..request
-            }
-            .into(),
-        )
-        .expect("card extraction should succeed")
+    TreeSitterCardExtractor::new().extract(
+        ExtractRequest {
+            path: &path,
+            ..request
+        }
+        .into(),
+    )
+}
+
+fn extract(request: ExtractRequest<'_>) -> crate::SymbolCard {
+    extract_result(request).expect("card extraction should succeed")
 }
 
 fn extract_error(request: ExtractRequest<'_>) -> CardExtractionError {
-    let path = super::absolute_test_path(request.path);
-    TreeSitterCardExtractor::new()
-        .extract(
-            ExtractRequest {
-                path: &path,
-                ..request
-            }
-            .into(),
-        )
-        .expect_err("card extraction should fail")
+    extract_result(request).expect_err("card extraction should fail")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -349,6 +342,58 @@ fn python_default_parameters_are_extracted_from_ast() {
         vec!["", ""]
     );
     assert_eq!(card.symbol.symbol_id, repeated.symbol.symbol_id);
+}
+
+#[test]
+fn python_raw_triple_quoted_docstrings_are_preserved() {
+    let card = extract(ExtractRequest {
+        path: Path::new("fixture.py"),
+        source: "def bar() -> None:\n    r\"\"\"raw docstring\"\"\"\n    return None\n",
+        line: 1,
+        column: 5,
+        detail: DetailLevel::Structure,
+    });
+
+    assert_eq!(
+        card.doc.as_ref().map(|doc| doc.docstring.as_str()),
+        Some("raw docstring")
+    );
+}
+
+#[test]
+fn signature_display_preserves_literal_whitespace() {
+    let card = extract(ExtractRequest {
+        path: Path::new("fixture.ts"),
+        source: "function greet(message = \"a  b\"): void {\n  return;\n}\n",
+        line: 1,
+        column: 10,
+        detail: DetailLevel::Signature,
+    });
+
+    assert_eq!(
+        card.signature
+            .as_ref()
+            .map(|signature| signature.display.as_str()),
+        Some("function greet(message = \"a  b\"): void")
+    );
+}
+
+#[test]
+fn decorator_text_preserves_literal_whitespace() {
+    let card = extract(ExtractRequest {
+        path: Path::new("fixture.py"),
+        source: "@route(\"a  b\")\ndef bar() -> None:\n    return None\n",
+        line: 2,
+        column: 5,
+        detail: DetailLevel::Structure,
+    });
+
+    assert_eq!(
+        card.attachments
+            .as_ref()
+            .and_then(|attachments| attachments.decorators.first().map(String::as_str)),
+        Some("@route(\"a  b\")")
+    );
 }
 
 #[test]

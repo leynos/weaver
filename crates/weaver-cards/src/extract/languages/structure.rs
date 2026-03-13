@@ -34,9 +34,7 @@ impl<'a> StructureCollector<'a> {
             return;
         }
 
-        if let Some(local) = local_info(node, self.source) {
-            self.locals.push(local);
-        }
+        self.locals.extend(local_info(node, self.source));
         if let Some(branch) = branch_info(node) {
             self.branches.push(branch);
         }
@@ -67,27 +65,53 @@ pub(super) fn is_nested_entity(kind: &str, root_kind: &str) -> bool {
         || (kind == "function_item" && root_kind != "trait_item")
         || kind == "function_declaration"
         || kind == "method_definition"
+        || kind == "class_definition"
+        || kind == "class_declaration"
+        || kind == "interface_declaration"
+        || kind == "type_alias_declaration"
+        || kind == "struct_item"
+        || kind == "enum_item"
+        || kind == "type_item"
+        || kind == "trait_item"
 }
 
-pub(super) fn local_info(node: Node<'_>, source: &str) -> Option<LocalInfo> {
-    match node.kind() {
-        "let_declaration" => Some(LocalInfo {
-            name: binding_name(node, source),
+pub(super) fn local_info(node: Node<'_>, source: &str) -> Vec<LocalInfo> {
+    let names = match node.kind() {
+        "let_declaration" => {
+            let names = binding_names(node, source);
+            if names.is_empty() {
+                vec![binding_name(node, source)]
+            } else {
+                names
+            }
+        }
+        "assignment" => {
+            let names = assignment_names(node, source);
+            if names.is_empty() {
+                vec![assignment_name(node, source)]
+            } else {
+                names
+            }
+        }
+        "lexical_declaration" => {
+            let names = lexical_names(node, source);
+            if names.is_empty() {
+                vec![lexical_name(node, source)]
+            } else {
+                names
+            }
+        }
+        _ => return Vec::new(),
+    };
+
+    names
+        .into_iter()
+        .map(|name| LocalInfo {
+            name,
             kind: String::from("variable"),
             decl_line: to_u32(node.start_position().row),
-        }),
-        "assignment" => Some(LocalInfo {
-            name: assignment_name(node, source),
-            kind: String::from("variable"),
-            decl_line: to_u32(node.start_position().row),
-        }),
-        "lexical_declaration" => Some(LocalInfo {
-            name: lexical_name(node, source),
-            kind: String::from("variable"),
-            decl_line: to_u32(node.start_position().row),
-        }),
-        _ => None,
-    }
+        })
+        .collect()
 }
 
 pub(super) fn branch_info(node: Node<'_>) -> Option<BranchInfo> {
@@ -106,33 +130,90 @@ pub(super) fn branch_info(node: Node<'_>) -> Option<BranchInfo> {
 }
 
 pub(super) fn binding_name(node: Node<'_>, source: &str) -> String {
-    node.child_by_field_name("pattern")
-        .and_then(|pattern| source.get(pattern.byte_range()))
-        .map_or_else(
-            || normalise_whitespace(source.get(node.byte_range()).unwrap_or_default()),
-            normalise_whitespace,
-        )
+    binding_names(node, source)
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| normalise_whitespace(source.get(node.byte_range()).unwrap_or_default()))
 }
 
 pub(super) fn assignment_name(node: Node<'_>, source: &str) -> String {
-    let mut cursor = node.walk();
-    node.named_children(&mut cursor)
+    assignment_names(node, source)
+        .into_iter()
         .next()
-        .and_then(|target| source.get(target.byte_range()))
-        .map_or_else(|| String::from("assignment"), normalise_whitespace)
+        .unwrap_or_else(|| String::from("assignment"))
 }
 
 pub(super) fn lexical_name(node: Node<'_>, source: &str) -> String {
-    let raw = source.get(node.byte_range()).unwrap_or_default().trim();
-    let trimmed = raw
-        .trim_start_matches("const ")
-        .trim_start_matches("let ")
-        .trim_start_matches("var ");
-    trimmed
-        .split_once('=')
-        .map_or(trimmed, |(name, _)| name)
-        .split_once(':')
-        .map_or(trimmed, |(name, _)| name)
-        .trim()
-        .to_owned()
+    lexical_names(node, source)
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| normalise_whitespace(source.get(node.byte_range()).unwrap_or_default()))
+}
+
+fn binding_names(node: Node<'_>, source: &str) -> Vec<String> {
+    node.child_by_field_name("pattern")
+        .map_or_else(Vec::new, |pattern| bound_names(pattern, source))
+}
+
+fn assignment_names(node: Node<'_>, source: &str) -> Vec<String> {
+    node.child_by_field_name("left")
+        .map_or_else(Vec::new, |target| bound_names(target, source))
+}
+
+fn lexical_names(node: Node<'_>, source: &str) -> Vec<String> {
+    let mut cursor = node.walk();
+    let names: Vec<String> = node
+        .named_children(&mut cursor)
+        .filter(|child| child.kind() == "variable_declarator")
+        .flat_map(|declarator| {
+            declarator
+                .child_by_field_name("name")
+                .map_or_else(Vec::new, |name| bound_names(name, source))
+        })
+        .collect();
+    if names.is_empty() {
+        let mut fallback_cursor = node.walk();
+        node.named_children(&mut fallback_cursor)
+            .flat_map(|child| bound_names(child, source))
+            .collect()
+    } else {
+        names
+    }
+}
+
+fn bound_names(node: Node<'_>, source: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    collect_bound_names(node, source, &mut names);
+    names
+}
+
+fn collect_bound_names(node: Node<'_>, source: &str, names: &mut Vec<String>) {
+    match node.kind() {
+        "identifier"
+        | "property_identifier"
+        | "shorthand_property_identifier"
+        | "shorthand_property_identifier_pattern" => {
+            if let Some(text) = source.get(node.byte_range()) {
+                let name = normalise_whitespace(text);
+                if !name.is_empty() {
+                    names.push(name);
+                }
+            }
+            return;
+        }
+        "member_expression" | "field_expression" | "subscript_expression" => return,
+        _ => {}
+    }
+
+    for field_name in ["name", "pattern", "left", "value"] {
+        if let Some(child) = node.child_by_field_name(field_name) {
+            collect_bound_names(child, source, names);
+            return;
+        }
+    }
+
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        collect_bound_names(child, source, names);
+    }
 }
