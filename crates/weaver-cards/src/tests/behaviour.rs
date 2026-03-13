@@ -68,6 +68,7 @@ fn parse_detail_level(raw: &str) -> Result<DetailLevel, String> {
 fn parse_refusal_reason(raw: &str) -> Result<RefusalReason, String> {
     match raw {
         "no_symbol_at_position" => Ok(RefusalReason::NoSymbolAtPosition),
+        "position_out_of_range" => Ok(RefusalReason::PositionOutOfRange),
         "unsupported_language" => Ok(RefusalReason::UnsupportedLanguage),
         "not_yet_implemented" => Ok(RefusalReason::NotYetImplemented),
         "backend_unavailable" => Ok(RefusalReason::BackendUnavailable),
@@ -87,6 +88,9 @@ fn build_refusal_response(reason: RefusalReason, detail: DetailLevel) -> GetCard
     let message = match &reason {
         RefusalReason::NoSymbolAtPosition => {
             String::from("no symbol found at the requested position")
+        }
+        RefusalReason::PositionOutOfRange => {
+            String::from("the requested position is outside the file bounds")
         }
         RefusalReason::UnsupportedLanguage => {
             String::from("the requested language is not supported")

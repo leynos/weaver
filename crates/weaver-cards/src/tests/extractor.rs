@@ -2,6 +2,8 @@
 
 use std::path::Path;
 
+use rstest::rstest;
+
 use crate::{
     CardExtractionError, CardExtractionInput, CardSymbolKind, DetailLevel, GetCardResponse,
     TreeSitterCardExtractor,
@@ -52,71 +54,85 @@ impl From<CaseSpec> for SymbolExpectation<'static> {
     }
 }
 
-fn rust_cases() -> Vec<SymbolExpectation<'static>> {
-    [
-        CaseSpec { path: Path::new("fixture.rs"), source: "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = name.len();\n    count\n}\n", line: 2, column: 4, kind: CardSymbolKind::Function, name: "greet", container: None },
-        CaseSpec { path: Path::new("fixture.rs"), source: "struct Widget {\n    name: String,\n}\n", line: 1, column: 8, kind: CardSymbolKind::Type, name: "Widget", container: None },
-        CaseSpec { path: Path::new("fixture.rs"), source: "impl Widget {\n    fn render(&self) {}\n}\n", line: 2, column: 8, kind: CardSymbolKind::Method, name: "render", container: Some("Widget") },
-    ].map(Into::into).to_vec()
-}
-
-fn python_cases() -> Vec<SymbolExpectation<'static>> {
-    [
-        CaseSpec { path: Path::new("fixture.py"), source: "def greet(name: str) -> int:\n    total = len(name)\n    return total\n", line: 1, column: 5, kind: CardSymbolKind::Function, name: "greet", container: None },
-        CaseSpec { path: Path::new("fixture.py"), source: "class Widget:\n    pass\n", line: 1, column: 7, kind: CardSymbolKind::Class, name: "Widget", container: None },
-        CaseSpec { path: Path::new("fixture.py"), source: "class Widget:\n    def render(self) -> None:\n        status = True\n        if status:\n            return None\n", line: 2, column: 9, kind: CardSymbolKind::Method, name: "render", container: Some("Widget") },
-    ].map(Into::into).to_vec()
-}
-
-fn typescript_cases() -> Vec<SymbolExpectation<'static>> {
-    [
-        CaseSpec { path: Path::new("fixture.ts"), source: "function greet(name: string): number {\n  const total = name.length;\n  return total;\n}\n", line: 1, column: 10, kind: CardSymbolKind::Function, name: "greet", container: None },
-        CaseSpec { path: Path::new("fixture.ts"), source: "interface Widget {\n  name: string;\n}\n", line: 1, column: 11, kind: CardSymbolKind::Interface, name: "Widget", container: None },
-        CaseSpec { path: Path::new("fixture.ts"), source: "class Widget {\n  render(): void {\n    const ready = true;\n    if (ready) {\n      return;\n    }\n  }\n}\n", line: 2, column: 3, kind: CardSymbolKind::Method, name: "render", container: Some("Widget") },
-    ].map(Into::into).to_vec()
-}
-
-fn all_symbol_cases() -> Vec<SymbolExpectation<'static>> {
-    [rust_cases(), python_cases(), typescript_cases()].concat()
+impl<'a> From<ExtractRequest<'a>> for CardExtractionInput<'a> {
+    fn from(r: ExtractRequest<'a>) -> Self {
+        CardExtractionInput {
+            path: r.path,
+            source: r.source,
+            line: r.line,
+            column: r.column,
+            detail: r.detail,
+        }
+    }
 }
 
 fn extract(request: ExtractRequest<'_>) -> crate::SymbolCard {
     let path = super::absolute_test_path(request.path);
     TreeSitterCardExtractor::new()
-        .extract(CardExtractionInput {
-            path: &path,
-            source: request.source,
-            line: request.line,
-            column: request.column,
-            detail: request.detail,
-        })
+        .extract(
+            ExtractRequest {
+                path: &path,
+                ..request
+            }
+            .into(),
+        )
         .expect("card extraction should succeed")
 }
 
 fn extract_error(request: ExtractRequest<'_>) -> CardExtractionError {
     let path = super::absolute_test_path(request.path);
     TreeSitterCardExtractor::new()
-        .extract(CardExtractionInput {
-            path: &path,
-            source: request.source,
-            line: request.line,
-            column: request.column,
-            detail: request.detail,
-        })
+        .extract(
+            ExtractRequest {
+                path: &path,
+                ..request
+            }
+            .into(),
+        )
         .expect_err("card extraction should fail")
 }
 
-#[test]
-fn extracts_supported_symbol_kinds() {
-    for case in all_symbol_cases() {
-        let card = extract(case.request);
-        assert_eq!(card.symbol.symbol_ref.kind, case.expected_kind);
-        assert_eq!(card.symbol.symbol_ref.name, case.expected_name);
-        assert_eq!(
-            card.symbol.symbol_ref.container.as_deref(),
-            case.expected_container
-        );
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExpectedError {
+    UnsupportedLanguage,
+    PositionOutOfRange,
+    NoSymbolAtPosition,
+}
+
+fn error_matches(err: &CardExtractionError, expected: ExpectedError) -> bool {
+    matches!(
+        (err, expected),
+        (
+            CardExtractionError::UnsupportedLanguage { .. },
+            ExpectedError::UnsupportedLanguage
+        ) | (
+            CardExtractionError::PositionOutOfRange { .. },
+            ExpectedError::PositionOutOfRange
+        ) | (
+            CardExtractionError::NoSymbolAtPosition { .. },
+            ExpectedError::NoSymbolAtPosition
+        )
+    )
+}
+
+#[rstest]
+#[case(CaseSpec { path: Path::new("fixture.rs"), source: "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = name.len();\n    count\n}\n", line: 2, column: 4, kind: CardSymbolKind::Function, name: "greet", container: None }.into())]
+#[case(CaseSpec { path: Path::new("fixture.rs"), source: "struct Widget {\n    name: String,\n}\n", line: 1, column: 8, kind: CardSymbolKind::Type, name: "Widget", container: None }.into())]
+#[case(CaseSpec { path: Path::new("fixture.rs"), source: "impl Widget {\n    fn render(&self) {}\n}\n", line: 2, column: 8, kind: CardSymbolKind::Method, name: "render", container: Some("Widget") }.into())]
+#[case(CaseSpec { path: Path::new("fixture.py"), source: "def greet(name: str) -> int:\n    total = len(name)\n    return total\n", line: 1, column: 5, kind: CardSymbolKind::Function, name: "greet", container: None }.into())]
+#[case(CaseSpec { path: Path::new("fixture.py"), source: "class Widget:\n    pass\n", line: 1, column: 7, kind: CardSymbolKind::Class, name: "Widget", container: None }.into())]
+#[case(CaseSpec { path: Path::new("fixture.py"), source: "class Widget:\n    def render(self) -> None:\n        status = True\n        if status:\n            return None\n", line: 2, column: 9, kind: CardSymbolKind::Method, name: "render", container: Some("Widget") }.into())]
+#[case(CaseSpec { path: Path::new("fixture.ts"), source: "function greet(name: string): number {\n  const total = name.length;\n  return total;\n}\n", line: 1, column: 10, kind: CardSymbolKind::Function, name: "greet", container: None }.into())]
+#[case(CaseSpec { path: Path::new("fixture.ts"), source: "interface Widget {\n  name: string;\n}\n", line: 1, column: 11, kind: CardSymbolKind::Interface, name: "Widget", container: None }.into())]
+#[case(CaseSpec { path: Path::new("fixture.ts"), source: "class Widget {\n  render(): void {\n    const ready = true;\n    if (ready) {\n      return;\n    }\n  }\n}\n", line: 2, column: 3, kind: CardSymbolKind::Method, name: "render", container: Some("Widget") }.into())]
+fn extracts_supported_symbol_kinds(#[case] case: SymbolExpectation<'static>) {
+    let card = extract(case.request);
+    assert_eq!(card.symbol.symbol_ref.kind, case.expected_kind);
+    assert_eq!(card.symbol.symbol_ref.name, case.expected_name);
+    assert_eq!(
+        card.symbol.symbol_ref.container.as_deref(),
+        case.expected_container
+    );
 }
 
 #[test]
@@ -275,6 +291,67 @@ fn whitespace_only_edits_do_not_change_symbol_id() {
 }
 
 #[test]
+fn rust_tuple_type_parameters_are_extracted_from_ast() {
+    let card = extract(ExtractRequest {
+        path: Path::new("fixture.rs"),
+        source: "fn foo(pair: (u32, u32)) -> u32 {\n    pair.0 + pair.1\n}\n",
+        line: 1,
+        column: 4,
+        detail: DetailLevel::Signature,
+    });
+    let repeated = extract(ExtractRequest {
+        path: Path::new("fixture.rs"),
+        source: "fn foo(pair: (u32, u32)) -> u32 {\n    pair.0 + pair.1\n}\n",
+        line: 1,
+        column: 4,
+        detail: DetailLevel::Signature,
+    });
+    let params = &card.signature.as_ref().expect("signature").params;
+
+    assert_eq!(params.len(), 1);
+    assert_eq!(
+        params.first().map(|param| param.name.as_str()),
+        Some("pair")
+    );
+    assert_eq!(
+        params.first().map(|param| param.type_annotation.as_str()),
+        Some("(u32, u32)")
+    );
+    assert_eq!(card.symbol.symbol_id, repeated.symbol.symbol_id);
+}
+
+#[test]
+fn python_default_parameters_are_extracted_from_ast() {
+    let card = extract(ExtractRequest {
+        path: Path::new("fixture.py"),
+        source: "def bar(x, y=1):\n    return x + y\n",
+        line: 1,
+        column: 5,
+        detail: DetailLevel::Signature,
+    });
+    let repeated = extract(ExtractRequest {
+        path: Path::new("fixture.py"),
+        source: "def bar(x, y=1):\n    return x + y\n",
+        line: 1,
+        column: 5,
+        detail: DetailLevel::Signature,
+    });
+    let params = &card.signature.as_ref().expect("signature").params;
+
+    assert_eq!(params.len(), 2);
+    assert_eq!(params.first().map(|param| param.name.as_str()), Some("x"));
+    assert_eq!(params.get(1).map(|param| param.name.as_str()), Some("y"));
+    assert_eq!(
+        params
+            .iter()
+            .map(|param| param.type_annotation.as_str())
+            .collect::<Vec<_>>(),
+        vec!["", ""]
+    );
+    assert_eq!(card.symbol.symbol_id, repeated.symbol.symbol_id);
+}
+
+#[test]
 fn semantic_detail_degrades_to_tree_sitter_provenance() {
     let card = extract(ExtractRequest {
         path: Path::new("fixture.ts"),
@@ -310,68 +387,39 @@ fn get_card_success_payload_can_wrap_extracted_cards() {
     assert!(matches!(response, GetCardResponse::Success { .. }));
 }
 
-#[test]
-fn returns_unsupported_language_error_for_unknown_extension() {
+#[rstest]
+#[case(
+    ExtractRequest { path: Path::new("fixture.foobar"), source: "fn main() {}\n", line: 1, column: 1, detail: DetailLevel::Full },
+    ExpectedError::UnsupportedLanguage,
+)]
+#[case(
+    ExtractRequest { path: Path::new("fixture.rs"), source: "fn main() {}\n", line: 0, column: 1, detail: DetailLevel::Full },
+    ExpectedError::PositionOutOfRange,
+)]
+#[case(
+    ExtractRequest { path: Path::new("fixture.rs"), source: "fn main() {}\n", line: 10, column: 100, detail: DetailLevel::Full },
+    ExpectedError::PositionOutOfRange,
+)]
+#[case(
+    ExtractRequest { path: Path::new("fixture.rs"), source: "// heading\nfn visible_symbol() {}\n", line: 1, column: 1, detail: DetailLevel::Full },
+    ExpectedError::NoSymbolAtPosition,
+)]
+fn extraction_error_cases(
+    #[case] request: ExtractRequest<'static>,
+    #[case] expected: ExpectedError,
+) {
     let err = extract_error(ExtractRequest {
-        path: Path::new("fixture.foobar"),
-        source: "fn main() {}\n",
-        line: 1,
-        column: 1,
-        detail: DetailLevel::Full,
+        path: request.path,
+        source: request.source,
+        line: request.line,
+        column: request.column,
+        detail: request.detail,
     });
 
-    assert!(matches!(
-        err,
-        CardExtractionError::UnsupportedLanguage { .. }
-    ));
-}
-
-#[test]
-fn returns_position_out_of_range_error_for_zero_position() {
-    let err = extract_error(ExtractRequest {
-        path: Path::new("fixture.rs"),
-        source: "fn main() {}\n",
-        line: 0,
-        column: 1,
-        detail: DetailLevel::Full,
-    });
-
-    assert!(matches!(
-        err,
-        CardExtractionError::PositionOutOfRange { .. }
-    ));
-}
-
-#[test]
-fn returns_position_out_of_range_error_for_position_beyond_end_of_source() {
-    let err = extract_error(ExtractRequest {
-        path: Path::new("fixture.rs"),
-        source: "fn main() {}\n",
-        line: 10,
-        column: 100,
-        detail: DetailLevel::Full,
-    });
-
-    assert!(matches!(
-        err,
-        CardExtractionError::PositionOutOfRange { .. }
-    ));
-}
-
-#[test]
-fn returns_no_symbol_at_position_error_when_nothing_matches() {
-    let err = extract_error(ExtractRequest {
-        path: Path::new("fixture.rs"),
-        source: "// heading\nfn visible_symbol() {}\n",
-        line: 1,
-        column: 1,
-        detail: DetailLevel::Full,
-    });
-
-    assert!(matches!(
-        err,
-        CardExtractionError::NoSymbolAtPosition { .. }
-    ));
+    assert!(
+        error_matches(&err, expected),
+        "expected {expected:?}, got {err:?}",
+    );
 }
 
 #[test]

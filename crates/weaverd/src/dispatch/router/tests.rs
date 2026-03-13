@@ -182,7 +182,7 @@ fn get_card_returns_structured_refusal(mut backends: FusionBackends<SemanticBack
     let data_str = envelope["data"].as_str().expect("data string");
     let card: serde_json::Value = serde_json::from_str(data_str).expect("parse card");
     assert_eq!(card["status"], "refusal");
-    assert_eq!(card["refusal"]["reason"], "no_symbol_at_position");
+    assert_eq!(card["refusal"]["reason"], "position_out_of_range");
     assert_eq!(card["refusal"]["requested_detail"], "structure");
 }
 

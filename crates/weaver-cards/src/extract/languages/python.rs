@@ -60,7 +60,7 @@ fn push_decorated_entities(entities: &mut Vec<EntityCandidate>, node: Node<'_>, 
     let decorators = decorator_texts(node, source);
     match definition.kind() {
         "function_definition" => {
-            entities.push(build_callable(
+            let mut candidate = build_callable(
                 definition,
                 source,
                 CallableSpec {
@@ -68,7 +68,9 @@ fn push_decorated_entities(entities: &mut Vec<EntityCandidate>, node: Node<'_>, 
                     container: None,
                     decorators,
                 },
-            ));
+            );
+            candidate.attachment_anchor = Some(node.start_byte());
+            entities.push(candidate);
         }
         "class_definition" => {
             push_class_entities(
@@ -154,7 +156,7 @@ fn decorated_method(
 ) -> Option<EntityCandidate> {
     let definition = node.child_by_field_name("definition")?;
     (definition.kind() == "function_definition").then(|| {
-        build_callable(
+        let mut candidate = build_callable(
             definition,
             source,
             CallableSpec {
@@ -162,6 +164,8 @@ fn decorated_method(
                 container,
                 decorators: decorator_texts(node, source),
             },
-        )
+        );
+        candidate.attachment_anchor = Some(node.start_byte());
+        candidate
     })
 }

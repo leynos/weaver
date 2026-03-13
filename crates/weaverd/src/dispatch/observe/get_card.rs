@@ -103,7 +103,7 @@ fn map_extraction_error(
         }),
         CardExtractionError::PositionOutOfRange { line, column } => Ok(GetCardResponse::Refusal {
             refusal: CardRefusal {
-                reason: RefusalReason::NoSymbolAtPosition,
+                reason: RefusalReason::PositionOutOfRange,
                 message: format!(
                     "observe get-card: position {line}:{column} is outside the bounds of the file"
                 ),
@@ -160,7 +160,7 @@ mod tests {
             DetailLevel::Structure => "structure",
             DetailLevel::Semantic => "semantic",
             DetailLevel::Full => "full",
-            _ => panic!("unsupported detail level in get-card test helper"),
+            detail => unreachable!("unexpected DetailLevel variant: {:?}", detail),
         };
         CommandRequest::parse(
             format!(
@@ -272,7 +272,7 @@ mod tests {
             },
             line: 10,
             column: 100,
-            expected_reason: RefusalReason::NoSymbolAtPosition,
+            expected_reason: RefusalReason::PositionOutOfRange,
             expected_message_substring: "position 10:100 is outside the bounds of the file",
         }
     )]

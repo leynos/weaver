@@ -593,8 +593,11 @@ level:
   structure it differently.
 - `structure` (default) — further adds `doc`, `structure`, and basic
   `metrics`. May include `attachments`.
-- `semantic` — adds LSP hover/type information.
-- `full` — adds dependency edges and fan-in/out metrics.
+- `semantic` — currently degrades to a Tree-sitter-only card with explicit
+  provenance markers; LSP hover/type enrichment is not yet applied.
+- `full` — currently degrades to a Tree-sitter-only card with explicit
+  provenance markers; dependency edges and fan-in/out metrics are not yet
+  included.
 
 #### observe grep
 

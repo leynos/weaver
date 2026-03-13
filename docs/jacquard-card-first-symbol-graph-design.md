@@ -414,13 +414,13 @@ Proposed detail levels:
 
   - Add deps (typed edges), fan-in/out metrics, canonical test mapping (future)
 
-| Detail      | Adds                            | Requires         | Expected latency |
-| ----------- | ------------------------------- | ---------------- | ---------------- |
-| `minimal`   | identity only                   | none             | lowest           |
-| `signature` | signature fingerprint           | Tree-sitter      | low              |
-| `structure` | doc/attachments/locals/branches | Tree-sitter      | low–medium       |
-| `semantic`  | hover/types                     | LSP initialized  | medium           |
-| `full`      | deps + fan metrics              | relational graph | medium–high      |
+| Detail      | Adds                            | Requires               | Expected latency |
+| ----------- | ------------------------------- | ---------------------- | ---------------- |
+| `minimal`   | identity only                   | none                   | lowest           |
+| `signature` | signature fingerprint           | Tree-sitter            | low              |
+| `structure` | doc/attachments/locals/branches | Tree-sitter            | low–medium       |
+| `semantic`  | hover/types                     | Tree-sitter (degrades) | low–medium       |
+| `full`      | deps + fan metrics              | Tree-sitter (degrades) | low–medium       |
 
 *Table 2: Progressive card enhancement layers.*
 
@@ -428,7 +428,8 @@ Implementation rules:
 
 - `observe get-card` defaults to `structure` for high utility without requiring
   a live LSP server.
-- `--detail semantic` triggers a semantic backend start if required.[^5]
+- `--detail semantic` and `--detail full` degrade to Tree-sitter-only payloads
+  with explicit provenance markers until LSP enrichment lands.
 - Each field includes provenance (`tree_sitter`, `lsp_hover`, …) so downstream
   tooling can treat low-confidence data appropriately.
 

@@ -134,7 +134,7 @@ impl Drop for GetCardWorld {
     fn drop(&mut self) {
         if let Some(handle) = self.listener.take() {
             handle.shutdown();
-            let _ = handle.join();
+            handle.join().ok();
         }
     }
 }

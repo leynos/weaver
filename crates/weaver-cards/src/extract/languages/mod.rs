@@ -32,12 +32,31 @@ pub(super) fn collect_import_interstitial(
         return None;
     }
 
-    let start = imports.first().map(|block| block.byte_start)?;
-    let end = imports.last().map(|block| block.byte_end)?;
+    // Keep the first contiguous import run so later import groups do not
+    // widen the interstitial span across intervening code.
+    let mut merged_group = Vec::new();
+    for block in &imports {
+        if merged_group.is_empty() {
+            merged_group.push(block);
+            continue;
+        }
+
+        let current_end = merged_group
+            .last()
+            .map_or(block.byte_start, |current| current.byte_end);
+        if block.byte_start <= current_end + 1 {
+            merged_group.push(block);
+        } else {
+            break;
+        }
+    }
+
+    let start = merged_group.first().map(|block| block.byte_start)?;
+    let end = merged_group.last().map(|block| block.byte_end)?;
     let raw = source.get(start..end).unwrap_or_default().to_owned();
     let mut normalized = Vec::new();
     let mut groups = Vec::new();
-    for block in &imports {
+    for block in merged_group {
         normalized.extend(block.normalized.clone());
         groups.push(block.normalized.clone());
     }
