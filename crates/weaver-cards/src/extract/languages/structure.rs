@@ -46,6 +46,12 @@ impl<'a> StructureCollector<'a> {
     }
 }
 
+/// Collects local bindings and branch markers for a callable body subtree.
+///
+/// `root` is the callable node that owns the body, `body` is the optional
+/// body node to traverse, and `source` provides text slices for extracted
+/// names. Returns `(locals, branches)` and yields empty vectors when no body is
+/// present.
 pub(super) fn collect_structure(
     root: Node<'_>,
     body: Option<Node<'_>>,
@@ -59,6 +65,10 @@ pub(super) fn collect_structure(
     collector.finish()
 }
 
+/// Reports whether a node kind should stop local traversal as a nested entity.
+///
+/// `kind` is the candidate nested node and `root_kind` is the surrounding
+/// callable or container kind, used for Rust trait-item exceptions.
 pub(super) fn is_nested_entity(kind: &str, root_kind: &str) -> bool {
     kind == "function_definition"
         || kind == "lambda"
@@ -75,6 +85,11 @@ pub(super) fn is_nested_entity(kind: &str, root_kind: &str) -> bool {
         || kind == "trait_item"
 }
 
+/// Extracts local variable declarations represented by the given node.
+///
+/// `node` is a declaration or assignment candidate and `source` provides text
+/// for bound-name extraction. Returns one [`LocalInfo`] per discovered binding,
+/// or an empty vector when the node does not declare locals.
 pub(super) fn local_info(node: Node<'_>, source: &str) -> Vec<LocalInfo> {
     let names = match node.kind() {
         "let_declaration" => {
@@ -114,6 +129,10 @@ pub(super) fn local_info(node: Node<'_>, source: &str) -> Vec<LocalInfo> {
         .collect()
 }
 
+/// Maps branch-like syntax nodes to the corresponding [`BranchInfo`].
+///
+/// Returns `None` for non-branch nodes and otherwise records the normalized
+/// branch kind plus the node's starting line.
 pub(super) fn branch_info(node: Node<'_>) -> Option<BranchInfo> {
     let kind = match node.kind() {
         "if_expression" | "if_statement" => "if",
@@ -129,6 +148,10 @@ pub(super) fn branch_info(node: Node<'_>) -> Option<BranchInfo> {
     })
 }
 
+/// Returns the first binding name extracted from a Rust-style let declaration.
+///
+/// `node` is expected to expose a `pattern` field. Falls back to the raw node
+/// text when no more specific binding name can be derived.
 pub(super) fn binding_name(node: Node<'_>, source: &str) -> String {
     binding_names(node, source)
         .into_iter()
@@ -136,6 +159,10 @@ pub(super) fn binding_name(node: Node<'_>, source: &str) -> String {
         .unwrap_or_else(|| normalise_whitespace(source.get(node.byte_range()).unwrap_or_default()))
 }
 
+/// Returns the first assignment target name extracted from a binding node.
+///
+/// `node` is expected to expose a `left` field. Returns `"assignment"` when no
+/// explicit target name can be resolved.
 pub(super) fn assignment_name(node: Node<'_>, source: &str) -> String {
     assignment_names(node, source)
         .into_iter()
@@ -143,6 +170,11 @@ pub(super) fn assignment_name(node: Node<'_>, source: &str) -> String {
         .unwrap_or_else(|| String::from("assignment"))
 }
 
+/// Returns the first lexical declaration name extracted from a declaration.
+///
+/// `node` is usually a JavaScript or TypeScript lexical declaration. Falls
+/// back to normalized node text when bound-name traversal finds nothing more
+/// specific.
 pub(super) fn lexical_name(node: Node<'_>, source: &str) -> String {
     lexical_names(node, source)
         .into_iter()

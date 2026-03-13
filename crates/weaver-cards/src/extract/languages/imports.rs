@@ -5,6 +5,13 @@ use weaver_syntax::SupportedLanguage;
 
 use crate::extract::ImportBlock;
 
+/// Collects top-level import blocks for the requested language.
+///
+/// `language` selects the import node kinds to match, `root` is the parsed
+/// syntax-tree root, and `source` provides the text slices used to build each
+/// [`ImportBlock`]. Returns consecutive import statements grouped into
+/// normalized blocks, or an empty vector when the file has no top-level
+/// imports.
 pub(super) fn top_level_imports(
     language: SupportedLanguage,
     root: Node<'_>,
@@ -28,6 +35,10 @@ pub(super) fn top_level_imports(
         .collect()
 }
 
+/// Groups consecutive import nodes that touch or are separated by one line.
+///
+/// The returned outer vector preserves source order. A new group starts when a
+/// node begins more than one row after the previous node's end row.
 pub(super) fn group_consecutive_nodes(nodes: Vec<Node<'_>>) -> Vec<Vec<Node<'_>>> {
     let mut groups: Vec<Vec<Node<'_>>> = Vec::new();
     for node in nodes {
@@ -43,6 +54,12 @@ pub(super) fn group_consecutive_nodes(nodes: Vec<Node<'_>>) -> Vec<Vec<Node<'_>>
     groups
 }
 
+/// Builds a single [`ImportBlock`] from one consecutive import group.
+///
+/// `language` controls normalization rules, `group` supplies the contiguous
+/// import nodes, and `source` provides the original byte slices. Returns
+/// `None` when the group is empty or its byte range cannot be sliced from the
+/// source text.
 pub(super) fn import_block_from_group(
     language: SupportedLanguage,
     group: &[Node<'_>],
@@ -62,11 +79,15 @@ pub(super) fn import_block_from_group(
     })
 }
 
+/// Normalizes a raw import statement for language-specific comparisons.
+///
+/// The returned string strips leading syntax such as `use`, `import`, or Rust
+/// visibility modifiers, removes trailing statement terminators where
+/// appropriate, and trims surrounding whitespace.
 pub(super) fn normalise_import(language: SupportedLanguage, raw: &str) -> String {
     let trimmed = raw.trim();
     match language {
         SupportedLanguage::Rust => strip_rust_visibility(trimmed)
-            .trim_start_matches("pub ")
             .trim_start_matches("use ")
             .trim_start_matches("extern crate ")
             .trim_end_matches(';')

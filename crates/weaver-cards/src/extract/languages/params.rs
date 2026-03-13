@@ -6,6 +6,13 @@ use crate::ParamInfo;
 
 use super::normalise_whitespace;
 
+/// Extracts parameter names and type annotations from a parameters node.
+///
+/// `param_node` is the Tree-sitter parameters list to inspect and `source`
+/// provides the backing text used for node slices. Returns one [`ParamInfo`]
+/// per non-empty parameter name, skipping receivers such as `self_parameter`
+/// and `receiver` plus separator nodes. Use this for callable signature
+/// extraction rather than raw text splitting.
 pub(super) fn parse_parameters(param_node: Node<'_>, source: &str) -> Vec<ParamInfo> {
     let mut cursor = param_node.walk();
     param_node
