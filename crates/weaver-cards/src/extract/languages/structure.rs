@@ -70,19 +70,24 @@ pub(super) fn collect_structure(
 /// `kind` is the candidate nested node and `root_kind` is the surrounding
 /// callable or container kind, used for Rust trait-item exceptions.
 pub(super) fn is_nested_entity(kind: &str, root_kind: &str) -> bool {
-    kind == "function_definition"
-        || kind == "lambda"
-        || (kind == "function_item" && root_kind != "trait_item")
-        || kind == "function_declaration"
-        || kind == "method_definition"
-        || kind == "class_definition"
-        || kind == "class_declaration"
-        || kind == "interface_declaration"
-        || kind == "type_alias_declaration"
-        || kind == "struct_item"
-        || kind == "enum_item"
-        || kind == "type_item"
-        || kind == "trait_item"
+    const ALWAYS_NESTED: &[&str] = &[
+        "function_definition",
+        "lambda",
+        "function_declaration",
+        "method_definition",
+        "class_definition",
+        "class_declaration",
+        "interface_declaration",
+        "type_alias_declaration",
+        "struct_item",
+        "enum_item",
+        "type_item",
+        "trait_item",
+    ];
+    if kind == "function_item" {
+        return root_kind != "trait_item";
+    }
+    ALWAYS_NESTED.contains(&kind)
 }
 
 /// Extracts local variable declarations represented by the given node.

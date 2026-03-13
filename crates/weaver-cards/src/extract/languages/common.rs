@@ -214,6 +214,24 @@ fn to_u32(value: usize) -> u32 {
     u32::try_from(value).unwrap_or(u32::MAX)
 }
 
+/// Returns `opening_index` when the prefix before the first quote character
+/// is either absent or a valid string-literal prefix (e.g. `r`, `b`, `rb`).
+fn string_literal_start(raw: &str, opening_index: usize) -> Option<usize> {
+    let prefix = raw.get(..opening_index)?;
+    if prefix.is_empty() || prefix.chars().all(|ch| ch.is_ascii_alphabetic()) {
+        Some(opening_index)
+    } else {
+        None
+    }
+}
+
+/// Identifies the Python string delimiter used in `literal` (longest-match
+/// first so that `"""` is preferred over `"`).
+fn detect_delimiter(literal: &str) -> Option<&'static str> {
+    const DELIMITERS: &[&str] = &["\"\"\"", "'''", "\"", "'"];
+    DELIMITERS.iter().copied().find(|&d| literal.starts_with(d))
+}
+
 fn extract_python_string_content(node: Node<'_>, source: &str) -> Option<String> {
     let mut cursor = node.walk();
     let parts: Vec<&str> = node
@@ -227,25 +245,9 @@ fn extract_python_string_content(node: Node<'_>, source: &str) -> Option<String>
 
     let raw = source.get(node.byte_range())?;
     let opening_index = raw.find(['"', '\''])?;
-    let prefix = raw.get(..opening_index)?;
-    let is_valid_prefix = !prefix.is_empty() && prefix.chars().all(|ch| ch.is_ascii_alphabetic());
-    let literal_start = if prefix.is_empty() || is_valid_prefix {
-        opening_index
-    } else {
-        return None;
-    };
+    let literal_start = string_literal_start(raw, opening_index)?;
     let literal = raw.get(literal_start..)?.trim();
-    let delimiter = if literal.starts_with("\"\"\"") {
-        "\"\"\""
-    } else if literal.starts_with("'''") {
-        "'''"
-    } else if literal.starts_with('"') {
-        "\""
-    } else if literal.starts_with('\'') {
-        "'"
-    } else {
-        return None;
-    };
+    let delimiter = detect_delimiter(literal)?;
 
     let content = literal
         .strip_prefix(delimiter)
