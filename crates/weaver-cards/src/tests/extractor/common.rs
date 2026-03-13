@@ -86,6 +86,7 @@ pub(super) fn extract_error(request: ExtractRequest<'_>) -> CardExtractionError 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ExpectedError {
+    Parse,
     UnsupportedLanguage,
     PositionOutOfRange,
     NoSymbolAtPosition,
@@ -94,15 +95,18 @@ pub(super) enum ExpectedError {
 pub(super) fn error_matches(err: &CardExtractionError, expected: ExpectedError) -> bool {
     matches!(
         (err, expected),
-        (
-            CardExtractionError::UnsupportedLanguage { .. },
-            ExpectedError::UnsupportedLanguage
-        ) | (
-            CardExtractionError::PositionOutOfRange { .. },
-            ExpectedError::PositionOutOfRange
-        ) | (
-            CardExtractionError::NoSymbolAtPosition { .. },
-            ExpectedError::NoSymbolAtPosition
-        )
+        (CardExtractionError::Parse { .. }, ExpectedError::Parse)
+            | (
+                CardExtractionError::UnsupportedLanguage { .. },
+                ExpectedError::UnsupportedLanguage
+            )
+            | (
+                CardExtractionError::PositionOutOfRange { .. },
+                ExpectedError::PositionOutOfRange
+            )
+            | (
+                CardExtractionError::NoSymbolAtPosition { .. },
+                ExpectedError::NoSymbolAtPosition
+            )
     )
 }

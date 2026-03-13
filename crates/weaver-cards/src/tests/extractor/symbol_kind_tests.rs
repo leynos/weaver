@@ -28,78 +28,68 @@ fn extracts_supported_symbol_kinds(#[case] case: SymbolExpectation<'static>) {
     );
 }
 
-#[test]
-fn returns_module_cards_for_import_interstitials() {
-    let requests = [
-        ExtractRequest {
-            path: Path::new("fixture.rs"),
-            source: "use std::fmt;\nuse std::io;\n\nfn greet() {}\n",
-            line: 1,
-            column: 1,
-            detail: DetailLevel::Structure,
-        },
-        ExtractRequest {
-            path: Path::new("fixture.py"),
-            source: "import os\nfrom pkg import value\n\ndef greet() -> None:\n    pass\n",
-            line: 1,
-            column: 1,
-            detail: DetailLevel::Structure,
-        },
-        ExtractRequest {
-            path: Path::new("fixture.ts"),
-            source: "import { join } from 'node:path';\nimport type { Widget } from './widget';\n\nfunction greet(): void {}\n",
-            line: 1,
-            column: 1,
-            detail: DetailLevel::Structure,
-        },
-    ];
-
-    for request in requests {
-        let card = extract(request);
-        assert_eq!(card.symbol.symbol_ref.kind, CardSymbolKind::Module);
-        let interstitial = card
-            .interstitial
-            .as_ref()
-            .expect("module card should carry interstitial imports");
-        assert!(
-            !interstitial.imports.normalized.is_empty(),
-            "expected normalized imports, got {:?}",
-            interstitial.imports.normalized
-        );
-    }
+#[rstest]
+#[case(ExtractRequest {
+    path: Path::new("fixture.rs"),
+    source: "use std::fmt;\nuse std::io;\n\nfn greet() {}\n",
+    line: 1,
+    column: 1,
+    detail: DetailLevel::Structure,
+})]
+#[case(ExtractRequest {
+    path: Path::new("fixture.py"),
+    source: "import os\nfrom pkg import value\n\ndef greet() -> None:\n    pass\n",
+    line: 1,
+    column: 1,
+    detail: DetailLevel::Structure,
+})]
+#[case(ExtractRequest {
+    path: Path::new("fixture.ts"),
+    source: "import { join } from 'node:path';\nimport type { Widget } from './widget';\n\nfunction greet(): void {}\n",
+    line: 1,
+    column: 1,
+    detail: DetailLevel::Structure,
+})]
+fn returns_module_cards_for_import_interstitials(#[case] request: ExtractRequest<'static>) {
+    let card = extract(request);
+    assert_eq!(card.symbol.symbol_ref.kind, CardSymbolKind::Module);
+    let interstitial = card
+        .interstitial
+        .as_ref()
+        .expect("module card should carry interstitial imports");
+    assert!(
+        !interstitial.imports.normalized.is_empty(),
+        "expected normalized imports, got {:?}",
+        interstitial.imports.normalized
+    );
 }
 
-#[test]
-fn nested_locals_do_not_become_entities() {
-    let requests = [
-        ExtractRequest {
-            path: Path::new("fixture.rs"),
-            source: "fn outer() {\n    fn inner() {}\n    inner();\n}\n",
-            line: 2,
-            column: 8,
-            detail: DetailLevel::Structure,
-        },
-        ExtractRequest {
-            path: Path::new("fixture.py"),
-            source: "def outer() -> None:\n    def inner() -> None:\n        return None\n    inner()\n",
-            line: 2,
-            column: 9,
-            detail: DetailLevel::Structure,
-        },
-        ExtractRequest {
-            path: Path::new("fixture.ts"),
-            source: "function outer(): void {\n  function inner(): void {}\n  inner();\n}\n",
-            line: 2,
-            column: 12,
-            detail: DetailLevel::Structure,
-        },
-    ];
-
-    for request in requests {
-        let card = extract(request);
-        assert_eq!(card.symbol.symbol_ref.kind, CardSymbolKind::Function);
-        assert_eq!(card.symbol.symbol_ref.name, "outer");
-    }
+#[rstest]
+#[case(ExtractRequest {
+    path: Path::new("fixture.rs"),
+    source: "fn outer() {\n    fn inner() {}\n    inner();\n}\n",
+    line: 2,
+    column: 8,
+    detail: DetailLevel::Structure,
+})]
+#[case(ExtractRequest {
+    path: Path::new("fixture.py"),
+    source: "def outer() -> None:\n    def inner() -> None:\n        return None\n    inner()\n",
+    line: 2,
+    column: 9,
+    detail: DetailLevel::Structure,
+})]
+#[case(ExtractRequest {
+    path: Path::new("fixture.ts"),
+    source: "function outer(): void {\n  function inner(): void {}\n  inner();\n}\n",
+    line: 2,
+    column: 12,
+    detail: DetailLevel::Structure,
+})]
+fn nested_locals_do_not_become_entities(#[case] request: ExtractRequest<'static>) {
+    let card = extract(request);
+    assert_eq!(card.symbol.symbol_ref.kind, CardSymbolKind::Function);
+    assert_eq!(card.symbol.symbol_ref.name, "outer");
 }
 
 #[test]

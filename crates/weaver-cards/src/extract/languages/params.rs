@@ -6,6 +6,13 @@ use crate::ParamInfo;
 
 use super::normalise_whitespace;
 
+fn is_ignorable_parameter_kind(kind: &str) -> bool {
+    matches!(
+        kind,
+        "self_parameter" | "receiver" | "positional_separator" | "keyword_separator"
+    )
+}
+
 /// Extracts parameter names and type annotations from a parameters node.
 ///
 /// `param_node` is the Tree-sitter parameters list to inspect and `source`
@@ -19,10 +26,7 @@ pub(super) fn parse_parameters(param_node: Node<'_>, source: &str) -> Vec<ParamI
         .named_children(&mut cursor)
         .filter_map(|child| {
             let kind = child.kind();
-            if matches!(
-                kind,
-                "self_parameter" | "receiver" | "positional_separator" | "keyword_separator"
-            ) {
+            if is_ignorable_parameter_kind(kind) {
                 return None;
             }
 

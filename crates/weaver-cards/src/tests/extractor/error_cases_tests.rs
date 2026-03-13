@@ -57,5 +57,9 @@ fn returns_parse_error_when_parser_setup_fails() {
     )
     .expect_err("expected parse error");
 
-    assert!(matches!(err, CardExtractionError::Parse { .. }));
+    assert!(
+        error_matches(&err, ExpectedError::Parse),
+        "expected {:?}, got {err:?}",
+        ExpectedError::Parse,
+    );
 }

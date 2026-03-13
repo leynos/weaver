@@ -70,8 +70,12 @@ pub(super) fn import_block_from_group(
     source.get(start..end)?;
     let normalized = group
         .iter()
-        .map(|node| normalise_import(language, source.get(node.byte_range()).unwrap_or_default()))
-        .collect();
+        .map(|node| {
+            source
+                .get(node.byte_range())
+                .map(|slice| normalise_import(language, slice))
+        })
+        .collect::<Option<Vec<_>>>()?;
     Some(ImportBlock {
         byte_start: start,
         byte_end: end,
