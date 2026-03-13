@@ -90,8 +90,9 @@ pub fn render_human_output(context: &OutputContext, data: &str) -> Option<String
         ("observe", "get-definition") => render_definitions(trimmed),
         ("observe", "find-references") => render_references(trimmed),
         ("verify", "diagnostics") => render_diagnostics(trimmed, context),
-        ("act", _) => render_capability_resolution(trimmed)
-            .or_else(|| render_verification_failures(trimmed)),
+        ("act", _) => {
+            render_capability_resolution(trimmed).or_else(|| render_verification_failures(trimmed))
+        }
         _ => None,
     }
 }

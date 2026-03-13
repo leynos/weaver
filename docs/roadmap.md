@@ -521,7 +521,7 @@ new* *capabilities and specialist providers.*
   - Acceptance criteria: plugin advertises `rename-symbol` in capability probes,
     request payloads conform to schema, and response payloads conform to schema.
     Rust rename flows are capability-routed.
-- [ ] 5.2.4. Implement daemon capability resolution for `rename-symbol` so
+- [x] 5.2.4. Implement daemon capability resolution for `rename-symbol` so
       plugin selection is language-aware and policy-driven. Requires 5.2.2 and
       5.2.3.
   - Acceptance criteria: routing selects the correct plugin per language,

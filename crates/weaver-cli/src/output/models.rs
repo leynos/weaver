@@ -253,7 +253,10 @@ mod tests {
 }"#;
         let resolution = parse_capability_resolution(payload).expect("capability resolution");
         assert_eq!(resolution.details.capability, "rename-symbol");
-        assert_eq!(resolution.details.selected_provider.as_deref(), Some("rope"));
+        assert_eq!(
+            resolution.details.selected_provider.as_deref(),
+            Some("rope")
+        );
         assert_eq!(resolution.details.candidates.len(), 1);
     }
 }

@@ -31,7 +31,10 @@ fn registry() -> PluginRegistry {
     registry
 }
 
-fn resolution_for(path: &str, provider: Option<&str>) -> super::resolution::CapabilityResolutionEnvelope {
+fn resolution_for(
+    path: &str,
+    provider: Option<&str>,
+) -> super::resolution::CapabilityResolutionEnvelope {
     resolve_provider(
         &registry(),
         ResolutionRequest::new(CapabilityId::RenameSymbol, Path::new(path), provider),
@@ -95,7 +98,10 @@ fn unknown_explicit_provider_is_refused() {
     assert_eq!(details.selected_provider(), None);
     assert_eq!(details.selection_mode, SelectionMode::ExplicitProvider);
     assert_eq!(details.outcome, ResolutionOutcome::Refused);
-    assert_eq!(details.refusal_reason, Some(RefusalReason::ProviderNotFound));
+    assert_eq!(
+        details.refusal_reason,
+        Some(RefusalReason::ProviderNotFound)
+    );
 }
 
 #[test]
@@ -105,7 +111,10 @@ fn unsupported_language_is_refused() {
 
     assert_eq!(details.selected_provider(), None);
     assert_eq!(details.outcome, ResolutionOutcome::Refused);
-    assert_eq!(details.refusal_reason, Some(RefusalReason::UnsupportedLanguage));
+    assert_eq!(
+        details.refusal_reason,
+        Some(RefusalReason::UnsupportedLanguage)
+    );
 }
 
 #[test]
@@ -116,5 +125,8 @@ fn supported_language_without_provider_is_refused_deterministically() {
     assert_eq!(details.selected_provider(), None);
     assert_eq!(details.language.as_deref(), Some("typescript"));
     assert_eq!(details.outcome, ResolutionOutcome::Refused);
-    assert_eq!(details.refusal_reason, Some(RefusalReason::NoMatchingProvider));
+    assert_eq!(
+        details.refusal_reason,
+        Some(RefusalReason::NoMatchingProvider)
+    );
 }

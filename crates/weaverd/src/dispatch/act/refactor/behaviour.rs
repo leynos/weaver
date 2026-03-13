@@ -9,8 +9,9 @@ use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_plugins::{CapabilityId, PluginError, PluginOutput, PluginRequest, PluginResponse};
 
 use super::resolution::{
-    CapabilityResolutionDetails, CapabilityResolutionEnvelope, CandidateEvaluation,
-    CandidateReason, RefusalReason, ResolutionOutcome, ResolutionRequest, SelectionMode,
+    CandidateEvaluation, CandidateReason, CapabilityResolutionDetails,
+    CapabilityResolutionEnvelope, RefusalReason, ResolutionOutcome, ResolutionRequest,
+    SelectionMode,
 };
 use super::*;
 
@@ -36,6 +37,14 @@ struct StubRuntime {
     execution: RuntimeMode,
 }
 
+struct RefusedResolution<'a> {
+    language: Option<&'a str>,
+    requested_provider: Option<&'a str>,
+    selection_mode: SelectionMode,
+    refusal_reason: RefusalReason,
+    candidates: Vec<CandidateEvaluation>,
+}
+
 impl RefactorPluginRuntime for StubRuntime {
     fn resolve(
         &self,
@@ -44,29 +53,26 @@ impl RefactorPluginRuntime for StubRuntime {
         Ok(match self.routing {
             RoutingMode::AutomaticPython => selected_resolution("python", "rope"),
             RoutingMode::AutomaticRust => selected_resolution("rust", "rust-analyzer"),
-            RoutingMode::UnsupportedLanguage => refused_resolution(
-                None,
-                None,
-                SelectionMode::Automatic,
-                RefusalReason::UnsupportedLanguage,
-                vec![
+            RoutingMode::UnsupportedLanguage => refused_resolution(RefusedResolution {
+                language: None,
+                requested_provider: None,
+                selection_mode: SelectionMode::Automatic,
+                refusal_reason: RefusalReason::UnsupportedLanguage,
+                candidates: vec![
                     rejected_candidate("rope", CandidateReason::UnsupportedLanguage),
                     rejected_candidate("rust-analyzer", CandidateReason::UnsupportedLanguage),
                 ],
-            ),
-            RoutingMode::ExplicitProviderMismatch => refused_resolution(
-                Some("python"),
-                Some("rust-analyzer"),
-                SelectionMode::ExplicitProvider,
-                RefusalReason::ExplicitProviderMismatch,
-                vec![
+            }),
+            RoutingMode::ExplicitProviderMismatch => refused_resolution(RefusedResolution {
+                language: Some("python"),
+                requested_provider: Some("rust-analyzer"),
+                selection_mode: SelectionMode::ExplicitProvider,
+                refusal_reason: RefusalReason::ExplicitProviderMismatch,
+                candidates: vec![
                     rejected_candidate("rope", CandidateReason::NotRequested),
-                    rejected_candidate(
-                        "rust-analyzer",
-                        CandidateReason::ExplicitProviderMismatch,
-                    ),
+                    rejected_candidate("rust-analyzer", CandidateReason::ExplicitProviderMismatch),
                 ],
-            ),
+            }),
         })
     }
 
@@ -207,22 +213,16 @@ fn selected_resolution(language: &str, provider: &str) -> CapabilityResolutionEn
     })
 }
 
-fn refused_resolution(
-    language: Option<&str>,
-    requested_provider: Option<&str>,
-    selection_mode: SelectionMode,
-    refusal_reason: RefusalReason,
-    candidates: Vec<CandidateEvaluation>,
-) -> CapabilityResolutionEnvelope {
+fn refused_resolution(config: RefusedResolution<'_>) -> CapabilityResolutionEnvelope {
     CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
         capability: CapabilityId::RenameSymbol,
-        language: language.map(String::from),
-        requested_provider: requested_provider.map(String::from),
+        language: config.language.map(String::from),
+        requested_provider: config.requested_provider.map(String::from),
         selected_provider: None,
-        selection_mode,
+        selection_mode: config.selection_mode,
         outcome: ResolutionOutcome::Refused,
-        refusal_reason: Some(refusal_reason),
-        candidates,
+        refusal_reason: Some(config.refusal_reason),
+        candidates: config.candidates,
     })
 }
 

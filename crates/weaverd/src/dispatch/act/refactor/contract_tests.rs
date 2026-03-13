@@ -9,7 +9,7 @@ use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_plugins::{CapabilityId, PluginError, PluginOutput, PluginRequest, PluginResponse};
 
 use super::resolution::{
-    CapabilityResolutionDetails, CapabilityResolutionEnvelope, CandidateEvaluation,
+    CandidateEvaluation, CapabilityResolutionDetails, CapabilityResolutionEnvelope,
     ResolutionOutcome, ResolutionRequest, SelectionMode,
 };
 use super::{
@@ -84,6 +84,14 @@ fn socket_dir() -> TempDir {
     TempDir::new().expect("socket dir")
 }
 
+struct RenameDispatch<'a> {
+    file: &'a str,
+    provider: &'static str,
+    language: &'static str,
+    extra_args: Vec<String>,
+    socket_dir: &'a TempDir,
+}
+
 fn build_backends(socket_path: &Path) -> FusionBackends<SemanticBackendProvider> {
     let config = Config {
         daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().as_ref()),
@@ -95,32 +103,26 @@ fn build_backends(socket_path: &Path) -> FusionBackends<SemanticBackendProvider>
 
 /// Dispatches a rename request through the handler and returns the captured
 /// `PluginRequest` for inspection.
-fn dispatch_inspecting_rename(
-    file: &str,
-    provider: &'static str,
-    language: &'static str,
-    extra_args: Vec<String>,
-    socket_dir: &TempDir,
-) -> PluginRequest {
+fn dispatch_inspecting_rename(config: RenameDispatch<'_>) -> PluginRequest {
     let workspace = TempDir::new().expect("workspace");
-    std::fs::write(workspace.path().join(file), "hello world\n").expect("write");
+    std::fs::write(workspace.path().join(config.file), "hello world\n").expect("write");
     let runtime = InspectingRuntime {
         captured: Mutex::new(None),
         response: PluginResponse::success(PluginOutput::Diff {
-            content: String::from(NOTES_DIFF.replace("notes.txt", file)),
+            content: NOTES_DIFF.replace("notes.txt", config.file),
         }),
-        provider,
-        language,
+        provider: config.provider,
+        language: config.language,
     };
     let mut args = vec![
         String::from("--refactoring"),
         String::from("rename"),
         String::from("--file"),
-        String::from(file),
+        String::from(config.file),
     ];
-    args.extend(extra_args);
+    args.extend(config.extra_args);
     let request = command_request(args);
-    let socket_path = socket_dir.path().join("socket.sock");
+    let socket_path = config.socket_dir.path().join("socket.sock");
     let mut backends = build_backends(&socket_path);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
@@ -143,13 +145,13 @@ fn dispatch_inspecting_rename(
 
 #[rstest]
 fn handler_sends_rename_symbol_contract_conforming_request(socket_dir: TempDir) {
-    let plugin_request = dispatch_inspecting_rename(
-        "notes.py",
-        "rope",
-        "python",
-        vec![String::from("offset=4"), String::from("new_name=woven")],
-        &socket_dir,
-    );
+    let plugin_request = dispatch_inspecting_rename(RenameDispatch {
+        file: "notes.py",
+        provider: "rope",
+        language: "python",
+        extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
+        socket_dir: &socket_dir,
+    });
 
     assert_eq!(plugin_request.operation(), "rename-symbol");
     let args = plugin_request.arguments();
@@ -157,7 +159,10 @@ fn handler_sends_rename_symbol_contract_conforming_request(socket_dir: TempDir) 
         args.get("uri").and_then(|value| value.as_str()),
         Some("file:///notes.py"),
     );
-    assert_eq!(args.get("position").and_then(|value| value.as_str()), Some("4"));
+    assert_eq!(
+        args.get("position").and_then(|value| value.as_str()),
+        Some("4")
+    );
     assert!(!args.contains_key("offset"));
     assert_eq!(
         args.get("new_name").and_then(|value| value.as_str()),
@@ -167,17 +172,17 @@ fn handler_sends_rename_symbol_contract_conforming_request(socket_dir: TempDir) 
 
 #[rstest]
 fn handler_overwrites_pre_existing_uri_with_file_path(socket_dir: TempDir) {
-    let plugin_request = dispatch_inspecting_rename(
-        "notes.py",
-        "rope",
-        "python",
-        vec![
+    let plugin_request = dispatch_inspecting_rename(RenameDispatch {
+        file: "notes.py",
+        provider: "rope",
+        language: "python",
+        extra_args: vec![
             String::from("uri=stale_value"),
             String::from("offset=4"),
             String::from("new_name=woven"),
         ],
-        &socket_dir,
-    );
+        socket_dir: &socket_dir,
+    });
 
     assert_eq!(
         plugin_request
@@ -190,26 +195,26 @@ fn handler_overwrites_pre_existing_uri_with_file_path(socket_dir: TempDir) {
 
 #[rstest]
 fn handler_omits_position_when_offset_not_provided(socket_dir: TempDir) {
-    let plugin_request = dispatch_inspecting_rename(
-        "notes.py",
-        "rope",
-        "python",
-        vec![String::from("new_name=woven")],
-        &socket_dir,
-    );
+    let plugin_request = dispatch_inspecting_rename(RenameDispatch {
+        file: "notes.py",
+        provider: "rope",
+        language: "python",
+        extra_args: vec![String::from("new_name=woven")],
+        socket_dir: &socket_dir,
+    });
 
     assert!(!plugin_request.arguments().contains_key("position"));
 }
 
 #[rstest]
 fn rust_analyzer_provider_uses_rename_symbol_contract(socket_dir: TempDir) {
-    let plugin_request = dispatch_inspecting_rename(
-        "notes.rs",
-        "rust-analyzer",
-        "rust",
-        vec![String::from("offset=4"), String::from("new_name=woven")],
-        &socket_dir,
-    );
+    let plugin_request = dispatch_inspecting_rename(RenameDispatch {
+        file: "notes.rs",
+        provider: "rust-analyzer",
+        language: "rust",
+        extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
+        socket_dir: &socket_dir,
+    });
 
     assert_eq!(plugin_request.operation(), "rename-symbol");
     assert_eq!(

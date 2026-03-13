@@ -7,9 +7,9 @@
 use std::path::Path;
 
 use serde::Serialize;
+use weaver_plugins::PluginRegistry;
 use weaver_plugins::capability::CapabilityId;
 use weaver_plugins::manifest::PluginManifest;
-use weaver_plugins::PluginRegistry;
 use weaver_syntax::SupportedLanguage;
 
 /// Stable envelope type written to the daemon output stream.
@@ -138,6 +138,16 @@ pub(crate) struct ResolutionRequest<'a> {
     explicit_provider: Option<&'a str>,
 }
 
+#[derive(Debug)]
+struct RefusalContext {
+    capability: CapabilityId,
+    language: Option<SupportedLanguage>,
+    requested_provider: Option<String>,
+    selection_mode: SelectionMode,
+    refusal_reason: RefusalReason,
+    candidates: Vec<CandidateEvaluation>,
+}
+
 impl<'a> ResolutionRequest<'a> {
     /// Creates a new resolution request.
     #[must_use]
@@ -152,7 +162,6 @@ impl<'a> ResolutionRequest<'a> {
             explicit_provider,
         }
     }
-
 }
 
 /// Resolves a provider from the registry using the built-in rename policy.
@@ -171,26 +180,21 @@ pub(crate) fn resolve_provider(
     let requested_provider = request.explicit_provider.map(String::from);
 
     let Some(language) = language else {
-        return refused(
-            request.capability,
-            None,
+        return refused(RefusalContext {
+            capability: request.capability,
+            language: None,
             requested_provider,
             selection_mode,
-            RefusalReason::UnsupportedLanguage,
-            candidates
+            refusal_reason: RefusalReason::UnsupportedLanguage,
+            candidates: candidates
                 .iter()
                 .map(|manifest| rejected_candidate(manifest, CandidateReason::UnsupportedLanguage))
                 .collect(),
-        );
+        });
     };
 
     if let Some(provider_name) = request.explicit_provider {
-        return resolve_explicit_provider(
-            request.capability,
-            language,
-            provider_name,
-            candidates,
-        );
+        return resolve_explicit_provider(request.capability, language, provider_name, candidates);
     }
 
     resolve_automatic_provider(request.capability, language, candidates)
@@ -239,23 +243,23 @@ fn resolve_explicit_provider(
             candidates: evaluations,
         }
     } else if found_requested {
-        refused_details(
+        refused_details(RefusalContext {
             capability,
-            Some(language),
-            Some(String::from(provider_name)),
-            SelectionMode::ExplicitProvider,
-            RefusalReason::ExplicitProviderMismatch,
-            evaluations,
-        )
+            language: Some(language),
+            requested_provider: Some(String::from(provider_name)),
+            selection_mode: SelectionMode::ExplicitProvider,
+            refusal_reason: RefusalReason::ExplicitProviderMismatch,
+            candidates: evaluations,
+        })
     } else {
-        refused_details(
+        refused_details(RefusalContext {
             capability,
-            Some(language),
-            Some(String::from(provider_name)),
-            SelectionMode::ExplicitProvider,
-            RefusalReason::ProviderNotFound,
-            evaluations,
-        )
+            language: Some(language),
+            requested_provider: Some(String::from(provider_name)),
+            selection_mode: SelectionMode::ExplicitProvider,
+            refusal_reason: RefusalReason::ProviderNotFound,
+            candidates: evaluations,
+        })
     };
 
     CapabilityResolutionEnvelope::from_details(details)
@@ -273,17 +277,17 @@ fn resolve_automatic_provider(
         .collect();
 
     if matching.is_empty() {
-        return refused(
+        return refused(RefusalContext {
             capability,
-            Some(language),
-            None,
-            SelectionMode::Automatic,
-            RefusalReason::NoMatchingProvider,
-            candidates
+            language: Some(language),
+            requested_provider: None,
+            selection_mode: SelectionMode::Automatic,
+            refusal_reason: RefusalReason::NoMatchingProvider,
+            candidates: candidates
                 .iter()
                 .map(|manifest| rejected_candidate(manifest, CandidateReason::UnsupportedLanguage))
                 .collect(),
-        );
+        });
     }
 
     let selected_name = matching
@@ -317,41 +321,22 @@ fn resolve_automatic_provider(
     })
 }
 
-fn refused(
-    capability: CapabilityId,
-    language: Option<SupportedLanguage>,
-    requested_provider: Option<String>,
-    selection_mode: SelectionMode,
-    refusal_reason: RefusalReason,
-    candidates: Vec<CandidateEvaluation>,
-) -> CapabilityResolutionEnvelope {
-    CapabilityResolutionEnvelope::from_details(refused_details(
-        capability,
-        language,
-        requested_provider,
-        selection_mode,
-        refusal_reason,
-        candidates,
-    ))
+fn refused(context: RefusalContext) -> CapabilityResolutionEnvelope {
+    CapabilityResolutionEnvelope::from_details(refused_details(context))
 }
 
-fn refused_details(
-    capability: CapabilityId,
-    language: Option<SupportedLanguage>,
-    requested_provider: Option<String>,
-    selection_mode: SelectionMode,
-    refusal_reason: RefusalReason,
-    candidates: Vec<CandidateEvaluation>,
-) -> CapabilityResolutionDetails {
+fn refused_details(context: RefusalContext) -> CapabilityResolutionDetails {
     CapabilityResolutionDetails {
-        capability,
-        language: language.map(|language| String::from(language.as_str())),
-        requested_provider,
+        capability: context.capability,
+        language: context
+            .language
+            .map(|language| String::from(language.as_str())),
+        requested_provider: context.requested_provider,
         selected_provider: None,
-        selection_mode,
+        selection_mode: context.selection_mode,
         outcome: ResolutionOutcome::Refused,
-        refusal_reason: Some(refusal_reason),
-        candidates,
+        refusal_reason: Some(context.refusal_reason),
+        candidates: context.candidates,
     }
 }
 
@@ -385,10 +370,7 @@ fn preferred_provider(language: SupportedLanguage) -> &'static str {
     }
 }
 
-fn accepted_candidate(
-    manifest: &PluginManifest,
-    reason: CandidateReason,
-) -> CandidateEvaluation {
+fn accepted_candidate(manifest: &PluginManifest, reason: CandidateReason) -> CandidateEvaluation {
     CandidateEvaluation {
         provider: String::from(manifest.name()),
         accepted: true,
@@ -396,10 +378,7 @@ fn accepted_candidate(
     }
 }
 
-fn rejected_candidate(
-    manifest: &PluginManifest,
-    reason: CandidateReason,
-) -> CandidateEvaluation {
+fn rejected_candidate(manifest: &PluginManifest, reason: CandidateReason) -> CandidateEvaluation {
     CandidateEvaluation {
         provider: String::from(manifest.name()),
         accepted: false,

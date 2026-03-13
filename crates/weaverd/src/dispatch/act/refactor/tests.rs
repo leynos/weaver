@@ -8,7 +8,7 @@ use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 
 use super::resolution::{
-    CapabilityResolutionDetails, CapabilityResolutionEnvelope, CandidateEvaluation,
+    CandidateEvaluation, CapabilityResolutionDetails, CapabilityResolutionEnvelope,
     ResolutionOutcome, ResolutionRequest, SelectionMode,
 };
 use super::{

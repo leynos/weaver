@@ -5,12 +5,12 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
 
-Implementation must not begin until this plan is explicitly approved.
+Implementation began after approval and is now complete.
 
 ## Purpose / big picture
 
@@ -140,20 +140,20 @@ Observable success for the eventual implementation:
   manifests, plugin registry, CLI daemon-output protocol, and prior 5.2.1 to
   5.2.3 ExecPlans.
 - [x] (2026-03-11) Drafted this ExecPlan.
-- [ ] Obtain approval for this ExecPlan.
-- [ ] Extract the refactor-routing code and tests into modules that can absorb
-  5.2.4 without violating the 400-line rule.
-- [ ] Implement deterministic `rename-symbol` capability resolution in
-  `weaverd`.
-- [ ] Emit machine-readable routing rationale and teach the CLI to render it
-  appropriately.
-- [ ] Add unit tests and `rstest-bdd` scenarios covering success, refusal, and
-  override paths.
-- [ ] Update `docs/weaver-design.md` and `docs/users-guide.md` with the final
-  behaviour and rationale format.
-- [ ] Run `make fmt`, `make markdownlint`, `make nixie`,
+- [x] (2026-03-13) Obtained approval for this ExecPlan.
+- [x] (2026-03-13) Extracted the refactor routing and tests into focused
+  modules that keep the handler within the repository line-budget rule.
+- [x] (2026-03-13) Implemented deterministic `rename-symbol` capability
+  resolution in `weaverd`.
+- [x] (2026-03-13) Emitted machine-readable routing rationale and updated the
+  CLI human renderer.
+- [x] (2026-03-13) Added unit and `rstest-bdd` behavioural coverage for
+  success, refusal, and override paths.
+- [x] (2026-03-13) Updated `docs/weaver-design.md` and `docs/users-guide.md`
+  with the shipped behaviour and rationale format.
+- [x] (2026-03-13) Ran `make fmt`, `make markdownlint`, `make nixie`,
   `make check-fmt`, `make lint`, and `make test`.
-- [ ] Mark roadmap entry 5.2.4 as done after all gates pass.
+- [x] (2026-03-13) Marked roadmap entry 5.2.4 as done after all gates passed.
 
 ## Surprises & Discoveries
 
@@ -430,7 +430,23 @@ Expected observable evidence after implementation:
 
 ## Outcomes & Retrospective
 
-Not started. When implementation completes, replace this section with a concise
-record of what shipped, which files changed, what rationale format was adopted,
-which tests prove the behaviour, and any follow-on work intentionally deferred
-to roadmap items 5.2.5 and 5.2.6.
+Completed on 2026-03-13. `weaverd` now resolves `rename-symbol` by capability,
+inferred language, and optional explicit provider override before plugin
+execution. The handler was split into orchestration plus dedicated
+`arguments.rs`, `resolution.rs`, `contract_tests.rs`, and `resolution_tests.rs`
+modules so the routing seam is explicit and the line budget stays healthy.
+
+Routing rationale now ships as a structured `CapabilityResolution` envelope on
+the existing daemon stream. The payload includes the requested capability,
+inferred language when known, optional requested provider, optional selected
+provider, selection mode, outcome, stable refusal code, and
+candidate-by-candidate reason codes. `weaver-cli` preserves that payload in
+JSON mode and renders the same information as concise routing text in human
+mode.
+
+The implementation is proven by unit routing tests, request-contract tests, and
+behavioural scenarios covering automatic Python routing, automatic Rust
+routing, unsupported-language refusal, and explicit provider mismatch refusal.
+Follow-on work intentionally deferred to roadmap items 5.2.5 and 5.2.6: broader
+end-to-end coverage and migration/deprecation guidance for legacy
+provider-specific paths.
