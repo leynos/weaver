@@ -13,9 +13,11 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use arguments::parse_refactor_args;
 use tracing::debug;
 use url::Url;
 
+use weaver_plugins::capability::CapabilityId;
 use weaver_plugins::process::SandboxExecutor;
 use weaver_plugins::protocol::FilePayload;
 use weaver_plugins::runner::PluginRunner;
@@ -33,12 +35,21 @@ use plugin_paths::{
     ROPE_PLUGIN_PATH_ENV, RUST_ANALYZER_PLUGIN_PATH_ENV, resolve_rope_plugin_path,
     resolve_rust_analyzer_plugin_path,
 };
+use resolution::{CapabilityResolutionEnvelope, ResolutionRequest, resolve_provider};
 
+mod arguments;
 mod manifests;
 mod plugin_paths;
+mod resolution;
 
 /// Runtime abstraction for executing refactor plugins.
 pub(crate) trait RefactorPluginRuntime {
+    /// Resolves a provider for the given capability request.
+    fn resolve(
+        &self,
+        request: ResolutionRequest<'_>,
+    ) -> Result<CapabilityResolutionEnvelope, PluginError>;
+
     /// Executes the named plugin with the provided request.
     fn execute(
         &self,
@@ -49,6 +60,7 @@ pub(crate) trait RefactorPluginRuntime {
 
 /// Sandbox-backed runtime that resolves plugins from a registry.
 pub(crate) struct SandboxRefactorRuntime {
+    registry: PluginRegistry,
     runner: PluginRunner<SandboxExecutor>,
 }
 
@@ -71,13 +83,19 @@ impl SandboxRefactorRuntime {
             .register(rust_analyzer_manifest(rust_analyzer_executable))
             .map_err(|error| format!("failed to initialize refactor runtime: {error}"))?;
 
-        Ok(Self {
-            runner: PluginRunner::new(registry, SandboxExecutor),
-        })
+        let runner = PluginRunner::new(registry.clone(), SandboxExecutor);
+        Ok(Self { registry, runner })
     }
 }
 
 impl RefactorPluginRuntime for SandboxRefactorRuntime {
+    fn resolve(
+        &self,
+        request: ResolutionRequest<'_>,
+    ) -> Result<CapabilityResolutionEnvelope, PluginError> {
+        Ok(resolve_provider(&self.registry, request))
+    }
+
     fn execute(
         &self,
         provider: &str,
@@ -93,6 +111,15 @@ struct NoopRefactorRuntime {
 }
 
 impl RefactorPluginRuntime for NoopRefactorRuntime {
+    fn resolve(
+        &self,
+        _request: ResolutionRequest<'_>,
+    ) -> Result<CapabilityResolutionEnvelope, PluginError> {
+        Err(PluginError::Manifest {
+            message: self.message.clone(),
+        })
+    }
+
     fn execute(
         &self,
         _provider: &str,
@@ -125,8 +152,9 @@ pub(crate) struct RefactorContext<'a> {
 
 /// Handles `act refactor` requests.
 ///
-/// Expects `--provider <plugin>` and `--refactoring <operation>` in the
-/// request arguments, plus `--file <path>` identifying the target file.
+/// Expects `--refactoring <operation>` and `--file <path>` in the request
+/// arguments. `--provider <plugin>` is optional and acts as an explicit
+/// compatibility override when supplied.
 ///
 /// The handler reads the file content, executes the plugin, and forwards
 /// successful diff output through `act apply-patch` for Double-Lock
@@ -140,7 +168,7 @@ pub fn handle<W: Write>(
 
     debug!(
         target: DISPATCH_TARGET,
-        provider = args.provider,
+        provider = args.provider.as_deref().unwrap_or("<auto>"),
         refactoring = args.refactoring,
         file = args.file,
         "handling act refactor"
@@ -188,98 +216,41 @@ pub fn handle<W: Write>(
         plugin_args,
     );
 
-    match context.runtime.execute(&args.provider, &plugin_request) {
+    let capability = capability_from_operation(&effective_operation)?;
+    let resolution = match context.runtime.resolve(ResolutionRequest::new(
+        capability,
+        file_path.as_path(),
+        args.provider.as_deref(),
+    )) {
+        Ok(resolution) => resolution,
+        Err(error) => {
+            writer.write_stderr(format!(
+                "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
+                args.provider.as_deref().unwrap_or("<auto>"),
+                args.refactoring,
+                args.file
+            ))?;
+            return Ok(DispatchResult::with_status(1));
+        }
+    };
+
+    write_capability_resolution(writer, &resolution)?;
+    let Some(selected_provider) = resolution.details().selected_provider() else {
+        return Ok(DispatchResult::with_status(1));
+    };
+
+    match context.runtime.execute(selected_provider, &plugin_request) {
         Ok(response) => {
             handle_plugin_response(response, writer, context.backends, context.workspace_root)
         }
         Err(error) => {
             writer.write_stderr(format!(
                 "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
-                args.provider, args.refactoring, args.file
+                selected_provider, args.refactoring, args.file
             ))?;
             Ok(DispatchResult::with_status(1))
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Argument parsing
-// ---------------------------------------------------------------------------
-
-struct RefactorArgs {
-    provider: String,
-    refactoring: String,
-    file: String,
-    extra: Vec<String>,
-}
-
-/// Accumulates parsed flag values during argument iteration.
-#[derive(Default)]
-struct RefactorArgsBuilder {
-    provider: Option<String>,
-    refactoring: Option<String>,
-    file: Option<String>,
-    extra: Vec<String>,
-}
-
-impl RefactorArgsBuilder {
-    /// Finalizes the builder, requiring all mandatory fields.
-    fn build(self) -> Result<RefactorArgs, DispatchError> {
-        Ok(RefactorArgs {
-            provider: self.provider.ok_or_else(|| {
-                DispatchError::invalid_arguments("act refactor requires --provider <plugin-name>")
-            })?,
-            refactoring: self.refactoring.ok_or_else(|| {
-                DispatchError::invalid_arguments("act refactor requires --refactoring <operation>")
-            })?,
-            file: self.file.ok_or_else(|| {
-                DispatchError::invalid_arguments("act refactor requires --file <path>")
-            })?,
-            extra: self.extra,
-        })
-    }
-}
-
-fn parse_refactor_args(arguments: &[String]) -> Result<RefactorArgs, DispatchError> {
-    let mut builder = RefactorArgsBuilder::default();
-    let mut iter = arguments.iter();
-
-    while let Some(arg) = iter.next() {
-        apply_flag(arg, &mut iter, &mut builder)?;
-    }
-
-    builder.build()
-}
-
-/// Classifies a single argument token, consuming the next token as the
-/// value when the argument is a recognised flag.
-fn apply_flag<'a>(
-    arg: &str,
-    iter: &mut impl Iterator<Item = &'a String>,
-    builder: &mut RefactorArgsBuilder,
-) -> Result<(), DispatchError> {
-    match arg {
-        "--provider" => {
-            builder.provider =
-                Some(iter.next().cloned().ok_or_else(|| {
-                    DispatchError::invalid_arguments("--provider requires a value")
-                })?);
-        }
-        "--refactoring" => {
-            builder.refactoring = Some(iter.next().cloned().ok_or_else(|| {
-                DispatchError::invalid_arguments("--refactoring requires a value")
-            })?);
-        }
-        "--file" => {
-            builder.file = Some(
-                iter.next()
-                    .cloned()
-                    .ok_or_else(|| DispatchError::invalid_arguments("--file requires a value"))?,
-            );
-        }
-        other => builder.extra.push(other.to_owned()),
-    }
-    Ok(())
 }
 
 /// Returns `true` if any component of `path` is a parent-directory reference.
@@ -341,6 +312,23 @@ fn to_file_uri(path: &str) -> Result<String, url::ParseError> {
     Ok(url.to_string())
 }
 
+fn capability_from_operation(operation: &str) -> Result<CapabilityId, DispatchError> {
+    match operation {
+        "rename-symbol" => Ok(CapabilityId::RenameSymbol),
+        other => Err(DispatchError::invalid_arguments(format!(
+            "act refactor does not support capability resolution for '{other}'"
+        ))),
+    }
+}
+
+fn write_capability_resolution<W: Write>(
+    writer: &mut ResponseWriter<W>,
+    resolution: &CapabilityResolutionEnvelope,
+) -> Result<(), DispatchError> {
+    let json = serde_json::to_string(resolution)?;
+    writer.write_stderr(format!("{json}\n"))
+}
+
 fn handle_plugin_response<W: Write>(
     response: PluginResponse,
     writer: &mut ResponseWriter<W>,
@@ -394,5 +382,9 @@ fn forward_diff_to_apply_patch<W: Write>(
 
 #[cfg(test)]
 mod behaviour;
+#[cfg(test)]
+mod contract_tests;
+#[cfg(test)]
+mod resolution_tests;
 #[cfg(test)]
 mod tests;
