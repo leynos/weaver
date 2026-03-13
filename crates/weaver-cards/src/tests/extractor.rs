@@ -66,7 +66,7 @@ impl<'a> From<ExtractRequest<'a>> for CardExtractionInput<'a> {
     }
 }
 
-fn extract_result(request: ExtractRequest<'_>) -> Result<crate::SymbolCard, CardExtractionError> {
+fn run_extraction(request: ExtractRequest<'_>) -> Result<crate::SymbolCard, CardExtractionError> {
     let path = super::absolute_test_path(request.path);
     TreeSitterCardExtractor::new().extract(
         ExtractRequest {
@@ -78,11 +78,11 @@ fn extract_result(request: ExtractRequest<'_>) -> Result<crate::SymbolCard, Card
 }
 
 fn extract(request: ExtractRequest<'_>) -> crate::SymbolCard {
-    extract_result(request).expect("card extraction should succeed")
+    run_extraction(request).expect("card extraction should succeed")
 }
 
 fn extract_error(request: ExtractRequest<'_>) -> CardExtractionError {
-    extract_result(request).expect_err("card extraction should fail")
+    run_extraction(request).expect_err("card extraction should fail")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -453,13 +453,7 @@ fn extraction_error_cases(
     #[case] request: ExtractRequest<'static>,
     #[case] expected: ExpectedError,
 ) {
-    let err = extract_error(ExtractRequest {
-        path: request.path,
-        source: request.source,
-        line: request.line,
-        column: request.column,
-        detail: request.detail,
-    });
+    let err = extract_error(request);
 
     assert!(
         error_matches(&err, expected),
