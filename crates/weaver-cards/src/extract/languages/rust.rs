@@ -19,7 +19,7 @@ pub(super) fn collect(root: Node<'_>, source: &str) -> Vec<EntityCandidate> {
                 child,
                 source,
                 CardSymbolKind::Function,
-                CallableMetadata::new(None, Vec::new(), extract_rust_docstring(source, child)),
+                CallableMetadata::new(None, Vec::new(), extract_rust_docstring(child)),
             )),
             "struct_item" | "enum_item" | "type_item" => {
                 entities.push(simple_candidate(child, source, CardSymbolKind::Type, None));
@@ -71,7 +71,7 @@ fn impl_like_methods(
                 CallableMetadata::new(
                     container.map(str::to_owned),
                     Vec::new(),
-                    extract_rust_docstring(source, child),
+                    extract_rust_docstring(child),
                 ),
             ));
         }

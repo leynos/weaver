@@ -6,6 +6,7 @@ use crate::{BranchInfo, LocalInfo};
 
 use super::{normalise_whitespace, to_u32};
 
+/// Tracks traversal state while collecting locals and branches from a body.
 pub(super) struct StructureCollector<'a> {
     source: &'a str,
     body_root_id: usize,
@@ -15,6 +16,8 @@ pub(super) struct StructureCollector<'a> {
 }
 
 impl<'a> StructureCollector<'a> {
+    /// Creates a collector for `source`, anchoring nested traversal at
+    /// `body_root.id()` and remembering the surrounding `root_kind`.
     pub(super) fn new(source: &'a str, body_root: Node<'_>, root_kind: &'a str) -> Self {
         Self {
             source,
@@ -25,10 +28,13 @@ impl<'a> StructureCollector<'a> {
         }
     }
 
+    /// Returns the accumulated `LocalInfo` and `BranchInfo` collections.
     pub(super) fn finish(self) -> (Vec<LocalInfo>, Vec<BranchInfo>) {
         (self.locals, self.branches)
     }
 
+    /// Recursively visits `node`, stopping at nested entities and collecting
+    /// `local_info` plus `branch_info` for each traversed child.
     pub(super) fn visit(&mut self, node: Node<'_>) {
         if node.id() != self.body_root_id && is_nested_entity(node.kind(), self.root_kind) {
             return;

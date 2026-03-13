@@ -1,5 +1,7 @@
 //! Shared Tree-sitter extraction helpers across supported languages.
 
+// Use explicit paths so the imports, params, and structure helper modules stay
+// colocated beside this file in the same directory.
 #[path = "imports.rs"]
 mod imports;
 #[path = "params.rs"]
@@ -185,7 +187,7 @@ pub(super) fn python_docstring(node: Node<'_>, source: &str) -> Option<String> {
 }
 
 /// Placeholder Rust docstring extractor until native docstring support lands.
-pub(super) const fn extract_rust_docstring(_source: &str, _node: Node<'_>) -> Option<String> {
+pub(super) const fn extract_rust_docstring(_node: Node<'_>) -> Option<String> {
     None
 }
 
@@ -232,6 +234,16 @@ fn detect_delimiter(literal: &str) -> Option<&'static str> {
     DELIMITERS.iter().copied().find(|&d| literal.starts_with(d))
 }
 
+fn has_even_trailing_backslashes(result: &str) -> bool {
+    let trailing_backslashes = result
+        .chars()
+        .rev()
+        .skip(1)
+        .take_while(|c| *c == '\\')
+        .count();
+    trailing_backslashes & 1 == 0
+}
+
 fn extract_python_string_content(node: Node<'_>, source: &str) -> Option<String> {
     let mut cursor = node.walk();
     let parts: Vec<&str> = node
@@ -261,21 +273,18 @@ fn normalise_whitespace_preserving_literals(raw: &str) -> String {
     let chars = raw.chars().peekable();
     let mut quote: Option<char> = None;
     let mut pending_space = false;
-    let mut previous = None;
 
     for ch in chars {
         if let Some(active_quote) = quote {
             result.push(ch);
-            if ch == active_quote && previous != Some('\\') {
+            if ch == active_quote && has_even_trailing_backslashes(&result) {
                 quote = None;
             }
-            previous = Some(ch);
             continue;
         }
 
         if ch.is_whitespace() {
             pending_space = !result.is_empty();
-            previous = Some(ch);
             continue;
         }
 
@@ -288,7 +297,6 @@ fn normalise_whitespace_preserving_literals(raw: &str) -> String {
             quote = Some(ch);
         }
         result.push(ch);
-        previous = Some(ch);
     }
 
     result.trim().to_owned()
