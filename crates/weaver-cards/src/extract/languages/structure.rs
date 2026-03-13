@@ -224,29 +224,33 @@ fn bound_names(node: Node<'_>, source: &str) -> Vec<String> {
     names
 }
 
+fn push_identifier_name(node: Node<'_>, source: &str, names: &mut Vec<String>) {
+    let name = normalise_whitespace(source.get(node.byte_range()).unwrap_or_default());
+    if !name.is_empty() {
+        names.push(name);
+    }
+}
+
+fn find_named_field_child<'a>(node: Node<'a>, fields: &[&str]) -> Option<Node<'a>> {
+    fields.iter().find_map(|f| node.child_by_field_name(f))
+}
+
 fn collect_bound_names(node: Node<'_>, source: &str, names: &mut Vec<String>) {
     match node.kind() {
         "identifier"
         | "property_identifier"
         | "shorthand_property_identifier"
         | "shorthand_property_identifier_pattern" => {
-            if let Some(text) = source.get(node.byte_range()) {
-                let name = normalise_whitespace(text);
-                if !name.is_empty() {
-                    names.push(name);
-                }
-            }
+            push_identifier_name(node, source, names);
             return;
         }
         "member_expression" | "field_expression" | "subscript_expression" => return,
         _ => {}
     }
 
-    for field_name in ["name", "pattern", "left", "value"] {
-        if let Some(child) = node.child_by_field_name(field_name) {
-            collect_bound_names(child, source, names);
-            return;
-        }
+    if let Some(child) = find_named_field_child(node, &["name", "pattern", "left", "value"]) {
+        collect_bound_names(child, source, names);
+        return;
     }
 
     let mut cursor = node.walk();
