@@ -1,0 +1,16 @@
+---
+source: crates/sempai-core/src/tests/diagnostic_snapshot_tests.rs
+expression: "serde_json::to_string_pretty(&report).expect(\"serialize validator report\")"
+---
+{
+  "diagnostics": [
+    {
+      "code": "E_SEMPAI_SCHEMA_INVALID",
+      "message": "rule id is required",
+      "primary_span": null,
+      "notes": [
+        "add an id field"
+      ]
+    }
+  ]
+}

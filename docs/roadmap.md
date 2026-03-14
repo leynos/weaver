@@ -349,7 +349,7 @@ phase* *with explicit parser, backend, and Weaver-integration milestones.*
       facade entrypoints.
   - Acceptance criteria: public API documentation builds for `sempai`, and
     stable types cover language, span, match, capture, and diagnostics models.
-- [ ] 4.1.2. Define structured diagnostics with stable `E_SEMPAI_*` error
+- [x] 4.1.2. Define structured diagnostics with stable `E_SEMPAI_*` error
       codes and report schema.
   - Acceptance criteria: diagnostics include code, message, primary span, and
     notes, and JSON snapshots remain stable across parser and validator paths.

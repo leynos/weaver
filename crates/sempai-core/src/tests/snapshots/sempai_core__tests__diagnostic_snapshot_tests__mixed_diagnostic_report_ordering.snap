@@ -1,0 +1,28 @@
+---
+source: crates/sempai-core/src/tests/diagnostic_snapshot_tests.rs
+expression: "serde_json::to_string_pretty(&report).expect(\"serialize mixed report\")"
+---
+{
+  "diagnostics": [
+    {
+      "code": "E_SEMPAI_DSL_PARSE",
+      "message": "unexpected token",
+      "primary_span": {
+        "start": 4,
+        "end": 6,
+        "uri": null
+      },
+      "notes": [
+        "while parsing parser clause"
+      ]
+    },
+    {
+      "code": "E_SEMPAI_INVALID_NOT_IN_OR",
+      "message": "negated branch in pattern-either",
+      "primary_span": null,
+      "notes": [
+        "rewrite as positive branch"
+      ]
+    }
+  ]
+}

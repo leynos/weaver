@@ -22,3 +22,22 @@ Feature: Sempai core type construction and serialization
     When the diagnostic report is formatted
     Then the formatted output contains "NOT_IMPLEMENTED"
     And the formatted output contains "compile_yaml"
+
+  Scenario: Parser diagnostic JSON uses the stable schema fields
+    Given a parser diagnostic with code "E_SEMPAI_YAML_PARSE" and message "invalid YAML"
+    When the diagnostic report is serialized to JSON
+    Then the first diagnostic JSON contains key "code"
+    And the first diagnostic JSON contains key "message"
+    And the first diagnostic JSON contains key "primary_span"
+    And the first diagnostic JSON contains key "notes"
+    And the first diagnostic JSON does not contain key "span"
+
+  Scenario: Invalid diagnostic code payload fails deterministically
+    Given diagnostic code payload "E_SEMPAI_NOT_A_REAL_CODE"
+    When the diagnostic code payload is deserialized
+    Then deserialization fails with message containing "E_SEMPAI_NOT_A_REAL_CODE"
+
+  Scenario: Null primary span remains explicit in JSON
+    Given a validator diagnostic with code "E_SEMPAI_SCHEMA_INVALID" and message "missing id"
+    When the diagnostic report is serialized to JSON
+    Then the first diagnostic JSON contains key "primary_span" with value "null"
