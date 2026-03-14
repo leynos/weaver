@@ -160,6 +160,8 @@ fn lexical_names(node: Node<'_>, source: &str) -> Vec<String> {
         })
         .collect();
     if names.is_empty() {
+        // `lexical_names` falls back when no `variable_declarator` children
+        // exist and conservatively collects any bound names via `bound_names`.
         let mut fallback_cursor = node.walk();
         node.named_children(&mut fallback_cursor)
             .flat_map(|child| bound_names(child, source))

@@ -2,22 +2,26 @@
 
 use std::path::Path;
 
-use rstest::rstest;
+use rstest::{fixture, rstest};
 
 use crate::{DetailLevel, GetCardResponse};
 
 use super::common::{ExtractRequest, extract};
 
-#[test]
-fn extraction_ranges_are_deterministic() {
-    let request = ExtractRequest {
+#[fixture]
+fn rust_extract_request() -> ExtractRequest<'static> {
+    ExtractRequest {
         path: Path::new("fixture.rs"),
         source: "fn greet(name: &str) -> usize {\n    name.len()\n}\n",
         line: 1,
         column: 4,
         detail: DetailLevel::Structure,
-    };
+    }
+}
 
+#[rstest]
+fn extraction_ranges_are_deterministic(rust_extract_request: ExtractRequest<'static>) {
+    let request = rust_extract_request;
     let first = extract(request);
     let second = extract(request);
 
@@ -109,14 +113,12 @@ fn semantic_detail_degrades_to_tree_sitter_provenance() {
     );
 }
 
-#[test]
-fn get_card_success_payload_preserves_wrapped_cards() {
+#[rstest]
+fn get_card_success_payload_preserves_wrapped_cards(rust_extract_request: ExtractRequest<'static>) {
     let card = extract(ExtractRequest {
-        path: Path::new("fixture.rs"),
         source: "fn greet() {}\n",
-        line: 1,
-        column: 4,
         detail: DetailLevel::Minimal,
+        ..rust_extract_request
     });
     let response = GetCardResponse::Success {
         card: Box::new(card),
