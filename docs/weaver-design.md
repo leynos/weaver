@@ -564,11 +564,24 @@ shared `Config` schema gains a `locale` field surfaced as `--locale`,
 the rest of the configuration contract. The CLI still needs a bootstrap locale
 before full configuration loading so `--help`, bare-invocation guidance, and
 parse failures can be localized even when they occur before the full config has
-been merged. The bootstrap order should therefore be `LC_ALL`, `LC_MESSAGES`,
-`LANG`, then `en-US`; once `Config::load` succeeds, the CLI rebuilds the
-localizer if `Config::locale` resolves to a different value. Locale values are
-validated as BCP 47 language identifiers during config loading so malformed
-settings fail fast instead of silently falling back to the wrong language.
+been merged. Weaver therefore performs a narrow pre-config pass that extracts
+`--locale` (including `--locale=<tag>`) before constructing any clap display
+surface. The bootstrap order should therefore be `--locale`, `WEAVER_LOCALE`,
+`LC_ALL`, `LC_MESSAGES`, `LANG`, then `en-US`; once `Config::load` succeeds,
+the CLI rebuilds the localizer if `Config::locale` resolves to a different
+value. This means early clap-only paths can honour the explicit CLI flag and
+the Weaver-scoped environment override immediately, while file-backed locale
+selection becomes authoritative only after the full config load completes.
+
+Bootstrap locale handling should distinguish explicit overrides from inherited
+process hints. Malformed `--locale` and `WEAVER_LOCALE` values are hard errors
+because they are explicit Weaver inputs and should behave like other invalid
+configuration values. Malformed `LC_ALL`, `LC_MESSAGES`, or `LANG` values
+should emit a warning and fall through to the next source so inherited shell
+state does not break `weaver --help`. Locale values read during config loading
+continue to be validated as BCP 47 language identifiers so malformed
+configuration files fail fast instead of silently falling back to the wrong
+language.
 
 Runtime localization should use `ortho_config::FluentLocalizer` with an
 embedded mandatory `en-US` bundle and optional consumer bundles under

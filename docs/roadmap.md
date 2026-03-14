@@ -349,13 +349,15 @@ does* *not require source inspection or external runbooks.*
       [weaver design §2.3.1](weaver-design.md#231-configuration-contract).
   - [ ] Add a `locale` field to `weaver-config`, surfaced as `--locale`,
         `WEAVER_LOCALE`, and a config-file key.
-  - [ ] Bootstrap locale selection from `LC_ALL`, `LC_MESSAGES`, and `LANG`
-        before full config loading, then rebuild the localizer if the resolved
-        config locale differs.
-  - [ ] Acceptance criteria: invalid locale identifiers fail fast during
-        config loading, `weaver --help` can be rendered through a non-default
-        locale selected by CLI, environment, or config file, and `en-US`
-        remains the guaranteed fallback.
+  - [ ] Add a pre-config bootstrap pass that honours `--locale` and
+        `WEAVER_LOCALE` before consulting `LC_ALL`, `LC_MESSAGES`, and `LANG`,
+        then rebuild the localizer if the resolved config locale differs.
+  - [ ] Acceptance criteria: `weaver --help` and other pre-config clap display
+        paths honour `--locale` and `WEAVER_LOCALE` immediately; malformed
+        `--locale` and `WEAVER_LOCALE` values fail fast; malformed ambient
+        `LC_*` or `LANG` values warn and fall back; file-backed locale
+        settings apply after full config loading; and `en-US` remains the
+        guaranteed fallback.
 - [ ] 3.3.2. Localize clap help and parse errors through `ortho_config`.
       Requires 3.3.1. See
       [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces).
@@ -385,9 +387,10 @@ does* *not require source inspection or external runbooks.*
         `OrthoConfigDocs` metadata for the generated help schema.
   - [ ] Add `[package.metadata.ortho_config]` wiring and `cargo orthohelp`
         generation for at least `en-US` and one secondary locale.
-  - [ ] Acceptance criteria: localized IR files are generated per locale,
-        `en-US` manpage packaging remains intact, and artefact validation
-        proves the generated help text matches the runtime Fluent catalogue.
+  - [ ] Acceptance criteria: localized intermediate representation (IR) files
+        are generated per locale, `en-US` manpage packaging remains intact,
+        and artefact validation proves the generated help text matches the
+        runtime Fluent catalogue.
 
 ## 4. Query language infrastructure (Sempai)
 
