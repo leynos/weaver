@@ -218,6 +218,8 @@ pub(super) fn to_range(node: Node<'_>) -> SourceRange {
     }
 }
 
+/// Converts a `usize` to `u32`, saturating at [`u32::MAX`] for files larger
+/// than 4 GiB, an edge case that is unreachable in normal operation.
 fn to_u32(value: usize) -> u32 {
     u32::try_from(value).unwrap_or(u32::MAX)
 }
