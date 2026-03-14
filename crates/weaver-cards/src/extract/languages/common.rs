@@ -183,6 +183,12 @@ pub(super) fn python_docstring(node: Node<'_>, source: &str) -> Option<String> {
     let string_node = first_statement
         .named_children(&mut statement_cursor)
         .find(|child| child.kind() == "string")?;
+    let raw_literal = source.get(string_node.start_byte()..string_node.end_byte())?;
+    let opening_index = raw_literal.find(['"', '\''])?;
+    let prefix = raw_literal.get(..opening_index)?.to_ascii_lowercase();
+    if prefix.contains('b') || prefix.contains('f') {
+        return None;
+    }
     extract_python_string_content(string_node, source)
 }
 

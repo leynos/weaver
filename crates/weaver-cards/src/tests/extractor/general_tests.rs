@@ -2,6 +2,8 @@
 
 use std::path::Path;
 
+use rstest::rstest;
+
 use crate::{DetailLevel, GetCardResponse};
 
 use super::common::{ExtractRequest, extract};
@@ -26,11 +28,22 @@ fn extraction_ranges_are_deterministic() {
     assert_eq!(first.etag, second.etag);
 }
 
-#[test]
-fn python_raw_triple_quoted_docstrings_are_preserved() {
+#[rstest]
+#[case(
+    "def bar() -> None:\n    r\"\"\"raw docstring\"\"\"\n    return None\n",
+    "raw docstring"
+)]
+#[case(
+    "def bar() -> None:\n    \"\"\"line\\nnext\"\"\"\n    return None\n",
+    "line\\nnext"
+)]
+fn python_docstrings_are_preserved(
+    #[case] source: &'static str,
+    #[case] expected_docstring: &'static str,
+) {
     let card = extract(ExtractRequest {
         path: Path::new("fixture.py"),
-        source: "def bar() -> None:\n    r\"\"\"raw docstring\"\"\"\n    return None\n",
+        source,
         line: 1,
         column: 5,
         detail: DetailLevel::Structure,
@@ -38,24 +51,23 @@ fn python_raw_triple_quoted_docstrings_are_preserved() {
 
     assert_eq!(
         card.doc.as_ref().map(|doc| doc.docstring.as_str()),
-        Some("raw docstring")
+        Some(expected_docstring)
     );
 }
 
-#[test]
-fn python_docstrings_preserve_escape_sequences() {
+#[rstest]
+#[case("def bar() -> None:\n    b\"\"\"raw docstring\"\"\"\n    return None\n")]
+#[case("def bar() -> None:\n    f\"\"\"raw docstring\"\"\"\n    return None\n")]
+fn python_byte_and_format_docstrings_are_rejected(#[case] source: &'static str) {
     let card = extract(ExtractRequest {
         path: Path::new("fixture.py"),
-        source: "def bar() -> None:\n    \"\"\"line\\nnext\"\"\"\n    return None\n",
+        source,
         line: 1,
         column: 5,
         detail: DetailLevel::Structure,
     });
 
-    assert_eq!(
-        card.doc.as_ref().map(|doc| doc.docstring.as_str()),
-        Some("line\\nnext")
-    );
+    assert!(card.doc.is_none());
 }
 
 #[test]
@@ -98,7 +110,7 @@ fn semantic_detail_degrades_to_tree_sitter_provenance() {
 }
 
 #[test]
-fn get_card_success_payload_can_wrap_extracted_cards() {
+fn get_card_success_payload_preserves_wrapped_cards() {
     let card = extract(ExtractRequest {
         path: Path::new("fixture.rs"),
         source: "fn greet() {}\n",
@@ -110,5 +122,14 @@ fn get_card_success_payload_can_wrap_extracted_cards() {
         card: Box::new(card),
     };
 
-    assert!(matches!(response, GetCardResponse::Success { .. }));
+    match response {
+        GetCardResponse::Success { card: boxed_card } => {
+            assert_eq!(boxed_card.symbol.symbol_ref.name, "greet");
+            assert_eq!(
+                boxed_card.symbol.symbol_ref.kind,
+                crate::CardSymbolKind::Function
+            );
+        }
+        GetCardResponse::Refusal { .. } => panic!("expected success response"),
+    }
 }

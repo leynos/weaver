@@ -103,23 +103,9 @@ pub(super) fn is_nested_entity(kind: &str, root_kind: &str) -> bool {
 /// or an empty vector when the node does not declare locals.
 pub(super) fn local_info(node: Node<'_>, source: &str) -> Vec<LocalInfo> {
     let names = match node.kind() {
-        "let_declaration" => {
-            let names = binding_names(node, source);
-            if names.is_empty() {
-                vec![binding_name(node, source)]
-            } else {
-                names
-            }
-        }
+        "let_declaration" => binding_names(node, source),
         "assignment" => assignment_names(node, source),
-        "lexical_declaration" => {
-            let names = lexical_names(node, source);
-            if names.is_empty() {
-                vec![lexical_name(node, source)]
-            } else {
-                names
-            }
-        }
+        "lexical_declaration" => lexical_names(node, source),
         _ => return Vec::new(),
     };
 
@@ -150,29 +136,6 @@ pub(super) fn branch_info(node: Node<'_>) -> Option<BranchInfo> {
         kind: String::from(kind),
         line: to_u32(node.start_position().row),
     })
-}
-
-/// Returns the first binding name extracted from a Rust-style let declaration.
-///
-/// `node` is expected to expose a `pattern` field. Falls back to the raw node
-/// text when no more specific binding name can be derived.
-pub(super) fn binding_name(node: Node<'_>, source: &str) -> String {
-    binding_names(node, source)
-        .into_iter()
-        .next()
-        .unwrap_or_else(|| normalise_whitespace(source.get(node.byte_range()).unwrap_or_default()))
-}
-
-/// Returns the first lexical declaration name extracted from a declaration.
-///
-/// `node` is usually a JavaScript or TypeScript lexical declaration. Falls
-/// back to normalized node text when bound-name traversal finds nothing more
-/// specific.
-pub(super) fn lexical_name(node: Node<'_>, source: &str) -> String {
-    lexical_names(node, source)
-        .into_iter()
-        .next()
-        .unwrap_or_else(|| normalise_whitespace(source.get(node.byte_range()).unwrap_or_default()))
 }
 
 fn binding_names(node: Node<'_>, source: &str) -> Vec<String> {
