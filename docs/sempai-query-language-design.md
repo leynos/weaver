@@ -966,6 +966,34 @@ Diagnostic fields:
 - Primary span: source location in rule file or DSL string
 - Notes: additional context (wrapper attempts, language profile used)
 
+Canonical JSON shape:
+
+```json
+{
+  "diagnostics": [
+    {
+      "code": "E_SEMPAI_SCHEMA_INVALID",
+      "message": "missing required field 'id'",
+      "primary_span": {
+        "start": 12,
+        "end": 26,
+        "uri": "file:///rules.yaml"
+      },
+      "notes": ["add a stable rule id"]
+    }
+  ]
+}
+```
+
+Stability rules:
+
+- Parser and validator diagnostics must serialize using the same schema.
+- The required keys for each diagnostic are `code`, `message`,
+  `primary_span`, and `notes`.
+- `primary_span` may be `null` when no source location is available.
+- Legacy payloads using `span` may be accepted for compatibility, but emitted
+  JSON must use `primary_span`.
+
 ### Error codes
 
 A minimal initial set:

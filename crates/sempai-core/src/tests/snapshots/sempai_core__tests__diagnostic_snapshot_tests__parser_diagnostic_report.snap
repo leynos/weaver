@@ -1,0 +1,21 @@
+---
+source: crates/sempai-core/src/tests/diagnostic_snapshot_tests.rs
+expression: "serde_json::to_string_pretty(&report).expect(\"serialize parser report\")"
+---
+{
+  "diagnostics": [
+    {
+      "code": "E_SEMPAI_YAML_PARSE",
+      "message": "failed to parse YAML",
+      "primary_span": {
+        "start": 0,
+        "end": 12,
+        "uri": "file:///rule.yaml"
+      },
+      "notes": [
+        "expected mapping",
+        "found sequence"
+      ]
+    }
+  ]
+}

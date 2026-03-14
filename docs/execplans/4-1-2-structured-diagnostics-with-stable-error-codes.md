@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -74,50 +74,50 @@ make nixie        # exits 0
 ## Risks
 
 - Risk: Existing diagnostics use `span`, while acceptance language uses
-  "primary span".
-  Severity: medium.
-  Likelihood: medium.
-  Mitigation: Define a canonical JSON field (`primary_span`) and, if needed,
-  support backward compatibility via serde aliasing and clear docs.
+  "primary span". Severity: medium. Likelihood: medium. Mitigation: Define a
+  canonical JSON field (`primary_span`) and, if needed, support backward
+  compatibility via serde aliasing and clear docs.
 
 - Risk: Parser and validator crates are not yet implemented, so "both paths"
-  must be represented via contract constructors/tests now.
-  Severity: medium.
-  Likelihood: high.
-  Mitigation: Add explicit parser/validator constructor paths in
-  `sempai_core::diagnostic` and lock both with snapshots and BDD scenarios.
+  must be represented via contract constructors/tests now. Severity: medium.
+  Likelihood: high. Mitigation: Add explicit parser/validator constructor paths
+  in `sempai_core::diagnostic` and lock both with snapshots and BDD scenarios.
 
 - Risk: Strict Clippy lints on tests can block concise fixture-heavy behaviour
-  tests.
-  Severity: low.
-  Likelihood: medium.
-  Mitigation: Keep helpers small, split modules early, and use scoped
-  `#[expect]` with reason only when structurally necessary.
+  tests. Severity: low. Likelihood: medium. Mitigation: Keep helpers small,
+  split modules early, and use scoped `#[expect]` with reason only when
+  structurally necessary.
 
 ## Progress
 
 - [x] (2026-03-11 00:00Z) Drafted this ExecPlan from roadmap and design docs.
-- [ ] Stage A: Write failing unit/snapshot/BDD tests for schema stability.
-- [ ] Stage B: Implement diagnostic schema and stable code mappings.
-- [ ] Stage C: Stabilize parser/validator diagnostic construction paths.
-- [ ] Stage D: Update design/user docs and mark roadmap item 4.1.2 done.
-- [ ] Stage E: Run quality gates and capture evidence.
+- [x] Stage A: Write failing unit/snapshot/BDD tests for schema stability.
+- [x] Stage B: Implement diagnostic schema and stable code mappings.
+- [x] Stage C: Stabilize parser/validator diagnostic construction paths.
+- [x] Stage D: Update design/user docs and mark roadmap item 4.1.2 done.
+- [x] Stage E: Run quality gates and capture evidence.
 
 ## Surprises & discoveries
 
 - Observation: `sempai_core` already defines all target `E_SEMPAI_*` variants,
   but current contract wording and tests do not yet lock parser-vs-validator
-  schema parity via snapshots.
-  Evidence:
+  schema parity via snapshots. Evidence:
   [crates/sempai-core/src/diagnostic.rs](../../crates/sempai-core/src/diagnostic.rs)
-  and
+   and
   [crates/sempai-core/src/tests/diagnostic_tests.rs](../../crates/sempai-core/src/tests/diagnostic_tests.rs).
-  Impact: Work should focus on schema hardening and path parity, not inventing
+   Impact: Work should focus on schema hardening and path parity, not inventing
   a new code set.
 
 - Observation: `rstest-bdd` v0.5.0 is already pinned at workspace level.
   Evidence: [Cargo.toml](../../Cargo.toml). Impact: No dependency update is
   required; tests should reuse current setup.
+
+- Observation: `insta::assert_json_snapshot!` is unavailable in the current
+  `insta` configuration, while `assert_snapshot!` is available and stable.
+  Evidence:
+  [crates/sempai-core/src/tests/diagnostic_snapshot_tests.rs](../../crates/sempai-core/src/tests/diagnostic_snapshot_tests.rs).
+   Impact: Snapshot tests should serialize deterministic pretty JSON strings
+  and use `assert_snapshot!`.
 
 ## Decision log
 
@@ -131,6 +131,11 @@ make nixie        # exits 0
   Rationale: Snapshots provide explicit, reviewable contract evidence and catch
   accidental field-shape drift. Date/Author: 2026-03-11 / Codex.
 
+- Decision: Emit `primary_span` in JSON while accepting legacy `span` on input
+  via serde aliasing. Rationale: This satisfies the roadmap contract and keeps
+  backward compatibility for older payloads during transition. Date/Author:
+  2026-03-14 / Codex.
+
 ## Outcomes & retrospective
 
 Target outcome at completion:
@@ -143,7 +148,19 @@ Target outcome at completion:
 6. Roadmap item 4.1.2 is checked off.
 7. `make check-fmt`, `make lint`, and `make test` pass.
 
-Retrospective notes will be filled after implementation.
+Retrospective notes:
+
+- Implemented canonical diagnostic JSON keys (`code`, `message`,
+  `primary_span`, `notes`) and maintained input compatibility for legacy `span`
+  payloads through serde aliasing.
+- Added parser/validator constructor helpers in `Diagnostic` and
+  `DiagnosticReport` to encode path parity in the type surface.
+- Added unit tests for happy/unhappy/edge paths, plus BDD scenarios and
+  snapshot tests proving parser/validator schema consistency.
+- Verified complete gate sequence with logs:
+  `/tmp/4-1-2-make-fmt.log`, `/tmp/4-1-2-make-markdownlint.log`,
+  `/tmp/4-1-2-make-nixie.log`, `/tmp/4-1-2-make-check-fmt.log`,
+  `/tmp/4-1-2-make-lint.log`, `/tmp/4-1-2-make-test.log`.
 
 ## Context and orientation
 

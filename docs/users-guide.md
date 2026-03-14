@@ -244,8 +244,8 @@ This output does not require a configuration file or a running daemon. Use
 
 ### Version
 
-Running `weaver --version` or `weaver -V` prints the version string to
-standard output and exits with code 0:
+Running `weaver --version` or `weaver -V` prints the version string to standard
+output and exits with code 0:
 
 ```text
 weaver 0.1.0
@@ -1126,6 +1126,8 @@ All error conditions are reported through `DiagnosticReport`, which carries
 stable diagnostic codes suitable for programmatic consumption. Stub methods
 currently return the `NOT_IMPLEMENTED` code; real `E_SEMPAI_*` codes will be
 used once the corresponding backends are implemented. Diagnostics include a
-code, message, optional source span, and supplementary notes.
+code, message, `primary_span` (or `null` when unavailable), and supplementary
+notes. Both parser-path and validator-path diagnostics use the same JSON
+schema, and snapshot tests lock this contract.
 
 [^1]: Jacquard roadmap section 7.1.2 — extraction milestone.

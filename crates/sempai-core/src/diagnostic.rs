@@ -153,8 +153,10 @@ pub struct Diagnostic {
     code: DiagnosticCode,
     /// A human-readable description of the problem.
     message: String,
-    /// The source location where the problem was detected, if available.
-    span: Option<SourceSpan>,
+    /// The primary source location where the problem was detected, if
+    /// available.
+    #[serde(rename = "primary_span", alias = "span")]
+    primary_span: Option<SourceSpan>,
     /// Additional notes providing context or suggestions.
     notes: Vec<String>,
 }
@@ -169,15 +171,37 @@ impl Diagnostic {
     pub fn new(
         code: DiagnosticCode,
         message: String,
-        span: Option<SourceSpan>,
+        primary_span: Option<SourceSpan>,
         notes: Vec<String>,
     ) -> Self {
         Self {
             code,
             message,
-            span,
+            primary_span,
             notes,
         }
+    }
+
+    /// Creates a parser-path diagnostic.
+    #[must_use]
+    pub fn parser(
+        code: DiagnosticCode,
+        message: String,
+        primary_span: Option<SourceSpan>,
+        notes: Vec<String>,
+    ) -> Self {
+        Self::new(code, message, primary_span, notes)
+    }
+
+    /// Creates a validator-path diagnostic.
+    #[must_use]
+    pub fn validator(
+        code: DiagnosticCode,
+        message: String,
+        primary_span: Option<SourceSpan>,
+        notes: Vec<String>,
+    ) -> Self {
+        Self::new(code, message, primary_span, notes)
     }
 
     /// Returns the diagnostic code.
@@ -194,8 +218,17 @@ impl Diagnostic {
 
     /// Returns the source span, if available.
     #[must_use]
+    pub const fn primary_span(&self) -> Option<&SourceSpan> {
+        self.primary_span.as_ref()
+    }
+
+    /// Returns the primary source span, if available.
+    ///
+    /// This compatibility alias will be removed once downstream callers have
+    /// migrated to [`primary_span`](Self::primary_span).
+    #[must_use]
     pub const fn span(&self) -> Option<&SourceSpan> {
-        self.span.as_ref()
+        self.primary_span()
     }
 
     /// Returns the supplementary notes.
@@ -242,6 +275,33 @@ impl DiagnosticReport {
     )]
     pub fn new(diagnostics: Vec<Diagnostic>) -> Self {
         Self { diagnostics }
+    }
+
+    /// Creates a report containing a single parser diagnostic.
+    #[must_use]
+    pub fn parser_error(
+        code: DiagnosticCode,
+        message: String,
+        primary_span: Option<SourceSpan>,
+        notes: Vec<String>,
+    ) -> Self {
+        Self::new(vec![Diagnostic::parser(code, message, primary_span, notes)])
+    }
+
+    /// Creates a report containing a single validation diagnostic.
+    #[must_use]
+    pub fn validation_error(
+        code: DiagnosticCode,
+        message: String,
+        primary_span: Option<SourceSpan>,
+        notes: Vec<String>,
+    ) -> Self {
+        Self::new(vec![Diagnostic::validator(
+            code,
+            message,
+            primary_span,
+            notes,
+        )])
     }
 
     /// Creates a single-diagnostic report indicating that a feature is not
