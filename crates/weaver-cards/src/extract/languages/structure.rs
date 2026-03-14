@@ -111,14 +111,7 @@ pub(super) fn local_info(node: Node<'_>, source: &str) -> Vec<LocalInfo> {
                 names
             }
         }
-        "assignment" => {
-            let names = assignment_names(node, source);
-            if names.is_empty() {
-                vec![assignment_name(node, source)]
-            } else {
-                names
-            }
-        }
+        "assignment" => assignment_names(node, source),
         "lexical_declaration" => {
             let names = lexical_names(node, source);
             if names.is_empty() {
@@ -168,17 +161,6 @@ pub(super) fn binding_name(node: Node<'_>, source: &str) -> String {
         .into_iter()
         .next()
         .unwrap_or_else(|| normalise_whitespace(source.get(node.byte_range()).unwrap_or_default()))
-}
-
-/// Returns the first assignment target name extracted from a binding node.
-///
-/// `node` is expected to expose a `left` field. Returns `"assignment"` when no
-/// explicit target name can be resolved.
-pub(super) fn assignment_name(node: Node<'_>, source: &str) -> String {
-    assignment_names(node, source)
-        .into_iter()
-        .next()
-        .unwrap_or_else(|| String::from("assignment"))
 }
 
 /// Returns the first lexical declaration name extracted from a declaration.

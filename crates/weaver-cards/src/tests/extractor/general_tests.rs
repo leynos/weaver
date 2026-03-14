@@ -43,6 +43,41 @@ fn python_raw_triple_quoted_docstrings_are_preserved() {
 }
 
 #[test]
+fn python_docstrings_preserve_escape_sequences() {
+    let card = extract(ExtractRequest {
+        path: Path::new("fixture.py"),
+        source: "def bar() -> None:\n    \"\"\"line\\nnext\"\"\"\n    return None\n",
+        line: 1,
+        column: 5,
+        detail: DetailLevel::Structure,
+    });
+
+    assert_eq!(
+        card.doc.as_ref().map(|doc| doc.docstring.as_str()),
+        Some("line\\nnext")
+    );
+}
+
+#[test]
+fn member_assignments_do_not_create_synthetic_locals() {
+    let card = extract(ExtractRequest {
+        path: Path::new("fixture.ts"),
+        source: "function update(obj: Widget): void {\n  obj.value = 1;\n}\n",
+        line: 1,
+        column: 10,
+        detail: DetailLevel::Structure,
+    });
+
+    assert!(
+        card.structure
+            .as_ref()
+            .expect("structure")
+            .locals
+            .is_empty()
+    );
+}
+
+#[test]
 fn semantic_detail_degrades_to_tree_sitter_provenance() {
     let card = extract(ExtractRequest {
         path: Path::new("fixture.ts"),

@@ -234,21 +234,13 @@ fn detect_delimiter(literal: &str) -> Option<&'static str> {
     DELIMITERS.iter().copied().find(|&d| literal.starts_with(d))
 }
 
-fn has_even_trailing_backslashes(result: &str) -> bool {
-    let trailing_backslashes = result
-        .chars()
-        .rev()
-        .skip(1)
-        .take_while(|c| *c == '\\')
-        .count();
-    trailing_backslashes & 1 == 0
-}
-
 fn extract_python_string_content(node: Node<'_>, source: &str) -> Option<String> {
     let mut cursor = node.walk();
     let parts: Vec<&str> = node
         .named_children(&mut cursor)
-        .filter(|child| child.kind().contains("string_content"))
+        .filter(|child| {
+            child.kind().contains("string_content") || child.kind() == "escape_sequence"
+        })
         .filter_map(|child| source.get(child.byte_range()))
         .collect();
     if !parts.is_empty() {
@@ -277,8 +269,14 @@ fn normalise_whitespace_preserving_literals(raw: &str) -> String {
     for ch in chars {
         if let Some(active_quote) = quote {
             result.push(ch);
-            if ch == active_quote && has_even_trailing_backslashes(&result) {
-                quote = None;
+            if ch == active_quote {
+                let trailing_backslashes = result
+                    .chars()
+                    .rev()
+                    .skip(1)
+                    .take_while(|c| *c == '\\')
+                    .count();
+                quote = (trailing_backslashes & 1 != 0).then_some(active_quote);
             }
             continue;
         }

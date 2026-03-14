@@ -10,6 +10,11 @@ use super::common::{
     simple_candidate,
 };
 
+/// Collects top-level Rust entities from `root` using slices from `source`.
+///
+/// `root` is expected to be the parsed file root for the current source text.
+/// Returns one [`EntityCandidate`] per supported top-level item, plus methods
+/// nested under trait and impl items.
 pub(super) fn collect(root: Node<'_>, source: &str) -> Vec<EntityCandidate> {
     let mut entities = Vec::new();
     let mut cursor = root.walk();
