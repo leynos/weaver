@@ -28,8 +28,8 @@ pub(crate) use cli::{Cli, CliCommand, DaemonAction};
 #[cfg(test)]
 pub(crate) use command::CommandDescriptor;
 pub(crate) use command::{CommandInvocation, CommandRequest};
+use config::{ConfigArgumentSplit, prepare_cli_arguments, split_config_arguments};
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader};
-use config::{prepare_cli_arguments, split_config_arguments};
 pub(crate) use daemon_output::{OutputSettings, read_daemon_messages};
 pub use discoverability::DOMAIN_OPERATIONS;
 use discoverability::should_emit_missing_operation_guidance;
@@ -158,19 +158,7 @@ where
         let result = Cli::try_parse_from(cli_arguments)
             .map_err(AppError::CliUsage)
             .and_then(|cli| {
-                if cli.is_bare_invocation() && !split.has_config_flags() {
-                    write_bare_help(&mut *self.io.stderr, localizer).ok();
-                    return Err(AppError::BareInvocation);
-                }
-                if should_emit_missing_operation_guidance(&cli)
-                    && write_missing_operation_guidance(
-                        &mut *self.io.stderr,
-                        cli.domain.as_deref().map(str::trim).unwrap_or_default(),
-                    )
-                    .map_err(AppError::EmitGuidance)?
-                {
-                    return Err(AppError::MissingOperationGuidance);
-                }
+                handle_preflight(&cli, &split, &mut *self.io.stderr, localizer)?;
                 self.loader
                     .load(&split.config_arguments)
                     .map(|config| (cli, config))
@@ -240,6 +228,28 @@ where
     E: Write,
 {
     run_with_loader(args, io, &OrthoConfigLoader)
+}
+
+fn handle_preflight<E: Write>(
+    cli: &Cli,
+    split: &ConfigArgumentSplit,
+    stderr: &mut E,
+    localizer: &dyn Localizer,
+) -> Result<(), AppError> {
+    if cli.is_bare_invocation() && !split.has_config_flags() {
+        write_bare_help(stderr, localizer).ok();
+        return Err(AppError::BareInvocation);
+    }
+    if should_emit_missing_operation_guidance(cli)
+        && write_missing_operation_guidance(
+            stderr,
+            cli.domain.as_deref().map(str::trim).unwrap_or_default(),
+        )
+        .map_err(AppError::EmitGuidance)?
+    {
+        return Err(AppError::MissingOperationGuidance);
+    }
+    Ok(())
 }
 
 fn execute_daemon_command<R, W, E>(
