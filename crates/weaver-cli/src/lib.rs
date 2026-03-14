@@ -10,12 +10,12 @@ use ortho_config::Localizer;
 use std::ffi::{OsStr, OsString};
 use std::io::{Read, Write};
 use std::process::ExitCode;
-use weaver_config::Config;
 
 mod cli;
 mod command;
 mod config;
 mod daemon_output;
+mod discoverability;
 mod errors;
 mod lifecycle;
 mod localizer;
@@ -28,19 +28,21 @@ pub(crate) use cli::{Cli, CliCommand, DaemonAction};
 #[cfg(test)]
 pub(crate) use command::CommandDescriptor;
 pub(crate) use command::{CommandInvocation, CommandRequest};
-use config::{ConfigArgumentSplit, split_config_arguments};
+use config::{ConfigArgumentSplit, prepare_cli_arguments, split_config_arguments};
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader};
 pub(crate) use daemon_output::{OutputSettings, read_daemon_messages};
+pub use discoverability::DOMAIN_OPERATIONS;
+use discoverability::should_emit_missing_operation_guidance;
+use discoverability::write_missing_operation_guidance;
 pub(crate) use errors::{AppError, is_daemon_not_running};
 use lifecycle::{
     LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput, SystemLifecycle,
     try_auto_start_daemon,
 };
-pub use localizer::after_help::DOMAIN_OPERATIONS;
 use localizer::{build_localizer, write_bare_help};
 pub use output::{OutputContext, ResolvedOutputFormat, render_human_output};
-use runtime_utils::emit_capabilities;
 pub(crate) use runtime_utils::exit_code_from_status;
+use runtime_utils::handle_capabilities_mode;
 use transport::{connect, connect_with_retry};
 /// CLI flags recognised by the configuration loader.
 ///
@@ -156,10 +158,7 @@ where
         let result = Cli::try_parse_from(cli_arguments)
             .map_err(AppError::CliUsage)
             .and_then(|cli| {
-                if cli.is_bare_invocation() && !split.has_config_flags() {
-                    write_bare_help(&mut *self.io.stderr, localizer).ok();
-                    return Err(AppError::BareInvocation);
-                }
+                handle_preflight(&cli, &split, &mut *self.io.stderr, localizer)?;
                 self.loader
                     .load(&split.config_arguments)
                     .map(|config| (cli, config))
@@ -206,6 +205,7 @@ where
         match result {
             Ok(exit_code) => exit_code,
             Err(AppError::BareInvocation) => ExitCode::FAILURE,
+            Err(AppError::MissingOperationGuidance) => ExitCode::FAILURE,
             Err(AppError::CliUsage(ref clap_err)) if !clap_err.use_stderr() => {
                 let _ = write!(self.io.stdout, "{clap_err}");
                 ExitCode::SUCCESS
@@ -230,38 +230,26 @@ where
     run_with_loader(args, io, &OrthoConfigLoader)
 }
 
-fn prepare_cli_arguments(args: &[OsString], split: &ConfigArgumentSplit) -> Vec<OsString> {
-    let mut cli_arguments: Vec<OsString> = Vec::new();
-    if let Some(first) = args.first() {
-        cli_arguments.push(first.clone());
-    }
-    if split.command_start < args.len() {
-        cli_arguments.extend(args[split.command_start..].iter().cloned());
-    }
-    cli_arguments
-}
-
-fn handle_capabilities_mode<R, W, E>(
+fn handle_preflight<E: Write>(
     cli: &Cli,
-    config: &Config,
-    io: &mut IoStreams<'_, R, W, E>,
-) -> Option<ExitCode>
-where
-    R: Read,
-    W: Write,
-    E: Write,
-{
-    if !cli.capabilities {
-        return None;
+    split: &ConfigArgumentSplit,
+    stderr: &mut E,
+    localizer: &dyn Localizer,
+) -> Result<(), AppError> {
+    if cli.is_bare_invocation() && !split.has_config_flags() {
+        write_bare_help(stderr, localizer).ok();
+        return Err(AppError::BareInvocation);
     }
-
-    match emit_capabilities(config, io.stdout) {
-        Ok(()) => Some(ExitCode::SUCCESS),
-        Err(error) => {
-            let _ = writeln!(io.stderr, "{error}");
-            Some(ExitCode::FAILURE)
-        }
+    if should_emit_missing_operation_guidance(cli)
+        && write_missing_operation_guidance(
+            stderr,
+            cli.domain.as_deref().map(str::trim).unwrap_or_default(),
+        )
+        .map_err(AppError::EmitGuidance)?
+    {
+        return Err(AppError::MissingOperationGuidance);
     }
+    Ok(())
 }
 
 fn execute_daemon_command<R, W, E>(

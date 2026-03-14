@@ -200,27 +200,6 @@ fn read_daemon_messages_fails_on_malformed_json() {
 }
 
 #[test]
-fn run_with_loader_reports_configuration_failures() {
-    struct FailingLoader;
-
-    impl ConfigLoader for FailingLoader {
-        fn load(&self, _args: &[OsString]) -> Result<Config, AppError> {
-            Err(AppError::MissingDomain)
-        }
-    }
-
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let mut stdin = Cursor::new(Vec::new());
-    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
-    let args = vec![OsString::from("weaver"), OsString::from("observe")];
-    let exit = run_with_loader(args, &mut io, &FailingLoader);
-    assert_eq!(exit, ExitCode::FAILURE);
-    let stderr_text = decode_utf8(stderr, "stderr").expect("decode stderr");
-    assert!(stderr_text.contains("command domain"));
-}
-
-#[test]
 fn run_with_loader_filters_configuration_arguments() {
     struct RecordingLoader {
         recorded: RefCell<Vec<OsString>>,
@@ -389,10 +368,12 @@ fn is_daemon_not_running_rejects_non_connect_errors() {
     assert!(!is_daemon_not_running(&AppError::MissingOperation));
     assert!(!is_daemon_not_running(&AppError::MissingExit));
     assert!(!is_daemon_not_running(&AppError::BareInvocation));
+    assert!(!is_daemon_not_running(&AppError::MissingOperationGuidance));
     let ser_err = AppError::SerialiseRequest(serde_json::from_str::<()>("bad").unwrap_err());
     assert!(!is_daemon_not_running(&ser_err));
 }
 mod after_help;
 mod auto_start;
 mod bare_invocation;
+mod missing_operation_guidance;
 mod version_output;

@@ -117,6 +117,20 @@ pub(crate) fn split_config_arguments(args: &[OsString]) -> ConfigArgumentSplit {
     }
 }
 
+pub(crate) fn prepare_cli_arguments(
+    args: &[OsString],
+    split: &ConfigArgumentSplit,
+) -> Vec<OsString> {
+    let mut cli_arguments: Vec<OsString> = Vec::new();
+    if let Some(first) = args.first() {
+        cli_arguments.push(first.clone());
+    }
+    if split.command_start < args.len() {
+        cli_arguments.extend(args[split.command_start..].iter().cloned());
+    }
+    cli_arguments
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

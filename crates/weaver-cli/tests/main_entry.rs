@@ -21,7 +21,9 @@ fn missing_operation_exits_with_failure() {
     command
         .assert()
         .failure()
-        .stderr(contains("command operation must be provided"));
+        .stderr(contains("error: operation required for domain 'observe'"))
+        .stderr(contains("get-card"))
+        .stderr(contains("weaver observe get-definition --help"));
 }
 
 #[test]

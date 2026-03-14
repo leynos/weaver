@@ -1,11 +1,11 @@
 //! Runtime helpers for the CLI entrypoints.
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::process::ExitCode;
 
 use weaver_config::{CapabilityMatrix, Config};
 
-use crate::AppError;
+use crate::{AppError, Cli, IoStreams};
 
 pub(crate) fn emit_capabilities<W>(config: &Config, stdout: &mut W) -> Result<(), AppError>
 where
@@ -24,5 +24,28 @@ pub(crate) fn exit_code_from_status(status: i32) -> ExitCode {
         ExitCode::from(status as u8)
     } else {
         ExitCode::FAILURE
+    }
+}
+
+pub(crate) fn handle_capabilities_mode<R, W, E>(
+    cli: &Cli,
+    config: &Config,
+    io: &mut IoStreams<'_, R, W, E>,
+) -> Option<ExitCode>
+where
+    R: Read,
+    W: Write,
+    E: Write,
+{
+    if !cli.capabilities {
+        return None;
+    }
+
+    match emit_capabilities(config, io.stdout) {
+        Ok(()) => Some(ExitCode::SUCCESS),
+        Err(error) => {
+            let _ = writeln!(io.stderr, "{error}");
+            Some(ExitCode::FAILURE)
+        }
     }
 }

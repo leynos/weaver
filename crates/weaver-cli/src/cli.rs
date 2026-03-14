@@ -47,7 +47,7 @@ pub enum OutputFormat {
         "\n",
         "  observe \u{2014} Query code structure and relationships\n",
         "    get-definition    find-references    grep\n",
-        "    diagnostics       call-hierarchy\n",
+        "    diagnostics       call-hierarchy    get-card\n",
         "\n",
         "  act \u{2014} Perform code modifications\n",
         "    rename-symbol     apply-edits        apply-patch\n",
