@@ -37,6 +37,13 @@ fn diagnostic_code_serde_round_trip() {
 }
 
 #[test]
+fn diagnostic_code_deserialization_rejects_unknown_code() {
+    let err = serde_json::from_str::<DiagnosticCode>("\"E_SEMPAI_DOES_NOT_EXIST\"")
+        .expect_err("unknown diagnostic code should fail");
+    assert!(err.to_string().contains("E_SEMPAI_DOES_NOT_EXIST"));
+}
+
+#[test]
 fn source_span_construction_and_accessors() {
     let span = SourceSpan::new(10, 42, Some(String::from("file:///rule.yml")));
     assert_eq!(span.start(), 10);
@@ -68,22 +75,138 @@ fn diagnostic_construction_and_accessors() {
     );
     assert_eq!(diag.code(), DiagnosticCode::ESempaiYamlParse);
     assert_eq!(diag.message(), "unexpected key 'patterns'");
-    assert!(diag.span().is_some());
+    assert!(diag.primary_span().is_some());
     assert_eq!(diag.notes().len(), 1);
 }
 
 #[test]
-fn diagnostic_serde_round_trip() {
+fn parser_and_validator_diagnostics_share_schema_shape() {
+    let parser = Diagnostic::parser(
+        DiagnosticCode::ESempaiYamlParse,
+        String::from("bad yaml"),
+        Some(SourceSpan::new(0, 1, None)),
+        vec![String::from("line 1")],
+    );
+    let validator = Diagnostic::validator(
+        DiagnosticCode::ESempaiSchemaInvalid,
+        String::from("missing id"),
+        Some(SourceSpan::new(
+            2,
+            4,
+            Some(String::from("file:///rules.yaml")),
+        )),
+        vec![],
+    );
+
+    let parser_json: serde_json::Value = serde_json::to_value(parser).expect("serialize parser");
+    let validator_json: serde_json::Value =
+        serde_json::to_value(validator).expect("serialize validator");
+
+    let parser_object = parser_json
+        .as_object()
+        .expect("parser diagnostic should be object");
+    let validator_object = validator_json
+        .as_object()
+        .expect("validator diagnostic should be object");
+
+    assert_eq!(parser_object.len(), 4);
+    assert_eq!(validator_object.len(), 4);
+    for key in ["code", "message", "primary_span", "notes"] {
+        assert!(parser_object.contains_key(key));
+        assert!(validator_object.contains_key(key));
+    }
+    assert!(!parser_object.contains_key("span"));
+    assert!(!validator_object.contains_key("span"));
+}
+
+#[test]
+fn diagnostic_serde_round_trip_uses_primary_span() {
     let diag = Diagnostic::new(
         DiagnosticCode::ESempaiDslParse,
         String::from("unexpected token"),
         None,
         vec![],
     );
-    let json = serde_json::to_string(&diag).expect("serialize");
-    let deserialized: Diagnostic = serde_json::from_str(&json).expect("deserialize");
+    let json = serde_json::to_value(&diag).expect("serialize");
+    let object = json.as_object().expect("diagnostic should be object");
+    assert!(object.contains_key("primary_span"));
+    assert!(!object.contains_key("span"));
+
+    let deserialized: Diagnostic = serde_json::from_value(json).expect("deserialize");
     assert_eq!(deserialized.code(), DiagnosticCode::ESempaiDslParse);
     assert_eq!(deserialized.message(), "unexpected token");
+    assert!(deserialized.primary_span().is_none());
+}
+
+#[test]
+fn diagnostic_deserializes_legacy_span_alias() {
+    let json = serde_json::json!({
+        "code": "E_SEMPAI_DSL_PARSE",
+        "message": "legacy format",
+        "span": {
+            "start": 1,
+            "end": 3,
+            "uri": null
+        },
+        "notes": []
+    });
+    let deserialized: Diagnostic = serde_json::from_value(json).expect("deserialize");
+    let span = deserialized
+        .primary_span()
+        .expect("legacy span should map to primary span");
+    assert_eq!(span.start(), 1);
+    assert_eq!(span.end(), 3);
+}
+
+#[test]
+fn diagnostic_deserialization_rejects_malformed_primary_span_payload() {
+    let json = serde_json::json!({
+        "code": "E_SEMPAI_DSL_PARSE",
+        "message": "bad span",
+        "primary_span": {
+            "start": "oops",
+            "end": 2,
+            "uri": null
+        },
+        "notes": []
+    });
+    let err = serde_json::from_value::<Diagnostic>(json)
+        .expect_err("invalid primary span payload should fail");
+    assert!(err.to_string().contains("invalid type"));
+}
+
+#[test]
+fn diagnostic_report_parser_error_constructor_builds_single_diagnostic() {
+    let report = DiagnosticReport::parser_error(
+        DiagnosticCode::ESempaiYamlParse,
+        String::from("invalid yaml"),
+        Some(SourceSpan::new(0, 5, None)),
+        vec![String::from("check indentation")],
+    );
+    assert_eq!(report.len(), 1);
+    let first = report
+        .diagnostics()
+        .first()
+        .expect("at least one diagnostic");
+    assert_eq!(first.code(), DiagnosticCode::ESempaiYamlParse);
+    assert!(first.primary_span().is_some());
+}
+
+#[test]
+fn diagnostic_report_validation_error_constructor_builds_single_diagnostic() {
+    let report = DiagnosticReport::validation_error(
+        DiagnosticCode::ESempaiSchemaInvalid,
+        String::from("missing id"),
+        None,
+        vec![],
+    );
+    assert_eq!(report.len(), 1);
+    let first = report
+        .diagnostics()
+        .first()
+        .expect("at least one diagnostic");
+    assert_eq!(first.code(), DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(first.primary_span().is_none());
 }
 
 #[test]

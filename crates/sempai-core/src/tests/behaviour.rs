@@ -18,11 +18,23 @@ struct TestWorld {
     report: Option<DiagnosticReport>,
     formatted_output: Option<String>,
     json_output: Option<String>,
+    diagnostic_code_payload: Option<String>,
+    deserialization_error: Option<String>,
 }
 
 #[fixture]
 fn world() -> TestWorld {
     TestWorld::default()
+}
+
+fn parse_diagnostic_code(code: &str) -> DiagnosticCode {
+    match code {
+        "E_SEMPAI_YAML_PARSE" => DiagnosticCode::ESempaiYamlParse,
+        "E_SEMPAI_DSL_PARSE" => DiagnosticCode::ESempaiDslParse,
+        "E_SEMPAI_SCHEMA_INVALID" => DiagnosticCode::ESempaiSchemaInvalid,
+        "E_SEMPAI_INVALID_NOT_IN_OR" => DiagnosticCode::ESempaiInvalidNotInOr,
+        other => panic!("unsupported diagnostic code: {other}"),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -43,11 +55,7 @@ fn given_language(world: &mut TestWorld, name: QuotedString) {
 
 #[given("a diagnostic with code {code} and message {message}")]
 fn given_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedString) {
-    let diag_code = match code.as_str() {
-        "E_SEMPAI_YAML_PARSE" => DiagnosticCode::ESempaiYamlParse,
-        "E_SEMPAI_DSL_PARSE" => DiagnosticCode::ESempaiDslParse,
-        other => panic!("unsupported diagnostic code: {other}"),
-    };
+    let diag_code = parse_diagnostic_code(code.as_str());
     let report = DiagnosticReport::new(vec![Diagnostic::new(
         diag_code,
         message.as_str().to_owned(),
@@ -57,9 +65,36 @@ fn given_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedSt
     world.report = Some(report);
 }
 
+#[given("a parser diagnostic with code {code} and message {message}")]
+fn given_parser_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedString) {
+    let diag_code = parse_diagnostic_code(code.as_str());
+    world.report = Some(DiagnosticReport::new(vec![Diagnostic::parser(
+        diag_code,
+        message.as_str().to_owned(),
+        None,
+        vec![],
+    )]));
+}
+
+#[given("a validator diagnostic with code {code} and message {message}")]
+fn given_validator_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedString) {
+    let diag_code = parse_diagnostic_code(code.as_str());
+    world.report = Some(DiagnosticReport::new(vec![Diagnostic::validator(
+        diag_code,
+        message.as_str().to_owned(),
+        None,
+        vec![],
+    )]));
+}
+
 #[given("a not-implemented report for feature {feature}")]
 fn given_not_implemented_report(world: &mut TestWorld, feature: QuotedString) {
     world.report = Some(DiagnosticReport::not_implemented(feature.as_str()));
+}
+
+#[given("diagnostic code payload {code}")]
+fn given_diagnostic_code_payload(world: &mut TestWorld, code: QuotedString) {
+    world.diagnostic_code_payload = Some(format!("\"{}\"", code.as_str()));
 }
 
 // ---------------------------------------------------------------------------
@@ -84,6 +119,24 @@ fn when_language_round_trip(world: &mut TestWorld) {
 fn when_format_report(world: &mut TestWorld) {
     let report = world.report.as_ref().expect("report should be set");
     world.formatted_output = Some(format!("{report}"));
+}
+
+#[when("the diagnostic report is serialized to JSON")]
+fn when_serialize_diagnostic_report(world: &mut TestWorld) {
+    let report = world.report.as_ref().expect("report should be set");
+    world.json_output = Some(serde_json::to_string(report).expect("serialize report"));
+}
+
+#[when("the diagnostic code payload is deserialized")]
+fn when_deserialize_diagnostic_code_payload(world: &mut TestWorld) {
+    let payload = world
+        .diagnostic_code_payload
+        .as_ref()
+        .expect("diagnostic code payload should be set");
+    let result = serde_json::from_str::<DiagnosticCode>(payload);
+    if let Err(err) = result {
+        world.deserialization_error = Some(err.to_string());
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +164,73 @@ fn then_json_contains(world: &mut TestWorld, key: QuotedString, value: QuotedStr
     );
 }
 
+#[then("the first diagnostic JSON contains key {key}")]
+fn then_first_diagnostic_contains_key(world: &mut TestWorld, key: QuotedString) {
+    let json = world.json_output.as_ref().expect("JSON should be set");
+    let parsed: serde_json::Value =
+        serde_json::from_str(json).expect("JSON output should be valid");
+    let first = parsed
+        .get("diagnostics")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|diagnostics| diagnostics.first())
+        .and_then(serde_json::Value::as_object)
+        .expect("first diagnostic object should exist");
+    assert!(
+        first.contains_key(key.as_str()),
+        "expected first diagnostic JSON to contain key '{}', got: {first:?}",
+        key.as_str()
+    );
+}
+
+#[then("the first diagnostic JSON does not contain key {key}")]
+fn then_first_diagnostic_does_not_contain_key(world: &mut TestWorld, key: QuotedString) {
+    let json = world.json_output.as_ref().expect("JSON should be set");
+    let parsed: serde_json::Value =
+        serde_json::from_str(json).expect("JSON output should be valid");
+    let first = parsed
+        .get("diagnostics")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|diagnostics| diagnostics.first())
+        .and_then(serde_json::Value::as_object)
+        .expect("first diagnostic object should exist");
+    assert!(
+        !first.contains_key(key.as_str()),
+        "expected first diagnostic JSON to not contain key '{}', got: {first:?}",
+        key.as_str()
+    );
+}
+
+#[then("the first diagnostic JSON contains key {key} with value {value}")]
+fn then_first_diagnostic_contains_key_with_value(
+    world: &mut TestWorld,
+    key: QuotedString,
+    value: QuotedString,
+) {
+    let json = world.json_output.as_ref().expect("JSON should be set");
+    let parsed: serde_json::Value =
+        serde_json::from_str(json).expect("JSON output should be valid");
+    let first = parsed
+        .get("diagnostics")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|diagnostics| diagnostics.first())
+        .and_then(serde_json::Value::as_object)
+        .expect("first diagnostic object should exist");
+    let actual = first.get(key.as_str()).unwrap_or_else(|| {
+        panic!(
+            "expected first diagnostic JSON to contain key '{}', got: {first:?}",
+            key.as_str()
+        )
+    });
+    let expected: serde_json::Value = serde_json::from_str(value.as_str())
+        .unwrap_or_else(|_| serde_json::Value::String(value.as_str().to_owned()));
+    assert_eq!(
+        actual,
+        &expected,
+        "expected key '{}' to have value {expected:?}, got {actual:?}",
+        key.as_str()
+    );
+}
+
 #[then("the round-tripped language equals the original")]
 fn then_language_round_trip_equals(world: &mut TestWorld) {
     let original = world.language.expect("original language should be set");
@@ -131,6 +251,19 @@ fn then_formatted_contains(world: &mut TestWorld, snippet: QuotedString) {
         "expected output to contain '{}', got: {}",
         snippet.as_str(),
         output
+    );
+}
+
+#[then("deserialization fails with message containing {snippet}")]
+fn then_deserialization_fails(world: &mut TestWorld, snippet: QuotedString) {
+    let err = world
+        .deserialization_error
+        .as_ref()
+        .expect("deserialization error should be set");
+    assert!(
+        err.contains(snippet.as_str()),
+        "expected deserialization error to contain '{}', got: {err}",
+        snippet.as_str()
     );
 }
 
