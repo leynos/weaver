@@ -360,6 +360,10 @@ remain stable under formatting churn.
 - Build alternating entity and interstitial regions for each file.
 - Record interstitials (imports, module headers, decorators not bundled to a
   symbol, configuration constructs, and whitespace runs) as first-class records.
+- In the shipped Tree-sitter-first milestone, surface import interstitials on
+  synthetic file/module cards rather than introducing a new public symbol kind.
+  This keeps the 7.1.1 schema stable while still exposing bounded file-level
+  context.
 
 ### Attachment bundling
 
@@ -368,6 +372,8 @@ remain stable under formatting churn.
   non-comment, non-decorator token is found, then attach the contiguous block.
 - Persist the chosen bundling rule in `attachments.bundle_rule` so downstream
   tooling can reason about portability across languages.
+- Normalize attachment fingerprints independently of display formatting so
+  whitespace-only edits do not perturb `SymbolId` or downstream diff matching.
 
 ### Nested entity filtering
 
@@ -376,6 +382,13 @@ remain stable under formatting churn.
   members but exclude local functions and closures by default).
 - Persist `structure.locals` as explicitly non-entity so the extraction
   pipeline cannot promote locals into the entity table.
+- The initial supported language set is Rust, Python, and TypeScript.
+- Requests for `--detail semantic` and `--detail full` continue to succeed in
+  this phase, but they degrade to Tree-sitter-only payloads with explicit
+  provenance markers until LSP enrichment lands.
+- Compute `SymbolId` from canonical structured fields (language, kind, name,
+  container, normalized parameter list, return shape, syntactic fingerprint,
+  and path hint) rather than from rendered signature text.
 
 ## Progressive discovery and enhancement
 
@@ -401,13 +414,13 @@ Proposed detail levels:
 
   - Add deps (typed edges), fan-in/out metrics, canonical test mapping (future)
 
-| Detail      | Adds                            | Requires         | Expected latency |
-| ----------- | ------------------------------- | ---------------- | ---------------- |
-| `minimal`   | identity only                   | none             | lowest           |
-| `signature` | signature fingerprint           | Tree-sitter      | low              |
-| `structure` | doc/attachments/locals/branches | Tree-sitter      | low–medium       |
-| `semantic`  | hover/types                     | LSP initialized  | medium           |
-| `full`      | deps + fan metrics              | relational graph | medium–high      |
+| Detail      | Adds                            | Requires               | Expected latency |
+| ----------- | ------------------------------- | ---------------------- | ---------------- |
+| `minimal`   | identity only                   | none                   | lowest           |
+| `signature` | signature fingerprint           | Tree-sitter            | low              |
+| `structure` | doc/attachments/locals/branches | Tree-sitter            | low–medium       |
+| `semantic`  | hover/types                     | Tree-sitter (degrades) | low–medium       |
+| `full`      | deps + fan metrics              | Tree-sitter (degrades) | low–medium       |
 
 *Table 2: Progressive card enhancement layers.*
 
@@ -415,7 +428,8 @@ Implementation rules:
 
 - `observe get-card` defaults to `structure` for high utility without requiring
   a live LSP server.
-- `--detail semantic` triggers a semantic backend start if required.[^5]
+- `--detail semantic` and `--detail full` degrade to Tree-sitter-only payloads
+  with explicit provenance markers until LSP enrichment lands.
 - Each field includes provenance (`tree_sitter`, `lsp_hover`, …) so downstream
   tooling can treat low-confidence data appropriately.
 
