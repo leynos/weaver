@@ -5,7 +5,8 @@ use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    GotoDefinitionParams, GotoDefinitionResponse, Location, ReferenceParams, Uri,
+    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, Location, ReferenceParams,
+    Uri,
 };
 use weaver_lsp_host::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 
@@ -73,6 +74,13 @@ impl LanguageServer for StubServer {
         &mut self,
         _params: CallHierarchyOutgoingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, LanguageServerError> {
+        Ok(None)
+    }
+
+    fn hover(
+        &mut self,
+        _params: HoverParams,
+    ) -> Result<Option<Hover>, LanguageServerError> {
         Ok(None)
     }
 }

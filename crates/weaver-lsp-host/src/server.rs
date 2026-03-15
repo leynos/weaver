@@ -7,7 +7,7 @@ use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    GotoDefinitionParams, GotoDefinitionResponse, ReferenceParams, Uri,
+    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, ReferenceParams, Uri,
 };
 use thiserror::Error;
 
@@ -18,6 +18,7 @@ pub struct ServerCapabilitySet {
     pub(crate) references: bool,
     pub(crate) diagnostics: bool,
     pub(crate) call_hierarchy: bool,
+    pub(crate) hover: bool,
 }
 
 impl ServerCapabilitySet {
@@ -29,6 +30,7 @@ impl ServerCapabilitySet {
             references,
             diagnostics,
             call_hierarchy: false,
+            hover: false,
         }
     }
 
@@ -36,6 +38,13 @@ impl ServerCapabilitySet {
     #[must_use]
     pub const fn with_call_hierarchy(mut self, supported: bool) -> Self {
         self.call_hierarchy = supported;
+        self
+    }
+
+    /// Builds a capability set with hover support.
+    #[must_use]
+    pub const fn with_hover(mut self, supported: bool) -> Self {
+        self.hover = supported;
         self
     }
 
@@ -61,6 +70,12 @@ impl ServerCapabilitySet {
     #[must_use]
     pub fn supports_call_hierarchy(self) -> bool {
         self.call_hierarchy
+    }
+
+    /// Whether the server reports support for `textDocument/hover`.
+    #[must_use]
+    pub fn supports_hover(self) -> bool {
+        self.hover
     }
 }
 
@@ -158,6 +173,9 @@ pub trait LanguageServer: Send {
         &mut self,
         params: CallHierarchyOutgoingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, LanguageServerError>;
+
+    /// Handles a `textDocument/hover` request.
+    fn hover(&mut self, params: HoverParams) -> Result<Option<Hover>, LanguageServerError>;
 }
 
 impl fmt::Debug for dyn LanguageServer {

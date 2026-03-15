@@ -5,9 +5,9 @@ use lsp_types::{
     CallHierarchyItem, CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams,
     CallHierarchyPrepareParams, ClientCapabilities, Diagnostic, DidChangeTextDocumentParams,
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentDiagnosticParams,
-    DocumentDiagnosticReport, GotoDefinitionParams, GotoDefinitionResponse, InitializeParams,
-    InitializeResult, InitializedParams, ReferenceParams, TextDocumentClientCapabilities,
-    TextDocumentIdentifier, Uri,
+    DocumentDiagnosticReport, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams,
+    InitializeParams, InitializeResult, InitializedParams, ReferenceParams,
+    TextDocumentClientCapabilities, TextDocumentIdentifier, Uri,
 };
 use tracing::debug;
 
@@ -63,6 +63,7 @@ impl LanguageServer for ProcessLanguageServer {
         let references_supported = caps.references_provider.is_some();
         let diagnostics_supported = caps.diagnostic_provider.is_some();
         let call_hierarchy_supported = caps.call_hierarchy_provider.is_some();
+        let hover_supported = caps.hover_provider.is_some();
 
         debug!(
             target: ADAPTER_TARGET,
@@ -71,6 +72,7 @@ impl LanguageServer for ProcessLanguageServer {
             references = references_supported,
             diagnostics = diagnostics_supported,
             call_hierarchy = call_hierarchy_supported,
+            hover = hover_supported,
             "language server initialized with capabilities"
         );
 
@@ -79,7 +81,8 @@ impl LanguageServer for ProcessLanguageServer {
             references_supported,
             diagnostics_supported,
         )
-        .with_call_hierarchy(call_hierarchy_supported))
+        .with_call_hierarchy(call_hierarchy_supported)
+        .with_hover(hover_supported))
     }
 
     fn goto_definition(
@@ -172,5 +175,10 @@ impl LanguageServer for ProcessLanguageServer {
     ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, LanguageServerError> {
         self.send_request_optional("callHierarchy/outgoingCalls", params)
             .map_err(|e| LanguageServerError::with_source("outgoingCalls request failed", e))
+    }
+
+    fn hover(&mut self, params: HoverParams) -> Result<Option<Hover>, LanguageServerError> {
+        self.send_request_optional("textDocument/hover", params)
+            .map_err(|e| LanguageServerError::with_source("hover request failed", e))
     }
 }

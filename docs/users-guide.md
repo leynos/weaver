@@ -507,12 +507,14 @@ indicating why a card could not be produced. When `"status"` is `"success"`,
 the envelope contains the card payload. The overall shape of the envelope
 therefore depends on the `"status"` value.
 
-`observe get-card` is Tree-sitter-first in this milestone. Supported Rust,
-Python, and TypeScript files return a deterministic card. Requests for
-unsupported file types or positions that do not resolve to a symbol return a
-structured refusal. Requests for `semantic` and `full` detail currently degrade
-to Tree-sitter-only cards with explicit provenance markers rather than starting
-an LSP server.
+`observe get-card` is Tree-sitter-first. Supported Rust, Python, and TypeScript
+files return a deterministic card. Requests for unsupported file types or
+positions that do not resolve to a symbol return a structured refusal. When
+`--detail semantic` (or higher) is requested, the handler attempts LSP
+enrichment via `textDocument/hover` to populate the card's `lsp` field with
+hover documentation, type information, and deprecation status. If the language
+server is unavailable, the card degrades gracefully to a Tree-sitter-only
+extraction with provenance `"tree_sitter_degraded_semantic"`.
 
 When the operation cannot produce a card, the status is `"refusal"`:
 
@@ -593,8 +595,12 @@ level:
   structure it differently.
 - `structure` (default) — further adds `doc`, `structure`, and basic
   `metrics`. May include `attachments`.
-- `semantic` — currently degrades to a Tree-sitter-only card with explicit
-  provenance markers; LSP hover/type enrichment is not yet applied.
+- `semantic` — attempts LSP enrichment via `textDocument/hover`. When
+  the language server is available and supports hover, the card's `lsp` field
+  is populated with hover documentation, type information, and deprecation
+  status, and provenance includes `"lsp_hover"`. When LSP is unavailable, the
+  card degrades to a Tree-sitter-only extraction with provenance
+  `"tree_sitter_degraded_semantic"`.
 - `full` — currently degrades to a Tree-sitter-only card with explicit
   provenance markers; dependency edges and fan-in/out metrics are not yet
   included.

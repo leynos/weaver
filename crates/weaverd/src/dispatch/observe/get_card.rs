@@ -1,7 +1,8 @@
 //! Handler for the `observe get-card` operation.
 //!
-//! This module resolves file URIs, loads source text, and delegates
-//! Tree-sitter-backed card extraction to `weaver-cards`.
+//! This module resolves file URIs, loads source text, delegates Tree-sitter-
+//! backed card extraction to `weaver-cards`, and optionally enriches the card
+//! with LSP hover data when `--detail semantic` or higher is requested.
 
 use std::fs;
 use std::io::Write;
@@ -9,14 +10,18 @@ use std::path::PathBuf;
 
 use url::Url;
 use weaver_cards::{
-    CardExtractionError, CardExtractionInput, CardRefusal, GetCardRequest, GetCardResponse,
-    RefusalReason, TreeSitterCardExtractor,
+    CardExtractionError, CardExtractionInput, CardRefusal, DetailLevel, GetCardRequest,
+    GetCardResponse, RefusalReason, TreeSitterCardExtractor,
 };
 
+use crate::backends::FusionBackends;
 use crate::dispatch::errors::DispatchError;
 use crate::dispatch::request::CommandRequest;
 use crate::dispatch::response::ResponseWriter;
 use crate::dispatch::router::DispatchResult;
+use crate::semantic_provider::SemanticBackendProvider;
+
+use super::enrich::{self, EnrichmentOutcome};
 
 /// Handles the `observe get-card` command.
 ///
@@ -28,6 +33,7 @@ use crate::dispatch::router::DispatchResult;
 pub fn handle<W: Write>(
     request: &CommandRequest,
     writer: &mut ResponseWriter<W>,
+    backends: &mut FusionBackends<SemanticBackendProvider>,
 ) -> Result<DispatchResult, DispatchError> {
     let card_request = GetCardRequest::parse(&request.arguments)
         .map_err(|error| DispatchError::invalid_arguments(error.to_string()))?;
@@ -45,9 +51,14 @@ pub fn handle<W: Write>(
         column: card_request.column,
         detail: card_request.detail,
     }) {
-        Ok(card) => GetCardResponse::Success {
-            card: Box::new(card),
-        },
+        Ok(mut card) => {
+            if card_request.detail >= DetailLevel::Semantic {
+                apply_lsp_enrichment(&mut card, backends);
+            }
+            GetCardResponse::Success {
+                card: Box::new(card),
+            }
+        }
         Err(error) => map_extraction_error(error, card_request.detail)?,
     };
 
@@ -60,6 +71,21 @@ pub fn handle<W: Write>(
     writer.write_stdout(json)?;
 
     Ok(DispatchResult::with_status(status))
+}
+
+/// Attempts LSP enrichment and updates provenance on success.
+fn apply_lsp_enrichment(
+    card: &mut weaver_cards::SymbolCard,
+    backends: &mut FusionBackends<SemanticBackendProvider>,
+) {
+    if enrich::try_lsp_enrichment(card, backends) == EnrichmentOutcome::Enriched {
+        card.provenance
+            .sources
+            .retain(|s| s != "tree_sitter_degraded_semantic");
+        if !card.provenance.sources.contains(&String::from("lsp_hover")) {
+            card.provenance.sources.push(String::from("lsp_hover"));
+        }
+    }
 }
 
 fn resolve_file_path(uri: &Url) -> Result<PathBuf, DispatchError> {
@@ -123,13 +149,26 @@ mod tests {
     use rstest::{fixture, rstest};
     use tempfile::TempDir;
     use weaver_cards::{DetailLevel, RefusalReason};
+    use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
     use super::*;
+    use crate::backends::FusionBackends;
     use crate::dispatch::request::CommandRequest;
+    use crate::semantic_provider::SemanticBackendProvider;
 
     #[fixture]
     fn temp_dir() -> TempDir {
         TempDir::new().expect("temp dir")
+    }
+
+    #[fixture]
+    fn backends() -> FusionBackends<SemanticBackendProvider> {
+        let config = Config {
+            daemon_socket: SocketEndpoint::unix("/tmp/weaver-test-get-card/socket.sock"),
+            ..Config::default()
+        };
+        let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
+        FusionBackends::new(config, provider)
     }
 
     #[derive(Clone, Copy)]
@@ -191,14 +230,18 @@ mod tests {
         serde_json::from_str(data).expect("payload")
     }
 
-    fn assert_refusal_response(temp_dir: TempDir, case: RefusalCase<'_>) {
+    fn assert_refusal_response(
+        temp_dir: TempDir,
+        case: RefusalCase<'_>,
+        backends: &mut FusionBackends<SemanticBackendProvider>,
+    ) {
         let path = write_source(&temp_dir, case.file);
         let uri = Url::from_file_path(&path).expect("file uri").to_string();
         let request = make_request(&uri, case.line, case.column, DetailLevel::Structure);
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
 
-        let result = handle(&request, &mut writer).expect("handler should succeed");
+        let result = handle(&request, &mut writer, backends).expect("handler should succeed");
 
         assert_eq!(result.status, 1);
         let payload = response_payload(output);
@@ -218,7 +261,10 @@ mod tests {
     }
 
     #[rstest]
-    fn handle_returns_success_for_supported_rust_symbol(temp_dir: TempDir) {
+    fn handle_returns_success_for_supported_rust_symbol(
+        temp_dir: TempDir,
+        mut backends: FusionBackends<SemanticBackendProvider>,
+    ) {
         let path = write_source(
             &temp_dir,
             SourceFile {
@@ -231,7 +277,7 @@ mod tests {
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
 
-        let result = handle(&request, &mut writer).expect("handler should succeed");
+        let result = handle(&request, &mut writer, &mut backends).expect("handler should succeed");
 
         assert_eq!(result.status, 0);
         let payload = response_payload(output);
@@ -276,17 +322,21 @@ mod tests {
             expected_message_substring: "position 10:100 is outside the bounds of the file",
         }
     )]
-    fn handle_returns_structured_refusals(temp_dir: TempDir, #[case] case: RefusalCase<'static>) {
-        assert_refusal_response(temp_dir, case);
+    fn handle_returns_structured_refusals(
+        temp_dir: TempDir,
+        #[case] case: RefusalCase<'static>,
+        mut backends: FusionBackends<SemanticBackendProvider>,
+    ) {
+        assert_refusal_response(temp_dir, case, &mut backends);
     }
 
-    #[test]
-    fn handle_rejects_non_file_uri() {
+    #[rstest]
+    fn handle_rejects_non_file_uri(mut backends: FusionBackends<SemanticBackendProvider>) {
         let request = make_request("https://example.com/demo.rs", 1, 1, DetailLevel::Minimal);
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
 
-        let error = match handle(&request, &mut writer) {
+        let error = match handle(&request, &mut writer, &mut backends) {
             Ok(result) => panic!("handler unexpectedly succeeded: {}", result.status),
             Err(error) => error,
         };

@@ -31,6 +31,8 @@ pub enum HostOperation {
     IncomingCalls,
     /// `callHierarchy/outgoingCalls` request.
     OutgoingCalls,
+    /// `textDocument/hover` request.
+    Hover,
 }
 
 impl fmt::Display for HostOperation {
@@ -46,6 +48,7 @@ impl fmt::Display for HostOperation {
             Self::PrepareCallHierarchy => "prepareCallHierarchy",
             Self::IncomingCalls => "incomingCalls",
             Self::OutgoingCalls => "outgoingCalls",
+            Self::Hover => "hover",
         };
         formatter.write_str(label)
     }

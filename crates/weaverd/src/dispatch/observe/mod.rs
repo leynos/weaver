@@ -5,6 +5,7 @@
 //! structural search.
 
 pub mod arguments;
+pub mod enrich;
 pub mod get_card;
 pub mod get_definition;
 pub mod responses;

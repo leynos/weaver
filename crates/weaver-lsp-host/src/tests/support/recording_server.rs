@@ -6,7 +6,8 @@ use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    GotoDefinitionParams, GotoDefinitionResponse, Location, ReferenceParams, Uri,
+    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, Location, ReferenceParams,
+    Uri,
 };
 
 use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
@@ -34,6 +35,8 @@ pub enum CallKind {
     IncomingCalls,
     /// `callHierarchy/outgoingCalls` was invoked.
     OutgoingCalls,
+    /// `textDocument/hover` was invoked.
+    Hover,
 }
 
 /// Test double that records every request routed through it.
@@ -206,6 +209,12 @@ impl LanguageServer for RecordingLanguageServer {
             responses.call_hierarchy.outgoing.clone()
         })
     }
+
+    fn hover(&mut self, _params: HoverParams) -> Result<Option<Hover>, LanguageServerError> {
+        self.handle_request(CallKind::Hover, "hover", |responses| {
+            responses.hover.clone()
+        })
+    }
 }
 
 /// Handle that exposes recorded state for assertions.
@@ -242,6 +251,8 @@ pub struct ResponseSet {
     pub document_sync: DocumentSyncErrors,
     /// Responses for call hierarchy requests.
     pub call_hierarchy: CallHierarchyResponses,
+    /// Response returned for hover requests.
+    pub hover: Option<Hover>,
 }
 
 impl Default for ResponseSet {
@@ -252,6 +263,7 @@ impl Default for ResponseSet {
             diagnostics: Vec::new(),
             document_sync: DocumentSyncErrors::default(),
             call_hierarchy: CallHierarchyResponses::default(),
+            hover: None,
         }
     }
 }
