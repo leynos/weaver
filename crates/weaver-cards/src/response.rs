@@ -16,6 +16,8 @@ use crate::{DetailLevel, SymbolCard};
 pub enum RefusalReason {
     /// No symbol found at the requested position.
     NoSymbolAtPosition,
+    /// The requested position is outside the file bounds.
+    PositionOutOfRange,
     /// The requested language is not supported.
     UnsupportedLanguage,
     /// The operation is not yet implemented.

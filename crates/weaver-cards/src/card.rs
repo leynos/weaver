@@ -25,7 +25,7 @@ use crate::SymbolIdentity;
 /// };
 /// assert_eq!(param.name, "x");
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ParamInfo {
     /// Parameter name.
     pub name: String,

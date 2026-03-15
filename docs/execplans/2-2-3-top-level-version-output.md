@@ -182,9 +182,9 @@ in `src/cli.rs` and is parsed by `src/lib.rs`. The build script at `build.rs`
 includes `cli.rs` via `#[path = "src/cli.rs"]` for manpage generation. This
 dual-compilation means any code in `cli.rs` must compile in both contexts.
 
-The workspace version is `0.1.0` (set in the workspace `Cargo.toml`). Clap's
-derive macro reads `CARGO_PKG_VERSION` automatically when the bare `version`
-attribute is present in `#[command()]`.
+The workspace version is `0.1.0` (set in the workspace `Cargo.toml` at line
+22). Clap's derive macro reads `CARGO_PKG_VERSION` automatically when the bare
+`version` attribute is present in `#[command()]`.
 
 Currently, `Cli::try_parse_from()` returns `Err(clap::Error)` for both `--help`
 and `--version`. This error is wrapped in `AppError::CliUsage` and handled in
@@ -408,10 +408,9 @@ fn help_flag_exits_successfully_with_quick_start() {
 invocation" (line 243) and "Top-level help" (line 245).
 
 Update the "Top-level help" section to mention exit code 0 and the quick-start
-block.
-
-Run `make markdownlint` and `make fmt` after the documentation edits so the
-guide and plan changes are validated and normalized before the Rust gates run.
+block. Run `make markdownlint` and `make fmt` after the documentation edits so
+the guide and plan changes are validated and normalized before the Rust gates
+run.
 
 ### Stage H: Mark roadmap done
 
@@ -503,8 +502,6 @@ Existing reusable code:
   unit tests to exercise the CLI without a real binary.
 
 ## File change summary
-
-Table 1. File change summary.
 
 | File                                        | Change                                     | Lines before | Lines after |
 | ------------------------------------------- | ------------------------------------------ | ------------ | ----------- |

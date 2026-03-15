@@ -139,6 +139,12 @@ fn refusal_response(reason: RefusalReason, message: &str, detail: DetailLevel) -
     "the requested language is not supported",
     DetailLevel::Structure
 )]
+#[case::position_out_of_range(
+    "refusal_position_out_of_range",
+    RefusalReason::PositionOutOfRange,
+    "the requested position is outside the file bounds",
+    DetailLevel::Structure
+)]
 #[case::backend_unavailable(
     "refusal_backend_unavailable",
     RefusalReason::BackendUnavailable,
