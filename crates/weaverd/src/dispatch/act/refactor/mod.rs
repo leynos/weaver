@@ -150,6 +150,50 @@ pub(crate) struct RefactorContext<'a> {
     pub runtime: &'a dyn RefactorPluginRuntime,
 }
 
+/// Resolves the target file, reads its content, builds the [`PluginRequest`],
+/// and maps the refactoring operation to the corresponding [`CapabilityId`].
+fn prepare_plugin_request(
+    workspace_root: &Path,
+    args: &arguments::RefactorArgs,
+) -> Result<(PluginRequest, CapabilityId, PathBuf), DispatchError> {
+    let file_path = resolve_file(workspace_root, &args.file)?;
+    let file_content = std::fs::read_to_string(&file_path).map_err(|err| {
+        DispatchError::invalid_arguments(format!("cannot read file '{}': {err}", args.file))
+    })?;
+
+    let mut plugin_args = std::collections::HashMap::new();
+    plugin_args.insert(
+        "refactoring".into(),
+        serde_json::Value::String(args.refactoring.clone()),
+    );
+    for extra in &args.extra {
+        let parts: Vec<&str> = extra.splitn(2, '=').collect();
+        if parts.len() == 2 {
+            plugin_args.insert(
+                parts[0].to_owned(),
+                serde_json::Value::String(parts[1].to_owned()),
+            );
+        }
+    }
+
+    let effective_operation = match args.refactoring.as_str() {
+        "rename" => {
+            apply_rename_symbol_mapping(&mut plugin_args, &args.file)?;
+            String::from("rename-symbol")
+        }
+        _ => args.refactoring.clone(),
+    };
+
+    let plugin_request = PluginRequest::with_arguments(
+        &effective_operation,
+        vec![FilePayload::new(PathBuf::from(&args.file), file_content)],
+        plugin_args,
+    );
+
+    let capability = capability_from_operation(&effective_operation)?;
+    Ok((plugin_request, capability, file_path))
+}
+
 /// Handles `act refactor` requests.
 ///
 /// Expects `--refactoring <operation>` and `--file <path>` in the request
@@ -179,44 +223,8 @@ pub fn handle<W: Write>(
         .ensure_started(BackendKind::Semantic)
         .map_err(DispatchError::backend_startup)?;
 
-    // Resolve the target file within the workspace.
-    let file_path = resolve_file(context.workspace_root, &args.file)?;
-    let file_content = std::fs::read_to_string(&file_path).map_err(|err| {
-        DispatchError::invalid_arguments(format!("cannot read file '{}': {err}", args.file))
-    })?;
-
-    let mut plugin_args = std::collections::HashMap::new();
-    plugin_args.insert(
-        "refactoring".into(),
-        serde_json::Value::String(args.refactoring.clone()),
-    );
-    // Forward any extra arguments beyond the known flags.
-    for extra in &args.extra {
-        let parts: Vec<&str> = extra.splitn(2, '=').collect();
-        if parts.len() == 2 {
-            plugin_args.insert(
-                parts[0].to_owned(),
-                serde_json::Value::String(parts[1].to_owned()),
-            );
-        }
-    }
-
-    // Map `--refactoring rename` to the `rename-symbol` capability contract.
-    let effective_operation = match args.refactoring.as_str() {
-        "rename" => {
-            apply_rename_symbol_mapping(&mut plugin_args, &args.file)?;
-            String::from("rename-symbol")
-        }
-        _ => args.refactoring.clone(),
-    };
-
-    let plugin_request = PluginRequest::with_arguments(
-        &effective_operation,
-        vec![FilePayload::new(PathBuf::from(&args.file), file_content)],
-        plugin_args,
-    );
-
-    let capability = capability_from_operation(&effective_operation)?;
+    let (plugin_request, capability, file_path) =
+        prepare_plugin_request(context.workspace_root, &args)?;
     let resolution = match context.runtime.resolve(ResolutionRequest::new(
         capability,
         file_path.as_path(),

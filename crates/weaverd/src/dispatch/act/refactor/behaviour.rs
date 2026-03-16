@@ -196,6 +196,22 @@ fn build_backends(socket_path: &Path) -> FusionBackends<SemanticBackendProvider>
     FusionBackends::new(config, provider)
 }
 
+fn standard_rename_args(file: &str) -> Vec<String> {
+    vec![
+        String::from("--refactoring"),
+        String::from("rename"),
+        String::from("--file"),
+        String::from(file),
+        String::from("offset=1"),
+        String::from("new_name=woven"),
+    ]
+}
+
+fn configure_request(world: &mut RefactorWorld, args: Vec<String>, routing_mode: RoutingMode) {
+    world.request = command_request(args);
+    world.routing_mode = routing_mode;
+}
+
 fn selected_resolution(language: &str, provider: &str) -> CapabilityResolutionEnvelope {
     CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
         capability: CapabilityId::RenameSymbol,
@@ -234,36 +250,21 @@ fn rejected_candidate(provider: &str, reason: CandidateReason) -> CandidateEvalu
     }
 }
 
-fn diff_for(relative_path: &str) -> String {
+fn format_diff(relative_path: &str, git_header: &str) -> String {
     let original = original_content_for(relative_path);
     let updated = updated_content_for(relative_path);
-    format!(
-        concat!(
-            "diff --git a/{0} b/{0}\n",
-            "<<<<<<< SEARCH\n",
-            "{1}",
-            "=======\n",
-            "{2}",
-            ">>>>>>> REPLACE\n",
-        ),
-        relative_path, original, updated
+    format!("{git_header}\n<<<<<<< SEARCH\n{original}=======\n{updated}>>>>>>> REPLACE\n",)
+}
+
+fn diff_for(relative_path: &str) -> String {
+    format_diff(
+        relative_path,
+        &format!("diff --git a/{0} b/{0}", relative_path),
     )
 }
 
 fn malformed_diff_for(relative_path: &str) -> String {
-    let original = original_content_for(relative_path);
-    let updated = updated_content_for(relative_path);
-    format!(
-        concat!(
-            "diff --git a/{0}\n",
-            "<<<<<<< SEARCH\n",
-            "{1}",
-            "=======\n",
-            "{2}",
-            ">>>>>>> REPLACE\n",
-        ),
-        relative_path, original, updated
-    )
+    format_diff(relative_path, &format!("diff --git a/{0}", relative_path))
 }
 
 fn original_content_for(relative_path: &str) -> &'static str {
@@ -309,56 +310,36 @@ fn given_workspace_file(world: &mut RefactorWorld) {
 
 #[given("a valid auto-routed act refactor request resolved to rope")]
 fn given_valid_rope_request(world: &mut RefactorWorld) {
-    world.request = command_request(vec![
-        String::from("--refactoring"),
-        String::from("rename"),
-        String::from("--file"),
-        String::from("notes.txt"),
-        String::from("offset=1"),
-        String::from("new_name=woven"),
-    ]);
-    world.routing_mode = RoutingMode::AutomaticPython;
+    configure_request(
+        world,
+        standard_rename_args("notes.txt"),
+        RoutingMode::AutomaticPython,
+    );
 }
 
 #[given("a valid auto-routed act refactor request resolved to rust-analyzer")]
 fn given_valid_rust_request(world: &mut RefactorWorld) {
-    world.request = command_request(vec![
-        String::from("--refactoring"),
-        String::from("rename"),
-        String::from("--file"),
-        String::from("notes.txt"),
-        String::from("offset=1"),
-        String::from("new_name=woven"),
-    ]);
-    world.routing_mode = RoutingMode::AutomaticRust;
+    configure_request(
+        world,
+        standard_rename_args("notes.txt"),
+        RoutingMode::AutomaticRust,
+    );
 }
 
 #[given("an unsupported-language act refactor request")]
 fn given_unsupported_language_request(world: &mut RefactorWorld) {
-    world.request = command_request(vec![
-        String::from("--refactoring"),
-        String::from("rename"),
-        String::from("--file"),
-        String::from("notes.txt"),
-        String::from("offset=1"),
-        String::from("new_name=woven"),
-    ]);
-    world.routing_mode = RoutingMode::UnsupportedLanguage;
+    configure_request(
+        world,
+        standard_rename_args("notes.txt"),
+        RoutingMode::UnsupportedLanguage,
+    );
 }
 
 #[given("a Python act refactor request with an incompatible provider override")]
 fn given_explicit_provider_mismatch_request(world: &mut RefactorWorld) {
-    world.request = command_request(vec![
-        String::from("--provider"),
-        String::from("rust-analyzer"),
-        String::from("--refactoring"),
-        String::from("rename"),
-        String::from("--file"),
-        String::from("notes.py"),
-        String::from("offset=1"),
-        String::from("new_name=woven"),
-    ]);
-    world.routing_mode = RoutingMode::ExplicitProviderMismatch;
+    let mut args = vec![String::from("--provider"), String::from("rust-analyzer")];
+    args.extend(standard_rename_args("notes.py"));
+    configure_request(world, args, RoutingMode::ExplicitProviderMismatch);
 }
 
 #[given("a runtime error from the refactor plugin")]
