@@ -143,6 +143,26 @@ fn when_deserialize_diagnostic_code_payload(world: &mut TestWorld) {
 // Then steps
 // ---------------------------------------------------------------------------
 
+fn first_diagnostic_object(world: &TestWorld) -> serde_json::Map<String, serde_json::Value> {
+    let json = world.json_output.as_ref().expect("JSON should be set");
+    let parsed: serde_json::Value =
+        serde_json::from_str(json).expect("JSON output should be valid");
+    parsed
+        .get("diagnostics")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|diagnostics| diagnostics.first())
+        .and_then(serde_json::Value::as_object)
+        .expect("first diagnostic object should exist")
+        .clone()
+}
+
+fn assert_str_contains(haystack: &str, needle: &str, label: &str) {
+    assert!(
+        haystack.contains(needle),
+        "expected {label} to contain '{needle}', got: {haystack}"
+    );
+}
+
 #[then("the JSON contains key {key} with value {value}")]
 fn then_json_contains(world: &mut TestWorld, key: QuotedString, value: QuotedString) {
     let json = world.json_output.as_ref().expect("JSON should be set");
@@ -166,15 +186,7 @@ fn then_json_contains(world: &mut TestWorld, key: QuotedString, value: QuotedStr
 
 #[then("the first diagnostic JSON contains key {key}")]
 fn then_first_diagnostic_contains_key(world: &mut TestWorld, key: QuotedString) {
-    let json = world.json_output.as_ref().expect("JSON should be set");
-    let parsed: serde_json::Value =
-        serde_json::from_str(json).expect("JSON output should be valid");
-    let first = parsed
-        .get("diagnostics")
-        .and_then(serde_json::Value::as_array)
-        .and_then(|diagnostics| diagnostics.first())
-        .and_then(serde_json::Value::as_object)
-        .expect("first diagnostic object should exist");
+    let first = first_diagnostic_object(world);
     assert!(
         first.contains_key(key.as_str()),
         "expected first diagnostic JSON to contain key '{}', got: {first:?}",
@@ -184,15 +196,7 @@ fn then_first_diagnostic_contains_key(world: &mut TestWorld, key: QuotedString) 
 
 #[then("the first diagnostic JSON does not contain key {key}")]
 fn then_first_diagnostic_does_not_contain_key(world: &mut TestWorld, key: QuotedString) {
-    let json = world.json_output.as_ref().expect("JSON should be set");
-    let parsed: serde_json::Value =
-        serde_json::from_str(json).expect("JSON output should be valid");
-    let first = parsed
-        .get("diagnostics")
-        .and_then(serde_json::Value::as_array)
-        .and_then(|diagnostics| diagnostics.first())
-        .and_then(serde_json::Value::as_object)
-        .expect("first diagnostic object should exist");
+    let first = first_diagnostic_object(world);
     assert!(
         !first.contains_key(key.as_str()),
         "expected first diagnostic JSON to not contain key '{}', got: {first:?}",
@@ -206,15 +210,7 @@ fn then_first_diagnostic_contains_key_with_value(
     key: QuotedString,
     value: QuotedString,
 ) {
-    let json = world.json_output.as_ref().expect("JSON should be set");
-    let parsed: serde_json::Value =
-        serde_json::from_str(json).expect("JSON output should be valid");
-    let first = parsed
-        .get("diagnostics")
-        .and_then(serde_json::Value::as_array)
-        .and_then(|diagnostics| diagnostics.first())
-        .and_then(serde_json::Value::as_object)
-        .expect("first diagnostic object should exist");
+    let first = first_diagnostic_object(world);
     let actual = first.get(key.as_str()).unwrap_or_else(|| {
         panic!(
             "expected first diagnostic JSON to contain key '{}', got: {first:?}",
@@ -246,12 +242,7 @@ fn then_formatted_contains(world: &mut TestWorld, snippet: QuotedString) {
         .formatted_output
         .as_ref()
         .expect("formatted output should be set");
-    assert!(
-        output.contains(snippet.as_str()),
-        "expected output to contain '{}', got: {}",
-        snippet.as_str(),
-        output
-    );
+    assert_str_contains(output, snippet.as_str(), "formatted output");
 }
 
 #[then("deserialization fails with message containing {snippet}")]
@@ -260,11 +251,7 @@ fn then_deserialization_fails(world: &mut TestWorld, snippet: QuotedString) {
         .deserialization_error
         .as_ref()
         .expect("deserialization error should be set");
-    assert!(
-        err.contains(snippet.as_str()),
-        "expected deserialization error to contain '{}', got: {err}",
-        snippet.as_str()
-    );
+    assert_str_contains(err, snippet.as_str(), "deserialization error");
 }
 
 // ---------------------------------------------------------------------------
