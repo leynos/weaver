@@ -182,28 +182,6 @@ impl Diagnostic {
         }
     }
 
-    /// Creates a parser-path diagnostic.
-    #[must_use]
-    pub fn parser(
-        code: DiagnosticCode,
-        message: String,
-        primary_span: Option<SourceSpan>,
-        notes: Vec<String>,
-    ) -> Self {
-        Self::new(code, message, primary_span, notes)
-    }
-
-    /// Creates a validator-path diagnostic.
-    #[must_use]
-    pub fn validator(
-        code: DiagnosticCode,
-        message: String,
-        primary_span: Option<SourceSpan>,
-        notes: Vec<String>,
-    ) -> Self {
-        Self::new(code, message, primary_span, notes)
-    }
-
     /// Returns the diagnostic code.
     #[must_use]
     pub const fn code(&self) -> DiagnosticCode {
@@ -277,6 +255,16 @@ impl DiagnosticReport {
         Self { diagnostics }
     }
 
+    /// Creates a report containing a single diagnostic.
+    fn single(
+        code: DiagnosticCode,
+        message: String,
+        primary_span: Option<SourceSpan>,
+        notes: Vec<String>,
+    ) -> Self {
+        Self::new(vec![Diagnostic::new(code, message, primary_span, notes)])
+    }
+
     /// Creates a report containing a single parser diagnostic.
     #[must_use]
     pub fn parser_error(
@@ -285,7 +273,7 @@ impl DiagnosticReport {
         primary_span: Option<SourceSpan>,
         notes: Vec<String>,
     ) -> Self {
-        Self::new(vec![Diagnostic::parser(code, message, primary_span, notes)])
+        Self::single(code, message, primary_span, notes)
     }
 
     /// Creates a report containing a single validation diagnostic.
@@ -296,12 +284,7 @@ impl DiagnosticReport {
         primary_span: Option<SourceSpan>,
         notes: Vec<String>,
     ) -> Self {
-        Self::new(vec![Diagnostic::validator(
-            code,
-            message,
-            primary_span,
-            notes,
-        )])
+        Self::single(code, message, primary_span, notes)
     }
 
     /// Creates a single-diagnostic report indicating that a feature is not

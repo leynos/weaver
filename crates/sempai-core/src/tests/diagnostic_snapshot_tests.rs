@@ -44,13 +44,13 @@ fn validator_diagnostic_report_json_snapshot() {
 #[test]
 fn mixed_report_ordering_json_snapshot() {
     let report = DiagnosticReport::new(vec![
-        Diagnostic::parser(
+        Diagnostic::new(
             DiagnosticCode::ESempaiDslParse,
             String::from("unexpected token"),
             Some(SourceSpan::new(4, 6, None)),
             vec![String::from("while parsing parser clause")],
         ),
-        Diagnostic::validator(
+        Diagnostic::new(
             DiagnosticCode::ESempaiInvalidNotInOr,
             String::from("negated branch in pattern-either"),
             None,

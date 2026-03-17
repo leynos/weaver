@@ -81,13 +81,13 @@ fn diagnostic_construction_and_accessors() {
 
 #[test]
 fn parser_and_validator_diagnostics_share_schema_shape() {
-    let parser = Diagnostic::parser(
+    let parser = Diagnostic::new(
         DiagnosticCode::ESempaiYamlParse,
         String::from("bad yaml"),
         Some(SourceSpan::new(0, 1, None)),
         vec![String::from("line 1")],
     );
-    let validator = Diagnostic::validator(
+    let validator = Diagnostic::new(
         DiagnosticCode::ESempaiSchemaInvalid,
         String::from("missing id"),
         Some(SourceSpan::new(
@@ -117,6 +117,20 @@ fn parser_and_validator_diagnostics_share_schema_shape() {
     }
     assert!(!parser_object.contains_key("span"));
     assert!(!validator_object.contains_key("span"));
+}
+
+fn assert_single_diagnostic_report(
+    report: &DiagnosticReport,
+    expected_code: DiagnosticCode,
+    expect_span: bool,
+) {
+    assert_eq!(report.len(), 1);
+    let first = report
+        .diagnostics()
+        .first()
+        .expect("at least one diagnostic");
+    assert_eq!(first.code(), expected_code);
+    assert_eq!(first.primary_span().is_some(), expect_span);
 }
 
 #[test]
@@ -183,13 +197,7 @@ fn diagnostic_report_parser_error_constructor_builds_single_diagnostic() {
         Some(SourceSpan::new(0, 5, None)),
         vec![String::from("check indentation")],
     );
-    assert_eq!(report.len(), 1);
-    let first = report
-        .diagnostics()
-        .first()
-        .expect("at least one diagnostic");
-    assert_eq!(first.code(), DiagnosticCode::ESempaiYamlParse);
-    assert!(first.primary_span().is_some());
+    assert_single_diagnostic_report(&report, DiagnosticCode::ESempaiYamlParse, true);
 }
 
 #[test]
@@ -200,13 +208,7 @@ fn diagnostic_report_validation_error_constructor_builds_single_diagnostic() {
         None,
         vec![],
     );
-    assert_eq!(report.len(), 1);
-    let first = report
-        .diagnostics()
-        .first()
-        .expect("at least one diagnostic");
-    assert_eq!(first.code(), DiagnosticCode::ESempaiSchemaInvalid);
-    assert!(first.primary_span().is_none());
+    assert_single_diagnostic_report(&report, DiagnosticCode::ESempaiSchemaInvalid, false);
 }
 
 #[test]

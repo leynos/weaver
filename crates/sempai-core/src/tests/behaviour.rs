@@ -41,6 +41,16 @@ fn parse_diagnostic_code(code: &str) -> DiagnosticCode {
 // Given steps
 // ---------------------------------------------------------------------------
 
+fn build_single_diagnostic_report(code: &str, message: &str) -> DiagnosticReport {
+    let diag_code = parse_diagnostic_code(code);
+    DiagnosticReport::new(vec![Diagnostic::new(
+        diag_code,
+        message.to_owned(),
+        None,
+        vec![],
+    )])
+}
+
 #[given("a span from bytes {byte_range} at lines {line_range}")]
 fn given_span(world: &mut TestWorld, byte_range: QuotedString, line_range: QuotedString) {
     let (start_byte, end_byte) = parse_byte_range(byte_range.as_str()).expect("valid byte range");
@@ -55,36 +65,26 @@ fn given_language(world: &mut TestWorld, name: QuotedString) {
 
 #[given("a diagnostic with code {code} and message {message}")]
 fn given_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedString) {
-    let diag_code = parse_diagnostic_code(code.as_str());
-    let report = DiagnosticReport::new(vec![Diagnostic::new(
-        diag_code,
-        message.as_str().to_owned(),
-        None,
-        vec![],
-    )]);
-    world.report = Some(report);
+    world.report = Some(build_single_diagnostic_report(
+        code.as_str(),
+        message.as_str(),
+    ));
 }
 
 #[given("a parser diagnostic with code {code} and message {message}")]
 fn given_parser_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedString) {
-    let diag_code = parse_diagnostic_code(code.as_str());
-    world.report = Some(DiagnosticReport::new(vec![Diagnostic::parser(
-        diag_code,
-        message.as_str().to_owned(),
-        None,
-        vec![],
-    )]));
+    world.report = Some(build_single_diagnostic_report(
+        code.as_str(),
+        message.as_str(),
+    ));
 }
 
 #[given("a validator diagnostic with code {code} and message {message}")]
 fn given_validator_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedString) {
-    let diag_code = parse_diagnostic_code(code.as_str());
-    world.report = Some(DiagnosticReport::new(vec![Diagnostic::validator(
-        diag_code,
-        message.as_str().to_owned(),
-        None,
-        vec![],
-    )]));
+    world.report = Some(build_single_diagnostic_report(
+        code.as_str(),
+        message.as_str(),
+    ));
 }
 
 #[given("a not-implemented report for feature {feature}")]
