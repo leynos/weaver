@@ -31,6 +31,15 @@ Feature: Weaver CLI behaviour
     And stderr contains "weaver observe get-definition --help"
     And no daemon command was sent
 
+  Scenario: Rejecting an unknown domain
+    When the operator runs "unknown-domain"
+    Then the CLI fails
+    And stderr contains "error: unknown domain 'unknown-domain'"
+    And stderr contains "Available operations:"
+    And stderr contains "observe get-definition"
+    And stderr contains "weaver observe get-definition --help"
+    And no daemon command was sent
+
   Scenario: Reporting malformed daemon responses
     Given a running fake daemon sending malformed json
     When the operator runs "observe get-definition --symbol main"

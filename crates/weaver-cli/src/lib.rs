@@ -32,8 +32,9 @@ use config::{ConfigArgumentSplit, prepare_cli_arguments, split_config_arguments}
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader};
 pub(crate) use daemon_output::{OutputSettings, read_daemon_messages};
 pub use discoverability::DOMAIN_OPERATIONS;
-use discoverability::should_emit_missing_operation_guidance;
+use discoverability::should_emit_domain_guidance;
 use discoverability::write_missing_operation_guidance;
+use discoverability::write_unknown_domain_guidance;
 pub(crate) use errors::{AppError, is_daemon_not_running};
 use lifecycle::{
     LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput, SystemLifecycle,
@@ -240,14 +241,13 @@ fn handle_preflight<E: Write>(
         write_bare_help(stderr, localizer).ok();
         return Err(AppError::BareInvocation);
     }
-    if should_emit_missing_operation_guidance(cli)
-        && write_missing_operation_guidance(
-            stderr,
-            cli.domain.as_deref().map(str::trim).unwrap_or_default(),
-        )
-        .map_err(AppError::EmitGuidance)?
-    {
-        return Err(AppError::MissingOperationGuidance);
+    if should_emit_domain_guidance(cli) {
+        let domain = cli.domain.as_deref().map(str::trim).unwrap_or_default();
+        if write_missing_operation_guidance(stderr, domain).map_err(AppError::EmitGuidance)?
+            || write_unknown_domain_guidance(stderr, domain).map_err(AppError::EmitGuidance)?
+        {
+            return Err(AppError::MissingOperationGuidance);
+        }
     }
     Ok(())
 }

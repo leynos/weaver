@@ -4,7 +4,7 @@
 //! and user-facing error handling when required arguments are missing.
 
 use assert_cmd::cargo::cargo_bin_cmd;
-use predicates::str::contains;
+use predicates::str::{contains, is_empty};
 use weaver_cli::DOMAIN_OPERATIONS;
 
 #[test]
@@ -21,6 +21,7 @@ fn missing_operation_exits_with_failure() {
     command
         .assert()
         .failure()
+        .stdout(is_empty())
         .stderr(contains("error: operation required for domain 'observe'"))
         .stderr(contains("get-card"))
         .stderr(contains("weaver observe get-definition --help"));

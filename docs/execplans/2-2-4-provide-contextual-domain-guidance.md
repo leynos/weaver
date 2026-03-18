@@ -23,9 +23,9 @@ consult external documentation. This is the gap described in
 
 After this change, invoking a known domain without an operation will fail
 client-side with contextual guidance written to standard error. The output must
-list every operation registered for that domain and include one concrete follow
-up help command. The guidance must be available without daemon startup, socket
-access, or configuration discovery.
+list every operation registered for that domain and include one concrete
+follow-up help command. The guidance must be available without daemon startup,
+socket access, or configuration discovery.
 
 Observable outcome:
 
@@ -248,7 +248,7 @@ The relevant pieces today are:
   Shows the established pattern for asserting a local guidance path that skips
   configuration loading by using a panicking loader.
 - `crates/weaver-cli/src/tests/behaviour.rs` and
-  `crates/weaver-cli/tests/features/weaver_cli.feature` Provide the
+  `crates/weaver-cli/tests/features/weaver_cli.feature` provide the
   `rstest-bdd` harness for user-visible CLI flows.
 - `crates/weaver-cli/tests/main_entry.rs`
   Verifies binary-level behaviour with `assert_cmd`.
@@ -289,14 +289,14 @@ The branch must:
    - no `--capabilities` probe;
    - `domain` is present and non-blank;
    - `operation` is absent or blank;
-   - the supplied domain is recognised by the canonical client-side catalogue.
+   - the supplied domain is recognized by the canonical client-side catalogue.
 3. Write the contextual guidance block to standard error.
 4. Exit with failure without loading configuration, attempting daemon
    connection, or triggering auto-start.
 
 Do not change the low-level `CommandInvocation::try_from` behaviour for unknown
 domains in this step. The preflight path should simply decline to handle
-unrecognised domains and let the existing generic error path continue.
+unrecognized domains and let the existing generic error path continue.
 
 Because `AppError::BareInvocation` already exists as a sentinel for "guidance
 already written", either introduce a second sentinel dedicated to

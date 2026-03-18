@@ -280,9 +280,10 @@ or configuration file.
 
 ### Domain-only guidance
 
-Running a known domain without an operation fails fast on the client side and
-prints the valid operations for that domain to standard error. This happens
-before configuration loading, daemon startup, or socket access. Example:
+Running a domain without an operation fails fast on the client side. Known
+domains print the valid operations for that domain; unknown domains print the
+built-in catalogue of available domain-operation pairs. This happens before
+configuration loading, daemon startup, or socket access. Example:
 
 ```text
 $ weaver observe

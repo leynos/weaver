@@ -44,7 +44,7 @@ where
     match emit_capabilities(config, io.stdout) {
         Ok(()) => Some(ExitCode::SUCCESS),
         Err(error) => {
-            let _ = writeln!(io.stderr, "{error}");
+            writeln!(io.stderr, "{error}").ok();
             Some(ExitCode::FAILURE)
         }
     }

@@ -42,6 +42,11 @@ pub(crate) fn operations_for_domain(
         .find(|(candidate, _)| candidate.eq_ignore_ascii_case(domain))
 }
 
+fn first_known_command() -> Option<(&'static str, &'static str)> {
+    let (domain, operations) = DOMAIN_OPERATIONS.first().copied()?;
+    Some((domain, operations.first().copied()?))
+}
+
 /// Writes contextual guidance for a known domain missing its operation.
 ///
 /// Returns `Ok(true)` when guidance was emitted and `Ok(false)` when the
@@ -72,8 +77,37 @@ pub(crate) fn write_missing_operation_guidance<W: Write>(
     Ok(true)
 }
 
-/// Returns true when a parsed CLI invocation qualifies for domain guidance.
-pub(crate) fn should_emit_missing_operation_guidance(cli: &crate::Cli) -> bool {
+/// Writes contextual guidance for an unknown domain missing its operation.
+pub(crate) fn write_unknown_domain_guidance<W: Write>(
+    writer: &mut W,
+    domain: &str,
+) -> io::Result<bool> {
+    if operations_for_domain(domain).is_some() {
+        return Ok(false);
+    }
+    let Some((hint_domain, hint_operation)) = first_known_command() else {
+        return Ok(false);
+    };
+
+    writeln!(writer, "error: unknown domain '{domain}'")?;
+    writeln!(writer)?;
+    writeln!(writer, "Available operations:")?;
+    for (known_domain, operations) in DOMAIN_OPERATIONS {
+        for operation in *operations {
+            writeln!(writer, "  {known_domain} {operation}")?;
+        }
+    }
+    writeln!(writer)?;
+    writeln!(
+        writer,
+        "Run 'weaver {hint_domain} {hint_operation} --help' for operation details.",
+    )?;
+
+    Ok(true)
+}
+
+/// Returns true when a parsed CLI invocation qualifies for preflight guidance.
+pub(crate) fn should_emit_domain_guidance(cli: &crate::Cli) -> bool {
     cli.command.is_none()
         && !cli.capabilities
         && cli
@@ -90,51 +124,80 @@ pub(crate) fn should_emit_missing_operation_guidance(cli: &crate::Cli) -> bool {
 pub(crate) mod fluent_entries {
     pub(in crate::discoverability) const HEADER: (&str, &str) =
         ("weaver-after-help-header", "Domains and operations:");
-    pub(in crate::discoverability) const OBSERVE_HEADING: (&str, &str) = (
-        "weaver-after-help-observe-heading",
-        "observe \u{2014} Query code structure and relationships",
-    );
-    pub(in crate::discoverability) const OBSERVE_OPS_1: (&str, &str) = (
-        "weaver-after-help-observe-ops-1",
-        "get-definition    find-references    grep",
-    );
-    pub(in crate::discoverability) const OBSERVE_OPS_2: (&str, &str) = (
-        "weaver-after-help-observe-ops-2",
-        "diagnostics       call-hierarchy    get-card",
-    );
-    pub(in crate::discoverability) const ACT_HEADING: (&str, &str) = (
-        "weaver-after-help-act-heading",
-        "act \u{2014} Perform code modifications",
-    );
-    pub(in crate::discoverability) const ACT_OPS_1: (&str, &str) = (
-        "weaver-after-help-act-ops-1",
-        "rename-symbol     apply-edits        apply-patch",
-    );
-    pub(in crate::discoverability) const ACT_OPS_2: (&str, &str) =
-        ("weaver-after-help-act-ops-2", "apply-rewrite     refactor");
-    pub(in crate::discoverability) const VERIFY_HEADING: (&str, &str) = (
-        "weaver-after-help-verify-heading",
-        "verify \u{2014} Validate code correctness",
-    );
-    pub(in crate::discoverability) const VERIFY_OPS: (&str, &str) =
-        ("weaver-after-help-verify-ops", "diagnostics       syntax");
+
+    fn domain_heading_entry(domain: &str) -> Option<(&'static str, &'static str)> {
+        match domain {
+            "observe" => Some((
+                "weaver-after-help-observe-heading",
+                "observe \u{2014} Query code structure and relationships",
+            )),
+            "act" => Some((
+                "weaver-after-help-act-heading",
+                "act \u{2014} Perform code modifications",
+            )),
+            "verify" => Some((
+                "weaver-after-help-verify-heading",
+                "verify \u{2014} Validate code correctness",
+            )),
+            _ => None,
+        }
+    }
+
+    fn localize_operation(
+        localizer: &dyn ortho_config::Localizer,
+        domain: &str,
+        operation: &str,
+    ) -> String {
+        let message_id = format!("weaver-after-help-{domain}-{operation}");
+        localizer.message(&message_id, None, operation)
+    }
+
+    fn format_operation_row(operations: &[String]) -> String {
+        const SECOND_COLUMN_START: usize = 18;
+        const THIRD_COLUMN_START: usize = 37;
+
+        let mut row = String::new();
+        if let Some(first) = operations.first() {
+            row.push_str(first);
+        }
+        if let Some(second) = operations.get(1) {
+            while row.len() < SECOND_COLUMN_START {
+                row.push(' ');
+            }
+            row.push_str(second);
+        }
+        if let Some(third) = operations.get(2) {
+            while row.len() < THIRD_COLUMN_START {
+                row.push(' ');
+            }
+            row.push_str(third);
+        }
+        row
+    }
 
     /// Renders the after-help domains-and-operations catalogue.
     pub(crate) fn render_after_help(localizer: &dyn ortho_config::Localizer) -> String {
-        let msg = |entry: &(&str, &str)| localizer.message(entry.0, None, entry.1);
-        let header = msg(&HEADER);
-        let obs_h = msg(&OBSERVE_HEADING);
-        let obs_1 = msg(&OBSERVE_OPS_1);
-        let obs_2 = msg(&OBSERVE_OPS_2);
-        let act_h = msg(&ACT_HEADING);
-        let act_1 = msg(&ACT_OPS_1);
-        let act_2 = msg(&ACT_OPS_2);
-        let ver_h = msg(&VERIFY_HEADING);
-        let ver_o = msg(&VERIFY_OPS);
-        format!(
-            "{header}\n\n  {obs_h}\n    {obs_1}\n    {obs_2}\n\n\
-             \x20 {act_h}\n    {act_1}\n    {act_2}\n\n\
-             \x20 {ver_h}\n    {ver_o}"
-        )
+        let header = localizer.message(HEADER.0, None, HEADER.1);
+        let mut sections = Vec::new();
+        for (domain, operations) in super::DOMAIN_OPERATIONS {
+            let Some((heading_id, heading_fallback)) = domain_heading_entry(domain) else {
+                continue;
+            };
+            let heading = localizer.message(heading_id, None, heading_fallback);
+            let rows = operations
+                .chunks(3)
+                .map(|chunk| {
+                    let localized = chunk
+                        .iter()
+                        .map(|operation| localize_operation(localizer, domain, operation))
+                        .collect::<Vec<_>>();
+                    format!("    {}", format_operation_row(&localized))
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            sections.push(format!("  {heading}\n{rows}"));
+        }
+
+        format!("{header}\n\n{}", sections.join("\n\n"))
     }
 }
