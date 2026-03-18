@@ -4,7 +4,7 @@ use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
 use crate::test_support::{QuotedString, parse_byte_range, parse_line_range};
-use crate::{Diagnostic, DiagnosticCode, DiagnosticReport, Language, Span};
+use crate::{DiagnosticCode, DiagnosticReport, Language, Span};
 
 // ---------------------------------------------------------------------------
 // Test world
@@ -37,13 +37,8 @@ fn parse_diagnostic_code(code: &str) -> DiagnosticCode {
 // ---------------------------------------------------------------------------
 
 fn build_single_diagnostic_report(code: &str, message: &str) -> DiagnosticReport {
-    let diag_code = parse_diagnostic_code(code);
-    DiagnosticReport::new(vec![Diagnostic::new(
-        diag_code,
-        message.to_owned(),
-        None,
-        vec![],
-    )])
+    let diagnostic_code = parse_diagnostic_code(code);
+    DiagnosticReport::single_error(diagnostic_code, message.to_owned(), None, vec![])
 }
 
 #[given("a span from bytes {byte_range} at lines {line_range}")]

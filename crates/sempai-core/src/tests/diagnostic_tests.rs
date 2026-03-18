@@ -119,26 +119,23 @@ fn parser_and_validator_diagnostics_share_schema_shape() {
     assert!(!validator_object.contains_key("span"));
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "test helper consolidates repetitive assertions"
-)]
-fn assert_single_diagnostic_report(
-    report: &DiagnosticReport,
-    expected_code: DiagnosticCode,
-    expect_span: bool,
-    expected_message: &str,
-    expected_notes: &[String],
-) {
+struct ExpectedDiagnostic<'a> {
+    code: DiagnosticCode,
+    has_span: bool,
+    message: &'a str,
+    notes: &'a [String],
+}
+
+fn assert_single_diagnostic_report(report: &DiagnosticReport, expected: &ExpectedDiagnostic<'_>) {
     assert_eq!(report.len(), 1);
     let first = report
         .diagnostics()
         .first()
         .expect("at least one diagnostic");
-    assert_eq!(first.code(), expected_code);
-    assert_eq!(first.primary_span().is_some(), expect_span);
-    assert_eq!(first.message(), expected_message);
-    assert_eq!(first.notes(), expected_notes);
+    assert_eq!(first.code(), expected.code);
+    assert_eq!(first.primary_span().is_some(), expected.has_span);
+    assert_eq!(first.message(), expected.message);
+    assert_eq!(first.notes(), expected.notes);
 }
 
 #[test]
@@ -206,13 +203,13 @@ fn diagnostic_report_parser_error_constructor_builds_single_diagnostic() {
         Some(SourceSpan::new(0, 5, None)),
         notes.clone(),
     );
-    assert_single_diagnostic_report(
-        &report,
-        DiagnosticCode::ESempaiYamlParse,
-        true,
-        "invalid yaml",
-        &notes,
-    );
+    let expected = ExpectedDiagnostic {
+        code: DiagnosticCode::ESempaiYamlParse,
+        has_span: true,
+        message: "invalid yaml",
+        notes: &notes,
+    };
+    assert_single_diagnostic_report(&report, &expected);
 }
 
 #[test]
@@ -224,13 +221,13 @@ fn diagnostic_report_validation_error_constructor_builds_single_diagnostic() {
         None,
         notes.clone(),
     );
-    assert_single_diagnostic_report(
-        &report,
-        DiagnosticCode::ESempaiSchemaInvalid,
-        false,
-        "missing id",
-        &notes,
-    );
+    let expected = ExpectedDiagnostic {
+        code: DiagnosticCode::ESempaiSchemaInvalid,
+        has_span: false,
+        message: "missing id",
+        notes: &notes,
+    };
+    assert_single_diagnostic_report(&report, &expected);
 }
 
 #[test]
