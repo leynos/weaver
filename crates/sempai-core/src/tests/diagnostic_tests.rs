@@ -119,10 +119,16 @@ fn parser_and_validator_diagnostics_share_schema_shape() {
     assert!(!validator_object.contains_key("span"));
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "test helper consolidates repetitive assertions"
+)]
 fn assert_single_diagnostic_report(
     report: &DiagnosticReport,
     expected_code: DiagnosticCode,
     expect_span: bool,
+    expected_message: &str,
+    expected_notes: &[String],
 ) {
     assert_eq!(report.len(), 1);
     let first = report
@@ -131,6 +137,8 @@ fn assert_single_diagnostic_report(
         .expect("at least one diagnostic");
     assert_eq!(first.code(), expected_code);
     assert_eq!(first.primary_span().is_some(), expect_span);
+    assert_eq!(first.message(), expected_message);
+    assert_eq!(first.notes(), expected_notes);
 }
 
 #[test]
@@ -191,44 +199,61 @@ fn diagnostic_deserialization_rejects_malformed_primary_span_payload() {
 
 #[test]
 fn diagnostic_report_parser_error_constructor_builds_single_diagnostic() {
-    let message = "invalid yaml";
     let notes = vec![String::from("check indentation")];
-
     let report = DiagnosticReport::parser_error(
         DiagnosticCode::ESempaiYamlParse,
-        String::from(message),
+        String::from("invalid yaml"),
         Some(SourceSpan::new(0, 5, None)),
         notes.clone(),
     );
-    assert_single_diagnostic_report(&report, DiagnosticCode::ESempaiYamlParse, true);
-
-    let diagnostic = report
-        .diagnostics()
-        .first()
-        .expect("parser_error should produce a single diagnostic");
-    assert_eq!(diagnostic.message(), message);
-    assert_eq!(diagnostic.notes(), &notes);
+    assert_single_diagnostic_report(
+        &report,
+        DiagnosticCode::ESempaiYamlParse,
+        true,
+        "invalid yaml",
+        &notes,
+    );
 }
 
 #[test]
 fn diagnostic_report_validation_error_constructor_builds_single_diagnostic() {
-    let message = "missing id";
     let notes: Vec<String> = vec![];
-
     let report = DiagnosticReport::validation_error(
         DiagnosticCode::ESempaiSchemaInvalid,
-        String::from(message),
+        String::from("missing id"),
         None,
         notes.clone(),
     );
-    assert_single_diagnostic_report(&report, DiagnosticCode::ESempaiSchemaInvalid, false);
+    assert_single_diagnostic_report(
+        &report,
+        DiagnosticCode::ESempaiSchemaInvalid,
+        false,
+        "missing id",
+        &notes,
+    );
+}
 
+#[test]
+fn diagnostic_report_single_error_constructor() {
+    let message = "syntax error";
+    let notes = vec![String::from("check syntax")];
+
+    let report = DiagnosticReport::single_error(
+        DiagnosticCode::ESempaiDslParse,
+        String::from(message),
+        Some(SourceSpan::new(10, 15, None)),
+        notes.clone(),
+    );
+
+    assert_eq!(report.len(), 1);
     let diagnostic = report
         .diagnostics()
         .first()
-        .expect("validation_error should produce a single diagnostic");
+        .expect("single_error should produce a single diagnostic");
+    assert_eq!(diagnostic.code(), DiagnosticCode::ESempaiDslParse);
     assert_eq!(diagnostic.message(), message);
     assert_eq!(diagnostic.notes(), &notes);
+    assert!(diagnostic.primary_span().is_some());
 }
 
 #[test]
