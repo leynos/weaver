@@ -138,16 +138,6 @@ pub(crate) struct ResolutionRequest<'a> {
     explicit_provider: Option<&'a str>,
 }
 
-#[derive(Debug)]
-struct RefusalContext {
-    capability: CapabilityId,
-    language: Option<SupportedLanguage>,
-    requested_provider: Option<String>,
-    selection_mode: SelectionMode,
-    refusal_reason: RefusalReason,
-    candidates: Vec<CandidateEvaluation>,
-}
-
 impl<'a> ResolutionRequest<'a> {
     /// Creates a new resolution request.
     #[must_use]
@@ -180,7 +170,7 @@ pub(crate) fn resolve_provider(
     let requested_provider = request.explicit_provider.map(String::from);
 
     let Some(language) = language else {
-        return refused(RefusalContext {
+        return refused(RefusalDetails {
             capability: request.capability,
             language: None,
             requested_provider,
@@ -231,8 +221,8 @@ fn resolve_explicit_provider(
         }
     }
 
-    let details = if let Some(selected_provider) = selected_provider {
-        CapabilityResolutionDetails {
+    if let Some(selected_provider) = selected_provider {
+        CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
             capability,
             language: Some(String::from(language.as_str())),
             requested_provider: Some(String::from(provider_name)),
@@ -241,9 +231,9 @@ fn resolve_explicit_provider(
             outcome: ResolutionOutcome::Selected,
             refusal_reason: None,
             candidates: evaluations,
-        }
+        })
     } else if found_requested {
-        refused_details(RefusalContext {
+        refused(RefusalDetails {
             capability,
             language: Some(language),
             requested_provider: Some(String::from(provider_name)),
@@ -252,7 +242,7 @@ fn resolve_explicit_provider(
             candidates: evaluations,
         })
     } else {
-        refused_details(RefusalContext {
+        refused(RefusalDetails {
             capability,
             language: Some(language),
             requested_provider: Some(String::from(provider_name)),
@@ -260,9 +250,7 @@ fn resolve_explicit_provider(
             refusal_reason: RefusalReason::ProviderNotFound,
             candidates: evaluations,
         })
-    };
-
-    CapabilityResolutionEnvelope::from_details(details)
+    }
 }
 
 fn resolve_automatic_provider(
@@ -277,7 +265,7 @@ fn resolve_automatic_provider(
         .collect();
 
     if matching.is_empty() {
-        return refused(RefusalContext {
+        return refused(RefusalDetails {
             capability,
             language: Some(language),
             requested_provider: None,
@@ -290,6 +278,8 @@ fn resolve_automatic_provider(
         });
     }
 
+    // INVARIANT: `matching` is guaranteed non-empty by the early-return guard above.
+    // The fallback to "unreachable" exists solely to satisfy the type system.
     let selected_name = matching
         .iter()
         .min_by_key(|manifest| provider_rank(manifest.name(), language))
@@ -321,23 +311,26 @@ fn resolve_automatic_provider(
     })
 }
 
-fn refused(context: RefusalContext) -> CapabilityResolutionEnvelope {
-    CapabilityResolutionEnvelope::from_details(refused_details(context))
+struct RefusalDetails {
+    capability: CapabilityId,
+    language: Option<SupportedLanguage>,
+    requested_provider: Option<String>,
+    selection_mode: SelectionMode,
+    refusal_reason: RefusalReason,
+    candidates: Vec<CandidateEvaluation>,
 }
 
-fn refused_details(context: RefusalContext) -> CapabilityResolutionDetails {
-    CapabilityResolutionDetails {
-        capability: context.capability,
-        language: context
-            .language
-            .map(|language| String::from(language.as_str())),
-        requested_provider: context.requested_provider,
+fn refused(details: RefusalDetails) -> CapabilityResolutionEnvelope {
+    CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
+        capability: details.capability,
+        language: details.language.map(|l| l.as_str().to_owned()),
+        requested_provider: details.requested_provider,
         selected_provider: None,
-        selection_mode: context.selection_mode,
+        selection_mode: details.selection_mode,
         outcome: ResolutionOutcome::Refused,
-        refusal_reason: Some(context.refusal_reason),
-        candidates: context.candidates,
-    }
+        refusal_reason: Some(details.refusal_reason),
+        candidates: details.candidates,
+    })
 }
 
 fn sorted_capability_manifests(
@@ -366,6 +359,7 @@ fn preferred_provider(language: SupportedLanguage) -> &'static str {
     match language {
         SupportedLanguage::Python => "rope",
         SupportedLanguage::Rust => "rust-analyzer",
+        // TODO: Implement TypeScript provider support - this placeholder will cause routing to fail for TypeScript files
         SupportedLanguage::TypeScript => "typescript-unimplemented",
     }
 }

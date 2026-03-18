@@ -321,10 +321,12 @@ fn to_file_uri(path: &str) -> Result<String, url::ParseError> {
 }
 
 fn capability_from_operation(operation: &str) -> Result<CapabilityId, DispatchError> {
+    // TODO: Extend this mapping when additional refactoring operations are added
+    // (e.g., extract-method, inline-variable, move-function).
     match operation {
         "rename-symbol" => Ok(CapabilityId::RenameSymbol),
         other => Err(DispatchError::invalid_arguments(format!(
-            "act refactor does not support capability resolution for '{other}'"
+            "act refactor does not support capability resolution for '{other}' (only 'rename-symbol' is currently implemented)"
         ))),
     }
 }

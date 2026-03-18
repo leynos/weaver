@@ -31,57 +31,58 @@ provider was selected or refused.
 
 Observable success for the eventual implementation:
 
-1. Running the Python flow without `--provider` selects `rope` for a
-   `*.py` target and still applies the returned diff through the existing
-   Double-Lock path.
-2. Running the Rust flow without `--provider` selects `rust-analyzer` for a
-   `*.rs` target and still applies the returned diff through the existing
-   Double-Lock path.
-3. Running the command against an unsupported language or an incompatible
-   explicit provider exits non-zero with a deterministic structured refusal.
-4. JSON mode exposes a machine-readable capability-resolution payload that
-   includes at least the requested capability, inferred language, selected or
-   refused provider, policy source, and candidate evaluation reasons.
-5. Human-readable mode does not degrade into raw JSON noise; any new structured
-   routing payload is either rendered cleanly by the CLI or otherwise surfaced
-   in a deliberate, documented form.
-6. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-   reflect the shipped behaviour once implementation is complete.
+- Running the Python flow without `--provider` selects `rope` for a
+  `*.py` target and still applies the returned diff through the existing
+  Double-Lock path.
+- Running the Rust flow without `--provider` selects `rust-analyzer` for a
+  `*.rs` target and still applies the returned diff through the existing
+  Double-Lock path.
+- Running the command against an unsupported language or an incompatible
+  explicit provider exits non-zero with a deterministic structured refusal.
+- JavaScript Object Notation (JSON) mode exposes a machine-readable
+  capability-resolution payload that includes at least the requested
+  capability, inferred language, selected or refused provider, policy source,
+  and candidate evaluation reasons.
+- Human-readable mode does not degrade into raw JSON noise; any new structured
+  routing payload is either rendered cleanly by the command-line interface
+  (CLI) or otherwise surfaced in a deliberate, documented form.
+- `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
+  reflect the shipped behaviour once implementation is complete.
 
 ## Constraints
 
-1. The `rename-symbol` capability contract defined in
-   `crates/weaver-plugins/src/capability/` is already complete. This roadmap
-   item resolves providers in the daemon; it must not redefine the contract
-   schema introduced by 5.2.1.
-2. Keep the CLI command shape stable. `--refactoring rename`, `offset`, and
-   `new_name` remain the operator-facing inputs. `--provider` may become
-   optional, but it must not be removed in 5.2.4 because 5.2.6 is the roadmap
-   item that deprecates legacy provider-specific paths.
-3. Preserve synchronous execution. Do not introduce async runtimes, async
-   traits, or background work queues.
-4. Preserve the existing safety-critical commit path. Successful plugin output
-   must continue to flow through `act apply-patch` and the Double-Lock safety
-   harness.
-5. Respect the repository's file-size rule. Current hotspots are
-   `crates/weaverd/src/dispatch/act/refactor/mod.rs` at 398 lines and
-   `crates/weaverd/src/dispatch/act/refactor/tests.rs` at 419 lines. Any
-   implementation that touches these files must split code rather than grow
-   them further.
-6. Behavioural tests must use `rstest-bdd` v0.5.0 patterns already used in the
-   workspace, including mutable fixtures named exactly `world`.
-7. Comments and documentation must use en-GB-oxendict spelling.
-8. Lint suppressions remain a last resort. If unavoidable, use tightly scoped
-   `#[expect(..., reason = "...")]` rather than `#[allow(...)]`.
-9. No new external dependencies should be added for this item. Reuse existing
-   workspace crates, including `weaver-syntax` if its language-detection helper
-   is suitable.
-10. Any design decision taken during implementation must be recorded in
-    `docs/weaver-design.md`, not only in this ExecPlan.
-11. The final implementation must be validated with unit tests and behavioural
-    tests, and the full workspace gates `make check-fmt`, `make lint`, and
-    `make test` must pass. Because this item also updates Markdown documents,
-    `make fmt`, `make markdownlint`, and `make nixie` must also pass.
+- The `rename-symbol` capability contract defined in
+  `crates/weaver-plugins/src/capability/` is already complete. This roadmap
+  item resolves providers in the daemon; it must not redefine the contract
+  schema introduced by 5.2.1.
+- Keep the CLI command shape stable. `--refactoring rename`, `offset`, and
+  `new_name` remain the operator-facing inputs. `--provider` may become
+  optional, but it must not be removed in 5.2.4 because 5.2.6 is the roadmap
+  item that deprecates legacy provider-specific paths.
+- Preserve synchronous execution. Do not introduce async runtimes, async
+  traits, or background work queues.
+- Preserve the existing safety-critical commit path. Successful plugin output
+  must continue to flow through `act apply-patch` and the Double-Lock safety
+  harness.
+- Respect the repository's file-size rule. Current hotspots are
+  `crates/weaverd/src/dispatch/act/refactor/mod.rs` at 398 lines and
+  `crates/weaverd/src/dispatch/act/refactor/tests.rs` at 419 lines. Any
+  implementation that touches these files must split code rather than grow them
+  further.
+- Behavioural tests must use `rstest-bdd` v0.5.0 patterns already used in the
+  workspace, including mutable fixtures named exactly `world`.
+- Comments and documentation must use en-GB-oxendict spelling.
+- Lint suppressions remain a last resort. If unavoidable, use tightly scoped
+  `#[expect(..., reason = "...")]` rather than `#[allow(...)]`.
+- No new external dependencies should be added for this item. Reuse existing
+  workspace crates, including `weaver-syntax` if its language-detection helper
+  is suitable.
+- Any design decision taken during implementation must be recorded in
+  `docs/weaver-design.md`, not only in this ExecPlan.
+- The final implementation must be validated with unit tests and behavioural
+  tests, and the full workspace gates `make check-fmt`, `make lint`, and
+  `make test` must pass. Because this item also updates Markdown documents,
+  `make fmt`, `make markdownlint`, and `make nixie` must also pass.
 
 ## Tolerances (exception triggers)
 
@@ -175,7 +176,8 @@ Observable success for the eventual implementation:
 
 - Discovery: there is no existing config field in `weaver-config` for
   refactor-plugin routing policy. The only current policy-like config surface
-  is the LSP capability matrix, which is unrelated to plugin selection.
+  is the Language Server Protocol (LSP) capability matrix, which is unrelated
+  to plugin selection.
 
 - Discovery: `crates/weaverd/src/dispatch/act/refactor/tests.rs` is already
   419 lines long, so test growth must begin with a split rather than more

@@ -126,7 +126,7 @@ fn dispatch_inspecting_rename(config: RenameDispatch<'_>) -> PluginRequest {
     let mut backends = build_backends(&socket_path);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
-    let _result = handle(
+    handle(
         &request,
         &mut writer,
         RefactorContext {

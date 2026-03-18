@@ -700,6 +700,8 @@ weaver act refactor [--provider <PLUGIN>] --refactoring <OP> --file <PATH> [KEY=
 
 Arguments:
 
+Table: act refactor command-line flags
+
 | Flag            | Description                                                                                                                                                                     |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--provider`    | Optional compatibility override for the registered plugin (e.g. `rope`, `rust-analyzer`). When omitted, the daemon selects a provider by capability and inferred file language. |
@@ -724,6 +726,8 @@ explicit provider conflicts with the inferred language.
 The `act refactor` handler accepts `--refactoring` and `--file`, honours an
 optional `--provider` override, and forwards any additional `KEY=VALUE` pairs
 to the selected plugin.
+
+Table: act refactor parameter semantics and validation
 
 | Parameter       | Meaning                                                                                                                                                | Valid values                                                                                              | Failure conditions                                                                                                       |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |

@@ -2,6 +2,12 @@
 
 use serde::Deserialize;
 
+/// Stable envelope type for daemon capability-resolution payloads.
+///
+/// This constant must match the daemon-side `CAPABILITY_RESOLUTION_TYPE` exported
+/// by `weaverd::dispatch::act::refactor::resolution` to ensure correct parsing.
+const CAPABILITY_RESOLUTION_TYPE: &str = "CapabilityResolution";
+
 /// A definition or reference location in the daemon response.
 #[derive(Debug, Deserialize)]
 pub(crate) struct DefinitionLocation {
@@ -58,8 +64,19 @@ pub(crate) struct VerificationFailure {
 }
 
 /// Parsed capability-resolution payload emitted by daemon routing.
+///
+/// This models the full envelope as emitted on the wire so that callers
+/// can access `status`, `type`, and `details` from a single deserialization.
 #[derive(Debug, Deserialize)]
 pub(crate) struct CapabilityResolution {
+    /// Resolution status (e.g. "ok", "error").
+    #[allow(dead_code)]
+    status: String,
+
+    /// Payload type discriminator.
+    #[serde(rename = "type")]
+    pub(crate) r#type: String,
+
     /// Structured routing details.
     pub(crate) details: CapabilityResolutionDetails,
 }
@@ -140,8 +157,7 @@ pub(crate) fn parse_verification_failures(payload: &str) -> Option<Vec<Verificat
 #[must_use]
 pub(crate) fn parse_capability_resolution(payload: &str) -> Option<CapabilityResolution> {
     let parsed: CapabilityResolution = serde_json::from_str(payload).ok()?;
-    let envelope: TypedEnvelope = serde_json::from_str(payload).ok()?;
-    if envelope.kind.as_deref() != Some("CapabilityResolution") {
+    if parsed.r#type != CAPABILITY_RESOLUTION_TYPE {
         return None;
     }
     Some(parsed)
@@ -152,12 +168,6 @@ struct VerificationErrorEnvelope {
     #[serde(rename = "type")]
     kind: Option<String>,
     details: Option<VerificationErrorDetails>,
-}
-
-#[derive(Debug, Deserialize)]
-struct TypedEnvelope {
-    #[serde(rename = "type")]
-    kind: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

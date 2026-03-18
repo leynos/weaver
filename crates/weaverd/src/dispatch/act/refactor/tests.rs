@@ -23,8 +23,13 @@ enum MockRuntimeResult {
     NotFound(String),
 }
 
+enum MockResolution {
+    Success(CapabilityResolutionEnvelope),
+    Error(String),
+}
+
 struct MockRuntime {
-    resolution: CapabilityResolutionEnvelope,
+    resolution: MockResolution,
     result: MockRuntimeResult,
 }
 
@@ -33,7 +38,12 @@ impl RefactorPluginRuntime for MockRuntime {
         &self,
         _request: ResolutionRequest<'_>,
     ) -> Result<CapabilityResolutionEnvelope, PluginError> {
-        Ok(self.resolution.clone())
+        match &self.resolution {
+            MockResolution::Success(envelope) => Ok(envelope.clone()),
+            MockResolution::Error(message) => Err(PluginError::Manifest {
+                message: message.clone(),
+            }),
+        }
     }
 
     fn execute(
@@ -102,7 +112,7 @@ fn handle_runtime_error_returns_status_one(socket_dir: TempDir) {
         String::from("notes.py"),
     ]);
     let runtime = MockRuntime {
-        resolution: automatic_selection("rope", "python"),
+        resolution: MockResolution::Success(automatic_selection("rope", "python")),
         result: MockRuntimeResult::NotFound(String::from("rope")),
     };
     let socket_path = socket_dir.path().join("socket.sock");
@@ -144,7 +154,7 @@ fn handle_non_diff_output_returns_status_one(
         String::from("notes.py"),
     ]);
     let runtime = MockRuntime {
-        resolution: automatic_selection("rope", "python"),
+        resolution: MockResolution::Success(automatic_selection("rope", "python")),
         result: MockRuntimeResult::Success(PluginResponse::success(output_variant)),
     };
     let socket_path = socket_dir.path().join("socket.sock");
@@ -184,7 +194,7 @@ fn handle_diff_output_applies_patch_through_apply_patch_pipeline(socket_dir: Tem
         ">>>>>>> REPLACE\n",
     );
     let runtime = MockRuntime {
-        resolution: automatic_selection("rope", "python"),
+        resolution: MockResolution::Success(automatic_selection("rope", "python")),
         result: MockRuntimeResult::Success(PluginResponse::success(PluginOutput::Diff {
             content: String::from(diff),
         })),
@@ -214,9 +224,9 @@ fn handle_diff_output_applies_patch_through_apply_patch_pipeline(socket_dir: Tem
     assert_eq!(result.status, 0);
     let updated = std::fs::read_to_string(workspace.path().join(relative_file)).expect("read");
     assert_eq!(updated, "hello woven\n");
-    let stdout = String::from_utf8(output).expect("stdout utf8");
-    assert!(stdout.contains("CapabilityResolution"));
-    assert!(stdout.contains("\"kind\":\"stream\""));
+    let stderr = String::from_utf8(output).expect("stderr utf8");
+    assert!(stderr.contains("CapabilityResolution"));
+    assert!(stderr.contains("\"kind\":\"stream\""));
 }
 
 #[test]
@@ -243,6 +253,7 @@ fn default_runtime_returns_shared_trait_object() {
 
 #[rstest]
 fn handle_returns_error_for_unsupported_refactoring(socket_dir: TempDir) {
+    let workspace = TempDir::new().expect("workspace");
     let request = command_request(vec![
         String::from("--refactoring"),
         String::from("extract-method"),
@@ -254,7 +265,7 @@ fn handle_returns_error_for_unsupported_refactoring(socket_dir: TempDir) {
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
     let runtime = MockRuntime {
-        resolution: automatic_selection("rope", "python"),
+        resolution: MockResolution::Success(automatic_selection("rope", "python")),
         result: MockRuntimeResult::NotFound(String::from("rope")),
     };
 
@@ -263,7 +274,7 @@ fn handle_returns_error_for_unsupported_refactoring(socket_dir: TempDir) {
         &mut writer,
         RefactorContext {
             backends: &mut backends,
-            workspace_root: Path::new("/tmp/workspace"),
+            workspace_root: workspace.path(),
             runtime: &runtime,
         },
     );
@@ -272,4 +283,101 @@ fn handle_returns_error_for_unsupported_refactoring(socket_dir: TempDir) {
         result,
         Err(DispatchError::InvalidArguments { .. })
     ));
+}
+
+#[rstest]
+fn handle_exits_with_error_when_resolution_fails(socket_dir: TempDir) {
+    let workspace = TempDir::new().expect("workspace");
+    std::fs::write(workspace.path().join("notes.py"), "hello\n").expect("write");
+
+    let request = command_request(vec![
+        String::from("--refactoring"),
+        String::from("rename"),
+        String::from("--file"),
+        String::from("notes.py"),
+    ]);
+    let runtime = MockRuntime {
+        resolution: MockResolution::Error(String::from("bad manifest")),
+        result: MockRuntimeResult::NotFound(String::from("rope")),
+    };
+    let socket_path = socket_dir.path().join("socket.sock");
+    let mut backends = build_backends(&socket_path);
+    let mut output = Vec::new();
+    let mut writer = ResponseWriter::new(&mut output);
+
+    let result = handle(
+        &request,
+        &mut writer,
+        RefactorContext {
+            backends: &mut backends,
+            workspace_root: workspace.path(),
+            runtime: &runtime,
+        },
+    )
+    .expect("dispatch result");
+
+    assert_eq!(result.status, 1);
+    let stderr = String::from_utf8(output).expect("stderr utf8");
+    assert!(
+        stderr.contains("act refactor failed"),
+        "stderr should contain the generic failure message, got: {stderr}"
+    );
+}
+
+#[rstest]
+fn handle_exits_with_error_when_resolution_refused_without_provider(socket_dir: TempDir) {
+    use super::resolution::RefusalReason::UnsupportedLanguage;
+
+    let workspace = TempDir::new().expect("workspace");
+    std::fs::write(workspace.path().join("notes.txt"), "hello\n").expect("write");
+
+    let request = command_request(vec![
+        String::from("--refactoring"),
+        String::from("rename"),
+        String::from("--file"),
+        String::from("notes.txt"),
+    ]);
+
+    let refused_envelope =
+        CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
+            capability: weaver_plugins::CapabilityId::RenameSymbol,
+            language: Some(String::from("unknown-lang")),
+            requested_provider: None,
+            selected_provider: None,
+            selection_mode: SelectionMode::Automatic,
+            outcome: ResolutionOutcome::Refused,
+            refusal_reason: Some(UnsupportedLanguage),
+            candidates: Vec::new(),
+        });
+
+    let runtime = MockRuntime {
+        resolution: MockResolution::Success(refused_envelope),
+        result: MockRuntimeResult::NotFound(String::from("rope")),
+    };
+    let socket_path = socket_dir.path().join("socket.sock");
+    let mut backends = build_backends(&socket_path);
+    let mut output = Vec::new();
+    let mut writer = ResponseWriter::new(&mut output);
+
+    let result = handle(
+        &request,
+        &mut writer,
+        RefactorContext {
+            backends: &mut backends,
+            workspace_root: workspace.path(),
+            runtime: &runtime,
+        },
+    )
+    .expect("dispatch result");
+
+    assert_eq!(result.status, 1);
+    let stderr = String::from_utf8(output).expect("stderr utf8");
+    assert!(
+        stderr.contains("CapabilityResolution"),
+        "stderr should contain the capability resolution envelope, got: {stderr}"
+    );
+    assert!(
+        stderr.contains("refused"),
+        "stderr should indicate refusal, got: {stderr}"
+    );
 }

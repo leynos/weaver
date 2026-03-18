@@ -65,22 +65,35 @@ fn apply_flag<'a>(
 ) -> Result<(), DispatchError> {
     match arg {
         "--provider" => {
-            builder.provider =
-                Some(iter.next().cloned().ok_or_else(|| {
-                    DispatchError::invalid_arguments("--provider requires a value")
-                })?);
+            let value = iter
+                .next()
+                .ok_or_else(|| DispatchError::invalid_arguments("--provider requires a value"))?;
+            if value.starts_with("--") {
+                return Err(DispatchError::invalid_arguments(
+                    "--provider requires a value",
+                ));
+            }
+            builder.provider = Some(value.clone());
         }
         "--refactoring" => {
-            builder.refactoring = Some(iter.next().cloned().ok_or_else(|| {
+            let value = iter.next().ok_or_else(|| {
                 DispatchError::invalid_arguments("--refactoring requires a value")
-            })?);
+            })?;
+            if value.starts_with("--") {
+                return Err(DispatchError::invalid_arguments(
+                    "--refactoring requires a value",
+                ));
+            }
+            builder.refactoring = Some(value.clone());
         }
         "--file" => {
-            builder.file = Some(
-                iter.next()
-                    .cloned()
-                    .ok_or_else(|| DispatchError::invalid_arguments("--file requires a value"))?,
-            );
+            let value = iter
+                .next()
+                .ok_or_else(|| DispatchError::invalid_arguments("--file requires a value"))?;
+            if value.starts_with("--") {
+                return Err(DispatchError::invalid_arguments("--file requires a value"));
+            }
+            builder.file = Some(value.clone());
         }
         other => builder.extra.push(other.to_owned()),
     }

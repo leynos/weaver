@@ -267,33 +267,45 @@ fn malformed_diff_for(relative_path: &str) -> String {
     format_diff(relative_path, &format!("diff --git a/{0}", relative_path))
 }
 
-fn original_content_for(relative_path: &str) -> &'static str {
+enum FileKind {
+    Python,
+    Rust,
+    Other,
+}
+
+fn classify_file(relative_path: &str) -> FileKind {
     if relative_path.ends_with(".py") {
-        "old_name = 1\nprint(old_name)\n"
+        FileKind::Python
     } else if relative_path.ends_with(".rs") {
-        concat!(
+        FileKind::Rust
+    } else {
+        FileKind::Other
+    }
+}
+
+fn original_content_for(relative_path: &str) -> &'static str {
+    match classify_file(relative_path) {
+        FileKind::Python => "old_name = 1\nprint(old_name)\n",
+        FileKind::Rust => concat!(
             "fn main() {\n",
             "    let old_name = 1;\n",
             "    println!(\"{}\", old_name);\n",
             "}\n",
-        )
-    } else {
-        "hello world\n"
+        ),
+        FileKind::Other => "hello world\n",
     }
 }
 
 fn updated_content_for(relative_path: &str) -> &'static str {
-    if relative_path.ends_with(".py") {
-        "new_name = 1\nprint(new_name)\n"
-    } else if relative_path.ends_with(".rs") {
-        concat!(
+    match classify_file(relative_path) {
+        FileKind::Python => "new_name = 1\nprint(new_name)\n",
+        FileKind::Rust => concat!(
             "fn main() {\n",
             "    let new_name = 1;\n",
             "    println!(\"{}\", new_name);\n",
             "}\n",
-        )
-    } else {
-        "hello woven\n"
+        ),
+        FileKind::Other => "hello woven\n",
     }
 }
 
