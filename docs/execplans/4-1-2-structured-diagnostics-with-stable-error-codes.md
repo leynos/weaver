@@ -260,7 +260,7 @@ Update docs once implementation is stable:
 
 Go/no-go:
 
-- Do not finalize until markdown and Rust quality gates pass.
+- Do not finalize until Markdown and Rust quality gates pass.
 
 ## Concrete steps
 

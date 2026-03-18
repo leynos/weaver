@@ -191,24 +191,44 @@ fn diagnostic_deserialization_rejects_malformed_primary_span_payload() {
 
 #[test]
 fn diagnostic_report_parser_error_constructor_builds_single_diagnostic() {
+    let message = "invalid yaml";
+    let notes = vec![String::from("check indentation")];
+
     let report = DiagnosticReport::parser_error(
         DiagnosticCode::ESempaiYamlParse,
-        String::from("invalid yaml"),
+        String::from(message),
         Some(SourceSpan::new(0, 5, None)),
-        vec![String::from("check indentation")],
+        notes.clone(),
     );
     assert_single_diagnostic_report(&report, DiagnosticCode::ESempaiYamlParse, true);
+
+    let diagnostic = report
+        .diagnostics()
+        .first()
+        .expect("parser_error should produce a single diagnostic");
+    assert_eq!(diagnostic.message(), message);
+    assert_eq!(diagnostic.notes(), &notes);
 }
 
 #[test]
 fn diagnostic_report_validation_error_constructor_builds_single_diagnostic() {
+    let message = "missing id";
+    let notes: Vec<String> = vec![];
+
     let report = DiagnosticReport::validation_error(
         DiagnosticCode::ESempaiSchemaInvalid,
-        String::from("missing id"),
+        String::from(message),
         None,
-        vec![],
+        notes.clone(),
     );
     assert_single_diagnostic_report(&report, DiagnosticCode::ESempaiSchemaInvalid, false);
+
+    let diagnostic = report
+        .diagnostics()
+        .first()
+        .expect("validation_error should produce a single diagnostic");
+    assert_eq!(diagnostic.message(), message);
+    assert_eq!(diagnostic.notes(), &notes);
 }
 
 #[test]

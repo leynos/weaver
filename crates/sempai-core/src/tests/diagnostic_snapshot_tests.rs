@@ -1,12 +1,14 @@
 //! Snapshot tests for stable diagnostic JSON schemas.
 
 use insta::assert_snapshot;
+use rstest::rstest;
 
 use crate::{Diagnostic, DiagnosticCode, DiagnosticReport, SourceSpan};
 
-#[test]
-fn parser_diagnostic_report_json_snapshot() {
-    let report = DiagnosticReport::parser_error(
+#[rstest]
+#[case(
+    "parser_diagnostic_report",
+    DiagnosticReport::parser_error(
         DiagnosticCode::ESempaiYamlParse,
         String::from("failed to parse YAML"),
         Some(SourceSpan::new(
@@ -18,26 +20,24 @@ fn parser_diagnostic_report_json_snapshot() {
             String::from("expected mapping"),
             String::from("found sequence"),
         ],
-    );
-
-    assert_snapshot!(
-        "parser_diagnostic_report",
-        serde_json::to_string_pretty(&report).expect("serialize parser report")
-    );
-}
-
-#[test]
-fn validator_diagnostic_report_json_snapshot() {
-    let report = DiagnosticReport::validation_error(
+    )
+)]
+#[case(
+    "validator_diagnostic_report",
+    DiagnosticReport::validation_error(
         DiagnosticCode::ESempaiSchemaInvalid,
         String::from("rule id is required"),
         None,
         vec![String::from("add an id field")],
-    );
-
+    )
+)]
+fn single_diagnostic_report_json_snapshot(
+    #[case] snapshot_name: &str,
+    #[case] report: DiagnosticReport,
+) {
     assert_snapshot!(
-        "validator_diagnostic_report",
-        serde_json::to_string_pretty(&report).expect("serialize validator report")
+        snapshot_name,
+        serde_json::to_string_pretty(&report).expect("serialize diagnostic report")
     );
 }
 

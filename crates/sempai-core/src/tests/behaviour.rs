@@ -28,13 +28,8 @@ fn world() -> TestWorld {
 }
 
 fn parse_diagnostic_code(code: &str) -> DiagnosticCode {
-    match code {
-        "E_SEMPAI_YAML_PARSE" => DiagnosticCode::ESempaiYamlParse,
-        "E_SEMPAI_DSL_PARSE" => DiagnosticCode::ESempaiDslParse,
-        "E_SEMPAI_SCHEMA_INVALID" => DiagnosticCode::ESempaiSchemaInvalid,
-        "E_SEMPAI_INVALID_NOT_IN_OR" => DiagnosticCode::ESempaiInvalidNotInOr,
-        other => panic!("unsupported diagnostic code: {other}"),
-    }
+    let json = format!("\"{code}\"");
+    serde_json::from_str(&json).unwrap_or_else(|_| panic!("unrecognised diagnostic code: {code}"))
 }
 
 // ---------------------------------------------------------------------------
@@ -73,18 +68,12 @@ fn given_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedSt
 
 #[given("a parser diagnostic with code {code} and message {message}")]
 fn given_parser_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedString) {
-    world.report = Some(build_single_diagnostic_report(
-        code.as_str(),
-        message.as_str(),
-    ));
+    given_diagnostic(world, code, message);
 }
 
 #[given("a validator diagnostic with code {code} and message {message}")]
 fn given_validator_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedString) {
-    world.report = Some(build_single_diagnostic_report(
-        code.as_str(),
-        message.as_str(),
-    ));
+    given_diagnostic(world, code, message);
 }
 
 #[given("a not-implemented report for feature {feature}")]
@@ -94,7 +83,8 @@ fn given_not_implemented_report(world: &mut TestWorld, feature: QuotedString) {
 
 #[given("diagnostic code payload {code}")]
 fn given_diagnostic_code_payload(world: &mut TestWorld, code: QuotedString) {
-    world.diagnostic_code_payload = Some(format!("\"{}\"", code.as_str()));
+    world.diagnostic_code_payload =
+        Some(serde_json::to_string(code.as_str()).expect("serialize diagnostic code payload"));
 }
 
 // ---------------------------------------------------------------------------
@@ -134,9 +124,7 @@ fn when_deserialize_diagnostic_code_payload(world: &mut TestWorld) {
         .as_ref()
         .expect("diagnostic code payload should be set");
     let result = serde_json::from_str::<DiagnosticCode>(payload);
-    if let Err(err) = result {
-        world.deserialization_error = Some(err.to_string());
-    }
+    world.deserialization_error = result.err().map(|e| e.to_string());
 }
 
 // ---------------------------------------------------------------------------

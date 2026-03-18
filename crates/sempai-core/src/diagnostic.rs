@@ -205,6 +205,7 @@ impl Diagnostic {
     /// This compatibility alias will be removed once downstream callers have
     /// migrated to [`primary_span`](Self::primary_span).
     #[must_use]
+    #[deprecated(since = "0.1.0", note = "use `primary_span()` instead")]
     pub const fn span(&self) -> Option<&SourceSpan> {
         self.primary_span()
     }
