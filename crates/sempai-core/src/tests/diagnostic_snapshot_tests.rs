@@ -8,7 +8,7 @@ use crate::{Diagnostic, DiagnosticCode, DiagnosticReport, SourceSpan};
 #[rstest]
 #[case(
     "parser_diagnostic_report",
-    DiagnosticReport::single_error(
+    DiagnosticReport::parser_error(
         DiagnosticCode::ESempaiYamlParse,
         String::from("failed to parse YAML"),
         Some(SourceSpan::new(
@@ -24,7 +24,7 @@ use crate::{Diagnostic, DiagnosticCode, DiagnosticReport, SourceSpan};
 )]
 #[case(
     "validator_diagnostic_report",
-    DiagnosticReport::single_error(
+    DiagnosticReport::validation_error(
         DiagnosticCode::ESempaiSchemaInvalid,
         String::from("rule id is required"),
         None,

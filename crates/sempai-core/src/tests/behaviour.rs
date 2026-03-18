@@ -68,12 +68,22 @@ fn given_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedSt
 
 #[given("a parser diagnostic with code {code} and message {message}")]
 fn given_parser_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedString) {
-    given_diagnostic(world, code, message);
+    world.report = Some(DiagnosticReport::parser_error(
+        parse_diagnostic_code(code.as_str()),
+        message.as_str().to_owned(),
+        None,
+        vec![],
+    ));
 }
 
 #[given("a validator diagnostic with code {code} and message {message}")]
 fn given_validator_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedString) {
-    given_diagnostic(world, code, message);
+    world.report = Some(DiagnosticReport::validation_error(
+        parse_diagnostic_code(code.as_str()),
+        message.as_str().to_owned(),
+        None,
+        vec![],
+    ));
 }
 
 #[given("a not-implemented report for feature {feature}")]
@@ -84,7 +94,7 @@ fn given_not_implemented_report(world: &mut TestWorld, feature: QuotedString) {
 #[given("diagnostic code payload {code}")]
 fn given_diagnostic_code_payload(world: &mut TestWorld, code: QuotedString) {
     world.diagnostic_code_payload =
-        Some(serde_json::to_string(code.as_str()).expect("serialize diagnostic code payload"));
+        Some(serde_json::to_string(code.as_str()).expect("serialise diagnostic code payload"));
 }
 
 // ---------------------------------------------------------------------------
@@ -123,8 +133,9 @@ fn when_deserialize_diagnostic_code_payload(world: &mut TestWorld) {
         .diagnostic_code_payload
         .as_ref()
         .expect("diagnostic code payload should be set");
-    let result = serde_json::from_str::<DiagnosticCode>(payload);
-    world.deserialization_error = result.err().map(|e| e.to_string());
+    world.deserialization_error = serde_json::from_str::<DiagnosticCode>(payload)
+        .err()
+        .map(|e| e.to_string());
 }
 
 // ---------------------------------------------------------------------------
