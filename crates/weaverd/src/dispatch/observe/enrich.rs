@@ -62,7 +62,15 @@ pub fn try_lsp_enrichment(
 
     let uri = match uri_str.parse() {
         Ok(u) => u,
-        Err(_) => return EnrichmentOutcome::Degraded,
+        Err(error) => {
+            debug!(
+                target: DISPATCH_TARGET,
+                uri = uri_str,
+                error = %error,
+                "LSP enrichment degraded: card URI could not be parsed for hover request"
+            );
+            return EnrichmentOutcome::Degraded;
+        }
     };
 
     let params = HoverParams {

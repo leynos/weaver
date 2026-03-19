@@ -25,8 +25,9 @@ Observable behaviour after implementation:
 
 1. A `get-card` request at `--detail semantic` against a file whose language
    server supports hover returns a card with a populated `lsp` field containing
-   `hover`, `type`, `deprecated`, and `source` attributes, and provenance
-   sources including both `"tree_sitter"` and `"lsp_hover"`.
+   `hover`, `type` (JSON key for the Rust field `type_info`), `deprecated`, and
+   `source` attributes, and provenance sources including both `"tree_sitter"`
+   and `"lsp_hover"`.
 2. The same request against a file where the LSP is unavailable (no server
    registered, hover capability missing, or server error) returns a card with
    `lsp: null` (omitted in JSON) and provenance containing
@@ -108,7 +109,7 @@ Observable behaviour after implementation:
   `backends`, and updated `router.rs` to pass `backends`.
 - [x] (2026-03-15) Stage D: Unit tests for hover response parsing
   (6 tests in `enrich.rs`). Updated existing `get_card.rs` unit tests to pass
-  `backends` via an rstest fixture.
+  `backends` via a rstest fixture.
 - [x] (2026-03-15) Stage E: BDD tests pass unchanged — the degraded
   path is naturally exercised since no real language servers are registered.
   The `behaviour.rs` BDD test in `weaver-lsp-host` needed `hover: None` added
@@ -147,7 +148,7 @@ Observable behaviour after implementation:
   `crates/weaverd/src/dispatch/observe/enrich.rs` rather than inlining in
   `get_card.rs`. Rationale: Keeps `get_card.rs` within the 400-line budget and
   separates the enrichment concern from request parsing and response
-  serialisation. Date/Author: 2026-03-15, agent.
+  serialization. Date/Author: 2026-03-15, agent.
 
 ## Outcomes & retrospective
 
@@ -230,7 +231,7 @@ Add `Hover` after `CallHierarchy` in the enum at line 21, with key
 
 Add `pub(crate) hover: bool` to the struct (line 20). Add builder method
 `with_hover(bool)`. Add query method `supports_hover()`. The existing `new()`
-constructor initialises `hover: false` for backwards compatibility.
+constructor initializes `hover: false` for backwards compatibility.
 
 **A3. Add `hover` method to `LanguageServer` trait**
 (`crates/weaver-lsp-host/src/server.rs`)
@@ -349,7 +350,7 @@ pub fn handle<W: Write>(
 ) -> Result<DispatchResult, DispatchError> {
 ```
 
-After successful Tree-sitter extraction but before serialisation, when
+After successful Tree-sitter extraction but before serialization, when
 `card_request.detail >= DetailLevel::Semantic`, call
 `enrich::try_lsp_enrichment(&mut card, backends)`. If the outcome is
 `Enriched`, update provenance sources to replace
@@ -471,7 +472,7 @@ Quality criteria:
 
 All steps are additive and can be re-run. If any stage fails, fix the issue and
 re-run the stage's validation. The change does not modify any existing
-serialised data or persistent state.
+serialized data or persistent state.
 
 ## Artefacts and notes
 
