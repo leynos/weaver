@@ -70,7 +70,10 @@ pub(crate) struct VerificationFailure {
 #[derive(Debug, Deserialize)]
 pub(crate) struct CapabilityResolution {
     /// Resolution status (e.g. "ok", "error").
-    #[allow(dead_code)]
+    #[expect(
+        dead_code,
+        reason = "the daemon includes status in the wire envelope even though the human renderer only reads routing details today"
+    )]
     status: String,
 
     /// Payload type discriminator.
@@ -268,5 +271,21 @@ mod tests {
             Some("rope")
         );
         assert_eq!(resolution.details.candidates.len(), 1);
+    }
+
+    #[test]
+    fn parse_capability_resolution_rejects_mismatched_type() {
+        let payload = r#"{
+  "status": "ok",
+  "type": "SomethingElse",
+  "details": {
+    "capability": "rename-symbol",
+    "selection_mode": "automatic",
+    "outcome": "selected",
+    "candidates": []
+  }
+}"#;
+
+        assert!(parse_capability_resolution(payload).is_none());
     }
 }

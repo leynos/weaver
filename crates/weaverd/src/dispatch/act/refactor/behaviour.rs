@@ -1,19 +1,22 @@
 //! Behavioural tests for the `act refactor` handler.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use tempfile::TempDir;
-use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
-use weaver_plugins::{CapabilityId, PluginError, PluginOutput, PluginRequest, PluginResponse};
+use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
+use weaver_syntax::SupportedLanguage;
 
 use super::resolution::{
-    CandidateEvaluation, CandidateReason, CapabilityResolutionDetails,
-    CapabilityResolutionEnvelope, RefusalReason, ResolutionOutcome, ResolutionRequest,
-    SelectionMode,
+    CandidateReason, CapabilityResolutionEnvelope, RefusalReason, ResolutionRequest, SelectionMode,
 };
 use super::*;
+
+#[path = "refactor_helpers.rs"]
+mod refactor_helpers;
+
+use refactor_helpers::*;
 
 #[derive(Clone, Copy, Default)]
 enum RuntimeMode {
@@ -37,40 +40,83 @@ struct StubRuntime {
     execution: RuntimeMode,
 }
 
-struct RefusedResolution<'a> {
-    language: Option<&'a str>,
-    requested_provider: Option<&'a str>,
-    selection_mode: SelectionMode,
-    refusal_reason: RefusalReason,
-    candidates: Vec<CandidateEvaluation>,
-}
-
 impl RefactorPluginRuntime for StubRuntime {
     fn resolve(
         &self,
-        _request: ResolutionRequest<'_>,
+        request: ResolutionRequest<'_>,
     ) -> Result<CapabilityResolutionEnvelope, PluginError> {
+        let language = SupportedLanguage::from_path(request.target_file());
+        let language_name = language.map(SupportedLanguage::as_str);
+        let requested_provider = request.explicit_provider();
+        let selection_mode = if requested_provider.is_some() {
+            SelectionMode::ExplicitProvider
+        } else {
+            SelectionMode::Automatic
+        };
+
         Ok(match self.routing {
-            RoutingMode::AutomaticPython => selected_resolution("python", "rope"),
-            RoutingMode::AutomaticRust => selected_resolution("rust", "rust-analyzer"),
+            RoutingMode::AutomaticPython => selected_resolution(SelectedResolution {
+                capability: request.capability(),
+                language: language_name.unwrap_or("python"),
+                provider: "rope",
+                selection_mode,
+                requested_provider,
+            }),
+            RoutingMode::AutomaticRust => selected_resolution(SelectedResolution {
+                capability: request.capability(),
+                language: language_name.unwrap_or("rust"),
+                provider: "rust-analyzer",
+                selection_mode,
+                requested_provider,
+            }),
             RoutingMode::UnsupportedLanguage => refused_resolution(RefusedResolution {
-                language: None,
-                requested_provider: None,
-                selection_mode: SelectionMode::Automatic,
+                capability: request.capability(),
+                language: language_name,
+                requested_provider,
+                selection_mode,
                 refusal_reason: RefusalReason::UnsupportedLanguage,
                 candidates: vec![
-                    rejected_candidate("rope", CandidateReason::UnsupportedLanguage),
-                    rejected_candidate("rust-analyzer", CandidateReason::UnsupportedLanguage),
+                    rejected_candidate(
+                        "rope",
+                        if requested_provider == Some("rope") {
+                            CandidateReason::ExplicitProviderMismatch
+                        } else {
+                            CandidateReason::UnsupportedLanguage
+                        },
+                    ),
+                    rejected_candidate(
+                        "rust-analyzer",
+                        if requested_provider == Some("rust-analyzer") {
+                            CandidateReason::ExplicitProviderMismatch
+                        } else {
+                            CandidateReason::UnsupportedLanguage
+                        },
+                    ),
                 ],
             }),
             RoutingMode::ExplicitProviderMismatch => refused_resolution(RefusedResolution {
-                language: Some("python"),
-                requested_provider: Some("rust-analyzer"),
-                selection_mode: SelectionMode::ExplicitProvider,
+                capability: request.capability(),
+                language: language_name,
+                requested_provider,
+                selection_mode,
                 refusal_reason: RefusalReason::ExplicitProviderMismatch,
                 candidates: vec![
-                    rejected_candidate("rope", CandidateReason::NotRequested),
-                    rejected_candidate("rust-analyzer", CandidateReason::ExplicitProviderMismatch),
+                    rejected_candidate(
+                        "rope",
+                        if requested_provider == Some("rope") {
+                            CandidateReason::ExplicitProviderMismatch
+                        } else {
+                            CandidateReason::NotRequested
+                        },
+                    ),
+                    rejected_candidate(
+                        "rust-analyzer",
+                        if requested_provider == Some("rust-analyzer") {
+                            CandidateReason::ExplicitProviderMismatch
+                        } else {
+                            CandidateReason::NotRequested
+                        },
+                    ),
                 ],
             }),
         })
@@ -91,13 +137,13 @@ impl RefactorPluginRuntime for StubRuntime {
 
         match self.execution {
             RuntimeMode::DiffSuccess => Ok(PluginResponse::success(PluginOutput::Diff {
-                content: diff_for(&relative_path),
+                content: routed_diff_for(&relative_path),
             })),
             RuntimeMode::RuntimeError => Err(PluginError::NotFound {
                 name: String::from("rope"),
             }),
             RuntimeMode::MalformedDiff => Ok(PluginResponse::success(PluginOutput::Diff {
-                content: malformed_diff_for(&relative_path),
+                content: routed_malformed_diff_for(&relative_path),
             })),
         }
     }
@@ -147,6 +193,14 @@ impl RefactorWorld {
         std::fs::write(self.path(relative), content).expect("write file");
     }
 
+    fn prepare_routed_fixture(&self, target_file: &str) {
+        self.write_file(target_file, original_content_for(target_file));
+        let patch_path = routed_patch_path(target_file);
+        if patch_path != target_file {
+            self.write_file(patch_path, original_content_for(target_file));
+        }
+    }
+
     fn read_file(&self, relative: &str) -> String {
         std::fs::read_to_string(self.path(relative)).expect("read file")
     }
@@ -176,139 +230,6 @@ impl RefactorWorld {
     }
 }
 
-fn command_request(arguments: Vec<String>) -> CommandRequest {
-    CommandRequest {
-        command: CommandDescriptor {
-            domain: String::from("act"),
-            operation: String::from("refactor"),
-        },
-        arguments,
-        patch: None,
-    }
-}
-
-fn build_backends(socket_path: &Path) -> FusionBackends<SemanticBackendProvider> {
-    let config = Config {
-        daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().as_ref()),
-        ..Config::default()
-    };
-    let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
-    FusionBackends::new(config, provider)
-}
-
-fn standard_rename_args(file: &str) -> Vec<String> {
-    vec![
-        String::from("--refactoring"),
-        String::from("rename"),
-        String::from("--file"),
-        String::from(file),
-        String::from("offset=1"),
-        String::from("new_name=woven"),
-    ]
-}
-
-fn configure_request(world: &mut RefactorWorld, args: Vec<String>, routing_mode: RoutingMode) {
-    world.request = command_request(args);
-    world.routing_mode = routing_mode;
-}
-
-fn selected_resolution(language: &str, provider: &str) -> CapabilityResolutionEnvelope {
-    CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
-        capability: CapabilityId::RenameSymbol,
-        language: Some(String::from(language)),
-        requested_provider: None,
-        selected_provider: Some(String::from(provider)),
-        selection_mode: SelectionMode::Automatic,
-        outcome: ResolutionOutcome::Selected,
-        refusal_reason: None,
-        candidates: vec![CandidateEvaluation {
-            provider: String::from(provider),
-            accepted: true,
-            reason: CandidateReason::MatchedLanguageAndCapability,
-        }],
-    })
-}
-
-fn refused_resolution(config: RefusedResolution<'_>) -> CapabilityResolutionEnvelope {
-    CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
-        capability: CapabilityId::RenameSymbol,
-        language: config.language.map(String::from),
-        requested_provider: config.requested_provider.map(String::from),
-        selected_provider: None,
-        selection_mode: config.selection_mode,
-        outcome: ResolutionOutcome::Refused,
-        refusal_reason: Some(config.refusal_reason),
-        candidates: config.candidates,
-    })
-}
-
-fn rejected_candidate(provider: &str, reason: CandidateReason) -> CandidateEvaluation {
-    CandidateEvaluation {
-        provider: String::from(provider),
-        accepted: false,
-        reason,
-    }
-}
-
-fn format_diff(relative_path: &str, git_header: &str) -> String {
-    let original = original_content_for(relative_path);
-    let updated = updated_content_for(relative_path);
-    format!("{git_header}\n<<<<<<< SEARCH\n{original}=======\n{updated}>>>>>>> REPLACE\n",)
-}
-
-fn diff_for(relative_path: &str) -> String {
-    format_diff(
-        relative_path,
-        &format!("diff --git a/{0} b/{0}", relative_path),
-    )
-}
-
-fn malformed_diff_for(relative_path: &str) -> String {
-    format_diff(relative_path, &format!("diff --git a/{0}", relative_path))
-}
-
-enum FileKind {
-    Python,
-    Rust,
-    Other,
-}
-
-fn classify_file(relative_path: &str) -> FileKind {
-    if relative_path.ends_with(".py") {
-        FileKind::Python
-    } else if relative_path.ends_with(".rs") {
-        FileKind::Rust
-    } else {
-        FileKind::Other
-    }
-}
-
-fn original_content_for(relative_path: &str) -> &'static str {
-    match classify_file(relative_path) {
-        FileKind::Python => "old_name = 1\nprint(old_name)\n",
-        FileKind::Rust => concat!(
-            "fn main() {\n",
-            "    let old_name = 1;\n",
-            "    println!(\"{}\", old_name);\n",
-            "}\n",
-        ),
-        FileKind::Other => "hello world\n",
-    }
-}
-
-fn updated_content_for(relative_path: &str) -> &'static str {
-    match classify_file(relative_path) {
-        FileKind::Python => "new_name = 1\nprint(new_name)\n",
-        FileKind::Rust => concat!(
-            "fn main() {\n",
-            "    let new_name = 1;\n",
-            "    println!(\"{}\", new_name);\n",
-            "}\n",
-        ),
-        FileKind::Other => "hello woven\n",
-    }
-}
-
 #[fixture]
 fn world() -> RefactorWorld {
     RefactorWorld::new()
@@ -322,36 +243,31 @@ fn given_workspace_file(world: &mut RefactorWorld) {
 
 #[given("a valid auto-routed act refactor request resolved to rope")]
 fn given_valid_rope_request(world: &mut RefactorWorld) {
-    configure_request(
-        world,
-        standard_rename_args("notes.txt"),
-        RoutingMode::AutomaticPython,
-    );
+    configure_request(&mut world.request, standard_rename_args("notes.py"));
+    world.routing_mode = RoutingMode::AutomaticPython;
+    world.prepare_routed_fixture("notes.py");
 }
 
 #[given("a valid auto-routed act refactor request resolved to rust-analyzer")]
 fn given_valid_rust_request(world: &mut RefactorWorld) {
-    configure_request(
-        world,
-        standard_rename_args("notes.txt"),
-        RoutingMode::AutomaticRust,
-    );
+    configure_request(&mut world.request, standard_rename_args("notes.rs"));
+    world.routing_mode = RoutingMode::AutomaticRust;
+    world.prepare_routed_fixture("notes.rs");
 }
 
 #[given("an unsupported-language act refactor request")]
 fn given_unsupported_language_request(world: &mut RefactorWorld) {
-    configure_request(
-        world,
-        standard_rename_args("notes.txt"),
-        RoutingMode::UnsupportedLanguage,
-    );
+    configure_request(&mut world.request, standard_rename_args("notes.txt"));
+    world.routing_mode = RoutingMode::UnsupportedLanguage;
 }
 
 #[given("a Python act refactor request with an incompatible provider override")]
 fn given_explicit_provider_mismatch_request(world: &mut RefactorWorld) {
     let mut args = vec![String::from("--provider"), String::from("rust-analyzer")];
     args.extend(standard_rename_args("notes.py"));
-    configure_request(world, args, RoutingMode::ExplicitProviderMismatch);
+    configure_request(&mut world.request, args);
+    world.routing_mode = RoutingMode::ExplicitProviderMismatch;
+    world.prepare_routed_fixture("notes.py");
 }
 
 #[given("a runtime error from the refactor plugin")]
@@ -386,14 +302,16 @@ fn then_refactor_fails_status_one(world: &mut RefactorWorld) {
 #[then("the target file is updated")]
 fn then_target_file_updated(world: &mut RefactorWorld) {
     let target_file = world.target_file();
-    let updated = world.read_file(&target_file);
+    let patch_target = routed_patch_path(&target_file);
+    let updated = world.read_file(patch_target);
     assert_eq!(updated, updated_content_for(&target_file));
 }
 
 #[then("the target file is unchanged")]
 fn then_target_file_unchanged(world: &mut RefactorWorld) {
     let target_file = world.target_file();
-    let updated = world.read_file(&target_file);
+    let patch_target = routed_patch_path(&target_file);
+    let updated = world.read_file(patch_target);
     assert_eq!(updated, original_content_for(&target_file));
 }
 

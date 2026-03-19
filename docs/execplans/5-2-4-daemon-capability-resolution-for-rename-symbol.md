@@ -225,11 +225,11 @@ The plugin registry already supports the lookups needed for resolution:
 
 The current missing pieces are:
 
-1. There is no language inference step for `act refactor`.
-2. There is no policy object that turns `(capability, language, explicit
-   provider?)` into a deterministic provider choice or refusal.
-3. There is no structured rationale payload for that decision.
-4. The CLI does not yet know how to render such a payload cleanly.
+- There is no language inference step for `act refactor`.
+- There is no policy object that turns `(capability, language, explicit
+  provider?)` into a deterministic provider choice or refusal.
+- There is no structured rationale payload for that decision.
+- The CLI does not yet know how to render such a payload cleanly.
 
 The likely files touched by implementation are:
 
@@ -258,12 +258,12 @@ Start by making room for the work. `mod.rs` is already at 398 lines and the
 unit-test file is already over the repository's line budget. Extract the new
 routing logic into focused modules before adding behaviour:
 
-1. Move capability-resolution types and helpers into a new sibling module such
-   as `resolution.rs`.
-2. Split the refactor unit tests into smaller modules, for example one module
-   for request-shape tests and one for routing-policy tests.
-3. Keep `manifests.rs` as the manifest-construction home; do not re-expand
-   manifest code back into `mod.rs`.
+- Move capability-resolution types and helpers into a new sibling module such
+  as `resolution.rs`.
+- Split the refactor unit tests into smaller modules, for example one module
+  for request-shape tests and one for routing-policy tests.
+- Keep `manifests.rs` as the manifest-construction home; do not re-expand
+  manifest code back into `mod.rs`.
 
 The target state after this milestone is that `mod.rs` is only orchestration:
 parse arguments, infer language, resolve provider, build `PluginRequest`,
@@ -274,17 +274,17 @@ execute the selected plugin, and forward diff output.
 Introduce a data model that the handler and tests can reason about directly.
 The names may vary, but the plan expects three concepts:
 
-1. A resolution input value, containing:
-   - the effective capability (`rename-symbol`)
-   - the target file path
-   - the inferred language
-   - any explicit provider override from `--provider`
-2. A resolution outcome value, containing:
-   - the selected provider name when routing succeeds
-   - a refusal code when routing fails
-   - the policy source that produced the outcome
-   - candidate-by-candidate evaluation details
-3. A bounded policy object that turns the input into the outcome.
+- A resolution input value, containing:
+  - the effective capability (`rename-symbol`)
+  - the target file path
+  - the inferred language
+  - any explicit provider override from `--provider`
+- A resolution outcome value, containing:
+  - the selected provider name when routing succeeds
+  - a refusal code when routing fails
+  - the policy source that produced the outcome
+  - candidate-by-candidate evaluation details
+- A bounded policy object that turns the input into the outcome.
 
 For 5.2.4, the default policy should be small and explicit:
 
@@ -334,23 +334,23 @@ tests and documentation to refer to it.
 
 Two implementation rules matter here:
 
-1. The payload must be emitted for both successful selection and deterministic
-   refusal.
-2. Human mode must remain readable. If the daemon adds a new message kind or a
-   new structured stream payload, update the CLI reader and human renderer in
-   the same change so users do not see unexplained JSON blobs.
+- The payload must be emitted for both successful selection and deterministic
+  refusal.
+- Human mode must remain readable. If the daemon adds a new message kind or a
+  new structured stream payload, update the CLI reader and human renderer in
+  the same change so users do not see unexplained JSON blobs.
 
 ### Milestone 4: Wire the selected provider into plugin execution
 
 Once resolution exists, use it to drive plugin execution:
 
-1. Apply language inference and resolution before invoking the runtime.
-2. Build the existing contract-conforming `PluginRequest` exactly as today for
-   `rename-symbol`.
-3. Execute the chosen provider and preserve the existing diff-to-apply-patch
-   handoff.
-4. Route deterministic refusal outcomes through the same response-writing path
-   used for other structured failures.
+- Apply language inference and resolution before invoking the runtime.
+- Build the existing contract-conforming `PluginRequest` exactly as today for
+  `rename-symbol`.
+- Execute the chosen provider and preserve the existing diff-to-apply-patch
+  handoff.
+- Route deterministic refusal outcomes through the same response-writing path
+  used for other structured failures.
 
 If the current `RefactorPluginRuntime` trait cannot support this cleanly, split
 it into resolution and execution methods or introduce a new internal runtime
@@ -365,22 +365,22 @@ proof of the resolver behaviour.
 
 Unit tests should cover at least:
 
-1. Python file without `--provider` selects `rope`.
-2. Rust file without `--provider` selects `rust-analyzer`.
-3. Explicit `--provider rope` for a Rust file is refused deterministically.
-4. Unsupported language refuses deterministically.
-5. If multiple candidates exist, the policy order is deterministic.
-6. The structured rationale includes the selected or refused provider and the
-   candidate rejection reasons.
+- Python file without `--provider` selects `rope`.
+- Rust file without `--provider` selects `rust-analyzer`.
+- Explicit `--provider rope` for a Rust file is refused deterministically.
+- Unsupported language refuses deterministically.
+- If multiple candidates exist, the policy order is deterministic.
+- The structured rationale includes the selected or refused provider and the
+  candidate rejection reasons.
 
 BDD scenarios using `rstest-bdd` v0.5.0 should cover at least:
 
-1. Successful Python rename routed by language without `--provider`.
-2. Successful Rust rename routed by language without `--provider`.
-3. Refusal when the file extension maps to an unsupported language.
-4. Refusal when an explicit provider conflicts with the inferred language.
-5. Emission of machine-readable rationale on both a success path and a refusal
-   path.
+- Successful Python rename routed by language without `--provider`.
+- Successful Rust rename routed by language without `--provider`.
+- Refusal when the file extension maps to an unsupported language.
+- Refusal when an explicit provider conflicts with the inferred language.
+- Emission of machine-readable rationale on both a success path and a refusal
+  path.
 
 Prefer a new focused feature file if that keeps the existing refactor feature
 readable. Do not keep growing one giant behaviour file.
@@ -389,15 +389,15 @@ readable. Do not keep growing one giant behaviour file.
 
 Once the implementation and tests are green, update the docs in the same change:
 
-1. `docs/weaver-design.md`
-   Record the final daemon-side routing policy, the rationale payload shape,
-   and any compatibility decision about `--provider`.
-2. `docs/users-guide.md`
-   Explain that `rename` routing is now language-aware, describe whether
-   `--provider` is optional or override-only, show at least one provider-less
-   example, and document the structured rationale visible in JSON mode.
-3. `docs/roadmap.md`
-   Mark 5.2.4 as done only after all tests and gates pass.
+- `docs/weaver-design.md`
+  Record the final daemon-side routing policy, the rationale payload shape, and
+  any compatibility decision about `--provider`.
+- `docs/users-guide.md`
+  Explain that `rename` routing is now language-aware, describe whether
+  `--provider` is optional or override-only, show at least one provider-less
+  example, and document the structured rationale visible in JSON mode.
+- `docs/roadmap.md`
+  Mark 5.2.4 as done only after all tests and gates pass.
 
 ## Validation
 

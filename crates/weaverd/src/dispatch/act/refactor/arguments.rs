@@ -64,40 +64,24 @@ fn apply_flag<'a>(
     builder: &mut RefactorArgsBuilder,
 ) -> Result<(), DispatchError> {
     match arg {
-        "--provider" => {
-            let value = iter
-                .next()
-                .ok_or_else(|| DispatchError::invalid_arguments("--provider requires a value"))?;
-            if value.starts_with("--") {
-                return Err(DispatchError::invalid_arguments(
-                    "--provider requires a value",
-                ));
-            }
-            builder.provider = Some(value.clone());
-        }
-        "--refactoring" => {
-            let value = iter.next().ok_or_else(|| {
-                DispatchError::invalid_arguments("--refactoring requires a value")
-            })?;
-            if value.starts_with("--") {
-                return Err(DispatchError::invalid_arguments(
-                    "--refactoring requires a value",
-                ));
-            }
-            builder.refactoring = Some(value.clone());
-        }
-        "--file" => {
-            let value = iter
-                .next()
-                .ok_or_else(|| DispatchError::invalid_arguments("--file requires a value"))?;
-            if value.starts_with("--") {
-                return Err(DispatchError::invalid_arguments("--file requires a value"));
-            }
-            builder.file = Some(value.clone());
-        }
+        "--provider" => builder.provider = Some(parse_flag_value(arg, iter)?),
+        "--refactoring" => builder.refactoring = Some(parse_flag_value(arg, iter)?),
+        "--file" => builder.file = Some(parse_flag_value(arg, iter)?),
         other => builder.extra.push(other.to_owned()),
     }
     Ok(())
+}
+
+fn parse_flag_value<'a>(
+    flag: &str,
+    iter: &mut impl Iterator<Item = &'a String>,
+) -> Result<String, DispatchError> {
+    let error = || DispatchError::invalid_arguments(format!("{flag} requires a value"));
+    let value = iter.next().ok_or_else(error)?;
+    if value.starts_with("--") {
+        return Err(error());
+    }
+    Ok(value.clone())
 }
 
 #[cfg(test)]
@@ -125,6 +109,22 @@ mod tests {
             String::from("--refactoring"),
             String::from("rename"),
             String::from("--file"),
+        ];
+
+        let error = parse_refactor_args(&args).expect_err("parse should fail");
+        assert!(matches!(
+            error,
+            crate::dispatch::errors::DispatchError::InvalidArguments { .. }
+        ));
+    }
+
+    #[test]
+    fn flag_as_value_is_rejected() {
+        let args = vec![
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("--provider"),
         ];
 
         let error = parse_refactor_args(&args).expect_err("parse should fail");

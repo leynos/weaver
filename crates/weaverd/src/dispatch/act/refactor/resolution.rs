@@ -152,6 +152,27 @@ impl<'a> ResolutionRequest<'a> {
             explicit_provider,
         }
     }
+
+    /// Returns the requested capability.
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) const fn capability(self) -> CapabilityId {
+        self.capability
+    }
+
+    /// Returns the target file path used for language inference.
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) const fn target_file(self) -> &'a Path {
+        self.target_file
+    }
+
+    /// Returns the explicit provider override supplied by the operator.
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) const fn explicit_provider(self) -> Option<&'a str> {
+        self.explicit_provider
+    }
 }
 
 /// Resolves a provider from the registry using the built-in rename policy.
