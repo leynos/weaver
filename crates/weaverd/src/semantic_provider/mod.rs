@@ -69,6 +69,17 @@ impl SemanticBackendProvider {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn with_lsp_host_for_tests(
+        capability_matrix: CapabilityMatrix,
+        lsp_host: LspHost,
+    ) -> Self {
+        Self {
+            capability_matrix,
+            lsp_host: Mutex::new(Some(lsp_host)),
+        }
+    }
+
     /// Executes a closure with a reference to the initialized LSP host.
     ///
     /// Returns `Ok(None)` if the host has not been started, or

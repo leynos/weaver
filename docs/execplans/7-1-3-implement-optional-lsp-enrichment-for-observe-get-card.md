@@ -40,9 +40,10 @@ Observable behaviour after implementation:
 
 1. The public JSON schema of `SymbolCard`, `LspInfo`, `GetCardResponse`,
    `DetailLevel`, and `Provenance` defined in `crates/weaver-cards/src/` is
-   already locked from roadmap 7.1.1. The `LspInfo` struct already has the
-   correct shape (`hover`, `type_info`, `deprecated`, `source`). This task must
-   populate it, not redesign it.
+   already locked from roadmap 7.1.1. The `LspInfo` Rust struct already has the
+   correct field shape (`hover`, `type_info`, `deprecated`, `source`) and
+   serializes `type_info` as JSON key `"type"`. This task must populate it, not
+   redesign it.
 2. The workspace enforces strict linting: `unwrap_used`, `expect_used`,
    `indexing_slicing`, `string_slice`, `allow_attributes`, `missing_docs`,
    `missing_const_for_fn`, `cognitive_complexity`, and the 400-line file limit
@@ -288,7 +289,7 @@ function:
 /// supports hover, this function calls `textDocument/hover` at the
 /// card's symbol position and populates the `lsp` field. When LSP
 /// is unavailable, the card is returned unchanged.
-pub fn try_lsp_enrichment<P: BackendProvider>(
+pub fn try_lsp_enrichment(
     card: &mut SymbolCard,
     backends: &mut FusionBackends<SemanticBackendProvider>,
 ) -> EnrichmentOutcome

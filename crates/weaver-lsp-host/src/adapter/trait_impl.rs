@@ -6,8 +6,8 @@ use lsp_types::{
     CallHierarchyPrepareParams, ClientCapabilities, Diagnostic, DidChangeTextDocumentParams,
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentDiagnosticParams,
     DocumentDiagnosticReport, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams,
-    InitializeParams, InitializeResult, InitializedParams, ReferenceParams,
-    TextDocumentClientCapabilities, TextDocumentIdentifier, Uri,
+    HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams,
+    ReferenceParams, TextDocumentClientCapabilities, TextDocumentIdentifier, Uri,
 };
 use tracing::debug;
 
@@ -63,7 +63,7 @@ impl LanguageServer for ProcessLanguageServer {
         let references_supported = caps.references_provider.is_some();
         let diagnostics_supported = caps.diagnostic_provider.is_some();
         let call_hierarchy_supported = caps.call_hierarchy_provider.is_some();
-        let hover_supported = caps.hover_provider.is_some();
+        let hover_supported = supports_hover(&caps.hover_provider);
 
         debug!(
             target: ADAPTER_TARGET,
@@ -180,5 +180,42 @@ impl LanguageServer for ProcessLanguageServer {
     fn hover(&mut self, params: HoverParams) -> Result<Option<Hover>, LanguageServerError> {
         self.send_request_optional("textDocument/hover", params)
             .map_err(|e| LanguageServerError::with_source("hover request failed", e))
+    }
+}
+
+fn supports_hover(capability: &Option<HoverProviderCapability>) -> bool {
+    matches!(
+        capability,
+        Some(HoverProviderCapability::Simple(true)) | Some(HoverProviderCapability::Options(_))
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use lsp_types::{HoverOptions, WorkDoneProgressOptions};
+
+    use super::*;
+
+    #[test]
+    fn explicit_false_hover_capability_is_not_treated_as_supported() {
+        assert!(!supports_hover(&Some(HoverProviderCapability::Simple(
+            false
+        ))));
+    }
+
+    #[test]
+    fn explicit_true_hover_capability_is_treated_as_supported() {
+        assert!(supports_hover(&Some(HoverProviderCapability::Simple(true))));
+    }
+
+    #[test]
+    fn hover_options_are_treated_as_supported() {
+        assert!(supports_hover(&Some(HoverProviderCapability::Options(
+            HoverOptions {
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: Some(true),
+                },
+            },
+        ))));
     }
 }

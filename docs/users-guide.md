@@ -370,9 +370,13 @@ Current capability keys used for Language Server Protocol (LSP)-backed
 operations:
 
 - `observe.get-definition`
+- `observe.get-card-hover`
 - `observe.find-references`
 - `observe.call-hierarchy`
 - `verify.diagnostics`
+
+`observe.get-card-hover` controls whether `observe get-card --detail semantic`
+may route `textDocument/hover` requests for LSP enrichment.
 
 Syntactic operations provided by `weaver-syntax` use the same domain/operation
 shape (`observe grep` and `act apply-rewrite`) once they are wired into the
