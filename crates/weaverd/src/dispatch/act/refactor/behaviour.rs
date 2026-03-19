@@ -1,6 +1,6 @@
 //! Behavioural tests for the `act refactor` handler.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
@@ -137,13 +137,13 @@ impl RefactorPluginRuntime for StubRuntime {
 
         match self.execution {
             RuntimeMode::DiffSuccess => Ok(PluginResponse::success(PluginOutput::Diff {
-                content: routed_diff_for(&relative_path),
+                content: routed_diff_for(Path::new(&relative_path)),
             })),
             RuntimeMode::RuntimeError => Err(PluginError::NotFound {
                 name: String::from("rope"),
             }),
             RuntimeMode::MalformedDiff => Ok(PluginResponse::success(PluginOutput::Diff {
-                content: routed_malformed_diff_for(&relative_path),
+                content: routed_malformed_diff_for(Path::new(&relative_path)),
             })),
         }
     }
@@ -194,10 +194,14 @@ impl RefactorWorld {
     }
 
     fn prepare_routed_fixture(&self, target_file: &str) {
-        self.write_file(target_file, original_content_for(target_file));
-        let patch_path = routed_patch_path(target_file);
-        if patch_path != target_file {
-            self.write_file(patch_path, original_content_for(target_file));
+        let target_path = Path::new(target_file);
+        self.write_file(target_file, original_content_for(target_path));
+        let patch_path = routed_patch_path(target_path);
+        if patch_path != target_path {
+            self.write_file(
+                patch_path.to_str().expect("valid UTF-8 path"),
+                original_content_for(target_path),
+            );
         }
     }
 
@@ -238,7 +242,7 @@ fn world() -> RefactorWorld {
 #[given("a workspace file for refactoring")]
 fn given_workspace_file(world: &mut RefactorWorld) {
     let target_file = world.target_file();
-    world.write_file(&target_file, original_content_for(&target_file));
+    world.write_file(&target_file, original_content_for(Path::new(&target_file)));
 }
 
 #[given("a valid auto-routed act refactor request resolved to rope")]
@@ -302,17 +306,19 @@ fn then_refactor_fails_status_one(world: &mut RefactorWorld) {
 #[then("the target file is updated")]
 fn then_target_file_updated(world: &mut RefactorWorld) {
     let target_file = world.target_file();
-    let patch_target = routed_patch_path(&target_file);
-    let updated = world.read_file(patch_target);
-    assert_eq!(updated, updated_content_for(&target_file));
+    let target_path = Path::new(&target_file);
+    let patch_target = routed_patch_path(target_path);
+    let updated = world.read_file(patch_target.to_str().expect("valid UTF-8 path"));
+    assert_eq!(updated, updated_content_for(target_path));
 }
 
 #[then("the target file is unchanged")]
 fn then_target_file_unchanged(world: &mut RefactorWorld) {
     let target_file = world.target_file();
-    let patch_target = routed_patch_path(&target_file);
-    let updated = world.read_file(patch_target);
-    assert_eq!(updated, original_content_for(&target_file));
+    let target_path = Path::new(&target_file);
+    let patch_target = routed_patch_path(target_path);
+    let updated = world.read_file(patch_target.to_str().expect("valid UTF-8 path"));
+    assert_eq!(updated, original_content_for(target_path));
 }
 
 #[then("the stderr stream contains {text}")]

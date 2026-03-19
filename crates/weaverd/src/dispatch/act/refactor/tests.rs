@@ -83,6 +83,42 @@ fn build_backends(socket_path: &Path) -> FusionBackends<SemanticBackendProvider>
     FusionBackends::new(config, provider)
 }
 
+fn run_rename_handle(
+    socket_dir: &TempDir,
+    file: &str,
+    resolution: MockResolution,
+    result: MockRuntimeResult,
+) -> (i32, String) {
+    let workspace = TempDir::new().expect("workspace");
+    std::fs::write(workspace.path().join(file), "hello\n").expect("write");
+
+    let request = command_request(vec![
+        String::from("--refactoring"),
+        String::from("rename"),
+        String::from("--file"),
+        String::from(file),
+    ]);
+    let runtime = MockRuntime { resolution, result };
+    let socket_path = socket_dir.path().join("socket.sock");
+    let mut backends = build_backends(&socket_path);
+    let mut output = Vec::new();
+    let mut writer = ResponseWriter::new(&mut output);
+
+    let dispatch_result = handle(
+        &request,
+        &mut writer,
+        RefactorContext {
+            backends: &mut backends,
+            workspace_root: workspace.path(),
+            runtime: &runtime,
+        },
+    )
+    .expect("dispatch result");
+
+    let stderr = String::from_utf8(output).expect("stderr utf8");
+    (dispatch_result.status, stderr)
+}
+
 fn automatic_selection(provider: &str, language: &str) -> CapabilityResolutionEnvelope {
     CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
         capability: weaver_plugins::CapabilityId::RenameSymbol,
@@ -102,37 +138,14 @@ fn automatic_selection(provider: &str, language: &str) -> CapabilityResolutionEn
 
 #[rstest]
 fn handle_runtime_error_returns_status_one(socket_dir: TempDir) {
-    let workspace = TempDir::new().expect("workspace");
-    std::fs::write(workspace.path().join("notes.py"), "hello\n").expect("write");
+    let (status, stderr) = run_rename_handle(
+        &socket_dir,
+        "notes.py",
+        MockResolution::Success(automatic_selection("rope", "python")),
+        MockRuntimeResult::NotFound(String::from("rope")),
+    );
 
-    let request = command_request(vec![
-        String::from("--refactoring"),
-        String::from("rename"),
-        String::from("--file"),
-        String::from("notes.py"),
-    ]);
-    let runtime = MockRuntime {
-        resolution: MockResolution::Success(automatic_selection("rope", "python")),
-        result: MockRuntimeResult::NotFound(String::from("rope")),
-    };
-    let socket_path = socket_dir.path().join("socket.sock");
-    let mut backends = build_backends(&socket_path);
-    let mut output = Vec::new();
-    let mut writer = ResponseWriter::new(&mut output);
-
-    let result = handle(
-        &request,
-        &mut writer,
-        RefactorContext {
-            backends: &mut backends,
-            workspace_root: workspace.path(),
-            runtime: &runtime,
-        },
-    )
-    .expect("dispatch result");
-
-    assert_eq!(result.status, 1);
-    let stderr = String::from_utf8(output).expect("stderr utf8");
+    assert_eq!(status, 1);
     assert!(stderr.contains("CapabilityResolution"));
     assert!(stderr.contains("act refactor failed"));
 }
@@ -287,37 +300,14 @@ fn handle_returns_error_for_unsupported_refactoring(socket_dir: TempDir) {
 
 #[rstest]
 fn handle_exits_with_error_when_resolution_fails(socket_dir: TempDir) {
-    let workspace = TempDir::new().expect("workspace");
-    std::fs::write(workspace.path().join("notes.py"), "hello\n").expect("write");
+    let (status, stderr) = run_rename_handle(
+        &socket_dir,
+        "notes.py",
+        MockResolution::Error(String::from("bad manifest")),
+        MockRuntimeResult::NotFound(String::from("rope")),
+    );
 
-    let request = command_request(vec![
-        String::from("--refactoring"),
-        String::from("rename"),
-        String::from("--file"),
-        String::from("notes.py"),
-    ]);
-    let runtime = MockRuntime {
-        resolution: MockResolution::Error(String::from("bad manifest")),
-        result: MockRuntimeResult::NotFound(String::from("rope")),
-    };
-    let socket_path = socket_dir.path().join("socket.sock");
-    let mut backends = build_backends(&socket_path);
-    let mut output = Vec::new();
-    let mut writer = ResponseWriter::new(&mut output);
-
-    let result = handle(
-        &request,
-        &mut writer,
-        RefactorContext {
-            backends: &mut backends,
-            workspace_root: workspace.path(),
-            runtime: &runtime,
-        },
-    )
-    .expect("dispatch result");
-
-    assert_eq!(result.status, 1);
-    let stderr = String::from_utf8(output).expect("stderr utf8");
+    assert_eq!(status, 1);
     assert!(
         stderr.contains("act refactor failed"),
         "stderr should contain the generic failure message, got: {stderr}"
@@ -327,16 +317,6 @@ fn handle_exits_with_error_when_resolution_fails(socket_dir: TempDir) {
 #[rstest]
 fn handle_exits_with_error_when_resolution_refused_without_provider(socket_dir: TempDir) {
     use super::resolution::RefusalReason::UnsupportedLanguage;
-
-    let workspace = TempDir::new().expect("workspace");
-    std::fs::write(workspace.path().join("notes.txt"), "hello\n").expect("write");
-
-    let request = command_request(vec![
-        String::from("--refactoring"),
-        String::from("rename"),
-        String::from("--file"),
-        String::from("notes.txt"),
-    ]);
 
     let refused_envelope =
         CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
@@ -350,28 +330,14 @@ fn handle_exits_with_error_when_resolution_refused_without_provider(socket_dir: 
             candidates: Vec::new(),
         });
 
-    let runtime = MockRuntime {
-        resolution: MockResolution::Success(refused_envelope),
-        result: MockRuntimeResult::NotFound(String::from("rope")),
-    };
-    let socket_path = socket_dir.path().join("socket.sock");
-    let mut backends = build_backends(&socket_path);
-    let mut output = Vec::new();
-    let mut writer = ResponseWriter::new(&mut output);
+    let (status, stderr) = run_rename_handle(
+        &socket_dir,
+        "notes.txt",
+        MockResolution::Success(refused_envelope),
+        MockRuntimeResult::NotFound(String::from("rope")),
+    );
 
-    let result = handle(
-        &request,
-        &mut writer,
-        RefactorContext {
-            backends: &mut backends,
-            workspace_root: workspace.path(),
-            runtime: &runtime,
-        },
-    )
-    .expect("dispatch result");
-
-    assert_eq!(result.status, 1);
-    let stderr = String::from_utf8(output).expect("stderr utf8");
+    assert_eq!(status, 1);
     assert!(
         stderr.contains("CapabilityResolution"),
         "stderr should contain the capability resolution envelope, got: {stderr}"

@@ -104,48 +104,46 @@ pub(super) fn rejected_candidate(provider: &str, reason: CandidateReason) -> Can
     }
 }
 
-pub(super) fn format_diff(relative_path: &str, git_header: &str) -> String {
-    let original = original_content_for(relative_path);
-    let updated = updated_content_for(relative_path);
+pub(super) fn format_diff(path: &Path, git_header: &str) -> String {
+    let original = original_content_for(path);
+    let updated = updated_content_for(path);
     format!("{git_header}\n<<<<<<< SEARCH\n{original}=======\n{updated}>>>>>>> REPLACE\n",)
 }
 
-pub(super) fn diff_for(relative_path: &str) -> String {
-    format_diff(
-        relative_path,
-        &format!("diff --git a/{0} b/{0}", relative_path),
-    )
+pub(super) fn diff_for(path: &Path) -> String {
+    let p = path.to_string_lossy();
+    format_diff(path, &format!("diff --git a/{p} b/{p}"))
 }
 
-pub(super) fn malformed_diff_for(relative_path: &str) -> String {
-    format_diff(relative_path, &format!("diff --git a/{0}", relative_path))
+pub(super) fn malformed_diff_for(path: &Path) -> String {
+    let p = path.to_string_lossy();
+    format_diff(path, &format!("diff --git a/{p}"))
 }
 
-pub(super) fn routed_patch_path(relative_path: &str) -> &str {
-    match classify_file(relative_path) {
-        FileKind::Python | FileKind::Rust => "notes.txt",
-        FileKind::Other => relative_path,
+pub(super) fn routed_patch_path(path: &Path) -> &Path {
+    match classify_file(path) {
+        FileKind::Python | FileKind::Rust => Path::new("notes.txt"),
+        FileKind::Other => path,
     }
 }
 
-pub(super) fn routed_diff_for(relative_path: &str) -> String {
-    let patch_path = routed_patch_path(relative_path);
-    if patch_path == relative_path {
-        diff_for(relative_path)
+pub(super) fn routed_diff_for(path: &Path) -> String {
+    let patch_path = routed_patch_path(path);
+    if patch_path == path {
+        diff_for(path)
     } else {
-        format_diff(
-            relative_path,
-            &format!("diff --git a/{0} b/{0}", patch_path),
-        )
+        let p = patch_path.to_string_lossy();
+        format_diff(path, &format!("diff --git a/{p} b/{p}"))
     }
 }
 
-pub(super) fn routed_malformed_diff_for(relative_path: &str) -> String {
-    let patch_path = routed_patch_path(relative_path);
-    if patch_path == relative_path {
-        malformed_diff_for(relative_path)
+pub(super) fn routed_malformed_diff_for(path: &Path) -> String {
+    let patch_path = routed_patch_path(path);
+    if patch_path == path {
+        malformed_diff_for(path)
     } else {
-        format_diff(relative_path, &format!("diff --git a/{0}", patch_path))
+        let p = patch_path.to_string_lossy();
+        format_diff(path, &format!("diff --git a/{p}"))
     }
 }
 
@@ -155,18 +153,16 @@ pub(super) enum FileKind {
     Other,
 }
 
-pub(super) fn classify_file(relative_path: &str) -> FileKind {
-    if relative_path.ends_with(".py") {
-        FileKind::Python
-    } else if relative_path.ends_with(".rs") {
-        FileKind::Rust
-    } else {
-        FileKind::Other
+pub(super) fn classify_file(path: &Path) -> FileKind {
+    match path.extension().and_then(|ext| ext.to_str()) {
+        Some("py") => FileKind::Python,
+        Some("rs") => FileKind::Rust,
+        _ => FileKind::Other,
     }
 }
 
-pub(super) fn original_content_for(relative_path: &str) -> &'static str {
-    match classify_file(relative_path) {
+pub(super) fn original_content_for(path: &Path) -> &'static str {
+    match classify_file(path) {
         FileKind::Python => "old_name = 1\nprint(old_name)\n",
         FileKind::Rust => concat!(
             "fn main() {\n",
@@ -178,8 +174,8 @@ pub(super) fn original_content_for(relative_path: &str) -> &'static str {
     }
 }
 
-pub(super) fn updated_content_for(relative_path: &str) -> &'static str {
-    match classify_file(relative_path) {
+pub(super) fn updated_content_for(path: &Path) -> &'static str {
+    match classify_file(path) {
         FileKind::Python => "woven = 1\nprint(woven)\n",
         FileKind::Rust => concat!(
             "fn main() {\n",

@@ -191,17 +191,17 @@ pub(crate) fn resolve_provider(
     let requested_provider = request.explicit_provider.map(String::from);
 
     let Some(language) = language else {
-        return refused(RefusalDetails {
-            capability: request.capability,
-            language: None,
+        return refused(
+            request.capability,
+            None,
             requested_provider,
             selection_mode,
-            refusal_reason: RefusalReason::UnsupportedLanguage,
-            candidates: candidates
+            RefusalReason::UnsupportedLanguage,
+            candidates
                 .iter()
                 .map(|manifest| rejected_candidate(manifest, CandidateReason::UnsupportedLanguage))
                 .collect(),
-        });
+        );
     };
 
     if let Some(provider_name) = request.explicit_provider {
@@ -254,23 +254,23 @@ fn resolve_explicit_provider(
             candidates: evaluations,
         })
     } else if found_requested {
-        refused(RefusalDetails {
+        refused(
             capability,
-            language: Some(language),
-            requested_provider: Some(String::from(provider_name)),
-            selection_mode: SelectionMode::ExplicitProvider,
-            refusal_reason: RefusalReason::ExplicitProviderMismatch,
-            candidates: evaluations,
-        })
+            Some(language),
+            Some(String::from(provider_name)),
+            SelectionMode::ExplicitProvider,
+            RefusalReason::ExplicitProviderMismatch,
+            evaluations,
+        )
     } else {
-        refused(RefusalDetails {
+        refused(
             capability,
-            language: Some(language),
-            requested_provider: Some(String::from(provider_name)),
-            selection_mode: SelectionMode::ExplicitProvider,
-            refusal_reason: RefusalReason::ProviderNotFound,
-            candidates: evaluations,
-        })
+            Some(language),
+            Some(String::from(provider_name)),
+            SelectionMode::ExplicitProvider,
+            RefusalReason::ProviderNotFound,
+            evaluations,
+        )
     }
 }
 
@@ -286,17 +286,17 @@ fn resolve_automatic_provider(
         .collect();
 
     if matching.is_empty() {
-        return refused(RefusalDetails {
+        return refused(
             capability,
-            language: Some(language),
-            requested_provider: None,
-            selection_mode: SelectionMode::Automatic,
-            refusal_reason: RefusalReason::NoMatchingProvider,
-            candidates: candidates
+            Some(language),
+            None,
+            SelectionMode::Automatic,
+            RefusalReason::NoMatchingProvider,
+            candidates
                 .iter()
                 .map(|manifest| rejected_candidate(manifest, CandidateReason::UnsupportedLanguage))
                 .collect(),
-        });
+        );
     }
 
     // INVARIANT: `matching` is guaranteed non-empty by the early-return guard above.
@@ -332,25 +332,27 @@ fn resolve_automatic_provider(
     })
 }
 
-struct RefusalDetails {
+#[expect(
+    clippy::too_many_arguments,
+    reason = "inline refusal construction per code review; grouping into a struct would re-introduce the removed RefusalDetails/RefusalContext"
+)]
+fn refused(
     capability: CapabilityId,
     language: Option<SupportedLanguage>,
     requested_provider: Option<String>,
     selection_mode: SelectionMode,
     refusal_reason: RefusalReason,
     candidates: Vec<CandidateEvaluation>,
-}
-
-fn refused(details: RefusalDetails) -> CapabilityResolutionEnvelope {
+) -> CapabilityResolutionEnvelope {
     CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
-        capability: details.capability,
-        language: details.language.map(|l| l.as_str().to_owned()),
-        requested_provider: details.requested_provider,
+        capability,
+        language: language.map(|l| l.as_str().to_owned()),
+        requested_provider,
         selected_provider: None,
-        selection_mode: details.selection_mode,
+        selection_mode,
         outcome: ResolutionOutcome::Refused,
-        refusal_reason: Some(details.refusal_reason),
-        candidates: details.candidates,
+        refusal_reason: Some(refusal_reason),
+        candidates,
     })
 }
 
