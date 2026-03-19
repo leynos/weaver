@@ -318,3 +318,49 @@ impl RecordingState {
         self.calls.push(kind);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use lsp_types::{
+        HoverContents, MarkupContent, MarkupKind, Position, TextDocumentIdentifier,
+        TextDocumentPositionParams,
+    };
+
+    use super::*;
+
+    #[test]
+    fn records_and_returns_hover_calls() {
+        let expected_hover = Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: String::from("```rust\nfn greet()\n```"),
+            }),
+            range: None,
+        };
+        let responses = ResponseSet {
+            hover: Some(expected_hover.clone()),
+            ..ResponseSet::default()
+        };
+        let mut server = RecordingLanguageServer::new(
+            ServerCapabilitySet::new(false, false, false).with_hover(true),
+            responses,
+        );
+        let handle = server.handle();
+
+        server.initialize().expect("server should initialise");
+        let hover = server
+            .hover(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier {
+                        uri: "file:///test.rs".parse().expect("uri should parse"),
+                    },
+                    position: Position::new(0, 0),
+                },
+                work_done_progress_params: Default::default(),
+            })
+            .expect("hover should succeed");
+
+        assert_eq!(hover, Some(expected_hover));
+        assert_eq!(handle.calls(), vec![CallKind::Initialise, CallKind::Hover]);
+    }
+}

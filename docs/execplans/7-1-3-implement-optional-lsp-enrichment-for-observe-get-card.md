@@ -15,10 +15,11 @@ repository root.
 After this change, `weaver observe get-card --detail semantic` will enrich the
 Tree-sitter-only symbol card with hover documentation, resolved type
 information, and deprecation status obtained from the language server via the
-`textDocument/hover` LSP request. When the LSP is unavailable (no registered
-server, capability denied, or server error), the card degrades gracefully to
-the Tree-sitter-only extraction and records explicit provenance so consumers
-know the semantic tier was requested but not fulfilled.
+`textDocument/hover` Language Server Protocol (LSP) request. When the LSP is
+unavailable (no registered server, capability denied, or server error), the
+card degrades gracefully to the Tree-sitter-only extraction and records
+explicit provenance so consumers know the semantic tier was requested but not
+fulfilled.
 
 Observable behaviour after implementation:
 
@@ -82,11 +83,12 @@ Observable behaviour after implementation:
   content as a single string; type extraction is best-effort from the hover
   text. Defer structured type resolution to a future milestone.
 
-- Risk: The BDD test harness creates a `SemanticBackendProvider` but does not
-  register real language servers, so LSP enrichment cannot be exercised in BDD
-  tests without mocking. Severity: low. Likelihood: high. Mitigation: BDD tests
-  verify the degraded path (LSP unavailable). Unit tests in `get_card.rs` use
-  mock backends to verify the enriched path.
+- Risk: The behaviour-driven development (BDD) test harness creates a
+  `SemanticBackendProvider` but does not register real language servers, so LSP
+  enrichment cannot be exercised in BDD tests without mocking. Severity: low.
+  Likelihood: high. Mitigation: BDD tests verify the degraded path (LSP
+  unavailable). Unit tests in `get_card.rs` use an injected `LspHost` with stub
+  language servers to verify the enriched path.
 
 - Risk: File size limits. `get_card.rs` is currently 297 lines and
   `host.rs` is 366 lines. Adding enrichment logic may push past 400. Severity:
@@ -471,7 +473,7 @@ All steps are additive and can be re-run. If any stage fails, fix the issue and
 re-run the stage's validation. The change does not modify any existing
 serialised data or persistent state.
 
-## Artifacts and notes
+## Artefacts and notes
 
 The `observe get-definition` handler at
 `crates/weaverd/src/dispatch/observe/get_definition.rs` is the reference

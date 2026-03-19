@@ -115,6 +115,21 @@ fn detects_deprecation_in_hover_text() {
 }
 
 #[test]
+fn ignores_unstructured_deprecated_mentions_in_hover_text() {
+    let hover = Hover {
+        contents: HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: String::from("See deprecated alternatives in the migration guide."),
+        }),
+        range: None,
+    };
+
+    let info = parse_hover_response(&hover);
+
+    assert!(!info.deprecated);
+}
+
+#[test]
 fn handles_empty_hover_contents() {
     let hover = Hover {
         contents: HoverContents::Array(vec![]),

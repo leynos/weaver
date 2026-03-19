@@ -39,7 +39,14 @@ pub fn try_lsp_enrichment(
 ) -> EnrichmentOutcome {
     let language = match to_lsp_language(card.symbol.symbol_ref.language) {
         Some(lang) => lang,
-        None => return EnrichmentOutcome::Degraded,
+        None => {
+            debug!(
+                target: DISPATCH_TARGET,
+                card_language = ?card.symbol.symbol_ref.language,
+                "LSP enrichment degraded: card language cannot be mapped to an LSP host language"
+            );
+            return EnrichmentOutcome::Degraded;
+        }
     };
 
     if backends.ensure_started(BackendKind::Semantic).is_err() {
@@ -69,33 +76,8 @@ pub fn try_lsp_enrichment(
         work_done_progress_params: Default::default(),
     };
 
-    let hover_result = backends.provider().with_lsp_host_mut(|lsp_host| {
-        if let Err(e) = lsp_host.initialize(language) {
-            debug!(
-                target: DISPATCH_TARGET,
-                language = %language,
-                error = %e,
-                "LSP enrichment degraded: initialization failed"
-            );
-            return None;
-        }
-
-        match lsp_host.hover(language, params) {
-            Ok(hover) => hover,
-            Err(e) => {
-                debug!(
-                    target: DISPATCH_TARGET,
-                    language = %language,
-                    error = %e,
-                    "LSP enrichment degraded: hover request failed"
-                );
-                None
-            }
-        }
-    });
-
-    let hover = match hover_result {
-        Ok(Some(Some(h))) => h,
+    let hover = match get_hover(language, params, backends) {
+        Some(hover) => hover,
         _ => return EnrichmentOutcome::Degraded,
     };
 
@@ -107,8 +89,16 @@ pub fn try_lsp_enrichment(
 /// Extracts structured LSP info from a hover response.
 fn parse_hover_response(hover: &lsp_types::Hover) -> LspInfo {
     let hover_text = extract_hover_text(&hover.contents);
-    let type_info = extract_type_hint(&hover_text);
-    let deprecated = hover_text.to_ascii_lowercase().contains("deprecated");
+    let type_info = hover_text
+        .lines()
+        .find(|line| {
+            let trimmed = line.trim();
+            !trimmed.is_empty() && !trimmed.starts_with("```")
+        })
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let deprecated = hover_text.lines().any(is_deprecation_marker);
 
     LspInfo {
         hover: hover_text,
@@ -131,30 +121,60 @@ fn extract_hover_text(contents: &HoverContents) -> String {
     }
 }
 
-/// Extracts a type hint from hover text as a best-effort heuristic.
-///
-/// Language servers commonly include the type in a fenced code block or as
-/// the first line of the hover. This function returns the first non-empty
-/// line as a rough type hint; structured type resolution is deferred to a
-/// future milestone.
-fn extract_type_hint(hover_text: &str) -> String {
-    hover_text
-        .lines()
-        .find(|line| {
-            let trimmed = line.trim();
-            !trimmed.is_empty() && !trimmed.starts_with("```")
-        })
-        .unwrap_or("")
-        .trim()
-        .to_string()
-}
-
 /// Converts a single `MarkedString` variant to plain text.
 fn marked_string_text(marked: &MarkedString) -> String {
     match marked {
         MarkedString::String(text) => text.clone(),
         MarkedString::LanguageString(lang_str) => lang_str.value.clone(),
     }
+}
+
+fn get_hover(
+    language: Language,
+    params: HoverParams,
+    backends: &mut FusionBackends<SemanticBackendProvider>,
+) -> Option<lsp_types::Hover> {
+    backends
+        .provider()
+        .with_lsp_host_mut(|lsp_host| {
+            if let Err(error) = lsp_host.initialize(language) {
+                debug!(
+                    target: DISPATCH_TARGET,
+                    language = %language,
+                    error = %error,
+                    "LSP enrichment degraded: initialization failed"
+                );
+                return None;
+            }
+
+            match lsp_host.hover(language, params) {
+                Ok(hover) => hover,
+                Err(error) => {
+                    debug!(
+                        target: DISPATCH_TARGET,
+                        language = %language,
+                        error = %error,
+                        "LSP enrichment degraded: hover request failed"
+                    );
+                    None
+                }
+            }
+        })
+        .ok()
+        .flatten()
+        .flatten()
+}
+
+fn is_deprecation_marker(line: &str) -> bool {
+    let trimmed = line.trim();
+    let lower = trimmed.to_ascii_lowercase();
+
+    lower.starts_with("@deprecated")
+        || lower.starts_with("**deprecated**")
+        || lower.starts_with("__deprecated__")
+        || lower.starts_with("deprecated:")
+        || lower.starts_with("deprecated.")
+        || lower.starts_with("deprecated ")
 }
 
 /// Maps a card language to an LSP host language.
