@@ -242,15 +242,13 @@ fn diagnostic_report_single_error_constructor() {
         notes.clone(),
     );
 
-    assert_eq!(report.len(), 1);
-    let diagnostic = report
-        .diagnostics()
-        .first()
-        .expect("single_error should produce a single diagnostic");
-    assert_eq!(diagnostic.code(), DiagnosticCode::ESempaiDslParse);
-    assert_eq!(diagnostic.message(), message);
-    assert_eq!(diagnostic.notes(), &notes);
-    assert!(diagnostic.primary_span().is_some());
+    let expected = ExpectedDiagnostic {
+        code: DiagnosticCode::ESempaiDslParse,
+        has_span: true,
+        message,
+        notes: &notes,
+    };
+    assert_single_diagnostic_report(&report, &expected);
 }
 
 #[test]

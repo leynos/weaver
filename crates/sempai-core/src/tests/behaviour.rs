@@ -28,7 +28,7 @@ fn world() -> TestWorld {
 }
 
 fn parse_diagnostic_code(code: &str) -> DiagnosticCode {
-    let json = format!("\"{code}\"");
+    let json = serde_json::to_string(code).expect("serialise diagnostic code");
     serde_json::from_str(&json).unwrap_or_else(|_| panic!("unrecognised diagnostic code: {code}"))
 }
 
