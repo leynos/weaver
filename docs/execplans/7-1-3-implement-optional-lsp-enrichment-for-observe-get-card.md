@@ -174,6 +174,17 @@ Lessons learned:
    kept both `get_card.rs` (347 lines) and `enrich.rs` (273 lines) comfortably
    within the 400-line budget.
 
+Known limitations:
+
+1. **UTF-16 conversion**: The hover request uses Tree-sitter byte offsets
+   directly for `Position.character` rather than converting to UTF-16 code
+   units as required by LSP. This works correctly for ASCII content but will
+   produce incorrect positions for lines containing multi-byte UTF-8 characters
+   (emoji, CJK characters, etc.). The proper fix requires passing source text
+   through to the enrichment module to perform line-based UTF-16 conversion.
+   This limitation was accepted for 7.1.3 to avoid expanding scope; it should
+   be addressed in a future milestone.
+
 ## Context and orientation
 
 The `observe get-card` operation extracts a structured symbol card for a given
@@ -192,7 +203,8 @@ file position. The operation spans three crates:
   `crates/weaverd/src/dispatch/router.rs` line 199 must be updated to pass
   `backends` so the handler can attempt LSP enrichment.
 
-Key types and locations:
+Key types and locations across the three crates involved in the
+`observe get-card` operation:
 
 | Type                      | File                                              |
 | ------------------------- | ------------------------------------------------- |
@@ -330,8 +342,9 @@ fn parse_hover_response(hover: &lsp_types::Hover) -> LspInfo
 
 Extracts the hover contents as a string (handling `MarkedString`,
 `MarkupContent`, and `Vec<MarkedString>` variants). Type info is extracted as
-best-effort from the hover text. Deprecation is detected by searching for
-`deprecated` in the hover text (case-insensitive).
+best-effort from the hover text. Deprecation is detected by identifying
+structured deprecation markers in the hover payload (such as lines beginning
+with `@deprecated`, `**deprecated**`, or similar marker tokens).
 
 **C2. Register `enrich` module** (`crates/weaverd/src/dispatch/observe/mod.rs`)
 
