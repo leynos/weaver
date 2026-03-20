@@ -126,6 +126,13 @@ struct ExpectedDiagnostic<'a> {
     notes: &'a [String],
 }
 
+struct ExpectedDiagnosticCase {
+    code: DiagnosticCode,
+    primary_span: Option<SourceSpan>,
+    message: &'static str,
+    notes: Vec<String>,
+}
+
 fn assert_single_diagnostic_report(report: &DiagnosticReport, expected: &ExpectedDiagnostic<'_>) {
     assert_eq!(report.len(), 1);
     let first = report
@@ -187,6 +194,8 @@ fn diagnostic_deserializes_legacy_span_alias() {
     let span = deserialized
         .primary_span()
         .expect("legacy span should map to primary span");
+    let expected = SourceSpan::new(1, 3, None);
+    assert_eq!(span, &expected);
     assert_eq!(span.start(), 1);
     assert_eq!(span.end(), 3);
 }
@@ -208,52 +217,51 @@ fn diagnostic_deserialization_rejects_malformed_primary_span_payload() {
     assert!(err.to_string().contains("invalid type"));
 }
 
-#[test]
-fn diagnostic_report_parser_error_constructor_builds_single_diagnostic() {
-    let notes = vec![String::from("check indentation")];
-    let expected = ExpectedDiagnostic {
+#[rstest]
+#[case(
+    DiagnosticReport::parser_error,
+    ExpectedDiagnosticCase {
         code: DiagnosticCode::ESempaiYamlParse,
         primary_span: Some(SourceSpan::new(0, 5, None)),
         message: "invalid yaml",
-        notes: &notes,
-    };
-    assert_report_constructor_builds_single_diagnostic(
-        DiagnosticReport::parser_error,
-        Some(SourceSpan::new(0, 5, None)),
-        &expected,
-    );
-}
-
-#[test]
-fn diagnostic_report_validation_error_constructor_builds_single_diagnostic() {
-    let notes: Vec<String> = vec![];
-    let expected = ExpectedDiagnostic {
+        notes: vec![String::from("check indentation")],
+    }
+)]
+#[case(
+    DiagnosticReport::validation_error,
+    ExpectedDiagnosticCase {
         code: DiagnosticCode::ESempaiSchemaInvalid,
         primary_span: None,
         message: "missing id",
-        notes: &notes,
-    };
-    assert_report_constructor_builds_single_diagnostic(
-        DiagnosticReport::validation_error,
-        None,
-        &expected,
-    );
-}
-
-#[test]
-fn diagnostic_report_single_error_constructor() {
-    let notes = vec![String::from("check syntax")];
-    let expected = ExpectedDiagnostic {
+        notes: vec![],
+    }
+)]
+#[case(
+    DiagnosticReport::single_error,
+    ExpectedDiagnosticCase {
         code: DiagnosticCode::ESempaiDslParse,
         primary_span: Some(SourceSpan::new(10, 15, None)),
         message: "syntax error",
-        notes: &notes,
+        notes: vec![String::from("check syntax")],
+    }
+)]
+fn diagnostic_report_constructors_build_single_diagnostic(
+    #[case] constructor: fn(
+        DiagnosticCode,
+        String,
+        Option<SourceSpan>,
+        Vec<String>,
+    ) -> DiagnosticReport,
+    #[case] expected: ExpectedDiagnosticCase,
+) {
+    let span = expected.primary_span.clone();
+    let borrowed_expected = ExpectedDiagnostic {
+        code: expected.code,
+        primary_span: expected.primary_span,
+        message: expected.message,
+        notes: &expected.notes,
     };
-    assert_report_constructor_builds_single_diagnostic(
-        DiagnosticReport::single_error,
-        Some(SourceSpan::new(10, 15, None)),
-        &expected,
-    );
+    assert_report_constructor_builds_single_diagnostic(constructor, span, &borrowed_expected);
 }
 
 #[test]
