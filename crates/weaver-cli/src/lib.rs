@@ -232,10 +232,10 @@ where
     run_with_loader(args, io, &OrthoConfigLoader)
 }
 
-fn handle_preflight<E: Write>(
+fn handle_preflight<ErrWriter: Write>(
     cli: &Cli,
     split: &ConfigArgumentSplit,
-    stderr: &mut E,
+    stderr: &mut ErrWriter,
     localizer: &dyn Localizer,
 ) -> Result<(), AppError> {
     if cli.is_bare_invocation() && !split.has_config_flags() {

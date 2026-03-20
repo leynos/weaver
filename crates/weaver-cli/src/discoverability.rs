@@ -15,7 +15,7 @@ pub(crate) enum KnownDomain {
 }
 
 impl KnownDomain {
-    pub(crate) fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Observe => "observe",
             Self::Act => "act",
