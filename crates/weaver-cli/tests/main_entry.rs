@@ -42,7 +42,7 @@ fn help_output_lists_all_domains_and_operations() {
         combined.contains("Domains and operations:"),
         "weaver --help output missing header"
     );
-    for (domain, ops) in DOMAIN_OPERATIONS {
+    for (domain, _, ops) in DOMAIN_OPERATIONS {
         assert!(
             combined.contains(domain),
             "weaver --help output missing domain {domain:?}"

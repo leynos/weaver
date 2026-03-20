@@ -20,7 +20,7 @@ fn assert_catalogue_complete(text: &str) {
     // Split into sections on blank lines. Each section after the header
     // starts with a domain heading (e.g. "  observe — …").
     let sections: Vec<&str> = text.split("\n\n").collect();
-    for (domain, operations) in DOMAIN_OPERATIONS {
+    for (domain, _, operations) in DOMAIN_OPERATIONS {
         let section = sections
             .iter()
             .find(|s| s.contains(domain))

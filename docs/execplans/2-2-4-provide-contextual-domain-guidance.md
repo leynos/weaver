@@ -17,9 +17,7 @@ the CLI exits 1 with the generic message
 `the command operation must be provided`. That confirms the invocation is
 incomplete, but it does not help the operator discover the valid operations for
 the chosen domain. The operator must inspect source, remember prior usage, or
-consult external documentation. This is the gap described in
-[Level 2](../ui-gap-analysis.md#level-2--domain-without-operation-weaver-observe)
- and [Level 10e](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes).
+consult external documentation. This is the gap described in [^1] and [^2].
 
 After this change, invoking a known domain without an operation will fail
 client-side with contextual guidance written to standard error. The output must
@@ -100,7 +98,7 @@ with the operation list and hint adapted to the supplied domain.
   Mitigation: move new runtime guidance logic into a dedicated helper module
   and keep the `lib.rs` call site minimal.
 
-- Risk: the acceptance criteria requires a concrete
+- Risk: the acceptance criteria require a concrete
   `weaver <domain> <operation> --help` hint, but operation-specific help is not
   scheduled until roadmap 3.2.4. Today clap treats that form as top-level help,
   not operation-level help. Mitigation: use a deterministic concrete hint now,
@@ -189,7 +187,7 @@ with the operation list and hint adapted to the supplied domain.
 - Decision: list operation names only in the new contextual guidance block.
   Do not add per-operation summaries unless they emerge naturally from an
   existing authoritative catalogue during implementation. Rationale: the
-  acceptance criteria requires complete operation enumeration and one concrete
+  acceptance criteria require complete operation enumeration and one concrete
   hint. Adding descriptive copy would broaden the catalogue surface and
   increase drift risk without being required for acceptance. Date: 2026-03-10.
 
@@ -394,3 +392,6 @@ The implementation is complete only when all of the following are true:
    updated.
 7. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all succeed.
+
+[^1]: [Level 2 — domain without operation (`weaver observe`)](../ui-gap-analysis.md#level-2--domain-without-operation-weaver-observe)
+[^2]: [Level 10 — error messages and exit codes](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
