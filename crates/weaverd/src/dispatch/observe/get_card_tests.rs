@@ -164,7 +164,7 @@ fn handle_returns_semantic_success_with_enrichment_and_rewritten_provenance(temp
             "**Deprecated**: use `welcome` instead"
         )),
     );
-    let mut backends = semantic_backends_with_server(Language::Rust, server);
+    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
 
@@ -199,7 +199,7 @@ fn handle_returns_semantic_success_with_degraded_provenance_when_hover_is_unavai
     let uri = Url::from_file_path(&path).expect("file uri").to_string();
     let request = make_request(&uri, 2, 4, DetailLevel::Semantic);
     let server = StubLanguageServer::missing_hover(ServerCapabilitySet::new(false, false, false));
-    let mut backends = semantic_backends_with_server(Language::Rust, server);
+    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
 

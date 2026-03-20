@@ -82,7 +82,7 @@ fn apply_lsp_enrichment(
         card.provenance
             .sources
             .retain(|s| s != "tree_sitter_degraded_semantic");
-        if !card.provenance.sources.contains(&String::from("lsp_hover")) {
+        if !card.provenance.sources.iter().any(|s| s == "lsp_hover") {
             card.provenance.sources.push(String::from("lsp_hover"));
         }
     }

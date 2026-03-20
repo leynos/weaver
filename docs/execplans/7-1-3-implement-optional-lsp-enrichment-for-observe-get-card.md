@@ -174,16 +174,20 @@ Lessons learned:
    kept both `get_card.rs` (347 lines) and `enrich.rs` (273 lines) comfortably
    within the 400-line budget.
 
-Known limitations:
+Post-implementation improvements (2026-03-20):
 
-1. **UTF-16 conversion**: The hover request uses Tree-sitter byte offsets
-   directly for `Position.character` rather than converting to UTF-16 code
-   units as required by LSP. This works correctly for ASCII content but will
-   produce incorrect positions for lines containing multi-byte UTF-8 characters
-   (emoji, CJK characters, etc.). The proper fix requires passing source text
-   through to the enrichment module to perform line-based UTF-16 conversion.
-   This limitation was accepted for 7.1.3 to avoid expanding scope; it should
-   be addressed in a future milestone.
+1. **UTF-8 position encoding negotiation**: Added UTF-8 encoding preference to
+   the LSP initialize handshake (`ClientCapabilities.general.position_encodings`).
+   When the server agrees to UTF-8 (LSP 3.17+), Tree-sitter byte offsets can be
+   used directly as character offsets, eliminating the UTF-16 conversion issue
+   for the majority of modern language servers. Servers that decline UTF-8
+   negotiation are logged with a debug warning. This change improves correctness
+   for files containing non-ASCII characters without requiring architectural
+   changes to pass source text through the enrichment pipeline.
+
+2. **Allocation optimization**: Replaced `contains(&String::from("lsp_hover"))`
+   with `iter().any(|s| s == "lsp_hover")` in `apply_lsp_enrichment` to avoid
+   allocating a temporary `String` during provenance checks.
 
 ## Context and orientation
 
@@ -194,17 +198,16 @@ file position. The operation spans three crates:
   `DetailLevel`, `Provenance`) and Tree-sitter extraction. The extractor
   currently sets `lsp: None` and records `"tree_sitter_degraded_semantic"` in
   provenance when `detail >= Semantic`.
-- `crates/weaver-lsp-host/` manages per-language LSP servers with capability
-  negotiation. It currently supports four capability kinds (`Definition`,
+- Before 7.1.3, `crates/weaver-lsp-host/` managed per-language LSP servers with
+  capability negotiation and supported four capability kinds (`Definition`,
   `References`, `Diagnostics`, `CallHierarchy`) but not `Hover`.
-- `crates/weaverd/` is the daemon. The handler at
-  `crates/weaverd/src/dispatch/observe/get_card.rs` currently receives only
-  `(request, writer)` — it does not have access to backends. The router at
-  `crates/weaverd/src/dispatch/router.rs` line 199 must be updated to pass
-  `backends` so the handler can attempt LSP enrichment.
+- Before 7.1.3, `crates/weaverd/` is the daemon. The handler at
+  `crates/weaverd/src/dispatch/observe/get_card.rs` only received
+  `(request, writer)` and did not have access to backends. The router at
+  `crates/weaverd/src/dispatch/router.rs` required updating to pass `backends`
+  so the handler could attempt LSP enrichment.
 
-Key types and locations across the three crates involved in the
-`observe get-card` operation:
+**Table:** Key types and locations referenced in this plan
 
 | Type                      | File                                              |
 | ------------------------- | ------------------------------------------------- |

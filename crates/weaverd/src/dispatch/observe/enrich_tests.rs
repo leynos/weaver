@@ -22,7 +22,7 @@ fn try_lsp_enrichment_starts_backend_and_populates_hover_info() {
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         hover,
     );
-    let mut backends = semantic_backends_with_server(Language::Rust, server);
+    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
     let mut card = rust_card();
 
     let outcome = try_lsp_enrichment(&mut card, &mut backends);
@@ -43,10 +43,7 @@ fn try_lsp_enrichment_degrades_when_initialization_fails() {
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         "boom",
     );
-    let mut backends = semantic_backends_with_server(Language::Rust, server);
-    let mut card = rust_card();
-
-    let outcome = try_lsp_enrichment(&mut card, &mut backends);
+    let (outcome, backends, card) = run_enrichment_with_server(server);
 
     assert_eq!(outcome, EnrichmentOutcome::Degraded);
     assert!(backends.is_started(BackendKind::Semantic));
@@ -58,10 +55,19 @@ fn try_lsp_enrichment_degrades_when_hover_is_missing() {
     let server = StubLanguageServer::missing_hover(
         ServerCapabilitySet::new(false, false, false).with_hover(true),
     );
-    let mut backends = semantic_backends_with_server(Language::Rust, server);
-    let mut card = rust_card();
+    let (outcome, _backends, card) = run_enrichment_with_server(server);
 
-    let outcome = try_lsp_enrichment(&mut card, &mut backends);
+    assert_eq!(outcome, EnrichmentOutcome::Degraded);
+    assert!(card.lsp.is_none());
+}
+
+#[test]
+fn try_lsp_enrichment_degrades_when_hover_request_fails() {
+    let server = StubLanguageServer::failing_hover(
+        ServerCapabilitySet::new(false, false, false).with_hover(true),
+        "hover RPC failed",
+    );
+    let (outcome, _backends, card) = run_enrichment_with_server(server);
 
     assert_eq!(outcome, EnrichmentOutcome::Degraded);
     assert!(card.lsp.is_none());
@@ -101,32 +107,15 @@ fn parses_scalar_marked_string_hover() {
 
 #[test]
 fn detects_deprecation_in_hover_text() {
-    let hover = Hover {
-        contents: HoverContents::Markup(MarkupContent {
-            kind: MarkupKind::Markdown,
-            value: String::from("**Deprecated**: use `new_function` instead"),
-        }),
-        range: None,
-    };
-
-    let info = parse_hover_response(&hover);
-
-    assert!(info.deprecated);
+    assert_deprecation("**Deprecated**: use `new_function` instead", true);
 }
 
 #[test]
 fn ignores_unstructured_deprecated_mentions_in_hover_text() {
-    let hover = Hover {
-        contents: HoverContents::Markup(MarkupContent {
-            kind: MarkupKind::Markdown,
-            value: String::from("See deprecated alternatives in the migration guide."),
-        }),
-        range: None,
-    };
-
-    let info = parse_hover_response(&hover);
-
-    assert!(!info.deprecated);
+    assert_deprecation(
+        "See deprecated alternatives in the migration guide.",
+        false,
+    );
 }
 
 #[test]
@@ -170,6 +159,34 @@ fn maps_card_languages_to_lsp() {
         to_lsp_language(CardLanguage::TypeScript),
         Some(Language::TypeScript)
     );
+}
+
+fn assert_deprecation(text: &str, expected: bool) {
+    let hover = Hover {
+        contents: HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: String::from(text),
+        }),
+        range: None,
+    };
+    let info = parse_hover_response(&hover);
+    assert_eq!(
+        info.deprecated, expected,
+        "unexpected deprecation flag for text: {text:?}"
+    );
+}
+
+fn run_enrichment_with_server(
+    server: StubLanguageServer,
+) -> (
+    EnrichmentOutcome,
+    FusionBackends<crate::semantic_provider::SemanticBackendProvider>,
+    SymbolCard,
+) {
+    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
+    let mut card = rust_card();
+    let outcome = try_lsp_enrichment(&mut card, &mut backends);
+    (outcome, backends, card)
 }
 
 fn rust_card() -> SymbolCard {

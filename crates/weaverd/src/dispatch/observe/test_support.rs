@@ -7,6 +7,7 @@ use lsp_types::{
     GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, Location, MarkupContent,
     MarkupKind, ReferenceParams, Uri,
 };
+use tempfile::TempDir;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_lsp_host::{
     Language, LanguageServer, LanguageServerError, LspHost, ServerCapabilitySet,
@@ -50,6 +51,18 @@ impl StubLanguageServer {
             hover: None,
             initialize_error: Some(message.into()),
             hover_error: None,
+        }
+    }
+
+    pub(crate) fn failing_hover(
+        capabilities: ServerCapabilitySet,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            capabilities,
+            hover: None,
+            initialize_error: None,
+            hover_error: Some(message.into()),
         }
     }
 }
@@ -140,7 +153,7 @@ pub(crate) fn markdown_hover(value: &str) -> Hover {
 pub(crate) fn semantic_backends_with_server(
     language: Language,
     server: impl LanguageServer + 'static,
-) -> FusionBackends<SemanticBackendProvider> {
+) -> (FusionBackends<SemanticBackendProvider>, TempDir) {
     let capability_matrix = CapabilityMatrix::default();
     let mut lsp_host = LspHost::new(capability_matrix.clone());
     lsp_host
@@ -149,12 +162,20 @@ pub(crate) fn semantic_backends_with_server(
 
     let provider =
         SemanticBackendProvider::with_lsp_host_for_tests(capability_matrix.clone(), lsp_host);
-    FusionBackends::new(test_config(), provider)
+    let (config, dir) = test_config();
+    (FusionBackends::new(config, provider), dir)
 }
 
-fn test_config() -> Config {
-    Config {
-        daemon_socket: SocketEndpoint::unix("/tmp/weaverd-observe-tests/socket.sock"),
+fn test_config() -> (Config, TempDir) {
+    let dir = TempDir::new().expect("create temp dir");
+    let socket_path = dir
+        .path()
+        .join("socket.sock")
+        .to_string_lossy()
+        .into_owned();
+    let config = Config {
+        daemon_socket: SocketEndpoint::unix(socket_path),
         ..Config::default()
-    }
+    };
+    (config, dir)
 }

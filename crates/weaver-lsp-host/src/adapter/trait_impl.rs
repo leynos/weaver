@@ -5,9 +5,10 @@ use lsp_types::{
     CallHierarchyItem, CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams,
     CallHierarchyPrepareParams, ClientCapabilities, Diagnostic, DidChangeTextDocumentParams,
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentDiagnosticParams,
-    DocumentDiagnosticReport, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams,
-    HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams,
-    ReferenceParams, TextDocumentClientCapabilities, TextDocumentIdentifier, Uri,
+    DocumentDiagnosticReport, GeneralClientCapabilities, GotoDefinitionParams,
+    GotoDefinitionResponse, Hover, HoverParams, HoverProviderCapability, InitializeParams,
+    InitializeResult, InitializedParams, PositionEncodingKind, ReferenceParams,
+    TextDocumentClientCapabilities, TextDocumentIdentifier, Uri,
 };
 use tracing::debug;
 
@@ -37,6 +38,10 @@ impl LanguageServer for ProcessLanguageServer {
         let params = InitializeParams {
             process_id: Some(std::process::id()),
             capabilities: ClientCapabilities {
+                general: Some(GeneralClientCapabilities {
+                    position_encodings: Some(vec![PositionEncodingKind::UTF8]),
+                    ..Default::default()
+                }),
                 text_document: Some(TextDocumentClientCapabilities {
                     call_hierarchy: Some(CallHierarchyClientCapabilities::default()),
                     ..Default::default()
@@ -56,8 +61,21 @@ impl LanguageServer for ProcessLanguageServer {
                 LanguageServerError::with_source("failed to send initialized notification", e)
             })?;
 
-        // Extract capabilities
+        // Verify position encoding negotiation
         let caps = &result.capabilities;
+        let negotiated_encoding = caps.position_encoding.as_ref();
+
+        if negotiated_encoding != Some(&PositionEncodingKind::UTF8) {
+            debug!(
+                target: ADAPTER_TARGET,
+                language = %self.language(),
+                negotiated = ?negotiated_encoding,
+                "server did not agree to UTF-8 position encoding; LSP features requiring \
+                 character offsets will be degraded"
+            );
+        }
+
+        // Extract capabilities
 
         let definition_supported = caps.definition_provider.is_some();
         let references_supported = caps.references_provider.is_some();
