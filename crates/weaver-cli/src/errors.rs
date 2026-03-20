@@ -17,6 +17,8 @@ pub(crate) enum AppError {
     MissingDomain,
     #[error("the command operation must be provided")]
     MissingOperation,
+    #[error("failed to emit bare help: {0}")]
+    EmitBareHelp(io::Error),
     /// Sentinel for bare invocation — help has already been written.
     #[error("bare invocation")]
     BareInvocation,

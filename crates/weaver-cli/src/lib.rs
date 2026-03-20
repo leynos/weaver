@@ -239,12 +239,12 @@ fn handle_preflight<E: Write>(
     localizer: &dyn Localizer,
 ) -> Result<(), AppError> {
     if cli.is_bare_invocation() && !split.has_config_flags() {
-        write_bare_help(stderr, localizer).ok();
+        write_bare_help(stderr, localizer).map_err(AppError::EmitBareHelp)?;
         return Err(AppError::BareInvocation);
     }
     if should_emit_domain_guidance(cli) {
         let raw_domain = cli.domain.as_deref().map(str::trim).unwrap_or_default();
-        let emitted_missing_operation_guidance = match KnownDomain::from_str(raw_domain) {
+        let emitted_missing_operation_guidance = match KnownDomain::try_parse(raw_domain) {
             Some(domain) => {
                 write_missing_operation_guidance(stderr, domain).map_err(AppError::EmitGuidance)?
             }

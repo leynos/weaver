@@ -24,7 +24,7 @@ impl KnownDomain {
     }
 
     /// Resolves a raw string to a known domain, case-insensitively.
-    pub(crate) fn from_str(s: &str) -> Option<Self> {
+    pub(crate) fn try_parse(s: &str) -> Option<Self> {
         match s.trim().to_ascii_lowercase().as_str() {
             "observe" => Some(Self::Observe),
             "act" => Some(Self::Act),
@@ -37,7 +37,8 @@ impl KnownDomain {
         DOMAIN_OPERATIONS
             .iter()
             .find(|(name, _, _)| *name == self.as_str())
-            .map_or(&[], |(_, _, ops)| *ops)
+            .map(|(_, _, ops)| *ops)
+            .unwrap_or_else(|| panic!("missing DOMAIN_OPERATIONS entry for '{}'", self.as_str()))
     }
 }
 
@@ -121,7 +122,7 @@ pub(crate) fn write_unknown_domain_guidance<W: Write>(
     writer: &mut W,
     domain: &str,
 ) -> io::Result<bool> {
-    if KnownDomain::from_str(domain).is_some() {
+    if KnownDomain::try_parse(domain).is_some() {
         return Ok(false);
     }
     let Some((hint_domain, hint_operation)) = first_known_command() else {
@@ -186,9 +187,9 @@ pub(crate) mod fluent_entries {
         localizer.message(&message_id, None, operation)
     }
 
-    fn pad_to(s: &mut String, target: usize) {
-        while s.len() < target {
-            s.push(' ');
+    fn pad_to(s: &mut String, width: usize) {
+        if s.len() < width {
+            s.extend(std::iter::repeat_n(' ', width - s.len()));
         }
     }
 
@@ -216,7 +217,7 @@ pub(crate) mod fluent_entries {
         let header = localizer.message(HEADER.0, None, HEADER.1);
         let mut sections = Vec::new();
         for (domain_str, _, operations) in super::DOMAIN_OPERATIONS {
-            let Some(domain) = super::KnownDomain::from_str(domain_str) else {
+            let Some(domain) = super::KnownDomain::try_parse(domain_str) else {
                 eprintln!("warning: missing heading for domain: {domain_str}");
                 debug_assert!(false, "missing heading for domain: {domain_str}");
                 continue;

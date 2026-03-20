@@ -5,14 +5,17 @@
 //! loading or daemon connectivity.
 
 use std::ffi::OsString;
-use std::io::Cursor;
+use std::io::{self, Cursor, Write};
 use std::process::ExitCode;
 
 use ortho_config::{FluentLocalizer, Localizer, NoOpLocalizer};
 use rstest::rstest;
 
 use crate::localizer::{WEAVER_EN_US, write_bare_help};
-use crate::{AppError, ConfigLoader, IoStreams, run_with_loader};
+use crate::{
+    AppError, Cli, ConfigLoader, IoStreams, handle_preflight, run_with_loader,
+    split_config_arguments,
+};
 use weaver_config::Config;
 
 /// A config loader that panics if called, proving that bare invocation
@@ -143,4 +146,36 @@ fn bare_help_contains_single_help_pointer() {
     let text = render_help(&NoOpLocalizer);
     let count = text.matches("weaver --help").count();
     assert_eq!(count, 1, "expected exactly one --help pointer");
+}
+
+struct FailingWriter;
+
+impl Write for FailingWriter {
+    fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
+        Err(io::Error::other("simulated stderr failure"))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn bare_invocation_propagates_bare_help_write_failures() {
+    let cli = Cli {
+        capabilities: false,
+        output: crate::OutputFormat::Auto,
+        command: None,
+        domain: None,
+        operation: None,
+        arguments: Vec::new(),
+    };
+    let args = vec![OsString::from("weaver")];
+    let split = split_config_arguments(&args);
+    let mut stderr = FailingWriter;
+
+    let error =
+        handle_preflight(&cli, &split, &mut stderr, &NoOpLocalizer).expect_err("write failure");
+
+    assert!(matches!(error, AppError::EmitBareHelp(_)));
 }
