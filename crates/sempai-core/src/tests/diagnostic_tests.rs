@@ -121,7 +121,7 @@ fn parser_and_validator_diagnostics_share_schema_shape() {
 
 struct ExpectedDiagnostic<'a> {
     code: DiagnosticCode,
-    has_span: bool,
+    primary_span: Option<SourceSpan>,
     message: &'a str,
     notes: &'a [String],
 }
@@ -133,7 +133,7 @@ fn assert_single_diagnostic_report(report: &DiagnosticReport, expected: &Expecte
         .first()
         .expect("at least one diagnostic");
     assert_eq!(first.code(), expected.code);
-    assert_eq!(first.primary_span().is_some(), expected.has_span);
+    assert_eq!(first.primary_span(), expected.primary_span.as_ref());
     assert_eq!(first.message(), expected.message);
     assert_eq!(first.notes(), expected.notes);
 }
@@ -213,7 +213,7 @@ fn diagnostic_report_parser_error_constructor_builds_single_diagnostic() {
     let notes = vec![String::from("check indentation")];
     let expected = ExpectedDiagnostic {
         code: DiagnosticCode::ESempaiYamlParse,
-        has_span: true,
+        primary_span: Some(SourceSpan::new(0, 5, None)),
         message: "invalid yaml",
         notes: &notes,
     };
@@ -229,7 +229,7 @@ fn diagnostic_report_validation_error_constructor_builds_single_diagnostic() {
     let notes: Vec<String> = vec![];
     let expected = ExpectedDiagnostic {
         code: DiagnosticCode::ESempaiSchemaInvalid,
-        has_span: false,
+        primary_span: None,
         message: "missing id",
         notes: &notes,
     };
@@ -245,7 +245,7 @@ fn diagnostic_report_single_error_constructor() {
     let notes = vec![String::from("check syntax")];
     let expected = ExpectedDiagnostic {
         code: DiagnosticCode::ESempaiDslParse,
-        has_span: true,
+        primary_span: Some(SourceSpan::new(10, 15, None)),
         message: "syntax error",
         notes: &notes,
     };
