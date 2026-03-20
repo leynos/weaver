@@ -6,6 +6,41 @@
 
 use std::io::{self, Write};
 
+/// A validated, known CLI domain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum KnownDomain {
+    Observe,
+    Act,
+    Verify,
+}
+
+impl KnownDomain {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Observe => "observe",
+            Self::Act => "act",
+            Self::Verify => "verify",
+        }
+    }
+
+    /// Resolves a raw string to a known domain, case-insensitively.
+    pub(crate) fn from_str(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "observe" => Some(Self::Observe),
+            "act" => Some(Self::Act),
+            "verify" => Some(Self::Verify),
+            _ => None,
+        }
+    }
+
+    fn operations(self) -> &'static [&'static str] {
+        DOMAIN_OPERATIONS
+            .iter()
+            .find(|(name, _, _)| *name == self.as_str())
+            .map_or(&[], |(_, _, ops)| *ops)
+    }
+}
+
 /// Canonical domain-to-operation mapping for CLI discoverability features.
 pub const DOMAIN_OPERATIONS: &[(&str, &str, &[&str])] = &[
     (
@@ -39,13 +74,8 @@ pub const DOMAIN_OPERATIONS: &[(&str, &str, &[&str])] = &[
 ];
 
 /// Returns the canonical operation list for a known domain.
-pub(crate) fn operations_for_domain(
-    domain: &str,
-) -> Option<(&'static str, &'static [&'static str])> {
-    DOMAIN_OPERATIONS
-        .iter()
-        .find(|(candidate, _, _)| candidate.eq_ignore_ascii_case(domain))
-        .map(|(candidate, _, operations)| (*candidate, *operations))
+pub(crate) fn operations_for_domain(domain: KnownDomain) -> &'static [&'static str] {
+    domain.operations()
 }
 
 /// Returns the first domain plus its first operation from `DOMAIN_OPERATIONS`.
@@ -63,14 +93,13 @@ fn first_known_command() -> Option<(&'static str, &'static str)> {
 /// supplied domain is not part of the client-side catalogue.
 pub(crate) fn write_missing_operation_guidance<W: Write>(
     writer: &mut W,
-    domain: &str,
+    domain: KnownDomain,
 ) -> io::Result<bool> {
-    let Some((domain, operations)) = operations_for_domain(domain) else {
-        return Ok(false);
-    };
+    let operations = operations_for_domain(domain);
     let Some(hint_operation) = operations.first() else {
         return Ok(false);
     };
+    let domain = domain.as_str();
 
     writeln!(writer, "error: operation required for domain '{domain}'")?;
     writeln!(writer)?;
@@ -92,7 +121,7 @@ pub(crate) fn write_unknown_domain_guidance<W: Write>(
     writer: &mut W,
     domain: &str,
 ) -> io::Result<bool> {
-    if operations_for_domain(domain).is_some() {
+    if KnownDomain::from_str(domain).is_some() {
         return Ok(false);
     }
     let Some((hint_domain, hint_operation)) = first_known_command() else {
@@ -135,25 +164,32 @@ pub(crate) mod fluent_entries {
     pub(in crate::discoverability) const HEADER: (&str, &str) =
         ("weaver-after-help-header", "Domains and operations:");
 
-    fn domain_heading_entry(domain: &str) -> Option<(String, String)> {
-        super::DOMAIN_OPERATIONS
+    fn domain_heading_entry(domain: super::KnownDomain) -> (String, String) {
+        let description = super::DOMAIN_OPERATIONS
             .iter()
-            .find(|(candidate, _, _)| candidate.eq_ignore_ascii_case(domain))
-            .map(|(candidate, description, _)| {
-                (
-                    format!("weaver-after-help-{candidate}-heading"),
-                    format!("{candidate} \u{2014} {description}"),
-                )
-            })
+            .find(|(candidate, _, _)| *candidate == domain.as_str())
+            .map(|(_, description, _)| *description)
+            .unwrap_or_default();
+
+        (
+            format!("weaver-after-help-{}-heading", domain.as_str()),
+            format!("{} \u{2014} {description}", domain.as_str()),
+        )
     }
 
     fn localize_operation(
         localizer: &dyn ortho_config::Localizer,
-        domain: &str,
+        domain: super::KnownDomain,
         operation: &str,
     ) -> String {
-        let message_id = format!("weaver-after-help-{domain}-{operation}");
+        let message_id = format!("weaver-after-help-{}-{operation}", domain.as_str());
         localizer.message(&message_id, None, operation)
+    }
+
+    fn pad_to(s: &mut String, target: usize) {
+        while s.len() < target {
+            s.push(' ');
+        }
     }
 
     fn format_operation_row(operations: &[String]) -> String {
@@ -165,15 +201,11 @@ pub(crate) mod fluent_entries {
             row.push_str(first);
         }
         if let Some(second) = operations.get(1) {
-            while row.len() < SECOND_COLUMN_START {
-                row.push(' ');
-            }
+            pad_to(&mut row, SECOND_COLUMN_START);
             row.push_str(second);
         }
         if let Some(third) = operations.get(2) {
-            while row.len() < THIRD_COLUMN_START {
-                row.push(' ');
-            }
+            pad_to(&mut row, THIRD_COLUMN_START);
             row.push_str(third);
         }
         row
@@ -183,12 +215,13 @@ pub(crate) mod fluent_entries {
     pub(crate) fn render_after_help(localizer: &dyn ortho_config::Localizer) -> String {
         let header = localizer.message(HEADER.0, None, HEADER.1);
         let mut sections = Vec::new();
-        for (domain, _, operations) in super::DOMAIN_OPERATIONS {
-            let Some((heading_id, heading_fallback)) = domain_heading_entry(domain) else {
-                eprintln!("warning: missing heading for domain: {domain}");
-                debug_assert!(false, "missing heading for domain: {domain}");
+        for (domain_str, _, operations) in super::DOMAIN_OPERATIONS {
+            let Some(domain) = super::KnownDomain::from_str(domain_str) else {
+                eprintln!("warning: missing heading for domain: {domain_str}");
+                debug_assert!(false, "missing heading for domain: {domain_str}");
                 continue;
             };
+            let (heading_id, heading_fallback) = domain_heading_entry(domain);
             let heading = localizer.message(&heading_id, None, &heading_fallback);
             let rows = operations
                 .chunks(3)

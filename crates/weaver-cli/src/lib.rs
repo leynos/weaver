@@ -32,6 +32,7 @@ use config::{ConfigArgumentSplit, prepare_cli_arguments, split_config_arguments}
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader};
 pub(crate) use daemon_output::{OutputSettings, read_daemon_messages};
 pub use discoverability::DOMAIN_OPERATIONS;
+use discoverability::KnownDomain;
 use discoverability::should_emit_domain_guidance;
 use discoverability::write_missing_operation_guidance;
 use discoverability::write_unknown_domain_guidance;
@@ -242,9 +243,15 @@ fn handle_preflight<E: Write>(
         return Err(AppError::BareInvocation);
     }
     if should_emit_domain_guidance(cli) {
-        let domain = cli.domain.as_deref().map(str::trim).unwrap_or_default();
-        if write_missing_operation_guidance(stderr, domain).map_err(AppError::EmitGuidance)?
-            || write_unknown_domain_guidance(stderr, domain).map_err(AppError::EmitGuidance)?
+        let raw_domain = cli.domain.as_deref().map(str::trim).unwrap_or_default();
+        let emitted_missing_operation_guidance = match KnownDomain::from_str(raw_domain) {
+            Some(domain) => {
+                write_missing_operation_guidance(stderr, domain).map_err(AppError::EmitGuidance)?
+            }
+            None => false,
+        };
+        if emitted_missing_operation_guidance
+            || write_unknown_domain_guidance(stderr, raw_domain).map_err(AppError::EmitGuidance)?
         {
             return Err(AppError::MissingOperationGuidance);
         }
