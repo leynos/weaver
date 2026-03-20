@@ -40,6 +40,7 @@ use resolution::{CapabilityResolutionEnvelope, ResolutionRequest, resolve_provid
 mod arguments;
 mod manifests;
 mod plugin_paths;
+mod refusal;
 mod resolution;
 
 /// Runtime abstraction for executing refactor plugins.

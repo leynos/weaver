@@ -117,10 +117,7 @@ pub(super) fn routed_patch_path(path: &Path) -> &Path {
     }
 }
 
-fn routed_format_diff(
-    path: &Path,
-    make_header: impl Fn(&str) -> String,
-) -> String {
+fn routed_format_diff(path: &Path, make_header: impl Fn(&str) -> String) -> String {
     let patch_path = routed_patch_path(path);
     format_diff(path, &make_header(&patch_path.to_string_lossy()))
 }
@@ -152,7 +149,7 @@ struct FileContents {
     updated: &'static str,
 }
 
-fn content_table(kind: &FileKind) -> FileContents {
+fn content_table(kind: FileKind) -> FileContents {
     match kind {
         FileKind::Python => FileContents {
             original: "old_name = 1\nprint(old_name)\n",
@@ -180,9 +177,9 @@ fn content_table(kind: &FileKind) -> FileContents {
 }
 
 pub(super) fn original_content_for(path: &Path) -> &'static str {
-    content_table(&classify_file(path)).original
+    content_table(classify_file(path)).original
 }
 
 pub(super) fn updated_content_for(path: &Path) -> &'static str {
-    content_table(&classify_file(path)).updated
+    content_table(classify_file(path)).updated
 }

@@ -12,6 +12,8 @@ use weaver_plugins::capability::CapabilityId;
 use weaver_plugins::manifest::PluginManifest;
 use weaver_syntax::SupportedLanguage;
 
+use super::refusal::{RoutingContext, refused};
+
 /// Stable envelope type written to the daemon output stream.
 pub(crate) const CAPABILITY_RESOLUTION_TYPE: &str = "CapabilityResolution";
 
@@ -192,10 +194,12 @@ pub(crate) fn resolve_provider(
 
     let Some(language) = language else {
         return refused(
-            request.capability,
-            None,
-            requested_provider,
-            selection_mode,
+            RoutingContext {
+                capability: request.capability,
+                language: None,
+                requested_provider,
+                selection_mode,
+            },
             RefusalReason::UnsupportedLanguage,
             candidates
                 .iter()
@@ -205,30 +209,46 @@ pub(crate) fn resolve_provider(
     };
 
     if let Some(provider_name) = request.explicit_provider {
-        return resolve_explicit_provider(request.capability, language, provider_name, candidates);
+        return resolve_explicit_provider(
+            registry,
+            provider_name,
+            ExplicitProviderContext {
+                capability: request.capability,
+                language,
+                candidates: &candidates,
+            },
+        );
     }
 
     resolve_automatic_provider(request.capability, language, candidates)
 }
 
-fn resolve_explicit_provider(
+struct ExplicitProviderContext<'a> {
     capability: CapabilityId,
     language: SupportedLanguage,
-    provider_name: &str,
-    candidates: Vec<&PluginManifest>,
-) -> CapabilityResolutionEnvelope {
-    let mut found_requested = false;
-    let mut selected_provider: Option<String> = None;
-    let mut evaluations = Vec::with_capacity(candidates.len());
+    candidates: &'a [&'a PluginManifest],
+}
 
-    for manifest in candidates {
+fn resolve_explicit_provider(
+    registry: &PluginRegistry,
+    provider_name: &str,
+    context: ExplicitProviderContext<'_>,
+) -> CapabilityResolutionEnvelope {
+    // Check if the provider exists in the registry at all
+    let provider_exists = registry.get(provider_name).is_some();
+
+    let mut found_in_candidates = false;
+    let mut selected_provider: Option<String> = None;
+    let mut evaluations = Vec::with_capacity(context.candidates.len());
+
+    for manifest in context.candidates {
         if manifest.name() != provider_name {
             evaluations.push(rejected_candidate(manifest, CandidateReason::NotRequested));
             continue;
         }
 
-        found_requested = true;
-        if manifest_supports_language(manifest, language) {
+        found_in_candidates = true;
+        if manifest_supports_language(manifest, context.language) {
             selected_provider = Some(String::from(manifest.name()));
             evaluations.push(accepted_candidate(
                 manifest,
@@ -244,8 +264,8 @@ fn resolve_explicit_provider(
 
     if let Some(selected_provider) = selected_provider {
         CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
-            capability,
-            language: Some(String::from(language.as_str())),
+            capability: context.capability,
+            language: Some(String::from(context.language.as_str())),
             requested_provider: Some(String::from(provider_name)),
             selected_provider: Some(selected_provider),
             selection_mode: SelectionMode::ExplicitProvider,
@@ -253,21 +273,39 @@ fn resolve_explicit_provider(
             refusal_reason: None,
             candidates: evaluations,
         })
-    } else if found_requested {
+    } else if found_in_candidates {
+        // Provider exists and provides the capability, but doesn't support the language
         refused(
-            capability,
-            Some(language),
-            Some(String::from(provider_name)),
-            SelectionMode::ExplicitProvider,
+            RoutingContext {
+                capability: context.capability,
+                language: Some(context.language),
+                requested_provider: Some(String::from(provider_name)),
+                selection_mode: SelectionMode::ExplicitProvider,
+            },
+            RefusalReason::ExplicitProviderMismatch,
+            evaluations,
+        )
+    } else if provider_exists {
+        // Provider exists in registry but doesn't provide this capability
+        refused(
+            RoutingContext {
+                capability: context.capability,
+                language: Some(context.language),
+                requested_provider: Some(String::from(provider_name)),
+                selection_mode: SelectionMode::ExplicitProvider,
+            },
             RefusalReason::ExplicitProviderMismatch,
             evaluations,
         )
     } else {
+        // Provider doesn't exist in registry at all
         refused(
-            capability,
-            Some(language),
-            Some(String::from(provider_name)),
-            SelectionMode::ExplicitProvider,
+            RoutingContext {
+                capability: context.capability,
+                language: Some(context.language),
+                requested_provider: Some(String::from(provider_name)),
+                selection_mode: SelectionMode::ExplicitProvider,
+            },
             RefusalReason::ProviderNotFound,
             evaluations,
         )
@@ -287,10 +325,12 @@ fn resolve_automatic_provider(
 
     if matching.is_empty() {
         return refused(
-            capability,
-            Some(language),
-            None,
-            SelectionMode::Automatic,
+            RoutingContext {
+                capability,
+                language: Some(language),
+                requested_provider: None,
+                selection_mode: SelectionMode::Automatic,
+            },
             RefusalReason::NoMatchingProvider,
             candidates
                 .iter()
@@ -329,30 +369,6 @@ fn resolve_automatic_provider(
         outcome: ResolutionOutcome::Selected,
         refusal_reason: None,
         candidates: evaluations,
-    })
-}
-
-#[expect(
-    clippy::too_many_arguments,
-    reason = "inline refusal construction per code review; grouping into a struct would re-introduce the removed RefusalDetails/RefusalContext"
-)]
-fn refused(
-    capability: CapabilityId,
-    language: Option<SupportedLanguage>,
-    requested_provider: Option<String>,
-    selection_mode: SelectionMode,
-    refusal_reason: RefusalReason,
-    candidates: Vec<CandidateEvaluation>,
-) -> CapabilityResolutionEnvelope {
-    CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
-        capability,
-        language: language.map(|l| l.as_str().to_owned()),
-        requested_provider,
-        selected_provider: None,
-        selection_mode,
-        outcome: ResolutionOutcome::Refused,
-        refusal_reason: Some(refusal_reason),
-        candidates,
     })
 }
 

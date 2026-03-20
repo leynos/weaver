@@ -41,7 +41,7 @@ Observable success for the eventual implementation:
   explicit provider exits non-zero with a deterministic structured refusal.
 - JavaScript Object Notation (JSON) mode exposes a machine-readable
   capability-resolution payload that includes at least the requested
-  capability, inferred language, selected or refused provider, policy source,
+  capability, inferred language, selected or refused provider, selection mode,
   and candidate evaluation reasons.
 - Human-readable mode does not degrade into raw JSON noise; any new structured
   routing payload is either rendered cleanly by the command-line interface
@@ -309,23 +309,27 @@ The cleanest additive shape is a dedicated routing event payload, for example:
 
 ```json
 {
-  "type": "capability_resolution",
-  "capability": "rename-symbol",
-  "language": "python",
-  "selected_provider": "rope",
-  "policy_source": "language_default",
-  "candidates": [
-    {
-      "provider": "rope",
-      "accepted": true,
-      "reason": "supports language and capability"
-    },
-    {
-      "provider": "rust-analyzer",
-      "accepted": false,
-      "reason": "unsupported_language"
-    }
-  ]
+  "status": "ok",
+  "type": "CapabilityResolution",
+  "details": {
+    "capability": "rename-symbol",
+    "language": "python",
+    "selected_provider": "rope",
+    "selection_mode": "automatic",
+    "outcome": "selected",
+    "candidates": [
+      {
+        "provider": "rope",
+        "accepted": true,
+        "reason": "matched_language_and_capability"
+      },
+      {
+        "provider": "rust-analyzer",
+        "accepted": false,
+        "reason": "unsupported_language"
+      }
+    ]
+  }
 }
 ```
 

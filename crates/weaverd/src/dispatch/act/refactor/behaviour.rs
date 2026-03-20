@@ -72,17 +72,36 @@ impl RefactorPluginRuntime for StubRuntime {
             SelectionMode::Automatic
         };
 
+        // Automatic routing modes require a valid language
+        let requires_language = matches!(
+            self.routing,
+            RoutingMode::AutomaticPython | RoutingMode::AutomaticRust
+        );
+        if requires_language && language_name.is_none() {
+            return Ok(refused_resolution(RefusedResolution {
+                capability: request.capability(),
+                language: None,
+                requested_provider,
+                selection_mode,
+                refusal_reason: RefusalReason::UnsupportedLanguage,
+                candidates: refused_candidates(
+                    requested_provider,
+                    CandidateReason::UnsupportedLanguage,
+                ),
+            }));
+        }
+
         Ok(match self.routing {
             RoutingMode::AutomaticPython => selected_resolution(SelectedResolution {
                 capability: request.capability(),
-                language: language_name.unwrap_or("python"),
+                language: language_name.expect("language validated above"),
                 provider: "rope",
                 selection_mode,
                 requested_provider,
             }),
             RoutingMode::AutomaticRust => selected_resolution(SelectedResolution {
                 capability: request.capability(),
-                language: language_name.unwrap_or("rust"),
+                language: language_name.expect("language validated above"),
                 provider: "rust-analyzer",
                 selection_mode,
                 requested_provider,
@@ -93,7 +112,10 @@ impl RefactorPluginRuntime for StubRuntime {
                 requested_provider,
                 selection_mode,
                 refusal_reason: RefusalReason::UnsupportedLanguage,
-                candidates: refused_candidates(requested_provider, CandidateReason::UnsupportedLanguage),
+                candidates: refused_candidates(
+                    requested_provider,
+                    CandidateReason::UnsupportedLanguage,
+                ),
             }),
             RoutingMode::ExplicitProviderMismatch => refused_resolution(RefusedResolution {
                 capability: request.capability(),
