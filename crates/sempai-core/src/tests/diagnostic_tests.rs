@@ -138,6 +138,20 @@ fn assert_single_diagnostic_report(report: &DiagnosticReport, expected: &Expecte
     assert_eq!(first.notes(), expected.notes);
 }
 
+fn assert_report_constructor_builds_single_diagnostic(
+    constructor: fn(DiagnosticCode, String, Option<SourceSpan>, Vec<String>) -> DiagnosticReport,
+    span: Option<SourceSpan>,
+    expected: &ExpectedDiagnostic<'_>,
+) {
+    let report = constructor(
+        expected.code,
+        expected.message.to_owned(),
+        span,
+        expected.notes.to_vec(),
+    );
+    assert_single_diagnostic_report(&report, expected);
+}
+
 #[test]
 fn diagnostic_serde_round_trip_uses_primary_span() {
     let diag = Diagnostic::new(
@@ -197,58 +211,49 @@ fn diagnostic_deserialization_rejects_malformed_primary_span_payload() {
 #[test]
 fn diagnostic_report_parser_error_constructor_builds_single_diagnostic() {
     let notes = vec![String::from("check indentation")];
-    let report = DiagnosticReport::parser_error(
-        DiagnosticCode::ESempaiYamlParse,
-        String::from("invalid yaml"),
-        Some(SourceSpan::new(0, 5, None)),
-        notes.clone(),
-    );
     let expected = ExpectedDiagnostic {
         code: DiagnosticCode::ESempaiYamlParse,
         has_span: true,
         message: "invalid yaml",
         notes: &notes,
     };
-    assert_single_diagnostic_report(&report, &expected);
+    assert_report_constructor_builds_single_diagnostic(
+        DiagnosticReport::parser_error,
+        Some(SourceSpan::new(0, 5, None)),
+        &expected,
+    );
 }
 
 #[test]
 fn diagnostic_report_validation_error_constructor_builds_single_diagnostic() {
     let notes: Vec<String> = vec![];
-    let report = DiagnosticReport::validation_error(
-        DiagnosticCode::ESempaiSchemaInvalid,
-        String::from("missing id"),
-        None,
-        notes.clone(),
-    );
     let expected = ExpectedDiagnostic {
         code: DiagnosticCode::ESempaiSchemaInvalid,
         has_span: false,
         message: "missing id",
         notes: &notes,
     };
-    assert_single_diagnostic_report(&report, &expected);
+    assert_report_constructor_builds_single_diagnostic(
+        DiagnosticReport::validation_error,
+        None,
+        &expected,
+    );
 }
 
 #[test]
 fn diagnostic_report_single_error_constructor() {
-    let message = "syntax error";
     let notes = vec![String::from("check syntax")];
-
-    let report = DiagnosticReport::single_error(
-        DiagnosticCode::ESempaiDslParse,
-        String::from(message),
-        Some(SourceSpan::new(10, 15, None)),
-        notes.clone(),
-    );
-
     let expected = ExpectedDiagnostic {
         code: DiagnosticCode::ESempaiDslParse,
         has_span: true,
-        message,
+        message: "syntax error",
         notes: &notes,
     };
-    assert_single_diagnostic_report(&report, &expected);
+    assert_report_constructor_builds_single_diagnostic(
+        DiagnosticReport::single_error,
+        Some(SourceSpan::new(10, 15, None)),
+        &expected,
+    );
 }
 
 #[test]

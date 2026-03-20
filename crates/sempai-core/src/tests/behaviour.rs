@@ -4,7 +4,7 @@ use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
 use crate::test_support::{QuotedString, parse_byte_range, parse_line_range};
-use crate::{DiagnosticCode, DiagnosticReport, Language, Span};
+use crate::{DiagnosticCode, DiagnosticReport, Language, SourceSpan, Span};
 
 // ---------------------------------------------------------------------------
 // Test world
@@ -36,9 +36,26 @@ fn parse_diagnostic_code(code: &str) -> DiagnosticCode {
 // Given steps
 // ---------------------------------------------------------------------------
 
-fn build_single_diagnostic_report(code: &str, message: &str) -> DiagnosticReport {
+fn build_single_diagnostic_report(
+    constructor: fn(DiagnosticCode, String, Option<SourceSpan>, Vec<String>) -> DiagnosticReport,
+    code: &str,
+    message: &str,
+) -> DiagnosticReport {
     let diagnostic_code = parse_diagnostic_code(code);
-    DiagnosticReport::single_error(diagnostic_code, message.to_owned(), None, vec![])
+    constructor(diagnostic_code, message.to_owned(), None, vec![])
+}
+
+fn given_report_with_constructor(
+    world: &mut TestWorld,
+    code: &QuotedString,
+    message: &QuotedString,
+    constructor: fn(DiagnosticCode, String, Option<SourceSpan>, Vec<String>) -> DiagnosticReport,
+) {
+    world.report = Some(build_single_diagnostic_report(
+        constructor,
+        code.as_str(),
+        message.as_str(),
+    ));
 }
 
 #[given("a span from bytes {byte_range} at lines {line_range}")]
@@ -55,30 +72,17 @@ fn given_language(world: &mut TestWorld, name: QuotedString) {
 
 #[given("a diagnostic with code {code} and message {message}")]
 fn given_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedString) {
-    world.report = Some(build_single_diagnostic_report(
-        code.as_str(),
-        message.as_str(),
-    ));
+    given_report_with_constructor(world, &code, &message, DiagnosticReport::single_error);
 }
 
 #[given("a parser diagnostic with code {code} and message {message}")]
 fn given_parser_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedString) {
-    world.report = Some(DiagnosticReport::parser_error(
-        parse_diagnostic_code(code.as_str()),
-        message.as_str().to_owned(),
-        None,
-        vec![],
-    ));
+    given_report_with_constructor(world, &code, &message, DiagnosticReport::parser_error);
 }
 
 #[given("a validator diagnostic with code {code} and message {message}")]
 fn given_validator_diagnostic(world: &mut TestWorld, code: QuotedString, message: QuotedString) {
-    world.report = Some(DiagnosticReport::validation_error(
-        parse_diagnostic_code(code.as_str()),
-        message.as_str().to_owned(),
-        None,
-        vec![],
-    ));
+    given_report_with_constructor(world, &code, &message, DiagnosticReport::validation_error);
 }
 
 #[given("a not-implemented report for feature {feature}")]
