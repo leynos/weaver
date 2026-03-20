@@ -21,6 +21,8 @@ use crate::semantic_provider::SemanticBackendProvider;
 enum MockRuntimeResult {
     Success(PluginResponse),
     NotFound(String),
+    /// Causes execute() to panic if called - use this in tests where execute() must not run.
+    Panic,
 }
 
 enum MockResolution {
@@ -54,6 +56,9 @@ impl RefactorPluginRuntime for MockRuntime {
         match &self.result {
             MockRuntimeResult::Success(response) => Ok(response.clone()),
             MockRuntimeResult::NotFound(name) => Err(PluginError::NotFound { name: name.clone() }),
+            MockRuntimeResult::Panic => {
+                panic!("MockRuntime::execute() was called when it should not have been")
+            }
         }
     }
 }
@@ -304,7 +309,7 @@ fn handle_exits_with_error_when_resolution_fails(socket_dir: TempDir) {
         &socket_dir,
         "notes.py",
         MockResolution::Error(String::from("bad manifest")),
-        MockRuntimeResult::NotFound(String::from("rope")),
+        MockRuntimeResult::Panic,
     );
 
     assert_eq!(status, 1);
@@ -334,7 +339,7 @@ fn handle_exits_with_error_when_resolution_refused_without_provider(socket_dir: 
         &socket_dir,
         "notes.txt",
         MockResolution::Success(refused_envelope),
-        MockRuntimeResult::NotFound(String::from("rope")),
+        MockRuntimeResult::Panic,
     );
 
     assert_eq!(status, 1);

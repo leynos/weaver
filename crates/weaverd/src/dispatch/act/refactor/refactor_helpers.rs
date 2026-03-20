@@ -104,20 +104,10 @@ pub(super) fn rejected_candidate(provider: &str, reason: CandidateReason) -> Can
     }
 }
 
-pub(super) fn format_diff(path: &Path, git_header: &str) -> String {
+fn format_diff(path: &Path, git_header: &str) -> String {
     let original = original_content_for(path);
     let updated = updated_content_for(path);
     format!("{git_header}\n<<<<<<< SEARCH\n{original}=======\n{updated}>>>>>>> REPLACE\n",)
-}
-
-pub(super) fn diff_for(path: &Path) -> String {
-    let p = path.to_string_lossy();
-    format_diff(path, &format!("diff --git a/{p} b/{p}"))
-}
-
-pub(super) fn malformed_diff_for(path: &Path) -> String {
-    let p = path.to_string_lossy();
-    format_diff(path, &format!("diff --git a/{p}"))
 }
 
 pub(super) fn routed_patch_path(path: &Path) -> &Path {
@@ -127,24 +117,20 @@ pub(super) fn routed_patch_path(path: &Path) -> &Path {
     }
 }
 
-pub(super) fn routed_diff_for(path: &Path) -> String {
+fn routed_format_diff(
+    path: &Path,
+    make_header: impl Fn(&str) -> String,
+) -> String {
     let patch_path = routed_patch_path(path);
-    if patch_path == path {
-        diff_for(path)
-    } else {
-        let p = patch_path.to_string_lossy();
-        format_diff(path, &format!("diff --git a/{p} b/{p}"))
-    }
+    format_diff(path, &make_header(&patch_path.to_string_lossy()))
+}
+
+pub(super) fn routed_diff_for(path: &Path) -> String {
+    routed_format_diff(path, |p| format!("diff --git a/{p} b/{p}"))
 }
 
 pub(super) fn routed_malformed_diff_for(path: &Path) -> String {
-    let patch_path = routed_patch_path(path);
-    if patch_path == path {
-        malformed_diff_for(path)
-    } else {
-        let p = patch_path.to_string_lossy();
-        format_diff(path, &format!("diff --git a/{p}"))
-    }
+    routed_format_diff(path, |p| format!("diff --git a/{p}"))
 }
 
 pub(super) enum FileKind {
@@ -161,28 +147,42 @@ pub(super) fn classify_file(path: &Path) -> FileKind {
     }
 }
 
-pub(super) fn original_content_for(path: &Path) -> &'static str {
-    match classify_file(path) {
-        FileKind::Python => "old_name = 1\nprint(old_name)\n",
-        FileKind::Rust => concat!(
-            "fn main() {\n",
-            "    let old_name = 1;\n",
-            "    println!(\"{}\", old_name);\n",
-            "}\n",
-        ),
-        FileKind::Other => "hello world\n",
+struct FileContents {
+    original: &'static str,
+    updated: &'static str,
+}
+
+fn content_table(kind: &FileKind) -> FileContents {
+    match kind {
+        FileKind::Python => FileContents {
+            original: "old_name = 1\nprint(old_name)\n",
+            updated: "woven = 1\nprint(woven)\n",
+        },
+        FileKind::Rust => FileContents {
+            original: concat!(
+                "fn main() {\n",
+                "    let old_name = 1;\n",
+                "    println!(\"{}\", old_name);\n",
+                "}\n",
+            ),
+            updated: concat!(
+                "fn main() {\n",
+                "    let woven = 1;\n",
+                "    println!(\"{}\", woven);\n",
+                "}\n",
+            ),
+        },
+        FileKind::Other => FileContents {
+            original: "hello world\n",
+            updated: "hello woven\n",
+        },
     }
 }
 
+pub(super) fn original_content_for(path: &Path) -> &'static str {
+    content_table(&classify_file(path)).original
+}
+
 pub(super) fn updated_content_for(path: &Path) -> &'static str {
-    match classify_file(path) {
-        FileKind::Python => "woven = 1\nprint(woven)\n",
-        FileKind::Rust => concat!(
-            "fn main() {\n",
-            "    let woven = 1;\n",
-            "    println!(\"{}\", woven);\n",
-            "}\n",
-        ),
-        FileKind::Other => "hello woven\n",
-    }
+    content_table(&classify_file(path)).updated
 }

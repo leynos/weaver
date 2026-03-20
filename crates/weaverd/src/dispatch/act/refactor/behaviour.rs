@@ -9,7 +9,8 @@ use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 use weaver_syntax::SupportedLanguage;
 
 use super::resolution::{
-    CandidateReason, CapabilityResolutionEnvelope, RefusalReason, ResolutionRequest, SelectionMode,
+    CandidateEvaluation, CandidateReason, CapabilityResolutionEnvelope, RefusalReason,
+    ResolutionRequest, SelectionMode,
 };
 use super::*;
 
@@ -38,6 +39,23 @@ enum RoutingMode {
 struct StubRuntime {
     routing: RoutingMode,
     execution: RuntimeMode,
+}
+
+fn refused_candidates(
+    requested_provider: Option<&str>,
+    default_reason: CandidateReason,
+) -> Vec<CandidateEvaluation> {
+    ["rope", "rust-analyzer"]
+        .iter()
+        .map(|&p| {
+            let reason = if requested_provider == Some(p) {
+                CandidateReason::ExplicitProviderMismatch
+            } else {
+                default_reason
+            };
+            rejected_candidate(p, reason)
+        })
+        .collect()
 }
 
 impl RefactorPluginRuntime for StubRuntime {
@@ -75,24 +93,7 @@ impl RefactorPluginRuntime for StubRuntime {
                 requested_provider,
                 selection_mode,
                 refusal_reason: RefusalReason::UnsupportedLanguage,
-                candidates: vec![
-                    rejected_candidate(
-                        "rope",
-                        if requested_provider == Some("rope") {
-                            CandidateReason::ExplicitProviderMismatch
-                        } else {
-                            CandidateReason::UnsupportedLanguage
-                        },
-                    ),
-                    rejected_candidate(
-                        "rust-analyzer",
-                        if requested_provider == Some("rust-analyzer") {
-                            CandidateReason::ExplicitProviderMismatch
-                        } else {
-                            CandidateReason::UnsupportedLanguage
-                        },
-                    ),
-                ],
+                candidates: refused_candidates(requested_provider, CandidateReason::UnsupportedLanguage),
             }),
             RoutingMode::ExplicitProviderMismatch => refused_resolution(RefusedResolution {
                 capability: request.capability(),
@@ -100,24 +101,7 @@ impl RefactorPluginRuntime for StubRuntime {
                 requested_provider,
                 selection_mode,
                 refusal_reason: RefusalReason::ExplicitProviderMismatch,
-                candidates: vec![
-                    rejected_candidate(
-                        "rope",
-                        if requested_provider == Some("rope") {
-                            CandidateReason::ExplicitProviderMismatch
-                        } else {
-                            CandidateReason::NotRequested
-                        },
-                    ),
-                    rejected_candidate(
-                        "rust-analyzer",
-                        if requested_provider == Some("rust-analyzer") {
-                            CandidateReason::ExplicitProviderMismatch
-                        } else {
-                            CandidateReason::NotRequested
-                        },
-                    ),
-                ],
+                candidates: refused_candidates(requested_provider, CandidateReason::NotRequested),
             }),
         })
     }
