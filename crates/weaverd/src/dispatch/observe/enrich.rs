@@ -60,7 +60,7 @@ pub fn try_lsp_enrichment(
     let uri_str = &card.symbol.symbol_ref.uri;
     let start = &card.symbol.symbol_ref.range.start;
 
-    let uri = match uri_str.parse() {
+    let uri: lsp_types::Uri = match uri_str.parse() {
         Ok(u) => u,
         Err(error) => {
             debug!(
@@ -73,12 +73,27 @@ pub fn try_lsp_enrichment(
         }
     };
 
+    // Convert byte column offset to UTF-16 code units as required by LSP spec
+    let utf16_character = match compute_utf16_character(&uri, start.line, start.column) {
+        Some(char_offset) => char_offset,
+        None => {
+            debug!(
+                target: DISPATCH_TARGET,
+                uri = uri_str,
+                line = start.line,
+                byte_column = start.column,
+                "LSP enrichment degraded: failed to compute UTF-16 character offset"
+            );
+            return EnrichmentOutcome::Degraded;
+        }
+    };
+
     let params = HoverParams {
         text_document_position_params: TextDocumentPositionParams {
             text_document: TextDocumentIdentifier { uri },
             position: Position {
                 line: start.line,
-                character: start.column,
+                character: utf16_character,
             },
         },
         work_done_progress_params: Default::default(),
@@ -193,6 +208,48 @@ const fn to_lsp_language(card_lang: CardLanguage) -> Option<Language> {
         CardLanguage::TypeScript => Some(Language::TypeScript),
         _ => None,
     }
+}
+
+/// Computes the UTF-16 character offset for a given byte column on a line.
+///
+/// Reads the file at the given URI, extracts the specified line, and converts
+/// the Tree-sitter byte offset to a UTF-16 code unit offset as required by
+/// the LSP specification.
+///
+/// Returns `None` if:
+/// - The URI cannot be converted to a file path
+/// - The file cannot be read
+/// - The line index is out of range
+/// - The byte offset is out of range or not on a char boundary
+fn compute_utf16_character(uri: &lsp_types::Uri, line: u32, byte_column: u32) -> Option<u32> {
+    // Convert lsp_types::Uri to url::Url for file path conversion
+    let url = url::Url::parse(uri.as_str()).ok()?;
+    let path = url.to_file_path().ok()?;
+    let content = std::fs::read_to_string(&path).ok()?;
+    let line_text = content.lines().nth(line as usize)?;
+
+    byte_col_to_utf16(line_text, byte_column)
+}
+
+/// Converts a byte column offset to a UTF-16 code unit offset.
+///
+/// Returns `None` when the offset is out of range or not on a char boundary.
+fn byte_col_to_utf16(line_text: &str, byte_col: u32) -> Option<u32> {
+    let byte_col = byte_col as usize;
+
+    if byte_col > line_text.len() {
+        return None;
+    }
+
+    // Check if the byte offset is on a valid char boundary
+    if !line_text.is_char_boundary(byte_col) {
+        return None;
+    }
+
+    let prefix = &line_text[..byte_col];
+    let utf16_count = prefix.encode_utf16().count() as u32;
+
+    Some(utf16_count)
 }
 
 #[cfg(test)]

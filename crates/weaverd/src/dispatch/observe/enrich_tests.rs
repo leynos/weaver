@@ -1,6 +1,7 @@
 //! Unit tests for `observe::enrich`.
 
 use lsp_types::{Hover, HoverContents, MarkedString, MarkupContent, MarkupKind};
+use std::io::Write;
 use weaver_cards::{
     CardLanguage, Provenance, SourcePosition, SourceRange, SymbolCard, SymbolIdentity, SymbolRef,
 };
@@ -14,6 +15,16 @@ use crate::dispatch::observe::test_support::{
 
 #[test]
 fn try_lsp_enrichment_starts_backend_and_populates_hover_info() {
+    // Create a temporary file for the card URI
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    let file_path = temp_dir.path().join("card.rs");
+    let source = "// comment\nfn greet(name: &str) -> usize { 0 }";
+    {
+        let mut file = std::fs::File::create(&file_path).expect("failed to create test file");
+        file.write_all(source.as_bytes())
+            .expect("failed to write test file");
+    }
+
     let hover = markdown_hover(concat!(
         "```rust\nfn greet(name: &str) -> usize\n```\n",
         "**Deprecated**: use `welcome` instead"
@@ -24,6 +35,7 @@ fn try_lsp_enrichment_starts_backend_and_populates_hover_info() {
     );
     let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
     let mut card = rust_card();
+    card.symbol.symbol_ref.uri = format!("file://{}", file_path.display());
 
     let outcome = try_lsp_enrichment(&mut card, &mut backends);
 
@@ -112,10 +124,7 @@ fn detects_deprecation_in_hover_text() {
 
 #[test]
 fn ignores_unstructured_deprecated_mentions_in_hover_text() {
-    assert_deprecation(
-        "See deprecated alternatives in the migration guide.",
-        false,
-    );
+    assert_deprecation("See deprecated alternatives in the migration guide.", false);
 }
 
 #[test]
@@ -159,6 +168,109 @@ fn maps_card_languages_to_lsp() {
         to_lsp_language(CardLanguage::TypeScript),
         Some(Language::TypeScript)
     );
+}
+
+#[test]
+fn byte_col_to_utf16_converts_ascii_correctly() {
+    let line = "fn foo() {}";
+    assert_eq!(byte_col_to_utf16(line, 0), Some(0));
+    assert_eq!(byte_col_to_utf16(line, 3), Some(3)); // at 'foo'
+    assert_eq!(byte_col_to_utf16(line, 11), Some(11)); // at end
+}
+
+#[test]
+fn byte_col_to_utf16_converts_multibyte_utf8_correctly() {
+    // "// café" — 'é' is 2 bytes in UTF-8 (U+00E9 = 0xC3 0xA9), but 1 UTF-16 code unit
+    // Bytes: 2f 2f 20 63 61 66 c3 a9
+    let line = "// café";
+    assert_eq!(byte_col_to_utf16(line, 0), Some(0)); // at start (before '/')
+    assert_eq!(byte_col_to_utf16(line, 3), Some(3)); // at ' ' (after '//')
+    assert_eq!(byte_col_to_utf16(line, 4), Some(4)); // at 'c'
+    assert_eq!(byte_col_to_utf16(line, 5), Some(5)); // at 'a'
+    assert_eq!(byte_col_to_utf16(line, 6), Some(6)); // at 'f'
+    assert_eq!(byte_col_to_utf16(line, 8), Some(7)); // after 'é' (byte 6-7 is 'é', byte 8 is end)
+}
+
+#[test]
+fn byte_col_to_utf16_converts_emoji_correctly() {
+    // "// 🦀 Rust" — '🦀' is 4 bytes (U+1F980), but 2 UTF-16 code units (surrogate pair)
+    let line = "// 🦀 Rust";
+    assert_eq!(byte_col_to_utf16(line, 0), Some(0)); // at start
+    assert_eq!(byte_col_to_utf16(line, 3), Some(3)); // at '🦀'
+    assert_eq!(byte_col_to_utf16(line, 7), Some(5)); // after '🦀' (4 bytes → 2 UTF-16)
+    assert_eq!(byte_col_to_utf16(line, 8), Some(6)); // at ' '
+}
+
+#[test]
+fn byte_col_to_utf16_rejects_out_of_range_offset() {
+    let line = "hello";
+    assert_eq!(byte_col_to_utf16(line, 100), None);
+}
+
+#[test]
+fn byte_col_to_utf16_rejects_non_char_boundary() {
+    let line = "café";
+    // 'é' starts at byte 3 and is 2 bytes; byte 4 is mid-character
+    assert_eq!(byte_col_to_utf16(line, 4), None);
+}
+
+#[test]
+fn try_lsp_enrichment_with_non_ascii_source() {
+    // Create a temporary file with non-ASCII content
+    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
+    let file_path = temp_dir.path().join("test.rs");
+    let source = "// café\nfn foo() {}";
+
+    {
+        let mut file = std::fs::File::create(&file_path).expect("failed to create test file");
+        file.write_all(source.as_bytes())
+            .expect("failed to write test file");
+    }
+
+    let hover = markdown_hover("```rust\nfn foo()\n```");
+    let server = StubLanguageServer::with_hover(
+        ServerCapabilitySet::new(false, false, false).with_hover(true),
+        hover,
+    );
+    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
+
+    // Symbol at line 1, byte column 3 (start of "foo")
+    let mut card = SymbolCard {
+        card_version: 1,
+        symbol: SymbolIdentity {
+            symbol_id: String::from("sym_foo"),
+            symbol_ref: SymbolRef {
+                uri: format!("file://{}", file_path.display()),
+                range: SourceRange {
+                    start: SourcePosition { line: 1, column: 3 },
+                    end: SourcePosition { line: 1, column: 6 },
+                },
+                language: CardLanguage::Rust,
+                kind: weaver_cards::CardSymbolKind::Function,
+                name: String::from("foo"),
+                container: None,
+            },
+        },
+        signature: None,
+        doc: None,
+        attachments: None,
+        structure: None,
+        lsp: None,
+        metrics: None,
+        deps: None,
+        interstitial: None,
+        provenance: Provenance {
+            extracted_at: String::from("2026-03-19T00:00:00Z"),
+            sources: vec![String::from("tree_sitter")],
+        },
+        etag: None,
+    };
+
+    let outcome = try_lsp_enrichment(&mut card, &mut backends);
+
+    // Should successfully enrich despite non-ASCII characters in the file
+    assert_eq!(outcome, EnrichmentOutcome::Enriched);
+    assert!(card.lsp.is_some());
 }
 
 fn assert_deprecation(text: &str, expected: bool) {
