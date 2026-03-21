@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use weaver_plugins::manifest::{PluginKind, PluginMetadata};
 use weaver_plugins::{CapabilityId, PluginManifest, PluginRegistry};
 
-use super::resolution::{
+use crate::dispatch::act::refactor::resolution::{
     CandidateReason, CapabilityResolutionDetails, RefusalReason, ResolutionOutcome,
     ResolutionRequest, SelectionMode, resolve_provider,
 };

@@ -38,6 +38,7 @@ use plugin_paths::{
 use resolution::{CapabilityResolutionEnvelope, ResolutionRequest, resolve_provider};
 
 mod arguments;
+mod candidates;
 mod manifests;
 mod plugin_paths;
 mod refusal;

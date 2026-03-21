@@ -1,23 +1,23 @@
 //! Unit tests for the `rename-symbol` request mapping contract.
 
-use std::path::Path;
 use std::sync::Mutex;
 
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
-use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_plugins::{CapabilityId, PluginError, PluginOutput, PluginRequest, PluginResponse};
 
-use super::resolution::{
+#[path = "refactor_helpers.rs"]
+mod refactor_helpers;
+
+use refactor_helpers::{build_backends, command_request};
+use crate::dispatch::act::refactor::resolution::{
     CandidateEvaluation, CapabilityResolutionDetails, CapabilityResolutionEnvelope,
     ResolutionOutcome, ResolutionRequest, SelectionMode,
 };
-use super::{
-    FusionBackends, RefactorContext, RefactorPluginRuntime, ResponseWriter, handle,
-    rust_analyzer_manifest,
+use crate::dispatch::act::refactor::{
+    RefactorContext, RefactorPluginRuntime, ResponseWriter, handle, rust_analyzer_manifest,
 };
-use crate::dispatch::request::{CommandDescriptor, CommandRequest};
-use crate::semantic_provider::SemanticBackendProvider;
+use crate::dispatch::request::CommandRequest;
 
 struct InspectingRuntime {
     captured: Mutex<Option<PluginRequest>>,
@@ -68,17 +68,6 @@ const NOTES_DIFF: &str = concat!(
     ">>>>>>> REPLACE\n",
 );
 
-fn command_request(arguments: Vec<String>) -> CommandRequest {
-    CommandRequest {
-        command: CommandDescriptor {
-            domain: String::from("act"),
-            operation: String::from("refactor"),
-        },
-        arguments,
-        patch: None,
-    }
-}
-
 #[fixture]
 fn socket_dir() -> TempDir {
     TempDir::new().expect("socket dir")
@@ -90,15 +79,6 @@ struct RenameDispatch<'a> {
     language: &'static str,
     extra_args: Vec<String>,
     socket_dir: &'a TempDir,
-}
-
-fn build_backends(socket_path: &Path) -> FusionBackends<SemanticBackendProvider> {
-    let config = Config {
-        daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().as_ref()),
-        ..Config::default()
-    };
-    let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
-    FusionBackends::new(config, provider)
 }
 
 /// Dispatches a rename request through the handler and returns the captured

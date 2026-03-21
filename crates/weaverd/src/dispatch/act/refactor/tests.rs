@@ -1,22 +1,21 @@
 //! Unit tests for the `act refactor` handler.
 
-use std::path::Path;
-
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
-use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 
-use super::resolution::{
+#[path = "refactor_helpers.rs"]
+mod refactor_helpers;
+
+use refactor_helpers::{build_backends, command_request};
+use crate::dispatch::act::refactor::resolution::{
     CandidateEvaluation, CapabilityResolutionDetails, CapabilityResolutionEnvelope,
     ResolutionOutcome, ResolutionRequest, SelectionMode,
 };
-use super::{
-    DispatchError, FusionBackends, RefactorContext, RefactorPluginRuntime, ResponseWriter,
-    default_runtime, handle, resolve_rope_plugin_path, resolve_rust_analyzer_plugin_path,
+use crate::dispatch::act::refactor::{
+    DispatchError, RefactorContext, RefactorPluginRuntime, ResponseWriter, default_runtime,
+    handle, resolve_rope_plugin_path, resolve_rust_analyzer_plugin_path,
 };
-use crate::dispatch::request::{CommandDescriptor, CommandRequest};
-use crate::semantic_provider::SemanticBackendProvider;
 
 enum MockRuntimeResult {
     Success(PluginResponse),
@@ -63,29 +62,9 @@ impl RefactorPluginRuntime for MockRuntime {
     }
 }
 
-fn command_request(arguments: Vec<String>) -> CommandRequest {
-    CommandRequest {
-        command: CommandDescriptor {
-            domain: String::from("act"),
-            operation: String::from("refactor"),
-        },
-        arguments,
-        patch: None,
-    }
-}
-
 #[fixture]
 fn socket_dir() -> TempDir {
     TempDir::new().expect("socket dir")
-}
-
-fn build_backends(socket_path: &Path) -> FusionBackends<SemanticBackendProvider> {
-    let config = Config {
-        daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().as_ref()),
-        ..Config::default()
-    };
-    let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
-    FusionBackends::new(config, provider)
 }
 
 fn run_rename_handle(
@@ -284,7 +263,7 @@ fn handle_returns_error_for_unsupported_refactoring(socket_dir: TempDir) {
     let mut writer = ResponseWriter::new(&mut output);
     let runtime = MockRuntime {
         resolution: MockResolution::Success(automatic_selection("rope", "python")),
-        result: MockRuntimeResult::NotFound(String::from("rope")),
+        result: MockRuntimeResult::Panic,
     };
 
     let result = handle(
@@ -321,7 +300,7 @@ fn handle_exits_with_error_when_resolution_fails(socket_dir: TempDir) {
 
 #[rstest]
 fn handle_exits_with_error_when_resolution_refused_without_provider(socket_dir: TempDir) {
-    use super::resolution::RefusalReason::UnsupportedLanguage;
+    use crate::dispatch::act::refactor::resolution::RefusalReason::UnsupportedLanguage;
 
     let refused_envelope =
         CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {

@@ -12,6 +12,9 @@ use weaver_plugins::capability::CapabilityId;
 use weaver_plugins::manifest::PluginManifest;
 use weaver_syntax::SupportedLanguage;
 
+use super::candidates::{
+    accepted_candidate, manifest_supports_language, provider_rank, rejected_candidate,
+};
 use super::refusal::{RoutingContext, refused};
 
 /// Stable envelope type written to the daemon output stream.
@@ -102,6 +105,8 @@ pub(crate) enum RefusalReason {
     UnsupportedLanguage,
     /// The requested provider name does not exist in the registry.
     ProviderNotFound,
+    /// The requested provider exists but does not declare support for the requested capability.
+    ProviderLacksCapability,
     /// The requested provider does not support the inferred language.
     ExplicitProviderMismatch,
     /// No registered provider matched the inferred language and capability.
@@ -294,7 +299,7 @@ fn resolve_explicit_provider(
                 requested_provider: Some(String::from(provider_name)),
                 selection_mode: SelectionMode::ExplicitProvider,
             },
-            RefusalReason::ExplicitProviderMismatch,
+            RefusalReason::ProviderLacksCapability,
             evaluations,
         )
     } else {
@@ -379,42 +384,4 @@ fn sorted_capability_manifests(
     let mut manifests = registry.find_for_capability(capability);
     manifests.sort_by(|left, right| left.name().cmp(right.name()));
     manifests
-}
-
-fn manifest_supports_language(manifest: &PluginManifest, language: SupportedLanguage) -> bool {
-    manifest
-        .languages()
-        .iter()
-        .any(|entry| entry == language.as_str())
-}
-
-fn provider_rank(provider_name: &str, language: SupportedLanguage) -> (usize, &str) {
-    let preferred = preferred_provider(language);
-    let rank = if provider_name == preferred { 0 } else { 1 };
-    (rank, provider_name)
-}
-
-fn preferred_provider(language: SupportedLanguage) -> &'static str {
-    match language {
-        SupportedLanguage::Python => "rope",
-        SupportedLanguage::Rust => "rust-analyzer",
-        // TODO: Implement TypeScript provider support - this placeholder will cause routing to fail for TypeScript files
-        SupportedLanguage::TypeScript => "typescript-unimplemented",
-    }
-}
-
-fn accepted_candidate(manifest: &PluginManifest, reason: CandidateReason) -> CandidateEvaluation {
-    CandidateEvaluation {
-        provider: String::from(manifest.name()),
-        accepted: true,
-        reason,
-    }
-}
-
-fn rejected_candidate(manifest: &PluginManifest, reason: CandidateReason) -> CandidateEvaluation {
-    CandidateEvaluation {
-        provider: String::from(manifest.name()),
-        accepted: false,
-        reason,
-    }
 }
