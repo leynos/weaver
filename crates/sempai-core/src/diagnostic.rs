@@ -153,8 +153,10 @@ pub struct Diagnostic {
     code: DiagnosticCode,
     /// A human-readable description of the problem.
     message: String,
-    /// The source location where the problem was detected, if available.
-    span: Option<SourceSpan>,
+    /// The primary source location where the problem was detected, if
+    /// available.
+    #[serde(rename = "primary_span", alias = "span")]
+    primary_span: Option<SourceSpan>,
     /// Additional notes providing context or suggestions.
     notes: Vec<String>,
 }
@@ -169,13 +171,13 @@ impl Diagnostic {
     pub fn new(
         code: DiagnosticCode,
         message: String,
-        span: Option<SourceSpan>,
+        primary_span: Option<SourceSpan>,
         notes: Vec<String>,
     ) -> Self {
         Self {
             code,
             message,
-            span,
+            primary_span,
             notes,
         }
     }
@@ -194,8 +196,18 @@ impl Diagnostic {
 
     /// Returns the source span, if available.
     #[must_use]
+    pub const fn primary_span(&self) -> Option<&SourceSpan> {
+        self.primary_span.as_ref()
+    }
+
+    /// Returns the primary source span, if available.
+    ///
+    /// This compatibility alias will be removed once downstream callers have
+    /// migrated to [`primary_span`](Self::primary_span).
+    #[must_use]
+    #[deprecated(since = "0.1.0", note = "use `primary_span()` instead")]
     pub const fn span(&self) -> Option<&SourceSpan> {
-        self.span.as_ref()
+        self.primary_span()
     }
 
     /// Returns the supplementary notes.
@@ -242,6 +254,62 @@ impl DiagnosticReport {
     )]
     pub fn new(diagnostics: Vec<Diagnostic>) -> Self {
         Self { diagnostics }
+    }
+
+    /// Creates a report containing a single diagnostic.
+    ///
+    /// This is the unified constructor for all single-diagnostic reports,
+    /// including parser errors, validation errors, and other diagnostic types.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sempai_core::{DiagnosticCode, DiagnosticReport};
+    ///
+    /// let report = DiagnosticReport::single_error(
+    ///     DiagnosticCode::ESempaiYamlParse,
+    ///     String::from("invalid yaml"),
+    ///     None,
+    ///     vec![],
+    /// );
+    /// assert_eq!(report.len(), 1);
+    /// ```
+    #[must_use]
+    pub fn single_error(
+        code: DiagnosticCode,
+        message: String,
+        primary_span: Option<SourceSpan>,
+        notes: Vec<String>,
+    ) -> Self {
+        Self::new(vec![Diagnostic::new(code, message, primary_span, notes)])
+    }
+
+    /// Creates a report containing a single parser diagnostic.
+    ///
+    /// This is a convenience wrapper around [`single_error`](Self::single_error)
+    /// for parser-related diagnostics.
+    #[must_use]
+    pub fn parser_error(
+        code: DiagnosticCode,
+        message: String,
+        primary_span: Option<SourceSpan>,
+        notes: Vec<String>,
+    ) -> Self {
+        Self::single_error(code, message, primary_span, notes)
+    }
+
+    /// Creates a report containing a single validation diagnostic.
+    ///
+    /// This is a convenience wrapper around [`single_error`](Self::single_error)
+    /// for validation-related diagnostics.
+    #[must_use]
+    pub fn validation_error(
+        code: DiagnosticCode,
+        message: String,
+        primary_span: Option<SourceSpan>,
+        notes: Vec<String>,
+    ) -> Self {
+        Self::single_error(code, message, primary_span, notes)
     }
 
     /// Creates a single-diagnostic report indicating that a feature is not

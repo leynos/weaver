@@ -2,6 +2,7 @@
 
 mod capture_tests;
 mod config_tests;
+mod diagnostic_snapshot_tests;
 mod diagnostic_tests;
 mod language_tests;
 mod match_tests;
