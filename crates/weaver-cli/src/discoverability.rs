@@ -42,6 +42,12 @@ impl KnownDomain {
             .map(|(_, _, ops)| *ops)
             .unwrap_or_else(|| panic!("missing DOMAIN_OPERATIONS entry for '{}'", self.as_str()))
     }
+
+    fn catalogue_order() -> impl Iterator<Item = Self> {
+        DOMAIN_OPERATIONS
+            .iter()
+            .map(|(domain, _, _)| known_domain_from_catalogue_entry(domain))
+    }
 }
 
 /// Canonical domain-to-operation mapping for CLI discoverability features.
@@ -91,13 +97,68 @@ fn known_domain_from_catalogue_entry(domain: &str) -> KnownDomain {
     })
 }
 
-/// Returns the first domain plus its first operation from `DOMAIN_OPERATIONS`.
-///
-/// Returns `None` when the catalogue is empty or when the first domain has no
-/// registered operations.
-fn first_known_command() -> Option<(&'static str, &'static str)> {
-    let (domain, _, operations) = DOMAIN_OPERATIONS.first().copied()?;
-    Some((domain, operations.first().copied()?))
+fn valid_domains_list() -> String {
+    KnownDomain::catalogue_order()
+        .map(KnownDomain::as_str)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn suggestion_for_unknown_domain(domain: &str) -> Option<KnownDomain> {
+    let normalized_domain = domain.trim().to_ascii_lowercase();
+    let mut best_match = None;
+    let mut best_distance = usize::MAX;
+    let mut tied = false;
+
+    for candidate in KnownDomain::catalogue_order() {
+        let Some(distance) = bounded_levenshtein(&normalized_domain, candidate.as_str(), 2) else {
+            continue;
+        };
+        if distance < best_distance {
+            best_distance = distance;
+            best_match = Some(candidate);
+            tied = false;
+        } else if distance == best_distance {
+            tied = true;
+        }
+    }
+
+    if tied { None } else { best_match }
+}
+
+fn bounded_levenshtein(left: &str, right: &str, max_distance: usize) -> Option<usize> {
+    let left_chars: Vec<char> = left.chars().collect();
+    let right_chars: Vec<char> = right.chars().collect();
+
+    if left_chars.len().abs_diff(right_chars.len()) > max_distance {
+        return None;
+    }
+
+    let mut previous: Vec<usize> = (0..=right_chars.len()).collect();
+    let mut current = vec![0; right_chars.len() + 1];
+
+    for (left_index, left_char) in left_chars.iter().enumerate() {
+        current[0] = left_index + 1;
+        let mut row_min = current[0];
+
+        for (right_index, right_char) in right_chars.iter().enumerate() {
+            let substitution_cost = usize::from(left_char != right_char);
+            current[right_index + 1] = usize::min(
+                usize::min(previous[right_index + 1] + 1, current[right_index] + 1),
+                previous[right_index] + substitution_cost,
+            );
+            row_min = row_min.min(current[right_index + 1]);
+        }
+
+        if row_min > max_distance {
+            return None;
+        }
+
+        previous.clone_from_slice(&current);
+    }
+
+    let distance = previous[right_chars.len()];
+    (distance <= max_distance).then_some(distance)
 }
 
 /// Writes contextual guidance for a known domain missing its operation.
@@ -146,7 +207,7 @@ pub(crate) fn write_missing_operation_guidance<W: Write>(
     Ok(true)
 }
 
-/// Writes contextual guidance for an unknown domain missing its operation.
+/// Writes contextual guidance for an unknown domain.
 pub(crate) fn write_unknown_domain_guidance<W: Write>(
     writer: &mut W,
     localizer: &dyn Localizer,
@@ -155,41 +216,35 @@ pub(crate) fn write_unknown_domain_guidance<W: Write>(
     if KnownDomain::try_parse(domain).is_some() {
         return Ok(false);
     }
-    let Some((hint_domain, hint_operation)) = first_known_command() else {
-        return Ok(false);
-    };
     let mut args = LocalizationArgs::new();
     args.insert("domain", domain.into());
-    args.insert("hint_domain", hint_domain.into());
-    args.insert("hint_operation", hint_operation.into());
+    let valid_domains = valid_domains_list();
+    args.insert("domains", valid_domains.as_str().into());
     let error = strip_bidi_isolates(localizer.message(
         "weaver-domain-guidance-unknown-domain-error",
         Some(&args),
         &format!("error: unknown domain '{domain}'"),
     ));
-    let available_operations = strip_bidi_isolates(localizer.message(
-        "weaver-domain-guidance-available-operations",
-        None,
-        "Available operations:",
-    ));
-    let hint = strip_bidi_isolates(localizer.message(
-        "weaver-domain-guidance-help-hint-unknown-domain",
+    let valid_domains_message = strip_bidi_isolates(localizer.message(
+        "weaver-domain-guidance-valid-domains",
         Some(&args),
-        &format!("Run 'weaver {hint_domain} {hint_operation} --help' for operation details."),
+        &format!("Valid domains: {valid_domains}"),
     ));
 
     writeln!(writer, "{error}")?;
     writeln!(writer)?;
-    writeln!(writer, "{available_operations}")?;
-    for (known_domain, _, operations) in DOMAIN_OPERATIONS {
-        let known_domain_enum = known_domain_from_catalogue_entry(known_domain);
-        for operation in *operations {
-            debug_assert_eq!(known_domain_enum.as_str(), *known_domain);
-            writeln!(writer, "  {known_domain} {operation}")?;
-        }
+    writeln!(writer, "{valid_domains_message}")?;
+
+    if let Some(suggested_domain) = suggestion_for_unknown_domain(domain) {
+        let suggested_domain = suggested_domain.as_str();
+        args.insert("suggested_domain", suggested_domain.into());
+        let suggestion = strip_bidi_isolates(localizer.message(
+            "weaver-domain-guidance-did-you-mean-domain",
+            Some(&args),
+            &format!("Did you mean '{suggested_domain}'?"),
+        ));
+        writeln!(writer, "{suggestion}")?;
     }
-    writeln!(writer)?;
-    writeln!(writer, "{hint}")?;
 
     Ok(true)
 }
@@ -202,10 +257,39 @@ pub(crate) fn should_emit_domain_guidance(cli: &crate::Cli) -> bool {
             .domain
             .as_deref()
             .is_some_and(|domain| !domain.trim().is_empty())
-        && cli
-            .operation
-            .as_deref()
-            .is_none_or(|operation| operation.trim().is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for unknown-domain suggestion helpers.
+
+    use super::{KnownDomain, bounded_levenshtein, suggestion_for_unknown_domain};
+    use rstest::rstest;
+
+    #[rstest]
+    #[case("observe", "observe", Some(0))]
+    #[case("obsrve", "observe", Some(1))]
+    #[case("bogus", "observe", None)]
+    fn bounded_levenshtein_respects_threshold(
+        #[case] left: &str,
+        #[case] right: &str,
+        #[case] expected: Option<usize>,
+    ) {
+        assert_eq!(bounded_levenshtein(left, right, 2), expected);
+    }
+
+    #[test]
+    fn suggestion_for_unknown_domain_returns_closest_match_within_threshold() {
+        assert_eq!(
+            suggestion_for_unknown_domain("obsrve"),
+            Some(KnownDomain::Observe)
+        );
+    }
+
+    #[test]
+    fn suggestion_for_unknown_domain_rejects_distant_values() {
+        assert_eq!(suggestion_for_unknown_domain("bogus"), None);
+    }
 }
 
 #[cfg(test)]

@@ -4,6 +4,7 @@
 //! and user-facing error handling when required arguments are missing.
 
 use assert_cmd::cargo::cargo_bin_cmd;
+use predicates::prelude::PredicateBooleanExt;
 use predicates::str::{contains, is_empty};
 use weaver_cli::DOMAIN_OPERATIONS;
 
@@ -25,6 +26,33 @@ fn missing_operation_exits_with_failure() {
         .stderr(contains("error: operation required for domain 'observe'"))
         .stderr(contains("get-card"))
         .stderr(contains("weaver observe get-definition --help"));
+}
+
+#[test]
+fn unknown_domain_exits_with_failure_before_daemon_startup() {
+    let mut command = cargo_bin_cmd!("weaver");
+    command.args(["unknown-domain", "get-definition"]);
+    command
+        .assert()
+        .failure()
+        .stdout(is_empty())
+        .stderr(contains("error: unknown domain 'unknown-domain'"))
+        .stderr(contains("Valid domains: observe, act, verify"))
+        .stderr(predicates::str::contains("Did you mean").not())
+        .stderr(predicates::str::contains("Waiting for daemon start...").not());
+}
+
+#[test]
+fn typo_domain_suggests_closest_known_domain() {
+    let mut command = cargo_bin_cmd!("weaver");
+    command.args(["obsrve", "get-definition"]);
+    command
+        .assert()
+        .failure()
+        .stdout(is_empty())
+        .stderr(contains("error: unknown domain 'obsrve'"))
+        .stderr(contains("Valid domains: observe, act, verify"))
+        .stderr(contains("Did you mean 'observe'?"));
 }
 
 #[test]

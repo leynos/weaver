@@ -35,9 +35,23 @@ Feature: Weaver CLI behaviour
     When the operator runs "unknown-domain"
     Then the CLI fails
     And stderr contains "error: unknown domain 'unknown-domain'"
-    And stderr contains "Available operations:"
-    And stderr contains "observe get-definition"
-    And stderr contains "weaver observe get-definition --help"
+    And stderr contains "Valid domains: observe, act, verify"
+    And no daemon command was sent
+
+  Scenario: Rejecting an unknown domain before daemon startup when an operation is present
+    When the operator runs "unknown-domain get-definition"
+    Then the CLI fails
+    And stderr contains "error: unknown domain 'unknown-domain'"
+    And stderr contains "Valid domains: observe, act, verify"
+    And stderr does not contain "Waiting for daemon start..."
+    And no daemon command was sent
+
+  Scenario: Suggesting the closest valid domain for a typo
+    When the operator runs "obsrve get-definition"
+    Then the CLI fails
+    And stderr contains "error: unknown domain 'obsrve'"
+    And stderr contains "Valid domains: observe, act, verify"
+    And stderr contains "Did you mean 'observe'?"
     And no daemon command was sent
 
   Scenario: Reporting malformed daemon responses

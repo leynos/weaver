@@ -194,7 +194,7 @@ does* *not require source inspection or external runbooks.*
 *Outcome: Ensure MVP error paths fail fast with deterministic, actionable*
 *operator guidance before daemon startup and during command routing.*
 
-- [ ] 2.3.1. Validate domains client-side before daemon startup.
+- [x] 2.3.1. Validate domains client-side before daemon startup.
       See
       [Level 3](ui-gap-analysis.md#level-3--unknown-domain-weaver-bogus-something)
       and

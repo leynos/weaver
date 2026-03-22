@@ -12,6 +12,9 @@ weaver-domain-guidance-missing-operation-error =
 weaver-domain-guidance-unknown-domain-error =
     error: unknown domain '{$domain}'
 weaver-domain-guidance-available-operations = Available operations:
+weaver-domain-guidance-valid-domains = Valid domains: {$domains}
+weaver-domain-guidance-did-you-mean-domain =
+    Did you mean '{$suggested_domain}'?
 weaver-domain-guidance-help-hint =
     Run 'weaver {$domain} {$hint_operation} --help' for operation details.
 weaver-domain-guidance-help-hint-unknown-domain =

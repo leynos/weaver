@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: DONE
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
@@ -148,14 +148,20 @@ Both commands exit non-zero and do not print `Waiting for daemon start...`.
       the built-in domain-operation catalogue.
 - [x] (2026-03-22 00:00Z) Drafted this ExecPlan in
       `docs/execplans/2-3-1-validate-domains-client-side-before-daemon-startup.md`.
-- [ ] Stage A: add failing unit, integration, and BDD tests for the new
-      unknown-domain contract.
-- [ ] Stage B: implement shared client-side domain validation plus suggestion
-      selection before daemon startup.
-- [ ] Stage C: update design and user docs, then mark roadmap item `2.3.1`
-      done.
-- [ ] Stage D: run `make fmt`, `make markdownlint`, `make nixie`,
-      `make check-fmt`, `make lint`, and `make test` with logged output.
+- [x] (2026-03-22 14:00Z) Stage A: added unit, integration, and BDD coverage
+      for unknown domains with and without operations, plus typo suggestion and
+      no-suggestion cases.
+- [x] (2026-03-22 14:05Z) Stage B: broadened CLI preflight validation to all
+      unknown domains before config loading or daemon startup, replaced the
+      unknown-domain output contract with the valid-domain list, added bounded
+      edit-distance suggestions, and renamed the sentinel to
+      `PreflightGuidance`.
+- [x] (2026-03-22 14:10Z) Stage C: updated `docs/weaver-design.md`,
+      `docs/users-guide.md`, and `docs/roadmap.md` to reflect the shipped
+      behaviour.
+- [x] (2026-03-22 14:20Z) Stage D: ran `make fmt`, `make markdownlint`,
+      `make nixie`, `make check-fmt`, `make lint`, and `make test` with logged
+      output.
 
 ## Surprises & Discoveries
 
@@ -231,7 +237,15 @@ Target outcome at completion:
 8. `make check-fmt`, `make lint`, and `make test` pass, along with the
    Markdown gates required by `AGENTS.md`.
 
-Retrospective notes will be filled in once implementation is complete.
+Retrospective notes:
+
+- Reusing the `2.2.4` preflight seam kept the change local to `weaver-cli`
+  and avoided any daemon or config-surface edits.
+- Renaming the sentinel from `MissingOperationGuidance` to
+  `PreflightGuidance` clarified the now-shared early-exit path and reduced
+  future maintenance ambiguity.
+- A tiny bounded Levenshtein helper was sufficient for the fixed three-domain
+  set; no external dependency or broader fuzzy-matching framework was needed.
 
 ## Context and orientation
 

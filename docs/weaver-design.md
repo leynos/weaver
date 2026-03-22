@@ -417,9 +417,16 @@ Known-domain invocations that omit the operation (for example,
 `weaver observe`) are also handled entirely on the client side. The CLI now
 consults a canonical built-in domain catalogue, prints the valid operations for
 the supplied domain, and exits non-zero before configuration discovery, daemon
-startup, or transport setup. Unknown domains intentionally remain outside this
-preflight path until roadmap item 2.3.1 adds dedicated client-side domain
-validation.
+startup, or transport setup.
+
+Unknown domains follow a separate client-side preflight rule. Any invocation
+whose first positional token is not one of the canonical domains `observe`,
+`act`, or `verify` fails before configuration discovery, daemon startup, or
+transport setup regardless of whether an operation token is present. The error
+body always includes `Valid domains: observe, act, verify`. When exactly one
+valid domain is within edit distance 2 of the supplied token, the CLI appends a
+single deterministic `Did you mean ...?` suggestion; otherwise it emits no
+suggestion.
 
 #### 2.1.2. Lifecycle orchestration
 
