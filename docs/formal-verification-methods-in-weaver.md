@@ -230,7 +230,7 @@ The repository changes for phase 1 should stay small:
 
 Kani harnesses should live next to the production code they verify, guarded
 with `#[cfg(kani)]`. That avoids widening public APIs purely for proof access.
-Verus proofs should live outside Cargo under `verus/`, because the verifier has
+Verus proofs should live outside Cargo under `verus/` because the verifier has
 its own installation and execution model.[^13][^14]
 
 ## Build and CI integration
@@ -340,7 +340,8 @@ The most coherent plan for Weaver is:
   capability-aware routing,
 - Verus second on a tiny proof-only model of transactional and routing
   invariants, and
-- later Kani on graph and matching guardrails once those roadmap items land.
+- later Kani harnesses for graph and matching guardrails once those roadmap
+  items land.
 
 That sequence pushes the highest bug-finding value to the front, keeps the
 developer workflow familiar, and avoids adding more proof machinery than the
