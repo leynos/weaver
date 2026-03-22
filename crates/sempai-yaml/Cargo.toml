@@ -1,12 +1,15 @@
 [package]
-name = "sempai"
+name = "sempai_yaml"
 edition.workspace = true
 version.workspace = true
 rust-version.workspace = true
 
 [dependencies]
 sempai_core = { path = "../sempai-core" }
-sempai_yaml = { path = "../sempai-yaml" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde-saphyr = { workspace = true }
+saphyr = { workspace = true }
 
 [dev-dependencies]
 sempai_core = { path = "../sempai-core", features = ["test-support"] }

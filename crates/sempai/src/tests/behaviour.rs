@@ -110,6 +110,21 @@ fn then_compilation_fails(world: &mut TestWorld, code: QuotedString) {
     );
 }
 
+#[then("the first diagnostic message contains {snippet}")]
+fn then_first_diagnostic_message_contains(world: &mut TestWorld, snippet: QuotedString) {
+    let report = world
+        .compile_result
+        .as_ref()
+        .expect("compile result should be set")
+        .as_ref()
+        .expect_err("expected compilation failure");
+    let first = report
+        .diagnostics()
+        .first()
+        .expect("at least one diagnostic");
+    assert!(first.message().contains(snippet.as_str()));
+}
+
 #[then("execution fails with code {code}")]
 fn then_execution_fails(world: &mut TestWorld, code: QuotedString) {
     assert_diagnostic_code(

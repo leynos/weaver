@@ -383,6 +383,12 @@ The one-liner Pratt binding powers must follow the provided table.[^3]
   - Forward-compatible unknown keys on the rule object
     (`additionalProperties: true`).[^1]
 
+Implementation note (2026-03-22): `crates/sempai-yaml` now owns this parser
+boundary. Search-mode legacy principals and v2 `match` principals are decoded
+into typed Rust enums, while extract, join, and taint mode-specific bodies are
+preserved for later semantic handling without forcing execution semantics into
+the parser stage.
+
 ### Rule model
 
 The schema defines the rule object and the allowed query keys.[^1]
@@ -414,6 +420,11 @@ Search mode rules require:
   - `pattern-regex`
   - `match`
   - `r2c-internal-project-depends-on` (parsed but ignored by Sempai).[^1]
+
+Implementation note (2026-03-22): `sempai::Engine::compile_yaml` now delegates
+to `sempai_yaml` for parse-time diagnostics. Successful YAML parsing still
+returns a deliberate `NOT_IMPLEMENTED` placeholder until 4.1.5 delivers
+normalisation into executable query plans.
 
 Extract mode rules require legacy query keys, not `match`.[^1]
 

@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -141,12 +141,18 @@ Implementation must not begin until the user explicitly approves this plan.
       the local parser-aligned Semgrep schema, adjacent 4.1.1 and 4.1.2
       ExecPlans, and the testing/documentation guidance requested in the task.
 - [x] (2026-03-21 UTC) Drafted this ExecPlan.
-- [ ] Stage A: Scaffold `sempai_yaml`, dependencies, and red-path tests.
-- [ ] Stage B: Implement schema-aligned YAML rule models and parsing entrypoint.
-- [ ] Stage C: Implement structured parser diagnostics with source spans.
-- [ ] Stage D: Wire `sempai::Engine::compile_yaml` to the parser boundary.
-- [ ] Stage E: Update design docs, users guide, and roadmap state.
-- [ ] Stage F: Run all required quality gates and capture evidence.
+- [x] (2026-03-22 UTC) Stage A: Scaffold `sempai_yaml`, dependencies, and
+      red-path tests.
+- [x] (2026-03-22 UTC) Stage B: Implement schema-aligned YAML rule models and
+      parsing entrypoint.
+- [x] (2026-03-22 UTC) Stage C: Implement structured parser diagnostics with
+      source spans.
+- [x] (2026-03-22 UTC) Stage D: Wire `sempai::Engine::compile_yaml` to the
+      parser boundary.
+- [x] (2026-03-22 UTC) Stage E: Update design docs, users guide, and roadmap
+      state.
+- [x] (2026-03-22 UTC) Stage F: Run all required quality gates and capture
+      evidence.
 
 ## Surprises & Discoveries
 
@@ -161,8 +167,7 @@ Implementation must not begin until the user explicitly approves this plan.
   stub path, even if successful parse results still await normalization.
 
 - Observation: the 4.1.2 work already established
-  `DiagnosticReport::parser_error`
-  and the `primary_span` JSON contract in
+  `DiagnosticReport::parser_error` and the `primary_span` JSON contract in
   [crates/sempai-core/src/diagnostic.rs](../../crates/sempai-core/src/diagnostic.rs).
    Impact: 4.1.3 should reuse that contract rather than inventing a
   parser-local error shape.
@@ -172,6 +177,11 @@ Implementation must not begin until the user explicitly approves this plan.
   [docs/semgrep-language-reference/semgrep-rule-schema.yaml](../semgrep-language-reference/semgrep-rule-schema.yaml).
    Impact: the implementation can lock its model and test fixtures to that
   local source of truth instead of reverse-engineering the shape ad hoc.
+- Observation: `serde-saphyr` already reports byte-oriented error spans when
+  parsing from `&str`, so `sempai_yaml` can use those locations directly for
+  malformed YAML and Serde shape failures while keeping `saphyr` as a coarse
+  fallback for rule-object spans. Impact: parser diagnostics retain useful
+  `primary_span` data without needing a bespoke event-stream mapper in 4.1.3.
 
 ## Decision Log
 
@@ -197,6 +207,11 @@ Implementation must not begin until the user explicitly approves this plan.
   even if successful compilation still cannot yield final `QueryPlan` values.
   Rationale: this produces immediate user-visible value without skipping the
   later normalization milestone. Date/Author: 2026-03-21 / Codex.
+- Decision: keep search-mode principals strongly typed in `sempai_yaml`, but
+  preserve join and taint bodies as opaque `serde_json::Value` payloads for
+  now. Rationale: 4.1.3 needs schema-aligned parsing without prematurely
+  committing 4.1.4/4.1.5 semantic models for mode-specific execution.
+  Date/Author: 2026-03-22 / Codex.
 
 ## Outcomes & Retrospective
 
@@ -218,8 +233,16 @@ Target outcome at completion:
 8. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
-Retrospective notes will be added here during implementation once the work is
-approved and underway.
+Retrospective notes:
+
+1. `serde-saphyr::Spanned<T>` was useful for raw deserialisation, but keeping
+   it out of the public `sempai_yaml` API avoided leaking parser dependency
+   types into the stable model.
+2. The strongest user-visible value in this milestone came from replacing the
+   blanket `NOT_IMPLEMENTED` YAML path with real parser/schema diagnostics,
+   even though query-plan normalisation is still pending.
+3. Final verification passed with `make fmt`, `make markdownlint`,
+   `make nixie`, `make check-fmt`, `make lint`, and `make test`.
 
 ## Context and orientation
 

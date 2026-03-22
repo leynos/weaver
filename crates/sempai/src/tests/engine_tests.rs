@@ -18,9 +18,9 @@ fn engine_new_with_custom_config() {
 }
 
 #[test]
-fn compile_yaml_returns_not_implemented() {
+fn compile_yaml_returns_yaml_parse_diagnostic_for_malformed_yaml() {
     let engine = Engine::new(EngineConfig::default());
-    let result = engine.compile_yaml("rules: []");
+    let result = engine.compile_yaml("rules:\n  - id: bad\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: [");
     assert!(result.is_err());
 
     let report = result.expect_err("should be error");
@@ -30,8 +30,36 @@ fn compile_yaml_returns_not_implemented() {
         .diagnostics()
         .first()
         .expect("at least one diagnostic");
+    assert_eq!(first.code(), DiagnosticCode::ESempaiYamlParse);
+}
+
+#[test]
+fn compile_yaml_returns_schema_diagnostic_for_missing_rule_id() {
+    let engine = Engine::new(EngineConfig::default());
+    let result = engine.compile_yaml(
+        "rules:\n  - message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n",
+    );
+    let report = result.expect_err("should be error");
+    let first = report
+        .diagnostics()
+        .first()
+        .expect("at least one diagnostic");
+    assert_eq!(first.code(), DiagnosticCode::ESempaiSchemaInvalid);
+}
+
+#[test]
+fn compile_yaml_returns_not_implemented_after_successful_parse() {
+    let engine = Engine::new(EngineConfig::default());
+    let result = engine.compile_yaml(
+        "rules:\n  - id: demo.rule\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n",
+    );
+    let report = result.expect_err("should be error");
+    let first = report
+        .diagnostics()
+        .first()
+        .expect("at least one diagnostic");
     assert_eq!(first.code(), DiagnosticCode::NotImplemented);
-    assert!(first.message().contains("compile_yaml"));
+    assert!(first.message().contains("normalisation"));
 }
 
 #[test]
