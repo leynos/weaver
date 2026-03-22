@@ -92,7 +92,7 @@ not control commit behaviour directly.
 
 ## Known risks and limitations
 
-- One-shot execution means each request pays process startup cost.
+- One-shot execution means each request pays a process startup cost.
 - Broker bugs can affect multiple plugins if orchestration is centralized.
 - Streaming state is unavailable, so plugins must be stateless or rehydrate
   their inputs each time.

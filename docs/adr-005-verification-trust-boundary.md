@@ -92,7 +92,7 @@ tools introduce.
 1. Name the verified kernel in the design and roadmap docs.
 2. List trusted external tools and filesystem assumptions explicitly.
 3. Make proof harnesses refer to the modelled assumptions by name.
-4. Keep future proof work inside the documented boundary.
+4. Keep future-proof work inside the documented boundary.
 
 ## Known risks and limitations
 
