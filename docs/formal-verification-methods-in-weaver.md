@@ -425,7 +425,7 @@ That layering keeps the assurance story honest and maintainable.
           duplicate-name and injectivity guardrails, and the default suite
           fails if either guardrail regresses.
   - [ ] 5.0.3. Add Kani harnesses for Sempai semantic constraints once the
-        planned parser/backend crates exist. Requires 4.2 and 4.3.
+        planned parser/backend crates exist. Requires 4.0.2 and 4.0.3.
     - [ ] Cover deterministic matcher and normalization kernels.
     - [ ] Acceptance criteria: harnesses or property tests cover the kernels
           without verifying external parser/runtime dependencies wholesale, and

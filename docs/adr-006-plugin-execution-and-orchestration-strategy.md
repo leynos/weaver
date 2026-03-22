@@ -8,6 +8,13 @@ Proposed.
 
 2026-03-22.
 
+## Outstanding Decisions
+
+- Which plugin categories, if any, need streaming behaviour instead of
+  one-shot JSONL?
+- Which team owns the broker-side timeout and payload-size defaults?
+- Which plugin lifecycle guarantees must remain stable before acceptance?
+
 ## Context and problem statement
 
 Weaver needs a concrete execution strategy for plugins and other external
@@ -23,7 +30,7 @@ than long-lived streaming sessions for plugin execution.
 - Keep plugin execution replaceable.
 - Keep broker ownership in Weaver.
 - Keep request and response shapes deterministic.
-- Minimise long-lived plugin state.
+- Minimize long-lived plugin state.
 
 ## Requirements
 
@@ -68,7 +75,7 @@ not control commit behaviour directly.
 
 - Keep the execution model predictable.
 - Keep plugin lifecycles easy to sandbox.
-- Keep orchestration logic centralised in the broker.
+- Keep orchestration logic centralized in the broker.
 
 ### Non-goals
 
@@ -86,7 +93,7 @@ not control commit behaviour directly.
 ## Known risks and limitations
 
 - One-shot execution means each request pays process startup cost.
-- Broker bugs can affect multiple plugins if orchestration is centralised.
+- Broker bugs can affect multiple plugins if orchestration is centralized.
 - Streaming state is unavailable, so plugins must be stateless or rehydrate
   their inputs each time.
 

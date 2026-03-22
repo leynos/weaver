@@ -8,6 +8,14 @@ Proposed.
 
 2026-03-22.
 
+## Outstanding Decisions
+
+- Which refusal reason codes are mandatory in the first acceptance set?
+- Which policy source owns the final routing decision when multiple providers
+  are eligible?
+- Which team owns the regression tests that pin refusal diagnostics and
+  rollback guarantees?
+
 ## Context and problem statement
 
 Weaver already has a capability model for plugin-backed `act` operations, but

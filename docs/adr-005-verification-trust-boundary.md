@@ -8,6 +8,13 @@ Proposed.
 
 2026-03-22.
 
+## Outstanding Decisions
+
+- Which Weaver-owned invariants are inside the verified kernel for phase one?
+- Which external tools remain trusted inputs rather than verified components?
+- Which filesystem assumptions must be documented before the ADR can be
+  accepted?
+
 ## Context and problem statement
 
 Formal verification is only useful if Weaver states which parts of the system
