@@ -1041,3 +1041,170 @@ implementation. See `docs/jacquard-card-first-symbol-graph-design.md` §13.2 and
   - [ ] Acceptance criteria: ledger writes are atomic; invalidation occurs when
     inputs change; and performance benchmarks show a measurable improvement for
     repeated history queries.
+
+## 8. Formal verification and proof tooling
+
+*Goal: Add bounded formal verification checks for Weaver-owned transactional,*
+*patching, routing, and guardrail invariants without replacing the existing*
+*test stack. See `docs/formal-verification-methods-in-weaver.md`.*
+
+### 8.1. Establish formal verification tooling
+
+*Outcome: Add pinned verifier installation, explicit make targets, and staged*
+*Continuous Integration (CI) entry points for Kani and Verus.*
+
+- [ ] 8.1.1. Add pinned verifier version files and install scripts for Kani and
+      Verus. See `docs/formal-verification-methods-in-weaver.md`
+      "Repository layout and tooling".
+  - [ ] Add `tools/kani/VERSION`.
+  - [ ] Add `tools/verus/VERSION` and `tools/verus/SHA256SUMS`.
+  - [ ] Add `scripts/install-kani.sh`, `scripts/install-verus.sh`, and
+        `scripts/run-verus.sh`.
+  - [ ] Acceptance criteria: local installs are reproducible from pinned
+        versions, scripts fail fast on version or checksum mismatch, and the
+        normal Rust toolchain workflow remains unchanged unless a formal target
+        is invoked.
+- [ ] 8.1.2. Add explicit `make kani`, `make kani-full`, `make verus`,
+      `make formal-pr`, and `make formal-nightly` targets. Requires 8.1.1.
+  - [ ] Keep the Kani smoke harness list explicit rather than scan-based.
+  - [ ] Keep Verus execution outside Cargo through `scripts/run-verus.sh`.
+  - [ ] Acceptance criteria: `make kani` runs only smoke harnesses,
+        `make kani-full` runs all checked-in Kani harnesses, `make verus`
+        executes the proof entrypoint, and the new targets are documented in
+        the `Makefile`.
+- [ ] 8.1.3. Add staged CI jobs for formal verification. Requires 8.1.2.
+  - [ ] Add `kani-smoke` to pull-request validation after the first smoke
+        harnesses land.
+  - [ ] Add `verus-proofs` as manual or nightly validation first, then promote
+        only if the proof set remains stable.
+  - [ ] Acceptance criteria: the existing `build-test` job remains intact,
+        formal jobs install their own tools, and slow proof suites are isolated
+        from the default pull-request path.
+
+### 8.2. Clarify proof contracts before gating
+
+*Outcome: Define the exact assurances that Kani and Verus are expected to*
+*prove, including filesystem assumptions and trust boundaries.*
+
+- [ ] 8.2.1. Publish the transaction atomicity contract for the Double-Lock
+      path. See `docs/formal-verification-methods-in-weaver.md`
+      "Atomicity contract".
+  - [ ] State the filesystem assumptions that define "all changes applied or
+        original state restored".
+  - [ ] State catastrophic failure conditions that are outside the verified
+        model.
+  - [ ] Acceptance criteria: the design document and user's guide describe the
+        same atomicity promise using one shared contract.
+- [ ] 8.2.2. Define the semantic-lock contract precisely. Requires 8.2.1. See
+      `docs/formal-verification-methods-in-weaver.md`
+      "Semantic-lock contract".
+  - [ ] Specify severity handling, provider normalization, baseline scope, and
+        backend-unavailable semantics.
+  - [ ] Acceptance criteria: implementation docs, CLI behaviour, and future
+        proof harnesses can refer to one explicit semantic-lock definition
+        without relying on inferred behaviour.
+- [ ] 8.2.3. Document the formal-verification trust boundary. Requires 8.2.2.
+      See `docs/formal-verification-methods-in-weaver.md` "Trust boundary".
+  - [ ] Separate verified orchestration invariants from trusted external-tool
+        assumptions.
+  - [ ] Acceptance criteria: docs name the verified kernel, list unverified
+        dependencies explicitly, and avoid claiming semantic correctness for
+        third-party tools.
+
+### 8.3. Add Kani checks for the transaction and patch kernels
+
+*Outcome: Add bounded model-checking coverage for the highest-risk write path*
+*that Weaver owns directly.*
+
+- [ ] 8.3.1. Add Kani smoke harnesses for Double-Lock transaction ordering in
+      `crates/weaverd/src/safety_harness/`. Requires 8.1.2 and 8.2.1.
+  - [ ] Prove commit is reachable only when both locks pass.
+  - [ ] Prove lock-failure and backend-unavailable states are non-committing.
+  - [ ] Acceptance criteria: `make kani` executes transaction smoke harnesses,
+        and counterexamples are reproducible through the documented target.
+- [ ] 8.3.2. Add Kani smoke harnesses for rollback bookkeeping and bounded file
+      traces in `crates/weaverd/src/safety_harness/`. Requires 8.3.1.
+  - [ ] Cover bounded create, modify, and delete combinations.
+  - [ ] Cover commit-phase failure that restores the pre-state under the
+        documented assumptions.
+  - [ ] Acceptance criteria: harnesses assert file-set preservation and
+        rollback restoration over bounded traces.
+- [ ] 8.3.3. Add Kani smoke harnesses for `act apply-patch` matching and path
+      guardrails in `crates/weaverd/src/dispatch/act/apply_patch/`.
+      Requires 8.3.1 and 6.1.4.
+  - [ ] Cover cursor monotonicity for ordered `SEARCH`/`REPLACE` blocks.
+  - [ ] Cover whole-command abort on unmatched blocks.
+  - [ ] Cover path normalization rejecting absolute and parent-escape paths.
+  - [ ] Acceptance criteria: `make kani` includes apply-patch smoke harnesses,
+        and the checked properties map directly to the documented patch
+        contract.
+- [ ] 8.3.4. Promote larger transaction and patch harnesses to `make kani-full`
+      once the smoke harnesses are stable. Requires 8.3.2 and 8.3.3.
+  - [ ] Expand touched-file counts and mixed-operation sequences.
+  - [ ] Keep smoke and full harnesses separate.
+  - [ ] Acceptance criteria: `make kani-full` exercises larger bounded traces
+        than the pull-request smoke set, and scheduled runs record stable pass
+        or fail outcomes.
+
+### 8.4. Add Kani checks for capability routing and refusal semantics
+
+*Outcome: Verify bounded capability-selection invariants in the plugin control*
+*plane before expanding proof coverage elsewhere.*
+
+- [ ] 8.4.1. Add Kani smoke harnesses for capability-resolution soundness in
+      `crates/weaver-plugins/src/`. Requires 8.1.2, 5.3.2, and 8.2.3.
+  - [ ] Prove the selected provider satisfies the requested language and
+        capability.
+  - [ ] Prove refusal is deterministic when no compatible provider exists.
+  - [ ] Acceptance criteria: `make kani` runs capability-routing smoke
+        harnesses, and refusal semantics are asserted over bounded routing
+        tables.
+- [ ] 8.4.2. Add property-based tests for refusal-code stability, path-policy
+      helpers, and bounded routing tables. Requires 8.4.1.
+  - [ ] Acceptance criteria: generated tests complement the Kani harnesses by
+        exploring larger input spaces without widening the verified kernel
+        claims.
+
+### 8.5. Add a proof-only Verus kernel
+
+*Outcome: Prove the smallest stable invariants in proof-only modules outside*
+*the main Cargo build.*
+
+- [ ] 8.5.1. Add a proof-only Verus workspace under `verus/` with
+      `weaver_proofs.rs` as the entrypoint. Requires 8.1.2 and 8.2.3.
+  - [ ] Add `transaction_kernel.rs`, `capability_routing.rs`, and
+        `apply_patch_paths.rs`.
+  - [ ] Acceptance criteria: `make verus` executes the proof entrypoint, and
+        the proof modules use proof-specific types rather than widening the
+        production API.
+- [ ] 8.5.2. Prove transaction-gating and rollback-restoration lemmas over a
+      modelled workspace state. Requires 8.5.1 and 8.2.1.
+  - [ ] Acceptance criteria: proofs establish that commit requires both locks
+        and that documented rollback restoration holds under the chosen model
+        assumptions.
+- [ ] 8.5.3. Prove capability-resolution soundness over an abstract resolver.
+      Requires 8.5.1 and 8.2.3.
+  - [ ] Acceptance criteria: proofs establish that successful resolution
+        satisfies language, capability, and policy predicates, and that refusal
+        occurs instead of silent fallback when no provider qualifies.
+
+### 8.6. Extend formal verification coverage after later roadmap features land
+
+*Outcome: Expand proof coverage only when the underlying contracts and kernels*
+*are implemented and stable.*
+
+- [ ] 8.6.1. Add Kani harnesses for graph-slice budget enforcement after 7.2.5
+      lands. Requires 7.2.5 and 8.3.4.
+  - [ ] Acceptance criteria: bounded graph harnesses prove counters do not
+        exceed accepted-card, edge, and token-budget caps on small graphs.
+- [ ] 8.6.2. Add Kani harnesses for duplicate-name guardrails and assignment
+      injectivity after 7.4.8 and 7.4.9 land. Requires 7.4.8, 7.4.9, and
+      8.3.4.
+  - [ ] Acceptance criteria: bounded matching harnesses prove injective
+        assignments by default and prove many-to-one assignments remain gated
+        behind explicit split or merge modes.
+- [ ] 8.6.3. Add Kani harnesses for Sempai semantic constraints only after the
+      planned parser and backend crates exist. Requires 4.2 and 4.3.
+  - [ ] Acceptance criteria: formal checks cover deterministic matcher and
+        normalization kernels without trying to verify external parser or
+        runtime dependencies wholesale.

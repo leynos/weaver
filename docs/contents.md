@@ -15,6 +15,9 @@
     refactoring.
 - [Documentation style guide](documentation-style-guide.md)
   - Writing, formatting, grammar, and structure standards for repository docs.
+- [Formal verification methods in Weaver](formal-verification-methods-in-weaver.md)
+  - Recommended Kani, Verus, and testing strategy for Weaver's transactional
+    and routing invariants.
 - [`execplans/`](execplans/)
   - Living execution plans used to scope, implement, and verify discrete
     deliverables.
