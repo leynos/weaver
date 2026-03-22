@@ -263,7 +263,7 @@ The Continuous Integration (CI) pipeline should keep the current `build-test`
 job intact and add new jobs in stages:
 
 1. `kani-smoke` on every pull request (PR) once the first smoke harnesses land,
-2. `verus-proofs` only after the first proof set stabilises, and
+2. `verus-proofs` only after the first proof set stabilizes, and
 3. a scheduled or manually dispatched slow suite for `kani-full` and the Verus
    proofs.[^10]
 
