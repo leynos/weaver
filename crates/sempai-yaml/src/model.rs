@@ -314,6 +314,19 @@ pub enum MatchFormula {
 }
 
 impl MatchFormula {
+    #[expect(
+        clippy::ref_option,
+        reason = "The helper mirrors the decorated arguments exactly as requested"
+    )]
+    #[inline]
+    const fn has_decoration(
+        where_clauses: &[Value],
+        as_name: &Option<String>,
+        fix: &Option<String>,
+    ) -> bool {
+        !where_clauses.is_empty() || as_name.is_some() || fix.is_some()
+    }
+
     /// Wraps a core match formula with optional decoration.
     #[must_use]
     pub fn decorated(
@@ -322,15 +335,15 @@ impl MatchFormula {
         as_name: Option<String>,
         fix: Option<String>,
     ) -> Self {
-        if where_clauses.is_empty() && as_name.is_none() && fix.is_none() {
-            formula
-        } else {
+        if Self::has_decoration(&where_clauses, &as_name, &fix) {
             Self::Decorated {
                 formula: Box::new(formula),
                 where_clauses,
                 as_name,
                 fix,
             }
+        } else {
+            formula
         }
     }
 }
