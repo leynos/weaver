@@ -85,13 +85,10 @@ fn strip_bidi_isolates(text: String) -> String {
     text.replace(['\u{2068}', '\u{2069}'], "")
 }
 
-fn localize_known_operation(
-    localizer: &dyn Localizer,
-    domain: KnownDomain,
-    operation: &str,
-) -> String {
-    let message_id = format!("weaver-after-help-{}-{operation}", domain.as_str());
-    strip_bidi_isolates(localizer.message(&message_id, None, operation))
+fn known_domain_from_catalogue_entry(domain: &str) -> KnownDomain {
+    KnownDomain::try_parse(domain).unwrap_or_else(|| {
+        panic!("DOMAIN_OPERATIONS must contain valid KnownDomain entries: {domain}")
+    })
 }
 
 /// Returns the first domain plus its first operation from `DOMAIN_OPERATIONS`.
@@ -141,7 +138,6 @@ pub(crate) fn write_missing_operation_guidance<W: Write>(
     writeln!(writer)?;
     writeln!(writer, "{available_operations}")?;
     for operation in operations {
-        let operation = localize_known_operation(localizer, domain, operation);
         writeln!(writer, "  {operation}")?;
     }
     writeln!(writer)?;
@@ -186,11 +182,9 @@ pub(crate) fn write_unknown_domain_guidance<W: Write>(
     writeln!(writer)?;
     writeln!(writer, "{available_operations}")?;
     for (known_domain, _, operations) in DOMAIN_OPERATIONS {
-        let Some(known_domain_enum) = KnownDomain::try_parse(known_domain) else {
-            continue;
-        };
+        let known_domain_enum = known_domain_from_catalogue_entry(known_domain);
         for operation in *operations {
-            let operation = localize_known_operation(localizer, known_domain_enum, operation);
+            debug_assert_eq!(known_domain_enum.as_str(), *known_domain);
             writeln!(writer, "  {known_domain} {operation}")?;
         }
     }
@@ -235,15 +229,6 @@ pub(crate) mod fluent_entries {
         )
     }
 
-    fn localize_operation(
-        localizer: &dyn ortho_config::Localizer,
-        domain: super::KnownDomain,
-        operation: &str,
-    ) -> String {
-        let message_id = format!("weaver-after-help-{}-{operation}", domain.as_str());
-        localizer.message(&message_id, None, operation)
-    }
-
     fn pad_to(s: &mut String, width: usize) {
         if s.len() < width {
             s.extend(std::iter::repeat_n(' ', width - s.len()));
@@ -274,21 +259,14 @@ pub(crate) mod fluent_entries {
         let header = localizer.message(HEADER.0, None, HEADER.1);
         let mut sections = Vec::new();
         for (domain_str, _, operations) in super::DOMAIN_OPERATIONS {
-            let Some(domain) = super::KnownDomain::try_parse(domain_str) else {
-                eprintln!("warning: missing heading for domain: {domain_str}");
-                debug_assert!(false, "missing heading for domain: {domain_str}");
-                continue;
-            };
+            let domain = super::known_domain_from_catalogue_entry(domain_str);
             let (heading_id, heading_fallback) = domain_heading_entry(domain);
             let heading = localizer.message(&heading_id, None, &heading_fallback);
             let rows = operations
                 .chunks(3)
                 .map(|chunk| {
-                    let localized = chunk
-                        .iter()
-                        .map(|operation| localize_operation(localizer, domain, operation))
-                        .collect::<Vec<_>>();
-                    format!("    {}", format_operation_row(&localized))
+                    let operations = chunk.iter().map(ToString::to_string).collect::<Vec<_>>();
+                    format!("    {}", format_operation_row(&operations))
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
