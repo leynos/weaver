@@ -6,6 +6,8 @@
 
 use std::io::{self, Write};
 
+use ortho_config::{LocalizationArgs, Localizer};
+
 /// A validated, known CLI domain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum KnownDomain {
@@ -79,6 +81,19 @@ pub(crate) fn operations_for_domain(domain: KnownDomain) -> &'static [&'static s
     domain.operations()
 }
 
+fn strip_bidi_isolates(text: String) -> String {
+    text.replace(['\u{2068}', '\u{2069}'], "")
+}
+
+fn localize_known_operation(
+    localizer: &dyn Localizer,
+    domain: KnownDomain,
+    operation: &str,
+) -> String {
+    let message_id = format!("weaver-after-help-{}-{operation}", domain.as_str());
+    strip_bidi_isolates(localizer.message(&message_id, None, operation))
+}
+
 /// Returns the first domain plus its first operation from `DOMAIN_OPERATIONS`.
 ///
 /// Returns `None` when the catalogue is empty or when the first domain has no
@@ -91,28 +106,46 @@ fn first_known_command() -> Option<(&'static str, &'static str)> {
 /// Writes contextual guidance for a known domain missing its operation.
 ///
 /// Returns `Ok(true)` when guidance was emitted and `Ok(false)` when the
-/// supplied domain is not part of the client-side catalogue.
+/// supplied [`KnownDomain`] has no registered operations, so no guidance could
+/// be emitted.
 pub(crate) fn write_missing_operation_guidance<W: Write>(
     writer: &mut W,
+    localizer: &dyn Localizer,
     domain: KnownDomain,
 ) -> io::Result<bool> {
     let operations = operations_for_domain(domain);
     let Some(hint_operation) = operations.first() else {
         return Ok(false);
     };
-    let domain = domain.as_str();
+    let domain_name = domain.as_str();
+    let mut args = LocalizationArgs::new();
+    args.insert("domain", domain_name.into());
+    args.insert("hint_operation", (*hint_operation).into());
+    let error = strip_bidi_isolates(localizer.message(
+        "weaver-domain-guidance-missing-operation-error",
+        Some(&args),
+        &format!("error: operation required for domain '{domain_name}'"),
+    ));
+    let available_operations = strip_bidi_isolates(localizer.message(
+        "weaver-domain-guidance-available-operations",
+        None,
+        "Available operations:",
+    ));
+    let hint = strip_bidi_isolates(localizer.message(
+        "weaver-domain-guidance-help-hint",
+        Some(&args),
+        &format!("Run 'weaver {domain_name} {hint_operation} --help' for operation details."),
+    ));
 
-    writeln!(writer, "error: operation required for domain '{domain}'")?;
+    writeln!(writer, "{error}")?;
     writeln!(writer)?;
-    writeln!(writer, "Available operations:")?;
+    writeln!(writer, "{available_operations}")?;
     for operation in operations {
+        let operation = localize_known_operation(localizer, domain, operation);
         writeln!(writer, "  {operation}")?;
     }
     writeln!(writer)?;
-    writeln!(
-        writer,
-        "Run 'weaver {domain} {hint_operation} --help' for operation details.",
-    )?;
+    writeln!(writer, "{hint}")?;
 
     Ok(true)
 }
@@ -120,6 +153,7 @@ pub(crate) fn write_missing_operation_guidance<W: Write>(
 /// Writes contextual guidance for an unknown domain missing its operation.
 pub(crate) fn write_unknown_domain_guidance<W: Write>(
     writer: &mut W,
+    localizer: &dyn Localizer,
     domain: &str,
 ) -> io::Result<bool> {
     if KnownDomain::try_parse(domain).is_some() {
@@ -128,20 +162,40 @@ pub(crate) fn write_unknown_domain_guidance<W: Write>(
     let Some((hint_domain, hint_operation)) = first_known_command() else {
         return Ok(false);
     };
+    let mut args = LocalizationArgs::new();
+    args.insert("domain", domain.into());
+    args.insert("hint_domain", hint_domain.into());
+    args.insert("hint_operation", hint_operation.into());
+    let error = strip_bidi_isolates(localizer.message(
+        "weaver-domain-guidance-unknown-domain-error",
+        Some(&args),
+        &format!("error: unknown domain '{domain}'"),
+    ));
+    let available_operations = strip_bidi_isolates(localizer.message(
+        "weaver-domain-guidance-available-operations",
+        None,
+        "Available operations:",
+    ));
+    let hint = strip_bidi_isolates(localizer.message(
+        "weaver-domain-guidance-help-hint-unknown-domain",
+        Some(&args),
+        &format!("Run 'weaver {hint_domain} {hint_operation} --help' for operation details."),
+    ));
 
-    writeln!(writer, "error: unknown domain '{domain}'")?;
+    writeln!(writer, "{error}")?;
     writeln!(writer)?;
-    writeln!(writer, "Available operations:")?;
+    writeln!(writer, "{available_operations}")?;
     for (known_domain, _, operations) in DOMAIN_OPERATIONS {
+        let Some(known_domain_enum) = KnownDomain::try_parse(known_domain) else {
+            continue;
+        };
         for operation in *operations {
+            let operation = localize_known_operation(localizer, known_domain_enum, operation);
             writeln!(writer, "  {known_domain} {operation}")?;
         }
     }
     writeln!(writer)?;
-    writeln!(
-        writer,
-        "Run 'weaver {hint_domain} {hint_operation} --help' for operation details.",
-    )?;
+    writeln!(writer, "{hint}")?;
 
     Ok(true)
 }
@@ -162,6 +216,9 @@ pub(crate) fn should_emit_domain_guidance(cli: &crate::Cli) -> bool {
 
 #[cfg(test)]
 pub(crate) mod fluent_entries {
+    //! Test-only after-help catalogue builders used to assert localized help
+    //! output without widening the production discoverability surface.
+
     pub(in crate::discoverability) const HEADER: (&str, &str) =
         ("weaver-after-help-header", "Domains and operations:");
 

@@ -245,13 +245,13 @@ fn handle_preflight<ErrWriter: Write>(
     if should_emit_domain_guidance(cli) {
         let raw_domain = cli.domain.as_deref().map(str::trim).unwrap_or_default();
         let emitted_missing_operation_guidance = match KnownDomain::try_parse(raw_domain) {
-            Some(domain) => {
-                write_missing_operation_guidance(stderr, domain).map_err(AppError::EmitGuidance)?
-            }
+            Some(domain) => write_missing_operation_guidance(stderr, localizer, domain)
+                .map_err(AppError::EmitGuidance)?,
             None => false,
         };
         if emitted_missing_operation_guidance
-            || write_unknown_domain_guidance(stderr, raw_domain).map_err(AppError::EmitGuidance)?
+            || write_unknown_domain_guidance(stderr, localizer, raw_domain)
+                .map_err(AppError::EmitGuidance)?
         {
             return Err(AppError::MissingOperationGuidance);
         }
