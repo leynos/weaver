@@ -25,7 +25,20 @@ Feature: Weaver CLI behaviour
   Scenario: Rejecting a missing operation
     When the operator runs "observe"
     Then the CLI fails
-    And stderr contains "command operation must be provided"
+    And stderr contains "error: operation required for domain 'observe'"
+    And stderr contains "Available operations:"
+    And stderr contains "get-card"
+    And stderr contains "weaver observe get-definition --help"
+    And no daemon command was sent
+
+  Scenario: Rejecting an unknown domain
+    When the operator runs "unknown-domain"
+    Then the CLI fails
+    And stderr contains "error: unknown domain 'unknown-domain'"
+    And stderr contains "Available operations:"
+    And stderr contains "observe get-definition"
+    And stderr contains "weaver observe get-definition --help"
+    And no daemon command was sent
 
   Scenario: Reporting malformed daemon responses
     Given a running fake daemon sending malformed json

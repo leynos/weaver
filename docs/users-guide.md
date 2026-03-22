@@ -268,7 +268,7 @@ Domains and operations:
 
   observe — Query code structure and relationships
     get-definition    find-references    grep
-    diagnostics       call-hierarchy
+    diagnostics       call-hierarchy    get-card
 
   act — Perform code modifications
     rename-symbol     apply-edits        apply-patch
@@ -280,6 +280,31 @@ Domains and operations:
 
 This catalogue is built into the binary and does not require a running daemon
 or configuration file.
+
+### Domain-only guidance
+
+Running a domain without an operation fails fast on the client side. Known
+domains print the valid operations for that domain; unknown domains print the
+built-in catalogue of available domain-operation pairs. This happens before
+configuration loading, daemon startup, or socket access. Example:
+
+```text
+$ weaver observe
+error: operation required for domain 'observe'
+
+Available operations:
+  get-definition
+  find-references
+  grep
+  diagnostics
+  call-hierarchy
+  get-card
+
+Run 'weaver observe get-definition --help' for operation details.
+```
+
+The follow-up `--help` hint is concrete and deterministic, but until
+operation-level help lands it still resolves to the top-level help output.
 
 ### Output formats
 

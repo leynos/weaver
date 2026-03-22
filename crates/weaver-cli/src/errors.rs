@@ -17,9 +17,14 @@ pub(crate) enum AppError {
     MissingDomain,
     #[error("the command operation must be provided")]
     MissingOperation,
+    #[error("failed to emit bare help: {0}")]
+    EmitBareHelp(io::Error),
     /// Sentinel for bare invocation — help has already been written.
     #[error("bare invocation")]
     BareInvocation,
+    /// Sentinel for contextual missing-operation guidance.
+    #[error("missing operation guidance")]
+    MissingOperationGuidance,
     #[error("failed to resolve daemon address {endpoint}: {source}")]
     Resolve { endpoint: String, source: io::Error },
     #[error("failed to connect to daemon at {endpoint}: {source}")]
@@ -47,6 +52,8 @@ pub(crate) enum AppError {
     SerialiseCapabilities(serde_json::Error),
     #[error("failed to emit capabilities: {0}")]
     EmitCapabilities(io::Error),
+    #[error("failed to emit missing-operation guidance: {0}")]
+    EmitGuidance(io::Error),
     #[error("daemon lifecycle command failed: {0}")]
     Lifecycle(#[from] LifecycleError),
 }

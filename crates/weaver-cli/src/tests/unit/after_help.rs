@@ -8,9 +8,9 @@ use clap::CommandFactory;
 use ortho_config::{FluentLocalizer, NoOpLocalizer};
 
 use crate::cli::Cli;
+use crate::discoverability::DOMAIN_OPERATIONS;
+use crate::discoverability::fluent_entries::render_after_help;
 use crate::localizer::WEAVER_EN_US;
-use crate::localizer::after_help::DOMAIN_OPERATIONS;
-use crate::localizer::after_help::fluent_entries::render_after_help;
 
 /// Splits the catalogue text into domain sections (separated by blank lines)
 /// and verifies that each operation appears in the section belonging to its
@@ -20,7 +20,7 @@ fn assert_catalogue_complete(text: &str) {
     // Split into sections on blank lines. Each section after the header
     // starts with a domain heading (e.g. "  observe — …").
     let sections: Vec<&str> = text.split("\n\n").collect();
-    for (domain, operations) in DOMAIN_OPERATIONS {
+    for (domain, _, operations) in DOMAIN_OPERATIONS {
         let section = sections
             .iter()
             .find(|s| s.contains(domain))

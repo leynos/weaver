@@ -177,15 +177,15 @@ does* *not require source inspection or external runbooks.*
         and emit the same version string, and `weaver --help` includes at
         least one runnable quick-start command example, and `make check-fmt`,
         `make markdownlint`, `make fmt`, `make lint`, and `make test` pass.
-- [ ] 2.2.4. Provide contextual guidance when a domain is supplied without an
+- [x] 2.2.4. Provide contextual guidance when a domain is supplied without an
       operation. See
       [Level 2](ui-gap-analysis.md#level-2--domain-without-operation-weaver-observe)
       and
       [Level 10](ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
       (10e).
-  - [ ] Print available operations for the provided domain and a follow-up help
+  - [x] Print available operations for the provided domain and a follow-up help
         command.
-  - [ ] Acceptance criteria: `weaver <domain>` without an operation exits
+  - [x] Acceptance criteria: `weaver <domain>` without an operation exits
         non-zero, lists all operations registered for that domain, and includes
         one concrete `weaver <domain> <operation> --help` hint.
 

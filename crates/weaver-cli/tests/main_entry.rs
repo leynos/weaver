@@ -4,7 +4,7 @@
 //! and user-facing error handling when required arguments are missing.
 
 use assert_cmd::cargo::cargo_bin_cmd;
-use predicates::str::contains;
+use predicates::str::{contains, is_empty};
 use weaver_cli::DOMAIN_OPERATIONS;
 
 #[test]
@@ -21,7 +21,10 @@ fn missing_operation_exits_with_failure() {
     command
         .assert()
         .failure()
-        .stderr(contains("command operation must be provided"));
+        .stdout(is_empty())
+        .stderr(contains("error: operation required for domain 'observe'"))
+        .stderr(contains("get-card"))
+        .stderr(contains("weaver observe get-definition --help"));
 }
 
 #[test]
@@ -39,7 +42,7 @@ fn help_output_lists_all_domains_and_operations() {
         combined.contains("Domains and operations:"),
         "weaver --help output missing header"
     );
-    for (domain, ops) in DOMAIN_OPERATIONS {
+    for (domain, _, ops) in DOMAIN_OPERATIONS {
         assert!(
             combined.contains(domain),
             "weaver --help output missing domain {domain:?}"

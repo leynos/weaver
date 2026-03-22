@@ -413,6 +413,14 @@ the negotiated capability matrix as pretty-printed JSON, and exits without
 contacting the daemon. This keeps the probe side effect free and allows agents
 to cache the matrix easily.
 
+Known-domain invocations that omit the operation (for example,
+`weaver observe`) are also handled entirely on the client side. The CLI now
+consults a canonical built-in domain catalogue, prints the valid operations for
+the supplied domain, and exits non-zero before configuration discovery, daemon
+startup, or transport setup. Unknown domains intentionally remain outside this
+preflight path until roadmap item 2.3.1 adds dedicated client-side domain
+validation.
+
 #### 2.1.2. Lifecycle orchestration
 
 Operators now control the daemon lifecycle directly through the CLI via
