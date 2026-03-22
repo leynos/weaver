@@ -8,6 +8,14 @@
     execution strategy.
 - [Architectural decision record (ADR) 003: Semgrep-compatible query engine strategy](adr-003-sempai-semgrep-compatible-query-engine.md)
   - Decision record for hybrid execution strategy and compatibility routing.
+- [Architectural decision record (ADR) 004: Plugin routing and refusal semantics](adr-004-plugin-routing-refusal-semantics.md)
+  - Decision record for deterministic routing, refusal diagnostics, and
+    rollback guarantees.
+- [Architectural decision record (ADR) 005: Verification trust boundary for Weaver](adr-005-verification-trust-boundary.md)
+  - Decision record for the formal-verification boundary between Weaver-owned
+    kernels and trusted external tools.
+- [Architectural decision record (ADR) 006: Plugin execution and orchestration strategy](adr-006-plugin-execution-and-orchestration-strategy.md)
+  - Decision record for one-shot JSONL execution and broker-owned orchestration.
 - [Building an error-recovering parser with Chumsky](building-an-error-recovering-parser-with-chumsky.md)
   - Practical parser-construction guidance for resilient parsing workflows.
 - [Code complexity guide](complexity-antipatterns-and-refactoring-strategies.md)

@@ -1,0 +1,97 @@
+# Architectural decision record (ADR) 006: Plugin execution and orchestration strategy
+
+## Status
+
+Proposed.
+
+## Date
+
+2026-03-22.
+
+## Context and problem statement
+
+Weaver needs a concrete execution strategy for plugins and other external
+helpers. The broker must keep ownership of command orchestration, but the
+plugin boundary still needs to be simple enough for testing, debugging, and
+sandbox control.
+
+The design also needs to explain why Weaver uses one-shot JSONL payloads rather
+than long-lived streaming sessions for plugin execution.
+
+## Decision drivers
+
+- Keep plugin execution replaceable.
+- Keep broker ownership in Weaver.
+- Keep request and response shapes deterministic.
+- Minimise long-lived plugin state.
+
+## Requirements
+
+### Functional requirements
+
+- Execute plugin work through `weaver-plugins`.
+- Pass requests as a single JSONL payload over stdio.
+- Preserve a single shared commit path for accepted edits.
+
+### Technical requirements
+
+- Keep plugins short-lived and isolated.
+- Keep the broker responsible for validation and orchestration.
+- Avoid exposing plugin internals through the public command surface.
+
+## Options considered
+
+### Option A: One-shot JSONL over stdio with broker ownership
+
+The broker writes one request, reads one response, and owns orchestration.
+
+### Option B: Long-lived plugin sessions
+
+Keep plugins alive across multiple requests and reuse their in-memory state.
+
+### Option C: Inline execution
+
+Call plugin code directly from the daemon process instead of spawning a plugin
+process.
+
+## Decision outcome / proposed direction
+
+Adopt one-shot JSONL over stdio with broker ownership in `weaver-plugins`.
+
+The broker should own request validation, execution selection, and final
+handoff into the transaction path. Plugins remain implementation details and do
+not control commit behaviour directly.
+
+## Goals and non-goals
+
+### Goals
+
+- Keep the execution model predictable.
+- Keep plugin lifecycles easy to sandbox.
+- Keep orchestration logic centralised in the broker.
+
+### Non-goals
+
+- Maintain per-plugin sessions across requests.
+- Expose plugin protocol details in the CLI contract.
+- Move commit responsibility out of Weaver's safety harness.
+
+## Migration plan
+
+1. Keep plugin requests to one JSONL line in and one JSONL line out.
+2. Make broker validation and routing explicit.
+3. Preserve the safety-harness handoff for accepted edits.
+4. Add tests that exercise refusal, success, and rollback paths.
+
+## Known risks and limitations
+
+- One-shot execution means each request pays process startup cost.
+- Broker bugs can affect multiple plugins if orchestration is centralised.
+- Streaming state is unavailable, so plugins must be stateless or rehydrate
+  their inputs each time.
+
+## Architectural rationale
+
+One-shot brokered execution keeps the plugin boundary narrow and auditable. It
+fits Weaver's command-line transport model and preserves the broker's control
+over commit-sensitive behaviour.
