@@ -18,24 +18,51 @@ impl ConfigLoader for PanickingLoader {
     }
 }
 
-#[test]
-fn known_domain_without_operation_emits_contextual_guidance() {
+fn run_with_panicking_loader(args: &[&str]) -> (ExitCode, Vec<u8>, String) {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let mut stdin = Cursor::new(Vec::new());
     let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
-
-    let exit = run_with_loader(
-        vec![OsString::from("weaver"), OsString::from("observe")],
-        &mut io,
-        &PanickingLoader,
-    );
-
+    let cli_args = std::iter::once("weaver")
+        .chain(args.iter().copied())
+        .map(OsString::from)
+        .collect::<Vec<_>>();
+    let exit = run_with_loader(cli_args, &mut io, &PanickingLoader);
     let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
+
+    (exit, stdout, stderr_text)
+}
+
+fn assert_unknown_domain_preflight(exit: ExitCode, stdout: &[u8], stderr_text: &str, domain: &str) {
     assert_eq!(exit, ExitCode::FAILURE);
     assert!(stdout.is_empty(), "guidance must not write to stdout");
-    assert!(stderr_text.contains("error: operation required for domain 'observe'"));
+    assert!(stderr_text.contains(&format!("error: unknown domain '{domain}'")));
+    assert!(stderr_text.contains("Valid domains: observe, act, verify"));
+}
+
+fn assert_known_domain_operation_guidance(
+    exit: ExitCode,
+    stdout: &[u8],
+    stderr_text: &str,
+    domain: &str,
+) {
+    assert_eq!(exit, ExitCode::FAILURE);
+    assert!(stdout.is_empty(), "guidance must not write to stdout");
+    assert!(stderr_text.contains(&format!("error: operation required for domain '{domain}'")));
     assert!(stderr_text.contains("Available operations:"));
+}
+
+fn assert_no_domain_guidance(stderr_text: &str) {
+    assert!(!stderr_text.contains("error: operation required for domain"));
+    assert!(!stderr_text.contains("Available operations:"));
+    assert!(!stderr_text.contains("Valid domains: observe, act, verify"));
+}
+
+#[test]
+fn known_domain_without_operation_emits_contextual_guidance() {
+    let (exit, stdout, stderr_text) = run_with_panicking_loader(&["observe"]);
+
+    assert_known_domain_operation_guidance(exit, &stdout, &stderr_text, "observe");
     assert!(stderr_text.contains("get-definition"));
     assert!(stderr_text.contains("get-card"));
     assert!(stderr_text.contains("weaver observe get-definition --help"));
@@ -43,98 +70,34 @@ fn known_domain_without_operation_emits_contextual_guidance() {
 
 #[test]
 fn unknown_domain_without_operation_emits_global_guidance() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let mut stdin = Cursor::new(Vec::new());
-    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
+    let (exit, stdout, stderr_text) = run_with_panicking_loader(&["unknown-domain"]);
 
-    let exit = run_with_loader(
-        vec![OsString::from("weaver"), OsString::from("unknown-domain")],
-        &mut io,
-        &PanickingLoader,
-    );
-
-    let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
-    assert_eq!(exit, ExitCode::FAILURE);
-    assert!(stdout.is_empty(), "guidance must not write to stdout");
-    assert!(stderr_text.contains("error: unknown domain 'unknown-domain'"));
-    assert!(stderr_text.contains("Valid domains: observe, act, verify"));
-    assert!(!stderr_text.contains("Available operations:"));
+    assert_unknown_domain_preflight(exit, &stdout, &stderr_text, "unknown-domain");
     assert!(!stderr_text.contains("weaver observe get-definition --help"));
 }
 
 #[test]
 fn unknown_domain_with_operation_emits_global_guidance_before_configuration_loading() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let mut stdin = Cursor::new(Vec::new());
-    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
+    let (exit, stdout, stderr_text) =
+        run_with_panicking_loader(&["unknown-domain", "get-definition"]);
 
-    let exit = run_with_loader(
-        vec![
-            OsString::from("weaver"),
-            OsString::from("unknown-domain"),
-            OsString::from("get-definition"),
-        ],
-        &mut io,
-        &PanickingLoader,
-    );
-
-    let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
-    assert_eq!(exit, ExitCode::FAILURE);
-    assert!(stdout.is_empty(), "guidance must not write to stdout");
-    assert!(stderr_text.contains("error: unknown domain 'unknown-domain'"));
-    assert!(stderr_text.contains("Valid domains: observe, act, verify"));
+    assert_unknown_domain_preflight(exit, &stdout, &stderr_text, "unknown-domain");
     assert!(!stderr_text.contains("Waiting for daemon start..."));
 }
 
 #[test]
 fn typo_domain_emits_single_suggestion() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let mut stdin = Cursor::new(Vec::new());
-    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
+    let (exit, stdout, stderr_text) = run_with_panicking_loader(&["obsrve", "get-definition"]);
 
-    let exit = run_with_loader(
-        vec![
-            OsString::from("weaver"),
-            OsString::from("obsrve"),
-            OsString::from("get-definition"),
-        ],
-        &mut io,
-        &PanickingLoader,
-    );
-
-    let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
-    assert_eq!(exit, ExitCode::FAILURE);
-    assert!(stdout.is_empty(), "guidance must not write to stdout");
-    assert!(stderr_text.contains("error: unknown domain 'obsrve'"));
-    assert!(stderr_text.contains("Valid domains: observe, act, verify"));
+    assert_unknown_domain_preflight(exit, &stdout, &stderr_text, "obsrve");
     assert!(stderr_text.contains("Did you mean 'observe'?"));
 }
 
 #[test]
 fn distant_unknown_domain_omits_suggestion() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let mut stdin = Cursor::new(Vec::new());
-    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
+    let (exit, stdout, stderr_text) = run_with_panicking_loader(&["bogus", "get-definition"]);
 
-    let exit = run_with_loader(
-        vec![
-            OsString::from("weaver"),
-            OsString::from("bogus"),
-            OsString::from("get-definition"),
-        ],
-        &mut io,
-        &PanickingLoader,
-    );
-
-    let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
-    assert_eq!(exit, ExitCode::FAILURE);
-    assert!(stdout.is_empty(), "guidance must not write to stdout");
-    assert!(stderr_text.contains("error: unknown domain 'bogus'"));
-    assert!(stderr_text.contains("Valid domains: observe, act, verify"));
+    assert_unknown_domain_preflight(exit, &stdout, &stderr_text, "bogus");
     assert!(!stderr_text.contains("Did you mean"));
 }
 
@@ -165,7 +128,5 @@ fn complete_command_still_reports_configuration_failures() {
     let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
     assert_eq!(exit, ExitCode::FAILURE);
     assert!(stderr_text.contains("command domain"));
-    assert!(!stderr_text.contains("error: operation required for domain"));
-    assert!(!stderr_text.contains("Available operations:"));
-    assert!(!stderr_text.contains("Valid domains: observe, act, verify"));
+    assert_no_domain_guidance(&stderr_text);
 }
