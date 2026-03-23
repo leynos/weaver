@@ -391,7 +391,6 @@ fn forward_diff_to_apply_patch<W: Write>(
     };
     apply_patch::handle(&patch_request, writer, backends, workspace_root)
 }
-
 #[cfg(test)]
 mod behaviour;
 #[cfg(test)]

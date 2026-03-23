@@ -105,8 +105,6 @@ pub(crate) enum RefusalReason {
     UnsupportedLanguage,
     /// The requested provider name does not exist in the registry.
     ProviderNotFound,
-    /// The requested provider exists but does not declare support for the requested capability.
-    ProviderLacksCapability,
     /// The requested provider does not support the inferred language.
     ExplicitProviderMismatch,
     /// No registered provider matched the inferred language and capability.
@@ -239,9 +237,6 @@ fn resolve_explicit_provider(
     provider_name: &str,
     context: ExplicitProviderContext<'_>,
 ) -> CapabilityResolutionEnvelope {
-    // Check if the provider exists in the registry at all
-    let provider_exists = registry.get(provider_name).is_some();
-
     let mut found_in_candidates = false;
     let mut selected_provider: Option<String> = None;
     let mut evaluations = Vec::with_capacity(context.candidates.len());
@@ -267,43 +262,24 @@ fn resolve_explicit_provider(
         }
     }
 
-    if let Some(selected_provider) = selected_provider {
+    let refusal_reason = if found_in_candidates || registry.get(provider_name).is_some() {
+        RefusalReason::ExplicitProviderMismatch
+    } else {
+        RefusalReason::ProviderNotFound
+    };
+
+    if let Some(provider) = selected_provider {
         CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
             capability: context.capability,
             language: Some(String::from(context.language.as_str())),
             requested_provider: Some(String::from(provider_name)),
-            selected_provider: Some(selected_provider),
+            selected_provider: Some(provider),
             selection_mode: SelectionMode::ExplicitProvider,
             outcome: ResolutionOutcome::Selected,
             refusal_reason: None,
             candidates: evaluations,
         })
-    } else if found_in_candidates {
-        // Provider exists and provides the capability, but doesn't support the language
-        refused(
-            RoutingContext {
-                capability: context.capability,
-                language: Some(context.language),
-                requested_provider: Some(String::from(provider_name)),
-                selection_mode: SelectionMode::ExplicitProvider,
-            },
-            RefusalReason::ExplicitProviderMismatch,
-            evaluations,
-        )
-    } else if provider_exists {
-        // Provider exists in registry but doesn't provide this capability
-        refused(
-            RoutingContext {
-                capability: context.capability,
-                language: Some(context.language),
-                requested_provider: Some(String::from(provider_name)),
-                selection_mode: SelectionMode::ExplicitProvider,
-            },
-            RefusalReason::ProviderLacksCapability,
-            evaluations,
-        )
     } else {
-        // Provider doesn't exist in registry at all
         refused(
             RoutingContext {
                 capability: context.capability,
@@ -311,7 +287,7 @@ fn resolve_explicit_provider(
                 requested_provider: Some(String::from(provider_name)),
                 selection_mode: SelectionMode::ExplicitProvider,
             },
-            RefusalReason::ProviderNotFound,
+            refusal_reason,
             evaluations,
         )
     }

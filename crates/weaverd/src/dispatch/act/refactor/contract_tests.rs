@@ -9,7 +9,6 @@ use weaver_plugins::{CapabilityId, PluginError, PluginOutput, PluginRequest, Plu
 #[path = "refactor_helpers.rs"]
 mod refactor_helpers;
 
-use refactor_helpers::{build_backends, command_request};
 use crate::dispatch::act::refactor::resolution::{
     CandidateEvaluation, CapabilityResolutionDetails, CapabilityResolutionEnvelope,
     ResolutionOutcome, ResolutionRequest, SelectionMode,
@@ -17,7 +16,7 @@ use crate::dispatch::act::refactor::resolution::{
 use crate::dispatch::act::refactor::{
     RefactorContext, RefactorPluginRuntime, ResponseWriter, handle, rust_analyzer_manifest,
 };
-use crate::dispatch::request::CommandRequest;
+use refactor_helpers::{build_backends, command_request};
 
 struct InspectingRuntime {
     captured: Mutex<Option<PluginRequest>>,
