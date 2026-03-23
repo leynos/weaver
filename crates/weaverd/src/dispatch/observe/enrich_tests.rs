@@ -35,10 +35,12 @@ fn try_lsp_enrichment_starts_backend_and_populates_hover_info() {
     let lsp = card.lsp.expect("card should contain LSP enrichment");
     assert_lsp_info(
         &lsp,
-        "lsp_hover",
-        "fn greet(name: &str) -> usize",
-        "fn greet(name: &str) -> usize",
-        true,
+        &ExpectedLspInfo {
+            source: "lsp_hover",
+            hover_fragment: "fn greet(name: &str) -> usize",
+            type_info: "fn greet(name: &str) -> usize",
+            deprecated: true,
+        },
     );
 }
 
@@ -83,10 +85,12 @@ fn parses_markup_hover_response() {
 
     assert_lsp_info(
         &info,
-        "lsp_hover",
-        "fn greet",
-        "fn greet(name: &str) -> usize",
-        false,
+        &ExpectedLspInfo {
+            source: "lsp_hover",
+            hover_fragment: "fn greet",
+            type_info: "fn greet(name: &str) -> usize",
+            deprecated: false,
+        },
     );
 }
 
@@ -251,23 +255,23 @@ fn try_lsp_enrichment_with_non_ascii_source() {
     assert!(card.lsp.is_some());
 }
 
-#[allow(clippy::too_many_arguments)]
-fn assert_lsp_info(
-    info: &LspInfo,
-    expected_source: &str,
-    expected_hover_fragment: &str,
-    expected_type_info: &str,
-    expected_deprecated: bool,
-) {
-    assert_eq!(info.source, expected_source, "source mismatch");
+struct ExpectedLspInfo<'a> {
+    source: &'a str,
+    hover_fragment: &'a str,
+    type_info: &'a str,
+    deprecated: bool,
+}
+
+fn assert_lsp_info(info: &LspInfo, expected: &ExpectedLspInfo<'_>) {
+    assert_eq!(info.source, expected.source, "source mismatch");
     assert!(
-        info.hover.contains(expected_hover_fragment),
+        info.hover.contains(expected.hover_fragment),
         "hover {:?} did not contain {:?}",
         info.hover,
-        expected_hover_fragment
+        expected.hover_fragment
     );
-    assert_eq!(info.type_info, expected_type_info, "type_info mismatch");
-    assert_eq!(info.deprecated, expected_deprecated, "deprecated mismatch");
+    assert_eq!(info.type_info, expected.type_info, "type_info mismatch");
+    assert_eq!(info.deprecated, expected.deprecated, "deprecated mismatch");
 }
 
 fn check_utf16_offset(line: &str, byte_col: usize, expected: Option<u32>) {
@@ -314,7 +318,7 @@ fn assert_enrichment_degrades(
     FusionBackends<crate::semantic_provider::SemanticBackendProvider>,
     TempDir,
 ) {
-    let source = "fn test() {}";
+    let source = "// comment\nfn greet(name: &str) -> usize { 0 }";
     let (outcome, backends, card, dir) = run_enrichment_with_server(server, source);
     assert_eq!(outcome, EnrichmentOutcome::Degraded);
     assert!(card.lsp.is_none());

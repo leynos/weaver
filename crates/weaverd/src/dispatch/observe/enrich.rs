@@ -29,7 +29,7 @@ pub enum EnrichmentOutcome {
 
 /// Assembles `HoverParams` from a card's symbol reference.
 ///
-/// Handles URI parsing, LSP initialisation, capability negotiation, and
+/// Handles URI parsing, LSP initialization, capability negotiation, and
 /// UTF-16 / UTF-8 character-offset conversion. Returns `None` on any failure,
 /// having already emitted an appropriate `debug!` log.
 fn build_hover_params(
@@ -222,6 +222,10 @@ fn get_hover(
                 None
             }
         })
+        // Triple unwrap: with_lsp_host_mut returns Result<Option<_>, _>,
+        // hover returns Result<Option<Hover>, _>, and the match wraps it again.
+        // Chain: .ok() unwraps the outer Result, first .flatten() unwraps the
+        // provider's Option, second .flatten() unwraps the hover's Option.
         .ok()
         .flatten()
         .flatten()
