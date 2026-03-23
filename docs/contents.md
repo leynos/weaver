@@ -1,13 +1,29 @@
 # [Contents index](contents.md) - Central index for all documentation files in `docs/`
 
-- [Architectural decision record (ADR) 001: Plugin capability model and `act extricate`](adr-001-plugin-capability-model-and-act-extricate.md)
+- [Architectural decision record (ADR) 001: Plugin capability model and
+  `act extricate`](adr-001-plugin-capability-model-and-act-extricate.md)
   - Decision record for plugin capability declarations and extrication
     behaviours.
-- [Architectural decision record (ADR) 002: Query language for feature extraction in Weaver](adr-002-query-language-for-feature-extraction-in-weaver.md)
+- [Architectural decision record (ADR) 002: Query language for feature
+  extraction in
+  Weaver](adr-002-query-language-for-feature-extraction-in-weaver.md)
   - Decision record for the Semgrep-style query surface and Tree-sitter
     execution strategy.
-- [Architectural decision record (ADR) 003: Semgrep-compatible query engine strategy](adr-003-sempai-semgrep-compatible-query-engine.md)
+- [Architectural decision record (ADR) 003: Semgrep-compatible query engine
+  strategy](adr-003-sempai-semgrep-compatible-query-engine.md)
   - Decision record for hybrid execution strategy and compatibility routing.
+- [Architectural decision record (ADR) 004: Plugin routing and refusal
+  semantics](adr-004-plugin-routing-refusal-semantics.md)
+  - Decision record for deterministic routing, refusal diagnostics, and
+    rollback guarantees.
+- [Architectural decision record (ADR) 005: Verification trust boundary for
+  Weaver](adr-005-verification-trust-boundary.md)
+  - Decision record for the formal-verification boundary between Weaver-owned
+    kernels and trusted external tools.
+- [Architectural decision record (ADR) 006: Plugin execution and
+  orchestration
+  strategy](adr-006-plugin-execution-and-orchestration-strategy.md)
+  - Decision record for one-shot JSONL execution and broker-owned orchestration.
 - [Building an error-recovering parser with Chumsky](building-an-error-recovering-parser-with-chumsky.md)
   - Practical parser-construction guidance for resilient parsing workflows.
 - [Code complexity guide](complexity-antipatterns-and-refactoring-strategies.md)
@@ -15,6 +31,9 @@
     refactoring.
 - [Documentation style guide](documentation-style-guide.md)
   - Writing, formatting, grammar, and structure standards for repository docs.
+- [Formal verification methods in Weaver](formal-verification-methods-in-weaver.md)
+  - Recommended Kani, Verus, and testing strategy for Weaver's transactional
+    and routing invariants.
 - [`execplans/`](execplans/)
   - Living execution plans used to scope, implement, and verify discrete
     deliverables.
