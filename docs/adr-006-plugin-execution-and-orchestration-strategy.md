@@ -22,8 +22,8 @@ helpers. The broker must keep ownership of command orchestration, but the
 plugin boundary still needs to be simple enough for testing, debugging, and
 sandbox control.
 
-The design also needs to explain why Weaver uses one-shot JSON Lines (JSONL) payloads rather
-than long-lived streaming sessions for plugin execution.
+The design also needs to explain why Weaver uses one-shot JSON Lines (JSONL)
+payloads rather than long-lived streaming sessions for plugin execution.
 
 ## Decision Drivers
 
