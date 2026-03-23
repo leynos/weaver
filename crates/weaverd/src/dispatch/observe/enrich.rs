@@ -27,6 +27,68 @@ pub enum EnrichmentOutcome {
     Degraded,
 }
 
+/// Assembles `HoverParams` from a card's symbol reference.
+///
+/// Handles URI parsing, LSP initialisation, capability negotiation, and
+/// UTF-16 / UTF-8 character-offset conversion. Returns `None` on any failure,
+/// having already emitted an appropriate `debug!` log.
+fn build_hover_params(
+    card: &SymbolCard,
+    source: &str,
+    language: Language,
+    backends: &mut FusionBackends<SemanticBackendProvider>,
+) -> Option<HoverParams> {
+    let uri_str = &card.symbol.symbol_ref.uri;
+    let start = &card.symbol.symbol_ref.range.start;
+
+    let uri: lsp_types::Uri = match uri_str.parse() {
+        Ok(u) => u,
+        Err(error) => {
+            debug!(
+                target: DISPATCH_TARGET,
+                uri = uri_str,
+                error = %error,
+                "LSP enrichment degraded: card URI could not be parsed for hover request"
+            );
+            return None;
+        }
+    };
+
+    let capabilities = initialize_and_get_capabilities(language, backends)?;
+
+    let character = if capabilities
+        .position_encoding()
+        .is_some_and(|enc| *enc == lsp_types::PositionEncodingKind::UTF8)
+    {
+        start.column
+    } else {
+        match compute_utf16_character(source, start.line, start.column) {
+            Some(offset) => offset,
+            None => {
+                debug!(
+                    target: DISPATCH_TARGET,
+                    uri = uri_str,
+                    line = start.line,
+                    byte_column = start.column,
+                    "LSP enrichment degraded: failed to compute UTF-16 character offset"
+                );
+                return None;
+            }
+        }
+    };
+
+    Some(HoverParams {
+        text_document_position_params: TextDocumentPositionParams {
+            text_document: TextDocumentIdentifier { uri },
+            position: Position {
+                line: start.line,
+                character,
+            },
+        },
+        work_done_progress_params: Default::default(),
+    })
+}
+
 /// Attempts LSP hover enrichment on a Tree-sitter-extracted card.
 ///
 /// When the semantic backend is available and the language server supports
@@ -61,61 +123,9 @@ pub fn try_lsp_enrichment(
         return EnrichmentOutcome::Degraded;
     }
 
-    let uri_str = &card.symbol.symbol_ref.uri;
-    let start = &card.symbol.symbol_ref.range.start;
-
-    let uri: lsp_types::Uri = match uri_str.parse() {
-        Ok(u) => u,
-        Err(error) => {
-            debug!(
-                target: DISPATCH_TARGET,
-                uri = uri_str,
-                error = %error,
-                "LSP enrichment degraded: card URI could not be parsed for hover request"
-            );
-            return EnrichmentOutcome::Degraded;
-        }
-    };
-
-    // Initialize to get server capabilities
-    let capabilities = match initialize_and_get_capabilities(language, backends) {
-        Some(caps) => caps,
+    let params = match build_hover_params(card, source, language, backends) {
+        Some(p) => p,
         None => return EnrichmentOutcome::Degraded,
-    };
-
-    // Compute character offset based on negotiated position encoding
-    let character = if capabilities
-        .position_encoding()
-        .is_some_and(|enc| *enc == lsp_types::PositionEncodingKind::UTF8)
-    {
-        // Server supports UTF-8: use Tree-sitter byte offset directly
-        start.column
-    } else {
-        // Server requires UTF-16: convert byte offset to UTF-16 code units
-        match compute_utf16_character(source, start.line, start.column) {
-            Some(char_offset) => char_offset,
-            None => {
-                debug!(
-                    target: DISPATCH_TARGET,
-                    uri = uri_str,
-                    line = start.line,
-                    byte_column = start.column,
-                    "LSP enrichment degraded: failed to compute UTF-16 character offset"
-                );
-                return EnrichmentOutcome::Degraded;
-            }
-        }
-    };
-
-    let params = HoverParams {
-        text_document_position_params: TextDocumentPositionParams {
-            text_document: TextDocumentIdentifier { uri },
-            position: Position {
-                line: start.line,
-                character,
-            },
-        },
-        work_done_progress_params: Default::default(),
     };
 
     let hover = match get_hover(language, params, backends) {
@@ -123,8 +133,7 @@ pub fn try_lsp_enrichment(
         _ => return EnrichmentOutcome::Degraded,
     };
 
-    let lsp_info = parse_hover_response(&hover);
-    card.lsp = Some(lsp_info);
+    card.lsp = Some(parse_hover_response(&hover));
     EnrichmentOutcome::Enriched
 }
 

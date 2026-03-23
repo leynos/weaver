@@ -16,25 +16,8 @@ use super::lifecycle::ADAPTER_TARGET;
 use super::process::ProcessLanguageServer;
 use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 
-impl LanguageServer for ProcessLanguageServer {
-    fn initialize(&mut self) -> Result<ServerCapabilitySet, LanguageServerError> {
-        debug!(
-            target: ADAPTER_TARGET,
-            language = %self.language(),
-            "initializing language server"
-        );
-
-        // Spawn process
-        let (child, transport) = self.spawn_process().map_err(|e| {
-            LanguageServerError::with_source(
-                format!("failed to spawn {} language server", self.language()),
-                e,
-            )
-        })?;
-
-        self.set_running_state(child, transport);
-
-        // Send initialize request
+impl ProcessLanguageServer {
+    fn send_initialize_handshake(&mut self) -> Result<InitializeResult, LanguageServerError> {
         let params = InitializeParams {
             process_id: Some(std::process::id()),
             capabilities: ClientCapabilities {
@@ -55,28 +38,36 @@ impl LanguageServer for ProcessLanguageServer {
             .send_request("initialize", params)
             .map_err(|e| LanguageServerError::with_source("initialization handshake failed", e))?;
 
-        // Send initialized notification
         self.send_notification("initialized", InitializedParams {})
             .map_err(|e| {
                 LanguageServerError::with_source("failed to send initialized notification", e)
             })?;
 
-        // Verify position encoding negotiation
-        let caps = &result.capabilities;
-        let negotiated_encoding = caps.position_encoding.as_ref();
+        Ok(result)
+    }
 
-        if negotiated_encoding != Some(&PositionEncodingKind::UTF8) {
+    fn negotiate_position_encoding<'a>(
+        &self,
+        caps: &'a lsp_types::ServerCapabilities,
+    ) -> Option<&'a PositionEncodingKind> {
+        let negotiated = caps.position_encoding.as_ref();
+        if negotiated != Some(&PositionEncodingKind::UTF8) {
             debug!(
                 target: ADAPTER_TARGET,
                 language = %self.language(),
-                negotiated = ?negotiated_encoding,
+                negotiated = ?negotiated,
                 "server did not agree to UTF-8 position encoding; LSP features requiring \
                  character offsets will be degraded"
             );
         }
+        negotiated
+    }
 
-        // Extract capabilities
-
+    fn build_capability_set(
+        &self,
+        caps: &lsp_types::ServerCapabilities,
+        position_encoding: Option<&PositionEncodingKind>,
+    ) -> ServerCapabilitySet {
         let definition_supported = caps.definition_provider.is_some();
         let references_supported = caps.references_provider.is_some();
         let diagnostics_supported = caps.diagnostic_provider.is_some();
@@ -94,14 +85,39 @@ impl LanguageServer for ProcessLanguageServer {
             "language server initialized with capabilities"
         );
 
-        Ok(ServerCapabilitySet::new(
+        ServerCapabilitySet::new(
             definition_supported,
             references_supported,
             diagnostics_supported,
         )
         .with_call_hierarchy(call_hierarchy_supported)
         .with_hover(hover_supported)
-        .with_position_encoding(negotiated_encoding.cloned()))
+        .with_position_encoding(position_encoding.cloned())
+    }
+}
+
+impl LanguageServer for ProcessLanguageServer {
+    fn initialize(&mut self) -> Result<ServerCapabilitySet, LanguageServerError> {
+        debug!(
+            target: ADAPTER_TARGET,
+            language = %self.language(),
+            "initializing language server"
+        );
+
+        let (child, transport) = self.spawn_process().map_err(|e| {
+            LanguageServerError::with_source(
+                format!("failed to spawn {} language server", self.language()),
+                e,
+            )
+        })?;
+
+        self.set_running_state(child, transport);
+
+        let result = self.send_initialize_handshake()?;
+        let caps = &result.capabilities;
+        let encoding = self.negotiate_position_encoding(caps);
+
+        Ok(self.build_capability_set(caps, encoding))
     }
 
     fn goto_definition(
