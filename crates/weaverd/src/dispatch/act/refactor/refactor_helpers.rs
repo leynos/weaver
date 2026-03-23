@@ -1,5 +1,8 @@
 //! Shared helper data and pure functions for `act refactor` behaviour tests.
 
+#![allow(dead_code)]
+#![allow(clippy::duplicate_mod)]
+
 use std::path::Path;
 
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
