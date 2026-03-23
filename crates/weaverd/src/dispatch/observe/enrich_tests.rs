@@ -1,6 +1,7 @@
 //! Unit tests for `observe::enrich`.
 
 use lsp_types::{Hover, HoverContents, MarkedString, MarkupContent, MarkupKind};
+use tempfile::TempDir;
 use weaver_cards::{
     CardLanguage, Provenance, SourcePosition, SourceRange, SymbolCard, SymbolIdentity, SymbolRef,
 };
@@ -32,10 +33,13 @@ fn try_lsp_enrichment_starts_backend_and_populates_hover_info() {
     assert!(backends.is_started(BackendKind::Semantic));
 
     let lsp = card.lsp.expect("card should contain LSP enrichment");
-    assert_eq!(lsp.source, "lsp_hover");
-    assert_eq!(lsp.type_info, "fn greet(name: &str) -> usize");
-    assert!(lsp.hover.contains("fn greet(name: &str) -> usize"));
-    assert!(lsp.deprecated);
+    assert_lsp_info(
+        &lsp,
+        "lsp_hover",
+        "fn greet(name: &str) -> usize",
+        "fn greet(name: &str) -> usize",
+        true,
+    );
 }
 
 #[test]
@@ -44,7 +48,7 @@ fn try_lsp_enrichment_degrades_when_initialization_fails() {
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         "boom",
     );
-    let backends = assert_enrichment_degrades(server);
+    let (backends, _dir) = assert_enrichment_degrades(server);
     assert!(backends.is_started(BackendKind::Semantic));
 }
 
@@ -53,7 +57,7 @@ fn try_lsp_enrichment_degrades_when_hover_is_missing() {
     let server = StubLanguageServer::missing_hover(
         ServerCapabilitySet::new(false, false, false).with_hover(true),
     );
-    assert_enrichment_degrades(server);
+    let _result = assert_enrichment_degrades(server);
 }
 
 #[test]
@@ -62,7 +66,7 @@ fn try_lsp_enrichment_degrades_when_hover_request_fails() {
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         "hover RPC failed",
     );
-    assert_enrichment_degrades(server);
+    let _result = assert_enrichment_degrades(server);
 }
 
 #[test]
@@ -77,10 +81,13 @@ fn parses_markup_hover_response() {
 
     let info = parse_hover_response(&hover);
 
-    assert_eq!(info.source, "lsp_hover");
-    assert!(info.hover.contains("fn greet"));
-    assert_eq!(info.type_info, "fn greet(name: &str) -> usize");
-    assert!(!info.deprecated);
+    assert_lsp_info(
+        &info,
+        "lsp_hover",
+        "fn greet",
+        "fn greet(name: &str) -> usize",
+        false,
+    );
 }
 
 #[test]
@@ -153,9 +160,9 @@ fn maps_card_languages_to_lsp() {
 #[test]
 fn byte_col_to_utf16_converts_ascii_correctly() {
     let line = "fn foo() {}";
-    assert_eq!(byte_col_to_utf16(line, 0), Some(0));
-    assert_eq!(byte_col_to_utf16(line, 3), Some(3)); // at 'foo'
-    assert_eq!(byte_col_to_utf16(line, 11), Some(11)); // at end
+    check_utf16_offset(line, 0, Some(0));
+    check_utf16_offset(line, 3, Some(3)); // at 'foo'
+    check_utf16_offset(line, 11, Some(11)); // at end
 }
 
 #[test]
@@ -163,35 +170,35 @@ fn byte_col_to_utf16_converts_multibyte_utf8_correctly() {
     // "// café" — 'é' is 2 bytes in UTF-8 (U+00E9 = 0xC3 0xA9), but 1 UTF-16 code unit
     // Bytes: 2f 2f 20 63 61 66 c3 a9
     let line = "// café";
-    assert_eq!(byte_col_to_utf16(line, 0), Some(0)); // at start (before '/')
-    assert_eq!(byte_col_to_utf16(line, 3), Some(3)); // at ' ' (after '//')
-    assert_eq!(byte_col_to_utf16(line, 4), Some(4)); // at 'c'
-    assert_eq!(byte_col_to_utf16(line, 5), Some(5)); // at 'a'
-    assert_eq!(byte_col_to_utf16(line, 6), Some(6)); // at 'f'
-    assert_eq!(byte_col_to_utf16(line, 8), Some(7)); // after 'é' (byte 6-7 is 'é', byte 8 is end)
+    check_utf16_offset(line, 0, Some(0)); // at start (before '/')
+    check_utf16_offset(line, 3, Some(3)); // at ' ' (after '//')
+    check_utf16_offset(line, 4, Some(4)); // at 'c'
+    check_utf16_offset(line, 5, Some(5)); // at 'a'
+    check_utf16_offset(line, 6, Some(6)); // at 'f'
+    check_utf16_offset(line, 8, Some(7)); // after 'é' (byte 6-7 is 'é', byte 8 is end)
 }
 
 #[test]
 fn byte_col_to_utf16_converts_emoji_correctly() {
     // "// 🦀 Rust" — '🦀' is 4 bytes (U+1F980), but 2 UTF-16 code units (surrogate pair)
     let line = "// 🦀 Rust";
-    assert_eq!(byte_col_to_utf16(line, 0), Some(0)); // at start
-    assert_eq!(byte_col_to_utf16(line, 3), Some(3)); // at '🦀'
-    assert_eq!(byte_col_to_utf16(line, 7), Some(5)); // after '🦀' (4 bytes → 2 UTF-16)
-    assert_eq!(byte_col_to_utf16(line, 8), Some(6)); // at ' '
+    check_utf16_offset(line, 0, Some(0)); // at start
+    check_utf16_offset(line, 3, Some(3)); // at '🦀'
+    check_utf16_offset(line, 7, Some(5)); // after '🦀' (4 bytes → 2 UTF-16)
+    check_utf16_offset(line, 8, Some(6)); // at ' '
 }
 
 #[test]
 fn byte_col_to_utf16_rejects_out_of_range_offset() {
     let line = "hello";
-    assert_eq!(byte_col_to_utf16(line, 100), None);
+    check_utf16_offset(line, 100, None);
 }
 
 #[test]
 fn byte_col_to_utf16_rejects_non_char_boundary() {
     let line = "café";
     // 'é' starts at byte 3 and is 2 bytes; byte 4 is mid-character
-    assert_eq!(byte_col_to_utf16(line, 4), None);
+    check_utf16_offset(line, 4, None);
 }
 
 #[test]
@@ -244,6 +251,33 @@ fn try_lsp_enrichment_with_non_ascii_source() {
     assert!(card.lsp.is_some());
 }
 
+#[allow(clippy::too_many_arguments)]
+fn assert_lsp_info(
+    info: &LspInfo,
+    expected_source: &str,
+    expected_hover_fragment: &str,
+    expected_type_info: &str,
+    expected_deprecated: bool,
+) {
+    assert_eq!(info.source, expected_source, "source mismatch");
+    assert!(
+        info.hover.contains(expected_hover_fragment),
+        "hover {:?} did not contain {:?}",
+        info.hover,
+        expected_hover_fragment
+    );
+    assert_eq!(info.type_info, expected_type_info, "type_info mismatch");
+    assert_eq!(info.deprecated, expected_deprecated, "deprecated mismatch");
+}
+
+fn check_utf16_offset(line: &str, byte_col: usize, expected: Option<u32>) {
+    assert_eq!(
+        byte_col_to_utf16(line, byte_col as u32),
+        expected,
+        "byte_col_to_utf16({line:?}, {byte_col}) expected {expected:?}"
+    );
+}
+
 fn assert_deprecation(text: &str, expected: bool) {
     let hover = Hover {
         contents: HoverContents::Markup(MarkupContent {
@@ -266,21 +300,25 @@ fn run_enrichment_with_server(
     EnrichmentOutcome,
     FusionBackends<crate::semantic_provider::SemanticBackendProvider>,
     SymbolCard,
+    TempDir,
 ) {
-    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
+    let (mut backends, dir) = semantic_backends_with_server(Language::Rust, server);
     let mut card = rust_card();
     let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
-    (outcome, backends, card)
+    (outcome, backends, card, dir)
 }
 
 fn assert_enrichment_degrades(
     server: StubLanguageServer,
-) -> FusionBackends<crate::semantic_provider::SemanticBackendProvider> {
+) -> (
+    FusionBackends<crate::semantic_provider::SemanticBackendProvider>,
+    TempDir,
+) {
     let source = "fn test() {}";
-    let (outcome, backends, card) = run_enrichment_with_server(server, source);
+    let (outcome, backends, card, dir) = run_enrichment_with_server(server, source);
     assert_eq!(outcome, EnrichmentOutcome::Degraded);
     assert!(card.lsp.is_none());
-    backends
+    (backends, dir)
 }
 
 fn rust_card() -> SymbolCard {
