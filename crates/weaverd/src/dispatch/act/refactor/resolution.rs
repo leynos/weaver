@@ -105,6 +105,8 @@ pub(crate) enum RefusalReason {
     UnsupportedLanguage,
     /// The requested provider name does not exist in the registry.
     ProviderNotFound,
+    /// The requested provider exists but does not declare support for the requested capability.
+    ProviderLacksCapability,
     /// The requested provider does not support the inferred language.
     ExplicitProviderMismatch,
     /// No registered provider matched the inferred language and capability.
@@ -262,9 +264,14 @@ fn resolve_explicit_provider(
         }
     }
 
-    let refusal_reason = if found_in_candidates || registry.get(provider_name).is_some() {
+    let refusal_reason = if found_in_candidates {
+        // Provider supports the capability but not the inferred language
         RefusalReason::ExplicitProviderMismatch
+    } else if registry.get(provider_name).is_some() {
+        // Provider exists but doesn't support the requested capability
+        RefusalReason::ProviderLacksCapability
     } else {
+        // Provider doesn't exist in the registry
         RefusalReason::ProviderNotFound
     };
 
