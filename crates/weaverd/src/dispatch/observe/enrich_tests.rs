@@ -20,7 +20,7 @@ fn try_lsp_enrichment_starts_backend_and_populates_hover_info() {
         "```rust\nfn greet(name: &str) -> usize\n```\n",
         "**Deprecated**: use `welcome` instead"
     ));
-    let server = StubLanguageServer::with_hover(
+    let (server, _hover_params) = StubLanguageServer::with_hover(
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         hover,
     );
@@ -46,7 +46,7 @@ fn try_lsp_enrichment_starts_backend_and_populates_hover_info() {
 
 #[test]
 fn try_lsp_enrichment_degrades_when_initialization_fails() {
-    let server = StubLanguageServer::failing_initialize(
+    let (server, _hover_params) = StubLanguageServer::failing_initialize(
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         "boom",
     );
@@ -56,7 +56,7 @@ fn try_lsp_enrichment_degrades_when_initialization_fails() {
 
 #[test]
 fn try_lsp_enrichment_degrades_when_hover_is_missing() {
-    let server = StubLanguageServer::missing_hover(
+    let (server, _hover_params) = StubLanguageServer::missing_hover(
         ServerCapabilitySet::new(false, false, false).with_hover(true),
     );
     let _result = assert_enrichment_degrades(server);
@@ -64,7 +64,7 @@ fn try_lsp_enrichment_degrades_when_hover_is_missing() {
 
 #[test]
 fn try_lsp_enrichment_degrades_when_hover_request_fails() {
-    let server = StubLanguageServer::failing_hover(
+    let (server, _hover_params) = StubLanguageServer::failing_hover(
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         "hover RPC failed",
     );
@@ -207,16 +207,19 @@ fn byte_col_to_utf16_rejects_non_char_boundary() {
 
 #[test]
 fn try_lsp_enrichment_with_non_ascii_source() {
-    let source = "// café\nfn foo() {}";
+    // Byte layout: "// café fn foo() {}"
+    // "// " (0-2), "café" (c=3, a=4, f=5, é=6-7), " " (8), "fn" (9-10), " " (11), "foo" starts at 12
+    // 'é' is 2 UTF-8 bytes but 1 UTF-16 code unit
+    let source = "// café fn foo() {}";
 
     let hover = markdown_hover("```rust\nfn foo()\n```");
-    let server = StubLanguageServer::with_hover(
+    let (server, hover_params_ref) = StubLanguageServer::with_hover(
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         hover,
     );
     let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
 
-    // Symbol at line 1, byte column 3 (start of "foo")
+    // Symbol at byte column 12 (start of "foo")
     let mut card = SymbolCard {
         card_version: 1,
         symbol: SymbolIdentity {
@@ -224,8 +227,8 @@ fn try_lsp_enrichment_with_non_ascii_source() {
             symbol_ref: SymbolRef {
                 uri: String::from("file:///tmp/test.rs"),
                 range: SourceRange {
-                    start: SourcePosition { line: 1, column: 3 },
-                    end: SourcePosition { line: 1, column: 6 },
+                    start: SourcePosition { line: 0, column: 12 },
+                    end: SourcePosition { line: 0, column: 15 },
                 },
                 language: CardLanguage::Rust,
                 kind: weaver_cards::CardSymbolKind::Function,
@@ -250,9 +253,73 @@ fn try_lsp_enrichment_with_non_ascii_source() {
 
     let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
 
-    // Should successfully enrich despite non-ASCII characters in the file
     assert_eq!(outcome, EnrichmentOutcome::Enriched);
     assert!(card.lsp.is_some());
+
+    // Server doesn't negotiate UTF-8, so byte offset 12 should be converted to UTF-16 offset 11
+    // (because 'é' at bytes 6-7 is 1 UTF-16 code unit, saving 1 position)
+    let hover_params = hover_params_ref.lock().unwrap();
+    let params = hover_params.as_ref().expect("hover should have been called");
+    assert_eq!(params.text_document_position_params.position.line, 0);
+    assert_eq!(params.text_document_position_params.position.character, 11);
+}
+
+#[test]
+fn try_lsp_enrichment_with_non_ascii_source_utf8_negotiated() {
+    // Same byte layout: "// café fn foo() {}"
+    let source = "// café fn foo() {}";
+
+    let hover = markdown_hover("```rust\nfn foo()\n```");
+    let (server, hover_params_ref) = StubLanguageServer::with_hover(
+        ServerCapabilitySet::new(false, false, false)
+            .with_hover(true)
+            .with_position_encoding(Some(lsp_types::PositionEncodingKind::UTF8)),
+        hover,
+    );
+    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
+
+    // Symbol at byte column 12 (start of "foo")
+    let mut card = SymbolCard {
+        card_version: 1,
+        symbol: SymbolIdentity {
+            symbol_id: String::from("sym_foo"),
+            symbol_ref: SymbolRef {
+                uri: String::from("file:///tmp/test.rs"),
+                range: SourceRange {
+                    start: SourcePosition { line: 0, column: 12 },
+                    end: SourcePosition { line: 0, column: 15 },
+                },
+                language: CardLanguage::Rust,
+                kind: weaver_cards::CardSymbolKind::Function,
+                name: String::from("foo"),
+                container: None,
+            },
+        },
+        signature: None,
+        doc: None,
+        attachments: None,
+        structure: None,
+        lsp: None,
+        metrics: None,
+        deps: None,
+        interstitial: None,
+        provenance: Provenance {
+            extracted_at: String::from("2026-03-19T00:00:00Z"),
+            sources: vec![String::from("tree_sitter")],
+        },
+        etag: None,
+    };
+
+    let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
+
+    assert_eq!(outcome, EnrichmentOutcome::Enriched);
+    assert!(card.lsp.is_some());
+
+    // Server negotiated UTF-8, so byte offset 12 is passed through unchanged
+    let hover_params = hover_params_ref.lock().unwrap();
+    let params = hover_params.as_ref().expect("hover should have been called");
+    assert_eq!(params.text_document_position_params.position.line, 0);
+    assert_eq!(params.text_document_position_params.position.character, 12);
 }
 
 struct ExpectedLspInfo<'a> {

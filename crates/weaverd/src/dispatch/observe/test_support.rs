@@ -1,5 +1,7 @@
 //! Test doubles shared by `observe` unit tests.
 
+use std::sync::{Arc, Mutex};
+
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
@@ -21,6 +23,7 @@ pub(crate) struct StubLanguageServer {
     hover: Option<Hover>,
     initialize_error: Option<String>,
     hover_error: Option<String>,
+    last_hover_params: Arc<Mutex<Option<HoverParams>>>,
 }
 
 impl StubLanguageServer {
@@ -29,34 +32,42 @@ impl StubLanguageServer {
         hover: Option<Hover>,
         initialize_error: Option<String>,
         hover_error: Option<String>,
-    ) -> Self {
-        Self {
+    ) -> (Self, Arc<Mutex<Option<HoverParams>>>) {
+        let last_hover_params = Arc::new(Mutex::new(None));
+        let server = Self {
             capabilities,
             hover,
             initialize_error,
             hover_error,
-        }
+            last_hover_params: Arc::clone(&last_hover_params),
+        };
+        (server, last_hover_params)
     }
 
-    pub(crate) fn with_hover(capabilities: ServerCapabilitySet, hover: Hover) -> Self {
+    pub(crate) fn with_hover(
+        capabilities: ServerCapabilitySet,
+        hover: Hover,
+    ) -> (Self, Arc<Mutex<Option<HoverParams>>>) {
         Self::new(capabilities, Some(hover), None, None)
     }
 
-    pub(crate) fn missing_hover(capabilities: ServerCapabilitySet) -> Self {
+    pub(crate) fn missing_hover(
+        capabilities: ServerCapabilitySet,
+    ) -> (Self, Arc<Mutex<Option<HoverParams>>>) {
         Self::new(capabilities, None, None, None)
     }
 
     pub(crate) fn failing_initialize(
         capabilities: ServerCapabilitySet,
         message: impl Into<String>,
-    ) -> Self {
+    ) -> (Self, Arc<Mutex<Option<HoverParams>>>) {
         Self::new(capabilities, None, Some(message.into()), None)
     }
 
     pub(crate) fn failing_hover(
         capabilities: ServerCapabilitySet,
         message: impl Into<String>,
-    ) -> Self {
+    ) -> (Self, Arc<Mutex<Option<HoverParams>>>) {
         Self::new(capabilities, None, None, Some(message.into()))
     }
 }
@@ -126,7 +137,8 @@ impl LanguageServer for StubLanguageServer {
         Ok(None)
     }
 
-    fn hover(&mut self, _params: HoverParams) -> Result<Option<Hover>, LanguageServerError> {
+    fn hover(&mut self, params: HoverParams) -> Result<Option<Hover>, LanguageServerError> {
+        *self.last_hover_params.lock().unwrap() = Some(params);
         match &self.hover_error {
             Some(message) => Err(LanguageServerError::new(message.clone())),
             None => Ok(self.hover.clone()),

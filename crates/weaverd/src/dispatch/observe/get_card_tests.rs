@@ -157,7 +157,7 @@ fn handle_returns_semantic_success_with_enrichment_and_rewritten_provenance(temp
     );
     let uri = Url::from_file_path(&path).expect("file uri").to_string();
     let request = make_request(&uri, 2, 4, DetailLevel::Semantic);
-    let server = StubLanguageServer::with_hover(
+    let (server, _hover_params) = StubLanguageServer::with_hover(
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         markdown_hover(concat!(
             "```rust\nfn greet(name: &str) -> usize\n```\n",
@@ -198,7 +198,8 @@ fn handle_returns_semantic_success_with_degraded_provenance_when_hover_is_unavai
     );
     let uri = Url::from_file_path(&path).expect("file uri").to_string();
     let request = make_request(&uri, 2, 4, DetailLevel::Semantic);
-    let server = StubLanguageServer::missing_hover(ServerCapabilitySet::new(false, false, false));
+    let (server, _hover_params) =
+        StubLanguageServer::missing_hover(ServerCapabilitySet::new(false, false, false));
     let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
