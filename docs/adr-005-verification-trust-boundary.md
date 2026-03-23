@@ -6,7 +6,7 @@ Proposed.
 
 ## Date
 
-2026-03-22.
+2026-03-22
 
 ## Outstanding Decisions
 
@@ -15,7 +15,7 @@ Proposed.
 - Which filesystem assumptions must be documented before the ADR can be
   accepted?
 
-## Context and problem statement
+## Context and Problem Statement
 
 Formal verification is only useful if Weaver states which parts of the system
 are actually being proved. The tool depends on external language servers,
@@ -25,7 +25,7 @@ does not own.
 Without an explicit trust boundary, proof claims would blur Weaver-owned
 invariants with assumptions about external components.
 
-## Decision drivers
+## Decision Drivers
 
 - Keep verification claims honest.
 - Avoid proving third-party behaviour as if Weaver owned it.
@@ -34,20 +34,20 @@ invariants with assumptions about external components.
 
 ## Requirements
 
-### Functional requirements
+### Functional Requirements
 
 - Identify the verified kernel explicitly.
 - Identify trusted external components explicitly.
 - Preserve the ability to add new proofs without reclassifying the whole
   system.
 
-### Technical requirements
+### Technical Requirements
 
 - Keep trust-boundary language consistent across design, roadmap, and proof
   docs.
 - Allow proof harnesses to depend on modelled filesystem and tool assumptions.
 
-## Options considered
+## Options Considered
 
 ### Option A: Verify the orchestration kernel only
 
@@ -64,7 +64,7 @@ filesystem behaviour alongside Weaver code.
 Write proofs and docs without distinguishing Weaver-owned behaviour from
 external assumptions.
 
-## Decision outcome / proposed direction
+## Decision Outcome / Proposed Direction
 
 Adopt Option A.
 
@@ -73,7 +73,7 @@ policy, capability routing, refusal semantics, and bounded counters. External
 tools remain trusted inputs, and the docs must state the assumptions those
 tools introduce.
 
-## Goals and non-goals
+## Goals and Non-Goals
 
 ### Goals
 
@@ -94,13 +94,13 @@ tools introduce.
 3. Make proof harnesses refer to the modelled assumptions by name.
 4. Keep future-proof work inside the documented boundary.
 
-## Known risks and limitations
+## Known Risks and Limitations
 
 - The boundary can drift if docs and code are not updated together.
 - Proofs can appear stronger than they are if assumptions are omitted.
 - External tool updates may change behaviour without changing Weaver code.
 
-## Architectural rationale
+## Architectural Rationale
 
 An explicit boundary keeps the assurance story accurate. Weaver can prove what
 it owns and document what it does not.
