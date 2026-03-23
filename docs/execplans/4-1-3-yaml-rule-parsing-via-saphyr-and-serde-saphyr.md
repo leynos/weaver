@@ -235,12 +235,12 @@ Target outcome at completion:
 
 Retrospective notes:
 
-1. `serde-saphyr::Spanned<T>` was useful for raw deserialisation, but keeping
+1. `serde-saphyr::Spanned<T>` was useful for raw deserialization, but keeping
    it out of the public `sempai_yaml` API avoided leaking parser dependency
    types into the stable model.
 2. The strongest user-visible value in this milestone came from replacing the
    blanket `NOT_IMPLEMENTED` YAML path with real parser/schema diagnostics,
-   even though query-plan normalisation is still pending.
+   even though query-plan normalization is still pending.
 3. Final verification passed with `make fmt`, `make markdownlint`,
    `make nixie`, `make check-fmt`, `make lint`, and `make test`.
 

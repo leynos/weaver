@@ -37,13 +37,10 @@ impl SourceMap {
         };
 
         let root_span = source_span_for_node(yaml, document, source_uri.as_deref());
-        let rules_span = document
-            .data
-            .as_mapping_get("rules")
-            .and_then(|rules| source_span_for_node(yaml, rules, source_uri.as_deref()));
-        let rule_spans = document
-            .data
-            .as_mapping_get("rules")
+        let rules_opt = document.data.as_mapping_get("rules");
+        let rules_span =
+            rules_opt.and_then(|rules| source_span_for_node(yaml, rules, source_uri.as_deref()));
+        let rule_spans = rules_opt
             .and_then(|rules| match &rules.data {
                 YamlDataOwned::Sequence(items) => Some(
                     items
@@ -114,10 +111,9 @@ fn char_index_to_byte(source: &str, index: usize) -> Option<usize> {
         return Some(0);
     }
 
-    let char_count = source.chars().count();
-    if index >= char_count {
-        return Some(source.len());
-    }
-
-    source.char_indices().nth(index).map(|(offset, _)| offset)
+    source
+        .char_indices()
+        .nth(index)
+        .map(|(offset, _)| offset)
+        .or(Some(source.len()))
 }

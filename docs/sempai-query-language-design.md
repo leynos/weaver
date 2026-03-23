@@ -424,7 +424,7 @@ Search mode rules require:
 Implementation note (2026-03-22): `sempai::Engine::compile_yaml` now delegates
 to `sempai_yaml` for parse-time diagnostics. Successful YAML parsing still
 returns a deliberate `NOT_IMPLEMENTED` placeholder until 4.1.5 delivers
-normalisation into executable query plans.
+normalization into executable query plans.
 
 Extract mode rules require legacy query keys, not `match`.[^1]
 

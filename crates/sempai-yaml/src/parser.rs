@@ -37,6 +37,8 @@ struct RawRuleFile {
     rules: Vec<RawRule>,
 }
 
+// Allow unknown fields for forward compatibility with future Semgrep rule extensions.
+// The official Semgrep schema sets `additionalProperties: true` on the rule object.
 #[derive(Debug, Deserialize)]
 struct RawRule {
     id: Option<Spanned<String>>,
@@ -305,23 +307,35 @@ fn build_search_principal(
     raw: &RawRule,
     rule_span: Option<SourceSpan>,
 ) -> Result<SearchQueryPrincipal, DiagnosticReport> {
-    let legacy_principal =
-        build_legacy_principal(raw, rule_span.clone()).map(SearchQueryPrincipal::Legacy);
-    let match_formula = raw
-        .match_formula
-        .clone()
-        .map(|formula| formula.value.try_into())
-        .transpose();
+    let has_legacy = raw.pattern.is_some()
+        || raw.pattern_regex.is_some()
+        || raw.patterns.is_some()
+        || raw.pattern_either.is_some();
+    let has_match = raw.match_formula.is_some();
 
-    match (legacy_principal, match_formula) {
-        (Ok(search_principal), Ok(None)) => Ok(search_principal),
-        (Err(_), Ok(Some(formula))) => Ok(SearchQueryPrincipal::Match(formula)),
-        (Ok(_), Ok(Some(_))) => Err(schema_error(
+    if has_legacy && has_match {
+        return Err(schema_error(
             String::from("rule must define exactly one top-level query principal"),
             rule_span,
             "choose one of the legacy search keys or `match`",
-        )),
-        (Err(error), Ok(None)) | (_, Err(error)) => Err(error),
+        ));
+    }
+
+    if has_match {
+        if let Some(formula) = raw.match_formula.clone() {
+            let match_formula = formula.value.try_into()?;
+            Ok(SearchQueryPrincipal::Match(match_formula))
+        } else {
+            // Safety: has_match is true, so match_formula must be Some
+            Err(schema_error(
+                String::from("internal error: match_formula is None despite has_match check"),
+                rule_span,
+                "please report this bug",
+            ))
+        }
+    } else {
+        let legacy_principal = build_legacy_principal(raw, rule_span)?;
+        Ok(SearchQueryPrincipal::Legacy(legacy_principal))
     }
 }
 
@@ -565,6 +579,35 @@ impl TryFrom<RawMatchFormulaObject> for MatchFormula {
     type Error = DiagnosticReport;
 
     fn try_from(value: RawMatchFormulaObject) -> Result<Self, Self::Error> {
+        let operator_count = [
+            value.pattern.is_some(),
+            value.regex.is_some(),
+            value.all.is_some(),
+            value.any.is_some(),
+            value.not.is_some(),
+            value.inside.is_some(),
+            value.anywhere.is_some(),
+        ]
+        .iter()
+        .filter(|&&present| present)
+        .count();
+
+        if operator_count == 0 {
+            return Err(schema_error(
+                String::from("match formula object is empty"),
+                None,
+                "add a supported `match` operator",
+            ));
+        }
+
+        if operator_count > 1 {
+            return Err(schema_error(
+                String::from("match formula object defines multiple operators"),
+                None,
+                "keep only one operator per match object",
+            ));
+        }
+
         let core = if let Some(pattern) = value.pattern {
             Self::PatternObject(pattern)
         } else if let Some(regex) = value.regex {
@@ -588,10 +631,11 @@ impl TryFrom<RawMatchFormulaObject> for MatchFormula {
         } else if let Some(anywhere) = value.anywhere {
             Self::Anywhere(Box::new((*anywhere).try_into()?))
         } else {
+            // Safety: operator_count == 1 ensures at least one operator is present
             return Err(schema_error(
-                String::from("match formula object is empty"),
+                String::from("internal error: no operator found despite count check"),
                 None,
-                "add a supported `match` operator",
+                "please report this bug",
             ));
         };
 

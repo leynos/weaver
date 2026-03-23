@@ -29,7 +29,11 @@ pub struct RuleFile {
 impl RuleFile {
     /// Creates a parsed rule file from the supplied rules.
     #[must_use]
-    pub const fn new(rules: Vec<Rule>) -> Self {
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "Vec requires heap allocation and cannot be used in const contexts"
+    )]
+    pub fn new(rules: Vec<Rule>) -> Self {
         Self { rules }
     }
 

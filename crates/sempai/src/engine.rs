@@ -29,7 +29,7 @@ pub struct QueryPlan {
     rule_id: String,
     language: Language,
     /// Placeholder for the internal plan representation.  Will be replaced
-    /// by `sempai_core::PlanNode` once the normalisation layer is built.
+    /// by `sempai_core::PlanNode` once the normalization layer is built.
     _plan: (),
 }
 
@@ -107,11 +107,11 @@ impl Engine {
     /// Returns a diagnostic report if parsing or validation fails.
     ///
     /// Successful YAML parsing still stops at the post-parse placeholder until
-    /// rule normalisation is implemented.
+    /// rule normalization is implemented.
     pub fn compile_yaml(&self, yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
         let _ = parse_rule_file(yaml, None)?;
         Err(DiagnosticReport::not_implemented(
-            "compile_yaml query-plan normalisation",
+            "compile_yaml query-plan normalization",
         ))
     }
 

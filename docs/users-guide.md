@@ -1137,7 +1137,7 @@ The `Engine` struct exposes three methods for query compilation and execution:
 keys return `E_SEMPAI_SCHEMA_INVALID`, both using the shared structured
 diagnostic payload with `primary_span` locations when available. Valid YAML
 rule files still stop at a `NOT_IMPLEMENTED` placeholder because rule
-normalisation into executable query plans is the next roadmap milestone.
+normalization into executable query plans is the next roadmap milestone.
 
 `compile_dsl(...)` and `execute(...)` still return "not implemented"
 diagnostics. They will be wired to the DSL parser and Tree-sitter backend as
