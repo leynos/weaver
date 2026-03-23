@@ -32,6 +32,7 @@ impl LanguageServer for DocStubServer {
             diagnostics: false,
             call_hierarchy: false,
             hover: false,
+            position_encoding: None,
         })
     }
 

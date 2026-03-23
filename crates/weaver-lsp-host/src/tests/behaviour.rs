@@ -30,13 +30,13 @@ fn given_all_languages(world: &RefCell<TestWorld>) {
     let configs = vec![
         TestServerConfig {
             language: Language::Rust,
-            capabilities: all_caps,
+            capabilities: all_caps.clone(),
             responses: responses.clone(),
             initialization_error: None,
         },
         TestServerConfig {
             language: Language::Python,
-            capabilities: all_caps,
+            capabilities: all_caps.clone(),
             responses: responses.clone(),
             initialization_error: None,
         },

@@ -1,7 +1,6 @@
 //! Unit tests for `observe::enrich`.
 
 use lsp_types::{Hover, HoverContents, MarkedString, MarkupContent, MarkupKind};
-use std::io::Write;
 use weaver_cards::{
     CardLanguage, Provenance, SourcePosition, SourceRange, SymbolCard, SymbolIdentity, SymbolRef,
 };
@@ -15,16 +14,7 @@ use crate::dispatch::observe::test_support::{
 
 #[test]
 fn try_lsp_enrichment_starts_backend_and_populates_hover_info() {
-    // Create a temporary file for the card URI
-    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
-    let file_path = temp_dir.path().join("card.rs");
     let source = "// comment\nfn greet(name: &str) -> usize { 0 }";
-    {
-        let mut file = std::fs::File::create(&file_path).expect("failed to create test file");
-        file.write_all(source.as_bytes())
-            .expect("failed to write test file");
-    }
-
     let hover = markdown_hover(concat!(
         "```rust\nfn greet(name: &str) -> usize\n```\n",
         "**Deprecated**: use `welcome` instead"
@@ -35,9 +25,8 @@ fn try_lsp_enrichment_starts_backend_and_populates_hover_info() {
     );
     let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
     let mut card = rust_card();
-    card.symbol.symbol_ref.uri = format!("file://{}", file_path.display());
 
-    let outcome = try_lsp_enrichment(&mut card, &mut backends);
+    let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
 
     assert_eq!(outcome, EnrichmentOutcome::Enriched);
     assert!(backends.is_started(BackendKind::Semantic));
@@ -55,7 +44,8 @@ fn try_lsp_enrichment_degrades_when_initialization_fails() {
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         "boom",
     );
-    let (outcome, backends, card) = run_enrichment_with_server(server);
+    let source = "fn test() {}";
+    let (outcome, backends, card) = run_enrichment_with_server(server, source);
 
     assert_eq!(outcome, EnrichmentOutcome::Degraded);
     assert!(backends.is_started(BackendKind::Semantic));
@@ -67,7 +57,8 @@ fn try_lsp_enrichment_degrades_when_hover_is_missing() {
     let server = StubLanguageServer::missing_hover(
         ServerCapabilitySet::new(false, false, false).with_hover(true),
     );
-    let (outcome, _backends, card) = run_enrichment_with_server(server);
+    let source = "fn test() {}";
+    let (outcome, _backends, card) = run_enrichment_with_server(server, source);
 
     assert_eq!(outcome, EnrichmentOutcome::Degraded);
     assert!(card.lsp.is_none());
@@ -79,7 +70,8 @@ fn try_lsp_enrichment_degrades_when_hover_request_fails() {
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         "hover RPC failed",
     );
-    let (outcome, _backends, card) = run_enrichment_with_server(server);
+    let source = "fn test() {}";
+    let (outcome, _backends, card) = run_enrichment_with_server(server, source);
 
     assert_eq!(outcome, EnrichmentOutcome::Degraded);
     assert!(card.lsp.is_none());
@@ -216,16 +208,7 @@ fn byte_col_to_utf16_rejects_non_char_boundary() {
 
 #[test]
 fn try_lsp_enrichment_with_non_ascii_source() {
-    // Create a temporary file with non-ASCII content
-    let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
-    let file_path = temp_dir.path().join("test.rs");
     let source = "// café\nfn foo() {}";
-
-    {
-        let mut file = std::fs::File::create(&file_path).expect("failed to create test file");
-        file.write_all(source.as_bytes())
-            .expect("failed to write test file");
-    }
 
     let hover = markdown_hover("```rust\nfn foo()\n```");
     let server = StubLanguageServer::with_hover(
@@ -240,7 +223,7 @@ fn try_lsp_enrichment_with_non_ascii_source() {
         symbol: SymbolIdentity {
             symbol_id: String::from("sym_foo"),
             symbol_ref: SymbolRef {
-                uri: format!("file://{}", file_path.display()),
+                uri: String::from("file:///tmp/test.rs"),
                 range: SourceRange {
                     start: SourcePosition { line: 1, column: 3 },
                     end: SourcePosition { line: 1, column: 6 },
@@ -266,7 +249,7 @@ fn try_lsp_enrichment_with_non_ascii_source() {
         etag: None,
     };
 
-    let outcome = try_lsp_enrichment(&mut card, &mut backends);
+    let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
 
     // Should successfully enrich despite non-ASCII characters in the file
     assert_eq!(outcome, EnrichmentOutcome::Enriched);
@@ -290,6 +273,7 @@ fn assert_deprecation(text: &str, expected: bool) {
 
 fn run_enrichment_with_server(
     server: StubLanguageServer,
+    source: &str,
 ) -> (
     EnrichmentOutcome,
     FusionBackends<crate::semantic_provider::SemanticBackendProvider>,
@@ -297,7 +281,7 @@ fn run_enrichment_with_server(
 ) {
     let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
     let mut card = rust_card();
-    let outcome = try_lsp_enrichment(&mut card, &mut backends);
+    let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
     (outcome, backends, card)
 }
 

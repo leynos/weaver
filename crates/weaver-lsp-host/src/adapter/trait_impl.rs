@@ -100,7 +100,8 @@ impl LanguageServer for ProcessLanguageServer {
             diagnostics_supported,
         )
         .with_call_hierarchy(call_hierarchy_supported)
-        .with_hover(hover_supported))
+        .with_hover(hover_supported)
+        .with_position_encoding(negotiated_encoding.cloned()))
     }
 
     fn goto_definition(

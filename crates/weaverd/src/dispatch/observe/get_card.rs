@@ -53,7 +53,7 @@ pub fn handle<W: Write>(
     }) {
         Ok(mut card) => {
             if card_request.detail >= DetailLevel::Semantic {
-                apply_lsp_enrichment(&mut card, backends);
+                apply_lsp_enrichment(&mut card, &source, backends);
             }
             GetCardResponse::Success {
                 card: Box::new(card),
@@ -76,9 +76,10 @@ pub fn handle<W: Write>(
 /// Attempts LSP enrichment and updates provenance on success.
 fn apply_lsp_enrichment(
     card: &mut weaver_cards::SymbolCard,
+    source: &str,
     backends: &mut FusionBackends<SemanticBackendProvider>,
 ) {
-    if enrich::try_lsp_enrichment(card, backends) == EnrichmentOutcome::Enriched {
+    if enrich::try_lsp_enrichment(card, source, backends) == EnrichmentOutcome::Enriched {
         card.provenance
             .sources
             .retain(|s| s != "tree_sitter_degraded_semantic");

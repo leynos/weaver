@@ -129,7 +129,7 @@ impl LanguageServer for RecordingLanguageServer {
                 return Err(LanguageServerError::new(message.clone()));
             }
             state.initialised = true;
-            Ok(state.capabilities)
+            Ok(state.capabilities.clone())
         })
     }
 

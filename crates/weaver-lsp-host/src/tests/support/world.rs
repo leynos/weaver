@@ -193,10 +193,13 @@ impl TestWorld {
         for config in &self.configs {
             let server = match &config.initialization_error {
                 Some(message) => RecordingLanguageServer::failing_initialize(
-                    config.capabilities,
+                    config.capabilities.clone(),
                     message.clone(),
                 ),
-                None => RecordingLanguageServer::new(config.capabilities, config.responses.clone()),
+                None => RecordingLanguageServer::new(
+                    config.capabilities.clone(),
+                    config.responses.clone(),
+                ),
             };
 
             let handle = server.handle();

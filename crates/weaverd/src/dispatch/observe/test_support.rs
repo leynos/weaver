@@ -71,7 +71,7 @@ impl LanguageServer for StubLanguageServer {
     fn initialize(&mut self) -> Result<ServerCapabilitySet, LanguageServerError> {
         match &self.initialize_error {
             Some(message) => Err(LanguageServerError::new(message.clone())),
-            None => Ok(self.capabilities),
+            None => Ok(self.capabilities.clone()),
         }
     }
 

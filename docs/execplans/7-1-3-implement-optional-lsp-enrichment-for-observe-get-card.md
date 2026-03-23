@@ -174,20 +174,32 @@ Lessons learned:
    kept both `get_card.rs` (347 lines) and `enrich.rs` (273 lines) comfortably
    within the 400-line budget.
 
-Post-implementation improvements (2026-03-20):
+Post-implementation improvements:
 
-1. **UTF-8 position encoding negotiation**: Added UTF-8 encoding preference to
-   the LSP initialize handshake
-   (`ClientCapabilities.general.position_encodings`). When the server agrees to
-   UTF-8 (LSP 3.17+), Tree-sitter byte offsets can be used directly as
-   character offsets, eliminating the UTF-16 conversion issue for the majority
-   of modern language servers. Servers that decline UTF-8 negotiation are
-   logged with a debug warning. This change improves correctness for files
-   containing non-ASCII characters without requiring architectural changes to
-   pass source text through the enrichment pipeline.
+1. **UTF-8 position encoding negotiation (2026-03-20)**: Added UTF-8 encoding
+   preference to the LSP initialize handshake
+   (`ClientCapabilities.general.position_encodings`). The negotiated encoding
+   is stored in `ServerCapabilitySet.position_encoding` and propagated through
+   `CapabilitySummary.position_encoding` to enrichment code. Servers that
+   decline UTF-8 negotiation are logged with a debug warning.
 
-2. **Allocation optimization**: Replaced `contains(&String::from("lsp_hover"))`
-   with `iter().any(|s| s == "lsp_hover")` in `apply_lsp_enrichment` to avoid
+2. **UTF-16 offset conversion (2026-03-23)**: Implemented conditional position
+   encoding logic in `crates/weaverd/src/dispatch/observe/enrich.rs`. When the
+   server negotiates UTF-8 (LSP 3.17+), Tree-sitter byte offsets are used
+   directly as character offsets. Otherwise, byte offsets are converted to
+   UTF-16 code units via `compute_utf16_character()` which reads from the
+   source string passed to `try_lsp_enrichment()`. This ensures correct hover
+   positions for files containing non-ASCII characters across all LSP servers.
+
+3. **Source parameter threading (2026-03-23)**: Updated `try_lsp_enrichment()`
+   to accept a `source: &str` parameter, eliminating file re-reads during
+   UTF-16 conversion. The source text is now passed from
+   `get_card.rs::apply_lsp_enrichment()`, which already has it loaded for
+   Tree-sitter extraction.
+
+4. **Allocation optimization (2026-03-20)**: Replaced
+   `contains(&String::from("lsp_hover"))` with
+   `iter().any(|s| s == "lsp_hover")` in `apply_lsp_enrichment` to avoid
    allocating a temporary `String` during provenance checks.
 
 ## Context and orientation

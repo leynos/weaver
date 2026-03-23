@@ -33,8 +33,12 @@ pub enum EnrichmentOutcome {
 /// hover, this function calls `textDocument/hover` at the card's symbol
 /// position and populates the `lsp` field. When LSP is unavailable, the
 /// card is returned unchanged.
+///
+/// The `source` parameter provides the file content, used to compute UTF-16
+/// character offsets when the server does not support UTF-8 position encoding.
 pub fn try_lsp_enrichment(
     card: &mut SymbolCard,
+    source: &str,
     backends: &mut FusionBackends<SemanticBackendProvider>,
 ) -> EnrichmentOutcome {
     let language = match to_lsp_language(card.symbol.symbol_ref.language) {
@@ -73,18 +77,33 @@ pub fn try_lsp_enrichment(
         }
     };
 
-    // Convert byte column offset to UTF-16 code units as required by LSP spec
-    let utf16_character = match compute_utf16_character(&uri, start.line, start.column) {
-        Some(char_offset) => char_offset,
-        None => {
-            debug!(
-                target: DISPATCH_TARGET,
-                uri = uri_str,
-                line = start.line,
-                byte_column = start.column,
-                "LSP enrichment degraded: failed to compute UTF-16 character offset"
-            );
-            return EnrichmentOutcome::Degraded;
+    // Initialize to get server capabilities
+    let capabilities = match initialize_and_get_capabilities(language, backends) {
+        Some(caps) => caps,
+        None => return EnrichmentOutcome::Degraded,
+    };
+
+    // Compute character offset based on negotiated position encoding
+    let character = if capabilities
+        .position_encoding()
+        .is_some_and(|enc| *enc == lsp_types::PositionEncodingKind::UTF8)
+    {
+        // Server supports UTF-8: use Tree-sitter byte offset directly
+        start.column
+    } else {
+        // Server requires UTF-16: convert byte offset to UTF-16 code units
+        match compute_utf16_character(source, start.line, start.column) {
+            Some(char_offset) => char_offset,
+            None => {
+                debug!(
+                    target: DISPATCH_TARGET,
+                    uri = uri_str,
+                    line = start.line,
+                    byte_column = start.column,
+                    "LSP enrichment degraded: failed to compute UTF-16 character offset"
+                );
+                return EnrichmentOutcome::Degraded;
+            }
         }
     };
 
@@ -93,7 +112,7 @@ pub fn try_lsp_enrichment(
             text_document: TextDocumentIdentifier { uri },
             position: Position {
                 line: start.line,
-                character: utf16_character,
+                character,
             },
         },
         work_done_progress_params: Default::default(),
@@ -152,6 +171,29 @@ fn marked_string_text(marked: &MarkedString) -> String {
     }
 }
 
+/// Initializes the LSP server and returns its capability summary.
+fn initialize_and_get_capabilities(
+    language: Language,
+    backends: &mut FusionBackends<SemanticBackendProvider>,
+) -> Option<weaver_lsp_host::CapabilitySummary> {
+    match backends
+        .provider()
+        .with_lsp_host_mut(|lsp_host| lsp_host.initialize(language))
+    {
+        Ok(Some(Ok(caps))) => Some(caps),
+        Ok(Some(Err(error))) => {
+            debug!(
+                target: DISPATCH_TARGET,
+                language = %language,
+                error = %error,
+                "LSP enrichment degraded: initialization failed"
+            );
+            None
+        }
+        Ok(None) | Err(_) => None,
+    }
+}
+
 fn get_hover(
     language: Language,
     params: HoverParams,
@@ -159,28 +201,16 @@ fn get_hover(
 ) -> Option<lsp_types::Hover> {
     backends
         .provider()
-        .with_lsp_host_mut(|lsp_host| {
-            if let Err(error) = lsp_host.initialize(language) {
+        .with_lsp_host_mut(|lsp_host| match lsp_host.hover(language, params) {
+            Ok(hover) => hover,
+            Err(error) => {
                 debug!(
                     target: DISPATCH_TARGET,
                     language = %language,
                     error = %error,
-                    "LSP enrichment degraded: initialization failed"
+                    "LSP enrichment degraded: hover request failed"
                 );
-                return None;
-            }
-
-            match lsp_host.hover(language, params) {
-                Ok(hover) => hover,
-                Err(error) => {
-                    debug!(
-                        target: DISPATCH_TARGET,
-                        language = %language,
-                        error = %error,
-                        "LSP enrichment degraded: hover request failed"
-                    );
-                    None
-                }
+                None
             }
         })
         .ok()
@@ -212,22 +242,14 @@ const fn to_lsp_language(card_lang: CardLanguage) -> Option<Language> {
 
 /// Computes the UTF-16 character offset for a given byte column on a line.
 ///
-/// Reads the file at the given URI, extracts the specified line, and converts
-/// the Tree-sitter byte offset to a UTF-16 code unit offset as required by
-/// the LSP specification.
+/// Extracts the specified line from the source and converts the Tree-sitter
+/// byte offset to a UTF-16 code unit offset as required by the LSP specification.
 ///
 /// Returns `None` if:
-/// - The URI cannot be converted to a file path
-/// - The file cannot be read
 /// - The line index is out of range
 /// - The byte offset is out of range or not on a char boundary
-fn compute_utf16_character(uri: &lsp_types::Uri, line: u32, byte_column: u32) -> Option<u32> {
-    // Convert lsp_types::Uri to url::Url for file path conversion
-    let url = url::Url::parse(uri.as_str()).ok()?;
-    let path = url.to_file_path().ok()?;
-    let content = std::fs::read_to_string(&path).ok()?;
-    let line_text = content.lines().nth(line as usize)?;
-
+fn compute_utf16_character(source: &str, line: u32, byte_column: u32) -> Option<u32> {
+    let line_text = source.lines().nth(line as usize)?;
     byte_col_to_utf16(line_text, byte_column)
 }
 
