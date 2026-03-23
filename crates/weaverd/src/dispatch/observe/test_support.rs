@@ -24,46 +24,40 @@ pub(crate) struct StubLanguageServer {
 }
 
 impl StubLanguageServer {
-    pub(crate) fn with_hover(capabilities: ServerCapabilitySet, hover: Hover) -> Self {
+    fn new(
+        capabilities: ServerCapabilitySet,
+        hover: Option<Hover>,
+        initialize_error: Option<String>,
+        hover_error: Option<String>,
+    ) -> Self {
         Self {
             capabilities,
-            hover: Some(hover),
-            initialize_error: None,
-            hover_error: None,
+            hover,
+            initialize_error,
+            hover_error,
         }
     }
 
+    pub(crate) fn with_hover(capabilities: ServerCapabilitySet, hover: Hover) -> Self {
+        Self::new(capabilities, Some(hover), None, None)
+    }
+
     pub(crate) fn missing_hover(capabilities: ServerCapabilitySet) -> Self {
-        Self {
-            capabilities,
-            hover: None,
-            initialize_error: None,
-            hover_error: None,
-        }
+        Self::new(capabilities, None, None, None)
     }
 
     pub(crate) fn failing_initialize(
         capabilities: ServerCapabilitySet,
         message: impl Into<String>,
     ) -> Self {
-        Self {
-            capabilities,
-            hover: None,
-            initialize_error: Some(message.into()),
-            hover_error: None,
-        }
+        Self::new(capabilities, None, Some(message.into()), None)
     }
 
     pub(crate) fn failing_hover(
         capabilities: ServerCapabilitySet,
         message: impl Into<String>,
     ) -> Self {
-        Self {
-            capabilities,
-            hover: None,
-            initialize_error: None,
-            hover_error: Some(message.into()),
-        }
+        Self::new(capabilities, None, None, Some(message.into()))
     }
 }
 

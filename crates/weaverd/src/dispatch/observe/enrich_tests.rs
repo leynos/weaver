@@ -44,12 +44,8 @@ fn try_lsp_enrichment_degrades_when_initialization_fails() {
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         "boom",
     );
-    let source = "fn test() {}";
-    let (outcome, backends, card) = run_enrichment_with_server(server, source);
-
-    assert_eq!(outcome, EnrichmentOutcome::Degraded);
+    let backends = assert_enrichment_degrades(server);
     assert!(backends.is_started(BackendKind::Semantic));
-    assert!(card.lsp.is_none());
 }
 
 #[test]
@@ -57,11 +53,7 @@ fn try_lsp_enrichment_degrades_when_hover_is_missing() {
     let server = StubLanguageServer::missing_hover(
         ServerCapabilitySet::new(false, false, false).with_hover(true),
     );
-    let source = "fn test() {}";
-    let (outcome, _backends, card) = run_enrichment_with_server(server, source);
-
-    assert_eq!(outcome, EnrichmentOutcome::Degraded);
-    assert!(card.lsp.is_none());
+    assert_enrichment_degrades(server);
 }
 
 #[test]
@@ -70,11 +62,7 @@ fn try_lsp_enrichment_degrades_when_hover_request_fails() {
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         "hover RPC failed",
     );
-    let source = "fn test() {}";
-    let (outcome, _backends, card) = run_enrichment_with_server(server, source);
-
-    assert_eq!(outcome, EnrichmentOutcome::Degraded);
-    assert!(card.lsp.is_none());
+    assert_enrichment_degrades(server);
 }
 
 #[test]
@@ -283,6 +271,16 @@ fn run_enrichment_with_server(
     let mut card = rust_card();
     let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
     (outcome, backends, card)
+}
+
+fn assert_enrichment_degrades(
+    server: StubLanguageServer,
+) -> FusionBackends<crate::semantic_provider::SemanticBackendProvider> {
+    let source = "fn test() {}";
+    let (outcome, backends, card) = run_enrichment_with_server(server, source);
+    assert_eq!(outcome, EnrichmentOutcome::Degraded);
+    assert!(card.lsp.is_none());
+    backends
 }
 
 fn rust_card() -> SymbolCard {
