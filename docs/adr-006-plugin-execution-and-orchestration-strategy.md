@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed.
+Proposed
 
 ## Date
 
@@ -11,7 +11,7 @@ Proposed.
 ## Outstanding Decisions
 
 - Which plugin categories, if any, need streaming behaviour instead of
-  one-shot JSONL?
+  one-shot JSON Lines (JSONL)?
 - Which team owns the broker-side timeout and payload-size defaults?
 - Which plugin lifecycle guarantees must remain stable before acceptance?
 
@@ -22,7 +22,7 @@ helpers. The broker must keep ownership of command orchestration, but the
 plugin boundary still needs to be simple enough for testing, debugging, and
 sandbox control.
 
-The design also needs to explain why Weaver uses one-shot JSONL payloads rather
+The design also needs to explain why Weaver uses one-shot JSON Lines (JSONL) payloads rather
 than long-lived streaming sessions for plugin execution.
 
 ## Decision Drivers

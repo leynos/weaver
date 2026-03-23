@@ -2,13 +2,13 @@
 
 ## Status
 
-Proposed.
+Proposed
 
 ## Date
 
-2026-03-22.
+2026-03-22
 
-## Outstanding Decisions
+## Outstanding decisions
 
 - Which refusal reason codes are mandatory in the first acceptance set?
 - Which policy source owns the final routing decision when multiple providers
