@@ -129,7 +129,7 @@ pub(crate) fn rust_card() -> SymbolCard {
 }
 
 /// Creates a test symbol card with custom position for encoding tests.
-#[allow(dead_code)]
+#[expect(dead_code, reason = "keeps helper available for encoding tests")]
 pub(crate) fn test_symbol_card_with_pos(
     start_line: u32,
     start_column: u32,
@@ -176,7 +176,9 @@ pub(crate) fn test_symbol_card_with_pos(
 
 /// Runs non-ASCII enrichment test with the given capabilities.
 /// Returns the enrichment outcome and the character offset sent to the LSP server.
-pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> (EnrichmentOutcome, u32) {
+pub(crate) fn run_non_ascii_enrichment(
+    capabilities: ServerCapabilitySet,
+) -> (EnrichmentOutcome, u32) {
     let source = "// café fn foo() {}";
     let hover = markdown_hover("```rust\nfn foo()\n```");
     let (server, hover_params_ref) = StubLanguageServer::with_hover(capabilities, hover);
@@ -189,8 +191,14 @@ pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> (En
             symbol_ref: SymbolRef {
                 uri: String::from("file:///tmp/test.rs"),
                 range: SourceRange {
-                    start: SourcePosition { line: 0, column: 12 },
-                    end: SourcePosition { line: 0, column: 15 },
+                    start: SourcePosition {
+                        line: 0,
+                        column: 12,
+                    },
+                    end: SourcePosition {
+                        line: 0,
+                        column: 15,
+                    },
                 },
                 language: CardLanguage::Rust,
                 kind: weaver_cards::CardSymbolKind::Function,
@@ -214,7 +222,10 @@ pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> (En
     };
 
     let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
-    assert!(card.lsp.is_some(), "card.lsp should be populated on success");
+    assert!(
+        card.lsp.is_some(),
+        "card.lsp should be populated on success"
+    );
 
     let hover_params = hover_params_ref
         .lock()
