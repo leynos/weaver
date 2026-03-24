@@ -41,8 +41,9 @@ pub(crate) fn assert_lsp_info(info: &LspInfo, expected: &ExpectedLspInfo<'_>) {
 /// Checks that byte-to-UTF-16 conversion produces expected result.
 pub(crate) fn check_utf16_offset(line: &str, byte_col: usize, expected: Option<u32>) {
     use crate::dispatch::observe::enrich::byte_col_to_utf16;
+    let byte_col_u32 = u32::try_from(byte_col).expect("byte_col must fit in u32");
     assert_eq!(
-        byte_col_to_utf16(line, byte_col as u32),
+        byte_col_to_utf16(line, byte_col_u32),
         expected,
         "byte_col_to_utf16({line:?}, {byte_col}) expected {expected:?}"
     );
@@ -129,7 +130,6 @@ pub(crate) fn rust_card() -> SymbolCard {
 }
 
 /// Creates a test symbol card with custom position for encoding tests.
-#[expect(dead_code, reason = "keeps helper available for encoding tests")]
 pub(crate) fn test_symbol_card_with_pos(
     start_line: u32,
     start_column: u32,
@@ -175,53 +175,18 @@ pub(crate) fn test_symbol_card_with_pos(
 }
 
 /// Runs non-ASCII enrichment test with the given capabilities.
-/// Returns the enrichment outcome and the character offset sent to the LSP server.
-pub(crate) fn run_non_ascii_enrichment(
-    capabilities: ServerCapabilitySet,
-) -> (EnrichmentOutcome, u32) {
+/// Returns the character offset sent to the LSP server.
+/// Asserts that enrichment succeeds.
+pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> u32 {
     let source = "// café fn foo() {}";
     let hover = markdown_hover("```rust\nfn foo()\n```");
     let (server, hover_params_ref) = StubLanguageServer::with_hover(capabilities, hover);
     let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
 
-    let mut card = SymbolCard {
-        card_version: 1,
-        symbol: SymbolIdentity {
-            symbol_id: String::from("sym_foo"),
-            symbol_ref: SymbolRef {
-                uri: String::from("file:///tmp/test.rs"),
-                range: SourceRange {
-                    start: SourcePosition {
-                        line: 0,
-                        column: 12,
-                    },
-                    end: SourcePosition {
-                        line: 0,
-                        column: 15,
-                    },
-                },
-                language: CardLanguage::Rust,
-                kind: weaver_cards::CardSymbolKind::Function,
-                name: String::from("foo"),
-                container: None,
-            },
-        },
-        signature: None,
-        doc: None,
-        attachments: None,
-        structure: None,
-        lsp: None,
-        metrics: None,
-        deps: None,
-        interstitial: None,
-        provenance: Provenance {
-            extracted_at: String::from("2026-03-19T00:00:00Z"),
-            sources: vec![String::from("tree_sitter")],
-        },
-        etag: None,
-    };
+    let mut card = test_symbol_card_with_pos(0, 12, 0, 15);
 
     let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
+    assert_eq!(outcome, EnrichmentOutcome::Enriched);
     assert!(
         card.lsp.is_some(),
         "card.lsp should be populated on success"
@@ -236,5 +201,5 @@ pub(crate) fn run_non_ascii_enrichment(
     assert_eq!(params.text_document_position_params.position.line, 0);
     let character = params.text_document_position_params.position.character;
 
-    (outcome, character)
+    character
 }

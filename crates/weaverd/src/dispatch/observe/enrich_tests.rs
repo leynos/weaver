@@ -208,8 +208,7 @@ fn byte_col_to_utf16_rejects_non_char_boundary() {
 #[test]
 fn try_lsp_enrichment_with_non_ascii_source() {
     let caps = ServerCapabilitySet::new(false, false, false).with_hover(true);
-    let (outcome, character) = run_non_ascii_enrichment(caps);
-    assert_eq!(outcome, EnrichmentOutcome::Enriched);
+    let character = run_non_ascii_enrichment(caps);
     // 'é' saves one position: byte offset 12 → UTF-16 offset 11
     assert_eq!(character, 11);
 }
@@ -219,8 +218,7 @@ fn try_lsp_enrichment_with_non_ascii_source_utf8_negotiated() {
     let caps = ServerCapabilitySet::new(false, false, false)
         .with_hover(true)
         .with_position_encoding(Some(lsp_types::PositionEncodingKind::UTF8));
-    let (outcome, character) = run_non_ascii_enrichment(caps);
-    assert_eq!(outcome, EnrichmentOutcome::Enriched);
+    let character = run_non_ascii_enrichment(caps);
     // UTF-8 negotiated: byte offset 12 is passed through unchanged
     assert_eq!(character, 12);
 }
