@@ -1,14 +1,11 @@
 //! Unit tests for `observe::enrich`.
 
 use lsp_types::{Hover, HoverContents, MarkedString, MarkupContent, MarkupKind};
-use weaver_cards::{
-    CardLanguage, Provenance, SourcePosition, SourceRange, SymbolCard, SymbolIdentity, SymbolRef,
-};
 use weaver_lsp_host::{Language, ServerCapabilitySet};
 
 use super::enrich_test_utils::{
     ExpectedLspInfo, assert_deprecation, assert_enrichment_degrades, assert_lsp_info,
-    check_utf16_offset, rust_card,
+    check_utf16_offset, rust_card, test_symbol_card_with_pos,
 };
 use super::*;
 use crate::backends::BackendKind;
@@ -223,42 +220,7 @@ fn try_lsp_enrichment_with_non_ascii_source() {
     let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
 
     // Symbol at byte column 12 (start of "foo")
-    let mut card = SymbolCard {
-        card_version: 1,
-        symbol: SymbolIdentity {
-            symbol_id: String::from("sym_foo"),
-            symbol_ref: SymbolRef {
-                uri: String::from("file:///tmp/test.rs"),
-                range: SourceRange {
-                    start: SourcePosition {
-                        line: 0,
-                        column: 12,
-                    },
-                    end: SourcePosition {
-                        line: 0,
-                        column: 15,
-                    },
-                },
-                language: CardLanguage::Rust,
-                kind: weaver_cards::CardSymbolKind::Function,
-                name: String::from("foo"),
-                container: None,
-            },
-        },
-        signature: None,
-        doc: None,
-        attachments: None,
-        structure: None,
-        lsp: None,
-        metrics: None,
-        deps: None,
-        interstitial: None,
-        provenance: Provenance {
-            extracted_at: String::from("2026-03-19T00:00:00Z"),
-            sources: vec![String::from("tree_sitter")],
-        },
-        etag: None,
-    };
+    let mut card = test_symbol_card_with_pos(0, 12, 0, 15);
 
     let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
 
@@ -292,42 +254,7 @@ fn try_lsp_enrichment_with_non_ascii_source_utf8_negotiated() {
     let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
 
     // Symbol at byte column 12 (start of "foo")
-    let mut card = SymbolCard {
-        card_version: 1,
-        symbol: SymbolIdentity {
-            symbol_id: String::from("sym_foo"),
-            symbol_ref: SymbolRef {
-                uri: String::from("file:///tmp/test.rs"),
-                range: SourceRange {
-                    start: SourcePosition {
-                        line: 0,
-                        column: 12,
-                    },
-                    end: SourcePosition {
-                        line: 0,
-                        column: 15,
-                    },
-                },
-                language: CardLanguage::Rust,
-                kind: weaver_cards::CardSymbolKind::Function,
-                name: String::from("foo"),
-                container: None,
-            },
-        },
-        signature: None,
-        doc: None,
-        attachments: None,
-        structure: None,
-        lsp: None,
-        metrics: None,
-        deps: None,
-        interstitial: None,
-        provenance: Provenance {
-            extracted_at: String::from("2026-03-19T00:00:00Z"),
-            sources: vec![String::from("tree_sitter")],
-        },
-        etag: None,
-    };
+    let mut card = test_symbol_card_with_pos(0, 12, 0, 15);
 
     let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
 

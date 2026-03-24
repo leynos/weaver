@@ -125,3 +125,48 @@ pub(crate) fn rust_card() -> SymbolCard {
         etag: None,
     }
 }
+
+/// Creates a test symbol card with custom position for encoding tests.
+pub(crate) fn test_symbol_card_with_pos(
+    start_line: u32,
+    start_column: u32,
+    end_line: u32,
+    end_column: u32,
+) -> SymbolCard {
+    SymbolCard {
+        card_version: 1,
+        symbol: SymbolIdentity {
+            symbol_id: String::from("sym_foo"),
+            symbol_ref: SymbolRef {
+                uri: String::from("file:///tmp/test.rs"),
+                range: SourceRange {
+                    start: SourcePosition {
+                        line: start_line,
+                        column: start_column,
+                    },
+                    end: SourcePosition {
+                        line: end_line,
+                        column: end_column,
+                    },
+                },
+                language: CardLanguage::Rust,
+                kind: weaver_cards::CardSymbolKind::Function,
+                name: String::from("foo"),
+                container: None,
+            },
+        },
+        signature: None,
+        doc: None,
+        attachments: None,
+        structure: None,
+        lsp: None,
+        metrics: None,
+        deps: None,
+        interstitial: None,
+        provenance: Provenance {
+            extracted_at: String::from("2026-03-19T00:00:00Z"),
+            sources: vec![String::from("tree_sitter")],
+        },
+        etag: None,
+    }
+}
