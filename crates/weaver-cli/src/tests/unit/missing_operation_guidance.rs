@@ -43,13 +43,16 @@ fn run_with_panicking_loader(args: &[&str]) -> PreflightOutput {
     }
 }
 
-fn assert_preflight_failure(exit: ExitCode, stdout: &[u8]) {
-    assert_eq!(exit, ExitCode::FAILURE);
-    assert!(stdout.is_empty(), "guidance must not write to stdout");
+fn assert_preflight_failure(output: &PreflightOutput) {
+    assert_eq!(output.exit, ExitCode::FAILURE);
+    assert!(
+        output.stdout.is_empty(),
+        "guidance must not write to stdout"
+    );
 }
 
 fn assert_unknown_domain_preflight(output: &PreflightOutput, domain: &str) {
-    assert_preflight_failure(output.exit, &output.stdout);
+    assert_preflight_failure(output);
     assert!(
         output
             .stderr
@@ -63,7 +66,7 @@ fn assert_unknown_domain_preflight(output: &PreflightOutput, domain: &str) {
 }
 
 fn assert_known_domain_operation_guidance(output: &PreflightOutput, domain: &str) {
-    assert_preflight_failure(output.exit, &output.stdout);
+    assert_preflight_failure(output);
     assert!(
         output
             .stderr
