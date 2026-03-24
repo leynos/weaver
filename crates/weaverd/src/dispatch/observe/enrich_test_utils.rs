@@ -82,6 +82,12 @@ pub(crate) fn assert_enrichment_degrades(
     let (outcome, backends, card, dir) = run_enrichment_with_server(server, source);
     assert_eq!(outcome, EnrichmentOutcome::Degraded);
     assert!(card.lsp.is_none());
+    // Verify that degradation leaves provenance unchanged
+    assert_eq!(
+        card.provenance.sources,
+        vec![String::from("tree_sitter")],
+        "degradation should not modify provenance"
+    );
     (backends, dir)
 }
 
@@ -94,10 +100,9 @@ pub(crate) fn rust_card() -> SymbolCard {
     card.symbol.symbol_id = String::from("sym_greet");
     card.symbol.symbol_ref.uri = String::from("file:///tmp/card.rs");
     card.symbol.symbol_ref.name = String::from("greet");
-    card.provenance.sources = vec![
-        String::from("tree_sitter"),
-        String::from("tree_sitter_degraded_semantic"),
-    ];
+    // Provenance starts neutral (tree_sitter only) to verify enrichment
+    // correctly preserves or modifies it.
+    card.provenance.sources = vec![String::from("tree_sitter")];
     card
 }
 
