@@ -250,7 +250,13 @@ fn world() -> RefactorWorld {
 }
 
 #[given("a workspace file for refactoring")]
-fn given_workspace_file(#[allow(unused_variables)] world: &mut RefactorWorld) {
+fn given_workspace_file(
+    #[expect(
+        unused_variables,
+        reason = "BDD step exists for readability; file creation happens in prepare_routed_fixture()"
+    )]
+    world: &mut RefactorWorld,
+) {
     // File creation is handled by prepare_routed_fixture() in subsequent steps
     // This step exists for BDD readability but performs no action
 }

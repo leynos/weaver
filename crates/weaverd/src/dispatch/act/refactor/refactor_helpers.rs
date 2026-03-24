@@ -64,12 +64,10 @@ pub(super) fn standard_rename_args(file: &str) -> Vec<String> {
     ]
 }
 
-#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn configure_request(request: &mut CommandRequest, args: Vec<String>) {
     *request = command_request(args);
 }
 
-#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn selected_resolution(config: SelectedResolution<'_>) -> CapabilityResolutionEnvelope {
     CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
         capability: config.capability,
@@ -87,7 +85,6 @@ pub(super) fn selected_resolution(config: SelectedResolution<'_>) -> CapabilityR
     })
 }
 
-#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn refused_resolution(config: RefusedResolution<'_>) -> CapabilityResolutionEnvelope {
     CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
         capability: config.capability,
@@ -101,7 +98,6 @@ pub(super) fn refused_resolution(config: RefusedResolution<'_>) -> CapabilityRes
     })
 }
 
-#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn rejected_candidate(provider: &str, reason: CandidateReason) -> CandidateEvaluation {
     CandidateEvaluation {
         provider: String::from(provider),
@@ -131,12 +127,10 @@ fn routed_format_diff(path: &Path, make_header: impl Fn(&str) -> String) -> Stri
     format_diff(path, &make_header(&patch_path.to_string_lossy()))
 }
 
-#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn routed_diff_for(path: &Path) -> String {
     routed_format_diff(path, |p| format!("diff --git a/{p} b/{p}"))
 }
 
-#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn routed_malformed_diff_for(path: &Path) -> String {
     routed_format_diff(path, |p| format!("diff --git a/{p}"))
 }
