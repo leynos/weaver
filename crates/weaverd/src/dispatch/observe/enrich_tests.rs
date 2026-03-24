@@ -1,12 +1,15 @@
 //! Unit tests for `observe::enrich`.
 
 use lsp_types::{Hover, HoverContents, MarkedString, MarkupContent, MarkupKind};
-use tempfile::TempDir;
 use weaver_cards::{
     CardLanguage, Provenance, SourcePosition, SourceRange, SymbolCard, SymbolIdentity, SymbolRef,
 };
 use weaver_lsp_host::{Language, ServerCapabilitySet};
 
+use super::enrich_test_utils::{
+    ExpectedLspInfo, assert_deprecation, assert_enrichment_degrades, assert_lsp_info,
+    check_utf16_offset, rust_card,
+};
 use super::*;
 use crate::backends::BackendKind;
 use crate::dispatch::observe::test_support::{
@@ -340,110 +343,4 @@ fn try_lsp_enrichment_with_non_ascii_source_utf8_negotiated() {
         .expect("hover should have been called");
     assert_eq!(params.text_document_position_params.position.line, 0);
     assert_eq!(params.text_document_position_params.position.character, 12);
-}
-
-struct ExpectedLspInfo<'a> {
-    source: &'a str,
-    hover_fragment: &'a str,
-    type_info: &'a str,
-    deprecated: bool,
-}
-
-fn assert_lsp_info(info: &LspInfo, expected: &ExpectedLspInfo<'_>) {
-    assert_eq!(info.source, expected.source, "source mismatch");
-    assert!(
-        info.hover.contains(expected.hover_fragment),
-        "hover {:?} did not contain {:?}",
-        info.hover,
-        expected.hover_fragment
-    );
-    assert_eq!(info.type_info, expected.type_info, "type_info mismatch");
-    assert_eq!(info.deprecated, expected.deprecated, "deprecated mismatch");
-}
-
-fn check_utf16_offset(line: &str, byte_col: usize, expected: Option<u32>) {
-    assert_eq!(
-        byte_col_to_utf16(line, byte_col as u32),
-        expected,
-        "byte_col_to_utf16({line:?}, {byte_col}) expected {expected:?}"
-    );
-}
-
-fn assert_deprecation(text: &str, expected: bool) {
-    let hover = Hover {
-        contents: HoverContents::Markup(MarkupContent {
-            kind: MarkupKind::Markdown,
-            value: String::from(text),
-        }),
-        range: None,
-    };
-    let info = parse_hover_response(&hover);
-    assert_eq!(
-        info.deprecated, expected,
-        "unexpected deprecation flag for text: {text:?}"
-    );
-}
-
-fn run_enrichment_with_server(
-    server: StubLanguageServer,
-    source: &str,
-) -> (
-    EnrichmentOutcome,
-    FusionBackends<crate::semantic_provider::SemanticBackendProvider>,
-    SymbolCard,
-    TempDir,
-) {
-    let (mut backends, dir) = semantic_backends_with_server(Language::Rust, server);
-    let mut card = rust_card();
-    let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
-    (outcome, backends, card, dir)
-}
-
-fn assert_enrichment_degrades(
-    server: StubLanguageServer,
-) -> (
-    FusionBackends<crate::semantic_provider::SemanticBackendProvider>,
-    TempDir,
-) {
-    let source = "// comment\nfn greet(name: &str) -> usize { 0 }";
-    let (outcome, backends, card, dir) = run_enrichment_with_server(server, source);
-    assert_eq!(outcome, EnrichmentOutcome::Degraded);
-    assert!(card.lsp.is_none());
-    (backends, dir)
-}
-
-fn rust_card() -> SymbolCard {
-    SymbolCard {
-        card_version: 1,
-        symbol: SymbolIdentity {
-            symbol_id: String::from("sym_greet"),
-            symbol_ref: SymbolRef {
-                uri: String::from("file:///tmp/card.rs"),
-                range: SourceRange {
-                    start: SourcePosition { line: 1, column: 3 },
-                    end: SourcePosition { line: 3, column: 0 },
-                },
-                language: CardLanguage::Rust,
-                kind: weaver_cards::CardSymbolKind::Function,
-                name: String::from("greet"),
-                container: None,
-            },
-        },
-        signature: None,
-        doc: None,
-        attachments: None,
-        structure: None,
-        lsp: None,
-        metrics: None,
-        deps: None,
-        interstitial: None,
-        provenance: Provenance {
-            extracted_at: String::from("2026-03-19T00:00:00Z"),
-            sources: vec![
-                String::from("tree_sitter"),
-                String::from("tree_sitter_degraded_semantic"),
-            ],
-        },
-        etag: None,
-    }
 }

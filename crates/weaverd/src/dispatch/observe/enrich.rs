@@ -288,5 +288,9 @@ fn byte_col_to_utf16(line_text: &str, byte_col: u32) -> Option<u32> {
 }
 
 #[cfg(test)]
+#[path = "enrich_test_utils.rs"]
+mod enrich_test_utils;
+
+#[cfg(test)]
 #[path = "enrich_tests.rs"]
 mod tests;
