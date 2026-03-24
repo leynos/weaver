@@ -14,7 +14,7 @@ use super::resolution::{
 };
 use super::*;
 
-#[allow(
+#[expect(
     clippy::duplicate_mod,
     reason = "Shared test helpers loaded by multiple test modules"
 )]

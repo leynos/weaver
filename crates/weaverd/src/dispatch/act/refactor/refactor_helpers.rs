@@ -3,6 +3,8 @@
 //! This file is intentionally loaded multiple times by different test modules
 //! using `#[path = "refactor_helpers.rs"]` to provide shared test utilities.
 
+#![allow(dead_code)]
+
 use std::path::Path;
 
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
@@ -106,14 +108,12 @@ pub(super) fn rejected_candidate(provider: &str, reason: CandidateReason) -> Can
     }
 }
 
-#[expect(dead_code, reason = "Test helper function reserved for future use")]
 fn format_diff(path: &Path, git_header: &str) -> String {
     let original = original_content_for(path);
     let updated = updated_content_for(path);
     format!("{git_header}\n<<<<<<< SEARCH\n{original}=======\n{updated}>>>>>>> REPLACE\n",)
 }
 
-#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn routed_patch_path(path: &Path) -> &Path {
     match classify_file(path) {
         FileKind::Python | FileKind::Rust => Path::new("notes.txt"),
@@ -121,7 +121,6 @@ pub(super) fn routed_patch_path(path: &Path) -> &Path {
     }
 }
 
-#[expect(dead_code, reason = "Test helper function reserved for future use")]
 fn routed_format_diff(path: &Path, make_header: impl Fn(&str) -> String) -> String {
     let patch_path = routed_patch_path(path);
     format_diff(path, &make_header(&patch_path.to_string_lossy()))
@@ -135,14 +134,12 @@ pub(super) fn routed_malformed_diff_for(path: &Path) -> String {
     routed_format_diff(path, |p| format!("diff --git a/{p}"))
 }
 
-#[expect(dead_code, reason = "Test helper enum reserved for future use")]
 pub(super) enum FileKind {
     Python,
     Rust,
     Other,
 }
 
-#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn classify_file(path: &Path) -> FileKind {
     match path.extension().and_then(|ext| ext.to_str()) {
         Some("py") => FileKind::Python,
@@ -151,13 +148,11 @@ pub(super) fn classify_file(path: &Path) -> FileKind {
     }
 }
 
-#[expect(dead_code, reason = "Test helper struct reserved for future use")]
 struct FileContents {
     original: &'static str,
     updated: &'static str,
 }
 
-#[expect(dead_code, reason = "Test helper function reserved for future use")]
 fn content_table(kind: FileKind) -> FileContents {
     match kind {
         FileKind::Python => FileContents {
@@ -185,12 +180,10 @@ fn content_table(kind: FileKind) -> FileContents {
     }
 }
 
-#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn original_content_for(path: &Path) -> &'static str {
     content_table(classify_file(path)).original
 }
 
-#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn updated_content_for(path: &Path) -> &'static str {
     content_table(classify_file(path)).updated
 }

@@ -4,7 +4,7 @@ use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 
-#[allow(
+#[expect(
     clippy::duplicate_mod,
     reason = "Shared test helpers loaded by multiple test modules"
 )]
