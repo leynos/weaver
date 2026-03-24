@@ -250,9 +250,9 @@ fn world() -> RefactorWorld {
 }
 
 #[given("a workspace file for refactoring")]
-fn given_workspace_file(world: &mut RefactorWorld) {
-    let target_file = world.target_file();
-    world.write_file(&target_file, original_content_for(Path::new(&target_file)));
+fn given_workspace_file(#[allow(unused_variables)] world: &mut RefactorWorld) {
+    // File creation is handled by prepare_routed_fixture() in subsequent steps
+    // This step exists for BDD readability but performs no action
 }
 
 #[given("a valid auto-routed act refactor request resolved to rope")]
