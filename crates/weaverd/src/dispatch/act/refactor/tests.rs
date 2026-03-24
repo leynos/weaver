@@ -4,6 +4,10 @@ use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 
+#[allow(
+    clippy::duplicate_mod,
+    reason = "Shared test helpers loaded by multiple test modules"
+)]
 #[path = "refactor_helpers.rs"]
 mod refactor_helpers;
 

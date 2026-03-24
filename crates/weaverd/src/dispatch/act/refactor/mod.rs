@@ -220,11 +220,6 @@ pub fn handle<W: Write>(
         "handling act refactor"
     );
 
-    context
-        .backends
-        .ensure_started(BackendKind::Semantic)
-        .map_err(DispatchError::backend_startup)?;
-
     let (plugin_request, capability, file_path) =
         prepare_plugin_request(context.workspace_root, &args)?;
     let resolution = match context.runtime.resolve(ResolutionRequest::new(
@@ -251,6 +246,11 @@ pub fn handle<W: Write>(
 
     match context.runtime.execute(selected_provider, &plugin_request) {
         Ok(response) => {
+            // Ensure semantic backend is started before forwarding to apply-patch
+            context
+                .backends
+                .ensure_started(BackendKind::Semantic)
+                .map_err(DispatchError::backend_startup)?;
             handle_plugin_response(response, writer, context.backends, context.workspace_root)
         }
         Err(error) => {
