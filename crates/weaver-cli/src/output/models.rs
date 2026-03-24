@@ -2,6 +2,12 @@
 
 use serde::Deserialize;
 
+/// Stable envelope type for daemon capability-resolution payloads.
+///
+/// This constant must match the daemon-side `CAPABILITY_RESOLUTION_TYPE` exported
+/// by `weaverd::dispatch::act::refactor::resolution` to ensure correct parsing.
+const CAPABILITY_RESOLUTION_TYPE: &str = "CapabilityResolution";
+
 /// A definition or reference location in the daemon response.
 #[derive(Debug, Deserialize)]
 pub(crate) struct DefinitionLocation {
@@ -57,6 +63,64 @@ pub(crate) struct VerificationFailure {
     pub(crate) message: String,
 }
 
+/// Parsed capability-resolution payload emitted by daemon routing.
+///
+/// This models the full envelope as emitted on the wire so that callers
+/// can access `status`, `type`, and `details` from a single deserialization.
+#[derive(Debug, Deserialize)]
+pub(crate) struct CapabilityResolution {
+    /// Resolution status (e.g. "ok", "error").
+    #[expect(
+        dead_code,
+        reason = "the daemon includes status in the wire envelope even though the human renderer only reads routing details today"
+    )]
+    status: String,
+
+    /// Payload type discriminator.
+    #[serde(rename = "type")]
+    pub(crate) r#type: String,
+
+    /// Structured routing details.
+    pub(crate) details: CapabilityResolutionDetails,
+}
+
+/// Inner details for a capability-resolution payload.
+#[derive(Debug, Deserialize)]
+pub(crate) struct CapabilityResolutionDetails {
+    /// Requested capability identifier.
+    pub(crate) capability: String,
+    /// Inferred language, when available.
+    #[serde(default)]
+    pub(crate) language: Option<String>,
+    /// Explicitly requested provider, when supplied.
+    #[serde(default)]
+    pub(crate) requested_provider: Option<String>,
+    /// Provider selected by the daemon, when routing succeeded.
+    #[serde(default)]
+    pub(crate) selected_provider: Option<String>,
+    /// Whether selection was automatic or explicit.
+    pub(crate) selection_mode: String,
+    /// High-level routing outcome.
+    pub(crate) outcome: String,
+    /// Stable refusal code, when routing refused execution.
+    #[serde(default)]
+    pub(crate) refusal_reason: Option<String>,
+    /// Candidate-by-candidate rationale.
+    #[serde(default)]
+    pub(crate) candidates: Vec<CapabilityCandidate>,
+}
+
+/// Candidate evaluation captured in a routing rationale payload.
+#[derive(Debug, Deserialize)]
+pub(crate) struct CapabilityCandidate {
+    /// Candidate provider name.
+    pub(crate) provider: String,
+    /// Whether the candidate was accepted.
+    pub(crate) accepted: bool,
+    /// Stable reason code for the decision.
+    pub(crate) reason: String,
+}
+
 /// Parses definition locations from a JSON payload.
 #[must_use]
 pub(crate) fn parse_definitions(payload: &str) -> Option<Vec<DefinitionLocation>> {
@@ -90,6 +154,16 @@ pub(crate) fn parse_verification_failures(payload: &str) -> Option<Vec<Verificat
     }
 
     Some(failures)
+}
+
+/// Parses daemon capability-resolution payloads.
+#[must_use]
+pub(crate) fn parse_capability_resolution(payload: &str) -> Option<CapabilityResolution> {
+    let parsed: CapabilityResolution = serde_json::from_str(payload).ok()?;
+    if parsed.r#type != CAPABILITY_RESOLUTION_TYPE {
+        return None;
+    }
+    Some(parsed)
 }
 
 #[derive(Debug, Deserialize)]
@@ -172,5 +246,46 @@ mod tests {
         assert_eq!(failures.len(), 1);
         assert_eq!(failures[0].phase.as_deref(), Some("SemanticLock"));
         assert_eq!(failures[0].line, Some(42));
+    }
+
+    #[test]
+    fn parses_capability_resolution_payload() {
+        let payload = r#"{
+  "status": "ok",
+  "type": "CapabilityResolution",
+  "details": {
+    "capability": "rename-symbol",
+    "language": "python",
+    "selected_provider": "rope",
+    "selection_mode": "automatic",
+    "outcome": "selected",
+    "candidates": [
+      {"provider": "rope", "accepted": true, "reason": "matched_language_and_capability"}
+    ]
+  }
+}"#;
+        let resolution = parse_capability_resolution(payload).expect("capability resolution");
+        assert_eq!(resolution.details.capability, "rename-symbol");
+        assert_eq!(
+            resolution.details.selected_provider.as_deref(),
+            Some("rope")
+        );
+        assert_eq!(resolution.details.candidates.len(), 1);
+    }
+
+    #[test]
+    fn parse_capability_resolution_rejects_mismatched_type() {
+        let payload = r#"{
+  "status": "ok",
+  "type": "SomethingElse",
+  "details": {
+    "capability": "rename-symbol",
+    "selection_mode": "automatic",
+    "outcome": "selected",
+    "candidates": []
+  }
+}"#;
+
+        assert!(parse_capability_resolution(payload).is_none());
     }
 }

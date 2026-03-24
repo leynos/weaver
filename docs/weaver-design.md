@@ -1470,6 +1470,17 @@ following decisions govern this rollout:
   payloads. The user-facing CLI still spells the operation as
   `--refactoring rename`; `weaverd` performs the contract mapping internally.
 
+- **Daemon-side capability resolution with structured rationale.** `weaverd`
+  now resolves `rename-symbol` by capability plus inferred file language before
+  plugin execution. Python defaults to `rope`, Rust defaults to
+  `rust-analyzer`, and explicit `--provider` values remain supported only as
+  compatibility overrides that still must match the inferred language and the
+  declared capability. Every selection or refusal emits a structured
+  `CapabilityResolution` payload containing the capability, inferred language,
+  selection mode, selected or requested provider, stable refusal code, and
+  candidate-by-candidate reasons so JSON consumers can inspect routing
+  decisions while human mode stays readable.
+
 - **Shared Double-Lock commit path remains unchanged.** As with rope, successful
   `PluginOutput::Diff` output from rust-analyzer is forwarded to
   `act apply-patch`, reusing the existing syntactic + semantic verification and

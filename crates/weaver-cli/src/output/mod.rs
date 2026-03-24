@@ -11,7 +11,8 @@ mod source;
 pub use crate::cli::OutputFormat;
 use crate::output::models::{
     DefinitionLocation, DiagnosticItem, DiagnosticsResponse, ReferenceResponse,
-    VerificationFailure, parse_definitions, parse_verification_failures,
+    VerificationFailure, parse_capability_resolution, parse_definitions,
+    parse_verification_failures,
 };
 use crate::output::source::{
     SourceLocation, SourcePosition, extract_uri_argument, from_path_or_uri, from_uri,
@@ -89,7 +90,9 @@ pub fn render_human_output(context: &OutputContext, data: &str) -> Option<String
         ("observe", "get-definition") => render_definitions(trimmed),
         ("observe", "find-references") => render_references(trimmed),
         ("verify", "diagnostics") => render_diagnostics(trimmed, context),
-        ("act", _) => render_verification_failures(trimmed),
+        ("act", _) => {
+            render_capability_resolution(trimmed).or_else(|| render_verification_failures(trimmed))
+        }
         _ => None,
     }
 }
@@ -183,6 +186,46 @@ fn render_verification_failures(payload: &str) -> Option<String> {
     Some(render::render_locations(&locations))
 }
 
+fn render_capability_resolution(payload: &str) -> Option<String> {
+    let resolution = parse_capability_resolution(payload)?;
+    let details = resolution.details;
+    let language = details.language.as_deref().unwrap_or("unknown");
+
+    let mut rendered = match details.selected_provider.as_deref() {
+        Some(provider) => format!(
+            "{} {} for {language}: selected {provider} ({})",
+            details.capability, details.selection_mode, details.outcome
+        ),
+        None => format!(
+            "{} {} for {language}: refused ({})",
+            details.capability, details.selection_mode, details.outcome
+        ),
+    };
+
+    if let Some(reason) = details.refusal_reason.as_deref() {
+        rendered.push_str(&format!(" ({reason})"));
+    }
+    rendered.push('\n');
+
+    if let Some(provider) = details.requested_provider.as_deref() {
+        rendered.push_str(&format!("requested provider: {provider}\n"));
+    }
+
+    for candidate in details.candidates {
+        let outcome = if candidate.accepted {
+            "accepted"
+        } else {
+            "rejected"
+        };
+        rendered.push_str(&format!(
+            "candidate {outcome}: {} ({})\n",
+            candidate.provider, candidate.reason
+        ));
+    }
+
+    Some(rendered)
+}
+
 fn diagnostic_to_location(
     diagnostic: DiagnosticItem,
     fallback_uri: Option<&str>,
@@ -242,5 +285,44 @@ mod tests {
         #[case] expected: ResolvedOutputFormat,
     ) {
         assert_eq!(format.resolve(stdout_is_terminal), expected);
+    }
+
+    #[test]
+    fn renders_capability_resolution_for_humans() {
+        let payload = r#"{
+  "status": "ok",
+  "type": "CapabilityResolution",
+  "details": {
+    "capability": "rename-symbol",
+    "language": "python",
+    "selected_provider": "rope",
+    "selection_mode": "automatic",
+    "outcome": "selected",
+    "candidates": [
+      {"provider": "rope", "accepted": true, "reason": "matched_language_and_capability"},
+      {"provider": "rust-analyzer", "accepted": false, "reason": "unsupported_language"}
+    ]
+  }
+}"#;
+        let context = OutputContext::new("act", "refactor", Vec::new());
+
+        let rendered = render_human_output(&context, payload).expect("rendered");
+
+        assert!(rendered.contains("rename-symbol automatic for python: selected rope"));
+        assert!(rendered.contains("candidate accepted: rope"));
+        assert!(rendered.contains("candidate rejected: rust-analyzer"));
+    }
+
+    #[test]
+    fn ignores_non_capability_json_in_capability_renderer() {
+        let context = OutputContext::new("act", "refactor", Vec::new());
+
+        let rendered = render_human_output(
+            &context,
+            r#"{"status":"error","type":"VerificationError","details":{"failures":[]}}"#,
+        )
+        .expect("rendered");
+
+        assert_eq!(rendered, "no verification failures reported\n");
     }
 }

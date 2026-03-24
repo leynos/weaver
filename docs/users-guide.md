@@ -729,17 +729,19 @@ Double-Lock safety harness before any filesystem change is committed.
 Syntax:
 
 ```sh
-weaver act refactor --provider <PLUGIN> --refactoring <OP> --file <PATH> [KEY=VALUE...]
+weaver act refactor [--provider <PLUGIN>] --refactoring <OP> --file <PATH> [KEY=VALUE...]
 ```
 
 Arguments:
 
-| Flag            | Description                                                                                                                             |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `--provider`    | Name of the registered plugin (e.g. `rope`, `rust-analyzer`).                                                                           |
-| `--refactoring` | Refactoring operation to request (currently `rename`). The handler maps `rename` to the `rename-symbol` capability contract internally. |
-| `--file`        | Path to the target file (relative to workspace root).                                                                                   |
-| `KEY=VALUE`     | Extra key-value arguments forwarded to the plugin.                                                                                      |
+Table: act refactor command-line flags
+
+| Flag            | Description                                                                                                                                                                     |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--provider`    | Optional compatibility override for the registered plugin (e.g. `rope`, `rust-analyzer`). When omitted, the daemon selects a provider by capability and inferred file language. |
+| `--refactoring` | Refactoring operation to request (currently `rename`). The handler maps `rename` to the `rename-symbol` capability contract internally.                                         |
+| `--file`        | Path to the target file (relative to workspace root).                                                                                                                           |
+| `KEY=VALUE`     | Extra key-value arguments forwarded to the plugin.                                                                                                                              |
 
 The plugin receives the file content in-band as part of the JSONL request and
 does not need filesystem access. The daemon validates the resulting diff
@@ -747,19 +749,27 @@ through both the syntactic (Tree-sitter) and semantic (LSP) locks before
 writing to disk.
 
 For the built-in actuators, `rename` requires `offset=<BYTE_OFFSET>` and
-`new_name=<IDENTIFIER>` in the trailing `KEY=VALUE` arguments.
+`new_name=<IDENTIFIER>` in the trailing `KEY=VALUE` arguments. When
+`--provider` is omitted, `weaverd` infers the language from `--file`, resolves
+the `rename-symbol` capability to the matching registered plugin for that
+language, and refuses deterministically when the language is unsupported or an
+explicit provider conflicts with the inferred language.
 
 ### Parameter semantics and valid values
 
-The `act refactor` handler accepts the three required flags and forwards any
-additional `KEY=VALUE` pairs to the selected plugin.
+The `act refactor` handler accepts `--refactoring` and `--file`, honours an
+optional `--provider` override, and forwards any additional `KEY=VALUE` pairs
+to the selected plugin.
 
-| Parameter       | Meaning                                                                                                                                                | Valid values                                                                             | Failure conditions                                                                          |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `--refactoring` | Refactoring operation requested from the plugin. The handler maps `rename` to the `rename-symbol` capability contract before forwarding to the plugin. | Currently only `rename` is implemented by built-in `rope` and `rust-analyzer` plugins.   | Missing value, or unsupported operation name (for example `extract_method`) causes failure. |
-| `--file`        | Target file to load and refactor.                                                                                                                      | Workspace-relative path to an existing readable file (for example `src/main.py`).        | Absolute paths, parent traversal (`..`), or unreadable/missing files cause failure.         |
-| `new_name`      | New symbol name used by `rename`.                                                                                                                      | Non-empty string value.                                                                  | Missing key, non-string value, or empty/whitespace-only value causes failure.               |
-| `offset`        | UTF-8 byte offset of the symbol occurrence used as rename anchor. The handler maps `offset` to the contract `position` field internally.               | Non-negative integer, provided as a number or numeric string (for example `4` or `"4"`). | Missing key, non-numeric value, or negative value causes failure.                           |
+Table: act refactor parameter semantics and validation
+
+| Parameter       | Meaning                                                                                                                                                | Valid values                                                                                              | Failure conditions                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `--provider`    | Optional explicit provider override.                                                                                                                   | Omit for daemon-selected routing, or supply a registered actuator name such as `rope` or `rust-analyzer`. | Unknown providers, or providers that do not support the inferred language and capability, are refused deterministically. |
+| `--refactoring` | Refactoring operation requested from the plugin. The handler maps `rename` to the `rename-symbol` capability contract before forwarding to the plugin. | Currently only `rename` is implemented by built-in `rope` and `rust-analyzer` plugins.                    | Missing value, or unsupported operation name (for example `extract_method`) causes failure.                              |
+| `--file`        | Target file to load and refactor.                                                                                                                      | Workspace-relative path to an existing readable file (for example `src/main.py`).                         | Absolute paths, parent traversal (`..`), or unreadable/missing files cause failure.                                      |
+| `new_name`      | New symbol name used by `rename`.                                                                                                                      | Non-empty string value.                                                                                   | Missing key, non-string value, or empty/whitespace-only value causes failure.                                            |
+| `offset`        | UTF-8 byte offset of the symbol occurrence used as rename anchor. The handler maps `offset` to the contract `position` field internally.               | Non-negative integer, provided as a number or numeric string (for example `4` or `"4"`).                  | Missing key, non-numeric value, or negative value causes failure.                                                        |
 
 For `offset`, count bytes from the start of the file (`0`-based), not line and
 column pairs. This matters when multibyte UTF-8 characters appear before the
@@ -770,12 +780,17 @@ target symbol.
 Both examples follow the same execution pipeline:
 
 1. `weaverd` parses `--provider`, `--refactoring`, and `--file`.
-2. The file content is read from the workspace and sent to the plugin in-band.
-3. The plugin executes `rename-symbol` using `position` and `new_name`.
-4. The plugin returns a unified diff for the modified file.
-5. Weaver validates the diff via the Double-Lock safety harness (syntax then
+2. It maps `rename` to `rename-symbol`, infers the target language from the
+   path, and resolves the provider automatically or validates the explicit
+   override.
+3. It emits a structured `CapabilityResolution` record describing that
+   routing decision.
+4. The file content is read from the workspace and sent to the plugin in-band.
+5. The plugin executes `rename-symbol` using `position` and `new_name`.
+6. The plugin returns a unified diff for the modified file.
+7. Weaver validates the diff via the Double-Lock safety harness (syntax then
    semantic checks).
-6. If validation passes, Weaver writes the file atomically and returns:
+8. If validation passes, Weaver writes the file atomically and returns:
    `{"files_deleted":0,"files_written":1,"status":"ok"}`.
 
 When validation fails, parameters are invalid, or the plugin reports an error,
@@ -783,7 +798,51 @@ the command exits non-zero and leaves the filesystem unchanged.
 
 Worked examples:
 
-- Python rename with `rope`:
+- Python rename with automatic routing:
+
+  ```sh
+  weaver --output json act refactor \
+    --refactoring rename \
+    --file src/main.py \
+    new_name=renamed_symbol \
+    offset=4
+  ```
+
+  Example routing rationale emitted before the final success payload:
+
+  ```json
+  {
+    "status": "ok",
+    "type": "CapabilityResolution",
+    "details": {
+      "capability": "rename-symbol",
+      "language": "python",
+      "selected_provider": "rope",
+      "selection_mode": "automatic",
+      "outcome": "selected",
+      "candidates": [
+        {
+          "provider": "rope",
+          "accepted": true,
+          "reason": "matched_language_and_capability"
+        },
+        {
+          "provider": "rust-analyzer",
+          "accepted": false,
+          "reason": "unsupported_language"
+        }
+      ]
+    }
+  }
+  ```
+
+  Example final result:
+
+  ```json
+  {"files_deleted":0,"files_written":1,"status":"ok"}
+  ```
+
+- Python rename with explicit `rope` override:
 
   ```sh
   weaver --output json act refactor \
@@ -794,13 +853,29 @@ Worked examples:
     offset=4
   ```
 
-  Example result:
+  Example final result:
 
   ```json
   {"files_deleted":0,"files_written":1,"status":"ok"}
   ```
 
-- Rust rename with `rust-analyzer`:
+- Rust rename with automatic routing:
+
+  ```sh
+  weaver --output json act refactor \
+    --refactoring rename \
+    --file src/main.rs \
+    new_name=renamed_name \
+    offset=3
+  ```
+
+  Example final result:
+
+  ```json
+  {"files_deleted":0,"files_written":1,"status":"ok"}
+  ```
+
+- Rust rename with explicit `rust-analyzer` override:
 
   ```sh
   weaver --output json act refactor \
@@ -811,7 +886,7 @@ Worked examples:
     offset=3
   ```
 
-  Example result:
+  Example final result:
 
   ```json
   {"files_deleted":0,"files_written":1,"status":"ok"}
@@ -843,6 +918,15 @@ failure and does not modify the filesystem.
 The built-in rust-analyzer plugin now declares the same capability contract as
 rope for rename flows, even though the CLI continues to accept
 `--refactoring rename`.
+
+In human-readable output mode, Weaver renders the routing rationale as concise
+text instead of raw JSON, for example:
+
+```text
+rename-symbol automatic for python: selected rope (selected)
+candidate accepted: rope (matched_language_and_capability)
+candidate rejected: rust-analyzer (unsupported_language)
+```
 
 ## Plugin system
 
@@ -992,7 +1076,10 @@ constraint during registration and rejects manifests that violate it.
 The daemon uses capability declarations to select plugins. For example, when
 routing a `rename-symbol` request for Python, the daemon queries the registry
 for actuator plugins that declare `rename-symbol` and support the `python`
-language.
+language. The current built-in routing policy selects `rope` for Python and
+`rust-analyzer` for Rust when `--provider` is omitted, and refuses
+deterministically for unsupported languages, unknown providers, and explicit
+provider/language mismatches.
 
 ### Safety harness integration
 

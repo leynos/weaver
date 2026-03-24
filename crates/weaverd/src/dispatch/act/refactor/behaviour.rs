@@ -1,34 +1,27 @@
 //! Behavioural tests for the `act refactor` handler.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use mockall::mock;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use tempfile::TempDir;
-use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
+use weaver_syntax::SupportedLanguage;
 
+use super::resolution::{
+    CandidateEvaluation, CandidateReason, CapabilityResolutionEnvelope, RefusalReason,
+    ResolutionRequest, SelectionMode,
+};
 use super::*;
 
-const ORIGINAL_CONTENT: &str = "hello world\n";
-const UPDATED_CONTENT: &str = "hello woven\n";
-const VALID_DIFF: &str = concat!(
-    "diff --git a/notes.txt b/notes.txt\n",
-    "<<<<<<< SEARCH\n",
-    "hello world\n",
-    "=======\n",
-    "hello woven\n",
-    ">>>>>>> REPLACE\n",
-);
-const MALFORMED_DIFF: &str = concat!(
-    "diff --git a/notes.txt\n",
-    "<<<<<<< SEARCH\n",
-    "hello world\n",
-    "=======\n",
-    "hello woven\n",
-    ">>>>>>> REPLACE\n",
-);
+#[expect(
+    clippy::duplicate_mod,
+    reason = "Shared test helpers loaded by multiple test modules"
+)]
+#[path = "refactor_helpers.rs"]
+mod refactor_helpers;
+
+use refactor_helpers::*;
 
 #[derive(Clone, Copy, Default)]
 enum RuntimeMode {
@@ -38,42 +31,132 @@ enum RuntimeMode {
     MalformedDiff,
 }
 
-mock! {
-    Runtime {}
-    impl RefactorPluginRuntime for Runtime {
-        fn execute(
-            &self,
-            provider: &str,
-            request: &PluginRequest,
-        ) -> Result<PluginResponse, PluginError>;
-    }
+#[derive(Clone, Copy, Default)]
+enum RoutingMode {
+    #[default]
+    AutomaticPython,
+    AutomaticRust,
+    UnsupportedLanguage,
+    ExplicitProviderMismatch,
 }
 
-const REQUIRED_FLAGS: &[&str] = &["--provider", "--refactoring", "--file"];
+struct StubRuntime {
+    routing: RoutingMode,
+    execution: RuntimeMode,
+}
 
-fn request_has_required_flags(request: &CommandRequest) -> bool {
-    REQUIRED_FLAGS
+fn refused_candidates(
+    requested_provider: Option<&str>,
+    default_reason: CandidateReason,
+) -> Vec<CandidateEvaluation> {
+    ["rope", "rust-analyzer"]
         .iter()
-        .all(|flag| request.arguments.iter().any(|argument| argument == flag))
+        .map(|&p| {
+            let reason = if requested_provider == Some(p) {
+                CandidateReason::ExplicitProviderMismatch
+            } else {
+                default_reason
+            };
+            rejected_candidate(p, reason)
+        })
+        .collect()
 }
 
-fn configure_runtime_for_mode(runtime: &mut MockRuntime, mode: RuntimeMode) {
-    runtime
-        .expect_execute()
-        .once()
-        .returning(
-            move |_provider: &str, _request: &PluginRequest| match mode {
-                RuntimeMode::DiffSuccess => Ok(PluginResponse::success(PluginOutput::Diff {
-                    content: String::from(VALID_DIFF),
-                })),
-                RuntimeMode::RuntimeError => Err(PluginError::NotFound {
-                    name: String::from("rope"),
-                }),
-                RuntimeMode::MalformedDiff => Ok(PluginResponse::success(PluginOutput::Diff {
-                    content: String::from(MALFORMED_DIFF),
-                })),
-            },
+impl RefactorPluginRuntime for StubRuntime {
+    fn resolve(
+        &self,
+        request: ResolutionRequest<'_>,
+    ) -> Result<CapabilityResolutionEnvelope, PluginError> {
+        let language = SupportedLanguage::from_path(request.target_file());
+        let language_name = language.map(SupportedLanguage::as_str);
+        let requested_provider = request.explicit_provider();
+        let selection_mode = if requested_provider.is_some() {
+            SelectionMode::ExplicitProvider
+        } else {
+            SelectionMode::Automatic
+        };
+
+        // Automatic routing modes require a valid language
+        let requires_language = matches!(
+            self.routing,
+            RoutingMode::AutomaticPython | RoutingMode::AutomaticRust
         );
+        if requires_language && language_name.is_none() {
+            return Ok(refused_resolution(RefusedResolution {
+                capability: request.capability(),
+                language: None,
+                requested_provider,
+                selection_mode,
+                refusal_reason: RefusalReason::UnsupportedLanguage,
+                candidates: refused_candidates(
+                    requested_provider,
+                    CandidateReason::UnsupportedLanguage,
+                ),
+            }));
+        }
+
+        Ok(match self.routing {
+            RoutingMode::AutomaticPython => selected_resolution(SelectedResolution {
+                capability: request.capability(),
+                language: language_name.expect("language validated above"),
+                provider: "rope",
+                selection_mode,
+                requested_provider,
+            }),
+            RoutingMode::AutomaticRust => selected_resolution(SelectedResolution {
+                capability: request.capability(),
+                language: language_name.expect("language validated above"),
+                provider: "rust-analyzer",
+                selection_mode,
+                requested_provider,
+            }),
+            RoutingMode::UnsupportedLanguage => refused_resolution(RefusedResolution {
+                capability: request.capability(),
+                language: language_name,
+                requested_provider,
+                selection_mode,
+                refusal_reason: RefusalReason::UnsupportedLanguage,
+                candidates: refused_candidates(
+                    requested_provider,
+                    CandidateReason::UnsupportedLanguage,
+                ),
+            }),
+            RoutingMode::ExplicitProviderMismatch => refused_resolution(RefusedResolution {
+                capability: request.capability(),
+                language: language_name,
+                requested_provider,
+                selection_mode,
+                refusal_reason: RefusalReason::ExplicitProviderMismatch,
+                candidates: refused_candidates(requested_provider, CandidateReason::NotRequested),
+            }),
+        })
+    }
+
+    fn execute(
+        &self,
+        _provider: &str,
+        request: &PluginRequest,
+    ) -> Result<PluginResponse, PluginError> {
+        let relative_path = request
+            .files()
+            .first()
+            .expect("file payload")
+            .path()
+            .to_string_lossy()
+            .into_owned();
+
+        match self.execution {
+            RuntimeMode::DiffSuccess => Ok(PluginResponse::success(PluginOutput::Diff {
+                content: routed_diff_for(Path::new(&relative_path)),
+            })),
+            RuntimeMode::RuntimeError => Err(PluginError::NotFound {
+                name: String::from("rope"),
+            }),
+            RuntimeMode::MalformedDiff => Ok(PluginResponse::success(PluginOutput::Diff {
+                content: routed_malformed_diff_for(Path::new(&relative_path)),
+            })),
+        }
+    }
 }
 
 struct RefactorWorld {
@@ -81,6 +164,7 @@ struct RefactorWorld {
     socket_dir: TempDir,
     request: CommandRequest,
     runtime_mode: RuntimeMode,
+    routing_mode: RoutingMode,
     dispatch_result: Option<Result<i32, DispatchError>>,
     response_stream: String,
 }
@@ -91,14 +175,13 @@ impl RefactorWorld {
             workspace: TempDir::new().expect("workspace"),
             socket_dir: TempDir::new().expect("socket dir"),
             request: command_request(vec![
-                String::from("--provider"),
-                String::from("rope"),
                 String::from("--refactoring"),
                 String::from("rename"),
                 String::from("--file"),
                 String::from("notes.txt"),
             ]),
             runtime_mode: RuntimeMode::DiffSuccess,
+            routing_mode: RoutingMode::AutomaticPython,
             dispatch_result: None,
             response_stream: String::new(),
         }
@@ -108,8 +191,28 @@ impl RefactorWorld {
         self.workspace.path().join(relative)
     }
 
+    fn target_file(&self) -> String {
+        self.request
+            .arguments
+            .windows(2)
+            .find_map(|pair| (pair[0] == "--file").then(|| pair[1].clone()))
+            .expect("target file argument")
+    }
+
     fn write_file(&self, relative: &str, content: &str) {
         std::fs::write(self.path(relative), content).expect("write file");
+    }
+
+    fn prepare_routed_fixture(&self, target_file: &str) {
+        let target_path = Path::new(target_file);
+        self.write_file(target_file, original_content_for(target_path));
+        let patch_path = routed_patch_path(target_path);
+        if patch_path != target_path {
+            self.write_file(
+                patch_path.to_str().expect("valid UTF-8 path"),
+                original_content_for(target_path),
+            );
+        }
     }
 
     fn read_file(&self, relative: &str) -> String {
@@ -117,10 +220,10 @@ impl RefactorWorld {
     }
 
     fn execute(&mut self) {
-        let mut runtime = MockRuntime::new();
-        if request_has_required_flags(&self.request) {
-            configure_runtime_for_mode(&mut runtime, self.runtime_mode);
-        }
+        let runtime = StubRuntime {
+            routing: self.routing_mode,
+            execution: self.runtime_mode,
+        };
         let mut output = Vec::new();
         let mut writer = ResponseWriter::new(&mut output);
         let socket_path = self.socket_dir.path().join("socket.sock");
@@ -141,58 +244,50 @@ impl RefactorWorld {
     }
 }
 
-fn command_request(arguments: Vec<String>) -> CommandRequest {
-    CommandRequest {
-        command: CommandDescriptor {
-            domain: String::from("act"),
-            operation: String::from("refactor"),
-        },
-        arguments,
-        patch: None,
-    }
-}
-
-fn build_backends(socket_path: &std::path::Path) -> FusionBackends<SemanticBackendProvider> {
-    let config = Config {
-        daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().as_ref()),
-        ..Config::default()
-    };
-    let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
-    FusionBackends::new(config, provider)
-}
-
 #[fixture]
 fn world() -> RefactorWorld {
     RefactorWorld::new()
 }
 
 #[given("a workspace file for refactoring")]
-fn given_workspace_file(world: &mut RefactorWorld) {
-    world.write_file("notes.txt", ORIGINAL_CONTENT);
+fn given_workspace_file(
+    #[expect(
+        unused_variables,
+        reason = "BDD step exists for readability; file creation happens in prepare_routed_fixture()"
+    )]
+    world: &mut RefactorWorld,
+) {
+    // File creation is handled by prepare_routed_fixture() in subsequent steps
+    // This step exists for BDD readability but performs no action
 }
 
-#[given("a valid act refactor request")]
-fn given_valid_request(world: &mut RefactorWorld) {
-    world.request = command_request(vec![
-        String::from("--provider"),
-        String::from("rope"),
-        String::from("--refactoring"),
-        String::from("rename"),
-        String::from("--file"),
-        String::from("notes.txt"),
-        String::from("offset=1"),
-        String::from("new_name=woven"),
-    ]);
+#[given("a valid auto-routed act refactor request resolved to rope")]
+fn given_valid_rope_request(world: &mut RefactorWorld) {
+    configure_request(&mut world.request, standard_rename_args("notes.py"));
+    world.routing_mode = RoutingMode::AutomaticPython;
+    world.prepare_routed_fixture("notes.py");
 }
 
-#[given("a refactor request missing provider")]
-fn given_missing_provider_request(world: &mut RefactorWorld) {
-    world.request = command_request(vec![
-        String::from("--refactoring"),
-        String::from("rename"),
-        String::from("--file"),
-        String::from("notes.txt"),
-    ]);
+#[given("a valid auto-routed act refactor request resolved to rust-analyzer")]
+fn given_valid_rust_request(world: &mut RefactorWorld) {
+    configure_request(&mut world.request, standard_rename_args("notes.rs"));
+    world.routing_mode = RoutingMode::AutomaticRust;
+    world.prepare_routed_fixture("notes.rs");
+}
+
+#[given("an unsupported-language act refactor request")]
+fn given_unsupported_language_request(world: &mut RefactorWorld) {
+    configure_request(&mut world.request, standard_rename_args("notes.txt"));
+    world.routing_mode = RoutingMode::UnsupportedLanguage;
+}
+
+#[given("a Python act refactor request with an incompatible provider override")]
+fn given_explicit_provider_mismatch_request(world: &mut RefactorWorld) {
+    let mut args = vec![String::from("--provider"), String::from("rust-analyzer")];
+    args.extend(standard_rename_args("notes.py"));
+    configure_request(&mut world.request, args);
+    world.routing_mode = RoutingMode::ExplicitProviderMismatch;
+    world.prepare_routed_fixture("notes.py");
 }
 
 #[given("a runtime error from the refactor plugin")]
@@ -224,25 +319,22 @@ fn then_refactor_fails_status_one(world: &mut RefactorWorld) {
     assert_eq!(*status, 1);
 }
 
-#[then("the refactor command is rejected as invalid arguments")]
-fn then_refactor_rejected_invalid_arguments(world: &mut RefactorWorld) {
-    let result = world.dispatch_result.as_ref().expect("result missing");
-    assert!(matches!(
-        result,
-        Err(DispatchError::InvalidArguments { .. })
-    ));
-}
-
 #[then("the target file is updated")]
 fn then_target_file_updated(world: &mut RefactorWorld) {
-    let updated = world.read_file("notes.txt");
-    assert_eq!(updated, UPDATED_CONTENT);
+    let target_file = world.target_file();
+    let target_path = Path::new(&target_file);
+    let patch_target = routed_patch_path(target_path);
+    let updated = world.read_file(patch_target.to_str().expect("valid UTF-8 path"));
+    assert_eq!(updated, updated_content_for(target_path));
 }
 
 #[then("the target file is unchanged")]
 fn then_target_file_unchanged(world: &mut RefactorWorld) {
-    let updated = world.read_file("notes.txt");
-    assert_eq!(updated, ORIGINAL_CONTENT);
+    let target_file = world.target_file();
+    let target_path = Path::new(&target_file);
+    let patch_target = routed_patch_path(target_path);
+    let updated = world.read_file(patch_target.to_str().expect("valid UTF-8 path"));
+    assert_eq!(updated, original_content_for(target_path));
 }
 
 #[then("the stderr stream contains {text}")]

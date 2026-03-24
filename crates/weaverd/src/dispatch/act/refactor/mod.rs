@@ -13,18 +13,19 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use arguments::parse_refactor_args;
 use tracing::debug;
 use url::Url;
 
+use weaver_plugins::capability::CapabilityId;
 use weaver_plugins::process::SandboxExecutor;
 use weaver_plugins::protocol::FilePayload;
 use weaver_plugins::runner::PluginRunner;
-use weaver_plugins::{PluginError, PluginOutput, PluginRegistry, PluginRequest, PluginResponse};
+use weaver_plugins::{PluginError, PluginRegistry, PluginRequest, PluginResponse};
 
 use crate::backends::{BackendKind, FusionBackends};
-use crate::dispatch::act::apply_patch;
 use crate::dispatch::errors::DispatchError;
-use crate::dispatch::request::{CommandDescriptor, CommandRequest};
+use crate::dispatch::request::CommandRequest;
 use crate::dispatch::response::ResponseWriter;
 use crate::dispatch::router::{DISPATCH_TARGET, DispatchResult};
 use crate::semantic_provider::SemanticBackendProvider;
@@ -33,12 +34,24 @@ use plugin_paths::{
     ROPE_PLUGIN_PATH_ENV, RUST_ANALYZER_PLUGIN_PATH_ENV, resolve_rope_plugin_path,
     resolve_rust_analyzer_plugin_path,
 };
+use resolution::{CapabilityResolutionEnvelope, ResolutionRequest, resolve_provider};
 
+mod arguments;
+mod candidates;
 mod manifests;
 mod plugin_paths;
+mod refusal;
+mod resolution;
+mod response_handling;
 
 /// Runtime abstraction for executing refactor plugins.
 pub(crate) trait RefactorPluginRuntime {
+    /// Resolves a provider for the given capability request.
+    fn resolve(
+        &self,
+        request: ResolutionRequest<'_>,
+    ) -> Result<CapabilityResolutionEnvelope, PluginError>;
+
     /// Executes the named plugin with the provided request.
     fn execute(
         &self,
@@ -49,6 +62,7 @@ pub(crate) trait RefactorPluginRuntime {
 
 /// Sandbox-backed runtime that resolves plugins from a registry.
 pub(crate) struct SandboxRefactorRuntime {
+    registry: PluginRegistry,
     runner: PluginRunner<SandboxExecutor>,
 }
 
@@ -71,13 +85,19 @@ impl SandboxRefactorRuntime {
             .register(rust_analyzer_manifest(rust_analyzer_executable))
             .map_err(|error| format!("failed to initialize refactor runtime: {error}"))?;
 
-        Ok(Self {
-            runner: PluginRunner::new(registry, SandboxExecutor),
-        })
+        let runner = PluginRunner::new(registry.clone(), SandboxExecutor);
+        Ok(Self { registry, runner })
     }
 }
 
 impl RefactorPluginRuntime for SandboxRefactorRuntime {
+    fn resolve(
+        &self,
+        request: ResolutionRequest<'_>,
+    ) -> Result<CapabilityResolutionEnvelope, PluginError> {
+        Ok(resolve_provider(&self.registry, request))
+    }
+
     fn execute(
         &self,
         provider: &str,
@@ -93,6 +113,15 @@ struct NoopRefactorRuntime {
 }
 
 impl RefactorPluginRuntime for NoopRefactorRuntime {
+    fn resolve(
+        &self,
+        _request: ResolutionRequest<'_>,
+    ) -> Result<CapabilityResolutionEnvelope, PluginError> {
+        Err(PluginError::Manifest {
+            message: self.message.clone(),
+        })
+    }
+
     fn execute(
         &self,
         _provider: &str,
@@ -123,36 +152,13 @@ pub(crate) struct RefactorContext<'a> {
     pub runtime: &'a dyn RefactorPluginRuntime,
 }
 
-/// Handles `act refactor` requests.
-///
-/// Expects `--provider <plugin>` and `--refactoring <operation>` in the
-/// request arguments, plus `--file <path>` identifying the target file.
-///
-/// The handler reads the file content, executes the plugin, and forwards
-/// successful diff output through `act apply-patch` for Double-Lock
-/// verification and atomic commit.
-pub fn handle<W: Write>(
-    request: &CommandRequest,
-    writer: &mut ResponseWriter<W>,
-    context: RefactorContext<'_>,
-) -> Result<DispatchResult, DispatchError> {
-    let args = parse_refactor_args(&request.arguments)?;
-
-    debug!(
-        target: DISPATCH_TARGET,
-        provider = args.provider,
-        refactoring = args.refactoring,
-        file = args.file,
-        "handling act refactor"
-    );
-
-    context
-        .backends
-        .ensure_started(BackendKind::Semantic)
-        .map_err(DispatchError::backend_startup)?;
-
-    // Resolve the target file within the workspace.
-    let file_path = resolve_file(context.workspace_root, &args.file)?;
+/// Resolves the target file, reads its content, builds the [`PluginRequest`],
+/// and maps the refactoring operation to the corresponding [`CapabilityId`].
+fn prepare_plugin_request(
+    workspace_root: &Path,
+    args: &arguments::RefactorArgs,
+) -> Result<(PluginRequest, CapabilityId, PathBuf), DispatchError> {
+    let file_path = resolve_file(workspace_root, &args.file)?;
     let file_content = std::fs::read_to_string(&file_path).map_err(|err| {
         DispatchError::invalid_arguments(format!("cannot read file '{}': {err}", args.file))
     })?;
@@ -162,7 +168,6 @@ pub fn handle<W: Write>(
         "refactoring".into(),
         serde_json::Value::String(args.refactoring.clone()),
     );
-    // Forward any extra arguments beyond the known flags.
     for extra in &args.extra {
         let parts: Vec<&str> = extra.splitn(2, '=').collect();
         if parts.len() == 2 {
@@ -173,7 +178,6 @@ pub fn handle<W: Write>(
         }
     }
 
-    // Map `--refactoring rename` to the `rename-symbol` capability contract.
     let effective_operation = match args.refactoring.as_str() {
         "rename" => {
             apply_rename_symbol_mapping(&mut plugin_args, &args.file)?;
@@ -188,98 +192,75 @@ pub fn handle<W: Write>(
         plugin_args,
     );
 
-    match context.runtime.execute(&args.provider, &plugin_request) {
+    let capability = capability_from_operation(&effective_operation)?;
+    Ok((plugin_request, capability, file_path))
+}
+
+/// Handles `act refactor` requests.
+///
+/// Expects `--refactoring <operation>` and `--file <path>` in the request
+/// arguments. `--provider <plugin>` is optional and acts as an explicit
+/// compatibility override when supplied.
+///
+/// The handler reads the file content, executes the plugin, and forwards
+/// successful diff output through `act apply-patch` for Double-Lock
+/// verification and atomic commit.
+pub fn handle<W: Write>(
+    request: &CommandRequest,
+    writer: &mut ResponseWriter<W>,
+    context: RefactorContext<'_>,
+) -> Result<DispatchResult, DispatchError> {
+    let args = parse_refactor_args(&request.arguments)?;
+
+    debug!(
+        target: DISPATCH_TARGET,
+        provider = args.provider.as_deref().unwrap_or("<auto>"),
+        refactoring = args.refactoring,
+        file = args.file,
+        "handling act refactor"
+    );
+
+    let (plugin_request, capability, file_path) =
+        prepare_plugin_request(context.workspace_root, &args)?;
+    let resolution = match context.runtime.resolve(ResolutionRequest::new(
+        capability,
+        file_path.as_path(),
+        args.provider.as_deref(),
+    )) {
+        Ok(resolution) => resolution,
+        Err(error) => {
+            writer.write_stderr(format!(
+                "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
+                args.provider.as_deref().unwrap_or("<auto>"),
+                args.refactoring,
+                args.file
+            ))?;
+            return Ok(DispatchResult::with_status(1));
+        }
+    };
+
+    write_capability_resolution(writer, &resolution)?;
+    let Some(selected_provider) = resolution.details().selected_provider() else {
+        return Ok(DispatchResult::with_status(1));
+    };
+
+    match context.runtime.execute(selected_provider, &plugin_request) {
         Ok(response) => {
+            // Ensure semantic backend is started before forwarding to apply-patch
+            context
+                .backends
+                .ensure_started(BackendKind::Semantic)
+                .map_err(DispatchError::backend_startup)?;
             handle_plugin_response(response, writer, context.backends, context.workspace_root)
         }
         Err(error) => {
             writer.write_stderr(format!(
                 "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
-                args.provider, args.refactoring, args.file
+                selected_provider, args.refactoring, args.file
             ))?;
             Ok(DispatchResult::with_status(1))
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Argument parsing
-// ---------------------------------------------------------------------------
-
-struct RefactorArgs {
-    provider: String,
-    refactoring: String,
-    file: String,
-    extra: Vec<String>,
-}
-
-/// Accumulates parsed flag values during argument iteration.
-#[derive(Default)]
-struct RefactorArgsBuilder {
-    provider: Option<String>,
-    refactoring: Option<String>,
-    file: Option<String>,
-    extra: Vec<String>,
-}
-
-impl RefactorArgsBuilder {
-    /// Finalizes the builder, requiring all mandatory fields.
-    fn build(self) -> Result<RefactorArgs, DispatchError> {
-        Ok(RefactorArgs {
-            provider: self.provider.ok_or_else(|| {
-                DispatchError::invalid_arguments("act refactor requires --provider <plugin-name>")
-            })?,
-            refactoring: self.refactoring.ok_or_else(|| {
-                DispatchError::invalid_arguments("act refactor requires --refactoring <operation>")
-            })?,
-            file: self.file.ok_or_else(|| {
-                DispatchError::invalid_arguments("act refactor requires --file <path>")
-            })?,
-            extra: self.extra,
-        })
-    }
-}
-
-fn parse_refactor_args(arguments: &[String]) -> Result<RefactorArgs, DispatchError> {
-    let mut builder = RefactorArgsBuilder::default();
-    let mut iter = arguments.iter();
-
-    while let Some(arg) = iter.next() {
-        apply_flag(arg, &mut iter, &mut builder)?;
-    }
-
-    builder.build()
-}
-
-/// Classifies a single argument token, consuming the next token as the
-/// value when the argument is a recognised flag.
-fn apply_flag<'a>(
-    arg: &str,
-    iter: &mut impl Iterator<Item = &'a String>,
-    builder: &mut RefactorArgsBuilder,
-) -> Result<(), DispatchError> {
-    match arg {
-        "--provider" => {
-            builder.provider =
-                Some(iter.next().cloned().ok_or_else(|| {
-                    DispatchError::invalid_arguments("--provider requires a value")
-                })?);
-        }
-        "--refactoring" => {
-            builder.refactoring = Some(iter.next().cloned().ok_or_else(|| {
-                DispatchError::invalid_arguments("--refactoring requires a value")
-            })?);
-        }
-        "--file" => {
-            builder.file = Some(
-                iter.next()
-                    .cloned()
-                    .ok_or_else(|| DispatchError::invalid_arguments("--file requires a value"))?,
-            );
-        }
-        other => builder.extra.push(other.to_owned()),
-    }
-    Ok(())
 }
 
 /// Returns `true` if any component of `path` is a parent-directory reference.
@@ -341,58 +322,31 @@ fn to_file_uri(path: &str) -> Result<String, url::ParseError> {
     Ok(url.to_string())
 }
 
-fn handle_plugin_response<W: Write>(
-    response: PluginResponse,
-    writer: &mut ResponseWriter<W>,
-    backends: &mut FusionBackends<SemanticBackendProvider>,
-    workspace_root: &Path,
-) -> Result<DispatchResult, DispatchError> {
-    if !response.is_success() {
-        let diagnostics: Vec<String> = response
-            .diagnostics()
-            .iter()
-            .map(|diag| diag.message().to_owned())
-            .collect();
-        let message = if diagnostics.is_empty() {
-            String::from("plugin reported failure without diagnostics")
-        } else {
-            diagnostics.join("; ")
-        };
-        writer.write_stderr(format!("act refactor failed: {message}\n"))?;
-        return Ok(DispatchResult::with_status(1));
-    }
-
-    match response.output() {
-        PluginOutput::Diff { content } => {
-            forward_diff_to_apply_patch(content, writer, backends, workspace_root)
-        }
-        PluginOutput::Analysis { .. } | PluginOutput::Empty => {
-            writer.write_stderr(
-                "act refactor failed: plugin succeeded but did not return diff output\n",
-            )?;
-            Ok(DispatchResult::with_status(1))
-        }
+fn capability_from_operation(operation: &str) -> Result<CapabilityId, DispatchError> {
+    // TODO: Extend this mapping when additional refactoring operations are added
+    // (e.g., extract-method, inline-variable, move-function).
+    match operation {
+        "rename-symbol" => Ok(CapabilityId::RenameSymbol),
+        other => Err(DispatchError::invalid_arguments(format!(
+            "act refactor does not support capability resolution for '{other}' (only 'rename-symbol' is currently implemented)"
+        ))),
     }
 }
 
-fn forward_diff_to_apply_patch<W: Write>(
-    patch: &str,
+fn write_capability_resolution<W: Write>(
     writer: &mut ResponseWriter<W>,
-    backends: &mut FusionBackends<SemanticBackendProvider>,
-    workspace_root: &Path,
-) -> Result<DispatchResult, DispatchError> {
-    let patch_request = CommandRequest {
-        command: CommandDescriptor {
-            domain: String::from("act"),
-            operation: String::from("apply-patch"),
-        },
-        arguments: Vec::new(),
-        patch: Some(patch.to_owned()),
-    };
-    apply_patch::handle(&patch_request, writer, backends, workspace_root)
+    resolution: &CapabilityResolutionEnvelope,
+) -> Result<(), DispatchError> {
+    let json = serde_json::to_string(resolution)?;
+    writer.write_stderr(format!("{json}\n"))
 }
 
+use response_handling::handle_plugin_response;
 #[cfg(test)]
 mod behaviour;
+#[cfg(test)]
+mod contract_tests;
+#[cfg(test)]
+mod resolution_tests;
 #[cfg(test)]
 mod tests;
