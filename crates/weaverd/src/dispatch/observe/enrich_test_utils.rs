@@ -1,6 +1,5 @@
 //! Test utilities for `observe::enrich` tests.
 
-use lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
 use tempfile::TempDir;
 use weaver_cards::{
     CardLanguage, LspInfo, Provenance, SourcePosition, SourceRange, SymbolCard, SymbolIdentity,
@@ -51,13 +50,7 @@ pub(crate) fn check_utf16_offset(line: &str, byte_col: usize, expected: Option<u
 
 /// Asserts that hover text is correctly parsed for deprecation status.
 pub(crate) fn assert_deprecation(text: &str, expected: bool) {
-    let hover = Hover {
-        contents: HoverContents::Markup(MarkupContent {
-            kind: MarkupKind::Markdown,
-            value: String::from(text),
-        }),
-        range: None,
-    };
+    let hover = markdown_hover(text);
     let info = parse_hover_response(&hover);
     assert_eq!(
         info.deprecated, expected,
@@ -94,39 +87,15 @@ pub(crate) fn assert_enrichment_degrades(
 
 /// Creates a sample Rust symbol card for testing.
 pub(crate) fn rust_card() -> SymbolCard {
-    SymbolCard {
-        card_version: 1,
-        symbol: SymbolIdentity {
-            symbol_id: String::from("sym_greet"),
-            symbol_ref: SymbolRef {
-                uri: String::from("file:///tmp/card.rs"),
-                range: SourceRange {
-                    start: SourcePosition { line: 1, column: 3 },
-                    end: SourcePosition { line: 3, column: 0 },
-                },
-                language: CardLanguage::Rust,
-                kind: weaver_cards::CardSymbolKind::Function,
-                name: String::from("greet"),
-                container: None,
-            },
-        },
-        signature: None,
-        doc: None,
-        attachments: None,
-        structure: None,
-        lsp: None,
-        metrics: None,
-        deps: None,
-        interstitial: None,
-        provenance: Provenance {
-            extracted_at: String::from("2026-03-19T00:00:00Z"),
-            sources: vec![
-                String::from("tree_sitter"),
-                String::from("tree_sitter_degraded_semantic"),
-            ],
-        },
-        etag: None,
-    }
+    let mut card = test_symbol_card_with_pos(1, 3, 3, 0);
+    card.symbol.symbol_id = String::from("sym_greet");
+    card.symbol.symbol_ref.uri = String::from("file:///tmp/card.rs");
+    card.symbol.symbol_ref.name = String::from("greet");
+    card.provenance.sources = vec![
+        String::from("tree_sitter"),
+        String::from("tree_sitter_degraded_semantic"),
+    ];
+    card
 }
 
 /// Creates a test symbol card with custom position for encoding tests.
