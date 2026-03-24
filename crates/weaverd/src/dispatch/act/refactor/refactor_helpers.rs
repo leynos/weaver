@@ -16,7 +16,6 @@ use crate::dispatch::act::refactor::resolution::{
 use crate::dispatch::request::{CommandDescriptor, CommandRequest};
 use crate::semantic_provider::SemanticBackendProvider;
 
-#[allow(dead_code, reason = "Test helper struct reserved for future use")]
 pub(super) struct RefusedResolution<'a> {
     pub(super) capability: CapabilityId,
     pub(super) language: Option<&'a str>,
@@ -26,7 +25,6 @@ pub(super) struct RefusedResolution<'a> {
     pub(super) candidates: Vec<CandidateEvaluation>,
 }
 
-#[allow(dead_code, reason = "Test helper struct reserved for future use")]
 pub(super) struct SelectedResolution<'a> {
     pub(super) capability: CapabilityId,
     pub(super) language: &'a str,
@@ -55,7 +53,6 @@ pub(super) fn build_backends(socket_path: &Path) -> FusionBackends<SemanticBacke
     FusionBackends::new(config, provider)
 }
 
-#[allow(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn standard_rename_args(file: &str) -> Vec<String> {
     vec![
         String::from("--refactoring"),
@@ -67,12 +64,12 @@ pub(super) fn standard_rename_args(file: &str) -> Vec<String> {
     ]
 }
 
-#[allow(dead_code, reason = "Test helper function reserved for future use")]
+#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn configure_request(request: &mut CommandRequest, args: Vec<String>) {
     *request = command_request(args);
 }
 
-#[allow(dead_code, reason = "Test helper function reserved for future use")]
+#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn selected_resolution(config: SelectedResolution<'_>) -> CapabilityResolutionEnvelope {
     CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
         capability: config.capability,
@@ -90,7 +87,7 @@ pub(super) fn selected_resolution(config: SelectedResolution<'_>) -> CapabilityR
     })
 }
 
-#[allow(dead_code, reason = "Test helper function reserved for future use")]
+#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn refused_resolution(config: RefusedResolution<'_>) -> CapabilityResolutionEnvelope {
     CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
         capability: config.capability,
@@ -104,7 +101,7 @@ pub(super) fn refused_resolution(config: RefusedResolution<'_>) -> CapabilityRes
     })
 }
 
-#[allow(dead_code, reason = "Test helper function reserved for future use")]
+#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn rejected_candidate(provider: &str, reason: CandidateReason) -> CandidateEvaluation {
     CandidateEvaluation {
         provider: String::from(provider),
@@ -113,14 +110,14 @@ pub(super) fn rejected_candidate(provider: &str, reason: CandidateReason) -> Can
     }
 }
 
-#[allow(dead_code, reason = "Test helper function reserved for future use")]
+#[expect(dead_code, reason = "Test helper function reserved for future use")]
 fn format_diff(path: &Path, git_header: &str) -> String {
     let original = original_content_for(path);
     let updated = updated_content_for(path);
     format!("{git_header}\n<<<<<<< SEARCH\n{original}=======\n{updated}>>>>>>> REPLACE\n",)
 }
 
-#[allow(dead_code, reason = "Test helper function reserved for future use")]
+#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn routed_patch_path(path: &Path) -> &Path {
     match classify_file(path) {
         FileKind::Python | FileKind::Rust => Path::new("notes.txt"),
@@ -128,30 +125,30 @@ pub(super) fn routed_patch_path(path: &Path) -> &Path {
     }
 }
 
-#[allow(dead_code, reason = "Test helper function reserved for future use")]
+#[expect(dead_code, reason = "Test helper function reserved for future use")]
 fn routed_format_diff(path: &Path, make_header: impl Fn(&str) -> String) -> String {
     let patch_path = routed_patch_path(path);
     format_diff(path, &make_header(&patch_path.to_string_lossy()))
 }
 
-#[allow(dead_code, reason = "Test helper function reserved for future use")]
+#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn routed_diff_for(path: &Path) -> String {
     routed_format_diff(path, |p| format!("diff --git a/{p} b/{p}"))
 }
 
-#[allow(dead_code, reason = "Test helper function reserved for future use")]
+#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn routed_malformed_diff_for(path: &Path) -> String {
     routed_format_diff(path, |p| format!("diff --git a/{p}"))
 }
 
-#[allow(dead_code, reason = "Test helper enum reserved for future use")]
+#[expect(dead_code, reason = "Test helper enum reserved for future use")]
 pub(super) enum FileKind {
     Python,
     Rust,
     Other,
 }
 
-#[allow(dead_code, reason = "Test helper function reserved for future use")]
+#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn classify_file(path: &Path) -> FileKind {
     match path.extension().and_then(|ext| ext.to_str()) {
         Some("py") => FileKind::Python,
@@ -160,13 +157,13 @@ pub(super) fn classify_file(path: &Path) -> FileKind {
     }
 }
 
-#[allow(dead_code, reason = "Test helper struct reserved for future use")]
+#[expect(dead_code, reason = "Test helper struct reserved for future use")]
 struct FileContents {
     original: &'static str,
     updated: &'static str,
 }
 
-#[allow(dead_code, reason = "Test helper function reserved for future use")]
+#[expect(dead_code, reason = "Test helper function reserved for future use")]
 fn content_table(kind: FileKind) -> FileContents {
     match kind {
         FileKind::Python => FileContents {
@@ -194,12 +191,12 @@ fn content_table(kind: FileKind) -> FileContents {
     }
 }
 
-#[allow(dead_code, reason = "Test helper function reserved for future use")]
+#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn original_content_for(path: &Path) -> &'static str {
     content_table(classify_file(path)).original
 }
 
-#[allow(dead_code, reason = "Test helper function reserved for future use")]
+#[expect(dead_code, reason = "Test helper function reserved for future use")]
 pub(super) fn updated_content_for(path: &Path) -> &'static str {
     content_table(classify_file(path)).updated
 }
