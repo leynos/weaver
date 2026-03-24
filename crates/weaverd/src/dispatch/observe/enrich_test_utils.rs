@@ -142,8 +142,14 @@ pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> u32
     let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
 
     let mut card = test_symbol_card_with_pos(
-        SourcePosition { line: 0, column: 12 },
-        SourcePosition { line: 0, column: 15 },
+        SourcePosition {
+            line: 0,
+            column: 12,
+        },
+        SourcePosition {
+            line: 0,
+            column: 15,
+        },
     );
 
     let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
