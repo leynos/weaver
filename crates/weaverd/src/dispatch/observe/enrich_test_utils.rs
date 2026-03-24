@@ -87,7 +87,10 @@ pub(crate) fn assert_enrichment_degrades(
 
 /// Creates a sample Rust symbol card for testing.
 pub(crate) fn rust_card() -> SymbolCard {
-    let mut card = test_symbol_card_with_pos(1, 3, 3, 0);
+    let mut card = test_symbol_card_with_pos(
+        SourcePosition { line: 1, column: 3 },
+        SourcePosition { line: 3, column: 0 },
+    );
     card.symbol.symbol_id = String::from("sym_greet");
     card.symbol.symbol_ref.uri = String::from("file:///tmp/card.rs");
     card.symbol.symbol_ref.name = String::from("greet");
@@ -99,28 +102,14 @@ pub(crate) fn rust_card() -> SymbolCard {
 }
 
 /// Creates a test symbol card with custom position for encoding tests.
-pub(crate) fn test_symbol_card_with_pos(
-    start_line: u32,
-    start_column: u32,
-    end_line: u32,
-    end_column: u32,
-) -> SymbolCard {
+pub(crate) fn test_symbol_card_with_pos(start: SourcePosition, end: SourcePosition) -> SymbolCard {
     SymbolCard {
         card_version: 1,
         symbol: SymbolIdentity {
             symbol_id: String::from("sym_foo"),
             symbol_ref: SymbolRef {
                 uri: String::from("file:///tmp/test.rs"),
-                range: SourceRange {
-                    start: SourcePosition {
-                        line: start_line,
-                        column: start_column,
-                    },
-                    end: SourcePosition {
-                        line: end_line,
-                        column: end_column,
-                    },
-                },
+                range: SourceRange { start, end },
                 language: CardLanguage::Rust,
                 kind: weaver_cards::CardSymbolKind::Function,
                 name: String::from("foo"),
@@ -152,7 +141,10 @@ pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> u32
     let (server, hover_params_ref) = StubLanguageServer::with_hover(capabilities, hover);
     let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
 
-    let mut card = test_symbol_card_with_pos(0, 12, 0, 15);
+    let mut card = test_symbol_card_with_pos(
+        SourcePosition { line: 0, column: 12 },
+        SourcePosition { line: 0, column: 15 },
+    );
 
     let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
     assert_eq!(outcome, EnrichmentOutcome::Enriched);
