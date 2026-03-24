@@ -199,7 +199,6 @@ pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> u32
         .as_ref()
         .expect("hover should have been called");
     assert_eq!(params.text_document_position_params.position.line, 0);
-    let character = params.text_document_position_params.position.character;
 
-    character
+    params.text_document_position_params.position.character
 }
