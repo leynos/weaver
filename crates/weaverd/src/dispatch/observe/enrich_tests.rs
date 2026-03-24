@@ -5,7 +5,7 @@ use weaver_lsp_host::{Language, ServerCapabilitySet};
 
 use super::enrich_test_utils::{
     ExpectedLspInfo, assert_deprecation, assert_enrichment_degrades, assert_lsp_info,
-    check_utf16_offset, rust_card, test_symbol_card_with_pos,
+    check_utf16_offset, run_non_ascii_enrichment, rust_card,
 };
 use super::*;
 use crate::backends::BackendKind;
@@ -207,67 +207,20 @@ fn byte_col_to_utf16_rejects_non_char_boundary() {
 
 #[test]
 fn try_lsp_enrichment_with_non_ascii_source() {
-    // Byte layout: "// café fn foo() {}"
-    // "// " (0-2), "café" (c=3, a=4, f=5, é=6-7), " " (8), "fn" (9-10), " " (11), "foo" starts at 12
-    // 'é' is 2 UTF-8 bytes but 1 UTF-16 code unit
-    let source = "// café fn foo() {}";
-
-    let hover = markdown_hover("```rust\nfn foo()\n```");
-    let (server, hover_params_ref) = StubLanguageServer::with_hover(
-        ServerCapabilitySet::new(false, false, false).with_hover(true),
-        hover,
-    );
-    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
-
-    // Symbol at byte column 12 (start of "foo")
-    let mut card = test_symbol_card_with_pos(0, 12, 0, 15);
-
-    let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
-
+    let caps = ServerCapabilitySet::new(false, false, false).with_hover(true);
+    let (outcome, character) = run_non_ascii_enrichment(caps);
     assert_eq!(outcome, EnrichmentOutcome::Enriched);
-    assert!(card.lsp.is_some());
-
-    // Server doesn't negotiate UTF-8, so byte offset 12 should be converted to UTF-16 offset 11
-    // (because 'é' at bytes 6-7 is 1 UTF-16 code unit, saving 1 position)
-    let hover_params = hover_params_ref
-        .lock()
-        .expect("failed to lock hover_params_ref");
-    let params = hover_params
-        .as_ref()
-        .expect("hover should have been called");
-    assert_eq!(params.text_document_position_params.position.line, 0);
-    assert_eq!(params.text_document_position_params.position.character, 11);
+    // 'é' saves one position: byte offset 12 → UTF-16 offset 11
+    assert_eq!(character, 11);
 }
 
 #[test]
 fn try_lsp_enrichment_with_non_ascii_source_utf8_negotiated() {
-    // Same byte layout: "// café fn foo() {}"
-    let source = "// café fn foo() {}";
-
-    let hover = markdown_hover("```rust\nfn foo()\n```");
-    let (server, hover_params_ref) = StubLanguageServer::with_hover(
-        ServerCapabilitySet::new(false, false, false)
-            .with_hover(true)
-            .with_position_encoding(Some(lsp_types::PositionEncodingKind::UTF8)),
-        hover,
-    );
-    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
-
-    // Symbol at byte column 12 (start of "foo")
-    let mut card = test_symbol_card_with_pos(0, 12, 0, 15);
-
-    let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
-
+    let caps = ServerCapabilitySet::new(false, false, false)
+        .with_hover(true)
+        .with_position_encoding(Some(lsp_types::PositionEncodingKind::UTF8));
+    let (outcome, character) = run_non_ascii_enrichment(caps);
     assert_eq!(outcome, EnrichmentOutcome::Enriched);
-    assert!(card.lsp.is_some());
-
-    // Server negotiated UTF-8, so byte offset 12 is passed through unchanged
-    let hover_params = hover_params_ref
-        .lock()
-        .expect("failed to lock hover_params_ref");
-    let params = hover_params
-        .as_ref()
-        .expect("hover should have been called");
-    assert_eq!(params.text_document_position_params.position.line, 0);
-    assert_eq!(params.text_document_position_params.position.character, 12);
+    // UTF-8 negotiated: byte offset 12 is passed through unchanged
+    assert_eq!(character, 12);
 }
