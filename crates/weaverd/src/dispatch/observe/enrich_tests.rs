@@ -227,8 +227,14 @@ fn try_lsp_enrichment_with_non_ascii_source() {
             symbol_ref: SymbolRef {
                 uri: String::from("file:///tmp/test.rs"),
                 range: SourceRange {
-                    start: SourcePosition { line: 0, column: 12 },
-                    end: SourcePosition { line: 0, column: 15 },
+                    start: SourcePosition {
+                        line: 0,
+                        column: 12,
+                    },
+                    end: SourcePosition {
+                        line: 0,
+                        column: 15,
+                    },
                 },
                 language: CardLanguage::Rust,
                 kind: weaver_cards::CardSymbolKind::Function,
@@ -258,8 +264,12 @@ fn try_lsp_enrichment_with_non_ascii_source() {
 
     // Server doesn't negotiate UTF-8, so byte offset 12 should be converted to UTF-16 offset 11
     // (because 'é' at bytes 6-7 is 1 UTF-16 code unit, saving 1 position)
-    let hover_params = hover_params_ref.lock().unwrap();
-    let params = hover_params.as_ref().expect("hover should have been called");
+    let hover_params = hover_params_ref
+        .lock()
+        .expect("failed to lock hover_params_ref");
+    let params = hover_params
+        .as_ref()
+        .expect("hover should have been called");
     assert_eq!(params.text_document_position_params.position.line, 0);
     assert_eq!(params.text_document_position_params.position.character, 11);
 }
@@ -286,8 +296,14 @@ fn try_lsp_enrichment_with_non_ascii_source_utf8_negotiated() {
             symbol_ref: SymbolRef {
                 uri: String::from("file:///tmp/test.rs"),
                 range: SourceRange {
-                    start: SourcePosition { line: 0, column: 12 },
-                    end: SourcePosition { line: 0, column: 15 },
+                    start: SourcePosition {
+                        line: 0,
+                        column: 12,
+                    },
+                    end: SourcePosition {
+                        line: 0,
+                        column: 15,
+                    },
                 },
                 language: CardLanguage::Rust,
                 kind: weaver_cards::CardSymbolKind::Function,
@@ -316,8 +332,12 @@ fn try_lsp_enrichment_with_non_ascii_source_utf8_negotiated() {
     assert!(card.lsp.is_some());
 
     // Server negotiated UTF-8, so byte offset 12 is passed through unchanged
-    let hover_params = hover_params_ref.lock().unwrap();
-    let params = hover_params.as_ref().expect("hover should have been called");
+    let hover_params = hover_params_ref
+        .lock()
+        .expect("failed to lock hover_params_ref");
+    let params = hover_params
+        .as_ref()
+        .expect("hover should have been called");
     assert_eq!(params.text_document_position_params.position.line, 0);
     assert_eq!(params.text_document_position_params.position.character, 12);
 }

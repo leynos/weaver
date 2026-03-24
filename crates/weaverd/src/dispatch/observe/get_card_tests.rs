@@ -23,13 +23,19 @@ fn temp_dir() -> TempDir {
 }
 
 #[fixture]
-fn backends() -> FusionBackends<SemanticBackendProvider> {
+fn backends() -> (FusionBackends<SemanticBackendProvider>, TempDir) {
+    let dir = TempDir::new().expect("create temp dir");
+    let socket_path = dir
+        .path()
+        .join("socket.sock")
+        .to_string_lossy()
+        .into_owned();
     let config = Config {
-        daemon_socket: SocketEndpoint::unix("/tmp/weaver-test-get-card/socket.sock"),
+        daemon_socket: SocketEndpoint::unix(socket_path),
         ..Config::default()
     };
     let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
-    FusionBackends::new(config, provider)
+    (FusionBackends::new(config, provider), dir)
 }
 
 #[derive(Clone, Copy)]
@@ -124,8 +130,9 @@ fn assert_refusal_response(
 #[rstest]
 fn handle_returns_success_for_supported_rust_symbol(
     temp_dir: TempDir,
-    mut backends: FusionBackends<SemanticBackendProvider>,
+    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
 ) {
+    let (mut backends, _dir) = backends;
     let path = write_source(
         &temp_dir,
         SourceFile {
@@ -256,13 +263,15 @@ fn handle_returns_semantic_success_with_degraded_provenance_when_hover_is_unavai
 fn handle_returns_structured_refusals(
     temp_dir: TempDir,
     #[case] case: RefusalCase<'static>,
-    mut backends: FusionBackends<SemanticBackendProvider>,
+    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
 ) {
+    let (mut backends, _dir) = backends;
     assert_refusal_response(temp_dir, case, &mut backends);
 }
 
 #[rstest]
-fn handle_rejects_non_file_uri(mut backends: FusionBackends<SemanticBackendProvider>) {
+fn handle_rejects_non_file_uri(backends: (FusionBackends<SemanticBackendProvider>, TempDir)) {
+    let (mut backends, _dir) = backends;
     let request = make_request("https://example.com/demo.rs", 1, 1, DetailLevel::Minimal);
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
