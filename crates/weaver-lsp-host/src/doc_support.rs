@@ -13,7 +13,7 @@ use lsp_types::{
     CallHierarchyPrepareParams as PrepareParams, Diagnostic,
     DidChangeTextDocumentParams as DidChangeParams, DidCloseTextDocumentParams as DidCloseParams,
     DidOpenTextDocumentParams as DidOpenParams, GotoDefinitionParams, GotoDefinitionResponse,
-    Location, ReferenceParams, Uri,
+    Hover, HoverParams, Location, ReferenceParams, Uri,
 };
 
 use crate::LspHost;
@@ -31,6 +31,8 @@ impl LanguageServer for DocStubServer {
             references: false,
             diagnostics: false,
             call_hierarchy: false,
+            hover: false,
+            position_encoding: None,
         })
     }
 
@@ -80,6 +82,10 @@ impl LanguageServer for DocStubServer {
         &mut self,
         _params: CallHierarchyOutgoingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, LanguageServerError> {
+        Ok(None)
+    }
+
+    fn hover(&mut self, _params: HoverParams) -> Result<Option<Hover>, LanguageServerError> {
         Ok(None)
     }
 }

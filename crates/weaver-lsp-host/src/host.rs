@@ -6,7 +6,7 @@ use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    GotoDefinitionParams, GotoDefinitionResponse, ReferenceParams, Uri,
+    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, ReferenceParams, Uri,
 };
 
 use crate::capability::{CapabilityKind, CapabilitySummary, resolve_capabilities};
@@ -281,6 +281,19 @@ impl LspHost {
             CapabilityKind::CallHierarchy,
             HostOperation::OutgoingCalls,
             outgoing_calls
+        }
+    );
+
+    lsp_method!(
+        /// Routes a hover request to the configured language server.
+        pub fn hover(
+            &mut self,
+            language: Language,
+            params: HoverParams,
+        ) -> Result<Option<Hover>, LspHostError> {
+            CapabilityKind::Hover,
+            HostOperation::Hover,
+            hover
         }
     );
 

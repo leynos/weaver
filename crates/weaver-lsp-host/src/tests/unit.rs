@@ -96,6 +96,13 @@ macro_rules! failing_server {
             {
                 Ok(None)
             }
+
+            fn hover(
+                &mut self,
+                _params: lsp_types::HoverParams,
+            ) -> Result<Option<lsp_types::Hover>, LanguageServerError> {
+                Ok(None)
+            }
         }
     };
 }

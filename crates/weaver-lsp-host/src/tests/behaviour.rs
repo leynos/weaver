@@ -24,17 +24,19 @@ fn world() -> RefCell<TestWorld> {
 #[given("stub servers for all primary languages")]
 fn given_all_languages(world: &RefCell<TestWorld>) {
     let responses = sample_responses();
-    let all_caps = ServerCapabilitySet::new(true, true, true).with_call_hierarchy(true);
+    let all_caps = ServerCapabilitySet::new(true, true, true)
+        .with_call_hierarchy(true)
+        .with_hover(true);
     let configs = vec![
         TestServerConfig {
             language: Language::Rust,
-            capabilities: all_caps,
+            capabilities: all_caps.clone(),
             responses: responses.clone(),
             initialization_error: None,
         },
         TestServerConfig {
             language: Language::Python,
-            capabilities: all_caps,
+            capabilities: all_caps.clone(),
             responses: responses.clone(),
             initialization_error: None,
         },
@@ -337,6 +339,7 @@ fn sample_responses() -> ResponseSet {
         diagnostics: vec![Diagnostic::default()],
         document_sync: DocumentSyncErrors::default(),
         call_hierarchy: Default::default(),
+        hover: None,
     }
 }
 

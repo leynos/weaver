@@ -19,6 +19,8 @@ pub enum CapabilityKind {
     Diagnostics,
     /// `textDocument/prepareCallHierarchy` and related requests.
     CallHierarchy,
+    /// `textDocument/hover`.
+    Hover,
 }
 
 impl CapabilityKind {
@@ -30,6 +32,7 @@ impl CapabilityKind {
             Self::References => "observe.find-references",
             Self::Diagnostics => "verify.diagnostics",
             Self::CallHierarchy => "observe.call-hierarchy",
+            Self::Hover => "observe.get-card-hover",
         }
     }
 }
@@ -82,11 +85,14 @@ impl CapabilityState {
     }
 }
 
+use lsp_types::PositionEncodingKind;
+
 /// Capability summary for a single language.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CapabilitySummary {
     language: Language,
     states: BTreeMap<CapabilityKind, CapabilityState>,
+    position_encoding: Option<PositionEncodingKind>,
 }
 
 impl CapabilitySummary {
@@ -109,6 +115,15 @@ impl CapabilitySummary {
     pub fn states(&self) -> impl Iterator<Item = CapabilityState> + '_ {
         self.states.values().copied()
     }
+
+    /// Returns the negotiated position encoding.
+    ///
+    /// When `Some(PositionEncodingKind::UTF8)`, Tree-sitter byte offsets can be
+    /// used directly. Otherwise, UTF-16 code unit conversion is required.
+    #[must_use]
+    pub fn position_encoding(&self) -> Option<&PositionEncodingKind> {
+        self.position_encoding.as_ref()
+    }
 }
 
 /// Resolves capability availability for a language using server data and overrides.
@@ -117,23 +132,29 @@ pub(crate) fn resolve_capabilities(
     advertised: ServerCapabilitySet,
     overrides: &CapabilityMatrix,
 ) -> CapabilitySummary {
+    let position_encoding = advertised.position_encoding().cloned();
     let mut states = BTreeMap::new();
     for capability in [
         CapabilityKind::Definition,
         CapabilityKind::References,
         CapabilityKind::Diagnostics,
         CapabilityKind::CallHierarchy,
+        CapabilityKind::Hover,
     ] {
-        let state = resolve_state(language, capability, advertised, overrides);
+        let state = resolve_state(language, capability, &advertised, overrides);
         states.insert(capability, state);
     }
-    CapabilitySummary { language, states }
+    CapabilitySummary {
+        language,
+        states,
+        position_encoding,
+    }
 }
 
 fn resolve_state(
     language: Language,
     capability: CapabilityKind,
-    advertised: ServerCapabilitySet,
+    advertised: &ServerCapabilitySet,
     overrides: &CapabilityMatrix,
 ) -> CapabilityState {
     match overrides.override_for(language.as_str(), capability.key()) {
@@ -161,6 +182,10 @@ fn resolve_state(
         }
         CapabilityKind::CallHierarchy => {
             let available = advertised.supports_call_hierarchy();
+            (available, capability_source(available))
+        }
+        CapabilityKind::Hover => {
+            let available = advertised.supports_hover();
             (available, capability_source(available))
         }
     };

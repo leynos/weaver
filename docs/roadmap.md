@@ -873,10 +873,10 @@ to Tree-sitter extraction and optionally enriches via LSP when available. See
         bundling is stable under whitespace edits; nested locals never appear
         as entities; and whitespace-only edits do not change `SymbolId`
         fingerprints.
-- [ ] 7.1.3. Implement optional LSP enrichment for `observe get-card` when
+- [x] 7.1.3. Implement optional LSP enrichment for `observe get-card` when
       `--detail semantic` (or higher) is requested. Requires 2.1.9 and 3.1.3.
-  - [ ] Enrich cards with hover/type and deprecation metadata where supported.
-  - [ ] Acceptance criteria: enrichment is gated by capability negotiation; LSP
+  - [x] Enrich cards with hover/type and deprecation metadata where supported.
+  - [x] Acceptance criteria: enrichment is gated by capability negotiation; LSP
         unavailability degrades to the Tree-sitter-only card with explicit
         provenance; and integration tests cover both enriched and degraded
         behaviour.

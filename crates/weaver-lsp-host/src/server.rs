@@ -7,17 +7,20 @@ use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    GotoDefinitionParams, GotoDefinitionResponse, ReferenceParams, Uri,
+    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, PositionEncodingKind,
+    ReferenceParams, Uri,
 };
 use thiserror::Error;
 
 /// Minimal set of capabilities the host inspects during negotiation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServerCapabilitySet {
     pub(crate) definition: bool,
     pub(crate) references: bool,
     pub(crate) diagnostics: bool,
     pub(crate) call_hierarchy: bool,
+    pub(crate) hover: bool,
+    pub(crate) position_encoding: Option<PositionEncodingKind>,
 }
 
 impl ServerCapabilitySet {
@@ -29,38 +32,69 @@ impl ServerCapabilitySet {
             references,
             diagnostics,
             call_hierarchy: false,
+            hover: false,
+            position_encoding: None,
         }
     }
 
     /// Builds a capability set with call hierarchy support.
     #[must_use]
-    pub const fn with_call_hierarchy(mut self, supported: bool) -> Self {
+    pub fn with_call_hierarchy(mut self, supported: bool) -> Self {
         self.call_hierarchy = supported;
+        self
+    }
+
+    /// Builds a capability set with hover support.
+    #[must_use]
+    pub fn with_hover(mut self, supported: bool) -> Self {
+        self.hover = supported;
+        self
+    }
+
+    /// Builds a capability set with position encoding.
+    #[must_use]
+    pub fn with_position_encoding(mut self, encoding: Option<PositionEncodingKind>) -> Self {
+        self.position_encoding = encoding;
         self
     }
 
     /// Whether the server reports support for `textDocument/definition`.
     #[must_use]
-    pub fn supports_definition(self) -> bool {
+    pub fn supports_definition(&self) -> bool {
         self.definition
     }
 
     /// Whether the server reports support for `textDocument/references`.
     #[must_use]
-    pub fn supports_references(self) -> bool {
+    pub fn supports_references(&self) -> bool {
         self.references
     }
 
     /// Whether the server reports support for diagnostics.
     #[must_use]
-    pub fn supports_diagnostics(self) -> bool {
+    pub fn supports_diagnostics(&self) -> bool {
         self.diagnostics
     }
 
     /// Whether the server reports support for `textDocument/prepareCallHierarchy`.
     #[must_use]
-    pub fn supports_call_hierarchy(self) -> bool {
+    pub fn supports_call_hierarchy(&self) -> bool {
         self.call_hierarchy
+    }
+
+    /// Whether the server reports support for `textDocument/hover`.
+    #[must_use]
+    pub fn supports_hover(&self) -> bool {
+        self.hover
+    }
+
+    /// Returns the negotiated position encoding.
+    ///
+    /// When `Some(PositionEncodingKind::UTF8)`, Tree-sitter byte offsets can be
+    /// used directly. Otherwise, UTF-16 code unit conversion is required.
+    #[must_use]
+    pub fn position_encoding(&self) -> Option<&PositionEncodingKind> {
+        self.position_encoding.as_ref()
     }
 }
 
@@ -158,6 +192,9 @@ pub trait LanguageServer: Send {
         &mut self,
         params: CallHierarchyOutgoingCallsParams,
     ) -> Result<Option<Vec<CallHierarchyOutgoingCall>>, LanguageServerError>;
+
+    /// Handles a `textDocument/hover` request.
+    fn hover(&mut self, params: HoverParams) -> Result<Option<Hover>, LanguageServerError>;
 }
 
 impl fmt::Debug for dyn LanguageServer {

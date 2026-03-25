@@ -6,7 +6,8 @@ use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    GotoDefinitionParams, GotoDefinitionResponse, Location, ReferenceParams, Uri,
+    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, Location, ReferenceParams,
+    Uri,
 };
 
 use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
@@ -34,6 +35,8 @@ pub enum CallKind {
     IncomingCalls,
     /// `callHierarchy/outgoingCalls` was invoked.
     OutgoingCalls,
+    /// `textDocument/hover` was invoked.
+    Hover,
 }
 
 /// Test double that records every request routed through it.
@@ -126,7 +129,7 @@ impl LanguageServer for RecordingLanguageServer {
                 return Err(LanguageServerError::new(message.clone()));
             }
             state.initialised = true;
-            Ok(state.capabilities)
+            Ok(state.capabilities.clone())
         })
     }
 
@@ -206,6 +209,12 @@ impl LanguageServer for RecordingLanguageServer {
             responses.call_hierarchy.outgoing.clone()
         })
     }
+
+    fn hover(&mut self, _params: HoverParams) -> Result<Option<Hover>, LanguageServerError> {
+        self.handle_request(CallKind::Hover, "hover", |responses| {
+            responses.hover.clone()
+        })
+    }
 }
 
 /// Handle that exposes recorded state for assertions.
@@ -242,6 +251,8 @@ pub struct ResponseSet {
     pub document_sync: DocumentSyncErrors,
     /// Responses for call hierarchy requests.
     pub call_hierarchy: CallHierarchyResponses,
+    /// Response returned for hover requests.
+    pub hover: Option<Hover>,
 }
 
 impl Default for ResponseSet {
@@ -252,6 +263,7 @@ impl Default for ResponseSet {
             diagnostics: Vec::new(),
             document_sync: DocumentSyncErrors::default(),
             call_hierarchy: CallHierarchyResponses::default(),
+            hover: None,
         }
     }
 }
@@ -304,5 +316,51 @@ impl RecordingState {
 
     fn record_call(&mut self, kind: CallKind) {
         self.calls.push(kind);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use lsp_types::{
+        HoverContents, MarkupContent, MarkupKind, Position, TextDocumentIdentifier,
+        TextDocumentPositionParams,
+    };
+
+    use super::*;
+
+    #[test]
+    fn records_and_returns_hover_calls() {
+        let expected_hover = Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: String::from("```rust\nfn greet()\n```"),
+            }),
+            range: None,
+        };
+        let responses = ResponseSet {
+            hover: Some(expected_hover.clone()),
+            ..ResponseSet::default()
+        };
+        let mut server = RecordingLanguageServer::new(
+            ServerCapabilitySet::new(false, false, false).with_hover(true),
+            responses,
+        );
+        let handle = server.handle();
+
+        server.initialize().expect("server should initialise");
+        let hover = server
+            .hover(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier {
+                        uri: "file:///test.rs".parse().expect("uri should parse"),
+                    },
+                    position: Position::new(0, 0),
+                },
+                work_done_progress_params: Default::default(),
+            })
+            .expect("hover should succeed");
+
+        assert_eq!(hover, Some(expected_hover));
+        assert_eq!(handle.calls(), vec![CallKind::Initialise, CallKind::Hover]);
     }
 }
