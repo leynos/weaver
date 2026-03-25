@@ -269,6 +269,7 @@ mod tests {
     #[rstest]
     #[case("observe", "observe", Some(0))]
     #[case("obsrve", "observe", Some(1))]
+    #[case("obsve", "observe", Some(2))]
     #[case("bogus", "observe", None)]
     fn bounded_levenshtein_respects_threshold(
         #[case] left: &str,
@@ -289,6 +290,14 @@ mod tests {
     #[test]
     fn suggestion_for_unknown_domain_rejects_distant_values() {
         assert_eq!(suggestion_for_unknown_domain("bogus"), None);
+    }
+
+    #[test]
+    fn suggestion_for_unknown_domain_accepts_distance_two_match() {
+        assert_eq!(
+            suggestion_for_unknown_domain("obsve"),
+            Some(KnownDomain::Observe)
+        );
     }
 }
 

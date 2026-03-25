@@ -1012,7 +1012,7 @@ Configuration is layered with `ortho-config`, producing the precedence order
 alongside the standard XDG locations, ensuring the CLI and daemon resolve
 identical results regardless of which component loads the settings.
 
-The workspace now targets `ortho-config` v0.8.0. The switch lets
+The workspace now targets `ortho-config` v0.8.0 and Rust 1.88. The switch lets
 `weaver-config::Config` declare its discovery policy inline through the
 `#[ortho_config(discovery(...))]` attribute. The app name, dotfile, project
 file, and `--config-path` flag are all defined next to the struct, so every

@@ -46,13 +46,28 @@ fn unknown_domain_exits_with_failure_before_daemon_startup() {
 fn typo_domain_suggests_closest_known_domain() {
     let mut command = cargo_bin_cmd!("weaver");
     command.args(["obsrve", "get-definition"]);
-    command
-        .assert()
-        .failure()
-        .stdout(is_empty())
-        .stderr(contains("error: unknown domain 'obsrve'"))
-        .stderr(contains("Valid domains: observe, act, verify"))
-        .stderr(contains("Did you mean 'observe'?"));
+    let output = command.output().expect("failed to execute weaver");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(!output.status.success(), "process should fail");
+    assert!(output.stdout.is_empty(), "stdout should be empty");
+    assert!(
+        stderr.contains("error: unknown domain 'obsrve'"),
+        "stderr should contain unknown domain error"
+    );
+    assert!(
+        stderr.contains("Valid domains: observe, act, verify"),
+        "stderr should contain valid domains list"
+    );
+    assert_eq!(
+        stderr.matches("Did you mean 'observe'?").count(),
+        1,
+        "stderr should contain exactly one suggestion"
+    );
+    assert!(
+        !stderr.contains("Waiting for daemon start..."),
+        "stderr should not contain daemon startup message"
+    );
 }
 
 #[test]

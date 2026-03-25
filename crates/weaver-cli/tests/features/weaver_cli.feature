@@ -36,6 +36,7 @@ Feature: Weaver CLI behaviour
     Then the CLI fails
     And stderr contains "error: unknown domain 'unknown-domain'"
     And stderr contains "Valid domains: observe, act, verify"
+    And stderr does not contain "Did you mean"
     And no daemon command was sent
 
   Scenario: Rejecting an unknown domain before daemon startup when an operation is present

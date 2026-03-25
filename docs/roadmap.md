@@ -200,9 +200,9 @@ does* *not require source inspection or external runbooks.*
       and
       [Level 10](ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
       (10b).
-  - [ ] Reject unknown domains with a valid-domain list.
-  - [ ] Add edit-distance suggestions for close typos.
-  - [ ] Acceptance criteria: invalid domains fail before daemon spawn, return
+  - [x] Reject unknown domains with a valid-domain list.
+  - [x] Add edit-distance suggestions for close typos.
+  - [x] Acceptance criteria: invalid domains fail before daemon spawn, return
         all three valid domains in the error body, and include a single
         "did you mean" suggestion when edit distance is 2 or less.
 - [ ] 2.3.2. Include valid operation alternatives for unknown operations.

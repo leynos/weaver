@@ -6,7 +6,10 @@ weaver-bare-help-domain-act = act       Perform code modifications
 weaver-bare-help-domain-verify = verify    Validate code correctness
 weaver-bare-help-pointer = Run 'weaver --help' for more information.
 
-# Preflight domain guidance shown when a domain lacks an operation.
+# Preflight domain guidance for missing operations and unknown domain validation.
+# Includes messages for weaver-domain-guidance-missing-operation-error,
+# weaver-domain-guidance-unknown-domain-error, weaver-domain-guidance-valid-domains,
+# and weaver-domain-guidance-did-you-mean-domain.
 weaver-domain-guidance-missing-operation-error =
     error: operation required for domain '{$domain}'
 weaver-domain-guidance-unknown-domain-error =

@@ -63,6 +63,13 @@ fn assert_unknown_domain_preflight(output: &PreflightOutput, domain: &str) {
             .stderr
             .contains("Valid domains: observe, act, verify")
     );
+    // Ensure legacy operation guidance does not appear
+    assert!(!output.stderr.contains("Available operations:"));
+    assert!(
+        !output
+            .stderr
+            .contains("weaver observe get-definition --help")
+    );
 }
 
 fn assert_known_domain_operation_guidance(output: &PreflightOutput, domain: &str) {
