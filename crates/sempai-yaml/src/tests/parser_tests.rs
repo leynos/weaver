@@ -6,6 +6,21 @@ use crate::{
 };
 use sempai_core::DiagnosticCode;
 
+// ── Test helpers ─────────────────────────────────────────────────────────────
+
+/// Parses `yaml` with a fixed test URI, asserts that it fails, and returns
+/// `(code, message, primary_span_present)` from the first diagnostic in the
+/// report.  Panics if parsing succeeds or the report contains no diagnostics.
+fn first_err_diagnostic(yaml: &str) -> (DiagnosticCode, String, bool) {
+    let report = parse_rule_file(yaml, Some("file:///rules.yaml"))
+        .expect_err("expected parse failure");
+    let d = report
+        .diagnostics()
+        .first()
+        .expect("expected at least one diagnostic");
+    (d.code(), d.message().to_owned(), d.primary_span().is_some())
+}
+
 #[test]
 fn parse_legacy_search_rule() {
     let yaml = concat!(
@@ -59,11 +74,9 @@ fn parse_match_rule() {
 #[test]
 fn invalid_yaml_returns_yaml_parse_diagnostic() {
     let yaml = "rules:\n  - id: bad\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: [";
-    let report = parse_rule_file(yaml, Some("file:///rules.yaml")).expect_err("invalid yaml");
-    let diagnostic = report.diagnostics().first().expect("one diagnostic");
-
-    assert_eq!(diagnostic.code(), DiagnosticCode::ESempaiYamlParse);
-    assert!(diagnostic.primary_span().is_some());
+    let (code, _, has_span) = first_err_diagnostic(yaml);
+    assert_eq!(code, DiagnosticCode::ESempaiYamlParse);
+    assert!(has_span);
 }
 
 #[test]
@@ -75,12 +88,10 @@ fn missing_required_field_returns_schema_diagnostic() {
         "    severity: ERROR\n",
         "    pattern: foo($X)\n",
     );
-    let report = parse_rule_file(yaml, Some("file:///rules.yaml")).expect_err("schema failure");
-    let diagnostic = report.diagnostics().first().expect("one diagnostic");
-
-    assert_eq!(diagnostic.code(), DiagnosticCode::ESempaiSchemaInvalid);
-    assert!(diagnostic.message().contains("missing required field"));
-    assert!(diagnostic.primary_span().is_some());
+    let (code, message, has_span) = first_err_diagnostic(yaml);
+    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(message.contains("missing required field"));
+    assert!(has_span);
 }
 
 #[test]
@@ -210,16 +221,7 @@ fn parse_unknown_mode_rule() {
 }
 
 #[test]
-#[expect(
-    clippy::cognitive_complexity,
-    reason = "test function validates multiple match variants"
-)]
-#[expect(
-    clippy::too_many_lines,
-    reason = "test data includes multiple YAML examples"
-)]
-#[expect(clippy::indexing_slicing, reason = "test assertions")]
-fn parse_match_variants() {
+fn parse_match_pattern_shorthand() {
     let yaml = concat!(
         "rules:\n",
         "  - id: demo.match.pattern\n",
@@ -227,14 +229,44 @@ fn parse_match_variants() {
         "    languages: [python]\n",
         "    severity: WARNING\n",
         "    match: \"foo($X)\"\n",
-        "\n",
+    );
+
+    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid match pattern shorthand");
+    let rule = file.rules().first().expect("one rule");
+
+    assert!(matches!(
+        rule.principal(),
+        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Pattern(p)))
+            if p == "foo($X)"
+    ));
+}
+
+#[test]
+fn parse_match_regex() {
+    let yaml = concat!(
+        "rules:\n",
         "  - id: demo.match.regex\n",
         "    message: regex\n",
         "    languages: [python]\n",
         "    severity: WARNING\n",
         "    match:\n",
         "      regex: \"bar\"\n",
-        "\n",
+    );
+
+    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid match regex");
+    let rule = file.rules().first().expect("one rule");
+
+    assert!(matches!(
+        rule.principal(),
+        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Regex(r)))
+            if r == "bar"
+    ));
+}
+
+#[test]
+fn parse_match_any() {
+    let yaml = concat!(
+        "rules:\n",
         "  - id: demo.match.any\n",
         "    message: any\n",
         "    languages: [python]\n",
@@ -243,7 +275,22 @@ fn parse_match_variants() {
         "      any:\n",
         "        - pattern: foo($X)\n",
         "        - pattern: bar($Y)\n",
-        "\n",
+    );
+
+    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid match any");
+    let rule = file.rules().first().expect("one rule");
+
+    assert!(matches!(
+        rule.principal(),
+        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Any(children)))
+            if children.len() == 2
+    ));
+}
+
+#[test]
+fn parse_match_not() {
+    let yaml = concat!(
+        "rules:\n",
         "  - id: demo.match.not\n",
         "    message: not\n",
         "    languages: [python]\n",
@@ -251,7 +298,21 @@ fn parse_match_variants() {
         "    match:\n",
         "      not:\n",
         "        pattern: foo($X)\n",
-        "\n",
+    );
+
+    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid match not");
+    let rule = file.rules().first().expect("one rule");
+
+    assert!(matches!(
+        rule.principal(),
+        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Not(_)))
+    ));
+}
+
+#[test]
+fn parse_match_inside() {
+    let yaml = concat!(
+        "rules:\n",
         "  - id: demo.match.inside\n",
         "    message: inside\n",
         "    languages: [python]\n",
@@ -259,7 +320,21 @@ fn parse_match_variants() {
         "    match:\n",
         "      inside:\n",
         "        pattern: class $C\n",
-        "\n",
+    );
+
+    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid match inside");
+    let rule = file.rules().first().expect("one rule");
+
+    assert!(matches!(
+        rule.principal(),
+        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Inside(_)))
+    ));
+}
+
+#[test]
+fn parse_match_anywhere() {
+    let yaml = concat!(
+        "rules:\n",
         "  - id: demo.match.anywhere\n",
         "    message: anywhere\n",
         "    languages: [python]\n",
@@ -269,46 +344,11 @@ fn parse_match_variants() {
         "        pattern: foo($X)\n",
     );
 
-    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid match variants");
-    let rules = file.rules();
-    assert_eq!(rules.len(), 6);
+    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid match anywhere");
+    let rule = file.rules().first().expect("one rule");
 
-    // Pattern string shorthand
     assert!(matches!(
-        rules[0].principal(),
-        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Pattern(p)))
-            if p == "foo($X)"
-    ));
-
-    // Regex
-    assert!(matches!(
-        rules[1].principal(),
-        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Regex(r)))
-            if r == "bar"
-    ));
-
-    // Any
-    assert!(matches!(
-        rules[2].principal(),
-        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Any(children)))
-            if children.len() == 2
-    ));
-
-    // Not
-    assert!(matches!(
-        rules[3].principal(),
-        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Not(_)))
-    ));
-
-    // Inside
-    assert!(matches!(
-        rules[4].principal(),
-        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Inside(_)))
-    ));
-
-    // Anywhere
-    assert!(matches!(
-        rules[5].principal(),
+        rule.principal(),
         RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Anywhere(_)))
     ));
 }
@@ -325,16 +365,9 @@ fn reject_both_legacy_and_match() {
         "    match: \"bar($Y)\"\n",
     );
 
-    let err = parse_rule_file(yaml, Some("file:///rules.yaml"))
-        .expect_err("should reject both legacy and match");
-    let diagnostic = err.diagnostics().first().expect("one diagnostic");
-
-    assert_eq!(diagnostic.code(), DiagnosticCode::ESempaiSchemaInvalid);
-    assert!(
-        diagnostic
-            .message()
-            .contains("exactly one top-level query principal")
-    );
+    let (code, message, _) = first_err_diagnostic(yaml);
+    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(message.contains("exactly one top-level query principal"));
 }
 
 #[test]
@@ -348,16 +381,9 @@ fn reject_empty_match_object() {
         "    match: {}\n",
     );
 
-    let err =
-        parse_rule_file(yaml, Some("file:///rules.yaml")).expect_err("should reject empty match");
-    let diagnostic = err.diagnostics().first().expect("one diagnostic");
-
-    assert_eq!(diagnostic.code(), DiagnosticCode::ESempaiSchemaInvalid);
-    assert!(
-        diagnostic
-            .message()
-            .contains("match formula object is empty")
-    );
+    let (code, message, _) = first_err_diagnostic(yaml);
+    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(message.contains("match formula object is empty"));
 }
 
 #[test]
@@ -373,14 +399,7 @@ fn reject_multiple_match_operators() {
         "      regex: bar\n",
     );
 
-    let err = parse_rule_file(yaml, Some("file:///rules.yaml"))
-        .expect_err("should reject multiple operators");
-    let diagnostic = err.diagnostics().first().expect("one diagnostic");
-
-    assert_eq!(diagnostic.code(), DiagnosticCode::ESempaiSchemaInvalid);
-    assert!(
-        diagnostic
-            .message()
-            .contains("match formula object defines multiple operators")
-    );
+    let (code, message, _) = first_err_diagnostic(yaml);
+    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(message.contains("match formula object defines multiple operators"));
 }
