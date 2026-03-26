@@ -218,6 +218,19 @@ fn build_taint_rule(
     validate_taint_header(raw, rule_span.clone())?;
 
     if let Some(taint) = raw.taint.clone() {
+        // Reject mixed taint+legacy forms
+        if raw.pattern_sources.is_some()
+            || raw.pattern_sanitizers.is_some()
+            || raw.pattern_sinks.is_some()
+        {
+            return Err(schema_error(
+                String::from(
+                    "taint rule must use either `taint` or legacy pattern-* fields, not both",
+                ),
+                rule_span,
+                "remove either `taint` or the pattern-sources/pattern-sinks fields",
+            ));
+        }
         return Ok(RulePrincipal::Taint(TaintQueryPrincipal::New(taint.value)));
     }
 

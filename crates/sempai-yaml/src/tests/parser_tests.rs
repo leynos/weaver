@@ -234,6 +234,27 @@ fn parse_taint_rule_legacy_form() {
 }
 
 #[test]
+fn reject_mixed_taint_forms() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.taint.mixed\n",
+        "    mode: taint\n",
+        "    message: mixed taint forms\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    taint:\n",
+        "      sources: [USER_INPUT]\n",
+        "      sinks: [SQL_EXEC]\n",
+        "    pattern-sources:\n",
+        "      - pattern: source()\n",
+    );
+
+    let (code, message, _) = first_err_diagnostic(yaml);
+    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(message.contains("taint rule must use either"));
+}
+
+#[test]
 fn parse_unknown_mode_rule() {
     let yaml = concat!(
         "rules:\n",
@@ -251,29 +272,20 @@ fn parse_unknown_mode_rule() {
     });
 }
 
-#[test]
-fn parse_match_pattern_shorthand() {
-    let yaml = concat!(
+#[rstest]
+#[case::pattern_shorthand(
+    concat!(
         "rules:\n",
         "  - id: demo.match.pattern\n",
         "    message: pattern string\n",
         "    languages: [python]\n",
         "    severity: WARNING\n",
         "    match: \"foo($X)\"\n",
-    );
-
-    check_first_rule(yaml, |rule| {
-        assert!(matches!(
-            rule.principal(),
-            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Pattern(p)))
-                if p == "foo($X)"
-        ));
-    });
-}
-
-#[test]
-fn parse_match_regex() {
-    let yaml = concat!(
+    ),
+    |principal: &MatchFormula| matches!(principal, MatchFormula::Pattern(p) if p == "foo($X)"),
+)]
+#[case::regex(
+    concat!(
         "rules:\n",
         "  - id: demo.match.regex\n",
         "    message: regex\n",
@@ -281,20 +293,11 @@ fn parse_match_regex() {
         "    severity: WARNING\n",
         "    match:\n",
         "      regex: \"bar\"\n",
-    );
-
-    check_first_rule(yaml, |rule| {
-        assert!(matches!(
-            rule.principal(),
-            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Regex(r)))
-                if r == "bar"
-        ));
-    });
-}
-
-#[test]
-fn parse_match_any() {
-    let yaml = concat!(
+    ),
+    |principal: &MatchFormula| matches!(principal, MatchFormula::Regex(r) if r == "bar"),
+)]
+#[case::any(
+    concat!(
         "rules:\n",
         "  - id: demo.match.any\n",
         "    message: any\n",
@@ -304,20 +307,11 @@ fn parse_match_any() {
         "      any:\n",
         "        - pattern: foo($X)\n",
         "        - pattern: bar($Y)\n",
-    );
-
-    check_first_rule(yaml, |rule| {
-        assert!(matches!(
-            rule.principal(),
-            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Any(children)))
-                if children.len() == 2
-        ));
-    });
-}
-
-#[test]
-fn parse_match_not() {
-    let yaml = concat!(
+    ),
+    |principal: &MatchFormula| matches!(principal, MatchFormula::Any(children) if children.len() == 2),
+)]
+#[case::not(
+    concat!(
         "rules:\n",
         "  - id: demo.match.not\n",
         "    message: not\n",
@@ -326,19 +320,11 @@ fn parse_match_not() {
         "    match:\n",
         "      not:\n",
         "        pattern: foo($X)\n",
-    );
-
-    check_first_rule(yaml, |rule| {
-        assert!(matches!(
-            rule.principal(),
-            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Not(_)))
-        ));
-    });
-}
-
-#[test]
-fn parse_match_inside() {
-    let yaml = concat!(
+    ),
+    |principal: &MatchFormula| matches!(principal, MatchFormula::Not(_)),
+)]
+#[case::inside(
+    concat!(
         "rules:\n",
         "  - id: demo.match.inside\n",
         "    message: inside\n",
@@ -347,19 +333,11 @@ fn parse_match_inside() {
         "    match:\n",
         "      inside:\n",
         "        pattern: class $C\n",
-    );
-
-    check_first_rule(yaml, |rule| {
-        assert!(matches!(
-            rule.principal(),
-            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Inside(_)))
-        ));
-    });
-}
-
-#[test]
-fn parse_match_anywhere() {
-    let yaml = concat!(
+    ),
+    |principal: &MatchFormula| matches!(principal, MatchFormula::Inside(_)),
+)]
+#[case::anywhere(
+    concat!(
         "rules:\n",
         "  - id: demo.match.anywhere\n",
         "    message: anywhere\n",
@@ -368,13 +346,22 @@ fn parse_match_anywhere() {
         "    match:\n",
         "      anywhere:\n",
         "        pattern: foo($X)\n",
-    );
-
+    ),
+    |principal: &MatchFormula| matches!(principal, MatchFormula::Anywhere(_)),
+)]
+fn parse_match_formula_variants<F>(#[case] yaml: &str, #[case] check_formula: F)
+where
+    F: Fn(&MatchFormula) -> bool,
+{
     check_first_rule(yaml, |rule| {
-        assert!(matches!(
-            rule.principal(),
-            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Anywhere(_)))
-        ));
+        if let RulePrincipal::Search(SearchQueryPrincipal::Match(formula)) = rule.principal() {
+            assert!(
+                check_formula(formula),
+                "formula did not match expected pattern"
+            );
+        } else {
+            panic!("expected Search(Match(...)) principal");
+        }
     });
 }
 
