@@ -287,25 +287,15 @@ mod tests {
         assert_eq!(bounded_levenshtein(left, right, 2), expected);
     }
 
-    #[test]
-    fn suggestion_for_unknown_domain_returns_closest_match_within_threshold() {
-        assert_eq!(
-            suggestion_for_unknown_domain("obsrve"),
-            Some(KnownDomain::Observe)
-        );
-    }
-
-    #[test]
-    fn suggestion_for_unknown_domain_rejects_distant_values() {
-        assert_eq!(suggestion_for_unknown_domain("bogus"), None);
-    }
-
-    #[test]
-    fn suggestion_for_unknown_domain_accepts_distance_two_match() {
-        assert_eq!(
-            suggestion_for_unknown_domain("obsve"),
-            Some(KnownDomain::Observe)
-        );
+    #[rstest]
+    #[case("obsrve", Some(KnownDomain::Observe))]
+    #[case("bogus", None)]
+    #[case("obsve", Some(KnownDomain::Observe))]
+    fn suggestion_for_unknown_domain_cases(
+        #[case] input: &str,
+        #[case] expected: Option<KnownDomain>,
+    ) {
+        assert_eq!(suggestion_for_unknown_domain(input), expected);
     }
 }
 

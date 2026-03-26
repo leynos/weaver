@@ -113,36 +113,28 @@ fn known_domain_without_operation_emits_contextual_guidance() {
 }
 
 #[rstest]
-#[case(&["unknown-domain"], "unknown-domain", None, None, Some("weaver observe get-definition --help"))]
-#[case(&["unknown-domain", "get-definition"], "unknown-domain", None, Some("Waiting for daemon start..."), None)]
-#[case(&["obsrve", "get-definition"], "obsrve", Some("Did you mean 'observe'?"), None, None)]
-#[case(&["bogus", "get-definition"], "bogus", None, None, Some("Did you mean"))]
+#[case(&["unknown-domain"], "unknown-domain", &[], &["weaver observe get-definition --help"])]
+#[case(&["unknown-domain", "get-definition"], "unknown-domain", &[], &["Waiting for daemon start..."])]
+#[case(&["obsrve", "get-definition"], "obsrve", &["Did you mean 'observe'?"], &[])]
+#[case(&["bogus", "get-definition"], "bogus", &[], &["Did you mean"])]
 fn unknown_domain_preflight_guidance(
     #[case] args: &[&str],
     #[case] domain: &str,
-    #[case] should_contain: Option<&str>,
-    #[case] should_not_contain_daemon: Option<&str>,
-    #[case] should_not_contain_other: Option<&str>,
+    #[case] required_contains: &[&str],
+    #[case] forbidden_contains: &[&str],
 ) {
     let output = run_with_panicking_loader(args);
 
     assert_unknown_domain_preflight(&output, domain);
 
-    if let Some(text) = should_contain {
+    for text in required_contains {
         assert!(
             output.stderr.contains(text),
             "stderr should contain '{text}'"
         );
     }
 
-    if let Some(text) = should_not_contain_daemon {
-        assert!(
-            !output.stderr.contains(text),
-            "stderr should not contain '{text}'"
-        );
-    }
-
-    if let Some(text) = should_not_contain_other {
+    for text in forbidden_contains {
         assert!(
             !output.stderr.contains(text),
             "stderr should not contain '{text}'"
