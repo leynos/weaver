@@ -1,7 +1,7 @@
 //! Unit tests for YAML rule parsing.
 
 use crate::{
-    LegacyFormula, MatchFormula, RuleMode, RulePrincipal, RuleSeverity, SearchQueryPrincipal,
+    LegacyFormula, MatchFormula, Rule, RuleMode, RulePrincipal, RuleSeverity, SearchQueryPrincipal,
     TaintQueryPrincipal, parse_rule_file,
 };
 use sempai_core::DiagnosticCode;
@@ -21,6 +21,18 @@ fn first_err_diagnostic(yaml: &str) -> (DiagnosticCode, String, bool) {
     (d.code(), d.message().to_owned(), d.primary_span().is_some())
 }
 
+/// Parses `yaml` with a fixed test URI, asserts success, and passes the
+/// first rule to `check`.  Panics if parsing fails or the file is empty.
+fn check_first_rule<F>(yaml: &str, check: F)
+where
+    F: FnOnce(&Rule),
+{
+    let file =
+        parse_rule_file(yaml, Some("file:///rules.yaml")).expect("expected successful parse");
+    let rule = file.rules().first().expect("expected at least one rule");
+    check(rule);
+}
+
 #[test]
 fn parse_legacy_search_rule() {
     let yaml = concat!(
@@ -32,19 +44,18 @@ fn parse_legacy_search_rule() {
         "    pattern: foo($X)\n",
     );
 
-    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid rule file");
-    let rule = file.rules().first().expect("one parsed rule");
-
-    assert_eq!(rule.id(), "demo.legacy");
-    assert_eq!(rule.mode(), &RuleMode::Search);
-    assert_eq!(rule.message(), Some("detect foo"));
-    assert_eq!(rule.languages(), &["python"]);
-    assert_eq!(rule.severity(), Some(&RuleSeverity::Warning));
-    assert!(matches!(
-        rule.principal(),
-        RulePrincipal::Search(SearchQueryPrincipal::Legacy(LegacyFormula::Pattern(pattern)))
-            if pattern == "foo($X)"
-    ));
+    check_first_rule(yaml, |rule| {
+        assert_eq!(rule.id(), "demo.legacy");
+        assert_eq!(rule.mode(), &RuleMode::Search);
+        assert_eq!(rule.message(), Some("detect foo"));
+        assert_eq!(rule.languages(), &["python"]);
+        assert_eq!(rule.severity(), Some(&RuleSeverity::Warning));
+        assert!(matches!(
+            rule.principal(),
+            RulePrincipal::Search(SearchQueryPrincipal::Legacy(LegacyFormula::Pattern(pattern)))
+                if pattern == "foo($X)"
+        ));
+    });
 }
 
 #[test]
@@ -62,13 +73,12 @@ fn parse_match_rule() {
         "      as: finding\n",
     );
 
-    let file = parse_rule_file(yaml, None).expect("valid rule file");
-    let rule = file.rules().first().expect("one parsed rule");
-
-    assert!(matches!(
-        rule.principal(),
-        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Decorated { .. }))
-    ));
+    check_first_rule(yaml, |rule| {
+        assert!(matches!(
+            rule.principal(),
+            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Decorated { .. }))
+        ));
+    });
 }
 
 #[test]
@@ -108,17 +118,16 @@ fn parse_extract_rule() {
         "    pattern: source($X)\n",
     );
 
-    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid extract rule");
-    let rule = file.rules().first().expect("one parsed rule");
-
-    assert_eq!(rule.mode(), &RuleMode::Extract);
-    match rule.principal() {
-        RulePrincipal::Extract(extract) => {
-            assert_eq!(extract.dest_language(), "python");
-            assert_eq!(extract.extract(), "foo($X)");
+    check_first_rule(yaml, |rule| {
+        assert_eq!(rule.mode(), &RuleMode::Extract);
+        match rule.principal() {
+            RulePrincipal::Extract(extract) => {
+                assert_eq!(extract.dest_language(), "python");
+                assert_eq!(extract.extract(), "foo($X)");
+            }
+            _ => panic!("expected Extract principal"),
         }
-        _ => panic!("expected Extract principal"),
-    }
+    });
 }
 
 #[test]
@@ -136,18 +145,17 @@ fn parse_join_rule() {
         "      right: pattern2\n",
     );
 
-    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid join rule");
-    let rule = file.rules().first().expect("one parsed rule");
-
-    assert_eq!(rule.mode(), &RuleMode::Join);
-    match rule.principal() {
-        RulePrincipal::Join(value) => {
-            assert_eq!(value["type"], "simple");
-            assert_eq!(value["left"], "pattern1");
-            assert_eq!(value["right"], "pattern2");
+    check_first_rule(yaml, |rule| {
+        assert_eq!(rule.mode(), &RuleMode::Join);
+        match rule.principal() {
+            RulePrincipal::Join(value) => {
+                assert_eq!(value["type"], "simple");
+                assert_eq!(value["left"], "pattern1");
+                assert_eq!(value["right"], "pattern2");
+            }
+            _ => panic!("expected Join principal"),
         }
-        _ => panic!("expected Join principal"),
-    }
+    });
 }
 
 #[test]
@@ -164,14 +172,13 @@ fn parse_taint_rule_new_form() {
         "      sinks: [SQL_EXEC]\n",
     );
 
-    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid taint rule");
-    let rule = file.rules().first().expect("one parsed rule");
-
-    assert_eq!(rule.mode(), &RuleMode::Taint);
-    assert!(matches!(
-        rule.principal(),
-        RulePrincipal::Taint(TaintQueryPrincipal::New(_))
-    ));
+    check_first_rule(yaml, |rule| {
+        assert_eq!(rule.mode(), &RuleMode::Taint);
+        assert!(matches!(
+            rule.principal(),
+            RulePrincipal::Taint(TaintQueryPrincipal::New(_))
+        ));
+    });
 }
 
 #[test]
@@ -189,14 +196,13 @@ fn parse_taint_rule_legacy_form() {
         "      - pattern: sink($X)\n",
     );
 
-    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid legacy taint rule");
-    let rule = file.rules().first().expect("one parsed rule");
-
-    assert_eq!(rule.mode(), &RuleMode::Taint);
-    assert!(matches!(
-        rule.principal(),
-        RulePrincipal::Taint(TaintQueryPrincipal::Legacy { .. })
-    ));
+    check_first_rule(yaml, |rule| {
+        assert_eq!(rule.mode(), &RuleMode::Taint);
+        assert!(matches!(
+            rule.principal(),
+            RulePrincipal::Taint(TaintQueryPrincipal::Legacy { .. })
+        ));
+    });
 }
 
 #[test]
@@ -211,13 +217,10 @@ fn parse_unknown_mode_rule() {
         "    pattern: foo($X)\n",
     );
 
-    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid custom mode rule");
-    let rule = file.rules().first().expect("one parsed rule");
-
-    match rule.mode() {
+    check_first_rule(yaml, |rule| match rule.mode() {
         RuleMode::Other(s) => assert_eq!(s, "custom-mode"),
         other => panic!("expected RuleMode::Other, got {other:?}"),
-    }
+    });
 }
 
 #[test]
@@ -231,15 +234,13 @@ fn parse_match_pattern_shorthand() {
         "    match: \"foo($X)\"\n",
     );
 
-    let file =
-        parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid match pattern shorthand");
-    let rule = file.rules().first().expect("one rule");
-
-    assert!(matches!(
-        rule.principal(),
-        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Pattern(p)))
-            if p == "foo($X)"
-    ));
+    check_first_rule(yaml, |rule| {
+        assert!(matches!(
+            rule.principal(),
+            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Pattern(p)))
+                if p == "foo($X)"
+        ));
+    });
 }
 
 #[test]
@@ -254,14 +255,13 @@ fn parse_match_regex() {
         "      regex: \"bar\"\n",
     );
 
-    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid match regex");
-    let rule = file.rules().first().expect("one rule");
-
-    assert!(matches!(
-        rule.principal(),
-        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Regex(r)))
-            if r == "bar"
-    ));
+    check_first_rule(yaml, |rule| {
+        assert!(matches!(
+            rule.principal(),
+            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Regex(r)))
+                if r == "bar"
+        ));
+    });
 }
 
 #[test]
@@ -278,14 +278,13 @@ fn parse_match_any() {
         "        - pattern: bar($Y)\n",
     );
 
-    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid match any");
-    let rule = file.rules().first().expect("one rule");
-
-    assert!(matches!(
-        rule.principal(),
-        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Any(children)))
-            if children.len() == 2
-    ));
+    check_first_rule(yaml, |rule| {
+        assert!(matches!(
+            rule.principal(),
+            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Any(children)))
+                if children.len() == 2
+        ));
+    });
 }
 
 #[test]
@@ -301,13 +300,12 @@ fn parse_match_not() {
         "        pattern: foo($X)\n",
     );
 
-    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid match not");
-    let rule = file.rules().first().expect("one rule");
-
-    assert!(matches!(
-        rule.principal(),
-        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Not(_)))
-    ));
+    check_first_rule(yaml, |rule| {
+        assert!(matches!(
+            rule.principal(),
+            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Not(_)))
+        ));
+    });
 }
 
 #[test]
@@ -323,13 +321,12 @@ fn parse_match_inside() {
         "        pattern: class $C\n",
     );
 
-    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid match inside");
-    let rule = file.rules().first().expect("one rule");
-
-    assert!(matches!(
-        rule.principal(),
-        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Inside(_)))
-    ));
+    check_first_rule(yaml, |rule| {
+        assert!(matches!(
+            rule.principal(),
+            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Inside(_)))
+        ));
+    });
 }
 
 #[test]
@@ -345,13 +342,12 @@ fn parse_match_anywhere() {
         "        pattern: foo($X)\n",
     );
 
-    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid match anywhere");
-    let rule = file.rules().first().expect("one rule");
-
-    assert!(matches!(
-        rule.principal(),
-        RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Anywhere(_)))
-    ));
+    check_first_rule(yaml, |rule| {
+        assert!(matches!(
+            rule.principal(),
+            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Anywhere(_)))
+        ));
+    });
 }
 
 #[test]

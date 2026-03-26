@@ -123,9 +123,8 @@ struct RawMatchFormulaObject {
     not: Option<Box<RawMatchFormula>>,
     inside: Option<Box<RawMatchFormula>>,
     anywhere: Option<Box<RawMatchFormula>>,
-    where_: Option<Vec<Value>>,
     #[serde(rename = "where")]
-    where_alias: Option<Vec<Value>>,
+    where_clauses: Option<Vec<Value>>,
     #[serde(rename = "as")]
     as_name: Option<String>,
     fix: Option<String>,
@@ -178,29 +177,71 @@ fn build_rule(
     })
 }
 
+fn singleton_formula<F>(
+    mut formulas: Vec<LegacyFormula>,
+    make_error: F,
+) -> Result<LegacyFormula, DiagnosticReport>
+where
+    F: FnOnce(usize) -> DiagnosticReport,
+{
+    match formulas.len() {
+        1 => Ok(formulas.remove(0)),
+        len => Err(make_error(len)),
+    }
+}
+
+fn validate_search_header(raw: &RawRule, span: Option<SourceSpan>) -> Result<(), DiagnosticReport> {
+    require(
+        raw.message.clone(),
+        "message",
+        span.clone(),
+        "add a rule message explaining the match",
+    )?;
+    require(
+        raw.languages.clone(),
+        "languages",
+        span.clone(),
+        "declare at least one target language",
+    )?;
+    require(
+        raw.severity.clone(),
+        "severity",
+        span,
+        "choose a schema-aligned severity such as WARNING or ERROR",
+    )?;
+    Ok(())
+}
+
+fn validate_extract_header(
+    raw: &RawRule,
+    span: Option<SourceSpan>,
+) -> Result<(), DiagnosticReport> {
+    require(
+        raw.languages.clone(),
+        "languages",
+        span.clone(),
+        "declare at least one target language",
+    )?;
+    require(
+        raw.dest_language.clone(),
+        "dest-language",
+        span.clone(),
+        "declare the destination language for extract mode",
+    )?;
+    require(
+        raw.extract.clone(),
+        "extract",
+        span,
+        "declare the extraction template",
+    )?;
+    Ok(())
+}
+
 fn build_search_rule(
     raw: &RawRule,
     rule_span: Option<SourceSpan>,
 ) -> Result<RulePrincipal, DiagnosticReport> {
-    let message = require(
-        raw.message.clone(),
-        "message",
-        rule_span.clone(),
-        "add a rule message explaining the match",
-    )?;
-    let languages = require(
-        raw.languages.clone(),
-        "languages",
-        rule_span.clone(),
-        "declare at least one target language",
-    )?;
-    let severity = require(
-        raw.severity.clone(),
-        "severity",
-        rule_span.clone(),
-        "choose a schema-aligned severity such as WARNING or ERROR",
-    )?;
-    drop((message, languages, severity));
+    validate_search_header(raw, rule_span.clone())?;
     build_search_principal(raw, rule_span).map(RulePrincipal::Search)
 }
 
@@ -208,31 +249,30 @@ fn build_extract_rule(
     raw: &RawRule,
     rule_span: Option<&SourceSpan>,
 ) -> Result<RulePrincipal, DiagnosticReport> {
-    let languages = require(
-        raw.languages.clone(),
-        "languages",
-        rule_span.cloned(),
-        "declare at least one target language",
-    )?;
-    let dest_language = require(
-        raw.dest_language.clone(),
-        "dest-language",
-        rule_span.cloned(),
-        "declare the destination language for extract mode",
-    )?;
-    let extract = require(
-        raw.extract.clone(),
-        "extract",
-        rule_span.cloned(),
-        "declare the extraction template",
-    )?;
-    drop(languages);
-    let legacy = build_legacy_principal(raw, rule_span.cloned())?;
-    Ok(RulePrincipal::Extract(ExtractQueryPrincipal {
-        dest_language,
-        extract,
-        query: legacy,
-    }))
+    if raw.match_formula.is_some() {
+        return Err(schema_error(
+            String::from("extract mode does not support `match`"),
+            rule_span.cloned(),
+            "replace `match` with a legacy query key such as `pattern` or `patterns`",
+        ));
+    }
+    validate_extract_header(raw, rule_span.cloned())?;
+    // Safety: validated by validate_extract_header above
+    if let (Some(dest_language), Some(extract)) = (&raw.dest_language, &raw.extract) {
+        let legacy = build_legacy_principal(raw, rule_span)?;
+        Ok(RulePrincipal::Extract(ExtractQueryPrincipal {
+            dest_language: dest_language.value.clone(),
+            extract: extract.value.clone(),
+            query: legacy,
+        }))
+    } else {
+        // This branch should never be reached because validate_extract_header already checked
+        Err(schema_error(
+            String::from("internal error: missing extract fields after validation"),
+            rule_span.cloned(),
+            "please report this bug",
+        ))
+    }
 }
 
 fn build_join_rule(
@@ -334,14 +374,14 @@ fn build_search_principal(
             ))
         }
     } else {
-        let legacy_principal = build_legacy_principal(raw, rule_span)?;
+        let legacy_principal = build_legacy_principal(raw, rule_span.as_ref())?;
         Ok(SearchQueryPrincipal::Legacy(legacy_principal))
     }
 }
 
 fn build_legacy_principal(
     raw: &RawRule,
-    rule_span: Option<SourceSpan>,
+    rule_span: Option<&SourceSpan>,
 ) -> Result<LegacyFormula, DiagnosticReport> {
     let mut formulas = Vec::new();
     if let Some(pattern) = &raw.pattern {
@@ -371,19 +411,18 @@ fn build_legacy_principal(
         ));
     }
 
-    match formulas.len() {
-        1 => Ok(formulas.remove(0)),
-        0 => Err(schema_error(
+    singleton_formula(formulas, |len| match len {
+        0 => schema_error(
             String::from("legacy rule is missing a query principal"),
-            rule_span,
+            rule_span.cloned(),
             "add one legacy query key",
-        )),
-        _ => Err(schema_error(
+        ),
+        _ => schema_error(
             String::from("legacy rule defines multiple query principals"),
-            rule_span,
+            rule_span.cloned(),
             "keep only one legacy query key",
-        )),
-    }
+        ),
+    })
 }
 
 fn parse_severity(
@@ -508,19 +547,18 @@ impl TryFrom<RawLegacyFormulaObject> for LegacyFormula {
         );
         push_optional_legacy_value_formula(&mut formulas, value.anywhere, Self::Anywhere)?;
 
-        match formulas.len() {
-            1 => Ok(formulas.remove(0)),
-            0 => Err(schema_error(
+        singleton_formula(formulas, |len| match len {
+            0 => schema_error(
                 String::from("legacy formula object is empty"),
                 None,
                 "add a supported legacy operator",
-            )),
-            _ => Err(schema_error(
+            ),
+            _ => schema_error(
                 String::from("legacy formula object defines multiple operators"),
                 None,
                 "keep only one operator per legacy object",
-            )),
-        }
+            ),
+        })
     }
 }
 
@@ -575,6 +613,44 @@ impl TryFrom<Box<RawMatchFormulaObject>> for MatchFormula {
     }
 }
 
+/// Converts the operator fields of a `RawMatchFormulaObject` into the core
+/// (undecorated) `MatchFormula` variant.  The caller is responsible for
+/// ensuring exactly one operator field is `Some` before calling this.
+fn build_core_match_formula(
+    value: RawMatchFormulaObject,
+) -> Result<MatchFormula, DiagnosticReport> {
+    if let Some(pattern) = value.pattern {
+        Ok(MatchFormula::PatternObject(pattern))
+    } else if let Some(regex) = value.regex {
+        Ok(MatchFormula::Regex(regex))
+    } else if let Some(all) = value.all {
+        Ok(MatchFormula::All(
+            all.into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<_>, _>>()?,
+        ))
+    } else if let Some(any) = value.any {
+        Ok(MatchFormula::Any(
+            any.into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<_>, _>>()?,
+        ))
+    } else if let Some(not) = value.not {
+        Ok(MatchFormula::Not(Box::new((*not).try_into()?)))
+    } else if let Some(inside) = value.inside {
+        Ok(MatchFormula::Inside(Box::new((*inside).try_into()?)))
+    } else if let Some(anywhere) = value.anywhere {
+        Ok(MatchFormula::Anywhere(Box::new((*anywhere).try_into()?)))
+    } else {
+        // Safety: caller guarantees operator_count == 1
+        Err(schema_error(
+            String::from("internal error: no operator found despite count check"),
+            None,
+            "please report this bug",
+        ))
+    }
+}
+
 impl TryFrom<RawMatchFormulaObject> for MatchFormula {
     type Error = DiagnosticReport;
 
@@ -608,42 +684,10 @@ impl TryFrom<RawMatchFormulaObject> for MatchFormula {
             ));
         }
 
-        let core = if let Some(pattern) = value.pattern {
-            Self::PatternObject(pattern)
-        } else if let Some(regex) = value.regex {
-            Self::Regex(regex)
-        } else if let Some(all) = value.all {
-            Self::All(
-                all.into_iter()
-                    .map(TryInto::try_into)
-                    .collect::<Result<Vec<_>, _>>()?,
-            )
-        } else if let Some(any) = value.any {
-            Self::Any(
-                any.into_iter()
-                    .map(TryInto::try_into)
-                    .collect::<Result<Vec<_>, _>>()?,
-            )
-        } else if let Some(not) = value.not {
-            Self::Not(Box::new((*not).try_into()?))
-        } else if let Some(inside) = value.inside {
-            Self::Inside(Box::new((*inside).try_into()?))
-        } else if let Some(anywhere) = value.anywhere {
-            Self::Anywhere(Box::new((*anywhere).try_into()?))
-        } else {
-            // Safety: operator_count == 1 ensures at least one operator is present
-            return Err(schema_error(
-                String::from("internal error: no operator found despite count check"),
-                None,
-                "please report this bug",
-            ));
-        };
-
-        Ok(Self::decorated(
-            core,
-            value.where_.or(value.where_alias).unwrap_or_default(),
-            value.as_name,
-            value.fix,
-        ))
+        let where_ = value.where_clauses.clone().unwrap_or_default();
+        let as_name = value.as_name.clone();
+        let fix = value.fix.clone();
+        let core = build_core_match_formula(value)?;
+        Ok(Self::decorated(core, where_, as_name, fix))
     }
 }
