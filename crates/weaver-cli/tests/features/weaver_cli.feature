@@ -53,6 +53,7 @@ Feature: Weaver CLI behaviour
     And stderr contains "error: unknown domain 'obsrve'"
     And stderr contains "Valid domains: observe, act, verify"
     And stderr contains "Did you mean 'observe'?"
+    And stderr does not contain "Waiting for daemon start..."
     And no daemon command was sent
 
   Scenario: Reporting malformed daemon responses

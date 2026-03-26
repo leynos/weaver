@@ -26,13 +26,18 @@ impl KnownDomain {
     }
 
     /// Resolves a raw string to a known domain, case-insensitively.
+    /// Uses DOMAIN_OPERATIONS as the single source of truth.
     pub(crate) fn try_parse(s: &str) -> Option<Self> {
-        match s.trim().to_ascii_lowercase().as_str() {
-            "observe" => Some(Self::Observe),
-            "act" => Some(Self::Act),
-            "verify" => Some(Self::Verify),
-            _ => None,
-        }
+        let normalized = s.trim().to_ascii_lowercase();
+        DOMAIN_OPERATIONS
+            .iter()
+            .find(|(domain, _, _)| *domain == normalized.as_str())
+            .map(|(domain, _, _)| match *domain {
+                "observe" => Self::Observe,
+                "act" => Self::Act,
+                "verify" => Self::Verify,
+                _ => panic!("DOMAIN_OPERATIONS contains unknown domain: {domain}"),
+            })
     }
 
     fn operations(self) -> &'static [&'static str] {
@@ -92,9 +97,12 @@ fn strip_bidi_isolates(text: String) -> String {
 }
 
 fn known_domain_from_catalogue_entry(domain: &str) -> KnownDomain {
-    KnownDomain::try_parse(domain).unwrap_or_else(|| {
-        panic!("DOMAIN_OPERATIONS must contain valid KnownDomain entries: {domain}")
-    })
+    match domain {
+        "observe" => KnownDomain::Observe,
+        "act" => KnownDomain::Act,
+        "verify" => KnownDomain::Verify,
+        _ => panic!("DOMAIN_OPERATIONS must contain valid KnownDomain entries: {domain}"),
+    }
 }
 
 fn valid_domains_list() -> String {

@@ -7,6 +7,8 @@ use std::ffi::OsString;
 use std::io::Cursor;
 use std::process::ExitCode;
 
+use rstest::rstest;
+
 use crate::{AppError, ConfigLoader, IoStreams, run_with_loader};
 use weaver_config::Config;
 
@@ -110,40 +112,42 @@ fn known_domain_without_operation_emits_contextual_guidance() {
     );
 }
 
-#[test]
-fn unknown_domain_without_operation_emits_global_guidance() {
-    let output = run_with_panicking_loader(&["unknown-domain"]);
+#[rstest]
+#[case(&["unknown-domain"], "unknown-domain", None, None, Some("weaver observe get-definition --help"))]
+#[case(&["unknown-domain", "get-definition"], "unknown-domain", None, Some("Waiting for daemon start..."), None)]
+#[case(&["obsrve", "get-definition"], "obsrve", Some("Did you mean 'observe'?"), None, None)]
+#[case(&["bogus", "get-definition"], "bogus", None, None, Some("Did you mean"))]
+fn unknown_domain_preflight_guidance(
+    #[case] args: &[&str],
+    #[case] domain: &str,
+    #[case] should_contain: Option<&str>,
+    #[case] should_not_contain_daemon: Option<&str>,
+    #[case] should_not_contain_other: Option<&str>,
+) {
+    let output = run_with_panicking_loader(args);
 
-    assert_unknown_domain_preflight(&output, "unknown-domain");
-    assert!(
-        !output
-            .stderr
-            .contains("weaver observe get-definition --help")
-    );
-}
+    assert_unknown_domain_preflight(&output, domain);
 
-#[test]
-fn unknown_domain_with_operation_emits_global_guidance_before_configuration_loading() {
-    let output = run_with_panicking_loader(&["unknown-domain", "get-definition"]);
+    if let Some(text) = should_contain {
+        assert!(
+            output.stderr.contains(text),
+            "stderr should contain '{text}'"
+        );
+    }
 
-    assert_unknown_domain_preflight(&output, "unknown-domain");
-    assert!(!output.stderr.contains("Waiting for daemon start..."));
-}
+    if let Some(text) = should_not_contain_daemon {
+        assert!(
+            !output.stderr.contains(text),
+            "stderr should not contain '{text}'"
+        );
+    }
 
-#[test]
-fn typo_domain_emits_single_suggestion() {
-    let output = run_with_panicking_loader(&["obsrve", "get-definition"]);
-
-    assert_unknown_domain_preflight(&output, "obsrve");
-    assert!(output.stderr.contains("Did you mean 'observe'?"));
-}
-
-#[test]
-fn distant_unknown_domain_omits_suggestion() {
-    let output = run_with_panicking_loader(&["bogus", "get-definition"]);
-
-    assert_unknown_domain_preflight(&output, "bogus");
-    assert!(!output.stderr.contains("Did you mean"));
+    if let Some(text) = should_not_contain_other {
+        assert!(
+            !output.stderr.contains(text),
+            "stderr should not contain '{text}'"
+        );
+    }
 }
 
 #[test]
