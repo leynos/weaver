@@ -363,6 +363,37 @@ fn build_taint_rule(
     }))
 }
 
+/// Converts the `match_formula` field of `raw` into a `SearchQueryPrincipal`.
+///
+/// # Errors
+///
+/// Returns a diagnostic error if the match formula structure is invalid.
+///
+/// # Panics
+///
+/// Panics if `raw.match_formula` is `None`; callers must ensure `has_match`
+/// is `true` before invoking this function.
+fn build_match_principal(
+    raw: &RawRule,
+    source_map: &SourceMap,
+) -> Result<SearchQueryPrincipal, DiagnosticReport> {
+    // Invariant: caller has verified raw.match_formula.is_some().
+    // Using unwrap here is safe because the caller guarantees the field exists.
+    #[expect(
+        clippy::unwrap_used,
+        reason = "caller guarantees raw.match_formula is Some via has_match check"
+    )]
+    let formula = raw.match_formula.clone().unwrap();
+    let formula_span = source_map.span_from_location(Some(formula.referenced));
+    let match_formula = match formula.value {
+        crate::raw::RawMatchFormula::String(s) => crate::model::MatchFormula::Pattern(s),
+        crate::raw::RawMatchFormula::Object(obj) => {
+            convert_match_formula_object(*obj, formula_span)?
+        }
+    };
+    Ok(SearchQueryPrincipal::Match(match_formula))
+}
+
 fn build_search_principal(
     raw: &RawRule,
     rule_span: Option<SourceSpan>,
@@ -383,26 +414,9 @@ fn build_search_principal(
     }
 
     if has_match {
-        if let Some(formula) = raw.match_formula.clone() {
-            let formula_span = source_map.span_from_location(Some(formula.referenced));
-            let match_formula = match formula.value {
-                crate::raw::RawMatchFormula::String(s) => crate::model::MatchFormula::Pattern(s),
-                crate::raw::RawMatchFormula::Object(obj) => {
-                    convert_match_formula_object(*obj, formula_span)?
-                }
-            };
-            Ok(SearchQueryPrincipal::Match(match_formula))
-        } else {
-            // Safety: has_match is true, so match_formula must be Some
-            Err(schema_error(
-                String::from("internal error: match_formula is None despite has_match check"),
-                rule_span,
-                "please report this bug",
-            ))
-        }
+        build_match_principal(raw, source_map)
     } else {
-        let legacy_principal = build_legacy_principal(raw, rule_span.as_ref())?;
-        Ok(SearchQueryPrincipal::Legacy(legacy_principal))
+        build_legacy_principal(raw, rule_span.as_ref()).map(SearchQueryPrincipal::Legacy)
     }
 }
 
