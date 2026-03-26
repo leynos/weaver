@@ -164,56 +164,73 @@ impl TryFrom<RawLegacyFormulaObject> for LegacyFormula {
     type Error = DiagnosticReport;
 
     fn try_from(value: RawLegacyFormulaObject) -> Result<Self, Self::Error> {
-        let mut formulas = Vec::new();
-        push_optional_legacy_formula(&mut formulas, value.pattern, Self::Pattern);
-        push_optional_legacy_formula(&mut formulas, value.pattern_regex, Self::PatternRegex);
-        if let Some(patterns) = value.patterns {
-            formulas.push(Self::Patterns(
-                patterns
-                    .into_iter()
-                    .map(TryInto::try_into)
-                    .collect::<Result<Vec<_>, _>>()?,
-            ));
-        }
-        if let Some(pattern_either) = value.pattern_either {
-            formulas.push(Self::PatternEither(
-                pattern_either
-                    .into_iter()
-                    .map(TryInto::try_into)
-                    .collect::<Result<Vec<_>, _>>()?,
-            ));
-        }
-        push_optional_legacy_value_formula(&mut formulas, value.pattern_not, Self::PatternNot)?;
-        push_optional_legacy_value_formula(
-            &mut formulas,
-            value.pattern_inside,
-            Self::PatternInside,
-        )?;
-        push_optional_legacy_value_formula(
-            &mut formulas,
-            value.pattern_not_inside,
-            Self::PatternNotInside,
-        )?;
-        push_optional_legacy_formula(
-            &mut formulas,
-            value.pattern_not_regex,
-            Self::PatternNotRegex,
-        );
-        push_optional_legacy_value_formula(&mut formulas, value.anywhere, Self::Anywhere)?;
-
-        singleton_formula(formulas, |len| match len {
-            0 => schema_error(
-                String::from("legacy formula object is empty"),
-                None,
-                "add a supported legacy operator",
-            ),
-            _ => schema_error(
-                String::from("legacy formula object defines multiple operators"),
-                None,
-                "keep only one operator per legacy object",
-            ),
-        })
+        convert_legacy_formula_object(value, None)
     }
+}
+
+/// Converts a `RawLegacyFormulaObject` to a `LegacyFormula`, using the provided
+/// span for error reporting when validation fails.
+pub(crate) fn convert_legacy_formula_object(
+    value: RawLegacyFormulaObject,
+    span: Option<SourceSpan>,
+) -> Result<LegacyFormula, DiagnosticReport> {
+    let mut formulas = Vec::new();
+    push_optional_legacy_formula(&mut formulas, value.pattern, LegacyFormula::Pattern);
+    push_optional_legacy_formula(
+        &mut formulas,
+        value.pattern_regex,
+        LegacyFormula::PatternRegex,
+    );
+    if let Some(patterns) = value.patterns {
+        formulas.push(LegacyFormula::Patterns(
+            patterns
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<_>, _>>()?,
+        ));
+    }
+    if let Some(pattern_either) = value.pattern_either {
+        formulas.push(LegacyFormula::PatternEither(
+            pattern_either
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<_>, _>>()?,
+        ));
+    }
+    push_optional_legacy_value_formula(
+        &mut formulas,
+        value.pattern_not,
+        LegacyFormula::PatternNot,
+    )?;
+    push_optional_legacy_value_formula(
+        &mut formulas,
+        value.pattern_inside,
+        LegacyFormula::PatternInside,
+    )?;
+    push_optional_legacy_value_formula(
+        &mut formulas,
+        value.pattern_not_inside,
+        LegacyFormula::PatternNotInside,
+    )?;
+    push_optional_legacy_formula(
+        &mut formulas,
+        value.pattern_not_regex,
+        LegacyFormula::PatternNotRegex,
+    );
+    push_optional_legacy_value_formula(&mut formulas, value.anywhere, LegacyFormula::Anywhere)?;
+
+    singleton_formula(formulas, |len| match len {
+        0 => schema_error(
+            String::from("legacy formula object is empty"),
+            span.clone(),
+            "add a supported legacy operator",
+        ),
+        _ => schema_error(
+            String::from("legacy formula object defines multiple operators"),
+            span,
+            "keep only one operator per legacy object",
+        ),
+    })
 }
 
 fn push_optional_legacy_formula(
@@ -309,41 +326,50 @@ impl TryFrom<RawMatchFormulaObject> for MatchFormula {
     type Error = DiagnosticReport;
 
     fn try_from(value: RawMatchFormulaObject) -> Result<Self, Self::Error> {
-        let operator_count = [
-            value.pattern.is_some(),
-            value.regex.is_some(),
-            value.all.is_some(),
-            value.any.is_some(),
-            value.not.is_some(),
-            value.inside.is_some(),
-            value.anywhere.is_some(),
-        ]
-        .iter()
-        .filter(|&&present| present)
-        .count();
-
-        if operator_count == 0 {
-            return Err(schema_error(
-                String::from("match formula object is empty"),
-                None,
-                "add a supported `match` operator",
-            ));
-        }
-
-        if operator_count > 1 {
-            return Err(schema_error(
-                String::from("match formula object defines multiple operators"),
-                None,
-                "keep only one operator per match object",
-            ));
-        }
-
-        let where_ = value.where_clauses.clone().unwrap_or_default();
-        let as_name = value.as_name.clone();
-        let fix = value.fix.clone();
-        let core = build_core_match_formula(value)?;
-        Ok(Self::decorated(core, where_, as_name, fix))
+        convert_match_formula_object(value, None)
     }
+}
+
+/// Converts a `RawMatchFormulaObject` to a `MatchFormula`, using the provided
+/// span for error reporting when validation fails.
+pub(crate) fn convert_match_formula_object(
+    value: RawMatchFormulaObject,
+    span: Option<SourceSpan>,
+) -> Result<MatchFormula, DiagnosticReport> {
+    let operator_count = [
+        value.pattern.is_some(),
+        value.regex.is_some(),
+        value.all.is_some(),
+        value.any.is_some(),
+        value.not.is_some(),
+        value.inside.is_some(),
+        value.anywhere.is_some(),
+    ]
+    .iter()
+    .filter(|&&present| present)
+    .count();
+
+    if operator_count == 0 {
+        return Err(schema_error(
+            String::from("match formula object is empty"),
+            span,
+            "add a supported `match` operator",
+        ));
+    }
+
+    if operator_count > 1 {
+        return Err(schema_error(
+            String::from("match formula object defines multiple operators"),
+            span,
+            "keep only one operator per match object",
+        ));
+    }
+
+    let where_ = value.where_clauses.clone().unwrap_or_default();
+    let as_name = value.as_name.clone();
+    let fix = value.fix.clone();
+    let core = build_core_match_formula(value)?;
+    Ok(MatchFormula::decorated(core, where_, as_name, fix))
 }
 
 // Helper functions for parsing that don't belong in the model

@@ -296,7 +296,11 @@ fn parse_match_formula_variant(#[case] yaml: &str, #[case] check: fn(&RulePrinci
     "match formula object defines multiple operators",
 )]
 fn reject_invalid_match_rule(#[case] yaml: &str, #[case] expected_fragment: &str) {
-    let (code, message, _) = first_err_diagnostic(yaml);
+    let (code, message, has_span) = first_err_diagnostic(yaml);
     assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
     assert!(message.contains(expected_fragment));
+    // Verify span information is present for match formula errors
+    if expected_fragment.contains("match formula object") {
+        assert!(has_span, "expected primary_span for match formula error");
+    }
 }

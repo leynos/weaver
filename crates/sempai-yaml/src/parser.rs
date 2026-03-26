@@ -9,7 +9,8 @@ use crate::model::{
     SearchQueryPrincipal, TaintQueryPrincipal,
 };
 use crate::raw::{
-    RawRule, RawRuleFile, parse_mode, parse_severity, schema_error, singleton_formula,
+    RawRule, RawRuleFile, convert_match_formula_object, parse_mode, parse_severity, schema_error,
+    singleton_formula,
 };
 use crate::source_map::SourceMap;
 
@@ -53,7 +54,9 @@ fn build_rule(
     let max_version = raw.max_version.clone().map(|value| value.value);
 
     let principal = match &mode {
-        RuleMode::Search | RuleMode::Other(_) => build_search_rule(&raw, rule_span.clone())?,
+        RuleMode::Search | RuleMode::Other(_) => {
+            build_search_rule(&raw, rule_span.clone(), source_map)?
+        }
         RuleMode::Extract => build_extract_rule(&raw, rule_span.as_ref())?,
         RuleMode::Join => build_join_rule(&raw, rule_span.clone())?,
         RuleMode::Taint => build_taint_rule(&raw, rule_span.clone())?,
@@ -149,9 +152,10 @@ fn validate_taint_header(raw: &RawRule, span: Option<SourceSpan>) -> Result<(), 
 fn build_search_rule(
     raw: &RawRule,
     rule_span: Option<SourceSpan>,
+    source_map: &SourceMap,
 ) -> Result<RulePrincipal, DiagnosticReport> {
     validate_search_header(raw, rule_span.clone())?;
-    build_search_principal(raw, rule_span).map(RulePrincipal::Search)
+    build_search_principal(raw, rule_span, source_map).map(RulePrincipal::Search)
 }
 
 fn build_extract_rule(
@@ -250,6 +254,7 @@ fn build_taint_rule(
 fn build_search_principal(
     raw: &RawRule,
     rule_span: Option<SourceSpan>,
+    source_map: &SourceMap,
 ) -> Result<SearchQueryPrincipal, DiagnosticReport> {
     let has_legacy = raw.pattern.is_some()
         || raw.pattern_regex.is_some()
@@ -267,7 +272,13 @@ fn build_search_principal(
 
     if has_match {
         if let Some(formula) = raw.match_formula.clone() {
-            let match_formula = formula.value.try_into()?;
+            let formula_span = source_map.span_from_location(Some(formula.referenced));
+            let match_formula = match formula.value {
+                crate::raw::RawMatchFormula::String(s) => crate::model::MatchFormula::Pattern(s),
+                crate::raw::RawMatchFormula::Object(obj) => {
+                    convert_match_formula_object(*obj, formula_span)?
+                }
+            };
             Ok(SearchQueryPrincipal::Match(match_formula))
         } else {
             // Safety: has_match is true, so match_formula must be Some
