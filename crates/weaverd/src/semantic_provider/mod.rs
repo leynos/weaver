@@ -9,6 +9,7 @@ use std::fmt;
 use std::sync::Mutex;
 
 use tracing::debug;
+use weaver_cards::TreeSitterCardExtractor;
 use weaver_config::{CapabilityMatrix, Config};
 use weaver_lsp_host::adapter::ProcessLanguageServer;
 use weaver_lsp_host::{Language, LspHost};
@@ -36,6 +37,7 @@ impl std::error::Error for LspHostPoisonedError {}
 /// capability overrides.
 pub struct SemanticBackendProvider {
     capability_matrix: CapabilityMatrix,
+    card_extractor: TreeSitterCardExtractor,
     lsp_host: Mutex<Option<LspHost>>,
 }
 
@@ -54,6 +56,7 @@ impl fmt::Debug for SemanticBackendProvider {
             .unwrap_or("poisoned");
         f.debug_struct("SemanticBackendProvider")
             .field("capability_matrix", &self.capability_matrix)
+            .field("card_extractor", &self.card_extractor)
             .field("lsp_host", &host_status)
             .finish()
     }
@@ -65,6 +68,7 @@ impl SemanticBackendProvider {
     pub fn new(capability_matrix: CapabilityMatrix) -> Self {
         Self {
             capability_matrix,
+            card_extractor: TreeSitterCardExtractor::new(),
             lsp_host: Mutex::new(None),
         }
     }
@@ -76,8 +80,15 @@ impl SemanticBackendProvider {
     ) -> Self {
         Self {
             capability_matrix,
+            card_extractor: TreeSitterCardExtractor::new(),
             lsp_host: Mutex::new(Some(lsp_host)),
         }
+    }
+
+    /// Returns the shared Tree-sitter card extractor.
+    #[must_use]
+    pub fn card_extractor(&self) -> &TreeSitterCardExtractor {
+        &self.card_extractor
     }
 
     /// Executes a closure with a reference to the initialized LSP host.

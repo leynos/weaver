@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: DONE
 
 ## Purpose / big picture
 
@@ -124,34 +124,43 @@ Observable behaviour after implementation:
 
 ## Progress
 
-- [ ] Stage 0: Pre-flight validation (confirm build, tests, and lint pass on
+- [x] Stage 0: Pre-flight validation (confirm build, tests, and lint pass on
   the current branch).
-- [ ] Stage A: Add `lru` workspace dependency and create the cache module in
+- [x] Stage A: Add `lru` workspace dependency and create the cache module in
   `crates/weaver-cards/src/cache.rs`.
-- [ ] Stage B: Integrate parser registry with card extraction, reusing the
+- [x] Stage B: Integrate parser registry with card extraction, reusing the
   `TreeSitterSyntacticLock` pattern for parser pooling.
-- [ ] Stage C: Wire cache into the `weaverd` handler, replacing direct
+- [x] Stage C: Wire cache into the `weaverd` handler, replacing direct
   `TreeSitterCardExtractor::extract()` calls with cache-aware extraction.
-- [ ] Stage D: Replace the `EXTRACTED_AT_PLACEHOLDER` with real timestamps and
+- [x] Stage D: Replace the `EXTRACTED_AT_PLACEHOLDER` with real timestamps and
   ensure cache hits preserve the original extraction timestamp.
-- [ ] Stage E: Reduce unnecessary string cloning in card and region extraction
+- [x] Stage E: Reduce unnecessary string cloning in card and region extraction
   hot paths.
-- [ ] Stage F: Write unit tests for cache behaviour (hit, miss, invalidation,
+- [x] Stage F: Write unit tests for cache behaviour (hit, miss, invalidation,
   eviction, correctness).
-- [ ] Stage G: Write BDD tests using `rstest-bdd` v0.5.0 covering cache happy
+- [x] Stage G: Write BDD tests using `rstest-bdd` v0.5.0 covering cache happy
   and unhappy paths.
-- [ ] Stage H: Author 20 Python and 20 Rust language example fixtures for
+- [x] Stage H: Author 20 Python and 20 Rust language example fixtures for
   end-to-end testing.
-- [ ] Stage I: Write end-to-end tests using `assert_cmd` and `insta` covering
+- [x] Stage I: Write end-to-end tests using `assert_cmd` and `insta` covering
   the full range of symbol scenarios.
-- [ ] Stage J: Update `docs/users-guide.md` with cache behaviour documentation.
-- [ ] Stage K: Update `docs/jacquard-card-first-symbol-graph-design.md` with
+- [x] Stage J: Update `docs/users-guide.md` with cache behaviour documentation.
+- [x] Stage K: Update `docs/jacquard-card-first-symbol-graph-design.md` with
   any design decisions taken.
-- [ ] Stage L: Mark roadmap 7.1.4 as done and run full validation suite.
+- [x] Stage L: Mark roadmap 7.1.4 as done and run full validation suite.
 
 ## Surprises & discoveries
 
-(None yet — to be populated during implementation.)
+- Housing a shared `TreeSitterCardExtractor` inside
+  `SemanticBackendProvider` gave the daemon one long-lived cache and parser
+  registry without widening router or handler signatures.
+- The workspace already used the `time` crate in `weaver-build-util`, so
+  promoting it to a workspace dependency for runtime RFC 3339 formatting was
+  lower risk than hand-writing UTC timestamp logic.
+- `weaver-e2e` could not rely on Cargo's automatic binary-path injection for
+  the `weaver` binary because that binary is defined in `weaver-cli`. The
+  snapshot harness now bootstraps it once with
+  `cargo build -p weaver-cli --bin weaver` and reuses `target/debug/weaver`.
 
 ## Decision log
 
@@ -189,9 +198,27 @@ Observable behaviour after implementation:
   correctness. The content hash serves as the revision discriminator.
   Date/Author: 2026-03-25 / plan author.
 
+- Decision: Share one extractor instance through `SemanticBackendProvider`
+  instead of threading separate cache and parser-registry references through
+  router call stacks. Rationale: this preserved existing handler signatures
+  while still giving the daemon one shared cache and parser pool across all
+  requests. Date/Author: 2026-03-26 / implementation.
+
 ## Outcomes & retrospective
 
-(To be populated upon completion.)
+- Implemented `crates/weaver-cards/src/cache.rs` with `CardCache`,
+  `ParserRegistry`, SHA-256 content hashing, hit/miss stats, and stale-revision
+  invalidation by path plus content hash.
+- `TreeSitterCardExtractor` is now stateful and cache-aware, reuses parsers
+  across requests, and emits real RFC 3339 timestamps in
+  `provenance.extracted_at`.
+- `weaverd` now shares one extractor instance via
+  `SemanticBackendProvider`, and daemon tests assert cache hits, preserved
+  timestamps, and deterministic invalidation after file edits.
+- Added unit tests, BDD coverage, and `weaver-e2e` CLI snapshots covering 20
+  Python fixtures, 20 Rust fixtures, refusal cases, detail-level variants, and
+  repeated-request cache reuse.
+- Full validation was run at the end of the implementation turn.
 
 ## Context and orientation
 

@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use url::Url;
 use weaver_cards::{
     CardExtractionError, CardExtractionInput, CardRefusal, DetailLevel, GetCardRequest,
-    GetCardResponse, RefusalReason, TreeSitterCardExtractor,
+    GetCardResponse, RefusalReason,
 };
 
 use crate::backends::FusionBackends;
@@ -42,7 +42,7 @@ pub fn handle<W: Write>(
     })?;
     let path = resolve_file_path(&parsed_uri)?;
     let source = fs::read_to_string(&path)?;
-    let extractor = TreeSitterCardExtractor::new();
+    let extractor = backends.provider().card_extractor();
 
     let response = match extractor.extract(CardExtractionInput {
         path: &path,

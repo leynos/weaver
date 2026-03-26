@@ -97,6 +97,16 @@ fn response_payload(output: Vec<u8>) -> serde_json::Value {
     serde_json::from_str(data).expect("payload")
 }
 
+fn dispatch_payload(
+    request: &CommandRequest,
+    backends: &mut FusionBackends<SemanticBackendProvider>,
+) -> (DispatchResult, serde_json::Value) {
+    let mut output = Vec::new();
+    let mut writer = ResponseWriter::new(&mut output);
+    let result = handle(request, &mut writer, backends).expect("handler should succeed");
+    (result, response_payload(output))
+}
+
 fn assert_refusal_response(
     temp_dir: TempDir,
     case: RefusalCase<'_>,
@@ -283,4 +293,65 @@ fn handle_rejects_non_file_uri(backends: (FusionBackends<SemanticBackendProvider
 
     assert!(matches!(error, DispatchError::InvalidArguments { .. }));
     assert!(error.to_string().contains("unsupported URI scheme"));
+}
+
+#[rstest]
+fn handle_reuses_cached_cards_for_identical_requests(
+    temp_dir: TempDir,
+    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
+) {
+    let (mut backends, _dir) = backends;
+    let path = write_source(
+        &temp_dir,
+        SourceFile {
+            name: "cache.rs",
+            content: "fn greet() -> usize {\n    1\n}\n",
+        },
+    );
+    let uri = Url::from_file_path(&path).expect("file uri").to_string();
+    let request = make_request(&uri, 1, 4, DetailLevel::Structure);
+
+    let (first_result, first_payload) = dispatch_payload(&request, &mut backends);
+    let (second_result, second_payload) = dispatch_payload(&request, &mut backends);
+    let stats = backends.provider().card_extractor().cache_stats();
+
+    assert_eq!(first_result.status, 0);
+    assert_eq!(second_result.status, 0);
+    assert_eq!(
+        first_payload["card"]["provenance"]["extracted_at"],
+        second_payload["card"]["provenance"]["extracted_at"]
+    );
+    assert_eq!(stats.hits, 1);
+    assert_eq!(stats.misses, 1);
+}
+
+#[rstest]
+fn handle_invalidates_stale_revisions_when_file_changes(
+    temp_dir: TempDir,
+    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
+) {
+    let (mut backends, _dir) = backends;
+    let path = write_source(
+        &temp_dir,
+        SourceFile {
+            name: "cache.rs",
+            content: "fn greet() -> usize {\n    1\n}\n",
+        },
+    );
+    let uri = Url::from_file_path(&path).expect("file uri").to_string();
+    let request = make_request(&uri, 1, 4, DetailLevel::Structure);
+
+    let (_, first_payload) = dispatch_payload(&request, &mut backends);
+    fs::write(&path, "fn welcome() -> usize {\n    2\n}\n").expect("rewrite source");
+    let (_, second_payload) = dispatch_payload(&request, &mut backends);
+    let extractor = backends.provider().card_extractor();
+    let stats = extractor.cache_stats();
+
+    assert_eq!(extractor.cache_len(), 1);
+    assert_eq!(stats.hits, 0);
+    assert_eq!(stats.misses, 2);
+    assert_ne!(
+        first_payload["card"]["symbol"]["ref"]["name"],
+        second_payload["card"]["symbol"]["ref"]["name"]
+    );
 }

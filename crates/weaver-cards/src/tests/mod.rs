@@ -3,6 +3,8 @@
 use std::path::{Path, PathBuf};
 
 mod behaviour;
+mod cache_behaviour;
+mod cache_tests;
 mod extractor;
 mod extractor_boundaries;
 mod fixtures;

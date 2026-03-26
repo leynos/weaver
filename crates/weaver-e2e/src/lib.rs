@@ -20,6 +20,7 @@
 //! Tests in this crate gracefully skip if the required tools (like `uvx` or Pyrefly)
 //! are not available, ensuring CI resilience.
 
+pub mod card_fixtures;
 pub mod fixtures;
 mod jsonrpc;
 pub mod lsp_client;

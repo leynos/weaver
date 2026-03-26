@@ -881,14 +881,14 @@ to Tree-sitter extraction and optionally enriches via LSP when available. See
         unavailability degrades to the Tree-sitter-only card with explicit
         provenance; and integration tests cover both enriched and degraded
         behaviour.
-- [ ] 7.1.4. Add cache integration for card extraction keyed by URI, language,
+- [x] 7.1.4. Add cache integration for card extraction keyed by URI, language,
       and document revision. Requires 4.3.4.
-  - [ ] Reuse Tree-sitter parser registries and cache extracted entity tables
+  - [x] Reuse Tree-sitter parser registries and cache extracted entity tables
         with an LRU (Least Recently Used) policy keyed by repo, ref, file path,
         and blob hash.
-  - [ ] Avoid unnecessary string cloning in card and region extraction; prefer
+  - [x] Avoid unnecessary string cloning in card and region extraction; prefer
         borrowing or interning for hot paths.
-  - [ ] Acceptance criteria: repeated `get-card` requests for unchanged
+  - [x] Acceptance criteria: repeated `get-card` requests for unchanged
         revisions hit cache in integration tests; revision changes invalidate
         deterministically; and cache misses preserve correctness.
 

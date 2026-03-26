@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpStream};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -41,8 +42,10 @@ struct GetCardWorld {
     listener: Option<ListenerHandle>,
     address: Option<SocketAddr>,
     temp_dir: TempDir,
+    paths: HashMap<String, PathBuf>,
     uris: HashMap<String, String>,
     response_lines: Vec<String>,
+    previous_response_lines: Option<Vec<String>>,
 }
 
 struct GetCardRequest<'a> {
@@ -60,8 +63,10 @@ impl GetCardWorld {
             listener: None,
             address: None,
             temp_dir: TempDir::new().expect("temp dir"),
+            paths: HashMap::new(),
             uris: HashMap::new(),
             response_lines: Vec::new(),
+            previous_response_lines: None,
         }
     }
 
@@ -79,6 +84,7 @@ impl GetCardWorld {
         let path = self.temp_dir.path().join(name);
         fs::write(&path, source).expect("write fixture");
         let uri = Url::from_file_path(&path).expect("file uri").to_string();
+        self.paths.insert(String::from(key), path);
         self.uris.insert(String::from(key), uri);
     }
 
@@ -108,6 +114,7 @@ impl GetCardWorld {
         stream.write_all(b"\n").expect("write newline");
         stream.flush().expect("flush");
 
+        self.previous_response_lines = Some(self.response_lines.clone());
         self.response_lines.clear();
         let mut reader = BufReader::new(stream);
         let mut line_buffer = String::new();
@@ -127,6 +134,27 @@ impl GetCardWorld {
         self.response_lines.iter().any(|line| {
             line.contains(r#""kind":"exit""#) && line.contains(&format!(r#""status":{status}"#))
         })
+    }
+
+    fn rewrite_fixture(&mut self, key: &str, source: &str) {
+        let path = self.paths.get(key).expect("fixture path");
+        fs::write(path, source).expect("rewrite fixture");
+    }
+
+    fn latest_stdout_contains(&self, needle: &str) -> bool {
+        self.stdout_contains(needle)
+    }
+
+    fn responses_are_identical(&self) -> bool {
+        self.previous_response_lines
+            .as_ref()
+            .is_some_and(|previous| previous == &self.response_lines)
+    }
+
+    fn latest_response_differs(&self) -> bool {
+        self.previous_response_lines
+            .as_ref()
+            .is_some_and(|previous| previous != &self.response_lines)
     }
 }
 
@@ -210,6 +238,19 @@ fn when_request_empty_fixture(world: &RefCell<GetCardWorld>) {
     });
 }
 
+#[when("the same observe get-card request is sent twice for the Rust fixture")]
+fn when_request_rust_fixture_twice(world: &RefCell<GetCardWorld>) {
+    when_request_rust_fixture(world);
+    when_request_rust_fixture(world);
+}
+
+#[when("the Rust fixture is rewritten to return {name}")]
+fn when_rewrite_rust_fixture(world: &RefCell<GetCardWorld>, name: String) {
+    let function_name = name.trim_matches('"');
+    let source = format!("fn {function_name}() -> usize {{\n    1\n}}\n");
+    world.borrow_mut().rewrite_fixture("rust", &source);
+}
+
 #[then(r#"the stdout response contains "{fragment}""#)]
 fn then_stdout_contains(world: &RefCell<GetCardWorld>, fragment: String) {
     let fragment = fragment.trim_matches('"');
@@ -225,6 +266,36 @@ fn then_exit_status(world: &RefCell<GetCardWorld>, status: i32) {
     assert!(
         world.borrow().has_exit_status(status),
         "expected exit status {status}, got {:?}",
+        world.borrow().response_lines
+    );
+}
+
+#[then("both responses are identical")]
+fn then_both_responses_identical(world: &RefCell<GetCardWorld>) {
+    assert!(
+        world.borrow().responses_are_identical(),
+        "expected identical responses, got previous {:?} and latest {:?}",
+        world.borrow().previous_response_lines,
+        world.borrow().response_lines
+    );
+}
+
+#[then(r#"the latest stdout response contains "{fragment}""#)]
+fn then_latest_stdout_contains(world: &RefCell<GetCardWorld>, fragment: String) {
+    let fragment = fragment.trim_matches('"');
+    assert!(
+        world.borrow().latest_stdout_contains(fragment),
+        "expected latest stdout to contain {fragment:?}, got {:?}",
+        world.borrow().response_lines
+    );
+}
+
+#[then("the latest stdout response differs from the first response")]
+fn then_latest_response_differs(world: &RefCell<GetCardWorld>) {
+    assert!(
+        world.borrow().latest_response_differs(),
+        "expected responses to differ, got previous {:?} and latest {:?}",
+        world.borrow().previous_response_lines,
         world.borrow().response_lines
     );
 }

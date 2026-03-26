@@ -8,11 +8,14 @@ mod positions;
 mod utils;
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use thiserror::Error;
-use weaver_syntax::{Parser, SupportedLanguage};
+use weaver_syntax::SupportedLanguage;
 
 use crate::Provenance;
+use crate::cache::{CardCache, CardCacheAddress, CardCacheKey, ParserRegistry};
+use crate::timestamp::extraction_timestamp_now;
 use crate::{
     AttachmentsInfo, DetailLevel, DocInfo, ImportInterstitialInfo, InterstitialInfo, MetricsInfo,
     NormalizedAttachments, SignatureInfo, StructureInfo, SymbolCard, SymbolIdentity, SymbolRef,
@@ -21,9 +24,6 @@ pub(super) use candidates::{EntityCandidate, InterstitialCandidate};
 use candidates::{build_module_candidate, select_candidate};
 use positions::{position_to_byte, usize_to_u32};
 use utils::{file_uri, provenance_sources, to_card_language};
-
-/// Deterministic placeholder timestamp used until revision-based caching lands.
-const EXTRACTED_AT_PLACEHOLDER: &str = "1970-01-01T00:00:00Z";
 
 /// Input required to extract a Tree-sitter-backed symbol card.
 #[derive(Debug, Clone, Copy)]
@@ -82,14 +82,29 @@ pub enum CardExtractionError {
 }
 
 /// Tree-sitter-first extractor for `observe get-card`.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct TreeSitterCardExtractor;
+#[derive(Debug, Clone)]
+pub struct TreeSitterCardExtractor {
+    cache: Arc<CardCache>,
+    parsers: Arc<ParserRegistry>,
+}
 
 impl TreeSitterCardExtractor {
     /// Creates a new extractor.
     #[must_use]
-    pub const fn new() -> Self {
-        Self
+    pub fn new() -> Self {
+        Self {
+            cache: Arc::new(CardCache::default()),
+            parsers: Arc::new(ParserRegistry::default()),
+        }
+    }
+
+    /// Creates a new extractor with a custom cache capacity.
+    #[must_use]
+    pub fn with_cache_capacity(capacity: usize) -> Self {
+        Self {
+            cache: Arc::new(CardCache::new(capacity)),
+            parsers: Arc::new(ParserRegistry::default()),
+        }
     }
 
     /// Extracts a symbol card for the requested position.
@@ -107,19 +122,32 @@ impl TreeSitterCardExtractor {
                 path: input.path.to_path_buf(),
             }
         })?;
-        Self::extract_for_language(input, language, |supported_language| {
-            let mut parser =
-                Parser::new(supported_language).map_err(|error| CardExtractionError::Parse {
-                    language: String::from(supported_language.as_str()),
-                    message: error.to_string(),
-                })?;
-            parser
-                .parse(input.source)
+        let cache_key = CardCacheKey::new(
+            input.path,
+            input.source,
+            CardCacheAddress {
+                language,
+                detail: input.detail,
+                line: input.line,
+                column: input.column,
+            },
+        );
+        if let Some(card) = self.cache.get(&cache_key) {
+            return Ok(card);
+        }
+
+        let card = Self::extract_for_language(input, language, |supported_language| {
+            self.parsers
+                .parse(supported_language, input.source)
                 .map_err(|error| CardExtractionError::Parse {
                     language: String::from(supported_language.as_str()),
                     message: error.to_string(),
                 })
-        })
+        })?;
+        self.cache
+            .invalidate_stale_revisions(input.path, cache_key.content_hash());
+        self.cache.insert(cache_key, card.clone());
+        Ok(card)
     }
 
     fn extract_for_language<F>(
@@ -169,6 +197,37 @@ impl TreeSitterCardExtractor {
             }
         })?;
         Self::extract_for_language(input, language, parser)
+    }
+
+    /// Returns cache hit/miss counters for this extractor instance.
+    #[must_use]
+    pub fn cache_stats(&self) -> crate::CacheStats {
+        self.cache.stats()
+    }
+
+    /// Returns the number of cached entries held by this extractor.
+    #[must_use]
+    pub fn cache_len(&self) -> usize {
+        self.cache.len()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn invalidate_path(&self, path: &Path) {
+        self.cache.invalidate(path);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn parser_identity(
+        &self,
+        language: SupportedLanguage,
+    ) -> Result<usize, weaver_syntax::SyntaxError> {
+        self.parsers.parser_identity(language)
+    }
+}
+
+impl Default for TreeSitterCardExtractor {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -233,7 +292,7 @@ fn build_card(
         deps: None,
         interstitial,
         provenance: Provenance {
-            extracted_at: String::from(EXTRACTED_AT_PLACEHOLDER),
+            extracted_at: extraction_timestamp_now(),
             sources: provenance_sources(context.detail),
         },
         etag: Some(symbol_id),
