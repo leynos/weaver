@@ -163,7 +163,20 @@ fn parse_unknown_mode_rule() {
         "      as: finding\n",
     ),
     |p: &RulePrincipal| -> bool {
-        matches!(p, RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Decorated { .. })))
+        match p {
+            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Decorated { formula, as_name, .. })) => {
+                // Verify the alias is "finding"
+                if as_name.as_deref() != Some("finding") {
+                    return false;
+                }
+                // Verify the inner formula is All with exactly two children
+                match formula.as_ref() {
+                    MatchFormula::All(children) => children.len() == 2,
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
     },
 )]
 #[case::pattern_shorthand(
@@ -303,4 +316,73 @@ fn reject_invalid_match_rule(#[case] yaml: &str, #[case] expected_fragment: &str
     if expected_fragment.contains("match formula object") {
         assert!(has_span, "expected primary_span for match formula error");
     }
+}
+
+#[rstest]
+#[case::search_with_taint(
+    concat!(
+        "rules:\n",
+        "  - id: demo.search.taint\n",
+        "    message: search with taint\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    mode: search\n",
+        "    pattern: foo($X)\n",
+        "    taint:\n",
+        "      sources: []\n",
+        "      sinks: []\n",
+    ),
+    "Search mode rule contains unexpected principal fields: `taint` or legacy taint fields",
+)]
+#[case::extract_with_join(
+    concat!(
+        "rules:\n",
+        "  - id: demo.extract.join\n",
+        "    message: extract with join\n",
+        "    languages: [python]\n",
+        "    mode: extract\n",
+        "    dest-language: python\n",
+        "    extract: $X\n",
+        "    pattern: foo($X)\n",
+        "    join:\n",
+        "      on: []\n",
+    ),
+    "Extract mode rule contains unexpected principal fields: `join`",
+)]
+#[case::join_with_match(
+    concat!(
+        "rules:\n",
+        "  - id: demo.join.match\n",
+        "    message: join with match\n",
+        "    severity: WARNING\n",
+        "    mode: join\n",
+        "    match:\n",
+        "      pattern: foo($X)\n",
+        "    join:\n",
+        "      on: []\n",
+    ),
+    "Join mode rule contains unexpected principal fields: `match` or legacy search keys",
+)]
+#[case::taint_with_extract(
+    concat!(
+        "rules:\n",
+        "  - id: demo.taint.extract\n",
+        "    message: taint with extract\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    mode: taint\n",
+        "    extract: $X\n",
+        "    taint:\n",
+        "      sources: []\n",
+        "      sinks: []\n",
+    ),
+    "Taint mode rule contains unexpected principal fields: `extract` or `dest-language`",
+)]
+fn reject_cross_mode_principal_fields(#[case] yaml: &str, #[case] expected_fragment: &str) {
+    let (code, message, _has_span) = first_err_diagnostic(yaml);
+    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(
+        message.contains(expected_fragment),
+        "expected error message to contain '{expected_fragment}', got '{message}'"
+    );
 }

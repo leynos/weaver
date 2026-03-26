@@ -33,6 +33,115 @@ pub fn parse_rule_file(yaml: &str, source_uri: Option<&str>) -> Result<RuleFile,
     Ok(RuleFile::new(rules))
 }
 
+/// Checks if the raw rule contains search or legacy search fields.
+const fn has_search_or_legacy_fields(raw: &RawRule) -> bool {
+    raw.pattern.is_some()
+        || raw.pattern_regex.is_some()
+        || raw.patterns.is_some()
+        || raw.pattern_either.is_some()
+        || raw.match_formula.is_some()
+}
+
+/// Checks if the raw rule contains extract fields.
+const fn has_extract_fields(raw: &RawRule) -> bool {
+    raw.extract.is_some() || raw.dest_language.is_some()
+}
+
+/// Checks if the raw rule contains join fields.
+const fn has_join_fields(raw: &RawRule) -> bool {
+    raw.join.is_some()
+}
+
+/// Checks if the raw rule contains taint fields (new or legacy).
+const fn has_taint_fields(raw: &RawRule) -> bool {
+    raw.taint.is_some()
+        || raw.pattern_sources.is_some()
+        || raw.pattern_sanitizers.is_some()
+        || raw.pattern_sinks.is_some()
+}
+
+/// Collects unexpected principal fields for search mode.
+fn unexpected_for_search(raw: &RawRule) -> Vec<&'static str> {
+    let mut found = Vec::new();
+    if has_extract_fields(raw) {
+        found.push("`extract` or `dest-language`");
+    }
+    if has_join_fields(raw) {
+        found.push("`join`");
+    }
+    if has_taint_fields(raw) {
+        found.push("`taint` or legacy taint fields");
+    }
+    found
+}
+
+/// Collects unexpected principal fields for extract mode.
+fn unexpected_for_extract(raw: &RawRule) -> Vec<&'static str> {
+    let mut found = Vec::new();
+    if has_join_fields(raw) {
+        found.push("`join`");
+    }
+    if has_taint_fields(raw) {
+        found.push("`taint` or legacy taint fields");
+    }
+    found
+}
+
+/// Collects unexpected principal fields for join mode.
+fn unexpected_for_join(raw: &RawRule) -> Vec<&'static str> {
+    let mut found = Vec::new();
+    if has_search_or_legacy_fields(raw) {
+        found.push("`match` or legacy search keys");
+    }
+    if has_extract_fields(raw) {
+        found.push("`extract` or `dest-language`");
+    }
+    if has_taint_fields(raw) {
+        found.push("`taint` or legacy taint fields");
+    }
+    found
+}
+
+/// Collects unexpected principal fields for taint mode.
+fn unexpected_for_taint(raw: &RawRule) -> Vec<&'static str> {
+    let mut found = Vec::new();
+    if has_extract_fields(raw) {
+        found.push("`extract` or `dest-language`");
+    }
+    if has_join_fields(raw) {
+        found.push("`join`");
+    }
+    found
+}
+
+/// Validates that the rule only contains principal keys allowed for the given mode.
+///
+/// This prevents silently ignoring principal family fields that don't match the mode,
+/// for example a search rule with `taint` or an extract rule with `join`.
+fn validate_principal_family(
+    raw: &RawRule,
+    mode: &RuleMode,
+    span: Option<&SourceSpan>,
+) -> Result<(), DiagnosticReport> {
+    let unexpected = match mode {
+        RuleMode::Search | RuleMode::Other(_) => unexpected_for_search(raw),
+        RuleMode::Extract => unexpected_for_extract(raw),
+        RuleMode::Join => unexpected_for_join(raw),
+        RuleMode::Taint => unexpected_for_taint(raw),
+    };
+
+    if !unexpected.is_empty() {
+        let fields = unexpected.join(", ");
+        return Err(schema_error(
+            format!("{mode:?} mode rule contains unexpected principal fields: {fields}"),
+            span.cloned(),
+            "remove principal fields that do not match the rule mode",
+        ));
+    }
+
+    Ok(())
+}
+
 fn build_rule(
     raw: RawRule,
     index: usize,
@@ -52,6 +161,9 @@ fn build_rule(
     let mode = parse_mode(raw.mode.as_ref().map(|mode| mode.value.as_str()));
     let min_version = raw.min_version.clone().map(|value| value.value);
     let max_version = raw.max_version.clone().map(|value| value.value);
+
+    // Validate that only the correct principal family is present for the chosen mode
+    validate_principal_family(&raw, &mode, rule_span.as_ref())?;
 
     let principal = match &mode {
         RuleMode::Search | RuleMode::Other(_) => {
