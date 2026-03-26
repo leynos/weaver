@@ -19,10 +19,10 @@ file, and `--config-path` flag are all defined next to the struct, so every
 consumer shares the same generated loader without bespoke builders.
 
 The `ortho_config` v0.8.0 loader preserves the stricter discovery and parsing
-model adopted in earlier releases: if any discovered configuration file fails to
-parse, `ConfigDiscovery::load_first` returns an aggregated `OrthoError`. Both
-the CLI and daemon bubble that error to the user instead of quietly falling back
-to defaults, making misconfigurations immediately visible.
+model adopted in earlier releases: if any discovered configuration file fails
+to parse, `ConfigDiscovery::load_first` returns an aggregated `OrthoError`.
+Both the CLI and daemon bubble that error to the user instead of quietly
+falling back to defaults, making misconfigurations immediately visible.
 
 Configuration is layered with `ortho_config`, producing the precedence order
 `defaults < files < environment < CLI`. File discovery honours `--config-path`

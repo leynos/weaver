@@ -1024,6 +1024,18 @@ parse, `ConfigDiscovery::load_first` returns an aggregated `OrthoError`. Both
 the CLI and daemon bubble that error to the user instead of quietly falling back
 to defaults, making misconfigurations immediately visible.
 
+`ortho_config` v0.8.0 also resolves layered and overriding configuration
+sources through its dependency-graph model, so the effective merge order
+remains `defaults < files < environment < CLI` even when multiple discovered
+files and overrides participate in the same load. Later sources shadow earlier
+values without bespoke builder calls, because the generated loader derives the
+full precedence graph from the inline discovery contract. All YAML
+configuration files are parsed according to the YAML 1.2 specification, which
+means bare scalars such as `on`, `off`, `yes`, and `no` remain strings unless
+tagged or quoted as booleans, anchors and aliases follow YAML 1.2 node-reuse
+rules, and tag resolution follows the YAML 1.2 core schema rather than legacy
+YAML 1.1 implicit typing.
+
 The daemon transport defaults to a Unix domain socket placed under
 `$XDG_RUNTIME_DIR/weaver/weaverd.sock`. When the runtime directory is absent,
 or otherwise unavailable, the path falls back to a per-user namespace under the
