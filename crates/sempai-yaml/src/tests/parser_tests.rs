@@ -1,38 +1,12 @@
 //! Unit tests for YAML rule parsing.
 
 use crate::{
-    LegacyFormula, MatchFormula, Rule, RuleMode, RulePrincipal, RuleSeverity, SearchQueryPrincipal,
-    TaintQueryPrincipal, parse_rule_file,
+    LegacyFormula, MatchFormula, RuleMode, RulePrincipal, RuleSeverity, SearchQueryPrincipal,
 };
 use rstest::rstest;
 use sempai_core::DiagnosticCode;
 
-// ── Test helpers ─────────────────────────────────────────────────────────────
-
-/// Parses `yaml` with a fixed test URI, asserts that it fails, and returns
-/// `(code, message, primary_span_present)` from the first diagnostic in the
-/// report.  Panics if parsing succeeds or the report contains no diagnostics.
-fn first_err_diagnostic(yaml: &str) -> (DiagnosticCode, String, bool) {
-    let report =
-        parse_rule_file(yaml, Some("file:///rules.yaml")).expect_err("expected parse failure");
-    let d = report
-        .diagnostics()
-        .first()
-        .expect("expected at least one diagnostic");
-    (d.code(), d.message().to_owned(), d.primary_span().is_some())
-}
-
-/// Parses `yaml` with a fixed test URI, asserts success, and passes the
-/// first rule to `check`.  Panics if parsing fails or the file is empty.
-fn check_first_rule<F>(yaml: &str, check: F)
-where
-    F: FnOnce(&Rule),
-{
-    let file =
-        parse_rule_file(yaml, Some("file:///rules.yaml")).expect("expected successful parse");
-    let rule = file.rules().first().expect("expected at least one rule");
-    check(rule);
-}
+use super::test_helpers::{check_first_rule, first_err_diagnostic};
 
 #[test]
 fn parse_legacy_search_rule() {
@@ -154,47 +128,6 @@ fn parse_join_rule() {
             _ => panic!("expected Join principal"),
         }
     });
-}
-
-#[test]
-fn reject_mixed_taint_forms() {
-    let yaml = concat!(
-        "rules:\n",
-        "  - id: demo.taint.mixed\n",
-        "    mode: taint\n",
-        "    message: mixed taint forms\n",
-        "    languages: [python]\n",
-        "    severity: WARNING\n",
-        "    taint:\n",
-        "      sources: [USER_INPUT]\n",
-        "      sinks: [SQL_EXEC]\n",
-        "    pattern-sources:\n",
-        "      - pattern: source()\n",
-    );
-
-    let (code, message, _) = first_err_diagnostic(yaml);
-    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
-    assert!(message.contains("taint rule must use either"));
-}
-
-#[test]
-fn reject_taint_rule_with_match() {
-    let yaml = concat!(
-        "rules:\n",
-        "  - id: demo.taint.invalid\n",
-        "    mode: taint\n",
-        "    message: taint with match\n",
-        "    languages: [python]\n",
-        "    severity: WARNING\n",
-        "    taint:\n",
-        "      sources: [USER_INPUT]\n",
-        "      sinks: [SQL_EXEC]\n",
-        "    match: \"foo($X)\"\n",
-    );
-
-    let (code, message, _) = first_err_diagnostic(yaml);
-    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
-    assert!(message.contains("taint mode does not support `match`"));
 }
 
 #[test]
@@ -323,47 +256,6 @@ fn parse_unknown_mode_rule() {
 )]
 fn parse_match_formula_variant(#[case] yaml: &str, #[case] check: fn(&RulePrincipal) -> bool) {
     check_first_rule(yaml, |rule| assert!(check(rule.principal())));
-}
-
-#[rstest]
-#[case::new_form(
-    concat!(
-        "rules:\n",
-        "  - id: demo.taint.new\n",
-        "    mode: taint\n",
-        "    message: taint flow\n",
-        "    languages: [python]\n",
-        "    severity: WARNING\n",
-        "    taint:\n",
-        "      sources: [USER_INPUT]\n",
-        "      sinks: [SQL_EXEC]\n",
-    ),
-    |p: &RulePrincipal| -> bool {
-        matches!(p, RulePrincipal::Taint(TaintQueryPrincipal::New(_)))
-    },
-)]
-#[case::legacy_form(
-    concat!(
-        "rules:\n",
-        "  - id: demo.taint.legacy\n",
-        "    mode: taint\n",
-        "    message: legacy taint\n",
-        "    languages: [python]\n",
-        "    severity: WARNING\n",
-        "    pattern-sources:\n",
-        "      - pattern: source()\n",
-        "    pattern-sinks:\n",
-        "      - pattern: sink($X)\n",
-    ),
-    |p: &RulePrincipal| -> bool {
-        matches!(p, RulePrincipal::Taint(TaintQueryPrincipal::Legacy { .. }))
-    },
-)]
-fn parse_taint_rule(#[case] yaml: &str, #[case] check: fn(&RulePrincipal) -> bool) {
-    check_first_rule(yaml, |rule| {
-        assert_eq!(rule.mode(), &RuleMode::Taint);
-        assert!(check(rule.principal()));
-    });
 }
 
 #[rstest]
