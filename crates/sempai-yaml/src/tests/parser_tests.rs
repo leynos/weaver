@@ -12,8 +12,8 @@ use sempai_core::DiagnosticCode;
 /// `(code, message, primary_span_present)` from the first diagnostic in the
 /// report.  Panics if parsing succeeds or the report contains no diagnostics.
 fn first_err_diagnostic(yaml: &str) -> (DiagnosticCode, String, bool) {
-    let report = parse_rule_file(yaml, Some("file:///rules.yaml"))
-        .expect_err("expected parse failure");
+    let report =
+        parse_rule_file(yaml, Some("file:///rules.yaml")).expect_err("expected parse failure");
     let d = report
         .diagnostics()
         .first()
@@ -231,7 +231,8 @@ fn parse_match_pattern_shorthand() {
         "    match: \"foo($X)\"\n",
     );
 
-    let file = parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid match pattern shorthand");
+    let file =
+        parse_rule_file(yaml, Some("file:///rules.yaml")).expect("valid match pattern shorthand");
     let rule = file.rules().first().expect("one rule");
 
     assert!(matches!(
