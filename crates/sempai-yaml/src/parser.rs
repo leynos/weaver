@@ -211,6 +211,12 @@ fn build_join_rule(
     Ok(RulePrincipal::Join(join))
 }
 
+/// Returns `true` when the rule carries any legacy taint field
+/// (`pattern-sources`, `pattern-sanitizers`, or `pattern-sinks`).
+const fn has_legacy_taint_fields(raw: &RawRule) -> bool {
+    raw.pattern_sources.is_some() || raw.pattern_sanitizers.is_some() || raw.pattern_sinks.is_some()
+}
+
 fn build_taint_rule(
     raw: &RawRule,
     rule_span: Option<SourceSpan>,
@@ -219,10 +225,7 @@ fn build_taint_rule(
 
     if let Some(taint) = raw.taint.clone() {
         // Reject mixed taint+legacy forms
-        if raw.pattern_sources.is_some()
-            || raw.pattern_sanitizers.is_some()
-            || raw.pattern_sinks.is_some()
-        {
+        if has_legacy_taint_fields(raw) {
             return Err(schema_error(
                 String::from(
                     "taint rule must use either `taint` or legacy pattern-* fields, not both",

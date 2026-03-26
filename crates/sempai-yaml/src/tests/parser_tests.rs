@@ -186,9 +186,9 @@ fn parse_join_rule() {
     });
 }
 
-#[test]
-fn parse_taint_rule_new_form() {
-    let yaml = concat!(
+#[rstest]
+#[case::new_form(
+    concat!(
         "rules:\n",
         "  - id: demo.taint.new\n",
         "    mode: taint\n",
@@ -198,20 +198,13 @@ fn parse_taint_rule_new_form() {
         "    taint:\n",
         "      sources: [USER_INPUT]\n",
         "      sinks: [SQL_EXEC]\n",
-    );
-
-    check_first_rule(yaml, |rule| {
-        assert_eq!(rule.mode(), &RuleMode::Taint);
-        assert!(matches!(
-            rule.principal(),
-            RulePrincipal::Taint(TaintQueryPrincipal::New(_))
-        ));
-    });
-}
-
-#[test]
-fn parse_taint_rule_legacy_form() {
-    let yaml = concat!(
+    ),
+    |p: &RulePrincipal| -> bool {
+        matches!(p, RulePrincipal::Taint(TaintQueryPrincipal::New(_)))
+    } as fn(&RulePrincipal) -> bool,
+)]
+#[case::legacy_form(
+    concat!(
         "rules:\n",
         "  - id: demo.taint.legacy\n",
         "    mode: taint\n",
@@ -222,14 +215,15 @@ fn parse_taint_rule_legacy_form() {
         "      - pattern: source()\n",
         "    pattern-sinks:\n",
         "      - pattern: sink($X)\n",
-    );
-
+    ),
+    |p: &RulePrincipal| -> bool {
+        matches!(p, RulePrincipal::Taint(TaintQueryPrincipal::Legacy { .. }))
+    } as fn(&RulePrincipal) -> bool,
+)]
+fn parse_taint_rule(#[case] yaml: &str, #[case] check: fn(&RulePrincipal) -> bool) {
     check_first_rule(yaml, |rule| {
         assert_eq!(rule.mode(), &RuleMode::Taint);
-        assert!(matches!(
-            rule.principal(),
-            RulePrincipal::Taint(TaintQueryPrincipal::Legacy { .. })
-        ));
+        assert!(check(rule.principal()));
     });
 }
 
