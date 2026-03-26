@@ -66,13 +66,13 @@ directive = "force"
 
 ### Validation and error reporting
 
-`weaver` now uses `ortho_config` v0.8.0 and Rust 1.88. The `ortho_config` v0.8.0
-loader treats invalid configuration files as fatal. When `--config-path` points
-at a broken file, or when discovery finds a malformed `weaver.toml`/`.weaver.toml`,
+Invalid configuration files are treated as fatal. When `--config-path` points at
+a broken file, or when discovery finds a malformed `weaver.toml`/`.weaver.toml`,
 both the CLI and daemon abort with a `LoadConfiguration` error that lists every
 offending path. Remove or fix the reported files before retrying. If no
 configuration files exist at all, the loader still falls back to the built-in
-defaults described below.
+defaults described below. See the [developer's guide](developers-guide.md) for
+toolchain baseline and configuration framework internals.
 
 Operators will see aggregated errors enumerated in the order discovery
 encounters them. For example:

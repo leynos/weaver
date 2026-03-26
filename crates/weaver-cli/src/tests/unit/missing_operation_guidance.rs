@@ -82,6 +82,9 @@ fn assert_known_domain_operation_guidance(output: &PreflightOutput, domain: &str
             .contains(&format!("error: operation required for domain '{domain}'"))
     );
     assert!(output.stderr.contains("Available operations:"));
+    // Ensure unknown-domain guidance does not appear
+    assert!(!output.stderr.contains("Valid domains:"));
+    assert!(!output.stderr.contains("Did you mean"));
 }
 
 fn assert_no_domain_guidance(output: &PreflightOutput) {
