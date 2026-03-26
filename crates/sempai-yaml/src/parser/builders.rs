@@ -1,199 +1,20 @@
-//! Parser entrypoints and rule construction logic.
+//! Rule builder functions and validators.
+//!
+//! This module contains mode-specific rule builders (`build_search_rule`,
+//! `build_extract_rule`, `build_join_rule`, `build_taint_rule`) and their
+//! associated validation functions.
 
 use serde_saphyr::Spanned;
 
-use sempai_core::{DiagnosticCode, DiagnosticReport, SourceSpan};
+use sempai_core::{DiagnosticReport, SourceSpan};
 
 use crate::model::{
-    ExtractQueryPrincipal, LegacyFormula, Rule, RuleFile, RuleMode, RulePrincipal,
-    SearchQueryPrincipal, TaintQueryPrincipal,
+    ExtractQueryPrincipal, LegacyFormula, RulePrincipal, SearchQueryPrincipal, TaintQueryPrincipal,
 };
-use crate::raw::{
-    RawRule, RawRuleFile, convert_match_formula_object, parse_mode, parse_severity, schema_error,
-    singleton_formula,
-};
+use crate::raw::{RawRule, convert_match_formula_object, schema_error, singleton_formula};
 use crate::source_map::SourceMap;
 
-/// Parses a Semgrep-compatible YAML rule file.
-///
-/// # Errors
-///
-/// Returns a structured [`DiagnosticReport`] when the YAML text is malformed
-/// or the deserialized shape does not match the supported rule schema.
-pub fn parse_rule_file(yaml: &str, source_uri: Option<&str>) -> Result<RuleFile, DiagnosticReport> {
-    let source_map = SourceMap::parse(yaml, source_uri.map(ToOwned::to_owned));
-    let raw: RawRuleFile =
-        serde_saphyr::from_str(yaml).map_err(|error| diagnostic_from_serde(&error, &source_map))?;
-    let rules = raw
-        .rules
-        .into_iter()
-        .enumerate()
-        .map(|(index, raw_rule)| build_rule(raw_rule, index, &source_map))
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(RuleFile::new(rules))
-}
-
-/// Checks if the raw rule contains search or legacy search fields.
-const fn has_search_or_legacy_fields(raw: &RawRule) -> bool {
-    raw.pattern.is_some()
-        || raw.pattern_regex.is_some()
-        || raw.patterns.is_some()
-        || raw.pattern_either.is_some()
-        || raw.match_formula.is_some()
-}
-
-/// Checks if the raw rule contains extract fields.
-const fn has_extract_fields(raw: &RawRule) -> bool {
-    raw.extract.is_some() || raw.dest_language.is_some()
-}
-
-/// Checks if the raw rule contains join fields.
-const fn has_join_fields(raw: &RawRule) -> bool {
-    raw.join.is_some()
-}
-
-/// Checks if the raw rule contains taint fields (new or legacy).
-const fn has_taint_fields(raw: &RawRule) -> bool {
-    raw.taint.is_some()
-        || raw.pattern_sources.is_some()
-        || raw.pattern_sanitizers.is_some()
-        || raw.pattern_sinks.is_some()
-}
-
-/// Collects unexpected principal fields for search mode.
-fn unexpected_for_search(raw: &RawRule) -> Vec<&'static str> {
-    let mut found = Vec::new();
-    if has_extract_fields(raw) {
-        found.push("`extract` or `dest-language`");
-    }
-    if has_join_fields(raw) {
-        found.push("`join`");
-    }
-    if has_taint_fields(raw) {
-        found.push("`taint` or legacy taint fields");
-    }
-    found
-}
-
-/// Collects unexpected principal fields for extract mode.
-fn unexpected_for_extract(raw: &RawRule) -> Vec<&'static str> {
-    let mut found = Vec::new();
-    if has_join_fields(raw) {
-        found.push("`join`");
-    }
-    if has_taint_fields(raw) {
-        found.push("`taint` or legacy taint fields");
-    }
-    found
-}
-
-/// Collects unexpected principal fields for join mode.
-fn unexpected_for_join(raw: &RawRule) -> Vec<&'static str> {
-    let mut found = Vec::new();
-    if has_search_or_legacy_fields(raw) {
-        found.push("`match` or legacy search keys");
-    }
-    if has_extract_fields(raw) {
-        found.push("`extract` or `dest-language`");
-    }
-    if has_taint_fields(raw) {
-        found.push("`taint` or legacy taint fields");
-    }
-    found
-}
-
-/// Collects unexpected principal fields for taint mode.
-fn unexpected_for_taint(raw: &RawRule) -> Vec<&'static str> {
-    let mut found = Vec::new();
-    if has_extract_fields(raw) {
-        found.push("`extract` or `dest-language`");
-    }
-    if has_join_fields(raw) {
-        found.push("`join`");
-    }
-    found
-}
-
-/// Validates that the rule only contains principal keys allowed for the given mode.
-///
-/// This prevents silently ignoring principal family fields that don't match the mode,
-/// for example a search rule with `taint` or an extract rule with `join`.
-fn validate_principal_family(
-    raw: &RawRule,
-    mode: &RuleMode,
-    span: Option<&SourceSpan>,
-) -> Result<(), DiagnosticReport> {
-    let unexpected = match mode {
-        RuleMode::Search | RuleMode::Other(_) => unexpected_for_search(raw),
-        RuleMode::Extract => unexpected_for_extract(raw),
-        RuleMode::Join => unexpected_for_join(raw),
-        RuleMode::Taint => unexpected_for_taint(raw),
-    };
-
-    if !unexpected.is_empty() {
-        let fields = unexpected.join(", ");
-        return Err(schema_error(
-            format!("{mode:?} mode rule contains unexpected principal fields: {fields}"),
-            span.cloned(),
-            "remove principal fields that do not match the rule mode",
-        ));
-    }
-
-    Ok(())
-}
-
-fn build_rule(
-    raw: RawRule,
-    index: usize,
-    source_map: &SourceMap,
-) -> Result<Rule, DiagnosticReport> {
-    let rule_span = source_map
-        .rule_span(index)
-        .cloned()
-        .or_else(|| source_map.rules_span().cloned())
-        .or_else(|| source_map.root_span().cloned());
-    let id = require(
-        raw.id.clone(),
-        "id",
-        rule_span.clone(),
-        "add a stable rule id",
-    )?;
-    let mode = parse_mode(raw.mode.as_ref().map(|mode| mode.value.as_str()));
-    let min_version = raw.min_version.clone().map(|value| value.value);
-    let max_version = raw.max_version.clone().map(|value| value.value);
-
-    // Validate that only the correct principal family is present for the chosen mode
-    validate_principal_family(&raw, &mode, rule_span.as_ref())?;
-
-    let principal = match &mode {
-        RuleMode::Search | RuleMode::Other(_) => {
-            build_search_rule(&raw, rule_span.clone(), source_map)?
-        }
-        RuleMode::Extract => build_extract_rule(&raw, rule_span.as_ref())?,
-        RuleMode::Join => build_join_rule(&raw, rule_span.clone())?,
-        RuleMode::Taint => build_taint_rule(&raw, rule_span.clone())?,
-    };
-
-    let languages = raw.languages.map(|value| value.value).unwrap_or_default();
-    let message = raw.message.map(|value| value.value);
-    let severity = raw
-        .severity
-        .as_ref()
-        .map(|value| parse_severity(value, rule_span.as_ref()))
-        .transpose()?;
-
-    Ok(Rule {
-        id,
-        mode,
-        message,
-        languages,
-        severity,
-        min_version,
-        max_version,
-        principal,
-    })
-}
-
+/// Validates required fields for search-mode rules.
 fn validate_search_header(raw: &RawRule, span: Option<SourceSpan>) -> Result<(), DiagnosticReport> {
     require(
         raw.message.clone(),
@@ -201,12 +22,19 @@ fn validate_search_header(raw: &RawRule, span: Option<SourceSpan>) -> Result<(),
         span.clone(),
         "add a rule message explaining the match",
     )?;
-    require(
+    let languages = require(
         raw.languages.clone(),
         "languages",
         span.clone(),
         "declare at least one target language",
     )?;
+    if languages.is_empty() {
+        return Err(schema_error(
+            String::from("field `languages` must not be empty"),
+            span.clone(),
+            "declare at least one target language",
+        ));
+    }
     require(
         raw.severity.clone(),
         "severity",
@@ -216,16 +44,24 @@ fn validate_search_header(raw: &RawRule, span: Option<SourceSpan>) -> Result<(),
     Ok(())
 }
 
+/// Validates required fields for extract-mode rules.
 fn validate_extract_header(
     raw: &RawRule,
     span: Option<SourceSpan>,
 ) -> Result<(), DiagnosticReport> {
-    require(
+    let languages = require(
         raw.languages.clone(),
         "languages",
         span.clone(),
         "declare at least one target language",
     )?;
+    if languages.is_empty() {
+        return Err(schema_error(
+            String::from("field `languages` must not be empty"),
+            span.clone(),
+            "declare at least one target language",
+        ));
+    }
     require(
         raw.dest_language.clone(),
         "dest-language",
@@ -241,6 +77,7 @@ fn validate_extract_header(
     Ok(())
 }
 
+/// Validates required fields for join-mode rules.
 fn validate_join_header(raw: &RawRule, span: Option<SourceSpan>) -> Result<(), DiagnosticReport> {
     require(
         raw.message.clone(),
@@ -257,11 +94,13 @@ fn validate_join_header(raw: &RawRule, span: Option<SourceSpan>) -> Result<(), D
     Ok(())
 }
 
+/// Validates required fields for taint-mode rules.
 fn validate_taint_header(raw: &RawRule, span: Option<SourceSpan>) -> Result<(), DiagnosticReport> {
     validate_search_header(raw, span)
 }
 
-fn build_search_rule(
+/// Builds a search-mode rule principal.
+pub(crate) fn build_search_rule(
     raw: &RawRule,
     rule_span: Option<SourceSpan>,
     source_map: &SourceMap,
@@ -270,7 +109,8 @@ fn build_search_rule(
     build_search_principal(raw, rule_span, source_map).map(RulePrincipal::Search)
 }
 
-fn build_extract_rule(
+/// Builds an extract-mode rule principal.
+pub(crate) fn build_extract_rule(
     raw: &RawRule,
     rule_span: Option<&SourceSpan>,
 ) -> Result<RulePrincipal, DiagnosticReport> {
@@ -300,7 +140,8 @@ fn build_extract_rule(
     }
 }
 
-fn build_join_rule(
+/// Builds a join-mode rule principal.
+pub(crate) fn build_join_rule(
     raw: &RawRule,
     rule_span: Option<SourceSpan>,
 ) -> Result<RulePrincipal, DiagnosticReport> {
@@ -311,11 +152,12 @@ fn build_join_rule(
 
 /// Returns `true` when the rule carries any legacy taint field
 /// (`pattern-sources`, `pattern-sanitizers`, or `pattern-sinks`).
-const fn has_legacy_taint_fields(raw: &RawRule) -> bool {
+pub(crate) const fn has_legacy_taint_fields(raw: &RawRule) -> bool {
     raw.pattern_sources.is_some() || raw.pattern_sanitizers.is_some() || raw.pattern_sinks.is_some()
 }
 
-fn build_taint_rule(
+/// Builds a taint-mode rule principal.
+pub(crate) fn build_taint_rule(
     raw: &RawRule,
     rule_span: Option<SourceSpan>,
 ) -> Result<RulePrincipal, DiagnosticReport> {
@@ -363,27 +205,15 @@ fn build_taint_rule(
     }))
 }
 
-/// Converts the `match_formula` field of `raw` into a `SearchQueryPrincipal`.
+/// Converts a `match` formula into a `SearchQueryPrincipal`.
 ///
 /// # Errors
 ///
 /// Returns a diagnostic error if the match formula structure is invalid.
-///
-/// # Panics
-///
-/// Panics if `raw.match_formula` is `None`; callers must ensure `has_match`
-/// is `true` before invoking this function.
 fn build_match_principal(
-    raw: &RawRule,
+    formula: Spanned<crate::raw::RawMatchFormula>,
     source_map: &SourceMap,
 ) -> Result<SearchQueryPrincipal, DiagnosticReport> {
-    // Invariant: caller has verified raw.match_formula.is_some().
-    // Using unwrap here is safe because the caller guarantees the field exists.
-    #[expect(
-        clippy::unwrap_used,
-        reason = "caller guarantees raw.match_formula is Some via has_match check"
-    )]
-    let formula = raw.match_formula.clone().unwrap();
     let formula_span = source_map.span_from_location(Some(formula.referenced));
     let match_formula = match formula.value {
         crate::raw::RawMatchFormula::String(s) => crate::model::MatchFormula::Pattern(s),
@@ -394,6 +224,7 @@ fn build_match_principal(
     Ok(SearchQueryPrincipal::Match(match_formula))
 }
 
+/// Builds a search query principal from raw rule fields.
 fn build_search_principal(
     raw: &RawRule,
     rule_span: Option<SourceSpan>,
@@ -413,13 +244,13 @@ fn build_search_principal(
         ));
     }
 
-    if has_match {
-        build_match_principal(raw, source_map)
-    } else {
-        build_legacy_principal(raw, rule_span.as_ref()).map(SearchQueryPrincipal::Legacy)
-    }
+    raw.match_formula.clone().map_or_else(
+        || build_legacy_principal(raw, rule_span.as_ref()).map(SearchQueryPrincipal::Legacy),
+        |formula| build_match_principal(formula, source_map),
+    )
 }
 
+/// Builds a legacy formula from raw rule fields.
 fn build_legacy_principal(
     raw: &RawRule,
     rule_span: Option<&SourceSpan>,
@@ -466,6 +297,7 @@ fn build_legacy_principal(
     })
 }
 
+/// Helper to require a field and extract its value.
 fn require<T: Clone>(
     value: Option<Spanned<T>>,
     field: &str,
@@ -479,29 +311,4 @@ fn require<T: Clone>(
             note,
         )
     })
-}
-
-fn diagnostic_from_serde(error: &serde_saphyr::Error, source_map: &SourceMap) -> DiagnosticReport {
-    let span = source_map
-        .span_from_location(error.location())
-        .or_else(|| source_map.rules_span().cloned())
-        .or_else(|| source_map.root_span().cloned());
-    let code = if is_schema_error(error) {
-        DiagnosticCode::ESempaiSchemaInvalid
-    } else {
-        DiagnosticCode::ESempaiYamlParse
-    };
-    DiagnosticReport::parser_error(code, error.to_string(), span, vec![])
-}
-
-const fn is_schema_error(error: &serde_saphyr::Error) -> bool {
-    matches!(
-        error,
-        serde_saphyr::Error::SerdeInvalidType { .. }
-            | serde_saphyr::Error::SerdeInvalidValue { .. }
-            | serde_saphyr::Error::SerdeUnknownVariant { .. }
-            | serde_saphyr::Error::SerdeUnknownField { .. }
-            | serde_saphyr::Error::SerdeMissingField { .. }
-            | serde_saphyr::Error::DuplicateMappingKey { .. }
-    )
 }

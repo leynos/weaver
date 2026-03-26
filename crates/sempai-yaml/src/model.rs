@@ -122,6 +122,18 @@ pub enum RuleMode {
     Other(String),
 }
 
+impl std::fmt::Display for RuleMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Search => write!(f, "Search"),
+            Self::Taint => write!(f, "Taint"),
+            Self::Join => write!(f, "Join"),
+            Self::Extract => write!(f, "Extract"),
+            Self::Other(mode) => write!(f, "{mode}"),
+        }
+    }
+}
+
 impl RuleMode {
     /// Parses a mode string into a rule mode.
     #[must_use]

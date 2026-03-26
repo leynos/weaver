@@ -35,7 +35,14 @@ fn parse_legacy_search_rule() {
 
 #[test]
 fn invalid_yaml_returns_yaml_parse_diagnostic() {
-    let yaml = "rules:\n  - id: bad\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: [";
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: bad\n",
+        "    message: oops\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    pattern: [",
+    );
     let (code, _, has_span) = first_err_diagnostic(yaml);
     assert_eq!(code, DiagnosticCode::ESempaiYamlParse);
     assert!(has_span);
@@ -384,5 +391,59 @@ fn reject_cross_mode_principal_fields(#[case] yaml: &str, #[case] expected_fragm
     assert!(
         message.contains(expected_fragment),
         "expected error message to contain '{expected_fragment}', got '{message}'"
+    );
+}
+
+#[test]
+fn reject_empty_languages_in_search_rule() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.empty.languages\n",
+        "    message: empty languages\n",
+        "    languages: []\n",
+        "    severity: WARNING\n",
+        "    pattern: foo\n",
+    );
+    let (code, message, _has_span) = first_err_diagnostic(yaml);
+    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(message.contains("field `languages` must not be empty"));
+}
+
+#[test]
+fn reject_empty_languages_in_extract_rule() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.empty.languages\n",
+        "    languages: []\n",
+        "    mode: extract\n",
+        "    dest-language: python\n",
+        "    extract: $X\n",
+        "    pattern: foo($X)\n",
+    );
+    let (code, message, _has_span) = first_err_diagnostic(yaml);
+    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(message.contains("field `languages` must not be empty"));
+}
+
+#[test]
+fn reject_taint_rule_with_legacy_search_keys() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.taint.pattern\n",
+        "    message: taint with pattern\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    mode: taint\n",
+        "    pattern: foo($X)\n",
+        "    taint:\n",
+        "      sources: []\n",
+        "      sinks: []\n",
+    );
+    let (code, message, _has_span) = first_err_diagnostic(yaml);
+    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(
+        message
+            .contains("Taint mode rule contains unexpected principal fields: legacy search keys"),
+        "expected error message to contain 'legacy search keys', got '{message}'"
     );
 }
