@@ -293,7 +293,7 @@ pub enum LegacyValue {
 pub enum LegacyClause {
     /// Nested legacy formula.
     Formula(LegacyFormula),
-    /// Any schema-aligned constraint object not yet normalised by Sempai.
+    /// Any schema-aligned constraint object not yet normalized by Sempai.
     Constraint(Value),
 }
 

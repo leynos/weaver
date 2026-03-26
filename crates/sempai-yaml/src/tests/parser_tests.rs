@@ -398,32 +398,25 @@ fn reject_cross_mode_principal_fields(#[case] yaml: &str, #[case] expected_fragm
     );
 }
 
-#[test]
-fn reject_empty_languages_in_search_rule() {
-    let yaml = concat!(
-        "rules:\n",
-        "  - id: demo.empty.languages\n",
-        "    message: empty languages\n",
-        "    languages: []\n",
-        "    severity: WARNING\n",
-        "    pattern: foo\n",
-    );
-    let (code, message, _has_span) = first_err_diagnostic(yaml);
-    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
-    assert!(message.contains("field `languages` must not be empty"));
-}
-
-#[test]
-fn reject_empty_languages_in_extract_rule() {
-    let yaml = concat!(
-        "rules:\n",
-        "  - id: demo.empty.languages\n",
-        "    languages: []\n",
-        "    mode: extract\n",
-        "    dest-language: python\n",
-        "    extract: $X\n",
-        "    pattern: foo($X)\n",
-    );
+#[rstest]
+#[case::search_rule(concat!(
+    "rules:\n",
+    "  - id: demo.empty.languages\n",
+    "    message: empty languages\n",
+    "    languages: []\n",
+    "    severity: WARNING\n",
+    "    pattern: foo\n",
+))]
+#[case::extract_rule(concat!(
+    "rules:\n",
+    "  - id: demo.empty.languages\n",
+    "    languages: []\n",
+    "    mode: extract\n",
+    "    dest-language: python\n",
+    "    extract: $X\n",
+    "    pattern: foo($X)\n",
+))]
+fn reject_empty_languages(#[case] yaml: &str) {
     let (code, message, _has_span) = first_err_diagnostic(yaml);
     assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
     assert!(message.contains("field `languages` must not be empty"));
