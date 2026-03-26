@@ -77,37 +77,49 @@ fn collect_unexpected(raw: &RawRule, checks: &[ValidationCheck]) -> Vec<&'static
 
 /// Collects unexpected principal fields for search mode.
 fn unexpected_for_search(raw: &RawRule) -> Vec<&'static str> {
-    collect_unexpected(raw, &[
-        (has_extract_fields, "`extract` or `dest-language`"),
-        (has_join_fields, "`join`"),
-        (has_taint_fields, "`taint` or legacy taint fields"),
-    ])
+    collect_unexpected(
+        raw,
+        &[
+            (has_extract_fields, "`extract` or `dest-language`"),
+            (has_join_fields, "`join`"),
+            (has_taint_fields, "`taint` or legacy taint fields"),
+        ],
+    )
 }
 
 /// Collects unexpected principal fields for extract mode.
 fn unexpected_for_extract(raw: &RawRule) -> Vec<&'static str> {
-    collect_unexpected(raw, &[
-        (has_join_fields, "`join`"),
-        (has_taint_fields, "`taint` or legacy taint fields"),
-    ])
+    collect_unexpected(
+        raw,
+        &[
+            (has_join_fields, "`join`"),
+            (has_taint_fields, "`taint` or legacy taint fields"),
+        ],
+    )
 }
 
 /// Collects unexpected principal fields for join mode.
 fn unexpected_for_join(raw: &RawRule) -> Vec<&'static str> {
-    collect_unexpected(raw, &[
-        (has_search_or_legacy_fields, "`match` or legacy search keys"),
-        (has_extract_fields, "`extract` or `dest-language`"),
-        (has_taint_fields, "`taint` or legacy taint fields"),
-    ])
+    collect_unexpected(
+        raw,
+        &[
+            (has_search_or_legacy_fields, "`match` or legacy search keys"),
+            (has_extract_fields, "`extract` or `dest-language`"),
+            (has_taint_fields, "`taint` or legacy taint fields"),
+        ],
+    )
 }
 
 /// Collects unexpected principal fields for taint mode.
 fn unexpected_for_taint(raw: &RawRule) -> Vec<&'static str> {
-    collect_unexpected(raw, &[
-        (has_legacy_search_fields, "legacy search keys"),
-        (has_extract_fields, "`extract` or `dest-language`"),
-        (has_join_fields, "`join`"),
-    ])
+    collect_unexpected(
+        raw,
+        &[
+            (has_legacy_search_fields, "legacy search keys"),
+            (has_extract_fields, "`extract` or `dest-language`"),
+            (has_join_fields, "`join`"),
+        ],
+    )
 }
 
 /// Validates that the rule only contains principal keys allowed for the given mode.
