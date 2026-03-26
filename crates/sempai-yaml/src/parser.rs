@@ -143,25 +143,7 @@ fn validate_join_header(raw: &RawRule, span: Option<SourceSpan>) -> Result<(), D
 }
 
 fn validate_taint_header(raw: &RawRule, span: Option<SourceSpan>) -> Result<(), DiagnosticReport> {
-    require(
-        raw.message.clone(),
-        "message",
-        span.clone(),
-        "add a rule message explaining the match",
-    )?;
-    require(
-        raw.languages.clone(),
-        "languages",
-        span.clone(),
-        "declare at least one target language",
-    )?;
-    require(
-        raw.severity.clone(),
-        "severity",
-        span,
-        "choose a schema-aligned severity such as WARNING or ERROR",
-    )?;
-    Ok(())
+    validate_search_header(raw, span)
 }
 
 fn build_search_rule(
@@ -222,6 +204,15 @@ fn build_taint_rule(
     rule_span: Option<SourceSpan>,
 ) -> Result<RulePrincipal, DiagnosticReport> {
     validate_taint_header(raw, rule_span.clone())?;
+
+    // Reject match field in taint mode
+    if raw.match_formula.is_some() {
+        return Err(schema_error(
+            String::from("taint mode does not support `match`"),
+            rule_span.clone(),
+            "use `taint` or legacy taint fields instead of `match`",
+        ));
+    }
 
     if let Some(taint) = raw.taint.clone() {
         // Reject mixed taint+legacy forms

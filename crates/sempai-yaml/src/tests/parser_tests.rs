@@ -60,36 +60,6 @@ fn parse_legacy_search_rule() {
 }
 
 #[test]
-fn parse_match_rule() {
-    let yaml = concat!(
-        "rules:\n",
-        "  - id: demo.match\n",
-        "    message: detect foo\n",
-        "    languages: [rust]\n",
-        "    severity: ERROR\n",
-        "    match:\n",
-        "      all:\n",
-        "        - pattern: foo($X)\n",
-        "        - regex: foo\n",
-        "      as: finding\n",
-    );
-
-    check_first_rule(yaml, |rule| {
-        assert!(matches!(
-            rule.principal(),
-            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Decorated {
-                formula,
-                as_name,
-                ..
-            })) if matches!(
-                formula.as_ref(),
-                MatchFormula::All(children) if children.len() == 2
-            ) && as_name.as_deref() == Some("finding")
-        ));
-    });
-}
-
-#[test]
 fn invalid_yaml_returns_yaml_parse_diagnostic() {
     let yaml = "rules:\n  - id: bad\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: [";
     let (code, _, has_span) = first_err_diagnostic(yaml);
@@ -186,47 +156,6 @@ fn parse_join_rule() {
     });
 }
 
-#[rstest]
-#[case::new_form(
-    concat!(
-        "rules:\n",
-        "  - id: demo.taint.new\n",
-        "    mode: taint\n",
-        "    message: taint flow\n",
-        "    languages: [python]\n",
-        "    severity: WARNING\n",
-        "    taint:\n",
-        "      sources: [USER_INPUT]\n",
-        "      sinks: [SQL_EXEC]\n",
-    ),
-    |p: &RulePrincipal| -> bool {
-        matches!(p, RulePrincipal::Taint(TaintQueryPrincipal::New(_)))
-    } as fn(&RulePrincipal) -> bool,
-)]
-#[case::legacy_form(
-    concat!(
-        "rules:\n",
-        "  - id: demo.taint.legacy\n",
-        "    mode: taint\n",
-        "    message: legacy taint\n",
-        "    languages: [python]\n",
-        "    severity: WARNING\n",
-        "    pattern-sources:\n",
-        "      - pattern: source()\n",
-        "    pattern-sinks:\n",
-        "      - pattern: sink($X)\n",
-    ),
-    |p: &RulePrincipal| -> bool {
-        matches!(p, RulePrincipal::Taint(TaintQueryPrincipal::Legacy { .. }))
-    } as fn(&RulePrincipal) -> bool,
-)]
-fn parse_taint_rule(#[case] yaml: &str, #[case] check: fn(&RulePrincipal) -> bool) {
-    check_first_rule(yaml, |rule| {
-        assert_eq!(rule.mode(), &RuleMode::Taint);
-        assert!(check(rule.principal()));
-    });
-}
-
 #[test]
 fn reject_mixed_taint_forms() {
     let yaml = concat!(
@@ -249,6 +178,26 @@ fn reject_mixed_taint_forms() {
 }
 
 #[test]
+fn reject_taint_rule_with_match() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.taint.invalid\n",
+        "    mode: taint\n",
+        "    message: taint with match\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    taint:\n",
+        "      sources: [USER_INPUT]\n",
+        "      sinks: [SQL_EXEC]\n",
+        "    match: \"foo($X)\"\n",
+    );
+
+    let (code, message, _) = first_err_diagnostic(yaml);
+    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(message.contains("taint mode does not support `match`"));
+}
+
+#[test]
 fn parse_unknown_mode_rule() {
     let yaml = concat!(
         "rules:\n",
@@ -267,6 +216,23 @@ fn parse_unknown_mode_rule() {
 }
 
 #[rstest]
+#[case::decorated(
+    concat!(
+        "rules:\n",
+        "  - id: demo.match\n",
+        "    message: detect foo\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    match:\n",
+        "      all:\n",
+        "        - pattern: foo($X)\n",
+        "        - regex: foo\n",
+        "      as: finding\n",
+    ),
+    |p: &RulePrincipal| -> bool {
+        matches!(p, RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Decorated { .. })))
+    },
+)]
 #[case::pattern_shorthand(
     concat!(
         "rules:\n",
@@ -276,7 +242,9 @@ fn parse_unknown_mode_rule() {
         "    severity: WARNING\n",
         "    match: \"foo($X)\"\n",
     ),
-    |principal: &MatchFormula| matches!(principal, MatchFormula::Pattern(p) if p == "foo($X)"),
+    |p: &RulePrincipal| -> bool {
+        matches!(p, RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Pattern(s))) if s == "foo($X)")
+    },
 )]
 #[case::regex(
     concat!(
@@ -288,7 +256,9 @@ fn parse_unknown_mode_rule() {
         "    match:\n",
         "      regex: \"bar\"\n",
     ),
-    |principal: &MatchFormula| matches!(principal, MatchFormula::Regex(r) if r == "bar"),
+    |p: &RulePrincipal| -> bool {
+        matches!(p, RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Regex(r))) if r == "bar")
+    },
 )]
 #[case::any(
     concat!(
@@ -302,7 +272,9 @@ fn parse_unknown_mode_rule() {
         "        - pattern: foo($X)\n",
         "        - pattern: bar($Y)\n",
     ),
-    |principal: &MatchFormula| matches!(principal, MatchFormula::Any(children) if children.len() == 2),
+    |p: &RulePrincipal| -> bool {
+        matches!(p, RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Any(children))) if children.len() == 2)
+    },
 )]
 #[case::not(
     concat!(
@@ -315,7 +287,9 @@ fn parse_unknown_mode_rule() {
         "      not:\n",
         "        pattern: foo($X)\n",
     ),
-    |principal: &MatchFormula| matches!(principal, MatchFormula::Not(_)),
+    |p: &RulePrincipal| -> bool {
+        matches!(p, RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Not(_))))
+    },
 )]
 #[case::inside(
     concat!(
@@ -328,7 +302,9 @@ fn parse_unknown_mode_rule() {
         "      inside:\n",
         "        pattern: class $C\n",
     ),
-    |principal: &MatchFormula| matches!(principal, MatchFormula::Inside(_)),
+    |p: &RulePrincipal| -> bool {
+        matches!(p, RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Inside(_))))
+    },
 )]
 #[case::anywhere(
     concat!(
@@ -341,21 +317,52 @@ fn parse_unknown_mode_rule() {
         "      anywhere:\n",
         "        pattern: foo($X)\n",
     ),
-    |principal: &MatchFormula| matches!(principal, MatchFormula::Anywhere(_)),
+    |p: &RulePrincipal| -> bool {
+        matches!(p, RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Anywhere(_))))
+    },
 )]
-fn parse_match_formula_variants<F>(#[case] yaml: &str, #[case] check_formula: F)
-where
-    F: Fn(&MatchFormula) -> bool,
-{
+fn parse_match_formula_variant(#[case] yaml: &str, #[case] check: fn(&RulePrincipal) -> bool) {
+    check_first_rule(yaml, |rule| assert!(check(rule.principal())));
+}
+
+#[rstest]
+#[case::new_form(
+    concat!(
+        "rules:\n",
+        "  - id: demo.taint.new\n",
+        "    mode: taint\n",
+        "    message: taint flow\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    taint:\n",
+        "      sources: [USER_INPUT]\n",
+        "      sinks: [SQL_EXEC]\n",
+    ),
+    |p: &RulePrincipal| -> bool {
+        matches!(p, RulePrincipal::Taint(TaintQueryPrincipal::New(_)))
+    },
+)]
+#[case::legacy_form(
+    concat!(
+        "rules:\n",
+        "  - id: demo.taint.legacy\n",
+        "    mode: taint\n",
+        "    message: legacy taint\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    pattern-sources:\n",
+        "      - pattern: source()\n",
+        "    pattern-sinks:\n",
+        "      - pattern: sink($X)\n",
+    ),
+    |p: &RulePrincipal| -> bool {
+        matches!(p, RulePrincipal::Taint(TaintQueryPrincipal::Legacy { .. }))
+    },
+)]
+fn parse_taint_rule(#[case] yaml: &str, #[case] check: fn(&RulePrincipal) -> bool) {
     check_first_rule(yaml, |rule| {
-        if let RulePrincipal::Search(SearchQueryPrincipal::Match(formula)) = rule.principal() {
-            assert!(
-                check_formula(formula),
-                "formula did not match expected pattern"
-            );
-        } else {
-            panic!("expected Search(Match(...)) principal");
-        }
+        assert_eq!(rule.mode(), &RuleMode::Taint);
+        assert!(check(rule.principal()));
     });
 }
 
