@@ -4,6 +4,7 @@ use crate::{
     LegacyFormula, MatchFormula, Rule, RuleMode, RulePrincipal, RuleSeverity, SearchQueryPrincipal,
     TaintQueryPrincipal, parse_rule_file,
 };
+use rstest::rstest;
 use sempai_core::DiagnosticCode;
 
 // ── Test helpers ─────────────────────────────────────────────────────────────
@@ -350,9 +351,9 @@ fn parse_match_anywhere() {
     });
 }
 
-#[test]
-fn reject_both_legacy_and_match() {
-    let yaml = concat!(
+#[rstest]
+#[case::both_legacy_and_match(
+    concat!(
         "rules:\n",
         "  - id: demo.conflict\n",
         "    message: conflict\n",
@@ -360,32 +361,22 @@ fn reject_both_legacy_and_match() {
         "    severity: WARNING\n",
         "    pattern: foo($X)\n",
         "    match: \"bar($Y)\"\n",
-    );
-
-    let (code, message, _) = first_err_diagnostic(yaml);
-    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
-    assert!(message.contains("exactly one top-level query principal"));
-}
-
-#[test]
-fn reject_empty_match_object() {
-    let yaml = concat!(
+    ),
+    "exactly one top-level query principal",
+)]
+#[case::empty_match_object(
+    concat!(
         "rules:\n",
         "  - id: demo.empty\n",
         "    message: empty match\n",
         "    languages: [python]\n",
         "    severity: WARNING\n",
         "    match: {}\n",
-    );
-
-    let (code, message, _) = first_err_diagnostic(yaml);
-    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
-    assert!(message.contains("match formula object is empty"));
-}
-
-#[test]
-fn reject_multiple_match_operators() {
-    let yaml = concat!(
+    ),
+    "match formula object is empty",
+)]
+#[case::multiple_match_operators(
+    concat!(
         "rules:\n",
         "  - id: demo.multi\n",
         "    message: multiple operators\n",
@@ -394,9 +385,11 @@ fn reject_multiple_match_operators() {
         "    match:\n",
         "      pattern: foo($X)\n",
         "      regex: bar\n",
-    );
-
+    ),
+    "match formula object defines multiple operators",
+)]
+fn reject_invalid_match_rule(#[case] yaml: &str, #[case] expected_fragment: &str) {
     let (code, message, _) = first_err_diagnostic(yaml);
     assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
-    assert!(message.contains("match formula object defines multiple operators"));
+    assert!(message.contains(expected_fragment));
 }

@@ -23,6 +23,7 @@
 
 mod model;
 mod parser;
+mod raw;
 mod source_map;
 
 pub use model::{
