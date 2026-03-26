@@ -64,61 +64,50 @@ const fn has_legacy_search_fields(raw: &RawRule) -> bool {
         || raw.pattern_either.is_some()
 }
 
+/// Type alias for a validation check: a predicate and its associated error label.
+type ValidationCheck = (fn(&RawRule) -> bool, &'static str);
+
+/// Collects the labels from `checks` whose predicate returns `true` for `raw`.
+fn collect_unexpected(raw: &RawRule, checks: &[ValidationCheck]) -> Vec<&'static str> {
+    checks
+        .iter()
+        .filter_map(|(pred, label)| pred(raw).then_some(*label))
+        .collect()
+}
+
 /// Collects unexpected principal fields for search mode.
 fn unexpected_for_search(raw: &RawRule) -> Vec<&'static str> {
-    let mut found = Vec::new();
-    if has_extract_fields(raw) {
-        found.push("`extract` or `dest-language`");
-    }
-    if has_join_fields(raw) {
-        found.push("`join`");
-    }
-    if has_taint_fields(raw) {
-        found.push("`taint` or legacy taint fields");
-    }
-    found
+    collect_unexpected(raw, &[
+        (has_extract_fields, "`extract` or `dest-language`"),
+        (has_join_fields, "`join`"),
+        (has_taint_fields, "`taint` or legacy taint fields"),
+    ])
 }
 
 /// Collects unexpected principal fields for extract mode.
 fn unexpected_for_extract(raw: &RawRule) -> Vec<&'static str> {
-    let mut found = Vec::new();
-    if has_join_fields(raw) {
-        found.push("`join`");
-    }
-    if has_taint_fields(raw) {
-        found.push("`taint` or legacy taint fields");
-    }
-    found
+    collect_unexpected(raw, &[
+        (has_join_fields, "`join`"),
+        (has_taint_fields, "`taint` or legacy taint fields"),
+    ])
 }
 
 /// Collects unexpected principal fields for join mode.
 fn unexpected_for_join(raw: &RawRule) -> Vec<&'static str> {
-    let mut found = Vec::new();
-    if has_search_or_legacy_fields(raw) {
-        found.push("`match` or legacy search keys");
-    }
-    if has_extract_fields(raw) {
-        found.push("`extract` or `dest-language`");
-    }
-    if has_taint_fields(raw) {
-        found.push("`taint` or legacy taint fields");
-    }
-    found
+    collect_unexpected(raw, &[
+        (has_search_or_legacy_fields, "`match` or legacy search keys"),
+        (has_extract_fields, "`extract` or `dest-language`"),
+        (has_taint_fields, "`taint` or legacy taint fields"),
+    ])
 }
 
 /// Collects unexpected principal fields for taint mode.
 fn unexpected_for_taint(raw: &RawRule) -> Vec<&'static str> {
-    let mut found = Vec::new();
-    if has_legacy_search_fields(raw) {
-        found.push("legacy search keys");
-    }
-    if has_extract_fields(raw) {
-        found.push("`extract` or `dest-language`");
-    }
-    if has_join_fields(raw) {
-        found.push("`join`");
-    }
-    found
+    collect_unexpected(raw, &[
+        (has_legacy_search_fields, "legacy search keys"),
+        (has_extract_fields, "`extract` or `dest-language`"),
+        (has_join_fields, "`join`"),
+    ])
 }
 
 /// Validates that the rule only contains principal keys allowed for the given mode.
