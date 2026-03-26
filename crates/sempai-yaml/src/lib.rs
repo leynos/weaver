@@ -27,8 +27,8 @@ mod raw;
 mod source_map;
 
 pub use model::{
-    ExtractQueryPrincipal, LegacyFormula, MatchFormula, Rule, RuleFile, RuleMode, RulePrincipal,
-    RuleSeverity, SearchQueryPrincipal, TaintQueryPrincipal,
+    ExtractQueryPrincipal, LegacyClause, LegacyFormula, LegacyValue, MatchFormula, Rule, RuleFile,
+    RuleMode, RulePrincipal, RuleSeverity, SearchQueryPrincipal, TaintQueryPrincipal,
 };
 pub use parser::parse_rule_file;
 

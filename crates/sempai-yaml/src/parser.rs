@@ -9,7 +9,7 @@ use crate::model::{
     SearchQueryPrincipal, TaintQueryPrincipal,
 };
 use crate::raw::{
-    parse_mode, parse_severity, schema_error, singleton_formula, RawRule, RawRuleFile,
+    RawRule, RawRuleFile, parse_mode, parse_severity, schema_error, singleton_formula,
 };
 use crate::source_map::SourceMap;
 
@@ -126,10 +126,7 @@ fn validate_extract_header(
     Ok(())
 }
 
-fn validate_join_header(
-    raw: &RawRule,
-    span: Option<SourceSpan>,
-) -> Result<(), DiagnosticReport> {
+fn validate_join_header(raw: &RawRule, span: Option<SourceSpan>) -> Result<(), DiagnosticReport> {
     require(
         raw.message.clone(),
         "message",
@@ -145,10 +142,7 @@ fn validate_join_header(
     Ok(())
 }
 
-fn validate_taint_header(
-    raw: &RawRule,
-    span: Option<SourceSpan>,
-) -> Result<(), DiagnosticReport> {
+fn validate_taint_header(raw: &RawRule, span: Option<SourceSpan>) -> Result<(), DiagnosticReport> {
     require(
         raw.message.clone(),
         "message",

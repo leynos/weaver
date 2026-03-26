@@ -1110,7 +1110,7 @@ currently supports Rust, Python, and TypeScript.
 ## Sempai query engine
 
 The `sempai` crate provides a Semgrep-compatible query engine backed by
-Tree-sitter for semantics-aware code pattern matching. It is organized as two
+Tree-sitter for semantics-aware code pattern matching. It is organized as three
 workspace crates:
 
 - **`sempai_core`** — canonical data model including language identifiers

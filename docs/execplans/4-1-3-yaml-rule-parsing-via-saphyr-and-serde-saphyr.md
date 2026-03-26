@@ -43,8 +43,6 @@ set -o pipefail; make markdownlint 2>&1 | tee /tmp/4-1-3-make-markdownlint.log
 set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-3-make-nixie.log
 ```
 
-Implementation must not begin until the user explicitly approves this plan.
-
 ## Constraints
 
 - Keep the implementation aligned with
@@ -494,9 +492,7 @@ Acceptance is satisfied when all of the following are true:
 - `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
   `make lint`, and `make test` all succeed.
 
-## Approval gate
+## Approval record
 
-This document is the draft phase only. After it is reviewed, the next agent
-should wait for explicit user approval before starting implementation. If the
-user approves with changes, this file must be updated first so it remains a
-self-contained and current guide for the implementation phase.
+Approved and implemented. Implementation completed 2026-03-22 UTC; see the
+Progress section and Outcomes & Retrospective above.

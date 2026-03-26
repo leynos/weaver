@@ -115,7 +115,11 @@ pub(crate) struct RawMatchFormulaObject {
     pub(crate) fix: Option<String>,
 }
 
-pub(crate) fn schema_error(message: String, span: Option<SourceSpan>, note: &str) -> DiagnosticReport {
+pub(crate) fn schema_error(
+    message: String,
+    span: Option<SourceSpan>,
+    note: &str,
+) -> DiagnosticReport {
     DiagnosticReport::validation_error(
         DiagnosticCode::ESempaiSchemaInvalid,
         message,

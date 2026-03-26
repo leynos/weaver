@@ -77,7 +77,14 @@ fn parse_match_rule() {
     check_first_rule(yaml, |rule| {
         assert!(matches!(
             rule.principal(),
-            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Decorated { .. }))
+            RulePrincipal::Search(SearchQueryPrincipal::Match(MatchFormula::Decorated {
+                formula,
+                as_name,
+                ..
+            })) if matches!(
+                formula.as_ref(),
+                MatchFormula::All(children) if children.len() == 2
+            ) && as_name.as_deref() == Some("finding")
         ));
     });
 }
@@ -129,6 +136,26 @@ fn parse_extract_rule() {
             _ => panic!("expected Extract principal"),
         }
     });
+}
+
+#[test]
+fn reject_extract_rule_with_match() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.extract.invalid\n",
+        "    mode: extract\n",
+        "    message: extract with match\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    dest-language: python\n",
+        "    extract: foo($X)\n",
+        "    pattern: source($X)\n",
+        "    match: \"bar($Y)\"\n",
+    );
+
+    let (code, message, _) = first_err_diagnostic(yaml);
+    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(message.contains("extract mode does not support `match`"));
 }
 
 #[test]
