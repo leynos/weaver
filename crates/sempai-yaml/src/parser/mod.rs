@@ -131,10 +131,12 @@ fn validate_principal_family(
     span: Option<&SourceSpan>,
 ) -> Result<(), DiagnosticReport> {
     let unexpected = match mode {
-        RuleMode::Search | RuleMode::Other(_) => unexpected_for_search(raw),
+        RuleMode::Search => unexpected_for_search(raw),
         RuleMode::Extract => unexpected_for_extract(raw),
         RuleMode::Join => unexpected_for_join(raw),
         RuleMode::Taint => unexpected_for_taint(raw),
+        // Skip validation for unknown modes - we don't know what fields they should have
+        RuleMode::Other(_) => return Ok(()),
     };
 
     if !unexpected.is_empty() {
@@ -189,6 +191,7 @@ fn build_rule(
     validate_principal_family(&raw, &mode, rule_span.as_ref())?;
 
     let principal = match &mode {
+        // Unknown modes are preserved for forward compatibility and treated as search-like
         RuleMode::Search | RuleMode::Other(_) => {
             build_search_rule(&raw, rule_span.clone(), source_map)?
         }

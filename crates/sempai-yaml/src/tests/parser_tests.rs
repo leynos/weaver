@@ -83,6 +83,10 @@ fn parse_extract_rule() {
             RulePrincipal::Extract(extract) => {
                 assert_eq!(extract.dest_language(), "python");
                 assert_eq!(extract.extract(), "foo($X)");
+                assert_eq!(
+                    extract.query(),
+                    &LegacyFormula::Pattern("source($X)".to_string())
+                );
             }
             _ => panic!("expected Extract principal"),
         }

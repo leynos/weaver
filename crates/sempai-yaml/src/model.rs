@@ -240,7 +240,7 @@ impl ExtractQueryPrincipal {
     }
 }
 
-/// Taint rule principal retained for later normalisation.
+/// Taint rule principal retained for later normalization.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaintQueryPrincipal {
     /// New-style top-level `taint` object.
@@ -320,7 +320,7 @@ pub enum MatchFormula {
     Decorated {
         /// The core formula branch.
         formula: Box<MatchFormula>,
-        /// Raw `where` clauses preserved for later normalisation.
+        /// Raw `where` clauses preserved for later normalization.
         where_clauses: Vec<Value>,
         /// Optional alias name.
         as_name: Option<String>,
