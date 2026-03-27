@@ -51,6 +51,23 @@ fn assert_preflight_failure(output: &PreflightOutput) {
         output.stdout.is_empty(),
         "guidance must not write to stdout"
     );
+    assert_no_daemon_start_text(output);
+}
+
+fn assert_no_daemon_start_text(output: &PreflightOutput) {
+    let stdout = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
+    let stderr = output.stderr.to_ascii_lowercase();
+
+    for phrase in ["starting daemon", "daemon started"] {
+        assert!(
+            !stdout.contains(phrase),
+            "stdout should not contain daemon-start text '{phrase}'"
+        );
+        assert!(
+            !stderr.contains(phrase),
+            "stderr should not contain daemon-start text '{phrase}'"
+        );
+    }
 }
 
 fn assert_unknown_domain_preflight(output: &PreflightOutput, domain: &str) {
