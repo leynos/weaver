@@ -7,6 +7,8 @@ use std::ffi::OsString;
 use std::io::Cursor;
 use std::process::ExitCode;
 
+use rstest::rstest;
+
 use crate::{AppError, ConfigLoader, IoStreams, run_with_loader};
 use weaver_config::Config;
 
@@ -18,50 +20,146 @@ impl ConfigLoader for PanickingLoader {
     }
 }
 
-#[test]
-fn known_domain_without_operation_emits_contextual_guidance() {
+struct PreflightOutput {
+    exit: ExitCode,
+    stdout: Vec<u8>,
+    stderr: String,
+}
+
+fn run_with_panicking_loader(args: &[&str]) -> PreflightOutput {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let mut stdin = Cursor::new(Vec::new());
     let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
-
-    let exit = run_with_loader(
-        vec![OsString::from("weaver"), OsString::from("observe")],
-        &mut io,
-        &PanickingLoader,
-    );
-
+    let cli_args = std::iter::once("weaver")
+        .chain(args.iter().copied())
+        .map(OsString::from)
+        .collect::<Vec<_>>();
+    let exit = run_with_loader(cli_args, &mut io, &PanickingLoader);
     let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
-    assert_eq!(exit, ExitCode::FAILURE);
-    assert!(stdout.is_empty(), "guidance must not write to stdout");
-    assert!(stderr_text.contains("error: operation required for domain 'observe'"));
-    assert!(stderr_text.contains("Available operations:"));
-    assert!(stderr_text.contains("get-definition"));
-    assert!(stderr_text.contains("get-card"));
-    assert!(stderr_text.contains("weaver observe get-definition --help"));
+
+    PreflightOutput {
+        exit,
+        stdout,
+        stderr: stderr_text,
+    }
+}
+
+fn assert_preflight_failure(output: &PreflightOutput) {
+    assert_eq!(output.exit, ExitCode::FAILURE);
+    assert!(
+        output.stdout.is_empty(),
+        "guidance must not write to stdout"
+    );
+    assert_no_daemon_start_text(output);
+}
+
+fn assert_no_daemon_start_text(output: &PreflightOutput) {
+    let stdout = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
+    let stderr = output.stderr.to_ascii_lowercase();
+
+    for phrase in ["starting daemon", "daemon started"] {
+        assert!(
+            !stdout.contains(phrase),
+            "stdout should not contain daemon-start text '{phrase}'"
+        );
+        assert!(
+            !stderr.contains(phrase),
+            "stderr should not contain daemon-start text '{phrase}'"
+        );
+    }
+}
+
+fn assert_unknown_domain_preflight(output: &PreflightOutput, domain: &str) {
+    assert_preflight_failure(output);
+    assert!(
+        output
+            .stderr
+            .contains(&format!("error: unknown domain '{domain}'"))
+    );
+    assert!(
+        output
+            .stderr
+            .contains("Valid domains: observe, act, verify")
+    );
+    // Ensure legacy operation guidance does not appear
+    assert!(!output.stderr.contains("Available operations:"));
+    assert!(
+        !output
+            .stderr
+            .contains("weaver observe get-definition --help")
+    );
+}
+
+fn assert_known_domain_operation_guidance(output: &PreflightOutput, domain: &str) {
+    assert_preflight_failure(output);
+    assert!(
+        output
+            .stderr
+            .contains(&format!("error: operation required for domain '{domain}'"))
+    );
+    assert!(output.stderr.contains("Available operations:"));
+    // Ensure unknown-domain guidance does not appear
+    assert!(!output.stderr.contains("Valid domains:"));
+    assert!(!output.stderr.contains("Did you mean"));
+}
+
+fn assert_no_domain_guidance(output: &PreflightOutput) {
+    assert!(
+        !output
+            .stderr
+            .contains("error: operation required for domain")
+    );
+    assert!(!output.stderr.contains("Available operations:"));
+    assert!(
+        !output
+            .stderr
+            .contains("Valid domains: observe, act, verify")
+    );
 }
 
 #[test]
-fn unknown_domain_without_operation_emits_global_guidance() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let mut stdin = Cursor::new(Vec::new());
-    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
+fn known_domain_without_operation_emits_contextual_guidance() {
+    let output = run_with_panicking_loader(&["observe"]);
 
-    let exit = run_with_loader(
-        vec![OsString::from("weaver"), OsString::from("unknown-domain")],
-        &mut io,
-        &PanickingLoader,
+    assert_known_domain_operation_guidance(&output, "observe");
+    assert!(output.stderr.contains("get-definition"));
+    assert!(output.stderr.contains("get-card"));
+    assert!(
+        output
+            .stderr
+            .contains("weaver observe get-definition --help")
     );
+}
 
-    let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
-    assert_eq!(exit, ExitCode::FAILURE);
-    assert!(stdout.is_empty(), "guidance must not write to stdout");
-    assert!(stderr_text.contains("error: unknown domain 'unknown-domain'"));
-    assert!(stderr_text.contains("Available operations:"));
-    assert!(stderr_text.contains("observe get-definition"));
-    assert!(stderr_text.contains("act rename-symbol"));
-    assert!(stderr_text.contains("weaver observe get-definition --help"));
+#[rstest]
+#[case(&["unknown-domain"], "unknown-domain", &[], &["weaver observe get-definition --help"])]
+#[case(&["unknown-domain", "get-definition"], "unknown-domain", &[], &["Waiting for daemon start..."])]
+#[case(&["obsrve", "get-definition"], "obsrve", &["Did you mean 'observe'?"], &[])]
+#[case(&["bogus", "get-definition"], "bogus", &[], &["Did you mean"])]
+fn unknown_domain_preflight_guidance(
+    #[case] args: &[&str],
+    #[case] domain: &str,
+    #[case] required_contains: &[&str],
+    #[case] forbidden_contains: &[&str],
+) {
+    let output = run_with_panicking_loader(args);
+
+    assert_unknown_domain_preflight(&output, domain);
+
+    for text in required_contains {
+        assert!(
+            output.stderr.contains(text),
+            "stderr should contain '{text}'"
+        );
+    }
+
+    for text in forbidden_contains {
+        assert!(
+            !output.stderr.contains(text),
+            "stderr should not contain '{text}'"
+        );
+    }
 }
 
 #[test]
@@ -88,9 +186,12 @@ fn complete_command_still_reports_configuration_failures() {
         &FailingLoader,
     );
 
-    let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
-    assert_eq!(exit, ExitCode::FAILURE);
-    assert!(stderr_text.contains("command domain"));
-    assert!(!stderr_text.contains("error: operation required for domain"));
-    assert!(!stderr_text.contains("Available operations:"));
+    let output = PreflightOutput {
+        exit,
+        stdout,
+        stderr: String::from_utf8(stderr).expect("stderr utf8"),
+    };
+    assert_eq!(output.exit, ExitCode::FAILURE);
+    assert!(output.stderr.contains("command domain"));
+    assert_no_domain_guidance(&output);
 }

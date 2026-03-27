@@ -417,9 +417,16 @@ Known-domain invocations that omit the operation (for example,
 `weaver observe`) are also handled entirely on the client side. The CLI now
 consults a canonical built-in domain catalogue, prints the valid operations for
 the supplied domain, and exits non-zero before configuration discovery, daemon
-startup, or transport setup. Unknown domains intentionally remain outside this
-preflight path until roadmap item 2.3.1 adds dedicated client-side domain
-validation.
+startup, or transport setup.
+
+Unknown domains follow a separate client-side preflight rule. Any invocation
+whose first positional token is not one of the canonical domains `observe`,
+`act`, or `verify` fails before configuration discovery, daemon startup, or
+transport setup regardless of whether an operation token is present. The error
+body always includes `Valid domains: observe, act, verify`. When exactly one
+valid domain is within edit distance 2 of the supplied token, the CLI appends a
+single deterministic `Did you mean ...?` suggestion; otherwise it emits no
+suggestion.
 
 #### 2.1.2. Lifecycle orchestration
 
@@ -1005,17 +1012,31 @@ Configuration is layered with `ortho-config`, producing the precedence order
 alongside the standard XDG locations, ensuring the CLI and daemon resolve
 identical results regardless of which component loads the settings.
 
-The workspace now targets `ortho-config` v0.8.0. The switch lets
-`weaver-config::Config` declare its discovery policy inline through the
-`#[ortho_config(discovery(...))]` attribute. The app name, dotfile, project
-file, and `--config-path` flag are all defined next to the struct, so every
-consumer shares the same generated loader without bespoke builders.
+The workspace now targets `ortho_config` v0.8.0 and Rust 1.88. The
+`ortho_config` v0.8.0 switch lets `weaver_config::Config` declare its discovery
+policy inline through the `#[ortho_config(discovery(...))]` attribute. The app
+name, dotfile, project file, and `--config-path` flag are all defined next to
+the struct, so every consumer shares the same generated loader without bespoke
+builders.
 
-Version 0.8.0 also preserves the stricter discovery and parsing model adopted
-in earlier releases: if any discovered configuration file fails to parse,
-`ConfigDiscovery::load_first` returns an aggregated `OrthoError`. Both the CLI
-and daemon bubble that error to the user instead of quietly falling back to
-defaults, making misconfigurations immediately visible.
+The `ortho_config` v0.8.0 loader preserves the stricter discovery and parsing
+model adopted in earlier releases: if any discovered configuration file fails
+to parse, `ConfigDiscovery::load_first` returns an aggregated `OrthoError`.
+Both the CLI and daemon bubble that error to the user instead of quietly
+falling back to defaults, making misconfigurations immediately visible.
+
+`ortho_config` v0.8.0 also resolves layered and overriding configuration
+sources through its dependency-graph model, so the effective merge order
+remains `defaults < files < environment < CLI` even when multiple discovered
+files and overrides participate in the same load. Later sources shadow earlier
+values without bespoke builder calls, because the generated loader derives the
+full precedence graph from the inline discovery contract. All configuration
+files are parsed according to TOML v1 rules, including explicit `true` and
+`false` booleans, TOML integer, float, and datetime formats, quoted and
+multiline string forms, table and dotted-key merging semantics, and the
+explicit typing rules for arrays and inline tables. TOML does not provide YAML
+anchors or aliases, and it does not perform implicit `yes` or `no` boolean
+conversion, so authored configuration must use TOML's explicit value syntax.
 
 The daemon transport defaults to a Unix domain socket placed under
 `$XDG_RUNTIME_DIR/weaver/weaverd.sock`. When the runtime directory is absent,

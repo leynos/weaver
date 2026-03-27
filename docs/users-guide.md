@@ -66,12 +66,14 @@ directive = "force"
 
 ### Validation and error reporting
 
-`weaver` now uses `ortho-config` v0.8.0, which treats invalid configuration
-files as fatal. When `--config-path` points at a broken file, or when discovery
-finds a malformed `weaver.toml`/`.weaver.toml`, both the CLI and daemon abort
-with a `LoadConfiguration` error that lists every offending path. Remove or fix
-the reported files before retrying. If no configuration files exist at all the
-loader still falls back to the built-in defaults described below.
+Invalid configuration files are treated as fatal. When `--config-path` points
+at a broken file, or when discovery finds a malformed
+`weaver.toml`/`.weaver.toml`, both the CLI and daemon abort with a
+`LoadConfiguration` error that lists every offending path. Remove or fix the
+reported files before retrying. If no configuration files exist at all, the
+loader still falls back to the built-in defaults described below. See the
+[developer's guide](developers-guide.md) for toolchain baseline and
+configuration framework internals.
 
 Operators will see aggregated errors enumerated in the order discovery
 encounters them. For example:
@@ -284,9 +286,9 @@ or configuration file.
 ### Domain-only guidance
 
 Running a domain without an operation fails fast on the client side. Known
-domains print the valid operations for that domain; unknown domains print the
-built-in catalogue of available domain-operation pairs. This happens before
-configuration loading, daemon startup, or socket access. Example:
+domains print the valid operations for that domain. Unknown domains also fail
+fast on the client side, even when an operation token is present. This happens
+before configuration loading, daemon startup, or socket access. Example:
 
 ```text
 $ weaver observe
@@ -303,8 +305,29 @@ Available operations:
 Run 'weaver observe get-definition --help' for operation details.
 ```
 
-The follow-up `--help` hint is concrete and deterministic, but until
-operation-level help lands it still resolves to the top-level help output.
+Unknown domains list the canonical domains instead of printing the operation
+catalogue:
+
+```text
+$ weaver obsrve get-definition --uri file:///tmp/main.rs --position 1:1
+error: unknown domain 'obsrve'
+
+Valid domains: observe, act, verify
+Did you mean 'observe'?
+```
+
+The suggestion line appears only when exactly one valid domain is within edit
+distance 2 of the supplied token. More distant values omit the suggestion:
+
+```text
+$ weaver bogus get-definition --uri file:///tmp/main.rs --position 1:1
+error: unknown domain 'bogus'
+
+Valid domains: observe, act, verify
+```
+
+The known-domain follow-up `--help` hint is concrete and deterministic, but
+until operation-level help lands it still resolves to the top-level help output.
 
 ### Output formats
 

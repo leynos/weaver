@@ -207,7 +207,7 @@ where
         match result {
             Ok(exit_code) => exit_code,
             Err(AppError::BareInvocation) => ExitCode::FAILURE,
-            Err(AppError::MissingOperationGuidance) => ExitCode::FAILURE,
+            Err(AppError::PreflightGuidance) => ExitCode::FAILURE,
             Err(AppError::CliUsage(ref clap_err)) if !clap_err.use_stderr() => {
                 let _ = write!(self.io.stdout, "{clap_err}");
                 ExitCode::SUCCESS
@@ -232,6 +232,38 @@ where
     run_with_loader(args, io, &OrthoConfigLoader)
 }
 
+fn preflight_result(written: bool) -> Result<(), AppError> {
+    if written {
+        Err(AppError::PreflightGuidance)
+    } else {
+        Ok(())
+    }
+}
+
+fn emit_domain_guidance<ErrWriter: Write>(
+    cli: &Cli,
+    stderr: &mut ErrWriter,
+    localizer: &dyn Localizer,
+    raw_domain: &str,
+) -> Result<(), AppError> {
+    let operation_is_missing = cli
+        .operation
+        .as_deref()
+        .is_none_or(|op| op.trim().is_empty());
+
+    match KnownDomain::try_parse(raw_domain) {
+        Some(domain) if operation_is_missing => preflight_result(
+            write_missing_operation_guidance(stderr, localizer, domain)
+                .map_err(AppError::EmitGuidance)?,
+        ),
+        Some(_) => Ok(()),
+        None => preflight_result(
+            write_unknown_domain_guidance(stderr, localizer, raw_domain)
+                .map_err(AppError::EmitGuidance)?,
+        ),
+    }
+}
+
 fn handle_preflight<ErrWriter: Write>(
     cli: &Cli,
     split: &ConfigArgumentSplit,
@@ -244,17 +276,7 @@ fn handle_preflight<ErrWriter: Write>(
     }
     if should_emit_domain_guidance(cli) {
         let raw_domain = cli.domain.as_deref().map(str::trim).unwrap_or_default();
-        let emitted_missing_operation_guidance = match KnownDomain::try_parse(raw_domain) {
-            Some(domain) => write_missing_operation_guidance(stderr, localizer, domain)
-                .map_err(AppError::EmitGuidance)?,
-            None => false,
-        };
-        if emitted_missing_operation_guidance
-            || write_unknown_domain_guidance(stderr, localizer, raw_domain)
-                .map_err(AppError::EmitGuidance)?
-        {
-            return Err(AppError::MissingOperationGuidance);
-        }
+        emit_domain_guidance(cli, stderr, localizer, raw_domain)?;
     }
     Ok(())
 }

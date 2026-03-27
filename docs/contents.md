@@ -29,6 +29,9 @@
 - [Code complexity guide](complexity-antipatterns-and-refactoring-strategies.md)
   - Patterns for identifying complexity anti-patterns and planning
     refactoring.
+- [Developer's guide](developers-guide.md)
+  - Weaver developer's guide covering setup, architecture, and contribution
+    guidelines.
 - [Documentation style guide](documentation-style-guide.md)
   - Writing, formatting, grammar, and structure standards for repository docs.
 - [Formal verification methods in Weaver](formal-verification-methods-in-weaver.md)
