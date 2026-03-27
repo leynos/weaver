@@ -75,53 +75,6 @@ fn collect_unexpected(raw: &RawRule, checks: &[ValidationCheck]) -> Vec<&'static
         .collect()
 }
 
-/// Collects unexpected principal fields for search mode.
-fn unexpected_for_search(raw: &RawRule) -> Vec<&'static str> {
-    collect_unexpected(
-        raw,
-        &[
-            (has_extract_fields, "`extract` or `dest-language`"),
-            (has_join_fields, "`join`"),
-            (has_taint_fields, "`taint` or legacy taint fields"),
-        ],
-    )
-}
-
-/// Collects unexpected principal fields for extract mode.
-fn unexpected_for_extract(raw: &RawRule) -> Vec<&'static str> {
-    collect_unexpected(
-        raw,
-        &[
-            (has_join_fields, "`join`"),
-            (has_taint_fields, "`taint` or legacy taint fields"),
-        ],
-    )
-}
-
-/// Collects unexpected principal fields for join mode.
-fn unexpected_for_join(raw: &RawRule) -> Vec<&'static str> {
-    collect_unexpected(
-        raw,
-        &[
-            (has_search_or_legacy_fields, "`match` or legacy search keys"),
-            (has_extract_fields, "`extract` or `dest-language`"),
-            (has_taint_fields, "`taint` or legacy taint fields"),
-        ],
-    )
-}
-
-/// Collects unexpected principal fields for taint mode.
-fn unexpected_for_taint(raw: &RawRule) -> Vec<&'static str> {
-    collect_unexpected(
-        raw,
-        &[
-            (has_legacy_search_fields, "legacy search keys"),
-            (has_extract_fields, "`extract` or `dest-language`"),
-            (has_join_fields, "`join`"),
-        ],
-    )
-}
-
 /// Validates that the rule only contains principal keys allowed for the given mode.
 ///
 /// This prevents silently ignoring principal family fields that don't match the mode,
@@ -132,10 +85,46 @@ fn validate_principal_family(
     span: Option<&SourceSpan>,
 ) -> Result<(), DiagnosticReport> {
     let unexpected = match mode {
-        RuleMode::Search => unexpected_for_search(raw),
-        RuleMode::Extract => unexpected_for_extract(raw),
-        RuleMode::Join => unexpected_for_join(raw),
-        RuleMode::Taint => unexpected_for_taint(raw),
+        RuleMode::Search => collect_unexpected(
+            raw,
+            &[
+                (
+                    has_extract_fields as fn(&RawRule) -> bool,
+                    "`extract` or `dest-language`",
+                ),
+                (has_join_fields, "`join`"),
+                (has_taint_fields, "`taint` or legacy taint fields"),
+            ],
+        ),
+        RuleMode::Extract => collect_unexpected(
+            raw,
+            &[
+                (has_join_fields as fn(&RawRule) -> bool, "`join`"),
+                (has_taint_fields, "`taint` or legacy taint fields"),
+            ],
+        ),
+        RuleMode::Join => collect_unexpected(
+            raw,
+            &[
+                (
+                    has_search_or_legacy_fields as fn(&RawRule) -> bool,
+                    "`match` or legacy search keys",
+                ),
+                (has_extract_fields, "`extract` or `dest-language`"),
+                (has_taint_fields, "`taint` or legacy taint fields"),
+            ],
+        ),
+        RuleMode::Taint => collect_unexpected(
+            raw,
+            &[
+                (
+                    has_legacy_search_fields as fn(&RawRule) -> bool,
+                    "legacy search keys",
+                ),
+                (has_extract_fields, "`extract` or `dest-language`"),
+                (has_join_fields, "`join`"),
+            ],
+        ),
         // Skip validation for unknown modes - we don't know what fields they should have
         RuleMode::Other(_) => return Ok(()),
     };
