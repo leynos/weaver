@@ -135,6 +135,7 @@ fn parse_unknown_mode_rule() {
         "rules:\n",
         "  - id: demo.join.match\n",
         "    message: join with match\n",
+        "    languages: [python]\n",
         "    severity: WARNING\n",
         "    mode: join\n",
         "    match:\n",
