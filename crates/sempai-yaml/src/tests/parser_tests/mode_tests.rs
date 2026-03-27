@@ -47,9 +47,10 @@ fn reject_extract_rule_with_match() {
         "    match: \"bar($Y)\"\n",
     );
 
-    let (code, message, _) = first_err_diagnostic(yaml);
+    let (code, message, has_span) = first_err_diagnostic(yaml);
     assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
     assert!(message.contains("extract mode does not support `match`"));
+    assert!(has_span, "expected primary_span for schema error");
 }
 
 #[test]
@@ -159,10 +160,11 @@ fn parse_unknown_mode_rule() {
     "Taint mode rule contains unexpected principal fields: `extract` or `dest-language`",
 )]
 fn reject_cross_mode_principal_fields(#[case] yaml: &str, #[case] expected_fragment: &str) {
-    let (code, message, _has_span) = first_err_diagnostic(yaml);
+    let (code, message, has_span) = first_err_diagnostic(yaml);
     assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
     assert!(
         message.contains(expected_fragment),
         "expected error message to contain '{expected_fragment}', got '{message}'"
     );
+    assert!(has_span, "expected primary_span for schema error");
 }
