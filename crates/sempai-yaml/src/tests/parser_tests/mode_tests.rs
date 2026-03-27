@@ -24,7 +24,7 @@ fn parse_extract_rule() {
                 assert_eq!(extract.extract(), "foo($X)");
                 assert_eq!(
                     extract.query(),
-                    &LegacyFormula::Pattern("source($X)".to_string())
+                    &LegacyFormula::Pattern(String::from("source($X)"))
                 );
             }
             _ => panic!("expected Extract principal"),
