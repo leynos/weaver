@@ -77,13 +77,13 @@ not control commit behaviour directly.
 - Keep plugin lifecycles easy to sandbox.
 - Keep orchestration logic centralized in the broker.
 
-### Non-goals
+### Non-Goals
 
 - Maintain per-plugin sessions across requests.
 - Expose plugin protocol details in the CLI contract.
 - Move commit responsibility out of Weaver's safety harness.
 
-## Migration plan
+## Migration Plan
 
 1. Keep plugin requests to one JSONL line in and one JSONL line out.
 2. Make broker validation and routing explicit.
