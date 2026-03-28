@@ -414,7 +414,7 @@ phase* *with explicit parser, backend, and Weaver-integration milestones.*
       codes and report schema.
   - Acceptance criteria: diagnostics include code, message, primary span, and
     notes, and JSON snapshots remain stable across parser and validator paths.
-- [ ] 4.1.3. Implement YAML rule parsing via `saphyr` and `serde-saphyr` with
+- [x] 4.1.3. Implement YAML rule parsing via `saphyr` and `serde-saphyr` with
       schema-aligned rule models.
   - Acceptance criteria: rule metadata and query principals parse from
     Semgrep-compatible YAML forms, and parse failures emit structured

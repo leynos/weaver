@@ -6,6 +6,7 @@
 //! [`QueryPlan`] to be reused across multiple source files.
 
 use sempai_core::{DiagnosticReport, EngineConfig, Language, Match};
+use sempai_yaml::parse_rule_file;
 
 /// A compiled query plan for one rule and one language.
 ///
@@ -28,7 +29,7 @@ pub struct QueryPlan {
     rule_id: String,
     language: Language,
     /// Placeholder for the internal plan representation.  Will be replaced
-    /// by `sempai_core::PlanNode` once the normalisation layer is built.
+    /// by `sempai_core::PlanNode` once the normalization layer is built.
     _plan: (),
 }
 
@@ -78,7 +79,7 @@ impl QueryPlan {
 ///
 /// let engine = Engine::new(EngineConfig::default());
 /// let result = engine.compile_yaml("rules: []");
-/// // Currently returns a "not implemented" diagnostic
+/// // Malformed YAML and schema errors now surface parser diagnostics.
 /// assert!(result.is_err());
 /// ```
 #[derive(Debug)]
@@ -104,9 +105,14 @@ impl Engine {
     /// # Errors
     ///
     /// Returns a diagnostic report if parsing or validation fails.
-    /// Currently returns a "not implemented" diagnostic for all inputs.
-    pub fn compile_yaml(&self, _yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
-        Err(DiagnosticReport::not_implemented("compile_yaml"))
+    ///
+    /// Successful YAML parsing still stops at the post-parse placeholder until
+    /// rule normalization is implemented.
+    pub fn compile_yaml(&self, yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
+        let _ = parse_rule_file(yaml, None)?;
+        Err(DiagnosticReport::not_implemented(
+            "compile_yaml query-plan normalization",
+        ))
     }
 
     /// Compiles a one-liner query DSL expression into a query plan.

@@ -1255,7 +1255,7 @@ currently supports Rust, Python, and TypeScript.
 ## Sempai query engine
 
 The `sempai` crate provides a Semgrep-compatible query engine backed by
-Tree-sitter for semantics-aware code pattern matching. It is organized as two
+Tree-sitter for semantics-aware code pattern matching. It is organized as three
 workspace crates:
 
 - **`sempai_core`** — canonical data model including language identifiers
@@ -1263,6 +1263,9 @@ workspace crates:
   capture bindings (`CaptureValue`, `CapturedNode`), structured diagnostics
   (`DiagnosticReport`, `Diagnostic`, `DiagnosticCode`), and engine
   configuration (`EngineConfig`).
+- **`sempai_yaml`** — Semgrep-compatible YAML parser built on `saphyr` and
+  `serde-saphyr`, exposing schema-aligned rule models for legacy and v2 search
+  principals plus parser-time handling for extract, join, and taint rules.
 - **`sempai`** — stable facade crate that re-exports all public types from
   `sempai_core` and provides the `Engine` entrypoint.
 
@@ -1272,14 +1275,23 @@ The `Engine` struct exposes three methods for query compilation and execution:
 - `compile_dsl(rule_id, language, dsl)` — compiles a one-liner domain-specific
   language (DSL) expression.
 - `execute(plan, uri, source)` — executes a compiled plan against a source
-  snapshot. All three methods currently return "not implemented" diagnostics.
-  They will be wired to the YAML parser, DSL parser, and Tree-sitter backend as
-  those components are delivered in subsequent roadmap phases.
+  snapshot.
+
+`compile_yaml(yaml)` now performs real YAML parsing. Malformed YAML returns
+`E_SEMPAI_YAML_PARSE`, and schema-shape failures such as missing required rule
+keys return `E_SEMPAI_SCHEMA_INVALID`, both using the shared structured
+diagnostic payload with `primary_span` locations when available. Valid YAML
+rule files still stop at a `NOT_IMPLEMENTED` placeholder because rule
+normalization into executable query plans is the next roadmap milestone.
+
+`compile_dsl(...)` and `execute(...)` still return "not implemented"
+diagnostics. They will be wired to the DSL parser and Tree-sitter backend as
+those components are delivered in subsequent roadmap phases.
 
 All error conditions are reported through `DiagnosticReport`, which carries
 stable diagnostic codes suitable for programmatic consumption. Stub methods
-currently return the `NOT_IMPLEMENTED` code; real `E_SEMPAI_*` codes will be
-used once the corresponding backends are implemented. Diagnostics include a
-code, message, `primary_span` (or `null` when unavailable), and supplementary
-notes. Both parser-path and validator-path diagnostics use the same JSON
-schema, and snapshot tests lock this contract.
+return the `NOT_IMPLEMENTED` code where implementation is still pending, while
+the YAML parser now emits real `E_SEMPAI_*` codes for malformed or invalid rule
+files. Diagnostics include a code, message, `primary_span` (or `null` when
+unavailable), and supplementary notes. Both parser-path and validator-path
+diagnostics use the same JSON schema, and snapshot tests lock this contract.

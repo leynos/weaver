@@ -1,7 +1,22 @@
 //! Tests for the `Engine` and `QueryPlan` types.
 
 use crate::engine::QueryPlan;
-use crate::{DiagnosticCode, Engine, EngineConfig, EngineLimits, Language};
+use crate::{
+    Diagnostic, DiagnosticCode, DiagnosticReport, Engine, EngineConfig, EngineLimits, Language,
+};
+
+fn default_engine() -> Engine {
+    Engine::new(EngineConfig::default())
+}
+
+fn first_diagnostic_of_err<T>(result: Result<T, DiagnosticReport>) -> (DiagnosticCode, Diagnostic) {
+    let report = result.err().expect("expected an error result");
+    let first: &Diagnostic = report
+        .diagnostics()
+        .first()
+        .expect("expected at least one diagnostic");
+    (first.code(), first.clone())
+}
 
 #[test]
 fn engine_new_with_default_config() {
@@ -18,49 +33,50 @@ fn engine_new_with_custom_config() {
 }
 
 #[test]
-fn compile_yaml_returns_not_implemented() {
-    let engine = Engine::new(EngineConfig::default());
-    let result = engine.compile_yaml("rules: []");
-    assert!(result.is_err());
+fn compile_yaml_returns_yaml_parse_diagnostic_for_malformed_yaml() {
+    let engine = default_engine();
+    let result = engine.compile_yaml("rules:\n  - id: bad\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: [");
+    let (code, first) = first_diagnostic_of_err(result);
+    assert_eq!(code, DiagnosticCode::ESempaiYamlParse);
+    assert!(first.primary_span().is_some());
+}
 
-    let report = result.expect_err("should be error");
-    assert_eq!(report.diagnostics().len(), 1);
+#[test]
+fn compile_yaml_returns_schema_diagnostic_for_missing_rule_id() {
+    let engine = default_engine();
+    let result = engine.compile_yaml(
+        "rules:\n  - message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n",
+    );
+    let (code, _diag) = first_diagnostic_of_err(result);
+    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
+}
 
-    let first = report
-        .diagnostics()
-        .first()
-        .expect("at least one diagnostic");
-    assert_eq!(first.code(), DiagnosticCode::NotImplemented);
-    assert!(first.message().contains("compile_yaml"));
+#[test]
+fn compile_yaml_returns_not_implemented_after_successful_parse() {
+    let engine = default_engine();
+    let result = engine.compile_yaml(
+        "rules:\n  - id: demo.rule\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n",
+    );
+    let (code, diag) = first_diagnostic_of_err(result);
+    assert_eq!(code, DiagnosticCode::NotImplemented);
+    assert!(diag.message().contains("normalization"));
 }
 
 #[test]
 fn compile_dsl_returns_not_implemented() {
-    let engine = Engine::new(EngineConfig::default());
+    let engine = default_engine();
     let result = engine.compile_dsl("test-rule", Language::Python, "pattern(\"def $F\")");
-    assert!(result.is_err());
-
-    let report = result.expect_err("should be error");
-    let first = report
-        .diagnostics()
-        .first()
-        .expect("at least one diagnostic");
-    assert_eq!(first.code(), DiagnosticCode::NotImplemented);
-    assert!(first.message().contains("compile_dsl"));
+    let (code, diag) = first_diagnostic_of_err(result);
+    assert_eq!(code, DiagnosticCode::NotImplemented);
+    assert!(diag.message().contains("compile_dsl"));
 }
 
 #[test]
 fn execute_returns_not_implemented() {
-    let engine = Engine::new(EngineConfig::default());
+    let engine = default_engine();
     let plan = QueryPlan::new(String::from("test-rule"), Language::Rust);
     let result = engine.execute(&plan, "file:///test.rs", "fn main() {}");
-    assert!(result.is_err());
-
-    let report = result.expect_err("should be error");
-    let first = report
-        .diagnostics()
-        .first()
-        .expect("at least one diagnostic");
-    assert_eq!(first.code(), DiagnosticCode::NotImplemented);
-    assert!(first.message().contains("execute"));
+    let (code, diag) = first_diagnostic_of_err(result);
+    assert_eq!(code, DiagnosticCode::NotImplemented);
+    assert!(diag.message().contains("execute"));
 }
