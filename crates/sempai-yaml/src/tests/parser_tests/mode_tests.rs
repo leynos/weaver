@@ -121,6 +121,7 @@ fn parse_unknown_mode_rule() {
         "  - id: demo.extract.join\n",
         "    message: extract with join\n",
         "    languages: [python]\n",
+        "    severity: WARNING\n",
         "    mode: extract\n",
         "    dest-language: python\n",
         "    extract: $X\n",
