@@ -10,6 +10,8 @@ use serde::Serialize;
 
 use super::errors::DispatchError;
 
+const UNKNOWN_OPERATION_TYPE: &str = "UnknownOperation";
+
 /// Target stream for output messages.
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -73,6 +75,21 @@ pub struct ResponseWriter<W> {
     writer: W,
 }
 
+#[derive(Debug, Serialize)]
+struct UnknownOperationPayload<'a> {
+    status: &'static str,
+    #[serde(rename = "type")]
+    kind: &'static str,
+    details: UnknownOperationDetails<'a>,
+}
+
+#[derive(Debug, Serialize)]
+struct UnknownOperationDetails<'a> {
+    domain: &'a str,
+    operation: &'a str,
+    known_operations: &'a [&'static str],
+}
+
 impl<W: Write> ResponseWriter<W> {
     /// Creates a new response writer wrapping the given output stream.
     pub fn new(writer: W) -> Self {
@@ -128,8 +145,34 @@ impl<W: Write> ResponseWriter<W> {
     ///
     /// Returns an error if writing fails.
     pub fn write_error(&mut self, error: &DispatchError) -> Result<(), DispatchError> {
-        self.write_stderr(format!("error: {error}\n"))?;
+        match error {
+            DispatchError::UnknownOperation {
+                domain,
+                operation,
+                known_operations,
+            } => self.write_unknown_operation_error(domain, operation, known_operations)?,
+            _ => self.write_stderr(format!("error: {error}\n"))?,
+        }
         self.write_exit(error.exit_status())
+    }
+
+    fn write_unknown_operation_error(
+        &mut self,
+        domain: &str,
+        operation: &str,
+        known_operations: &'static [&'static str],
+    ) -> Result<(), DispatchError> {
+        let payload = UnknownOperationPayload {
+            status: "error",
+            kind: UNKNOWN_OPERATION_TYPE,
+            details: UnknownOperationDetails {
+                domain,
+                operation,
+                known_operations,
+            },
+        };
+        let data = serde_json::to_string(&payload)?;
+        self.write_stderr(data)
     }
 }
 
@@ -180,6 +223,40 @@ mod tests {
 
         let response = String::from_utf8(output).expect("valid utf8");
         assert!(response.contains("unknown domain"));
+        assert!(response.contains(r#""status":1"#));
+    }
+
+    #[test]
+    fn write_error_serializes_unknown_operation_payload() {
+        let mut output = Vec::new();
+        let mut writer = ResponseWriter::new(&mut output);
+        let error = DispatchError::unknown_operation(
+            "observe",
+            "bogus",
+            &["get-definition", "find-references"],
+        );
+        writer.write_error(&error).expect("write error");
+
+        let response = String::from_utf8(output).expect("valid utf8");
+        let payload = response
+            .lines()
+            .find_map(|line| {
+                let envelope: serde_json::Value = serde_json::from_str(line).ok()?;
+                if envelope["kind"] != "stream" || envelope["stream"] != "stderr" {
+                    return None;
+                }
+                envelope["data"]
+                    .as_str()
+                    .and_then(|data| serde_json::from_str::<serde_json::Value>(data).ok())
+            })
+            .expect("unknown-operation payload");
+        assert_eq!(payload["type"], "UnknownOperation");
+        assert_eq!(payload["details"]["domain"], "observe");
+        assert_eq!(payload["details"]["operation"], "bogus");
+        assert_eq!(
+            payload["details"]["known_operations"],
+            serde_json::json!(["get-definition", "find-references"])
+        );
         assert!(response.contains(r#""status":1"#));
     }
 }

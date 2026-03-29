@@ -202,6 +202,32 @@ fn given_daemon_diagnostics_output(world: &RefCell<TestWorld>) {
         .expect("failed to start daemon");
 }
 
+#[given("a running fake daemon emitting an unknown-operation payload")]
+fn given_daemon_unknown_operation_output(world: &RefCell<TestWorld>) {
+    let payload = serde_json::to_string(&json!({
+        "status": "error",
+        "type": "UnknownOperation",
+        "details": {
+            "domain": "observe",
+            "operation": "nonexistent",
+            "known_operations": [
+                "get-definition",
+                "find-references",
+                "grep",
+                "diagnostics",
+                "call-hierarchy",
+                "get-card"
+            ]
+        }
+    }))
+    .expect("serialize unknown-operation payload");
+    let lines = daemon_lines_for_stderr(&payload, 1);
+    world
+        .borrow_mut()
+        .start_daemon_with_lines(lines)
+        .expect("failed to start daemon");
+}
+
 #[when("the operator runs {command}")]
 fn when_operator_runs(world: &RefCell<TestWorld>, command: String) {
     world

@@ -11,7 +11,7 @@ mod source;
 pub use crate::cli::OutputFormat;
 use crate::output::models::{
     DefinitionLocation, DiagnosticItem, DiagnosticsResponse, ReferenceResponse,
-    VerificationFailure, parse_capability_resolution, parse_definitions,
+    VerificationFailure, parse_capability_resolution, parse_definitions, parse_unknown_operation,
     parse_verification_failures,
 };
 use crate::output::source::{
@@ -81,6 +81,10 @@ pub fn render_human_output(context: &OutputContext, data: &str) -> Option<String
     let trimmed = data.trim();
     if trimmed.is_empty() {
         return None;
+    }
+
+    if let Some(rendered) = render_unknown_operation(trimmed) {
+        return Some(rendered);
     }
 
     let domain = context.domain.to_ascii_lowercase();
@@ -226,6 +230,19 @@ fn render_capability_resolution(payload: &str) -> Option<String> {
     Some(rendered)
 }
 
+fn render_unknown_operation(payload: &str) -> Option<String> {
+    let unknown_operation = parse_unknown_operation(payload)?;
+    let details = unknown_operation.details;
+    let mut rendered = format!(
+        "error: unknown operation '{}' for domain '{}'\n\nAvailable operations:\n",
+        details.operation, details.domain
+    );
+    for operation in details.known_operations {
+        rendered.push_str(&format!("  {operation}\n"));
+    }
+    Some(rendered)
+}
+
 fn diagnostic_to_location(
     diagnostic: DiagnosticItem,
     fallback_uri: Option<&str>,
@@ -324,5 +341,33 @@ mod tests {
         .expect("rendered");
 
         assert_eq!(rendered, "no verification failures reported\n");
+    }
+
+    #[test]
+    fn renders_unknown_operation_payload_for_humans() {
+        let context = OutputContext::new("observe", "nonexistent", Vec::new());
+        let payload = r#"{
+  "status": "error",
+  "type": "UnknownOperation",
+  "details": {
+    "domain": "observe",
+    "operation": "nonexistent",
+    "known_operations": [
+      "get-definition",
+      "find-references",
+      "grep",
+      "diagnostics",
+      "call-hierarchy",
+      "get-card"
+    ]
+  }
+}"#;
+
+        let rendered = render_human_output(&context, payload).expect("rendered");
+
+        assert!(rendered.contains("error: unknown operation 'nonexistent' for domain 'observe'"));
+        assert!(rendered.contains("Available operations:"));
+        assert!(rendered.contains("get-definition"));
+        assert!(rendered.contains("get-card"));
     }
 }

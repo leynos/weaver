@@ -329,6 +329,30 @@ Valid domains: observe, act, verify
 The known-domain follow-up `--help` hint is concrete and deterministic, but
 until operation-level help lands it still resolves to the top-level help output.
 
+Unknown operations are handled differently. The request still reaches the
+daemon, because the daemon router owns the canonical operation list for each
+domain. Human-readable output now includes the full alternatives returned by
+the daemon:
+
+```text
+$ weaver --output human observe nonexistent
+error: unknown operation 'nonexistent' for domain 'observe'
+
+Available operations:
+  get-definition
+  find-references
+  grep
+  diagnostics
+  call-hierarchy
+  get-card
+```
+
+JSON output forwards the daemon payload unchanged:
+
+```json
+{"status":"error","type":"UnknownOperation","details":{"domain":"observe","operation":"nonexistent","known_operations":["get-definition","find-references","grep","diagnostics","call-hierarchy","get-card"]}}
+```
+
 ### Output formats
 
 Daemon responses are JSON objects with `kind` set to `stream` or `exit`. Stream

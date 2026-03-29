@@ -316,6 +316,23 @@ pub(super) fn daemon_lines_for_stdout(payload: &str) -> Vec<String> {
     ]
 }
 
+/// Builds a stderr stream entry plus exit record for a custom payload.
+pub(super) fn daemon_lines_for_stderr(payload: &str, status: i32) -> Vec<String> {
+    let stream = serde_json::json!({
+        "kind": "stream",
+        "stream": "stderr",
+        "data": payload,
+    });
+    let exit = serde_json::json!({
+        "kind": "exit",
+        "status": status,
+    });
+    vec![
+        serde_json::to_string(&stream).expect("serialize stream"),
+        serde_json::to_string(&exit).expect("serialize exit"),
+    ]
+}
+
 // ── Fixtures ───────────────────────────────────────────────────────────────────
 
 #[fixture]
