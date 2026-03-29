@@ -35,6 +35,7 @@ const fn has_search_or_legacy_fields(raw: &RawRule) -> bool {
         || raw.patterns.is_some()
         || raw.pattern_either.is_some()
         || raw.match_formula.is_some()
+        || raw.project_depends_on.is_some()
 }
 
 /// Checks if the raw rule contains extract fields.
@@ -174,6 +175,10 @@ fn build_rule(
         "add a stable rule id",
     )?;
     let mode = parse_mode(raw.mode.as_ref().map(|mode| mode.value.as_str()));
+    let mode_span = raw
+        .mode
+        .as_ref()
+        .and_then(|mode_field| source_map.span_from_location(Some(mode_field.referenced)));
     let min_version = raw.min_version.clone().map(|value| value.value);
     let max_version = raw.max_version.clone().map(|value| value.value);
 
@@ -201,6 +206,8 @@ fn build_rule(
     Ok(Rule {
         id,
         mode,
+        span: rule_span,
+        mode_span,
         message,
         languages,
         severity,

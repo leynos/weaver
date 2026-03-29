@@ -235,19 +235,29 @@ fn build_search_principal(
         || raw.patterns.is_some()
         || raw.pattern_either.is_some();
     let has_match = raw.match_formula.is_some();
+    let has_project_depends_on = raw.project_depends_on.is_some();
+    let query_principal_count =
+        usize::from(has_legacy) + usize::from(has_match) + usize::from(has_project_depends_on);
 
-    if has_legacy && has_match {
+    if query_principal_count > 1 {
         return Err(schema_error(
             String::from("rule must define exactly one top-level query principal"),
             rule_span,
-            "choose one of the legacy search keys or `match`",
+            "choose one of the legacy search keys, `match`, or `r2c-internal-project-depends-on`",
         ));
     }
 
-    raw.match_formula.clone().map_or_else(
-        || build_legacy_principal(raw, rule_span.as_ref()).map(SearchQueryPrincipal::Legacy),
-        |formula| build_match_principal(formula, source_map),
-    )
+    if let Some(formula) = raw.match_formula.clone() {
+        return build_match_principal(formula, source_map);
+    }
+
+    if let Some(project_depends_on) = raw.project_depends_on.clone() {
+        return Ok(SearchQueryPrincipal::ProjectDependsOn(
+            project_depends_on.value,
+        ));
+    }
+
+    build_legacy_principal(raw, rule_span.as_ref()).map(SearchQueryPrincipal::Legacy)
 }
 
 /// Builds a legacy formula from raw rule fields.

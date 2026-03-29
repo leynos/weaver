@@ -20,6 +20,24 @@ Feature: Sempai engine facade behaviour
     Then compilation fails with code "NOT_IMPLEMENTED"
     And the first diagnostic message contains "normalisation"
 
+  Scenario: Engine compile_yaml keeps the placeholder for dependency search rules
+    Given an engine with default configuration
+    When YAML "rules:\n  - id: demo.depends\n    message: detect vulnerable dependency\n    languages: [python]\n    severity: WARNING\n    r2c-internal-project-depends-on:\n      namespace: pypi\n      package: requests\n" is compiled
+    Then compilation fails with code "NOT_IMPLEMENTED"
+    And the first diagnostic message contains "normalisation"
+
+  Scenario: Engine compile_yaml rejects extract mode during execution gating
+    Given an engine with default configuration
+    When YAML "rules:\n  - id: demo.extract\n    mode: extract\n    message: extract foo\n    languages: [python]\n    severity: WARNING\n    dest-language: python\n    extract: foo($X)\n    pattern: source($X)\n" is compiled
+    Then compilation fails with code "E_SEMPAI_UNSUPPORTED_MODE"
+    And the first diagnostic message contains "extract"
+
+  Scenario: Engine compile_yaml rejects unknown modes during execution gating
+    Given an engine with default configuration
+    When YAML "rules:\n  - id: demo.custom\n    mode: custom-mode\n    message: custom mode\n    languages: [python]\n    severity: WARNING\n    pattern: foo($X)\n" is compiled
+    Then compilation fails with code "E_SEMPAI_UNSUPPORTED_MODE"
+    And the first diagnostic message contains "custom-mode"
+
   Scenario: Engine compile_dsl returns not-implemented error
     Given an engine with default configuration
     When DSL "pattern(\"fn $F\")" is compiled for language "rust"

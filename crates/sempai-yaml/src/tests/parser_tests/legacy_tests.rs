@@ -28,6 +28,31 @@ fn parse_legacy_search_rule() {
 }
 
 #[test]
+fn parse_project_depends_on_search_rule() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.depends\n",
+        "    message: detect vulnerable dependency\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    r2c-internal-project-depends-on:\n",
+        "      namespace: pypi\n",
+        "      package: requests\n",
+    );
+
+    check_first_rule(yaml, |rule| {
+        assert_eq!(rule.mode(), &RuleMode::Search);
+        match rule.principal() {
+            RulePrincipal::Search(SearchQueryPrincipal::ProjectDependsOn(value)) => {
+                assert_eq!(value["namespace"], "pypi");
+                assert_eq!(value["package"], "requests");
+            }
+            other => panic!("expected ProjectDependsOn principal, got {other:?}"),
+        }
+    });
+}
+
+#[test]
 fn invalid_yaml_returns_yaml_parse_diagnostic() {
     let yaml = concat!(
         "rules:\n",

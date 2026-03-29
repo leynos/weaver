@@ -421,10 +421,18 @@ Search mode rules require:
   - `match`
   - `r2c-internal-project-depends-on` (parsed but ignored by Sempai).[^1]
 
-Implementation note (2026-03-22): `sempai::Engine::compile_yaml` now delegates
-to `sempai_yaml` for parse-time diagnostics. Successful YAML parsing still
-returns a deliberate `NOT_IMPLEMENTED` placeholder until 4.1.5 delivers
-normalization into executable query plans.
+Implementation note (2026-03-29): `sempai_yaml` now preserves
+`r2c-internal-project-depends-on` as an opaque search principal so the parser
+accepts Semgrep-compatible dependency rules without inventing execution
+semantics early.
+
+Implementation note (2026-03-29): `sempai::Engine::compile_yaml` now applies a
+mode-aware validation pass after parsing. Search rules continue to the
+deliberate `NOT_IMPLEMENTED` normalization placeholder, while `extract`,
+`taint`, `join`, and forward-compatible unknown modes fail deterministically
+with `E_SEMPAI_UNSUPPORTED_MODE`. The first unsupported rule in source order is
+reported, and its `primary_span` prefers the `mode` field span before falling
+back to the enclosing rule span.
 
 Extract mode rules require legacy query keys, not `match`.[^1]
 

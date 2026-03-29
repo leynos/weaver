@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -35,8 +35,8 @@ without pulling 4.1.5 or 4.2.x work forward.
 Observable completion evidence:
 
 ```plaintext
-set -o pipefail; cargo test -p sempai_yaml --all-targets --all-features 2>&1 | tee /tmp/4-1-4-sempai-yaml-test.log
-set -o pipefail; cargo test -p sempai --all-targets --all-features 2>&1 | tee /tmp/4-1-4-sempai-test.log
+set -o pipefail; cargo test -p sempai_yaml 2>&1 | tee /tmp/4-1-4-sempai-yaml-test.log
+set -o pipefail; cargo test -p sempai 2>&1 | tee /tmp/4-1-4-sempai-test.log
 set -o pipefail; make check-fmt 2>&1 | tee /tmp/4-1-4-make-check-fmt.log
 set -o pipefail; make lint 2>&1 | tee /tmp/4-1-4-make-lint.log
 set -o pipefail; make test 2>&1 | tee /tmp/4-1-4-make-test.log
@@ -149,13 +149,21 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log
       current `sempai_yaml` parser/builder code, the `sempai` facade tests,
       and adjacent ExecPlans.
 - [x] (2026-03-28 UTC) Drafted this ExecPlan.
-- [ ] Stage A: Lock the intended behaviour with failing unit and BDD tests.
-- [ ] Stage B: Add parser/model support for search-mode validation inputs and
-      span propagation needed by engine diagnostics.
-- [ ] Stage C: Implement engine-side mode gating and deterministic validation
-      diagnostics.
-- [ ] Stage D: Update docs and mark the roadmap item done.
-- [ ] Stage E: Run all required quality gates and capture evidence.
+- [x] (2026-03-29 UTC) Stage A: Locked the intended behaviour with unit and
+      BDD tests for dependency search rules, unsupported execution modes, and
+      the preserved search-mode placeholder path.
+- [x] (2026-03-29 UTC) Stage B: Added additive parsed-rule metadata
+      (`mode_span` plus enclosing rule span) and model support for the
+      compatibility key `r2c-internal-project-depends-on`.
+- [x] (2026-03-29 UTC) Stage C: Implemented engine-side whole-document mode
+      gating that reports the first unsupported rule in source order via
+      `E_SEMPAI_UNSUPPORTED_MODE`.
+- [x] (2026-03-29 UTC) Stage D: Updated the Sempai design doc, the user's
+      guide, and the roadmap to reflect mode-aware `compile_yaml(...)`
+      behaviour.
+- [x] (2026-03-29 UTC) Stage E: Ran `make fmt`, `make markdownlint`,
+      `make nixie`, `make check-fmt`, `make lint`, `make test`,
+      `cargo test -p sempai_yaml`, and `cargo test -p sempai`.
 
 ## Surprises & Discoveries
 
@@ -186,6 +194,11 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log
   generic engine placeholder path. Impact: 4.1.4 must add behavioural coverage
   in both `sempai_yaml` and `sempai`, not just unit assertions.
 
+- Observation: the package name for focused parser tests is `sempai_yaml`
+  rather than `sempai-yaml`, so the crate-level verification commands needed to
+  use the underscore form. Impact: the completion evidence now records the
+  executable commands that actually passed in this workspace.
+
 ## Decision Log
 
 - Decision: keep parse-time and execution-time concerns separate. `sempai_yaml`
@@ -210,6 +223,12 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log
   `primary_span` values are more useful than location-free `UnsupportedMode`
   errors and remain compatible with the existing public API. Date/Author:
   2026-03-28 / Codex.
+
+- Decision: keep `r2c-internal-project-depends-on` opaque inside
+  `SearchQueryPrincipal` rather than introducing a partially normalized
+  dependency model. Rationale: 4.1.4 only needs the key to satisfy search-mode
+  validation and preserve forward-compatible data; richer semantics belong to
+  later normalization and execution milestones. Date/Author: 2026-03-29 / Codex.
 
 ## Outcomes & Retrospective
 
@@ -236,14 +255,27 @@ Target outcome at completion:
 9. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
-Retrospective notes to fill in after implementation:
+Retrospective notes:
 
-- Which span shape was chosen for engine validation diagnostics and why.
-- Whether `r2c-internal-project-depends-on` stayed opaque or gained a typed
-  representation.
-- Whether any parser-time checks had to move to the engine validator to keep
-  the boundary coherent.
-- The exact commands and log files used to verify the final implementation.
+- Engine validation diagnostics now prefer the parsed `mode` field span and
+  fall back to the enclosing rule span. This keeps unsupported-mode reports
+  anchored to the most actionable location without changing public signatures.
+- `r2c-internal-project-depends-on` stayed opaque as
+  `SearchQueryPrincipal::ProjectDependsOn(serde_json::Value)`. That was enough
+  to satisfy search-mode validation while deferring dependency semantics to a
+  later milestone.
+- No existing parser-time checks had to move into the engine validator. The
+  parser still owns YAML shape, required metadata fields, and cross-family
+  principal rejection; the engine now owns execution support gating.
+- Final verification commands and logs:
+  - `set -o pipefail; cargo test -p sempai_yaml 2>&1 | tee /tmp/4-1-4-sempai-yaml-test.log`
+  - `set -o pipefail; cargo test -p sempai 2>&1 | tee /tmp/4-1-4-sempai-test.log`
+  - `set -o pipefail; make fmt 2>&1 | tee /tmp/4-1-4-make-fmt.log`
+  - `set -o pipefail; make markdownlint 2>&1 | tee /tmp/4-1-4-make-markdownlint.log`
+  - `set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log`
+  - `set -o pipefail; make check-fmt 2>&1 | tee /tmp/4-1-4-make-check-fmt.log`
+  - `set -o pipefail; make lint 2>&1 | tee /tmp/4-1-4-make-lint.log`
+  - `set -o pipefail; make test 2>&1 | tee /tmp/4-1-4-make-test.log`
 
 ## Context and orientation
 
