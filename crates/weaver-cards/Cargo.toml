@@ -5,9 +5,11 @@ version.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+lru = { workspace = true }
 serde = { workspace = true }
-sha2 = "0.10"
+sha2 = { workspace = true }
 thiserror = { workspace = true }
+time = { workspace = true }
 tree-sitter = { workspace = true }
 url = { workspace = true }
 weaver-syntax = { path = "../weaver-syntax" }

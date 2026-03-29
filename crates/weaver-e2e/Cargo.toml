@@ -21,6 +21,9 @@ insta = { workspace = true }
 tempfile = { workspace = true }
 url = { workspace = true }
 weaver-cli = { path = "../weaver-cli" }
+weaver-cards = { path = "../weaver-cards" }
+weaver-config = { path = "../weaver-config" }
+weaverd = { path = "../weaverd", features = ["test-support"] }
 
 [lints]
 workspace = true

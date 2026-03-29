@@ -36,5 +36,7 @@ mod request;
 mod response;
 mod router;
 
-pub(crate) use self::backend_manager::BackendManager;
-pub(crate) use self::handler::DispatchConnectionHandler;
+#[doc(hidden)]
+pub use self::backend_manager::BackendManager;
+#[doc(hidden)]
+pub use self::handler::DispatchConnectionHandler;

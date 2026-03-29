@@ -29,6 +29,7 @@
 //! assert_eq!(request.detail, DetailLevel::Structure);
 //! ```
 
+mod cache;
 mod card;
 mod detail;
 mod error;
@@ -36,7 +37,12 @@ mod extract;
 mod request;
 mod response;
 mod symbol;
+mod timestamp;
 
+pub use cache::{
+    CacheStats, CardCache, CardCacheAddress, CardCacheKey, DEFAULT_CACHE_CAPACITY, ParserRegistry,
+    content_hash,
+};
 pub use card::{
     AttachmentsInfo, BranchInfo, DepsInfo, DocInfo, ImportInterstitialInfo, InterstitialInfo,
     LocalInfo, LspInfo, MetricsInfo, NormalizedAttachments, ParamInfo, Provenance, SignatureInfo,

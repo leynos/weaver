@@ -11,6 +11,7 @@
 //!
 //! The crate is organized into several modules:
 //!
+//! - [`card_fixtures`]: Shared `observe get-card` fixture batteries
 //! - [`lsp_client`]: Generic LSP client for spawning and communicating with servers
 //! - [`pyrefly`]: Pyrefly-specific client and helpers
 //! - [`fixtures`]: Test fixtures for Python code samples
@@ -20,6 +21,7 @@
 //! Tests in this crate gracefully skip if the required tools (like `uvx` or Pyrefly)
 //! are not available, ensuring CI resilience.
 
+pub mod card_fixtures;
 pub mod fixtures;
 mod jsonrpc;
 pub mod lsp_client;

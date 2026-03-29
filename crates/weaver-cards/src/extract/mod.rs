@@ -5,14 +5,16 @@ mod candidates;
 mod fingerprint;
 mod languages;
 mod positions;
+mod state;
 mod utils;
 
 use std::path::{Path, PathBuf};
 
 use thiserror::Error;
-use weaver_syntax::{Parser, SupportedLanguage};
+use weaver_syntax::SupportedLanguage;
 
 use crate::Provenance;
+use crate::timestamp::extraction_timestamp_now;
 use crate::{
     AttachmentsInfo, DetailLevel, DocInfo, ImportInterstitialInfo, InterstitialInfo, MetricsInfo,
     NormalizedAttachments, SignatureInfo, StructureInfo, SymbolCard, SymbolIdentity, SymbolRef,
@@ -20,10 +22,8 @@ use crate::{
 pub(super) use candidates::{EntityCandidate, InterstitialCandidate};
 use candidates::{build_module_candidate, select_candidate};
 use positions::{position_to_byte, usize_to_u32};
+pub use state::TreeSitterCardExtractor;
 use utils::{file_uri, provenance_sources, to_card_language};
-
-/// Deterministic placeholder timestamp used until revision-based caching lands.
-const EXTRACTED_AT_PLACEHOLDER: &str = "1970-01-01T00:00:00Z";
 
 /// Input required to extract a Tree-sitter-backed symbol card.
 #[derive(Debug, Clone, Copy)]
@@ -81,95 +81,54 @@ pub enum CardExtractionError {
     },
 }
 
-/// Tree-sitter-first extractor for `observe get-card`.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct TreeSitterCardExtractor;
+fn extract_for_language<F>(
+    input: CardExtractionInput<'_>,
+    language: SupportedLanguage,
+    parser: F,
+) -> Result<SymbolCard, CardExtractionError>
+where
+    F: FnOnce(SupportedLanguage) -> Result<weaver_syntax::ParseResult, CardExtractionError>,
+{
+    let parse = parser(language)?;
+    let position_byte = position_to_byte(input.source, input.line, input.column)?;
+    let mut entities = languages::collect_entities(language, parse.root_node(), input.source);
+    entities.sort_by_key(|candidate| candidate.byte_range.start);
+    let interstitial =
+        languages::collect_import_interstitial(language, parse.root_node(), input.source);
+    let module_candidate = build_module_candidate(input.path, input.source, interstitial);
 
-impl TreeSitterCardExtractor {
-    /// Creates a new extractor.
-    #[must_use]
-    pub const fn new() -> Self {
-        Self
-    }
+    let selected = select_candidate(&entities, module_candidate.as_ref(), position_byte).ok_or(
+        CardExtractionError::NoSymbolAtPosition {
+            line: input.line,
+            column: input.column,
+        },
+    )?;
 
-    /// Extracts a symbol card for the requested position.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`CardExtractionError`] when the path is unsupported, the
-    /// position is invalid, parsing fails, or no symbol matches the position.
-    pub fn extract(
-        &self,
-        input: CardExtractionInput<'_>,
-    ) -> Result<SymbolCard, CardExtractionError> {
-        let language = SupportedLanguage::from_path(input.path).ok_or_else(|| {
-            CardExtractionError::UnsupportedLanguage {
-                path: input.path.to_path_buf(),
-            }
-        })?;
-        Self::extract_for_language(input, language, |supported_language| {
-            let mut parser =
-                Parser::new(supported_language).map_err(|error| CardExtractionError::Parse {
-                    language: String::from(supported_language.as_str()),
-                    message: error.to_string(),
-                })?;
-            parser
-                .parse(input.source)
-                .map_err(|error| CardExtractionError::Parse {
-                    language: String::from(supported_language.as_str()),
-                    message: error.to_string(),
-                })
-        })
-    }
+    build_card(
+        selected,
+        CardBuildContext {
+            language,
+            path: input.path,
+            detail: input.detail,
+            source: input.source,
+        },
+    )
+}
 
-    fn extract_for_language<F>(
-        input: CardExtractionInput<'_>,
-        language: SupportedLanguage,
-        parser: F,
-    ) -> Result<SymbolCard, CardExtractionError>
-    where
-        F: FnOnce(SupportedLanguage) -> Result<weaver_syntax::ParseResult, CardExtractionError>,
-    {
-        let parse = parser(language)?;
-        let position_byte = position_to_byte(input.source, input.line, input.column)?;
-        let mut entities = languages::collect_entities(language, parse.root_node(), input.source);
-        entities.sort_by_key(|candidate| candidate.byte_range.start);
-        let interstitial =
-            languages::collect_import_interstitial(language, parse.root_node(), input.source);
-        let module_candidate = build_module_candidate(input.path, input.source, interstitial);
-
-        let selected = select_candidate(&entities, module_candidate.as_ref(), position_byte)
-            .ok_or(CardExtractionError::NoSymbolAtPosition {
-                line: input.line,
-                column: input.column,
-            })?;
-
-        build_card(
-            selected,
-            CardBuildContext {
-                language,
-                path: input.path,
-                detail: input.detail,
-                source: input.source,
-            },
-        )
-    }
-
-    #[cfg(test)]
-    pub(crate) fn extract_with_parser_for_test<F>(
-        input: CardExtractionInput<'_>,
-        parser: F,
-    ) -> Result<SymbolCard, CardExtractionError>
-    where
-        F: FnOnce(SupportedLanguage) -> Result<weaver_syntax::ParseResult, CardExtractionError>,
-    {
-        let language = SupportedLanguage::from_path(input.path).ok_or_else(|| {
-            CardExtractionError::UnsupportedLanguage {
-                path: input.path.to_path_buf(),
-            }
-        })?;
-        Self::extract_for_language(input, language, parser)
-    }
+#[cfg(test)]
+pub(crate) fn extract_with_parser_for_test<F>(
+    input: CardExtractionInput<'_>,
+    parser: F,
+) -> Result<SymbolCard, CardExtractionError>
+where
+    F: FnOnce(SupportedLanguage) -> Result<weaver_syntax::ParseResult, CardExtractionError>,
+{
+    let language = SupportedLanguage::from_path(input.path).ok_or_else(|| {
+        CardExtractionError::UnsupportedLanguage {
+            path: input.path.to_path_buf(),
+        }
+    })?;
+    extract_for_language(input, language, parser)
 }
 
 #[derive(Debug, Clone)]
@@ -233,7 +192,7 @@ fn build_card(
         deps: None,
         interstitial,
         provenance: Provenance {
-            extracted_at: String::from(EXTRACTED_AT_PLACEHOLDER),
+            extracted_at: extraction_timestamp_now(),
             sources: provenance_sources(context.detail),
         },
         etag: Some(symbol_id),

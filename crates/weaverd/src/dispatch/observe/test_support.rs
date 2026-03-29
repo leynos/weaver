@@ -10,6 +10,7 @@ use lsp_types::{
     MarkupKind, ReferenceParams, Uri,
 };
 use tempfile::TempDir;
+use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_lsp_host::{
     Language, LanguageServer, LanguageServerError, LspHost, ServerCapabilitySet,
@@ -166,8 +167,11 @@ pub(crate) fn semantic_backends_with_server(
         .register_language(language, Box::new(server))
         .expect("register test language server");
 
-    let provider =
-        SemanticBackendProvider::with_lsp_host_for_tests(capability_matrix.clone(), lsp_host);
+    let provider = SemanticBackendProvider::with_lsp_host_for_tests(
+        capability_matrix.clone(),
+        lsp_host,
+        DEFAULT_CACHE_CAPACITY,
+    );
     let (config, dir) = test_config();
     (FusionBackends::new(config, provider), dir)
 }

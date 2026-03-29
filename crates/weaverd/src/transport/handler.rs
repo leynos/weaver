@@ -7,7 +7,7 @@ use std::net::TcpStream;
 use std::os::unix::net::UnixStream;
 
 /// Stream types accepted by the daemon listener.
-pub(crate) enum ConnectionStream {
+pub enum ConnectionStream {
     Tcp(TcpStream),
     #[cfg(unix)]
     Unix(UnixStream),
@@ -42,7 +42,7 @@ impl Write for ConnectionStream {
 }
 
 /// Handles accepted socket connections.
-pub(crate) trait ConnectionHandler: Send + Sync + 'static {
+pub trait ConnectionHandler: Send + Sync + 'static {
     /// Handles a single connection. Implementations should avoid panicking.
     fn handle(&self, stream: ConnectionStream);
 }
