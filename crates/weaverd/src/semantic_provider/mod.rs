@@ -83,11 +83,14 @@ impl SemanticBackendProvider {
         lsp_host: LspHost,
         card_cache_capacity: usize,
     ) -> Self {
-        Self {
-            capability_matrix,
-            card_extractor: TreeSitterCardExtractor::with_cache_capacity(card_cache_capacity),
-            lsp_host: Mutex::new(Some(lsp_host)),
-        }
+        let provider = Self::new(capability_matrix, card_cache_capacity);
+        let mut guard = provider
+            .lsp_host
+            .lock()
+            .expect("fresh mutex cannot be poisoned");
+        *guard = Some(lsp_host);
+        drop(guard);
+        provider
     }
 
     /// Returns the shared Tree-sitter card extractor.
