@@ -87,7 +87,7 @@ tools introduce.
 - Prove the correctness of Tree-sitter or sandbox internals.
 - Remove all runtime assumptions from the system.
 
-## Migration plan
+## Migration Plan
 
 1. Name the verified kernel in the design and roadmap docs.
 2. List trusted external tools and filesystem assumptions explicitly.
