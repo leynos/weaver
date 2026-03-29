@@ -98,6 +98,15 @@ fn explicit_provider_mismatch_is_refused() {
 }
 
 #[test]
+fn explicit_provider_selection_succeeds_when_language_matches() {
+    let envelope = resolution_for("src/main.py", Some("rope"));
+    let details = envelope.details();
+
+    assert_provider_selected(details, "rope", SelectionMode::ExplicitProvider, "python");
+    assert_eq!(details.requested_provider.as_deref(), Some("rope"));
+}
+
+#[test]
 fn unknown_explicit_provider_is_refused() {
     let envelope = resolution_for("src/main.py", Some("missing-provider"));
     let details = envelope.details();
@@ -121,4 +130,12 @@ fn supported_language_without_provider_is_refused_deterministically() {
 
     assert_eq!(details.language.as_deref(), Some("typescript"));
     assert_provider_refused(details, RefusalReason::NoMatchingProvider);
+    assert!(
+        details
+            .candidates
+            .iter()
+            .all(|candidate| candidate.reason == CandidateReason::UnsupportedLanguage),
+        "expected deterministic unsupported-language rejections, got: {:?}",
+        details.candidates
+    );
 }

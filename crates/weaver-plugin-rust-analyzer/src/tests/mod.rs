@@ -2,6 +2,8 @@
 
 mod argument_validation;
 mod behaviour;
+mod contract_behaviour;
+mod contract_fixtures;
 mod dispatch_layer;
 mod support;
 

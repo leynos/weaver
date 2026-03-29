@@ -1,6 +1,8 @@
 //! Unit and behavioural tests for the rope actuator plugin.
 
 mod behaviour;
+mod contract_behaviour;
+mod contract_fixtures;
 
 use std::collections::HashMap;
 use std::path::PathBuf;

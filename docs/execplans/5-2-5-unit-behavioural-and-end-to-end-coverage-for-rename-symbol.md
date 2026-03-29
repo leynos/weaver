@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
@@ -130,14 +130,34 @@ plugins.
 
 ## Progress
 
-- [ ] Reviewed `AGENTS.md`, the roadmap entry, the preceding ExecPlans
+- [x] Reviewed `AGENTS.md`, the roadmap entry, the preceding ExecPlans
   (5.2.1 through 5.2.4), and project memory notes.
-- [ ] Inspected current test coverage across all relevant crates.
-- [ ] Drafted this ExecPlan.
+- [x] Inspected current test coverage across all relevant crates.
+- [x] Drafted this ExecPlan.
+- [x] Added feature-gated shared `rename-symbol` contract fixtures in
+  `weaver-plugins` and consumed them from both plugin crates.
+- [x] Expanded rope and rust-analyzer tests with shared-fixture unit coverage
+  and BDD contract scenarios.
+- [x] Extended daemon-side routing coverage with explicit-provider success,
+  non-diff success rejection, and rollback assertions proving failure paths
+  leave files unchanged.
+- [x] Extended CLI end-to-end snapshots to cover automatic routing and
+  structured provider-mismatch refusals for both Python and Rust rename flows.
+- [x] Reviewed and updated user-facing documentation and marked roadmap item
+  5.2.5 complete.
 
 ## Surprises & Discoveries
 
-(No surprises yet; this section will be updated during implementation.)
+- Surprise: targeted Cargo test batches can stall behind background
+  `leta-daemon` `cargo check` processes that hold the workspace build lock.
+  Resolution: inspect running `cargo` processes and terminate the background
+  checker before running gated test commands.
+
+- Surprise: `weaver-e2e` snapshot tests that use
+  `assert_cmd::cargo::cargo_bin("weaver")` do not run correctly when invoked as
+  a package-only test target because Cargo does not build the `weaver` binary
+  for that narrowed scope. Resolution: generate or verify those snapshots from
+  workspace-scoped test runs.
 
 ## Decision Log
 
@@ -166,6 +186,31 @@ plugins.
    and `crates/weaverd/tests/features/rename_symbol_coverage.feature`.
   Rationale: keeps each feature file focused and within budget. Date:
   2026-03-24.
+
+- Decision: keep the shared-fixture seam lightweight by exporting immutable
+  request and response examples rather than a bespoke assertion framework.
+  Rationale: downstream plugin crates can reuse the same fixture data from unit
+  tests and BDD step definitions without inheriting opaque test harness logic.
+  Date: 2026-03-29.
+
+- Decision: extend the existing e2e fake daemons just enough to emit automatic
+  capability-resolution envelopes and explicit-provider mismatch refusals based
+  on the request arguments. Rationale: this preserves the current lightweight
+  socket harness while letting the new snapshots exercise routing rationale and
+  refusal output without needing a full daemon implementation. Date: 2026-03-29.
+
+## Outcomes & Retrospective
+
+- Added shared `rename-symbol` request and response fixtures behind the
+  `weaver-plugins/test-support` feature, then reused them from both plugin
+  crates for unit and BDD contract validation.
+- Extended daemon coverage to prove automatic and explicit routing decisions,
+  non-diff success rejection, and rollback invariants on refusal and execution
+  failure paths.
+- Extended end-to-end snapshot coverage so the CLI now records automatic
+  routing and structured mismatch refusals for both built-in rename flows.
+- Updated `docs/users-guide.md` and `docs/roadmap.md` so the documented state
+  matches the implemented coverage milestone.
 
 ## Context and orientation
 
