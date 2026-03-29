@@ -276,10 +276,10 @@ fn normalize_snapshot_value(value: &mut serde_json::Value) {
 }
 
 fn normalize_message_value(value: &mut serde_json::Value) {
-    if let serde_json::Value::String(message) = value {
-        if let Some((prefix, _)) = message.split_once("/tmp/") {
-            *message = format!("{prefix}<path>");
-        }
+    if let serde_json::Value::String(message) = value
+        && let Some((prefix, _)) = message.split_once("/tmp/")
+    {
+        *message = format!("{prefix}<path>");
     }
 }
 
