@@ -381,7 +381,7 @@ Modify `crates/weaverd/src/dispatch/observe/get_card.rs` to use the cache:
    `provenance.extracted_at`. Use `std::time::SystemTime` and format manually
    (the workspace does not depend on `chrono` or `time`; a minimal UTC
    formatter is sufficient, or add a lightweight dependency if needed — but
-   prefer a small hand-written formatter to avoid a new dependency).
+   prefer a small handwritten formatter to avoid a new dependency).
 
 3. In `CachedCard`, store the extraction timestamp alongside the card so that
    cache hits return the original extraction time, not the current time.
@@ -534,7 +534,7 @@ tests that:
 4. Capture the JSON response and assert it using
    `insta::assert_snapshot!` with `serde_json::to_string_pretty()`.
 
-Structure the tests as parameterised `rstest` cases over the fixture constants,
+Structure the tests as parameterized `rstest` cases over the fixture constants,
 generating one snapshot per fixture. Use descriptive snapshot names that
 include the language and scenario (e.g.,
 `get_card_snapshots__python_simple_function`,

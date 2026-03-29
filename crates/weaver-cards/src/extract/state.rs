@@ -86,6 +86,11 @@ impl TreeSitterCardExtractor {
             },
         );
 
+        if let Some(card) = self.cache.peek_shared(&cache_key) {
+            self.cache.record_hit();
+            return Ok(card);
+        }
+
         let _population_guard = self.cache.lock_population(&cache_key);
         if let Some(card) = self.cache.get_shared(&cache_key) {
             return Ok(card);

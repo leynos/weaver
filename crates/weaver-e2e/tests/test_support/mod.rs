@@ -202,7 +202,14 @@ fn accept_before_deadline(listener: &TcpListener) -> Option<TcpStream> {
                 );
                 thread::sleep(ACCEPT_POLL_INTERVAL);
             }
-            Err(_) => return None,
+            Err(error) => {
+                let listener_address = listener
+                    .local_addr()
+                    .map_or_else(|_| String::from("<unknown>"), |address| address.to_string());
+                panic!(
+                    "test daemon listener {listener_address} failed before {ACCEPT_TIMEOUT:?}: {error}"
+                );
+            }
         }
     }
 }

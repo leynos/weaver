@@ -111,14 +111,14 @@ impl CardCache {
     #[must_use]
     pub fn get_shared(&self, key: &CardCacheKey) -> Option<Arc<SymbolCard>> {
         let Ok(mut guard) = self.inner.lock() else {
-            self.misses.fetch_add(1, Ordering::Relaxed);
+            self.record_miss();
             return None;
         };
         let card = guard.get(key).cloned();
         if card.is_some() {
-            self.hits.fetch_add(1, Ordering::Relaxed);
+            self.record_hit();
         } else {
-            self.misses.fetch_add(1, Ordering::Relaxed);
+            self.record_miss();
         }
         card
     }
@@ -164,6 +164,23 @@ impl CardCache {
     /// Invalidates cached entries for older revisions of the same path.
     pub fn invalidate_stale_revisions(&self, path: &Path, current_hash: &[u8; 32]) {
         self.evict_matching(|key| key.path() == path && key.content_hash() != current_hash);
+    }
+
+    /// Returns a cached card without updating hit/miss counters.
+    #[must_use]
+    pub(crate) fn peek_shared(&self, key: &CardCacheKey) -> Option<Arc<SymbolCard>> {
+        self.inner
+            .lock()
+            .ok()
+            .and_then(|mut guard| guard.get(key).cloned())
+    }
+
+    pub(crate) fn record_hit(&self) {
+        self.hits.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(crate) fn record_miss(&self) {
+        self.misses.fetch_add(1, Ordering::Relaxed);
     }
 
     fn evict_matching<F>(&self, predicate: F)
