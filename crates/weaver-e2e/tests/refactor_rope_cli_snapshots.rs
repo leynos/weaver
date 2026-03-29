@@ -365,110 +365,69 @@ fn output_to_transcript(
     }
 }
 
-#[test]
-fn refactor_actuator_isolation_cli_snapshot() {
+#[expect(
+    clippy::expect_used,
+    reason = "test helper surfaces setup failures with the exact requested call structure"
+)]
+fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
     let daemon = FakeDaemon::start(1).expect("fake daemon should start");
     let endpoint = daemon.endpoint();
 
-    let command_string = String::from(
-        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider rope --refactoring rename --file src/main.py new_name=renamed_symbol offset=4",
+    let provider_fragment = provider
+        .map(|p| format!("--provider {p} "))
+        .unwrap_or_default();
+    let command_string = format!(
+        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
+         {provider_fragment}--refactoring rename --file src/main.py \
+         new_name=renamed_symbol offset=4"
     );
+
+    let mut args: Vec<String> = vec![
+        "--daemon-socket".into(),
+        endpoint.clone(),
+        "--output".into(),
+        "json".into(),
+        "act".into(),
+        "refactor".into(),
+    ];
+    if let Some(p) = provider {
+        args.push("--provider".into());
+        args.push(p.into());
+    }
+    args.extend([
+        "--refactoring".into(),
+        "rename".into(),
+        "--file".into(),
+        "src/main.py".into(),
+        "new_name=renamed_symbol".into(),
+        "offset=4".into(),
+    ]);
 
     let mut command = Command::new(weaver_binary_path());
     let output = command
-        .args([
-            "--daemon-socket",
-            endpoint.as_str(),
-            "--output",
-            "json",
-            "act",
-            "refactor",
-            "--provider",
-            "rope",
-            "--refactoring",
-            "rename",
-            "--file",
-            "src/main.py",
-            "new_name=renamed_symbol",
-            "offset=4",
-        ])
+        .args(&args)
         .output()
         .expect("command should execute");
 
     let transcript = output_to_transcript(command_string, &output, daemon.requests());
     daemon.join();
 
-    assert_debug_snapshot!("refactor_actuator_isolation", transcript);
+    assert_debug_snapshot!(snapshot_name, transcript);
+}
+
+#[test]
+fn refactor_actuator_isolation_cli_snapshot() {
+    run_rename_refactor_snapshot("refactor_actuator_isolation", Some("rope"));
 }
 
 #[test]
 fn refactor_automatic_rope_routing_cli_snapshot() {
-    let daemon = FakeDaemon::start(1).expect("fake daemon should start");
-    let endpoint = daemon.endpoint();
-
-    let command_string = String::from(
-        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --refactoring rename --file src/main.py new_name=renamed_symbol offset=4",
-    );
-
-    let mut command = Command::new(weaver_binary_path());
-    let output = command
-        .args([
-            "--daemon-socket",
-            endpoint.as_str(),
-            "--output",
-            "json",
-            "act",
-            "refactor",
-            "--refactoring",
-            "rename",
-            "--file",
-            "src/main.py",
-            "new_name=renamed_symbol",
-            "offset=4",
-        ])
-        .output()
-        .expect("command should execute");
-
-    let transcript = output_to_transcript(command_string, &output, daemon.requests());
-    daemon.join();
-
-    assert_debug_snapshot!("refactor_automatic_rope_routing", transcript);
+    run_rename_refactor_snapshot("refactor_automatic_rope_routing", None);
 }
 
 #[test]
 fn refactor_provider_mismatch_refusal_cli_snapshot() {
-    let daemon = FakeDaemon::start(1).expect("fake daemon should start");
-    let endpoint = daemon.endpoint();
-
-    let command_string = String::from(
-        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider rust-analyzer --refactoring rename --file src/main.py new_name=renamed_symbol offset=4",
-    );
-
-    let mut command = Command::new(weaver_binary_path());
-    let output = command
-        .args([
-            "--daemon-socket",
-            endpoint.as_str(),
-            "--output",
-            "json",
-            "act",
-            "refactor",
-            "--provider",
-            "rust-analyzer",
-            "--refactoring",
-            "rename",
-            "--file",
-            "src/main.py",
-            "new_name=renamed_symbol",
-            "offset=4",
-        ])
-        .output()
-        .expect("command should execute");
-
-    let transcript = output_to_transcript(command_string, &output, daemon.requests());
-    daemon.join();
-
-    assert_debug_snapshot!("refactor_provider_mismatch_refusal", transcript);
+    run_rename_refactor_snapshot("refactor_provider_mismatch_refusal", Some("rust-analyzer"));
 }
 
 #[test]

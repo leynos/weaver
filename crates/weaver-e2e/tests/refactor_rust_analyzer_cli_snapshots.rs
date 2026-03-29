@@ -365,22 +365,32 @@ fn output_to_transcript(
     }
 }
 
-#[test]
-fn refactor_rust_analyzer_actuator_isolation_cli_snapshot() {
-    let daemon = FakeDaemon::start(1).expect("fake daemon should start");
+fn run_refactor_snapshot(snapshot_name: &str, display_command: &str, extra_args: &[&str]) {
+    let daemon =
+        FakeDaemon::start(1).unwrap_or_else(|error| panic!("fake daemon should start: {error}"));
     let endpoint = daemon.endpoint();
 
-    let command_string = String::from(
-        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider rust-analyzer --refactoring rename --file src/main.rs new_name=renamed_name offset=3",
-    );
+    let output = Command::new(weaver_binary_path())
+        .arg("--daemon-socket")
+        .arg(endpoint.as_str())
+        .arg("--output")
+        .arg("json")
+        .args(extra_args)
+        .output()
+        .unwrap_or_else(|error| panic!("command should execute: {error}"));
 
-    let mut command = Command::new(weaver_binary_path());
-    let output = command
-        .args([
-            "--daemon-socket",
-            endpoint.as_str(),
-            "--output",
-            "json",
+    let transcript = output_to_transcript(display_command.to_owned(), &output, daemon.requests());
+    daemon.join();
+
+    assert_debug_snapshot!(snapshot_name, transcript);
+}
+
+#[test]
+fn refactor_rust_analyzer_actuator_isolation_cli_snapshot() {
+    run_refactor_snapshot(
+        "refactor_rust_analyzer_actuator_isolation",
+        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider rust-analyzer --refactoring rename --file src/main.rs new_name=renamed_name offset=3",
+        &[
             "act",
             "refactor",
             "--provider",
@@ -391,32 +401,16 @@ fn refactor_rust_analyzer_actuator_isolation_cli_snapshot() {
             "src/main.rs",
             "new_name=renamed_name",
             "offset=3",
-        ])
-        .output()
-        .expect("command should execute");
-
-    let transcript = output_to_transcript(command_string, &output, daemon.requests());
-    daemon.join();
-
-    assert_debug_snapshot!("refactor_rust_analyzer_actuator_isolation", transcript);
+        ],
+    );
 }
 
 #[test]
 fn refactor_automatic_rust_routing_cli_snapshot() {
-    let daemon = FakeDaemon::start(1).expect("fake daemon should start");
-    let endpoint = daemon.endpoint();
-
-    let command_string = String::from(
+    run_refactor_snapshot(
+        "refactor_automatic_rust_routing",
         "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --refactoring rename --file src/main.rs new_name=renamed_name offset=3",
-    );
-
-    let mut command = Command::new(weaver_binary_path());
-    let output = command
-        .args([
-            "--daemon-socket",
-            endpoint.as_str(),
-            "--output",
-            "json",
+        &[
             "act",
             "refactor",
             "--refactoring",
@@ -425,32 +419,16 @@ fn refactor_automatic_rust_routing_cli_snapshot() {
             "src/main.rs",
             "new_name=renamed_name",
             "offset=3",
-        ])
-        .output()
-        .expect("command should execute");
-
-    let transcript = output_to_transcript(command_string, &output, daemon.requests());
-    daemon.join();
-
-    assert_debug_snapshot!("refactor_automatic_rust_routing", transcript);
+        ],
+    );
 }
 
 #[test]
 fn refactor_rust_provider_mismatch_refusal_cli_snapshot() {
-    let daemon = FakeDaemon::start(1).expect("fake daemon should start");
-    let endpoint = daemon.endpoint();
-
-    let command_string = String::from(
+    run_refactor_snapshot(
+        "refactor_rust_provider_mismatch_refusal",
         "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider rope --refactoring rename --file src/main.rs new_name=renamed_name offset=3",
-    );
-
-    let mut command = Command::new(weaver_binary_path());
-    let output = command
-        .args([
-            "--daemon-socket",
-            endpoint.as_str(),
-            "--output",
-            "json",
+        &[
             "act",
             "refactor",
             "--provider",
@@ -461,14 +439,8 @@ fn refactor_rust_provider_mismatch_refusal_cli_snapshot() {
             "src/main.rs",
             "new_name=renamed_name",
             "offset=3",
-        ])
-        .output()
-        .expect("command should execute");
-
-    let transcript = output_to_transcript(command_string, &output, daemon.requests());
-    daemon.join();
-
-    assert_debug_snapshot!("refactor_rust_provider_mismatch_refusal", transcript);
+        ],
+    );
 }
 
 #[test]

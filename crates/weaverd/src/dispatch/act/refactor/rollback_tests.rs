@@ -71,6 +71,19 @@ fn refused_runtime() -> RollbackRuntime {
     }
 }
 
+fn rope_python_runtime(execute_result: ExecuteResult) -> RollbackRuntime {
+    RollbackRuntime {
+        resolution: selected_resolution(SelectedResolution {
+            capability: weaver_plugins::CapabilityId::RenameSymbol,
+            language: "python",
+            provider: "rope",
+            selection_mode: super::resolution::SelectionMode::Automatic,
+            requested_provider: None,
+        }),
+        execute_result,
+    }
+}
+
 fn run_failure_case(runtime: RollbackRuntime) -> RollbackOutcome {
     let workspace = TempDir::new().expect("workspace");
     let file = "notes.py";
@@ -101,6 +114,15 @@ fn run_failure_case(runtime: RollbackRuntime) -> RollbackOutcome {
     }
 }
 
+fn assert_rollback_invariants(outcome: &RollbackOutcome, stderr_fragment: &str) {
+    assert_eq!(outcome.status, 1);
+    assert_eq!(
+        outcome.content,
+        original_content_for(std::path::Path::new("notes.py"))
+    );
+    assert!(outcome.stderr.contains(stderr_fragment));
+}
+
 #[test]
 fn refused_resolution_leaves_target_file_unchanged() {
     let outcome = run_failure_case(refused_runtime());
@@ -115,44 +137,16 @@ fn refused_resolution_leaves_target_file_unchanged() {
 
 #[test]
 fn plugin_runtime_error_leaves_target_file_unchanged() {
-    let outcome = run_failure_case(RollbackRuntime {
-        resolution: selected_resolution(SelectedResolution {
-            capability: weaver_plugins::CapabilityId::RenameSymbol,
-            language: "python",
-            provider: "rope",
-            selection_mode: super::resolution::SelectionMode::Automatic,
-            requested_provider: None,
-        }),
-        execute_result: ExecuteResult::MissingPlugin("rope"),
-    });
-
-    assert_eq!(outcome.status, 1);
-    assert_eq!(
-        outcome.content,
-        original_content_for(std::path::Path::new("notes.py"))
-    );
-    assert!(outcome.stderr.contains("act refactor failed"));
+    let outcome = run_failure_case(rope_python_runtime(ExecuteResult::MissingPlugin("rope")));
+    assert_rollback_invariants(&outcome, "act refactor failed");
 }
 
 #[test]
 fn successful_non_diff_response_leaves_target_file_unchanged() {
-    let outcome = run_failure_case(RollbackRuntime {
-        resolution: selected_resolution(SelectedResolution {
-            capability: weaver_plugins::CapabilityId::RenameSymbol,
-            language: "python",
-            provider: "rope",
-            selection_mode: super::resolution::SelectionMode::Automatic,
-            requested_provider: None,
-        }),
-        execute_result: ExecuteResult::Success(PluginResponse::success(PluginOutput::Analysis {
+    let outcome = run_failure_case(rope_python_runtime(ExecuteResult::Success(
+        PluginResponse::success(PluginOutput::Analysis {
             data: serde_json::json!({ "unexpected": true }),
-        })),
-    });
-
-    assert_eq!(outcome.status, 1);
-    assert_eq!(
-        outcome.content,
-        original_content_for(std::path::Path::new("notes.py"))
-    );
-    assert!(outcome.stderr.contains("did not return diff output"));
+        }),
+    )));
+    assert_rollback_invariants(&outcome, "did not return diff output");
 }

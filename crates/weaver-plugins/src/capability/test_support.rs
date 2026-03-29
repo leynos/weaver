@@ -8,25 +8,25 @@ use crate::protocol::{
     DiagnosticSeverity, PluginDiagnostic, PluginOutput, PluginRequest, PluginResponse,
 };
 
-/// Shared request fixture for `rename-symbol` contract validation.
+/// Shared fixture for `rename-symbol` contract validation payloads.
 #[derive(Debug, Clone)]
-pub struct RenameSymbolRequestFixture {
+pub struct RenameSymbolFixture<T> {
     name: &'static str,
-    request: PluginRequest,
+    payload: T,
     expected_error_fragment: Option<&'static str>,
 }
 
-impl RenameSymbolRequestFixture {
-    /// Creates a new request fixture.
+impl<T> RenameSymbolFixture<T> {
+    /// Creates a new fixture.
     #[must_use]
     pub const fn new(
         name: &'static str,
-        request: PluginRequest,
+        payload: T,
         expected_error_fragment: Option<&'static str>,
     ) -> Self {
         Self {
             name,
-            request,
+            payload,
             expected_error_fragment,
         }
     }
@@ -37,81 +37,44 @@ impl RenameSymbolRequestFixture {
         self.name
     }
 
-    /// Returns the fixture request.
+    /// Returns the fixture payload.
     #[must_use]
-    pub const fn request(&self) -> &PluginRequest {
-        &self.request
+    pub const fn payload(&self) -> &T {
+        &self.payload
     }
 
-    /// Returns the expected error fragment for invalid requests.
-    #[must_use]
-    pub const fn expected_error_fragment(&self) -> Option<&'static str> {
-        self.expected_error_fragment
-    }
-}
-
-/// Shared response fixture for `rename-symbol` contract validation.
-#[derive(Debug, Clone)]
-pub struct RenameSymbolResponseFixture {
-    name: &'static str,
-    response: PluginResponse,
-    expected_error_fragment: Option<&'static str>,
-}
-
-impl RenameSymbolResponseFixture {
-    /// Creates a new response fixture.
-    #[must_use]
-    pub const fn new(
-        name: &'static str,
-        response: PluginResponse,
-        expected_error_fragment: Option<&'static str>,
-    ) -> Self {
-        Self {
-            name,
-            response,
-            expected_error_fragment,
-        }
-    }
-
-    /// Returns the human-readable fixture name.
-    #[must_use]
-    pub const fn name(&self) -> &'static str {
-        self.name
-    }
-
-    /// Returns the fixture response.
-    #[must_use]
-    pub const fn response(&self) -> &PluginResponse {
-        &self.response
-    }
-
-    /// Returns the expected error fragment for invalid responses.
+    /// Returns the expected error fragment for invalid payloads.
     #[must_use]
     pub const fn expected_error_fragment(&self) -> Option<&'static str> {
         self.expected_error_fragment
     }
 }
+
+/// Shared request fixture alias for `rename-symbol` contract validation.
+pub type RenameSymbolRequestFixture = RenameSymbolFixture<PluginRequest>;
+/// Shared response fixture alias for `rename-symbol` contract validation.
+pub type RenameSymbolResponseFixture = RenameSymbolFixture<PluginResponse>;
 
 /// Returns the canonical request fixtures shared by rename-capable plugins.
 #[must_use]
 pub fn rename_symbol_request_fixtures() -> Vec<RenameSymbolRequestFixture> {
     vec![
-        RenameSymbolRequestFixture::new(
+        RenameSymbolFixture::new(
             "valid_request",
             PluginRequest::with_arguments("rename-symbol", Vec::new(), valid_arguments()),
             None,
         ),
-        RenameSymbolRequestFixture::new(
+        RenameSymbolFixture::new(
             "wrong_operation",
             PluginRequest::with_arguments("extract-method", Vec::new(), valid_arguments()),
             Some("expects operation"),
         ),
-        RenameSymbolRequestFixture::new(
+        RenameSymbolFixture::new(
             "missing_uri",
             PluginRequest::with_arguments("rename-symbol", Vec::new(), arguments_without("uri")),
             Some("uri"),
         ),
-        RenameSymbolRequestFixture::new(
+        RenameSymbolFixture::new(
             "missing_position",
             PluginRequest::with_arguments(
                 "rename-symbol",
@@ -120,7 +83,7 @@ pub fn rename_symbol_request_fixtures() -> Vec<RenameSymbolRequestFixture> {
             ),
             Some("position"),
         ),
-        RenameSymbolRequestFixture::new(
+        RenameSymbolFixture::new(
             "missing_new_name",
             PluginRequest::with_arguments(
                 "rename-symbol",
@@ -129,7 +92,7 @@ pub fn rename_symbol_request_fixtures() -> Vec<RenameSymbolRequestFixture> {
             ),
             Some("new_name"),
         ),
-        RenameSymbolRequestFixture::new(
+        RenameSymbolFixture::new(
             "empty_new_name",
             PluginRequest::with_arguments(
                 "rename-symbol",
@@ -145,21 +108,21 @@ pub fn rename_symbol_request_fixtures() -> Vec<RenameSymbolRequestFixture> {
 #[must_use]
 pub fn rename_symbol_response_fixtures() -> Vec<RenameSymbolResponseFixture> {
     vec![
-        RenameSymbolResponseFixture::new(
+        RenameSymbolFixture::new(
             "successful_diff",
             PluginResponse::success(PluginOutput::Diff {
                 content: String::from("--- a/src/main.py\n+++ b/src/main.py\n"),
             }),
             None,
         ),
-        RenameSymbolResponseFixture::new(
+        RenameSymbolFixture::new(
             "successful_analysis_rejected",
             PluginResponse::success(PluginOutput::Analysis {
                 data: serde_json::json!({ "unexpected": true }),
             }),
             Some("diff output"),
         ),
-        RenameSymbolResponseFixture::new(
+        RenameSymbolFixture::new(
             "failed_response_with_reason_code",
             PluginResponse::failure(vec![
                 PluginDiagnostic::new(DiagnosticSeverity::Error, "symbol not found")

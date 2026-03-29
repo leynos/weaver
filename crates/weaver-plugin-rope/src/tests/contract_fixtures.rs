@@ -10,7 +10,7 @@ fn shared_request_fixtures_match_rename_symbol_contract() {
     let contract = RenameSymbolContract;
 
     for fixture in rename_symbol_request_fixtures() {
-        let result = contract.validate_request(fixture.request());
+        let result = contract.validate_request(fixture.payload());
         match fixture.expected_error_fragment() {
             None => assert!(
                 result.is_ok(),
@@ -35,7 +35,7 @@ fn shared_response_fixtures_match_rename_symbol_contract() {
     let contract = RenameSymbolContract;
 
     for fixture in rename_symbol_response_fixtures() {
-        let result = contract.validate_response(fixture.response());
+        let result = contract.validate_response(fixture.payload());
         match fixture.expected_error_fragment() {
             None => assert!(
                 result.is_ok(),
