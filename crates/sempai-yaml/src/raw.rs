@@ -43,6 +43,8 @@ pub(crate) struct RawRule {
     pub(crate) pattern_either: Option<Spanned<Vec<RawLegacyFormulaObject>>>,
     #[serde(rename = "match")]
     pub(crate) match_formula: Option<Spanned<RawMatchFormula>>,
+    #[serde(rename = "r2c-internal-project-depends-on")]
+    pub(crate) project_depends_on: Option<Spanned<Value>>,
     #[serde(rename = "dest-language")]
     pub(crate) dest_language: Option<Spanned<String>>,
     pub(crate) extract: Option<Spanned<String>>,

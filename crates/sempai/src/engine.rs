@@ -5,8 +5,8 @@
 //! Compilation and execution are separate phases, allowing a compiled
 //! [`QueryPlan`] to be reused across multiple source files.
 
-use sempai_core::{DiagnosticReport, EngineConfig, Language, Match};
-use sempai_yaml::parse_rule_file;
+use sempai_core::{DiagnosticCode, DiagnosticReport, EngineConfig, Language, Match, SourceSpan};
+use sempai_yaml::{Rule, RuleFile, RuleMode, parse_rule_file};
 
 /// A compiled query plan for one rule and one language.
 ///
@@ -109,7 +109,8 @@ impl Engine {
     /// Successful YAML parsing still stops at the post-parse placeholder until
     /// rule normalization is implemented.
     pub fn compile_yaml(&self, yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
-        let _ = parse_rule_file(yaml, None)?;
+        let file = parse_rule_file(yaml, None)?;
+        validate_supported_modes(&file)?;
         Err(DiagnosticReport::not_implemented(
             "compile_yaml query-plan normalization",
         ))
@@ -143,5 +144,47 @@ impl Engine {
         _source: &str,
     ) -> Result<Vec<Match>, DiagnosticReport> {
         Err(DiagnosticReport::not_implemented("execute"))
+    }
+}
+
+fn validate_supported_modes(file: &RuleFile) -> Result<(), DiagnosticReport> {
+    file.rules()
+        .iter()
+        .find_map(unsupported_mode_diagnostic)
+        .map_or(Ok(()), Err)
+}
+
+fn unsupported_mode_diagnostic(rule: &Rule) -> Option<DiagnosticReport> {
+    match rule.mode() {
+        RuleMode::Search => None,
+        RuleMode::Extract | RuleMode::Join | RuleMode::Taint | RuleMode::Other(_) => {
+            Some(DiagnosticReport::validation_error(
+                DiagnosticCode::ESempaiUnsupportedMode,
+                format!(
+                    "rule mode `{}` is not yet supported by `compile_yaml`",
+                    rule_mode_name(rule.mode())
+                ),
+                unsupported_mode_span(rule),
+                vec![String::from(
+                    "only `search` mode can proceed past validation today",
+                )],
+            ))
+        }
+    }
+}
+
+fn unsupported_mode_span(rule: &Rule) -> Option<SourceSpan> {
+    rule.mode_span()
+        .cloned()
+        .or_else(|| rule.rule_span().cloned())
+}
+
+const fn rule_mode_name(mode: &RuleMode) -> &str {
+    match mode {
+        RuleMode::Search => "search",
+        RuleMode::Taint => "taint",
+        RuleMode::Join => "join",
+        RuleMode::Extract => "extract",
+        RuleMode::Other(other_mode) => other_mode.as_str(),
     }
 }

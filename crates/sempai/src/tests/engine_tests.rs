@@ -63,6 +63,62 @@ fn compile_yaml_returns_not_implemented_after_successful_parse() {
 }
 
 #[test]
+fn compile_yaml_returns_not_implemented_for_project_depends_on_search_rule() {
+    let engine = default_engine();
+    let result = engine.compile_yaml(concat!(
+        "rules:\n",
+        "  - id: demo.depends\n",
+        "    message: detect vulnerable dependency\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    r2c-internal-project-depends-on:\n",
+        "      namespace: pypi\n",
+        "      package: requests\n",
+    ));
+    let (code, diag) = first_diagnostic_of_err(result);
+    assert_eq!(code, DiagnosticCode::NotImplemented);
+    assert!(diag.message().contains("normalization"));
+}
+
+#[test]
+fn compile_yaml_returns_unsupported_mode_for_extract_rules() {
+    let engine = default_engine();
+    let result = engine.compile_yaml(concat!(
+        "rules:\n",
+        "  - id: demo.extract\n",
+        "    mode: extract\n",
+        "    message: extract foo\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    dest-language: python\n",
+        "    extract: foo($X)\n",
+        "    pattern: source($X)\n",
+    ));
+    let (code, diag) = first_diagnostic_of_err(result);
+    assert_eq!(code, DiagnosticCode::ESempaiUnsupportedMode);
+    assert!(diag.message().contains("extract"));
+    assert!(diag.primary_span().is_some());
+}
+
+#[test]
+fn compile_yaml_returns_unsupported_mode_for_unknown_modes() {
+    let engine = default_engine();
+    let result = engine.compile_yaml(concat!(
+        "rules:\n",
+        "  - id: demo.custom\n",
+        "    mode: custom-mode\n",
+        "    message: custom mode\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    pattern: foo($X)\n",
+    ));
+    let (code, diag) = first_diagnostic_of_err(result);
+    assert_eq!(code, DiagnosticCode::ESempaiUnsupportedMode);
+    assert!(diag.message().contains("custom-mode"));
+    assert!(diag.primary_span().is_some());
+}
+
+#[test]
 fn compile_dsl_returns_not_implemented() {
     let engine = default_engine();
     let result = engine.compile_dsl("test-rule", Language::Python, "pattern(\"def $F\")");
