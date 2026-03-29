@@ -57,14 +57,14 @@ fn given_non_diff_response_fixture(world: &mut World) {
 fn when_validating_request_fixture(world: &mut World) {
     let contract = RenameSymbolContract;
     let fixture = world.request_fixture.as_ref().expect("request fixture");
-    world.validation_result = Some(contract.validate_request(fixture.request()));
+    world.validation_result = Some(contract.validate_request(fixture.payload()));
 }
 
 #[when("the rust-analyzer crate validates the shared response fixture")]
 fn when_validating_response_fixture(world: &mut World) {
     let contract = RenameSymbolContract;
     let fixture = world.response_fixture.as_ref().expect("response fixture");
-    world.validation_result = Some(contract.validate_response(fixture.response()));
+    world.validation_result = Some(contract.validate_response(fixture.payload()));
 }
 
 #[then("the shared fixture passes contract validation")]
