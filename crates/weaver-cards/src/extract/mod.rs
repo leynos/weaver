@@ -5,16 +5,15 @@ mod candidates;
 mod fingerprint;
 mod languages;
 mod positions;
+mod state;
 mod utils;
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use thiserror::Error;
 use weaver_syntax::SupportedLanguage;
 
 use crate::Provenance;
-use crate::cache::{CardCache, CardCacheAddress, CardCacheKey, ParserRegistry};
 use crate::timestamp::extraction_timestamp_now;
 use crate::{
     AttachmentsInfo, DetailLevel, DocInfo, ImportInterstitialInfo, InterstitialInfo, MetricsInfo,
@@ -23,6 +22,7 @@ use crate::{
 pub(super) use candidates::{EntityCandidate, InterstitialCandidate};
 use candidates::{build_module_candidate, select_candidate};
 use positions::{position_to_byte, usize_to_u32};
+pub use state::TreeSitterCardExtractor;
 use utils::{file_uri, provenance_sources, to_card_language};
 
 /// Input required to extract a Tree-sitter-backed symbol card.
@@ -81,181 +81,54 @@ pub enum CardExtractionError {
     },
 }
 
-/// Tree-sitter-first extractor for `observe get-card`.
-#[derive(Debug, Clone)]
-pub struct TreeSitterCardExtractor {
-    cache: Arc<CardCache>,
-    parsers: Arc<ParserRegistry>,
-}
+fn extract_for_language<F>(
+    input: CardExtractionInput<'_>,
+    language: SupportedLanguage,
+    parser: F,
+) -> Result<SymbolCard, CardExtractionError>
+where
+    F: FnOnce(SupportedLanguage) -> Result<weaver_syntax::ParseResult, CardExtractionError>,
+{
+    let parse = parser(language)?;
+    let position_byte = position_to_byte(input.source, input.line, input.column)?;
+    let mut entities = languages::collect_entities(language, parse.root_node(), input.source);
+    entities.sort_by_key(|candidate| candidate.byte_range.start);
+    let interstitial =
+        languages::collect_import_interstitial(language, parse.root_node(), input.source);
+    let module_candidate = build_module_candidate(input.path, input.source, interstitial);
 
-impl TreeSitterCardExtractor {
-    /// Creates a new extractor.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::with_shared_resources(
-            Arc::new(CardCache::default()),
-            Arc::new(ParserRegistry::default()),
-        )
-    }
+    let selected = select_candidate(&entities, module_candidate.as_ref(), position_byte).ok_or(
+        CardExtractionError::NoSymbolAtPosition {
+            line: input.line,
+            column: input.column,
+        },
+    )?;
 
-    /// Creates a new extractor with a custom cache capacity.
-    #[must_use]
-    pub fn with_cache_capacity(capacity: usize) -> Self {
-        Self::with_shared_resources(
-            Arc::new(CardCache::new(capacity)),
-            Arc::new(ParserRegistry::default()),
-        )
-    }
-
-    /// Creates a new extractor backed by caller-supplied shared resources.
-    #[must_use]
-    pub const fn with_shared_resources(
-        cache: Arc<CardCache>,
-        parsers: Arc<ParserRegistry>,
-    ) -> Self {
-        Self { cache, parsers }
-    }
-
-    /// Extracts a symbol card for the requested position.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`CardExtractionError`] when the path is unsupported, the
-    /// position is invalid, parsing fails, or no symbol matches the position.
-    pub fn extract(
-        &self,
-        input: CardExtractionInput<'_>,
-    ) -> Result<SymbolCard, CardExtractionError> {
-        self.extract_shared(input).map(|card| card.as_ref().clone())
-    }
-
-    /// Extracts a symbol card for the requested position, reusing a shared
-    /// payload when the cache already contains the card.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`CardExtractionError`] when the path is unsupported, the
-    /// position is invalid, parsing fails, or no symbol matches the position.
-    pub fn extract_shared(
-        &self,
-        input: CardExtractionInput<'_>,
-    ) -> Result<Arc<SymbolCard>, CardExtractionError> {
-        let language = SupportedLanguage::from_path(input.path).ok_or_else(|| {
-            CardExtractionError::UnsupportedLanguage {
-                path: input.path.to_path_buf(),
-            }
-        })?;
-        let cache_key = CardCacheKey::new(
-            input.path,
-            input.source,
-            CardCacheAddress {
-                language,
-                detail: input.detail,
-                line: input.line,
-                column: input.column,
-            },
-        );
-        if let Some(card) = self.cache.get_shared(&cache_key) {
-            return Ok(card);
-        }
-
-        let card = Arc::new(Self::extract_for_language(
-            input,
+    build_card(
+        selected,
+        CardBuildContext {
             language,
-            |supported_language| {
-                self.parsers
-                    .parse(supported_language, input.source)
-                    .map_err(|error| CardExtractionError::Parse {
-                        language: String::from(supported_language.as_str()),
-                        message: error.to_string(),
-                    })
-            },
-        )?);
-        self.cache
-            .invalidate_stale_revisions(input.path, cache_key.content_hash());
-        self.cache.insert_shared(cache_key, Arc::clone(&card));
-        Ok(card)
-    }
-
-    fn extract_for_language<F>(
-        input: CardExtractionInput<'_>,
-        language: SupportedLanguage,
-        parser: F,
-    ) -> Result<SymbolCard, CardExtractionError>
-    where
-        F: FnOnce(SupportedLanguage) -> Result<weaver_syntax::ParseResult, CardExtractionError>,
-    {
-        let parse = parser(language)?;
-        let position_byte = position_to_byte(input.source, input.line, input.column)?;
-        let mut entities = languages::collect_entities(language, parse.root_node(), input.source);
-        entities.sort_by_key(|candidate| candidate.byte_range.start);
-        let interstitial =
-            languages::collect_import_interstitial(language, parse.root_node(), input.source);
-        let module_candidate = build_module_candidate(input.path, input.source, interstitial);
-
-        let selected = select_candidate(&entities, module_candidate.as_ref(), position_byte)
-            .ok_or(CardExtractionError::NoSymbolAtPosition {
-                line: input.line,
-                column: input.column,
-            })?;
-
-        build_card(
-            selected,
-            CardBuildContext {
-                language,
-                path: input.path,
-                detail: input.detail,
-                source: input.source,
-            },
-        )
-    }
-
-    #[cfg(test)]
-    pub(crate) fn extract_with_parser_for_test<F>(
-        input: CardExtractionInput<'_>,
-        parser: F,
-    ) -> Result<SymbolCard, CardExtractionError>
-    where
-        F: FnOnce(SupportedLanguage) -> Result<weaver_syntax::ParseResult, CardExtractionError>,
-    {
-        let language = SupportedLanguage::from_path(input.path).ok_or_else(|| {
-            CardExtractionError::UnsupportedLanguage {
-                path: input.path.to_path_buf(),
-            }
-        })?;
-        Self::extract_for_language(input, language, parser)
-    }
-
-    /// Returns cache hit/miss counters for this extractor instance.
-    #[must_use]
-    pub fn cache_stats(&self) -> crate::CacheStats {
-        self.cache.stats()
-    }
-
-    /// Returns the number of cached entries held by this extractor.
-    #[must_use]
-    pub fn cache_len(&self) -> usize {
-        self.cache.len()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn invalidate_path(&self, path: &Path) {
-        self.cache.invalidate(path);
-    }
-
-    #[cfg(test)]
-    pub(crate) fn parser_identity(
-        &self,
-        language: SupportedLanguage,
-    ) -> Result<usize, weaver_syntax::SyntaxError> {
-        self.parsers.parser_identity(language)
-    }
+            path: input.path,
+            detail: input.detail,
+            source: input.source,
+        },
+    )
 }
 
-impl Default for TreeSitterCardExtractor {
-    fn default() -> Self {
-        Self::new()
-    }
+#[cfg(test)]
+pub(crate) fn extract_with_parser_for_test<F>(
+    input: CardExtractionInput<'_>,
+    parser: F,
+) -> Result<SymbolCard, CardExtractionError>
+where
+    F: FnOnce(SupportedLanguage) -> Result<weaver_syntax::ParseResult, CardExtractionError>,
+{
+    let language = SupportedLanguage::from_path(input.path).ok_or_else(|| {
+        CardExtractionError::UnsupportedLanguage {
+            path: input.path.to_path_buf(),
+        }
+    })?;
+    extract_for_language(input, language, parser)
 }
 
 #[derive(Debug, Clone)]

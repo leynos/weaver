@@ -1,6 +1,8 @@
 //! Unit tests for card extraction cache behaviour.
 
 use std::path::Path;
+use std::sync::{Arc, Barrier};
+use std::thread;
 
 use rstest::rstest;
 use weaver_syntax::SupportedLanguage;
@@ -68,6 +70,12 @@ fn cache_miss_returns_none() {
 
     assert_eq!(cache.get(&key), None);
     assert_eq!(cache.stats().misses, 1);
+}
+
+#[rstest]
+#[should_panic(expected = "card cache capacity must be greater than zero")]
+fn zero_capacity_cache_panics() {
+    drop(CardCache::new(0));
 }
 
 #[rstest]
@@ -254,4 +262,34 @@ fn extractor_reuses_parser_and_cache_for_identical_requests() {
     assert_eq!(parser_before, parser_after_first);
     assert_eq!(parser_after_first, parser_after_second);
     assert_eq!(extractor.cache_stats().hits, 1);
+}
+
+#[rstest]
+fn identical_concurrent_requests_only_parse_once() {
+    let extractor = Arc::new(TreeSitterCardExtractor::with_cache_capacity(8));
+    let barrier = Arc::new(Barrier::new(2));
+    let source = rust_source("greet");
+
+    let handles: Vec<_> = (0..2)
+        .map(|_| {
+            let shared_extractor = Arc::clone(&extractor);
+            let shared_barrier = Arc::clone(&barrier);
+            let request_source = source.clone();
+            thread::spawn(move || {
+                shared_barrier.wait();
+                extract_card(&shared_extractor, &request_source)
+            })
+        })
+        .collect();
+
+    let cards: Vec<_> = handles
+        .into_iter()
+        .map(|handle| handle.join().expect("thread should complete"))
+        .collect();
+
+    let first = cards.first().expect("first card should exist");
+    let second = cards.get(1).expect("second card should exist");
+    assert_eq!(first, second);
+    assert_eq!(extractor.cache_stats().hits, 1);
+    assert_eq!(extractor.cache_stats().misses, 1);
 }

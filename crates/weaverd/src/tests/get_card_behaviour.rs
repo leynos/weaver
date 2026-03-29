@@ -13,6 +13,7 @@ use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use tempfile::TempDir;
 use url::Url;
+use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
 use crate::backends::FusionBackends;
@@ -26,7 +27,8 @@ fn test_handler() -> Arc<DispatchConnectionHandler> {
         daemon_socket: SocketEndpoint::unix("/tmp/weaver-bdd-get-card/socket.sock"),
         ..Config::default()
     };
-    let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
+    let provider =
+        SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
     let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
     let backend_manager = BackendManager::new(backends);
     let workspace_root = std::env::current_dir().expect("workspace root");
@@ -154,8 +156,23 @@ impl GetCardWorld {
     fn latest_response_differs(&self) -> bool {
         self.previous_response_lines
             .as_ref()
-            .is_some_and(|previous| previous != &self.response_lines)
+            .is_some_and(|previous| {
+                stdout_payload(previous) != stdout_payload(&self.response_lines)
+            })
     }
+}
+
+fn stdout_payload(lines: &[String]) -> Option<serde_json::Value> {
+    lines.iter().find_map(|line| {
+        let envelope: serde_json::Value = serde_json::from_str(line).ok()?;
+        if envelope.get("kind") != Some(&serde_json::Value::String(String::from("stream"))) {
+            return None;
+        }
+        if envelope.get("stream") != Some(&serde_json::Value::String(String::from("stdout"))) {
+            return None;
+        }
+        serde_json::from_str(envelope.get("data")?.as_str()?).ok()
+    })
 }
 
 impl Drop for GetCardWorld {

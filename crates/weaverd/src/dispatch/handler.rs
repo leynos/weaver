@@ -175,6 +175,7 @@ mod tests {
     use std::thread::{self, JoinHandle};
 
     use rstest::{fixture, rstest};
+    use weaver_cards::DEFAULT_CACHE_CAPACITY;
     use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
     use crate::backends::FusionBackends;
@@ -188,7 +189,8 @@ mod tests {
             daemon_socket: SocketEndpoint::unix("/tmp/weaver-test/socket.sock"),
             ..Config::default()
         };
-        let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
+        let provider =
+            SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
         let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
         BackendManager::new(backends)
     }

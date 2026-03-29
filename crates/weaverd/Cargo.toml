@@ -8,6 +8,10 @@ rust-version.workspace = true
 name = "weaverd"
 path = "src/main.rs"
 
+[features]
+# Exposes internal transport/dispatch wiring for workspace integration tests.
+test-support = []
+
 [dependencies]
 daemonize-me = "2.0.2"
 dirs = "5.0"

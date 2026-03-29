@@ -40,7 +40,8 @@ mod symbol;
 mod timestamp;
 
 pub use cache::{
-    CacheStats, CardCache, CardCacheAddress, CardCacheKey, ParserRegistry, content_hash,
+    CacheStats, CardCache, CardCacheAddress, CardCacheKey, DEFAULT_CACHE_CAPACITY, ParserRegistry,
+    content_hash,
 };
 pub use card::{
     AttachmentsInfo, BranchInfo, DepsInfo, DocInfo, ImportInterstitialInfo, InterstitialInfo,

@@ -4,6 +4,7 @@ use std::env;
 use std::sync::{Arc, Mutex};
 
 use tracing::info;
+use weaver_cards::DEFAULT_CACHE_CAPACITY;
 
 use crate::StructuredHealthReporter;
 use crate::bootstrap::{ConfigLoader, StaticConfigLoader, SystemConfigLoader, bootstrap_with};
@@ -112,7 +113,8 @@ where
     let listener = SocketListener::bind(config.daemon_socket())?;
 
     // Create a single provider and backends instance shared by daemon and dispatch
-    let provider = SemanticBackendProvider::new(config.capability_matrix().clone());
+    let provider =
+        SemanticBackendProvider::new(config.capability_matrix().clone(), DEFAULT_CACHE_CAPACITY);
     let static_loader = StaticConfigLoader::new(config.clone());
     let daemon = bootstrap_with(&static_loader, reporter, provider)?;
 

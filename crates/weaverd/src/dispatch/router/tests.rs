@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use url::Url;
+use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
 use super::*;
@@ -23,7 +24,8 @@ fn build_backends() -> FusionBackends<SemanticBackendProvider> {
         daemon_socket: SocketEndpoint::unix("/tmp/weaver-test/socket.sock"),
         ..Config::default()
     };
-    let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
+    let provider =
+        SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
     FusionBackends::new(config, provider)
 }
 

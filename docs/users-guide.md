@@ -571,7 +571,7 @@ extraction with provenance `"tree_sitter_degraded_semantic"`.
 `observe get-card` responses are cached per daemon process by
 `(path, content hash, language, detail level, line, column)`. Repeating the
 same request against an unchanged file revision reuses the cached card instead
-of re-parsing the file. When the file contents change, Weaver invalidates stale
+of reparsing the file. When the file contents change, Weaver invalidates stale
 cached revisions for that path and records a fresh `provenance.extracted_at`
 timestamp. Cache hits preserve the original extraction timestamp.
 

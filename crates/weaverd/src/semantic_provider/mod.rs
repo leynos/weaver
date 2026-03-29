@@ -64,11 +64,15 @@ impl fmt::Debug for SemanticBackendProvider {
 
 impl SemanticBackendProvider {
     /// Creates a new provider with the given capability matrix.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `card_cache_capacity` is zero.
     #[must_use]
-    pub fn new(capability_matrix: CapabilityMatrix) -> Self {
+    pub fn new(capability_matrix: CapabilityMatrix, card_cache_capacity: usize) -> Self {
         Self {
             capability_matrix,
-            card_extractor: TreeSitterCardExtractor::new(),
+            card_extractor: TreeSitterCardExtractor::with_cache_capacity(card_cache_capacity),
             lsp_host: Mutex::new(None),
         }
     }
@@ -77,10 +81,11 @@ impl SemanticBackendProvider {
     pub(crate) fn with_lsp_host_for_tests(
         capability_matrix: CapabilityMatrix,
         lsp_host: LspHost,
+        card_cache_capacity: usize,
     ) -> Self {
         Self {
             capability_matrix,
-            card_extractor: TreeSitterCardExtractor::new(),
+            card_extractor: TreeSitterCardExtractor::with_cache_capacity(card_cache_capacity),
             lsp_host: Mutex::new(Some(lsp_host)),
         }
     }
@@ -221,7 +226,10 @@ mod tests {
 
     #[fixture]
     fn provider() -> SemanticBackendProvider {
-        SemanticBackendProvider::new(CapabilityMatrix::default())
+        SemanticBackendProvider::new(
+            CapabilityMatrix::default(),
+            weaver_cards::DEFAULT_CACHE_CAPACITY,
+        )
     }
 
     #[rstest]

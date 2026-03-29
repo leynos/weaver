@@ -5,7 +5,7 @@ use std::fs;
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use url::Url;
-use weaver_cards::{DetailLevel, RefusalReason};
+use weaver_cards::{DEFAULT_CACHE_CAPACITY, DetailLevel, RefusalReason};
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_lsp_host::{Language, ServerCapabilitySet};
 
@@ -34,7 +34,8 @@ fn backends() -> (FusionBackends<SemanticBackendProvider>, TempDir) {
         daemon_socket: SocketEndpoint::unix(socket_path),
         ..Config::default()
     };
-    let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
+    let provider =
+        SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
     (FusionBackends::new(config, provider), dir)
 }
 
@@ -135,6 +136,38 @@ fn assert_refusal_response(
         "expected message '{message}' to contain '{}'",
         case.expected_message_substring
     );
+}
+
+fn assert_cached_request_reuse(
+    temp_dir: &TempDir,
+    backends: &mut FusionBackends<SemanticBackendProvider>,
+    detail: DetailLevel,
+) {
+    let path = write_source(
+        temp_dir,
+        SourceFile {
+            name: "cache.rs",
+            content: "fn greet() -> usize {\n    1\n}\n",
+        },
+    );
+    let uri = Url::from_file_path(&path).expect("file uri").to_string();
+    let request = make_request(&uri, 1, 4, detail);
+
+    let (first_result, first_payload) = dispatch_payload(&request, backends);
+    let (second_result, second_payload) = dispatch_payload(&request, backends);
+    let stats = backends.provider().card_extractor().cache_stats();
+
+    assert_eq!(first_result.status, 0);
+    assert_eq!(second_result.status, 0);
+    assert_eq!(
+        first_payload["card"]["provenance"]["extracted_at"],
+        second_payload["card"]["provenance"]["extracted_at"]
+    );
+    assert_eq!(stats.hits, 1);
+    assert_eq!(stats.misses, 1);
+    if detail >= DetailLevel::Semantic {
+        assert_eq!(first_payload["card"]["lsp"], second_payload["card"]["lsp"]);
+    }
 }
 
 #[rstest]
@@ -301,28 +334,16 @@ fn handle_reuses_cached_cards_for_identical_requests(
     backends: (FusionBackends<SemanticBackendProvider>, TempDir),
 ) {
     let (mut backends, _dir) = backends;
-    let path = write_source(
-        &temp_dir,
-        SourceFile {
-            name: "cache.rs",
-            content: "fn greet() -> usize {\n    1\n}\n",
-        },
-    );
-    let uri = Url::from_file_path(&path).expect("file uri").to_string();
-    let request = make_request(&uri, 1, 4, DetailLevel::Structure);
+    assert_cached_request_reuse(&temp_dir, &mut backends, DetailLevel::Structure);
+}
 
-    let (first_result, first_payload) = dispatch_payload(&request, &mut backends);
-    let (second_result, second_payload) = dispatch_payload(&request, &mut backends);
-    let stats = backends.provider().card_extractor().cache_stats();
-
-    assert_eq!(first_result.status, 0);
-    assert_eq!(second_result.status, 0);
-    assert_eq!(
-        first_payload["card"]["provenance"]["extracted_at"],
-        second_payload["card"]["provenance"]["extracted_at"]
-    );
-    assert_eq!(stats.hits, 1);
-    assert_eq!(stats.misses, 1);
+#[rstest]
+fn handle_reuses_cached_cards_for_identical_semantic_requests(
+    temp_dir: TempDir,
+    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
+) {
+    let (mut backends, _dir) = backends;
+    assert_cached_request_reuse(&temp_dir, &mut backends, DetailLevel::Semantic);
 }
 
 #[rstest]

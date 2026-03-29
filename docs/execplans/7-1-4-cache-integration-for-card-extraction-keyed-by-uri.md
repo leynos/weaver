@@ -10,7 +10,7 @@ Status: DONE
 ## Purpose / big picture
 
 After this change, repeated `observe get-card` requests for the same file at
-the same revision will return cached symbol cards without re-parsing the source
+the same revision will return cached symbol cards without reparsing the source
 text, significantly reducing latency for AI agent workflows that issue many
 card requests against an unchanged working tree. When file contents change (as
 detected by a content hash), the cache invalidates deterministically and the
@@ -42,7 +42,7 @@ Observable behaviour after implementation:
 
 1. The public JSON schema of `SymbolCard`, `GetCardResponse`, `DetailLevel`,
    `Provenance`, and all types in `crates/weaver-cards/src/` is locked from
-   roadmaps 7.1.1 and 7.1.2. The cache must not alter serialised field names,
+   roadmaps 7.1.1 and 7.1.2. The cache must not alter serialized field names,
    shapes, or ordering. The only schema-visible change is that
    `provenance.extracted_at` transitions from the placeholder to a real ISO
    8601 timestamp.
@@ -67,10 +67,11 @@ Observable behaviour after implementation:
    `Mutex<HashMap<SupportedLanguage, Arc<Mutex<Parser>>>>` parser registry
    pattern. The card cache should reuse this proven pattern rather than
    inventing a new one.
-10. The roadmap states "Requires 4.3.4" (parse-cache adapter). Since 4.3.4 is
-    not yet implemented, this plan implements the cache layer directly in the
-    card extraction path as a self-contained prerequisite, establishing the
-    URI + language + revision keying contract that 4.3.4 will later generalise.
+10. Earlier roadmap drafts stated "Requires 4.3.4" (parse-cache adapter).
+    Since 4.3.4 is not yet implemented, this plan implements the cache layer
+    directly in the card extraction path as a self-contained prerequisite,
+    establishing the URI + language + revision keying contract that 4.3.4 will
+    later generalize.
 
 ## Tolerances (exception triggers)
 
@@ -118,7 +119,7 @@ Observable behaviour after implementation:
   with targeted unit tests rather than attempting a full-crate refactor.
 
 - Risk: The 20+20 language example battery is a significant test data
-  authoring effort. Severity: low. Likelihood: medium. Mitigation: organise
+  authoring effort. Severity: low. Likelihood: medium. Mitigation: organize
   examples as static `&str` constants in dedicated fixture modules, following
   the pattern in `crates/weaver-e2e/src/fixtures.rs`.
 
@@ -232,7 +233,7 @@ paths are relative to the repository root.
   extraction logic. Has no dependency on `weaverd` or LSP.
 - `crates/weaverd/` — Daemon process. Routes JSONL commands. The handler at
   `crates/weaverd/src/dispatch/observe/get_card.rs` orchestrates card
-  extraction, optional LSP enrichment, and response serialisation.
+  extraction, optional LSP enrichment, and response serialization.
 - `crates/weaver-syntax/` — Tree-sitter wrapper. Provides `Parser`,
   `SupportedLanguage`, `ParseResult`, and the `TreeSitterSyntacticLock` parser
   registry.
@@ -251,7 +252,7 @@ paths are relative to the repository root.
   `symbol_id()` function that produces deterministic `sym_<hex>` identifiers.
 - `crates/weaverd/src/dispatch/observe/get_card.rs` (148 lines) — Handler
   that reads the file, creates a `TreeSitterCardExtractor`, calls `extract()`,
-  optionally applies LSP enrichment, and serialises the response.
+  optionally applies LSP enrichment, and serializes the response.
 - `crates/weaver-syntax/src/syntactic_lock.rs` — Contains
   `TreeSitterSyntacticLock` with the parser registry pattern:
   `Mutex<HashMap<SupportedLanguage, Arc<Mutex<Parser>>>>`.
@@ -273,7 +274,7 @@ paths are relative to the repository root.
 The `TreeSitterSyntacticLock` parser registry pattern in
 `crates/weaver-syntax/src/syntactic_lock.rs` is the canonical example of parser
 pooling in this workspace. It wraps parsers in `Arc<Mutex<Parser>>` inside a
-`Mutex<HashMap<SupportedLanguage, ...>>` for thread-safe lazy initialisation.
+`Mutex<HashMap<SupportedLanguage, ...>>` for thread-safe lazy initialization.
 The card cache should follow the same concurrency pattern.
 
 For test infrastructure:
@@ -345,7 +346,7 @@ time.
    method remains unchanged for backward compatibility and tests that do not
    need caching.
 
-3. The parser registry lazily initialises parsers on first use and returns
+3. The parser registry lazily initializes parsers on first use and returns
    them to the pool after extraction completes.
 
 ### Stage C: Wire cache into the daemon handler
@@ -353,7 +354,7 @@ time.
 Modify `crates/weaverd/src/dispatch/observe/get_card.rs` to use the cache:
 
 1. The handler receives a `&CardCache` (and a `&ParserRegistry`) from the
-   daemon's shared state. These are initialised once at daemon startup in
+   daemon's shared state. These are initialized once at daemon startup in
    `crates/weaverd/src/backends.rs` or a neighbouring module.
 
 2. The handler flow becomes:
@@ -367,7 +368,7 @@ Modify `crates/weaverd/src/dispatch/observe/get_card.rs` to use the cache:
    - Apply LSP enrichment if `detail >= Semantic` (unchanged, applied to both
      cached and fresh cards — LSP enrichment is not cached because it depends
      on server state).
-   - Serialise and write response (unchanged).
+   - Serialize and write response (unchanged).
 
 3. Update `router.rs` to pass the cache and registry references to the handler.
 
@@ -440,7 +441,7 @@ Create `crates/weaver-cards/tests/features/card_cache.feature` with scenarios:
 
 1. "Cache hit for unchanged file" — Given a source file and a `get-card`
    extraction, When the same extraction is repeated, Then the cache returns the
-   same card without re-parsing.
+   same card without reparsing.
 2. "Cache miss on first request" — Given an empty cache, When a `get-card`
    extraction is performed, Then the card is extracted from source.
 3. "Cache invalidation on content change" — Given a cached card for a file,
@@ -626,7 +627,7 @@ Create `crates/weaver-cards/src/cache.rs` and register it in
 
 Modify `crates/weaverd/src/dispatch/observe/get_card.rs` to accept and use the
 cache. Update `crates/weaverd/src/dispatch/router.rs` to pass the cache
-reference. Initialise the cache and parser registry in the daemon's shared
+reference. Initialize the cache and parser registry in the daemon's shared
 state.
 
 ### Run validation after each stage

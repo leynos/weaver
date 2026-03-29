@@ -1,10 +1,10 @@
 //! Shared cache and parser-pool infrastructure for card extraction.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 
 use lru::LruCache;
 use sha2::{Digest, Sha256};
@@ -78,16 +78,24 @@ pub struct CacheStats {
 /// LRU cache for extracted symbol cards.
 pub struct CardCache {
     inner: Mutex<LruCache<CardCacheKey, Arc<SymbolCard>>>,
+    in_flight: Mutex<HashSet<CardCacheKey>>,
+    in_flight_ready: Condvar,
     hits: AtomicU64,
     misses: AtomicU64,
 }
 
 impl CardCache {
     /// Creates a cache with the given maximum entry count.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `capacity` is zero.
     #[must_use]
     pub fn new(capacity: usize) -> Self {
         Self {
             inner: Mutex::new(LruCache::new(non_zero_capacity(capacity))),
+            in_flight: Mutex::new(HashSet::new()),
+            in_flight_ready: Condvar::new(),
             hits: AtomicU64::new(0),
             misses: AtomicU64::new(0),
         }
@@ -127,6 +135,23 @@ impl CardCache {
         }
     }
 
+    /// Acquires an in-flight population lock for a single cache key.
+    ///
+    /// Only one thread may hold the population lock for a given key at a time.
+    #[must_use]
+    pub(crate) fn lock_population(&self, key: &CardCacheKey) -> CachePopulationGuard<'_> {
+        let mut guard = recover_lock(self.in_flight.lock());
+        while guard.contains(key) {
+            guard = recover_wait(self.in_flight_ready.wait(guard));
+        }
+        guard.insert(key.clone());
+        drop(guard);
+        CachePopulationGuard {
+            cache: self,
+            key: key.clone(),
+        }
+    }
+
     /// Invalidates all entries associated with the given path.
     ///
     /// Path matching is based on the exact `PathBuf` stored in the cache key.
@@ -154,7 +179,7 @@ impl CardCache {
                 .map(|(key, _)| key.clone())
                 .collect();
             for key in stale_keys {
-                let _ = guard.pop(&key);
+                drop(guard.pop(&key));
             }
         }
     }
@@ -194,6 +219,20 @@ impl std::fmt::Debug for CardCache {
             .field("len", &self.len())
             .field("stats", &self.stats())
             .finish()
+    }
+}
+
+/// Guard that serializes cache population for a single [`CardCacheKey`].
+pub(crate) struct CachePopulationGuard<'a> {
+    cache: &'a CardCache,
+    key: CardCacheKey,
+}
+
+impl Drop for CachePopulationGuard<'_> {
+    fn drop(&mut self) {
+        let mut guard = recover_lock(self.cache.in_flight.lock());
+        guard.remove(&self.key);
+        self.cache.in_flight_ready.notify_all();
     }
 }
 
@@ -280,5 +319,30 @@ pub fn content_hash(source: &str) -> [u8; 32] {
 }
 
 fn non_zero_capacity(capacity: usize) -> NonZeroUsize {
-    NonZeroUsize::new(capacity).unwrap_or(NonZeroUsize::MIN)
+    assert!(
+        capacity > 0,
+        "card cache capacity must be greater than zero"
+    );
+    NonZeroUsize::new(capacity).map_or_else(
+        || panic!("card cache capacity must be greater than zero"),
+        |non_zero| non_zero,
+    )
+}
+
+fn recover_lock<'a, T>(
+    result: Result<MutexGuard<'a, T>, std::sync::PoisonError<MutexGuard<'a, T>>>,
+) -> MutexGuard<'a, T> {
+    match result {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
+fn recover_wait<'a, T>(
+    result: Result<MutexGuard<'a, T>, std::sync::PoisonError<MutexGuard<'a, T>>>,
+) -> MutexGuard<'a, T> {
+    match result {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
 }
