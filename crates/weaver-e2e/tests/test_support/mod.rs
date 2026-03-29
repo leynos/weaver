@@ -177,14 +177,12 @@ fn serve_requests(
         "non-blocking mode should be supported",
     );
     for _ in 0..expected_requests {
-        let Some(stream) = accept_before_deadline(listener) else {
-            return;
-        };
+        let stream = accept_before_deadline(listener);
         handler.handle(ConnectionStream::Tcp(stream));
     }
 }
 
-fn accept_before_deadline(listener: &TcpListener) -> Option<TcpStream> {
+fn accept_before_deadline(listener: &TcpListener) -> TcpStream {
     let deadline = Instant::now() + ACCEPT_TIMEOUT;
     loop {
         match listener.accept() {
@@ -193,7 +191,7 @@ fn accept_before_deadline(listener: &TcpListener) -> Option<TcpStream> {
                     stream.set_nonblocking(false),
                     "blocking mode should be supported",
                 );
-                return Some(stream);
+                return stream;
             }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                 assert!(

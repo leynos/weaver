@@ -140,9 +140,9 @@ impl CardCache {
     /// Only one thread may hold the population lock for a given key at a time.
     #[must_use]
     pub(crate) fn lock_population(&self, key: &CardCacheKey) -> CachePopulationGuard<'_> {
-        let mut guard = recover_lock(self.in_flight.lock());
+        let mut guard = recover_guard(self.in_flight.lock());
         while guard.contains(key) {
-            guard = recover_wait(self.in_flight_ready.wait(guard));
+            guard = recover_guard(self.in_flight_ready.wait(guard));
         }
         guard.insert(key.clone());
         drop(guard);
@@ -247,7 +247,7 @@ pub(crate) struct CachePopulationGuard<'a> {
 
 impl Drop for CachePopulationGuard<'_> {
     fn drop(&mut self) {
-        let mut guard = recover_lock(self.cache.in_flight.lock());
+        let mut guard = recover_guard(self.cache.in_flight.lock());
         guard.remove(&self.key);
         self.cache.in_flight_ready.notify_all();
     }
@@ -340,22 +340,13 @@ fn non_zero_capacity(capacity: usize) -> NonZeroUsize {
         capacity > 0,
         "card cache capacity must be greater than zero"
     );
-    NonZeroUsize::new(capacity).map_or_else(
-        || panic!("card cache capacity must be greater than zero"),
-        |non_zero| non_zero,
-    )
+    let Some(non_zero) = NonZeroUsize::new(capacity) else {
+        panic!("card cache capacity must be greater than zero");
+    };
+    non_zero
 }
 
-fn recover_lock<'a, T>(
-    result: Result<MutexGuard<'a, T>, std::sync::PoisonError<MutexGuard<'a, T>>>,
-) -> MutexGuard<'a, T> {
-    match result {
-        Ok(guard) => guard,
-        Err(poisoned) => poisoned.into_inner(),
-    }
-}
-
-fn recover_wait<'a, T>(
+fn recover_guard<'a, T>(
     result: Result<MutexGuard<'a, T>, std::sync::PoisonError<MutexGuard<'a, T>>>,
 ) -> MutexGuard<'a, T> {
     match result {
