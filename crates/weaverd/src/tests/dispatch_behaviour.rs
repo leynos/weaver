@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
+use serde_json::Value;
 
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
@@ -111,6 +112,18 @@ impl DispatchWorld {
         self.response_lines
             .iter()
             .any(|line| line.contains("unknown operation"))
+    }
+
+    fn unknown_operation_payload(&self) -> Option<Value> {
+        self.response_lines.iter().find_map(|line| {
+            let envelope: Value = serde_json::from_str(line).ok()?;
+            if envelope["kind"] != "stream" || envelope["stream"] != "stderr" {
+                return None;
+            }
+            envelope["data"]
+                .as_str()
+                .and_then(|data| serde_json::from_str::<Value>(data).ok())
+        })
     }
 
     fn has_invalid_arguments_error(&self) -> bool {
@@ -224,6 +237,49 @@ fn then_unknown_operation_error(world: &RefCell<DispatchWorld>) {
         world.borrow().has_unknown_operation_error(),
         "expected unknown operation error, got: {:?}",
         world.borrow().response_lines
+    );
+}
+
+#[then(r#"the unknown operation payload lists the known operations for "{domain}""#)]
+fn then_unknown_operation_payload_lists_known_operations(
+    world: &RefCell<DispatchWorld>,
+    domain: String,
+) {
+    let payload = world
+        .borrow()
+        .unknown_operation_payload()
+        .expect("unknown-operation payload should be present");
+    let domain = strip_quotes(&domain);
+    let expected = match domain {
+        "observe" => serde_json::json!([
+            "get-definition",
+            "find-references",
+            "grep",
+            "diagnostics",
+            "call-hierarchy",
+            "get-card"
+        ]),
+        "act" => serde_json::json!([
+            "rename-symbol",
+            "apply-edits",
+            "apply-patch",
+            "apply-rewrite",
+            "refactor"
+        ]),
+        "verify" => serde_json::json!(["diagnostics", "syntax"]),
+        other => panic!("unsupported domain {other}"),
+    };
+
+    assert_eq!(payload["status"], "error");
+    assert_eq!(payload["type"], "UnknownOperation");
+    assert_eq!(payload["details"]["domain"], domain);
+    assert_eq!(payload["details"]["known_operations"], expected);
+    assert_eq!(
+        payload["details"]["known_operations"]
+            .as_array()
+            .expect("known_operations array")
+            .len(),
+        expected.as_array().expect("expected array").len()
     );
 }
 

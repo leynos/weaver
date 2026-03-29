@@ -26,6 +26,7 @@ Feature: Daemon JSONL request dispatch
     Given a daemon connection is established
     When a request with unknown operation "nonexistent" in domain "observe" is sent
     Then the response includes an unknown operation error
+    And the unknown operation payload lists the known operations for "observe"
     And the response includes an exit message with status 1
 
   Scenario: Dispatching a valid act command
