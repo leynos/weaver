@@ -10,16 +10,16 @@ use test_support::{
 };
 use weaver_e2e::card_fixtures::{PYTHON_CASES, RUST_CASES};
 
+#[expect(
+    clippy::expect_used,
+    reason = "test helper failures should panic with explicit setup messages"
+)]
 fn unsupported_fixture_uri(temp_dir: &TempDir) -> String {
     let path = temp_dir.path().join("notes.txt");
-    match std::fs::write(&path, "plain text\n") {
-        Ok(()) => {}
-        Err(error) => panic!("write unsupported fixture: {error}"),
-    }
-    match Url::from_file_path(&path) {
-        Ok(uri) => uri.to_string(),
-        Err(()) => panic!("unsupported path to URI"),
-    }
+    std::fs::write(&path, "plain text\n").expect("write unsupported fixture");
+    Url::from_file_path(&path)
+        .map(|uri| uri.to_string())
+        .expect("unsupported path to URI")
 }
 
 #[test]
