@@ -66,11 +66,6 @@ impl CardCacheKey {
     }
 }
 
-#[derive(Debug, Clone)]
-struct CachedCard {
-    card: SymbolCard,
-}
-
 /// Point-in-time cache counters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CacheStats {
@@ -82,7 +77,7 @@ pub struct CacheStats {
 
 /// LRU cache for extracted symbol cards.
 pub struct CardCache {
-    inner: Mutex<LruCache<CardCacheKey, CachedCard>>,
+    inner: Mutex<LruCache<CardCacheKey, Arc<SymbolCard>>>,
     hits: AtomicU64,
     misses: AtomicU64,
 }
@@ -101,8 +96,17 @@ impl CardCache {
     /// Returns a cached card if present.
     #[must_use]
     pub fn get(&self, key: &CardCacheKey) -> Option<SymbolCard> {
-        let mut guard = self.inner.lock().ok()?;
-        let card = guard.get(key).cloned().map(|entry| entry.card);
+        self.get_shared(key).as_deref().cloned()
+    }
+
+    /// Returns a cached card if present, keeping the stored payload shared.
+    #[must_use]
+    pub fn get_shared(&self, key: &CardCacheKey) -> Option<Arc<SymbolCard>> {
+        let Ok(mut guard) = self.inner.lock() else {
+            self.misses.fetch_add(1, Ordering::Relaxed);
+            return None;
+        };
+        let card = guard.get(key).cloned();
         if card.is_some() {
             self.hits.fetch_add(1, Ordering::Relaxed);
         } else {
@@ -113,12 +117,21 @@ impl CardCache {
 
     /// Inserts a card into the cache.
     pub fn insert(&self, key: CardCacheKey, card: SymbolCard) {
+        self.insert_shared(key, Arc::new(card));
+    }
+
+    /// Inserts a shared card into the cache.
+    pub fn insert_shared(&self, key: CardCacheKey, card: Arc<SymbolCard>) {
         if let Ok(mut guard) = self.inner.lock() {
-            guard.put(key, CachedCard { card });
+            guard.put(key, card);
         }
     }
 
     /// Invalidates all entries associated with the given path.
+    ///
+    /// Path matching is based on the exact `PathBuf` stored in the cache key.
+    /// Callers that need symlink or relative-path canonicalisation must do so
+    /// before building cache keys.
     pub fn invalidate(&self, path: &Path) {
         self.evict_matching(|key| key.path() == path);
     }
@@ -133,6 +146,8 @@ impl CardCache {
         F: Fn(&CardCacheKey) -> bool,
     {
         if let Ok(mut guard) = self.inner.lock() {
+            // Collect keys first because `lru::LruCache` cannot be mutated
+            // while it is being iterated.
             let stale_keys: Vec<CardCacheKey> = guard
                 .iter()
                 .filter(|(key, _)| predicate(key))

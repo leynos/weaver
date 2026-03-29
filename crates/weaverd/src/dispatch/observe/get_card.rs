@@ -44,14 +44,15 @@ pub fn handle<W: Write>(
     let source = fs::read_to_string(&path)?;
     let extractor = backends.provider().card_extractor();
 
-    let response = match extractor.extract(CardExtractionInput {
+    let response = match extractor.extract_shared(CardExtractionInput {
         path: &path,
         source: &source,
         line: card_request.line,
         column: card_request.column,
         detail: card_request.detail,
     }) {
-        Ok(mut card) => {
+        Ok(card) => {
+            let mut card = card.as_ref().clone();
             if card_request.detail >= DetailLevel::Semantic {
                 apply_lsp_enrichment(&mut card, &source, backends);
             }

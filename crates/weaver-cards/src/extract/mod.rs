@@ -92,19 +92,28 @@ impl TreeSitterCardExtractor {
     /// Creates a new extractor.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            cache: Arc::new(CardCache::default()),
-            parsers: Arc::new(ParserRegistry::default()),
-        }
+        Self::with_shared_resources(
+            Arc::new(CardCache::default()),
+            Arc::new(ParserRegistry::default()),
+        )
     }
 
     /// Creates a new extractor with a custom cache capacity.
     #[must_use]
     pub fn with_cache_capacity(capacity: usize) -> Self {
-        Self {
-            cache: Arc::new(CardCache::new(capacity)),
-            parsers: Arc::new(ParserRegistry::default()),
-        }
+        Self::with_shared_resources(
+            Arc::new(CardCache::new(capacity)),
+            Arc::new(ParserRegistry::default()),
+        )
+    }
+
+    /// Creates a new extractor backed by caller-supplied shared resources.
+    #[must_use]
+    pub const fn with_shared_resources(
+        cache: Arc<CardCache>,
+        parsers: Arc<ParserRegistry>,
+    ) -> Self {
+        Self { cache, parsers }
     }
 
     /// Extracts a symbol card for the requested position.
@@ -117,6 +126,20 @@ impl TreeSitterCardExtractor {
         &self,
         input: CardExtractionInput<'_>,
     ) -> Result<SymbolCard, CardExtractionError> {
+        self.extract_shared(input).map(|card| card.as_ref().clone())
+    }
+
+    /// Extracts a symbol card for the requested position, reusing a shared
+    /// payload when the cache already contains the card.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CardExtractionError`] when the path is unsupported, the
+    /// position is invalid, parsing fails, or no symbol matches the position.
+    pub fn extract_shared(
+        &self,
+        input: CardExtractionInput<'_>,
+    ) -> Result<Arc<SymbolCard>, CardExtractionError> {
         let language = SupportedLanguage::from_path(input.path).ok_or_else(|| {
             CardExtractionError::UnsupportedLanguage {
                 path: input.path.to_path_buf(),
@@ -132,21 +155,25 @@ impl TreeSitterCardExtractor {
                 column: input.column,
             },
         );
-        if let Some(card) = self.cache.get(&cache_key) {
+        if let Some(card) = self.cache.get_shared(&cache_key) {
             return Ok(card);
         }
 
-        let card = Self::extract_for_language(input, language, |supported_language| {
-            self.parsers
-                .parse(supported_language, input.source)
-                .map_err(|error| CardExtractionError::Parse {
-                    language: String::from(supported_language.as_str()),
-                    message: error.to_string(),
-                })
-        })?;
+        let card = Arc::new(Self::extract_for_language(
+            input,
+            language,
+            |supported_language| {
+                self.parsers
+                    .parse(supported_language, input.source)
+                    .map_err(|error| CardExtractionError::Parse {
+                        language: String::from(supported_language.as_str()),
+                        message: error.to_string(),
+                    })
+            },
+        )?);
         self.cache
             .invalidate_stale_revisions(input.path, cache_key.content_hash());
-        self.cache.insert(cache_key, card.clone());
+        self.cache.insert_shared(cache_key, Arc::clone(&card));
         Ok(card)
     }
 

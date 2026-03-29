@@ -57,8 +57,8 @@ Observable behaviour after implementation:
 5. Behaviour tests must use `rstest-bdd` v0.5.0 with the `world` fixture
    convention established in the codebase.
 6. The Tree-sitter extraction layer in `crates/weaver-cards/` must remain
-   independent of LSP. LSP enrichment is a post-extraction concern owned by the
-   daemon handler in `crates/weaverd/`.
+   independent of the Language Server Protocol (LSP). LSP enrichment is a
+   post-extraction concern owned by the daemon handler in `crates/weaverd/`.
 7. en-GB-oxendict spelling ("-ize" / "-yse" / "-our") for comments and
    documentation.
 8. No single code file may exceed 400 lines.
@@ -656,7 +656,7 @@ Quality criteria (what "done" means):
   `docs/jacquard-card-first-symbol-graph-design.md` records design decisions.
 - Roadmap: 7.1.4 sub-items are marked `[x]`.
 
-Quality method (how we check):
+Quality method (validation steps):
 
 ```sh
 set -o pipefail; make check-fmt 2>&1 | tee /tmp/7-1-4-final-check-fmt.log
