@@ -11,6 +11,8 @@
 
 pub mod reason_code;
 pub mod rename_symbol;
+#[cfg(feature = "test-support")]
+pub mod test_support;
 
 #[cfg(test)]
 mod tests;

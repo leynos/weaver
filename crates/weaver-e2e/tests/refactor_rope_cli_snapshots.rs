@@ -149,6 +149,103 @@ fn response_payload_for_operation(operation: &str) -> String {
     }
 }
 
+fn request_arguments(parsed_request: &serde_json::Value) -> Vec<&str> {
+    parsed_request
+        .get("arguments")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(serde_json::Value::as_str)
+        .collect()
+}
+
+fn argument_value<'a>(arguments: &'a [&str], flag: &str) -> Option<&'a str> {
+    arguments.windows(2).find_map(|pair| {
+        let current = pair.first().copied()?;
+        let next = pair.get(1).copied()?;
+        (current == flag).then_some(next)
+    })
+}
+
+fn automatic_resolution_payload(file: &str) -> Option<String> {
+    match std::path::Path::new(file).extension().and_then(|ext| ext.to_str()) {
+        Some("py") => Some(
+            json!({
+                "status": "ok",
+                "type": "CapabilityResolution",
+                "details": {
+                    "capability": "rename-symbol",
+                    "language": "python",
+                    "selected_provider": "rope",
+                    "selection_mode": "automatic",
+                    "outcome": "selected",
+                    "candidates": [
+                        { "provider": "rope", "accepted": true, "reason": "matched_language_and_capability" },
+                        { "provider": "rust-analyzer", "accepted": false, "reason": "unsupported_language" }
+                    ]
+                }
+            })
+            .to_string(),
+        ),
+        Some("rs") => Some(
+            json!({
+                "status": "ok",
+                "type": "CapabilityResolution",
+                "details": {
+                    "capability": "rename-symbol",
+                    "language": "rust",
+                    "selected_provider": "rust-analyzer",
+                    "selection_mode": "automatic",
+                    "outcome": "selected",
+                    "candidates": [
+                        { "provider": "rust-analyzer", "accepted": true, "reason": "matched_language_and_capability" },
+                        { "provider": "rope", "accepted": false, "reason": "unsupported_language" }
+                    ]
+                }
+            })
+            .to_string(),
+        ),
+        _ => None,
+    }
+}
+
+fn provider_mismatch_payload(file: &str, provider: &str) -> Option<String> {
+    let language = match std::path::Path::new(file)
+        .extension()
+        .and_then(|ext| ext.to_str())
+    {
+        Some("py") => Some("python"),
+        Some("rs") => Some("rust"),
+        _ => None,
+    }?;
+    let mismatched = matches!(
+        (language, provider),
+        ("python", "rust-analyzer") | ("rust", "rope")
+    );
+    if !mismatched {
+        return None;
+    }
+
+    Some(
+        json!({
+            "status": "ok",
+            "type": "CapabilityResolution",
+            "details": {
+                "capability": "rename-symbol",
+                "language": language,
+                "requested_provider": provider,
+                "selection_mode": "explicit_provider",
+                "outcome": "refused",
+                "refusal_reason": "explicit_provider_mismatch",
+                "candidates": [
+                    { "provider": provider, "accepted": false, "reason": "explicit_provider_mismatch" }
+                ]
+            }
+        })
+        .to_string(),
+    )
+}
+
 #[expect(
     clippy::expect_used,
     reason = "poisoned mutex in test fixture must surface as panic for clear diagnostics"
@@ -178,19 +275,68 @@ fn respond_to_request(
         .and_then(|command| command.get("operation"))
         .and_then(serde_json::Value::as_str)
         .unwrap_or_default();
-
-    let payload = response_payload_for_operation(operation);
+    let arguments = request_arguments(&parsed_request);
 
     let mut writer = stream;
+    if operation == "refactor" {
+        write_refactor_response(&mut writer, operation, &arguments)
+    } else {
+        write_stdout_exit(&mut writer, &response_payload_for_operation(operation), 0)
+    }
+}
+
+fn write_refactor_response(
+    writer: &mut TcpStream,
+    operation: &str,
+    arguments: &[&str],
+) -> Result<(), std::io::Error> {
+    let file = argument_value(arguments, "--file").unwrap_or_default();
+    let requested_provider = argument_value(arguments, "--provider");
+
+    if let Some(provider_name) = requested_provider
+        && let Some(payload) = provider_mismatch_payload(file, provider_name)
+    {
+        write_json_line(
+            writer,
+            &json!({
+                "kind": "stream",
+                "stream": "stderr",
+                "data": payload,
+            }),
+        )?;
+        return write_json_line(writer, &json!({ "kind": "exit", "status": 1 }));
+    }
+
+    if requested_provider.is_none()
+        && let Some(payload) = automatic_resolution_payload(file)
+    {
+        write_json_line(
+            writer,
+            &json!({
+                "kind": "stream",
+                "stream": "stderr",
+                "data": payload,
+            }),
+        )?;
+    }
+
+    write_stdout_exit(writer, &response_payload_for_operation(operation), 0)
+}
+
+fn write_stdout_exit(
+    writer: &mut TcpStream,
+    payload: &str,
+    status: i32,
+) -> Result<(), std::io::Error> {
     write_json_line(
-        &mut writer,
+        writer,
         &json!({
             "kind": "stream",
             "stream": "stdout",
             "data": payload,
         }),
     )?;
-    write_json_line(&mut writer, &json!({ "kind": "exit", "status": 0 }))
+    write_json_line(writer, &json!({ "kind": "exit", "status": status }))
 }
 
 fn write_json_line(
@@ -219,40 +365,69 @@ fn output_to_transcript(
     }
 }
 
-#[test]
-fn refactor_actuator_isolation_cli_snapshot() {
+#[expect(
+    clippy::expect_used,
+    reason = "test helper surfaces setup failures with the exact requested call structure"
+)]
+fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
     let daemon = FakeDaemon::start(1).expect("fake daemon should start");
     let endpoint = daemon.endpoint();
 
-    let command_string = String::from(
-        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider rope --refactoring rename --file src/main.py new_name=renamed_symbol offset=4",
+    let provider_fragment = provider
+        .map(|p| format!("--provider {p} "))
+        .unwrap_or_default();
+    let command_string = format!(
+        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
+         {provider_fragment}--refactoring rename --file src/main.py \
+         new_name=renamed_symbol offset=4"
     );
+
+    let mut args: Vec<String> = vec![
+        "--daemon-socket".into(),
+        endpoint.clone(),
+        "--output".into(),
+        "json".into(),
+        "act".into(),
+        "refactor".into(),
+    ];
+    if let Some(p) = provider {
+        args.push("--provider".into());
+        args.push(p.into());
+    }
+    args.extend([
+        "--refactoring".into(),
+        "rename".into(),
+        "--file".into(),
+        "src/main.py".into(),
+        "new_name=renamed_symbol".into(),
+        "offset=4".into(),
+    ]);
 
     let mut command = Command::new(weaver_binary_path());
     let output = command
-        .args([
-            "--daemon-socket",
-            endpoint.as_str(),
-            "--output",
-            "json",
-            "act",
-            "refactor",
-            "--provider",
-            "rope",
-            "--refactoring",
-            "rename",
-            "--file",
-            "src/main.py",
-            "new_name=renamed_symbol",
-            "offset=4",
-        ])
+        .args(&args)
         .output()
         .expect("command should execute");
 
     let transcript = output_to_transcript(command_string, &output, daemon.requests());
     daemon.join();
 
-    assert_debug_snapshot!("refactor_actuator_isolation", transcript);
+    assert_debug_snapshot!(snapshot_name, transcript);
+}
+
+#[test]
+fn refactor_actuator_isolation_cli_snapshot() {
+    run_rename_refactor_snapshot("refactor_actuator_isolation", Some("rope"));
+}
+
+#[test]
+fn refactor_automatic_rope_routing_cli_snapshot() {
+    run_rename_refactor_snapshot("refactor_automatic_rope_routing", None);
+}
+
+#[test]
+fn refactor_provider_mismatch_refusal_cli_snapshot() {
+    run_rename_refactor_snapshot("refactor_provider_mismatch_refusal", Some("rust-analyzer"));
 }
 
 #[test]

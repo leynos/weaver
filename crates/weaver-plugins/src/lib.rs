@@ -52,6 +52,11 @@ pub mod runner;
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "test-support")]
+pub use self::capability::test_support::{
+    RenameSymbolRequestFixture, RenameSymbolResponseFixture, rename_symbol_request_fixtures,
+    rename_symbol_response_fixtures,
+};
 pub use self::capability::{
     CapabilityContract, CapabilityId, ContractVersion, ReasonCode, RenameSymbolContract,
     RenameSymbolRequest,
