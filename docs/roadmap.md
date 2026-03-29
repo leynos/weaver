@@ -587,7 +587,7 @@ new* *capabilities and specialist providers.*
   - Acceptance criteria: routing selects the correct plugin per language,
     fallback and refusal paths are deterministic, and routing decisions include
     machine-readable rationale.
-- [ ] 5.2.5. Add unit, behavioural, and end-to-end coverage for Python and Rust
+- [x] 5.2.5. Add unit, behavioural, and end-to-end coverage for Python and Rust
       `rename-symbol` under the new capability architecture. Requires 5.2.4.
   - Acceptance criteria: tests cover success paths, refusal paths, and rollback
     guarantees, and both plugins pass shared contract fixtures.
