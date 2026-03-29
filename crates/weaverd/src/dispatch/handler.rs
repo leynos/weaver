@@ -293,4 +293,42 @@ mod tests {
 
         harness.join();
     }
+
+    #[rstest]
+    fn handler_emits_known_operations_for_unknown_operation(mut harness: HandlerTestHarness) {
+        let lines = harness
+            .send_and_collect(b"{\"command\":{\"domain\":\"observe\",\"operation\":\"bogus\"}}\n");
+
+        let payload = lines
+            .iter()
+            .find_map(|line| {
+                let envelope: serde_json::Value = serde_json::from_str(line).ok()?;
+                if envelope["kind"] != "stream" || envelope["stream"] != "stderr" {
+                    return None;
+                }
+                envelope["data"]
+                    .as_str()
+                    .and_then(|data| serde_json::from_str::<serde_json::Value>(data).ok())
+            })
+            .expect("unknown-operation payload should be present");
+
+        assert_eq!(payload["status"], "error");
+        assert_eq!(payload["type"], "UnknownOperation");
+        assert_eq!(payload["details"]["domain"], "observe");
+        assert_eq!(payload["details"]["operation"], "bogus");
+        assert_eq!(
+            payload["details"]["known_operations"],
+            serde_json::json!([
+                "get-definition",
+                "find-references",
+                "grep",
+                "diagnostics",
+                "call-hierarchy",
+                "get-card"
+            ])
+        );
+        assert!(lines.iter().any(|line| line.contains(r#""status":1"#)));
+
+        harness.join();
+    }
 }

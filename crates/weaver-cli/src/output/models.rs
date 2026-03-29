@@ -7,6 +7,7 @@ use serde::Deserialize;
 /// This constant must match the daemon-side `CAPABILITY_RESOLUTION_TYPE` exported
 /// by `weaverd::dispatch::act::refactor::resolution` to ensure correct parsing.
 const CAPABILITY_RESOLUTION_TYPE: &str = "CapabilityResolution";
+const UNKNOWN_OPERATION_TYPE: &str = "UnknownOperation";
 
 /// A definition or reference location in the daemon response.
 #[derive(Debug, Deserialize)]
@@ -121,6 +122,28 @@ pub(crate) struct CapabilityCandidate {
     pub(crate) reason: String,
 }
 
+/// Parsed unknown-operation payload emitted by daemon dispatch.
+#[derive(Debug, Deserialize)]
+pub(crate) struct UnknownOperationPayload {
+    /// Payload type discriminator.
+    #[serde(rename = "type")]
+    pub(crate) r#type: String,
+
+    /// Structured error details.
+    pub(crate) details: UnknownOperationDetails,
+}
+
+/// Inner details for an unknown-operation payload.
+#[derive(Debug, Deserialize)]
+pub(crate) struct UnknownOperationDetails {
+    /// Routed domain containing the unknown operation.
+    pub(crate) domain: String,
+    /// Unknown operation requested by the client.
+    pub(crate) operation: String,
+    /// Canonical known operations for the routed domain.
+    pub(crate) known_operations: Vec<String>,
+}
+
 /// Parses definition locations from a JSON payload.
 #[must_use]
 pub(crate) fn parse_definitions(payload: &str) -> Option<Vec<DefinitionLocation>> {
@@ -161,6 +184,16 @@ pub(crate) fn parse_verification_failures(payload: &str) -> Option<Vec<Verificat
 pub(crate) fn parse_capability_resolution(payload: &str) -> Option<CapabilityResolution> {
     let parsed: CapabilityResolution = serde_json::from_str(payload).ok()?;
     if parsed.r#type != CAPABILITY_RESOLUTION_TYPE {
+        return None;
+    }
+    Some(parsed)
+}
+
+/// Parses daemon unknown-operation payloads.
+#[must_use]
+pub(crate) fn parse_unknown_operation(payload: &str) -> Option<UnknownOperationPayload> {
+    let parsed: UnknownOperationPayload = serde_json::from_str(payload).ok()?;
+    if parsed.r#type != UNKNOWN_OPERATION_TYPE {
         return None;
     }
     Some(parsed)
@@ -287,5 +320,44 @@ mod tests {
 }"#;
 
         assert!(parse_capability_resolution(payload).is_none());
+    }
+
+    #[test]
+    fn parses_unknown_operation_payload() {
+        let payload = r#"{
+  "status": "error",
+  "type": "UnknownOperation",
+  "details": {
+    "domain": "observe",
+    "operation": "bogus",
+    "known_operations": ["get-definition", "find-references"]
+  }
+}"#;
+
+        let parsed = parse_unknown_operation(payload).expect("unknown operation");
+        assert_eq!(parsed.details.domain, "observe");
+        assert_eq!(parsed.details.operation, "bogus");
+        assert_eq!(
+            parsed.details.known_operations,
+            vec![
+                String::from("get-definition"),
+                String::from("find-references")
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_unknown_operation_rejects_mismatched_type() {
+        let payload = r#"{
+  "status": "error",
+  "type": "VerificationError",
+  "details": {
+    "domain": "observe",
+    "operation": "bogus",
+    "known_operations": []
+  }
+}"#;
+
+        assert!(parse_unknown_operation(payload).is_none());
     }
 }

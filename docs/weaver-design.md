@@ -428,6 +428,21 @@ valid domain is within edit distance 2 of the supplied token, the CLI appends a
 single deterministic `Did you mean ...?` suggestion; otherwise it emits no
 suggestion.
 
+Unknown operations deliberately remain daemon-routed because the daemon router
+owns the canonical per-domain `known_operations` slices. When a request such as
+`weaver observe nonexistent` reaches `weaverd`, the daemon now writes a
+structured stderr payload inside the existing JSONL `stream` envelope:
+
+```json
+{"status":"error","type":"UnknownOperation","details":{"domain":"observe","operation":"nonexistent","known_operations":["get-definition","find-references","grep","diagnostics","call-hierarchy","get-card"]}}
+```
+
+The CLI preserves that payload unchanged in `--output json` mode. In
+`--output human` mode it renders the payload into an actionable guidance block
+headed by `Available operations:`. The CLI does not consult its own
+discoverability catalogue for this case, preventing drift between client help
+text and daemon dispatch authority.
+
 #### 2.1.2. Lifecycle orchestration
 
 Operators now control the daemon lifecycle directly through the CLI via

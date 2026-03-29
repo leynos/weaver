@@ -5,12 +5,10 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
-
-Do not begin implementation until the user explicitly approves this plan.
 
 ## Purpose / big picture
 
@@ -150,14 +148,23 @@ the UI gap analysis.[^level4][^level10]
       is required.
 - [x] (2026-03-28 00:30Z) Drafted this ExecPlan in
       `docs/execplans/2-3-2-valid-operation-alternatives-for-unknown-operations.md`.
-- [ ] Stage A: add failing unit and behavioural tests for daemon payload shape
-      and CLI rendering.
-- [ ] Stage B: implement structured unknown-operation payload emission in
-      `weaverd`.
-- [ ] Stage C: implement CLI human rendering and JSON passthrough assertions.
-- [ ] Stage D: update `docs/weaver-design.md`, `docs/users-guide.md`, and
-      `docs/roadmap.md`.
-- [ ] Stage E: run the Markdown and Rust quality gates and capture logs.
+- [x] (2026-03-28 23:15Z) Stage A: added failing unit and behavioural tests
+      covering daemon payload shape, CLI human rendering, and JSON passthrough
+      for unknown operations.
+- [x] (2026-03-28 23:22Z) Stage B: extended `DispatchError::UnknownOperation`
+      with canonical `known_operations` and taught `ResponseWriter` to emit a
+      structured `UnknownOperation` JSON payload on stderr.
+- [x] (2026-03-28 23:30Z) Stage C: added CLI parsing and human rendering for
+      `UnknownOperation` payloads and confirmed the new `rstest-bdd` scenarios
+      pass for both daemon and CLI.
+- [x] (2026-03-29 12:45Z) Stage D: updated `docs/weaver-design.md`,
+      `docs/users-guide.md`, and `docs/roadmap.md` to describe the shipped
+      daemon-routed `UnknownOperation` contract and marked roadmap item
+      `2.3.2` done.
+- [x] (2026-03-29 12:59Z) Stage E: ran `make fmt`,
+      `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
+      `make test` successfully after fixing one daemon unit assertion to parse
+      the inner JSON payload from the stream envelope.
 
 ## Surprises & Discoveries
 
@@ -177,29 +184,39 @@ the UI gap analysis.[^level4][^level10]
   behaviour from `2.3.1`, but it does not yet explain that unknown operations
   are daemon-routed and should return structured alternatives.
 
+- `ResponseWriter::write_error(...)` was sufficient for the daemon change once
+  it learned to special-case `DispatchError::UnknownOperation`; no extra
+  handler-level branching was needed in `DispatchConnectionHandler`.
+
 ## Decision Log
 
-- Proposed decision: keep unknown-operation detection daemon-side instead of
+- Decision: keep unknown-operation detection daemon-side instead of
   adding CLI pre-validation. Rationale: the daemon router already owns the
   canonical operation list for each domain, while the CLI catalogue is a
   discoverability aid rather than the dispatch authority. Date: 2026-03-28.
 
-- Proposed decision: emit an additive structured error payload inside the
+- Decision: emit an additive structured error payload inside the
   existing `DaemonMessage::Stream` envelope instead of changing the outer JSONL
   protocol. Rationale: this satisfies the JSON-output acceptance criteria while
   preserving transport compatibility and keeping scope aligned with `2.3.2`.
   Date: 2026-03-28.
 
-- Proposed decision: have the CLI human renderer format the daemon-provided
+- Decision: have the CLI human renderer format the daemon-provided
   `known_operations` array into an `Available operations:` block, one operation
   per line. Rationale: the JSON payload remains machine-friendly, while the
   human output stays consistent with the discoverability style already used for
   `weaver <domain>`. Date: 2026-03-28.
 
-- Proposed decision: keep the list order identical to the router's
+- Decision: keep the list order identical to the router's
   `known_operations` slice and test that exact order. Rationale: deterministic
   order makes operator guidance predictable and gives tests a concrete
   contract. Date: 2026-03-28.
+
+- Decision: special-case `UnknownOperation` inside
+  `ResponseWriter::write_error(...)` rather than adding a second dispatch-layer
+  error serializer. Rationale: this kept the change local to the existing
+  error-writing seam and avoided widening `DispatchConnectionHandler`. Date:
+  2026-03-28.
 
 ## Outcomes & Retrospective
 
@@ -221,7 +238,13 @@ Target outcome at completion:
 
 Retrospective notes:
 
-- Pending implementation approval.
+- The daemon and CLI behavioural coverage landed without any new harnesses by
+  extending the existing dispatch-world and fake-daemon seams.
+- The only full-gate regression was in a new daemon unit test that asserted on
+  the outer JSONL envelope as plain text. Parsing the inner `data` JSON fixed
+  the test and better matched the wire contract under test.
+- Final verification succeeded with `make fmt`, `make markdownlint`,
+  `make nixie`, `make check-fmt`, `make lint`, and `make test`.
 
 ## Context and orientation
 
