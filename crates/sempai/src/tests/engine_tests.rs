@@ -80,42 +80,52 @@ fn compile_yaml_returns_not_implemented_for_project_depends_on_search_rule() {
     assert!(diag.message().contains("normalization"));
 }
 
-#[test]
-fn compile_yaml_returns_unsupported_mode_for_extract_rules() {
+fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str) {
     let engine = default_engine();
-    let result = engine.compile_yaml(concat!(
-        "rules:\n",
-        "  - id: demo.extract\n",
-        "    mode: extract\n",
-        "    message: extract foo\n",
-        "    languages: [python]\n",
-        "    severity: WARNING\n",
-        "    dest-language: python\n",
-        "    extract: foo($X)\n",
-        "    pattern: source($X)\n",
-    ));
+    let result = engine.compile_yaml(yaml);
     let (code, diag) = first_diagnostic_of_err(result);
     assert_eq!(code, DiagnosticCode::ESempaiUnsupportedMode);
-    assert!(diag.message().contains("extract"));
+    assert!(
+        diag.message().contains(expected_mode_fragment),
+        "expected diagnostic message to contain {:?}, got {:?}",
+        expected_mode_fragment,
+        diag.message(),
+    );
     assert!(diag.primary_span().is_some());
 }
 
 #[test]
+fn compile_yaml_returns_unsupported_mode_for_extract_rules() {
+    assert_compile_yaml_unsupported_mode(
+        concat!(
+            "rules:\n",
+            "  - id: demo.extract\n",
+            "    mode: extract\n",
+            "    message: extract foo\n",
+            "    languages: [python]\n",
+            "    severity: WARNING\n",
+            "    dest-language: python\n",
+            "    extract: foo($X)\n",
+            "    pattern: source($X)\n",
+        ),
+        "extract",
+    );
+}
+
+#[test]
 fn compile_yaml_returns_unsupported_mode_for_unknown_modes() {
-    let engine = default_engine();
-    let result = engine.compile_yaml(concat!(
-        "rules:\n",
-        "  - id: demo.custom\n",
-        "    mode: custom-mode\n",
-        "    message: custom mode\n",
-        "    languages: [python]\n",
-        "    severity: WARNING\n",
-        "    pattern: foo($X)\n",
-    ));
-    let (code, diag) = first_diagnostic_of_err(result);
-    assert_eq!(code, DiagnosticCode::ESempaiUnsupportedMode);
-    assert!(diag.message().contains("custom-mode"));
-    assert!(diag.primary_span().is_some());
+    assert_compile_yaml_unsupported_mode(
+        concat!(
+            "rules:\n",
+            "  - id: demo.custom\n",
+            "    mode: custom-mode\n",
+            "    message: custom mode\n",
+            "    languages: [python]\n",
+            "    severity: WARNING\n",
+            "    pattern: foo($X)\n",
+        ),
+        "custom-mode",
+    );
 }
 
 #[test]
