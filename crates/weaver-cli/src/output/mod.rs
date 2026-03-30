@@ -144,32 +144,37 @@ where
     render::render_locations(&locations)
 }
 
-fn render_definitions(definitions: Vec<DefinitionLocation>) -> String {
+fn render_definition_locations(
+    items: Vec<DefinitionLocation>,
+    options: LocationRenderOptions,
+) -> String {
     render_location_items(
+        items,
+        options,
+        LocationItemAccessors {
+            uri: |item: &DefinitionLocation| item.uri.clone(),
+            line: |item: &DefinitionLocation| item.line,
+            column: |item: &DefinitionLocation| item.column,
+        },
+    )
+}
+
+fn render_definitions(definitions: Vec<DefinitionLocation>) -> String {
+    render_definition_locations(
         definitions,
         LocationRenderOptions {
             empty_message: "no definitions found\n",
             label: "definition",
         },
-        LocationItemAccessors {
-            uri: |definition: &DefinitionLocation| definition.uri.clone(),
-            line: |definition: &DefinitionLocation| definition.line,
-            column: |definition: &DefinitionLocation| definition.column,
-        },
     )
 }
 
 fn render_references(response: ReferenceResponse) -> String {
-    render_location_items(
+    render_definition_locations(
         response.references,
         LocationRenderOptions {
             empty_message: "no references found\n",
             label: "reference",
-        },
-        LocationItemAccessors {
-            uri: |reference: &DefinitionLocation| reference.uri.clone(),
-            line: |reference: &DefinitionLocation| reference.line,
-            column: |reference: &DefinitionLocation| reference.column,
         },
     )
 }
