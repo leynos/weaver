@@ -10,9 +10,9 @@ mod source;
 
 pub use crate::cli::OutputFormat;
 use crate::output::models::{
-    DefinitionLocation, DiagnosticItem, DiagnosticsResponse, ReferenceResponse,
-    VerificationFailure, parse_capability_resolution, parse_definitions, parse_unknown_operation,
-    parse_verification_failures,
+    CapabilityResolution, DefinitionLocation, DiagnosticItem, DiagnosticsResponse,
+    ReferenceResponse, UnknownOperationDetails, VerificationFailure, parse_capability_resolution,
+    parse_definitions, parse_unknown_operation, parse_verification_failures,
 };
 use crate::output::source::{
     SourceLocation, SourcePosition, extract_uri_argument, from_path_or_uri, from_uri,
@@ -83,20 +83,24 @@ pub fn render_human_output(context: &OutputContext, data: &str) -> Option<String
         return None;
     }
 
-    if let Some(rendered) = render_unknown_operation(trimmed) {
-        return Some(rendered);
+    if let Some(unknown_operation) = parse_unknown_operation(trimmed) {
+        return Some(render_unknown_operation(unknown_operation.details));
     }
 
     let domain = context.domain.to_ascii_lowercase();
     let operation = context.operation.to_ascii_lowercase();
 
     match (domain.as_str(), operation.as_str()) {
-        ("observe", "get-definition") => render_definitions(trimmed),
-        ("observe", "find-references") => render_references(trimmed),
-        ("verify", "diagnostics") => render_diagnostics(trimmed, context),
-        ("act", _) => {
-            render_capability_resolution(trimmed).or_else(|| render_verification_failures(trimmed))
-        }
+        ("observe", "get-definition") => parse_definitions(trimmed).map(render_definitions),
+        ("observe", "find-references") => serde_json::from_str::<ReferenceResponse>(trimmed)
+            .ok()
+            .map(render_references),
+        ("verify", "diagnostics") => serde_json::from_str::<DiagnosticsResponse>(trimmed)
+            .ok()
+            .map(|response| render_diagnostics(response, context)),
+        ("act", _) => parse_capability_resolution(trimmed)
+            .map(render_capability_resolution)
+            .or_else(|| parse_verification_failures(trimmed).map(render_verification_failures)),
         _ => None,
     }
 }
@@ -107,10 +111,14 @@ struct LocationItemAccessors<FUri, FLine, FColumn> {
     column: FColumn,
 }
 
+struct LocationRenderOptions {
+    empty_message: &'static str,
+    label: &'static str,
+}
+
 fn render_location_items<T, FUri, FLine, FColumn>(
     items: Vec<T>,
-    empty_message: &str,
-    label: &str,
+    options: LocationRenderOptions,
     accessors: LocationItemAccessors<FUri, FLine, FColumn>,
 ) -> String
 where
@@ -119,7 +127,7 @@ where
     FColumn: Fn(&T) -> u32,
 {
     if items.is_empty() {
-        return String::from(empty_message);
+        return String::from(options.empty_message);
     }
     let locations: Vec<SourceLocation> = items
         .into_iter()
@@ -129,45 +137,46 @@ where
                 &uri,
                 Some((accessors.line)(&item)),
                 Some((accessors.column)(&item)),
-                label,
+                options.label,
             )
         })
         .collect();
     render::render_locations(&locations)
 }
 
-fn render_definitions(payload: &str) -> Option<String> {
-    let definitions = parse_definitions(payload)?;
-    Some(render_location_items(
+fn render_definitions(definitions: Vec<DefinitionLocation>) -> String {
+    render_location_items(
         definitions,
-        "no definitions found\n",
-        "definition",
+        LocationRenderOptions {
+            empty_message: "no definitions found\n",
+            label: "definition",
+        },
         LocationItemAccessors {
             uri: |definition: &DefinitionLocation| definition.uri.clone(),
             line: |definition: &DefinitionLocation| definition.line,
             column: |definition: &DefinitionLocation| definition.column,
         },
-    ))
+    )
 }
 
-fn render_references(payload: &str) -> Option<String> {
-    let response: ReferenceResponse = serde_json::from_str(payload).ok()?;
-    Some(render_location_items(
+fn render_references(response: ReferenceResponse) -> String {
+    render_location_items(
         response.references,
-        "no references found\n",
-        "reference",
+        LocationRenderOptions {
+            empty_message: "no references found\n",
+            label: "reference",
+        },
         LocationItemAccessors {
             uri: |reference: &DefinitionLocation| reference.uri.clone(),
             line: |reference: &DefinitionLocation| reference.line,
             column: |reference: &DefinitionLocation| reference.column,
         },
-    ))
+    )
 }
 
-fn render_diagnostics(payload: &str, context: &OutputContext) -> Option<String> {
-    let response: DiagnosticsResponse = serde_json::from_str(payload).ok()?;
+fn render_diagnostics(response: DiagnosticsResponse, context: &OutputContext) -> String {
     if response.diagnostics.is_empty() {
-        return Some(String::from("no diagnostics reported\n"));
+        return String::from("no diagnostics reported\n");
     }
     let fallback_uri = extract_uri_argument(&context.arguments);
     let locations: Vec<SourceLocation> = response
@@ -175,23 +184,21 @@ fn render_diagnostics(payload: &str, context: &OutputContext) -> Option<String> 
         .into_iter()
         .map(|diagnostic| diagnostic_to_location(diagnostic, fallback_uri.as_deref()))
         .collect();
-    Some(render::render_locations(&locations))
+    render::render_locations(&locations)
 }
 
-fn render_verification_failures(payload: &str) -> Option<String> {
-    let failures = parse_verification_failures(payload)?;
+fn render_verification_failures(failures: Vec<VerificationFailure>) -> String {
     if failures.is_empty() {
-        return Some(String::from("no verification failures reported\n"));
+        return String::from("no verification failures reported\n");
     }
     let locations: Vec<SourceLocation> = failures
         .into_iter()
         .map(verification_failure_to_location)
         .collect();
-    Some(render::render_locations(&locations))
+    render::render_locations(&locations)
 }
 
-fn render_capability_resolution(payload: &str) -> Option<String> {
-    let resolution = parse_capability_resolution(payload)?;
+fn render_capability_resolution(resolution: CapabilityResolution) -> String {
     let details = resolution.details;
     let language = details.language.as_deref().unwrap_or("unknown");
 
@@ -227,12 +234,10 @@ fn render_capability_resolution(payload: &str) -> Option<String> {
         ));
     }
 
-    Some(rendered)
+    rendered
 }
 
-fn render_unknown_operation(payload: &str) -> Option<String> {
-    let unknown_operation = parse_unknown_operation(payload)?;
-    let details = unknown_operation.details;
+fn render_unknown_operation(details: UnknownOperationDetails) -> String {
     let mut rendered = format!(
         "error: unknown operation '{}' for domain '{}'\n\nAvailable operations:\n",
         details.operation, details.domain
@@ -240,7 +245,7 @@ fn render_unknown_operation(payload: &str) -> Option<String> {
     for operation in details.known_operations {
         rendered.push_str(&format!("  {operation}\n"));
     }
-    Some(rendered)
+    rendered
 }
 
 fn diagnostic_to_location(
