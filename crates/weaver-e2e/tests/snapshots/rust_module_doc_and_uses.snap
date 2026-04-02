@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/get_card_snapshots.rs
+---
+{
+  "command": "weaver --daemon-socket tcp://<daemon-endpoint> --output json observe get-card --uri <uri> --position 1:1 --detail structure",
+  "status": 1,
+  "stdout": "{\n  \"refusal\": {\n    \"message\": \"observe get-card: no symbol found at 1:1\",\n    \"reason\": \"no_symbol_at_position\",\n    \"requested_detail\": \"structure\"\n  },\n  \"status\": \"refusal\"\n}",
+  "stderr": ""
+}

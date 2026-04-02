@@ -7,6 +7,7 @@
 
 use std::path::Path;
 
+use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_plugins::CapabilityId;
 
@@ -51,7 +52,8 @@ pub(super) fn build_backends(socket_path: &Path) -> FusionBackends<SemanticBacke
         daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().as_ref()),
         ..Config::default()
     };
-    let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
+    let provider =
+        SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
     FusionBackends::new(config, provider)
 }
 

@@ -9,6 +9,7 @@ use std::time::Duration;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
+use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
 use crate::backends::FusionBackends;
@@ -23,7 +24,8 @@ fn test_handler() -> Arc<DispatchConnectionHandler> {
         daemon_socket: SocketEndpoint::unix("/tmp/weaver-bdd-test/socket.sock"),
         ..Config::default()
     };
-    let provider = SemanticBackendProvider::new(CapabilityMatrix::default());
+    let provider =
+        SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
     let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
     let backend_manager = BackendManager::new(backends);
     let workspace_root = std::env::current_dir().expect("workspace root");

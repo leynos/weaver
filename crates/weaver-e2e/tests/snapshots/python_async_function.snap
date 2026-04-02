@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/get_card_snapshots.rs
+---
+{
+  "command": "weaver --daemon-socket tcp://<daemon-endpoint> --output json observe get-card --uri <uri> --position 1:11 --detail structure",
+  "status": 0,
+  "stdout": "{\n  \"card\": {\n    \"card_version\": 1,\n    \"etag\": \"<etag>\",\n    \"metrics\": {\n      \"cyclomatic\": 1,\n      \"lines\": 2\n    },\n    \"provenance\": {\n      \"extracted_at\": \"<timestamp>\",\n      \"sources\": [\n        \"tree_sitter\"\n      ]\n    },\n    \"signature\": {\n      \"display\": \"async def fetch() -> str:\",\n      \"params\": [],\n      \"returns\": \"str\"\n    },\n    \"structure\": {\n      \"branches\": [],\n      \"locals\": []\n    },\n    \"symbol\": {\n      \"ref\": {\n        \"kind\": \"function\",\n        \"language\": \"python\",\n        \"name\": \"fetch\",\n        \"range\": {\n          \"end\": {\n            \"column\": 15,\n            \"line\": 1\n          },\n          \"start\": {\n            \"column\": 0,\n            \"line\": 0\n          }\n        },\n        \"uri\": \"<uri>\"\n      },\n      \"symbol_id\": \"<symbol_id>\"\n    }\n  },\n  \"status\": \"success\"\n}",
+  "stderr": ""
+}

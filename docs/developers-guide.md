@@ -45,3 +45,245 @@ applicable (those are YAML concepts); TOML scalars are strongly typed and
 preserve their declared type without implicit coercion. Boolean values must be
 `true` or `false` (the string `"yes"` is rejected as an invalid boolean, as
 shown in the user-facing error example).
+
+## Card extraction cache internals
+
+The `observe get-card` path is optimized around two shared resources in
+`crates/weaver-cards/`:
+
+- `CardCache`, an LRU cache of extracted `SymbolCard` values keyed by request
+  identity and source revision.
+- `ParserRegistry`, a pool of reusable Tree-sitter parsers keyed by
+  `SupportedLanguage`.
+
+`TreeSitterCardExtractor` composes both resources. In production the daemon
+constructs one extractor and reuses it across requests so cards and parsers
+stay warm across repeated lookups.
+
+### `CardCache` design
+
+`CardCache` wraps `lru::LruCache<CardCacheKey, Arc<SymbolCard>>` behind a
+`Mutex`. The cached payload is stored as `Arc<SymbolCard>` so a cache hit can
+reuse the existing card without cloning a potentially large structure on every
+lookup.
+
+The cache also tracks:
+
+- `hits` and `misses` counters for integration tests and operational checks.
+- `in_flight`, a `HashSet<CardCacheKey>` guarded by a `Mutex`.
+- `in_flight_ready`, a `Condvar` used to serialize concurrent population of the
+  same key.
+
+The in-flight set matters because multiple concurrent requests can miss the LRU
+at the same time. Without a per-key population guard, each request would parse
+the file and try to insert the same card independently. The current design lets
+exactly one thread compute a missing card for a given `CardCacheKey`, while
+other threads wait, re-check the cache, and reuse the inserted result.
+
+Example:
+
+```rust
+use std::sync::Arc;
+use weaver_cards::{CardCache, CardCacheAddress, CardCacheKey, DetailLevel};
+use weaver_syntax::SupportedLanguage;
+
+let cache = CardCache::new(128);
+let key = CardCacheKey::new(
+    std::path::Path::new("src/lib.rs"),
+    "fn greet() {}\n",
+    CardCacheAddress {
+        language: SupportedLanguage::Rust,
+        detail: DetailLevel::Structure,
+        line: 1,
+        column: 4,
+    },
+);
+
+if let Some(card) = cache.get_shared(&key) {
+    assert_eq!(card.symbol.name, "greet");
+}
+```
+
+`CardCache::new` rejects a zero capacity. A zero-capacity cache would silently
+degrade into surprising behaviour, so callers must choose an explicit positive
+bound.
+
+### `CardCacheKey` composition
+
+`CardCacheKey` combines the pieces of state that make one extraction result
+meaningfully different from another:
+
+- `path: PathBuf`
+- `content_hash: [u8; 32]`
+- `language: SupportedLanguage`
+- `detail: DetailLevel`
+- `line: u32`
+- `column: u32`
+
+The `content_hash` is a SHA-256 digest of the source text, not file metadata.
+That keeps the key stable across timestamp-only filesystem changes while still
+invalidating entries when the content changes.
+
+`CardCacheAddress` carries the request-specific fields before key construction.
+That keeps call sites explicit about which parts of a request affect cache
+identity.
+
+Example:
+
+```rust
+use weaver_cards::{CardCacheAddress, CardCacheKey, DetailLevel};
+use weaver_syntax::SupportedLanguage;
+
+let source = "def greet(name: str) -> str:\n    return f\"hi {name}\"\n";
+let address = CardCacheAddress {
+    language: SupportedLanguage::Python,
+    detail: DetailLevel::Semantic,
+    line: 1,
+    column: 5,
+};
+
+let key = CardCacheKey::new(
+    std::path::Path::new("/workspace/app.py"),
+    source,
+    address,
+);
+
+assert_eq!(key.path(), std::path::Path::new("/workspace/app.py"));
+```
+
+The path component is matched by exact `PathBuf` equality. Relative paths,
+symlinked paths, and canonicalized paths do not collapse to one cache entry
+unless the caller normalizes them before building the key.
+
+### `ParserRegistry` pooling pattern
+
+Tree-sitter parser construction is not free, so `ParserRegistry` keeps one
+`Parser` per `SupportedLanguage` in a shared map:
+
+```rust
+HashMap<SupportedLanguage, Arc<Mutex<Parser>>>
+```
+
+The first request for a language creates the parser and stores it in the map.
+Later requests clone the `Arc`, lock the parser for the duration of one parse,
+and reuse the same initialized parser instance.
+
+This pattern matches the cache design:
+
+- one shared registry per long-lived extractor
+- fine-grained reuse by language
+- a narrow lock scope around the actual parse call
+
+Example:
+
+```rust
+use weaver_cards::ParserRegistry;
+use weaver_syntax::SupportedLanguage;
+
+let registry = ParserRegistry::new();
+
+let rust_tree = registry.parse(
+    SupportedLanguage::Rust,
+    "fn greet(name: &str) -> String { format!(\"hi {name}\") }\n",
+)?;
+let python_tree = registry.parse(
+    SupportedLanguage::Python,
+    "def greet(name: str) -> str:\n    return f\"hi {name}\"\n",
+)?;
+
+assert!(rust_tree.root_node().is_named());
+assert!(python_tree.root_node().is_named());
+# Ok::<(), weaver_syntax::SyntaxError>(())
+```
+
+The registry is intentionally independent of the daemon and independent of the
+Language Server Protocol (LSP). Tree-sitter extraction remains the baseline
+syntax pass, while LSP enrichment is added later by `weaverd` when a request
+asks for semantic detail and a backend is available.
+
+### Cache invalidation strategies
+
+The cache uses two invalidation paths, each for a different event:
+
+- `invalidate(path)` removes every cached card for that exact path.
+- `invalidate_stale_revisions(path, current_hash)` removes entries for the same
+  path whose content hash no longer matches the current source text.
+
+`invalidate(path)` is the blunt tool used when the caller knows an entire
+document identity is no longer valid. `invalidate_stale_revisions(...)` is the
+steady-state path used during extraction: once a new card is computed, older
+revisions for that path are evicted and the current revision stays cached.
+
+Examples:
+
+```rust
+use std::path::Path;
+use weaver_cards::CardCache;
+
+let cache = CardCache::new(128);
+let path = Path::new("/workspace/src/lib.rs");
+
+cache.invalidate(path);
+```
+
+```rust
+use std::path::Path;
+use weaver_cards::{content_hash, CardCache};
+
+let cache = CardCache::new(128);
+let path = Path::new("/workspace/src/lib.rs");
+let source = "fn greet() {}\n";
+
+cache.invalidate_stale_revisions(path, &content_hash(source));
+```
+
+Because invalidation is exact-path based, callers that want symlink and
+relative-path stability should normalize paths at the boundary where requests
+enter the cacheable extraction flow.
+
+### `TreeSitterCardExtractor` integration
+
+`TreeSitterCardExtractor` is the orchestrator that ties cache keys, parser
+pooling, and language-specific extraction together.
+
+The cache-aware `extract_shared(...)` flow is:
+
+1. Detect `SupportedLanguage` from the request path.
+2. Build a `CardCacheKey` from path, source, detail, and cursor position.
+3. Probe the cache with `peek_shared(...)`.
+4. On a hit, record a cache hit and return the shared card immediately.
+5. On a miss, acquire `lock_population(&cache_key)` so only one thread fills
+   that key.
+6. Re-check the cache with `get_shared(...)` in case another thread won the
+   race while the current thread was waiting.
+7. Parse through `ParserRegistry`, build the card, invalidate stale revisions,
+   and insert the new shared card into `CardCache`.
+
+Example:
+
+```rust
+use std::sync::Arc;
+use weaver_cards::{CardCache, CardExtractionInput, ParserRegistry};
+use weaver_cards::TreeSitterCardExtractor;
+
+let extractor = TreeSitterCardExtractor::with_shared_resources(
+    Arc::new(CardCache::new(256)),
+    Arc::new(ParserRegistry::new()),
+);
+
+let card = extractor.extract_shared(CardExtractionInput {
+    path: std::path::Path::new("/workspace/src/lib.rs"),
+    source: "fn greet() {}\n",
+    line: 1,
+    column: 4,
+    detail: weaver_cards::DetailLevel::Structure,
+})?;
+
+assert_eq!(card.symbol.name, "greet");
+# Ok::<(), weaver_cards::CardExtractionError>(())
+```
+
+The plain `extract(...)` method remains available for callers that want an
+owned `SymbolCard`, but the daemon and other long-lived services should prefer
+shared resources and `extract_shared(...)` so cache hits do not pay for extra
+deep clones.

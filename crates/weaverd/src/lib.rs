@@ -46,10 +46,20 @@ pub use backends::{
 pub use bootstrap::{
     BootstrapError, ConfigLoader, Daemon, StaticConfigLoader, SystemConfigLoader, bootstrap_with,
 };
+// Workspace integration tests can opt into these internal wiring exports via
+// the `test-support` cargo feature.
+#[cfg(feature = "test-support")]
+#[doc(hidden)]
+pub use dispatch::{BackendManager, DispatchConnectionHandler};
 pub use health::{HealthReporter, StructuredHealthReporter};
 pub use process::{LaunchError, LaunchMode, run_daemon};
 pub use semantic_provider::SemanticBackendProvider;
 pub use telemetry::{TelemetryError, TelemetryHandle};
+// Workspace integration tests can opt into these internal wiring exports via
+// the `test-support` cargo feature.
+#[cfg(feature = "test-support")]
+#[doc(hidden)]
+pub use transport::{ConnectionHandler, ConnectionStream};
 
 #[cfg(test)]
 mod tests;

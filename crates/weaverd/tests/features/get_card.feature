@@ -27,3 +27,20 @@ Feature: Observe get-card
     When an observe get-card request is sent for the empty Python fixture
     Then the stdout response contains "\"reason\":\"no_symbol_at_position\""
     And the get-card response exits with status 1
+
+  Scenario: Repeated requests reuse cached extraction output
+    Given a daemon connection is established for get-card
+    And a supported Rust source fixture
+    When the same observe get-card request is sent twice for the Rust fixture
+    Then both responses are identical
+    And the get-card response exits with status 0
+
+  Scenario: File edits invalidate cached extraction output
+    Given a daemon connection is established for get-card
+    And a supported Rust source fixture
+    When an observe get-card request is sent for the Rust fixture
+    And the Rust fixture is rewritten to return "welcome"
+    And an observe get-card request is sent for the Rust fixture
+    Then the latest stdout response contains "\"name\":\"welcome\""
+    And the latest stdout response differs from the first response
+    And the get-card response exits with status 0

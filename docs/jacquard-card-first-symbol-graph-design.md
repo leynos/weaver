@@ -963,6 +963,10 @@ Implementation should meet the following performance expectations.[^8]
   ranges do not starve other requests.
 - Define cache invalidation boundaries per repo, ref, and file path + blob
   hash, with explicit eviction metrics.
+- The current daemon implementation shares one cache-backed
+  `TreeSitterCardExtractor` through `SemanticBackendProvider`, which keeps
+  routing signatures stable while still reusing parser pools and cached cards
+  across connections.
 
 ## Testing strategy
 
