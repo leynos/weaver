@@ -150,7 +150,7 @@ Pattern snippets must support:
 
 ### Parser-enforced semantic constraints
 
-Semantic constraints must be enforced after parsing and normalisation.[^3]
+Semantic constraints must be enforced after parsing and normalization.[^3]
 
 - `pattern-either` (legacy OR) rejects negated branches (`InvalidNotInOr`).[^3]
 - `patterns` and `all` reject conjunctions with no positive terms
@@ -1133,7 +1133,7 @@ mirrored into `sempai_fixtures` as local test inputs.[^7]
 
   - Success criteria: schema-aligned deserialisation for rule metadata and
     query keys.[^1]
-- [ ] 1.2.2. Implement legacy and v2 parsing paths and normalisation.
+- [ ] 1.2.2. Implement legacy and v2 parsing paths and normalization.
 
   - Success criteria: normalised formula output snapshots for paired legacy/v2
     examples.[^2][^3]

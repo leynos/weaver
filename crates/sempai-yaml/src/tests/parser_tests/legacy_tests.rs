@@ -44,12 +44,50 @@ fn parse_project_depends_on_search_rule() {
         assert_eq!(rule.mode(), &RuleMode::Search);
         match rule.principal() {
             RulePrincipal::Search(SearchQueryPrincipal::ProjectDependsOn(value)) => {
-                assert_eq!(value["namespace"], "pypi");
-                assert_eq!(value["package"], "requests");
+                assert_eq!(value.namespace(), "pypi");
+                assert_eq!(value.package(), "requests");
             }
             other => panic!("expected ProjectDependsOn principal, got {other:?}"),
         }
     });
+}
+
+#[test]
+fn parse_project_depends_on_with_legacy_principal_fails() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.depends\n",
+        "    message: detect vulnerable dependency\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    pattern: foo()\n",
+        "    r2c-internal-project-depends-on:\n",
+        "      namespace: pypi\n",
+        "      package: requests\n",
+    );
+
+    let (code, message, has_span) = first_err_diagnostic(yaml);
+    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(message.contains("exactly one top-level query principal"));
+    assert!(has_span);
+}
+
+#[test]
+fn parse_project_depends_on_requires_namespace_and_package() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.depends.invalid\n",
+        "    message: detect vulnerable dependency\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    r2c-internal-project-depends-on:\n",
+        "      namespace: pypi\n",
+    );
+
+    let (code, message, has_span) = first_err_diagnostic(yaml);
+    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(message.contains("must define string `namespace` and `package` fields"));
+    assert!(has_span);
 }
 
 #[test]

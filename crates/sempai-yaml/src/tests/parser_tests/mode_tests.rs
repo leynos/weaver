@@ -131,6 +131,23 @@ fn parse_unknown_mode_rule() {
     ),
     "Extract mode rule contains unexpected principal fields: `join`",
 )]
+#[case::extract_with_project_depends_on(
+    concat!(
+        "rules:\n",
+        "  - id: demo.extract.depends\n",
+        "    message: extract with dependency principal\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    mode: extract\n",
+        "    dest-language: python\n",
+        "    extract: $X\n",
+        "    pattern: foo($X)\n",
+        "    r2c-internal-project-depends-on:\n",
+        "      namespace: pypi\n",
+        "      package: requests\n",
+    ),
+    "extract mode does not support `r2c-internal-project-depends-on`",
+)]
 #[case::join_with_match(
     concat!(
         "rules:\n",
@@ -160,6 +177,23 @@ fn parse_unknown_mode_rule() {
         "      sinks: []\n",
     ),
     "Taint mode rule contains unexpected principal fields: `extract` or `dest-language`",
+)]
+#[case::taint_with_project_depends_on(
+    concat!(
+        "rules:\n",
+        "  - id: demo.taint.depends\n",
+        "    message: taint with dependency principal\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    mode: taint\n",
+        "    taint:\n",
+        "      sources: []\n",
+        "      sinks: []\n",
+        "    r2c-internal-project-depends-on:\n",
+        "      namespace: pypi\n",
+        "      package: requests\n",
+    ),
+    "taint mode does not support `r2c-internal-project-depends-on`",
 )]
 fn reject_cross_mode_principal_fields(#[case] yaml: &str, #[case] expected_fragment: &str) {
     let (code, message, has_span) = first_err_diagnostic(yaml);

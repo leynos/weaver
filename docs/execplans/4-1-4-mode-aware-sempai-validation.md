@@ -74,9 +74,10 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log
   do not normalize legacy and v2 principals into canonical `Formula`, and do
   not produce real `QueryPlan` values yet.
 - Keep this milestone out of 4.1.6 scope:
-  do not implement the one-liner DSL parser as part of this work.
-- Add both unit tests and behavioural tests using `rstest-bdd` v0.5.0. Cover
-  happy paths, unhappy paths, and edge cases.
+  do not implement the one-liner domain-specific language (DSL) parser as part
+  of this work.
+- Add both unit tests and behaviour-driven development (BDD) tests using
+  `rstest-bdd` v0.5.0. Cover happy paths, unhappy paths, and edge cases.
 - Keep files below 400 lines. Split validator code and test helpers into small,
   purpose-specific modules instead of growing `engine.rs` or
   `crates/sempai-yaml/src/parser/builders.rs` into catch-all files.
@@ -325,9 +326,9 @@ In `crates/sempai-yaml`:
   - `r2c-internal-project-depends-on`
 - Add unhappy-path unit tests for search rules that declare the search header
   but none of the allowed principal keys.
-- Extend the BDD feature file with one happy path proving the compatibility key
-  is accepted and one unhappy path proving missing-principal search rules still
-  fail with `E_SEMPAI_SCHEMA_INVALID`.
+- Extend the behaviour-driven development (BDD) feature file with one happy
+  path proving the compatibility key is accepted and one unhappy path proving
+  missing-principal search rules still fail with `E_SEMPAI_SCHEMA_INVALID`.
 
 In `crates/sempai`:
 
