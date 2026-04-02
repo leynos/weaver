@@ -36,8 +36,7 @@ struct SnapshotHarness {
 }
 
 impl SnapshotHarness {
-    fn workspace_for_case(self, case: weaver_e2e::card_fixtures::CardFixtureCase) -> WorkspaceUri {
-        let _ = self.default_expected_requests;
+    fn workspace_for_case(case: weaver_e2e::card_fixtures::CardFixtureCase) -> WorkspaceUri {
         let temp_dir = TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
         let uri = fixture_uri(&temp_dir, case);
         WorkspaceUri {
@@ -46,8 +45,7 @@ impl SnapshotHarness {
         }
     }
 
-    fn unsupported_workspace(self) -> WorkspaceUri {
-        let _ = self.default_expected_requests;
+    fn unsupported_workspace() -> WorkspaceUri {
         let temp_dir = TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
         let uri = unsupported_fixture_uri(&temp_dir);
         WorkspaceUri {
@@ -56,13 +54,11 @@ impl SnapshotHarness {
         }
     }
 
-    fn daemon(self, expected_requests: usize) -> TestDaemon {
-        let _ = self.default_expected_requests;
-        TestDaemon::start(expected_requests)
+    fn daemon(self, expected_requests: Option<usize>) -> TestDaemon {
+        TestDaemon::start(expected_requests.unwrap_or(self.default_expected_requests))
     }
 
-    const fn request(self, uri: &str, spec: RequestSpec) -> GetCardRequest<'_> {
-        let _ = self.default_expected_requests;
+    const fn request(uri: &str, spec: RequestSpec) -> GetCardRequest<'_> {
         GetCardRequest {
             uri,
             line: spec.line,
@@ -91,9 +87,12 @@ fn unsupported_fixture_uri(temp_dir: &TempDir) -> String {
         .expect("unsupported path to URI")
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "test helper failures should panic with explicit setup messages"
+)]
 fn render_snapshot<T: serde::Serialize>(transcript: &T) -> String {
-    serde_json::to_string_pretty(transcript)
-        .unwrap_or_else(|error| panic!("serialize transcript: {error}"))
+    serde_json::to_string_pretty(transcript).expect("serialize transcript")
 }
 
 #[rstest]
@@ -141,11 +140,11 @@ fn get_card_structure_snapshots_cover_python_and_rust_fixture_battery(
     #[case] case: weaver_e2e::card_fixtures::CardFixtureCase,
     snapshot_harness: SnapshotHarness,
 ) {
-    let workspace = snapshot_harness.workspace_for_case(case);
-    let daemon = snapshot_harness.daemon(1);
+    let workspace = SnapshotHarness::workspace_for_case(case);
+    let daemon = snapshot_harness.daemon(None);
     let transcript = run_get_card(
         &daemon,
-        snapshot_harness.request(
+        SnapshotHarness::request(
             &workspace.uri,
             RequestSpec {
                 line: case.line,
@@ -167,11 +166,11 @@ fn get_card_detail_levels_snapshot(
     snapshot_harness: SnapshotHarness,
 ) {
     let case = RUST_CASES[0];
-    let workspace = snapshot_harness.workspace_for_case(case);
-    let daemon = snapshot_harness.daemon(1);
+    let workspace = SnapshotHarness::workspace_for_case(case);
+    let daemon = snapshot_harness.daemon(None);
     let transcript = run_get_card(
         &daemon,
-        snapshot_harness.request(
+        SnapshotHarness::request(
             &workspace.uri,
             RequestSpec {
                 line: case.line,
@@ -211,29 +210,25 @@ fn get_card_refusal_snapshots(
     snapshot_harness: SnapshotHarness,
 ) {
     let workspace = if refusal_case.uses_unsupported_workspace {
-        snapshot_harness.unsupported_workspace()
+        SnapshotHarness::unsupported_workspace()
     } else {
-        snapshot_harness.workspace_for_case(RUST_CASES[0])
+        SnapshotHarness::workspace_for_case(RUST_CASES[0])
     };
-    let daemon = snapshot_harness.daemon(1);
+    let daemon = snapshot_harness.daemon(None);
     let transcript = run_get_card(
         &daemon,
-        snapshot_harness.request(&workspace.uri, refusal_case.request),
+        SnapshotHarness::request(&workspace.uri, refusal_case.request),
     );
     daemon.join();
     assert_named_snapshot(refusal_case.snapshot_name, &render_snapshot(&transcript));
 }
 
 #[rstest]
-#[case(true)]
-fn get_card_repeated_request_uses_cache_snapshot(
-    #[case] repeated: bool,
-    snapshot_harness: SnapshotHarness,
-) {
+fn get_card_repeated_request_uses_cache_snapshot(snapshot_harness: SnapshotHarness) {
     let case = RUST_CASES[0];
-    let workspace = snapshot_harness.workspace_for_case(case);
-    let daemon = snapshot_harness.daemon(if repeated { 2 } else { 1 });
-    let request = snapshot_harness.request(
+    let workspace = SnapshotHarness::workspace_for_case(case);
+    let daemon = snapshot_harness.daemon(Some(2));
+    let request = SnapshotHarness::request(
         &workspace.uri,
         RequestSpec {
             line: case.line,
@@ -242,7 +237,6 @@ fn get_card_repeated_request_uses_cache_snapshot(
         },
     );
     let first = run_get_card(&daemon, request);
-    assert!(repeated, "cache snapshot requires a repeated request");
     let second = run_get_card(&daemon, request);
     let stats = daemon.cache_stats();
     daemon.join();
