@@ -36,8 +36,12 @@ struct SnapshotHarness {
 }
 
 impl SnapshotHarness {
+    #[expect(
+        clippy::expect_used,
+        reason = "test helper failures should panic with explicit setup messages"
+    )]
     fn workspace_for_case(case: weaver_e2e::card_fixtures::CardFixtureCase) -> WorkspaceUri {
-        let temp_dir = TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
+        let temp_dir = TempDir::new().expect("creating temp dir");
         let uri = fixture_uri(&temp_dir, case);
         WorkspaceUri {
             _temp_dir: temp_dir,
@@ -45,8 +49,12 @@ impl SnapshotHarness {
         }
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "test helper failures should panic with explicit setup messages"
+    )]
     fn unsupported_workspace() -> WorkspaceUri {
-        let temp_dir = TempDir::new().unwrap_or_else(|error| panic!("temp dir: {error}"));
+        let temp_dir = TempDir::new().expect("creating temp dir");
         let uri = unsupported_fixture_uri(&temp_dir);
         WorkspaceUri {
             _temp_dir: temp_dir,
