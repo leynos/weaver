@@ -262,9 +262,9 @@ Retrospective notes:
   fall back to the enclosing rule span. This keeps unsupported-mode reports
   anchored to the most actionable location without changing public signatures.
 - `r2c-internal-project-depends-on` stayed opaque as
-  `SearchQueryPrincipal::ProjectDependsOn(serde_json::Value)`. That was enough
-  to satisfy search-mode validation while deferring dependency semantics to a
-  later milestone.
+  `SearchQueryPrincipal::ProjectDependsOn(ProjectDependsOnPayload)`. That was
+  enough to satisfy search-mode validation while deferring dependency semantics
+  to a later milestone.
 - No existing parser-time checks had to move into the engine validator. The
   parser still owns YAML shape, required metadata fields, and cross-family
   principal rejection; the engine now owns execution support gating.

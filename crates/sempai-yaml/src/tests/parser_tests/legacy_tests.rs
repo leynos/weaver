@@ -52,9 +52,9 @@ fn parse_project_depends_on_search_rule() {
     });
 }
 
-#[test]
-fn parse_project_depends_on_with_legacy_principal_fails() {
-    let yaml = concat!(
+#[rstest]
+#[case::legacy_principal_conflict(
+    concat!(
         "rules:\n",
         "  - id: demo.depends\n",
         "    message: detect vulnerable dependency\n",
@@ -64,17 +64,11 @@ fn parse_project_depends_on_with_legacy_principal_fails() {
         "    r2c-internal-project-depends-on:\n",
         "      namespace: pypi\n",
         "      package: requests\n",
-    );
-
-    let (code, message, has_span) = first_err_diagnostic(yaml);
-    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
-    assert!(message.contains("exactly one top-level query principal"));
-    assert!(has_span);
-}
-
-#[test]
-fn parse_project_depends_on_requires_namespace_and_package() {
-    let yaml = concat!(
+    ),
+    "exactly one top-level query principal",
+)]
+#[case::missing_package(
+    concat!(
         "rules:\n",
         "  - id: demo.depends.invalid\n",
         "    message: detect vulnerable dependency\n",
@@ -82,11 +76,16 @@ fn parse_project_depends_on_requires_namespace_and_package() {
         "    severity: WARNING\n",
         "    r2c-internal-project-depends-on:\n",
         "      namespace: pypi\n",
-    );
-
+    ),
+    "must define string `namespace` and `package` fields",
+)]
+fn reject_invalid_project_depends_on_rule(
+    #[case] yaml: &str,
+    #[case] expected_message_fragment: &str,
+) {
     let (code, message, has_span) = first_err_diagnostic(yaml);
     assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
-    assert!(message.contains("must define string `namespace` and `package` fields"));
+    assert!(message.contains(expected_message_fragment));
     assert!(has_span);
 }
 
