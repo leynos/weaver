@@ -62,38 +62,35 @@ fn assert_schema_invalid(yaml: &str, expected_fragment: &str) {
     assert!(has_span);
 }
 
-#[test]
-fn parse_project_depends_on_with_legacy_principal_fails() {
-    assert_schema_invalid(
-        concat!(
-            "rules:\n",
-            "  - id: demo.depends\n",
-            "    message: detect vulnerable dependency\n",
-            "    languages: [python]\n",
-            "    severity: WARNING\n",
-            "    pattern: foo()\n",
-            "    r2c-internal-project-depends-on:\n",
-            "      namespace: pypi\n",
-            "      package: requests\n",
-        ),
-        "exactly one top-level query principal",
-    );
-}
-
-#[test]
-fn parse_project_depends_on_requires_namespace_and_package() {
-    assert_schema_invalid(
-        concat!(
-            "rules:\n",
-            "  - id: demo.depends.invalid\n",
-            "    message: detect vulnerable dependency\n",
-            "    languages: [python]\n",
-            "    severity: WARNING\n",
-            "    r2c-internal-project-depends-on:\n",
-            "      namespace: pypi\n",
-        ),
-        "must define string `namespace` and `package` fields",
-    );
+#[rstest]
+#[case::legacy_principal_conflict(
+    concat!(
+        "rules:\n",
+        "  - id: demo.depends\n",
+        "    message: detect vulnerable dependency\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    pattern: foo()\n",
+        "    r2c-internal-project-depends-on:\n",
+        "      namespace: pypi\n",
+        "      package: requests\n",
+    ),
+    "exactly one top-level query principal",
+)]
+#[case::missing_package(
+    concat!(
+        "rules:\n",
+        "  - id: demo.depends.invalid\n",
+        "    message: detect vulnerable dependency\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    r2c-internal-project-depends-on:\n",
+        "      namespace: pypi\n",
+    ),
+    "must define string `namespace` and `package` fields",
+)]
+fn parse_project_depends_on_invalid_cases(#[case] case_yaml: &str, #[case] case_expected: &str) {
+    assert_schema_invalid(case_yaml, case_expected);
 }
 
 #[test]
