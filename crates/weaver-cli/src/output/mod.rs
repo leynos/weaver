@@ -8,6 +8,8 @@ mod models;
 mod render;
 mod source;
 
+#[cfg(test)]
+pub(crate) use self::models::UNKNOWN_OPERATION_TYPE;
 pub use crate::cli::OutputFormat;
 use crate::output::models::{
     CapabilityResolution, DefinitionLocation, DiagnosticItem, DiagnosticsResponse,
@@ -356,24 +358,25 @@ mod tests {
     #[test]
     fn renders_unknown_operation_payload_for_humans() {
         let context = OutputContext::new("observe", "nonexistent", Vec::new());
-        let payload = r#"{
-  "status": "error",
-  "type": "UnknownOperation",
-  "details": {
-    "domain": "observe",
-    "operation": "nonexistent",
-    "known_operations": [
-      "get-definition",
-      "find-references",
-      "grep",
-      "diagnostics",
-      "call-hierarchy",
-      "get-card"
-    ]
-  }
-}"#;
+        let payload = serde_json::to_string(&serde_json::json!({
+            "status": "error",
+            "type": UNKNOWN_OPERATION_TYPE,
+            "details": {
+                "domain": "observe",
+                "operation": "nonexistent",
+                "known_operations": [
+                    "get-definition",
+                    "find-references",
+                    "grep",
+                    "diagnostics",
+                    "call-hierarchy",
+                    "get-card"
+                ]
+            }
+        }))
+        .expect("unknown-operation payload");
 
-        let rendered = render_human_output(&context, payload).expect("rendered");
+        let rendered = render_human_output(&context, &payload).expect("rendered");
 
         assert!(rendered.contains("error: unknown operation 'nonexistent' for domain 'observe'"));
         assert!(rendered.contains("Available operations:"));

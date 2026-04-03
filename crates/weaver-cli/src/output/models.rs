@@ -7,7 +7,7 @@ use serde::Deserialize;
 /// This constant must match the daemon-side `CAPABILITY_RESOLUTION_TYPE` exported
 /// by `weaverd::dispatch::act::refactor::resolution` to ensure correct parsing.
 const CAPABILITY_RESOLUTION_TYPE: &str = "CapabilityResolution";
-const UNKNOWN_OPERATION_TYPE: &str = "UnknownOperation";
+pub(crate) const UNKNOWN_OPERATION_TYPE: &str = "UnknownOperation";
 
 /// A definition or reference location in the daemon response.
 #[derive(Debug, Deserialize)]
@@ -324,17 +324,18 @@ mod tests {
 
     #[test]
     fn parses_unknown_operation_payload() {
-        let payload = r#"{
-  "status": "error",
-  "type": "UnknownOperation",
-  "details": {
-    "domain": "observe",
-    "operation": "bogus",
-    "known_operations": ["get-definition", "find-references"]
-  }
-}"#;
+        let payload = serde_json::to_string(&serde_json::json!({
+            "status": "error",
+            "type": UNKNOWN_OPERATION_TYPE,
+            "details": {
+                "domain": "observe",
+                "operation": "bogus",
+                "known_operations": ["get-definition", "find-references"]
+            }
+        }))
+        .expect("unknown-operation payload");
 
-        let parsed = parse_unknown_operation(payload).expect("unknown operation");
+        let parsed = parse_unknown_operation(&payload).expect("unknown operation");
         assert_eq!(parsed.details.domain, "observe");
         assert_eq!(parsed.details.operation, "bogus");
         assert_eq!(

@@ -434,7 +434,22 @@ owns the canonical per-domain `known_operations` slices. When a request such as
 structured stderr payload inside the existing JSONL `stream` envelope:
 
 ```json
-{"status":"error","type":"UnknownOperation","details":{"domain":"observe","operation":"nonexistent","known_operations":["get-definition","find-references","grep","diagnostics","call-hierarchy","get-card"]}}
+{
+  "status": "error",
+  "type": "UnknownOperation",
+  "details": {
+    "domain": "observe",
+    "operation": "nonexistent",
+    "known_operations": [
+      "get-definition",
+      "find-references",
+      "grep",
+      "diagnostics",
+      "call-hierarchy",
+      "get-card"
+    ]
+  }
+}
 ```
 
 The CLI preserves that payload unchanged in `--output json` mode. In

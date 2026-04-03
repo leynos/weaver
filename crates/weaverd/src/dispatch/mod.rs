@@ -40,3 +40,5 @@ mod router;
 pub use self::backend_manager::BackendManager;
 #[doc(hidden)]
 pub use self::handler::DispatchConnectionHandler;
+#[cfg(test)]
+pub(crate) use self::response::{UNKNOWN_OPERATION_TYPE, parse_stderr_json_payload};

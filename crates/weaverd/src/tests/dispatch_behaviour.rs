@@ -14,7 +14,9 @@ use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
 use crate::backends::FusionBackends;
-use crate::dispatch::{BackendManager, DispatchConnectionHandler};
+use crate::dispatch::{
+    BackendManager, DispatchConnectionHandler, UNKNOWN_OPERATION_TYPE, parse_stderr_json_payload,
+};
 use crate::semantic_provider::SemanticBackendProvider;
 use crate::transport::{ListenerHandle, SocketListener};
 
@@ -109,21 +111,14 @@ impl DispatchWorld {
     }
 
     fn has_unknown_operation_error(&self) -> bool {
-        self.response_lines
-            .iter()
-            .any(|line| line.contains("unknown operation"))
+        self.unknown_operation_payload().is_some()
     }
 
     fn unknown_operation_payload(&self) -> Option<Value> {
-        self.response_lines.iter().find_map(|line| {
-            let envelope: Value = serde_json::from_str(line).ok()?;
-            if envelope["kind"] != "stream" || envelope["stream"] != "stderr" {
-                return None;
-            }
-            envelope["data"]
-                .as_str()
-                .and_then(|data| serde_json::from_str::<Value>(data).ok())
-        })
+        self.response_lines
+            .iter()
+            .filter_map(|line| parse_stderr_json_payload::<Value>(line))
+            .find(|payload| payload["type"] == UNKNOWN_OPERATION_TYPE)
     }
 
     fn has_invalid_arguments_error(&self) -> bool {
@@ -271,7 +266,7 @@ fn then_unknown_operation_payload_lists_known_operations(
     };
 
     assert_eq!(payload["status"], "error");
-    assert_eq!(payload["type"], "UnknownOperation");
+    assert_eq!(payload["type"], UNKNOWN_OPERATION_TYPE);
     assert_eq!(payload["details"]["domain"], domain);
     assert_eq!(payload["details"]["known_operations"], expected);
     assert_eq!(

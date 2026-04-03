@@ -179,6 +179,7 @@ mod tests {
     use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
     use crate::backends::FusionBackends;
+    use crate::dispatch::{UNKNOWN_OPERATION_TYPE, parse_stderr_json_payload};
     use crate::semantic_provider::SemanticBackendProvider;
 
     use super::*;
@@ -303,19 +304,11 @@ mod tests {
 
         let payload = lines
             .iter()
-            .find_map(|line| {
-                let envelope: serde_json::Value = serde_json::from_str(line).ok()?;
-                if envelope["kind"] != "stream" || envelope["stream"] != "stderr" {
-                    return None;
-                }
-                envelope["data"]
-                    .as_str()
-                    .and_then(|data| serde_json::from_str::<serde_json::Value>(data).ok())
-            })
+            .find_map(|line| parse_stderr_json_payload::<serde_json::Value>(line))
             .expect("unknown-operation payload should be present");
 
         assert_eq!(payload["status"], "error");
-        assert_eq!(payload["type"], "UnknownOperation");
+        assert_eq!(payload["type"], UNKNOWN_OPERATION_TYPE);
         assert_eq!(payload["details"]["domain"], "observe");
         assert_eq!(payload["details"]["operation"], "bogus");
         assert_eq!(

@@ -7,10 +7,12 @@
 use std::io::Write;
 
 use serde::Serialize;
+#[cfg(test)]
+use serde::de::DeserializeOwned;
 
 use super::errors::DispatchError;
 
-const UNKNOWN_OPERATION_TYPE: &str = "UnknownOperation";
+pub(crate) const UNKNOWN_OPERATION_TYPE: &str = "UnknownOperation";
 
 /// Target stream for output messages.
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -138,8 +140,12 @@ impl<W: Write> ResponseWriter<W> {
 
     /// Writes an error message to stderr followed by an exit message.
     ///
-    /// The error's display representation is written to stderr, then an exit
-    /// message with the error's status code is sent.
+    /// For `DispatchError::UnknownOperation`, this emits a structured JSON
+    /// payload via `write_unknown_operation_error(...)` and `write_stderr(...)`
+    /// so clients can render the canonical `known_operations` list. All other
+    /// errors write the error's display representation to stderr. In every
+    /// case, the method then sends an exit message using `error.exit_status()`
+    /// via `write_exit(...)`.
     ///
     /// # Errors
     ///
@@ -174,6 +180,20 @@ impl<W: Write> ResponseWriter<W> {
         let data = serde_json::to_string(&payload)?;
         self.write_stderr(data)
     }
+}
+
+#[cfg(test)]
+pub(crate) fn parse_stderr_json_payload<T>(line: &str) -> Option<T>
+where
+    T: DeserializeOwned,
+{
+    let envelope: serde_json::Value = serde_json::from_str(line).ok()?;
+    if envelope["kind"] != "stream" || envelope["stream"] != "stderr" {
+        return None;
+    }
+    envelope["data"]
+        .as_str()
+        .and_then(|data| serde_json::from_str::<T>(data).ok())
 }
 
 #[cfg(test)]
@@ -240,17 +260,9 @@ mod tests {
         let response = String::from_utf8(output).expect("valid utf8");
         let payload = response
             .lines()
-            .find_map(|line| {
-                let envelope: serde_json::Value = serde_json::from_str(line).ok()?;
-                if envelope["kind"] != "stream" || envelope["stream"] != "stderr" {
-                    return None;
-                }
-                envelope["data"]
-                    .as_str()
-                    .and_then(|data| serde_json::from_str::<serde_json::Value>(data).ok())
-            })
+            .find_map(parse_stderr_json_payload::<serde_json::Value>)
             .expect("unknown-operation payload");
-        assert_eq!(payload["type"], "UnknownOperation");
+        assert_eq!(payload["type"], UNKNOWN_OPERATION_TYPE);
         assert_eq!(payload["details"]["domain"], "observe");
         assert_eq!(payload["details"]["operation"], "bogus");
         assert_eq!(

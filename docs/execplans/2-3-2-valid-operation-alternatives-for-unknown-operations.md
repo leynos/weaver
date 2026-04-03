@@ -42,7 +42,22 @@ And:
 
 ```plaintext
 $ weaver --output json observe nonexistent
-{"status":"error","type":"UnknownOperation","details":{"domain":"observe","operation":"nonexistent","known_operations":["get-definition","find-references","grep","diagnostics","call-hierarchy","get-card"]}}
+{
+  "status": "error",
+  "type": "UnknownOperation",
+  "details": {
+    "domain": "observe",
+    "operation": "nonexistent",
+    "known_operations": [
+      "get-definition",
+      "find-references",
+      "grep",
+      "diagnostics",
+      "call-hierarchy",
+      "get-card"
+    ]
+  }
+}
 ```
 
 The JSON payload must contain the full operation set for the routed domain, and
@@ -107,8 +122,9 @@ the UI gap analysis.[^level4][^level10]
 
 - Risk: `DispatchError::UnknownOperation` currently carries only `domain` and
   `operation`, so `ResponseWriter::write_error(...)` can emit only plain text.
-  Mitigation: extend the error variant or add an adjacent payload type so the
-  handler can serialize the canonical `known_operations` list without guessing.
+  Mitigation: extend the error variant or add an adjacent payload type so
+  `ResponseWriter::write_error(...)` can serialize the canonical
+  `known_operations` list without guessing.
 
 - Risk: the CLI already has its own domain-operation catalogue in
   `crates/weaver-cli/src/discoverability.rs`, and prior work found drift
@@ -261,9 +277,10 @@ The change spans two crates and three documentation files.
   Owns `ResponseWriter` and the current `write_error(...)` helper. This is the
   likely serialization seam for emitting a structured unknown-operation error.
 - `crates/weaverd/src/dispatch/handler.rs`
-  Routes dispatch failures through `writer.write_error(...)`. If
-  unknown-operation errors need a special serializer, this is where the match
-  should happen.
+  Routes dispatch failures through `writer.write_error(...)`, but the
+  unknown-operation serialization seam itself should remain inside
+  `ResponseWriter::write_error(...)` so callers do not need their own special
+  cases.
 - `crates/weaverd/src/dispatch/router/tests.rs`
   Contains parameterized router tests against `DomainRoutingContext`.
 - `crates/weaverd/src/tests/dispatch_behaviour.rs` and
@@ -360,9 +377,9 @@ The smallest viable implementation is:
    error.
 3. Add a serializer helper near `ResponseWriter` that converts the error into
    the structured JSON payload above.
-4. In `DispatchConnectionHandler::dispatch(...)`, special-case
-   `DispatchError::UnknownOperation` so it uses the new serializer while other
-   errors continue through the existing `write_error(...)` path.
+4. Special-case `DispatchError::UnknownOperation` inside
+   `ResponseWriter::write_error(...)` so callers keep using the same error
+   writing path while other errors continue through the display-string branch.
 
 Do not widen this into a general error-envelope refactor. That broader cleanup
 belongs to roadmap `2.3.3`.
