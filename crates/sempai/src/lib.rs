@@ -36,6 +36,7 @@
 //! ```
 
 mod engine;
+mod mode_validation;
 
 // Re-export all stable types from sempai_core.
 pub use sempai_core::{

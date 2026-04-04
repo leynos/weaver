@@ -419,7 +419,7 @@ phase* *with explicit parser, backend, and Weaver-integration milestones.*
   - Acceptance criteria: rule metadata and query principals parse from
     Semgrep-compatible YAML forms, and parse failures emit structured
     diagnostics.
-- [ ] 4.1.4. Implement mode-aware validation for `search`, `extract`, `taint`,
+- [x] 4.1.4. Implement mode-aware validation for `search`, `extract`, `taint`,
       and `join`, with execution gating to supported modes.
   - Acceptance criteria: unsupported execution modes return deterministic
     `UnsupportedMode` diagnostics, and search mode validation enforces required

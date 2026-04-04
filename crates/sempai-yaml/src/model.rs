@@ -1,6 +1,12 @@
 //! Schema-aligned rule models exposed by `sempai_yaml`.
 
+use sempai_core::SourceSpan;
 use serde_json::Value;
+
+#[path = "project_depends_on.rs"]
+pub mod project_depends_on;
+
+pub use project_depends_on::ProjectDependsOnPayload;
 
 /// A parsed Semgrep-compatible YAML rule file.
 ///
@@ -49,6 +55,8 @@ impl RuleFile {
 pub struct Rule {
     pub(crate) id: String,
     pub(crate) mode: RuleMode,
+    pub(crate) span: Option<SourceSpan>,
+    pub(crate) mode_span: Option<SourceSpan>,
     pub(crate) message: Option<String>,
     pub(crate) languages: Vec<String>,
     pub(crate) severity: Option<RuleSeverity>,
@@ -64,10 +72,22 @@ impl Rule {
         &self.id
     }
 
+    /// Returns the coarse span of the full rule object when known.
+    #[must_use]
+    pub const fn rule_span(&self) -> Option<&SourceSpan> {
+        self.span.as_ref()
+    }
+
     /// Returns the parsed rule mode.
     #[must_use]
     pub const fn mode(&self) -> &RuleMode {
         &self.mode
+    }
+
+    /// Returns the source span of the `mode` field when known.
+    #[must_use]
+    pub const fn mode_span(&self) -> Option<&SourceSpan> {
+        self.mode_span.as_ref()
     }
 
     /// Returns the user-facing rule message when present.
@@ -210,6 +230,8 @@ pub enum SearchQueryPrincipal {
     Legacy(LegacyFormula),
     /// v2 `match` query syntax.
     Match(MatchFormula),
+    /// Semgrep compatibility key preserved for later dependency semantics.
+    ProjectDependsOn(ProjectDependsOnPayload),
 }
 
 /// Extract rule principal.

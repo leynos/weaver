@@ -28,6 +28,72 @@ fn parse_legacy_search_rule() {
 }
 
 #[test]
+fn parse_project_depends_on_search_rule() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.depends\n",
+        "    message: detect vulnerable dependency\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    r2c-internal-project-depends-on:\n",
+        "      namespace: pypi\n",
+        "      package: requests\n",
+    );
+
+    check_first_rule(yaml, |rule| {
+        assert_eq!(rule.mode(), &RuleMode::Search);
+        match rule.principal() {
+            RulePrincipal::Search(SearchQueryPrincipal::ProjectDependsOn(value)) => {
+                assert_eq!(value.namespace(), "pypi");
+                assert_eq!(value.package(), "requests");
+            }
+            other => panic!("expected ProjectDependsOn principal, got {other:?}"),
+        }
+    });
+}
+
+fn assert_schema_invalid(yaml: &str, expected_fragment: &str) {
+    let (code, message, has_span) = first_err_diagnostic(yaml);
+    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(
+        message.contains(expected_fragment),
+        "expected diagnostic message to contain {expected_fragment:?}, got {message:?}",
+    );
+    assert!(has_span);
+}
+
+#[rstest]
+#[case::legacy_principal_conflict(
+    concat!(
+        "rules:\n",
+        "  - id: demo.depends\n",
+        "    message: detect vulnerable dependency\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    pattern: foo()\n",
+        "    r2c-internal-project-depends-on:\n",
+        "      namespace: pypi\n",
+        "      package: requests\n",
+    ),
+    "exactly one top-level query principal",
+)]
+#[case::missing_package(
+    concat!(
+        "rules:\n",
+        "  - id: demo.depends.invalid\n",
+        "    message: detect vulnerable dependency\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    r2c-internal-project-depends-on:\n",
+        "      namespace: pypi\n",
+    ),
+    "must define string `namespace` and `package` fields",
+)]
+fn parse_project_depends_on_invalid_cases(#[case] case_yaml: &str, #[case] case_expected: &str) {
+    assert_schema_invalid(case_yaml, case_expected);
+}
+
+#[test]
 fn invalid_yaml_returns_yaml_parse_diagnostic() {
     let yaml = concat!(
         "rules:\n",
