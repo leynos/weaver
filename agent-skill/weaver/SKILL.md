@@ -1,6 +1,6 @@
 ---
 name: weaver
-description: Use this skill whenever the user wants semantic code intelligence through the Weaver CLI, including finding definitions or references, inspecting call hierarchies, fetching symbol cards, checking capability support, or performing language-aware renames. Trigger even when the user does not mention Weaver by name if they want IDE-like code navigation or semantic refactors from the terminal.
+description: Use this skill whenever the user wants semantic code intelligence through the Weaver CLI, especially for fetching definitions, fetching symbol cards, checking capability support, inspecting daemon state, or performing language-aware renames. Trigger even when the user does not mention Weaver by name if they want IDE-like code navigation or semantic refactors from the terminal.
 ---
 
 # Weaver
@@ -17,6 +17,10 @@ instead of raw text edits.
   (`.ts`/`.tsx`).
 - Domain commands auto-start the daemon when needed, so manual daemon control
   is mainly for health checks and debugging.
+- In this repository, the implemented semantic read operations are currently
+  `observe get-definition` and `observe get-card`. Do not route reference
+  lookup, call-graph, or diagnostics requests to Weaver here; use fallback
+  tooling instead.
 
 ## Operating stance
 
@@ -30,17 +34,17 @@ instead of raw text edits.
 
 ## Before you run a command
 
-1. Convert source paths to file URIs for `observe` and `verify` commands, for
-   example `file:///abs/path/to/file.rs`.
+1. Convert source paths to file URIs for `observe` commands, for example
+   `file:///abs/path/to/file.rs`.
 2. Use 1-indexed `LINE:COL` values for `--position`.
-3. Choose the narrowest command that matches the task:
+3. Choose the narrowest implemented command that matches the task:
    - definition lookup → `observe get-definition`
-   - usage lookup → `observe find-references`
-   - caller/callee traversal → `observe call-hierarchy`
    - rich symbol summary → `observe get-card`
    - semantic rename → `act refactor --refactoring rename`
-   - diagnostics → `verify diagnostics`
-4. If the user asks what Weaver supports in the current setup, run
+4. If the user asks for references, call graphs, or diagnostics, do not call
+   the unimplemented Weaver operations in this repo. Use the repository's
+   normal exploration or validation tools instead.
+5. If the user asks what Weaver supports in the current setup, run
    `weaver --capabilities`.
 
 ## Command playbook
@@ -64,26 +68,6 @@ weaver --output json observe get-definition \
 ```
 
 Expect an array of locations, each with `uri`, `line`, and `column`.
-
-### Find references
-
-```sh
-weaver --output json observe find-references \
-  --uri file:///abs/path/to/file.rs \
-  --position 42:17
-```
-
-Expect a JSON object with a `references` array.
-
-### Inspect a call hierarchy
-
-```sh
-weaver --output json observe call-hierarchy \
-  --uri file:///abs/path/to/file.rs \
-  --position 42:17
-```
-
-Use this when the user wants callers or callees rather than raw references.
 
 ### Fetch a symbol card
 
@@ -126,21 +110,16 @@ Notes:
   inspect it when routing matters.
 - Treat the rename as complete only after diff review and validator passes.
 
-### Run diagnostics
-
-```sh
-weaver --output json verify diagnostics --uri file:///abs/path/to/file.rs
-```
-
 ## Choosing commands and fallbacks
 
 - Use `get-definition` for "where is this defined?"
-- Use `find-references` for "show me all usages."
-- Use `call-hierarchy` for "who calls this?" or "what does this call?"
 - Use `get-card` for a compact semantic brief on a symbol.
-- Use `verify diagnostics` for file-level analysis errors.
 - Use `act refactor rename` only for deliberate symbol changes with a clear
   target location.
+- Use fallback tooling, not Weaver, for:
+  - "show me all usages"
+  - "who calls this?" / "what does this call?"
+  - file or project diagnostics
 
 If Weaver reports an unsupported language, missing capability, or another
 structured refusal:
@@ -158,6 +137,8 @@ of pasting raw payloads unless they asked for the full JSON. Focus on:
 - symbol names, kinds, and containers
 - routing decisions for refactors
 - refusal reasons and next steps
+- clear fallback guidance when the requested operation is not implemented in
+  this repository
 
 ## Examples
 
