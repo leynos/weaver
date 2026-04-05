@@ -268,6 +268,10 @@ fn then_unknown_operation_payload_lists_known_operations(
     assert_eq!(payload["status"], "error");
     assert_eq!(payload["type"], UNKNOWN_OPERATION_TYPE);
     assert_eq!(payload["details"]["domain"], domain);
+    assert!(
+        payload["details"]["operation"].is_string(),
+        "operation field should be present and a string"
+    );
     assert_eq!(payload["details"]["known_operations"], expected);
     assert_eq!(
         payload["details"]["known_operations"]

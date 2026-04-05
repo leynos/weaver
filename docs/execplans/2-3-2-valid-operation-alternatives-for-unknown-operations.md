@@ -40,7 +40,7 @@ Available operations:
 
 And:
 
-```plaintext
+```json
 $ weaver --output json observe nonexistent
 {
   "status": "error",
@@ -353,7 +353,7 @@ truth.
 Extend the unknown-operation path so the daemon can serialize a payload shaped
 like the other typed responses already used by the CLI:
 
-```plaintext
+```json
 {
   "status": "error",
   "type": "UnknownOperation",
