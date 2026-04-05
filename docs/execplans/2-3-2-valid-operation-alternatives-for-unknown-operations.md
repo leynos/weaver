@@ -13,8 +13,8 @@ repository root.
 ## Purpose / big picture
 
 Roadmap item `2.3.2` closes the current daemon-side gap for valid but
-unsupported operation names.[^roadmap] Today, `weaver observe nonexistent`
-reaches `weaverd`, which replies with a plain-text error:
+unsupported operation names.[^1] Today, `weaver observe nonexistent` reaches
+`weaverd`, which replies with a plain-text error:
 
 ```plaintext
 error: unknown operation 'nonexistent' for domain 'observe'
@@ -22,7 +22,7 @@ error: unknown operation 'nonexistent' for domain 'observe'
 
 That message does not tell the operator which operations are valid for the
 chosen domain, even though the daemon router already owns the canonical
-`known_operations` arrays.[^gap] After this change, unknown-operation failures
+`known_operations` arrays.[^2] After this change, unknown-operation failures
 must remain daemon-routed, but both output modes must become actionable:
 
 ```plaintext
@@ -63,7 +63,7 @@ $ weaver --output json observe nonexistent
 The JSON payload must contain the full operation set for the routed domain, and
 the human-readable output must be rendered from that same payload so the CLI
 does not drift from the daemon router. This closes Level 4 and Level 10c from
-the UI gap analysis.[^level4][^level10]
+the UI gap analysis.[^3][^4]
 
 ## Constraints
 
@@ -80,7 +80,7 @@ the UI gap analysis.[^level4][^level10]
   rendering unknown-operation errors.
 - Preserve the existing client-side unknown-domain flow from roadmap `2.3.1`.
   `weaver bogus something` must still fail before config loading or daemon
-  startup.[^plan231]
+  startup.[^5]
 - Preserve the outer JSONL transport contract. The daemon may extend the inner
   payload carried in `DaemonMessage::Stream`, but it must not replace the
   `stream` and `exit` envelope in this task.
@@ -476,8 +476,8 @@ This work is complete only when all of the following are true:
 7. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
-[^roadmap]: `docs/roadmap.md` item `2.3.2`.
-[^gap]: `docs/ui-gap-analysis.md` Level 4.
-[^level4]: `docs/ui-gap-analysis.md#level-4--unknown-operation-weaver-observe-nonexistent`.
-[^level10]: `docs/ui-gap-analysis.md#level-10--error-messages-and-exit-codes`.
-[^plan231]: `docs/execplans/2-3-1-validate-domains-client-side-before-daemon-startup.md`.
+[^1]: `docs/roadmap.md` item `2.3.2`.
+[^2]: `docs/ui-gap-analysis.md` Level 4.
+[^3]: `docs/ui-gap-analysis.md#level-4--unknown-operation-weaver-observe-nonexistent`.
+[^4]: `docs/ui-gap-analysis.md#level-10--error-messages-and-exit-codes`.
+[^5]: `docs/execplans/2-3-1-validate-domains-client-side-before-daemon-startup.md`.

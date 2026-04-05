@@ -235,9 +235,12 @@ fn then_unknown_operation_error(world: &RefCell<DispatchWorld>) {
     );
 }
 
-#[then(r#"the unknown operation payload lists the known operations for "{domain}""#)]
+#[then(
+    r#"the unknown operation payload for "{operation}" lists the known operations for "{domain}""#
+)]
 fn then_unknown_operation_payload_lists_known_operations(
     world: &RefCell<DispatchWorld>,
+    operation: String,
     domain: String,
 ) {
     let payload = world
@@ -245,6 +248,7 @@ fn then_unknown_operation_payload_lists_known_operations(
         .unknown_operation_payload()
         .expect("unknown-operation payload should be present");
     let domain = strip_quotes(&domain);
+    let operation = strip_quotes(&operation);
     let expected = match domain {
         "observe" => serde_json::json!([
             "get-definition",
@@ -268,10 +272,7 @@ fn then_unknown_operation_payload_lists_known_operations(
     assert_eq!(payload["status"], "error");
     assert_eq!(payload["type"], UNKNOWN_OPERATION_TYPE);
     assert_eq!(payload["details"]["domain"], domain);
-    assert!(
-        payload["details"]["operation"].is_string(),
-        "operation field should be present and a string"
-    );
+    assert_eq!(payload["details"]["operation"], operation);
     assert_eq!(payload["details"]["known_operations"], expected);
     assert_eq!(
         payload["details"]["known_operations"]

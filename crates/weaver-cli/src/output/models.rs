@@ -7,6 +7,11 @@ use serde::Deserialize;
 /// This constant must match the daemon-side `CAPABILITY_RESOLUTION_TYPE` exported
 /// by `weaverd::dispatch::act::refactor::resolution` to ensure correct parsing.
 const CAPABILITY_RESOLUTION_TYPE: &str = "CapabilityResolution";
+
+/// Wire-protocol discriminator for unknown-operation error payloads.
+///
+/// This constant must match the daemon-side `UNKNOWN_OPERATION_TYPE` exported
+/// by `weaverd::dispatch::response` to ensure correct parsing.
 pub(crate) const UNKNOWN_OPERATION_TYPE: &str = "UnknownOperation";
 
 /// A definition or reference location in the daemon response.

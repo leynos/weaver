@@ -12,7 +12,11 @@ use serde::de::DeserializeOwned;
 
 use super::errors::DispatchError;
 
-pub(crate) const UNKNOWN_OPERATION_TYPE: &str = "UnknownOperation";
+/// Wire-protocol discriminator for unknown-operation error payloads.
+///
+/// This constant is part of the JSONL protocol contract between the daemon
+/// and CLI. It must remain stable across releases.
+pub const UNKNOWN_OPERATION_TYPE: &str = "UnknownOperation";
 
 /// Target stream for output messages.
 #[derive(Debug, Clone, Copy, Serialize)]
