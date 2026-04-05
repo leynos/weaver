@@ -206,15 +206,15 @@ does* *not require source inspection or external runbooks.*
         all three valid domains in the error body, and include a single
         "did you mean" suggestion only when exactly one valid domain is within
         edit distance 2.
-- [ ] 2.3.2. Include valid operation alternatives for unknown operations.
+- [x] 2.3.2. Include valid operation alternatives for unknown operations.
       See
       [Level 4](ui-gap-analysis.md#level-4--unknown-operation-weaver-observe-nonexistent)
       and
       [Level 10](ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
       (10c).
-  - [ ] Extend daemon and CLI error payloads to include known operations for
+  - [x] Extend daemon and CLI error payloads to include known operations for
         the domain.
-  - [ ] Acceptance criteria: unknown-operation errors in both JSON and
+  - [x] Acceptance criteria: unknown-operation errors in both JSON and
         human-readable output include the full known-operation set for the
         domain, with a count equal to the router's `known_operations` length.
 - [ ] 2.3.3. Standardize actionable guidance in startup and routing errors.

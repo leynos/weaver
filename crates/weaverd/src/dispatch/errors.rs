@@ -32,7 +32,11 @@ pub enum DispatchError {
 
     /// Operation field contains an unrecognised value for the given domain.
     #[error("unknown operation '{operation}' for domain '{domain}'")]
-    UnknownOperation { domain: String, operation: String },
+    UnknownOperation {
+        domain: String,
+        operation: String,
+        known_operations: &'static [&'static str],
+    },
 
     /// Request exceeds the maximum allowed size.
     #[error("request too large: {size} bytes exceeds {max_size} byte limit")]
@@ -118,10 +122,15 @@ impl DispatchError {
     }
 
     /// Creates an unknown operation error.
-    pub fn unknown_operation(domain: impl Into<String>, operation: impl Into<String>) -> Self {
+    pub fn unknown_operation(
+        domain: impl Into<String>,
+        operation: impl Into<String>,
+        known_operations: &'static [&'static str],
+    ) -> Self {
         Self::UnknownOperation {
             domain: domain.into(),
             operation: operation.into(),
+            known_operations,
         }
     }
 

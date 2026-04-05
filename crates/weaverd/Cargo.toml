@@ -28,6 +28,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json",
 url.workspace = true
 weaver-cards = { path = "../weaver-cards" }
 weaver-config = { path = "../weaver-config", features = ["cli"] }
+weaver-daemon-types = { path = "../weaver-daemon-types" }
 weaver-lsp-host = { path = "../weaver-lsp-host" }
 weaver-plugins = { path = "../weaver-plugins" }
 weaver-syntax = { path = "../weaver-syntax" }

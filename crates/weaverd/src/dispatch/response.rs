@@ -7,8 +7,13 @@
 use std::io::Write;
 
 use serde::Serialize;
+#[cfg(test)]
+use serde::de::DeserializeOwned;
 
 use super::errors::DispatchError;
+
+// Re-export the wire-protocol constant for internal and test use.
+pub use weaver_daemon_types::UNKNOWN_OPERATION_TYPE;
 
 /// Target stream for output messages.
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -73,6 +78,21 @@ pub struct ResponseWriter<W> {
     writer: W,
 }
 
+#[derive(Debug, Serialize)]
+struct UnknownOperationPayload<'a> {
+    status: &'static str,
+    #[serde(rename = "type")]
+    kind: &'static str,
+    details: UnknownOperationDetails<'a>,
+}
+
+#[derive(Debug, Serialize)]
+struct UnknownOperationDetails<'a> {
+    domain: &'a str,
+    operation: &'a str,
+    known_operations: &'a [&'static str],
+}
+
 impl<W: Write> ResponseWriter<W> {
     /// Creates a new response writer wrapping the given output stream.
     pub fn new(writer: W) -> Self {
@@ -121,16 +141,60 @@ impl<W: Write> ResponseWriter<W> {
 
     /// Writes an error message to stderr followed by an exit message.
     ///
-    /// The error's display representation is written to stderr, then an exit
-    /// message with the error's status code is sent.
+    /// For `DispatchError::UnknownOperation`, this emits a structured JSON
+    /// payload via `write_unknown_operation_error(...)` and `write_stderr(...)`
+    /// so clients can render the canonical `known_operations` list. All other
+    /// errors write the error's display representation to stderr. In every
+    /// case, the method then sends an exit message using `error.exit_status()`
+    /// via `write_exit(...)`.
     ///
     /// # Errors
     ///
     /// Returns an error if writing fails.
     pub fn write_error(&mut self, error: &DispatchError) -> Result<(), DispatchError> {
-        self.write_stderr(format!("error: {error}\n"))?;
+        match error {
+            DispatchError::UnknownOperation {
+                domain,
+                operation,
+                known_operations,
+            } => self.write_unknown_operation_error(domain, operation, known_operations)?,
+            _ => self.write_stderr(format!("error: {error}\n"))?,
+        }
         self.write_exit(error.exit_status())
     }
+
+    fn write_unknown_operation_error(
+        &mut self,
+        domain: &str,
+        operation: &str,
+        known_operations: &'static [&'static str],
+    ) -> Result<(), DispatchError> {
+        let payload = UnknownOperationPayload {
+            status: "error",
+            kind: UNKNOWN_OPERATION_TYPE,
+            details: UnknownOperationDetails {
+                domain,
+                operation,
+                known_operations,
+            },
+        };
+        let data = serde_json::to_string(&payload)?;
+        self.write_stderr(data)
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn parse_stderr_json_payload<T>(line: &str) -> Option<T>
+where
+    T: DeserializeOwned,
+{
+    let envelope: serde_json::Value = serde_json::from_str(line).ok()?;
+    if envelope["kind"] != "stream" || envelope["stream"] != "stderr" {
+        return None;
+    }
+    envelope["data"]
+        .as_str()
+        .and_then(|data| serde_json::from_str::<T>(data).ok())
 }
 
 #[cfg(test)]
@@ -180,6 +244,32 @@ mod tests {
 
         let response = String::from_utf8(output).expect("valid utf8");
         assert!(response.contains("unknown domain"));
+        assert!(response.contains(r#""status":1"#));
+    }
+
+    #[test]
+    fn write_error_serializes_unknown_operation_payload() {
+        let mut output = Vec::new();
+        let mut writer = ResponseWriter::new(&mut output);
+        let error = DispatchError::unknown_operation(
+            "observe",
+            "bogus",
+            &["get-definition", "find-references"],
+        );
+        writer.write_error(&error).expect("write error");
+
+        let response = String::from_utf8(output).expect("valid utf8");
+        let payload = response
+            .lines()
+            .find_map(parse_stderr_json_payload::<serde_json::Value>)
+            .expect("unknown-operation payload");
+        assert_eq!(payload["type"], UNKNOWN_OPERATION_TYPE);
+        assert_eq!(payload["details"]["domain"], "observe");
+        assert_eq!(payload["details"]["operation"], "bogus");
+        assert_eq!(
+            payload["details"]["known_operations"],
+            serde_json::json!(["get-definition", "find-references"])
+        );
         assert!(response.contains(r#""status":1"#));
     }
 }

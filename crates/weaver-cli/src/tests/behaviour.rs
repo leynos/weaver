@@ -6,6 +6,7 @@
 use super::support::*;
 use crate::EMPTY_LINE_LIMIT;
 use crate::lifecycle::{LifecycleCommand, LifecycleError};
+use crate::output::UNKNOWN_OPERATION_TYPE;
 
 use std::cell::RefCell;
 
@@ -50,9 +51,9 @@ fn assert_output_contains<F>(
 {
     let world = world.borrow();
     let text = output_getter(&world).unwrap_or_else(|_| panic!("{output_name} text missing"));
-    let snippet = snippet.trim_matches('"');
+    let snippet = snippet.trim_matches('"').replace("\\n", "\n");
     assert!(
-        text.contains(snippet),
+        text.contains(&snippet),
         "{output_name} {:?} did not contain {:?}",
         text,
         snippet
@@ -69,9 +70,9 @@ fn assert_output_does_not_contain<F>(
 {
     let world = world.borrow();
     let text = output_getter(&world).unwrap_or_else(|_| panic!("{output_name} text missing"));
-    let snippet = snippet.trim_matches('"');
+    let snippet = snippet.trim_matches('"').replace("\\n", "\n");
     assert!(
-        !text.contains(snippet),
+        !text.contains(&snippet),
         "{output_name} {:?} unexpectedly contained {:?}",
         text,
         snippet
@@ -196,6 +197,32 @@ fn given_daemon_diagnostics_output(world: &RefCell<TestWorld>) {
     }))
     .expect("serialize diagnostics payload");
     let lines = daemon_lines_for_stdout(&payload);
+    world
+        .borrow_mut()
+        .start_daemon_with_lines(lines)
+        .expect("failed to start daemon");
+}
+
+#[given("a running fake daemon emitting an unknown-operation payload")]
+fn given_daemon_unknown_operation_output(world: &RefCell<TestWorld>) {
+    let payload = serde_json::to_string(&json!({
+        "status": "error",
+        "type": UNKNOWN_OPERATION_TYPE,
+        "details": {
+            "domain": "observe",
+            "operation": "nonexistent",
+            "known_operations": [
+                "get-definition",
+                "find-references",
+                "grep",
+                "diagnostics",
+                "call-hierarchy",
+                "get-card"
+            ]
+        }
+    }))
+    .expect("serialize unknown-operation payload");
+    let lines = daemon_lines_for_stderr(&payload, 1);
     world
         .borrow_mut()
         .start_daemon_with_lines(lines)
