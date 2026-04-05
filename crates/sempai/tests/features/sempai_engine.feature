@@ -14,23 +14,27 @@ Feature: Sempai engine facade behaviour
     When YAML "rules:\n  - message: detect foo\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n" is compiled
     Then compilation fails with code "E_SEMPAI_SCHEMA_INVALID"
 
-  Scenario: Engine compile_yaml keeps a post-parse placeholder for valid YAML
+  Scenario: Engine compile_yaml succeeds for valid search YAML
     Given an engine with default configuration
     When YAML "rules:\n  - id: demo.rule\n    message: detect foo\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n" is compiled
-    Then compilation fails with code "NOT_IMPLEMENTED"
-    And the first diagnostic message contains "normalization"
+    Then compilation succeeds with 1 plan
 
   Scenario: Engine compile_yaml keeps the placeholder for dependency search rules
     Given an engine with default configuration
     When YAML "rules:\n  - id: demo.depends\n    message: detect vulnerable dependency\n    languages: [python]\n    severity: WARNING\n    r2c-internal-project-depends-on:\n      namespace: pypi\n      package: requests\n" is compiled
-    Then compilation fails with code "NOT_IMPLEMENTED"
-    And the first diagnostic message contains "normalization"
+    Then compilation succeeds with 1 plan
 
   Scenario: Engine compile_yaml rejects extract mode during execution gating
     Given an engine with default configuration
     When YAML "rules:\n  - id: demo.extract\n    mode: extract\n    message: extract foo\n    languages: [python]\n    severity: WARNING\n    dest-language: python\n    extract: foo($X)\n    pattern: source($X)\n" is compiled
     Then compilation fails with code "E_SEMPAI_UNSUPPORTED_MODE"
     And the first diagnostic message contains "extract"
+
+  Scenario: Engine compile_yaml rejects taint mode during execution gating
+    Given an engine with default configuration
+    When YAML "rules:\n  - id: demo.taint\n    mode: taint\n    message: detect foo\n    languages: [rust]\n    severity: ERROR\n    taint:\n      sources: []\n      sinks: []\n" is compiled
+    Then compilation fails with code "E_SEMPAI_UNSUPPORTED_MODE"
+    And the first diagnostic message contains "taint"
 
   Scenario: Engine compile_yaml rejects unknown modes during execution gating
     Given an engine with default configuration

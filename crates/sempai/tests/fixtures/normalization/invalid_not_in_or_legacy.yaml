@@ -1,0 +1,8 @@
+rules:
+  - id: invalid.not.in.or.legacy
+    message: negation inside pattern-either should fail
+    languages: [rust]
+    severity: ERROR
+    pattern-either:
+      - pattern-not: fn $F($X)
+      - pattern: fn $G($Y)

@@ -1,0 +1,6 @@
+rules:
+  - id: simple.pattern.legacy
+    message: detect simple pattern
+    languages: [rust]
+    severity: ERROR
+    pattern: fn $F($X)

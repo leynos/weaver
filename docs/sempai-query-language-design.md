@@ -337,32 +337,45 @@ conjunction contexts, rather than match-producers. This aligns with the
 “positive term” semantics in conjunction validity checking.[^3]
 
 ```rust
-#[derive(Debug, Clone)]
 pub enum Formula {
     Atom(Atom),
-    Not(Box<Decorated<Formula>>),
-    Inside(Box<Decorated<Formula>>),
-    Anywhere(Box<Decorated<Formula>>),
-    And(Vec<Decorated<Formula>>),
-    Or(Vec<Decorated<Formula>>),
+    Not(Box<DecoratedFormula>),
+    Inside(Box<DecoratedFormula>),
+    Anywhere(Box<DecoratedFormula>),
+    And(Vec<DecoratedFormula>),
+    Or(Vec<DecoratedFormula>),
 }
 
-#[derive(Debug, Clone)]
 pub enum Atom {
-    Pattern(PatternAtom),
-    Regex(RegexAtom),
-    TreeSitterQuery(TreeSitterQueryAtom),
+    Pattern(String),
+    Regex(String),
 }
 
-#[derive(Debug, Clone)]
-pub struct Decorated<T> {
-    pub node: T,
-    pub where_: Vec<WhereClause>,
-    pub as_: Option<String>,
+pub struct DecoratedFormula {
+    pub formula: Formula,
+    pub where_clauses: Vec<WhereClause>,
+    pub as_name: Option<String>,
     pub fix: Option<String>,
-    pub span: SourceSpan,
+    pub span: Option<SourceSpan>,
 }
 ```
+
+Implementation location: `crates/sempai-core/src/formula.rs`
+
+Normalization logic: `crates/sempai/src/normalize.rs`
+
+The `normalize_rule_file` function lowers parsed `sempai_yaml` rule models into
+the canonical representation. It performs semantic validation including:
+
+- `InvalidNotInOr`: Rejects negation directly inside disjunctions
+- `MissingPositiveTermInAnd`: Ensures conjunctions have at least one positive
+  match-producing term (Atom or Or)
+
+Positive term classification:
+- `Atom` (Pattern, Regex) → positive
+- `Or` → positive (at least one branch must match)
+- `Not`, `Inside`, `Anywhere` → constraints (not positive)
+- `And` → positive if any child is positive
 
 ### Operator precedence
 
@@ -426,13 +439,19 @@ Implementation note (2026-03-29): `sempai_yaml` now preserves
 accepts Semgrep-compatible dependency rules without inventing execution
 semantics early.
 
-Implementation note (2026-03-29): `sempai::Engine::compile_yaml` now applies a
-mode-aware validation pass after parsing. Search rules continue to the
-deliberate `NOT_IMPLEMENTED` normalization placeholder, while `extract`,
-`taint`, `join`, and forward-compatible unknown modes fail deterministically
-with `E_SEMPAI_UNSUPPORTED_MODE`. The first unsupported rule in source order is
+Implementation note (2026-04-05): `sempai::Engine::compile_yaml` now performs
+full normalization of search-mode rules. Both legacy `pattern*` syntax and v2
+`match` syntax lower into the canonical `Formula` model defined in
+`sempai_core::formula`. Mode-aware validation runs first: search rules
+proceed to normalization, while `extract`, `taint`, `join`, and
+forward-compatible unknown modes fail deterministically with
+`E_SEMPAI_UNSUPPORTED_MODE`. The first unsupported rule in source order is
 reported, and its `primary_span` prefers the `mode` field span before falling
 back to the enclosing rule span.
+
+Semantic validation (`InvalidNotInOr`, `MissingPositiveTermInAnd`) runs on the
+canonical form and produces `E_SEMPAI_*` diagnostics for constraint
+violations.
 
 Extract mode rules require legacy query keys, not `match`.[^1]
 

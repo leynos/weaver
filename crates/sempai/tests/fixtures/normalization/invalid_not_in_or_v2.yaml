@@ -1,0 +1,10 @@
+rules:
+  - id: invalid.not.in.or.v2
+    message: negation inside any should fail
+    languages: [rust]
+    severity: ERROR
+    match:
+      any:
+        - not:
+            pattern: fn $F($X)
+        - pattern: fn $G($Y)

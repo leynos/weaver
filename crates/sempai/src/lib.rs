@@ -36,7 +36,9 @@
 //! ```
 
 mod engine;
+
 mod mode_validation;
+pub(crate) mod normalize;
 
 // Re-export all stable types from sempai_core.
 pub use sempai_core::{

@@ -1,0 +1,8 @@
+rules:
+  - id: invalid.no.positive.legacy
+    message: conjunction with no positive term should fail
+    languages: [rust]
+    severity: ERROR
+    patterns:
+      - pattern-not: fn $F($X)
+      - pattern-inside: impl $T

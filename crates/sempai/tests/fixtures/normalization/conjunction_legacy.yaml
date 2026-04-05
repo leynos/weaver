@@ -1,0 +1,8 @@
+rules:
+  - id: conjunction.legacy
+    message: detect conjunction
+    languages: [rust]
+    severity: ERROR
+    patterns:
+      - pattern: fn $F($X)
+      - pattern-inside: impl $T

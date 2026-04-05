@@ -1,0 +1,9 @@
+rules:
+  - id: disjunction.v2
+    message: detect disjunction
+    languages: [rust]
+    severity: ERROR
+    match:
+      any:
+        - pattern: fn $F($X)
+        - pattern: fn $G($Y)

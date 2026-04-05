@@ -1,0 +1,9 @@
+rules:
+  - id: nested.context.legacy
+    message: detect nested context
+    languages: [rust]
+    severity: ERROR
+    patterns:
+      - pattern-inside: impl $T
+      - pattern: fn $F($X)
+      - pattern-not: fn main($X)
