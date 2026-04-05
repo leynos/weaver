@@ -1,0 +1,12 @@
+rules:
+  - id: valid.metavariable.exception
+    message: metavariable-pattern context allows no positive term
+    languages: [rust]
+    severity: ERROR
+    patterns:
+      - pattern: $F($X)
+      - metavariable-pattern:
+          metavariable: $F
+          patterns:
+            - pattern-not: foo
+            - pattern-inside: bar

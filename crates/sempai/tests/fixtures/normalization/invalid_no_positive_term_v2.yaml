@@ -1,0 +1,11 @@
+rules:
+  - id: invalid.no.positive.v2
+    message: conjunction with no positive term should fail
+    languages: [rust]
+    severity: ERROR
+    match:
+      all:
+        - not:
+            pattern: fn $F($X)
+        - inside:
+            pattern: impl $T

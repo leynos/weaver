@@ -1,0 +1,6 @@
+rules:
+  - id: simple.pattern.v2
+    message: detect simple pattern
+    languages: [rust]
+    severity: ERROR
+    match: fn $F($X)

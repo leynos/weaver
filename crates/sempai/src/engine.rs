@@ -5,10 +5,11 @@
 //! Compilation and execution are separate phases, allowing a compiled
 //! [`QueryPlan`] to be reused across multiple source files.
 
-use sempai_core::{DiagnosticReport, EngineConfig, Language, Match};
+use sempai_core::{DiagnosticReport, EngineConfig, Formula, Language, Match};
 use sempai_yaml::parse_rule_file;
 
 use crate::mode_validation::validate_supported_modes;
+use crate::normalize::normalize_rule_file;
 
 /// A compiled query plan for one rule and one language.
 ///
@@ -30,15 +31,12 @@ use crate::mode_validation::validate_supported_modes;
 pub struct QueryPlan {
     rule_id: String,
     language: Language,
-    /// Placeholder for the internal plan representation.  Will be replaced
-    /// by `sempai_core::PlanNode` once the normalization layer is built.
-    _plan: (),
+    /// The normalized canonical formula for this query plan.
+    formula: Formula,
 }
 
 impl QueryPlan {
     /// Creates a new query plan (crate-internal).
-    // FIXME: remove `#[cfg(test)]` when `compile_yaml` / `compile_dsl` produce
-    // real plans — https://github.com/leynos/weaver/issues/67
     #[cfg(test)]
     #[must_use]
     #[expect(
@@ -49,7 +47,20 @@ impl QueryPlan {
         Self {
             rule_id,
             language,
-            _plan: (),
+            formula: Formula::And(vec![]),
+        }
+    }
+
+    /// Creates a new query plan with the given formula.
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "String/Vec params prevent const fn"
+    )]
+    pub(crate) fn with_formula(rule_id: String, language: Language, formula: Formula) -> Self {
+        Self {
+            rule_id,
+            language,
+            formula,
         }
     }
 
@@ -63,6 +74,12 @@ impl QueryPlan {
     #[must_use]
     pub const fn language(&self) -> Language {
         self.language
+    }
+
+    /// Returns the normalized canonical formula for this query plan.
+    #[must_use]
+    pub const fn formula(&self) -> &Formula {
+        &self.formula
     }
 }
 
@@ -108,14 +125,25 @@ impl Engine {
     ///
     /// Returns a diagnostic report if parsing or validation fails.
     ///
-    /// Successful YAML parsing still stops at the post-parse placeholder until
-    /// rule normalization is implemented.
+    /// Successfully parsed search-mode rules are normalized into canonical
+    /// formulas and returned as query plans. Other modes (taint, join, extract)
+    /// return unsupported mode diagnostics.
+    ///
+    /// # Errors
+    ///
+    /// Returns a diagnostic report if parsing fails, if unsupported modes are
+    /// encountered, or if normalization produces semantic validation errors.
     pub fn compile_yaml(&self, yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
         let file = parse_rule_file(yaml, None)?;
         validate_supported_modes(&file)?;
-        Err(DiagnosticReport::not_implemented(
-            "compile_yaml query-plan normalization",
-        ))
+        let normalized = normalize_rule_file(&file)?;
+
+        let plans = normalized
+            .into_iter()
+            .map(|rule| QueryPlan::with_formula(rule.rule_id, rule.language, rule.formula))
+            .collect();
+
+        Ok(plans)
     }
 
     /// Compiles a one-liner query DSL expression into a query plan.

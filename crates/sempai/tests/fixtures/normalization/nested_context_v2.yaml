@@ -1,0 +1,12 @@
+rules:
+  - id: nested.context.v2
+    message: detect nested context
+    languages: [rust]
+    severity: ERROR
+    match:
+      all:
+        - inside:
+            pattern: impl $T
+        - pattern: fn $F($X)
+        - not:
+            pattern: fn main($X)

@@ -28,6 +28,7 @@
 mod capture;
 mod config;
 mod diagnostic;
+mod formula;
 mod language;
 mod match_result;
 mod span;
@@ -35,6 +36,7 @@ mod span;
 pub use capture::{CaptureValue, CapturedNode};
 pub use config::{EngineConfig, EngineLimits};
 pub use diagnostic::{Diagnostic, DiagnosticCode, DiagnosticReport, SourceSpan};
+pub use formula::{Atom, DecoratedFormula, Formula, WhereClause};
 pub use language::{Language, LanguageParseError};
 pub use match_result::Match;
 pub use span::{LineCol, Span};

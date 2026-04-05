@@ -1,0 +1,10 @@
+rules:
+  - id: conjunction.v2
+    message: detect conjunction
+    languages: [rust]
+    severity: ERROR
+    match:
+      all:
+        - pattern: fn $F($X)
+        - inside:
+            pattern: impl $T

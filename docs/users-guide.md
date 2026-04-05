@@ -1323,27 +1323,32 @@ The `Engine` struct exposes three methods for query compilation and execution:
 - `execute(plan, uri, source)` — executes a compiled plan against a source
   snapshot.
 
-`compile_yaml(yaml)` now performs real YAML parsing plus a mode-aware
-validation pass. Malformed YAML returns `E_SEMPAI_YAML_PARSE`, and schema-shape
+`compile_yaml(yaml)` performs full YAML parsing, mode-aware validation, and
+normalization of search-mode rules. The pipeline is:
+
+1. **Parse** — Malformed YAML returns `E_SEMPAI_YAML_PARSE`, and schema-shape
 failures such as missing required rule keys return `E_SEMPAI_SCHEMA_INVALID`,
 both using the shared structured diagnostic payload with `primary_span`
 locations when available.
 
-After parsing succeeds, `compile_yaml(yaml)` now distinguishes parseable rules
-from executable ones:
-
-- Valid `search` rules, including compatibility-only
-  `r2c-internal-project-depends-on` rules, continue to the existing
-  `NOT_IMPLEMENTED` normalization placeholder.
-- Valid `extract`, `taint`, `join`, and unknown future mode strings now fail
-  deterministically with `E_SEMPAI_UNSUPPORTED_MODE` instead of falling through
-  to the generic placeholder.
-
+2. **Mode validation** — `search` rules, including compatibility-only
+`r2c-internal-project-depends-on` rules, proceed to normalization.
+Non-search modes (`extract`, `taint`, `join`) and unknown future mode strings
+fail deterministically with `E_SEMPAI_UNSUPPORTED_MODE`.
 Unsupported-mode diagnostics point at the rule's `mode` field when that span is
-available, which makes whole-document failures deterministic even though the
-execution backend is still pending.
+available.
 
-`compile_dsl(...)` and `execute(...)` still return "not implemented"
+3. **Normalization** — Valid search-mode rules have both legacy `pattern*` syntax
+and v2 `match` syntax lowered into a canonical `Formula` model. Semantic
+validation on the canonical form produces deterministic diagnostics:
+
+- `E_SEMPAI_INVALID_NOT_IN_OR` — negation directly inside `pattern-either` or `any`
+- `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND` — conjunction with only constraints
+
+Valid search-mode rules return real `QueryPlan` values containing the
+normalized formula.
+
+`compile_dsl(...)` and `execute(...)` still return `NOT_IMPLEMENTED`
 diagnostics. They will be wired to the DSL parser and Tree-sitter backend as
 those components are delivered in subsequent roadmap phases.
 
