@@ -2884,6 +2884,7 @@ dependencies = [
  "url",
  "weaver-build-util",
  "weaver-config",
+ "weaver-daemon-types",
 ]
 
 [[package]]
@@ -2904,6 +2905,13 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.17",
  "url",
+]
+
+[[package]]
+name = "weaver-daemon-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -3063,6 +3071,7 @@ dependencies = [
  "weaver-build-util",
  "weaver-cards",
  "weaver-config",
+ "weaver-daemon-types",
  "weaver-lsp-host",
  "weaver-plugins",
  "weaver-syntax",

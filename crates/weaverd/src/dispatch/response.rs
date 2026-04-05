@@ -12,11 +12,8 @@ use serde::de::DeserializeOwned;
 
 use super::errors::DispatchError;
 
-/// Wire-protocol discriminator for unknown-operation error payloads.
-///
-/// This constant is part of the JSONL protocol contract between the daemon
-/// and CLI. It must remain stable across releases.
-pub const UNKNOWN_OPERATION_TYPE: &str = "UnknownOperation";
+// Re-export the wire-protocol constant for internal and test use.
+pub use weaver_daemon_types::UNKNOWN_OPERATION_TYPE;
 
 /// Target stream for output messages.
 #[derive(Debug, Clone, Copy, Serialize)]

@@ -13,12 +13,13 @@ pub(crate) use self::models::UNKNOWN_OPERATION_TYPE;
 pub use crate::cli::OutputFormat;
 use crate::output::models::{
     CapabilityResolution, DefinitionLocation, DiagnosticItem, DiagnosticsResponse,
-    ReferenceResponse, UnknownOperationDetails, VerificationFailure, parse_capability_resolution,
-    parse_definitions, parse_unknown_operation, parse_verification_failures,
+    ReferenceResponse, VerificationFailure, parse_capability_resolution, parse_definitions,
+    parse_unknown_operation, parse_verification_failures,
 };
 use crate::output::source::{
     SourceLocation, SourcePosition, extract_uri_argument, from_path_or_uri, from_uri,
 };
+use weaver_daemon_types::UnknownOperationDetails;
 
 /// Output format after resolving `auto` based on TTY detection.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

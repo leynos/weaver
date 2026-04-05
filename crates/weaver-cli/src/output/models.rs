@@ -8,11 +8,9 @@ use serde::Deserialize;
 /// by `weaverd::dispatch::act::refactor::resolution` to ensure correct parsing.
 const CAPABILITY_RESOLUTION_TYPE: &str = "CapabilityResolution";
 
-/// Wire-protocol discriminator for unknown-operation error payloads.
-///
-/// This constant must match the daemon-side `UNKNOWN_OPERATION_TYPE` exported
-/// by `weaverd::dispatch::response` to ensure correct parsing.
-pub(crate) const UNKNOWN_OPERATION_TYPE: &str = "UnknownOperation";
+// Import and re-export the wire-protocol constant and types.
+pub(crate) use weaver_daemon_types::UNKNOWN_OPERATION_TYPE;
+use weaver_daemon_types::UnknownOperationPayload;
 
 /// A definition or reference location in the daemon response.
 #[derive(Debug, Deserialize)]
@@ -125,28 +123,6 @@ pub(crate) struct CapabilityCandidate {
     pub(crate) accepted: bool,
     /// Stable reason code for the decision.
     pub(crate) reason: String,
-}
-
-/// Parsed unknown-operation payload emitted by daemon dispatch.
-#[derive(Debug, Deserialize)]
-pub(crate) struct UnknownOperationPayload {
-    /// Payload type discriminator.
-    #[serde(rename = "type")]
-    pub(crate) r#type: String,
-
-    /// Structured error details.
-    pub(crate) details: UnknownOperationDetails,
-}
-
-/// Inner details for an unknown-operation payload.
-#[derive(Debug, Deserialize)]
-pub(crate) struct UnknownOperationDetails {
-    /// Routed domain containing the unknown operation.
-    pub(crate) domain: String,
-    /// Unknown operation requested by the client.
-    pub(crate) operation: String,
-    /// Canonical known operations for the routed domain.
-    pub(crate) known_operations: Vec<String>,
 }
 
 /// Parses definition locations from a JSON payload.

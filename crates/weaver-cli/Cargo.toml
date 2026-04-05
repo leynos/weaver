@@ -10,6 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 weaver-config = { path = "../weaver-config", features = ["cli"] }
+weaver-daemon-types = { path = "../weaver-daemon-types" }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
