@@ -372,6 +372,7 @@ the canonical representation. It performs semantic validation including:
   match-producing term (Atom or Or)
 
 Positive term classification:
+
 - `Atom` (Pattern, Regex) → positive
 - `Or` → positive (at least one branch must match)
 - `Not`, `Inside`, `Anywhere` → constraints (not positive)

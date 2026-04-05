@@ -332,6 +332,17 @@ fn normalize_languages(languages: &[String]) -> Result<Vec<Language>, Diagnostic
 mod tests {
     use super::*;
 
+    fn parse_and_normalize(yaml: &str) -> Result<Vec<NormalizedSearchRule>, DiagnosticReport> {
+        let file = sempai_yaml::parse_rule_file(yaml, None).unwrap();
+        normalize_rule_file(&file)
+    }
+
+    fn expect_diagnostic(yaml: &str, expected_code: DiagnosticCode) {
+        let err = parse_and_normalize(yaml).expect_err("should fail");
+        let first = err.diagnostics().first().unwrap();
+        assert_eq!(first.code(), expected_code);
+    }
+
     #[test]
     fn normalize_simple_pattern_legacy() {
         let yaml = concat!(
@@ -342,8 +353,7 @@ mod tests {
             "    severity: ERROR\n",
             "    pattern: fn $F($X)\n",
         );
-        let file = sempai_yaml::parse_rule_file(yaml, None).unwrap();
-        let result = normalize_rule_file(&file).unwrap();
+        let result = parse_and_normalize(yaml).unwrap();
 
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].rule_id, "test.rule");
@@ -361,8 +371,7 @@ mod tests {
             "    severity: ERROR\n",
             "    match: fn $F($X)\n",
         );
-        let file = sempai_yaml::parse_rule_file(yaml, None).unwrap();
-        let result = normalize_rule_file(&file).unwrap();
+        let result = parse_and_normalize(yaml).unwrap();
 
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].rule_id, "test.rule");
@@ -389,125 +398,101 @@ mod tests {
             "    match: fn $F($X)\n",
         );
 
-        let legacy_file = sempai_yaml::parse_rule_file(legacy_yaml, None).unwrap();
-        let v2_file = sempai_yaml::parse_rule_file(v2_yaml, None).unwrap();
-
-        let legacy_result = normalize_rule_file(&legacy_file).unwrap();
-        let v2_result = normalize_rule_file(&v2_file).unwrap();
+        let legacy_result = parse_and_normalize(legacy_yaml).unwrap();
+        let v2_result = parse_and_normalize(v2_yaml).unwrap();
 
         assert_eq!(legacy_result[0].formula, v2_result[0].formula);
     }
 
     #[test]
     fn invalid_not_in_or_detected_legacy() {
-        let yaml = concat!(
-            "rules:\n",
-            "  - id: test.rule\n",
-            "    message: test\n",
-            "    languages: [rust]\n",
-            "    severity: ERROR\n",
-            "    pattern-either:\n",
-            "      - pattern-not: fn $F($X)\n",
-            "      - pattern: fn $G($Y)\n",
+        expect_diagnostic(
+            concat!(
+                "rules:\n",
+                "  - id: test.rule\n",
+                "    message: test\n",
+                "    languages: [rust]\n",
+                "    severity: ERROR\n",
+                "    pattern-either:\n",
+                "      - pattern-not: fn $F($X)\n",
+                "      - pattern: fn $G($Y)\n",
+            ),
+            DiagnosticCode::ESempaiInvalidNotInOr,
         );
-        let file = sempai_yaml::parse_rule_file(yaml, None).unwrap();
-        let result = normalize_rule_file(&file);
-
-        let err = result.expect_err("should fail");
-        let first = err.diagnostics().first().unwrap();
-        assert_eq!(first.code(), DiagnosticCode::ESempaiInvalidNotInOr);
     }
 
     #[test]
     fn invalid_not_in_or_detected_v2() {
-        let yaml = concat!(
-            "rules:\n",
-            "  - id: test.rule\n",
-            "    message: test\n",
-            "    languages: [rust]\n",
-            "    severity: ERROR\n",
-            "    match:\n",
-            "      any:\n",
-            "        - not:\n",
-            "            pattern: fn $F($X)\n",
-            "        - pattern: fn $G($Y)\n",
+        expect_diagnostic(
+            concat!(
+                "rules:\n",
+                "  - id: test.rule\n",
+                "    message: test\n",
+                "    languages: [rust]\n",
+                "    severity: ERROR\n",
+                "    match:\n",
+                "      any:\n",
+                "        - not:\n",
+                "            pattern: fn $F($X)\n",
+                "        - pattern: fn $G($Y)\n",
+            ),
+            DiagnosticCode::ESempaiInvalidNotInOr,
         );
-        let file = sempai_yaml::parse_rule_file(yaml, None).unwrap();
-        let result = normalize_rule_file(&file);
-
-        let err = result.expect_err("should fail");
-        let first = err.diagnostics().first().unwrap();
-        assert_eq!(first.code(), DiagnosticCode::ESempaiInvalidNotInOr);
     }
 
     #[test]
     fn missing_positive_term_detected_legacy() {
-        let yaml = concat!(
-            "rules:\n",
-            "  - id: test.rule\n",
-            "    message: test\n",
-            "    languages: [rust]\n",
-            "    severity: ERROR\n",
-            "    patterns:\n",
-            "      - pattern-not: fn $F($X)\n",
-            "      - pattern-inside: impl $T\n",
-        );
-        let file = sempai_yaml::parse_rule_file(yaml, None).unwrap();
-        let result = normalize_rule_file(&file);
-
-        let err = result.expect_err("should fail");
-        let first = err.diagnostics().first().unwrap();
-        assert_eq!(
-            first.code(),
-            DiagnosticCode::ESempaiMissingPositiveTermInAnd
+        expect_diagnostic(
+            concat!(
+                "rules:\n",
+                "  - id: test.rule\n",
+                "    message: test\n",
+                "    languages: [rust]\n",
+                "    severity: ERROR\n",
+                "    patterns:\n",
+                "      - pattern-not: fn $F($X)\n",
+                "      - pattern-inside: impl $T\n",
+            ),
+            DiagnosticCode::ESempaiMissingPositiveTermInAnd,
         );
     }
 
     #[test]
     fn missing_positive_term_detected_v2() {
-        let yaml = concat!(
-            "rules:\n",
-            "  - id: test.rule\n",
-            "    message: test\n",
-            "    languages: [rust]\n",
-            "    severity: ERROR\n",
-            "    match:\n",
-            "      all:\n",
-            "        - not:\n",
-            "            pattern: fn $F($X)\n",
-            "        - inside:\n",
-            "            pattern: impl $T\n",
-        );
-        let file = sempai_yaml::parse_rule_file(yaml, None).unwrap();
-        let result = normalize_rule_file(&file);
-
-        let err = result.expect_err("should fail");
-        let first = err.diagnostics().first().unwrap();
-        assert_eq!(
-            first.code(),
-            DiagnosticCode::ESempaiMissingPositiveTermInAnd
+        expect_diagnostic(
+            concat!(
+                "rules:\n",
+                "  - id: test.rule\n",
+                "    message: test\n",
+                "    languages: [rust]\n",
+                "    severity: ERROR\n",
+                "    match:\n",
+                "      all:\n",
+                "        - not:\n",
+                "            pattern: fn $F($X)\n",
+                "        - inside:\n",
+                "            pattern: impl $T\n",
+            ),
+            DiagnosticCode::ESempaiMissingPositiveTermInAnd,
         );
     }
 
     #[test]
     fn unsupported_mode_returns_error() {
-        let yaml = concat!(
-            "rules:\n",
-            "  - id: test.rule\n",
-            "    mode: taint\n",
-            "    message: test\n",
-            "    languages: [rust]\n",
-            "    severity: ERROR\n",
-            "    taint:\n",
-            "      sources: []\n",
-            "      sinks: []\n",
+        expect_diagnostic(
+            concat!(
+                "rules:\n",
+                "  - id: test.rule\n",
+                "    mode: taint\n",
+                "    message: test\n",
+                "    languages: [rust]\n",
+                "    severity: ERROR\n",
+                "    taint:\n",
+                "      sources: []\n",
+                "      sinks: []\n",
+            ),
+            DiagnosticCode::ESempaiUnsupportedMode,
         );
-        let file = sempai_yaml::parse_rule_file(yaml, None).unwrap();
-        let result = normalize_rule_file(&file);
-
-        let err = result.expect_err("should fail");
-        let first = err.diagnostics().first().unwrap();
-        assert_eq!(first.code(), DiagnosticCode::ESempaiUnsupportedMode);
     }
 
     #[test]
@@ -520,8 +505,7 @@ mod tests {
             "    severity: ERROR\n",
             "    pattern: fn $F($X)\n",
         );
-        let file = sempai_yaml::parse_rule_file(yaml, None).unwrap();
-        let result = normalize_rule_file(&file).unwrap();
+        let result = parse_and_normalize(yaml).unwrap();
 
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].language, Language::Rust);

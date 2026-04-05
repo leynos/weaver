@@ -137,19 +137,24 @@ Implementation must not begin until the user explicitly approves this plan.
       current `sempai`, `sempai_core`, and `sempai_yaml` code structure, and
       the requested testing/documentation guidance.
 - [x] (2026-04-05 UTC) Drafted this ExecPlan.
-- [x] (2026-04-05 UTC) Stage A: Added failing paired-fixture and semantic-diagnostic tests.
-- [x] (2026-04-05 UTC) Stage B: Added canonical `Formula` and clause model to `sempai_core`.
-- [x] (2026-04-05 UTC) Stage C: Implemented normalization and semantic validation in `sempai`.
-- [x] (2026-04-05 UTC) Stage D: Return real search-mode query plans from `compile_yaml`.
-- [x] (2026-04-05 UTC) Stage E: Updated docs, marked roadmap item done, ran quality gates.
+- [x] (2026-04-05 UTC) Stage A: Added failing paired-fixture and
+  semantic-diagnostic tests.
+- [x] (2026-04-05 UTC) Stage B: Added canonical `Formula` and clause model to
+  `sempai_core`.
+- [x] (2026-04-05 UTC) Stage C: Implemented normalization and semantic
+  validation in `sempai`.
+- [x] (2026-04-05 UTC) Stage D: Return real search-mode query plans from
+  `compile_yaml`.
+- [x] (2026-04-05 UTC) Stage E: Updated docs, marked roadmap item done, ran
+  quality gates.
 
 ## Surprises & discoveries
 
 - Observation: `crates/sempai/src/engine.rs` already calls
   `sempai_yaml::parse_rule_file`, but it still returns
   `DiagnosticReport::not_implemented("compile_yaml query-plan normalization")`
-  after every successful parse. Impact: 4.1.5 can unlock meaningful user value
-  without waiting for Tree-sitter execution.
+  after every successful parse. Impact: 4.1.5 can unlock meaningful user
+  value without waiting for Tree-sitter execution.
 
 - Observation: `crates/sempai-yaml/src/model.rs` already distinguishes
   `LegacyFormula`, `MatchFormula`, legacy constraint payloads, and decorated
@@ -626,6 +631,7 @@ documentation requirements.
 
 **2026-04-05 UTC**: Completed implementation. All stages (A-E) finished.
 Key changes from draft:
+
 - Added `Formula`, `Atom`, `DecoratedFormula`, `WhereClause` types to `sempai_core`
 - Implemented `normalize.rs` with legacy and v2 lowering logic
 - Implemented semantic validation for `InvalidNotInOr` and `MissingPositiveTermInAnd`

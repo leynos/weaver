@@ -36,44 +36,47 @@ fn normalize_fixture(
     normalize_rule_file(&file)
 }
 
+/// Asserts that the legacy and v2 fixtures normalise to the same single formula.
+fn assert_equivalent_formulas(legacy_fixture: &str, v2_fixture: &str) {
+    let legacy = normalize_fixture(legacy_fixture)
+        .unwrap_or_else(|e| panic!("legacy fixture '{legacy_fixture}' failed: {e:?}"));
+    let v2 = normalize_fixture(v2_fixture)
+        .unwrap_or_else(|e| panic!("v2 fixture '{v2_fixture}' failed: {e:?}"));
+
+    assert_eq!(
+        legacy.len(),
+        1,
+        "legacy fixture '{legacy_fixture}' should yield exactly one rule"
+    );
+    assert_eq!(
+        v2.len(),
+        1,
+        "v2 fixture '{v2_fixture}' should yield exactly one rule"
+    );
+    assert_eq!(
+        legacy[0].formula, v2[0].formula,
+        "legacy and v2 fixtures should normalise to the same formula",
+    );
+}
+
 #[test]
 fn simple_pattern_legacy_and_v2_normalize_to_equivalent_formulas() {
-    let legacy = normalize_fixture("simple_pattern_legacy.yaml").expect("legacy should parse");
-    let v2 = normalize_fixture("simple_pattern_v2.yaml").expect("v2 should parse");
-
-    assert_eq!(legacy.len(), 1);
-    assert_eq!(v2.len(), 1);
-    assert_eq!(legacy[0].formula, v2[0].formula);
+    assert_equivalent_formulas("simple_pattern_legacy.yaml", "simple_pattern_v2.yaml");
 }
 
 #[test]
 fn conjunction_legacy_and_v2_normalize_to_equivalent_formulas() {
-    let legacy = normalize_fixture("conjunction_legacy.yaml").expect("legacy should parse");
-    let v2 = normalize_fixture("conjunction_v2.yaml").expect("v2 should parse");
-
-    assert_eq!(legacy.len(), 1);
-    assert_eq!(v2.len(), 1);
-    assert_eq!(legacy[0].formula, v2[0].formula);
+    assert_equivalent_formulas("conjunction_legacy.yaml", "conjunction_v2.yaml");
 }
 
 #[test]
 fn disjunction_legacy_and_v2_normalize_to_equivalent_formulas() {
-    let legacy = normalize_fixture("disjunction_legacy.yaml").expect("legacy should parse");
-    let v2 = normalize_fixture("disjunction_v2.yaml").expect("v2 should parse");
-
-    assert_eq!(legacy.len(), 1);
-    assert_eq!(v2.len(), 1);
-    assert_eq!(legacy[0].formula, v2[0].formula);
+    assert_equivalent_formulas("disjunction_legacy.yaml", "disjunction_v2.yaml");
 }
 
 #[test]
 fn nested_context_legacy_and_v2_normalize_to_equivalent_formulas() {
-    let legacy = normalize_fixture("nested_context_legacy.yaml").expect("legacy should parse");
-    let v2 = normalize_fixture("nested_context_v2.yaml").expect("v2 should parse");
-
-    assert_eq!(legacy.len(), 1);
-    assert_eq!(v2.len(), 1);
-    assert_eq!(legacy[0].formula, v2[0].formula);
+    assert_equivalent_formulas("nested_context_legacy.yaml", "nested_context_v2.yaml");
 }
 
 #[test]
