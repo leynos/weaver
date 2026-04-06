@@ -251,14 +251,13 @@ fn check_process(pid: u32) -> Result<bool, LaunchError> {
 }
 
 #[cfg(test)]
-fn record_health_event(path: &Path, status: &'static str) {
-    HEALTH_EVENTS
+fn record_health_event(path: &Path, status: &'static str) -> Result<(), String> {
+    let mut guard = HEALTH_EVENTS
         .get_or_init(|| Mutex::new(HashMap::new()))
         .lock()
-        .expect("health event mutex poisoned")
-        .entry(path.to_path_buf())
-        .or_default()
-        .push(status);
+        .map_err(|_| "health event mutex poisoned")?;
+    guard.entry(path.to_path_buf()).or_default().push(status);
+    Ok(())
 }
 
 #[cfg(test)]
@@ -272,19 +271,17 @@ pub(super) mod test_support {
     }
 
     /// Clears recorded events for the provided health file path.
-    pub fn clear_health_events(path: &Path) {
-        let mut guard = storage().lock().expect("health event mutex poisoned");
+    pub fn clear_health_events(path: &Path) -> Result<(), String> {
+        let mut guard = storage().lock().map_err(|_| "health event mutex poisoned")?;
         guard.remove(path);
+        Ok(())
     }
 
     #[must_use]
     pub fn health_events(path: &Path) -> Vec<&'static str> {
         storage()
             .lock()
-            .expect("health event mutex poisoned")
-            .get(path)
-            .cloned()
-            .unwrap_or_default()
+            .map_or_else(|_| Vec::new(), |guard| guard.get(path).cloned().unwrap_or_default())
     }
 }
 
