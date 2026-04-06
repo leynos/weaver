@@ -35,7 +35,8 @@ fn try_lsp_enrichment_starts_backend_and_populates_hover_info() {
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         hover,
     );
-    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
+    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server)
+        .expect("semantic_backends_with_server should succeed");
     let mut card = rust_card();
 
     let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
@@ -70,7 +71,7 @@ fn try_lsp_enrichment_degrades_when_hover_is_missing() {
     let (server, _hover_params) = StubLanguageServer::missing_hover(
         ServerCapabilitySet::new(false, false, false).with_hover(true),
     );
-    let _result = assert_enrichment_degrades(server);
+    let (_backends, _dir) = assert_enrichment_degrades(server);
 }
 
 #[test]
@@ -79,7 +80,7 @@ fn try_lsp_enrichment_degrades_when_hover_request_fails() {
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         "hover RPC failed",
     );
-    let _result = assert_enrichment_degrades(server);
+    let (_backends, _dir) = assert_enrichment_degrades(server);
 }
 
 #[test]
