@@ -1,7 +1,6 @@
 //! Error types and diagnostics helpers for the CLI runtime.
 
-use std::io;
-use std::sync::Arc;
+use std::{io, sync::Arc};
 
 use thiserror::Error;
 

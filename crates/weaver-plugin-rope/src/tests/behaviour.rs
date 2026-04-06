@@ -1,13 +1,17 @@
 //! Behaviour-driven tests for rope plugin request dispatch.
 
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use mockall::mock;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
+use weaver_test_macros::allow_fixture_expansion_lints;
 use weaver_plugins::protocol::{
-    DiagnosticSeverity, FilePayload, PluginOutput, PluginRequest, PluginResponse,
+    DiagnosticSeverity,
+    FilePayload,
+    PluginOutput,
+    PluginRequest,
+    PluginResponse,
 };
 
 use crate::{RopeAdapter, RopeAdapterError, execute_request, failure_response};
@@ -27,10 +31,9 @@ enum AdapterMode {
     Fails,
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> World {
-    World::default()
-}
+fn world() -> World { World::default() }
 
 mock! {
     BehaviourAdapter {}
@@ -109,14 +112,10 @@ fn given_unsupported_operation(world: &mut World) {
 }
 
 #[given("a rope adapter that fails")]
-fn given_failing_adapter(world: &mut World) {
-    world.adapter_mode = AdapterMode::Fails;
-}
+fn given_failing_adapter(world: &mut World) { world.adapter_mode = AdapterMode::Fails; }
 
 #[given("a rope adapter that returns unchanged content")]
-fn given_no_change_adapter(world: &mut World) {
-    world.adapter_mode = AdapterMode::NoChange;
-}
+fn given_no_change_adapter(world: &mut World) { world.adapter_mode = AdapterMode::NoChange; }
 
 #[when("the plugin executes the request")]
 fn when_execute(world: &mut World) {
@@ -205,6 +204,4 @@ fn then_failure_has_reason_code(world: &mut World, code: String) {
 }
 
 #[scenario(path = "tests/features/rope_plugin.feature")]
-fn rope_plugin_behaviour(world: World) {
-    let _ = world;
-}
+fn rope_plugin_behaviour(world: World) { let _ = world; }

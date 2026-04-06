@@ -1,28 +1,24 @@
 //! Manages runtime lock, PID, and health files for the daemon process.
 
-use std::fs::{self, File, OpenOptions};
-use std::io;
-use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use nix::errno::Errno;
-use nix::sys::signal::kill;
-use nix::unistd::Pid;
-use serde::Serialize;
-use tracing::{info, warn};
-
-use super::files::atomic_write;
-
 #[cfg(test)]
 use std::collections::HashMap;
 #[cfg(test)]
 use std::path::PathBuf;
 #[cfg(test)]
 use std::sync::{Mutex, OnceLock};
+use std::{
+    fs::{self, File, OpenOptions},
+    io,
+    path::Path,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
-use super::PROCESS_TARGET;
-use super::errors::LaunchError;
+use nix::{errno::Errno, sys::signal::kill, unistd::Pid};
+use serde::Serialize;
+use tracing::{info, warn};
 use weaver_config::RuntimePaths;
+
+use super::{PROCESS_TARGET, errors::LaunchError, files::atomic_write};
 
 #[cfg(test)]
 static HEALTH_EVENTS: OnceLock<Mutex<HashMap<PathBuf, Vec<&'static str>>>> = OnceLock::new();
@@ -82,9 +78,7 @@ impl ProcessGuard {
         Ok(())
     }
 
-    pub(super) fn paths(&self) -> &RuntimePaths {
-        &self.paths
-    }
+    pub(super) fn paths(&self) -> &RuntimePaths { &self.paths }
 
     fn cleanup(&self) {
         for path in [
@@ -98,9 +92,7 @@ impl ProcessGuard {
 }
 
 impl Drop for ProcessGuard {
-    fn drop(&mut self) {
-        self.cleanup();
-    }
+    fn drop(&mut self) { self.cleanup(); }
 }
 
 fn remove_runtime_file(path: &Path) {
@@ -296,10 +288,10 @@ pub(super) mod test_support {
 
 #[cfg(test)]
 mod tests {
-    use super::test_support;
-    use super::*;
     use tempfile::TempDir;
     use weaver_config::{Config, SocketEndpoint};
+
+    use super::{test_support, *};
 
     fn build_paths() -> (TempDir, RuntimePaths) {
         let dir = TempDir::new().expect("failed to create temporary runtime directory");

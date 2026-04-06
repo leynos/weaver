@@ -40,15 +40,11 @@ impl PyreflyClient {
     }
 
     /// Returns a mutable reference to the underlying LSP client.
-    pub const fn client_mut(&mut self) -> &mut LspClient {
-        &mut self.client
-    }
+    pub const fn client_mut(&mut self) -> &mut LspClient { &mut self.client }
 
     /// Shuts down the Pyrefly server.
     ///
     /// # Errors
     /// Returns an error if shutdown fails.
-    pub fn shutdown(&mut self) -> Result<(), LspClientError> {
-        self.client.shutdown()
-    }
+    pub fn shutdown(&mut self) -> Result<(), LspClientError> { self.client.shutdown() }
 }

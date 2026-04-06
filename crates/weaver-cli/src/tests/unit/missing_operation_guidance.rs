@@ -3,14 +3,12 @@
 //! Verifies that known domains fail fast with actionable guidance before
 //! configuration loading, while preserving the client-side-only UX path.
 
-use std::ffi::OsString;
-use std::io::Cursor;
-use std::process::ExitCode;
+use std::{ffi::OsString, io::Cursor, process::ExitCode};
 
 use rstest::rstest;
+use weaver_config::Config;
 
 use crate::{AppError, ConfigLoader, IoStreams, run_with_loader};
-use weaver_config::Config;
 
 struct PanickingLoader;
 

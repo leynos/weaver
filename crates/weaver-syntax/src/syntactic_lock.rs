@@ -5,13 +5,13 @@
 //! safety harness in `weaverd` to prevent syntactically invalid code from
 //! being committed.
 
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+};
 
-use crate::error::SyntaxError;
-use crate::language::SupportedLanguage;
-use crate::parser::Parser;
+use crate::{error::SyntaxError, language::SupportedLanguage, parser::Parser};
 
 /// Tree-sitter based syntactic validation.
 ///
@@ -195,15 +195,11 @@ impl TreeSitterSyntacticLock {
     /// Returns `true` if the file has a recognised extension that maps
     /// to a supported language.
     #[must_use]
-    pub fn supports_file(path: &Path) -> bool {
-        SupportedLanguage::from_path(path).is_some()
-    }
+    pub fn supports_file(path: &Path) -> bool { SupportedLanguage::from_path(path).is_some() }
 }
 
 impl Default for TreeSitterSyntacticLock {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 impl std::fmt::Debug for TreeSitterSyntacticLock {
@@ -245,9 +241,11 @@ impl std::fmt::Display for ValidationFailure {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use rstest::rstest;
     use std::path::PathBuf;
+
+    use rstest::rstest;
+
+    use super::*;
 
     #[rstest]
     #[case("test.rs", "fn main() { println!(\"hello\"); }", true)]

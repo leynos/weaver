@@ -106,7 +106,8 @@ fn refactor_rust_analyzer_pipeline_with_observe_and_jq_snapshot() {
         "observe get-definition --symbol old_name ",
         "| jq -r '.[0].symbol' ",
         "| xargs -I{} \"$WEAVER_BIN\" --daemon-socket \"$WEAVER_ENDPOINT\" --output json ",
-        "act refactor --provider rust-analyzer --refactoring rename --file src/main.rs new_name={} offset=3"
+        "act refactor --provider rust-analyzer --refactoring rename --file src/main.rs \
+         new_name={} offset=3"
     );
 
     let output = Command::new("bash")

@@ -1,7 +1,9 @@
-//! Shared helper data and pure functions for `act refactor` tests.
+//! Shared helper data and pure functions for `act refactor` behaviour tests.
 //!
-//! Grouped into focused inline modules; re-exported at the top level for
-//! convenient glob-import by sibling test modules.
+//! This file is intentionally loaded multiple times by different test modules
+//! using `#[path = "refactor_helpers.rs"]` to provide shared test utilities.
+
+#![allow(dead_code)]
 
 pub(crate) mod builders {
     use std::path::Path;

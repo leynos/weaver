@@ -3,10 +3,22 @@
 use std::sync::{Arc, Mutex};
 
 use lsp_types::{
-    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
-    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, Location, ReferenceParams,
+    CallHierarchyIncomingCall,
+    CallHierarchyIncomingCallsParams,
+    CallHierarchyItem,
+    CallHierarchyOutgoingCall,
+    CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams,
+    Diagnostic,
+    DidChangeTextDocumentParams,
+    DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams,
+    GotoDefinitionParams,
+    GotoDefinitionResponse,
+    Hover,
+    HoverParams,
+    Location,
+    ReferenceParams,
     Uri,
 };
 
@@ -225,9 +237,7 @@ pub struct RecordingServerHandle {
 
 impl RecordingServerHandle {
     /// Returns the ordered list of calls the server observed.
-    pub fn calls(&self) -> Vec<CallKind> {
-        with_state(&self.shared, |state| state.calls.clone())
-    }
+    pub fn calls(&self) -> Vec<CallKind> { with_state(&self.shared, |state| state.calls.clone()) }
 }
 
 fn with_state<R, F>(shared: &Arc<Mutex<RecordingState>>, action: F) -> R
@@ -314,15 +324,17 @@ impl RecordingState {
         }
     }
 
-    fn record_call(&mut self, kind: CallKind) {
-        self.calls.push(kind);
-    }
+    fn record_call(&mut self, kind: CallKind) { self.calls.push(kind); }
 }
 
 #[cfg(test)]
 mod tests {
     use lsp_types::{
-        HoverContents, MarkupContent, MarkupKind, Position, TextDocumentIdentifier,
+        HoverContents,
+        MarkupContent,
+        MarkupKind,
+        Position,
+        TextDocumentIdentifier,
         TextDocumentPositionParams,
     };
 

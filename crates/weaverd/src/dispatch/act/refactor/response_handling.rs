@@ -1,17 +1,20 @@
 //! Response handling and diff forwarding for `act refactor`.
 
-use std::io::Write;
-use std::path::Path;
+use std::{io::Write, path::Path};
 
 use weaver_plugins::{PluginOutput, PluginResponse};
 
-use crate::backends::FusionBackends;
-use crate::dispatch::act::apply_patch;
-use crate::dispatch::errors::DispatchError;
-use crate::dispatch::request::{CommandDescriptor, CommandRequest};
-use crate::dispatch::response::ResponseWriter;
-use crate::dispatch::router::DispatchResult;
-use crate::semantic_provider::SemanticBackendProvider;
+use crate::{
+    backends::FusionBackends,
+    dispatch::{
+        act::apply_patch,
+        errors::DispatchError,
+        request::{CommandDescriptor, CommandRequest},
+        response::ResponseWriter,
+        router::DispatchResult,
+    },
+    semantic_provider::SemanticBackendProvider,
+};
 
 pub(super) fn handle_plugin_response<W: Write>(
     response: PluginResponse,

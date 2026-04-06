@@ -3,17 +3,18 @@
 //! Provides helpers for reading and evaluating health snapshots, waiting for
 //! the daemon to become ready, and reading PID files.
 
-use std::io;
-use std::path::Path;
-use std::process::Child;
-use std::thread;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::{
+    io,
+    path::Path,
+    process::Child,
+    thread,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
 
 use cap_std::fs::Dir;
 use weaver_config::RuntimePaths;
 
-use super::error::LifecycleError;
-use super::utils::open_runtime_dir;
+use super::{error::LifecycleError, utils::open_runtime_dir};
 
 /// Filename for the daemon's PID file within the runtime directory.
 pub(super) const PID_FILENAME: &str = "weaverd.pid";
@@ -62,8 +63,8 @@ impl std::fmt::Display for DaemonStatus {
 ///
 /// * `status` - Current daemon state as a [`DaemonStatus`] enum variant.
 /// * `pid` - Process ID of the running daemon.
-/// * `timestamp` - Unix timestamp (seconds since epoch) when the snapshot was
-///   written. Used to distinguish fresh snapshots from stale ones.
+/// * `timestamp` - Unix timestamp (seconds since epoch) when the snapshot was written. Used to
+///   distinguish fresh snapshots from stale ones.
 #[derive(Debug, serde::Deserialize, PartialEq, Eq)]
 pub(crate) struct HealthSnapshot {
     /// Current daemon state.
@@ -181,8 +182,8 @@ macro_rules! define_reader {
 ///
 /// * `paths` - Runtime paths containing the location of health and PID files.
 /// * `child` - Handle to the spawned daemon process.
-/// * `started_at` - Timestamp when the daemon was started, used to validate
-///   that health snapshots are fresh (not stale from a previous run).
+/// * `started_at` - Timestamp when the daemon was started, used to validate that health snapshots
+///   are fresh (not stale from a previous run).
 /// * `timeout` - Maximum duration to wait for the daemon to become ready.
 ///
 /// # Returns
@@ -329,8 +330,8 @@ pub(crate) struct ProcessMonitorContext {
 ///
 /// * [`HealthCheckOutcome::Ready`] - Snapshot is valid and daemon reports ready.
 /// * [`HealthCheckOutcome::Aborted`] - Snapshot is valid but daemon is stopping.
-/// * [`HealthCheckOutcome::Continue`] - No valid snapshot yet (missing, stale,
-///   PID mismatch, or daemon still starting); polling should continue.
+/// * [`HealthCheckOutcome::Continue`] - No valid snapshot yet (missing, stale, PID mismatch, or
+///   daemon still starting); polling should continue.
 ///
 /// # Errors
 ///

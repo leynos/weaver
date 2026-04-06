@@ -66,13 +66,13 @@ pub fn extract_locations(response: GotoDefinitionResponse) -> Vec<DefinitionLoca
 mod tests {
     use lsp_types::{Position, Range, Uri};
     use rstest::{fixture, rstest};
+    use weaver_test_macros::allow_fixture_expansion_lints;
 
     use super::*;
 
+    #[allow_fixture_expansion_lints]
     #[fixture]
-    fn sample_uri() -> Uri {
-        "file:///src/main.rs".parse().expect("valid uri")
-    }
+    fn sample_uri() -> Uri { "file:///src/main.rs".parse().expect("valid uri") }
 
     fn make_location(uri: &Uri, line: u32, character: u32) -> Location {
         Location {

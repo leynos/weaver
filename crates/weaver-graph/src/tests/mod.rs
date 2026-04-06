@@ -12,9 +12,11 @@
 )]
 
 mod graph_tests {
-    use crate::edge::{CallEdge, EdgeSource};
-    use crate::graph::CallGraph;
-    use crate::node::{CallNode, Position, SymbolKind};
+    use crate::{
+        edge::{CallEdge, EdgeSource},
+        graph::CallGraph,
+        node::{CallNode, Position, SymbolKind},
+    };
 
     #[test]
     fn empty_graph_has_no_nodes() {
@@ -114,8 +116,9 @@ mod graph_tests {
 }
 
 mod node_tests {
-    use crate::node::{CallNode, NodeId, Position, SymbolKind};
     use camino::Utf8PathBuf;
+
+    use crate::node::{CallNode, NodeId, Position, SymbolKind};
 
     #[test]
     fn node_id_format_is_correct() {
@@ -144,9 +147,12 @@ mod node_tests {
 }
 
 mod edge_tests {
-    use crate::edge::{CallEdge, EdgeSource};
-    use crate::node::{NodeId, Position};
     use camino::Utf8PathBuf;
+
+    use crate::{
+        edge::{CallEdge, EdgeSource},
+        node::{NodeId, Position},
+    };
 
     #[test]
     fn edge_accessors_return_correct_values() {

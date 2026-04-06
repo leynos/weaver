@@ -2,19 +2,25 @@
 
 use tempfile::TempDir;
 use weaver_cards::{
-    CardLanguage, LspInfo, Provenance, SourcePosition, SourceRange, SymbolCard, SymbolIdentity,
+    CardLanguage,
+    LspInfo,
+    Provenance,
+    SourcePosition,
+    SourceRange,
+    SymbolCard,
+    SymbolIdentity,
     SymbolRef,
 };
 use weaver_lsp_host::{Language, ServerCapabilitySet};
 
-use crate::backends::FusionBackends;
-use crate::dispatch::observe::enrich::{
-    EnrichmentOutcome, parse_hover_response, try_lsp_enrichment,
+use crate::{
+    backends::FusionBackends,
+    dispatch::observe::{
+        enrich::{EnrichmentOutcome, parse_hover_response, try_lsp_enrichment},
+        test_support::{StubLanguageServer, markdown_hover, semantic_backends_with_server},
+    },
+    semantic_provider::SemanticBackendProvider,
 };
-use crate::dispatch::observe::test_support::{
-    StubLanguageServer, markdown_hover, semantic_backends_with_server,
-};
-use crate::semantic_provider::SemanticBackendProvider;
 
 /// Expected values for LSP info assertions.
 pub(crate) struct ExpectedLspInfo<'a> {

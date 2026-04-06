@@ -11,13 +11,12 @@ mod listener_tests;
 #[cfg(test)]
 mod test_utils;
 
-pub(crate) use self::errors::ListenerError;
 #[doc(hidden)]
 pub use self::handler::{ConnectionHandler, ConnectionStream};
 #[cfg(test)]
 pub(crate) use self::listener::ListenerHandle;
-pub(crate) use self::listener::SocketListener;
 #[cfg(test)]
 pub(crate) use self::test_utils::CountingHandler;
+pub(crate) use self::{errors::ListenerError, listener::SocketListener};
 
 const LISTENER_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::transport");

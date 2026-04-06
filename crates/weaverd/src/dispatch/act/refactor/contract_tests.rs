@@ -5,8 +5,16 @@ use std::sync::Mutex;
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use weaver_plugins::{CapabilityId, PluginError, PluginOutput, PluginRequest, PluginResponse};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use super::refactor_helpers::{build_backends, command_request};
+#[expect(
+    clippy::duplicate_mod,
+    reason = "Shared test helpers loaded by multiple test modules"
+)]
+#[path = "refactor_helpers.rs"]
+mod refactor_helpers;
+
+use refactor_helpers::{build_backends, command_request};
 use crate::dispatch::act::refactor::resolution::{
     CandidateEvaluation, CapabilityResolutionDetails, CapabilityResolutionEnvelope,
     ResolutionOutcome, ResolutionRequest, SelectionMode,
@@ -64,10 +72,9 @@ const NOTES_DIFF: &str = concat!(
     ">>>>>>> REPLACE\n",
 );
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn socket_dir() -> TempDir {
-    TempDir::new().expect("socket dir")
-}
+fn socket_dir() -> TempDir { TempDir::new().expect("socket dir") }
 
 struct RenameDispatch<'a> {
     file: &'a str,

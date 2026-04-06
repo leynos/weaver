@@ -1,19 +1,38 @@
 //! Implementation of [`LanguageServer`] trait for [`ProcessLanguageServer`].
 
 use lsp_types::{
-    CallHierarchyClientCapabilities, CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams,
-    CallHierarchyItem, CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams,
-    CallHierarchyPrepareParams, ClientCapabilities, Diagnostic, DidChangeTextDocumentParams,
-    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentDiagnosticParams,
-    DocumentDiagnosticReport, GeneralClientCapabilities, GotoDefinitionParams,
-    GotoDefinitionResponse, Hover, HoverParams, HoverProviderCapability, InitializeParams,
-    InitializeResult, InitializedParams, PositionEncodingKind, ReferenceParams,
-    TextDocumentClientCapabilities, TextDocumentIdentifier, Uri,
+    CallHierarchyClientCapabilities,
+    CallHierarchyIncomingCall,
+    CallHierarchyIncomingCallsParams,
+    CallHierarchyItem,
+    CallHierarchyOutgoingCall,
+    CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams,
+    ClientCapabilities,
+    Diagnostic,
+    DidChangeTextDocumentParams,
+    DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams,
+    DocumentDiagnosticParams,
+    DocumentDiagnosticReport,
+    GeneralClientCapabilities,
+    GotoDefinitionParams,
+    GotoDefinitionResponse,
+    Hover,
+    HoverParams,
+    HoverProviderCapability,
+    InitializeParams,
+    InitializeResult,
+    InitializedParams,
+    PositionEncodingKind,
+    ReferenceParams,
+    TextDocumentClientCapabilities,
+    TextDocumentIdentifier,
+    Uri,
 };
 use tracing::debug;
 
-use super::lifecycle::ADAPTER_TARGET;
-use super::process::ProcessLanguageServer;
+use super::{lifecycle::ADAPTER_TARGET, process::ProcessLanguageServer};
 use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
 
 impl ProcessLanguageServer {

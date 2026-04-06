@@ -4,9 +4,7 @@ use std::collections::BTreeMap;
 
 use crate::{CaptureValue, CapturedNode, LineCol, Match, Span};
 
-fn sample_span() -> Span {
-    Span::new(12, 42, LineCol::new(2, 0), LineCol::new(4, 0))
-}
+fn sample_span() -> Span { Span::new(12, 42, LineCol::new(2, 0), LineCol::new(4, 0)) }
 
 #[test]
 fn match_construction_with_empty_captures() {

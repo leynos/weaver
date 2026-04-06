@@ -1,16 +1,19 @@
 //! Tests for the socket listener.
 
-use std::net::TcpStream;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
+use std::{
+    net::TcpStream,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::{Duration, Instant},
+};
 
 use rstest::{fixture, rstest};
-
 use weaver_config::SocketEndpoint;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use super::listener::SocketListener;
-use super::{ConnectionHandler, CountingHandler, ListenerError};
+use super::{ConnectionHandler, CountingHandler, ListenerError, listener::SocketListener};
 
 #[derive(Clone)]
 struct CountingFixture {
@@ -24,10 +27,9 @@ fn counting_fixture() -> CountingFixture {
     CountingFixture { count, handler }
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn tcp_endpoint() -> SocketEndpoint {
-    SocketEndpoint::tcp("127.0.0.1", 0)
-}
+fn tcp_endpoint() -> SocketEndpoint { SocketEndpoint::tcp("127.0.0.1", 0) }
 
 fn wait_for_count(count: &AtomicUsize, expected: usize) -> bool {
     let deadline = Instant::now() + Duration::from_secs(2);
@@ -62,10 +64,9 @@ fn tcp_listener_accepts_connections(
 }
 
 #[cfg(unix)]
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn unix_tempdir() -> tempfile::TempDir {
-    tempfile::tempdir().expect("temp dir")
-}
+fn unix_tempdir() -> tempfile::TempDir { tempfile::tempdir().expect("temp dir") }
 
 #[cfg(unix)]
 #[rstest]

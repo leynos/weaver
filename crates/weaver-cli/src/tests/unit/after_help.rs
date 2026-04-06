@@ -7,10 +7,11 @@
 use clap::CommandFactory;
 use ortho_config::{FluentLocalizer, NoOpLocalizer};
 
-use crate::cli::Cli;
-use crate::discoverability::DOMAIN_OPERATIONS;
-use crate::discoverability::fluent_entries::render_after_help;
-use crate::localizer::WEAVER_EN_US;
+use crate::{
+    cli::Cli,
+    discoverability::{DOMAIN_OPERATIONS, fluent_entries::render_after_help},
+    localizer::WEAVER_EN_US,
+};
 
 /// Splits the catalogue text into domain sections (separated by blank lines)
 /// and verifies that each operation appears in the section belonging to its

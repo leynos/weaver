@@ -5,20 +5,18 @@
 //! own set of supported operations. Unknown domains or operations are rejected
 //! with structured errors.
 
-use std::io::Write;
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{io::Write, path::PathBuf, sync::Arc};
 
 use tracing::debug;
 
-use crate::backends::FusionBackends;
-use crate::semantic_provider::SemanticBackendProvider;
-
-use super::act;
-use super::errors::DispatchError;
-use super::observe;
-use super::request::CommandRequest;
-use super::response::ResponseWriter;
+use super::{
+    act,
+    errors::DispatchError,
+    observe,
+    request::CommandRequest,
+    response::ResponseWriter,
+};
+use crate::{backends::FusionBackends, semantic_provider::SemanticBackendProvider};
 
 /// Tracing target for dispatch operations.
 pub(crate) const DISPATCH_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::dispatch");
@@ -68,14 +66,10 @@ pub struct DispatchResult {
 
 impl DispatchResult {
     /// Creates a successful result (status 0).
-    pub const fn success() -> Self {
-        Self { status: 0 }
-    }
+    pub const fn success() -> Self { Self { status: 0 } }
 
     /// Creates a result with the given status code.
-    pub const fn with_status(status: i32) -> Self {
-        Self { status }
-    }
+    pub const fn with_status(status: i32) -> Self { Self { status } }
 }
 
 /// Context for routing operations within a domain.
@@ -128,11 +122,132 @@ pub struct DomainRouter {
     refactor_runtime: Arc<dyn act::refactor::RefactorPluginRuntime + Send + Sync>,
 }
 
-impl std::fmt::Debug for DomainRouter {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DomainRouter")
-            .field("workspace_root", &self.workspace_root)
-            .finish_non_exhaustive()
+impl DomainRouter {
+    /// Creates a new domain router with the workspace root.
+    pub fn new(workspace_root: PathBuf) -> Self {
+        Self {
+            workspace_root,
+            refactor_runtime: act::refactor::default_runtime(),
+        }
+    }
+
+    /// Creates a domain router with a custom refactor runtime.
+    #[cfg(test)]
+    #[expect(
+        dead_code,
+        reason = "builder for test-injected runtimes; used by future tests"
+    )]
+    pub fn with_runtime(
+        workspace_root: PathBuf,
+        runtime: Arc<dyn act::refactor::RefactorPluginRuntime + Send + Sync>,
+    ) -> Self {
+        Self {
+            workspace_root,
+            refactor_runtime: runtime,
+        }
+    }
+
+    /// Routes a command request to the appropriate domain handler.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the domain or operation is unknown.
+    pub fn route<W: Write>(
+        &self,
+        request: &CommandRequest,
+        writer: &mut ResponseWriter<W>,
+        backends: &mut FusionBackends<SemanticBackendProvider>,
+    ) -> Result<DispatchResult, DispatchError> {
+        let domain = Domain::parse(request.domain())?;
+
+        debug!(
+            target: DISPATCH_TARGET,
+            domain = domain.as_str(),
+            operation = request.operation(),
+            "routing command"
+        );
+
+        match domain {
+            Domain::Observe => self.route_observe(request, writer, backends),
+            Domain::Act => self.route_act(request, writer, backends),
+            Domain::Verify => self.route_verify(request, writer),
+        }
+    }
+
+    fn route_observe<W: Write>(
+        &self,
+        request: &CommandRequest,
+        writer: &mut ResponseWriter<W>,
+        backends: &mut FusionBackends<SemanticBackendProvider>,
+    ) -> Result<DispatchResult, DispatchError> {
+        let operation = request.operation().to_ascii_lowercase();
+        match operation.as_str() {
+            "get-definition" => observe::get_definition::handle(request, writer, backends),
+            "get-card" => observe::get_card::handle(request, writer, backends),
+            "graph-slice" => observe::graph_slice::handle(request, writer),
+            _ => Self::route_fallback(&DomainRoutingContext::OBSERVE, operation.as_str(), writer),
+        }
+    }
+
+    fn route_act<W: Write>(
+        &self,
+        request: &CommandRequest,
+        writer: &mut ResponseWriter<W>,
+        backends: &mut FusionBackends<SemanticBackendProvider>,
+    ) -> Result<DispatchResult, DispatchError> {
+        let operation = request.operation().to_ascii_lowercase();
+        match operation.as_str() {
+            "apply-patch" => {
+                act::apply_patch::handle(request, writer, backends, &self.workspace_root)
+            }
+            "refactor" => act::refactor::handle(
+                request,
+                writer,
+                act::refactor::RefactorContext {
+                    backends,
+                    workspace_root: &self.workspace_root,
+                    runtime: self.refactor_runtime.as_ref(),
+                },
+            ),
+            _ => Self::route_fallback(&DomainRoutingContext::ACT, operation.as_str(), writer),
+        }
+    }
+
+    fn route_verify<W: Write>(
+        &self,
+        request: &CommandRequest,
+        writer: &mut ResponseWriter<W>,
+    ) -> Result<DispatchResult, DispatchError> {
+        let operation = request.operation().to_ascii_lowercase();
+        Self::route_fallback(&DomainRoutingContext::VERIFY, operation.as_str(), writer)
+    }
+
+    /// Handles routing fallbacks for known-but-unimplemented and unknown operations.
+    fn route_fallback<W: Write>(
+        routing: &DomainRoutingContext,
+        operation: &str,
+        writer: &mut ResponseWriter<W>,
+    ) -> Result<DispatchResult, DispatchError> {
+        if routing.known_operations.contains(&operation) {
+            Self::write_not_implemented(writer, routing.domain, operation)
+        } else {
+            Err(DispatchError::unknown_operation(
+                routing.domain,
+                operation.to_string(),
+                routing.known_operations,
+            ))
+        }
+    }
+
+    fn write_not_implemented<W: Write>(
+        writer: &mut ResponseWriter<W>,
+        domain: &str,
+        operation: &str,
+    ) -> Result<DispatchResult, DispatchError> {
+        writer.write_stderr(format!(
+            "{domain} {operation}: operation not yet implemented\n"
+        ))?;
+        Ok(DispatchResult::with_status(1))
     }
 }
 

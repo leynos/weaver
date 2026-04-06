@@ -2,11 +2,13 @@
 
 use std::path::PathBuf;
 
-use crate::error::PluginError;
-use crate::manifest::{PluginKind, PluginManifest, PluginMetadata};
-use crate::protocol::{PluginOutput, PluginRequest, PluginResponse};
-use crate::registry::PluginRegistry;
-use crate::runner::{MockPluginExecutor, PluginRunner};
+use crate::{
+    error::PluginError,
+    manifest::{PluginKind, PluginManifest, PluginMetadata},
+    protocol::{PluginOutput, PluginRequest, PluginResponse},
+    registry::PluginRegistry,
+    runner::{MockPluginExecutor, PluginRunner},
+};
 
 mod behaviour;
 mod capability_behaviour;

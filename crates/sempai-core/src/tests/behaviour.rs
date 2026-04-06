@@ -2,9 +2,16 @@
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use crate::test_support::{QuotedString, parse_byte_range, parse_line_range};
-use crate::{DiagnosticCode, DiagnosticReport, Language, SourceSpan, Span};
+use crate::{
+    DiagnosticCode,
+    DiagnosticReport,
+    Language,
+    SourceSpan,
+    Span,
+    test_support::{QuotedString, parse_byte_range, parse_line_range},
+};
 
 // ---------------------------------------------------------------------------
 // Test world
@@ -22,10 +29,9 @@ struct TestWorld {
     deserialization_error: Option<String>,
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> TestWorld {
-    TestWorld::default()
-}
+fn world() -> TestWorld { TestWorld::default() }
 
 fn parse_diagnostic_code(code: &str) -> DiagnosticCode {
     let json = serde_json::to_string(code).expect("serialise diagnostic code");
@@ -257,6 +263,4 @@ fn then_deserialization_fails(world: &mut TestWorld, snippet: QuotedString) {
 // ---------------------------------------------------------------------------
 
 #[scenario(path = "tests/features/sempai_core.feature")]
-fn sempai_core_behaviour(world: TestWorld) {
-    let _ = world;
-}
+fn sempai_core_behaviour(world: TestWorld) { let _ = world; }

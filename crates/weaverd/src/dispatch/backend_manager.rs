@@ -6,10 +6,8 @@
 
 use std::sync::{Arc, Mutex};
 
-use crate::backends::FusionBackends;
-use crate::semantic_provider::SemanticBackendProvider;
-
 use super::errors::DispatchError;
+use crate::{backends::FusionBackends, semantic_provider::SemanticBackendProvider};
 
 /// Manager providing access to shared backends with encapsulated locking.
 ///

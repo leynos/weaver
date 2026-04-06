@@ -7,21 +7,29 @@
 mod jsonrpc;
 mod text_edits;
 
-use std::io::{BufReader, BufWriter};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::{
+    io::{BufReader, BufWriter},
+    process::{Child, ChildStdin, ChildStdout, Command, Stdio},
+};
 
 use lsp_types::{DidOpenTextDocumentParams, TextDocumentItem, Uri, WorkspaceEdit};
 use serde_json::json;
 use tempfile::TempDir;
 use weaver_plugins::protocol::FilePayload;
 
-use crate::{ByteOffset, RustAnalyzerAdapter, RustAnalyzerAdapterError, write_workspace_file};
-
-use self::jsonrpc::{JsonRpcRequestSpec, send_notification, send_request};
-use self::text_edits::{
-    PositionEncoding, apply_workspace_edit, byte_offset_to_lsp_position, ensure_response_is_object,
-    parse_workspace_edit, path_to_file_uri, write_stub_cargo_toml,
+use self::{
+    jsonrpc::{JsonRpcRequestSpec, send_notification, send_request},
+    text_edits::{
+        PositionEncoding,
+        apply_workspace_edit,
+        byte_offset_to_lsp_position,
+        ensure_response_is_object,
+        parse_workspace_edit,
+        path_to_file_uri,
+        write_stub_cargo_toml,
+    },
 };
+use crate::{ByteOffset, RustAnalyzerAdapter, RustAnalyzerAdapterError, write_workspace_file};
 
 const RUST_ANALYZER_BINARY: &str = "rust-analyzer";
 const RUST_ANALYZER_BINARY_ENV: &str = "WEAVER_RUST_ANALYZER_BINARY";

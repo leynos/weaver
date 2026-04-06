@@ -1,19 +1,32 @@
 //! Tests for daemon health monitoring utilities.
 
-use std::fs as std_fs;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{
+    fs as std_fs,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 use cap_std::fs::Dir;
 use rstest::rstest;
 use tempfile::TempDir;
 use weaver_config::RuntimePaths;
 
-use crate::lifecycle::LifecycleError;
-use crate::lifecycle::monitoring::{
-    DaemonStatus, HealthCheckOutcome, HealthSnapshot, ProcessMonitorContext, check_health_snapshot,
-    read_pid, snapshot_is_recent, snapshot_matches_process, wait_for_ready,
+use crate::{
+    lifecycle::{
+        LifecycleError,
+        monitoring::{
+            DaemonStatus,
+            HealthCheckOutcome,
+            HealthSnapshot,
+            ProcessMonitorContext,
+            check_health_snapshot,
+            read_pid,
+            snapshot_is_recent,
+            snapshot_matches_process,
+            wait_for_ready,
+        },
+    },
+    tests::support::{temp_paths, write_health_snapshot},
 };
-use crate::tests::support::{temp_paths, write_health_snapshot};
 
 /// Opens a `Dir` handle for tests using ambient authority.
 fn open_test_dir(paths: &RuntimePaths) -> Dir {

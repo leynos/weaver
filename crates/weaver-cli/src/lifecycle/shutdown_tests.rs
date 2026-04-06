@@ -1,16 +1,15 @@
 //! Tests for daemon shutdown utilities.
 
-use std::fs;
-use std::net::TcpListener;
-use std::thread;
-use std::time::Duration;
+use std::{fs, net::TcpListener, thread, time::Duration};
 
 use rstest::rstest;
 use tempfile::TempDir;
 use weaver_config::{Config, RuntimePaths, SocketEndpoint};
 
-use crate::lifecycle::LifecycleError;
-use crate::lifecycle::shutdown::{signal_daemon, wait_for_shutdown};
+use crate::lifecycle::{
+    LifecycleError,
+    shutdown::{signal_daemon, wait_for_shutdown},
+};
 
 #[cfg(unix)]
 #[test]
@@ -200,9 +199,7 @@ fn wait_for_shutdown_times_out_when_conditions_persist() {
 #[cfg(unix)]
 #[test]
 fn signal_daemon_succeeds_for_child_process() {
-    use std::io::ErrorKind;
-    use std::os::unix::process::ExitStatusExt;
-    use std::process::Command;
+    use std::{io::ErrorKind, os::unix::process::ExitStatusExt, process::Command};
 
     // Spawn a child process that sleeps indefinitely.
     let mut child = match Command::new("sleep").arg("60").spawn() {

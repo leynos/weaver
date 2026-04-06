@@ -4,11 +4,15 @@ mod test_support;
 
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
-use url::Url;
-
 use test_support::{
-    CacheTranscript, GetCardRequest, TestDaemon, assert_named_snapshot, fixture_uri, run_get_card,
+    CacheTranscript,
+    GetCardRequest,
+    TestDaemon,
+    assert_named_snapshot,
+    fixture_uri,
+    run_get_card,
 };
+use url::Url;
 use weaver_e2e::card_fixtures::{PYTHON_CASES, RUST_CASES};
 
 struct WorkspaceUri {

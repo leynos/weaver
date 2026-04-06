@@ -5,7 +5,11 @@
 //! strongly-typed values suitable for calling backend services.
 
 use lsp_types::{
-    GotoDefinitionParams, Position, TextDocumentIdentifier, TextDocumentPositionParams, Uri,
+    GotoDefinitionParams,
+    Position,
+    TextDocumentIdentifier,
+    TextDocumentPositionParams,
+    Uri,
 };
 use weaver_lsp_host::Language;
 
@@ -159,9 +163,7 @@ mod tests {
 
     use super::*;
 
-    fn args(items: &[&str]) -> Vec<String> {
-        items.iter().map(|s| (*s).to_string()).collect()
-    }
+    fn args(items: &[&str]) -> Vec<String> { items.iter().map(|s| (*s).to_string()).collect() }
 
     /// Asserts that parsing the given arguments fails with `InvalidArguments`
     /// and the error message contains the expected substring.

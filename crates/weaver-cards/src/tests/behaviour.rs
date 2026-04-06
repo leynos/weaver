@@ -2,6 +2,7 @@
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 use super::fixtures;
 use super::test_utils::QuotedString;
@@ -19,10 +20,9 @@ struct TestWorld {
     json_output: Option<String>,
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> TestWorld {
-    TestWorld::default()
-}
+fn world() -> TestWorld { TestWorld::default() }
 
 // ---------------------------------------------------------------------------
 // Fixture builders (delegates to shared fixtures module)
@@ -181,7 +181,7 @@ fn then_json_field_has_value(world: &mut TestWorld, key: QuotedString, value: Qu
     let (parsed, pointer) = parse_json_and_pointer(world, &key);
     let actual = parsed
         .pointer(&pointer)
-        .unwrap_or_else(|| panic!("expected JSON to contain key '{}'", key.as_str()));
+        .expect("expected JSON to contain key");
     let expected: serde_json::Value = serde_json::from_str(value.as_str())
         .unwrap_or_else(|_| serde_json::Value::String(String::from(value.as_str())));
     assert_eq!(
@@ -206,6 +206,4 @@ fn then_detail_level_is(world: &mut TestWorld, level: QuotedString) {
 // ---------------------------------------------------------------------------
 
 #[scenario(path = "tests/features/get_card_schema.feature")]
-fn get_card_schema_behaviour(world: TestWorld) {
-    drop(world);
-}
+fn get_card_schema_behaviour(world: TestWorld) { drop(world); }

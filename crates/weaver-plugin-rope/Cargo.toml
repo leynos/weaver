@@ -5,6 +5,8 @@ version.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+cap-std = { workspace = true }
+camino = { workspace = true }
 serde_json.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
@@ -16,6 +18,7 @@ rstest.workspace = true
 rstest-bdd.workspace = true
 rstest-bdd-macros.workspace = true
 weaver-plugins = { path = "../weaver-plugins", features = ["test-support"] }
+weaver-test-macros = { path = "../weaver-test-macros" }
 
 [lints]
 workspace = true

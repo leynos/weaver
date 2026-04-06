@@ -6,9 +6,8 @@
 //! Rust, Python, and TypeScript.
 
 use insta::assert_debug_snapshot;
-use weaver_syntax::{Pattern, RewriteRule, Rewriter, SupportedLanguage};
-
 use weaver_e2e::fixtures;
+use weaver_syntax::{Pattern, RewriteRule, Rewriter, SupportedLanguage};
 
 #[derive(Debug, thiserror::Error)]
 enum TestError {
@@ -98,7 +97,9 @@ macro_rules! rewrite_test {
 
 /// Macro to generate an error-checking rewrite test.
 macro_rules! rewrite_error_test {
-    ($name:ident, $source:expr, $pattern:expr, $replacement:expr, $language:expr, $expected:expr) => {
+    (
+        $name:ident, $source:expr, $pattern:expr, $replacement:expr, $language:expr, $expected:expr
+    ) => {
         #[test]
         fn $name() {
             assert_rewrite_error(

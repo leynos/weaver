@@ -55,15 +55,11 @@ impl QueryPlan {
 
     /// Returns the rule identifier.
     #[must_use]
-    pub fn rule_id(&self) -> &str {
-        &self.rule_id
-    }
+    pub fn rule_id(&self) -> &str { &self.rule_id }
 
     /// Returns the target language.
     #[must_use]
-    pub const fn language(&self) -> Language {
-        self.language
-    }
+    pub const fn language(&self) -> Language { self.language }
 }
 
 /// Compiles and executes Semgrep-compatible queries on Tree-sitter syntax
@@ -92,15 +88,11 @@ pub struct Engine {
 impl Engine {
     /// Creates a new engine with the given configuration.
     #[must_use]
-    pub const fn new(config: EngineConfig) -> Self {
-        Self { config }
-    }
+    pub const fn new(config: EngineConfig) -> Self { Self { config } }
 
     /// Returns the engine configuration.
     #[must_use]
-    pub const fn config(&self) -> &EngineConfig {
-        &self.config
-    }
+    pub const fn config(&self) -> &EngineConfig { &self.config }
 
     /// Compiles a YAML rule file into query plans.
     ///

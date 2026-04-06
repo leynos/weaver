@@ -5,18 +5,21 @@
 //! parses them into typed commands, routes them to domain handlers, and streams
 //! responses back to the client.
 
-use std::io::{self, Read};
-use std::path::PathBuf;
+use std::{
+    io::{self, Read},
+    path::PathBuf,
+};
 
 use tracing::{debug, warn};
 
+use super::{
+    backend_manager::BackendManager,
+    errors::DispatchError,
+    request::CommandRequest,
+    response::ResponseWriter,
+    router::{DISPATCH_TARGET, DomainRouter},
+};
 use crate::transport::{ConnectionHandler, ConnectionStream};
-
-use super::backend_manager::BackendManager;
-use super::errors::DispatchError;
-use super::request::CommandRequest;
-use super::response::ResponseWriter;
-use super::router::{DISPATCH_TARGET, DomainRouter};
 
 /// Maximum size of a single request line in bytes.
 /// Increased to 1 MiB to accommodate apply-patch payloads.
@@ -111,9 +114,7 @@ impl DispatchConnectionHandler {
 }
 
 impl ConnectionHandler for DispatchConnectionHandler {
-    fn handle(&self, stream: ConnectionStream) {
-        self.dispatch(stream);
-    }
+    fn handle(&self, stream: ConnectionStream) { self.dispatch(stream); }
 }
 
 /// Reads a bounded JSONL request line from the stream.
@@ -169,20 +170,23 @@ fn enforce_limit(size: usize) -> Result<(), DispatchError> {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{BufRead, BufReader, Write};
-    use std::net::{SocketAddr, TcpListener, TcpStream};
-    use std::sync::{Arc, Mutex};
-    use std::thread::{self, JoinHandle};
+    use std::{
+        io::{BufRead, BufReader, Write},
+        net::{SocketAddr, TcpListener, TcpStream},
+        sync::{Arc, Mutex},
+        thread::{self, JoinHandle},
+    };
 
     use rstest::{fixture, rstest};
     use weaver_cards::DEFAULT_CACHE_CAPACITY;
     use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
-    use crate::backends::FusionBackends;
-    use crate::dispatch::{UNKNOWN_OPERATION_TYPE, parse_stderr_json_payload};
-    use crate::semantic_provider::SemanticBackendProvider;
-
     use super::*;
+    use crate::{
+        backends::FusionBackends,
+        dispatch::{UNKNOWN_OPERATION_TYPE, parse_stderr_json_payload},
+        semantic_provider::SemanticBackendProvider,
+    };
 
     #[fixture]
     fn backend_manager() -> BackendManager {
@@ -219,9 +223,7 @@ mod tests {
         }
 
         /// Waits for the server thread to complete.
-        fn join(self) {
-            self.server_handle.join().expect("server join");
-        }
+        fn join(self) { self.server_handle.join().expect("server join"); }
     }
 
     /// Creates a TCP listener and returns the listener and its address.

@@ -2,17 +2,23 @@
 
 use std::cell::RefCell;
 
+use lsp_types::{
+    CallHierarchyIncomingCall,
+    CallHierarchyIncomingCallsParams,
+    CallHierarchyItem,
+    CallHierarchyOutgoingCall,
+    CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams,
+};
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use crate::provider::{
-    CallGraphProvider, CallHierarchyClient, LspCallGraphProvider, SourcePosition,
-};
-use crate::tests::support::{Response, incoming_call, item, outgoing_call};
-use crate::{CallGraph, GraphError};
-use lsp_types::{
-    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
-    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
+use crate::{
+    CallGraph,
+    GraphError,
+    provider::{CallGraphProvider, CallHierarchyClient, LspCallGraphProvider, SourcePosition},
+    tests::support::{Response, incoming_call, item, outgoing_call},
 };
 
 #[derive(Default)]
@@ -21,10 +27,9 @@ struct TestWorld {
     result: Option<Result<CallGraph, GraphError>>,
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> RefCell<TestWorld> {
-    RefCell::new(TestWorld::default())
-}
+fn world() -> RefCell<TestWorld> { RefCell::new(TestWorld::default()) }
 
 #[derive(Clone, Debug)]
 struct TestClient {
@@ -82,9 +87,7 @@ impl CallHierarchyClient for TestClient {
     }
 }
 
-fn strip_quotes(value: &str) -> &str {
-    value.trim_matches('"')
-}
+fn strip_quotes(value: &str) -> &str { value.trim_matches('"') }
 
 #[given("a call hierarchy client with a simple call chain")]
 fn given_simple_chain(world: &RefCell<TestWorld>) {
@@ -187,6 +190,4 @@ fn then_graph_build_fails(world: &RefCell<TestWorld>, error_kind: String) {
 }
 
 #[scenario(path = "tests/features/weaver_graph.feature")]
-fn call_graph_behaviour(world: RefCell<TestWorld>) {
-    let _ = world;
-}
+fn call_graph_behaviour(world: RefCell<TestWorld>) { let _ = world; }

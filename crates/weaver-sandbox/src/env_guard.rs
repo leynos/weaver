@@ -6,13 +6,10 @@
 //! upstream marker while still containing all mutations behind the guard's
 //! snapshot-and-restore discipline.
 
-use std::env;
-use std::ffi::OsString;
+use std::{env, ffi::OsString};
 
 #[inline]
-fn unset_env_var<K: AsRef<std::ffi::OsStr>>(key: K) {
-    unsafe { env::remove_var(key) };
-}
+fn unset_env_var<K: AsRef<std::ffi::OsStr>>(key: K) { unsafe { env::remove_var(key) }; }
 
 #[inline]
 fn set_env_var<K: AsRef<std::ffi::OsStr>, V: AsRef<std::ffi::OsStr>>(key: K, value: V) {
@@ -48,7 +45,5 @@ impl EnvGuard {
 }
 
 impl Drop for EnvGuard {
-    fn drop(&mut self) {
-        self.restore();
-    }
+    fn drop(&mut self) { self.restore(); }
 }

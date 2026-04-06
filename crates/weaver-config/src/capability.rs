@@ -3,9 +3,7 @@
 //! The module exposes helpers for parsing capability directives supplied by
 //! configuration sources and constructing normalised lookup tables for the
 //! daemon and CLI.
-use std::collections::BTreeMap;
-use std::fmt;
-use std::str::FromStr;
+use std::{collections::BTreeMap, fmt, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString};
@@ -183,9 +181,7 @@ pub fn deduplicate_directives(directives: &mut Vec<CapabilityDirective>) {
     *directives = merged.into_values().collect();
 }
 
-fn normalise_key(key: &str) -> String {
-    key.trim().to_lowercase()
-}
+fn normalise_key(key: &str) -> String { key.trim().to_lowercase() }
 
 #[cfg(test)]
 mod tests {

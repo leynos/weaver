@@ -1,13 +1,15 @@
 //! Behavioural tests for `observe get-card`.
 
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::fs;
-use std::io::{BufRead, BufReader, Write};
-use std::net::{SocketAddr, TcpStream};
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    fs,
+    io::{BufRead, BufReader, Write},
+    net::{SocketAddr, TcpStream},
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
@@ -16,10 +18,12 @@ use url::Url;
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
-use crate::backends::FusionBackends;
-use crate::dispatch::{BackendManager, DispatchConnectionHandler};
-use crate::semantic_provider::SemanticBackendProvider;
-use crate::transport::{ListenerHandle, SocketListener};
+use crate::{
+    backends::FusionBackends,
+    dispatch::{BackendManager, DispatchConnectionHandler},
+    semantic_provider::SemanticBackendProvider,
+    transport::{ListenerHandle, SocketListener},
+};
 
 #[fixture]
 fn test_handler() -> Arc<DispatchConnectionHandler> {
@@ -143,9 +147,7 @@ impl GetCardWorld {
         fs::write(path, source).expect("rewrite fixture");
     }
 
-    fn latest_stdout_contains(&self, needle: &str) -> bool {
-        self.stdout_contains(needle)
-    }
+    fn latest_stdout_contains(&self, needle: &str) -> bool { self.stdout_contains(needle) }
 
     fn responses_are_identical(&self) -> bool {
         self.previous_response_lines
@@ -190,16 +192,15 @@ fn world(test_handler: Arc<DispatchConnectionHandler>) -> RefCell<GetCardWorld> 
 }
 
 #[given("a daemon connection is established for get-card")]
-fn given_daemon_connection(world: &RefCell<GetCardWorld>) {
-    world.borrow_mut().start_listener();
-}
+fn given_daemon_connection(world: &RefCell<GetCardWorld>) { world.borrow_mut().start_listener(); }
 
 #[given("a supported Rust source fixture")]
 fn given_supported_rust_fixture(world: &RefCell<GetCardWorld>) {
     world.borrow_mut().write_fixture(
         "rust",
         "card.rs",
-        "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = name.len();\n    count\n}\n",
+        "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = name.len();\n    \
+         count\n}\n",
     );
 }
 
@@ -318,6 +319,4 @@ fn then_latest_response_differs(world: &RefCell<GetCardWorld>) {
 }
 
 #[scenario(path = "tests/features/get_card.feature")]
-fn get_card_behaviour(#[from(world)] world: RefCell<GetCardWorld>) {
-    drop(world);
-}
+fn get_card_behaviour(#[from(world)] world: RefCell<GetCardWorld>) { drop(world); }

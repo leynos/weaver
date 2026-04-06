@@ -4,8 +4,7 @@
 //! can inspect the failure programmatically. I/O errors are wrapped in `Arc`
 //! to satisfy the `result_large_err` Clippy lint.
 
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use thiserror::Error;
 
