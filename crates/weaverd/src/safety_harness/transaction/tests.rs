@@ -99,7 +99,7 @@ impl TransactionTestBuilder {
 
     /// Creates a file with the given content and adds it to the tracked files.
     fn with_file(mut self, name: &str, content: &str) -> Self {
-        let path = temp_file(&self.dir, name, content);
+        let path = temp_file(&self.dir, name, content).expect("temp file");
         self.files.push((path, content.to_string()));
         self
     }
@@ -265,8 +265,8 @@ fn handles_new_file_creation() {
 #[test]
 fn handles_multiple_files() {
     let dir = TempDir::new().expect("create temp dir");
-    let path1 = temp_file(&dir, "file1.txt", "aaa");
-    let path2 = temp_file(&dir, "file2.txt", "bbb");
+    let path1 = temp_file(&dir, "file1.txt", "aaa").expect("temp file");
+    let path2 = temp_file(&dir, "file2.txt", "bbb").expect("temp file");
 
     let edit1 = FileEdit::with_edits(
         path1.clone(),
