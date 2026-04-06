@@ -32,8 +32,8 @@ fn build_content_transaction<'a>(
 #[test]
 fn content_transaction_commits_writes_and_deletes() {
     let dir = TempDir::new().expect("temp dir");
-    let keep_path = temp_file(&dir, "keep.txt", "hello");
-    let delete_path = temp_file(&dir, "delete.txt", "goodbye");
+    let keep_path = temp_file(&dir, "keep.txt", "hello").expect("temp file");
+    let delete_path = temp_file(&dir, "delete.txt", "goodbye").expect("temp file");
 
     let syntactic = ConfigurableSyntacticLock::passing();
     let semantic = ConfigurableSemanticLock::passing();
@@ -60,8 +60,8 @@ fn content_transaction_commits_writes_and_deletes() {
 #[case::semantic(LockFailureKind::Semantic, "type error")]
 fn content_transaction_rejects_lock_failure(#[case] kind: LockFailureKind, #[case] message: &str) {
     let dir = TempDir::new().expect("temp dir");
-    let keep_path = temp_file(&dir, "keep.txt", "hello");
-    let delete_path = temp_file(&dir, "delete.txt", "goodbye");
+    let keep_path = temp_file(&dir, "keep.txt", "hello").expect("temp file");
+    let delete_path = temp_file(&dir, "delete.txt", "goodbye").expect("temp file");
     let failure = VerificationFailure::new(keep_path.clone(), message);
 
     let (syntactic, semantic) = match kind {
