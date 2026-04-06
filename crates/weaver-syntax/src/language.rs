@@ -133,6 +133,8 @@ impl FromStr for SupportedLanguage {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for language detection and supported language mappings.
+
     use rstest::rstest;
 
     use super::*;

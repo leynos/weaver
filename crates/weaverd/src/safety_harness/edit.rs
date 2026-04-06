@@ -158,6 +158,8 @@ impl FileEdit {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for text edit operations and positioning.
+
     use super::*;
 
     #[test]

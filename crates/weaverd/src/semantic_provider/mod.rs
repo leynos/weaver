@@ -210,6 +210,8 @@ impl BackendProvider for SemanticBackendProvider {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for semantic provider configuration and backend provider.
+
     use rstest::{fixture, rstest};
     use weaver_config::SocketEndpoint;
 

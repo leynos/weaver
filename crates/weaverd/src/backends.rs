@@ -168,6 +168,8 @@ impl<P> FusionBackends<P> {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for backend orchestration and lifecycle management.
+
     use std::sync::{Arc, Mutex};
 
     use rstest::{fixture, rstest};

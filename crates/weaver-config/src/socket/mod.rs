@@ -118,6 +118,8 @@ pub enum SocketParseError {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for socket endpoint parsing and display.
+
     use super::*;
 
     #[test]

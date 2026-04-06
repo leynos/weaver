@@ -18,5 +18,7 @@ pub(crate) const FOREGROUND_ENV_VAR: &str = "WEAVER_FOREGROUND";
 
 #[cfg(test)]
 pub(crate) mod test_support {
+    //! Test support re-exports for process module tests.
+
     pub use super::guard::test_support::*;
 }

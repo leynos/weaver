@@ -329,6 +329,8 @@ impl RecordingState {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for the recording server test double.
+
     use lsp_types::{
         HoverContents,
         MarkupContent,

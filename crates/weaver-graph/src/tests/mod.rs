@@ -11,6 +11,8 @@
     reason = "closures needed for &&T to &T conversion in first().map()"
 )]
 
+//! Tests for graph operations including nodes, edges, and traversals.
+
 mod graph_tests {
     use crate::{
         edge::{CallEdge, EdgeSource},
@@ -115,6 +117,8 @@ mod graph_tests {
     }
 }
 
+//! Tests for node creation and accessor methods.
+
 mod node_tests {
     use camino::Utf8PathBuf;
 
@@ -145,6 +149,8 @@ mod node_tests {
         assert!(node.container().is_none());
     }
 }
+
+//! Tests for edge creation and relationship tracking.
 
 mod edge_tests {
     use camino::Utf8PathBuf;

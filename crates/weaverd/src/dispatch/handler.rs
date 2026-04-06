@@ -170,6 +170,8 @@ fn enforce_limit(size: usize) -> Result<(), DispatchError> {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for command dispatch and request handling.
+
     use std::{
         io::{BufRead, BufReader, Write},
         net::{SocketAddr, TcpListener, TcpStream},

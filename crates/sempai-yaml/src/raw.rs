@@ -84,7 +84,7 @@ pub(crate) struct RawLegacyFormulaObject {
     pub(crate) pattern_regex: Option<String>,
     pub(crate) patterns: Option<Vec<RawLegacyClause>>,
     #[serde(rename = "pattern-either")]
-    pub(crate) pattern_either: Option<Vec<RawLegacyFormulaObject>>,
+    pub(crate) pattern_either: Option<Vec<Self>>,
     #[serde(rename = "pattern-not")]
     pub(crate) pattern_not: Option<RawLegacyValue>,
     #[serde(rename = "pattern-inside")]

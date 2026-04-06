@@ -112,6 +112,8 @@ pub fn parse_line_range(range: &str) -> Result<(LineCol, LineCol), RangeParseErr
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for test support utilities like QuotedString parsing.
+
     use super::*;
 
     #[test]

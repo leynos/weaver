@@ -246,6 +246,8 @@ fn supports_hover(capability: &Option<HoverProviderCapability>) -> bool {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for LSP capability detection and trait implementations.
+
     use lsp_types::{HoverOptions, WorkDoneProgressOptions};
 
     use super::*;

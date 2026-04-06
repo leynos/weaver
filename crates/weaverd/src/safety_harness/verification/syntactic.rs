@@ -102,6 +102,8 @@ fn convert_failure(f: weaver_syntax::ValidationFailure) -> VerificationFailure {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for Tree-sitter syntactic lock verification.
+
     use std::path::PathBuf;
 
     use rstest::{fixture, rstest};
