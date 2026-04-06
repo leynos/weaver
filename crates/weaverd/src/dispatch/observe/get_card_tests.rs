@@ -202,7 +202,9 @@ fn handle_returns_success_for_supported_rust_symbol(
 }
 
 #[rstest]
-fn handle_returns_semantic_success_with_enrichment_and_rewritten_provenance(temp_dir: TempDir) {
+fn handle_returns_semantic_success_with_enrichment_and_rewritten_provenance(
+    temp_dir: TempDir,
+) -> Result<(), String> {
     let path = write_source(
         &temp_dir,
         SourceFile {
@@ -220,7 +222,7 @@ fn handle_returns_semantic_success_with_enrichment_and_rewritten_provenance(temp
             "**Deprecated**: use `welcome` instead"
         )),
     );
-    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
+    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server)?;
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
 
@@ -239,12 +241,13 @@ fn handle_returns_semantic_success_with_enrichment_and_rewritten_provenance(temp
         payload["card"]["provenance"]["sources"],
         serde_json::json!(["tree_sitter", "lsp_hover"])
     );
+    Ok(())
 }
 
 #[rstest]
 fn handle_returns_semantic_success_with_degraded_provenance_when_hover_is_unavailable(
     temp_dir: TempDir,
-) {
+) -> Result<(), String> {
     let path = write_source(
         &temp_dir,
         SourceFile {
@@ -257,7 +260,7 @@ fn handle_returns_semantic_success_with_degraded_provenance_when_hover_is_unavai
     let request = make_request(&uri, 2, 4, DetailLevel::Semantic);
     let (server, _hover_params) =
         StubLanguageServer::missing_hover(ServerCapabilitySet::new(false, false, false));
-    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
+    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server)?;
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
 
@@ -271,6 +274,7 @@ fn handle_returns_semantic_success_with_degraded_provenance_when_hover_is_unavai
         payload["card"]["provenance"]["sources"],
         serde_json::json!(["tree_sitter", "tree_sitter_degraded_semantic"])
     );
+    Ok(())
 }
 
 #[rstest]
