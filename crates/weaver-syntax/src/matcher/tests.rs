@@ -51,9 +51,9 @@ fn extract_multiple_capture<'a>(
 ) -> &'a CapturedNodes<'a> {
     match_result
         .capture(var_name)
-        .unwrap_or_else(|| panic!("should capture {var_name}"))
+        .expect(&format!("should capture {var_name}"))
         .as_multiple()
-        .unwrap_or_else(|| panic!("{var_name} should be multiple"))
+        .expect(&format!("{var_name} should be multiple"))
 }
 
 #[rstest]
