@@ -74,7 +74,7 @@ fn assert_diagnostic_code(
     result_name: &str,
     failure_kind: &str,
 ) {
-    let inner = result.unwrap_or_else(|| panic!("{result_name} should be set"));
+    let inner = result.expect(&format!("{result_name} should be set"));
     let report = inner
         .as_ref()
         .expect_err(&format!("expected {failure_kind}"));
