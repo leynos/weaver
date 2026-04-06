@@ -67,7 +67,11 @@ impl RefactorPluginRuntime for InspectingRuntime {
         _provider: &str,
         request: &PluginRequest,
     ) -> Result<PluginResponse, PluginError> {
-        *self.captured.lock().expect("lock") = Some(request.clone());
+        let mut guard = self.captured.lock().map_err(|_| PluginError::NotFound {
+            name: String::from("lock"),
+        })?;
+        *guard = Some(request.clone());
+        drop(guard);
         Ok(self.response.clone())
     }
 }
@@ -83,7 +87,9 @@ const NOTES_DIFF: &str = concat!(
 
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn socket_dir() -> TempDir { TempDir::new().expect("socket dir") }
+fn socket_dir() -> TempDir {
+    TempDir::new().expect("socket dir")
+}
 
 struct RenameDispatch<'a> {
     file: &'a str,
@@ -95,9 +101,10 @@ struct RenameDispatch<'a> {
 
 /// Dispatches a rename request through the handler and returns the captured
 /// `PluginRequest` for inspection.
-fn dispatch_inspecting_rename(config: RenameDispatch<'_>) -> PluginRequest {
-    let workspace = TempDir::new().expect("workspace");
-    std::fs::write(workspace.path().join(config.file), "hello world\n").expect("write");
+fn dispatch_inspecting_rename(config: RenameDispatch<'_>) -> Result<PluginRequest, String> {
+    let workspace = TempDir::new().map_err(|e| format!("workspace: {e}"))?;
+    std::fs::write(workspace.path().join(config.file), "hello world\n")
+        .map_err(|e| format!("write: {e}"))?;
     let runtime = InspectingRuntime {
         captured: Mutex::new(None),
         response: PluginResponse::success(PluginOutput::Diff {
@@ -127,23 +134,26 @@ fn dispatch_inspecting_rename(config: RenameDispatch<'_>) -> PluginRequest {
             runtime: &runtime,
         },
     )
-    .expect("dispatch result");
-    runtime
+    .map_err(|e| format!("dispatch result: {e}"))?;
+    let captured = runtime
         .captured
         .into_inner()
-        .expect("lock")
-        .expect("request should be captured")
+        .map_err(|_| "lock poisoned")?
+        .ok_or("request should be captured")?;
+    Ok(captured)
 }
 
 #[rstest]
-fn handler_sends_rename_symbol_contract_conforming_request(socket_dir: TempDir) {
+fn handler_sends_rename_symbol_contract_conforming_request(
+    socket_dir: TempDir,
+) -> Result<(), String> {
     let plugin_request = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.py",
         provider: "rope",
         language: "python",
         extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
         socket_dir: &socket_dir,
-    });
+    })?;
 
     assert_eq!(plugin_request.operation(), "rename-symbol");
     let args = plugin_request.arguments();
@@ -160,10 +170,13 @@ fn handler_sends_rename_symbol_contract_conforming_request(socket_dir: TempDir) 
         args.get("new_name").and_then(|value| value.as_str()),
         Some("woven")
     );
+    Ok(())
 }
 
 #[rstest]
-fn handler_overwrites_pre_existing_uri_with_file_path(socket_dir: TempDir) {
+fn handler_overwrites_pre_existing_uri_with_file_path(
+    socket_dir: TempDir,
+) -> Result<(), String> {
     let plugin_request = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.py",
         provider: "rope",
@@ -174,7 +187,7 @@ fn handler_overwrites_pre_existing_uri_with_file_path(socket_dir: TempDir) {
             String::from("new_name=woven"),
         ],
         socket_dir: &socket_dir,
-    });
+    })?;
 
     assert_eq!(
         plugin_request
@@ -183,30 +196,34 @@ fn handler_overwrites_pre_existing_uri_with_file_path(socket_dir: TempDir) {
             .and_then(|value| value.as_str()),
         Some("file:///notes.py"),
     );
+    Ok(())
 }
 
 #[rstest]
-fn handler_omits_position_when_offset_not_provided(socket_dir: TempDir) {
+fn handler_omits_position_when_offset_not_provided(socket_dir: TempDir) -> Result<(), String> {
     let plugin_request = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.py",
         provider: "rope",
         language: "python",
         extra_args: vec![String::from("new_name=woven")],
         socket_dir: &socket_dir,
-    });
+    })?;
 
     assert!(!plugin_request.arguments().contains_key("position"));
+    Ok(())
 }
 
 #[rstest]
-fn rust_analyzer_provider_uses_rename_symbol_contract(socket_dir: TempDir) {
+fn rust_analyzer_provider_uses_rename_symbol_contract(
+    socket_dir: TempDir,
+) -> Result<(), String> {
     let plugin_request = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.rs",
         provider: "rust-analyzer",
         language: "rust",
         extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
         socket_dir: &socket_dir,
-    });
+    })?;
 
     assert_eq!(plugin_request.operation(), "rename-symbol");
     assert_eq!(
@@ -223,6 +240,7 @@ fn rust_analyzer_provider_uses_rename_symbol_contract(socket_dir: TempDir) {
             .and_then(|value| value.as_str()),
         Some("4"),
     );
+    Ok(())
 }
 
 #[test]
