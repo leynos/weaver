@@ -68,7 +68,9 @@ impl ProcessGuard {
             source,
         })?;
         #[cfg(test)]
-        record_health_event(path, snapshot.status);
+        {
+            let _ = record_health_event(path, snapshot.status);
+        }
         info!(
             target: PROCESS_TARGET,
             status = snapshot.status,
@@ -312,7 +314,7 @@ mod tests {
 
     /// Acquires a guard, records the provided health state, and returns the guard for assertions.
     fn setup_guard_with_health(paths: &RuntimePaths, state: HealthState) -> ProcessGuard {
-        test_support::clear_health_events(paths.health_path());
+        let _ = test_support::clear_health_events(paths.health_path());
         let mut guard = ProcessGuard::acquire(paths.clone()).expect("lock should be acquired");
         let pid = std::process::id();
         guard.write_pid(pid).expect("pid write should succeed");
