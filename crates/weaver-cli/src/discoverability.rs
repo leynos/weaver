@@ -42,12 +42,11 @@ impl KnownDomain {
             })
     }
 
-    fn operations(self) -> &'static [&'static str] {
+    fn operations(self) -> Option<&'static [&'static str]> {
         DOMAIN_OPERATIONS
             .iter()
             .find(|(name, ..)| *name == self.as_str())
             .map(|(_, _, ops)| *ops)
-            .unwrap_or_else(|| panic!("missing DOMAIN_OPERATIONS entry for '{}'", self.as_str()))
     }
 
     fn catalogue_order() -> impl Iterator<Item = Self> {
@@ -91,7 +90,7 @@ pub const DOMAIN_OPERATIONS: &[(&str, &str, &[&str])] = &[
 ];
 
 /// Returns the canonical operation list for a known domain.
-pub(crate) fn operations_for_domain(domain: KnownDomain) -> &'static [&'static str] {
+pub(crate) fn operations_for_domain(domain: KnownDomain) -> Option<&'static [&'static str]> {
     domain.operations()
 }
 
@@ -182,7 +181,9 @@ pub(crate) fn write_missing_operation_guidance<W: Write>(
     localizer: &dyn Localizer,
     domain: KnownDomain,
 ) -> io::Result<bool> {
-    let operations = operations_for_domain(domain);
+    let Some(operations) = operations_for_domain(domain) else {
+        return Ok(false);
+    };
     let Some(hint_operation) = operations.first() else {
         return Ok(false);
     };
