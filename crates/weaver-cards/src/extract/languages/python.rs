@@ -2,13 +2,18 @@
 
 use tree_sitter::Node;
 
-use crate::CardSymbolKind;
-
-use super::EntityCandidate;
-use super::common::{
-    CallableMetadata, callable_candidate, decorator_texts, name_text, python_docstring,
-    simple_candidate,
+use super::{
+    EntityCandidate,
+    common::{
+        CallableMetadata,
+        callable_candidate,
+        decorator_texts,
+        name_text,
+        python_docstring,
+        simple_candidate,
+    },
 };
+use crate::CardSymbolKind;
 
 #[derive(Clone, Copy)]
 struct ClassMetadata<'a> {

@@ -39,15 +39,11 @@ impl RuleFile {
         clippy::missing_const_for_fn,
         reason = "Vec requires heap allocation and cannot be used in const contexts"
     )]
-    pub fn new(rules: Vec<Rule>) -> Self {
-        Self { rules }
-    }
+    pub fn new(rules: Vec<Rule>) -> Self { Self { rules } }
 
     /// Returns the parsed rules.
     #[must_use]
-    pub fn rules(&self) -> &[Rule] {
-        &self.rules
-    }
+    pub fn rules(&self) -> &[Rule] { &self.rules }
 }
 
 /// A parsed Semgrep-compatible rule.
@@ -68,63 +64,43 @@ pub struct Rule {
 impl Rule {
     /// Returns the stable rule identifier.
     #[must_use]
-    pub fn id(&self) -> &str {
-        &self.id
-    }
+    pub fn id(&self) -> &str { &self.id }
 
     /// Returns the coarse span of the full rule object when known.
     #[must_use]
-    pub const fn rule_span(&self) -> Option<&SourceSpan> {
-        self.span.as_ref()
-    }
+    pub const fn rule_span(&self) -> Option<&SourceSpan> { self.span.as_ref() }
 
     /// Returns the parsed rule mode.
     #[must_use]
-    pub const fn mode(&self) -> &RuleMode {
-        &self.mode
-    }
+    pub const fn mode(&self) -> &RuleMode { &self.mode }
 
     /// Returns the source span of the `mode` field when known.
     #[must_use]
-    pub const fn mode_span(&self) -> Option<&SourceSpan> {
-        self.mode_span.as_ref()
-    }
+    pub const fn mode_span(&self) -> Option<&SourceSpan> { self.mode_span.as_ref() }
 
     /// Returns the user-facing rule message when present.
     #[must_use]
-    pub fn message(&self) -> Option<&str> {
-        self.message.as_deref()
-    }
+    pub fn message(&self) -> Option<&str> { self.message.as_deref() }
 
     /// Returns the declared host languages.
     #[must_use]
-    pub fn languages(&self) -> &[String] {
-        &self.languages
-    }
+    pub fn languages(&self) -> &[String] { &self.languages }
 
     /// Returns the declared severity when present.
     #[must_use]
-    pub const fn severity(&self) -> Option<&RuleSeverity> {
-        self.severity.as_ref()
-    }
+    pub const fn severity(&self) -> Option<&RuleSeverity> { self.severity.as_ref() }
 
     /// Returns the minimum Semgrep version constraint when present.
     #[must_use]
-    pub fn min_version(&self) -> Option<&str> {
-        self.min_version.as_deref()
-    }
+    pub fn min_version(&self) -> Option<&str> { self.min_version.as_deref() }
 
     /// Returns the maximum Semgrep version constraint when present.
     #[must_use]
-    pub fn max_version(&self) -> Option<&str> {
-        self.max_version.as_deref()
-    }
+    pub fn max_version(&self) -> Option<&str> { self.max_version.as_deref() }
 
     /// Returns the parsed query principal.
     #[must_use]
-    pub const fn principal(&self) -> &RulePrincipal {
-        &self.principal
-    }
+    pub const fn principal(&self) -> &RulePrincipal { &self.principal }
 }
 
 /// Parsed Semgrep rule modes.
@@ -245,21 +221,15 @@ pub struct ExtractQueryPrincipal {
 impl ExtractQueryPrincipal {
     /// Returns the extracted destination language.
     #[must_use]
-    pub fn dest_language(&self) -> &str {
-        &self.dest_language
-    }
+    pub fn dest_language(&self) -> &str { &self.dest_language }
 
     /// Returns the extraction template.
     #[must_use]
-    pub fn extract(&self) -> &str {
-        &self.extract
-    }
+    pub fn extract(&self) -> &str { &self.extract }
 
     /// Returns the legacy search principal used to locate the extraction input.
     #[must_use]
-    pub const fn query(&self) -> &LegacyFormula {
-        &self.query
-    }
+    pub const fn query(&self) -> &LegacyFormula { &self.query }
 }
 
 /// Taint rule principal retained for later normalization.

@@ -14,14 +14,10 @@ pub(crate) struct RenameSymbolArgs {
 
 impl RenameSymbolArgs {
     /// Returns the byte offset parsed from the `position` field.
-    pub(crate) const fn offset(&self) -> usize {
-        self.offset
-    }
+    pub(crate) const fn offset(&self) -> usize { self.offset }
 
     /// Returns the new symbol name.
-    pub(crate) fn new_name(&self) -> &str {
-        &self.new_name
-    }
+    pub(crate) fn new_name(&self) -> &str { &self.new_name }
 }
 
 /// Parses and validates rename-symbol arguments from the request map.

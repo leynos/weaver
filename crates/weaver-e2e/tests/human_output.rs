@@ -5,10 +5,11 @@ use std::path::Path;
 use lsp_types::{GotoDefinitionResponse, Location, Uri};
 use tempfile::TempDir;
 use url::Url;
-
 use weaver_cli::{OutputContext, render_human_output};
-use weaver_e2e::fixtures;
-use weaver_e2e::lsp_client::{LspClient, LspClientError};
+use weaver_e2e::{
+    fixtures,
+    lsp_client::{LspClient, LspClientError},
+};
 
 /// Test error type for human output rendering.
 #[derive(Debug, thiserror::Error)]

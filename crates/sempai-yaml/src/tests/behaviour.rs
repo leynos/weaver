@@ -3,6 +3,7 @@
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use sempai_core::{DiagnosticCode, DiagnosticReport, test_support::QuotedString};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 use crate::parse_rule_file;
 
@@ -12,10 +13,9 @@ struct TestWorld {
     parse_result: Option<Result<usize, DiagnosticReport>>,
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> TestWorld {
-    TestWorld::default()
-}
+fn world() -> TestWorld { TestWorld::default() }
 
 #[given("YAML {yaml}")]
 fn given_yaml(world: &mut TestWorld, yaml: QuotedString) {
@@ -55,6 +55,4 @@ fn then_parse_fails(world: &mut TestWorld, code: QuotedString) {
 }
 
 #[scenario(path = "tests/features/sempai_yaml.feature")]
-fn sempai_yaml_behaviour(world: TestWorld) {
-    let _ = world;
-}
+fn sempai_yaml_behaviour(world: TestWorld) { let _ = world; }

@@ -1,7 +1,6 @@
 //! Supported languages for the LSP host.
 
-use std::fmt;
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 use thiserror::Error;
 
@@ -42,9 +41,7 @@ pub struct LanguageParseError(String);
 impl LanguageParseError {
     /// Returns the input that failed to parse.
     #[must_use]
-    pub fn input(&self) -> &str {
-        self.0.as_str()
-    }
+    pub fn input(&self) -> &str { self.0.as_str() }
 }
 
 impl FromStr for Language {

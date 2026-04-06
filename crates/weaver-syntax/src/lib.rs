@@ -2,12 +2,10 @@
 //!
 //! This crate provides structural code analysis capabilities including:
 //!
-//! - **Syntactic validation** via [`TreeSitterSyntacticLock`] for the Double-Lock
-//!   safety harness
-//! - **Pattern matching** via [`Pattern`] for structural code search (powers
-//!   `observe grep`)
-//! - **Code rewriting** via [`Rewriter`] for structural transformations (powers
-//!   `act apply-rewrite`)
+//! - **Syntactic validation** via [`TreeSitterSyntacticLock`] for the Double-Lock safety harness
+//! - **Pattern matching** via [`Pattern`] for structural code search (powers `observe grep`)
+//! - **Code rewriting** via [`Rewriter`] for structural transformations (powers `act
+//!   apply-rewrite`)
 //!
 //! # Supported Languages
 //!
@@ -28,7 +26,7 @@
 //! # Example: Pattern Matching
 //!
 //! ```
-//! use weaver_syntax::{Pattern, Parser, SupportedLanguage};
+//! use weaver_syntax::{Parser, Pattern, SupportedLanguage};
 //!
 //! // Parse some Rust code
 //! let mut parser = Parser::new(SupportedLanguage::Rust)?;
@@ -52,22 +50,17 @@
 //!
 //! ```
 //! use std::path::Path;
+//!
 //! use weaver_syntax::TreeSitterSyntacticLock;
 //!
 //! let lock = TreeSitterSyntacticLock::new();
 //!
 //! // Validate valid code
-//! let failures = lock.validate_file(
-//!     Path::new("main.rs"),
-//!     "fn main() {}"
-//! )?;
+//! let failures = lock.validate_file(Path::new("main.rs"), "fn main() {}")?;
 //! assert!(failures.is_empty());
 //!
 //! // Validate invalid code
-//! let failures = lock.validate_file(
-//!     Path::new("broken.rs"),
-//!     "fn broken() {"
-//! )?;
+//! let failures = lock.validate_file(Path::new("broken.rs"), "fn broken() {")?;
 //! assert!(!failures.is_empty());
 //! # Ok::<(), weaver_syntax::SyntaxError>(())
 //! ```

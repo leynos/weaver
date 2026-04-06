@@ -5,8 +5,7 @@
 //! complementary identities:
 //!
 //! - A [`SymbolRef`] anchored to a source location (file, range, language).
-//! - A [`SymbolId`] derived from content for version-scoped caching and
-//!   matching.
+//! - A [`SymbolId`] derived from content for version-scoped caching and matching.
 //!
 //! Together, these form a [`SymbolIdentity`] that the rest of the card
 //! pipeline uses to look up, cache, and compare symbols across commits.
@@ -23,7 +22,10 @@ use serde::{Deserialize, Serialize};
 /// ```
 /// use weaver_cards::SourcePosition;
 ///
-/// let pos = SourcePosition { line: 10, column: 0 };
+/// let pos = SourcePosition {
+///     line: 10,
+///     column: 0,
+/// };
 /// assert_eq!(pos.line, 10);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -42,8 +44,14 @@ pub struct SourcePosition {
 /// use weaver_cards::{SourcePosition, SourceRange};
 ///
 /// let range = SourceRange {
-///     start: SourcePosition { line: 10, column: 0 },
-///     end: SourcePosition { line: 42, column: 1 },
+///     start: SourcePosition {
+///         line: 10,
+///         column: 0,
+///     },
+///     end: SourcePosition {
+///         line: 42,
+///         column: 1,
+///     },
 /// };
 /// assert_eq!(range.start.line, 10);
 /// ```
@@ -105,15 +113,19 @@ pub enum CardLanguage {
 /// # Example
 ///
 /// ```
-/// use weaver_cards::{
-///     CardLanguage, CardSymbolKind, SourcePosition, SourceRange, SymbolRef,
-/// };
+/// use weaver_cards::{CardLanguage, CardSymbolKind, SourcePosition, SourceRange, SymbolRef};
 ///
 /// let sym_ref = SymbolRef {
 ///     uri: String::from("file:///src/main.rs"),
 ///     range: SourceRange {
-///         start: SourcePosition { line: 10, column: 0 },
-///         end: SourcePosition { line: 42, column: 1 },
+///         start: SourcePosition {
+///             line: 10,
+///             column: 0,
+///         },
+///         end: SourcePosition {
+///             line: 42,
+///             column: 1,
+///         },
 ///     },
 ///     language: CardLanguage::Rust,
 ///     kind: CardSymbolKind::Function,
@@ -169,8 +181,12 @@ pub struct SymbolId {
 ///
 /// ```
 /// use weaver_cards::{
-///     CardLanguage, CardSymbolKind, SourcePosition, SourceRange,
-///     SymbolIdentity, SymbolRef,
+///     CardLanguage,
+///     CardSymbolKind,
+///     SourcePosition,
+///     SourceRange,
+///     SymbolIdentity,
+///     SymbolRef,
 /// };
 ///
 /// let identity = SymbolIdentity {
@@ -178,8 +194,14 @@ pub struct SymbolId {
 ///     symbol_ref: SymbolRef {
 ///         uri: String::from("file:///src/main.rs"),
 ///         range: SourceRange {
-///             start: SourcePosition { line: 10, column: 0 },
-///             end: SourcePosition { line: 42, column: 1 },
+///             start: SourcePosition {
+///                 line: 10,
+///                 column: 0,
+///             },
+///             end: SourcePosition {
+///                 line: 42,
+///                 column: 1,
+///             },
 ///         },
 ///         language: CardLanguage::Rust,
 ///         kind: CardSymbolKind::Function,

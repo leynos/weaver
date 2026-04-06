@@ -4,9 +4,7 @@ use std::io::{self, IsTerminal};
 
 use once_cell::sync::OnceCell;
 use tracing::{Subscriber, subscriber::SetGlobalDefaultError};
-use tracing_subscriber::EnvFilter;
-use tracing_subscriber::fmt;
-
+use tracing_subscriber::{EnvFilter, fmt};
 use weaver_config::{Config, LogFormat};
 
 static TELEMETRY_GUARD: OnceCell<()> = OnceCell::new();

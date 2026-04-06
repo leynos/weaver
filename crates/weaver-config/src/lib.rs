@@ -30,19 +30,24 @@ mod runtime;
 mod socket;
 
 use capability::deduplicate_directives;
-use ortho_config::OrthoConfig;
-use serde::{Deserialize, Serialize};
-
 pub use capability::{
-    CapabilityDirective, CapabilityDirectiveParseError, CapabilityMatrix, CapabilityOverride,
+    CapabilityDirective,
+    CapabilityDirectiveParseError,
+    CapabilityMatrix,
+    CapabilityOverride,
     LanguageCapabilities,
 };
 pub use defaults::{
-    DEFAULT_LOG_FILTER, DEFAULT_TCP_PORT, default_log_filter, default_log_format,
+    DEFAULT_LOG_FILTER,
+    DEFAULT_TCP_PORT,
+    default_log_filter,
+    default_log_format,
     default_socket_endpoint,
 };
 pub use logging::{LogFormat, LogFormatParseError};
+use ortho_config::OrthoConfig;
 pub use runtime::{RuntimePaths, RuntimePathsError};
+use serde::{Deserialize, Serialize};
 pub use socket::{SocketEndpoint, SocketParseError, SocketPreparationError};
 
 /// Complete configuration merged from defaults, files, environment, and CLI.
@@ -117,21 +122,15 @@ impl Config {
 
     /// Accessor for the configured daemon socket.
     #[must_use]
-    pub fn daemon_socket(&self) -> &SocketEndpoint {
-        &self.daemon_socket
-    }
+    pub fn daemon_socket(&self) -> &SocketEndpoint { &self.daemon_socket }
 
     /// Accessor for the logging filter expression.
     #[must_use]
-    pub fn log_filter(&self) -> &str {
-        self.log_filter.as_str()
-    }
+    pub fn log_filter(&self) -> &str { self.log_filter.as_str() }
 
     /// Accessor for the logging format.
     #[must_use]
-    pub fn log_format(&self) -> LogFormat {
-        self.log_format
-    }
+    pub fn log_format(&self) -> LogFormat { self.log_format }
 
     /// Builds a [`CapabilityMatrix`] from the configured directives.
     #[must_use]

@@ -8,8 +8,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::capture::CaptureValue;
-use crate::span::Span;
+use crate::{capture::CaptureValue, span::Span};
 
 /// A match result produced by query execution.
 ///
@@ -17,6 +16,7 @@ use crate::span::Span;
 ///
 /// ```
 /// use std::collections::BTreeMap;
+///
 /// use sempai_core::{LineCol, Match, Span};
 ///
 /// let span = Span::new(12, 42, LineCol::new(2, 0), LineCol::new(4, 0));
@@ -70,31 +70,21 @@ impl Match {
 
     /// Returns the rule identifier.
     #[must_use]
-    pub fn rule_id(&self) -> &str {
-        &self.rule_id
-    }
+    pub fn rule_id(&self) -> &str { &self.rule_id }
 
     /// Returns the source file URI.
     #[must_use]
-    pub fn uri(&self) -> &str {
-        &self.uri
-    }
+    pub fn uri(&self) -> &str { &self.uri }
 
     /// Returns the match span.
     #[must_use]
-    pub const fn span(&self) -> &Span {
-        &self.span
-    }
+    pub const fn span(&self) -> &Span { &self.span }
 
     /// Returns the focus span, if any.
     #[must_use]
-    pub const fn focus(&self) -> Option<&Span> {
-        self.focus.as_ref()
-    }
+    pub const fn focus(&self) -> Option<&Span> { self.focus.as_ref() }
 
     /// Returns the capture bindings.
     #[must_use]
-    pub const fn captures(&self) -> &BTreeMap<String, CaptureValue> {
-        &self.captures
-    }
+    pub const fn captures(&self) -> &BTreeMap<String, CaptureValue> { &self.captures }
 }

@@ -4,11 +4,13 @@ use std::sync::Arc;
 
 use rstest::rstest;
 
-use crate::{BackendKind, bootstrap_with};
-
 use super::support::{
-    HealthEvent, RecordingBackendProvider, RecordingHealthReporter, TestConfigLoader,
+    HealthEvent,
+    RecordingBackendProvider,
+    RecordingHealthReporter,
+    TestConfigLoader,
 };
+use crate::{BackendKind, bootstrap_with};
 
 #[rstest]
 fn bootstrap_does_not_eagerly_start_backends() {

@@ -1,10 +1,10 @@
 //! Unit tests for YAML taint rule parsing.
 
-use crate::{RuleMode, RulePrincipal, TaintQueryPrincipal};
 use rstest::rstest;
 use sempai_core::DiagnosticCode;
 
 use super::test_helpers::{check_first_rule, first_err_diagnostic};
+use crate::{RuleMode, RulePrincipal, TaintQueryPrincipal};
 
 #[rstest]
 #[case::new_form(

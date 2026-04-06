@@ -2,8 +2,7 @@
 //!
 //! Captures bind metavariable names to the parts of the source code they match.
 
-use std::collections::HashMap;
-use std::ops::Range;
+use std::{collections::HashMap, ops::Range};
 
 /// A single captured AST node.
 #[derive(Debug, Clone)]
@@ -15,21 +14,15 @@ pub struct CapturedNode<'a> {
 impl<'a> CapturedNode<'a> {
     /// Returns the captured AST node.
     #[must_use]
-    pub const fn node(&self) -> tree_sitter::Node<'a> {
-        self.node
-    }
+    pub const fn node(&self) -> tree_sitter::Node<'a> { self.node }
 
     /// Returns the text of the captured node.
     #[must_use]
-    pub const fn text(&self) -> &'a str {
-        self.text
-    }
+    pub const fn text(&self) -> &'a str { self.text }
 
     /// Returns the byte range of the captured node.
     #[must_use]
-    pub fn byte_range(&self) -> Range<usize> {
-        self.node.byte_range()
-    }
+    pub fn byte_range(&self) -> Range<usize> { self.node.byte_range() }
 }
 
 /// A capture for a multiple-node metavariable (`$$$NAME`).
@@ -43,21 +36,15 @@ pub struct CapturedNodes<'a> {
 impl<'a> CapturedNodes<'a> {
     /// Returns the captured nodes in order.
     #[must_use]
-    pub fn nodes(&self) -> &[CapturedNode<'a>] {
-        &self.nodes
-    }
+    pub fn nodes(&self) -> &[CapturedNode<'a>] { &self.nodes }
 
     /// Returns the full source text covered by the capture.
     #[must_use]
-    pub const fn text(&self) -> &'a str {
-        self.text
-    }
+    pub const fn text(&self) -> &'a str { self.text }
 
     /// Returns the byte range covered by the capture.
     #[must_use]
-    pub fn byte_range(&self) -> Range<usize> {
-        self.byte_range.clone()
-    }
+    pub fn byte_range(&self) -> Range<usize> { self.byte_range.clone() }
 }
 
 /// Captured metavariable value.
@@ -137,9 +124,7 @@ impl<'a> Captures<'a> {
         }
     }
 
-    pub(super) fn into_inner(self) -> HashMap<String, CapturedValue<'a>> {
-        self.inner
-    }
+    pub(super) fn into_inner(self) -> HashMap<String, CapturedValue<'a>> { self.inner }
 
     pub(super) fn capture_single(&mut self, name: &str, node: tree_sitter::Node<'a>) -> bool {
         if name == "_" {

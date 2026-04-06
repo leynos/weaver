@@ -5,12 +5,11 @@
 //! or daemon connectivity.  Also verifies that `--help` now exits
 //! with code 0 and writes to stdout.
 
-use std::ffi::OsString;
-use std::io::Cursor;
-use std::process::ExitCode;
+use std::{ffi::OsString, io::Cursor, process::ExitCode};
+
+use weaver_config::Config;
 
 use crate::{AppError, ConfigLoader, IoStreams, run_with_loader};
-use weaver_config::Config;
 
 /// A config loader that panics if called, proving that version output
 /// short-circuits before configuration loading.
@@ -38,14 +37,14 @@ fn run_with_args(args: Vec<OsString>) -> (ExitCode, String, String) {
 #[test]
 fn version_long_flag_exits_with_success() {
     let args = vec![OsString::from("weaver"), OsString::from("--version")];
-    let (exit, _, _) = run_with_args(args);
+    let (exit, ..) = run_with_args(args);
     assert_eq!(exit, ExitCode::SUCCESS);
 }
 
 #[test]
 fn version_short_flag_exits_with_success() {
     let args = vec![OsString::from("weaver"), OsString::from("-V")];
-    let (exit, _, _) = run_with_args(args);
+    let (exit, ..) = run_with_args(args);
     assert_eq!(exit, ExitCode::SUCCESS);
 }
 
@@ -82,7 +81,7 @@ fn version_long_and_short_produce_identical_output() {
 #[test]
 fn help_flag_exits_with_success() {
     let args = vec![OsString::from("weaver"), OsString::from("--help")];
-    let (exit, _, _) = run_with_args(args);
+    let (exit, ..) = run_with_args(args);
     assert_eq!(exit, ExitCode::SUCCESS);
 }
 

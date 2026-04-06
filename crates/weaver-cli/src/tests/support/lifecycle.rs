@@ -3,19 +3,18 @@
 //! Provides mocks for lifecycle operations and fixtures for creating temporary
 //! runtime directories with health snapshots for daemon monitoring tests.
 
-use std::cell::RefCell;
-use std::collections::VecDeque;
-use std::fs;
-use std::io::Write;
-use std::path::Path;
-use std::process::ExitCode;
+use std::{cell::RefCell, collections::VecDeque, fs, io::Write, path::Path, process::ExitCode};
 
 use rstest::fixture;
 use tempfile::TempDir;
 use weaver_config::{Config, RuntimePaths, SocketEndpoint};
 
 use crate::lifecycle::{
-    LifecycleCommand, LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput,
+    LifecycleCommand,
+    LifecycleContext,
+    LifecycleError,
+    LifecycleInvocation,
+    LifecycleOutput,
 };
 
 /// Captures lifecycle invocations and replays queued results for behavioural tests.
@@ -33,9 +32,7 @@ pub(in crate::tests) struct LifecycleCall {
 
 impl TestLifecycle {
     /// Returns all recorded lifecycle calls.
-    pub fn record(&self) -> Vec<LifecycleCall> {
-        self.calls.borrow().clone()
-    }
+    pub fn record(&self) -> Vec<LifecycleCall> { self.calls.borrow().clone() }
 
     /// Enqueues a result to be returned by the next `handle` call.
     pub fn enqueue(&self, result: Result<ExitCode, LifecycleError>) {

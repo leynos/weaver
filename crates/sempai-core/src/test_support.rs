@@ -38,9 +38,7 @@ impl FromStr for QuotedString {
 impl QuotedString {
     /// Returns the inner string slice.
     #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+    pub fn as_str(&self) -> &str { &self.0 }
 }
 
 /// Error returned when a range string cannot be parsed.

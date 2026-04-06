@@ -3,9 +3,9 @@
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use sempai_core::test_support::QuotedString;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use crate::engine::QueryPlan;
-use crate::{DiagnosticReport, Engine, EngineConfig, Language};
+use crate::{DiagnosticReport, Engine, EngineConfig, Language, engine::QueryPlan};
 
 // ---------------------------------------------------------------------------
 // Test world
@@ -18,10 +18,9 @@ struct TestWorld {
     execute_result: Option<Result<(), DiagnosticReport>>,
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> TestWorld {
-    TestWorld::default()
-}
+fn world() -> TestWorld { TestWorld::default() }
 
 // ---------------------------------------------------------------------------
 // Given steps
@@ -140,6 +139,4 @@ fn then_execution_fails(world: &mut TestWorld, code: QuotedString) {
 // ---------------------------------------------------------------------------
 
 #[scenario(path = "tests/features/sempai_engine.feature")]
-fn sempai_engine_behaviour(world: TestWorld) {
-    let _ = world;
-}
+fn sempai_engine_behaviour(world: TestWorld) { let _ = world; }

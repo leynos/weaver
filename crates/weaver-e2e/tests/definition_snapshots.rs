@@ -10,10 +10,11 @@ use lsp_types::{GotoDefinitionResponse, Location, Uri};
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use url::Url;
-
-use weaver_e2e::fixtures;
-use weaver_e2e::lsp_client::{LspClient, LspClientError};
-use weaver_e2e::pyrefly_available;
+use weaver_e2e::{
+    fixtures,
+    lsp_client::{LspClient, LspClientError},
+    pyrefly_available,
+};
 
 /// Test error type for definition snapshot tests.
 #[derive(Debug, thiserror::Error)]

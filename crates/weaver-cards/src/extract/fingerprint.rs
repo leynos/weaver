@@ -62,6 +62,4 @@ const fn nibble_to_hex(nibble: u8) -> char {
 
 /// Normalises the file path so it contributes weakly but deterministically to
 /// the symbol fingerprint.
-fn normalise_path_hint(path: &Path) -> String {
-    path.to_string_lossy().replace('\\', "/")
-}
+fn normalise_path_hint(path: &Path) -> String { path.to_string_lossy().replace('\\', "/") }

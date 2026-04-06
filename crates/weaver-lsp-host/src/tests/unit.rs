@@ -5,14 +5,22 @@ use std::str::FromStr;
 use rstest::rstest;
 use weaver_config::{CapabilityMatrix, CapabilityOverride};
 
-use crate::capability::{CapabilityKind, CapabilitySource};
-use crate::errors::HostOperation;
-use crate::errors::LspHostError;
-use crate::language::Language;
-use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
-use crate::tests::support::{
-    CallKind, RecordingLanguageServer, ResponseSet, TestWorld, definition_params,
-    did_change_params, did_close_params, did_open_params, sample_uri,
+use crate::{
+    capability::{CapabilityKind, CapabilitySource},
+    errors::{HostOperation, LspHostError},
+    language::Language,
+    server::{LanguageServer, LanguageServerError, ServerCapabilitySet},
+    tests::support::{
+        CallKind,
+        RecordingLanguageServer,
+        ResponseSet,
+        TestWorld,
+        definition_params,
+        did_change_params,
+        did_close_params,
+        did_open_params,
+        sample_uri,
+    },
 };
 
 macro_rules! failing_server {

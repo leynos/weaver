@@ -6,16 +6,23 @@
 use std::path::Path;
 
 use lsp_types::{
-    CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    Position, TextDocumentIdentifier, TextDocumentPositionParams, Uri, WorkDoneProgressParams,
+    CallHierarchyIncomingCallsParams,
+    CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams,
+    Position,
+    TextDocumentIdentifier,
+    TextDocumentPositionParams,
+    Uri,
+    WorkDoneProgressParams,
 };
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use url::Url;
-
-use weaver_e2e::fixtures;
-use weaver_e2e::lsp_client::{LspClient, LspClientError};
-use weaver_e2e::pyrefly_available;
+use weaver_e2e::{
+    fixtures,
+    lsp_client::{LspClient, LspClientError},
+    pyrefly_available,
+};
 
 /// Test error type for call hierarchy tests.
 #[derive(Debug, thiserror::Error)]
@@ -165,8 +172,9 @@ use fixtures_impl::{linear_chain_context, no_calls_context};
 
 /// Module containing test implementations.
 mod test_impl {
-    use super::*;
     use lsp_types::CallHierarchyItem;
+
+    use super::*;
 
     /// Prepares call hierarchy at the given position and returns the first item.
     fn prepare_call_hierarchy_item(

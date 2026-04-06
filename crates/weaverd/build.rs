@@ -1,6 +1,8 @@
 //! Build script: generate a minimal weaverd man page for packaging.
 
-use std::{env, path::PathBuf};
+use std::env;
+
+use camino::Utf8PathBuf;
 use weaver_build_util::{manual_date_from_env, out_dir_for_target_profile, write_man_page};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,9 +16,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let binary_name = env::var("CARGO_BIN_NAME")
         .or_else(|_| env::var("CARGO_PKG_NAME"))
         .unwrap_or_else(|_| "weaverd".into());
-    let version = env::var("CARGO_PKG_VERSION").map_err(
-        |_| "CARGO_PKG_VERSION must be set by Cargo; cannot render manual page without it.",
-    )?;
+    let version = env::var("CARGO_PKG_VERSION").map_err(|_| {
+        "CARGO_PKG_VERSION must be set by Cargo; cannot render manual page without it."
+    })?;
 
     let mut warnings = Vec::new();
     let date = manual_date_from_env(&mut warnings);
@@ -47,7 +49,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Man page generation is pure file output, so it works during cross-compilation.
     let target = env::var("TARGET").unwrap_or_else(|_| "unknown-target".into());
     let profile = env::var("PROFILE").unwrap_or_else(|_| "unknown-profile".into());
-    let out_dir_env = env::var_os("OUT_DIR").map(PathBuf::from);
+    let out_dir_env: Option<Utf8PathBuf> =
+        env::var_os("OUT_DIR").and_then(|p| p.to_str().map(Utf8PathBuf::from));
     let out_dir = out_dir_for_target_profile(&target, &profile, out_dir_env.as_deref());
     write_man_page(man_page.as_bytes(), &out_dir, &page_name)?;
 
@@ -57,7 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         println!(
             "cargo:warning=Failed to stage manual page in OUT_DIR ({}): {err}",
-            extra_dir_path.display()
+            extra_dir_path
         );
     }
 

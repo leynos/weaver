@@ -1,12 +1,10 @@
 //! Capability modelling and resolution.
 
-use std::collections::BTreeMap;
-use std::fmt;
+use std::{collections::BTreeMap, fmt};
 
 use weaver_config::{CapabilityMatrix, CapabilityOverride};
 
-use crate::language::Language;
-use crate::server::ServerCapabilitySet;
+use crate::{language::Language, server::ServerCapabilitySet};
 
 /// LSP feature exposed through the host.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -98,9 +96,7 @@ pub struct CapabilitySummary {
 impl CapabilitySummary {
     /// Returns the language associated with this summary.
     #[must_use]
-    pub fn language(&self) -> Language {
-        self.language
-    }
+    pub fn language(&self) -> Language { self.language }
 
     /// Returns the state for the requested capability.
     #[must_use]

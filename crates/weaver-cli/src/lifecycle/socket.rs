@@ -3,9 +3,11 @@
 //! Provides helpers for probing socket availability and connectivity, used to
 //! determine whether the daemon is running or if a socket is available for use.
 
-use std::io;
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
-use std::time::Duration;
+use std::{
+    io,
+    net::{SocketAddr, TcpStream, ToSocketAddrs},
+    time::Duration,
+};
 
 use socket2::{Domain, SockAddr, Socket, Type};
 use weaver_config::SocketEndpoint;
@@ -92,10 +94,11 @@ fn is_socket_available(error: &io::Error) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{net::TcpListener, thread};
+
     use rstest::rstest;
-    use std::net::TcpListener;
-    use std::thread;
+
+    use super::*;
 
     #[test]
     fn socket_reachability_tracks_tcp_listener() {
@@ -152,6 +155,7 @@ mod tests {
     #[test]
     fn unix_socket_reachability_tracks_listener() {
         use std::os::unix::net::UnixListener;
+
         use tempfile::TempDir;
 
         let dir = TempDir::new().expect("create temp dir");

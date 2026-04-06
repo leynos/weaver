@@ -20,9 +20,7 @@ pub enum SyntacticLockResult {
 impl SyntacticLockResult {
     /// Returns true when the syntactic lock passed.
     #[must_use]
-    pub const fn passed(&self) -> bool {
-        matches!(self, Self::Passed)
-    }
+    pub const fn passed(&self) -> bool { matches!(self, Self::Passed) }
 
     /// Returns the failures, if any.
     #[must_use]
@@ -49,9 +47,7 @@ pub enum SemanticLockResult {
 impl SemanticLockResult {
     /// Returns true when the semantic lock passed.
     #[must_use]
-    pub const fn passed(&self) -> bool {
-        matches!(self, Self::Passed)
-    }
+    pub const fn passed(&self) -> bool { matches!(self, Self::Passed) }
 
     /// Returns the failures, if any.
     #[must_use]

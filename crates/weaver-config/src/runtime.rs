@@ -4,18 +4,19 @@
 //! Both binaries need to agree on the directory layout so lifecycle commands
 //! can interact with the files written by the daemon supervisor.
 
-use std::env;
-use std::fs;
-use std::path::{Path, PathBuf};
-
-use thiserror::Error;
-
-use crate::{Config, SocketEndpoint};
+use std::{
+    env,
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[cfg(unix)]
 use dirs::runtime_dir;
 #[cfg(unix)]
 use libc::geteuid;
+use thiserror::Error;
+
+use crate::{Config, SocketEndpoint};
 
 /// Canonical paths for runtime artefacts written by the daemon.
 #[derive(Debug, Clone)]
@@ -45,24 +46,16 @@ impl RuntimePaths {
     }
 
     /// Directory holding runtime artefacts.
-    pub fn runtime_dir(&self) -> &Path {
-        self.runtime_dir.as_path()
-    }
+    pub fn runtime_dir(&self) -> &Path { self.runtime_dir.as_path() }
 
     /// Path to the lock file guarding singleton startup.
-    pub fn lock_path(&self) -> &Path {
-        self.lock_path.as_path()
-    }
+    pub fn lock_path(&self) -> &Path { self.lock_path.as_path() }
 
     /// Path to the PID file.
-    pub fn pid_path(&self) -> &Path {
-        self.pid_path.as_path()
-    }
+    pub fn pid_path(&self) -> &Path { self.pid_path.as_path() }
 
     /// Path to the health snapshot.
-    pub fn health_path(&self) -> &Path {
-        self.health_path.as_path()
-    }
+    pub fn health_path(&self) -> &Path { self.health_path.as_path() }
 }
 
 impl RuntimePaths {

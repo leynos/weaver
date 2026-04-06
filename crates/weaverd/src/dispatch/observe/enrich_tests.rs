@@ -3,14 +3,25 @@
 use lsp_types::{Hover, HoverContents, MarkedString, MarkupContent, MarkupKind};
 use weaver_lsp_host::{Language, ServerCapabilitySet};
 
-use super::enrich_test_utils::{
-    ExpectedLspInfo, assert_deprecation, assert_enrichment_degrades, assert_lsp_info,
-    check_utf16_offset, run_non_ascii_enrichment, rust_card,
+use super::{
+    enrich_test_utils::{
+        ExpectedLspInfo,
+        assert_deprecation,
+        assert_enrichment_degrades,
+        assert_lsp_info,
+        check_utf16_offset,
+        run_non_ascii_enrichment,
+        rust_card,
+    },
+    *,
 };
-use super::*;
-use crate::backends::BackendKind;
-use crate::dispatch::observe::test_support::{
-    StubLanguageServer, markdown_hover, semantic_backends_with_server,
+use crate::{
+    backends::BackendKind,
+    dispatch::observe::test_support::{
+        StubLanguageServer,
+        markdown_hover,
+        semantic_backends_with_server,
+    },
 };
 
 #[test]

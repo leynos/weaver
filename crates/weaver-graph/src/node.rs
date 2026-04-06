@@ -18,15 +18,11 @@ impl NodeId {
 
     /// Returns the string representation of this node ID.
     #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+    pub fn as_str(&self) -> &str { &self.0 }
 }
 
 impl std::fmt::Display for NodeId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str(&self.0) }
 }
 
 /// Position in source code (line and column).
@@ -41,9 +37,7 @@ pub struct Position {
 impl Position {
     /// Creates a new source position.
     #[must_use]
-    pub const fn new(line: u32, column: u32) -> Self {
-        Self { line, column }
-    }
+    pub const fn new(line: u32, column: u32) -> Self { Self { line, column } }
 }
 
 /// Kind of symbol represented by a call graph node.
@@ -125,51 +119,35 @@ impl CallNode {
 
     /// Returns the unique identifier for this node.
     #[must_use]
-    pub const fn id(&self) -> &NodeId {
-        &self.id
-    }
+    pub const fn id(&self) -> &NodeId { &self.id }
 
     /// Returns the name of the symbol.
     #[must_use]
-    pub fn name(&self) -> &str {
-        &self.name
-    }
+    pub fn name(&self) -> &str { &self.name }
 
     /// Returns the kind of symbol.
     #[must_use]
-    pub const fn kind(&self) -> SymbolKind {
-        self.kind
-    }
+    pub const fn kind(&self) -> SymbolKind { self.kind }
 
     /// Returns the path to the file containing this symbol.
     #[must_use]
-    pub const fn path(&self) -> &Utf8PathBuf {
-        &self.path
-    }
+    pub const fn path(&self) -> &Utf8PathBuf { &self.path }
 
     /// Returns the position where the symbol is defined.
     #[must_use]
-    pub const fn position(&self) -> Position {
-        self.position
-    }
+    pub const fn position(&self) -> Position { self.position }
 
     /// Returns the line number where the symbol is defined.
     #[must_use]
-    pub const fn line(&self) -> u32 {
-        self.position.line
-    }
+    pub const fn line(&self) -> u32 { self.position.line }
 
     /// Returns the column number where the symbol is defined.
     #[must_use]
-    pub const fn column(&self) -> u32 {
-        self.position.column
-    }
+    pub const fn column(&self) -> u32 { self.position.column }
 
     /// Returns the container name if present.
     #[must_use]
-    pub fn container(&self) -> Option<&str> {
-        self.container.as_deref()
-    }
+    pub fn container(&self) -> Option<&str> { self.container.as_deref() }
 
     /// Returns the fully qualified name including the container.
     #[must_use]

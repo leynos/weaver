@@ -4,16 +4,21 @@
 //! `build_extract_rule`, `build_join_rule`, `build_taint_rule`) and their
 //! associated validation functions.
 
+use sempai_core::{DiagnosticReport, SourceSpan};
 use serde_saphyr::Spanned;
 
-use sempai_core::{DiagnosticReport, SourceSpan};
-
-use crate::model::{
-    ExtractQueryPrincipal, LegacyFormula, ProjectDependsOnPayload, RulePrincipal,
-    SearchQueryPrincipal, TaintQueryPrincipal,
+use crate::{
+    model::{
+        ExtractQueryPrincipal,
+        LegacyFormula,
+        ProjectDependsOnPayload,
+        RulePrincipal,
+        SearchQueryPrincipal,
+        TaintQueryPrincipal,
+    },
+    raw::{RawRule, convert_match_formula_object, schema_error, singleton_formula},
+    source_map::SourceMap,
 };
-use crate::raw::{RawRule, convert_match_formula_object, schema_error, singleton_formula};
-use crate::source_map::SourceMap;
 
 /// Validates required fields for search-mode rules.
 fn validate_search_header(raw: &RawRule, span: Option<SourceSpan>) -> Result<(), DiagnosticReport> {
@@ -119,7 +124,8 @@ pub(crate) fn build_extract_rule(
         raw,
         rule_span.cloned(),
         "extract",
-        "replace `r2c-internal-project-depends-on` with a legacy query key such as `pattern` or `patterns`",
+        "replace `r2c-internal-project-depends-on` with a legacy query key such as `pattern` or \
+         `patterns`",
     )?;
     if raw.match_formula.is_some() {
         return Err(schema_error(

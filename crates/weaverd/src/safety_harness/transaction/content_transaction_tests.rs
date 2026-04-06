@@ -3,11 +3,18 @@
 use rstest::rstest;
 use tempfile::TempDir;
 
-use super::super::{ContentChange, ContentTransaction, SafetyHarnessError, TransactionOutcome};
-use super::test_support::{LockFailureKind, temp_file};
-use crate::safety_harness::error::VerificationFailure;
-use crate::safety_harness::verification::{
-    ConfigurableSemanticLock, ConfigurableSyntacticLock, SemanticLock, SyntacticLock,
+use super::{
+    super::{ContentChange, ContentTransaction, SafetyHarnessError, TransactionOutcome},
+    test_support::{LockFailureKind, temp_file},
+};
+use crate::safety_harness::{
+    error::VerificationFailure,
+    verification::{
+        ConfigurableSemanticLock,
+        ConfigurableSyntacticLock,
+        SemanticLock,
+        SyntacticLock,
+    },
 };
 
 fn build_content_transaction<'a>(

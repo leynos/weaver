@@ -16,6 +16,7 @@ rstest = { workspace = true }
 rstest-bdd = { workspace = true }
 rstest-bdd-macros = { workspace = true }
 insta = { workspace = true }
+weaver-test-macros = { path = "../weaver-test-macros" }
 
 [lints]
 workspace = true

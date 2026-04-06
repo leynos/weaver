@@ -1,10 +1,11 @@
 //! Handles OS-level shutdown signals for the daemon lifecycle.
 
-use std::io;
-use std::time::Duration;
+use std::{io, time::Duration};
 
-use signal_hook::consts::signal::{SIGHUP, SIGINT, SIGQUIT, SIGTERM};
-use signal_hook::iterator::Signals;
+use signal_hook::{
+    consts::signal::{SIGHUP, SIGINT, SIGQUIT, SIGTERM},
+    iterator::Signals,
+};
 use thiserror::Error;
 use tracing::info;
 
@@ -36,9 +37,7 @@ pub struct SystemShutdownSignal {
 
 impl SystemShutdownSignal {
     /// Builds a signal listener with the configured timeout budget.
-    pub fn new(timeout: Duration) -> Self {
-        Self { timeout }
-    }
+    pub fn new(timeout: Duration) -> Self { Self { timeout } }
 }
 
 impl ShutdownSignal for SystemShutdownSignal {

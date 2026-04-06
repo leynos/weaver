@@ -21,6 +21,7 @@ rstest-bdd-macros = { workspace = true }
 insta = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
+weaver-test-macros = { path = "../weaver-test-macros" }
 
 [lints]
 workspace = true

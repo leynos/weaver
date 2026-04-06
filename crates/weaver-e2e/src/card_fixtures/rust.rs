@@ -43,7 +43,8 @@ pub const RUST_CASES: [CardFixtureCase; 20] = [
     CardFixtureCase {
         name: "rust_impl_methods",
         file_name: "impl_methods.rs",
-        source: "struct Counter(u32);\n\nimpl Counter {\n    fn increment(&mut self) {\n        self.0 += 1;\n    }\n}\n",
+        source: "struct Counter(u32);\n\nimpl Counter {\n    fn increment(&mut self) {\n        \
+                 self.0 += 1;\n    }\n}\n",
         line: 4,
         column: 8,
     },
@@ -57,7 +58,9 @@ pub const RUST_CASES: [CardFixtureCase; 20] = [
     CardFixtureCase {
         name: "rust_trait_impl",
         file_name: "trait_impl.rs",
-        source: "trait Render {\n    fn render(&self) -> String;\n}\n\nstruct Card;\n\nimpl Render for Card {\n    fn render(&self) -> String {\n        String::from(\"ok\")\n    }\n}\n",
+        source: "trait Render {\n    fn render(&self) -> String;\n}\n\nstruct Card;\n\nimpl \
+                 Render for Card {\n    fn render(&self) -> String {\n        \
+                 String::from(\"ok\")\n    }\n}\n",
         line: 7,
         column: 8,
     },
@@ -85,7 +88,9 @@ pub const RUST_CASES: [CardFixtureCase; 20] = [
     CardFixtureCase {
         name: "rust_control_flow",
         file_name: "control_flow.rs",
-        source: "fn classify(value: i32) -> &'static str {\n    match value {\n        0 => \"zero\",\n        value if value > 10 => \"big\",\n        _ => \"small\",\n    }\n}\n",
+        source: "fn classify(value: i32) -> &'static str {\n    match value {\n        0 => \
+                 \"zero\",\n        value if value > 10 => \"big\",\n        _ => \"small\",\n    \
+                 }\n}\n",
         line: 1,
         column: 4,
     },
@@ -127,7 +132,8 @@ pub const RUST_CASES: [CardFixtureCase; 20] = [
     CardFixtureCase {
         name: "rust_result_function",
         file_name: "result_fn.rs",
-        source: "fn load(path: &str) -> Result<String, std::io::Error> {\n    std::fs::read_to_string(path)\n}\n",
+        source: "fn load(path: &str) -> Result<String, std::io::Error> {\n    \
+                 std::fs::read_to_string(path)\n}\n",
         line: 1,
         column: 4,
     },

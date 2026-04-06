@@ -6,9 +6,7 @@
 
 use std::ops::Range;
 
-use crate::error::SyntaxError;
-use crate::language::SupportedLanguage;
-use crate::position::point_to_one_based;
+use crate::{error::SyntaxError, language::SupportedLanguage, position::point_to_one_based};
 
 /// Result of parsing source code.
 ///
@@ -25,30 +23,22 @@ pub struct ParseResult {
 impl ParseResult {
     /// Returns the parsed syntax tree.
     #[must_use]
-    pub const fn tree(&self) -> &tree_sitter::Tree {
-        &self.tree
-    }
+    pub const fn tree(&self) -> &tree_sitter::Tree { &self.tree }
 
     /// Returns the source code that was parsed.
     #[must_use]
-    pub fn source(&self) -> &str {
-        &self.source
-    }
+    pub fn source(&self) -> &str { &self.source }
 
     /// Returns the language of the parsed code.
     #[must_use]
-    pub const fn language(&self) -> SupportedLanguage {
-        self.language
-    }
+    pub const fn language(&self) -> SupportedLanguage { self.language }
 
     /// Returns whether the parse result contains any syntax errors.
     ///
     /// Tree-sitter produces ERROR nodes for portions of the source that
     /// could not be parsed according to the grammar.
     #[must_use]
-    pub fn has_errors(&self) -> bool {
-        has_error_nodes(self.tree.root_node())
-    }
+    pub fn has_errors(&self) -> bool { has_error_nodes(self.tree.root_node()) }
 
     /// Collects all syntax errors found in the parse result.
     ///
@@ -63,9 +53,7 @@ impl ParseResult {
 
     /// Returns the root node of the syntax tree.
     #[must_use]
-    pub fn root_node(&self) -> tree_sitter::Node<'_> {
-        self.tree.root_node()
-    }
+    pub fn root_node(&self) -> tree_sitter::Node<'_> { self.tree.root_node() }
 }
 
 /// Information about a syntax error found during parsing.
@@ -154,9 +142,7 @@ impl Parser {
 
     /// Returns the language this parser is configured for.
     #[must_use]
-    pub const fn language(&self) -> SupportedLanguage {
-        self.language
-    }
+    pub const fn language(&self) -> SupportedLanguage { self.language }
 
     /// Parses source code and returns the result.
     ///
@@ -216,8 +202,9 @@ fn collect_error_nodes(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use rstest::rstest;
+
+    use super::*;
 
     #[rstest]
     #[case(SupportedLanguage::Rust, "fn main() {}")]

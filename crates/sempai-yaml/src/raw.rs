@@ -6,14 +6,18 @@
 //! does not satisfy semantic constraints (e.g., missing required fields,
 //! multiple conflicting operators, etc.).
 
+use sempai_core::{DiagnosticCode, DiagnosticReport, SourceSpan};
 use serde::Deserialize;
 use serde_json::Value;
 use serde_saphyr::Spanned;
 
-use sempai_core::{DiagnosticCode, DiagnosticReport, SourceSpan};
-
 use crate::model::{
-    LegacyClause, LegacyFormula, LegacyValue, MatchFormula, RuleMode, RuleSeverity,
+    LegacyClause,
+    LegacyFormula,
+    LegacyValue,
+    MatchFormula,
+    RuleMode,
+    RuleSeverity,
 };
 
 #[derive(Debug, Deserialize)]
@@ -383,11 +387,10 @@ pub(crate) fn parse_severity(
         schema_error(
             format!("unsupported severity `{}`", value.value),
             fallback_span.cloned(),
-            "use one of ERROR, WARNING, INFO, INVENTORY, EXPERIMENT, CRITICAL, HIGH, MEDIUM, or LOW",
+            "use one of ERROR, WARNING, INFO, INVENTORY, EXPERIMENT, CRITICAL, HIGH, MEDIUM, or \
+             LOW",
         )
     })
 }
 
-pub(crate) fn parse_mode(value: Option<&str>) -> RuleMode {
-    RuleMode::from_optional(value)
-}
+pub(crate) fn parse_mode(value: Option<&str>) -> RuleMode { RuleMode::from_optional(value) }

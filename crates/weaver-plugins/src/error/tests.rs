@@ -1,7 +1,6 @@
 //! Unit tests for plugin error types.
 
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use rstest::rstest;
 

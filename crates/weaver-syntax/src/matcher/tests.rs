@@ -2,18 +2,16 @@
 //!
 //! Exercises pattern matching, capture extraction, and match positioning.
 
-use super::*;
-
 use rstest::*;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use crate::language::SupportedLanguage;
-use crate::parser::Parser;
+use super::*;
+use crate::{language::SupportedLanguage, parser::Parser};
 
 /// Fixture providing a Rust parser.
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn rust_parser() -> Parser {
-    Parser::new(SupportedLanguage::Rust).expect("parser")
-}
+fn rust_parser() -> Parser { Parser::new(SupportedLanguage::Rust).expect("parser") }
 
 /// Helper to parse source and compile a pattern.
 fn parse_and_pattern(

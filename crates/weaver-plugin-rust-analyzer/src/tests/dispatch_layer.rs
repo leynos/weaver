@@ -1,11 +1,17 @@
 //! stdin/stdout dispatch-layer tests for rust-analyzer plugin requests.
 
 use rstest::rstest;
-use weaver_plugins::capability::ReasonCode;
-use weaver_plugins::protocol::{DiagnosticSeverity, PluginResponse};
+use weaver_plugins::{
+    capability::ReasonCode,
+    protocol::{DiagnosticSeverity, PluginResponse},
+};
 
 use super::support::{
-    MockAdapter, adapter_returning, adapter_unused, rename_arguments, request_with_args,
+    MockAdapter,
+    adapter_returning,
+    adapter_unused,
+    rename_arguments,
+    request_with_args,
 };
 use crate::run_with_adapter;
 

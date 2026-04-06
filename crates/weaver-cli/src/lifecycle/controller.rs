@@ -4,21 +4,24 @@
 //! `types` and `utils`, ensuring the CLI drives a single entrypoint when
 //! interacting with `weaverd`.
 
-use std::io::Write;
-use std::process::ExitCode;
-use std::time::SystemTime;
+use std::{io::Write, process::ExitCode, time::SystemTime};
 
 use weaver_config::RuntimePaths;
 
-use super::error::LifecycleError;
-use super::monitoring::{HEALTH_FILENAME, PID_FILENAME, read_health, read_pid, wait_for_ready};
-use super::shutdown::{signal_daemon, wait_for_shutdown};
-use super::socket::{ensure_socket_available, socket_is_reachable};
-use super::spawning::spawn_daemon;
-use super::types::{LifecycleCommand, LifecycleContext, LifecycleInvocation, LifecycleOutput};
-use super::utils::{
-    STARTUP_TIMEOUT, ensure_no_extra_arguments, open_runtime_dir, prepare_runtime,
-    write_startup_banner,
+use super::{
+    error::LifecycleError,
+    monitoring::{HEALTH_FILENAME, PID_FILENAME, read_health, read_pid, wait_for_ready},
+    shutdown::{signal_daemon, wait_for_shutdown},
+    socket::{ensure_socket_available, socket_is_reachable},
+    spawning::spawn_daemon,
+    types::{LifecycleCommand, LifecycleContext, LifecycleInvocation, LifecycleOutput},
+    utils::{
+        STARTUP_TIMEOUT,
+        ensure_no_extra_arguments,
+        open_runtime_dir,
+        prepare_runtime,
+        write_startup_banner,
+    },
 };
 
 /// Production lifecycle controller.
@@ -132,7 +135,8 @@ impl SystemLifecycle {
             }
             None if reachable => {
                 output.stdout_line(format_args!(
-                    "daemon socket {} is listening but runtime files are missing; consider 'weaver daemon stop' or removing {}",
+                    "daemon socket {} is listening but runtime files are missing; consider \
+                     'weaver daemon stop' or removing {}",
                     context.config.daemon_socket(),
                     paths.runtime_dir().display()
                 ))?;

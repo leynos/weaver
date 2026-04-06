@@ -7,8 +7,10 @@
 //! <payload>
 //! ```
 
-use std::io::{BufRead, BufReader, BufWriter, Read, Write};
-use std::process::{ChildStdin, ChildStdout};
+use std::{
+    io::{BufRead, BufReader, BufWriter, Read, Write},
+    process::{ChildStdin, ChildStdout},
+};
 
 use super::error::TransportError;
 
@@ -130,9 +132,7 @@ mod tests {
             Ok(content)
         }
 
-        fn written_bytes(&self) -> &[u8] {
-            &self.write_buffer
-        }
+        fn written_bytes(&self) -> &[u8] { &self.write_buffer }
     }
 
     #[rstest]

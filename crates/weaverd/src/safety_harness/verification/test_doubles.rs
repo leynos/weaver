@@ -3,10 +3,11 @@
 //! These configurable lock types exist for tests and behavioural specs,
 //! allowing test scenarios to specify exact pass/fail behaviour.
 
-use crate::safety_harness::error::{SafetyHarnessError, VerificationFailure};
-use crate::safety_harness::locks::{SemanticLockResult, SyntacticLockResult};
-
 use super::{SemanticLock, SyntacticLock, VerificationContext};
+use crate::safety_harness::{
+    error::{SafetyHarnessError, VerificationFailure},
+    locks::{SemanticLockResult, SyntacticLockResult},
+};
 
 /// Configurable syntactic lock for testing purposes.
 ///
@@ -19,15 +20,11 @@ pub struct ConfigurableSyntacticLock {
 impl ConfigurableSyntacticLock {
     /// Creates a lock that always passes.
     #[must_use]
-    pub fn passing() -> Self {
-        Self { failures: vec![] }
-    }
+    pub fn passing() -> Self { Self { failures: vec![] } }
 
     /// Creates a lock that fails with the specified failures.
     #[must_use]
-    pub fn failing(failures: Vec<VerificationFailure>) -> Self {
-        Self { failures }
-    }
+    pub fn failing(failures: Vec<VerificationFailure>) -> Self { Self { failures } }
 }
 
 impl SyntacticLock for ConfigurableSyntacticLock {

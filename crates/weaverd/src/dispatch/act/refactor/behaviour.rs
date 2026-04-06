@@ -12,10 +12,17 @@ use super::refactor_helpers::*;
 use super::resolution::{
     CandidateEvaluation, CandidateReason, CapabilityResolutionEnvelope, RefusalReason,
     ResolutionRequest, SelectionMode,
+    ResolutionRequest,
+    RefusalReason,
+    SelectionMode,
+    CandidateReason,
+    CapabilityResolutionEnvelope,
+    resolution::{,
+    CandidateEvaluation,
 };
-use super::*;
 
 #[derive(Clone, Copy, Default)]
+use weaver_test_macros::allow_fixture_expansion_lints;
 enum RuntimeMode {
     #[default]
     DiffSuccess,
@@ -181,9 +188,7 @@ impl RefactorWorld {
         }
     }
 
-    fn path(&self, relative: &str) -> PathBuf {
-        self.workspace.path().join(relative)
-    }
+    fn path(&self, relative: &str) -> PathBuf { self.workspace.path().join(relative) }
 
     fn target_file(&self) -> String {
         self.request
@@ -238,16 +243,16 @@ impl RefactorWorld {
     }
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> RefactorWorld {
-    RefactorWorld::new()
-}
+fn world() -> RefactorWorld { RefactorWorld::new() }
 
 #[given("a workspace file for refactoring")]
 fn given_workspace_file(
     #[expect(
         unused_variables,
-        reason = "BDD step exists for readability; file creation happens in prepare_routed_fixture()"
+        reason = "BDD step exists for readability; file creation happens in \
+                  prepare_routed_fixture()"
     )]
     world: &mut RefactorWorld,
 ) {
@@ -300,9 +305,7 @@ fn given_non_diff_success(world: &mut RefactorWorld) {
 }
 
 #[when("the act refactor command executes")]
-fn when_refactor_executes(world: &mut RefactorWorld) {
-    world.execute();
-}
+fn when_refactor_executes(world: &mut RefactorWorld) { world.execute(); }
 
 #[then("the refactor command succeeds")]
 fn then_refactor_succeeds(world: &mut RefactorWorld) {

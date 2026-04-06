@@ -7,17 +7,24 @@ use std::path::Path;
 
 use camino::Utf8PathBuf;
 use lsp_types::{
-    CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
+    CallHierarchyIncomingCallsParams,
+    CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams,
     Uri,
 };
 use tempfile::TempDir;
 use url::Url;
-
-use weaver_e2e::fixtures;
-use weaver_e2e::lsp_client::{LspClient, LspClientError};
-use weaver_e2e::pyrefly_available;
+use weaver_e2e::{
+    fixtures,
+    lsp_client::{LspClient, LspClientError},
+    pyrefly_available,
+};
 use weaver_graph::{
-    CallGraphProvider, CallHierarchyClient, GraphError, LspCallGraphProvider, SourcePosition,
+    CallGraphProvider,
+    CallHierarchyClient,
+    GraphError,
+    LspCallGraphProvider,
+    SourcePosition,
 };
 
 #[derive(Debug, thiserror::Error)]

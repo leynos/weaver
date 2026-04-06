@@ -25,6 +25,7 @@ socket2 = { version = "0.5" }
 libc = "0.2"
 
 [build-dependencies]
+camino = { workspace = true }
 clap = { workspace = true }
 clap_mangen = "0.2"
 weaver-build-util = { path = "../weaver-build-util" }
@@ -37,3 +38,4 @@ rstest-bdd-macros = { workspace = true }
 assert_cmd = "2.0"
 predicates = "3.0"
 tempfile = { workspace = true }
+weaver-test-macros = { path = "../weaver-test-macros" }

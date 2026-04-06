@@ -4,9 +4,8 @@ use std::path::Path;
 
 use rstest::rstest;
 
-use crate::{CardSymbolKind, DetailLevel};
-
 use super::common::{CaseSpec, ExtractRequest, SymbolExpectation, extract};
+use crate::{CardSymbolKind, DetailLevel};
 
 #[rstest]
 #[case(CaseSpec { path: Path::new("fixture.rs"), source: "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = name.len();\n    count\n}\n", line: 2, column: 4, kind: CardSymbolKind::Function, name: "greet", container: None }.into())]

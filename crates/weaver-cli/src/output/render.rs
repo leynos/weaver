@@ -1,12 +1,14 @@
 //! Human-readable rendering of source locations.
 
-use std::collections::HashMap;
-use std::collections::hash_map::Entry;
-use std::fmt::Write as _;
-use std::fs;
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    fmt::Write as _,
+    fs,
+};
+
+use unicode_width::UnicodeWidthChar;
 
 use super::source::SourceLocation;
-use unicode_width::UnicodeWidthChar;
 
 const CONTEXT_LINES: u32 = 2;
 
@@ -205,9 +207,7 @@ fn caret_display_offset(text: &str, target_units: u32) -> usize {
     width
 }
 
-fn num_digits(value: u32) -> usize {
-    value.to_string().len()
-}
+fn num_digits(value: u32) -> usize { value.to_string().len() }
 
 struct LineColumn {
     line: u32,

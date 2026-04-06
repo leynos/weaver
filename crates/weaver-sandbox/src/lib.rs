@@ -10,14 +10,11 @@
 //! - Networking is disabled unless explicitly enabled.
 //! - Environment variables are stripped unless whitelisted.
 //! - Executables must be whitelisted and provided as absolute paths.
-//! - Standard library locations on Linux are whitelisted by default to keep
-//!   dynamically linked binaries functional without exposing the wider
-//!   filesystem.
+//! - Standard library locations on Linux are whitelisted by default to keep dynamically linked
+//!   binaries functional without exposing the wider filesystem.
 //!
 //! ```rust,no_run
-//! use weaver_sandbox::{
-//!     Sandbox, SandboxCommand, SandboxProfile, process::Stdio,
-//! };
+//! use weaver_sandbox::{Sandbox, SandboxCommand, SandboxProfile, process::Stdio};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let profile = SandboxProfile::new()
@@ -30,7 +27,10 @@
 //! let sandbox = Sandbox::new(profile);
 //! let mut child = sandbox.spawn(command)?;
 //! let output = child.wait_with_output()?;
-//! assert_eq!(String::from_utf8_lossy(&output.stdout), "hello from the cage\n");
+//! assert_eq!(
+//!     String::from_utf8_lossy(&output.stdout),
+//!     "hello from the cage\n"
+//! );
 //! # Ok(()) }
 //! ```
 //!

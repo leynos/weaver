@@ -1,7 +1,6 @@
 //! Error types for process-based language server adapters.
 
-use std::io;
-use std::sync::Arc;
+use std::{io, sync::Arc};
 
 use thiserror::Error;
 

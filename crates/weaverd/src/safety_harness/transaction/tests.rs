@@ -1,17 +1,25 @@
 //! Tests for edit and content transaction management.
 
-use std::fs;
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 use rstest::rstest;
 use tempfile::TempDir;
 
-use super::test_support::{LockFailureKind, temp_file};
-use super::{EditTransaction, SafetyHarnessError, TransactionOutcome};
-use crate::safety_harness::edit::{FileEdit, Position, TextEdit};
-use crate::safety_harness::error::VerificationFailure;
-use crate::safety_harness::verification::{
-    ConfigurableSemanticLock, ConfigurableSyntacticLock, SemanticLock, SyntacticLock,
+use super::{
+    EditTransaction,
+    SafetyHarnessError,
+    TransactionOutcome,
+    test_support::{LockFailureKind, temp_file},
+};
+use crate::safety_harness::{
+    edit::{FileEdit, Position, TextEdit},
+    error::VerificationFailure,
+    verification::{
+        ConfigurableSemanticLock,
+        ConfigurableSyntacticLock,
+        SemanticLock,
+        SyntacticLock,
+    },
 };
 
 /// Creates a standard failure scenario builder with a test file and replacement edit.
@@ -69,9 +77,7 @@ impl LineReplacement {
     }
 
     /// Creates a replacement starting from column 0.
-    fn from_start(end_col: u32, text: impl Into<String>) -> Self {
-        Self::new(0, end_col, text)
-    }
+    fn from_start(end_col: u32, text: impl Into<String>) -> Self { Self::new(0, end_col, text) }
 }
 
 /// Builder for constructing test transactions with reduced boilerplate.
@@ -129,9 +135,7 @@ impl TransactionTestBuilder {
     }
 
     /// Returns a reference to a file path by index.
-    fn file_path(&self, idx: usize) -> &PathBuf {
-        &self.files[idx].0
-    }
+    fn file_path(&self, idx: usize) -> &PathBuf { &self.files[idx].0 }
 
     /// Executes the transaction with the given locks and returns the outcome.
     ///

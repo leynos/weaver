@@ -1,11 +1,18 @@
 //! Shared test helpers for call hierarchy test cases.
 
-use crate::GraphError;
-use lsp_types::{
-    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, Position, Range,
-    SymbolKind, Uri,
-};
 use std::str::FromStr;
+
+use lsp_types::{
+    CallHierarchyIncomingCall,
+    CallHierarchyItem,
+    CallHierarchyOutgoingCall,
+    Position,
+    Range,
+    SymbolKind,
+    Uri,
+};
+
+use crate::GraphError;
 
 /// Test-friendly wrapper for call hierarchy responses.
 #[derive(Clone, Debug)]
@@ -24,9 +31,7 @@ impl<T: Clone> Response<T> {
     }
 }
 
-fn test_uri() -> Uri {
-    Uri::from_str("file:///src/main.rs").expect("valid URI")
-}
+fn test_uri() -> Uri { Uri::from_str("file:///src/main.rs").expect("valid URI") }
 
 fn range(line: u32, column: u32) -> Range {
     Range {

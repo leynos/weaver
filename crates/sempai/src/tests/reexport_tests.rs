@@ -7,8 +7,17 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    CaptureValue, CapturedNode, Diagnostic, DiagnosticCode, DiagnosticReport, EngineConfig,
-    Language, LineCol, Match, SourceSpan, Span,
+    CaptureValue,
+    CapturedNode,
+    Diagnostic,
+    DiagnosticCode,
+    DiagnosticReport,
+    EngineConfig,
+    Language,
+    LineCol,
+    Match,
+    SourceSpan,
+    Span,
 };
 
 #[test]

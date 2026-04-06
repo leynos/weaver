@@ -9,32 +9,44 @@
 //! [`PluginRequest`]. Diff output is forwarded to `act apply-patch` so
 //! syntactic and semantic locks are reused without duplicating safety logic.
 
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use arguments::parse_refactor_args;
-use tracing::debug;
-use url::Url;
-
-use weaver_plugins::capability::CapabilityId;
-use weaver_plugins::process::SandboxExecutor;
-use weaver_plugins::protocol::FilePayload;
-use weaver_plugins::runner::PluginRunner;
-use weaver_plugins::{PluginError, PluginRegistry, PluginRequest, PluginResponse};
-
-use crate::backends::{BackendKind, FusionBackends};
-use crate::dispatch::errors::DispatchError;
-use crate::dispatch::request::CommandRequest;
-use crate::dispatch::response::ResponseWriter;
-use crate::dispatch::router::{DISPATCH_TARGET, DispatchResult};
-use crate::semantic_provider::SemanticBackendProvider;
 use manifests::{rope_manifest, rust_analyzer_manifest};
 use plugin_paths::{
-    ROPE_PLUGIN_PATH_ENV, RUST_ANALYZER_PLUGIN_PATH_ENV, resolve_rope_plugin_path,
+    ROPE_PLUGIN_PATH_ENV,
+    RUST_ANALYZER_PLUGIN_PATH_ENV,
+    resolve_rope_plugin_path,
     resolve_rust_analyzer_plugin_path,
 };
 use resolution::{CapabilityResolutionEnvelope, ResolutionRequest, resolve_provider};
+use tracing::debug;
+use url::Url;
+use weaver_plugins::{
+    PluginError,
+    PluginRegistry,
+    PluginRequest,
+    PluginResponse,
+    capability::CapabilityId,
+    process::SandboxExecutor,
+    protocol::FilePayload,
+    runner::PluginRunner,
+};
+
+use crate::{
+    backends::{BackendKind, FusionBackends},
+    dispatch::{
+        errors::DispatchError,
+        request::CommandRequest,
+        response::ResponseWriter,
+        router::{DISPATCH_TARGET, DispatchResult},
+    },
+    semantic_provider::SemanticBackendProvider,
+};
 
 mod arguments;
 mod candidates;
@@ -330,7 +342,8 @@ fn capability_from_operation(operation: &str) -> Result<CapabilityId, DispatchEr
     match operation {
         "rename-symbol" => Ok(CapabilityId::RenameSymbol),
         other => Err(DispatchError::invalid_arguments(format!(
-            "act refactor does not support capability resolution for '{other}' (only 'rename-symbol' is currently implemented)"
+            "act refactor does not support capability resolution for '{other}' (only \
+             'rename-symbol' is currently implemented)"
         ))),
     }
 }

@@ -1,24 +1,30 @@
 //! Behavioural tests for the JSONL dispatch loop.
 
-use std::cell::RefCell;
-use std::io::{BufRead, BufReader, Write};
-use std::net::{SocketAddr, TcpStream};
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::{
+    cell::RefCell,
+    io::{BufRead, BufReader, Write},
+    net::{SocketAddr, TcpStream},
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use serde_json::Value;
-
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
-use crate::backends::FusionBackends;
-use crate::dispatch::{
-    BackendManager, DispatchConnectionHandler, UNKNOWN_OPERATION_TYPE, parse_stderr_json_payload,
+use crate::{
+    backends::FusionBackends,
+    dispatch::{
+        BackendManager,
+        DispatchConnectionHandler,
+        UNKNOWN_OPERATION_TYPE,
+        parse_stderr_json_payload,
+    },
+    semantic_provider::SemanticBackendProvider,
+    transport::{ListenerHandle, SocketListener},
 };
-use crate::semantic_provider::SemanticBackendProvider;
-use crate::transport::{ListenerHandle, SocketListener};
 
 /// Test fixture providing a configured `DispatchConnectionHandler` with test backends.
 #[fixture]
@@ -110,9 +116,7 @@ impl DispatchWorld {
             .any(|line| line.contains("unknown domain"))
     }
 
-    fn has_unknown_operation_error(&self) -> bool {
-        self.unknown_operation_payload().is_some()
-    }
+    fn has_unknown_operation_error(&self) -> bool { self.unknown_operation_payload().is_some() }
 
     fn unknown_operation_payload(&self) -> Option<Value> {
         self.response_lines
@@ -143,9 +147,7 @@ fn world(test_handler: Arc<DispatchConnectionHandler>) -> RefCell<DispatchWorld>
 }
 
 #[given("a daemon connection is established")]
-fn given_daemon_connection(world: &RefCell<DispatchWorld>) {
-    world.borrow_mut().start_listener();
-}
+fn given_daemon_connection(world: &RefCell<DispatchWorld>) { world.borrow_mut().start_listener(); }
 
 #[when("an observe get-definition request is sent without arguments")]
 fn when_observe_request_without_args(world: &RefCell<DispatchWorld>) {
@@ -294,11 +296,7 @@ fn then_invalid_arguments_error(world: &RefCell<DispatchWorld>) {
 }
 
 /// Strips surrounding double quotes from a string if present.
-fn strip_quotes(s: &str) -> &str {
-    s.trim_matches('"')
-}
+fn strip_quotes(s: &str) -> &str { s.trim_matches('"') }
 
 #[scenario(path = "tests/features/daemon_dispatch.feature")]
-fn daemon_dispatch(#[from(world)] world: RefCell<DispatchWorld>) {
-    drop(world);
-}
+fn daemon_dispatch(#[from(world)] world: RefCell<DispatchWorld>) { drop(world); }

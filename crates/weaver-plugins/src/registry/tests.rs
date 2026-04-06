@@ -5,8 +5,10 @@ use std::path::PathBuf;
 use rstest::{fixture, rstest};
 
 use super::*;
-use crate::error::PluginError;
-use crate::manifest::{PluginKind, PluginManifest, PluginMetadata};
+use crate::{
+    error::PluginError,
+    manifest::{PluginKind, PluginManifest, PluginMetadata},
+};
 
 fn make_actuator(name: &str, lang: &str) -> PluginManifest {
     let meta = PluginMetadata::new(name, "1.0", PluginKind::Actuator);

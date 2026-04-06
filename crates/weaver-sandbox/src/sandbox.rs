@@ -1,16 +1,24 @@
 //! Sandbox orchestration built on top of `birdcage`.
 
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{
+    fmt,
+    fs,
+    path::{Path, PathBuf},
+};
 
-use birdcage::process::{Child, Command, Output};
-use birdcage::{Birdcage, Exception, Sandbox as BirdcageTrait};
+use birdcage::{
+    Birdcage,
+    Exception,
+    Sandbox as BirdcageTrait,
+    process::{Child, Command, Output},
+};
 
-use crate::env_guard::EnvGuard;
-use crate::error::SandboxError;
-use crate::profile::{NetworkPolicy, SandboxProfile};
-use crate::runtime::thread_count;
-use std::fmt;
+use crate::{
+    env_guard::EnvGuard,
+    error::SandboxError,
+    profile::{NetworkPolicy, SandboxProfile},
+    runtime::thread_count,
+};
 
 /// Builder for sandboxed commands.
 pub type SandboxCommand = Command;

@@ -1,20 +1,27 @@
 //! Behavioural tests for the Double-Lock safety harness.
 
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::fs;
-use std::io::Write;
-use std::path::PathBuf;
+use std::{cell::RefCell, collections::HashMap, fs, io::Write, path::PathBuf};
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use tempfile::TempDir;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 use super::safety_harness_types::{DiagnosticMessage, FileContent, FileName, TextPattern};
 use crate::safety_harness::{
-    ConfigurableSemanticLock, ConfigurableSyntacticLock, EditTransaction, FileEdit, Position,
-    SafetyHarnessError, SyntacticLock, SyntacticLockResult, TextEdit, TransactionOutcome,
-    TreeSitterSyntacticLockAdapter, VerificationContext, VerificationFailure,
+    ConfigurableSemanticLock,
+    ConfigurableSyntacticLock,
+    EditTransaction,
+    FileEdit,
+    Position,
+    SafetyHarnessError,
+    SyntacticLock,
+    SyntacticLockResult,
+    TextEdit,
+    TransactionOutcome,
+    TreeSitterSyntacticLockAdapter,
+    VerificationContext,
+    VerificationFailure,
 };
 
 /// Syntactic lock variant for BDD test scenarios.
@@ -150,10 +157,9 @@ impl SafetyHarnessWorld {
     }
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> RefCell<SafetyHarnessWorld> {
-    RefCell::new(SafetyHarnessWorld::new())
-}
+fn world() -> RefCell<SafetyHarnessWorld> { RefCell::new(SafetyHarnessWorld::new()) }
 
 // ---- Given steps ----
 

@@ -1,11 +1,13 @@
 //! Structured health reporting for daemon lifecycle events.
 
-use crate::backends::{BackendKind, BackendStartupError};
-use crate::bootstrap::BootstrapError;
-
 use std::fmt;
 
 use weaver_config::Config;
+
+use crate::{
+    backends::{BackendKind, BackendStartupError},
+    bootstrap::BootstrapError,
+};
 
 const HEALTH_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::health");
 
@@ -46,9 +48,7 @@ pub struct StructuredHealthReporter;
 impl StructuredHealthReporter {
     /// Builds a new reporter.
     #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
+    pub fn new() -> Self { Self }
 }
 
 impl HealthReporter for StructuredHealthReporter {

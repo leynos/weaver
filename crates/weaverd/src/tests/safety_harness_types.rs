@@ -3,8 +3,10 @@
 //! These types eliminate string-heavy function arguments and make the test
 //! domain model explicit and type-safe.
 
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use derive_more::{AsRef, Deref};
 
@@ -14,35 +16,25 @@ use derive_more::{AsRef, Deref};
 pub struct FileName(String);
 
 impl From<String> for FileName {
-    fn from(s: String) -> Self {
-        Self(s.trim_matches('"').to_string())
-    }
+    fn from(s: String) -> Self { Self(s.trim_matches('"').to_string()) }
 }
 
 impl From<&str> for FileName {
-    fn from(s: &str) -> Self {
-        Self(s.trim_matches('"').to_string())
-    }
+    fn from(s: &str) -> Self { Self(s.trim_matches('"').to_string()) }
 }
 
 impl FileName {
     /// Returns the inner string as a string slice.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+    pub fn as_str(&self) -> &str { &self.0 }
 
     /// Joins this file name to a base path.
-    pub fn to_path(&self, base: &Path) -> PathBuf {
-        base.join(&self.0)
-    }
+    pub fn to_path(&self, base: &Path) -> PathBuf { base.join(&self.0) }
 }
 
 impl FromStr for FileName {
     type Err = std::convert::Infallible;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::from(s))
-    }
+    fn from_str(s: &str) -> Result<Self, Self::Err> { Ok(Self::from(s)) }
 }
 
 /// Wraps file content strings.
@@ -51,35 +43,25 @@ impl FromStr for FileName {
 pub struct FileContent(String);
 
 impl From<String> for FileContent {
-    fn from(s: String) -> Self {
-        Self(s.trim_matches('"').to_string())
-    }
+    fn from(s: String) -> Self { Self(s.trim_matches('"').to_string()) }
 }
 
 impl From<&str> for FileContent {
-    fn from(s: &str) -> Self {
-        Self(s.trim_matches('"').to_string())
-    }
+    fn from(s: &str) -> Self { Self(s.trim_matches('"').to_string()) }
 }
 
 impl FileContent {
     /// Returns the inner string as a string slice.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+    pub fn as_str(&self) -> &str { &self.0 }
 
     /// Returns the content as bytes.
-    pub fn as_bytes(&self) -> &[u8] {
-        self.0.as_bytes()
-    }
+    pub fn as_bytes(&self) -> &[u8] { self.0.as_bytes() }
 }
 
 impl FromStr for FileContent {
     type Err = std::convert::Infallible;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::from(s))
-    }
+    fn from_str(s: &str) -> Result<Self, Self::Err> { Ok(Self::from(s)) }
 }
 
 /// Wraps text patterns for search/replace/assertion.
@@ -88,30 +70,22 @@ impl FromStr for FileContent {
 pub struct TextPattern(String);
 
 impl From<String> for TextPattern {
-    fn from(s: String) -> Self {
-        Self(s.trim_matches('"').to_string())
-    }
+    fn from(s: String) -> Self { Self(s.trim_matches('"').to_string()) }
 }
 
 impl From<&str> for TextPattern {
-    fn from(s: &str) -> Self {
-        Self(s.trim_matches('"').to_string())
-    }
+    fn from(s: &str) -> Self { Self(s.trim_matches('"').to_string()) }
 }
 
 impl TextPattern {
     /// Returns the inner string as a string slice.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+    pub fn as_str(&self) -> &str { &self.0 }
 }
 
 impl FromStr for TextPattern {
     type Err = std::convert::Infallible;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::from(s))
-    }
+    fn from_str(s: &str) -> Result<Self, Self::Err> { Ok(Self::from(s)) }
 }
 
 /// Wraps diagnostic messages for lock configuration.
@@ -120,28 +94,20 @@ impl FromStr for TextPattern {
 pub struct DiagnosticMessage(String);
 
 impl From<String> for DiagnosticMessage {
-    fn from(s: String) -> Self {
-        Self(s.trim_matches('"').to_string())
-    }
+    fn from(s: String) -> Self { Self(s.trim_matches('"').to_string()) }
 }
 
 impl From<&str> for DiagnosticMessage {
-    fn from(s: &str) -> Self {
-        Self(s.trim_matches('"').to_string())
-    }
+    fn from(s: &str) -> Self { Self(s.trim_matches('"').to_string()) }
 }
 
 impl DiagnosticMessage {
     /// Returns the inner string as a string slice.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+    pub fn as_str(&self) -> &str { &self.0 }
 }
 
 impl FromStr for DiagnosticMessage {
     type Err = std::convert::Infallible;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::from(s))
-    }
+    fn from_str(s: &str) -> Result<Self, Self::Err> { Ok(Self::from(s)) }
 }

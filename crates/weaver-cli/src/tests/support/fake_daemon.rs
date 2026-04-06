@@ -3,14 +3,15 @@
 //! Provides a mock TCP server that simulates daemon responses, allowing CLI
 //! integration tests to verify request/response behaviour without a real daemon.
 
-use std::io::{self, BufRead, BufReader, Read, Write};
-use std::net::{TcpListener, TcpStream};
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::{Duration, Instant};
-
 #[cfg(unix)]
 use std::os::unix::net::UnixStream;
+use std::{
+    io::{self, BufRead, BufReader, Read, Write},
+    net::{TcpListener, TcpStream},
+    sync::{Arc, Mutex},
+    thread,
+    time::{Duration, Instant},
+};
 
 use anyhow::{Context, Result, anyhow};
 
@@ -51,9 +52,7 @@ impl FakeDaemon {
         })
     }
 
-    pub fn port(&self) -> u16 {
-        self.port
-    }
+    pub fn port(&self) -> u16 { self.port }
 
     /// Waits for the daemon thread to complete and returns all recorded requests.
     pub fn take_requests(&mut self) -> Result<Vec<String>> {
@@ -147,18 +146,14 @@ pub(in crate::tests) trait TryCloneStream: Write {
 impl TryCloneStream for TcpStream {
     type Owned = TcpStream;
 
-    fn try_clone(&self) -> io::Result<Self::Owned> {
-        TcpStream::try_clone(self)
-    }
+    fn try_clone(&self) -> io::Result<Self::Owned> { TcpStream::try_clone(self) }
 }
 
 #[cfg(unix)]
 impl TryCloneStream for UnixStream {
     type Owned = UnixStream;
 
-    fn try_clone(&self) -> io::Result<Self::Owned> {
-        UnixStream::try_clone(self)
-    }
+    fn try_clone(&self) -> io::Result<Self::Owned> { UnixStream::try_clone(self) }
 }
 
 /// Reads a request line from a stream and writes response lines.

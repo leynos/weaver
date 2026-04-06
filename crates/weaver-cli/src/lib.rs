@@ -5,11 +5,14 @@
 //! to be exercised both from the binary entrypoint and from tests where
 //! configuration loading and IO streams can be substituted.
 
+use std::{
+    ffi::{OsStr, OsString},
+    io::{Read, Write},
+    process::ExitCode,
+};
+
 use clap::Parser;
 use ortho_config::Localizer;
-use std::ffi::{OsStr, OsString};
-use std::io::{Read, Write};
-use std::process::ExitCode;
 
 mod actionable_guidance;
 mod cli;
@@ -33,13 +36,19 @@ use config::{ConfigArgumentSplit, prepare_cli_arguments, split_config_arguments}
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader};
 pub(crate) use daemon_output::{OutputSettings, read_daemon_messages};
 pub use discoverability::DOMAIN_OPERATIONS;
-use discoverability::KnownDomain;
-use discoverability::should_emit_domain_guidance;
-use discoverability::write_missing_operation_guidance;
-use discoverability::write_unknown_domain_guidance;
+use discoverability::{
+    KnownDomain,
+    should_emit_domain_guidance,
+    write_missing_operation_guidance,
+    write_unknown_domain_guidance,
+};
 pub(crate) use errors::{AppError, is_daemon_not_running};
 use lifecycle::{
-    LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput, SystemLifecycle,
+    LifecycleContext,
+    LifecycleError,
+    LifecycleInvocation,
+    LifecycleOutput,
+    SystemLifecycle,
     try_auto_start_daemon,
 };
 use localizer::build_localizer;
@@ -75,23 +84,15 @@ pub struct IoStreams<'a, R: Read, W: Write, E: Write> {
 }
 
 impl<'a, R: Read, W: Write, E: Write> IoStreams<'a, R, W, E> {
-    pub fn new(
-        stdin: &'a mut R,
-        stdout: &'a mut W,
-        stderr: &'a mut E,
-        stdout_is_terminal: bool,
-    ) -> Self {
+    fn new(io: &'a mut IoStreams<'a, R, W, E>, loader: &'a L) -> Self {
         Self {
-            stdin,
-            stdout,
-            stderr,
-            stdout_is_terminal,
+            io,
+            loader,
+            daemon_binary: None,
         }
     }
 
-    pub(crate) const fn stdout_is_terminal(&self) -> bool {
-        self.stdout_is_terminal
-    }
+    pub(crate) const fn stdout_is_terminal(&self) -> bool { self.stdout_is_terminal }
 }
 
 impl Cli {
@@ -129,16 +130,15 @@ where
         self
     }
 
-    fn run<I>(&mut self, args: I) -> ExitCode
-    where
-        I: IntoIterator<Item = OsString>,
-    {
-        let localizer = build_localizer();
-        let mut lifecycle = SystemLifecycle;
-        self.run_with_handler(args, localizer.as_ref(), |invocation, context, output| {
-            lifecycle.handle(invocation, context, output)
-        })
-    }
+pub fn run<'a, I, R, W, E>(args: I, io: &'a mut IoStreams<'a, R, W, E>) -> ExitCode
+where
+    I: IntoIterator<Item = OsString>,
+    R: Read,
+    W: Write,
+    E: Write,
+{
+    run_with_loader(args, io, &OrthoConfigLoader)
+}
 
     fn run_with_handler<I, F>(
         &mut self,

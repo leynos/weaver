@@ -33,8 +33,8 @@ impl KnownDomain {
         let normalized = s.trim().to_ascii_lowercase();
         DOMAIN_OPERATIONS
             .iter()
-            .find(|(domain, _, _)| *domain == normalized.as_str())
-            .map(|(domain, _, _)| match *domain {
+            .find(|(domain, ..)| *domain == normalized.as_str())
+            .map(|(domain, ..)| match *domain {
                 "observe" => Self::Observe,
                 "act" => Self::Act,
                 "verify" => Self::Verify,
@@ -45,7 +45,7 @@ impl KnownDomain {
     fn operations(self) -> &'static [&'static str] {
         DOMAIN_OPERATIONS
             .iter()
-            .find(|(name, _, _)| *name == self.as_str())
+            .find(|(name, ..)| *name == self.as_str())
             .map(|(_, _, ops)| *ops)
             .unwrap_or_else(|| panic!("missing DOMAIN_OPERATIONS entry for '{}'", self.as_str()))
     }
@@ -53,7 +53,7 @@ impl KnownDomain {
     fn catalogue_order() -> impl Iterator<Item = Self> {
         DOMAIN_OPERATIONS
             .iter()
-            .map(|(domain, _, _)| known_domain_from_catalogue_entry(domain))
+            .map(|(domain, ..)| known_domain_from_catalogue_entry(domain))
     }
 }
 
@@ -95,9 +95,7 @@ pub(crate) fn operations_for_domain(domain: KnownDomain) -> &'static [&'static s
     domain.operations()
 }
 
-fn strip_bidi_isolates(text: String) -> String {
-    text.replace(['\u{2068}', '\u{2069}'], "")
-}
+fn strip_bidi_isolates(text: String) -> String { text.replace(['\u{2068}', '\u{2069}'], "") }
 
 fn known_domain_from_catalogue_entry(domain: &str) -> KnownDomain {
     match domain {

@@ -15,9 +15,7 @@ use crate::{BranchInfo, CardRefusal, DetailLevel, GetCardResponse, RefusalReason
 // Fixture builders (snapshot-specific wrappers around shared fixtures)
 // ---------------------------------------------------------------------------
 
-fn minimal_identity() -> crate::SymbolIdentity {
-    fixtures::sample_identity(None)
-}
+fn minimal_identity() -> crate::SymbolIdentity { fixtures::sample_identity(None) }
 
 fn identity_with_container() -> crate::SymbolIdentity {
     fixtures::sample_identity(Some("handlers"))

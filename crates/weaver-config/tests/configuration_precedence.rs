@@ -1,14 +1,17 @@
 #![cfg(feature = "cli")]
 
-use std::ffi::OsString;
-use std::fs;
+use std::{ffi::OsString, fs};
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use tempfile::TempDir;
-
+use weaver_test_macros::allow_fixture_expansion_lints;
 use weaver_config::{
-    Config, SocketEndpoint, default_log_filter, default_log_format, default_socket_endpoint,
+    Config,
+    SocketEndpoint,
+    default_log_filter,
+    default_log_format,
+    default_socket_endpoint,
 };
 
 struct Harness {
@@ -103,10 +106,9 @@ impl Drop for Harness {
     }
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn harness() -> Harness {
-    Harness::new()
-}
+fn harness() -> Harness { Harness::new() }
 
 #[given("a configuration file setting the daemon socket to \"{socket}\"")]
 fn given_configuration_file(harness: &Harness, socket: String) {
@@ -129,9 +131,7 @@ fn when_cli_override(harness: &Harness, socket: String) {
 }
 
 #[when("the configuration loads without overrides")]
-fn when_load_without_overrides(harness: &Harness) {
-    harness.load();
-}
+fn when_load_without_overrides(harness: &Harness) { harness.load(); }
 
 #[then("loading the configuration resolves the daemon socket to \"{socket}\"")]
 fn then_resolved_socket(harness: &Harness, socket: String) {
@@ -181,6 +181,4 @@ fn then_defaults_applied(harness: &Harness) {
 }
 
 #[scenario(path = "tests/features/configuration_precedence.feature")]
-fn configuration_precedence(#[from(harness)] harness: Harness) {
-    let _ = harness;
-}
+fn configuration_precedence(#[from(harness)] harness: Harness) { let _ = harness; }

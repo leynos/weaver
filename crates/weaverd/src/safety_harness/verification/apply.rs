@@ -5,8 +5,7 @@
 
 use std::path::Path;
 
-use crate::safety_harness::edit::FileEdit;
-use crate::safety_harness::error::SafetyHarnessError;
+use crate::safety_harness::{edit::FileEdit, error::SafetyHarnessError};
 
 /// Applies text edits to the original content to produce modified content.
 ///

@@ -1,7 +1,6 @@
 //! Plugin path constants and resolution helpers for `act refactor`.
 
-use std::ffi::OsString;
-use std::path::PathBuf;
+use std::{ffi::OsString, path::PathBuf};
 
 use crate::dispatch::router::DISPATCH_TARGET;
 

@@ -10,17 +10,23 @@ use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_lsp_host::{Language, ServerCapabilitySet};
 
 use super::*;
-use crate::backends::FusionBackends;
-use crate::dispatch::observe::test_support::{
-    StubLanguageServer, markdown_hover, semantic_backends_with_server,
+use crate::{
+    backends::FusionBackends,
+    dispatch::{
+        observe::test_support::{
+            StubLanguageServer,
+            markdown_hover,
+            semantic_backends_with_server,
+        },
+        request::CommandRequest,
+    },
+    semantic_provider::SemanticBackendProvider,
 };
-use crate::dispatch::request::CommandRequest;
-use crate::semantic_provider::SemanticBackendProvider;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn temp_dir() -> TempDir {
-    TempDir::new().expect("temp dir")
-}
+fn temp_dir() -> TempDir { TempDir::new().expect("temp dir") }
 
 #[fixture]
 fn backends() -> (FusionBackends<SemanticBackendProvider>, TempDir) {
@@ -86,9 +92,7 @@ fn make_request(uri: &str, line: u32, column: u32, detail: DetailLevel) -> Comma
     .expect("request")
 }
 
-fn response_text(output: Vec<u8>) -> String {
-    String::from_utf8(output).expect("utf8")
-}
+fn response_text(output: Vec<u8>) -> String { String::from_utf8(output).expect("utf8") }
 
 fn response_payload(output: Vec<u8>) -> serde_json::Value {
     let response = response_text(output);
@@ -180,7 +184,8 @@ fn handle_returns_success_for_supported_rust_symbol(
         &temp_dir,
         SourceFile {
             name: "card.rs",
-            content: "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = name.len();\n    count\n}\n",
+            content: "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = \
+                      name.len();\n    count\n}\n",
         },
     );
     let uri = Url::from_file_path(&path).expect("file uri").to_string();
@@ -202,7 +207,8 @@ fn handle_returns_semantic_success_with_enrichment_and_rewritten_provenance(temp
         &temp_dir,
         SourceFile {
             name: "card.rs",
-            content: "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = name.len();\n    count\n}\n",
+            content: "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = \
+                      name.len();\n    count\n}\n",
         },
     );
     let uri = Url::from_file_path(&path).expect("file uri").to_string();
@@ -243,7 +249,8 @@ fn handle_returns_semantic_success_with_degraded_provenance_when_hover_is_unavai
         &temp_dir,
         SourceFile {
             name: "card.rs",
-            content: "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = name.len();\n    count\n}\n",
+            content: "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = \
+                      name.len();\n    count\n}\n",
         },
     );
     let uri = Url::from_file_path(&path).expect("file uri").to_string();

@@ -5,6 +5,8 @@ version.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+cap-std = { workspace = true }
+camino = { workspace = true }
 time = { version = "0.3", features = ["formatting"] }
 
 [lints]

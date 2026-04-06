@@ -1,13 +1,14 @@
 //! Shared harness utilities for end-to-end integration tests.
 
-use std::io;
-use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::path::{Path, PathBuf};
-use std::process::Output;
-use std::sync::OnceLock;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::{
+    io,
+    net::{SocketAddr, TcpListener, TcpStream},
+    path::{Path, PathBuf},
+    process::Output,
+    sync::{Arc, Mutex, OnceLock},
+    thread,
+    time::{Duration, Instant},
+};
 
 use assert_cmd::{Command, cargo};
 use insta::assert_snapshot;
@@ -16,12 +17,15 @@ use tempfile::TempDir;
 use url::Url;
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
+use weaver_e2e::card_fixtures::CardFixtureCase;
 use weaverd::{
-    BackendManager, ConnectionHandler, ConnectionStream, DispatchConnectionHandler, FusionBackends,
+    BackendManager,
+    ConnectionHandler,
+    ConnectionStream,
+    DispatchConnectionHandler,
+    FusionBackends,
     SemanticBackendProvider,
 };
-
-use weaver_e2e::card_fixtures::CardFixtureCase;
 
 const ACCEPT_TIMEOUT: Duration = Duration::from_secs(10);
 const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
@@ -102,9 +106,7 @@ impl TestDaemon {
         }
     }
 
-    fn endpoint(&self) -> String {
-        format!("tcp://{}", self.address)
-    }
+    fn endpoint(&self) -> String { format!("tcp://{}", self.address) }
 
     pub(crate) fn cache_stats(&self) -> weaver_cards::CacheStats {
         let stats = self
@@ -131,7 +133,8 @@ pub(crate) fn fixture_uri(temp_dir: &TempDir, case: CardFixtureCase) -> String {
 
 pub(crate) fn run_get_card(daemon: &TestDaemon, request: GetCardRequest<'_>) -> Transcript {
     let command = format!(
-        "weaver --daemon-socket tcp://<daemon-endpoint> --output json observe get-card --uri <uri> --position {}:{} --detail {}",
+        "weaver --daemon-socket tcp://<daemon-endpoint> --output json observe get-card --uri \
+         <uri> --position {}:{} --detail {}",
         request.line, request.column, request.detail
     );
     let command_output = Command::new(weaver_binary_path())
@@ -205,7 +208,8 @@ fn accept_before_deadline(listener: &TcpListener) -> TcpStream {
                     .local_addr()
                     .map_or_else(|_| String::from("<unknown>"), |address| address.to_string());
                 panic!(
-                    "test daemon listener {listener_address} failed before {ACCEPT_TIMEOUT:?}: {error}"
+                    "test daemon listener {listener_address} failed before {ACCEPT_TIMEOUT:?}: \
+                     {error}"
                 );
             }
         }

@@ -7,6 +7,7 @@ use tempfile::TempDir;
 use url::Url;
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 use super::*;
 use crate::dispatch::request::CommandRequest;
@@ -29,14 +30,11 @@ fn build_backends() -> FusionBackends<SemanticBackendProvider> {
     FusionBackends::new(config, provider)
 }
 
-fn build_router() -> DomainRouter {
-    DomainRouter::new(PathBuf::from("/tmp/weaver-test-workspace"))
-}
+fn build_router() -> DomainRouter { DomainRouter::new(PathBuf::from("/tmp/weaver-test-workspace")) }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn backends() -> FusionBackends<SemanticBackendProvider> {
-    build_backends()
-}
+fn backends() -> FusionBackends<SemanticBackendProvider> { build_backends() }
 
 fn invalid_arguments_message(domain: &str, operation: &str) -> Option<&'static str> {
     match (domain, operation) {

@@ -1,8 +1,10 @@
 #![cfg(feature = "cli")]
 
-use std::ffi::{OsStr, OsString};
-use std::fs;
-use std::sync::{Mutex, MutexGuard};
+use std::{
+    ffi::{OsStr, OsString},
+    fs,
+    sync::{Mutex, MutexGuard},
+};
 
 use once_cell::sync::Lazy;
 use ortho_config::OrthoError;

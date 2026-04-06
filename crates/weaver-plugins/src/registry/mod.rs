@@ -6,25 +6,24 @@
 
 use std::collections::HashMap;
 
-use crate::capability::CapabilityId;
-use crate::error::PluginError;
-use crate::manifest::{PluginKind, PluginManifest};
+use crate::{
+    capability::CapabilityId,
+    error::PluginError,
+    manifest::{PluginKind, PluginManifest},
+};
 
 /// Registry of available plugin manifests.
 ///
 /// # Example
 ///
 /// ```
-/// use weaver_plugins::{PluginRegistry, PluginManifest, PluginMetadata, PluginKind};
 /// use std::path::PathBuf;
+///
+/// use weaver_plugins::{PluginKind, PluginManifest, PluginMetadata, PluginRegistry};
 ///
 /// let mut registry = PluginRegistry::new();
 /// let meta = PluginMetadata::new("rope", "1.0.0", PluginKind::Actuator);
-/// let manifest = PluginManifest::new(
-///     meta,
-///     vec!["python".into()],
-///     PathBuf::from("/usr/bin/rope"),
-/// );
+/// let manifest = PluginManifest::new(meta, vec!["python".into()], PathBuf::from("/usr/bin/rope"));
 /// registry.register(manifest).expect("registration succeeds");
 /// assert!(registry.get("rope").is_some());
 /// ```
@@ -36,9 +35,7 @@ pub struct PluginRegistry {
 impl PluginRegistry {
     /// Creates an empty registry.
     #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
+    pub fn new() -> Self { Self::default() }
 
     /// Registers a plugin manifest after validation.
     ///
@@ -61,9 +58,7 @@ impl PluginRegistry {
 
     /// Looks up a plugin by name.
     #[must_use]
-    pub fn get(&self, name: &str) -> Option<&PluginManifest> {
-        self.manifests.get(name)
-    }
+    pub fn get(&self, name: &str) -> Option<&PluginManifest> { self.manifests.get(name) }
 
     /// Returns all plugins matching the specified kind.
     #[must_use]
@@ -124,15 +119,11 @@ impl PluginRegistry {
 
     /// Returns the number of registered plugins.
     #[must_use]
-    pub fn len(&self) -> usize {
-        self.manifests.len()
-    }
+    pub fn len(&self) -> usize { self.manifests.len() }
 
     /// Returns `true` when no plugins are registered.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.manifests.is_empty()
-    }
+    pub fn is_empty(&self) -> bool { self.manifests.is_empty() }
 }
 
 #[cfg(test)]

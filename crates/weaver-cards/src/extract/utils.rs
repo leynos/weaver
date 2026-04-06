@@ -1,7 +1,6 @@
 //! URI, provenance, and language-mapping helpers for card assembly.
 
-use std::path::Path;
-use std::sync::OnceLock;
+use std::{path::Path, sync::OnceLock};
 
 use url::Url;
 use weaver_syntax::SupportedLanguage;

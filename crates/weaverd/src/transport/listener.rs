@@ -6,31 +6,31 @@
 //! limit for handler threads, and cleans up Unix socket files during shutdown
 //! or early error paths.
 
-use std::io;
-#[cfg(test)]
-use std::net::SocketAddr;
-use std::net::{TcpListener, ToSocketAddrs};
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, AtomicUsize, Ordering},
-};
-use std::thread;
-use std::time::Duration;
-
-use tracing::{info, warn};
-
-use weaver_config::SocketEndpoint;
-
-use super::{ConnectionHandler, ConnectionStream, LISTENER_TARGET, ListenerError};
-
 #[cfg(unix)]
 use std::fs;
+#[cfg(test)]
+use std::net::SocketAddr;
 #[cfg(unix)]
 use std::os::unix::fs::FileTypeExt;
 #[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 #[cfg(unix)]
 use std::path::Path;
+use std::{
+    io,
+    net::{TcpListener, ToSocketAddrs},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
+    thread,
+    time::Duration,
+};
+
+use tracing::{info, warn};
+use weaver_config::SocketEndpoint;
+
+use super::{ConnectionHandler, ConnectionStream, LISTENER_TARGET, ListenerError};
 
 const ACCEPT_BACKOFF: Duration = Duration::from_millis(25);
 const ERROR_BACKOFF: Duration = Duration::from_millis(150);
@@ -147,9 +147,7 @@ pub(crate) struct ListenerHandle {
 
 impl ListenerHandle {
     /// Signals the accept loop to shut down.
-    pub(crate) fn shutdown(&self) {
-        self.shutdown.store(true, Ordering::SeqCst);
-    }
+    pub(crate) fn shutdown(&self) { self.shutdown.store(true, Ordering::SeqCst); }
 
     /// Waits for the accept loop to complete.
     ///
@@ -217,15 +215,11 @@ struct HandlerPermit {
 }
 
 impl HandlerPermit {
-    fn new(active: Arc<AtomicUsize>) -> Self {
-        Self { active }
-    }
+    fn new(active: Arc<AtomicUsize>) -> Self { Self { active } }
 }
 
 impl Drop for HandlerPermit {
-    fn drop(&mut self) {
-        self.active.fetch_sub(1, Ordering::SeqCst);
-    }
+    fn drop(&mut self) { self.active.fetch_sub(1, Ordering::SeqCst); }
 }
 
 fn run_accept_loop(

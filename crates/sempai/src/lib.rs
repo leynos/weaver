@@ -39,12 +39,22 @@ mod engine;
 mod mode_validation;
 
 // Re-export all stable types from sempai_core.
-pub use sempai_core::{
-    CaptureValue, CapturedNode, Diagnostic, DiagnosticCode, DiagnosticReport, EngineConfig,
-    EngineLimits, Language, LanguageParseError, LineCol, Match, SourceSpan, Span,
-};
-
 pub use engine::{Engine, QueryPlan};
+pub use sempai_core::{
+    CaptureValue,
+    CapturedNode,
+    Diagnostic,
+    DiagnosticCode,
+    DiagnosticReport,
+    EngineConfig,
+    EngineLimits,
+    Language,
+    LanguageParseError,
+    LineCol,
+    Match,
+    SourceSpan,
+    Span,
+};
 
 #[cfg(test)]
 mod tests;

@@ -1,17 +1,19 @@
 //! Behavioural tests for the daemon socket listener.
 
-use std::cell::RefCell;
-use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
+use std::{
+    cell::RefCell,
+    net::{SocketAddr, TcpListener, TcpStream},
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::{Duration, Instant},
 };
-use std::time::{Duration, Instant};
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
-
 use weaver_config::SocketEndpoint;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 use crate::transport::{CountingHandler, ListenerHandle, SocketListener};
 
@@ -93,10 +95,9 @@ impl Drop for ListenerWorld {
     }
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> RefCell<ListenerWorld> {
-    RefCell::new(ListenerWorld::new())
-}
+fn world() -> RefCell<ListenerWorld> { RefCell::new(ListenerWorld::new()) }
 
 #[given("a TCP socket listener is running")]
 fn given_tcp_listener(world: &RefCell<ListenerWorld>) {
@@ -109,19 +110,13 @@ fn given_tcp_listener(world: &RefCell<ListenerWorld>) {
 }
 
 #[given("a TCP socket is already bound")]
-fn given_tcp_in_use(world: &RefCell<ListenerWorld>) {
-    world.borrow_mut().reserve_port();
-}
+fn given_tcp_in_use(world: &RefCell<ListenerWorld>) { world.borrow_mut().reserve_port(); }
 
 #[when("a client connects")]
-fn when_client_connects(world: &RefCell<ListenerWorld>) {
-    world.borrow().connect_clients(1);
-}
+fn when_client_connects(world: &RefCell<ListenerWorld>) { world.borrow().connect_clients(1); }
 
 #[when("two clients connect")]
-fn when_two_clients_connect(world: &RefCell<ListenerWorld>) {
-    world.borrow().connect_clients(2);
-}
+fn when_two_clients_connect(world: &RefCell<ListenerWorld>) { world.borrow().connect_clients(2); }
 
 #[when("the listener starts on the same socket")]
 fn when_listener_starts_same_socket(world: &RefCell<ListenerWorld>) {
@@ -155,6 +150,4 @@ fn then_listener_fails(world: &RefCell<ListenerWorld>) {
 }
 
 #[scenario(path = "tests/features/daemon_socket.feature")]
-fn daemon_socket_listener(#[from(world)] world: RefCell<ListenerWorld>) {
-    drop(world);
-}
+fn daemon_socket_listener(#[from(world)] world: RefCell<ListenerWorld>) { drop(world); }

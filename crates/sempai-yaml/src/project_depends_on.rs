@@ -14,15 +14,11 @@ pub struct ProjectDependsOnPayload {
 impl ProjectDependsOnPayload {
     /// Returns the dependency namespace.
     #[must_use]
-    pub fn namespace(&self) -> &str {
-        &self.namespace
-    }
+    pub fn namespace(&self) -> &str { &self.namespace }
 
     /// Returns the dependency package.
     #[must_use]
-    pub fn package(&self) -> &str {
-        &self.package
-    }
+    pub fn package(&self) -> &str { &self.package }
 
     /// Consumes the wrapper and returns the underlying payload.
     #[must_use]
@@ -52,7 +48,8 @@ impl TryFrom<Value> for ProjectDependsOnPayload {
         let has_package = object.get("package").and_then(Value::as_str).is_some();
         if !(has_namespace && has_package) {
             return Err(String::from(
-                "`r2c-internal-project-depends-on` must define string `namespace` and `package` fields",
+                "`r2c-internal-project-depends-on` must define string `namespace` and `package` \
+                 fields",
             ));
         }
 
@@ -61,7 +58,8 @@ impl TryFrom<Value> for ProjectDependsOnPayload {
             .and_then(Value::as_str)
             .ok_or_else(|| {
                 String::from(
-                    "`r2c-internal-project-depends-on` must define string `namespace` and `package` fields",
+                    "`r2c-internal-project-depends-on` must define string `namespace` and \
+                     `package` fields",
                 )
             })?
             .to_owned();
@@ -70,7 +68,8 @@ impl TryFrom<Value> for ProjectDependsOnPayload {
             .and_then(Value::as_str)
             .ok_or_else(|| {
                 String::from(
-                    "`r2c-internal-project-depends-on` must define string `namespace` and `package` fields",
+                    "`r2c-internal-project-depends-on` must define string `namespace` and \
+                     `package` fields",
                 )
             })?
             .to_owned();
@@ -80,7 +79,5 @@ impl TryFrom<Value> for ProjectDependsOnPayload {
 }
 
 impl From<ProjectDependsOnPayload> for Value {
-    fn from(payload: ProjectDependsOnPayload) -> Self {
-        payload.into_inner()
-    }
+    fn from(payload: ProjectDependsOnPayload) -> Self { payload.into_inner() }
 }

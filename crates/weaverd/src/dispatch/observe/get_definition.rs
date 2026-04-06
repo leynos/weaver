@@ -9,15 +9,17 @@ use std::io::Write;
 
 use tracing::debug;
 
-use crate::backends::{BackendKind, FusionBackends};
-use crate::dispatch::errors::DispatchError;
-use crate::dispatch::request::CommandRequest;
-use crate::dispatch::response::ResponseWriter;
-use crate::dispatch::router::{DISPATCH_TARGET, DispatchResult};
-use crate::semantic_provider::SemanticBackendProvider;
-
-use super::arguments::GetDefinitionArgs;
-use super::responses::extract_locations;
+use super::{arguments::GetDefinitionArgs, responses::extract_locations};
+use crate::{
+    backends::{BackendKind, FusionBackends},
+    dispatch::{
+        errors::DispatchError,
+        request::CommandRequest,
+        response::ResponseWriter,
+        router::{DISPATCH_TARGET, DispatchResult},
+    },
+    semantic_provider::SemanticBackendProvider,
+};
 
 /// Handles the `observe get-definition` command.
 ///

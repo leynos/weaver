@@ -3,15 +3,17 @@
 //! These steps map feature scenarios in `tests/features/weaver_cli.feature`
 //! to harness operations that exercise the CLI against a fake daemon.
 
-use super::support::*;
-use crate::EMPTY_LINE_LIMIT;
-use crate::lifecycle::{LifecycleCommand, LifecycleError};
-use crate::output::UNKNOWN_OPERATION_TYPE;
-
 use std::cell::RefCell;
 
 use rstest_bdd_macros::{given, scenario, then, when};
 use serde_json::json;
+
+use super::support::*;
+use crate::{
+    EMPTY_LINE_LIMIT,
+    lifecycle::{LifecycleCommand, LifecycleError},
+    output::UNKNOWN_OPERATION_TYPE,
+};
 
 const SAMPLE_RUST_SOURCE: &str = "fn main() {\n    let value = 1;\n    value\n}\n";
 const SAMPLE_PATCH: &str = concat!(
@@ -88,9 +90,7 @@ fn given_running_daemon(world: &RefCell<TestWorld>) {
 }
 
 #[given("patch input is available")]
-fn given_patch_input(world: &RefCell<TestWorld>) {
-    world.borrow_mut().set_stdin(SAMPLE_PATCH);
-}
+fn given_patch_input(world: &RefCell<TestWorld>) { world.borrow_mut().set_stdin(SAMPLE_PATCH); }
 
 #[given("lifecycle responses succeed")]
 fn given_lifecycle_success(world: &RefCell<TestWorld>) {
@@ -348,19 +348,13 @@ fn then_capabilities(world: &RefCell<TestWorld>, fixture: String) {
 }
 
 #[scenario(path = "tests/features/weaver_cli.feature")]
-fn weaver_cli_behaviour(world: RefCell<TestWorld>) {
-    let _ = world;
-}
+fn weaver_cli_behaviour(world: RefCell<TestWorld>) { let _ = world; }
 
 #[scenario(path = "tests/features/weaver_cli_output.feature")]
-fn weaver_cli_output_behaviour(world: RefCell<TestWorld>) {
-    let _ = world;
-}
+fn weaver_cli_output_behaviour(world: RefCell<TestWorld>) { let _ = world; }
 
 #[scenario(path = "tests/features/weaver_cli_version.feature")]
-fn weaver_cli_version_behaviour(world: RefCell<TestWorld>) {
-    let _ = world;
-}
+fn weaver_cli_version_behaviour(world: RefCell<TestWorld>) { let _ = world; }
 
 fn parse_lifecycle_command(label: &str) -> LifecycleCommand {
     match label.trim().to_ascii_lowercase().as_str() {

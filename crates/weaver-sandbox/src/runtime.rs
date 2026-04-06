@@ -1,15 +1,13 @@
 //! Platform helpers for sandbox defaults and preflight checks.
 
-use std::io;
-use std::path::PathBuf;
+use std::{io, path::PathBuf};
 
 /// Returns standard Linux library paths that should be readable by default.
 #[must_use]
 pub fn linux_runtime_roots() -> Vec<PathBuf> {
     #[cfg(target_os = "linux")]
     {
-        use std::fs;
-        use std::path::Path;
+        use std::{fs, path::Path};
 
         let candidates = [
             "/lib",

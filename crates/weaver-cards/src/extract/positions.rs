@@ -4,9 +4,7 @@ use super::CardExtractionError;
 
 /// Converts a `usize` to `u32`, saturating at [`u32::MAX`] for files larger
 /// than 4 GiB, an edge case that is unreachable in normal operation.
-pub(super) fn usize_to_u32(value: usize) -> u32 {
-    u32::try_from(value).unwrap_or(u32::MAX)
-}
+pub(super) fn usize_to_u32(value: usize) -> u32 { u32::try_from(value).unwrap_or(u32::MAX) }
 
 pub(super) fn position_to_byte(
     source: &str,
