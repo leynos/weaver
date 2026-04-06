@@ -33,6 +33,10 @@ struct TestWorld {
 #[fixture]
 fn world() -> TestWorld { TestWorld::default() }
 
+#[expect(
+    clippy::expect_fun_call,
+    reason = "Test helper needs string interpolation in expect message; will be addressed when whitaker permits unwrap_or_else panic in test interpolation contexts"
+)]
 fn parse_diagnostic_code(code: &str) -> DiagnosticCode {
     let json = serde_json::to_string(code).expect("serialise diagnostic code");
     serde_json::from_str(&json).expect(&format!("unrecognised diagnostic code: {code}"))
@@ -167,6 +171,10 @@ fn assert_str_contains(haystack: &str, needle: &str, label: &str) {
     );
 }
 
+#[expect(
+    clippy::expect_fun_call,
+    reason = "Test step needs string interpolation in expect message; will be addressed when whitaker permits unwrap_or_else panic in test interpolation contexts"
+)]
 #[then("the JSON contains key {key} with value {value}")]
 fn then_json_contains(world: &mut TestWorld, key: QuotedString, value: QuotedString) {
     let json = world.json_output.as_ref().expect("JSON should be set");
@@ -205,6 +213,10 @@ fn then_first_diagnostic_does_not_contain_key(world: &mut TestWorld, key: Quoted
     );
 }
 
+#[expect(
+    clippy::expect_fun_call,
+    reason = "Test step needs string interpolation in expect message; will be addressed when whitaker permits unwrap_or_else panic in test interpolation contexts"
+)]
 #[then("the first diagnostic JSON contains key {key} with value {value}")]
 fn then_first_diagnostic_contains_key_with_value(
     world: &mut TestWorld,

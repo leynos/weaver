@@ -45,6 +45,10 @@ fn extract_multiple_capture_text(
 }
 
 /// Helper to extract a multiple metavariable capture from a match result.
+#[expect(
+    clippy::expect_fun_call,
+    reason = "Test helper needs string interpolation in expect message; will be addressed when whitaker permits unwrap_or_else panic in test interpolation contexts"
+)]
 fn extract_multiple_capture<'a>(
     match_result: &'a MatchResult<'a>,
     var_name: &str,
