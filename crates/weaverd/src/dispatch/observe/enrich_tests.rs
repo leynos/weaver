@@ -173,63 +173,70 @@ fn maps_card_languages_to_lsp() {
 }
 
 #[test]
-fn byte_col_to_utf16_converts_ascii_correctly() {
+fn byte_col_to_utf16_converts_ascii_correctly() -> Result<(), String> {
     let line = "fn foo() {}";
-    check_utf16_offset(line, 0, Some(0));
-    check_utf16_offset(line, 3, Some(3)); // at 'foo'
-    check_utf16_offset(line, 11, Some(11)); // at end
+    check_utf16_offset(line, 0, Some(0))?;
+    check_utf16_offset(line, 3, Some(3))?; // at 'foo'
+    check_utf16_offset(line, 11, Some(11))?; // at end
+    Ok(())
 }
 
 #[test]
-fn byte_col_to_utf16_converts_multibyte_utf8_correctly() {
+fn byte_col_to_utf16_converts_multibyte_utf8_correctly() -> Result<(), String> {
     // "// café" — 'é' is 2 bytes in UTF-8 (U+00E9 = 0xC3 0xA9), but 1 UTF-16 code unit
     // Bytes: 2f 2f 20 63 61 66 c3 a9
     let line = "// café";
-    check_utf16_offset(line, 0, Some(0)); // at start (before '/')
-    check_utf16_offset(line, 3, Some(3)); // at ' ' (after '//')
-    check_utf16_offset(line, 4, Some(4)); // at 'c'
-    check_utf16_offset(line, 5, Some(5)); // at 'a'
-    check_utf16_offset(line, 6, Some(6)); // at 'f'
-    check_utf16_offset(line, 8, Some(7)); // after 'é' (byte 6-7 is 'é', byte 8 is end)
+    check_utf16_offset(line, 0, Some(0))?; // at start (before '/')
+    check_utf16_offset(line, 3, Some(3))?; // at ' ' (after '//')
+    check_utf16_offset(line, 4, Some(4))?; // at 'c'
+    check_utf16_offset(line, 5, Some(5))?; // at 'a'
+    check_utf16_offset(line, 6, Some(6))?; // at 'f'
+    check_utf16_offset(line, 8, Some(7))?; // after 'é' (byte 6-7 is 'é', byte 8 is end)
+    Ok(())
 }
 
 #[test]
-fn byte_col_to_utf16_converts_emoji_correctly() {
+fn byte_col_to_utf16_converts_emoji_correctly() -> Result<(), String> {
     // "// 🦀 Rust" — '🦀' is 4 bytes (U+1F980), but 2 UTF-16 code units (surrogate pair)
     let line = "// 🦀 Rust";
-    check_utf16_offset(line, 0, Some(0)); // at start
-    check_utf16_offset(line, 3, Some(3)); // at '🦀'
-    check_utf16_offset(line, 7, Some(5)); // after '🦀' (4 bytes → 2 UTF-16)
-    check_utf16_offset(line, 8, Some(6)); // at ' '
+    check_utf16_offset(line, 0, Some(0))?; // at start
+    check_utf16_offset(line, 3, Some(3))?; // at '🦀'
+    check_utf16_offset(line, 7, Some(5))?; // after '🦀' (4 bytes → 2 UTF-16)
+    check_utf16_offset(line, 8, Some(6))?; // at ' '
+    Ok(())
 }
 
 #[test]
-fn byte_col_to_utf16_rejects_out_of_range_offset() {
+fn byte_col_to_utf16_rejects_out_of_range_offset() -> Result<(), String> {
     let line = "hello";
-    check_utf16_offset(line, 100, None);
+    check_utf16_offset(line, 100, None)?;
+    Ok(())
 }
 
 #[test]
-fn byte_col_to_utf16_rejects_non_char_boundary() {
+fn byte_col_to_utf16_rejects_non_char_boundary() -> Result<(), String> {
     let line = "café";
     // 'é' starts at byte 3 and is 2 bytes; byte 4 is mid-character
-    check_utf16_offset(line, 4, None);
+    check_utf16_offset(line, 4, None)?;
+    Ok(())
 }
 
 #[test]
-fn try_lsp_enrichment_with_non_ascii_source() {
+fn try_lsp_enrichment_with_non_ascii_source() -> Result<(), String> {
     let caps = ServerCapabilitySet::new(false, false, false).with_hover(true);
-    let character = run_non_ascii_enrichment(caps);
+    let character = run_non_ascii_enrichment(caps)?;
     // 'é' saves one position: byte offset 12 → UTF-16 offset 11
     assert_eq!(character, 11);
+    Ok(())
 }
 
 #[test]
-fn try_lsp_enrichment_with_non_ascii_source_utf8_negotiated() {
+fn try_lsp_enrichment_with_non_ascii_source_utf8_negotiated() -> Result<(), String> {
     let caps = ServerCapabilitySet::new(false, false, false)
         .with_hover(true)
         .with_position_encoding(Some(lsp_types::PositionEncodingKind::UTF8));
-    let character = run_non_ascii_enrichment(caps);
+    let character = run_non_ascii_enrichment(caps)?;
     // UTF-8 negotiated: byte offset 12 is passed through unchanged
     assert_eq!(character, 12);
+    Ok(())
 }
