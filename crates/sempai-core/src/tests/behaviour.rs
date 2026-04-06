@@ -35,7 +35,7 @@ fn world() -> TestWorld { TestWorld::default() }
 
 fn parse_diagnostic_code(code: &str) -> DiagnosticCode {
     let json = serde_json::to_string(code).expect("serialise diagnostic code");
-    serde_json::from_str(&json).unwrap_or_else(|_| panic!("unrecognised diagnostic code: {code}"))
+    serde_json::from_str(&json).expect(&format!("unrecognised diagnostic code: {code}"))
 }
 
 // ---------------------------------------------------------------------------
@@ -172,12 +172,9 @@ fn then_json_contains(world: &mut TestWorld, key: QuotedString, value: QuotedStr
     let json = world.json_output.as_ref().expect("JSON should be set");
     let parsed: serde_json::Value =
         serde_json::from_str(json).expect("JSON output should be valid");
-    let actual = parsed.get(key.as_str()).unwrap_or_else(|| {
-        panic!(
-            "expected JSON to contain key '{}', got: {json}",
-            key.as_str()
-        )
-    });
+    let actual = parsed
+        .get(key.as_str())
+        .expect(&format!("expected JSON to contain key '{}', got: {json}", key.as_str()));
     let expected: serde_json::Value = serde_json::from_str(value.as_str())
         .unwrap_or_else(|_| serde_json::Value::String(value.as_str().to_owned()));
     assert_eq!(
@@ -215,12 +212,9 @@ fn then_first_diagnostic_contains_key_with_value(
     value: QuotedString,
 ) {
     let first = first_diagnostic_object(world);
-    let actual = first.get(key.as_str()).unwrap_or_else(|| {
-        panic!(
-            "expected first diagnostic JSON to contain key '{}', got: {first:?}",
-            key.as_str()
-        )
-    });
+    let actual = first
+        .get(key.as_str())
+        .expect(&format!("expected first diagnostic JSON to contain key '{}', got: {first:?}", key.as_str()));
     let expected: serde_json::Value = serde_json::from_str(value.as_str())
         .unwrap_or_else(|_| serde_json::Value::String(value.as_str().to_owned()));
     assert_eq!(
