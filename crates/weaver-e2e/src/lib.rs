@@ -33,8 +33,7 @@ pub fn command_available(cmd: &str) -> bool {
     std::process::Command::new("which")
         .arg(cmd)
         .output()
-        .map(|out| out.status.success())
-        .unwrap_or(false)
+        .is_ok_and(|out| out.status.success())
 }
 
 /// Checks if Pyrefly is available via uvx.
@@ -48,6 +47,5 @@ pub fn pyrefly_available() -> bool {
     std::process::Command::new("uvx")
         .args(["pyrefly", "--help"])
         .output()
-        .map(|out| out.status.success())
-        .unwrap_or(false)
+        .is_ok_and(|out| out.status.success())
 }

@@ -1,4 +1,6 @@
 //! Unit tests for the weaver-graph crate.
+//!
+//! Tests for graph operations including nodes, edges, and traversals.
 
 // Tests use caller/callee terminology which triggers similar_names lint
 #![expect(
@@ -10,8 +12,6 @@
     clippy::redundant_closure_for_method_calls,
     reason = "closures needed for &&T to &T conversion in first().map()"
 )]
-
-//! Tests for graph operations including nodes, edges, and traversals.
 
 mod graph_tests {
     use crate::{
@@ -117,8 +117,7 @@ mod graph_tests {
     }
 }
 
-//! Tests for node creation and accessor methods.
-
+/// Tests for node creation and accessor methods.
 mod node_tests {
     use camino::Utf8PathBuf;
 
@@ -150,8 +149,7 @@ mod node_tests {
     }
 }
 
-//! Tests for edge creation and relationship tracking.
-
+/// Tests for edge creation and relationship tracking.
 mod edge_tests {
     use camino::Utf8PathBuf;
 
