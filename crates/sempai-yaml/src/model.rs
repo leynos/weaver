@@ -258,7 +258,7 @@ pub enum LegacyFormula {
     /// `patterns: [...]`
     Patterns(Vec<LegacyClause>),
     /// `pattern-either: [...]`
-    PatternEither(Vec<LegacyFormula>),
+    PatternEither(Vec<Self>),
     /// `pattern-not: ...`
     PatternNot(Box<LegacyValue>),
     /// `pattern-inside: ...`
@@ -299,19 +299,19 @@ pub enum MatchFormula {
     /// `regex: "..."`
     Regex(String),
     /// `all: [...]`
-    All(Vec<MatchFormula>),
+    All(Vec<Self>),
     /// `any: [...]`
-    Any(Vec<MatchFormula>),
+    Any(Vec<Self>),
     /// `not: ...`
-    Not(Box<MatchFormula>),
+    Not(Box<Self>),
     /// `inside: ...`
-    Inside(Box<MatchFormula>),
+    Inside(Box<Self>),
     /// `anywhere: ...`
-    Anywhere(Box<MatchFormula>),
+    Anywhere(Box<Self>),
     /// Query object with optional `where`, `as`, or `fix`.
     Decorated {
         /// The core formula branch.
-        formula: Box<MatchFormula>,
+        formula: Box<Self>,
         /// Raw `where` clauses preserved for later normalization.
         where_clauses: Vec<Value>,
         /// Optional alias name.

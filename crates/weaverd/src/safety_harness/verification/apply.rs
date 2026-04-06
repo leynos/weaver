@@ -114,6 +114,8 @@ fn line_column_to_offset(
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for edit application and text transformation.
+
     use std::path::PathBuf;
 
     use rstest::rstest;

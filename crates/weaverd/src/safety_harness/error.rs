@@ -187,6 +187,8 @@ impl SafetyHarnessError {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for verification error types and display formatting.
+
     use super::*;
 
     #[test]

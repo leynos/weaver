@@ -159,6 +159,8 @@ fn parse_position(value: &str) -> Result<(u32, u32), DispatchError> {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for observe command argument parsing.
+
     use rstest::rstest;
 
     use super::*;

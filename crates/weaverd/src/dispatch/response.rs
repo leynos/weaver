@@ -194,6 +194,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for response writing and formatting.
+
     use super::*;
 
     #[test]

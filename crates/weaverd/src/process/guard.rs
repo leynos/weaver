@@ -263,6 +263,8 @@ fn record_health_event(path: &Path, status: &'static str) {
 
 #[cfg(test)]
 pub(super) mod test_support {
+    //! Test support utilities for health event tracking.
+
     use super::{HEALTH_EVENTS, HashMap, Mutex, Path, PathBuf};
 
     fn storage() -> &'static Mutex<HashMap<PathBuf, Vec<&'static str>>> {
@@ -288,6 +290,8 @@ pub(super) mod test_support {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for process guard health checking.
+
     use tempfile::TempDir;
     use weaver_config::{Config, SocketEndpoint};
 

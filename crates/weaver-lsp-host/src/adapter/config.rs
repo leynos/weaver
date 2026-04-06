@@ -62,6 +62,8 @@ impl LspServerConfig {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for language server configuration defaults.
+
     use rstest::rstest;
 
     use super::*;

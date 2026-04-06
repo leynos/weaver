@@ -149,7 +149,7 @@ impl Rewriter {
         // Sort matches by byte offset (descending) to replace from end to start
         // This preserves earlier offsets when replacing
         let mut sorted_matches: Vec<_> = matches.iter().collect();
-        sorted_matches.sort_by(|a, b| b.byte_range().start.cmp(&a.byte_range().start));
+        sorted_matches.sort_by_key(|b| std::cmp::Reverse(b.byte_range().start));
 
         let mut result = source.to_owned();
 
@@ -294,6 +294,8 @@ fn substitute_metavariables(template: &str, match_result: &MatchResult<'_>) -> S
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for pattern-based source code rewriting.
+
     use super::*;
 
     #[test]

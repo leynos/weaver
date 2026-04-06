@@ -141,6 +141,8 @@ impl SemanticLock for PlaceholderSemanticLock {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for verification context and file tracking.
+
     use super::*;
 
     #[test]

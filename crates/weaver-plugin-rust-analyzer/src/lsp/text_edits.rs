@@ -127,7 +127,7 @@ pub(super) fn apply_workspace_edit(
         })
         .collect::<Result<Vec<(usize, usize, String)>, RustAnalyzerAdapterError>>()?;
 
-    ranges.sort_by(|left, right| right.0.cmp(&left.0));
+    ranges.sort_by_key(|right| std::cmp::Reverse(right.0));
 
     let mut updated = String::from(original);
     for (start, end, replacement) in ranges {

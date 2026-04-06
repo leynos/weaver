@@ -125,6 +125,8 @@ pub enum RuntimePathsError {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for runtime path derivation from configuration.
+
     use super::*;
     use crate::Config;
 

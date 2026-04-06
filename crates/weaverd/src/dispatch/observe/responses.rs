@@ -64,6 +64,8 @@ pub fn extract_locations(response: GotoDefinitionResponse) -> Vec<DefinitionLoca
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for LSP response conversion and extraction.
+
     use lsp_types::{Position, Range, Uri};
     use rstest::{fixture, rstest};
     use weaver_test_macros::allow_fixture_expansion_lints;

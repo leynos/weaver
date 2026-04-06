@@ -92,6 +92,8 @@ fn trim_trailing_whitespace(bytes: &[u8]) -> &[u8] {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for command request parsing and validation.
+
     use rstest::rstest;
 
     use super::*;

@@ -94,6 +94,8 @@ impl StdioTransport {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for LSP transport layer and message framing.
+
     use std::io::Cursor;
 
     use rstest::rstest;
