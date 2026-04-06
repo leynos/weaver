@@ -252,10 +252,6 @@ impl RefactorWorld {
 
 #[allow_fixture_expansion_lints]
 #[fixture]
-#[expect(
-    clippy::expect_used,
-    reason = "Fixture initialization failure is unrecoverable; test cannot proceed without world"
-)]
 fn world() -> RefactorWorld {
     RefactorWorld::new().expect("failed to create refactor world")
 }
