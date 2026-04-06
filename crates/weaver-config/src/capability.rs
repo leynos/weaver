@@ -185,6 +185,8 @@ fn normalise_key(key: &str) -> String { key.trim().to_lowercase() }
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for capability matrix overrides and lookups.
+
     use super::*;
 
     #[test]

@@ -241,6 +241,8 @@ impl std::fmt::Display for ValidationFailure {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for syntactic validation using Tree-sitter locks.
+
     use std::path::PathBuf;
 
     use rstest::rstest;

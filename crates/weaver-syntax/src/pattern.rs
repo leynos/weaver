@@ -262,6 +262,8 @@ fn extract_metavariables(source: &str) -> Result<Vec<MetaVariable>, SyntaxError>
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for pattern metavariable extraction and validation.
+
     use super::*;
 
     #[test]

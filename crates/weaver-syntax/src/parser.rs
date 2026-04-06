@@ -202,6 +202,8 @@ fn collect_error_nodes(
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for Tree-sitter parser initialisation and parsing.
+
     use rstest::rstest;
 
     use super::*;

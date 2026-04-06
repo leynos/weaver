@@ -58,6 +58,8 @@ pub fn path_to_uri(path: &Utf8PathBuf) -> Result<Uri, GraphError> {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for URI to path conversion utilities.
+
     #![expect(clippy::unwrap_used, reason = "tests use unwrap for clarity")]
 
     use std::str::FromStr;

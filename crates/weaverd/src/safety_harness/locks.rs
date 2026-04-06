@@ -61,6 +61,8 @@ impl SemanticLockResult {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for syntactic and semantic lock results.
+
     use std::path::PathBuf;
 
     use super::*;

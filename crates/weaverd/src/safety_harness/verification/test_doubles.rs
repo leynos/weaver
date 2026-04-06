@@ -100,6 +100,8 @@ impl SemanticLock for ConfigurableSemanticLock {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for verification test doubles and mocks.
+
     use std::path::PathBuf;
 
     use super::*;
