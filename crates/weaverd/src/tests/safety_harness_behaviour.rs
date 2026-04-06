@@ -325,24 +325,29 @@ fn then_named_file_contains(
 }
 
 #[then("the file is unchanged")]
-fn then_file_unchanged(world: &RefCell<SafetyHarnessWorld>) {
+fn then_file_unchanged(world: &RefCell<SafetyHarnessWorld>) -> Result<(), String> {
     let file_name = world.borrow().current_file_name();
     let world = world.borrow();
     let content = world.read_file(&file_name);
     let expected = world
         .original_content(&file_name)
-        .unwrap_or_else(|| panic!("no original content recorded for {}", file_name.as_str()));
+        .ok_or_else(|| format!("no original content recorded for {}", file_name.as_str()))?;
     assert_eq!(content, expected, "file should be unchanged");
+    Ok(())
 }
 
 #[then("the file {name} is unchanged")]
-fn then_named_file_unchanged(world: &RefCell<SafetyHarnessWorld>, name: FileName) {
+fn then_named_file_unchanged(
+    world: &RefCell<SafetyHarnessWorld>,
+    name: FileName,
+) -> Result<(), String> {
     let world = world.borrow();
     let content = world.read_file(&name);
     let expected = world
         .original_content(&name)
-        .unwrap_or_else(|| panic!("no original content recorded for {}", name.as_str()));
+        .ok_or_else(|| format!("no original content recorded for {}", name.as_str()))?;
     assert_eq!(content, expected, "{} should be unchanged", name.as_str());
+    Ok(())
 }
 
 #[scenario(path = "tests/features/safety_harness.feature")]

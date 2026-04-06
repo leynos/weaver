@@ -19,27 +19,25 @@ fn world() -> RefCell<ProcessTestWorld> { RefCell::new(ProcessTestWorld::new()) 
 fn given_world(world: &RefCell<ProcessTestWorld>) { let _ = world; }
 
 #[when("the daemon starts in background mode")]
-fn when_daemon_starts_background(world: &RefCell<ProcessTestWorld>) {
-    world
-        .borrow_mut()
-        .start_background()
-        .unwrap_or_else(|error| panic!("daemon background start failed: {error}"));
+fn when_daemon_starts_background(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+    world.borrow_mut().start_background()?;
+    Ok(())
 }
 
 #[when("the daemon starts in foreground mode")]
-fn when_daemon_starts_foreground(world: &RefCell<ProcessTestWorld>) {
+fn when_daemon_starts_foreground(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
     world
         .borrow_mut()
-        .start_foreground(LaunchMode::Foreground, true)
-        .unwrap_or_else(|error| panic!("daemon foreground start failed: {error}"));
+        .start_foreground(LaunchMode::Foreground, true)?;
+    Ok(())
 }
 
 #[when("the daemon starts in foreground mode with invalid configuration")]
-fn when_daemon_starts_invalid(world: &RefCell<ProcessTestWorld>) {
+fn when_daemon_starts_invalid(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
     world
         .borrow_mut()
-        .start_foreground_with_invalid_config()
-        .unwrap_or_else(|error| panic!("invalid foreground start should fail: {error}"));
+        .start_foreground_with_invalid_config()?;
+    Ok(())
 }
 
 #[when("shutdown is triggered")]
@@ -52,35 +50,29 @@ fn when_wait_for_ready(world: &RefCell<ProcessTestWorld>) {
 
 #[when("the daemon run completes")]
 #[then("the daemon run completes")]
-fn daemon_run_completes(world: &RefCell<ProcessTestWorld>) {
-    world
-        .borrow_mut()
-        .join_background()
-        .unwrap_or_else(|error| panic!("daemon run should complete: {error}"));
+fn daemon_run_completes(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+    world.borrow_mut().join_background()?;
+    Ok(())
 }
 
 #[given("stale runtime artefacts exist")]
-fn given_stale_runtime(world: &RefCell<ProcessTestWorld>) {
-    world
-        .borrow()
-        .write_stale_runtime()
-        .unwrap_or_else(|error| panic!("failed to write stale runtime: {error}"));
+fn given_stale_runtime(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+    world.borrow().write_stale_runtime()?;
+    Ok(())
 }
 
 #[given("stale runtime artefacts with invalid pid exist")]
-fn given_stale_runtime_invalid(world: &RefCell<ProcessTestWorld>) {
+fn given_stale_runtime_invalid(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
     world
         .borrow()
-        .write_stale_runtime_with_invalid_pid(99999)
-        .unwrap_or_else(|error| panic!("failed to write invalid stale runtime: {error}"));
+        .write_stale_runtime_with_invalid_pid(99999)?;
+    Ok(())
 }
 
 #[given("a lock without a pid file exists")]
-fn given_lock_without_pid(world: &RefCell<ProcessTestWorld>) {
-    world
-        .borrow()
-        .write_lock_without_pid()
-        .unwrap_or_else(|error| panic!("failed to write lock without pid: {error}"));
+fn given_lock_without_pid(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
+    world.borrow().write_lock_without_pid()?;
+    Ok(())
 }
 
 #[then("daemonisation was requested")]
