@@ -2,13 +2,14 @@
 
 mod behaviour;
 
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use mockall::mock;
 use rstest::{fixture, rstest};
-use weaver_plugins::capability::ReasonCode;
-use weaver_plugins::protocol::{FilePayload, PluginOutput, PluginRequest};
+use weaver_plugins::{
+    capability::ReasonCode,
+    protocol::{FilePayload, PluginOutput, PluginRequest},
+};
 
 use crate::{PluginFailure, RopeAdapter, RopeAdapterError, execute_request, run_with_adapter};
 
@@ -35,9 +36,7 @@ fn adapter_returning(result: Result<String, RopeAdapterError>) -> MockAdapter {
 }
 
 /// Builds a `MockAdapter` where rename is never expected.
-fn adapter_unused() -> MockAdapter {
-    MockAdapter::new()
-}
+fn adapter_unused() -> MockAdapter { MockAdapter::new() }
 
 #[fixture]
 fn rename_arguments() -> HashMap<String, serde_json::Value> {
@@ -78,9 +77,7 @@ fn rename_success_returns_diff_output(rename_arguments: HashMap<String, serde_js
     assert!(matches!(response.output(), PluginOutput::Diff { .. }));
 }
 
-fn remove_uri(arguments: &mut HashMap<String, serde_json::Value>) {
-    arguments.remove("uri");
-}
+fn remove_uri(arguments: &mut HashMap<String, serde_json::Value>) { arguments.remove("uri"); }
 
 fn set_boolean_uri(arguments: &mut HashMap<String, serde_json::Value>) {
     arguments.insert(String::from("uri"), serde_json::Value::Bool(true));

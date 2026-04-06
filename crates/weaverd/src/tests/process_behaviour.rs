@@ -1,23 +1,22 @@
 //! Behavioural tests covering daemon process supervision and lifecycle files.
 
-use std::cell::RefCell;
-use std::fs;
+use std::{cell::RefCell, fs};
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use crate::process::{LaunchError, LaunchMode};
-use crate::tests::support::{ProcessTestWorld, snapshot_status};
+use crate::{
+    process::{LaunchError, LaunchMode},
+    tests::support::{ProcessTestWorld, snapshot_status},
+};
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> RefCell<ProcessTestWorld> {
-    RefCell::new(ProcessTestWorld::new())
-}
+fn world() -> RefCell<ProcessTestWorld> { RefCell::new(ProcessTestWorld::new()) }
 
 #[given("a fresh daemon process world")]
-fn given_world(world: &RefCell<ProcessTestWorld>) {
-    let _ = world;
-}
+fn given_world(world: &RefCell<ProcessTestWorld>) { let _ = world; }
 
 #[when("the daemon starts in background mode")]
 fn when_daemon_starts_background(world: &RefCell<ProcessTestWorld>) {
@@ -44,9 +43,7 @@ fn when_daemon_starts_invalid(world: &RefCell<ProcessTestWorld>) {
 }
 
 #[when("shutdown is triggered")]
-fn when_shutdown_triggered(world: &RefCell<ProcessTestWorld>) {
-    world.borrow().trigger_shutdown();
-}
+fn when_shutdown_triggered(world: &RefCell<ProcessTestWorld>) { world.borrow().trigger_shutdown(); }
 
 #[when("we wait for the daemon to become ready")]
 fn when_wait_for_ready(world: &RefCell<ProcessTestWorld>) {

@@ -1,16 +1,21 @@
 //! Process-based language server adapter.
 
+use std::{
+    process::{Child, Command, Stdio},
+    sync::Mutex,
+};
+
 use serde::de::DeserializeOwned;
-use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
 use tracing::{debug, warn};
 
-use super::config::LspServerConfig;
-use super::error::AdapterError;
-use super::lifecycle::{ADAPTER_TARGET, terminate_child};
-use super::messaging;
-use super::state::ProcessState;
-use super::transport::StdioTransport;
+use super::{
+    config::LspServerConfig,
+    error::AdapterError,
+    lifecycle::{ADAPTER_TARGET, terminate_child},
+    messaging,
+    state::ProcessState,
+    transport::StdioTransport,
+};
 use crate::Language;
 
 /// A language server adapter that spawns and communicates with an external process.
@@ -56,9 +61,7 @@ impl ProcessLanguageServer {
 
     /// Returns the language this adapter serves.
     #[must_use]
-    pub fn language(&self) -> Language {
-        self.language
-    }
+    pub fn language(&self) -> Language { self.language }
 
     /// Spawns the language server process.
     pub(super) fn spawn_process(&self) -> Result<(Child, StdioTransport), AdapterError> {

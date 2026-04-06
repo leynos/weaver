@@ -3,15 +3,6 @@
 //! Verifies that the CLI automatically starts the daemon when it detects
 //! connection-refused errors, and that spawn failures are reported appropriately.
 
-use crate::lifecycle::LifecycleContext;
-use crate::tests::support::{decode_utf8, default_daemon_lines, respond_to_request};
-use crate::{CommandInvocation, IoStreams, ResolvedOutputFormat, execute_daemon_command};
-use rstest::rstest;
-use std::ffi::OsStr;
-use std::io::Cursor;
-use std::process::ExitCode;
-use weaver_config::{Config, SocketEndpoint};
-
 #[cfg(unix)]
 use std::fs;
 #[cfg(unix)]
@@ -20,8 +11,21 @@ use std::os::unix::net::UnixListener;
 use std::thread;
 #[cfg(unix)]
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::{ffi::OsStr, io::Cursor, process::ExitCode};
+
+use rstest::rstest;
 #[cfg(unix)]
 use tempfile::TempDir;
+use weaver_config::{Config, SocketEndpoint};
+
+use crate::{
+    CommandInvocation,
+    IoStreams,
+    ResolvedOutputFormat,
+    execute_daemon_command,
+    lifecycle::LifecycleContext,
+    tests::support::{decode_utf8, default_daemon_lines, respond_to_request},
+};
 
 /// Creates a minimal test invocation for daemon command tests.
 fn make_invocation() -> CommandInvocation {

@@ -4,25 +4,20 @@ use std::cell::RefCell;
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
-
-use crate::backends::BackendKind;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 use super::support::{self, HealthEvent, TestWorld};
+use crate::backends::BackendKind;
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> RefCell<TestWorld> {
-    support::world()
-}
+fn world() -> RefCell<TestWorld> { support::world() }
 
 #[given("a healthy configuration loader")]
-fn given_healthy_loader(world: &RefCell<TestWorld>) {
-    world.borrow_mut().use_successful_loader();
-}
+fn given_healthy_loader(world: &RefCell<TestWorld>) { world.borrow_mut().use_successful_loader(); }
 
 #[given("a failing configuration loader")]
-fn given_failing_loader(world: &RefCell<TestWorld>) {
-    world.borrow_mut().use_failing_loader();
-}
+fn given_failing_loader(world: &RefCell<TestWorld>) { world.borrow_mut().use_failing_loader(); }
 
 #[given("a backend provider that fails for {backend}")]
 fn given_backend_failure(world: &RefCell<TestWorld>, backend: String) {
@@ -34,9 +29,7 @@ fn given_backend_failure(world: &RefCell<TestWorld>, backend: String) {
 }
 
 #[when("the daemon bootstrap runs")]
-fn when_bootstrap_runs(world: &RefCell<TestWorld>) {
-    world.borrow_mut().bootstrap();
-}
+fn when_bootstrap_runs(world: &RefCell<TestWorld>) { world.borrow_mut().bootstrap(); }
 
 #[when("the {backend} backend is requested")]
 fn when_backend_requested(world: &RefCell<TestWorld>, backend: String) {

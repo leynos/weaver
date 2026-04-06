@@ -6,16 +6,23 @@
 
 use camino::Utf8PathBuf;
 use lsp_types::{
-    CallHierarchyIncomingCallsParams, CallHierarchyItem, CallHierarchyOutgoingCallsParams,
-    CallHierarchyPrepareParams, Position as LspPosition, TextDocumentIdentifier,
-    TextDocumentPositionParams, WorkDoneProgressParams,
+    CallHierarchyIncomingCallsParams,
+    CallHierarchyItem,
+    CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams,
+    Position as LspPosition,
+    TextDocumentIdentifier,
+    TextDocumentPositionParams,
+    WorkDoneProgressParams,
 };
 
-use crate::edge::{CallEdge, EdgeSource};
-use crate::error::GraphError;
-use crate::graph::CallGraph;
-use crate::node::{CallNode, Position, SymbolKind};
-use crate::uri::{path_to_uri, uri_to_path};
+use crate::{
+    edge::{CallEdge, EdgeSource},
+    error::GraphError,
+    graph::CallGraph,
+    node::{CallNode, Position, SymbolKind},
+    uri::{path_to_uri, uri_to_path},
+};
 
 /// A position in a source file for initiating call graph queries.
 #[derive(Debug, Clone)]
@@ -38,15 +45,11 @@ impl SourcePosition {
 
     /// Returns the line number (0-based).
     #[must_use]
-    pub const fn line(&self) -> u32 {
-        self.position.line
-    }
+    pub const fn line(&self) -> u32 { self.position.line }
 
     /// Returns the column number (0-based).
     #[must_use]
-    pub const fn column(&self) -> u32 {
-        self.position.column
-    }
+    pub const fn column(&self) -> u32 { self.position.column }
 }
 
 /// Trait for call graph data providers.
@@ -143,9 +146,7 @@ pub struct LspCallGraphProvider<C> {
 impl<C> LspCallGraphProvider<C> {
     /// Creates a new LSP call graph provider with the given client.
     #[must_use]
-    pub const fn new(client: C) -> Self {
-        Self { client }
-    }
+    pub const fn new(client: C) -> Self { Self { client } }
 }
 
 impl<C: CallHierarchyClient> CallGraphProvider for LspCallGraphProvider<C> {

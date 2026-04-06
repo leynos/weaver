@@ -76,7 +76,8 @@ pub(crate) struct CapabilityResolution {
     /// Resolution status (e.g. "ok", "error").
     #[expect(
         dead_code,
-        reason = "the daemon includes status in the wire envelope even though the human renderer only reads routing details today"
+        reason = "the daemon includes status in the wire envelope even though the human renderer \
+                  only reads routing details today"
     )]
     status: String,
 

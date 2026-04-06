@@ -2,9 +2,8 @@
 
 use tree_sitter::Node;
 
-use crate::{BranchInfo, LocalInfo};
-
 use super::{normalise_whitespace, to_u32};
+use crate::{BranchInfo, LocalInfo};
 
 /// Tracks traversal state while collecting locals and branches from a body.
 pub(super) struct StructureCollector<'a> {
@@ -29,9 +28,7 @@ impl<'a> StructureCollector<'a> {
     }
 
     /// Returns the accumulated `LocalInfo` and `BranchInfo` collections.
-    pub(super) fn finish(self) -> (Vec<LocalInfo>, Vec<BranchInfo>) {
-        (self.locals, self.branches)
-    }
+    pub(super) fn finish(self) -> (Vec<LocalInfo>, Vec<BranchInfo>) { (self.locals, self.branches) }
 
     /// Recursively visits `node`, stopping at nested entities and collecting
     /// `local_info` plus `branch_info` for each traversed child.

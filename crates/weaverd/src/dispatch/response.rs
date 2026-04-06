@@ -9,11 +9,10 @@ use std::io::Write;
 use serde::Serialize;
 #[cfg(test)]
 use serde::de::DeserializeOwned;
-
-use super::errors::DispatchError;
-
 // Re-export the wire-protocol constant for internal and test use.
 pub use weaver_daemon_types::UNKNOWN_OPERATION_TYPE;
+
+use super::errors::DispatchError;
 
 /// Target stream for output messages.
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -65,9 +64,7 @@ impl DaemonMessage {
     }
 
     /// Creates an exit message with the given status code.
-    pub fn exit(status: i32) -> Self {
-        Self::Exit { status }
-    }
+    pub fn exit(status: i32) -> Self { Self::Exit { status } }
 }
 
 /// Writer that serializes daemon messages to a stream.
@@ -95,9 +92,7 @@ struct UnknownOperationDetails<'a> {
 
 impl<W: Write> ResponseWriter<W> {
     /// Creates a new response writer wrapping the given output stream.
-    pub fn new(writer: W) -> Self {
-        Self { writer }
-    }
+    pub fn new(writer: W) -> Self { Self { writer } }
 
     /// Writes a daemon message as a JSONL line.
     ///

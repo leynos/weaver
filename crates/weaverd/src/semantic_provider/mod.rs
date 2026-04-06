@@ -5,14 +5,12 @@
 //! finding. The provider lazily initializes the LSP host when the semantic
 //! backend is first requested.
 
-use std::fmt;
-use std::sync::Mutex;
+use std::{fmt, sync::Mutex};
 
 use tracing::debug;
 use weaver_cards::TreeSitterCardExtractor;
 use weaver_config::{CapabilityMatrix, Config};
-use weaver_lsp_host::adapter::ProcessLanguageServer;
-use weaver_lsp_host::{Language, LspHost};
+use weaver_lsp_host::{Language, LspHost, adapter::ProcessLanguageServer};
 
 use crate::backends::{BackendKind, BackendProvider, BackendStartupError};
 
@@ -95,9 +93,7 @@ impl SemanticBackendProvider {
 
     /// Returns the shared Tree-sitter card extractor.
     #[must_use]
-    pub fn card_extractor(&self) -> &TreeSitterCardExtractor {
-        &self.card_extractor
-    }
+    pub fn card_extractor(&self) -> &TreeSitterCardExtractor { &self.card_extractor }
 
     /// Executes a closure with a reference to the initialized LSP host.
     ///

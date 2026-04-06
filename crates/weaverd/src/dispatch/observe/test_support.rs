@@ -3,21 +3,38 @@
 use std::sync::{Arc, Mutex};
 
 use lsp_types::{
-    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
-    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, Location, MarkupContent,
-    MarkupKind, ReferenceParams, Uri,
+    CallHierarchyIncomingCall,
+    CallHierarchyIncomingCallsParams,
+    CallHierarchyItem,
+    CallHierarchyOutgoingCall,
+    CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams,
+    Diagnostic,
+    DidChangeTextDocumentParams,
+    DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams,
+    GotoDefinitionParams,
+    GotoDefinitionResponse,
+    Hover,
+    HoverParams,
+    Location,
+    MarkupContent,
+    MarkupKind,
+    ReferenceParams,
+    Uri,
 };
 use tempfile::TempDir;
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_lsp_host::{
-    Language, LanguageServer, LanguageServerError, LspHost, ServerCapabilitySet,
+    Language,
+    LanguageServer,
+    LanguageServerError,
+    LspHost,
+    ServerCapabilitySet,
 };
 
-use crate::backends::FusionBackends;
-use crate::semantic_provider::SemanticBackendProvider;
+use crate::{backends::FusionBackends, semantic_provider::SemanticBackendProvider};
 
 pub(crate) struct StubLanguageServer {
     capabilities: ServerCapabilitySet,

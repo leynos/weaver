@@ -2,8 +2,16 @@
 
 use std::path::Path;
 
+use camino::Utf8PathBuf;
+use cap_std::fs::Dir;
 use lsp_types::{
-    AnnotatedTextEdit, DocumentChangeOperation, DocumentChanges, OneOf, Position, TextEdit, Uri,
+    AnnotatedTextEdit,
+    DocumentChangeOperation,
+    DocumentChanges,
+    OneOf,
+    Position,
+    TextEdit,
+    Uri,
     WorkspaceEdit,
 };
 
@@ -203,7 +211,8 @@ fn collect_operation(
         DocumentChangeOperation::Op(resource_operation) => {
             Err(RustAnalyzerAdapterError::InvalidOutput {
                 message: format!(
-                    "workspace edit includes unsupported resource operation: {resource_operation:?}"
+                    "workspace edit includes unsupported resource operation: \
+                     {resource_operation:?}"
                 ),
             })
         }
@@ -321,8 +330,22 @@ fn find_line_start_offset(
 }
 
 /// Writes a minimal `Cargo.toml` so rust-analyzer can open the workspace.
-pub(super) fn write_stub_cargo_toml(workspace_root: &Path) -> Result<(), RustAnalyzerAdapterError> {
-    let cargo_toml = workspace_root.join("Cargo.toml");
+pub(super) fn write_stub_cargo_toml(
+    workspace_root: &Path,
+) -> Result<(), RustAnalyzerAdapterError> {
+    let utf8_path = Utf8PathBuf::from_path_buf(workspace_root.to_path_buf())
+        .map_err(|_| RustAnalyzerAdapterError::InvalidPath {
+            message: String::from("workspace path contains invalid UTF-8"),
+        })?;
+
+    let workspace_dir =
+        Dir::open_ambient_dir(&utf8_path, cap_std::ambient_authority()).map_err(|source| {
+            RustAnalyzerAdapterError::WorkspaceWrite {
+                path: workspace_root.to_path_buf(),
+                source,
+            }
+        })?;
+
     let content = concat!(
         "[package]\n",
         "name = \"weaver-rust-analyzer-workspace\"\n",
@@ -330,9 +353,9 @@ pub(super) fn write_stub_cargo_toml(workspace_root: &Path) -> Result<(), RustAna
         "edition = \"2024\"\n",
     );
 
-    std::fs::write(&cargo_toml, content).map_err(|source| {
+    workspace_dir.write("Cargo.toml", content.as_bytes()).map_err(|source| {
         RustAnalyzerAdapterError::WorkspaceWrite {
-            path: cargo_toml,
+            path: workspace_root.join("Cargo.toml"),
             source,
         }
     })

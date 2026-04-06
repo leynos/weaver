@@ -1,8 +1,8 @@
 //! Parser state helpers for apply-patch operations.
 
-use crate::dispatch::act::apply_patch::errors::ApplyPatchError;
-use crate::dispatch::act::apply_patch::types::{
-    FileContent, FilePath, ReplacementText, SearchPattern, SearchReplaceBlock,
+use crate::dispatch::act::apply_patch::{
+    errors::ApplyPatchError,
+    types::{FileContent, FilePath, ReplacementText, SearchPattern, SearchReplaceBlock},
 };
 
 pub(super) struct SearchReplaceParser {
@@ -68,9 +68,7 @@ impl SearchReplaceParser {
         self.search_start.is_some() || self.replace_start.is_some()
     }
 
-    pub(super) fn into_blocks(self) -> Vec<SearchReplaceBlock> {
-        self.blocks
-    }
+    pub(super) fn into_blocks(self) -> Vec<SearchReplaceBlock> { self.blocks }
 }
 
 pub(super) struct CreateContentCapture {
@@ -130,6 +128,4 @@ fn split_line_content(line: &str) -> (&str, &str) {
     }
 }
 
-fn strip_leading_plus(line: &str) -> &str {
-    line.strip_prefix('+').unwrap_or(line)
-}
+fn strip_leading_plus(line: &str) -> &str { line.strip_prefix('+').unwrap_or(line) }

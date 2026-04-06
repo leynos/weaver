@@ -4,9 +4,11 @@ use std::fmt;
 
 use thiserror::Error;
 
-use crate::capability::{CapabilityKind, CapabilitySource};
-use crate::language::Language;
-use crate::server::LanguageServerError;
+use crate::{
+    capability::{CapabilityKind, CapabilitySource},
+    language::Language,
+    server::LanguageServerError,
+};
 
 /// Operation being executed when an error occurred.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,14 +102,10 @@ pub enum LspHostError {
 
 impl LspHostError {
     /// Builds an `UnknownLanguage` error for the supplied language.
-    pub(crate) fn unknown(language: Language) -> Self {
-        Self::UnknownLanguage { language }
-    }
+    pub(crate) fn unknown(language: Language) -> Self { Self::UnknownLanguage { language } }
 
     /// Builds a `DuplicateLanguage` error.
-    pub(crate) fn duplicate(language: Language) -> Self {
-        Self::DuplicateLanguage { language }
-    }
+    pub(crate) fn duplicate(language: Language) -> Self { Self::DuplicateLanguage { language } }
 
     /// Builds a `CapabilityUnavailable` error with the provided reason.
     pub(crate) fn capability_unavailable(

@@ -1,8 +1,6 @@
 //! Shared helpers for transaction tests.
 
-use std::fs;
-use std::io::Write;
-use std::path::PathBuf;
+use std::{fs, io::Write, path::PathBuf};
 
 use tempfile::TempDir;
 

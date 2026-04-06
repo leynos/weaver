@@ -7,13 +7,24 @@ use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use weaver_config::{CapabilityMatrix, CapabilityOverride};
 
-use crate::capability::{CapabilityKind, CapabilitySource};
-use crate::errors::{HostOperation, LspHostError};
-use crate::language::Language;
-use crate::server::ServerCapabilitySet;
-use crate::tests::support::{
-    CallKind, DocumentSyncErrors, ResponseSet, TestServerConfig, TestWorld, definition_params,
-    did_change_params, did_close_params, did_open_params, reference_params, sample_uri,
+use crate::{
+    capability::{CapabilityKind, CapabilitySource},
+    errors::{HostOperation, LspHostError},
+    language::Language,
+    server::ServerCapabilitySet,
+    tests::support::{
+        CallKind,
+        DocumentSyncErrors,
+        ResponseSet,
+        TestServerConfig,
+        TestWorld,
+        definition_params,
+        did_change_params,
+        did_close_params,
+        did_open_params,
+        reference_params,
+        sample_uri,
+    },
 };
 
 #[fixture]

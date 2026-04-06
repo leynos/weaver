@@ -12,18 +12,25 @@ mod tests;
 
 mod lsp;
 
-use std::io::{BufRead, Write};
-use std::path::{Component, Path, PathBuf};
+use std::{
+    io::{self, BufRead, Write},
+    path::{Component, Path, PathBuf},
+};
 
+use camino::{Utf8Path, Utf8PathBuf};
+use cap_std::fs::Dir;
+pub use lsp::RustAnalyzerLspAdapter;
 use thiserror::Error;
 use url::Url;
-use weaver_plugins::capability::ReasonCode;
-use weaver_plugins::protocol::{FilePayload, PluginOutput, PluginRequest, PluginResponse};
+use weaver_plugins::{
+    capability::ReasonCode,
+    protocol::{FilePayload, PluginOutput, PluginRequest, PluginResponse},
+};
 
-use crate::arguments::parse_rename_symbol_arguments;
-use crate::failure::{PluginFailure, failure_response};
-
-pub use lsp::RustAnalyzerLspAdapter;
+use crate::{
+    arguments::parse_rename_symbol_arguments,
+    failure::{PluginFailure, failure_response},
+};
 
 /// UTF-8 byte offset into a source document.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -32,15 +39,11 @@ pub struct ByteOffset(usize);
 impl ByteOffset {
     /// Creates a new byte offset value.
     #[must_use]
-    pub const fn new(offset: usize) -> Self {
-        Self(offset)
-    }
+    pub const fn new(offset: usize) -> Self { Self(offset) }
 
     /// Returns the inner byte offset as `usize`.
     #[must_use]
-    pub const fn as_usize(self) -> usize {
-        self.0
-    }
+    pub const fn as_usize(self) -> usize { self.0 }
 }
 
 /// Refactoring adapter abstraction used to keep behaviour deterministic in tests.
@@ -255,23 +258,63 @@ fn execute_rename<R: RustAnalyzerAdapter>(
     }))
 }
 
+/// Creates a directory and all its parents using capability-based filesystem operations.
+fn create_dir_all_cap(base: &Dir, path: &Utf8Path) -> io::Result<()> {
+    for component in path.components() {
+        let name = component.as_str();
+        match base.create_dir(name) {
+            Ok(()) => {}
+            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
+            Err(err) => return Err(err),
+        }
+    }
+
+    Ok(())
+}
+
 pub(crate) fn write_workspace_file(
     workspace_root: &Path,
     relative_path: &Path,
     content: &str,
 ) -> Result<PathBuf, RustAnalyzerAdapterError> {
     let absolute_path = workspace_root.join(relative_path);
+    let utf8_path = Utf8PathBuf::from_path_buf(absolute_path.clone())
+        .map_err(|_| RustAnalyzerAdapterError::InvalidPath {
+            message: String::from("path contains invalid UTF-8"),
+        })?;
 
-    if let Some(parent) = absolute_path.parent() {
-        std::fs::create_dir_all(parent).map_err(|source| {
+    // Open the workspace root as a capability
+    let workspace_dir = Dir::open_ambient_dir(workspace_root, cap_std::ambient_authority())
+        .map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
+            path: workspace_root.to_path_buf(),
+            source,
+        })?;
+
+    // Get the parent directory and file name
+    let parent_path = utf8_path.parent().unwrap_or_else(|| Utf8Path::new(""));
+    let file_name = utf8_path.file_name().unwrap_or("file");
+
+    // Create parent directories if needed
+    if !parent_path.as_str().is_empty() {
+        create_dir_all_cap(&workspace_dir, parent_path).map_err(|source| {
             RustAnalyzerAdapterError::WorkspaceWrite {
-                path: parent.to_path_buf(),
+                path: parent_path.into(),
                 source,
             }
         })?;
     }
 
-    std::fs::write(&absolute_path, content).map_err(|source| {
+    // Open the target directory and write the file
+    let target_dir = if parent_path.as_str().is_empty() {
+        workspace_dir
+    } else {
+        workspace_dir.open_dir(parent_path).map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
+            path: parent_path.into(),
+            source,
+        })?
+    };
+
+    target_dir.write(file_name, content.as_bytes()).map_err(|source| {
         RustAnalyzerAdapterError::WorkspaceWrite {
             path: absolute_path.clone(),
             source,

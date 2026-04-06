@@ -13,10 +13,12 @@
 //! Metavariable names must start with an uppercase letter or underscore,
 //! followed by uppercase letters, digits, or underscores.
 
-use crate::error::SyntaxError;
-use crate::language::SupportedLanguage;
-use crate::metavariables::{extract_metavar_name, placeholder_for_metavar};
-use crate::parser::{ParseResult, Parser};
+use crate::{
+    error::SyntaxError,
+    language::SupportedLanguage,
+    metavariables::{extract_metavar_name, placeholder_for_metavar},
+    parser::{ParseResult, Parser},
+};
 
 /// A compiled structural pattern for matching code.
 ///
@@ -111,37 +113,25 @@ impl Pattern {
 
     /// Returns the original pattern source.
     #[must_use]
-    pub fn source(&self) -> &str {
-        &self.source
-    }
+    pub fn source(&self) -> &str { &self.source }
 
     /// Returns the language this pattern is compiled for.
     #[must_use]
-    pub const fn language(&self) -> SupportedLanguage {
-        self.language
-    }
+    pub const fn language(&self) -> SupportedLanguage { self.language }
 
-    pub(crate) const fn wrapped_in_function(&self) -> bool {
-        self.wrapped_in_function
-    }
+    pub(crate) const fn wrapped_in_function(&self) -> bool { self.wrapped_in_function }
 
     /// Returns the metavariables defined in this pattern.
     #[must_use]
-    pub fn metavariables(&self) -> &[MetaVariable] {
-        &self.metavariables
-    }
+    pub fn metavariables(&self) -> &[MetaVariable] { &self.metavariables }
 
     /// Returns the parsed syntax tree of the pattern.
     #[must_use]
-    pub const fn parsed(&self) -> &ParseResult {
-        &self.parsed
-    }
+    pub const fn parsed(&self) -> &ParseResult { &self.parsed }
 
     /// Returns whether this pattern has any metavariables.
     #[must_use]
-    pub const fn has_metavariables(&self) -> bool {
-        !self.metavariables.is_empty()
-    }
+    pub const fn has_metavariables(&self) -> bool { !self.metavariables.is_empty() }
 }
 
 fn wrap_pattern_for_parse(language: SupportedLanguage, pattern: &str) -> String {

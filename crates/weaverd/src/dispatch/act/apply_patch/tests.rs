@@ -1,16 +1,18 @@
 //! Tests for apply-patch handler helpers.
 
-use super::{ApplyPatchExecutor, resolve_path};
-use crate::dispatch::act::apply_patch::ApplyPatchFailure;
-use crate::dispatch::act::apply_patch::types::FilePath;
-use crate::safety_harness::{ConfigurableSemanticLock, ConfigurableSyntacticLock};
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
+use super::{ApplyPatchExecutor, resolve_path};
+use crate::{
+    dispatch::act::apply_patch::{ApplyPatchFailure, types::FilePath},
+    safety_harness::{ConfigurableSemanticLock, ConfigurableSyntacticLock},
+};
+
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn temp_dir() -> TempDir {
-    TempDir::new().expect("temp dir")
-}
+fn temp_dir() -> TempDir { TempDir::new().expect("temp dir") }
 
 #[rstest]
 fn resolve_path_rejects_parent_dir(temp_dir: TempDir) {

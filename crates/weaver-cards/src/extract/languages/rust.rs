@@ -2,13 +2,18 @@
 
 use tree_sitter::Node;
 
-use crate::CardSymbolKind;
-
-use super::EntityCandidate;
-use super::common::{
-    CallableMetadata, callable_candidate, extract_rust_docstring, impl_container_name, name_text,
-    simple_candidate,
+use super::{
+    EntityCandidate,
+    common::{
+        CallableMetadata,
+        callable_candidate,
+        extract_rust_docstring,
+        impl_container_name,
+        name_text,
+        simple_candidate,
+    },
 };
+use crate::CardSymbolKind;
 
 /// Collects top-level Rust entities from `root` using slices from `source`.
 ///

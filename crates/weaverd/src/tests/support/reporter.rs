@@ -5,11 +5,13 @@
 
 use std::sync::Mutex;
 
-use crate::backends::{BackendKind, BackendStartupError};
-use crate::bootstrap::BootstrapError;
-use crate::health::HealthReporter;
-
 use weaver_config::Config;
+
+use crate::{
+    backends::{BackendKind, BackendStartupError},
+    bootstrap::BootstrapError,
+    health::HealthReporter,
+};
 
 /// Structured health events tracked during scenarios.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -53,9 +55,7 @@ impl RecordingHealthReporter {
 }
 
 impl HealthReporter for RecordingHealthReporter {
-    fn bootstrap_starting(&self) {
-        self.record(HealthEvent::BootstrapStarting);
-    }
+    fn bootstrap_starting(&self) { self.record(HealthEvent::BootstrapStarting); }
 
     fn bootstrap_succeeded(&self, _config: &Config) {
         self.record(HealthEvent::BootstrapSucceeded);
@@ -69,9 +69,7 @@ impl HealthReporter for RecordingHealthReporter {
         self.record(HealthEvent::BackendStarting(kind));
     }
 
-    fn backend_ready(&self, kind: BackendKind) {
-        self.record(HealthEvent::BackendReady(kind));
-    }
+    fn backend_ready(&self, kind: BackendKind) { self.record(HealthEvent::BackendReady(kind)); }
 
     fn backend_failed(&self, error: &BackendStartupError) {
         self.record(HealthEvent::BackendFailed {

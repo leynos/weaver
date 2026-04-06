@@ -45,13 +45,30 @@ mod symbol;
 mod timestamp;
 
 pub use cache::{
-    CacheStats, CardCache, CardCacheAddress, CardCacheKey, DEFAULT_CACHE_CAPACITY, ParserRegistry,
+    CacheStats,
+    CardCache,
+    CardCacheAddress,
+    CardCacheKey,
+    DEFAULT_CACHE_CAPACITY,
+    ParserRegistry,
     content_hash,
 };
 pub use card::{
-    AttachmentsInfo, BranchInfo, DepsInfo, DocInfo, ImportInterstitialInfo, InterstitialInfo,
-    LocalInfo, LspInfo, MetricsInfo, NormalizedAttachments, ParamInfo, Provenance, SignatureInfo,
-    StructureInfo, SymbolCard,
+    AttachmentsInfo,
+    BranchInfo,
+    DepsInfo,
+    DocInfo,
+    ImportInterstitialInfo,
+    InterstitialInfo,
+    LocalInfo,
+    LspInfo,
+    MetricsInfo,
+    NormalizedAttachments,
+    ParamInfo,
+    Provenance,
+    SignatureInfo,
+    StructureInfo,
+    SymbolCard,
 };
 pub use detail::{DetailLevel, DetailLevelParseError};
 pub use error::GetCardError;
@@ -64,7 +81,13 @@ pub use graph_slice::{
 pub use request::GetCardRequest;
 pub use response::{CardRefusal, GetCardResponse, RefusalReason};
 pub use symbol::{
-    CardLanguage, CardSymbolKind, SourcePosition, SourceRange, SymbolId, SymbolIdentity, SymbolRef,
+    CardLanguage,
+    CardSymbolKind,
+    SourcePosition,
+    SourceRange,
+    SymbolId,
+    SymbolIdentity,
+    SymbolRef,
 };
 
 #[cfg(test)]

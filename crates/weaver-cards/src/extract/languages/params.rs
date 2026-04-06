@@ -2,9 +2,8 @@
 
 use tree_sitter::Node;
 
-use crate::ParamInfo;
-
 use super::normalise_whitespace;
+use crate::ParamInfo;
 
 fn is_ignorable_parameter_kind(kind: &str) -> bool {
     matches!(

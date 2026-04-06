@@ -4,12 +4,15 @@
 //! user-facing command ergonomics, including a shell pipeline that chains an
 //! observe query through `jq` into an actuator command.
 
-use std::io::{BufRead, BufReader, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::process::Output;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
-use std::{io, thread};
+use std::{
+    io,
+    io::{BufRead, BufReader, Write},
+    net::{SocketAddr, TcpListener, TcpStream},
+    process::Output,
+    sync::{Arc, Mutex},
+    thread,
+    time::{Duration, Instant},
+};
 
 use assert_cmd::Command;
 use insta::assert_debug_snapshot;
@@ -36,9 +39,7 @@ struct FakeDaemon {
     deprecated,
     reason = "assert_cmd::cargo::cargo_bin resolves workspace binaries for e2e tests"
 )]
-fn weaver_binary_path() -> std::path::PathBuf {
-    assert_cmd::cargo::cargo_bin("weaver")
-}
+fn weaver_binary_path() -> std::path::PathBuf { assert_cmd::cargo::cargo_bin("weaver") }
 
 impl FakeDaemon {
     fn start(expected_requests: usize) -> Result<Self, std::io::Error> {
@@ -58,9 +59,7 @@ impl FakeDaemon {
         })
     }
 
-    fn endpoint(&self) -> String {
-        format!("tcp://{}", self.address)
-    }
+    fn endpoint(&self) -> String { format!("tcp://{}", self.address) }
 
     #[expect(
         clippy::expect_used,
@@ -126,8 +125,7 @@ fn accept_before_deadline(listener: &TcpListener) -> Option<TcpStream> {
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                 assert!(
                     Instant::now() < deadline,
-                    "fake daemon timed out waiting for CLI connection \
-                     after {ACCEPT_TIMEOUT:?}"
+                    "fake daemon timed out waiting for CLI connection after {ACCEPT_TIMEOUT:?}"
                 );
                 thread::sleep(ACCEPT_POLL_INTERVAL);
             }
@@ -225,7 +223,8 @@ fn refactor_actuator_isolation_cli_snapshot() {
     let endpoint = daemon.endpoint();
 
     let command_string = String::from(
-        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider rope --refactoring rename --file src/main.py new_name=renamed_symbol offset=4",
+        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider \
+         rope --refactoring rename --file src/main.py new_name=renamed_symbol offset=4",
     );
 
     let mut command = Command::new(weaver_binary_path());

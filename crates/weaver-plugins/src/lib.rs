@@ -21,11 +21,16 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use weaver_plugins::{
-//!     PluginManifest, PluginMetadata, PluginKind, PluginRegistry, PluginRunner,
-//! };
-//! use weaver_plugins::process::SandboxExecutor;
 //! use std::path::PathBuf;
+//!
+//! use weaver_plugins::{
+//!     PluginKind,
+//!     PluginManifest,
+//!     PluginMetadata,
+//!     PluginRegistry,
+//!     PluginRunner,
+//!     process::SandboxExecutor,
+//! };
 //!
 //! let meta = PluginMetadata::new("rope", "1.0.0", PluginKind::Actuator);
 //! let manifest = PluginManifest::new(
@@ -52,14 +57,25 @@ pub mod runner;
 #[cfg(test)]
 mod tests;
 
-pub use self::capability::{
-    CapabilityContract, CapabilityId, ContractVersion, ReasonCode, RenameSymbolContract,
-    RenameSymbolRequest,
+pub use self::{
+    capability::{
+        CapabilityContract,
+        CapabilityId,
+        ContractVersion,
+        ReasonCode,
+        RenameSymbolContract,
+        RenameSymbolRequest,
+    },
+    error::PluginError,
+    manifest::{PluginKind, PluginManifest, PluginMetadata},
+    protocol::{
+        DiagnosticSeverity,
+        FilePayload,
+        PluginDiagnostic,
+        PluginOutput,
+        PluginRequest,
+        PluginResponse,
+    },
+    registry::PluginRegistry,
+    runner::{PluginExecutor, PluginRunner},
 };
-pub use self::error::PluginError;
-pub use self::manifest::{PluginKind, PluginManifest, PluginMetadata};
-pub use self::protocol::{
-    DiagnosticSeverity, FilePayload, PluginDiagnostic, PluginOutput, PluginRequest, PluginResponse,
-};
-pub use self::registry::PluginRegistry;
-pub use self::runner::{PluginExecutor, PluginRunner};

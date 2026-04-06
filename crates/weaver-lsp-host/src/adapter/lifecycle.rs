@@ -1,8 +1,7 @@
 //! Process lifecycle management for language server adapters.
 
-use std::process::Child;
-use std::thread;
-use std::time::Duration;
+use std::{process::Child, thread, time::Duration};
+
 use tracing::{debug, warn};
 
 use crate::Language;

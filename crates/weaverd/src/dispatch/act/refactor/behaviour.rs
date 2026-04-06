@@ -7,12 +7,19 @@ use rstest_bdd_macros::{given, scenario, then, when};
 use tempfile::TempDir;
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 use weaver_syntax::SupportedLanguage;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use super::resolution::{
-    CandidateEvaluation, CandidateReason, CapabilityResolutionEnvelope, RefusalReason,
-    ResolutionRequest, SelectionMode,
+use super::{
+    resolution::{
+        CandidateEvaluation,
+        CandidateReason,
+        CapabilityResolutionEnvelope,
+        RefusalReason,
+        ResolutionRequest,
+        SelectionMode,
+    },
+    *,
 };
-use super::*;
 
 #[expect(
     clippy::duplicate_mod,
@@ -187,9 +194,7 @@ impl RefactorWorld {
         }
     }
 
-    fn path(&self, relative: &str) -> PathBuf {
-        self.workspace.path().join(relative)
-    }
+    fn path(&self, relative: &str) -> PathBuf { self.workspace.path().join(relative) }
 
     fn target_file(&self) -> String {
         self.request
@@ -244,16 +249,16 @@ impl RefactorWorld {
     }
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> RefactorWorld {
-    RefactorWorld::new()
-}
+fn world() -> RefactorWorld { RefactorWorld::new() }
 
 #[given("a workspace file for refactoring")]
 fn given_workspace_file(
     #[expect(
         unused_variables,
-        reason = "BDD step exists for readability; file creation happens in prepare_routed_fixture()"
+        reason = "BDD step exists for readability; file creation happens in \
+                  prepare_routed_fixture()"
     )]
     world: &mut RefactorWorld,
 ) {
@@ -301,9 +306,7 @@ fn given_malformed_diff(world: &mut RefactorWorld) {
 }
 
 #[when("the act refactor command executes")]
-fn when_refactor_executes(world: &mut RefactorWorld) {
-    world.execute();
-}
+fn when_refactor_executes(world: &mut RefactorWorld) { world.execute(); }
 
 #[then("the refactor command succeeds")]
 fn then_refactor_succeeds(world: &mut RefactorWorld) {

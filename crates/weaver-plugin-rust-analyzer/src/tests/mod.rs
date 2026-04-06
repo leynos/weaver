@@ -6,14 +6,20 @@ mod dispatch_layer;
 mod support;
 
 use rstest::rstest;
-use weaver_plugins::capability::ReasonCode;
-use weaver_plugins::protocol::{PluginOutput, PluginRequest};
+use support::{
+    adapter_returning,
+    adapter_returning_with_path,
+    adapter_unused,
+    rename_arguments,
+    request_with_args,
+    request_with_path,
+};
+use weaver_plugins::{
+    capability::ReasonCode,
+    protocol::{PluginOutput, PluginRequest},
+};
 
 use crate::{RustAnalyzerAdapterError, execute_request};
-use support::{
-    adapter_returning, adapter_returning_with_path, adapter_unused, rename_arguments,
-    request_with_args, request_with_path,
-};
 
 #[test]
 fn rename_success_returns_diff_output() {

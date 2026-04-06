@@ -4,8 +4,7 @@
 //! and command dispatch. Each variant maps to a specific failure mode and
 //! carries enough context to produce actionable error messages for clients.
 
-use std::io;
-use std::sync::Arc;
+use std::{io, sync::Arc};
 
 use thiserror::Error;
 

@@ -1,7 +1,9 @@
 //! Runtime helpers for the CLI entrypoints.
 
-use std::io::{Read, Write};
-use std::process::ExitCode;
+use std::{
+    io::{Read, Write},
+    process::ExitCode,
+};
 
 use weaver_config::{CapabilityMatrix, Config};
 

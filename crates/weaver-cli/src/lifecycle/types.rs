@@ -3,9 +3,11 @@
 //! Defines the payloads and IO wrappers shared across lifecycle commands so the
 //! controller can remain agnostic of concrete writers.
 
-use std::ffi::{OsStr, OsString};
-use std::fmt;
-use std::io::Write;
+use std::{
+    ffi::{OsStr, OsString},
+    fmt,
+    io::Write,
+};
 
 use weaver_config::Config;
 
@@ -56,9 +58,7 @@ pub struct LifecycleOutput<W: Write, E: Write> {
 }
 
 impl<W: Write, E: Write> LifecycleOutput<W, E> {
-    pub fn new(stdout: W, stderr: E) -> Self {
-        Self { stdout, stderr }
-    }
+    pub fn new(stdout: W, stderr: E) -> Self { Self { stdout, stderr } }
 
     pub fn stdout_line(&mut self, args: fmt::Arguments<'_>) -> Result<(), LifecycleError> {
         self.stdout.write_fmt(args).map_err(LifecycleError::Io)?;

@@ -6,9 +6,8 @@
 use std::collections::BTreeMap;
 
 use insta::assert_debug_snapshot;
-use weaver_syntax::{Parser, Pattern, SupportedLanguage};
-
 use weaver_e2e::fixtures;
+use weaver_syntax::{Parser, Pattern, SupportedLanguage};
 
 /// Minimal Rust source for testing pattern error handling.
 static DUMMY_RUST_SOURCE: &str = "fn foo() {}";

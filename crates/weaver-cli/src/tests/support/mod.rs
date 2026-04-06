@@ -7,26 +7,27 @@
 mod fake_daemon;
 mod lifecycle;
 
-use std::cell::RefCell;
-use std::ffi::OsString;
-use std::fs;
-use std::path::{Component, PathBuf};
-use std::process::ExitCode;
+use std::{
+    cell::RefCell,
+    ffi::OsString,
+    fs,
+    path::{Component, PathBuf},
+    process::ExitCode,
+};
 
 use anyhow::{Context, Result, ensure};
+#[cfg(unix)]
+pub(super) use fake_daemon::accept_unix_connection;
+use weaver_test_macros::allow_fixture_expansion_lints;
+pub(super) use fake_daemon::{FakeDaemon, accept_tcp_connection, respond_to_request};
+pub(super) use lifecycle::{LifecycleCall, TestLifecycle};
+pub(crate) use lifecycle::{temp_paths, write_health_json, write_health_snapshot};
 use rstest::fixture;
 use tempfile::TempDir;
 use url::Url;
 use weaver_config::{CapabilityDirective, CapabilityOverride, Config, SocketEndpoint};
 
-use crate::lifecycle::LifecycleError;
-use crate::{AppError, ConfigLoader, IoStreams, run_with_daemon_binary};
-
-#[cfg(unix)]
-pub(super) use fake_daemon::accept_unix_connection;
-pub(super) use fake_daemon::{FakeDaemon, accept_tcp_connection, respond_to_request};
-pub(super) use lifecycle::{LifecycleCall, TestLifecycle};
-pub(crate) use lifecycle::{temp_paths, write_health_json, write_health_snapshot};
+use crate::{AppError, ConfigLoader, IoStreams, lifecycle::LifecycleError, run_with_daemon_binary};
 
 /// A config loader that returns a fixed configuration for tests.
 pub(super) struct StaticConfigLoader {
@@ -34,15 +35,11 @@ pub(super) struct StaticConfigLoader {
 }
 
 impl StaticConfigLoader {
-    pub(super) fn new(config: Config) -> Self {
-        Self { config }
-    }
+    pub(super) fn new(config: Config) -> Self { Self { config } }
 }
 
 impl ConfigLoader for StaticConfigLoader {
-    fn load(&self, _args: &[OsString]) -> Result<Config, AppError> {
-        Ok(self.config.clone())
-    }
+    fn load(&self, _args: &[OsString]) -> Result<Config, AppError> { Ok(self.config.clone()) }
 }
 
 /// Test world holding CLI state, daemon instance, and captured output.
@@ -185,9 +182,7 @@ impl TestWorld {
         Ok(())
     }
 
-    pub fn set_stdin(&mut self, data: &str) {
-        self.stdin = data.as_bytes().to_vec();
-    }
+    pub fn set_stdin(&mut self, data: &str) { self.stdin = data.as_bytes().to_vec(); }
 
     fn build_args(command: &str) -> Vec<OsString> {
         let mut args = vec![OsString::from("weaver")];
@@ -202,13 +197,9 @@ impl TestWorld {
         args
     }
 
-    pub fn stdout_text(&self) -> Result<String> {
-        decode_utf8(self.stdout.clone(), "stdout")
-    }
+    pub fn stdout_text(&self) -> Result<String> { decode_utf8(self.stdout.clone(), "stdout") }
 
-    pub fn stderr_text(&self) -> Result<String> {
-        decode_utf8(self.stderr.clone(), "stderr")
-    }
+    pub fn stderr_text(&self) -> Result<String> { decode_utf8(self.stderr.clone(), "stderr") }
 
     pub fn assert_exit_code(&self, expected: u8) -> Result<()> {
         let exit = self.exit_code.context("exit code recorded")?;
@@ -255,13 +246,9 @@ impl TestWorld {
         Ok(())
     }
 
-    pub fn lifecycle_calls(&self) -> Vec<LifecycleCall> {
-        self.lifecycle.record()
-    }
+    pub fn lifecycle_calls(&self) -> Vec<LifecycleCall> { self.lifecycle.record() }
 
-    pub fn lifecycle_enqueue_success(&self) {
-        self.lifecycle.enqueue(Ok(ExitCode::SUCCESS));
-    }
+    pub fn lifecycle_enqueue_success(&self) { self.lifecycle.enqueue(Ok(ExitCode::SUCCESS)); }
 
     pub fn lifecycle_enqueue_error(&self, error: LifecycleError) {
         self.lifecycle.enqueue(Err(error));
@@ -335,7 +322,6 @@ pub(super) fn daemon_lines_for_stderr(payload: &str, status: i32) -> Vec<String>
 
 // ── Fixtures ───────────────────────────────────────────────────────────────────
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-pub(super) fn world() -> RefCell<TestWorld> {
-    RefCell::new(TestWorld::default())
-}
+pub(super) fn world() -> RefCell<TestWorld> { RefCell::new(TestWorld::default()) }

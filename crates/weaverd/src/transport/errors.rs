@@ -1,7 +1,6 @@
 //! Error types for socket listener operations.
 
-use std::io;
-use std::net::SocketAddr;
+use std::{io, net::SocketAddr};
 
 use thiserror::Error;
 

@@ -1,7 +1,8 @@
 //! Shared test helpers for YAML rule parsing tests.
 
-use crate::{Rule, parse_rule_file};
 use sempai_core::DiagnosticCode;
+
+use crate::{Rule, parse_rule_file};
 
 /// Parses `yaml` with a fixed test URI, asserts that it fails, and returns
 /// `(code, message, primary_span_present)` from the first diagnostic in the
