@@ -44,14 +44,20 @@ pub(crate) fn assert_lsp_info(info: &LspInfo, expected: &ExpectedLspInfo<'_>) {
 }
 
 /// Checks that byte-to-UTF-16 conversion produces expected result.
-pub(crate) fn check_utf16_offset(line: &str, byte_col: usize, expected: Option<u32>) {
+pub(crate) fn check_utf16_offset(
+    line: &str,
+    byte_col: usize,
+    expected: Option<u32>,
+) -> Result<(), String> {
     use crate::dispatch::observe::enrich::byte_col_to_utf16;
-    let byte_col_u32 = u32::try_from(byte_col).expect("byte_col must fit in u32");
+    let byte_col_u32 =
+        u32::try_from(byte_col).map_err(|_| "byte_col must fit in u32".to_string())?;
     assert_eq!(
         byte_col_to_utf16(line, byte_col_u32),
         expected,
         "byte_col_to_utf16({line:?}, {byte_col}) expected {expected:?}"
     );
+    Ok(())
 }
 
 /// Asserts that hover text is correctly parsed for deprecation status.
@@ -146,7 +152,9 @@ pub(crate) fn test_symbol_card_with_pos(start: SourcePosition, end: SourcePositi
 /// Runs non-ASCII enrichment test with the given capabilities.
 /// Returns the character offset sent to the LSP server.
 /// Asserts that enrichment succeeds.
-pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> u32 {
+pub(crate) fn run_non_ascii_enrichment(
+    capabilities: ServerCapabilitySet,
+) -> Result<u32, String> {
     let source = "// café fn foo() {}";
     let hover = markdown_hover("```rust\nfn foo()\n```");
     let (server, hover_params_ref) = StubLanguageServer::with_hover(capabilities, hover);
@@ -172,11 +180,11 @@ pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> u32
 
     let hover_params = hover_params_ref
         .lock()
-        .expect("failed to lock hover_params_ref");
+        .map_err(|_| "failed to lock hover_params_ref")?;
     let params = hover_params
         .as_ref()
-        .expect("hover should have been called");
+        .ok_or("hover should have been called")?;
     assert_eq!(params.text_document_position_params.position.line, 0);
 
-    params.text_document_position_params.position.character
+    Ok(params.text_document_position_params.position.character)
 }
