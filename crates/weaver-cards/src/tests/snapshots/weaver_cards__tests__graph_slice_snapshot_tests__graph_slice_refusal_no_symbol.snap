@@ -1,0 +1,11 @@
+---
+source: crates/weaver-cards/src/tests/graph_slice_snapshot_tests.rs
+expression: json
+---
+{
+  "status": "refusal",
+  "refusal": {
+    "reason": "no_symbol_at_position",
+    "message": "no symbol found at the requested position"
+  }
+}

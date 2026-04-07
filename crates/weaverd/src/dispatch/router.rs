@@ -95,6 +95,7 @@ impl DomainRoutingContext {
             "diagnostics",
             "call-hierarchy",
             "get-card",
+            "graph-slice",
         ],
     };
 
@@ -197,6 +198,7 @@ impl DomainRouter {
         match operation.as_str() {
             "get-definition" => observe::get_definition::handle(request, writer, backends),
             "get-card" => observe::get_card::handle(request, writer, backends),
+            "graph-slice" => observe::graph_slice::handle(request, writer),
             _ => Self::route_fallback(&DomainRoutingContext::OBSERVE, operation.as_str(), writer),
         }
     }

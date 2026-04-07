@@ -1,0 +1,127 @@
+---
+source: crates/weaver-cards/src/tests/graph_slice_snapshot_tests.rs
+expression: json
+---
+{
+  "status": "success",
+  "slice_version": 1,
+  "entry": {
+    "symbol_id": "sym_abc123"
+  },
+  "constraints": {
+    "depth": 2,
+    "direction": "both",
+    "edge_types": [
+      "call",
+      "import",
+      "config"
+    ],
+    "min_confidence": 0.5,
+    "budget": {
+      "max_cards": 30,
+      "max_edges": 200,
+      "max_estimated_tokens": 4000
+    },
+    "entry_detail": "structure",
+    "node_detail": "minimal"
+  },
+  "cards": [
+    {
+      "card_version": 1,
+      "symbol": {
+        "symbol_id": "sym_abc123",
+        "ref": {
+          "uri": "file:///src/main.rs",
+          "range": {
+            "start": {
+              "line": 10,
+              "column": 0
+            },
+            "end": {
+              "line": 42,
+              "column": 1
+            }
+          },
+          "language": "rust",
+          "kind": "function",
+          "name": "process_request",
+          "container": "handlers"
+        }
+      },
+      "signature": {
+        "display": "fn process_request(req: &Request) -> Response",
+        "params": [
+          {
+            "name": "req",
+            "type": "&Request"
+          }
+        ],
+        "returns": "Response"
+      },
+      "doc": {
+        "docstring": "Processes a request.",
+        "summary": "Processes a request.",
+        "source": "tree_sitter"
+      },
+      "structure": {
+        "locals": [
+          {
+            "name": "result",
+            "kind": "variable",
+            "decl_line": 15
+          }
+        ],
+        "branches": [
+          {
+            "kind": "if",
+            "line": 18
+          }
+        ]
+      },
+      "metrics": {
+        "lines": 33,
+        "cyclomatic": 5
+      },
+      "provenance": {
+        "extracted_at": "2026-03-03T12:34:56Z",
+        "sources": [
+          "tree_sitter"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "edge_version": 1,
+      "type": "call",
+      "from": "sym_abc123",
+      "to": "sym_def456",
+      "confidence": 0.92,
+      "direction": "out",
+      "resolution_scope": "full_symbol_table",
+      "provenance": {
+        "source": "lsp_call_hierarchy",
+        "details": {
+          "call_site": {
+            "uri": "file:///src/main.rs",
+            "line": 15,
+            "column": 8
+          }
+        }
+      }
+    }
+  ],
+  "spillover": {
+    "truncated": true,
+    "frontier": [
+      {
+        "symbol_id": "sym_spill_001",
+        "depth": 2
+      },
+      {
+        "symbol_id": "sym_spill_002",
+        "depth": 3
+      }
+    ]
+  }
+}

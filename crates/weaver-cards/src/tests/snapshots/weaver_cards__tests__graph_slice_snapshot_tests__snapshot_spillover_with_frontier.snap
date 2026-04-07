@@ -1,0 +1,17 @@
+---
+source: crates/weaver-cards/src/tests/graph_slice_snapshot_tests.rs
+expression: json
+---
+{
+  "truncated": true,
+  "frontier": [
+    {
+      "symbol_id": "sym_spill_001",
+      "depth": 2
+    },
+    {
+      "symbol_id": "sym_spill_002",
+      "depth": 3
+    }
+  ]
+}

@@ -8,6 +8,9 @@ mod cache_tests;
 mod extractor;
 mod extractor_boundaries;
 mod fixtures;
+mod graph_slice_behaviour;
+mod graph_slice_fixtures;
+mod graph_slice_snapshot_tests;
 mod round_trip_tests;
 mod snapshot_tests;
 

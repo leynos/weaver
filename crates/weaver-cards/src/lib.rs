@@ -1,10 +1,11 @@
-//! Stable JSONL schemas for the `observe get-card` operation.
+//! Stable JSONL schemas for Weaver's `observe` operations.
 //!
 //! This crate provides serde-annotated Rust types that define the request
-//! and response payloads for Weaver's `observe get-card` command. The
-//! schemas lock down field names, payload shapes, versioning markers, and
-//! provenance metadata so that downstream consumers (handlers, test
-//! harnesses, documentation generators) work against a stable contract.
+//! and response payloads for Weaver's `observe get-card` and
+//! `observe graph-slice` commands. The schemas lock down field names,
+//! payload shapes, versioning markers, and provenance metadata so that
+//! downstream consumers (handlers, test harnesses, documentation
+//! generators) work against a stable contract.
 //!
 //! # Core types
 //!
@@ -13,8 +14,11 @@
 //! - [`SymbolCard`] — the structured card payload with progressive detail
 //! - [`DetailLevel`] — extraction depth
 //!   (`minimal`/`signature`/`structure`/`semantic`/`full`)
-//! - [`GetCardRequest`] — parsed request arguments
-//! - [`GetCardResponse`] — success or refusal envelope
+//! - [`GetCardRequest`] — parsed `get-card` request arguments
+//! - [`GetCardResponse`] — `get-card` success or refusal envelope
+//! - [`GraphSliceRequest`] — parsed `graph-slice` request arguments
+//! - [`GraphSliceResponse`] — `graph-slice` success or refusal envelope
+//! - [`SliceBudget`] — traversal budget constraints
 //!
 //! # Example
 //!
@@ -34,6 +38,7 @@ mod card;
 mod detail;
 mod error;
 mod extract;
+pub mod graph_slice;
 mod request;
 mod response;
 mod symbol;
@@ -51,6 +56,11 @@ pub use card::{
 pub use detail::{DetailLevel, DetailLevelParseError};
 pub use error::GetCardError;
 pub use extract::{CardExtractionError, CardExtractionInput, TreeSitterCardExtractor};
+pub use graph_slice::{
+    DEFAULT_MAX_CARDS, DEFAULT_MAX_EDGES, DEFAULT_MAX_ESTIMATED_TOKENS, GraphSliceError,
+    GraphSliceRequest, GraphSliceResponse, SliceBudget, SliceDirection, SliceEdgeType,
+    SliceSpillover,
+};
 pub use request::GetCardRequest;
 pub use response::{CardRefusal, GetCardResponse, RefusalReason};
 pub use symbol::{

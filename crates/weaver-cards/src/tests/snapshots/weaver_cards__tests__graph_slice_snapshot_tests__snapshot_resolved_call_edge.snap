@@ -1,0 +1,23 @@
+---
+source: crates/weaver-cards/src/tests/graph_slice_snapshot_tests.rs
+expression: json
+---
+{
+  "edge_version": 1,
+  "type": "call",
+  "from": "sym_abc123",
+  "to": "sym_def456",
+  "confidence": 0.92,
+  "direction": "out",
+  "resolution_scope": "full_symbol_table",
+  "provenance": {
+    "source": "lsp_call_hierarchy",
+    "details": {
+      "call_site": {
+        "uri": "file:///src/main.rs",
+        "line": 15,
+        "column": 8
+      }
+    }
+  }
+}

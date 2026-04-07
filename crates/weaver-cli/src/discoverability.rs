@@ -67,6 +67,7 @@ pub const DOMAIN_OPERATIONS: &[(&str, &str, &[&str])] = &[
             "diagnostics",
             "call-hierarchy",
             "get-card",
+            "graph-slice",
         ],
     ),
     (
