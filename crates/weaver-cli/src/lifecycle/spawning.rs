@@ -43,6 +43,8 @@ fn resolve_daemon_binary(binary_override: Option<&OsStr>) -> OsString {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for daemon spawning and binary resolution.
+
     use super::*;
 
     #[test]

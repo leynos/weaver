@@ -218,6 +218,8 @@ impl VerificationDiagnostic {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for output model parsing and validation.
+
     use super::*;
 
     #[test]
