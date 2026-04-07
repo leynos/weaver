@@ -249,6 +249,19 @@ struct ExecutionParams<'a> {
     selected_provider: &'a str,
     plugin_request: &'a PluginRequest,
 }
+
+/// Starts the semantic backend and handles the plugin response.
+fn handle_successful_execution<W: Write>(
+    response: PluginResponse,
+    writer: &mut ResponseWriter<W>,
+    context: &mut RefactorContext<'_>,
+) -> Result<DispatchResult, DispatchError> {
+    context
+        .backends
+        .ensure_started(BackendKind::Semantic)
+        .map_err(DispatchError::backend_startup)?;
+    handle_plugin_response(response, writer, context.backends, context.workspace_root)
+}
 /// Handles `act refactor` requests.
 ///
 /// Expects `--refactoring <operation>` and `--file <path>` in the request
@@ -400,23 +413,27 @@ fn execute_plugin_and_handle_response<W: Write>(
     writer: &mut ResponseWriter<W>,
     context: &mut RefactorContext<'_>,
 ) -> Result<DispatchResult, DispatchError> {
-    match params
+    let result = params
         .runtime
-        .execute(params.selected_provider, params.plugin_request)
-    {
-        Ok(response) => {
-            context
-                .backends
-                .ensure_started(BackendKind::Semantic)
-                .map_err(DispatchError::backend_startup)?;
-            handle_plugin_response(response, writer, context.backends, context.workspace_root)
-        }
-        Err(error) => {
-            writer.write_stderr(format!(
-                "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
-                params.selected_provider, args.refactoring, args.file
-            ))?;
-            Ok(DispatchResult::with_status(1))
-        }
+        .execute(params.selected_provider, params.plugin_request);
+
+    if let Ok(response) = result {
+        return handle_successful_execution(response, writer, context);
     }
+
+    write_execution_error(&result.unwrap_err(), params.selected_provider, args, writer)?;
+    Ok(DispatchResult::with_status(1))
+}
+
+/// Writes an error message for a failed plugin execution.
+fn write_execution_error<W: Write>(
+    error: &PluginError,
+    selected_provider: &str,
+    args: &arguments::RefactorArgs,
+    writer: &mut ResponseWriter<W>,
+) -> Result<(), DispatchError> {
+    writer.write_stderr(format!(
+        "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
+        selected_provider, args.refactoring, args.file
+    ))
 }
