@@ -244,8 +244,7 @@ fn validate_invalid_not_in_or(formula: &Formula) -> Result<(), DiagnosticReport>
                 if matches!(child.formula, Formula::Not(_)) {
                     return Err(DiagnosticReport::single_error(
                         DiagnosticCode::ESempaiInvalidNotInOr,
-                        "negation is not allowed directly inside 'pattern-either' or 'any'"
-                            .to_owned(),
+                        "negation is not allowed inside 'pattern-either' or 'any'".to_owned(),
                         None,
                         vec![
                             "Move the negation outside the disjunction, or restructure the query"
@@ -333,13 +332,17 @@ mod tests {
     use super::*;
 
     fn parse_and_normalize(yaml: &str) -> Result<Vec<NormalizedSearchRule>, DiagnosticReport> {
-        let file = sempai_yaml::parse_rule_file(yaml, None).unwrap();
+        let file =
+            sempai_yaml::parse_rule_file(yaml, None).expect("test fixture YAML should parse");
         normalize_rule_file(&file)
     }
 
     fn expect_diagnostic(yaml: &str, expected_code: DiagnosticCode) {
         let err = parse_and_normalize(yaml).expect_err("should fail");
-        let first = err.diagnostics().first().unwrap();
+        let first = err
+            .diagnostics()
+            .first()
+            .expect("should have at least one diagnostic");
         assert_eq!(first.code(), expected_code);
     }
 

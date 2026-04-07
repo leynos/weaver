@@ -46,7 +46,7 @@ Implementation must not begin until the user explicitly approves this plan.
 - Keep the implementation aligned with
   [docs/roadmap.md](../roadmap.md) item 4.1.5 and
   [docs/sempai-query-language-design.md](../sempai-query-language-design.md),
-  especially the normalised formula model, semantic constraint rules, and the
+  especially the normalized formula model, semantic constraint rules, and the
   rule that `inside` and `anywhere` act as constraints in conjunctions rather
   than as positive match producers.
 - Do not fold the full 4.1.4 mode-gating milestone into this change. This

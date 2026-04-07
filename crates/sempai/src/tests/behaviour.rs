@@ -14,7 +14,7 @@ use crate::{DiagnosticReport, Engine, EngineConfig, Language};
 #[derive(Default)]
 struct TestWorld {
     engine: Option<Engine>,
-    compile_result: Option<Result<(), DiagnosticReport>>,
+    compile_result: Option<Result<Vec<QueryPlan>, DiagnosticReport>>,
     execute_result: Option<Result<(), DiagnosticReport>>,
 }
 
@@ -39,17 +39,18 @@ fn given_default_engine(world: &mut TestWorld) {
 #[when("YAML {yaml} is compiled")]
 fn when_compile_yaml(world: &mut TestWorld, yaml: QuotedString) {
     let engine = world.engine.as_ref().expect("engine should be set");
-    world.compile_result = Some(engine.compile_yaml(yaml.as_str()).map(|_| ()));
+    world.compile_result = Some(engine.compile_yaml(yaml.as_str()));
 }
 
 #[when("DSL {dsl} is compiled for language {lang}")]
 fn when_compile_dsl(world: &mut TestWorld, dsl: QuotedString, lang: QuotedString) {
     let engine = world.engine.as_ref().expect("engine should be set");
     let language: Language = lang.as_str().parse().expect("valid language name");
+    // For DSL compilation, we store an empty vec on success since there's no QueryPlan vec
     world.compile_result = Some(
         engine
             .compile_dsl("interactive", language, dsl.as_str())
-            .map(|_| ()),
+            .map(|plan| vec![plan]),
     );
 }
 
@@ -69,8 +70,8 @@ fn when_execute(world: &mut TestWorld) {
 // ---------------------------------------------------------------------------
 
 /// Asserts that a diagnostic result contains a specific error code.
-fn assert_diagnostic_code(
-    result: Option<&Result<(), DiagnosticReport>>,
+fn assert_diagnostic_code<T: std::fmt::Debug>(
+    result: Option<&Result<T, DiagnosticReport>>,
     expected_code: &str,
     result_name: &str,
     failure_kind: &str,
@@ -112,15 +113,18 @@ fn then_compilation_fails(world: &mut TestWorld, code: QuotedString) {
 
 #[then("compilation succeeds with {count} plan")]
 fn then_compilation_succeeds(world: &mut TestWorld, count: usize) {
-    let _result = world
+    let plans = world
         .compile_result
         .as_ref()
         .expect("compile result should be set")
         .as_ref()
         .expect("compilation should succeed");
-    // The result is () because we map it in when_compile_yaml, so we can't check count directly
-    // The count validation happens implicitly - if we get here, at least one plan was compiled
-    let _ = count; // Acknowledge the parameter for future use
+    assert_eq!(
+        plans.len(),
+        count,
+        "expected {count} plan(s), got {}",
+        plans.len()
+    );
 }
 
 #[then("the first diagnostic message contains {snippet}")]
