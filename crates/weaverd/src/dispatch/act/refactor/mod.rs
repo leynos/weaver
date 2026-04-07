@@ -210,6 +210,28 @@ fn prepare_plugin_request(
     Ok((plugin_request, capability, file_path))
 }
 
+/// Resolves the provider for the refactor operation.
+fn resolve_provider_with_fallback(
+    runtime: &dyn RefactorPluginRuntime,
+    capability: CapabilityId,
+    file_path: &std::path::Path,
+    provider_override: Option<&str>,
+    args: &arguments::RefactorArgs,
+    writer: &mut ResponseWriter<impl Write>,
+) -> Result<Option<CapabilityResolutionEnvelope>, DispatchError> {
+    match runtime.resolve(ResolutionRequest::new(capability, file_path, provider_override)) {
+        Ok(resolution) => Ok(Some(resolution)),
+        Err(error) => {
+            writer.write_stderr(format!(
+                "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
+                args.provider.as_deref().unwrap_or("<auto>"),
+                args.refactoring,
+                args.file
+            ))?;
+            Ok(None)
+        }
+    }
+}
 /// Handles `act refactor` requests.
 ///
 /// Expects `--refactoring <operation>` and `--file <path>` in the request
@@ -222,7 +244,7 @@ fn prepare_plugin_request(
 pub fn handle<W: Write>(
     request: &CommandRequest,
     writer: &mut ResponseWriter<W>,
-    context: RefactorContext<'_>,
+    mut context: RefactorContext<'_>,
 ) -> Result<DispatchResult, DispatchError> {
     let args = parse_refactor_args(&request.arguments)?;
 
@@ -236,21 +258,17 @@ pub fn handle<W: Write>(
 
     let (plugin_request, capability, file_path) =
         prepare_plugin_request(context.workspace_root, &args)?;
-    let resolution = match context.runtime.resolve(ResolutionRequest::new(
+
+    let Some(resolution) = resolve_provider_with_fallback(
+        context.runtime,
         capability,
         file_path.as_path(),
         args.provider.as_deref(),
-    )) {
-        Ok(resolution) => resolution,
-        Err(error) => {
-            writer.write_stderr(format!(
-                "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
-                args.provider.as_deref().unwrap_or("<auto>"),
-                args.refactoring,
-                args.file
-            ))?;
-            return Ok(DispatchResult::with_status(1));
-        }
+        &args,
+        writer,
+    )?
+    else {
+        return Ok(DispatchResult::with_status(1));
     };
 
     write_capability_resolution(writer, &resolution)?;
@@ -258,23 +276,14 @@ pub fn handle<W: Write>(
         return Ok(DispatchResult::with_status(1));
     };
 
-    match context.runtime.execute(selected_provider, &plugin_request) {
-        Ok(response) => {
-            // Ensure semantic backend is started before forwarding to apply-patch
-            context
-                .backends
-                .ensure_started(BackendKind::Semantic)
-                .map_err(DispatchError::backend_startup)?;
-            handle_plugin_response(response, writer, context.backends, context.workspace_root)
-        }
-        Err(error) => {
-            writer.write_stderr(format!(
-                "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
-                selected_provider, args.refactoring, args.file
-            ))?;
-            Ok(DispatchResult::with_status(1))
-        }
-    }
+    execute_plugin_and_handle_response(
+        context.runtime,
+        selected_provider,
+        &plugin_request,
+        &args,
+        writer,
+        &mut context,
+    )
 }
 
 /// Returns `true` if any component of `path` is a parent-directory reference.
@@ -367,3 +376,30 @@ mod resolution_tests;
 mod rollback_tests;
 #[cfg(test)]
 mod tests;
+
+/// Executes the plugin and handles the response.
+fn execute_plugin_and_handle_response<W: Write>(
+    runtime: &dyn RefactorPluginRuntime,
+    selected_provider: &str,
+    plugin_request: &PluginRequest,
+    args: &arguments::RefactorArgs,
+    writer: &mut ResponseWriter<W>,
+    context: &mut RefactorContext<'_>,
+) -> Result<DispatchResult, DispatchError> {
+    match runtime.execute(selected_provider, plugin_request) {
+        Ok(response) => {
+            context
+                .backends
+                .ensure_started(BackendKind::Semantic)
+                .map_err(DispatchError::backend_startup)?;
+            handle_plugin_response(response, writer, context.backends, context.workspace_root)
+        }
+        Err(error) => {
+            writer.write_stderr(format!(
+                "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
+                selected_provider, args.refactoring, args.file
+            ))?;
+            Ok(DispatchResult::with_status(1))
+        }
+    }
+}
