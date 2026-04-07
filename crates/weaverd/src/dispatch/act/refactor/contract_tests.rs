@@ -88,7 +88,10 @@ const NOTES_DIFF: &str = concat!(
 #[allow_fixture_expansion_lints]
 #[fixture]
 fn socket_dir() -> TempDir {
-    TempDir::new().expect("socket dir")
+    match TempDir::new() {
+        Ok(dir) => dir,
+        Err(e) => panic!("failed to create socket dir: {}", e),
+    }
 }
 
 struct RenameDispatch<'a> {
