@@ -1,13 +1,11 @@
 #![cfg(feature = "cli")]
-#![allow(unknown_lints)]
-#![allow(no_std_fs_operations)]
 
 use std::{
     ffi::{OsStr, OsString},
-    fs,
     sync::{Mutex, MutexGuard},
 };
 
+use cap_std::fs::Dir;
 use once_cell::sync::Lazy;
 use ortho_config::OrthoError;
 use tempfile::TempDir;
@@ -54,13 +52,17 @@ fn malformed_configs_return_aggregated_error() {
     let cli_path = temp_dir.path().join("cli_weaver.toml");
     let env_path = temp_dir.path().join("env_weaver.toml");
 
-    fs::write(
-        &cli_path,
+    // Open the temp directory with capability-based access
+    let dir = Dir::open_ambient_dir(temp_dir.path(), cap_std::ambient_authority())
+        .expect("open temp dir");
+
+    dir.write(
+        "cli_weaver.toml",
         r#"daemon_socket = { transport = "tcp" host = "127.0.0.1" }"#,
     )
     .expect("write malformed cli config");
-    fs::write(
-        &env_path,
+    dir.write(
+        "env_weaver.toml",
         r#"daemon_socket = { transport = "tcp", port = not_a_number }"#,
     )
     .expect("write malformed env config");

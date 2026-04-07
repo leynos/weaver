@@ -32,3 +32,4 @@ rstest-bdd-macros.workspace = true
 tempfile.workspace = true
 once_cell.workspace = true
 weaver-test-macros = { path = "../weaver-test-macros" }
+cap-std = "3.0"
