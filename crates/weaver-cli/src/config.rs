@@ -131,6 +131,8 @@ pub(crate) fn prepare_cli_arguments(
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for configuration loading and CLI argument processing.
+
     use std::ffi::OsStr;
 
     use super::*;
