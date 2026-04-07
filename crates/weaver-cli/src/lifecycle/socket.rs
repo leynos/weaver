@@ -94,6 +94,8 @@ fn is_socket_available(error: &io::Error) -> bool {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for socket endpoint reachability and connection handling.
+
     use std::{net::TcpListener, thread};
 
     use rstest::rstest;

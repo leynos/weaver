@@ -306,6 +306,8 @@ fn verification_failure_to_location(failure: VerificationFailure) -> SourceLocat
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for output format resolution and stream handling.
+
     use rstest::rstest;
 
     use super::*;
@@ -392,5 +394,4 @@ mod tests {
         assert!(rendered.contains("get-definition"));
         assert!(rendered.contains("get-card"));
     }
-
 }

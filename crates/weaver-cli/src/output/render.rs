@@ -223,6 +223,8 @@ struct CaretContext<'a> {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for output rendering and formatting.
+
     use super::*;
     use crate::output::source::{SourceLocation, SourcePosition, SourceReference};
 

@@ -98,6 +98,8 @@ pub(super) fn write_startup_banner<W: Write, E: Write>(
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for lifecycle utility functions and health snapshot parsing.
+
     use std::time::UNIX_EPOCH;
 
     use rstest::rstest;
