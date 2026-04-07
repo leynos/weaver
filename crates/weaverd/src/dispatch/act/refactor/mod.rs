@@ -210,16 +210,26 @@ fn prepare_plugin_request(
     Ok((plugin_request, capability, file_path))
 }
 
+/// Parameters required for provider resolution.
+struct ResolutionParams<'a> {
+    runtime: &'a dyn RefactorPluginRuntime,
+    capability: CapabilityId,
+    file_path: &'a std::path::Path,
+    provider_override: Option<&'a str>,
+}
 /// Resolves the provider for the refactor operation.
 fn resolve_provider_with_fallback(
-    runtime: &dyn RefactorPluginRuntime,
-    capability: CapabilityId,
-    file_path: &std::path::Path,
-    provider_override: Option<&str>,
+    params: ResolutionParams<'_>,
     args: &arguments::RefactorArgs,
     writer: &mut ResponseWriter<impl Write>,
 ) -> Result<Option<CapabilityResolutionEnvelope>, DispatchError> {
-    match runtime.resolve(ResolutionRequest::new(capability, file_path, provider_override)) {
+    match params
+        .runtime
+        .resolve(ResolutionRequest::new(
+            params.capability,
+            params.file_path,
+            params.provider_override,
+        )) {
         Ok(resolution) => Ok(Some(resolution)),
         Err(error) => {
             writer.write_stderr(format!(
@@ -231,6 +241,13 @@ fn resolve_provider_with_fallback(
             Ok(None)
         }
     }
+}
+
+/// Parameters required for plugin execution.
+struct ExecutionParams<'a> {
+    runtime: &'a dyn RefactorPluginRuntime,
+    selected_provider: &'a str,
+    plugin_request: &'a PluginRequest,
 }
 /// Handles `act refactor` requests.
 ///
@@ -259,14 +276,14 @@ pub fn handle<W: Write>(
     let (plugin_request, capability, file_path) =
         prepare_plugin_request(context.workspace_root, &args)?;
 
-    let Some(resolution) = resolve_provider_with_fallback(
-        context.runtime,
+    let resolution_params = ResolutionParams {
+        runtime: context.runtime,
         capability,
-        file_path.as_path(),
-        args.provider.as_deref(),
-        &args,
-        writer,
-    )?
+        file_path: file_path.as_path(),
+        provider_override: args.provider.as_deref(),
+    };
+
+    let Some(resolution) = resolve_provider_with_fallback(resolution_params, &args, writer)?
     else {
         return Ok(DispatchResult::with_status(1));
     };
@@ -276,14 +293,13 @@ pub fn handle<W: Write>(
         return Ok(DispatchResult::with_status(1));
     };
 
-    execute_plugin_and_handle_response(
-        context.runtime,
+    let execution_params = ExecutionParams {
+        runtime: context.runtime,
         selected_provider,
-        &plugin_request,
-        &args,
-        writer,
-        &mut context,
-    )
+        plugin_request: &plugin_request,
+    };
+
+    execute_plugin_and_handle_response(execution_params, &args, writer, &mut context)
 }
 
 /// Returns `true` if any component of `path` is a parent-directory reference.
@@ -379,14 +395,15 @@ mod tests;
 
 /// Executes the plugin and handles the response.
 fn execute_plugin_and_handle_response<W: Write>(
-    runtime: &dyn RefactorPluginRuntime,
-    selected_provider: &str,
-    plugin_request: &PluginRequest,
+    params: ExecutionParams<'_>,
     args: &arguments::RefactorArgs,
     writer: &mut ResponseWriter<W>,
     context: &mut RefactorContext<'_>,
 ) -> Result<DispatchResult, DispatchError> {
-    match runtime.execute(selected_provider, plugin_request) {
+    match params
+        .runtime
+        .execute(params.selected_provider, params.plugin_request)
+    {
         Ok(response) => {
             context
                 .backends
@@ -397,7 +414,7 @@ fn execute_plugin_and_handle_response<W: Write>(
         Err(error) => {
             writer.write_stderr(format!(
                 "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
-                selected_provider, args.refactoring, args.file
+                params.selected_provider, args.refactoring, args.file
             ))?;
             Ok(DispatchResult::with_status(1))
         }
