@@ -44,11 +44,11 @@ typecheck: ## Type-check without building
 	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) check $(CARGO_FLAGS)
 
 fmt: ## Format Rust and Markdown sources
-	$(CARGO) +nightly fmt --all
+	$(CARGO) fmt --all
 	mdformat-all
 
 check-fmt: ## Verify formatting
-	$(CARGO) +nightly fmt --all -- --check
+	$(CARGO) fmt --all -- --check
 
 markdownlint: ## Lint Markdown files
 	PATH="$(USER_BIN_PATH):$(PATH)" $(MDLINT) '**/*.md'
