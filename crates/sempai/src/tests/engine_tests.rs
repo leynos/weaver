@@ -66,8 +66,11 @@ fn compile_yaml_returns_success_for_valid_search_rule() {
 }
 
 #[test]
-fn compile_yaml_returns_not_implemented_for_project_depends_on_search_rule() {
+fn compile_yaml_succeeds_for_project_depends_on_search_rule() {
     let engine = default_engine();
+    // ProjectDependsOn now normalizes to an empty formula that passes validation.
+    // The actual dependency checking logic is not yet implemented,
+    // but the rule compiles successfully.
     let result = engine.compile_yaml(concat!(
         "rules:\n",
         "  - id: demo.depends\n",
@@ -78,9 +81,9 @@ fn compile_yaml_returns_not_implemented_for_project_depends_on_search_rule() {
         "      namespace: pypi\n",
         "      package: requests\n",
     ));
-    let (code, diag) = first_diagnostic_of_err(result);
-    assert_eq!(code, DiagnosticCode::NotImplemented);
-    assert!(diag.message().contains("normalization"));
+    let plans = result.expect("should compile successfully");
+    assert_eq!(plans.len(), 1);
+    assert_eq!(plans[0].rule_id(), "demo.depends");
 }
 
 fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str) {

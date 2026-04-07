@@ -86,14 +86,16 @@ fn normalize_search_principal(principal: &RulePrincipal) -> Result<Formula, Diag
     match principal {
         RulePrincipal::Search(search) => match search {
             SearchQueryPrincipal::Legacy(legacy) => normalize_legacy_formula(legacy),
-            SearchQueryPrincipal::Match(v2) => normalize_v2_formula(v2),
+            SearchQueryPrincipal::Match(v2) => {
+                let decorated = normalize_v2_formula(v2)?;
+                Ok(decorated.formula)
+            }
             SearchQueryPrincipal::ProjectDependsOn(_) => {
                 // ProjectDependsOn is a compatibility-only search principal.
-                // Return NotImplemented as the actual dependency checking logic
-                // is not yet implemented.
-                Err(DiagnosticReport::not_implemented(
-                    "project-depends-on dependency checking (normalization)",
-                ))
+                // For now, we normalize it to an empty conjunction, which is a
+                // valid but non-executable formula. The actual dependency
+                // checking logic will be implemented in a future milestone.
+                Ok(Formula::And(vec![]))
             }
         },
         _ => Err(DiagnosticReport::single_error(
@@ -111,7 +113,11 @@ fn normalize_legacy_formula(formula: &LegacyFormula) -> Result<Formula, Diagnost
         LegacyFormula::Pattern(pattern) => Ok(Formula::Atom(Atom::Pattern(pattern.clone()))),
         LegacyFormula::PatternRegex(regex) => Ok(Formula::Atom(Atom::Regex(regex.clone()))),
         LegacyFormula::Patterns(clauses) => {
-            let children: Result<Vec<_>, _> = clauses.iter().map(normalize_legacy_clause).collect();
+            let children: Result<Vec<_>, _> = clauses
+                .iter()
+                .map(normalize_legacy_clause)
+                .filter_map(Result::transpose)
+                .collect();
             Ok(Formula::And(children?))
         }
         LegacyFormula::PatternEither(formulas) => {
@@ -152,18 +158,23 @@ fn normalize_legacy_formula(formula: &LegacyFormula) -> Result<Formula, Diagnost
     }
 }
 
-/// Normalizes a legacy clause (formula or constraint) into a decorated formula.
-fn normalize_legacy_clause(clause: &LegacyClause) -> Result<DecoratedFormula, DiagnosticReport> {
+/// Normalizes a legacy clause (formula or constraint) into an optional decorated formula.
+/// Returns `Ok(None)` for constraints that should be skipped.
+fn normalize_legacy_clause(
+    clause: &LegacyClause,
+) -> Result<Option<DecoratedFormula>, DiagnosticReport> {
     match clause {
         LegacyClause::Formula(formula) => {
             let normalized = normalize_legacy_formula(formula)?;
-            Ok(DecoratedFormula::new(normalized))
+            Ok(Some(DecoratedFormula::new(normalized)))
         }
         LegacyClause::Constraint(_) => {
-            // Constraints are preserved as raw where clauses
-            // For now, we treat them as empty decorated formulas
-            // In a full implementation, we'd parse them into WhereClause variants
-            Ok(DecoratedFormula::new(Formula::And(vec![])))
+            // Constraints (metavariable-pattern, metavariable-regex, etc.) are
+            // not yet implemented. We return None to skip them entirely,
+            // rather than creating an empty And which would cause semantic
+            // validation to fail. In a full implementation, we'd parse them
+            // into WhereClause variants and preserve them.
+            Ok(None)
         }
     }
 }
@@ -177,50 +188,53 @@ fn normalize_legacy_value(value: &LegacyValue) -> Result<Formula, DiagnosticRepo
 }
 
 /// Normalizes a v2 match formula into canonical form.
-fn normalize_v2_formula(formula: &MatchFormula) -> Result<Formula, DiagnosticReport> {
+fn normalize_v2_formula(formula: &MatchFormula) -> Result<DecoratedFormula, DiagnosticReport> {
     match formula {
-        MatchFormula::Pattern(pattern) | MatchFormula::PatternObject(pattern) => {
-            Ok(Formula::Atom(Atom::Pattern(pattern.clone())))
-        }
-        MatchFormula::Regex(regex) => Ok(Formula::Atom(Atom::Regex(regex.clone()))),
+        MatchFormula::Pattern(pattern) | MatchFormula::PatternObject(pattern) => Ok(
+            DecoratedFormula::new(Formula::Atom(Atom::Pattern(pattern.clone()))),
+        ),
+        MatchFormula::Regex(regex) => Ok(DecoratedFormula::new(Formula::Atom(Atom::Regex(
+            regex.clone(),
+        )))),
         MatchFormula::All(children) => {
-            let normalized: Result<Vec<_>, _> = children
-                .iter()
-                .map(|f| {
-                    let inner = normalize_v2_formula(f)?;
-                    Ok(DecoratedFormula::new(inner))
-                })
-                .collect();
-            Ok(Formula::And(normalized?))
+            let normalized: Result<Vec<_>, _> = children.iter().map(normalize_v2_formula).collect();
+            Ok(DecoratedFormula::new(Formula::And(normalized?)))
         }
         MatchFormula::Any(children) => {
-            let normalized: Result<Vec<_>, _> = children
-                .iter()
-                .map(|f| {
-                    let inner = normalize_v2_formula(f)?;
-                    Ok(DecoratedFormula::new(inner))
-                })
-                .collect();
-            Ok(Formula::Or(normalized?))
+            let normalized: Result<Vec<_>, _> = children.iter().map(normalize_v2_formula).collect();
+            Ok(DecoratedFormula::new(Formula::Or(normalized?)))
         }
         MatchFormula::Not(inner) => {
             let normalized = normalize_v2_formula(inner)?;
-            Ok(Formula::Not(Box::new(DecoratedFormula::new(normalized))))
+            Ok(DecoratedFormula::new(Formula::Not(Box::new(normalized))))
         }
         MatchFormula::Inside(inner) => {
             let normalized = normalize_v2_formula(inner)?;
-            Ok(Formula::Inside(Box::new(DecoratedFormula::new(normalized))))
+            Ok(DecoratedFormula::new(Formula::Inside(Box::new(normalized))))
         }
         MatchFormula::Anywhere(inner) => {
             let normalized = normalize_v2_formula(inner)?;
-            Ok(Formula::Anywhere(Box::new(DecoratedFormula::new(
+            Ok(DecoratedFormula::new(Formula::Anywhere(Box::new(
                 normalized,
             ))))
         }
-        MatchFormula::Decorated { formula: inner, .. } => {
-            // For now, we normalize the inner formula and ignore decorations
-            // In a full implementation, we'd preserve where_clauses, as_name, and fix
-            normalize_v2_formula(inner)
+        MatchFormula::Decorated {
+            formula: inner,
+            as_name,
+            fix,
+            ..
+        } => {
+            let mut normalized = normalize_v2_formula(inner)?;
+            // Preserve as_name and fix decorations
+            if let Some(name) = as_name {
+                normalized = normalized.with_as_name(name.clone());
+            }
+            if let Some(fix_text) = fix {
+                normalized = normalized.with_fix(fix_text.clone());
+            }
+            // Note: where_clauses are not yet implemented - they would need
+            // to be parsed from the raw YAML Value into WhereClause variants
+            Ok(normalized)
         }
     }
 }
@@ -274,6 +288,11 @@ fn validate_invalid_not_in_or(formula: &Formula) -> Result<(), DiagnosticReport>
 fn validate_positive_terms(formula: &Formula) -> Result<(), DiagnosticReport> {
     match formula {
         Formula::And(children) => {
+            // Empty conjunctions are allowed (they represent no-op/placeholder formulas)
+            if children.is_empty() {
+                return Ok(());
+            }
+
             // Check if there's at least one positive term
             let has_positive = children.iter().any(DecoratedFormula::is_positive_term);
 

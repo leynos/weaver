@@ -73,6 +73,13 @@ impl DecoratedFormula {
         self
     }
 
+    /// Sets all where clauses for this decorated formula.
+    #[must_use]
+    pub fn with_where_clauses(mut self, clauses: Vec<WhereClause>) -> Self {
+        self.where_clauses = clauses;
+        self
+    }
+
     /// Sets the alias name for this decorated formula.
     #[must_use]
     pub fn with_as_name(mut self, name: String) -> Self {
