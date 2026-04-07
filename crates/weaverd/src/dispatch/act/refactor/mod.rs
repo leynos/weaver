@@ -208,38 +208,17 @@ fn prepare_plugin_request(
     Ok((plugin_request, capability, file_path))
 }
 
-/// Handles `act refactor` requests.
-///
-/// Expects `--refactoring <operation>` and `--file <path>` in the request
-/// arguments. `--provider <plugin>` is optional and acts as an explicit
-/// compatibility override when supplied.
-///
-/// The handler reads the file content, executes the plugin, and forwards
-/// successful diff output through `act apply-patch` for Double-Lock
-/// verification and atomic commit.
-pub fn handle<W: Write>(
-    request: &CommandRequest,
-    writer: &mut ResponseWriter<W>,
-    context: RefactorContext<'_>,
-) -> Result<DispatchResult, DispatchError> {
-    let args = parse_refactor_args(&request.arguments)?;
-
-    debug!(
-        target: DISPATCH_TARGET,
-        provider = args.provider.as_deref().unwrap_or("<auto>"),
-        refactoring = args.refactoring,
-        file = args.file,
-        "handling act refactor"
-    );
-
-    let (plugin_request, capability, file_path) =
-        prepare_plugin_request(context.workspace_root, &args)?;
-    let resolution = match context.runtime.resolve(ResolutionRequest::new(
-        capability,
-        file_path.as_path(),
-        args.provider.as_deref(),
-    )) {
-        Ok(resolution) => resolution,
+/// Resolves the provider for the refactor operation.
+fn resolve_provider_with_fallback(
+    runtime: &dyn RefactorPluginRuntime,
+    capability: CapabilityId,
+    file_path: &std::path::Path,
+    provider_override: Option<&str>,
+    args: &arguments::RefactorArgs,
+    writer: &mut ResponseWriter<impl Write>,
+) -> Result<Option<CapabilityResolutionEnvelope>, DispatchError> {
+    match runtime.resolve(ResolutionRequest::new(capability, file_path, provider_override)) {
+        Ok(resolution) => Ok(Some(resolution)),
         Err(error) => {
             writer.write_stderr(format!(
                 "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
@@ -247,18 +226,22 @@ pub fn handle<W: Write>(
                 args.refactoring,
                 args.file
             ))?;
-            return Ok(DispatchResult::with_status(1));
+            Ok(None)
         }
-    };
+    }
+}
 
-    write_capability_resolution(writer, &resolution)?;
-    let Some(selected_provider) = resolution.details().selected_provider() else {
-        return Ok(DispatchResult::with_status(1));
-    };
-
-    match context.runtime.execute(selected_provider, &plugin_request) {
+/// Executes the plugin and handles the response.
+fn execute_plugin_and_handle_response<W: Write>(
+    runtime: &dyn RefactorPluginRuntime,
+    selected_provider: &str,
+    plugin_request: &PluginRequest,
+    args: &arguments::RefactorArgs,
+    writer: &mut ResponseWriter<W>,
+    context: &mut RefactorContext<'_>,
+) -> Result<DispatchResult, DispatchError> {
+    match runtime.execute(selected_provider, plugin_request) {
         Ok(response) => {
-            // Ensure semantic backend is started before forwarding to apply-patch
             context
                 .backends
                 .ensure_started(BackendKind::Semantic)
@@ -273,6 +256,60 @@ pub fn handle<W: Write>(
             Ok(DispatchResult::with_status(1))
         }
     }
+}
+
+/// Handles `act refactor` requests.
+///
+/// Expects `--refactoring <operation>` and `--file <path>` in the request
+/// arguments. `--provider <plugin>` is optional and acts as an explicit
+/// compatibility override when supplied.
+///
+/// The handler reads the file content, executes the plugin, and forwards
+/// successful diff output through `act apply-patch` for Double-Lock
+/// verification and atomic commit.
+pub fn handle<W: Write>(
+    request: &CommandRequest,
+    writer: &mut ResponseWriter<W>,
+    mut context: RefactorContext<'_>,
+) -> Result<DispatchResult, DispatchError> {
+    let args = parse_refactor_args(&request.arguments)?;
+
+    debug!(
+        target: DISPATCH_TARGET,
+        provider = args.provider.as_deref().unwrap_or("<auto>"),
+        refactoring = args.refactoring,
+        file = args.file,
+        "handling act refactor"
+    );
+
+    let (plugin_request, capability, file_path) =
+        prepare_plugin_request(context.workspace_root, &args)?;
+
+    let Some(resolution) = resolve_provider_with_fallback(
+        context.runtime,
+        capability,
+        file_path.as_path(),
+        args.provider.as_deref(),
+        &args,
+        writer,
+    )?
+    else {
+        return Ok(DispatchResult::with_status(1));
+    };
+
+    write_capability_resolution(writer, &resolution)?;
+    let Some(selected_provider) = resolution.details().selected_provider() else {
+        return Ok(DispatchResult::with_status(1));
+    };
+
+    execute_plugin_and_handle_response(
+        context.runtime,
+        selected_provider,
+        &plugin_request,
+        &args,
+        writer,
+        &mut context,
+    )
 }
 
 /// Returns `true` if any component of `path` is a parent-directory reference.
