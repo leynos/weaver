@@ -34,9 +34,7 @@ fn when_daemon_starts_foreground(world: &RefCell<ProcessTestWorld>) -> Result<()
 
 #[when("the daemon starts in foreground mode with invalid configuration")]
 fn when_daemon_starts_invalid(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
-    world
-        .borrow_mut()
-        .start_foreground_with_invalid_config()?;
+    world.borrow_mut().start_foreground_with_invalid_config()?;
     Ok(())
 }
 
@@ -63,9 +61,7 @@ fn given_stale_runtime(world: &RefCell<ProcessTestWorld>) -> Result<(), String> 
 
 #[given("stale runtime artefacts with invalid pid exist")]
 fn given_stale_runtime_invalid(world: &RefCell<ProcessTestWorld>) -> Result<(), String> {
-    world
-        .borrow()
-        .write_stale_runtime_with_invalid_pid(99999)?;
+    world.borrow().write_stale_runtime_with_invalid_pid(99999)?;
     Ok(())
 }
 

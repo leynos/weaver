@@ -1,14 +1,5 @@
 # Weaver
 
-Name: `weaver`
-
-Use this skill whenever the user wants semantic code intelligence through the
-Weaver CLI, especially for fetching definitions, fetching symbol cards,
-checking capability support, inspecting daemon state, or performing
-language-aware renames. Trigger even when the user does not mention Weaver by
-name if they want IDE-like code navigation or semantic refactors from the
-terminal.
-
 Weaver gives you semantic code operations through a CLI and daemon. Use it when
 plain text search is too lossy, when the user wants structured JSON about code
 relationships, or when a rename should go through language-aware tooling
@@ -183,3 +174,12 @@ Agent flow:
 3. Review the diff.
 4. Run project validators.
 5. Report the outcome.
+
+______________________________________________________________________
+name: weaver description: Use this skill whenever the user wants semantic code
+intelligence through the Weaver CLI, especially for fetching definitions,
+fetching symbol cards, checking capability support, inspecting daemon state, or
+performing language-aware renames. Trigger even when the user does not mention
+Weaver by name if they want IDE-like code navigation or semantic refactors from
+the terminal.
+______________________________________________________________________

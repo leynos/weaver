@@ -2900,6 +2900,7 @@ name = "weaver-config"
 version = "0.1.0"
 dependencies = [
  "camino",
+ "cap-std 3.4.5",
  "clap",
  "dirs 6.0.0",
  "libc",

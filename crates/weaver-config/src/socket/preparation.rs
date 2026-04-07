@@ -232,8 +232,10 @@ fn validate_no_path_traversal(parent: &Utf8Path) -> Result<(), SocketPreparation
 mod tests {
     //! Unix-specific tests for socket directory preparation and hardening.
 
-    use std::os::unix::fs::{PermissionsExt, symlink};
-    use std::path::Path;
+    use std::{
+        os::unix::fs::{PermissionsExt, symlink},
+        path::Path,
+    };
 
     use tempfile::tempdir;
 

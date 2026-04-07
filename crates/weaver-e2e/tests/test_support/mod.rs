@@ -262,9 +262,7 @@ fn normalize_snapshot_value(value: &mut serde_json::Value) {
                 normalize_snapshot_value(item);
             }
         }
-        serde_json::Value::String(text)
-            if text.starts_with("file://") =>
-        {
+        serde_json::Value::String(text) if text.starts_with("file://") => {
             *text = String::from("<uri>");
         }
         _ => {}

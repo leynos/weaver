@@ -62,9 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(extra_dir) = out_dir_env
         && let Err(err) = write_man_page(&buf, &extra_dir, &page_name)
     {
-        println!(
-            "cargo:warning=Failed to stage manual page in OUT_DIR ({extra_dir}): {err}"
-        );
+        println!("cargo:warning=Failed to stage manual page in OUT_DIR ({extra_dir}): {err}");
     }
 
     Ok(())

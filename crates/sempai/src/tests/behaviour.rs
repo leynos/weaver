@@ -70,7 +70,8 @@ fn when_execute(world: &mut TestWorld) {
 /// Asserts that a diagnostic result contains a specific error code.
 #[expect(
     clippy::expect_fun_call,
-    reason = "Test helper needs string interpolation in expect message; will be addressed when whitaker permits unwrap_or_else panic in test interpolation contexts"
+    reason = "Test helper needs string interpolation in expect message; will be addressed when \
+              whitaker permits unwrap_or_else panic in test interpolation contexts"
 )]
 fn assert_diagnostic_code(
     result: Option<&Result<(), DiagnosticReport>>,
