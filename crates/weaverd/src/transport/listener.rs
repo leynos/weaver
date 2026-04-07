@@ -313,13 +313,9 @@ fn handle_accept_result<T, A>(
 
 fn accept_connection(listener: &mut SocketListener) -> Result<Option<ConnectionStream>, io::Error> {
     match &listener.listener {
-        ListenerKind::Tcp(tcp) => {
-            handle_accept_result(tcp.accept(), configure_tcp_stream)
-        }
+        ListenerKind::Tcp(tcp) => handle_accept_result(tcp.accept(), configure_tcp_stream),
         #[cfg(unix)]
-        ListenerKind::Unix(unix) => {
-            handle_accept_result(unix.accept(), configure_unix_stream)
-        }
+        ListenerKind::Unix(unix) => handle_accept_result(unix.accept(), configure_unix_stream),
     }
 }
 

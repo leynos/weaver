@@ -5,7 +5,6 @@ use std::{collections::HashMap, path::PathBuf};
 use mockall::mock;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
-use weaver_test_macros::allow_fixture_expansion_lints;
 use weaver_plugins::protocol::{
     DiagnosticSeverity,
     FilePayload,
@@ -13,6 +12,7 @@ use weaver_plugins::protocol::{
     PluginRequest,
     PluginResponse,
 };
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 use crate::{RopeAdapter, RopeAdapterError, execute_request, failure_response};
 

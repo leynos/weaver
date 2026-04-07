@@ -341,10 +341,11 @@ fn write_workspace_file(
     content: &str,
 ) -> Result<PathBuf, RopeAdapterError> {
     let absolute_path = workspace_root.join(relative_path);
-    let utf8_path = Utf8PathBuf::from_path_buf(absolute_path.clone())
-        .map_err(|_| RopeAdapterError::InvalidPath {
+    let utf8_path = Utf8PathBuf::from_path_buf(absolute_path.clone()).map_err(|_| {
+        RopeAdapterError::InvalidPath {
             message: String::from("path contains invalid UTF-8"),
-        })?;
+        }
+    })?;
 
     // Open the workspace root as a capability
     let workspace_dir = Dir::open_ambient_dir(workspace_root, cap_std::ambient_authority())
@@ -371,18 +372,20 @@ fn write_workspace_file(
     let target_dir = if parent_path.as_str().is_empty() {
         workspace_dir
     } else {
-        workspace_dir.open_dir(parent_path).map_err(|source| RopeAdapterError::WorkspaceWrite {
-            path: parent_path.into(),
-            source,
-        })?
+        workspace_dir
+            .open_dir(parent_path)
+            .map_err(|source| RopeAdapterError::WorkspaceWrite {
+                path: parent_path.into(),
+                source,
+            })?
     };
 
-    target_dir.write(file_name, content.as_bytes()).map_err(|source| {
-        RopeAdapterError::WorkspaceWrite {
+    target_dir
+        .write(file_name, content.as_bytes())
+        .map_err(|source| RopeAdapterError::WorkspaceWrite {
             path: absolute_path.clone(),
             source,
-        }
-    })?;
+        })?;
 
     Ok(absolute_path)
 }

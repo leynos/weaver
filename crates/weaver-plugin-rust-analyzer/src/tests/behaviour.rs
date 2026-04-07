@@ -5,11 +5,11 @@ use std::{collections::HashMap, path::PathBuf};
 use mockall::mock;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
-use weaver_test_macros::allow_fixture_expansion_lints;
 use weaver_plugins::{
     capability::ReasonCode,
     protocol::{DiagnosticSeverity, FilePayload, PluginOutput, PluginRequest, PluginResponse},
 };
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 use crate::{
     ByteOffset,

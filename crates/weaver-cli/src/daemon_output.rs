@@ -64,8 +64,7 @@ where
     if consecutive_empty_lines >= EMPTY_LINE_LIMIT {
         writeln!(
             io.stderr,
-            "Warning: received {EMPTY_LINE_LIMIT} consecutive empty lines from daemon; \
-             aborting."
+            "Warning: received {EMPTY_LINE_LIMIT} consecutive empty lines from daemon; aborting."
         )
         .map_err(AppError::ForwardResponse)?;
         return Ok(true);

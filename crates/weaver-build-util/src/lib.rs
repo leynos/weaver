@@ -1,9 +1,6 @@
 //! Build-time utilities shared across Weaver build scripts.
 
-use std::{
-    env,
-    io,
-};
+use std::{env, io};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::fs::Dir;
@@ -115,7 +112,8 @@ fn push_source_date_warning(warnings: &mut Vec<String>, error: &SourceDateError)
 /// ```
 /// use weaver_build_util::workspace_target_dir;
 ///
-/// let out_dir = camino::Utf8Path::new("/tmp/workspace/target/release/build/weaver-cli-abc123/out");
+/// let out_dir =
+///     camino::Utf8Path::new("/tmp/workspace/target/release/build/weaver-cli-abc123/out");
 ///
 /// let target_dir = workspace_target_dir(out_dir).expect("target directory not found");
 ///

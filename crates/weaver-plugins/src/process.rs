@@ -233,10 +233,7 @@ fn poll_child(
 }
 
 /// Handles a child process that has exited.
-fn handle_exited(
-    name: &str,
-    status: std::process::ExitStatus,
-) -> Result<(), PluginError> {
+fn handle_exited(name: &str, status: std::process::ExitStatus) -> Result<(), PluginError> {
     debug!(
         target: PLUGIN_TARGET,
         plugin = name,

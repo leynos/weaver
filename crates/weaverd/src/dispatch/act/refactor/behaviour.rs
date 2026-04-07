@@ -95,10 +95,9 @@ impl RefactorPluginRuntime for StubRuntime {
             }));
         }
 
-        let language = language_name
-            .ok_or_else(|| PluginError::NotFound {
-                name: String::from("language"),
-            })?;
+        let language = language_name.ok_or_else(|| PluginError::NotFound {
+            name: String::from("language"),
+        })?;
 
         Ok(match self.routing {
             RoutingMode::AutomaticPython => selected_resolution(SelectedResolution {
@@ -142,9 +141,12 @@ impl RefactorPluginRuntime for StubRuntime {
         _provider: &str,
         request: &PluginRequest,
     ) -> Result<PluginResponse, PluginError> {
-        let file_payload = request.files().first().ok_or_else(|| PluginError::NotFound {
-            name: String::from("file payload"),
-        })?;
+        let file_payload = request
+            .files()
+            .first()
+            .ok_or_else(|| PluginError::NotFound {
+                name: String::from("file payload"),
+            })?;
         let relative_path = file_payload.path().to_string_lossy().into_owned();
 
         match self.execution {
@@ -201,8 +203,7 @@ impl RefactorWorld {
     }
 
     fn write_file(&self, relative: &str, content: &str) -> Result<(), String> {
-        std::fs::write(self.path(relative), content)
-            .map_err(|e| format!("write file: {e}"))
+        std::fs::write(self.path(relative), content).map_err(|e| format!("write file: {e}"))
     }
 
     fn prepare_routed_fixture(&self, target_file: &str) -> Result<(), String> {
@@ -210,17 +211,14 @@ impl RefactorWorld {
         self.write_file(target_file, original_content_for(target_path))?;
         let patch_path = routed_patch_path(target_path);
         if patch_path != target_path {
-            let path_str = patch_path
-                .to_str()
-                .ok_or("invalid UTF-8 path")?;
+            let path_str = patch_path.to_str().ok_or("invalid UTF-8 path")?;
             self.write_file(path_str, original_content_for(target_path))?;
         }
         Ok(())
     }
 
     fn read_file(&self, relative: &str) -> Result<String, String> {
-        std::fs::read_to_string(self.path(relative))
-            .map_err(|e| format!("read file: {e}"))
+        std::fs::read_to_string(self.path(relative)).map_err(|e| format!("read file: {e}"))
     }
 
     fn execute(&mut self) -> Result<(), String> {
@@ -244,8 +242,8 @@ impl RefactorWorld {
         .map(|dispatch| dispatch.status);
 
         self.dispatch_result = Some(result);
-        self.response_stream = String::from_utf8(output)
-            .map_err(|e| format!("response utf8: {e}"))?;
+        self.response_stream =
+            String::from_utf8(output).map_err(|e| format!("response utf8: {e}"))?;
         Ok(())
     }
 }
@@ -321,10 +319,7 @@ fn when_refactor_executes(world: &mut RefactorWorld) -> Result<(), String> { wor
 
 #[then("the refactor command succeeds")]
 fn then_refactor_succeeds(world: &mut RefactorWorld) -> Result<(), String> {
-    let result = world
-        .dispatch_result
-        .as_ref()
-        .ok_or("result missing")?;
+    let result = world.dispatch_result.as_ref().ok_or("result missing")?;
     let status = result.as_ref().map_err(|e| format!("status error: {e}"))?;
     assert_eq!(*status, 0);
     Ok(())
@@ -332,10 +327,7 @@ fn then_refactor_succeeds(world: &mut RefactorWorld) -> Result<(), String> {
 
 #[then("the refactor command fails with status 1")]
 fn then_refactor_fails_status_one(world: &mut RefactorWorld) -> Result<(), String> {
-    let result = world
-        .dispatch_result
-        .as_ref()
-        .ok_or("result missing")?;
+    let result = world.dispatch_result.as_ref().ok_or("result missing")?;
     let status = result.as_ref().map_err(|e| format!("status error: {e}"))?;
     assert_eq!(*status, 1);
     Ok(())
@@ -346,9 +338,7 @@ fn then_target_file_updated(world: &mut RefactorWorld) -> Result<(), String> {
     let target_file = world.target_file()?;
     let target_path = Path::new(&target_file);
     let patch_target = routed_patch_path(target_path);
-    let path_str = patch_target
-        .to_str()
-        .ok_or("invalid UTF-8 path")?;
+    let path_str = patch_target.to_str().ok_or("invalid UTF-8 path")?;
     let updated = world.read_file(path_str)?;
     assert_eq!(updated, updated_content_for(target_path));
     Ok(())
@@ -359,9 +349,7 @@ fn then_target_file_unchanged(world: &mut RefactorWorld) -> Result<(), String> {
     let target_file = world.target_file()?;
     let target_path = Path::new(&target_file);
     let patch_target = routed_patch_path(target_path);
-    let path_str = patch_target
-        .to_str()
-        .ok_or("invalid UTF-8 path")?;
+    let path_str = patch_target.to_str().ok_or("invalid UTF-8 path")?;
     let updated = world.read_file(path_str)?;
     assert_eq!(updated, original_content_for(target_path));
     Ok(())

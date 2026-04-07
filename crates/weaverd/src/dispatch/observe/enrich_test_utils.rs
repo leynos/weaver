@@ -155,9 +155,7 @@ pub(crate) fn test_symbol_card_with_pos(start: SourcePosition, end: SourcePositi
 /// Runs non-ASCII enrichment test with the given capabilities.
 /// Returns the character offset sent to the LSP server.
 /// Asserts that enrichment succeeds.
-pub(crate) fn run_non_ascii_enrichment(
-    capabilities: ServerCapabilitySet,
-) -> Result<u32, String> {
+pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> Result<u32, String> {
     let source = "// café fn foo() {}";
     let hover = markdown_hover("```rust\nfn foo()\n```");
     let (server, hover_params_ref) = StubLanguageServer::with_hover(capabilities, hover);

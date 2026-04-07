@@ -330,13 +330,12 @@ fn find_line_start_offset(
 }
 
 /// Writes a minimal `Cargo.toml` so rust-analyzer can open the workspace.
-pub(super) fn write_stub_cargo_toml(
-    workspace_root: &Path,
-) -> Result<(), RustAnalyzerAdapterError> {
-    let utf8_path = Utf8PathBuf::from_path_buf(workspace_root.to_path_buf())
-        .map_err(|_| RustAnalyzerAdapterError::InvalidPath {
+pub(super) fn write_stub_cargo_toml(workspace_root: &Path) -> Result<(), RustAnalyzerAdapterError> {
+    let utf8_path = Utf8PathBuf::from_path_buf(workspace_root.to_path_buf()).map_err(|_| {
+        RustAnalyzerAdapterError::InvalidPath {
             message: String::from("workspace path contains invalid UTF-8"),
-        })?;
+        }
+    })?;
 
     let workspace_dir =
         Dir::open_ambient_dir(&utf8_path, cap_std::ambient_authority()).map_err(|source| {
@@ -353,12 +352,12 @@ pub(super) fn write_stub_cargo_toml(
         "edition = \"2024\"\n",
     );
 
-    workspace_dir.write("Cargo.toml", content.as_bytes()).map_err(|source| {
-        RustAnalyzerAdapterError::WorkspaceWrite {
+    workspace_dir
+        .write("Cargo.toml", content.as_bytes())
+        .map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
             path: workspace_root.join("Cargo.toml"),
             source,
-        }
-    })
+        })
 }
 
 /// Converts an absolute path to an `lsp_types::Uri` using `file://` encoding.

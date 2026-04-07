@@ -156,9 +156,10 @@ impl LanguageServer for StubLanguageServer {
     }
 
     fn hover(&mut self, params: HoverParams) -> Result<Option<Hover>, LanguageServerError> {
-        let mut guard = self.last_hover_params.lock().map_err(|_| {
-            LanguageServerError::new("failed to lock last_hover_params")
-        })?;
+        let mut guard = self
+            .last_hover_params
+            .lock()
+            .map_err(|_| LanguageServerError::new("failed to lock last_hover_params"))?;
         *guard = Some(params);
         drop(guard);
         match &self.hover_error {

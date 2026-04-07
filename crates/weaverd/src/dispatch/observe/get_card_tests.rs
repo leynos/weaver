@@ -8,6 +8,7 @@ use url::Url;
 use weaver_cards::{DEFAULT_CACHE_CAPACITY, DetailLevel, RefusalReason};
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_lsp_host::{Language, ServerCapabilitySet};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 use super::*;
 use crate::{
@@ -22,7 +23,6 @@ use crate::{
     },
     semantic_provider::SemanticBackendProvider,
 };
-use weaver_test_macros::allow_fixture_expansion_lints;
 
 #[allow_fixture_expansion_lints]
 #[fixture]

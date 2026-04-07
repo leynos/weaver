@@ -114,9 +114,11 @@ impl TryFrom<ParseState> for GetCardRequest {
         let uri = state.uri.ok_or_else(|| GetCardError::MissingArgument {
             flag: String::from("--uri"),
         })?;
-        let (line, column) = state.position.ok_or_else(|| GetCardError::MissingArgument {
-            flag: String::from("--position"),
-        })?;
+        let (line, column) = state
+            .position
+            .ok_or_else(|| GetCardError::MissingArgument {
+                flag: String::from("--position"),
+            })?;
 
         Ok(Self {
             uri,

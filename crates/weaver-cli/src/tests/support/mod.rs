@@ -18,7 +18,6 @@ use std::{
 use anyhow::{Context, Result, ensure};
 #[cfg(unix)]
 pub(super) use fake_daemon::accept_unix_connection;
-use weaver_test_macros::allow_fixture_expansion_lints;
 pub(super) use fake_daemon::{FakeDaemon, accept_tcp_connection, respond_to_request};
 pub(super) use lifecycle::{LifecycleCall, TestLifecycle};
 pub(crate) use lifecycle::{temp_paths, write_health_json, write_health_snapshot};
@@ -26,6 +25,7 @@ use rstest::fixture;
 use tempfile::TempDir;
 use url::Url;
 use weaver_config::{CapabilityDirective, CapabilityOverride, Config, SocketEndpoint};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 use crate::{AppError, ConfigLoader, IoStreams, lifecycle::LifecycleError, run_with_daemon_binary};
 
