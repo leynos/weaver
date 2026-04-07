@@ -31,7 +31,10 @@ fn build_content_transaction<'a>(
 
 #[test]
 fn content_transaction_commits_writes_and_deletes() {
-    let dir = TempDir::new().expect("temp dir");
+    let dir = match TempDir::new() {
+        Ok(d) => d,
+        Err(e) => panic!("temp dir: {}", e),
+    };
     let keep_path = temp_file(&dir, "keep.txt", "hello").expect("temp file");
     let delete_path = temp_file(&dir, "delete.txt", "goodbye").expect("temp file");
 
