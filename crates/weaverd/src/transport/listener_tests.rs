@@ -66,16 +66,16 @@ fn tcp_listener_accepts_connections(
 #[cfg(unix)]
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn unix_tempdir() -> tempfile::TempDir {
-    match tempfile::tempdir() {
-        Ok(dir) => dir,
-        Err(e) => panic!("failed to create temp dir: {}", e),
-    }
+fn unix_tempdir() -> Result<tempfile::TempDir, String> {
+    tempfile::tempdir().map_err(|e| format!("failed to create temp dir: {e}"))
 }
 
 #[cfg(unix)]
 #[rstest]
-fn unix_listener_cleans_stale_socket_files(unix_tempdir: tempfile::TempDir) {
+fn unix_listener_cleans_stale_socket_files(
+    unix_tempdir: Result<tempfile::TempDir, String>,
+) -> Result<(), String> {
+    let unix_tempdir = unix_tempdir?;
     let path = unix_tempdir.path().join("weaverd.sock");
     {
         let _stale = std::os::unix::net::UnixListener::bind(&path).expect("bind stale listener");
@@ -95,15 +95,20 @@ fn unix_listener_cleans_stale_socket_files(unix_tempdir: tempfile::TempDir) {
         !path.exists(),
         "listener should remove unix socket on shutdown"
     );
+    Ok(())
 }
 
 #[cfg(unix)]
 #[rstest]
-fn unix_listener_rejects_in_use_socket(unix_tempdir: tempfile::TempDir) {
+fn unix_listener_rejects_in_use_socket(
+    unix_tempdir: Result<tempfile::TempDir, String>,
+) -> Result<(), String> {
+    let unix_tempdir = unix_tempdir?;
     let path = unix_tempdir.path().join("weaverd.sock");
     let _existing = std::os::unix::net::UnixListener::bind(&path).expect("bind existing listener");
 
     let endpoint = SocketEndpoint::unix(path.to_str().expect("utf8 path").to_string());
     let error = SocketListener::bind(&endpoint).expect_err("should fail bind");
     assert!(matches!(error, ListenerError::UnixInUse { .. }));
+    Ok(())
 }
