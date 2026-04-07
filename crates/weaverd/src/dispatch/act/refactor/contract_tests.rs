@@ -87,11 +87,8 @@ const NOTES_DIFF: &str = concat!(
 
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn socket_dir() -> TempDir {
-    match TempDir::new() {
-        Ok(dir) => dir,
-        Err(e) => panic!("failed to create socket dir: {}", e),
-    }
+fn socket_dir() -> Result<TempDir, String> {
+    TempDir::new().map_err(|e| format!("failed to create socket dir: {e}"))
 }
 
 struct RenameDispatch<'a> {
@@ -148,8 +145,9 @@ fn dispatch_inspecting_rename(config: RenameDispatch<'_>) -> Result<PluginReques
 
 #[rstest]
 fn handler_sends_rename_symbol_contract_conforming_request(
-    socket_dir: TempDir,
+    socket_dir: Result<TempDir, String>,
 ) -> Result<(), String> {
+    let socket_dir = socket_dir?;
     let plugin_request = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.py",
         provider: "rope",
@@ -178,8 +176,9 @@ fn handler_sends_rename_symbol_contract_conforming_request(
 
 #[rstest]
 fn handler_overwrites_pre_existing_uri_with_file_path(
-    socket_dir: TempDir,
+    socket_dir: Result<TempDir, String>,
 ) -> Result<(), String> {
+    let socket_dir = socket_dir?;
     let plugin_request = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.py",
         provider: "rope",
@@ -203,7 +202,10 @@ fn handler_overwrites_pre_existing_uri_with_file_path(
 }
 
 #[rstest]
-fn handler_omits_position_when_offset_not_provided(socket_dir: TempDir) -> Result<(), String> {
+fn handler_omits_position_when_offset_not_provided(
+    socket_dir: Result<TempDir, String>,
+) -> Result<(), String> {
+    let socket_dir = socket_dir?;
     let plugin_request = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.py",
         provider: "rope",
@@ -218,8 +220,9 @@ fn handler_omits_position_when_offset_not_provided(socket_dir: TempDir) -> Resul
 
 #[rstest]
 fn rust_analyzer_provider_uses_rename_symbol_contract(
-    socket_dir: TempDir,
+    socket_dir: Result<TempDir, String>,
 ) -> Result<(), String> {
+    let socket_dir = socket_dir?;
     let plugin_request = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.rs",
         provider: "rust-analyzer",
