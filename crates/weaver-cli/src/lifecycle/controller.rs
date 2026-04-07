@@ -96,10 +96,7 @@ impl SystemLifecycle {
         &self,
         config: &weaver_config::Config,
     ) -> Option<RuntimePaths> {
-        match RuntimePaths::from_config_readonly(config) {
-            Ok(paths) => Some(paths),
-            Err(_) => None,
-        }
+        RuntimePaths::from_config_readonly(config).ok()
     }
 
     /// Reports daemon status when a valid health snapshot is available.
