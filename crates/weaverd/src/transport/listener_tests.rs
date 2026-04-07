@@ -66,7 +66,12 @@ fn tcp_listener_accepts_connections(
 #[cfg(unix)]
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn unix_tempdir() -> tempfile::TempDir { tempfile::tempdir().expect("temp dir") }
+fn unix_tempdir() -> tempfile::TempDir {
+    match tempfile::tempdir() {
+        Ok(dir) => dir,
+        Err(e) => panic!("failed to create temp dir: {}", e),
+    }
+}
 
 #[cfg(unix)]
 #[rstest]
