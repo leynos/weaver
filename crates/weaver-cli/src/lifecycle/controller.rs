@@ -91,40 +91,41 @@ impl SystemLifecycle {
         Ok(ExitCode::SUCCESS)
     }
 
-    fn status<W: Write, E: Write>(
-        &mut self,
-        invocation: &LifecycleInvocation,
-        context: LifecycleContext<'_>,
+    /// Checks if the daemon is running by attempting to read runtime paths.
+    fn check_daemon_paths(
+        &self,
+        config: &weaver_config::Config,
+    ) -> Option<RuntimePaths> {
+        match RuntimePaths::from_config_readonly(config) {
+            Ok(paths) => Some(paths),
+            Err(_) => None,
+        }
+    }
+
+    /// Reports daemon status when a valid health snapshot is available.
+    fn report_healthy_status<W: Write, E: Write>(
+        &self,
+        snapshot: &super::monitoring::HealthSnapshot,
+        context: &LifecycleContext<'_>,
         output: &mut LifecycleOutput<W, E>,
-    ) -> Result<ExitCode, LifecycleError> {
-        ensure_no_extra_arguments(invocation)?;
-        let paths = match RuntimePaths::from_config_readonly(context.config) {
-            Ok(paths) => paths,
-            Err(_) => {
-                output.stdout_line(format_args!(
-                    "daemon is not running; use 'weaver daemon start' to launch it."
-                ))?;
-                return Ok(ExitCode::SUCCESS);
-            }
-        };
-        if !paths.runtime_dir().exists() {
-            output.stdout_line(format_args!(
-                "daemon is not running; use 'weaver daemon start' to launch it."
-            ))?;
-            return Ok(ExitCode::SUCCESS);
-        }
-        let dir = open_runtime_dir(&paths)?;
-        let snapshot = read_health(&dir, HEALTH_FILENAME, paths.health_path())?;
-        if let Some(snapshot) = snapshot {
-            output.stdout_line(format_args!(
-                "daemon status: {} (pid {}) via {}",
-                snapshot.status,
-                snapshot.pid,
-                context.config.daemon_socket()
-            ))?;
-            return Ok(ExitCode::SUCCESS);
-        }
+    ) -> Result<(), LifecycleError> {
+        output.stdout_line(format_args!(
+            "daemon status: {} (pid {}) via {}",
+            snapshot.status,
+            snapshot.pid,
+            context.config.daemon_socket()
+        ))
+    }
+
+    /// Reports daemon status when health snapshot is missing but runtime exists.
+    fn report_degraded_status<W: Write, E: Write>(
+        &self,
+        paths: &RuntimePaths,
+        context: &LifecycleContext<'_>,
+        output: &mut LifecycleOutput<W, E>,
+    ) -> Result<(), LifecycleError> {
         let reachable = socket_is_reachable(context.config.daemon_socket())?;
+        let dir = open_runtime_dir(paths)?;
         let pid = read_pid(&dir, PID_FILENAME, paths.pid_path())?;
         match pid {
             Some(pid) => {
@@ -147,6 +148,43 @@ impl SystemLifecycle {
                 ))?;
             }
         }
+        Ok(())
+    }
+
+    fn status<W: Write, E: Write>(
+        &mut self,
+        invocation: &LifecycleInvocation,
+        context: LifecycleContext<'_>,
+        output: &mut LifecycleOutput<W, E>,
+    ) -> Result<ExitCode, LifecycleError> {
+        ensure_no_extra_arguments(invocation)?;
+
+        let paths = match self.check_daemon_paths(context.config) {
+            Some(paths) => paths,
+            None => {
+                output.stdout_line(format_args!(
+                    "daemon is not running; use 'weaver daemon start' to launch it."
+                ))?;
+                return Ok(ExitCode::SUCCESS);
+            }
+        };
+
+        if !paths.runtime_dir().exists() {
+            output.stdout_line(format_args!(
+                "daemon is not running; use 'weaver daemon start' to launch it."
+            ))?;
+            return Ok(ExitCode::SUCCESS);
+        }
+
+        let dir = open_runtime_dir(&paths)?;
+        let snapshot = read_health(&dir, HEALTH_FILENAME, paths.health_path())?;
+
+        if let Some(snapshot) = snapshot {
+            self.report_healthy_status(&snapshot, &context, output)?;
+            return Ok(ExitCode::SUCCESS);
+        }
+
+        self.report_degraded_status(&paths, &context, output)?;
         Ok(ExitCode::SUCCESS)
     }
 }
