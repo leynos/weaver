@@ -4,4 +4,4 @@
 # - weaver_config: performs configuration file I/O operations
 # - weaverd: daemon requires direct filesystem access for runtime operations
 [no_std_fs_operations]
-excluded_crates = ["weaver_sandbox", "weaver_config", "weaver-config", "weaverd"]
+excluded_crates = ["weaver_sandbox", "weaver_config", "weaverd"]
