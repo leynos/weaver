@@ -1,4 +1,6 @@
 #![cfg(feature = "cli")]
+#![allow(unknown_lints)]
+#![allow(no_std_fs_operations)]
 
 use std::{ffi::OsString, fs};
 

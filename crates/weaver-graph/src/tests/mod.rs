@@ -14,6 +14,8 @@
 )]
 
 mod graph_tests {
+    //! Tests for graph operations and structure.
+
     use crate::{
         edge::{CallEdge, EdgeSource},
         graph::CallGraph,
@@ -117,8 +119,9 @@ mod graph_tests {
     }
 }
 
-/// Tests for node creation and accessor methods.
 mod node_tests {
+    //! Tests for node creation and accessor methods.
+
     use camino::Utf8PathBuf;
 
     use crate::node::{CallNode, NodeId, Position, SymbolKind};
@@ -149,8 +152,9 @@ mod node_tests {
     }
 }
 
-/// Tests for edge creation and relationship tracking.
 mod edge_tests {
+    //! Tests for edge creation and relationship tracking.
+
     use camino::Utf8PathBuf;
 
     use crate::{
