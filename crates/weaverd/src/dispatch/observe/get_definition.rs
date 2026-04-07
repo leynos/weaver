@@ -95,4 +95,6 @@ pub fn handle<W: Write>(
 // Unit tests for response serialization are in the responses module.
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    //! Unit tests for get_definition dispatch handler.
+}
