@@ -30,13 +30,10 @@ fn build_content_transaction<'a>(
 }
 
 #[test]
-fn content_transaction_commits_writes_and_deletes() {
-    let dir = match TempDir::new() {
-        Ok(d) => d,
-        Err(e) => panic!("temp dir: {}", e),
-    };
-    let keep_path = temp_file(&dir, "keep.txt", "hello").expect("temp file");
-    let delete_path = temp_file(&dir, "delete.txt", "goodbye").expect("temp file");
+fn content_transaction_commits_writes_and_deletes() -> Result<(), String> {
+    let dir = TempDir::new().map_err(|e| format!("temp dir: {e}"))?;
+    let keep_path = temp_file(&dir, "keep.txt", "hello")?;
+    let delete_path = temp_file(&dir, "delete.txt", "goodbye")?;
 
     let syntactic = ConfigurableSyntacticLock::passing();
     let semantic = ConfigurableSemanticLock::passing();
@@ -48,23 +45,29 @@ fn content_transaction_commits_writes_and_deletes() {
     ));
     transaction.add_change(ContentChange::delete(delete_path.clone()));
 
-    let outcome = transaction.execute().expect("transaction should succeed");
+    let outcome = transaction
+        .execute()
+        .map_err(|e| format!("transaction failed: {e}"))?;
     assert!(matches!(outcome, TransactionOutcome::Committed { .. }));
     assert_eq!(outcome.files_modified(), Some(2));
     assert_eq!(
-        std::fs::read_to_string(&keep_path).expect("read keep file"),
+        std::fs::read_to_string(&keep_path).map_err(|e| format!("read keep file: {e}"))?,
         "hello world"
     );
     assert!(!delete_path.exists(), "delete file should be removed");
+    Ok(())
 }
 
 #[rstest]
 #[case::syntactic(LockFailureKind::Syntactic, "syntax error")]
 #[case::semantic(LockFailureKind::Semantic, "type error")]
-fn content_transaction_rejects_lock_failure(#[case] kind: LockFailureKind, #[case] message: &str) {
-    let dir = TempDir::new().expect("temp dir");
-    let keep_path = temp_file(&dir, "keep.txt", "hello").expect("temp file");
-    let delete_path = temp_file(&dir, "delete.txt", "goodbye").expect("temp file");
+fn content_transaction_rejects_lock_failure(
+    #[case] kind: LockFailureKind,
+    #[case] message: &str,
+) -> Result<(), String> {
+    let dir = TempDir::new().map_err(|e| format!("temp dir: {e}"))?;
+    let keep_path = temp_file(&dir, "keep.txt", "hello")?;
+    let delete_path = temp_file(&dir, "delete.txt", "goodbye")?;
     let failure = VerificationFailure::new(keep_path.clone(), message);
 
     let (syntactic, semantic) = match kind {
@@ -84,7 +87,9 @@ fn content_transaction_rejects_lock_failure(#[case] kind: LockFailureKind, #[cas
         keep_path.clone(),
         delete_path.clone(),
     );
-    let outcome = transaction.execute().expect("transaction should succeed");
+    let outcome = transaction
+        .execute()
+        .map_err(|e| format!("transaction failed: {e}"))?;
     match kind {
         LockFailureKind::Syntactic => {
             assert!(matches!(
@@ -100,10 +105,11 @@ fn content_transaction_rejects_lock_failure(#[case] kind: LockFailureKind, #[cas
         }
     }
     assert_eq!(
-        std::fs::read_to_string(&keep_path).expect("read keep file"),
+        std::fs::read_to_string(&keep_path).map_err(|e| format!("read keep file: {e}"))?,
         "hello"
     );
     assert!(delete_path.exists(), "delete file should remain");
+    Ok(())
 }
 
 #[test]
