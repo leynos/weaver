@@ -222,13 +222,11 @@ fn resolve_provider_with_fallback(
     args: &arguments::RefactorArgs,
     writer: &mut ResponseWriter<impl Write>,
 ) -> Result<Option<CapabilityResolutionEnvelope>, DispatchError> {
-    match params
-        .runtime
-        .resolve(ResolutionRequest::new(
-            params.capability,
-            params.file_path,
-            params.provider_override,
-        )) {
+    match params.runtime.resolve(ResolutionRequest::new(
+        params.capability,
+        params.file_path,
+        params.provider_override,
+    )) {
         Ok(resolution) => Ok(Some(resolution)),
         Err(error) => {
             writer.write_stderr(format!(
@@ -328,8 +326,7 @@ pub fn handle<W: Write>(
         provider_override: args.provider.as_deref(),
     };
 
-    let Some(resolution) = resolve_provider_with_fallback(resolution_params, &args, writer)?
-    else {
+    let Some(resolution) = resolve_provider_with_fallback(resolution_params, &args, writer)? else {
         return Ok(DispatchResult::with_status(1));
     };
 

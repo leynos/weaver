@@ -33,7 +33,9 @@ fn registry() -> Result<PluginRegistry, String> {
         PathBuf::from("/usr/bin/weaver-plugin-rust-analyzer"),
     )
     .with_capabilities(vec![CapabilityId::RenameSymbol]);
-    registry.register(rope).map_err(|e| format!("register rope: {e}"))?;
+    registry
+        .register(rope)
+        .map_err(|e| format!("register rope: {e}"))?;
     registry
         .register(rust_analyzer)
         .map_err(|e| format!("register rust-analyzer: {e}"))?;

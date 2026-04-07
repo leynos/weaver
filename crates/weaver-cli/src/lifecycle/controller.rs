@@ -92,10 +92,7 @@ impl SystemLifecycle {
     }
 
     /// Checks if the daemon is running by attempting to read runtime paths.
-    fn check_daemon_paths(
-        &self,
-        config: &weaver_config::Config,
-    ) -> Option<RuntimePaths> {
+    fn check_daemon_paths(&self, config: &weaver_config::Config) -> Option<RuntimePaths> {
         RuntimePaths::from_config_readonly(config).ok()
     }
 
@@ -135,8 +132,8 @@ impl SystemLifecycle {
         output: &mut LifecycleOutput<W, E>,
     ) -> Result<(), LifecycleError> {
         output.stdout_line(format_args!(
-            "daemon socket {} is listening but runtime files are missing; consider \
-             'weaver daemon stop' or removing {}",
+            "daemon socket {} is listening but runtime files are missing; consider 'weaver daemon \
+             stop' or removing {}",
             context.config.daemon_socket(),
             paths.runtime_dir().display()
         ))

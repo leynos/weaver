@@ -274,16 +274,19 @@ pub(super) mod test_support {
 
     /// Clears recorded events for the provided health file path.
     pub fn clear_health_events(path: &Path) -> Result<(), String> {
-        let mut guard = storage().lock().map_err(|_| "health event mutex poisoned")?;
+        let mut guard = storage()
+            .lock()
+            .map_err(|_| "health event mutex poisoned")?;
         guard.remove(path);
         Ok(())
     }
 
     #[must_use]
     pub fn health_events(path: &Path) -> Vec<&'static str> {
-        storage()
-            .lock()
-            .map_or_else(|_| Vec::new(), |guard| guard.get(path).cloned().unwrap_or_default())
+        storage().lock().map_or_else(
+            |_| Vec::new(),
+            |guard| guard.get(path).cloned().unwrap_or_default(),
+        )
     }
 }
 

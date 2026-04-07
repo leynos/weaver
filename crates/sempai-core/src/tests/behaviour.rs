@@ -35,7 +35,8 @@ fn world() -> TestWorld { TestWorld::default() }
 
 #[expect(
     clippy::expect_fun_call,
-    reason = "Test helper needs string interpolation in expect message; will be addressed when whitaker permits unwrap_or_else panic in test interpolation contexts"
+    reason = "Test helper needs string interpolation in expect message; will be addressed when \
+              whitaker permits unwrap_or_else panic in test interpolation contexts"
 )]
 fn parse_diagnostic_code(code: &str) -> DiagnosticCode {
     let json = serde_json::to_string(code).expect("serialise diagnostic code");
@@ -173,16 +174,18 @@ fn assert_str_contains(haystack: &str, needle: &str, label: &str) {
 
 #[expect(
     clippy::expect_fun_call,
-    reason = "Test step needs string interpolation in expect message; will be addressed when whitaker permits unwrap_or_else panic in test interpolation contexts"
+    reason = "Test step needs string interpolation in expect message; will be addressed when \
+              whitaker permits unwrap_or_else panic in test interpolation contexts"
 )]
 #[then("the JSON contains key {key} with value {value}")]
 fn then_json_contains(world: &mut TestWorld, key: QuotedString, value: QuotedString) {
     let json = world.json_output.as_ref().expect("JSON should be set");
     let parsed: serde_json::Value =
         serde_json::from_str(json).expect("JSON output should be valid");
-    let actual = parsed
-        .get(key.as_str())
-        .expect(&format!("expected JSON to contain key '{}', got: {json}", key.as_str()));
+    let actual = parsed.get(key.as_str()).expect(&format!(
+        "expected JSON to contain key '{}', got: {json}",
+        key.as_str()
+    ));
     let expected: serde_json::Value = serde_json::from_str(value.as_str())
         .unwrap_or_else(|_| serde_json::Value::String(value.as_str().to_owned()));
     assert_eq!(
@@ -215,7 +218,8 @@ fn then_first_diagnostic_does_not_contain_key(world: &mut TestWorld, key: Quoted
 
 #[expect(
     clippy::expect_fun_call,
-    reason = "Test step needs string interpolation in expect message; will be addressed when whitaker permits unwrap_or_else panic in test interpolation contexts"
+    reason = "Test step needs string interpolation in expect message; will be addressed when \
+              whitaker permits unwrap_or_else panic in test interpolation contexts"
 )]
 #[then("the first diagnostic JSON contains key {key} with value {value}")]
 fn then_first_diagnostic_contains_key_with_value(
@@ -224,9 +228,10 @@ fn then_first_diagnostic_contains_key_with_value(
     value: QuotedString,
 ) {
     let first = first_diagnostic_object(world);
-    let actual = first
-        .get(key.as_str())
-        .expect(&format!("expected first diagnostic JSON to contain key '{}', got: {first:?}", key.as_str()));
+    let actual = first.get(key.as_str()).expect(&format!(
+        "expected first diagnostic JSON to contain key '{}', got: {first:?}",
+        key.as_str()
+    ));
     let expected: serde_json::Value = serde_json::from_str(value.as_str())
         .unwrap_or_else(|_| serde_json::Value::String(value.as_str().to_owned()));
     assert_eq!(

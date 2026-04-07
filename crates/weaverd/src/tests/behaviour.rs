@@ -20,10 +20,7 @@ fn given_healthy_loader(world: &RefCell<TestWorld>) { world.borrow_mut().use_suc
 fn given_failing_loader(world: &RefCell<TestWorld>) { world.borrow_mut().use_failing_loader(); }
 
 #[given("a backend provider that fails for {backend}")]
-fn given_backend_failure(
-    world: &RefCell<TestWorld>,
-    backend: String,
-) -> Result<(), String> {
+fn given_backend_failure(world: &RefCell<TestWorld>, backend: String) -> Result<(), String> {
     let kind = parse_backend(&backend)?;
     world
         .borrow()
@@ -36,20 +33,14 @@ fn given_backend_failure(
 fn when_bootstrap_runs(world: &RefCell<TestWorld>) { world.borrow_mut().bootstrap(); }
 
 #[when("the {backend} backend is requested")]
-fn when_backend_requested(
-    world: &RefCell<TestWorld>,
-    backend: String,
-) -> Result<(), String> {
+fn when_backend_requested(world: &RefCell<TestWorld>, backend: String) -> Result<(), String> {
     let kind = parse_backend(&backend)?;
     world.borrow_mut().request_backend(kind);
     Ok(())
 }
 
 #[when("the {backend} backend is requested again")]
-fn when_backend_requested_again(
-    world: &RefCell<TestWorld>,
-    backend: String,
-) -> Result<(), String> {
+fn when_backend_requested_again(world: &RefCell<TestWorld>, backend: String) -> Result<(), String> {
     let kind = parse_backend(&backend)?;
     world.borrow_mut().request_backend(kind);
     Ok(())
@@ -155,10 +146,7 @@ fn then_reporter_success(world: &RefCell<TestWorld>) {
 }
 
 #[then("the reporter recorded backend start for {backend}")]
-fn then_reporter_backend_start(
-    world: &RefCell<TestWorld>,
-    backend: String,
-) -> Result<(), String> {
+fn then_reporter_backend_start(world: &RefCell<TestWorld>, backend: String) -> Result<(), String> {
     assert_backend_event(
         world,
         backend,
@@ -168,10 +156,7 @@ fn then_reporter_backend_start(
 }
 
 #[then("the reporter recorded backend ready for {backend}")]
-fn then_reporter_backend_ready(
-    world: &RefCell<TestWorld>,
-    backend: String,
-) -> Result<(), String> {
+fn then_reporter_backend_ready(world: &RefCell<TestWorld>, backend: String) -> Result<(), String> {
     assert_backend_event(
         world,
         backend,
@@ -213,10 +198,7 @@ fn then_reporter_backend_failure(
 }
 
 #[then("the backend was started exactly once for {backend}")]
-fn then_backend_started_once(
-    world: &RefCell<TestWorld>,
-    backend: String,
-) -> Result<(), String> {
+fn then_backend_started_once(world: &RefCell<TestWorld>, backend: String) -> Result<(), String> {
     let kind = parse_backend(&backend)?;
     let starts = world.borrow().backend_starts();
     assert!(
