@@ -22,6 +22,57 @@ pub(crate) struct OutputSettings<'a> {
     pub(crate) context: &'a OutputContext,
 }
 
+/// Processes a single daemon message, writing output to the appropriate stream.
+fn process_message<W, E, S>(
+    message: DaemonMessage,
+    io: &mut IoStreams<'_, S, W, E>,
+    settings: &OutputSettings<'_>,
+) -> Result<(), AppError>
+where
+    S: Read,
+    W: Write,
+    E: Write,
+{
+    match message {
+        DaemonMessage::Stream { stream, data } => {
+            let rendered = match settings.format {
+                ResolvedOutputFormat::Human => render_human_output(settings.context, &data),
+                ResolvedOutputFormat::Json => None,
+            };
+            let payload = rendered.as_deref().unwrap_or(&data);
+            match stream {
+                StreamTarget::Stdout => io.stdout.write_all(payload.as_bytes()),
+                StreamTarget::Stderr => io.stderr.write_all(payload.as_bytes()),
+            }
+            .map_err(AppError::ForwardResponse)?;
+        }
+        DaemonMessage::Exit { .. } => {}
+    }
+    Ok(())
+}
+
+/// Checks if the empty line limit has been reached and writes a warning if so.
+fn check_empty_line_limit<W, E, S>(
+    consecutive_empty_lines: usize,
+    io: &mut IoStreams<'_, S, W, E>,
+) -> Result<bool, AppError>
+where
+    S: Read,
+    W: Write,
+    E: Write,
+{
+    if consecutive_empty_lines >= EMPTY_LINE_LIMIT {
+        writeln!(
+            io.stderr,
+            "Warning: received {EMPTY_LINE_LIMIT} consecutive empty lines from daemon; \
+             aborting."
+        )
+        .map_err(AppError::ForwardResponse)?;
+        return Ok(true);
+    }
+    Ok(false)
+}
+
 pub(crate) fn read_daemon_messages<R, W, E, S>(
     connection: &mut R,
     io: &mut IoStreams<'_, S, W, E>,
@@ -47,13 +98,7 @@ where
     {
         if line.trim().is_empty() {
             consecutive_empty_lines += 1;
-            if consecutive_empty_lines >= EMPTY_LINE_LIMIT {
-                writeln!(
-                    io.stderr,
-                    "Warning: received {EMPTY_LINE_LIMIT} consecutive empty lines from daemon; \
-                     aborting."
-                )
-                .map_err(AppError::ForwardResponse)?;
+            if check_empty_line_limit(consecutive_empty_lines, io)? {
                 break;
             }
             line.clear();
@@ -61,21 +106,10 @@ where
         }
         consecutive_empty_lines = 0;
         let message: DaemonMessage = serde_json::from_str(&line).map_err(AppError::ParseMessage)?;
-        match message {
-            DaemonMessage::Stream { stream, data } => {
-                let rendered = match settings.format {
-                    ResolvedOutputFormat::Human => render_human_output(settings.context, &data),
-                    ResolvedOutputFormat::Json => None,
-                };
-                let payload = rendered.as_deref().unwrap_or(&data);
-                match stream {
-                    StreamTarget::Stdout => io.stdout.write_all(payload.as_bytes()),
-                    StreamTarget::Stderr => io.stderr.write_all(payload.as_bytes()),
-                }
-                .map_err(AppError::ForwardResponse)?;
-            }
-            DaemonMessage::Exit { status } => exit_status = Some(status),
+        if let DaemonMessage::Exit { status } = &message {
+            exit_status = Some(*status);
         }
+        process_message(message, io, &settings)?;
         line.clear();
     }
 
