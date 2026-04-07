@@ -1,13 +1,11 @@
 #![cfg(feature = "cli")]
-#![allow(unknown_lints)]
-#![allow(no_std_fs_operations)]
 
-use std::{ffi::OsString, fs};
+use std::ffi::OsString;
 
+use cap_std::fs::Dir;
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use tempfile::TempDir;
-use weaver_test_macros::allow_fixture_expansion_lints;
 use weaver_config::{
     Config,
     SocketEndpoint,
@@ -15,6 +13,7 @@ use weaver_config::{
     default_log_format,
     default_socket_endpoint,
 };
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 struct Harness {
     temp_dir: TempDir,
@@ -54,7 +53,9 @@ impl Harness {
             ),
         };
 
-        if let Err(error) = fs::write(&path, toml) {
+        let dir = Dir::open_ambient_dir(self.temp_dir.path(), cap_std::ambient_authority())
+            .expect("open temp dir");
+        if let Err(error) = dir.write("weaver.toml", toml) {
             panic!("failed to write configuration: {error}");
         }
 
