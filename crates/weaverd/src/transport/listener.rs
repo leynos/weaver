@@ -284,27 +284,42 @@ fn handle_accept_cycle(
     }
 }
 
+/// Configures a TCP stream for blocking operation with read timeout.
+fn configure_tcp_stream(stream: std::net::TcpStream) -> Result<ConnectionStream, io::Error> {
+    stream.set_nonblocking(false)?;
+    stream.set_read_timeout(Some(READ_TIMEOUT))?;
+    Ok(ConnectionStream::Tcp(stream))
+}
+
+#[cfg(unix)]
+/// Configures a Unix stream for blocking operation with read timeout.
+fn configure_unix_stream(stream: UnixStream) -> Result<ConnectionStream, io::Error> {
+    stream.set_nonblocking(false)?;
+    stream.set_read_timeout(Some(READ_TIMEOUT))?;
+    Ok(ConnectionStream::Unix(stream))
+}
+
+/// Handles the result of a socket accept operation.
+fn handle_accept_result<T, A>(
+    result: Result<(T, A), io::Error>,
+    configure: impl FnOnce(T) -> Result<ConnectionStream, io::Error>,
+) -> Result<Option<ConnectionStream>, io::Error> {
+    match result {
+        Ok((stream, _)) => Ok(Some(configure(stream)?)),
+        Err(error) if error.kind() == io::ErrorKind::WouldBlock => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
 fn accept_connection(listener: &mut SocketListener) -> Result<Option<ConnectionStream>, io::Error> {
     match &listener.listener {
-        ListenerKind::Tcp(tcp) => match tcp.accept() {
-            Ok((stream, _)) => {
-                stream.set_nonblocking(false)?;
-                stream.set_read_timeout(Some(READ_TIMEOUT))?;
-                Ok(Some(ConnectionStream::Tcp(stream)))
-            }
-            Err(error) if error.kind() == io::ErrorKind::WouldBlock => Ok(None),
-            Err(error) => Err(error),
-        },
+        ListenerKind::Tcp(tcp) => {
+            handle_accept_result(tcp.accept(), configure_tcp_stream)
+        }
         #[cfg(unix)]
-        ListenerKind::Unix(unix) => match unix.accept() {
-            Ok((stream, _)) => {
-                stream.set_nonblocking(false)?;
-                stream.set_read_timeout(Some(READ_TIMEOUT))?;
-                Ok(Some(ConnectionStream::Unix(stream)))
-            }
-            Err(error) if error.kind() == io::ErrorKind::WouldBlock => Ok(None),
-            Err(error) => Err(error),
-        },
+        ListenerKind::Unix(unix) => {
+            handle_accept_result(unix.accept(), configure_unix_stream)
+        }
     }
 }
 
