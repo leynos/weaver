@@ -15,15 +15,19 @@ use weaver_test_macros::allow_fixture_expansion_lints;
 mod refactor_helpers;
 
 use refactor_helpers::{build_backends, command_request};
-use crate::dispatch::act::refactor::resolution::{
-    CandidateEvaluation, CapabilityResolutionDetails, CapabilityResolutionEnvelope,
-    ResolutionOutcome, ResolutionRequest, SelectionMode,
-};
 use crate::dispatch::act::refactor::{
     RefactorContext,
     RefactorPluginRuntime,
     ResponseWriter,
     handle,
+    resolution::{
+        CandidateEvaluation,
+        CapabilityResolutionDetails,
+        CapabilityResolutionEnvelope,
+        ResolutionOutcome,
+        ResolutionRequest,
+        SelectionMode,
+    },
     rust_analyzer_manifest,
 };
 
@@ -82,7 +86,10 @@ const NOTES_DIFF: &str = concat!(
 #[allow_fixture_expansion_lints]
 #[fixture]
 fn socket_dir() -> TempDir {
-    TempDir::new().expect("socket dir")
+    match TempDir::new() {
+        Ok(dir) => dir,
+        Err(error) => panic!("failed to create socket dir: {error}"),
+    }
 }
 
 struct RenameDispatch<'a> {
@@ -130,11 +137,12 @@ fn dispatch_inspecting_rename(config: RenameDispatch<'_>) -> Result<PluginReques
     )
     .map_err(|e| format!("dispatch result: {e}"))?;
 
-    runtime
+    let captured = runtime
         .captured
         .into_inner()
         .map_err(|_| String::from("lock poisoned"))?
-        .ok_or_else(|| String::from("request should be captured"))
+        .ok_or_else(|| String::from("request should be captured"))?;
+    Ok(captured)
 }
 
 #[rstest]

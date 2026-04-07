@@ -253,7 +253,10 @@ impl RefactorWorld {
 #[allow_fixture_expansion_lints]
 #[fixture]
 fn world() -> RefactorWorld {
-    RefactorWorld::new().expect("failed to create refactor world")
+    match RefactorWorld::new() {
+        Ok(world) => world,
+        Err(e) => panic!("failed to create refactor world: {}", e),
+    }
 }
 
 #[given("a workspace file for refactoring")]
