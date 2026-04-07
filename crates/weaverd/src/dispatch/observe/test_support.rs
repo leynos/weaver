@@ -192,7 +192,8 @@ pub(crate) fn semantic_backends_with_server(
         capability_matrix.clone(),
         lsp_host,
         DEFAULT_CACHE_CAPACITY,
-    );
+    )
+    .map_err(|e| format!("failed to create semantic backend provider: {e}"))?;
     let (config, dir) = test_config()?;
     Ok((FusionBackends::new(config, provider), dir))
 }
