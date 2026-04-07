@@ -27,8 +27,7 @@ fn snapshot_graph_slice_request_defaults() {
         String::from("10:5"),
     ];
     let request = GraphSliceRequest::parse(&args).expect("valid request");
-    let json =
-        serde_json::to_string_pretty(&request).expect("serialize");
+    let json = serde_json::to_string_pretty(&request).expect("serialize");
     assert_snapshot!(json);
 }
 
@@ -59,8 +58,7 @@ fn snapshot_graph_slice_request_all_flags() {
         String::from("signature"),
     ];
     let request = GraphSliceRequest::parse(&args).expect("valid request");
-    let json =
-        serde_json::to_string_pretty(&request).expect("serialize");
+    let json = serde_json::to_string_pretty(&request).expect("serialize");
     assert_snapshot!(json);
 }
 
@@ -71,33 +69,28 @@ fn snapshot_graph_slice_request_all_flags() {
 #[test]
 fn snapshot_graph_slice_success_default_budget() {
     let response = graph_slice_fixtures::sample_success_response();
-    let json =
-        serde_json::to_string_pretty(&response).expect("serialize");
+    let json = serde_json::to_string_pretty(&response).expect("serialize");
     assert_snapshot!(json);
 }
 
 #[test]
 fn snapshot_graph_slice_truncated_with_spillover() {
     let response = graph_slice_fixtures::sample_truncated_response();
-    let json =
-        serde_json::to_string_pretty(&response).expect("serialize");
+    let json = serde_json::to_string_pretty(&response).expect("serialize");
     assert_snapshot!(json);
 }
 
 #[test]
 fn snapshot_graph_slice_multi_resolution_scopes() {
-    let response =
-        graph_slice_fixtures::sample_multi_resolution_response();
-    let json =
-        serde_json::to_string_pretty(&response).expect("serialize");
+    let response = graph_slice_fixtures::sample_multi_resolution_response();
+    let json = serde_json::to_string_pretty(&response).expect("serialize");
     assert_snapshot!(json);
 }
 
 #[test]
 fn snapshot_graph_slice_refusal_not_implemented() {
     let response = GraphSliceResponse::not_yet_implemented();
-    let json =
-        serde_json::to_string_pretty(&response).expect("serialize");
+    let json = serde_json::to_string_pretty(&response).expect("serialize");
     assert_snapshot!(json);
 }
 
@@ -123,8 +116,7 @@ fn snapshot_graph_slice_refusal_variants(
     #[case] reason: SliceRefusalReason,
 ) {
     let response = graph_slice_fixtures::sample_refusal(reason);
-    let json =
-        serde_json::to_string_pretty(&response).expect("serialize");
+    let json = serde_json::to_string_pretty(&response).expect("serialize");
     assert_snapshot!(snapshot_name, json);
 }
 
@@ -153,8 +145,7 @@ fn snapshot_external_target_edge() {
 #[test]
 fn snapshot_spillover_empty() {
     let spillover = SliceSpillover::empty();
-    let json =
-        serde_json::to_string_pretty(&spillover).expect("serialize");
+    let json = serde_json::to_string_pretty(&spillover).expect("serialize");
     assert_snapshot!(json);
 }
 
@@ -173,8 +164,7 @@ fn snapshot_spillover_with_frontier() {
             },
         ],
     };
-    let json =
-        serde_json::to_string_pretty(&spillover).expect("serialize");
+    let json = serde_json::to_string_pretty(&spillover).expect("serialize");
     assert_snapshot!(json);
 }
 
@@ -184,17 +174,14 @@ fn snapshot_spillover_with_frontier() {
 
 #[test]
 fn resolution_scope_serializes_as_snake_case() {
-    let json = serde_json::to_string(&ResolutionScope::FullSymbolTable)
-        .expect("serialize");
-    assert_eq!(json, "\"full_symbol_table\"");
+    let full = serde_json::to_string(&ResolutionScope::FullSymbolTable).expect("serialize");
+    assert_eq!(full, "\"full_symbol_table\"");
 
-    let json = serde_json::to_string(&ResolutionScope::PartialSymbolTable)
-        .expect("serialize");
-    assert_eq!(json, "\"partial_symbol_table\"");
+    let partial = serde_json::to_string(&ResolutionScope::PartialSymbolTable).expect("serialize");
+    assert_eq!(partial, "\"partial_symbol_table\"");
 
-    let json =
-        serde_json::to_string(&ResolutionScope::Lsp).expect("serialize");
-    assert_eq!(json, "\"lsp\"");
+    let lsp = serde_json::to_string(&ResolutionScope::Lsp).expect("serialize");
+    assert_eq!(lsp, "\"lsp\"");
 }
 
 #[test]
@@ -208,8 +195,7 @@ fn slice_direction_serializes_as_snake_case() {
         "\"out\""
     );
     assert_eq!(
-        serde_json::to_string(&SliceDirection::Both)
-            .expect("serialize"),
+        serde_json::to_string(&SliceDirection::Both).expect("serialize"),
         "\"both\""
     );
 }
@@ -221,13 +207,11 @@ fn slice_edge_type_serializes_as_snake_case() {
         "\"call\""
     );
     assert_eq!(
-        serde_json::to_string(&SliceEdgeType::Import)
-            .expect("serialize"),
+        serde_json::to_string(&SliceEdgeType::Import).expect("serialize"),
         "\"import\""
     );
     assert_eq!(
-        serde_json::to_string(&SliceEdgeType::Config)
-            .expect("serialize"),
+        serde_json::to_string(&SliceEdgeType::Config).expect("serialize"),
         "\"config\""
     );
 }

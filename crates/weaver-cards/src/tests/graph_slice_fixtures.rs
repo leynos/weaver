@@ -9,7 +9,7 @@ use crate::graph_slice::{
     ResolutionScope, SliceConstraints, SliceEdge, SliceEntry, SliceRefusal, SliceRefusalReason,
     SliceSpillover, SpilloverCandidate,
 };
-use crate::{DetailLevel, SliceBudget, SliceDirection, SliceEdgeType, SymbolCard};
+use crate::{DetailLevel, SliceBudget, SliceDirection, SliceEdgeType};
 
 use super::fixtures;
 
@@ -144,14 +144,11 @@ pub fn sample_refusal(reason: SliceRefusalReason) -> GraphSliceResponse {
             String::from("the requested language is not supported")
         }
         SliceRefusalReason::NotYetImplemented => {
-            String::from(
-                "observe graph-slice: graph-slice traversal is not yet implemented",
-            )
+            String::from("observe graph-slice: graph-slice traversal is not yet implemented")
         }
         SliceRefusalReason::BackendUnavailable => {
             String::from("the required backend is not available")
         }
-        _ => String::from("slice could not be produced"),
     };
     GraphSliceResponse::Refusal {
         refusal: SliceRefusal { reason, message },
@@ -214,9 +211,4 @@ pub fn sample_external_edge() -> SliceEdge {
             details: None,
         },
     }
-}
-
-/// Builds a [`SymbolCard`] stub for a non-entry node.
-pub fn sample_node_card() -> SymbolCard {
-    fixtures::build_card_at_level(DetailLevel::Minimal)
 }

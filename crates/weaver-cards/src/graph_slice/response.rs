@@ -256,12 +256,10 @@ impl GraphSliceResponse {
         Self::Refusal {
             refusal: SliceRefusal {
                 reason: SliceRefusalReason::NotYetImplemented,
-                message: String::from(
-                    concat!(
-                        "observe graph-slice: ",
-                        "graph-slice traversal is not yet implemented"
-                    ),
-                ),
+                message: String::from(concat!(
+                    "observe graph-slice: ",
+                    "graph-slice traversal is not yet implemented"
+                )),
             },
         }
     }

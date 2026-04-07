@@ -36,19 +36,22 @@ pub const DEFAULT_MAX_ESTIMATED_TOKENS: u32 = 4000;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SliceBudget {
     /// Maximum number of symbol cards to include.
-    max_cards: u32,
+    #[serde(rename = "max_cards")]
+    cards: u32,
     /// Maximum number of edges to include.
-    max_edges: u32,
+    #[serde(rename = "max_edges")]
+    edges: u32,
     /// Maximum estimated token count across all included cards.
-    max_estimated_tokens: u32,
+    #[serde(rename = "max_estimated_tokens")]
+    estimated_tokens: u32,
 }
 
 impl Default for SliceBudget {
     fn default() -> Self {
         Self {
-            max_cards: DEFAULT_MAX_CARDS,
-            max_edges: DEFAULT_MAX_EDGES,
-            max_estimated_tokens: DEFAULT_MAX_ESTIMATED_TOKENS,
+            cards: DEFAULT_MAX_CARDS,
+            edges: DEFAULT_MAX_EDGES,
+            estimated_tokens: DEFAULT_MAX_ESTIMATED_TOKENS,
         }
     }
 }
@@ -56,23 +59,29 @@ impl Default for SliceBudget {
 impl SliceBudget {
     /// Creates a budget with explicit values for all fields.
     #[must_use]
-    pub const fn new(max_cards: u32, max_edges: u32, max_estimated_tokens: u32) -> Self {
+    pub const fn new(cards: u32, edges: u32, estimated_tokens: u32) -> Self {
         Self {
-            max_cards,
-            max_edges,
-            max_estimated_tokens,
+            cards,
+            edges,
+            estimated_tokens,
         }
     }
 
     /// Returns the maximum number of cards.
     #[must_use]
-    pub const fn max_cards(&self) -> u32 { self.max_cards }
+    pub const fn max_cards(&self) -> u32 {
+        self.cards
+    }
 
     /// Returns the maximum number of edges.
     #[must_use]
-    pub const fn max_edges(&self) -> u32 { self.max_edges }
+    pub const fn max_edges(&self) -> u32 {
+        self.edges
+    }
 
     /// Returns the maximum estimated token count.
     #[must_use]
-    pub const fn max_estimated_tokens(&self) -> u32 { self.max_estimated_tokens }
+    pub const fn max_estimated_tokens(&self) -> u32 {
+        self.estimated_tokens
+    }
 }

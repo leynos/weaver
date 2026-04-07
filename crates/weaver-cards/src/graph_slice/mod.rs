@@ -6,21 +6,19 @@
 //! documentation generators work against a stable, version-pinned
 //! contract.
 //!
-//! # Module layout
+//! # Key types
 //!
-//! - [`budget`] — traversal budget constraints ([`SliceBudget`]).
-//! - [`request`] — request parsing and defaults
-//!   ([`GraphSliceRequest`]).
-//! - [`response`] — response envelope, edges, spillover, and refusal
-//!   types ([`GraphSliceResponse`]).
+//! - [`SliceBudget`] — traversal budget constraints.
+//! - [`GraphSliceRequest`] — request parsing and defaults.
+//! - [`GraphSliceResponse`] — response envelope, edges, spillover,
+//!   and refusal types.
 
 mod budget;
+mod parse;
 mod request;
 mod response;
 
-pub use budget::{
-    DEFAULT_MAX_CARDS, DEFAULT_MAX_EDGES, DEFAULT_MAX_ESTIMATED_TOKENS, SliceBudget,
-};
+pub use budget::{DEFAULT_MAX_CARDS, DEFAULT_MAX_EDGES, DEFAULT_MAX_ESTIMATED_TOKENS, SliceBudget};
 pub use request::{
     DEFAULT_DEPTH, DEFAULT_MIN_CONFIDENCE, GraphSliceError, GraphSliceRequest, SliceDirection,
     SliceEdgeType,

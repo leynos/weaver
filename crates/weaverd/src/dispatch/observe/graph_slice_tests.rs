@@ -25,8 +25,7 @@ fn dispatch_graph_slice(arguments: &[&str]) -> (i32, String) {
     let request = make_request(arguments);
     let mut buffer = Vec::new();
     let mut writer = ResponseWriter::new(&mut buffer);
-    let result =
-        handle(&request, &mut writer).expect("dispatch succeeds");
+    let result = handle(&request, &mut writer).expect("dispatch succeeds");
     let output = String::from_utf8(buffer).expect("valid UTF-8");
     (result.status, output)
 }
@@ -37,18 +36,11 @@ fn dispatch_graph_slice(arguments: &[&str]) -> (i32, String) {
 /// envelopes. This helper extracts just the data content.
 fn extract_stdout(raw: &str) -> String {
     for line in raw.lines() {
-        if let Ok(envelope) =
-            serde_json::from_str::<serde_json::Value>(line)
+        if let Ok(envelope) = serde_json::from_str::<serde_json::Value>(line)
+            && envelope.get("stream").and_then(|v| v.as_str()) == Some("stdout")
+            && let Some(data) = envelope.get("data").and_then(|v| v.as_str())
         {
-            if envelope.get("stream").and_then(|v| v.as_str())
-                == Some("stdout")
-            {
-                if let Some(data) =
-                    envelope.get("data").and_then(|v| v.as_str())
-                {
-                    return String::from(data);
-                }
-            }
+            return String::from(data);
         }
     }
     String::from(raw)
@@ -56,25 +48,18 @@ fn extract_stdout(raw: &str) -> String {
 
 #[test]
 fn valid_request_returns_not_yet_implemented_refusal() {
-    let (status, output) = dispatch_graph_slice(&[
-        "--uri",
-        "file:///src/main.rs",
-        "--position",
-        "10:5",
-    ]);
+    let (status, output) =
+        dispatch_graph_slice(&["--uri", "file:///src/main.rs", "--position", "10:5"]);
 
     assert_eq!(status, 1);
     let parsed: serde_json::Value =
-        serde_json::from_str(&extract_stdout(&output))
-            .expect("valid JSON");
+        serde_json::from_str(&extract_stdout(&output)).expect("valid JSON");
     assert_eq!(
         parsed.get("status").and_then(|v| v.as_str()),
         Some("refusal")
     );
     assert_eq!(
-        parsed
-            .pointer("/refusal/reason")
-            .and_then(|v| v.as_str()),
+        parsed.pointer("/refusal/reason").and_then(|v| v.as_str()),
         Some("not_yet_implemented")
     );
 }
@@ -90,12 +75,7 @@ fn invalid_arguments_returns_dispatch_error() {
 
 #[test]
 fn bad_position_format_returns_dispatch_error() {
-    let request = make_request(&[
-        "--uri",
-        "file:///src/main.rs",
-        "--position",
-        "bad",
-    ]);
+    let request = make_request(&["--uri", "file:///src/main.rs", "--position", "bad"]);
     let mut buffer = Vec::new();
     let mut writer = ResponseWriter::new(&mut buffer);
     let result = handle(&request, &mut writer);

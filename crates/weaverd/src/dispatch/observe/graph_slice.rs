@@ -31,9 +31,7 @@ pub fn handle<W: Write>(
     // Validate the request through the stable schema types to ensure
     // all arguments are well-formed before responding.
     let _slice_request = GraphSliceRequest::parse(&request.arguments)
-        .map_err(|error| {
-            DispatchError::invalid_arguments(error.to_string())
-        })?;
+        .map_err(|error| DispatchError::invalid_arguments(error.to_string()))?;
 
     let response = GraphSliceResponse::not_yet_implemented();
 

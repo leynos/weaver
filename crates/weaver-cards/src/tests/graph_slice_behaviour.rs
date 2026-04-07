@@ -33,7 +33,9 @@ impl FromStr for QuotedString {
 }
 
 impl QuotedString {
-    fn as_str(&self) -> &str { &self.0 }
+    fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -59,14 +61,12 @@ fn world() -> TestWorld {
 
 #[given("a graph-slice success response with default budget")]
 fn given_default_success(world: &mut TestWorld) {
-    world.response =
-        Some(graph_slice_fixtures::sample_success_response());
+    world.response = Some(graph_slice_fixtures::sample_success_response());
 }
 
 #[given("a graph-slice truncated response with spillover")]
 fn given_truncated_response(world: &mut TestWorld) {
-    world.response =
-        Some(graph_slice_fixtures::sample_truncated_response());
+    world.response = Some(graph_slice_fixtures::sample_truncated_response());
 }
 
 #[given("a graph-slice refusal with reason {reason}")]
@@ -79,8 +79,7 @@ fn given_refusal(world: &mut TestWorld, reason: QuotedString) {
         "backend_unavailable" => SliceRefusalReason::BackendUnavailable,
         other => panic!("unknown refusal reason: {other}"),
     };
-    world.response =
-        Some(graph_slice_fixtures::sample_refusal(parsed));
+    world.response = Some(graph_slice_fixtures::sample_refusal(parsed));
 }
 
 #[given("a graph-slice request with no optional flags")]
@@ -91,15 +90,11 @@ fn given_default_request(world: &mut TestWorld) {
         String::from("--position"),
         String::from("10:5"),
     ];
-    world.request =
-        Some(GraphSliceRequest::parse(&args).expect("valid request"));
+    world.request = Some(GraphSliceRequest::parse(&args).expect("valid request"));
 }
 
 #[given("a graph-slice request with edge types {types}")]
-fn given_request_with_edge_types(
-    world: &mut TestWorld,
-    types: QuotedString,
-) {
+fn given_request_with_edge_types(world: &mut TestWorld, types: QuotedString) {
     let args = vec![
         String::from("--uri"),
         String::from("file:///src/main.rs"),
@@ -132,20 +127,17 @@ fn given_request_with_depth(world: &mut TestWorld, depth: QuotedString) {
 
 #[given("a graph-slice response with all resolution scopes")]
 fn given_multi_resolution(world: &mut TestWorld) {
-    world.response =
-        Some(graph_slice_fixtures::sample_multi_resolution_response());
+    world.response = Some(graph_slice_fixtures::sample_multi_resolution_response());
 }
 
 // ---------------------------------------------------------------------------
 // When steps
 // ---------------------------------------------------------------------------
 
-#[when("the response is serialized to JSON")]
+#[when("the slice response is serialized to JSON")]
 fn when_response_serialized(world: &mut TestWorld) {
-    let response =
-        world.response.as_ref().expect("response should be set");
-    world.json_output =
-        Some(serde_json::to_string(response).expect("serialize"));
+    let response = world.response.as_ref().expect("response should be set");
+    world.json_output = Some(serde_json::to_string(response).expect("serialize"));
 }
 
 // ---------------------------------------------------------------------------
@@ -153,8 +145,7 @@ fn when_response_serialized(world: &mut TestWorld) {
 // ---------------------------------------------------------------------------
 
 fn parse_json(world: &TestWorld) -> serde_json::Value {
-    let json =
-        world.json_output.as_ref().expect("JSON should be set");
+    let json = world.json_output.as_ref().expect("JSON should be set");
     serde_json::from_str(json).expect("valid JSON")
 }
 
@@ -162,7 +153,7 @@ fn json_pointer(field: &str) -> String {
     format!("/{}", field.replace('.', "/"))
 }
 
-#[then("the JSON contains a {field} field")]
+#[then("the slice JSON contains a {field} field")]
 fn then_json_contains(world: &mut TestWorld, field: QuotedString) {
     let parsed = parse_json(world);
     let pointer = json_pointer(field.as_str());
@@ -173,25 +164,18 @@ fn then_json_contains(world: &mut TestWorld, field: QuotedString) {
     );
 }
 
-#[then("the JSON field {key} has value {value}")]
-fn then_json_field_value(
-    world: &mut TestWorld,
-    key: QuotedString,
-    value: QuotedString,
-) {
+#[then("the slice JSON field {key} has value {value}")]
+fn then_json_field_value(world: &mut TestWorld, key: QuotedString, value: QuotedString) {
     let parsed = parse_json(world);
     let pointer = json_pointer(key.as_str());
     let actual = parsed
         .pointer(&pointer)
-        .unwrap_or_else(|| {
-            panic!("expected JSON to contain key '{}'", key.as_str())
-        });
-    let expected: serde_json::Value =
-        serde_json::from_str(value.as_str()).unwrap_or_else(|_| {
-            serde_json::Value::String(String::from(value.as_str()))
-        });
+        .unwrap_or_else(|| panic!("expected JSON to contain key '{}'", key.as_str()));
+    let expected: serde_json::Value = serde_json::from_str(value.as_str())
+        .unwrap_or_else(|_| serde_json::Value::String(String::from(value.as_str())));
     assert_eq!(
-        actual, &expected,
+        actual,
+        &expected,
         "expected '{}' = {:?}, got {:?}",
         key.as_str(),
         expected,
@@ -201,20 +185,14 @@ fn then_json_field_value(
 
 #[then("the depth is {depth}")]
 fn then_depth_is(world: &mut TestWorld, depth: QuotedString) {
-    let request =
-        world.request.as_ref().expect("request should be set");
-    let expected: u32 =
-        depth.as_str().parse().expect("valid u32 in feature file");
+    let request = world.request.as_ref().expect("request should be set");
+    let expected: u32 = depth.as_str().parse().expect("valid u32 in feature file");
     assert_eq!(request.depth(), expected);
 }
 
 #[then("the direction is {direction}")]
-fn then_direction_is(
-    world: &mut TestWorld,
-    direction: QuotedString,
-) {
-    let request =
-        world.request.as_ref().expect("request should be set");
+fn then_direction_is(world: &mut TestWorld, direction: QuotedString) {
+    let request = world.request.as_ref().expect("request should be set");
     let expected: crate::SliceDirection = direction
         .as_str()
         .parse()
@@ -223,12 +201,8 @@ fn then_direction_is(
 }
 
 #[then("the edge types include {edge_type}")]
-fn then_edge_types_include(
-    world: &mut TestWorld,
-    edge_type: QuotedString,
-) {
-    let request =
-        world.request.as_ref().expect("request should be set");
+fn then_edge_types_include(world: &mut TestWorld, edge_type: QuotedString) {
+    let request = world.request.as_ref().expect("request should be set");
     let expected: SliceEdgeType = edge_type
         .as_str()
         .parse()
@@ -243,8 +217,7 @@ fn then_edge_types_include(
 
 #[then("the edge types are {types}")]
 fn then_edge_types_are(world: &mut TestWorld, types: QuotedString) {
-    let request =
-        world.request.as_ref().expect("request should be set");
+    let request = world.request.as_ref().expect("request should be set");
     let expected: Vec<SliceEdgeType> = types
         .as_str()
         .split(',')
@@ -262,10 +235,7 @@ fn then_request_rejected(world: &mut TestWorld) {
 }
 
 #[then("the response contains edge with resolution_scope {scope}")]
-fn then_response_contains_resolution_scope(
-    world: &mut TestWorld,
-    scope: QuotedString,
-) {
+fn then_response_contains_resolution_scope(world: &mut TestWorld, scope: QuotedString) {
     let parsed = parse_json(world);
     let edges = parsed
         .get("edges")
@@ -277,14 +247,11 @@ fn then_response_contains_resolution_scope(
         "lsp" => ResolutionScope::Lsp,
         other => panic!("unknown resolution scope: {other}"),
     };
-    let expected_str =
-        serde_json::to_string(&expected_scope).expect("serialize");
-    let expected_str = expected_str.trim_matches('"');
-    let found = edges.iter().any(|edge| {
-        edge.get("resolution_scope")
-            .and_then(|v| v.as_str())
-            == Some(expected_str)
-    });
+    let serialized = serde_json::to_string(&expected_scope).expect("serialize");
+    let expected_str = serialized.trim_matches('"');
+    let found = edges
+        .iter()
+        .any(|edge| edge.get("resolution_scope").and_then(|v| v.as_str()) == Some(expected_str));
     assert!(
         found,
         "expected to find edge with resolution_scope '{expected_str}'"
