@@ -454,9 +454,28 @@ structured stderr payload inside the existing JSONL `stream` envelope:
 
 The CLI preserves that payload unchanged in `--output json` mode. In
 `--output human` mode it renders the payload into an actionable guidance block
-headed by `Available operations:`. The CLI does not consult its own
-discoverability catalogue for this case, preventing drift between client help
-text and daemon dispatch authority.
+following the unified three-part error template (roadmap 2.3.3):
+
+```plaintext
+error: unknown operation 'nonexistent' for domain 'observe'
+
+Available operations:
+  get-definition
+  find-references
+  grep
+  diagnostics
+  call-hierarchy
+  get-card
+
+Next command:
+  weaver observe get-definition --help
+```
+
+The three-part template—error statement, alternatives block, and next
+command—provides consistent, actionable guidance across all Level 10 failure
+paths. The CLI does not consult its own discoverability catalogue for unknown
+operations, preventing drift between client help text and daemon dispatch
+authority.
 
 #### 2.1.2. Lifecycle orchestration
 
@@ -550,6 +569,37 @@ recoverable connection failures (`ConnectionRefused`, `NotFound`,
 `AddrNotAvailable`) from other errors that should fail immediately. This
 ensures the CLI only attempts auto-start when the daemon genuinely isn't
 running, rather than masking configuration errors or network issues.
+
+When auto-start fails, the CLI renders the failure using the unified three-part
+error template (roadmap 2.3.3). For a missing `weaverd` binary:
+
+```plaintext
+error: failed to spawn weaverd binary 'weaverd'
+
+Valid alternatives:
+  - Verify weaverd is installed and in your PATH
+  - Set WEAVERD_BIN to the full path to the weaverd binary
+
+Next command:
+  command -v weaverd || echo 'weaverd not found in PATH'
+```
+
+For startup failures (daemon exits without becoming ready):
+
+```plaintext
+error: daemon exited before reporting ready (status: Some(1))
+
+Valid alternatives:
+  - Check the daemon logs for errors
+  - Run with WEAVER_FOREGROUND=1 to see startup output
+
+Next command:
+  WEAVER_FOREGROUND=1 weaver daemon start
+```
+
+This consistent structure—error statement, alternatives block, and next
+command—applies across all Level 10 failure paths including bare invocation,
+unknown domains, unknown operations, and startup failures.
 
 #### 2.1.4. Human-readable output and code context blocks
 

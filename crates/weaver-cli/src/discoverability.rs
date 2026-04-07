@@ -179,6 +179,8 @@ pub(crate) fn write_missing_operation_guidance<W: Write>(
     localizer: &dyn Localizer,
     domain: KnownDomain,
 ) -> io::Result<bool> {
+    use crate::actionable_guidance::{ActionableGuidance, write_actionable_guidance};
+
     let operations = operations_for_domain(domain);
     let Some(hint_operation) = operations.first() else {
         return Ok(false);
@@ -187,30 +189,28 @@ pub(crate) fn write_missing_operation_guidance<W: Write>(
     let mut args = LocalizationArgs::new();
     args.insert("domain", domain_name.into());
     args.insert("hint_operation", (*hint_operation).into());
-    let error = strip_bidi_isolates(localizer.message(
+
+    let problem = strip_bidi_isolates(localizer.message(
         "weaver-domain-guidance-missing-operation-error",
         Some(&args),
-        &format!("error: operation required for domain '{domain_name}'"),
+        &format!("operation required for domain '{domain_name}'"),
     ));
+
     let available_operations = strip_bidi_isolates(localizer.message(
         "weaver-domain-guidance-available-operations",
         None,
         "Available operations:",
     ));
-    let hint = strip_bidi_isolates(localizer.message(
-        "weaver-domain-guidance-help-hint",
-        Some(&args),
-        &format!("Run 'weaver {domain_name} {hint_operation} --help' for operation details."),
-    ));
 
-    writeln!(writer, "{error}")?;
-    writeln!(writer)?;
-    writeln!(writer, "{available_operations}")?;
+    let mut alternatives = vec![available_operations];
     for operation in operations {
-        writeln!(writer, "  {operation}")?;
+        alternatives.push(format!("  {operation}"));
     }
-    writeln!(writer)?;
-    writeln!(writer, "{hint}")?;
+
+    let next_command = format!("weaver {domain_name} {hint_operation} --help");
+
+    let guidance = ActionableGuidance::new(problem, alternatives, next_command);
+    write_actionable_guidance(writer, &guidance)?;
 
     Ok(true)
 }
@@ -221,6 +221,8 @@ pub(crate) fn write_unknown_domain_guidance<W: Write>(
     localizer: &dyn Localizer,
     domain: &str,
 ) -> io::Result<bool> {
+    use crate::actionable_guidance::{ActionableGuidance, write_actionable_guidance};
+
     if KnownDomain::try_parse(domain).is_some() {
         return Ok(false);
     }
@@ -228,31 +230,44 @@ pub(crate) fn write_unknown_domain_guidance<W: Write>(
     args.insert("domain", domain.into());
     let valid_domains = valid_domains_list();
     args.insert("domains", valid_domains.as_str().into());
-    let error = strip_bidi_isolates(localizer.message(
+
+    let problem = strip_bidi_isolates(localizer.message(
         "weaver-domain-guidance-unknown-domain-error",
         Some(&args),
-        &format!("error: unknown domain '{domain}'"),
+        &format!("unknown domain '{domain}'"),
     ));
+
     let valid_domains_message = strip_bidi_isolates(localizer.message(
         "weaver-domain-guidance-valid-domains",
         Some(&args),
         &format!("Valid domains: {valid_domains}"),
     ));
 
-    writeln!(writer, "{error}")?;
-    writeln!(writer)?;
-    writeln!(writer, "{valid_domains_message}")?;
+    let mut alternatives = vec![valid_domains_message];
 
-    if let Some(suggested_domain) = suggestion_for_unknown_domain(domain) {
-        let suggested_domain = suggested_domain.as_str();
-        args.insert("suggested_domain", suggested_domain.into());
+    // Include "Did you mean" in alternatives if there's a suggestion
+    let next_command = if let Some(suggested_domain) = suggestion_for_unknown_domain(domain) {
+        let suggested_domain_str = suggested_domain.as_str();
+        args.insert("suggested_domain", suggested_domain_str.into());
         let suggestion = strip_bidi_isolates(localizer.message(
             "weaver-domain-guidance-did-you-mean-domain",
             Some(&args),
-            &format!("Did you mean '{suggested_domain}'?"),
+            &format!("Did you mean '{suggested_domain_str}'?"),
         ));
-        writeln!(writer, "{suggestion}")?;
-    }
+        alternatives.push(suggestion);
+        // Use the first operation of the suggested domain
+        let hint_op = suggested_domain
+            .operations()
+            .first()
+            .copied()
+            .unwrap_or("get-definition");
+        format!("weaver {suggested_domain_str} {hint_op} --help")
+    } else {
+        "weaver --help".to_string()
+    };
+
+    let guidance = ActionableGuidance::new(problem, alternatives, next_command);
+    write_actionable_guidance(writer, &guidance)?;
 
     Ok(true)
 }

@@ -63,6 +63,55 @@ fn bare_invocation_emits_help_to_stderr() {
     assert!(stderr_text.contains("weaver --help"));
 }
 
+/// Verifies the unified three-part error template for bare invocation.
+/// Per roadmap 2.3.3, all Level 10 paths must render:
+///   error: <problem>
+///   <alternatives>
+///   Next command: <command>
+#[test]
+fn bare_invocation_uses_three_part_template() {
+    let (_, _, stderr) = run_bare_invocation();
+    let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
+
+    // Part 1: error line
+    assert!(
+        stderr_text.contains("error:"),
+        "bare invocation must have explicit error line"
+    );
+
+    // Part 2: alternatives block (Usage + domains)
+    assert!(stderr_text.contains("Usage:"));
+    assert!(stderr_text.contains("observe"));
+    assert!(stderr_text.contains("act"));
+    assert!(stderr_text.contains("verify"));
+
+    // Part 3: Next command line
+    assert!(
+        stderr_text.contains("Next command:"),
+        "bare invocation must include Next command line"
+    );
+    assert!(
+        stderr_text.contains("weaver --help"),
+        "Next command should be weaver --help"
+    );
+
+    // Verify structure: error comes before alternatives, Next command at end
+    let error_pos = stderr_text.find("error:").expect("error line");
+    let usage_pos = stderr_text.find("Usage:").expect("Usage line");
+    let next_cmd_pos = stderr_text
+        .find("Next command:")
+        .expect("Next command line");
+
+    assert!(
+        error_pos < usage_pos,
+        "error line must come before Usage block"
+    );
+    assert!(
+        usage_pos < next_cmd_pos,
+        "Usage block must come before Next command"
+    );
+}
+
 #[test]
 fn bare_invocation_produces_no_stdout() {
     let (_, stdout, _) = run_bare_invocation();

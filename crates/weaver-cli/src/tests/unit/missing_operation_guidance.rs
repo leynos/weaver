@@ -84,10 +84,11 @@ fn assert_unknown_domain_preflight(output: &PreflightOutput, domain: &str) {
     );
     // Ensure legacy operation guidance does not appear
     assert!(!output.stderr.contains("Available operations:"));
+
+    // Verify three-part template per roadmap 2.3.3
     assert!(
-        !output
-            .stderr
-            .contains("weaver observe get-definition --help")
+        output.stderr.contains("Next command:"),
+        "unknown domain must include Next command line"
     );
 }
 
@@ -102,6 +103,35 @@ fn assert_known_domain_operation_guidance(output: &PreflightOutput, domain: &str
     // Ensure unknown-domain guidance does not appear
     assert!(!output.stderr.contains("Valid domains:"));
     assert!(!output.stderr.contains("Did you mean"));
+}
+
+/// Verifies the unified three-part error template for known domain without operation.
+/// Per roadmap 2.3.3: error, alternatives, Next command.
+fn assert_three_part_template(output: &PreflightOutput) {
+    // Part 1: error line
+    assert!(
+        output.stderr.contains("error:"),
+        "must have explicit error line"
+    );
+
+    // Part 2: alternatives block (already verified in domain-specific assertions)
+
+    // Part 3: Next command line
+    assert!(
+        output.stderr.contains("Next command:"),
+        "must include Next command line"
+    );
+
+    // Verify ordering
+    let error_pos = output.stderr.find("error:").expect("error line");
+    let next_cmd_pos = output
+        .stderr
+        .find("Next command:")
+        .expect("Next command line");
+    assert!(
+        error_pos < next_cmd_pos,
+        "error line must come before Next command"
+    );
 }
 
 fn assert_no_domain_guidance(output: &PreflightOutput) {
@@ -130,6 +160,7 @@ fn known_domain_without_operation_emits_contextual_guidance() {
             .stderr
             .contains("weaver observe get-definition --help")
     );
+    assert_three_part_template(&output);
 }
 
 #[rstest]

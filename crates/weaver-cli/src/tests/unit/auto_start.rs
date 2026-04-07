@@ -80,6 +80,61 @@ fn auto_start_failure_paths(
     );
 }
 
+/// Verifies that missing daemon binary provides actionable guidance.
+/// Per roadmap 2.3.3, startup failures must use the three-part template
+/// and mention WEAVERD_BIN and installation checks.
+#[cfg(unix)]
+#[test]
+fn auto_start_missing_binary_shows_actionable_guidance() {
+    let config = Config {
+        daemon_socket: SocketEndpoint::tcp("127.0.0.1", 1),
+        ..Config::default()
+    };
+    let context = LifecycleContext {
+        config: &config,
+        config_arguments: &[],
+        daemon_binary: Some(OsStr::new("/nonexistent/weaverd")),
+    };
+    let invocation = make_invocation();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut stdin = Cursor::new(Vec::new());
+    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
+
+    let exit = execute_daemon_command(invocation, context, &mut io, ResolvedOutputFormat::Json);
+
+    assert_eq!(exit, ExitCode::FAILURE);
+    let stderr_text = decode_utf8(stderr, "stderr").expect("stderr utf8");
+
+    // Three-part template per roadmap 2.3.3
+    // Part 1: error line
+    assert!(
+        stderr_text.contains("error:"),
+        "startup failure must have explicit error line"
+    );
+
+    // Part 2: alternatives block with actionable guidance
+    assert!(
+        stderr_text.to_lowercase().contains("weaverd_bin") || stderr_text.contains("WEAVERD_BIN"),
+        "must mention WEAVERD_BIN environment variable"
+    );
+    assert!(
+        stderr_text.to_lowercase().contains("install")
+            || stderr_text.to_lowercase().contains("path"),
+        "must mention installation or PATH checking"
+    );
+
+    // Part 3: Next command line
+    assert!(
+        stderr_text.contains("Next command:"),
+        "startup failure must include Next command line"
+    );
+    assert!(
+        stderr_text.contains("command -v weaverd") || stderr_text.contains("WEAVERD_BIN"),
+        "Next command should help verify weaverd installation"
+    );
+}
+
 /// Writes a health snapshot JSON file to the specified path.
 #[cfg(unix)]
 fn write_health_snapshot(path: &std::path::Path, status: &str, pid: u32, timestamp: u64) {

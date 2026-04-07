@@ -246,14 +246,30 @@ fn render_capability_resolution(resolution: CapabilityResolution) -> String {
 }
 
 fn render_unknown_operation(details: UnknownOperationDetails) -> String {
-    let mut rendered = format!(
-        "error: unknown operation '{}' for domain '{}'\n\nAvailable operations:\n",
+    use crate::actionable_guidance::{ActionableGuidance, write_actionable_guidance};
+
+    let problem = format!(
+        "unknown operation '{}' for domain '{}'",
         details.operation, details.domain
     );
-    for operation in details.known_operations {
-        rendered.push_str(&format!("  {operation}\n"));
+
+    let mut alternatives = vec!["Available operations:".to_string()];
+    for operation in &details.known_operations {
+        alternatives.push(format!("  {operation}"));
     }
-    rendered
+
+    // Derive next command from first known operation
+    let first_op = details
+        .known_operations
+        .first()
+        .map(String::as_str)
+        .unwrap_or("get-definition");
+    let next_command = format!("weaver {} {} --help", details.domain, first_op);
+
+    let guidance = ActionableGuidance::new(problem, alternatives, next_command);
+    let mut buf = Vec::new();
+    write_actionable_guidance(&mut buf, &guidance).expect("write to vec");
+    String::from_utf8(buf).expect("utf8")
 }
 
 fn diagnostic_to_location(
@@ -383,5 +399,64 @@ mod tests {
         assert!(rendered.contains("Available operations:"));
         assert!(rendered.contains("get-definition"));
         assert!(rendered.contains("get-card"));
+    }
+
+    /// Verifies the unified three-part error template for unknown operations.
+    /// Per roadmap 2.3.3: error, alternatives, Next command.
+    #[test]
+    fn renders_unknown_operation_with_three_part_template() {
+        let context = OutputContext::new("observe", "nonexistent", Vec::new());
+        let payload = serde_json::to_string(&serde_json::json!({
+            "status": "error",
+            "type": UNKNOWN_OPERATION_TYPE,
+            "details": {
+                "domain": "observe",
+                "operation": "nonexistent",
+                "known_operations": [
+                    "get-definition",
+                    "find-references",
+                    "grep",
+                    "diagnostics",
+                    "call-hierarchy",
+                    "get-card"
+                ]
+            }
+        }))
+        .expect("unknown-operation payload");
+
+        let rendered = render_human_output(&context, &payload).expect("rendered");
+
+        // Part 1: error line
+        assert!(
+            rendered.contains("error: unknown operation 'nonexistent' for domain 'observe'"),
+            "must have explicit error line"
+        );
+
+        // Part 2: alternatives block (Available operations)
+        assert!(rendered.contains("Available operations:"));
+        assert!(rendered.contains("get-definition"));
+
+        // Part 3: Next command line - derived from first known_operation
+        assert!(
+            rendered.contains("Next command:"),
+            "must include Next command line"
+        );
+        assert!(
+            rendered.contains("weaver observe get-definition --help"),
+            "Next command should use first known operation"
+        );
+
+        // Verify structure: error < alternatives < Next command
+        let error_pos = rendered.find("error:").expect("error line");
+        let alt_pos = rendered
+            .find("Available operations:")
+            .expect("alternatives");
+        let next_cmd_pos = rendered.find("Next command:").expect("Next command");
+
+        assert!(error_pos < alt_pos, "error must come before alternatives");
+        assert!(
+            alt_pos < next_cmd_pos,
+            "alternatives must come before Next command"
+        );
     }
 }

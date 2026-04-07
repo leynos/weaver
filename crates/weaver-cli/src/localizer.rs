@@ -5,6 +5,7 @@
 //! to [`NoOpLocalizer`] (hardcoded English) when the Fluent pipeline
 //! fails.
 
+#[cfg(test)]
 use std::io::Write;
 
 use ortho_config::{FluentLocalizer, Localizer, NoOpLocalizer};
@@ -16,31 +17,34 @@ pub(crate) static WEAVER_EN_US: &str = include_str!("../locales/en-US/messages.f
 ///
 /// The fallback values must match `locales/en-US/messages.ftl`; the
 /// `fluent_and_fallback_outputs_are_identical` test guards against drift.
-mod bare_help {
-    pub(super) const USAGE: (&str, &str) = (
+pub(crate) mod bare_help {
+    pub(crate) const USAGE: (&str, &str) = (
         "weaver-bare-help-usage",
         "Usage: weaver <DOMAIN> <OPERATION> [ARG]...",
     );
-    pub(super) const HEADER: (&str, &str) = ("weaver-bare-help-header", "Domains:");
-    pub(super) const OBSERVE: (&str, &str) = (
+    pub(crate) const HEADER: (&str, &str) = ("weaver-bare-help-header", "Domains:");
+    pub(crate) const OBSERVE: (&str, &str) = (
         "weaver-bare-help-domain-observe",
         "observe   Query code structure and relationships",
     );
-    pub(super) const ACT: (&str, &str) = (
+    pub(crate) const ACT: (&str, &str) = (
         "weaver-bare-help-domain-act",
         "act       Perform code modifications",
     );
-    pub(super) const VERIFY: (&str, &str) = (
+    pub(crate) const VERIFY: (&str, &str) = (
         "weaver-bare-help-domain-verify",
         "verify    Validate code correctness",
     );
-    pub(super) const POINTER: (&str, &str) = (
+    // Kept for backwards compatibility; new code uses actionable_guidance.
+    #[cfg(test)]
+    pub(crate) const POINTER: (&str, &str) = (
         "weaver-bare-help-pointer",
         "Run 'weaver --help' for more information.",
     );
 }
 
 /// Resolves a single help message through the localizer.
+#[cfg(test)]
 fn msg(localizer: &dyn Localizer, entry: &(&str, &str)) -> String {
     localizer.message(entry.0, None, entry.1)
 }
@@ -81,6 +85,7 @@ pub(crate) fn build_localizer() -> Box<dyn Localizer> {
 /// write_bare_help(&mut buf, &loc).expect("write bare help");
 /// assert!(String::from_utf8(buf).expect("valid UTF-8").contains("Usage:"));
 /// ```
+#[cfg(test)]
 pub(crate) fn write_bare_help<W: Write>(
     writer: &mut W,
     localizer: &dyn Localizer,
