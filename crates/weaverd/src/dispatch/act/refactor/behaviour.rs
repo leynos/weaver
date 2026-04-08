@@ -29,6 +29,7 @@ enum RuntimeMode {
     DiffSuccess,
     RuntimeError,
     MalformedDiff,
+    EmptySuccess,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -155,6 +156,7 @@ impl RefactorPluginRuntime for StubRuntime {
             RuntimeMode::MalformedDiff => Ok(PluginResponse::success(PluginOutput::Diff {
                 content: routed_malformed_diff_for(Path::new(&relative_path)),
             })),
+            RuntimeMode::EmptySuccess => Ok(PluginResponse::success(PluginOutput::Empty)),
         }
     }
 }
@@ -300,6 +302,11 @@ fn given_malformed_diff(world: &mut RefactorWorld) {
     world.runtime_mode = RuntimeMode::MalformedDiff;
 }
 
+#[given("a non-diff success response from the refactor plugin")]
+fn given_non_diff_success(world: &mut RefactorWorld) {
+    world.runtime_mode = RuntimeMode::EmptySuccess;
+}
+
 #[when("the act refactor command executes")]
 fn when_refactor_executes(world: &mut RefactorWorld) {
     world.execute();
@@ -348,4 +355,6 @@ fn then_stderr_contains(world: &mut RefactorWorld, text: String) {
 }
 
 #[scenario(path = "tests/features/refactor.feature")]
-fn refactor_behaviour(#[from(world)] _world: RefactorWorld) {}
+fn refactor_behaviour(#[from(world)] world: RefactorWorld) {
+    let _ = world;
+}
