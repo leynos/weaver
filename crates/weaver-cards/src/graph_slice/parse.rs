@@ -320,10 +320,12 @@ where
     let flag = raw.flag;
     let value = raw.value;
 
-    value.parse::<T>().map_err(|e| GraphSliceError::InvalidValue {
-        flag: flag.into(),
-        message: e.to_string(),
-    })
+    value
+        .parse::<T>()
+        .map_err(|e| GraphSliceError::InvalidValue {
+            flag: flag.into(),
+            message: e.to_string(),
+        })
 }
 
 fn parse_detail(raw: RawValue<'_>) -> Result<DetailLevel, GraphSliceError> {
