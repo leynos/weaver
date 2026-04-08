@@ -271,15 +271,7 @@ fn parse_u32(raw: RawValue<'_>) -> Result<u32, GraphSliceError> {
 }
 
 fn parse_direction(raw: RawValue<'_>) -> Result<SliceDirection, GraphSliceError> {
-    let flag = raw.flag;
-    let value = raw.value;
-
-    value
-        .parse()
-        .map_err(|e: SliceParseError| GraphSliceError::InvalidValue {
-            flag: flag.into(),
-            message: e.to_string(),
-        })
+    parse_with_fromstr(raw)
 }
 
 fn parse_edge_types(raw: RawValue<'_>) -> Result<Vec<SliceEdgeType>, GraphSliceError> {
@@ -316,14 +308,24 @@ fn parse_confidence(raw: RawValue<'_>) -> Result<f64, GraphSliceError> {
     Ok(confidence)
 }
 
-fn parse_detail(raw: RawValue<'_>) -> Result<DetailLevel, GraphSliceError> {
+/// Generic helper for parsing values that implement `FromStr`.
+///
+/// Converts the parse error into a `GraphSliceError::InvalidValue` using
+/// the error's `Display` implementation.
+fn parse_with_fromstr<T>(raw: RawValue<'_>) -> Result<T, GraphSliceError>
+where
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+{
     let flag = raw.flag;
     let value = raw.value;
 
-    value.parse().map_err(
-        |e: crate::DetailLevelParseError| GraphSliceError::InvalidValue {
-            flag: flag.into(),
-            message: e.to_string(),
-        },
-    )
+    value.parse::<T>().map_err(|e| GraphSliceError::InvalidValue {
+        flag: flag.into(),
+        message: e.to_string(),
+    })
+}
+
+fn parse_detail(raw: RawValue<'_>) -> Result<DetailLevel, GraphSliceError> {
+    parse_with_fromstr(raw)
 }
