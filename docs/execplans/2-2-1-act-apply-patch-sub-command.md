@@ -72,13 +72,13 @@ writes.
 - [x] (2026-01-28 00:00Z) Drafted ExecPlan.
 - [x] (2026-02-02 00:00Z) Plan approved; implementation started.
 - [x] (2026-02-02 00:00Z) Add JSONL request/response types for apply-patch and
-      update CLI stdin handling.
+  update CLI stdin handling.
 - [x] (2026-02-02 00:00Z) Implement patch parsing, matching, and safety harness
-      integration in `weaverd`.
+  integration in `weaverd`.
 - [x] (2026-02-02 00:00Z) Add unit and BDD tests (rstest + rstest-bdd) for
-      happy/unhappy paths.
+  happy/unhappy paths.
 - [x] (2026-02-02 00:00Z) Update design doc, user guide, and roadmap; run
-      quality gates.
+  quality gates.
 
 ## Surprises & discoveries
 
@@ -194,11 +194,11 @@ Stage H (quality gates): run `make check-fmt`, `make lint`, `make test`,
 
 1. Reconfirm requirements and decide on request size handling, then update
    `docs/weaver-design.md` with the decision before coding.
-2. Implement CLI JSONL request changes and tests, then run the CLI-focused
+1. Implement CLI JSONL request changes and tests, then run the CLI-focused
    unit and BDD suites.
-3. Implement daemon apply-patch handler, parser, and safety harness changes,
+1. Implement daemon apply-patch handler, parser, and safety harness changes,
    then run unit and BDD suites for `weaverd`.
-4. Update documentation and roadmap, then run the full workspace gates.
+1. Update documentation and roadmap, then run the full workspace gates.
 
 Commands (run from repo root, using `tee` + `pipefail`):
 

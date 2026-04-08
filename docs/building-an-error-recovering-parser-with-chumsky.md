@@ -47,9 +47,9 @@ Error recovery is what turns the parser from Vogon poetry into a Babel fish.
 
 1. **Anchors:** Tell Chumsky that `;`, `}`, `]`, and other setters of cosmic
    balance are “hard delimiters”. Use `recover_with(skip_until([]))`.
-2. **Labels:** Tag sub-parsers with `.labelled("expression")` so the diagnostics
+1. **Labels:** Tag sub-parsers with `.labelled("expression")` so the diagnostics
    mention something friendlier than “expected `Unknown(42)`”.
-3. **Tri-state nodes:** Return `Option<AstNode>`; missing bits propagate, but
+1. **Tri-state nodes:** Return `Option<AstNode>`; missing bits propagate, but
    the parser soldiers on.
 
 In practice, it is common to compose the built-ins via
@@ -74,8 +74,8 @@ Codex is a marvellous companion so long as the operator:
 Treat the linter as the pre-solver phase of the differential logic engine:
 
 1. Build symbol tables and scope graphs.
-2. Run the cheap local checks (duplicates, arity, type holes).
-3. Emit a constraint set and immediately feed it to the solver; conflicts become
+1. Run the cheap local checks (duplicates, arity, type holes).
+1. Emit a constraint set and immediately feed it to the solver; conflicts become
    diagnostics.
 
 Because differential logic supports incremental rechecking, teams can deliver

@@ -136,21 +136,21 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-3-make-nixie.log
 ## Progress
 
 - [x] (2026-03-21 UTC) Reviewed roadmap item 4.1.3, the Sempai design document,
-      the local parser-aligned Semgrep schema, adjacent 4.1.1 and 4.1.2
-      ExecPlans, and the testing/documentation guidance requested in the task.
+  the local parser-aligned Semgrep schema, adjacent 4.1.1 and 4.1.2
+  ExecPlans, and the testing/documentation guidance requested in the task.
 - [x] (2026-03-21 UTC) Drafted this ExecPlan.
 - [x] (2026-03-22 UTC) Stage A: Scaffold `sempai_yaml`, dependencies, and
-      red-path tests.
+  red-path tests.
 - [x] (2026-03-22 UTC) Stage B: Implement schema-aligned YAML rule models and
-      parsing entrypoint.
+  parsing entrypoint.
 - [x] (2026-03-22 UTC) Stage C: Implement structured parser diagnostics with
-      source spans.
+  source spans.
 - [x] (2026-03-22 UTC) Stage D: Wire `sempai::Engine::compile_yaml` to the
-      parser boundary.
+  parser boundary.
 - [x] (2026-03-22 UTC) Stage E: Update design docs, users guide, and roadmap
-      state.
+  state.
 - [x] (2026-03-22 UTC) Stage F: Run all required quality gates and capture
-      evidence.
+  evidence.
 
 ## Surprises & Discoveries
 
@@ -167,14 +167,15 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-3-make-nixie.log
 - Observation: the 4.1.2 work already established
   `DiagnosticReport::parser_error` and the `primary_span` JSON contract in
   [crates/sempai-core/src/diagnostic.rs](../../crates/sempai-core/src/diagnostic.rs).
-   Impact: 4.1.3 should reuse that contract rather than inventing a
+  Impact: 4.1.3 should reuse that contract rather than inventing a
   parser-local error shape.
 
 - Observation: the repository already carries a local parser-aligned Semgrep
   schema at
   [docs/semgrep-language-reference/semgrep-rule-schema.yaml](../semgrep-language-reference/semgrep-rule-schema.yaml).
-   Impact: the implementation can lock its model and test fixtures to that
+  Impact: the implementation can lock its model and test fixtures to that
   local source of truth instead of reverse-engineering the shape ad hoc.
+
 - Observation: `serde-saphyr` already reports byte-oriented error spans when
   parsing from `&str`, so `sempai_yaml` can use those locations directly for
   malformed YAML and Serde shape failures while keeping `saphyr` as a coarse
@@ -205,6 +206,7 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-3-make-nixie.log
   even if successful compilation still cannot yield final `QueryPlan` values.
   Rationale: this produces immediate user-visible value without skipping the
   later normalization milestone. Date/Author: 2026-03-21 / Codex.
+
 - Decision: keep search-mode principals strongly typed in `sempai_yaml`, but
   preserve join and taint bodies as opaque `serde_json::Value` payloads for
   now. Rationale: 4.1.3 needs schema-aligned parsing without prematurely
@@ -217,18 +219,18 @@ Target outcome at completion:
 
 1. `crates/sempai-yaml` exists and exposes a documented public parser API for
    Semgrep-compatible YAML rule files.
-2. Rule metadata and query principals parse from supported Semgrep-compatible
+1. Rule metadata and query principals parse from supported Semgrep-compatible
    YAML forms, covering both legacy and v2 query entrypoints.
-3. Malformed YAML and structural schema errors emit `DiagnosticReport` values
+1. Malformed YAML and structural schema errors emit `DiagnosticReport` values
    with stable `E_SEMPAI_*` codes and useful `primary_span` locations.
-4. Unit tests and `rstest-bdd` v0.5.0 scenarios cover happy paths, unhappy
+1. Unit tests and `rstest-bdd` v0.5.0 scenarios cover happy paths, unhappy
    paths, and edge cases.
-5. `docs/sempai-query-language-design.md` records the design decisions taken
+1. `docs/sempai-query-language-design.md` records the design decisions taken
    during implementation.
-6. `docs/users-guide.md` explains any changed user-visible behaviour,
+1. `docs/users-guide.md` explains any changed user-visible behaviour,
    especially `compile_yaml` failure semantics.
-7. `docs/roadmap.md` marks 4.1.3 done.
-8. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
+1. `docs/roadmap.md` marks 4.1.3 done.
+1. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
 Retrospective notes:
@@ -236,10 +238,10 @@ Retrospective notes:
 1. `serde-saphyr::Spanned<T>` was useful for raw deserialization, but keeping
    it out of the public `sempai_yaml` API avoided leaking parser dependency
    types into the stable model.
-2. The strongest user-visible value in this milestone came from replacing the
+1. The strongest user-visible value in this milestone came from replacing the
    blanket `NOT_IMPLEMENTED` YAML path with real parser/schema diagnostics,
    even though query-plan normalization is still pending.
-3. Final verification passed with `make fmt`, `make markdownlint`,
+1. Final verification passed with `make fmt`, `make markdownlint`,
    `make nixie`, `make check-fmt`, `make lint`, and `make test`.
 
 ## Context and orientation

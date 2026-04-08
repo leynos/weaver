@@ -86,9 +86,9 @@ not control commit behaviour directly.
 ## Migration plan
 
 1. Keep plugin requests to one JSONL line in and one JSONL line out.
-2. Make broker validation and routing explicit.
-3. Preserve the safety-harness handoff for accepted edits.
-4. Add tests that exercise refusal, success, and rollback paths.
+1. Make broker validation and routing explicit.
+1. Preserve the safety-harness handoff for accepted edits.
+1. Add tests that exercise refusal, success, and rollback paths.
 
 ## Known Risks and Limitations
 

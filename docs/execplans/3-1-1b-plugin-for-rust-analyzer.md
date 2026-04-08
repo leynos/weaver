@@ -78,13 +78,13 @@ Observable success:
 ## Progress
 
 - [x] (2026-02-17 00:00Z) Added `crates/weaver-plugin-rust-analyzer/` crate
-      with request dispatch, adapter trait boundary, and binary entrypoint.
+  with request dispatch, adapter trait boundary, and binary entrypoint.
 - [x] (2026-02-17 00:20Z) Implemented production adapter using rust-analyzer
-      LSP JSON-RPC flow with workspace-edit application.
+  LSP JSON-RPC flow with workspace-edit application.
 - [x] (2026-02-17 00:35Z) Wired runtime registration in `weaverd` for the
-      rust-analyzer provider and added path resolution tests.
+  rust-analyzer provider and added path resolution tests.
 - [x] (2026-02-17 00:45Z) Added unit and behavioural tests for plugin dispatch,
-      plus e2e CLI snapshots for rust-analyzer command ergonomics.
+  plus e2e CLI snapshots for rust-analyzer command ergonomics.
 - [x] (2026-02-17 01:00Z) Updated design docs, user guide, and roadmap status.
 - [x] (2026-02-17 01:15Z) Ran full quality gates successfully.
 

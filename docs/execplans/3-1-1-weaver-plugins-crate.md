@@ -75,27 +75,27 @@ Key files the reader should understand before proceeding:
 
 1. **No async runtime.** The entire project uses synchronous blocking I/O.
    Plugin execution must remain synchronous.
-2. **Single-threaded sandbox.** `birdcage` requires `Sandbox::spawn()` to be
+1. **Single-threaded sandbox.** `birdcage` requires `Sandbox::spawn()` to be
    called from a single-threaded context. The daemon's per-connection handler
    satisfies this naturally.
-3. **Edition 2024, Rust 1.85+.** The workspace uses `edition = "2024"` and
+1. **Edition 2024, Rust 1.85+.** The workspace uses `edition = "2024"` and
    `rust-version = "1.85"`.
-4. **Strict Clippy.** Over 60 denied lint categories including `unwrap_used`,
+1. **Strict Clippy.** Over 60 denied lint categories including `unwrap_used`,
    `expect_used`, `indexing_slicing`, `string_slice`, `missing_docs`, and
    `cognitive_complexity`. All code must pass
    `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
-5. **File size limit.** No single source file may exceed 400 lines.
-6. **Error handling.** Library crates use `thiserror`-derived error enums.
+1. **File size limit.** No single source file may exceed 400 lines.
+1. **Error handling.** Library crates use `thiserror`-derived error enums.
    No `eyre` or `anyhow` in library code.
-7. **Documentation.** Every module must begin with `//!` doc comments. All
+1. **Documentation.** Every module must begin with `//!` doc comments. All
    public items must have `///` rustdoc comments with examples where
    non-trivial.
-8. **en-GB-oxendict spelling.** Comments and documentation use British English
+1. **en-GB-oxendict spelling.** Comments and documentation use British English
    with Oxford "-ize" spelling.
-9. **rstest-bdd v0.5.0.** BDD tests must use v0.5.0 (upgrade from current
+1. **rstest-bdd v0.5.0.** BDD tests must use v0.5.0 (upgrade from current
    v0.4.0), with mutable world fixtures (`&mut`) instead of `RefCell`.
-10. **Workspace dependencies.** New dependencies must use caret requirements
-    and be declared in `[workspace.dependencies]` when shared.
+1. **Workspace dependencies.** New dependencies must use caret requirements
+   and be declared in `[workspace.dependencies]` when shared.
 
 ## Tolerances (exception triggers)
 
@@ -253,31 +253,31 @@ following modules in order (each must compile and pass lint before the next):
    `SpawnFailed`, `Timeout`, `NonZeroExit`, `SerializeRequest`,
    `DeserializeResponse`, `InvalidOutput`, `Io`, `Sandbox`, `Manifest`.
 
-2. `protocol.rs` — IPC message types: `PluginRequest`, `PluginResponse`,
+1. `protocol.rs` — IPC message types: `PluginRequest`, `PluginResponse`,
    `FilePayload`, `PluginOutput` (tagged enum: `Diff`, `Analysis`, `Empty`),
    `PluginDiagnostic`, `DiagnosticSeverity`. All types derive `Serialize` and
    `Deserialize`. Unit tests verify round-trip serialization.
 
-3. `manifest.rs` — `PluginKind` (`Sensor` / `Actuator`),
+1. `manifest.rs` — `PluginKind` (`Sensor` / `Actuator`),
    `PluginManifest` (name, version, kind, languages, executable path, args,
    timeout). Validation: non-empty name, absolute executable path.
 
-4. `registry.rs` — `PluginRegistry` backed by `HashMap<String, PluginManifest>`.
+1. `registry.rs` — `PluginRegistry` backed by `HashMap<String, PluginManifest>`.
    Methods: `register()`, `get()`, `find_by_kind()`, `find_for_language()`,
    `find_actuator_for_language()`.
 
-5. `process.rs` — `ProcessPlugin` struct. The `run()` method:
+1. `process.rs` — `ProcessPlugin` struct. The `run()` method:
    (a) builds a `SandboxProfile` with the plugin executable whitelisted, (b)
    creates a `Sandbox` and spawns the command with stdin/stdout piped, (c)
    writes a single JSONL request line to stdin and closes it, (d) reads a
    single JSONL response line from stdout, (e) waits for exit with timeout, (f)
    returns a `PluginResponse` or `PluginError`.
 
-6. `runner.rs` — `PluginRunner` wrapping `PluginRegistry`. The `execute()`
+1. `runner.rs` — `PluginRunner` wrapping `PluginRegistry`. The `execute()`
    method resolves the manifest, creates a `ProcessPlugin`, calls `run()`, and
    returns the response. Uses a `PluginExecutor` trait to enable test doubles.
 
-7. `lib.rs` — module declarations, `pub use` re-exports, crate-level `//!`
+1. `lib.rs` — module declarations, `pub use` re-exports, crate-level `//!`
    documentation.
 
 ### Stage C: BDD tests
@@ -304,8 +304,9 @@ Wire the plugin system into the `weaverd` dispatch layer:
 1. Add `weaver-plugins = { path = "../weaver-plugins" }` to
    `crates/weaverd/Cargo.toml`.
 
-2. Create `crates/weaverd/src/dispatch/act/refactor/mod.rs` with a `handle()`
+1. Create `crates/weaverd/src/dispatch/act/refactor/mod.rs` with a `handle()`
    function following the `apply_patch::handle()` pattern:
+
    - Parse `--provider` and `--refactoring` arguments from `CommandRequest`.
    - Read target file content from disk.
    - Build a `PluginRequest` with the file content and arguments.
@@ -316,10 +317,10 @@ Wire the plugin system into the `weaverd` dispatch layer:
      and semantic locks.
    - Return the result via `ResponseWriter`.
 
-3. Update `crates/weaverd/src/dispatch/act/mod.rs` to declare
+1. Update `crates/weaverd/src/dispatch/act/mod.rs` to declare
    `pub mod refactor;`.
 
-4. Update `crates/weaverd/src/dispatch/router.rs` to route `"refactor"` to
+1. Update `crates/weaverd/src/dispatch/router.rs` to route `"refactor"` to
    `act::refactor::handle()` in `route_act()`.
 
 ### Stage E: Documentation and roadmap
@@ -328,21 +329,24 @@ Wire the plugin system into the `weaverd` dispatch layer:
    documenting the implementation decisions (IPC protocol choice, in-band file
    content, plugin trait pattern, safety harness integration).
 
-2. Add a "Plugin system" section to `docs/users-guide.md` documenting:
+1. Add a "Plugin system" section to `docs/users-guide.md` documenting:
+
    - Plugin categories (sensor/actuator).
    - Plugin manifest format.
    - The `act refactor` command syntax.
    - How plugin output is validated through the Double-Lock harness.
 
-3. Mark the first Phase 3 roadmap entry as done in `docs/roadmap.md`.
+1. Mark the first Phase 3 roadmap entry as done in `docs/roadmap.md`.
 
 ### Stage F: Final verification
 
 Run:
 
-    make check-fmt
-    make lint
-    make test
+```
+make check-fmt
+make lint
+make test
+```
 
 All must pass. Commit the change.
 
@@ -352,66 +356,80 @@ All must pass. Commit the change.
 
 In `Cargo.toml` (root), change:
 
-    rstest-bdd = { version = "0.4.0", default-features = false }
-    rstest-bdd-macros = "0.4.0"
+```
+rstest-bdd = { version = "0.4.0", default-features = false }
+rstest-bdd-macros = "0.4.0"
+```
 
 to:
 
-    rstest-bdd = { version = "0.5.0", default-features = false }
-    rstest-bdd-macros = "0.5.0"
+```
+rstest-bdd = { version = "0.5.0", default-features = false }
+rstest-bdd-macros = "0.5.0"
+```
 
 Run:
 
-    make test 2>&1 | tee /tmp/rstest-upgrade.log; echo "EXIT: $?"
+```
+make test 2>&1 | tee /tmp/rstest-upgrade.log; echo "EXIT: $?"
+```
 
 If tests fail, migrate affected step definitions from `RefCell<World>` to
 `&mut World`. Repeat until `make test` passes.
 
 ### Step 2: Create crate skeleton
 
-    mkdir -p crates/weaver-plugins/src/tests
+```
+mkdir -p crates/weaver-plugins/src/tests
+```
 
 Add `"crates/weaver-plugins"` to the workspace `members` list in the root
 `Cargo.toml`.
 
 Create `crates/weaver-plugins/Cargo.toml`:
 
-    [package]
-    name = "weaver-plugins"
-    edition.workspace = true
-    version.workspace = true
+```
+[package]
+name = "weaver-plugins"
+edition.workspace = true
+version.workspace = true
 
-    [dependencies]
-    serde = { version = "1.0", features = ["derive"] }
-    serde_json = "1.0"
-    thiserror.workspace = true
-    tracing = "0.1"
-    weaver-sandbox = { path = "../weaver-sandbox" }
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror.workspace = true
+tracing = "0.1"
+weaver-sandbox = { path = "../weaver-sandbox" }
 
-    [dev-dependencies]
-    rstest.workspace = true
-    rstest-bdd.workspace = true
-    rstest-bdd-macros.workspace = true
-    tempfile.workspace = true
+[dev-dependencies]
+rstest.workspace = true
+rstest-bdd.workspace = true
+rstest-bdd-macros.workspace = true
+tempfile.workspace = true
 
-    [build-dependencies]
-    weaver-build-util = { path = "../weaver-build-util" }
+[build-dependencies]
+weaver-build-util = { path = "../weaver-build-util" }
 
-    [lints]
-    workspace = true
+[lints]
+workspace = true
+```
 
 Create `crates/weaver-plugins/src/lib.rs` with module declarations and
 crate-level documentation. Verify with:
 
-    cargo check -p weaver-plugins
+```
+cargo check -p weaver-plugins
+```
 
 ### Step 3: Implement core modules
 
 Implement `error.rs`, `protocol.rs`, `manifest.rs`, `registry.rs`,
 `process.rs`, and `runner.rs` as described in Stage B. After each module:
 
-    cargo check -p weaver-plugins
-    cargo clippy -p weaver-plugins --all-targets -- -D warnings
+```
+cargo check -p weaver-plugins
+cargo clippy -p weaver-plugins --all-targets -- -D warnings
+```
 
 ### Step 4: Write unit tests
 
@@ -428,38 +446,48 @@ fixtures. Expected test coverage:
 
 Verify:
 
-    cargo test -p weaver-plugins 2>&1 | tee /tmp/plugins-test.log
-    echo "EXIT: $?"
+```
+cargo test -p weaver-plugins 2>&1 | tee /tmp/plugins-test.log
+echo "EXIT: $?"
+```
 
 ### Step 5: Write BDD tests
 
 Create `crates/weaver-plugins/tests/features/plugin_execution.feature` and step
 definitions. Verify:
 
-    cargo test -p weaver-plugins 2>&1 | tee /tmp/plugins-bdd.log
-    echo "EXIT: $?"
+```
+cargo test -p weaver-plugins 2>&1 | tee /tmp/plugins-bdd.log
+echo "EXIT: $?"
+```
 
 ### Step 6: Wire into weaverd
 
 Add `weaver-plugins` dependency to `crates/weaverd/Cargo.toml`. Create the
 `refactor` handler module. Update the router. Verify:
 
-    cargo test -p weaverd 2>&1 | tee /tmp/weaverd-test.log
-    echo "EXIT: $?"
+```
+cargo test -p weaverd 2>&1 | tee /tmp/weaverd-test.log
+echo "EXIT: $?"
+```
 
 ### Step 7: Update documentation
 
 Edit `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`.
 Verify:
 
-    make check-fmt
+```
+make check-fmt
+```
 
 ### Step 8: Full quality gate
 
-    set -o pipefail
-    make check-fmt 2>&1 | tee /tmp/check-fmt.log; echo "EXIT: $?"
-    make lint 2>&1 | tee /tmp/lint.log; echo "EXIT: $?"
-    make test 2>&1 | tee /tmp/test.log; echo "EXIT: $?"
+```
+set -o pipefail
+make check-fmt 2>&1 | tee /tmp/check-fmt.log; echo "EXIT: $?"
+make lint 2>&1 | tee /tmp/lint.log; echo "EXIT: $?"
+make test 2>&1 | tee /tmp/test.log; echo "EXIT: $?"
+```
 
 All three must exit with status 0.
 
@@ -479,7 +507,9 @@ Quality criteria (what "done" means):
 
 Quality method (how we check):
 
-    make check-fmt && make lint && make test
+```
+make check-fmt && make lint && make test
+```
 
 ## Idempotence and recovery
 
@@ -504,93 +534,105 @@ Dev-dependencies: `rstest` (workspace), `rstest-bdd` (workspace),
 
 In `crates/weaver-plugins/src/manifest.rs`:
 
-    /// Category of a plugin within the Weaver ecosystem.
-    pub enum PluginKind { Sensor, Actuator }
+```
+/// Category of a plugin within the Weaver ecosystem.
+pub enum PluginKind { Sensor, Actuator }
 
-    /// Declarative description of a plugin's identity and capabilities.
-    pub struct PluginManifest {
-        name: String,
-        version: String,
-        kind: PluginKind,
-        languages: Vec<String>,
-        executable: PathBuf,
-        args: Vec<String>,
-        timeout_secs: u64,
-    }
+/// Declarative description of a plugin's identity and capabilities.
+pub struct PluginManifest {
+    name: String,
+    version: String,
+    kind: PluginKind,
+    languages: Vec<String>,
+    executable: PathBuf,
+    args: Vec<String>,
+    timeout_secs: u64,
+}
+```
 
 In `crates/weaver-plugins/src/protocol.rs`:
 
-    /// Request sent from weaverd to a plugin on stdin.
-    pub struct PluginRequest {
-        operation: String,
-        files: Vec<FilePayload>,
-        arguments: HashMap<String, serde_json::Value>,
-    }
+```
+/// Request sent from weaverd to a plugin on stdin.
+pub struct PluginRequest {
+    operation: String,
+    files: Vec<FilePayload>,
+    arguments: HashMap<String, serde_json::Value>,
+}
 
-    /// File content passed to the plugin in the request.
-    pub struct FilePayload { path: PathBuf, content: String }
+/// File content passed to the plugin in the request.
+pub struct FilePayload { path: PathBuf, content: String }
 
-    /// Response sent from a plugin to weaverd on stdout.
-    pub struct PluginResponse {
-        success: bool,
-        output: PluginOutput,
-        diagnostics: Vec<PluginDiagnostic>,
-    }
+/// Response sent from a plugin to weaverd on stdout.
+pub struct PluginResponse {
+    success: bool,
+    output: PluginOutput,
+    diagnostics: Vec<PluginDiagnostic>,
+}
 
-    /// Output payload from a plugin.
-    pub enum PluginOutput {
-        Diff { content: String },
-        Analysis { data: serde_json::Value },
-        Empty,
-    }
+/// Output payload from a plugin.
+pub enum PluginOutput {
+    Diff { content: String },
+    Analysis { data: serde_json::Value },
+    Empty,
+}
+```
 
 In `crates/weaver-plugins/src/runner.rs`:
 
-    /// Trait abstracting plugin execution for testability.
-    pub trait PluginExecutor {
-        fn execute(
-            &self,
-            manifest: &PluginManifest,
-            request: &PluginRequest,
-        ) -> Result<PluginResponse, PluginError>;
-    }
+```
+/// Trait abstracting plugin execution for testability.
+pub trait PluginExecutor {
+    fn execute(
+        &self,
+        manifest: &PluginManifest,
+        request: &PluginRequest,
+    ) -> Result<PluginResponse, PluginError>;
+}
 
-    /// Orchestrates plugin execution within the sandbox.
-    pub struct PluginRunner<E> {
-        registry: PluginRegistry,
-        executor: E,
-    }
+/// Orchestrates plugin execution within the sandbox.
+pub struct PluginRunner<E> {
+    registry: PluginRegistry,
+    executor: E,
+}
+```
 
 In `crates/weaver-plugins/src/error.rs`:
 
-    /// Errors arising from plugin operations.
-    pub enum PluginError {
-        NotFound { name: String },
-        SpawnFailed { name: String, message: String, source: … },
-        Timeout { name: String, timeout_secs: u64 },
-        NonZeroExit { name: String, status: i32 },
-        SerializeRequest(serde_json::Error),
-        DeserializeResponse { message: String, source: … },
-        InvalidOutput { name: String, message: String },
-        Io { name: String, source: Arc<std::io::Error> },
-        Sandbox { name: String, message: String },
-        Manifest { message: String },
-    }
+```
+/// Errors arising from plugin operations.
+pub enum PluginError {
+    NotFound { name: String },
+    SpawnFailed { name: String, message: String, source: … },
+    Timeout { name: String, timeout_secs: u64 },
+    NonZeroExit { name: String, status: i32 },
+    SerializeRequest(serde_json::Error),
+    DeserializeResponse { message: String, source: … },
+    InvalidOutput { name: String, message: String },
+    Io { name: String, source: Arc<std::io::Error> },
+    Sandbox { name: String, message: String },
+    Manifest { message: String },
+}
+```
 
 ### IPC protocol specification
 
 Direction: weaverd -> plugin (stdin). A single JSONL line:
 
-    {"operation":"rename","files":[{"path":"/project/src/main.py","content":"def old():\n    pass\n"}],"arguments":{"new_name":"new_func"}}\n
+```
+{"operation":"rename","files":[{"path":"/project/src/main.py","content":"def old():\n    pass\n"}],"arguments":{"new_name":"new_func"}}\n
+```
 
 The broker closes stdin after writing to signal no more input.
 
 Direction: plugin -> weaverd (stdout). A single JSONL line:
 
-    {"success":true,"output":{"kind":"diff",
-    "content":"--- a/src/main.py\n+++ b/src/main.py\n
-    @@ -1 +1 @@\n-def old():\n+def new_func():\n"},
-    "diagnostics":[]}\n
+```
+{"success":true,"output":{"kind":"diff",
+"content":"--- a/src/main.py\n+++ b/src/main.py\n
+@@ -1 +1 @@\n-def old():\n+def new_func():\n"},
+"diagnostics":[]}\n
+```
 
 Plugin stderr is captured for diagnostic logging but is not part of the
 protocol.

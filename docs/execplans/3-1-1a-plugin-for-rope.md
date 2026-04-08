@@ -91,20 +91,20 @@ Observable success:
 ## Progress
 
 - [x] (2026-02-12 00:00Z) Drafted ExecPlan at
-      `docs/execplans/3-1-1a-plugin-for-rope.md`.
+  `docs/execplans/3-1-1a-plugin-for-rope.md`.
 - [x] (2026-02-13 01:30Z) Validated plugin bootstrap assumptions and added
-      executable override via `WEAVER_ROPE_PLUGIN_PATH`.
+  executable override via `WEAVER_ROPE_PLUGIN_PATH`.
 - [x] (2026-02-13 02:00Z) Implemented `crates/weaver-plugin-rope/` with
-      protocol handling, rope adapter boundary, and error mapping.
+  protocol handling, rope adapter boundary, and error mapping.
 - [x] (2026-02-13 02:20Z) Wired `act refactor` to execute plugins and route
-      diff output through the existing Double-Lock apply-patch flow.
+  diff output through the existing Double-Lock apply-patch flow.
 - [x] (2026-02-13 02:50Z) Added unit, behavioural (`rstest-bdd` 0.5.0), and
-      e2e (`assert_cmd` + `insta`) tests for happy, unhappy, and edge paths.
+  e2e (`assert_cmd` + `insta`) tests for happy, unhappy, and edge paths.
 - [x] (2026-02-13 03:00Z) Updated design and user documentation and marked the
-      roadmap rope entry as done.
+  roadmap rope entry as done.
 - [x] (2026-02-13 03:20Z) Ran full quality gates successfully:
-      `make fmt`, `make check-fmt`, `make lint`, `make test`,
-      `make markdownlint`, and `make nixie`.
+  `make fmt`, `make check-fmt`, `make lint`, `make test`,
+  `make markdownlint`, and `make nixie`.
 
 ## Surprises & Discoveries
 
@@ -318,29 +318,33 @@ Run formatting, lint, tests, and markdown checks with `tee` and
 ## Concrete steps
 
 1. Create the new crate and module skeletons.
-2. Implement protocol handler, rope adapter boundary, and error mapping.
-3. Add rope plugin unit tests and BDD scenarios.
-4. Implement plugin runtime bootstrap in `weaverd` and inject into dispatch.
-5. Replace refactor stub with plugin execution and shared patch application.
-6. Add `weaverd` unit tests and BDD scenarios for refactor behaviour.
-7. Add `assert_cmd` + `insta` e2e tests for isolated and pipeline ergonomics.
-8. Update design docs, user docs, and roadmap status.
-9. Run quality gates and inspect logs.
+1. Implement protocol handler, rope adapter boundary, and error mapping.
+1. Add rope plugin unit tests and BDD scenarios.
+1. Implement plugin runtime bootstrap in `weaverd` and inject into dispatch.
+1. Replace refactor stub with plugin execution and shared patch application.
+1. Add `weaverd` unit tests and BDD scenarios for refactor behaviour.
+1. Add `assert_cmd` + `insta` e2e tests for isolated and pipeline ergonomics.
+1. Update design docs, user docs, and roadmap status.
+1. Run quality gates and inspect logs.
 
 Commands (run from repository root):
 
-    set -o pipefail && make fmt 2>&1 | tee /tmp/3-1-1a-make-fmt.log
-    set -o pipefail && make check-fmt 2>&1 | tee /tmp/3-1-1a-check-fmt.log
-    set -o pipefail && make lint 2>&1 | tee /tmp/3-1-1a-make-lint.log
-    set -o pipefail && make test 2>&1 | tee /tmp/3-1-1a-make-test.log
-    set -o pipefail && make markdownlint 2>&1 | tee /tmp/3-1-1a-markdownlint.log
-    set -o pipefail && make nixie 2>&1 | tee /tmp/3-1-1a-nixie.log
+```
+set -o pipefail && make fmt 2>&1 | tee /tmp/3-1-1a-make-fmt.log
+set -o pipefail && make check-fmt 2>&1 | tee /tmp/3-1-1a-check-fmt.log
+set -o pipefail && make lint 2>&1 | tee /tmp/3-1-1a-make-lint.log
+set -o pipefail && make test 2>&1 | tee /tmp/3-1-1a-make-test.log
+set -o pipefail && make markdownlint 2>&1 | tee /tmp/3-1-1a-markdownlint.log
+set -o pipefail && make nixie 2>&1 | tee /tmp/3-1-1a-nixie.log
+```
 
 Targeted test loops while implementing:
 
-    set -o pipefail && cargo test -p weaver-plugin-rope 2>&1 | tee /tmp/3-1-1a-rope-plugin-test.log
-    set -o pipefail && cargo test -p weaverd refactor 2>&1 | tee /tmp/3-1-1a-weaverd-refactor-test.log
-    set -o pipefail && cargo test -p weaver-e2e refactor_rope_cli 2>&1 | tee /tmp/3-1-1a-weaver-e2e-refactor.log
+```
+set -o pipefail && cargo test -p weaver-plugin-rope 2>&1 | tee /tmp/3-1-1a-rope-plugin-test.log
+set -o pipefail && cargo test -p weaverd refactor 2>&1 | tee /tmp/3-1-1a-weaverd-refactor-test.log
+set -o pipefail && cargo test -p weaver-e2e refactor_rope_cli 2>&1 | tee /tmp/3-1-1a-weaver-e2e-refactor.log
+```
 
 ## Validation and acceptance
 
@@ -390,19 +394,23 @@ Planned interfaces (final names may vary but intent must hold):
 
 - In `crates/weaver-plugin-rope/src/adapter.rs`:
 
-      pub trait RopeAdapter {
-          fn execute(&self, request: &PluginRequest) -> Result<PluginOutput, RopeAdapterError>;
-      }
+  ```
+  pub trait RopeAdapter {
+      fn execute(&self, request: &PluginRequest) -> Result<PluginOutput, RopeAdapterError>;
+  }
+  ```
 
 - In `crates/weaverd/src/dispatch/act/refactor/...`:
 
-      pub trait RefactorPluginRuntime {
-          fn execute(
-              &self,
-              provider: &str,
-              request: &PluginRequest,
-          ) -> Result<PluginResponse, PluginError>;
-      }
+  ```
+  pub trait RefactorPluginRuntime {
+      fn execute(
+          &self,
+          provider: &str,
+          request: &PluginRequest,
+      ) -> Result<PluginResponse, PluginError>;
+  }
+  ```
 
 - In `crates/weaverd/src/dispatch/act/apply_patch/...` (shared path): expose a
   crate-visible helper that executes a patch string through the existing parser

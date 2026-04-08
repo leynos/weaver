@@ -1,7 +1,10 @@
 //! Tests for legacy/v2 formula normalization into canonical `Formula` model.
 
 #![expect(clippy::indexing_slicing, reason = "tests panic on out-of-bounds")]
-#![expect(clippy::panic_in_result_fn, reason = "test infrastructure may panic on fixture I/O errors")]
+#![expect(
+    clippy::panic_in_result_fn,
+    reason = "test infrastructure may panic on fixture I/O errors"
+)]
 
 use std::fs;
 use std::path::PathBuf;

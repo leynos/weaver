@@ -147,24 +147,24 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log
 ## Progress
 
 - [x] (2026-03-28 UTC) Reviewed roadmap item 4.1.4, the Sempai design doc, the
-      current `sempai_yaml` parser/builder code, the `sempai` facade tests,
-      and adjacent ExecPlans.
+  current `sempai_yaml` parser/builder code, the `sempai` facade tests,
+  and adjacent ExecPlans.
 - [x] (2026-03-28 UTC) Drafted this ExecPlan.
 - [x] (2026-03-29 UTC) Stage A: Locked the intended behaviour with unit and
-      BDD tests for dependency search rules, unsupported execution modes, and
-      the preserved search-mode placeholder path.
+  BDD tests for dependency search rules, unsupported execution modes, and
+  the preserved search-mode placeholder path.
 - [x] (2026-03-29 UTC) Stage B: Added additive parsed-rule metadata
-      (`mode_span` plus enclosing rule span) and model support for the
-      compatibility key `r2c-internal-project-depends-on`.
+  (`mode_span` plus enclosing rule span) and model support for the
+  compatibility key `r2c-internal-project-depends-on`.
 - [x] (2026-03-29 UTC) Stage C: Implemented engine-side whole-document mode
-      gating that reports the first unsupported rule in source order via
-      `E_SEMPAI_UNSUPPORTED_MODE`.
+  gating that reports the first unsupported rule in source order via
+  `E_SEMPAI_UNSUPPORTED_MODE`.
 - [x] (2026-03-29 UTC) Stage D: Updated the Sempai design doc, the user's
-      guide, and the roadmap to reflect mode-aware `compile_yaml(...)`
-      behaviour.
+  guide, and the roadmap to reflect mode-aware `compile_yaml(...)`
+  behaviour.
 - [x] (2026-03-29 UTC) Stage E: Ran `make fmt`, `make markdownlint`,
-      `make nixie`, `make check-fmt`, `make lint`, `make test`,
-      `cargo test -p sempai_yaml`, and `cargo test -p sempai`.
+  `make nixie`, `make check-fmt`, `make lint`, `make test`,
+  `cargo test -p sempai_yaml`, and `cargo test -p sempai`.
 
 ## Surprises & Discoveries
 
@@ -238,22 +238,22 @@ Target outcome at completion:
 1. `sempai_yaml` parses `search`, `extract`, `taint`, `join`, and
    forward-compatible mode strings while preserving enough metadata for a
    separate validation pass.
-2. Search mode validation enforces the required key combinations documented in
+1. Search mode validation enforces the required key combinations documented in
    the design, including the compatibility-only
    `r2c-internal-project-depends-on` key.
-3. `sempai::Engine::compile_yaml(...)` returns
+1. `sempai::Engine::compile_yaml(...)` returns
    `E_SEMPAI_UNSUPPORTED_MODE` for `extract`, `taint`, `join`, and other
    non-search modes, with deterministic messaging and stable diagnostics.
-4. Valid `search` rules continue to the existing normalization placeholder and
+1. Valid `search` rules continue to the existing normalization placeholder and
    still return `NOT_IMPLEMENTED` until 4.1.5 is complete.
-5. Unit tests and `rstest-bdd` v0.5.0 scenarios cover happy, unhappy, and edge
+1. Unit tests and `rstest-bdd` v0.5.0 scenarios cover happy, unhappy, and edge
    paths in both `sempai_yaml` and `sempai`.
-6. `docs/sempai-query-language-design.md` records the final boundary between
+1. `docs/sempai-query-language-design.md` records the final boundary between
    parser validation and engine validation.
-7. `docs/users-guide.md` explains the mode-specific `compile_yaml(...)`
+1. `docs/users-guide.md` explains the mode-specific `compile_yaml(...)`
    behaviour users now see.
-8. `docs/roadmap.md` marks 4.1.4 done.
-9. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
+1. `docs/roadmap.md` marks 4.1.4 done.
+1. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
 Retrospective notes:

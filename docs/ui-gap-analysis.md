@@ -13,15 +13,15 @@ The analysis was conducted by:
 
 1. Reading every help surface the binary exposes today (`--help`, `-h`,
    `help`, bare invocation, per-subcommand help).
-2. Tracing the clap definition in
+1. Tracing the clap definition in
    [`crates/weaver-cli/src/cli.rs`](../crates/weaver-cli/src/cli.rs) and the
    domain router in
    [`crates/weaverd/src/dispatch/router.rs`](../crates/weaverd/src/dispatch/router.rs).
-3. Exercising error paths for unknown domains, unknown operations,
+1. Exercising error paths for unknown domains, unknown operations,
    missing arguments, and missing operations.
-4. Reviewing the plugin registry, the daemon dispatch table, and the
+1. Reviewing the plugin registry, the daemon dispatch table, and the
    output-rendering pipeline.
-5. Cross-referencing against the user's guide
+1. Cross-referencing against the user's guide
    ([`docs/users-guide.md`](users-guide.md)) and the generated manual page.
 
 The sections below are ordered from the outermost user interaction (bare
@@ -419,13 +419,13 @@ ______________________________________________________________________
 
 ## Level 10 — error messages and exit codes
 
-| #   | Scenario                             | Current message                                                         | Missing guidance                                                |
+| # | Scenario | Current message | Missing guidance |
 | --- | ------------------------------------ | ----------------------------------------------------------------------- | --------------------------------------------------------------- |
 | 10a | Daemon not running, auto-start fails | `failed to spawn weaverd binary '"weaverd"': No such file or directory` | Does not suggest installing `weaverd` or setting `WEAVERD_BIN`. |
-| 10b | Unknown domain (daemon)              | `unknown domain: bogus`                                                 | Does not list valid domains.                                    |
-| 10c | Unknown operation (daemon)           | `unknown operation 'x' for domain 'y'`                                  | Does not list valid operations.                                 |
-| 10d | Missing domain                       | `the command domain must be provided`                                   | Does not list domains or point to `--help`.                     |
-| 10e | Missing operation                    | `the command operation must be provided`                                | Does not list operations or point to domain help.               |
+| 10b | Unknown domain (daemon) | `unknown domain: bogus` | Does not list valid domains. |
+| 10c | Unknown operation (daemon) | `unknown operation 'x' for domain 'y'` | Does not list valid operations. |
+| 10d | Missing domain | `the command domain must be provided` | Does not list domains or point to `--help`. |
+| 10e | Missing operation | `the command operation must be provided` | Does not list operations or point to domain help. |
 
 **Remedy.** Each error message should include actionable next steps. A
 consistent pattern would be:
@@ -484,25 +484,25 @@ ______________________________________________________________________
 
 ## Summary of gaps and priority
 
-| Priority | Level | Gap summary                                  | Effort         |
+| Priority | Level | Gap summary | Effort |
 | -------- | ----- | -------------------------------------------- | -------------- |
-| P0       | 0     | Bare invocation gives no guidance            | Small          |
-| P0       | 1a    | Domains not listed in help                   | Small          |
-| P0       | 1b    | Operations not listed in help                | Small          |
-| P0       | 2     | Missing operation gives no alternatives      | Small          |
-| P0       | 1d    | No `--version` flag                          | Trivial        |
-| P1       | 1c    | Config flags invisible in help               | Medium         |
-| P1       | 3     | Unknown domain gives no suggestions          | Small          |
-| P1       | 4     | Unknown operation gives no suggestions       | Small          |
-| P1       | 5a    | No operation-level help                      | Medium–Large   |
-| P1       | 5b    | Refactor error lists only first missing flag | Small          |
-| P1       | 10    | Error messages lack actionable guidance      | Medium         |
-| P1       | 12    | `weaver help` broken                         | Small          |
-| P2       | 1e    | No long description or after-help            | Small          |
-| P2       | 1f    | `help` subcommand disabled                   | Small          |
-| P2       | 7     | No plugin listing command                    | Medium         |
-| P2       | 8     | Daemon start help lacks config/env detail    | Small          |
-| P3       | 9     | Capabilities probe shows overrides only      | Medium         |
+| P0 | 0 | Bare invocation gives no guidance | Small |
+| P0 | 1a | Domains not listed in help | Small |
+| P0 | 1b | Operations not listed in help | Small |
+| P0 | 2 | Missing operation gives no alternatives | Small |
+| P0 | 1d | No `--version` flag | Trivial |
+| P1 | 1c | Config flags invisible in help | Medium |
+| P1 | 3 | Unknown domain gives no suggestions | Small |
+| P1 | 4 | Unknown operation gives no suggestions | Small |
+| P1 | 5a | No operation-level help | Medium–Large |
+| P1 | 5b | Refactor error lists only first missing flag | Small |
+| P1 | 10 | Error messages lack actionable guidance | Medium |
+| P1 | 12 | `weaver help` broken | Small |
+| P2 | 1e | No long description or after-help | Small |
+| P2 | 1f | `help` subcommand disabled | Small |
+| P2 | 7 | No plugin listing command | Medium |
+| P2 | 8 | Daemon start help lacks config/env detail | Small |
+| P3 | 9 | Capabilities probe shows overrides only | Medium |
 
 ______________________________________________________________________
 
@@ -512,21 +512,21 @@ ______________________________________________________________________
    operations in `after_help`. Improve bare-invocation and missing-operation
    error messages. These changes touch only
    [`cli.rs`](../crates/weaver-cli/src/cli.rs), [`command.rs`](../crates/weaver-cli/src/command.rs),
-    and [`errors.rs`](../crates/weaver-cli/src/errors.rs).
+   and [`errors.rs`](../crates/weaver-cli/src/errors.rs).
 
-2. **Error message enrichment (P1):** Add valid-alternative listings
+1. **Error message enrichment (P1):** Add valid-alternative listings
    to unknown-domain and unknown-operation errors in both the CLI and the
    daemon router. Surface all required arguments in `act refactor` errors.
 
-3. **Configuration flag visibility (P1):** Register the five config
+1. **Configuration flag visibility (P1):** Register the five config
    flags as clap arguments (even if parsing remains in `ortho-config`) so they
    appear in help output.
 
-4. **Help subcommand and operation-level help (P1–P2):** Re-enable
+1. **Help subcommand and operation-level help (P1–P2):** Re-enable
    the help subcommand and implement topic-based help. Optionally restructure
    the clap model to use nested subcommands for full per-operation `--help`.
 
-5. **Plugin introspection (P2):** Add a `list-plugins` command.
+1. **Plugin introspection (P2):** Add a `list-plugins` command.
 
-6. **Capability matrix enrichment (P3):** Extend `--capabilities` to
+1. **Capability matrix enrichment (P3):** Extend `--capabilities` to
    merge runtime capabilities.

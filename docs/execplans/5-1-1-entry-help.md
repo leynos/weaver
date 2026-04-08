@@ -38,7 +38,7 @@ Run 'weaver --help' for more information.
 
 This addresses the P0 gap identified in the
 [UI gap analysis Level 0](../ui-gap-analysis.md#level-0--bare-invocation-weaver)
- and
+and
 [Level 10d](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes), and
 satisfies roadmap task 5.1.1 in `../roadmap.md`.
 
@@ -81,7 +81,7 @@ satisfies roadmap task 5.1.1 in `../roadmap.md`.
 - Risk: `unit.rs` is exactly 400 lines; adding a `mod bare_invocation;`
   declaration pushes it over the limit. Severity: low Likelihood: high
   Mitigation: Remove the redundant `///` doc comment on `mod auto_start;` (line
-  399) since the module already has its own `//!` doc comment inside
+  399\) since the module already has its own `//!` doc comment inside
   `auto_start.rs`. This frees one line for the new `mod` declaration.
 
 - Risk: The `BareInvocation` error variant with `#[error("")]` might trigger
@@ -208,11 +208,11 @@ satisfies roadmap task 5.1.1 in `../roadmap.md`.
 All acceptance criteria met:
 
 1. `weaver` with no arguments exits non-zero.
-2. Output includes `Usage: weaver <DOMAIN> <OPERATION> [ARG]...`.
-3. Lists three domains: `observe`, `act`, `verify`.
-4. Includes exactly one `weaver --help` pointer.
-5. Does not require configuration loading (proved by `PanickingLoader`).
-6. All text sourced through `ortho_config::Localizer` with Fluent `.ftl`
+1. Output includes `Usage: weaver <DOMAIN> <OPERATION> [ARG]...`.
+1. Lists three domains: `observe`, `act`, `verify`.
+1. Includes exactly one `weaver --help` pointer.
+1. Does not require configuration loading (proved by `PanickingLoader`).
+1. All text sourced through `ortho_config::Localizer` with Fluent `.ftl`
    resources.
 
 Quality gates passed: `make check-fmt`, `make lint`, `make test` all exit 0.
@@ -230,13 +230,13 @@ creates a `CliRunner` and calls `CliRunner::run()`, which calls
 
 1. Splits config arguments from command arguments
    (`split_config_arguments()`).
-2. Parses CLI arguments via `Cli::try_parse_from()`.
-3. Loads configuration via `self.loader.load()`.
-4. Checks for `--capabilities` mode.
-5. Checks for `daemon` subcommand.
-6. Builds `CommandInvocation::try_from(cli)` — this is where
+1. Parses CLI arguments via `Cli::try_parse_from()`.
+1. Loads configuration via `self.loader.load()`.
+1. Checks for `--capabilities` mode.
+1. Checks for `daemon` subcommand.
+1. Builds `CommandInvocation::try_from(cli)` — this is where
    `AppError::MissingDomain` is returned when `domain` is `None`.
-7. Executes the daemon command.
+1. Executes the daemon command.
 
 The error is caught at the bottom of `run_with_handler()` (line 180-186 of
 `lib.rs`) and printed to stderr.
@@ -268,11 +268,10 @@ transitive dependencies: `fluent-bundle`, `fluent-syntax`, `unic-langid`.
 The hello_world example in ortho-config demonstrates the pattern:
 
 1. `.ftl` files under `locales/en-US/messages.ftl`.
-2. Embed via `include_str!("../locales/en-US/messages.ftl")`.
-3. Build: `FluentLocalizer::builder(langid!("en-US"))
-   .with_consumer_resources([APP_FTL]).try_build()?`.
-4. Fall back to `NoOpLocalizer` on error.
-5. Resolve strings via `localizer.message("msg-id", None, "fallback")`.
+1. Embed via `include_str!("../locales/en-US/messages.ftl")`.
+1. Build: `FluentLocalizer::builder(langid!("en-US")) .with_consumer_resources([APP_FTL]).try_build()?`.
+1. Fall back to `NoOpLocalizer` on error.
+1. Resolve strings via `localizer.message("msg-id", None, "fallback")`.
 
 Fluent message IDs use hyphens (dots are normalized to hyphens by
 ortho-config's `normalize_identifier()`). The embedded en-US catalogue in
@@ -283,24 +282,24 @@ localization.
 
 _Table 1: Key files involved in this change and their purpose._
 
-| File                                                  | Lines | Purpose                            |
+| File | Lines | Purpose |
 | ----------------------------------------------------- | ----- | ---------------------------------- |
-| `Cargo.toml` (workspace)                              | —     | ortho-config version               |
-| `crates/weaver-cli/Cargo.toml`                        | —     | weaver-cli dependencies            |
-| `crates/weaver-cli/src/cli.rs`                        | 73    | Clap `#[derive(Parser)]` struct    |
-| `crates/weaver-cli/src/command.rs`                    | 91    | `CommandInvocation::try_from(Cli)` |
-| `crates/weaver-cli/src/errors.rs`                     | 65    | `AppError` enum                    |
-| `crates/weaver-cli/src/lib.rs`                        | 375   | Core runtime, `CliRunner`          |
-| `crates/weaver-cli/src/runtime_utils.rs`              | 28    | Small runtime helpers              |
-| `crates/weaver-cli/src/localizer.rs`                  | NEW   | Fluent localizer module            |
-| `crates/weaver-cli/locales/en-US/messages.ftl`        | NEW   | Fluent resources                   |
-| `crates/weaver-cli/src/tests/unit.rs`                 | 400   | Unit tests (at limit)              |
-| `crates/weaver-cli/src/tests/unit/auto_start.rs`      | 227   | Auto-start tests                   |
-| `crates/weaver-cli/src/tests/behaviour.rs`            | 340   | BDD step definitions               |
-| `crates/weaver-cli/src/tests/support/mod.rs`          | 323   | Test world/helpers                 |
-| `crates/weaver-cli/tests/features/weaver_cli.feature` | 77    | BDD scenarios                      |
-| `docs/roadmap.md`                                     | 424   | Roadmap checkboxes                 |
-| `docs/users-guide.md`                                 | 837   | User documentation                 |
+| `Cargo.toml` (workspace) | — | ortho-config version |
+| `crates/weaver-cli/Cargo.toml` | — | weaver-cli dependencies |
+| `crates/weaver-cli/src/cli.rs` | 73 | Clap `#[derive(Parser)]` struct |
+| `crates/weaver-cli/src/command.rs` | 91 | `CommandInvocation::try_from(Cli)` |
+| `crates/weaver-cli/src/errors.rs` | 65 | `AppError` enum |
+| `crates/weaver-cli/src/lib.rs` | 375 | Core runtime, `CliRunner` |
+| `crates/weaver-cli/src/runtime_utils.rs` | 28 | Small runtime helpers |
+| `crates/weaver-cli/src/localizer.rs` | NEW | Fluent localizer module |
+| `crates/weaver-cli/locales/en-US/messages.ftl` | NEW | Fluent resources |
+| `crates/weaver-cli/src/tests/unit.rs` | 400 | Unit tests (at limit) |
+| `crates/weaver-cli/src/tests/unit/auto_start.rs` | 227 | Auto-start tests |
+| `crates/weaver-cli/src/tests/behaviour.rs` | 340 | BDD step definitions |
+| `crates/weaver-cli/src/tests/support/mod.rs` | 323 | Test world/helpers |
+| `crates/weaver-cli/tests/features/weaver_cli.feature` | 77 | BDD scenarios |
+| `docs/roadmap.md` | 424 | Roadmap checkboxes |
+| `docs/users-guide.md` | 837 | User documentation |
 
 ### Test infrastructure
 
@@ -359,9 +358,9 @@ weaver-bare-help-pointer = Run 'weaver --help' for more information.
 This module:
 
 1. Embeds the `.ftl` resource via `include_str!`.
-2. Exposes `build_localizer() -> Box<dyn Localizer>` which constructs a
+1. Exposes `build_localizer() -> Box<dyn Localizer>` which constructs a
    `FluentLocalizer` with `en-US` defaults, falling back to `NoOpLocalizer`.
-3. Exposes `write_bare_help(writer, &dyn Localizer) -> io::Result<()>` which
+1. Exposes `write_bare_help(writer, &dyn Localizer) -> io::Result<()>` which
    resolves each message via `Localizer::message()` with English fallbacks and
    writes the composed help block.
 
@@ -495,16 +494,16 @@ No new step definitions required.
 Tests that:
 
 1. Bare invocation exits with `FAILURE`.
-2. Bare invocation emits text containing the expected fragments to stderr.
-3. Bare invocation produces no stdout.
-4. Bare invocation does not attempt config loading (`PanickingLoader`).
-5. `write_bare_help()` with `NoOpLocalizer` produces the expected English
+1. Bare invocation emits text containing the expected fragments to stderr.
+1. Bare invocation produces no stdout.
+1. Bare invocation does not attempt config loading (`PanickingLoader`).
+1. `write_bare_help()` with `NoOpLocalizer` produces the expected English
    help block (tests the fallback path).
-6. `write_bare_help()` with the real `FluentLocalizer` produces the same
+1. `write_bare_help()` with the real `FluentLocalizer` produces the same
    English help block (tests the Fluent resolution path).
-7. The help text contains all three domains.
-8. The help text contains a `Usage:` line.
-9. The help text contains exactly one `weaver --help` pointer.
+1. The help text contains all three domains.
+1. The help text contains a `Usage:` line.
+1. The help text contains exactly one `weaver --help` pointer.
 
 ```rust
 //! Tests for bare-invocation help output.
@@ -730,9 +729,9 @@ Run `make check-fmt && make lint && make test`.
 Add a "Bare invocation" subsection within "Command reference", before "Output
 formats":
 
-Add a heading `### Bare invocation` describing the new behaviour.  Include a
+Add a heading `### Bare invocation` describing the new behaviour. Include a
 `text` code block showing the help output and a note that it does not require a
-configuration file or a running daemon.  See the actual `docs/users-guide.md`
+configuration file or a running daemon. See the actual `docs/users-guide.md`
 change for the rendered version.
 
 **E2. Mark roadmap task 5.1.1 as done in `docs/roadmap.md`.**
@@ -764,41 +763,41 @@ Work for full code listings; this section summarises the edits and commands.
 ### Stage A: Upgrade ortho-config
 
 1. Edit `Cargo.toml` line 33: `"0.6.0"` → `"0.7.0"`.
-2. Run `cargo check --workspace && make test` to verify no regressions.
+1. Run `cargo check --workspace && make test` to verify no regressions.
 
 ### Stage B: Scaffold Fluent resources and localizer
 
 1. Create `crates/weaver-cli/locales/en-US/messages.ftl` with bare-help
    Fluent messages (see Plan of Work B1).
-2. Create `crates/weaver-cli/src/localizer.rs` with `build_localizer()` and
+1. Create `crates/weaver-cli/src/localizer.rs` with `build_localizer()` and
    `write_bare_help()` (see Plan of Work B2).
-3. Add `BareInvocation` to `AppError` in `errors.rs` (B3).
-4. Add `is_bare_invocation()` to `Cli` in `cli.rs` (B4).
-5. Register `mod localizer;` and update imports in `lib.rs` (B5).
+1. Add `BareInvocation` to `AppError` in `errors.rs` (B3).
+1. Add `is_bare_invocation()` to `Cli` in `cli.rs` (B4).
+1. Register `mod localizer;` and update imports in `lib.rs` (B5).
 
 ### Stage C: Scaffold tests
 
 1. Append BDD scenario to `weaver_cli.feature` (C1).
-2. Create `src/tests/unit/bare_invocation.rs` with unit tests (C2).
-3. Update `unit.rs` to declare `mod bare_invocation` (C3).
-4. Run `cargo check --workspace` then `make test` — new tests should fail
+1. Create `src/tests/unit/bare_invocation.rs` with unit tests (C2).
+1. Update `unit.rs` to declare `mod bare_invocation` (C3).
+1. Run `cargo check --workspace` then `make test` — new tests should fail
    (red phase).
 
 ### Stage D: Wire implementation
 
 1. Construct localizer in `CliRunner::run()` and thread through
    `run_with_handler()` (D1).
-2. Add `BareInvocation` match arm in error handler (D2).
-3. Update `run_with_daemon_binary` and `TestWorld::run()` to pass
+1. Add `BareInvocation` match arm in error handler (D2).
+1. Update `run_with_daemon_binary` and `TestWorld::run()` to pass
    `&NoOpLocalizer` (D3).
-4. Fix `run_with_loader_reports_configuration_failures` test args (D4).
-5. Run `make check-fmt && make lint && make test` — all must pass (D5).
+1. Fix `run_with_loader_reports_configuration_failures` test args (D4).
+1. Run `make check-fmt && make lint && make test` — all must pass (D5).
 
 ### Stage E: Documentation
 
 1. Add "Bare invocation" subsection to `docs/users-guide.md`.
-2. Mark 5.1.1 as done in `docs/roadmap.md`.
-3. Run `make fmt && make markdownlint`.
+1. Mark 5.1.1 as done in `docs/roadmap.md`.
+1. Run `make fmt && make markdownlint`.
 
 ### Stage F: Final validation
 
@@ -816,17 +815,17 @@ make test 2>&1 | tee /tmp/test.log
 1. `weaver` with no arguments exits non-zero — verified by BDD scenario
    `Bare invocation shows short help` (`Then the CLI fails`) and unit test
    `bare_invocation_exits_with_failure`.
-2. Prints a `Usage:` line — verified by BDD `stderr contains "Usage: weaver"`
+1. Prints a `Usage:` line — verified by BDD `stderr contains "Usage: weaver"`
    and unit test `bare_help_contains_usage_line`.
-3. Lists the three valid domains — verified by BDD assertions for `observe`,
+1. Lists the three valid domains — verified by BDD assertions for `observe`,
    `act`, `verify` and unit tests
    `write_bare_help_with_noop_produces_english_fallback` /
    `write_bare_help_with_fluent_produces_english`.
-4. Includes exactly one pointer to `weaver --help` — verified by unit test
+1. Includes exactly one pointer to `weaver --help` — verified by unit test
    `bare_help_contains_single_help_pointer`.
-5. Does not require config loading — verified by `PanickingLoader` in unit
+1. Does not require config loading — verified by `PanickingLoader` in unit
    tests (loader panics if called).
-6. All user-facing text is sourced through `ortho_config::Localizer` — verified
+1. All user-facing text is sourced through `ortho_config::Localizer` — verified
    by unit tests exercising both `NoOpLocalizer` and `FluentLocalizer` paths.
 
 **Quality criteria:**
@@ -889,16 +888,16 @@ pub(crate) enum AppError {
 
 _Table 2: Files modified and their changes._
 
-| File                                                  | Change                                                    |
+| File | Change |
 | ----------------------------------------------------- | --------------------------------------------------------- |
-| `Cargo.toml`                                          | Upgrade `ortho_config` to `"0.7.0"`                       |
-| `crates/weaver-cli/locales/en-US/messages.ftl`        | New: Fluent resources                                     |
-| `crates/weaver-cli/src/localizer.rs`                  | New: localizer module                                     |
-| `crates/weaver-cli/src/errors.rs`                     | Add `BareInvocation` variant                              |
-| `crates/weaver-cli/src/lib.rs`                        | Wire localizer + bare invocation + `is_bare_invocation()` |
-| `crates/weaver-cli/src/tests/unit.rs`                 | Fix test args; add `mod` decl                             |
-| `crates/weaver-cli/src/tests/unit/bare_invocation.rs` | New: unit tests                                           |
-| `crates/weaver-cli/src/tests/support/mod.rs`          | Pass `NoOpLocalizer`                                      |
-| `crates/weaver-cli/tests/features/weaver_cli.feature` | Add BDD scenario                                          |
-| `docs/users-guide.md`                                 | Add "Bare invocation" subsection                          |
-| `docs/roadmap.md`                                     | Mark 5.1.1 checkboxes as done                             |
+| `Cargo.toml` | Upgrade `ortho_config` to `"0.7.0"` |
+| `crates/weaver-cli/locales/en-US/messages.ftl` | New: Fluent resources |
+| `crates/weaver-cli/src/localizer.rs` | New: localizer module |
+| `crates/weaver-cli/src/errors.rs` | Add `BareInvocation` variant |
+| `crates/weaver-cli/src/lib.rs` | Wire localizer + bare invocation + `is_bare_invocation()` |
+| `crates/weaver-cli/src/tests/unit.rs` | Fix test args; add `mod` decl |
+| `crates/weaver-cli/src/tests/unit/bare_invocation.rs` | New: unit tests |
+| `crates/weaver-cli/src/tests/support/mod.rs` | Pass `NoOpLocalizer` |
+| `crates/weaver-cli/tests/features/weaver_cli.feature` | Add BDD scenario |
+| `docs/users-guide.md` | Add "Bare invocation" subsection |
+| `docs/roadmap.md` | Mark 5.1.1 checkboxes as done |

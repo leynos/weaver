@@ -133,35 +133,35 @@ Both commands exit non-zero and do not print `Waiting for daemon start...`.
 ## Progress
 
 - [x] (2026-03-22 00:00Z) Read `docs/roadmap.md`, `docs/ui-gap-analysis.md`,
-      `docs/weaver-design.md`, the relevant testing guides, and the prior
-      `2.2.4` ExecPlan.
+  `docs/weaver-design.md`, the relevant testing guides, and the prior
+  `2.2.4` ExecPlan.
 - [x] (2026-03-22 00:00Z) Confirmed the current runtime path in
-      `crates/weaver-cli/src/lib.rs`: `handle_preflight(...)` already runs
-      before config loading, but only emits unknown-domain guidance when the
-      operator provides no operation.
+  `crates/weaver-cli/src/lib.rs`: `handle_preflight(...)` already runs
+  before config loading, but only emits unknown-domain guidance when the
+  operator provides no operation.
 - [x] (2026-03-22 00:00Z) Confirmed the current implementation gap in
-      `crates/weaver-cli/src/discoverability.rs`: `write_unknown_domain_guidance(...)`
-      prints a full domain-operation catalogue and offers no edit-distance
-      suggestion.
+  `crates/weaver-cli/src/discoverability.rs`: `write_unknown_domain_guidance(...)`
+  prints a full domain-operation catalogue and offers no edit-distance
+  suggestion.
 - [x] (2026-03-22 00:00Z) Confirmed the current documentation drift in
-      `docs/users-guide.md`: unknown domains are still documented as printing
-      the built-in domain-operation catalogue.
+  `docs/users-guide.md`: unknown domains are still documented as printing
+  the built-in domain-operation catalogue.
 - [x] (2026-03-22 00:00Z) Drafted this ExecPlan in
-      `docs/execplans/2-3-1-validate-domains-client-side-before-daemon-startup.md`.
+  `docs/execplans/2-3-1-validate-domains-client-side-before-daemon-startup.md`.
 - [x] (2026-03-22 14:00Z) Stage A: added unit, integration, and BDD coverage
-      for unknown domains with and without operations, plus typo suggestion and
-      no-suggestion cases.
+  for unknown domains with and without operations, plus typo suggestion and
+  no-suggestion cases.
 - [x] (2026-03-22 14:05Z) Stage B: broadened CLI preflight validation to all
-      unknown domains before config loading or daemon startup, replaced the
-      unknown-domain output contract with the valid-domain list, added bounded
-      edit-distance suggestions, and renamed the sentinel to
-      `PreflightGuidance`.
+  unknown domains before config loading or daemon startup, replaced the
+  unknown-domain output contract with the valid-domain list, added bounded
+  edit-distance suggestions, and renamed the sentinel to
+  `PreflightGuidance`.
 - [x] (2026-03-22 14:10Z) Stage C: updated `docs/weaver-design.md`,
-      `docs/users-guide.md`, and `docs/roadmap.md` to reflect the shipped
-      behaviour.
+  `docs/users-guide.md`, and `docs/roadmap.md` to reflect the shipped
+  behaviour.
 - [x] (2026-03-22 14:20Z) Stage D: ran `make fmt`, `make markdownlint`,
-      `make nixie`, `make check-fmt`, `make lint`, and `make test` with logged
-      output.
+  `make nixie`, `make check-fmt`, `make lint`, and `make test` with logged
+  output.
 
 ## Surprises & Discoveries
 
@@ -223,18 +223,18 @@ Target outcome at completion:
 
 1. `weaver <unknown-domain>` fails client-side with the canonical valid-domain
    list and no daemon interaction.
-2. `weaver <unknown-domain> <operation>` also fails client-side before config
+1. `weaver <unknown-domain> <operation>` also fails client-side before config
    load or daemon auto-start.
-3. A close typo such as `obsrve` emits exactly one `Did you mean 'observe'?`
+1. A close typo such as `obsrve` emits exactly one `Did you mean 'observe'?`
    line.
-4. A distant invalid domain emits no suggestion line.
-5. Known-domain missing-operation guidance still behaves as delivered in
+1. A distant invalid domain emits no suggestion line.
+1. Known-domain missing-operation guidance still behaves as delivered in
    roadmap `2.2.4`.
-6. Unit tests, integration tests, and `rstest-bdd` scenarios cover happy,
+1. Unit tests, integration tests, and `rstest-bdd` scenarios cover happy,
    unhappy, and edge cases.
-7. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
+1. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
    reflect the final behaviour.
-8. `make check-fmt`, `make lint`, and `make test` pass, along with the
+1. `make check-fmt`, `make lint`, and `make test` pass, along with the
    Markdown gates required by `AGENTS.md`.
 
 Retrospective notes:
@@ -358,21 +358,21 @@ Implementation outline:
    - recognizes the three valid domains,
    - calculates the best edit-distance match within threshold 2, and
    - returns a structured result the writer can render.
-2. Broaden the preflight predicate so it covers both:
+1. Broaden the preflight predicate so it covers both:
    - known domain with missing operation, and
    - unknown domain with or without an operation.
-3. Keep `write_missing_operation_guidance(...)` for the known-domain path.
-4. Replace `write_unknown_domain_guidance(...)` output so it writes:
+1. Keep `write_missing_operation_guidance(...)` for the known-domain path.
+1. Replace `write_unknown_domain_guidance(...)` output so it writes:
    - the unknown-domain error line,
    - a blank line,
    - `Valid domains: observe, act, verify`,
    - an optional `Did you mean '<domain>'?` line, and
    - no operation catalogue.
-5. Update `handle_preflight(...)` so an unknown-domain result returns the
+1. Update `handle_preflight(...)` so an unknown-domain result returns the
    preflight sentinel before config loading or daemon startup.
-6. If the sentinel name is now misleading, rename it and update the narrow
+1. If the sentinel name is now misleading, rename it and update the narrow
    error-to-exit-code mapping in `CliRunner::map_result_to_exit_code(...)`.
-7. Update `crates/weaver-cli/locales/en-US/messages.ftl` with the new message
+1. Update `crates/weaver-cli/locales/en-US/messages.ftl` with the new message
    IDs and fallbacks for:
    - valid-domain list heading/body,
    - optional suggestion line,
@@ -434,6 +434,7 @@ Expected evidence:
 
 ## References
 
-[^roadmap]: [docs/roadmap.md](../roadmap.md)
-[^level3]: [docs/ui-gap-analysis.md Level 3](../ui-gap-analysis.md#level-3--unknown-domain-weaver-bogus-something)
-[^level10]: [docs/ui-gap-analysis.md Level 10](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
+\[^level3\]: [docs/ui-gap-analysis.md Level 3](../ui-gap-analysis.md#level-3--unknown-domain-weaver-bogus-something)
+\[^level10\]: [docs/ui-gap-analysis.md Level 10](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
+
+[^roadmap]: %5Bdocs/roadmap.md%5D(../roadmap.md)

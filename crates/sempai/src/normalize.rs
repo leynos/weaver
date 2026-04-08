@@ -1,4 +1,40 @@
 //! Normalization of parsed YAML rules into canonical `Formula` model.
+//!
+//! This module provides the normalization pipeline that transforms parsed YAML rules
+//! into a canonical `Formula` representation suitable for query plan construction.
+//!
+//! # Pipeline Stages
+//!
+//! 1. **Rule File Parsing**: YAML is parsed into `RuleFile` structures via `sempai_yaml`
+//! 2. **Mode Filtering**: Only `search` mode rules are processed; other modes return
+//!    unsupported mode diagnostics
+//! 3. **Formula Normalization**: Legacy and v2 syntax are transformed into canonical
+//!    `Formula` variants (`Atom`, `Not`, `Inside`, `Anywhere`, `And`, `Or`)
+//! 4. **Semantic Validation**: The normalized formula is validated for:
+//!    - `InvalidNotInOr`: Disjunctions cannot contain negated branches
+//!    - `MissingPositiveTermInAnd`: Conjunctions must have at least one positive term
+//! 5. **Multi-Language Expansion**: Rules with multiple languages are expanded into
+//!    one `NormalizedSearchRule` per language
+//!
+//! # Example
+//!
+//! ```
+//! use sempai::normalize::normalize_rule_file;
+//! use sempai_yaml::parse_rule_file;
+//!
+//! let yaml = r#"
+//! rules:
+//!   - id: test.rule
+//!     message: test
+//!     languages: [rust]
+//!     severity: ERROR
+//!     pattern: fn $F($X)
+//! "#;
+//!
+//! let file = parse_rule_file(yaml, None).unwrap();
+//! let rules = normalize_rule_file(&file).unwrap();
+//! assert_eq!(rules.len(), 1);
+//! ```
 
 use sempai_core::{Atom, DecoratedFormula, DiagnosticCode, DiagnosticReport, Formula, Language};
 use sempai_yaml::{
@@ -19,6 +55,16 @@ pub struct NormalizedSearchRule {
     pub formula: Formula,
 }
 
+/// Returns an unsupported mode diagnostic for the given mode.
+fn unsupported_mode(mode: &str) -> Result<Vec<NormalizedSearchRule>, DiagnosticReport> {
+    Err(DiagnosticReport::single_error(
+        DiagnosticCode::ESempaiUnsupportedMode,
+        format!("mode '{mode}' is not yet supported for execution"),
+        None,
+        vec!["Only 'search' mode is currently supported".to_owned()],
+    ))
+}
+
 /// Normalizes a rule file into a vector of normalized search rules.
 ///
 /// This function:
@@ -30,32 +76,14 @@ pub fn normalize_rule_file(file: &RuleFile) -> Result<Vec<NormalizedSearchRule>,
     let mut results = Vec::new();
 
     for rule in file.rules() {
-        match normalize_rule(rule)? {
-            NormalizedRule::Search(rules) => results.extend(rules),
-            NormalizedRule::UnsupportedMode(mode) => {
-                return Err(DiagnosticReport::single_error(
-                    DiagnosticCode::ESempaiUnsupportedMode,
-                    format!("mode '{mode}' is not yet supported for execution"),
-                    None,
-                    vec!["Only 'search' mode is currently supported".to_owned()],
-                ));
-            }
-        }
+        results.extend(normalize_rule(rule)?);
     }
 
     Ok(results)
 }
 
-/// Result of normalizing a single rule.
-enum NormalizedRule {
-    /// Successfully normalized search rules (one per language).
-    Search(Vec<NormalizedSearchRule>),
-    /// The rule mode is not yet supported.
-    UnsupportedMode(String),
-}
-
-/// Normalizes a single rule.
-fn normalize_rule(rule: &Rule) -> Result<NormalizedRule, DiagnosticReport> {
+/// Normalizes a single rule into a vector of search rules (one per language).
+fn normalize_rule(rule: &Rule) -> Result<Vec<NormalizedSearchRule>, DiagnosticReport> {
     match rule.mode() {
         RuleMode::Search => {
             let formula = normalize_search_principal(rule.principal())?;
@@ -74,12 +102,12 @@ fn normalize_rule(rule: &Rule) -> Result<NormalizedRule, DiagnosticReport> {
                 })
                 .collect();
 
-            Ok(NormalizedRule::Search(rules))
+            Ok(rules)
         }
-        RuleMode::Taint => Ok(NormalizedRule::UnsupportedMode("taint".to_owned())),
-        RuleMode::Join => Ok(NormalizedRule::UnsupportedMode("join".to_owned())),
-        RuleMode::Extract => Ok(NormalizedRule::UnsupportedMode("extract".to_owned())),
-        RuleMode::Other(mode) => Ok(NormalizedRule::UnsupportedMode(mode.clone())),
+        RuleMode::Taint => unsupported_mode("taint"),
+        RuleMode::Join => unsupported_mode("join"),
+        RuleMode::Extract => unsupported_mode("extract"),
+        RuleMode::Other(mode) => unsupported_mode(mode),
     }
 }
 

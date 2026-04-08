@@ -20,15 +20,15 @@ blocks while keeping the JSONL protocol payloads intact for machine use.
 1. **CLI-side rendering**: Keep `weaverd` JSONL payloads unchanged and perform
    human-readable rendering in `weaver-cli`, preserving the canonical transport
    while allowing richer presentation.
-2. **Output format selection**: Add an `--output` flag with `auto`, `human`, and
+1. **Output format selection**: Add an `--output` flag with `auto`, `human`, and
    `json` values. `auto` defaults to `human` when stdout is a TTY and `json`
    when stdout is redirected, ensuring machine pipelines remain stable.
-3. **Miette-style renderer configuration**: Emit ASCII-only context blocks
+1. **Miette-style renderer configuration**: Emit ASCII-only context blocks
    modelled on `miette` output to match the design doc examples.
-4. **Lightweight response models**: Define CLI-side response structs mirroring
+1. **Lightweight response models**: Define CLI-side response structs mirroring
    `docs/users-guide.md` JSON shapes for definitions, references, diagnostics,
    and safety harness failures to avoid cross-crate coupling.
-5. **Source grouping and fallback**: Group results by file with one header per
+1. **Source grouping and fallback**: Group results by file with one header per
    file and a context block per location. When source content is unavailable,
    emit a fallback message that preserves the path and range with the reason.
 
@@ -131,23 +131,23 @@ updates, per `AGENTS.md`.
 
 ## Files Modified
 
-| File                                                         | Action                                      |
+| File | Action |
 | ------------------------------------------------------------ | ------------------------------------------- |
-| `Cargo.toml`                                                 | Bump `rstest-bdd` deps                      |
-| `crates/weaver-cli/Cargo.toml`                               | Add output rendering deps                   |
-| `crates/weaver-cli/src/lib.rs`                               | Add `--output` and renderer integration     |
-| `crates/weaver-cli/src/output/mod.rs`                        | Create                                      |
-| `crates/weaver-cli/src/output/models.rs`                     | Create                                      |
-| `crates/weaver-cli/src/output/render.rs`                     | Create                                      |
-| `crates/weaver-cli/src/output/source.rs`                     | Create                                      |
-| `crates/weaver-cli/tests/features/weaver_cli_output.feature` | Create                                      |
-| `crates/weaver-cli/src/tests/behaviour.rs`                   | Extend steps for new scenarios              |
-| `crates/weaver-cli/src/tests/support/`                       | Add fixtures for rendered output            |
-| `crates/weaver-e2e/tests/`                                   | Extend for human-readable output validation |
-| `docs/weaver-design.md`                                      | Record design decisions                     |
-| `docs/users-guide.md`                                        | Document output format changes              |
-| `docs/roadmap.md`                                            | Mark entry done                             |
-| `docs/execplans/phase-1-human-readable-output.md`            | Create                                      |
+| `Cargo.toml` | Bump `rstest-bdd` deps |
+| `crates/weaver-cli/Cargo.toml` | Add output rendering deps |
+| `crates/weaver-cli/src/lib.rs` | Add `--output` and renderer integration |
+| `crates/weaver-cli/src/output/mod.rs` | Create |
+| `crates/weaver-cli/src/output/models.rs` | Create |
+| `crates/weaver-cli/src/output/render.rs` | Create |
+| `crates/weaver-cli/src/output/source.rs` | Create |
+| `crates/weaver-cli/tests/features/weaver_cli_output.feature` | Create |
+| `crates/weaver-cli/src/tests/behaviour.rs` | Extend steps for new scenarios |
+| `crates/weaver-cli/src/tests/support/` | Add fixtures for rendered output |
+| `crates/weaver-e2e/tests/` | Extend for human-readable output validation |
+| `docs/weaver-design.md` | Record design decisions |
+| `docs/users-guide.md` | Document output format changes |
+| `docs/roadmap.md` | Mark entry done |
+| `docs/execplans/phase-1-human-readable-output.md` | Create |
 
 ## Dependencies
 

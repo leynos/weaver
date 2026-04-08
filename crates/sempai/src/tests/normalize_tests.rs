@@ -1,8 +1,5 @@
 //! Unit tests for the `normalize` module.
 
-#![expect(clippy::unwrap_used, reason = "tests use unwrap for brevity")]
-#![expect(clippy::indexing_slicing, reason = "tests panic on out-of-bounds")]
-
 use sempai_core::{Atom, DiagnosticCode, DiagnosticReport, Formula, Language};
 
 use crate::normalize::{NormalizedSearchRule, normalize_rule_file};
@@ -31,12 +28,12 @@ fn normalize_simple_pattern_legacy() {
         "    severity: ERROR\n",
         "    pattern: fn $F($X)\n",
     );
-    let result = parse_and_normalize(yaml).unwrap();
+    let result = parse_and_normalize(yaml).expect("should normalize successfully");
 
-    assert_eq!(result.len(), 1);
-    assert_eq!(result[0].rule_id, "test.rule");
-    assert_eq!(result[0].language, Language::Rust);
-    assert!(matches!(result[0].formula, Formula::Atom(Atom::Pattern(_))));
+    let rule = result.first().expect("expected a single rule");
+    assert_eq!(rule.rule_id, "test.rule");
+    assert_eq!(rule.language, Language::Rust);
+    assert!(matches!(rule.formula, Formula::Atom(Atom::Pattern(_))));
 }
 
 #[test]
@@ -49,12 +46,12 @@ fn normalize_simple_pattern_v2() {
         "    severity: ERROR\n",
         "    match: fn $F($X)\n",
     );
-    let result = parse_and_normalize(yaml).unwrap();
+    let result = parse_and_normalize(yaml).expect("should normalize successfully");
 
-    assert_eq!(result.len(), 1);
-    assert_eq!(result[0].rule_id, "test.rule");
-    assert_eq!(result[0].language, Language::Rust);
-    assert!(matches!(result[0].formula, Formula::Atom(Atom::Pattern(_))));
+    let rule = result.first().expect("expected a single rule");
+    assert_eq!(rule.rule_id, "test.rule");
+    assert_eq!(rule.language, Language::Rust);
+    assert!(matches!(rule.formula, Formula::Atom(Atom::Pattern(_))));
 }
 
 #[test]
@@ -76,10 +73,12 @@ fn legacy_and_v2_patterns_normalize_equivalently() {
         "    match: fn $F($X)\n",
     );
 
-    let legacy_result = parse_and_normalize(legacy_yaml).unwrap();
-    let v2_result = parse_and_normalize(v2_yaml).unwrap();
+    let legacy_result = parse_and_normalize(legacy_yaml).expect("legacy should normalize");
+    let v2_result = parse_and_normalize(v2_yaml).expect("v2 should normalize");
 
-    assert_eq!(legacy_result[0].formula, v2_result[0].formula);
+    let legacy_rule = legacy_result.first().expect("expected legacy rule");
+    let v2_rule = v2_result.first().expect("expected v2 rule");
+    assert_eq!(legacy_rule.formula, v2_rule.formula);
 }
 
 #[test]
@@ -183,11 +182,13 @@ fn multi_language_rule_expands_to_multiple_rules() {
         "    severity: ERROR\n",
         "    pattern: fn $F($X)\n",
     );
-    let result = parse_and_normalize(yaml).unwrap();
+    let result = parse_and_normalize(yaml).expect("should normalize successfully");
 
     assert_eq!(result.len(), 2);
-    assert_eq!(result[0].language, Language::Rust);
-    assert_eq!(result[1].language, Language::Python);
+    let rust_rule = result.first().expect("expected rust rule");
+    let python_rule = result.get(1).expect("expected python rule");
+    assert_eq!(rust_rule.language, Language::Rust);
+    assert_eq!(python_rule.language, Language::Python);
     // Both should have the same formula
-    assert_eq!(result[0].formula, result[1].formula);
+    assert_eq!(rust_rule.formula, python_rule.formula);
 }

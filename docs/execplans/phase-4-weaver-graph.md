@@ -121,19 +121,19 @@ are safe to re-run.
    rg "call-hierarchy" -n docs
    ```
 
-2. If the crate does not exist, create it and add it to the workspace.
+1. If the crate does not exist, create it and add it to the workspace.
 
    cargo new crates/weaver-graph --lib
 
    Then update `Cargo.toml` (workspace members and shared dependencies).
 
-3. Implement or adjust the weaver-graph modules:
+1. Implement or adjust the weaver-graph modules:
 
    - `crates/weaver-graph/src/lib.rs`
    - `crates/weaver-graph/src/node.rs`, `edge.rs`, `graph.rs`, `error.rs`
    - `crates/weaver-graph/src/provider.rs` for the LSP provider
 
-4. Ensure `weaver-lsp-host` exposes call hierarchy operations and capabilities
+1. Ensure `weaver-lsp-host` exposes call hierarchy operations and capabilities
    if missing. Touch the following only if required by the inventory step:
 
    - `crates/weaver-lsp-host/src/host.rs`
@@ -141,7 +141,7 @@ are safe to re-run.
    - `crates/weaver-lsp-host/src/capability.rs`
    - `crates/weaver-lsp-host/src/errors.rs`
 
-5. Add tests:
+1. Add tests:
 
    - Unit tests in `crates/weaver-graph/src/tests.rs` or
      `crates/weaver-graph/src/tests/`.
@@ -150,13 +150,13 @@ are safe to re-run.
    - Add `rstest-bdd` and `rstest-bdd-macros` as dev-dependencies in
      `crates/weaver-graph/Cargo.toml` using workspace versions.
 
-6. Update documentation:
+1. Update documentation:
 
    - `docs/weaver-design.md`
    - `docs/users-guide.md`
    - `docs/roadmap.md`
 
-7. Format and validate documentation (required after doc changes):
+1. Format and validate documentation (required after doc changes):
 
    ```sh
    set -o pipefail
@@ -166,7 +166,7 @@ are safe to re-run.
 
    Run `make nixie` only if a Mermaid diagram was edited.
 
-8. Run the Rust quality gates:
+1. Run the Rust quality gates:
 
    ```sh
    set -o pipefail
@@ -225,16 +225,18 @@ consume:
 
 - `weaver_graph::CallGraph` with `add_node`, `add_edge`, `callers_of`,
   `callees_of`, `find_by_name`, `node_count`, and `edge_count`.
+
 - `weaver_graph::CallNode` and `weaver_graph::CallEdge` with stable `NodeId`
   strings and optional call-site metadata.
+
 - `weaver_graph::CallGraphProvider` with:
 
-    fn build_graph(&mut self, position: &SourcePosition, depth: u32)
-        -> Result<CallGraph, GraphError>;
-    fn callers_graph(&mut self, position: &SourcePosition, depth: u32)
-        -> Result<CallGraph, GraphError>;
-    fn callees_graph(&mut self, position: &SourcePosition, depth: u32)
-        -> Result<CallGraph, GraphError>;
+  fn build_graph(&mut self, position: &SourcePosition, depth: u32)
+  -> Result\<CallGraph, GraphError>;
+  fn callers_graph(&mut self, position: &SourcePosition, depth: u32)
+  -> Result\<CallGraph, GraphError>;
+  fn callees_graph(&mut self, position: &SourcePosition, depth: u32)
+  -> Result\<CallGraph, GraphError>;
 
 - `weaver_graph::CallHierarchyClient` trait implemented by an adapter over
   `weaver-lsp-host` so the LSP provider can run without owning the host.

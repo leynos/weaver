@@ -615,7 +615,7 @@ inputs. For each invalid input, the test must verify two critical properties:
 1. **Correct Errors:** The parser produced the expected set of errors, with the
    correct error messages and spans.
 
-2. **Correct Recovery:** The parser successfully recovered and was able to
+1. **Correct Recovery:** The parser successfully recovered and was able to
    produce a useful partial AST for the valid parts of the code.
 
 Snapshot testing is the perfect tool for this. By snapshotting both the error
@@ -725,10 +725,10 @@ simple:
 
 1. Parse a source string into a `rowan::SyntaxNode`.
 
-2. Traverse the `SyntaxNode`, concatenating the text of every `SyntaxToken`
+1. Traverse the `SyntaxNode`, concatenating the text of every `SyntaxToken`
    (including trivia like whitespace and comments).
 
-3. Assert that the resulting string is byte-for-byte identical to the original
+1. Assert that the resulting string is byte-for-byte identical to the original
    input string.
 
 If this property holds for a comprehensive corpus of source files, it provides
@@ -883,11 +883,11 @@ The core workflow of property-based testing is:
    asserts an invariant. For example, for any list `v`,
    `v.reverse().reverse() == v`.
 
-2. **Generate Inputs:** `proptest` uses "strategies" to generate random inputs
+1. **Generate Inputs:** `proptest` uses "strategies" to generate random inputs
    that conform to certain rules (e.g., integers within a range, strings
    matching a regex, or complex, custom data structures).
 
-3. **Test and Shrink:** The test runner executes the property function hundreds
+1. **Test and Shrink:** The test runner executes the property function hundreds
    or thousands of times with different generated inputs. If an assertion
    fails, `proptest` begins a shrinking process, iteratively simplifying the
    failing input to find a minimal counterexample.
@@ -1097,14 +1097,14 @@ philosophy:
    and property-based tests with `proptest` for universal invariants provides
    comprehensive coverage.
 
-2. **Prioritize High-Leverage Tests:** In the context of parsing, the most
+1. **Prioritize High-Leverage Tests:** In the context of parsing, the most
    powerful tests are often those that verify the integration of the entire
    pipeline. The AST round-trip property test and the CST losslessness test are
    paramount. Investing in the infrastructure for these tests—namely,
    `Arbitrary` implementations and a pretty-printer—early in the development
    process yields the highest return.
 
-3. **Treat Spans and Errors as First-Class Citizens:** A parser is not merely a
+1. **Treat Spans and Errors as First-Class Citizens:** A parser is not merely a
    validator; it is a critical component of the developer experience. The
    quality of its error messages and the accuracy of its source location
    information are non-negotiable features. Every stage of testing, from the
@@ -1112,7 +1112,7 @@ philosophy:
    error structures, with snapshot testing being the ideal tool for this
    purpose.
 
-4. **Integrate Testing into the Development Workflow:** Tools like `insta` are
+1. **Integrate Testing into the Development Workflow:** Tools like `insta` are
    not just for preventing regressions; they are powerful aids for development
    and refactoring. The `cargo insta review` workflow allows for rapid,
    confident iteration on a language's syntax and its corresponding AST
@@ -1132,41 +1132,41 @@ single most important asset for managing this evolution. It provides the
 confidence needed to refactor, experiment, and extend the language, ensuring
 the long-term health, correctness, and maintainability of the entire project.
 
-[^1]: Original source citation number 1 from the source material.
-[^2]: Original source citation number 2 from the source material.
-[^3]: Original source citation number 4 from the source material.
-[^4]: Original source citation number 6 from the source material.
-[^5]: Original source citation number 7 from the source material.
-[^6]: Original source citation number 15 from the source material.
-[^7]: Original source citation number 10 from the source material.
-[^8]: Original source citation number 19 from the source material.
-[^9]: Original source citation number 19 from the source material.
-[^10]: Original source citation number 21 from the source material.
-[^11]: Original source citation number 15 from the source material.
-[^12]: Original source citation number 1 from the source material.
-[^13]: Original source citation number 1 from the source material.
-[^14]: Original source citation number 22 from the source material.
-[^15]: Original source citation number 22 from the source material.
-[^16]: Original source citation number 23 from the source material.
-[^17]: Original source citation number 23 from the source material.
-[^18]: Original source citation number 27 from the source material.
-[^19]: Original source citation number 11 from the source material.
-[^20]: Original source citation number 11 from the source material.
-[^21]: Original source citation number 12 from the source material.
-[^22]: Original source citation number 23 from the source material.
-[^23]: Original source citation number 23 from the source material.
-[^24]: Original source citation number 24 from the source material.
-[^25]: Original source citation number 21 from the source material.
-[^26]: Original source citation number 29 from the source material.
-[^27]: Original source citation number 21 from the source material.
-[^28]: Original source citation number 31 from the source material.
-[^29]: Original source citation number 29 from the source material.
-[^30]: Original source citation number 31 from the source material.
-[^31]: Original source citation number 31 from the source material.
-[^32]: Original source citation number 13 from the source material.
-[^33]: Original source citation number 2 from the source material.
-[^34]: Original source citation number 13 from the source material.
-[^35]: Original source citation number 13 from the source material.
-[^36]: Original source citation number 2 from the source material.
-[^37]: Original source citation number 35 from the source material.
-[^38]: Original source citation number 23 from the source material.
+\[^1\]: Original source citation number 1 from the source material.
+\[^2\]: Original source citation number 2 from the source material.
+\[^3\]: Original source citation number 4 from the source material.
+\[^4\]: Original source citation number 6 from the source material.
+\[^5\]: Original source citation number 7 from the source material.
+\[^6\]: Original source citation number 15 from the source material.
+\[^7\]: Original source citation number 10 from the source material.
+\[^8\]: Original source citation number 19 from the source material.
+\[^9\]: Original source citation number 19 from the source material.
+\[^10\]: Original source citation number 21 from the source material.
+\[^11\]: Original source citation number 15 from the source material.
+\[^12\]: Original source citation number 1 from the source material.
+\[^13\]: Original source citation number 1 from the source material.
+\[^14\]: Original source citation number 22 from the source material.
+\[^15\]: Original source citation number 22 from the source material.
+\[^16\]: Original source citation number 23 from the source material.
+\[^17\]: Original source citation number 23 from the source material.
+\[^18\]: Original source citation number 27 from the source material.
+\[^19\]: Original source citation number 11 from the source material.
+\[^20\]: Original source citation number 11 from the source material.
+\[^21\]: Original source citation number 12 from the source material.
+\[^22\]: Original source citation number 23 from the source material.
+\[^23\]: Original source citation number 23 from the source material.
+\[^24\]: Original source citation number 24 from the source material.
+\[^25\]: Original source citation number 21 from the source material.
+\[^26\]: Original source citation number 29 from the source material.
+\[^27\]: Original source citation number 21 from the source material.
+\[^28\]: Original source citation number 31 from the source material.
+\[^29\]: Original source citation number 29 from the source material.
+\[^30\]: Original source citation number 31 from the source material.
+\[^31\]: Original source citation number 31 from the source material.
+\[^32\]: Original source citation number 13 from the source material.
+\[^33\]: Original source citation number 2 from the source material.
+\[^34\]: Original source citation number 13 from the source material.
+\[^35\]: Original source citation number 13 from the source material.
+\[^36\]: Original source citation number 2 from the source material.
+\[^37\]: Original source citation number 35 from the source material.
+\[^38\]: Original source citation number 23 from the source material.

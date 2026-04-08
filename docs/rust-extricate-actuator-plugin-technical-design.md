@@ -86,7 +86,7 @@ These behaviours directly affect payload and transaction handling:
 
 Authoritative runbook:
 [Migration guide: Weaver adoption of v0.8.0](ortho-config-v0-8-0-migration-guide.md),
- especially sections:
+especially sections:
 
 - [Required migration steps](ortho-config-v0-8-0-migration-guide.md#required-migration-steps)
 - [YAML semantics changed, even though Weaver runtime config is TOML-first](ortho-config-v0-8-0-migration-guide.md#4-yaml-semantics-changed-even-though-weaver-runtime-config-is-toml-first)
@@ -110,14 +110,14 @@ requests.
 
 The plugin arguments are defined as follows.
 
-| Key                      | Type   | Required | Description                                                     |
+| Key | Type | Required | Description |
 | ------------------------ | ------ | -------- | --------------------------------------------------------------- |
-| `uri`                    | string | Yes      | Source file URI containing the selected symbol.                 |
-| `position`               | string | Yes      | Source position in `line:col` form using LSP coordinates.       |
-| `to`                     | string | Yes      | Destination module path or destination file URI.                |
-| `create_missing_modules` | bool   | No       | Create missing destination modules when `true`. Default `true`. |
-| `format`                 | string | No       | `auto`, `on`, or `off`. Default `auto`.                         |
-| `explain`                | bool   | No       | Emit execution plan metadata in diagnostics output.             |
+| `uri` | string | Yes | Source file URI containing the selected symbol. |
+| `position` | string | Yes | Source position in `line:col` form using LSP coordinates. |
+| `to` | string | Yes | Destination module path or destination file URI. |
+| `create_missing_modules` | bool | No | Create missing destination modules when `true`. Default `true`. |
+| `format` | string | No | `auto`, `on`, or `off`. Default `auto`. |
+| `explain` | bool | No | Emit execution plan metadata in diagnostics output. |
 
 _Table 1: Arguments for Rust `extricate-symbol` plugin requests._
 
@@ -140,14 +140,14 @@ fail with a structured diagnostic.
 Rust `extricate-symbol` failures must return `PluginResponse::failure` with one
 or more `PluginDiagnostic` entries.
 
-| Field                    | Type   | Required | Description                                                         |
+| Field | Type | Required | Description |
 | ------------------------ | ------ | -------- | ------------------------------------------------------------------- |
-| `success`                | bool   | Yes      | Must be `false` for refusal or execution failure.                   |
-| `output`                 | enum   | Yes      | Must be `empty` on failure.                                         |
-| `diagnostics[].severity` | enum   | Yes      | `error`, `warning`, or `info`.                                      |
-| `diagnostics[].message`  | string | Yes      | Human-readable failure reason with actionable context.              |
-| `diagnostics[].file`     | path   | No       | Absolute or workspace-relative path for location-specific failures. |
-| `diagnostics[].line`     | u32    | No       | 1-based line for location-specific failures.                        |
+| `success` | bool | Yes | Must be `false` for refusal or execution failure. |
+| `output` | enum | Yes | Must be `empty` on failure. |
+| `diagnostics[].severity` | enum | Yes | `error`, `warning`, or `info`. |
+| `diagnostics[].message` | string | Yes | Human-readable failure reason with actionable context. |
+| `diagnostics[].file` | path | No | Absolute or workspace-relative path for location-specific failures. |
+| `diagnostics[].line` | u32 | No | 1-based line for location-specific failures. |
 
 _Table 2: Failure payload schema for `extricate-symbol` responses._
 
@@ -198,35 +198,35 @@ The following sequence is normative and is the single source of truth for
 ordering.
 
 1. Validate request arguments and payload completeness.
-2. Start RA session and open overlay documents.
-3. Resolve selected definition and collect pre-move references.
-4. Compute module paths and destination module graph updates.
-5. Build move-set closure for symbol and associated `impl` blocks.
-6. Apply planned move edits to overlay and publish `didChange`.
-7. Rewrite external references and affected `use` trees.
-8. Run import repair via diagnostics plus code actions.
-9. Resolve ambiguous fixes using definition-equivalence checks.
-10. Apply formatting for touched files when enabled.
-11. Run semantic invariants and diagnostics gate checks.
-12. Emit unified diff and return success, or refuse and rollback.
+1. Start RA session and open overlay documents.
+1. Resolve selected definition and collect pre-move references.
+1. Compute module paths and destination module graph updates.
+1. Build move-set closure for symbol and associated `impl` blocks.
+1. Apply planned move edits to overlay and publish `didChange`.
+1. Rewrite external references and affected `use` trees.
+1. Run import repair via diagnostics plus code actions.
+1. Resolve ambiguous fixes using definition-equivalence checks.
+1. Apply formatting for touched files when enabled.
+1. Run semantic invariants and diagnostics gate checks.
+1. Emit unified diff and return success, or refuse and rollback.
 
 ## LSP surface and behaviour
 
 The plugin uses RA over JSON-RPC 2.0 with stdio transport.[^1]
 
-| LSP method                        | Purpose                                                 |
+| LSP method | Purpose |
 | --------------------------------- | ------------------------------------------------------- |
-| `initialize` / `initialized`      | Start session and negotiate capabilities.               |
-| `textDocument/didOpen`            | Load file content from payloads into RA.                |
-| `textDocument/didChange`          | Keep RA in sync with overlay edits.                     |
-| `textDocument/documentSymbol`     | Select top-level item enclosing the requested position. |
-| `textDocument/definition`         | Resolve symbols for move-set and meaning checks.        |
-| `textDocument/references`         | Enumerate all call sites that must remain equivalent.   |
-| `textDocument/codeAction`         | Request import and fix-up actions from diagnostics.     |
-| `workspace/executeCommand`        | Execute code actions that are command-only.             |
-| `experimental/parentModule`       | Compute canonical module path chain.                    |
-| `experimental/ssr`                | Optional structural rewrite helper for path updates.    |
-| `textDocument/publishDiagnostics` | Primary diagnostics source for fix loops.               |
+| `initialize` / `initialized` | Start session and negotiate capabilities. |
+| `textDocument/didOpen` | Load file content from payloads into RA. |
+| `textDocument/didChange` | Keep RA in sync with overlay edits. |
+| `textDocument/documentSymbol` | Select top-level item enclosing the requested position. |
+| `textDocument/definition` | Resolve symbols for move-set and meaning checks. |
+| `textDocument/references` | Enumerate all call sites that must remain equivalent. |
+| `textDocument/codeAction` | Request import and fix-up actions from diagnostics. |
+| `workspace/executeCommand` | Execute code actions that are command-only. |
+| `experimental/parentModule` | Compute canonical module path chain. |
+| `experimental/ssr` | Optional structural rewrite helper for path updates. |
+| `textDocument/publishDiagnostics` | Primary diagnostics source for fix loops. |
 
 _Table 3: RA and LSP methods required for extrication.[^2][^3]_
 
@@ -253,11 +253,11 @@ writing changes.
 Move-set planning defines exactly which syntax nodes move.
 
 1. Resolve selected top-level item from `documentSymbol` by position.
-2. Parse source syntax tree and collect candidate `impl` blocks.
-3. For each candidate `impl`, probe the self-type definition using
+1. Parse source syntax tree and collect candidate `impl` blocks.
+1. For each candidate `impl`, probe the self-type definition using
    `textDocument/definition`.
-4. Include only `impl` blocks resolving to the selected item definition.
-5. Preserve item attributes, docs, and comments verbatim in moved text.
+1. Include only `impl` blocks resolving to the selected item definition.
+1. Preserve item attributes, docs, and comments verbatim in moved text.
 
 This approach prevents accidental capture of similarly named types in scope.
 
@@ -302,14 +302,14 @@ Destination files are expected to report unresolved symbols after initial move.
 Repair loop:
 
 1. Read destination diagnostics.
-2. Request code actions for missing-name diagnostics.
-3. If one action is available, apply it.
-4. If multiple actions exist, evaluate candidates one at a time:
+1. Request code actions for missing-name diagnostics.
+1. If one action is available, apply it.
+1. If multiple actions exist, evaluate candidates one at a time:
    - apply candidate in overlay,
    - probe definition at diagnostic site,
    - keep candidate only if definition matches pre-move anchor,
    - otherwise revert candidate.
-5. Continue until diagnostics converge or deterministic resolution fails.
+1. Continue until diagnostics converge or deterministic resolution fails.
 
 Deterministic failure to disambiguate imports is a hard error.
 
@@ -387,20 +387,20 @@ The following components are expected to change for implementation:
 
 ## Risks and mitigations
 
-| Risk                                      | Impact                          | Mitigation                                                       |
+| Risk | Impact | Mitigation |
 | ----------------------------------------- | ------------------------------- | ---------------------------------------------------------------- |
-| Incomplete payload snapshot               | Incorrect or partial edits      | Validate required file-set closure before session start.         |
-| RA code actions vary across versions      | Non-deterministic import repair | Gate on semantic probes and pin behaviour via fixture snapshots. |
-| Command-only actions without usable edits | Inability to apply fixes        | Implement `workspace/executeCommand` with explicit allow list.   |
-| Destination module policy mismatch        | Broken module graph             | Enforce deterministic module creation policy in planner.         |
+| Incomplete payload snapshot | Incorrect or partial edits | Validate required file-set closure before session start. |
+| RA code actions vary across versions | Non-deterministic import repair | Gate on semantic probes and pin behaviour via fixture snapshots. |
+| Command-only actions without usable edits | Inability to apply fixes | Implement `workspace/executeCommand` with explicit allow list. |
+| Destination module policy mismatch | Broken module graph | Enforce deterministic module creation policy in planner. |
 
 _Table 4: Primary implementation risks and mitigations._
 
 ## References
 
-[^1]: [Manually use rust-analyzer](https://users.rust-lang.org/t/manually-use-rust-analyzer/57156?utm_source=chatgpt.com)
-[^2]: [rust-analyzer LSP extensions](https://git.joshthomas.dev/language-servers/rust-analyzer/src/commit/c0107d2ea63a5527d2990f7f322f642340ceb3cd/docs/dev/lsp-extensions.md)
-[^3]: [LSP extensions mirror](https://android.googlesource.com/toolchain/rustc/%2B/HEAD/src/tools/rust-analyzer/docs/dev/lsp-extensions.md)
-[^4]: [RA diagnostic pull issue](https://github.com/rust-lang/rust-analyzer/issues/18709)
-[^5]: [Command-based RA code action handling](https://github.com/kakoune-lsp/kakoune-lsp/issues/314?utm_source=chatgpt.com)
-[^6]: [rust-analyzer book](https://rust-analyzer.github.io/book/)
+\[^1\]: [Manually use rust-analyzer](https://users.rust-lang.org/t/manually-use-rust-analyzer/57156?utm_source=chatgpt.com)
+\[^2\]: [rust-analyzer LSP extensions](https://git.joshthomas.dev/language-servers/rust-analyzer/src/commit/c0107d2ea63a5527d2990f7f322f642340ceb3cd/docs/dev/lsp-extensions.md)
+\[^3\]: [LSP extensions mirror](https://android.googlesource.com/toolchain/rustc/%2B/HEAD/src/tools/rust-analyzer/docs/dev/lsp-extensions.md)
+\[^4\]: [RA diagnostic pull issue](https://github.com/rust-lang/rust-analyzer/issues/18709)
+\[^5\]: [Command-based RA code action handling](https://github.com/kakoune-lsp/kakoune-lsp/issues/314?utm_source=chatgpt.com)
+\[^6\]: [rust-analyzer book](https://rust-analyzer.github.io/book/)

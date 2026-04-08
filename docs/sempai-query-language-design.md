@@ -18,15 +18,20 @@ specification documents.[^1][^2][^3]
 
   - Legacy `pattern*` operators.
   - v2 `match` formula operators and decorators.
+
 - Support Rust, Python, TypeScript, and Go with full Tree-sitter feature
   coverage (including decorators/attributes).
+
 - Provide optional HashiCorp Configuration Language (HCL) support, gated by a
   feature flag.
+
 - Support both:
 
   - Full rule files (YAML) with comments and structure.
   - One-liner queries for command-line interface (CLI) interactive usage.
+
 - Provide a stable Rust library API suitable for use outside Weaver.
+
 - Provide an explicit escape hatch for raw Tree-sitter queries.
 
 ## Non-goals
@@ -35,10 +40,12 @@ specification documents.[^1][^2][^3]
 
   - `taint`, `join`, and `extract` are parsed for compatibility but are not
     executed in the initial feature-extraction minimum viable product (MVP).
+
 - Rewriting and autofix application:
 
   - `fix` is parsed and surfaced but is not applied by Sempai.
   - Weaver remains the actuator for edits.
+
 - Dataflow analysis and path-sensitive semantics.
 
 ## Terminology
@@ -64,14 +71,14 @@ Table 1 describes the proposed crates.
 
 *Table 1: Proposed workspace crates for Sempai.*
 
-| Path                     | Crate name        | Purpose                                                            | Public API |
+| Path | Crate name | Purpose | Public API |
 | ------------------------ | ----------------- | ------------------------------------------------------------------ | ---------- |
-| `crates/sempai`          | `sempai`          | Facade crate, stable API                                           | Yes        |
-| `crates/sempai-core`     | `sempai_core`     | Data model, diagnostics, planning intermediate representation (IR) | Yes        |
-| `crates/sempai-yaml`     | `sempai_yaml`     | YAML rule parsing via saphyr                                       | Yes        |
-| `crates/sempai-dsl`      | `sempai_dsl`      | One-liner domain-specific language (DSL) parsing via Chumsky       | Yes        |
-| `crates/sempai-ts`       | `sempai_ts`       | Tree-sitter backend + matcher                                      | Yes        |
-| `crates/sempai-fixtures` | `sempai_fixtures` | Test corpora + helper macros                                       | No         |
+| `crates/sempai` | `sempai` | Facade crate, stable API | Yes |
+| `crates/sempai-core` | `sempai_core` | Data model, diagnostics, planning intermediate representation (IR) | Yes |
+| `crates/sempai-yaml` | `sempai_yaml` | YAML rule parsing via saphyr | Yes |
+| `crates/sempai-dsl` | `sempai_dsl` | One-liner domain-specific language (DSL) parsing via Chumsky | Yes |
+| `crates/sempai-ts` | `sempai_ts` | Tree-sitter backend + matcher | Yes |
+| `crates/sempai-fixtures` | `sempai_fixtures` | Test corpora + helper macros | No |
 
 The facade crate `sempai` re-exports stable types from `sempai_core` and
 provides top-level convenience entrypoints.
@@ -165,10 +172,12 @@ Sempai execution scope:
 - `mode: search`:
 
   - Full support for `pattern*` and `match`.
+
 - `mode: extract`:
 
   - Rule file parsing support.
   - Execution returns `UnsupportedMode(extract)` until implemented.
+
 - `mode: taint` and `mode: join`:
 
   - Rule file parsing support.
@@ -309,21 +318,26 @@ A Tree-sitter escape hatch is represented as an atom within the plan (see
 
    - YAML rule file parsing.
    - One-liner DSL parsing.
-2. Normalisation:
+
+1. Normalisation:
 
    - Lower legacy and v2 syntaxes to a shared formula model.[^3]
-3. Validation:
+
+1. Validation:
 
    - Enforce semantic constraints and mode constraints.
-4. Compilation:
+
+1. Compilation:
 
    - Compile pattern atoms to pattern IR (intermediate representation).
    - Select a Tree-sitter language profile and snippet wrapper.
-5. Execution:
+
+1. Execution:
 
    - Parse target source via Tree-sitter.
    - Evaluate the compiled plan over the syntax tree.
-6. Projection:
+
+1. Projection:
 
    - Produce `Match` objects with spans, captures, and focus.
 
@@ -390,7 +404,9 @@ The one-liner Pratt binding powers must follow the provided table.[^3]
 ### YAML parser stack
 
 - `saphyr` parses YAML into a value model with location info.
+
 - `serde-saphyr` deserialises to Rust structs.
+
 - A custom deserialisation layer handles:
 
   - Union shapes (string vs object).
@@ -410,10 +426,12 @@ The schema defines the rule object and the allowed query keys.[^1]
 Sempai should model:
 
 - Rule metadata: `id`, `message`, `languages`, `severity`, `mode`.
+
 - Query principal:
 
   - Legacy: `pattern`, `pattern-regex`, `patterns`, `pattern-either`.
   - v2: `match` (string or object).
+
 - Execution gating:
 
   - Parse all modes.
@@ -426,6 +444,7 @@ Validation should follow the conditional constraints in the schema.[^1]
 Search mode rules require:
 
 - `id`, `message`, `languages`, `severity`
+
 - Any of:
 
   - `pattern`
@@ -506,8 +525,11 @@ Tokens:
 
 - Identifiers: `pattern`, `regex`, `inside`, `anywhere`, `not`, `and`, `or`,
   `where`, `as`, `fix`, `focus`
+
 - String literals: `"..."` with escapes, plus raw string support
+
 - Punctuation: `(`, `)`, `{`, `}`, `,`
+
 - Whitespace and comments:
 
   - Line comment: `# ...`
@@ -550,26 +572,32 @@ Example wrappers (illustrative):
 
   - `fn __sempai__() { let _ = <expr>; }`
   - Root extraction: the initializer expression node.
+
 - Rust item:
 
   - parse as-is
   - Root extraction: first item node.
+
 - Python expression:
 
   - `__sempai__ = <expr>`
   - Root extraction: RHS expression node.
+
 - Python statement block:
 
   - `def __sempai__():\n    <stmts>`
   - Root extraction: statement list node.
+
 - TypeScript expression:
 
   - `const __sempai__ = <expr>;`
   - Root extraction: initializer expression node.
+
 - Go statement list:
 
   - `package main\nfunc __sempai__(){ <stmts> }`
   - Root extraction: statement list.
+
 - HCL:
 
   - `resource "x" "y" { <body> }`
@@ -584,7 +612,7 @@ A two-stage rewrite is required:
 
 1. Lexical scan of the pattern text to locate Semgrep tokens defined by the
    EBNF.[^2]
-2. Replacement of tokens with parseable placeholders for the chosen wrapper and
+1. Replacement of tokens with parseable placeholders for the chosen wrapper and
    language.
 
 Placeholder forms:
@@ -592,15 +620,19 @@ Placeholder forms:
 - Metavariable `$X`:
 
   - Replace with identifier placeholder `__SEMPAI_META_X__`.
+
 - Anonymous metavariable `$_`:
 
   - Replace with placeholder `__SEMPAI_WILDCARD__`.
+
 - Ellipsis `...`:
 
   - Replace with placeholder `__SEMPAI_ELLIPSIS__`.
+
 - Metavariable ellipsis `$...ARGS`:
 
   - Replace with placeholder `__SEMPAI_ELLIPSIS_ARGS__`.
+
 - Deep ellipsis `<... fragment ...>`:
 
   - Replace the entire region with `__SEMPAI_DEEP_0__`, `__SEMPAI_DEEP_1__`,
@@ -667,10 +699,12 @@ matches.
 `PatNode::Kind` matches a target node if:
 
 - The Tree-sitter node kind matches exactly.
+
 - For each `PatChild`, the corresponding target child matches:
 
   - Field name must match if present.
   - Order is preserved among named children.
+
 - Extras (comments/whitespace) are ignored.
 
 Leaf matching (`PatNode::Text`) is applied to nodes with no named children or
@@ -747,6 +781,7 @@ Compilation performs positive-term splitting:
 - Anchors:
 
   - `pattern`, `regex`, `any`, `or` branches that yield matches.
+
 - Constraints:
 
   - `not`, `inside`, `anywhere`
@@ -762,7 +797,7 @@ Conjunction execution proceeds:
 
 1. Compute anchor matches from the first anchor term.
 
-2. For each anchor match:
+1. For each anchor match:
 
    - Apply each constraint term as a predicate:
 
@@ -772,12 +807,13 @@ Conjunction execution proceeds:
      - `Not(x)` holds if no match of `x` overlaps the anchor in the configured
        relation.
      - `Where(...)` holds if all clauses validate over current bindings.
+
    - Apply additional anchor terms as existential constraints:
 
      - At least one compatible match must exist for each additional anchor
        term, with metavariable unification across bindings.
 
-3. Emit a match per surviving anchor, projecting:
+1. Emit a match per surviving anchor, projecting:
 
    - `span`: anchor span
    - `captures`: merged bindings
@@ -879,6 +915,7 @@ Tree-sitter query strings are supported as an atom:
 - YAML:
 
   - `ts-query: "(function_item name: (identifier) @name)"`
+
 - DSL:
 
   - `ts("(function_item name: (identifier) @name)")`
@@ -904,7 +941,9 @@ A new `observe` command is required:
 - `weaver observe query`
 
   - `--lang <rust|python|ts|go|hcl>`
+
   - `--uri <file:///...>`
+
   - One of:
 
     - `--rule-file <path>`
@@ -1054,12 +1093,15 @@ A minimal initial set:
 - Compile-once, execute-many:
 
   - `QueryPlan` should be cached by `(language, rule_hash)`.
+
 - Parse caching:
 
   - Tree-sitter parsing should be cached per file revision.
+
 - Early pruning:
 
   - `PatNode::Kind` provides a candidate-kind filter for tree traversal.
+
 - Bounded deep matching:
 
   - Enforce `max_deep_search_nodes`.
@@ -1069,9 +1111,11 @@ A minimal initial set:
 - Limit matches per rule:
 
   - `max_matches_per_rule` truncates output deterministically.
+
 - Limit capture text:
 
   - `max_capture_text_bytes` truncates text fields or disables them.
+
 - Limit nested alternation explosion:
 
   - Disjunction branches are evaluated independently but must be bounded by
@@ -1106,20 +1150,24 @@ A small corpus per language is required to guarantee language feature coverage:
   - Item attributes (`#[derive(...)]`, `#[cfg(...)]`)
   - Macro-heavy items
   - Impl blocks with generics and lifetimes
+
 - Python:
 
   - Decorators on functions and classes
   - Decorated async defs
   - Match/case constructs
+
 - TypeScript:
 
   - Decorators
   - Type assertions and generics
   - JSX excluded unless explicitly added
+
 - Go:
 
   - Generics
   - Function literals and method sets
+
 - HCL (optional):
 
   - Deep ellipsis patterns (Terraform examples)
@@ -1143,6 +1191,7 @@ mirrored into `sempai_fixtures` as local test inputs.[^7]
 - [ ] 1.1.1. Add `sempai_core`, `sempai`, and shared types.
 
   - Success criteria: `cargo doc -p sempai` builds with complete public docs.
+
 - [ ] 1.1.2. Define diagnostic codes and report formatting.
 
   - Success criteria: snapshot tests for diagnostic JSON output.
@@ -1153,6 +1202,7 @@ mirrored into `sempai_fixtures` as local test inputs.[^7]
 
   - Success criteria: schema-aligned deserialisation for rule metadata and
     query keys.[^1]
+
 - [ ] 1.2.2. Implement legacy and v2 parsing paths and normalization.
 
   - Success criteria: normalised formula output snapshots for paired legacy/v2
@@ -1164,6 +1214,7 @@ mirrored into `sempai_fixtures` as local test inputs.[^7]
 
   - Success criteria: precedence tests match the Semgrep binding power
     table.[^3]
+
 - [ ] 1.3.2. Implement error recovery with delimiter anchors.
 
   - Success criteria: snapshot tests show partial AST output on malformed
@@ -1176,6 +1227,7 @@ mirrored into `sempai_fixtures` as local test inputs.[^7]
 - [ ] 2.1.1. Implement Rust/Python/TypeScript/Go profiles and wrappers.
 
   - Success criteria: pattern snippet compilation succeeds for fixture corpus.
+
 - [ ] 2.1.2. Implement placeholder rewriting and IR extraction.
 
   - Success criteria: IR snapshots stable across fixture updates.
@@ -1185,9 +1237,11 @@ mirrored into `sempai_fixtures` as local test inputs.[^7]
 - [ ] 2.2.1. Implement node matching and metavariable binding.
 
   - Success criteria: captures unify across repeated `$X` occurrences.
+
 - [ ] 2.2.2. Implement `...` and `$...ARGS` list matching.
 
   - Success criteria: variadic argument matching passes Rust and TS fixtures.
+
 - [ ] 2.2.3. Implement deep ellipsis `<... ...>` with bounded traversal.
 
   - Success criteria: deep ellipsis fixtures pass with configured bounds.
@@ -1205,6 +1259,7 @@ mirrored into `sempai_fixtures` as local test inputs.[^7]
 - [ ] 3.1.1. Add a Sempai execution path in `weaverd` observe handlers.
 
   - Success criteria: daemon streams matches as JSONL for a local file.
+
 - [ ] 3.1.2. Integrate parse caching with Weaver’s document store.
 
   - Success criteria: repeated queries against unchanged files reuse cached
@@ -1215,22 +1270,20 @@ mirrored into `sempai_fixtures` as local test inputs.[^7]
 - [ ] 3.2.1. Add `weaver observe query --engine sempai`.
 
   - Success criteria: CLI can run both `--rule-file` and `--q` forms.
+
 - [ ] 3.2.2. Add `--engine treesitter` using the same response schema.
 
   - Success criteria: escape hatch exposed uniformly.
 
 ## References
 
-[^1]: `semgrep-rule-schema.yaml` (parser-aligned draft).
+\[^1\]: `semgrep-rule-schema.yaml` (parser-aligned draft).
 
-[^2]: `semgrep-query-language.ebnf` (parser-aligned practical EBNF).
+\[^2\]: `semgrep-query-language.ebnf` (parser-aligned practical EBNF).
 
-[^3]: `semgrep-operator-precedence.md` and `semgrep-legacy-vs-v2-guidance.md`.
+\[^3\]: `semgrep-operator-precedence.md` and `semgrep-legacy-vs-v2-guidance.md`.
 
-[^4]: `building-an-error-recovering-parser-with-chumsky.md`.
-
-[^5]: `pratt-parser-for-ddlog-expressions.md`.
-
-[^6]: `rust-parser-testing-comprehensive-guide.md`.
-
-[^7]: `semgrep-minimal-examples.md`.
+[^4]: %60building-an-error-recovering-parser-with-chumsky.md%60.
+[^5]: %60pratt-parser-for-ddlog-expressions.md%60.
+[^6]: %60rust-parser-testing-comprehensive-guide.md%60.
+[^7]: %60semgrep-minimal-examples.md%60.

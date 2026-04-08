@@ -58,14 +58,14 @@ It does not fully cover:
 
 ## Legacy versus v2 comparison
 
-| Topic                       | Legacy                                            | v2 (`match`)                           | Guidance                                |
+| Topic | Legacy | v2 (`match`) | Guidance |
 | --------------------------- | ------------------------------------------------- | -------------------------------------- | --------------------------------------- |
-| Search formula entry        | `pattern*` keys                                   | `match` object or string               | Prefer v2 for new rules                 |
-| Negation and context        | `pattern-not`, `pattern-inside`, and related keys | `not`, `inside`, `anywhere`            | v2 is clearer                           |
-| Conjunction and disjunction | `patterns`, `pattern-either`                      | `all`, `any`                           | v2 names align with formula AST         |
-| Decorators and attachments  | Scattered across legacy fields                    | `where`, `as`, `fix` on `match` object | Prefer v2                               |
-| Parser parity               | Broad historical coverage                         | Partial parity                         | Keep compatibility path as needed       |
-| Ecosystem compatibility     | Highest today                                     | Growing                                | Support both for broad interoperability |
+| Search formula entry | `pattern*` keys | `match` object or string | Prefer v2 for new rules |
+| Negation and context | `pattern-not`, `pattern-inside`, and related keys | `not`, `inside`, `anywhere` | v2 is clearer |
+| Conjunction and disjunction | `patterns`, `pattern-either` | `all`, `any` | v2 names align with formula AST |
+| Decorators and attachments | Scattered across legacy fields | `where`, `as`, `fix` on `match` object | Prefer v2 |
+| Parser parity | Broad historical coverage | Partial parity | Keep compatibility path as needed |
+| Ecosystem compatibility | Highest today | Growing | Support both for broad interoperability |
 
 _Table 1: Legacy and v2 comparison for parser and rule-authoring decisions._
 
@@ -84,10 +84,10 @@ rule corpus must be ingested.
 Implement both syntaxes and normalize to a shared formula AST:
 
 1. Parse v2 `match`.
-2. Parse legacy `pattern*` forms.
-3. Lower both to shared constructors such as `P`, `Not`, `Inside`, `Anywhere`,
+1. Parse legacy `pattern*` forms.
+1. Lower both to shared constructors such as `P`, `Not`, `Inside`, `Anywhere`,
    `And`, and `Or`.
-4. Apply shared semantic checks such as `InvalidNotInOr` and
+1. Apply shared semantic checks such as `InvalidNotInOr` and
    `MissingPositiveTermInAnd`.
 
 Use this option when interoperability with existing Semgrep rules is required.
@@ -97,10 +97,10 @@ Use this option when interoperability with existing Semgrep rules is required.
 The following pointers reference upstream Semgrep implementation files and line
 ranges at the time this guide was compiled.[^1][^2][^3][^4]
 
-[^1]: `src/parsing/Parse_rule.ml` — lines `648`, `1011`, and `1026`.
-[^2]: `src/parsing/Parse_rule_formula.ml` — lines `315`, `739`, and `954`.
-[^3]: `src/rule/Rule.ml` — line `63`.
-[^4]: <https://raw.githubusercontent.com/semgrep/semgrep-interfaces/7e509db48c700cae49fe0372e2aa0410fa86d867/rule_schema_v1.yaml>
+\[^1\]: `src/parsing/Parse_rule.ml` — lines `648`, `1011`, and `1026`.
+\[^2\]: `src/parsing/Parse_rule_formula.ml` — lines `315`, `739`, and `954`.
+\[^3\]: `src/rule/Rule.ml` — line `63`.
+\[^4\]: <https://raw.githubusercontent.com/semgrep/semgrep-interfaces/7e509db48c700cae49fe0372e2aa0410fa86d867/rule_schema_v1.yaml>
 
 ## Related documents in this repository
 

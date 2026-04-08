@@ -49,13 +49,13 @@ TypeScript, and the security sandbox—but there's more to come. Check out our
 
 Weaver is organised as a Cargo workspace with five crates:
 
-| Crate             | Description                                                      |
+| Crate | Description |
 | ----------------- | ---------------------------------------------------------------- |
-| `weaver-cli`      | Thin CLI client that serialises commands into JSONL              |
-| `weaverd`         | Daemon broker that orchestrates backends and verifies operations |
-| `weaver-config`   | Shared configuration management via `ortho-config`               |
-| `weaver-lsp-host` | Language Server Protocol host with capability detection          |
-| `weaver-sandbox`  | Security sandbox wrapper around `birdcage`                       |
+| `weaver-cli` | Thin CLI client that serialises commands into JSONL |
+| `weaverd` | Daemon broker that orchestrates backends and verifies operations |
+| `weaver-config` | Shared configuration management via `ortho-config` |
+| `weaver-lsp-host` | Language Server Protocol host with capability detection |
+| `weaver-sandbox` | Security sandbox wrapper around `birdcage` |
 
 ## Getting started
 

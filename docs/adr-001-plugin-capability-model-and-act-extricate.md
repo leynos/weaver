@@ -91,13 +91,13 @@ build and lint pass.
 
 Move the symbol and keep a re-export at the original location by default.
 
-| Topic                       | Option A              | Option B | Option C | Option D      | Option E      |
+| Topic | Option A | Option B | Option C | Option D | Option E |
 | --------------------------- | --------------------- | -------- | -------- | ------------- | ------------- |
-| Meaning preservation        | High, explicit checks | Medium   | Low      | Low to medium | Medium        |
-| Determinism                 | High                  | Medium   | Medium   | Low           | High          |
-| Implementation complexity   | Medium to high        | Medium   | High     | Low           | Low           |
-| User-facing simplicity      | High                  | High     | High     | Medium        | Medium        |
-| Long-term architectural fit | High                  | Medium   | Low      | Low           | Low to medium |
+| Meaning preservation | High, explicit checks | Medium | Low | Low to medium | Medium |
+| Determinism | High | Medium | Medium | Low | High |
+| Implementation complexity | Medium to high | Medium | High | Low | Low |
+| User-facing simplicity | High | High | High | Medium | Medium |
+| Long-term architectural fit | High | Medium | Low | Low | Low to medium |
 
 _Table 1: Comparison of candidate approaches for `act extricate`._
 
@@ -153,16 +153,16 @@ This split keeps architecture and implementation aligned:
    - Extend plugin manifest schema with capability declarations.
    - Add resolver logic for language and capability selection.
    - Expose capability discovery output.
-2. Python provider rollout
+1. Python provider rollout
    - Extend Rope plugin with `extricate-symbol` handling.
    - Map `uri`, `position`, and `to` arguments to Rope move operations.
    - Emit unified diffs compatible with existing patch apply flow.
-3. Rust provider rollout
+1. Rust provider rollout
    - Add built-in extrication orchestration and overlay edit planning.
    - Integrate LSP requests for definition, references, and code actions.
    - Integrate rust-analyzer extension requests where available.
    - Add meaning-preservation verification before final commit.
-4. Hardening and expansion
+1. Hardening and expansion
    - Add behavioural and end-to-end tests for Python and Rust.
    - Add diagnostics and explanation output for capability resolution.
    - Expand additional capabilities incrementally behind the same model.

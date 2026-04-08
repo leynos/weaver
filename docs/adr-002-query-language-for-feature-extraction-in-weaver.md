@@ -89,10 +89,10 @@ heavier than required for Weaver's near-term feature extraction goals.
 
 | Option | Ergonomics | Integration fit | Semantic scope | Operational cost |
 | ------ | ---------- | --------------- | -------------- | ---------------- |
-| A      | Low        | High            | Medium         | Low              |
-| B      | High       | High            | Medium         | Medium           |
-| C      | High       | Medium          | Medium         | Low              |
-| D      | Medium     | Low             | High           | High             |
+| A | Low | High | Medium | Low |
+| B | High | High | Medium | Medium |
+| C | High | Medium | Medium | Low |
+| D | Medium | Low | High | High |
 
 _Table 1: High-level trade-offs across candidate query approaches._
 
@@ -121,10 +121,10 @@ cases that need grammar-level precision beyond the Semgrep-style subset.
 ## Migration plan
 
 1. Define the Semgrep-style subset grammar and AST in `weaver-syntax` docs.
-2. Implement parsing and normalization to Weaver internal query operators.
-3. Add execution over Tree-sitter-backed structures with capture support.
-4. Add conformance tests for mandatory language constructs.
-5. Provide explicit diagnostics for unsupported features with escape-hatch
+1. Implement parsing and normalization to Weaver internal query operators.
+1. Add execution over Tree-sitter-backed structures with capture support.
+1. Add conformance tests for mandatory language constructs.
+1. Provide explicit diagnostics for unsupported features with escape-hatch
    guidance to direct Tree-sitter queries.
 
 ## Known risks and limitations

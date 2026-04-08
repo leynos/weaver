@@ -1,7 +1,5 @@
 //! Tests for the `Engine` and `QueryPlan` types.
 
-#![expect(clippy::indexing_slicing, reason = "tests panic on out-of-bounds")]
-
 use crate::engine::QueryPlan;
 use crate::{
     Diagnostic, DiagnosticCode, DiagnosticReport, Engine, EngineConfig, EngineLimits, Language,
@@ -60,9 +58,9 @@ fn compile_yaml_returns_success_for_valid_search_rule() {
         "rules:\n  - id: demo.rule\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n",
     );
     let plans = result.expect("should compile successfully");
-    assert_eq!(plans.len(), 1);
-    assert_eq!(plans[0].rule_id(), "demo.rule");
-    assert_eq!(plans[0].language(), Language::Rust);
+    let plan = plans.first().expect("expected a single plan");
+    assert_eq!(plan.rule_id(), "demo.rule");
+    assert_eq!(plan.language(), Language::Rust);
 }
 
 #[test]
@@ -82,8 +80,8 @@ fn compile_yaml_succeeds_for_project_depends_on_search_rule() {
         "      package: requests\n",
     ));
     let plans = result.expect("should compile successfully");
-    assert_eq!(plans.len(), 1);
-    assert_eq!(plans[0].rule_id(), "demo.depends");
+    let plan = plans.first().expect("expected a single plan");
+    assert_eq!(plan.rule_id(), "demo.depends");
 }
 
 fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str) {

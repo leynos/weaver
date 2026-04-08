@@ -39,37 +39,37 @@ Observable behaviour after this change:
 
 1. **No async runtime.** The entire project uses synchronous blocking I/O.
    All new code must remain synchronous.
-2. **Edition 2024, Rust 1.85+.** The workspace uses `edition = "2024"` and
+1. **Edition 2024, Rust 1.85+.** The workspace uses `edition = "2024"` and
    `rust-version = "1.85"`.
-3. **Strict Clippy.** Over 60 denied lint categories including `unwrap_used`,
+1. **Strict Clippy.** Over 60 denied lint categories including `unwrap_used`,
    `expect_used`, `indexing_slicing`, `string_slice`, `missing_docs`,
    `cognitive_complexity`, `self_named_module_files`, and `allow_attributes`.
    The `weaver-plugins` crate opts into workspace lints via
    `[lints] workspace = true`. All code must pass
    `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
-4. **400-line file limit.** No single source file may exceed 400 lines.
-5. **Error handling.** Library crates use `thiserror`-derived error enums.
+1. **400-line file limit.** No single source file may exceed 400 lines.
+1. **Error handling.** Library crates use `thiserror`-derived error enums.
    No `eyre` or `anyhow` in library code. Large errors use `Arc` to satisfy
    `result_large_err`.
-6. **Documentation.** Every module begins with `//!` doc comments. All
+1. **Documentation.** Every module begins with `//!` doc comments. All
    public items have `///` rustdoc comments with examples where non-trivial.
-7. **en-GB-oxendict spelling.** Comments and documentation use British English
+1. **en-GB-oxendict spelling.** Comments and documentation use British English
    with Oxford "-ize" / "-yse" / "-our" spelling.
-8. **rstest-bdd v0.5.0.** BDD tests use v0.5.0 with mutable world fixtures
+1. **rstest-bdd v0.5.0.** BDD tests use v0.5.0 with mutable world fixtures
    (`&mut`) instead of `RefCell`.
-9. **Caret version requirements.** New dependencies must use caret
+1. **Caret version requirements.** New dependencies must use caret
    requirements and be declared in `[workspace.dependencies]` when shared.
-10. **Lint suppressions must use `#[expect]` with reason**, not `#[allow]`.
-11. **Existing public API stability.** All existing public types in
-    `weaver-plugins` (`PluginRequest`, `PluginResponse`, `PluginOutput`,
-    `PluginManifest`, `PluginKind`, `PluginError`, etc.) must retain their
-    current public API signatures. New fields on serializable structs must
-    use `#[serde(default)]` for backwards compatibility.
-12. **Scope boundary.** This plan defines the contract types, validation
-    functions, and manifest extension only. It does not wire capability
-    routing into `weaverd` dispatch (that is roadmap item 5.2.4), nor does
-    it modify the rope or rust-analyzer plugin crates (those are 5.2.2 and
-    5.2.3).
+1. **Lint suppressions must use `#[expect]` with reason**, not `#[allow]`.
+1. **Existing public API stability.** All existing public types in
+   `weaver-plugins` (`PluginRequest`, `PluginResponse`, `PluginOutput`,
+   `PluginManifest`, `PluginKind`, `PluginError`, etc.) must retain their
+   current public API signatures. New fields on serializable structs must
+   use `#[serde(default)]` for backwards compatibility.
+1. **Scope boundary.** This plan defines the contract types, validation
+   functions, and manifest extension only. It does not wire capability
+   routing into `weaverd` dispatch (that is roadmap item 5.2.4), nor does
+   it modify the rope or rust-analyzer plugin crates (those are 5.2.2 and
+   5.2.3).
 
 ## Tolerances (exception triggers)
 
@@ -201,13 +201,13 @@ All acceptance criteria are met:
    current `rename-symbol` contract version. `is_compatible_with()` enforces
    same-major-version compatibility.
 
-2. **Broker validation enforces schema shape.** `RenameSymbolContract`
+1. **Broker validation enforces schema shape.** `RenameSymbolContract`
    implements `CapabilityContract` with `validate_request()` (checks `uri`,
    `position`, `new_name` fields) and `validate_response()` (checks successful
    responses contain `PluginOutput::Diff`). Unit and BDD tests cover happy and
    unhappy paths.
 
-3. **Refusal diagnostics use stable reason codes.** `ReasonCode` enum with 7
+1. **Refusal diagnostics use stable reason codes.** `ReasonCode` enum with 7
    variants is serialized as `snake_case` strings. The optional `reason_code`
    field on `PluginDiagnostic` is backwards-compatible via `serde(default)`.
 
@@ -298,18 +298,18 @@ Create the `capability/` module directory with four files:
    `CapabilityContract` trait defining the validation interface. Re-exports for
    public API.
 
-2. `crates/weaver-plugins/src/capability/rename_symbol.rs` — Module-level
+1. `crates/weaver-plugins/src/capability/rename_symbol.rs` — Module-level
    doc comment for the rename-symbol contract. `RenameSymbolRequest` struct
    defining the typed request shape with `extract()` method that validates the
    untyped arguments HashMap. `RenameSymbolContract` struct implementing
    `CapabilityContract`. `RENAME_SYMBOL_CONTRACT_VERSION` constant. Validation
    logic for request and response.
 
-3. `crates/weaver-plugins/src/capability/reason_code.rs` — Module-level doc
+1. `crates/weaver-plugins/src/capability/reason_code.rs` — Module-level doc
    comment for refusal reason codes. `ReasonCode` enum with seven stable codes
    serialized as snake_case strings.
 
-4. `crates/weaver-plugins/src/capability/tests.rs` — Unit tests covering
+1. `crates/weaver-plugins/src/capability/tests.rs` — Unit tests covering
    serde round-trips, validation happy/unhappy paths, version compatibility,
    and reason code serialization.
 
@@ -387,12 +387,12 @@ Acceptance criteria from the roadmap:
    `ContractVersion::new(1, 0)`. Unit test verifies the version value.
    `ContractVersion::is_compatible_with()` enables negotiation.
 
-2. **Broker validation enforces schema shape:** The `validate_request()`
+1. **Broker validation enforces schema shape:** The `validate_request()`
    and `validate_response()` methods on `RenameSymbolContract` check field
    presence, types, and output variant. Unit and BDD tests exercise both happy
    and unhappy paths.
 
-3. **Refusal diagnostics use stable reason codes:** The `ReasonCode` enum
+1. **Refusal diagnostics use stable reason codes:** The `ReasonCode` enum
    provides seven stable codes serialized as snake_case strings. The
    `PluginDiagnostic::with_reason_code()` builder attaches a code to a
    diagnostic. BDD scenarios verify round-trip serialization.
@@ -411,16 +411,16 @@ deleted or renamed.
 Table: Line-budget projection for files modified by the rename-symbol
 capability.
 
-| File                          | Current lines | Planned additions | Projected total |
+| File | Current lines | Planned additions | Projected total |
 | ----------------------------- | ------------- | ----------------- | --------------- |
-| `protocol/mod.rs`             | 254           | +20               | 274             |
-| `manifest/mod.rs`             | 240           | +20               | 260             |
-| `registry/mod.rs`             | 112           | +20               | 132             |
-| `error/mod.rs`                | 112           | 0                 | 112             |
-| `lib.rs`                      | 60            | +10               | 70              |
-| `capability/mod.rs`           | 0 (new)       | ~120              | 120             |
-| `capability/rename_symbol.rs` | 0 (new)       | ~150              | 150             |
-| `capability/reason_code.rs`   | 0 (new)       | ~80               | 80              |
+| `protocol/mod.rs` | 254 | +20 | 274 |
+| `manifest/mod.rs` | 240 | +20 | 260 |
+| `registry/mod.rs` | 112 | +20 | 132 |
+| `error/mod.rs` | 112 | 0 | 112 |
+| `lib.rs` | 60 | +10 | 70 |
+| `capability/mod.rs` | 0 (new) | ~120 | 120 |
+| `capability/rename_symbol.rs` | 0 (new) | ~150 | 150 |
+| `capability/reason_code.rs` | 0 (new) | ~80 | 80 |
 
 All files remain well within the 400-line limit.
 

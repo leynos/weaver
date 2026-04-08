@@ -2,12 +2,12 @@
 
 ## Metadata
 
-| Field             | Value                                |
+| Field | Value |
 | ----------------- | ------------------------------------ |
-| **Status**        | Complete                             |
-| **Created**       | 2026-01-21                           |
-| **Target**        | Phase 1 Minimum Viable Product (MVP) |
-| **Roadmap Entry** | `docs/roadmap.md` line 79-87         |
+| **Status** | Complete |
+| **Created** | 2026-01-21 |
+| **Target** | Phase 1 Minimum Viable Product (MVP) |
+| **Roadmap Entry** | `docs/roadmap.md` line 79-87 |
 
 ## Big Picture
 
@@ -20,22 +20,22 @@ with production-ready adapters.
 ## Constraints
 
 1. **Must implement `Send`**: Required by `LanguageServer` trait bound
-2. **Synchronous interface**: All trait methods block on process input/output
+1. **Synchronous interface**: All trait methods block on process input/output
    (I/O)
-3. **Single initialization**: `initialize()` called once per language, result
+1. **Single initialization**: `initialize()` called once per language, result
    cached by `LspHost`
-4. **Graceful degradation**: Missing binaries produce clear diagnostic errors,
+1. **Graceful degradation**: Missing binaries produce clear diagnostic errors,
    not crashes
-5. **Zero-trust sandbox**: Language servers execute in restricted sandbox
+1. **Zero-trust sandbox**: Language servers execute in restricted sandbox
    (future integration)
 
 ## Acceptance Criteria
 
 1. `SemanticBackendProvider::start_backend()` registers adapters for configured
    languages
-2. Adapters spawn server processes and communicate via stdio
-3. Server shutdown is handled gracefully on daemon stop
-4. Missing server binaries produce clear diagnostic errors
+1. Adapters spawn server processes and communicate via stdio
+1. Server shutdown is handled gracefully on daemon stop
+1. Missing server binaries produce clear diagnostic errors
 
 ## Implementation Tasks
 
@@ -167,13 +167,13 @@ All must pass before committing.
 
 ## Critical Files
 
-| File                                                            | Purpose                           |
+| File | Purpose |
 | --------------------------------------------------------------- | --------------------------------- |
-| `crates/weaver-lsp-host/src/server.rs`                          | `LanguageServer` trait definition |
-| `crates/weaver-lsp-host/src/adapter/process.rs`                 | Main adapter implementation       |
-| `crates/weaverd/src/semantic_provider/mod.rs`                   | Integration point                 |
-| `crates/weaver-lsp-host/tests/features/process_adapter.feature` | BDD scenarios                     |
-| `docs/users-guide.md`                                           | User documentation                |
+| `crates/weaver-lsp-host/src/server.rs` | `LanguageServer` trait definition |
+| `crates/weaver-lsp-host/src/adapter/process.rs` | Main adapter implementation |
+| `crates/weaverd/src/semantic_provider/mod.rs` | Integration point |
+| `crates/weaver-lsp-host/tests/features/process_adapter.feature` | BDD scenarios |
+| `docs/users-guide.md` | User documentation |
 
 ## Design Decisions
 
@@ -222,17 +222,17 @@ infrastructure. Pull model is simpler and sufficient for MVP.
 
 ## Risks and Mitigations
 
-| Risk                          | Mitigation                                              |
+| Risk | Mitigation |
 | ----------------------------- | ------------------------------------------------------- |
-| Language server not installed | Clear error message with installation hint              |
-| Server crashes mid-session    | `ProcessExited` error propagates; daemon remains stable |
-| Slow server initialization    | Configurable timeout; default 30s                       |
-| JSON-RPC protocol mismatch    | Comprehensive unit tests for codec                      |
+| Language server not installed | Clear error message with installation hint |
+| Server crashes mid-session | `ProcessExited` error propagates; daemon remains stable |
+| Slow server initialization | Configurable timeout; default 30s |
+| JSON-RPC protocol mismatch | Comprehensive unit tests for codec |
 
 ## Progress Log
 
-| Date       | Update                                                                                                                                                                                                                      |
+| Date | Update |
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-01-21 | Plan created                                                                                                                                                                                                                |
-| 2026-01-21 | Implementation started                                                                                                                                                                                                      |
+| 2026-01-21 | Plan created |
+| 2026-01-21 | Implementation started |
 | 2026-01-21 | All tasks complete: adapter module with error types, JSON-RPC codec, transport, config, ProcessLanguageServer; integrated with SemanticBackendProvider; BDD tests added; documentation and roadmap updated; all checks pass |

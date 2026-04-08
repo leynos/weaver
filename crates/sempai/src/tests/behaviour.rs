@@ -46,7 +46,7 @@ fn when_compile_yaml(world: &mut TestWorld, yaml: QuotedString) {
 fn when_compile_dsl(world: &mut TestWorld, dsl: QuotedString, lang: QuotedString) {
     let engine = world.engine.as_ref().expect("engine should be set");
     let language: Language = lang.as_str().parse().expect("valid language name");
-    // For DSL compilation, we store an empty vec on success since there's no QueryPlan vec
+    // For DSL compilation, we wrap the single QueryPlan in a vec to match the compile_yaml result type
     world.compile_result = Some(
         engine
             .compile_dsl("interactive", language, dsl.as_str())

@@ -510,8 +510,8 @@ Acceptance is satisfied when all of the following are true:
   formulas,
 - `pattern-either` / `any` with direct negation fails deterministically with a
   stable semantic diagnostic,
-- `patterns` / `all` with no positive terms fails deterministically unless the
-  accepted metavariable-pattern exception applies,
+- `patterns` / `all` with no positive terms fails deterministically (the
+  metavariable-pattern exception is deferred to a future milestone),
 - `pattern-not-regex` and `pattern-not-inside` lower deterministically into the
   canonical model,
 - `sempai::Engine::compile_yaml` succeeds for valid search-mode YAML and
@@ -560,7 +560,7 @@ In `crates/sempai-core/src/formula.rs`, define the canonical model:
 
 ```rust
 pub enum Formula {
-    Atom(FormulaAtom),
+    Atom(Atom),
     Not(Box<DecoratedFormula>),
     Inside(Box<DecoratedFormula>),
     Anywhere(Box<DecoratedFormula>),
@@ -568,7 +568,7 @@ pub enum Formula {
     Or(Vec<DecoratedFormula>),
 }
 
-pub enum FormulaAtom {
+pub enum Atom {
     Pattern(String),
     Regex(String),
 }

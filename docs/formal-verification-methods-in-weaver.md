@@ -13,9 +13,9 @@ That structure points to a narrow and practical verification plan:
 
 1. Use **Kani** for small, deterministic kernels in `weaverd`,
    `weaver-plugins`, and, later, `weaver-graph` and Sempai.
-2. Use **Verus** only for a very small proof-oriented kernel after the
+1. Use **Verus** only for a very small proof-oriented kernel after the
    transaction and routing contracts stop moving.
-3. Keep ordinary testing, behaviour-driven development (BDD), snapshot tests,
+1. Keep ordinary testing, behaviour-driven development (BDD), snapshot tests,
    end-to-end tests, and property-based testing for anything that depends on
    external tools or broad behavioural coverage.[^4][^5]
 
@@ -90,10 +90,10 @@ That is an excellent Kani target because it is a finite state machine with
 explicit success and failure modes. The first harnesses should check:
 
 1. commit is unreachable unless both locks pass,
-2. syntactic failure and semantic failure are terminal non-committing states,
-3. prepare, commit, and rollback preserve the expected file set for bounded
+1. syntactic failure and semantic failure are terminal non-committing states,
+1. prepare, commit, and rollback preserve the expected file set for bounded
    create, modify, and delete traces, and
-4. lock failure never performs a filesystem write in the verified model.[^6]
+1. lock failure never performs a filesystem write in the verified model.[^6]
 
 ### `act apply-patch`
 
@@ -109,10 +109,10 @@ safety-critical route through `ContentTransaction` before commit.[^5]
 The first practical harnesses should check:
 
 1. ordered `SEARCH`/`REPLACE` blocks never match behind the cursor,
-2. failure of any unmatched block aborts the whole command,
-3. exact and normalized-fuzzy matching agree on bounded equivalence classes,
-4. path normalization never returns a path outside the workspace root, and
-5. no lock outcome can commit a partially prepared patch set.[^5][^6]
+1. failure of any unmatched block aborts the whole command,
+1. exact and normalized-fuzzy matching agree on bounded equivalence classes,
+1. path normalization never returns a path outside the workspace root, and
+1. no lock outcome can commit a partially prepared patch set.[^5][^6]
 
 ### Capability routing and refusal diagnostics
 
@@ -132,10 +132,10 @@ deterministic refusal diagnostics and rollback guarantees
 The first Kani obligations in this area should cover:
 
 1. manifest-schema helper invariants,
-2. language and capability compatibility checks,
-3. "selected provider must advertise the requested capability" properties,
-4. deterministic refusal-code enumeration, and
-5. refusal-or-commit state machines for plugin output that re-enters the
+1. language and capability compatibility checks,
+1. "selected provider must advertise the requested capability" properties,
+1. deterministic refusal-code enumeration, and
+1. refusal-or-commit state machines for plugin output that re-enters the
    safety harness.[^16]
 
 ### Later graph and matching guardrails
@@ -271,8 +271,8 @@ The Continuous Integration (CI) pipeline should keep the current `build-test`
 job intact and add new jobs in stages:
 
 1. `kani-smoke` on every pull request (PR) once the first smoke harnesses land,
-2. `verus-proofs` only after the first proof set stabilizes, and
-3. a scheduled or manually dispatched slow suite for `kani-full` and the Verus
+1. `verus-proofs` only after the first proof set stabilizes, and
+1. a scheduled or manually dispatched slow suite for `kani-full` and the Verus
    proofs.[^10]
 
 The installation flow should stay reproducible and pinned. Kani supports a
@@ -299,137 +299,142 @@ That layering keeps the assurance story honest and maintainable.
 ## Implementation sequence
 
 - [ ] 1.0. Phase 1: infrastructure
+
   - [ ] 1.0.1. Add pinned verifier version files and install scripts for Kani
-        and Verus. Requires none.
+    and Verus. Requires none.
     - [ ] Add `tools/kani/VERSION`.
     - [ ] Add `tools/verus/VERSION` and `tools/verus/SHA256SUMS`.
     - [ ] Add `scripts/install-kani.sh`, `scripts/install-verus.sh`, and
-          `scripts/run-verus.sh`.
+      `scripts/run-verus.sh`.
     - [ ] Acceptance criteria: local installs are reproducible from pinned
-          versions, scripts fail fast on version or checksum mismatch, and the
-          normal Rust toolchain workflow remains unchanged unless a formal
-          target is invoked.
+      versions, scripts fail fast on version or checksum mismatch, and the
+      normal Rust toolchain workflow remains unchanged unless a formal
+      target is invoked.
   - [ ] 1.0.2. Add explicit `make kani`, `make kani-full`, `make verus`,
-        `make formal-pr`, and `make formal-nightly` targets. Requires 1.0.1.
+    `make formal-pr`, and `make formal-nightly` targets. Requires 1.0.1.
     - [ ] Keep the Kani smoke harness list explicit rather than scan-based.
     - [ ] Keep Verus execution outside Cargo through
-          `scripts/run-verus.sh`.
+      `scripts/run-verus.sh`.
     - [ ] Acceptance criteria: `make kani` runs only smoke harnesses,
-          `make kani-full` runs all checked-in Kani harnesses, `make verus`
-          executes the proof entrypoint, and the new targets are documented in
-          the `Makefile`.
+      `make kani-full` runs all checked-in Kani harnesses, `make verus`
+      executes the proof entrypoint, and the new targets are documented in
+      the `Makefile`.
   - [ ] 1.0.3. Add staged CI jobs for formal verification. Requires 1.0.2.
     - [ ] Add `kani-smoke` to pull-request validation after the first smoke
-          harnesses land.
+      harnesses land.
     - [ ] Add `verus-proofs` as manual or nightly validation first, then
-          promote only if the proof set remains stable.
+      promote only if the proof set remains stable.
     - [ ] Acceptance criteria: the existing `build-test` job remains intact,
-          formal jobs install their own tools, and slow proof suites are
-          isolated from the default pull-request path.
+      formal jobs install their own tools, and slow proof suites are
+      isolated from the default pull-request path.
 
 - [ ] 2.0. Phase 2: high-value Kani harnesses
+
   - [ ] 2.0.1. Add `#[cfg(kani)]` harnesses in
-        `crates/weaverd/src/safety_harness/`. Requires 1.0.2 and 1.0.3.
+    `crates/weaverd/src/safety_harness/`. Requires 1.0.2 and 1.0.3.
     - [ ] Prove commit is reachable only when both locks pass.
     - [ ] Prove lock-failure and backend-unavailable states are
-          non-committing.
+      non-committing.
     - [ ] Acceptance criteria: `make kani` executes at least two transaction
-          smoke harnesses, and counterexamples are reproducible through the
-          documented target.
+      smoke harnesses, and counterexamples are reproducible through the
+      documented target.
   - [ ] 2.0.2. Add `#[cfg(kani)]` harnesses in
-        `crates/weaverd/src/dispatch/act/apply_patch/`. Requires 2.0.1 and
-        6.1.4.
+    `crates/weaverd/src/dispatch/act/apply_patch/`. Requires 2.0.1 and
+    6.1.4.
     - [ ] Cover cursor monotonicity for ordered `SEARCH`/`REPLACE` blocks.
     - [ ] Cover whole-command abort on unmatched blocks.
     - [ ] Cover path normalization rejecting absolute and parent-escape
-          paths.
+      paths.
     - [ ] Acceptance criteria: `make kani` includes at least three apply-patch
-          smoke harnesses, and the checked properties map directly to the
-          documented patch contract.
+      smoke harnesses, and the checked properties map directly to the
+      documented patch contract.
   - [ ] 2.0.3. Add `#[cfg(kani)]` harnesses in `crates/weaver-plugins/src/`
-        for capability resolution. Requires 1.0.2, 1.0.3, and 5.3.2.
+    for capability resolution. Requires 1.0.2, 1.0.3, and 5.3.2.
     - [ ] Prove the selected provider satisfies the requested language and
-          capability.
+      capability.
     - [ ] Prove refusal is deterministic when no compatible provider exists.
     - [ ] Acceptance criteria: one smoke harness per capability-routing
-          invariant and refusal path exists over bounded routing tables.
+      invariant and refusal path exists over bounded routing tables.
   - [ ] 2.0.4. Add property-based tests around path normalization,
-        refusal-code stability, and bounded routing tables. Requires 2.0.2 and
-        2.0.3.
+    refusal-code stability, and bounded routing tables. Requires 2.0.2 and
+    2.0.3.
     - [ ] Acceptance criteria: the generated suite covers the documented
-          helper functions and is run in CI with the existing unit and BDD
-          tests.
+      helper functions and is run in CI with the existing unit and BDD
+      tests.
 
 - [ ] 3.0. Phase 3: contract clarification
+
   - [ ] 3.0.1. State filesystem and rollback assumptions explicitly in the
-        docs. Requires 2.0.1.
+    docs. Requires 2.0.1.
     - [ ] Document what "all changes applied or original state restored" means
-          under normal filesystem assumptions.
+      under normal filesystem assumptions.
     - [ ] Acceptance criteria: the design document and user's guide use the
-          same atomicity contract, and the reviewed wording names the modelled
-          filesystem assumptions.
+      same atomicity contract, and the reviewed wording names the modelled
+      filesystem assumptions.
   - [ ] 3.0.2. Define semantic-lock failure precisely. Requires 3.0.1.
     - [ ] Specify severity handling, provider normalization, baseline scope,
-          and backend-unavailable semantics.
+      and backend-unavailable semantics.
     - [ ] Acceptance criteria: the docs cite one canonical semantic-lock
-          definition, and the harness comments can refer to it without
-          inference.
+      definition, and the harness comments can refer to it without
+      inference.
   - [ ] 3.0.3. Define the trust boundary between verified orchestration and
-        trusted external tools [ADR 005](adr-005-verification-trust-boundary.md).
-        Requires 3.0.2.
+    trusted external tools [ADR 005](adr-005-verification-trust-boundary.md).
+    Requires 3.0.2.
     - [ ] Enumerate the verified kernel and unverified dependencies.
     - [ ] Acceptance criteria: the docs explicitly classify at least five
-          trust-boundary components and avoid claiming semantic correctness of
-          third-party tools.
+      trust-boundary components and avoid claiming semantic correctness of
+      third-party tools.
 
 - [ ] 4.0. Phase 4: small Verus kernel
+
   - [ ] 4.0.1. Create `verus/weaver_proofs.rs`. Requires 3.0.3 and 1.0.2.
     - [ ] Add `transaction_kernel.rs`, `capability_routing.rs`, and
-          `apply_patch_paths.rs`.
+      `apply_patch_paths.rs`.
     - [ ] Acceptance criteria: `make verus` executes the proof entrypoint, the
-          proof modules stay outside Cargo, and the initial proof tree contains
-          at least three proof modules.
+      proof modules stay outside Cargo, and the initial proof tree contains
+      at least three proof modules.
   - [ ] 4.0.2. Prove the transaction-gating model
-        [ADR 005](adr-005-verification-trust-boundary.md). Requires 4.0.1 and
-        3.0.1.
+    [ADR 005](adr-005-verification-trust-boundary.md). Requires 4.0.1 and
+    3.0.1.
     - [ ] Prove commit requires both locks.
     - [ ] Prove rollback restoration over a modelled workspace map.
     - [ ] Acceptance criteria: at least two lemmas are machine-checked and
-          named in the proof module, and the proof script documents the model
-          assumptions.
+      named in the proof module, and the proof script documents the model
+      assumptions.
   - [ ] 4.0.3. Prove capability-resolution soundness over an abstract
-        resolver [ADR 001](adr-001-plugin-capability-model-and-act-extricate.md)
-        [ADR 004](adr-004-plugin-routing-refusal-semantics.md). Requires 4.0.1
-        and 3.0.3.
+    resolver [ADR 001](adr-001-plugin-capability-model-and-act-extricate.md)
+    [ADR 004](adr-004-plugin-routing-refusal-semantics.md). Requires 4.0.1
+    and 3.0.3.
     - [ ] Successful resolution satisfies language, capability, and policy
-          predicates.
+      predicates.
     - [ ] Refusal occurs instead of silent fallback when no provider qualifies.
     - [ ] Acceptance criteria: proof obligations cover the routing and refusal
-          invariants named in the linked ADRs, and the proof module contains at
-          least one lemma for each invariant class.
+      invariants named in the linked ADRs, and the proof module contains at
+      least one lemma for each invariant class.
 
 - [ ] 5.0. Phase 5: later expansion
+
   - [ ] 5.0.1. Add Kani harnesses for graph-slice budgets after `7.2.5` lands.
-        Requires 7.2.5 and 2.0.4.
+    Requires 7.2.5 and 2.0.4.
     - [ ] Prove counters do not exceed accepted-card, edge, and token-budget
-          caps on small graphs.
+      caps on small graphs.
     - [ ] Acceptance criteria: smoke and full harnesses cover graph budgets
-          separately from transaction suites, and the resulting checks run in
-          `kani-full` rather than `kani`.
+      separately from transaction suites, and the resulting checks run in
+      `kani-full` rather than `kani`.
   - [ ] 5.0.2. Add Kani harnesses for `max_duplicates` and assignment
-        injectivity after `7.4.8` and `7.4.9` land. Requires 7.4.8, 7.4.9, and
-        2.0.4.
+    injectivity after `7.4.8` and `7.4.9` land. Requires 7.4.8, 7.4.9, and
+    2.0.4.
     - [ ] Prove injective assignments by default and many-to-one only under
-          explicit split/merge modes.
+      explicit split/merge modes.
     - [ ] Acceptance criteria: bounded matching harnesses exist for
-          duplicate-name and injectivity guardrails, and the default suite
-          fails if either guardrail regresses.
+      duplicate-name and injectivity guardrails, and the default suite
+      fails if either guardrail regresses.
   - [ ] 5.0.3. Add Kani harnesses for Sempai semantic constraints once the
-        planned parser/backend crates exist. Requires 4.0.2 and 4.0.3.
+    planned parser/backend crates exist. Requires 4.0.2 and 4.0.3.
     - [ ] Cover deterministic matcher and normalization kernels.
     - [ ] Acceptance criteria: harnesses or property tests cover the kernels
-          without verifying external parser/runtime dependencies wholesale, and
-          the first proof targets are stable enough for CI review.
+      without verifying external parser/runtime dependencies wholesale, and
+      the first proof targets are stable enough for CI review.
 
 ## Final recommendation
 
@@ -449,39 +454,39 @@ current contracts can support.
 
 ## References
 
-[^1]: Weaver design document, safety harness and transaction model:
-  <https://github.com/leynos/weaver/blob/main/docs/weaver-design.md>
-[^2]: Weaver user's guide, two-phase verification:
-  <https://github.com/leynos/weaver/blob/main/docs/users-guide.md>
-[^3]: Weaver roadmap, safety harness and atomic transaction tasks:
-  <https://github.com/leynos/weaver/blob/main/docs/roadmap.md>
-[^4]: Weaver design document, testing conventions and behavioural tests:
-  <https://github.com/leynos/weaver/blob/main/docs/weaver-design.md>
-[^5]: Weaver design document, `act apply-patch` and plugin orchestration:
-  <https://github.com/leynos/weaver/blob/main/docs/weaver-design.md>
-[^6]: Kani overview, first steps, and limitations:
-  <https://model-checking.github.io/kani/>
-[^7]: Weaver root `Cargo.toml`:
-  <https://github.com/leynos/weaver/blob/main/Cargo.toml>
-[^8]: Weaver repository layout:
-  <https://github.com/leynos/weaver/blob/main/docs/repository-layout.md>
-[^9]: Weaver `Makefile`:
-  <https://github.com/leynos/weaver/blob/main/Makefile>
-[^10]: Weaver Continuous Integration workflow:
-  <https://github.com/leynos/weaver/blob/main/.github/workflows/ci.yml>
-[^11]: Sempai query-language design and testing strategy:
-  <https://github.com/leynos/weaver/blob/main/docs/sempai-query-language-design.md>
-[^12]: Jacquard graph and matching design guidance:
-  <https://github.com/leynos/weaver/blob/main/docs/jacquard-card-first-symbol-graph-design.md>
-[^13]: Verus guide:
-  <https://verus-lang.github.io/verus/guide/>
-[^14]: Verus installation instructions:
-  <https://github.com/verus-lang/verus/blob/main/INSTALL.md>
-[^15]: Weaver roadmap, `act apply-patch` requirements:
-  <https://github.com/leynos/weaver/blob/main/docs/roadmap.md>
-[^16]: Weaver roadmap and design document, plugin routing and refusal
-  diagnostics: <https://github.com/leynos/weaver/blob/main/docs/roadmap.md>
-[^17]: Weaver roadmap, graph-slice budget tasks:
-  <https://github.com/leynos/weaver/blob/main/docs/roadmap.md>
-[^18]: Weaver roadmap, matching guardrail tasks:
-  <https://github.com/leynos/weaver/blob/main/docs/roadmap.md>
+\[^1\]: Weaver design document, safety harness and transaction model:
+<https://github.com/leynos/weaver/blob/main/docs/weaver-design.md>
+\[^2\]: Weaver user's guide, two-phase verification:
+<https://github.com/leynos/weaver/blob/main/docs/users-guide.md>
+\[^3\]: Weaver roadmap, safety harness and atomic transaction tasks:
+<https://github.com/leynos/weaver/blob/main/docs/roadmap.md>
+\[^4\]: Weaver design document, testing conventions and behavioural tests:
+<https://github.com/leynos/weaver/blob/main/docs/weaver-design.md>
+\[^5\]: Weaver design document, `act apply-patch` and plugin orchestration:
+<https://github.com/leynos/weaver/blob/main/docs/weaver-design.md>
+\[^6\]: Kani overview, first steps, and limitations:
+<https://model-checking.github.io/kani/>
+\[^7\]: Weaver root `Cargo.toml`:
+<https://github.com/leynos/weaver/blob/main/Cargo.toml>
+\[^8\]: Weaver repository layout:
+<https://github.com/leynos/weaver/blob/main/docs/repository-layout.md>
+\[^9\]: Weaver `Makefile`:
+<https://github.com/leynos/weaver/blob/main/Makefile>
+\[^10\]: Weaver Continuous Integration workflow:
+<https://github.com/leynos/weaver/blob/main/.github/workflows/ci.yml>
+\[^11\]: Sempai query-language design and testing strategy:
+<https://github.com/leynos/weaver/blob/main/docs/sempai-query-language-design.md>
+\[^12\]: Jacquard graph and matching design guidance:
+<https://github.com/leynos/weaver/blob/main/docs/jacquard-card-first-symbol-graph-design.md>
+\[^13\]: Verus guide:
+<https://verus-lang.github.io/verus/guide/>
+\[^14\]: Verus installation instructions:
+<https://github.com/verus-lang/verus/blob/main/INSTALL.md>
+\[^15\]: Weaver roadmap, `act apply-patch` requirements:
+<https://github.com/leynos/weaver/blob/main/docs/roadmap.md>
+\[^16\]: Weaver roadmap and design document, plugin routing and refusal
+diagnostics: <https://github.com/leynos/weaver/blob/main/docs/roadmap.md>
+\[^17\]: Weaver roadmap, graph-slice budget tasks:
+<https://github.com/leynos/weaver/blob/main/docs/roadmap.md>
+\[^18\]: Weaver roadmap, matching guardrail tasks:
+<https://github.com/leynos/weaver/blob/main/docs/roadmap.md>
