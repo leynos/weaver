@@ -133,9 +133,9 @@ Implementation must not begin until the user explicitly approves this plan.
 ## Progress
 
 - [x] (2026-04-05 UTC) Reviewed roadmap item 4.1.5, the Sempai design
-      document, relevant Semgrep guidance docs, adjacent Sempai ExecPlans, the
-      current `sempai`, `sempai_core`, and `sempai_yaml` code structure, and
-      the requested testing/documentation guidance.
+  document, relevant Semgrep guidance docs, adjacent Sempai ExecPlans, the
+  current `sempai`, `sempai_core`, and `sempai_yaml` code structure, and
+  the requested testing/documentation guidance.
 - [x] (2026-04-05 UTC) Drafted this ExecPlan.
 - [x] (2026-04-05 UTC) Stage A: Added failing paired-fixture and
   semantic-diagnostic tests.
@@ -229,18 +229,18 @@ Target outcome at completion:
 
 1. `sempai_core` exposes a canonical `Formula` model and the smallest shared
    clause vocabulary needed by normalization and semantic checks.
-2. `sempai` contains a normalization pass that lowers parsed legacy and v2
+1. `sempai` contains a normalization pass that lowers parsed legacy and v2
    search principals into the same canonical representation.
-3. Valid paired legacy and v2 fixture rules normalize to structurally
+1. Valid paired legacy and v2 fixture rules normalize to structurally
    equivalent formulas.
-4. Invalid semantic states emit stable diagnostics for
+1. Invalid semantic states emit stable diagnostics for
    `InvalidNotInOr` and `MissingPositiveTermInAnd`.
-5. `sempai::Engine::compile_yaml` returns real query plans for valid
+1. `sempai::Engine::compile_yaml` returns real query plans for valid
    search-mode rules instead of a post-parse placeholder.
-6. Unit tests and `rstest-bdd` scenarios cover happy, unhappy, and edge paths.
-7. `docs/sempai-query-language-design.md`, `docs/users-guide.md`, and
+1. Unit tests and `rstest-bdd` scenarios cover happy, unhappy, and edge paths.
+1. `docs/sempai-query-language-design.md`, `docs/users-guide.md`, and
    `docs/roadmap.md` are updated to match the delivered behaviour.
-8. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
+1. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
 Retrospective notes will be filled in during implementation and finalization.
@@ -518,9 +518,9 @@ Acceptance is satisfied when all of the following are true:
   returns real query plans,
 - `compile_dsl` and `execute` still fail explicitly rather than pretending to
   support more than they do,
-- unit tests and `rstest-bdd` scenarios cover happy, unhappy, and edge cases,
+- unit tests and `rstest-bdd` scenarios cover happy, unhappy, and edge cases
 - `docs/sempai-query-language-design.md`, `docs/users-guide.md`, and
-  `docs/roadmap.md` match the delivered behaviour,
+  `docs/roadmap.md` match the delivered behaviour
 - `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
   `make lint`, and `make test` all succeed.
 

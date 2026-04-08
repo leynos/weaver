@@ -19,7 +19,7 @@ Feature: Sempai engine facade behaviour
     When YAML "rules:\n  - id: demo.rule\n    message: detect foo\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n" is compiled
     Then compilation succeeds with 1 plan
 
-  Scenario: Engine compile_yaml keeps the placeholder for dependency search rules
+  Scenario: Engine compile_yaml compiles dependency search rule into one plan
     Given an engine with default configuration
     When YAML "rules:\n  - id: demo.depends\n    message: detect vulnerable dependency\n    languages: [python]\n    severity: WARNING\n    r2c-internal-project-depends-on:\n      namespace: pypi\n      package: requests\n" is compiled
     Then compilation succeeds with 1 plan

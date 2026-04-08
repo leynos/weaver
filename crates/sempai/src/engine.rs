@@ -123,16 +123,12 @@ impl Engine {
     ///
     /// # Errors
     ///
-    /// Returns a diagnostic report if parsing or validation fails.
+    /// Returns a diagnostic report if parsing fails, if unsupported modes are
+    /// encountered, or if normalization produces semantic validation errors.
     ///
     /// Successfully parsed search-mode rules are normalized into canonical
     /// formulas and returned as query plans. Other modes (taint, join, extract)
     /// return unsupported mode diagnostics.
-    ///
-    /// # Errors
-    ///
-    /// Returns a diagnostic report if parsing fails, if unsupported modes are
-    /// encountered, or if normalization produces semantic validation errors.
     pub fn compile_yaml(&self, yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
         let file = parse_rule_file(yaml, None)?;
         validate_supported_modes(&file)?;
