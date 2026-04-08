@@ -13,6 +13,7 @@ use std::{io, thread};
 
 use assert_cmd::Command;
 use insta::assert_debug_snapshot;
+use rstest::rstest;
 use serde::Serialize;
 use serde_json::json;
 
@@ -385,62 +386,53 @@ fn run_refactor_snapshot(snapshot_name: &str, display_command: &str, extra_args:
     assert_debug_snapshot!(snapshot_name, transcript);
 }
 
-#[test]
-fn refactor_rust_analyzer_actuator_isolation_cli_snapshot() {
-    run_refactor_snapshot(
-        "refactor_rust_analyzer_actuator_isolation",
-        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider rust-analyzer --refactoring rename --file src/main.rs new_name=renamed_name offset=3",
-        &[
-            "act",
-            "refactor",
-            "--provider",
-            "rust-analyzer",
-            "--refactoring",
-            "rename",
-            "--file",
-            "src/main.rs",
-            "new_name=renamed_name",
-            "offset=3",
-        ],
-    );
-}
-
-#[test]
-fn refactor_automatic_rust_routing_cli_snapshot() {
-    run_refactor_snapshot(
-        "refactor_automatic_rust_routing",
-        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --refactoring rename --file src/main.rs new_name=renamed_name offset=3",
-        &[
-            "act",
-            "refactor",
-            "--refactoring",
-            "rename",
-            "--file",
-            "src/main.rs",
-            "new_name=renamed_name",
-            "offset=3",
-        ],
-    );
-}
-
-#[test]
-fn refactor_rust_provider_mismatch_refusal_cli_snapshot() {
-    run_refactor_snapshot(
-        "refactor_rust_provider_mismatch_refusal",
-        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider rope --refactoring rename --file src/main.rs new_name=renamed_name offset=3",
-        &[
-            "act",
-            "refactor",
-            "--provider",
-            "rope",
-            "--refactoring",
-            "rename",
-            "--file",
-            "src/main.rs",
-            "new_name=renamed_name",
-            "offset=3",
-        ],
-    );
+#[rstest]
+#[case(
+    "refactor_rust_analyzer_actuator_isolation",
+    "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
+     --provider rust-analyzer --refactoring rename --file src/main.rs \
+     new_name=renamed_name offset=3",
+    &[
+        "act", "refactor",
+        "--provider", "rust-analyzer",
+        "--refactoring", "rename",
+        "--file", "src/main.rs",
+        "new_name=renamed_name",
+        "offset=3",
+    ],
+)]
+#[case(
+    "refactor_automatic_rust_routing",
+    "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
+     --refactoring rename --file src/main.rs new_name=renamed_name offset=3",
+    &[
+        "act", "refactor",
+        "--refactoring", "rename",
+        "--file", "src/main.rs",
+        "new_name=renamed_name",
+        "offset=3",
+    ],
+)]
+#[case(
+    "refactor_rust_provider_mismatch_refusal",
+    "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
+     --provider rope --refactoring rename --file src/main.rs \
+     new_name=renamed_name offset=3",
+    &[
+        "act", "refactor",
+        "--provider", "rope",
+        "--refactoring", "rename",
+        "--file", "src/main.rs",
+        "new_name=renamed_name",
+        "offset=3",
+    ],
+)]
+fn refactor_rust_routing_cli_snapshot(
+    #[case] snapshot_name: &str,
+    #[case] display_command: &str,
+    #[case] extra_args: &[&str],
+) {
+    run_refactor_snapshot(snapshot_name, display_command, extra_args);
 }
 
 #[test]
