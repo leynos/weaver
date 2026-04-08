@@ -8,6 +8,8 @@
 use sempai_core::{DiagnosticReport, EngineConfig, Language, Match};
 use sempai_yaml::parse_rule_file;
 
+use crate::mode_validation::validate_supported_modes;
+
 /// A compiled query plan for one rule and one language.
 ///
 /// Query plans are produced by [`Engine::compile_yaml`] or
@@ -109,7 +111,8 @@ impl Engine {
     /// Successful YAML parsing still stops at the post-parse placeholder until
     /// rule normalization is implemented.
     pub fn compile_yaml(&self, yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
-        let _ = parse_rule_file(yaml, None)?;
+        let file = parse_rule_file(yaml, None)?;
+        validate_supported_modes(&file)?;
         Err(DiagnosticReport::not_implemented(
             "compile_yaml query-plan normalization",
         ))

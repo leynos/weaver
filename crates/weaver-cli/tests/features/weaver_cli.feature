@@ -74,6 +74,21 @@ Feature: Weaver CLI behaviour
     Then the CLI fails
     And stderr contains "Warning: received"
 
+  Scenario: Rendering unknown-operation alternatives for humans
+    Given a running fake daemon emitting an unknown-operation payload
+    When the operator runs "--output human observe nonexistent"
+    Then the CLI fails
+    And stderr contains "error: unknown operation 'nonexistent' for domain 'observe'"
+    And stderr contains "Available operations:\n  get-definition\n  find-references\n  grep\n  diagnostics\n  call-hierarchy\n  get-card"
+
+  Scenario: Forwarding unknown-operation payloads in JSON mode
+    Given a running fake daemon emitting an unknown-operation payload
+    When the operator runs "--output json observe nonexistent"
+    Then the CLI fails
+    And stderr contains "\"type\":\"UnknownOperation\""
+    And stderr contains "\"known_operations\":[\"get-definition\",\"find-references\",\"grep\",\"diagnostics\",\"call-hierarchy\",\"get-card\"]"
+    And stderr contains "\"operation\":\"nonexistent\""
+
   Scenario: Routing lifecycle commands through helper
     Given lifecycle responses succeed
     When the operator runs "daemon status"

@@ -248,6 +248,7 @@ impl DomainRouter {
             Err(DispatchError::unknown_operation(
                 routing.domain,
                 operation.to_string(),
+                routing.known_operations,
             ))
         }
     }

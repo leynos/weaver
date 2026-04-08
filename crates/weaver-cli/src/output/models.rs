@@ -8,6 +8,10 @@ use serde::Deserialize;
 /// by `weaverd::dispatch::act::refactor::resolution` to ensure correct parsing.
 const CAPABILITY_RESOLUTION_TYPE: &str = "CapabilityResolution";
 
+// Import and re-export the wire-protocol constant and types.
+pub(crate) use weaver_daemon_types::UNKNOWN_OPERATION_TYPE;
+use weaver_daemon_types::UnknownOperationPayload;
+
 /// A definition or reference location in the daemon response.
 #[derive(Debug, Deserialize)]
 pub(crate) struct DefinitionLocation {
@@ -166,6 +170,16 @@ pub(crate) fn parse_capability_resolution(payload: &str) -> Option<CapabilityRes
     Some(parsed)
 }
 
+/// Parses daemon unknown-operation payloads.
+#[must_use]
+pub(crate) fn parse_unknown_operation(payload: &str) -> Option<UnknownOperationPayload> {
+    let parsed: UnknownOperationPayload = serde_json::from_str(payload).ok()?;
+    if parsed.r#type != UNKNOWN_OPERATION_TYPE {
+        return None;
+    }
+    Some(parsed)
+}
+
 #[derive(Debug, Deserialize)]
 struct VerificationErrorEnvelope {
     #[serde(rename = "type")]
@@ -287,5 +301,45 @@ mod tests {
 }"#;
 
         assert!(parse_capability_resolution(payload).is_none());
+    }
+
+    #[test]
+    fn parses_unknown_operation_payload() {
+        let payload = serde_json::to_string(&serde_json::json!({
+            "status": "error",
+            "type": UNKNOWN_OPERATION_TYPE,
+            "details": {
+                "domain": "observe",
+                "operation": "bogus",
+                "known_operations": ["get-definition", "find-references"]
+            }
+        }))
+        .expect("unknown-operation payload");
+
+        let parsed = parse_unknown_operation(&payload).expect("unknown operation");
+        assert_eq!(parsed.details.domain, "observe");
+        assert_eq!(parsed.details.operation, "bogus");
+        assert_eq!(
+            parsed.details.known_operations,
+            vec![
+                String::from("get-definition"),
+                String::from("find-references")
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_unknown_operation_rejects_mismatched_type() {
+        let payload = r#"{
+  "status": "error",
+  "type": "VerificationError",
+  "details": {
+    "domain": "observe",
+    "operation": "bogus",
+    "known_operations": []
+  }
+}"#;
+
+        assert!(parse_unknown_operation(payload).is_none());
     }
 }

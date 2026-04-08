@@ -3,6 +3,7 @@ members = [
     "crates/weaver-build-util",
     "crates/weaver-cli",
     "crates/weaver-config",
+    "crates/weaver-daemon-types",
     "crates/weaver-e2e",
     "crates/weaver-graph",
     "crates/weaverd",

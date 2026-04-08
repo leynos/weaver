@@ -179,6 +179,7 @@ mod tests {
     use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
     use crate::backends::FusionBackends;
+    use crate::dispatch::{UNKNOWN_OPERATION_TYPE, parse_stderr_json_payload};
     use crate::semantic_provider::SemanticBackendProvider;
 
     use super::*;
@@ -292,6 +293,36 @@ mod tests {
         // find-references is not yet implemented
         assert!(lines.iter().any(|l| l.contains("not yet implemented")));
         assert!(lines.iter().any(|l| l.contains(r#""kind":"exit""#)));
+
+        harness.join();
+    }
+
+    #[rstest]
+    fn handler_emits_known_operations_for_unknown_operation(mut harness: HandlerTestHarness) {
+        let lines = harness
+            .send_and_collect(b"{\"command\":{\"domain\":\"observe\",\"operation\":\"bogus\"}}\n");
+
+        let payload = lines
+            .iter()
+            .find_map(|line| parse_stderr_json_payload::<serde_json::Value>(line))
+            .expect("unknown-operation payload should be present");
+
+        assert_eq!(payload["status"], "error");
+        assert_eq!(payload["type"], UNKNOWN_OPERATION_TYPE);
+        assert_eq!(payload["details"]["domain"], "observe");
+        assert_eq!(payload["details"]["operation"], "bogus");
+        assert_eq!(
+            payload["details"]["known_operations"],
+            serde_json::json!([
+                "get-definition",
+                "find-references",
+                "grep",
+                "diagnostics",
+                "call-hierarchy",
+                "get-card"
+            ])
+        );
+        assert!(lines.iter().any(|line| line.contains(r#""status":1"#)));
 
         harness.join();
     }

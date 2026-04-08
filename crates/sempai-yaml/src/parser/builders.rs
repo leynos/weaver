@@ -9,7 +9,8 @@ use serde_saphyr::Spanned;
 use sempai_core::{DiagnosticReport, SourceSpan};
 
 use crate::model::{
-    ExtractQueryPrincipal, LegacyFormula, RulePrincipal, SearchQueryPrincipal, TaintQueryPrincipal,
+    ExtractQueryPrincipal, LegacyFormula, ProjectDependsOnPayload, RulePrincipal,
+    SearchQueryPrincipal, TaintQueryPrincipal,
 };
 use crate::raw::{RawRule, convert_match_formula_object, schema_error, singleton_formula};
 use crate::source_map::SourceMap;
@@ -114,6 +115,12 @@ pub(crate) fn build_extract_rule(
     raw: &RawRule,
     rule_span: Option<&SourceSpan>,
 ) -> Result<RulePrincipal, DiagnosticReport> {
+    reject_project_depends_on(
+        raw,
+        rule_span.cloned(),
+        "extract",
+        "replace `r2c-internal-project-depends-on` with a legacy query key such as `pattern` or `patterns`",
+    )?;
     if raw.match_formula.is_some() {
         return Err(schema_error(
             String::from("extract mode does not support `match`"),
@@ -145,6 +152,12 @@ pub(crate) fn build_join_rule(
     raw: &RawRule,
     rule_span: Option<SourceSpan>,
 ) -> Result<RulePrincipal, DiagnosticReport> {
+    reject_project_depends_on(
+        raw,
+        rule_span.clone(),
+        "join",
+        "use `join` instead of search-only dependency principal fields",
+    )?;
     validate_join_header(raw, rule_span.clone())?;
     let join = require(raw.join.clone(), "join", rule_span, "add a join definition")?;
     Ok(RulePrincipal::Join(join))
@@ -161,6 +174,12 @@ pub(crate) fn build_taint_rule(
     raw: &RawRule,
     rule_span: Option<SourceSpan>,
 ) -> Result<RulePrincipal, DiagnosticReport> {
+    reject_project_depends_on(
+        raw,
+        rule_span.clone(),
+        "taint",
+        "use `taint` or legacy taint fields instead of search-only dependency principal fields",
+    )?;
     validate_taint_header(raw, rule_span.clone())?;
 
     // Reject match field in taint mode
@@ -235,19 +254,63 @@ fn build_search_principal(
         || raw.patterns.is_some()
         || raw.pattern_either.is_some();
     let has_match = raw.match_formula.is_some();
+    let has_project_depends_on = raw.project_depends_on.is_some();
+    let query_principal_count =
+        usize::from(has_legacy) + usize::from(has_match) + usize::from(has_project_depends_on);
 
-    if has_legacy && has_match {
+    if query_principal_count > 1 {
         return Err(schema_error(
             String::from("rule must define exactly one top-level query principal"),
             rule_span,
-            "choose one of the legacy search keys or `match`",
+            search_principal_note(),
         ));
     }
 
-    raw.match_formula.clone().map_or_else(
-        || build_legacy_principal(raw, rule_span.as_ref()).map(SearchQueryPrincipal::Legacy),
-        |formula| build_match_principal(formula, source_map),
-    )
+    if query_principal_count == 0 {
+        return Err(schema_error(
+            String::from("search rule is missing a query principal"),
+            rule_span,
+            search_principal_note(),
+        ));
+    }
+
+    if let Some(formula) = raw.match_formula.clone() {
+        return build_match_principal(formula, source_map);
+    }
+
+    if let Some(project_depends_on) = raw.project_depends_on.clone() {
+        return Ok(SearchQueryPrincipal::ProjectDependsOn(
+            ProjectDependsOnPayload::try_from(project_depends_on.value).map_err(|message| {
+                schema_error(
+                    message,
+                    rule_span.clone(),
+                    "declare string `namespace` and `package` fields for the dependency principal",
+                )
+            })?,
+        ));
+    }
+
+    build_legacy_principal(raw, rule_span.as_ref()).map(SearchQueryPrincipal::Legacy)
+}
+
+const fn search_principal_note() -> &'static str {
+    "choose one of the legacy search keys, `match`, or `r2c-internal-project-depends-on`"
+}
+
+fn reject_project_depends_on(
+    raw: &RawRule,
+    rule_span: Option<SourceSpan>,
+    mode_name: &str,
+    note: &str,
+) -> Result<(), DiagnosticReport> {
+    if raw.project_depends_on.is_some() {
+        return Err(schema_error(
+            format!("{mode_name} mode does not support `r2c-internal-project-depends-on`"),
+            rule_span,
+            note,
+        ));
+    }
+    Ok(())
 }
 
 /// Builds a legacy formula from raw rule fields.
