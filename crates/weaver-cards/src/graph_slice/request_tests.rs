@@ -91,42 +91,26 @@ fn parses_all_flags_budget_and_detail() {
     assert_eq!(request.node_detail(), DetailLevel::Signature);
 }
 
-#[test]
-fn normalizes_duplicate_edge_types() {
+#[rstest]
+#[case::deduplicates(
+    "import,call,import",
+    &[SliceEdgeType::Call, SliceEdgeType::Import]
+)]
+#[case::canonical_order(
+    "config,call,import",
+    &[SliceEdgeType::Call, SliceEdgeType::Import, SliceEdgeType::Config]
+)]
+fn normalizes_edge_types(#[case] input: &str, #[case] expected: &[SliceEdgeType]) {
     let arguments = args(&[
         "--uri",
         "file:///src/main.rs",
         "--position",
         "1:1",
         "--edge-types",
-        "import,call,import",
+        input,
     ]);
     let request = GraphSliceRequest::parse(&arguments).expect("should parse");
-    assert_eq!(
-        request.edge_types(),
-        &[SliceEdgeType::Call, SliceEdgeType::Import]
-    );
-}
-
-#[test]
-fn normalizes_edge_types_to_canonical_order() {
-    let arguments = args(&[
-        "--uri",
-        "file:///src/main.rs",
-        "--position",
-        "1:1",
-        "--edge-types",
-        "config,call,import",
-    ]);
-    let request = GraphSliceRequest::parse(&arguments).expect("should parse");
-    assert_eq!(
-        request.edge_types(),
-        &[
-            SliceEdgeType::Call,
-            SliceEdgeType::Import,
-            SliceEdgeType::Config
-        ]
-    );
+    assert_eq!(request.edge_types(), expected);
 }
 
 #[rstest]

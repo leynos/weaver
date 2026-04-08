@@ -5,13 +5,55 @@
 //! helpers live in this module so that the public `request` module
 //! stays focused on types and accessors.
 
+use std::fmt;
+
 use crate::DetailLevel;
 
 use super::budget::SliceBudget;
 use super::request::{
-    DEFAULT_DEPTH, DEFAULT_MIN_CONFIDENCE, DirectionParseError, EdgeTypeParseError,
-    GraphSliceError, GraphSliceRequest, SliceDirection, SliceEdgeType,
+    DEFAULT_DEPTH, DEFAULT_MIN_CONFIDENCE, GraphSliceError, GraphSliceRequest, SliceDirection,
+    SliceEdgeType, SliceParseError,
 };
+
+/// Identifies a recognised CLI flag for error-reporting purposes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Flag {
+    Uri,
+    Position,
+    Depth,
+    Direction,
+    EdgeTypes,
+    MinConfidence,
+    MaxCards,
+    MaxEdges,
+    MaxEstimatedTokens,
+    EntryDetail,
+    NodeDetail,
+}
+
+impl fmt::Display for Flag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Uri => "--uri",
+            Self::Position => "--position",
+            Self::Depth => "--depth",
+            Self::Direction => "--direction",
+            Self::EdgeTypes => "--edge-types",
+            Self::MinConfidence => "--min-confidence",
+            Self::MaxCards => "--max-cards",
+            Self::MaxEdges => "--max-edges",
+            Self::MaxEstimatedTokens => "--max-estimated-tokens",
+            Self::EntryDetail => "--entry-detail",
+            Self::NodeDetail => "--node-detail",
+        })
+    }
+}
+
+impl From<Flag> for String {
+    fn from(flag: Flag) -> Self {
+        flag.to_string()
+    }
+}
 
 /// Accumulates parsed flag values before constructing a
 /// [`GraphSliceRequest`].
@@ -41,32 +83,32 @@ impl RequestBuilder {
     {
         match flag {
             "--uri" => {
-                let v = require_arg_value(iter, flag)?;
+                let v = require_arg_value(iter, Flag::Uri)?;
                 self.uri = Some(String::from(v));
             }
             "--position" => {
-                let v = require_arg_value(iter, flag)?;
+                let v = require_arg_value(iter, Flag::Position)?;
                 self.position = Some(parse_position(v)?);
             }
             "--depth" => {
-                let v = require_arg_value(iter, flag)?;
-                self.depth = Some(parse_u32(v, flag)?);
+                let v = require_arg_value(iter, Flag::Depth)?;
+                self.depth = Some(parse_u32(v, Flag::Depth)?);
             }
             "--direction" => {
-                let v = require_arg_value(iter, flag)?;
+                let v = require_arg_value(iter, Flag::Direction)?;
                 self.direction = Some(parse_direction(v)?);
             }
             "--edge-types" => {
-                let v = require_arg_value(iter, flag)?;
+                let v = require_arg_value(iter, Flag::EdgeTypes)?;
                 self.edge_types = Some(parse_edge_types(v)?);
             }
             "--min-confidence" => {
-                let v = require_arg_value(iter, flag)?;
+                let v = require_arg_value(iter, Flag::MinConfidence)?;
                 self.min_confidence = Some(parse_confidence(v)?);
             }
             "--max-cards" => {
-                let v = require_arg_value(iter, flag)?;
-                let n = parse_u32(v, flag)?;
+                let v = require_arg_value(iter, Flag::MaxCards)?;
+                let n = parse_u32(v, Flag::MaxCards)?;
                 self.budget = SliceBudget::new(
                     n,
                     self.budget.max_edges(),
@@ -74,8 +116,8 @@ impl RequestBuilder {
                 );
             }
             "--max-edges" => {
-                let v = require_arg_value(iter, flag)?;
-                let n = parse_u32(v, flag)?;
+                let v = require_arg_value(iter, Flag::MaxEdges)?;
+                let n = parse_u32(v, Flag::MaxEdges)?;
                 self.budget = SliceBudget::new(
                     self.budget.max_cards(),
                     n,
@@ -83,17 +125,17 @@ impl RequestBuilder {
                 );
             }
             "--max-estimated-tokens" => {
-                let v = require_arg_value(iter, flag)?;
-                let n = parse_u32(v, flag)?;
+                let v = require_arg_value(iter, Flag::MaxEstimatedTokens)?;
+                let n = parse_u32(v, Flag::MaxEstimatedTokens)?;
                 self.budget = SliceBudget::new(self.budget.max_cards(), self.budget.max_edges(), n);
             }
             "--entry-detail" => {
-                let v = require_arg_value(iter, flag)?;
-                self.entry_detail = Some(parse_detail(v, flag)?);
+                let v = require_arg_value(iter, Flag::EntryDetail)?;
+                self.entry_detail = Some(parse_detail(v, Flag::EntryDetail)?);
             }
             "--node-detail" => {
-                let v = require_arg_value(iter, flag)?;
-                self.node_detail = Some(parse_detail(v, flag)?);
+                let v = require_arg_value(iter, Flag::NodeDetail)?;
+                self.node_detail = Some(parse_detail(v, Flag::NodeDetail)?);
             }
             _ => skip_unknown_flag_value(iter),
         }
@@ -103,12 +145,12 @@ impl RequestBuilder {
     /// Validates required fields and constructs the request.
     pub(super) fn build(self) -> Result<GraphSliceRequest, GraphSliceError> {
         let uri = self.uri.ok_or_else(|| GraphSliceError::MissingArgument {
-            flag: String::from("--uri"),
+            flag: Flag::Uri.into(),
         })?;
         let (line, column) = self
             .position
             .ok_or_else(|| GraphSliceError::MissingArgument {
-                flag: String::from("--position"),
+                flag: Flag::Position.into(),
             })?;
 
         let mut edge_types = self
@@ -117,18 +159,18 @@ impl RequestBuilder {
         edge_types.sort();
         edge_types.dedup();
 
-        Ok(GraphSliceRequest::new(
+        Ok(GraphSliceRequest {
             uri,
             line,
             column,
-            self.depth.unwrap_or(DEFAULT_DEPTH),
-            self.direction.unwrap_or_default(),
+            depth: self.depth.unwrap_or(DEFAULT_DEPTH),
+            direction: self.direction.unwrap_or_default(),
             edge_types,
-            self.min_confidence.unwrap_or(DEFAULT_MIN_CONFIDENCE),
-            self.budget,
-            self.entry_detail.unwrap_or(DetailLevel::Structure),
-            self.node_detail.unwrap_or(DetailLevel::Minimal),
-        ))
+            min_confidence: self.min_confidence.unwrap_or(DEFAULT_MIN_CONFIDENCE),
+            budget: self.budget,
+            entry_detail: self.entry_detail.unwrap_or(DetailLevel::Structure),
+            node_detail: self.node_detail.unwrap_or(DetailLevel::Minimal),
+        })
     }
 }
 
@@ -136,18 +178,18 @@ impl RequestBuilder {
 // Value-level parsing helpers
 // -------------------------------------------------------------------------
 
-fn require_arg_value<'a, I>(iter: &mut I, flag: &str) -> Result<&'a str, GraphSliceError>
+fn require_arg_value<'a, I>(iter: &mut I, flag: Flag) -> Result<&'a str, GraphSliceError>
 where
     I: Iterator<Item = &'a String>,
 {
     match iter.next().map(String::as_str) {
         Some(value) if value.starts_with('-') => Err(GraphSliceError::InvalidValue {
-            flag: String::from(flag),
+            flag: flag.into(),
             message: String::from("requires a value"),
         }),
         Some(value) => Ok(value),
         None => Err(GraphSliceError::InvalidValue {
-            flag: String::from(flag),
+            flag: flag.into(),
             message: String::from("requires a value"),
         }),
     }
@@ -168,30 +210,30 @@ fn parse_position(value: &str) -> Result<(u32, u32), GraphSliceError> {
         value
             .split_once(':')
             .ok_or_else(|| GraphSliceError::InvalidValue {
-                flag: String::from("--position"),
+                flag: Flag::Position.into(),
                 message: format!("expected LINE:COL, got: {value}"),
             })?;
 
     let line: u32 = line_str
         .parse()
         .map_err(|_| GraphSliceError::InvalidValue {
-            flag: String::from("--position"),
+            flag: Flag::Position.into(),
             message: format!("invalid line number: {line_str}"),
         })?;
     let column: u32 = col_str.parse().map_err(|_| GraphSliceError::InvalidValue {
-        flag: String::from("--position"),
+        flag: Flag::Position.into(),
         message: format!("invalid column number: {col_str}"),
     })?;
 
     if line == 0 {
         return Err(GraphSliceError::InvalidValue {
-            flag: String::from("--position"),
+            flag: Flag::Position.into(),
             message: String::from("line number must be >= 1"),
         });
     }
     if column == 0 {
         return Err(GraphSliceError::InvalidValue {
-            flag: String::from("--position"),
+            flag: Flag::Position.into(),
             message: String::from("column number must be >= 1"),
         });
     }
@@ -199,9 +241,9 @@ fn parse_position(value: &str) -> Result<(u32, u32), GraphSliceError> {
     Ok((line, column))
 }
 
-fn parse_u32(value: &str, flag: &str) -> Result<u32, GraphSliceError> {
+fn parse_u32(value: &str, flag: Flag) -> Result<u32, GraphSliceError> {
     value.parse().map_err(|_| GraphSliceError::InvalidValue {
-        flag: String::from(flag),
+        flag: flag.into(),
         message: format!("expected a positive integer, got: {value}"),
     })
 }
@@ -209,8 +251,8 @@ fn parse_u32(value: &str, flag: &str) -> Result<u32, GraphSliceError> {
 fn parse_direction(value: &str) -> Result<SliceDirection, GraphSliceError> {
     value
         .parse()
-        .map_err(|e: DirectionParseError| GraphSliceError::InvalidValue {
-            flag: String::from("--direction"),
+        .map_err(|e: SliceParseError| GraphSliceError::InvalidValue {
+            flag: Flag::Direction.into(),
             message: e.to_string(),
         })
 }
@@ -221,8 +263,8 @@ fn parse_edge_types(value: &str) -> Result<Vec<SliceEdgeType>, GraphSliceError> 
         .map(|s| {
             s.trim()
                 .parse()
-                .map_err(|e: EdgeTypeParseError| GraphSliceError::InvalidValue {
-                    flag: String::from("--edge-types"),
+                .map_err(|e: SliceParseError| GraphSliceError::InvalidValue {
+                    flag: Flag::EdgeTypes.into(),
                     message: e.to_string(),
                 })
         })
@@ -231,22 +273,22 @@ fn parse_edge_types(value: &str) -> Result<Vec<SliceEdgeType>, GraphSliceError> 
 
 fn parse_confidence(value: &str) -> Result<f64, GraphSliceError> {
     let confidence: f64 = value.parse().map_err(|_| GraphSliceError::InvalidValue {
-        flag: String::from("--min-confidence"),
+        flag: Flag::MinConfidence.into(),
         message: format!("expected a number between 0.0 and 1.0, got: {value}"),
     })?;
     if !(0.0..=1.0).contains(&confidence) {
         return Err(GraphSliceError::InvalidValue {
-            flag: String::from("--min-confidence"),
+            flag: Flag::MinConfidence.into(),
             message: format!("expected a number between 0.0 and 1.0, got: {value}"),
         });
     }
     Ok(confidence)
 }
 
-fn parse_detail(value: &str, flag: &str) -> Result<DetailLevel, GraphSliceError> {
+fn parse_detail(value: &str, flag: Flag) -> Result<DetailLevel, GraphSliceError> {
     value.parse().map_err(
         |e: crate::DetailLevelParseError| GraphSliceError::InvalidValue {
-            flag: String::from(flag),
+            flag: flag.into(),
             message: e.to_string(),
         },
     )

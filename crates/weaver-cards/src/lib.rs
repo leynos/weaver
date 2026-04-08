@@ -59,7 +59,7 @@ pub use extract::{CardExtractionError, CardExtractionInput, TreeSitterCardExtrac
 pub use graph_slice::{
     DEFAULT_MAX_CARDS, DEFAULT_MAX_EDGES, DEFAULT_MAX_ESTIMATED_TOKENS, GraphSliceError,
     GraphSliceRequest, GraphSliceResponse, SliceBudget, SliceDirection, SliceEdgeType,
-    SliceSpillover,
+    SliceParseError, SliceSpillover,
 };
 pub use request::GetCardRequest;
 pub use response::{CardRefusal, GetCardResponse, RefusalReason};

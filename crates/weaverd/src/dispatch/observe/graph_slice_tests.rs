@@ -30,20 +30,25 @@ fn dispatch_graph_slice(arguments: &[&str]) -> (i32, String) {
     (result.status, output)
 }
 
+fn parse_stdout_data(line: &str) -> Option<String> {
+    let envelope = serde_json::from_str::<serde_json::Value>(line).ok()?;
+    if envelope.get("stream").and_then(|v| v.as_str()) != Some("stdout") {
+        return None;
+    }
+    envelope
+        .get("data")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+}
+
 /// Extracts the stdout payload from the JSONL stream envelope.
 ///
 /// The `ResponseWriter` wraps output in `{"stream":"stdout","data":"…"}`
 /// envelopes. This helper extracts just the data content.
 fn extract_stdout(raw: &str) -> String {
-    for line in raw.lines() {
-        if let Ok(envelope) = serde_json::from_str::<serde_json::Value>(line)
-            && envelope.get("stream").and_then(|v| v.as_str()) == Some("stdout")
-            && let Some(data) = envelope.get("data").and_then(|v| v.as_str())
-        {
-            return String::from(data);
-        }
-    }
-    String::from(raw)
+    raw.lines()
+        .find_map(parse_stdout_data)
+        .unwrap_or_else(|| String::from(raw))
 }
 
 #[test]

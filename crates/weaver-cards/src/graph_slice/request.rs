@@ -45,33 +45,37 @@ pub enum SliceDirection {
     Both,
 }
 
-/// Error returned when a string does not match any known direction.
+/// Error returned when a string does not match a known variant of a slice enum.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DirectionParseError {
+pub struct SliceParseError {
+    kind: &'static str,
+    expected: &'static str,
     name: String,
 }
 
-impl fmt::Display for DirectionParseError {
+impl fmt::Display for SliceParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "unknown direction: {}; expected one of: in, out, both",
-            self.name
+            "unknown {}: {}; expected one of: {}",
+            self.kind, self.name, self.expected
         )
     }
 }
 
-impl std::error::Error for DirectionParseError {}
+impl std::error::Error for SliceParseError {}
 
 impl FromStr for SliceDirection {
-    type Err = DirectionParseError;
+    type Err = SliceParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "in" => Ok(Self::In),
             "out" => Ok(Self::Out),
             "both" => Ok(Self::Both),
-            _ => Err(DirectionParseError {
+            _ => Err(SliceParseError {
+                kind: "direction",
+                expected: "in, out, both",
                 name: String::from(s),
             }),
         }
@@ -94,33 +98,17 @@ pub enum SliceEdgeType {
     Config,
 }
 
-/// Error returned when a string does not match any known edge type.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EdgeTypeParseError {
-    name: String,
-}
-
-impl fmt::Display for EdgeTypeParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "unknown edge type: {}; expected one of: call, import, config",
-            self.name
-        )
-    }
-}
-
-impl std::error::Error for EdgeTypeParseError {}
-
 impl FromStr for SliceEdgeType {
-    type Err = EdgeTypeParseError;
+    type Err = SliceParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "call" => Ok(Self::Call),
             "import" => Ok(Self::Import),
             "config" => Ok(Self::Config),
-            _ => Err(EdgeTypeParseError {
+            _ => Err(SliceParseError {
+                kind: "edge type",
+                expected: "call, import, config",
                 name: String::from(s),
             }),
         }
@@ -183,25 +171,25 @@ pub enum GraphSliceError {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GraphSliceRequest {
     /// File URI (e.g. `file:///src/main.rs`).
-    uri: String,
+    pub(super) uri: String,
     /// Line number (1-indexed, user-facing).
-    line: u32,
+    pub(super) line: u32,
     /// Column number (1-indexed, user-facing).
-    column: u32,
+    pub(super) column: u32,
     /// Traversal depth limit.
-    depth: u32,
+    pub(super) depth: u32,
     /// Traversal direction.
-    direction: SliceDirection,
+    pub(super) direction: SliceDirection,
     /// Edge type filter (canonical order).
-    edge_types: Vec<SliceEdgeType>,
+    pub(super) edge_types: Vec<SliceEdgeType>,
     /// Minimum confidence threshold.
-    min_confidence: f64,
+    pub(super) min_confidence: f64,
     /// Budget constraints.
-    budget: SliceBudget,
+    pub(super) budget: SliceBudget,
     /// Detail level for the entry card.
-    entry_detail: DetailLevel,
+    pub(super) entry_detail: DetailLevel,
     /// Detail level for non-entry cards.
-    node_detail: DetailLevel,
+    pub(super) node_detail: DetailLevel,
 }
 
 impl GraphSliceRequest {
@@ -293,39 +281,6 @@ impl GraphSliceRequest {
     #[must_use]
     pub const fn node_detail(&self) -> DetailLevel {
         self.node_detail
-    }
-
-    /// Constructs a request with all fields specified.
-    ///
-    /// Used by [`RequestBuilder`] after validation.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "internal constructor mirrors the full request shape"
-    )]
-    pub(super) const fn new(
-        uri: String,
-        line: u32,
-        column: u32,
-        depth: u32,
-        direction: SliceDirection,
-        edge_types: Vec<SliceEdgeType>,
-        min_confidence: f64,
-        budget: SliceBudget,
-        entry_detail: DetailLevel,
-        node_detail: DetailLevel,
-    ) -> Self {
-        Self {
-            uri,
-            line,
-            column,
-            depth,
-            direction,
-            edge_types,
-            min_confidence,
-            budget,
-            entry_detail,
-            node_detail,
-        }
     }
 }
 

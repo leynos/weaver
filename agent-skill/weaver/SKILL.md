@@ -1,7 +1,11 @@
----
-name: weaver
-description: Use this skill whenever the user wants semantic code intelligence through the Weaver CLI, especially for fetching definitions, fetching symbol cards, checking capability support, inspecting daemon state, or performing language-aware renames. Trigger even when the user does not mention Weaver by name if they want IDE-like code navigation or semantic refactors from the terminal.
----
+______________________________________________________________________
+name: weaver description: Use this skill whenever the user wants semantic code
+intelligence through the Weaver CLI, especially for fetching definitions,
+fetching symbol cards, checking capability support, inspecting daemon state, or
+performing language-aware renames. Trigger even when the user does not mention
+Weaver by name if they want IDE-like code navigation or semantic refactors from
+the terminal.
+______________________________________________________________________
 
 # Weaver
 
@@ -144,8 +148,7 @@ of pasting raw payloads unless they asked for the full JSON. Focus on:
 
 ### Definition lookup
 
-User: "Use Weaver to find the definition of the symbol at
-`src/lib.rs:42:17`."
+User: "Use Weaver to find the definition of the symbol at `src/lib.rs:42:17`."
 
 Agent flow:
 
@@ -165,8 +168,8 @@ Agent flow:
 
 ### Safe rename
 
-User: "Rename the symbol at byte offset 123 in `src/main.py` to
-`build_index` with Weaver."
+User: "Rename the symbol at byte offset 123 in `src/main.py` to `build_index`
+with Weaver."
 
 Agent flow:
 

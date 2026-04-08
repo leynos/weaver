@@ -21,7 +21,7 @@ mod response;
 pub use budget::{DEFAULT_MAX_CARDS, DEFAULT_MAX_EDGES, DEFAULT_MAX_ESTIMATED_TOKENS, SliceBudget};
 pub use request::{
     DEFAULT_DEPTH, DEFAULT_MIN_CONFIDENCE, GraphSliceError, GraphSliceRequest, SliceDirection,
-    SliceEdgeType,
+    SliceEdgeType, SliceParseError,
 };
 pub use response::{
     CallSiteInfo, EdgeProvenance, EdgeProvenanceDetails, ExternalTarget, GraphSliceResponse,
