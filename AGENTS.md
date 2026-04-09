@@ -155,8 +155,8 @@ project:
 - Where a function has too many parameters, group related parameters in
   meaningfully named structs.
 
-- Where a function is returning a large error consider using `Arc` to reduce the
-  amount of data returned.
+- Where a function is returning a large error, consider using `Arc` to reduce
+  the amount of data returned.
 
 - Write unit and behavioural tests for new functionality. Run both before and
   after making any change.
