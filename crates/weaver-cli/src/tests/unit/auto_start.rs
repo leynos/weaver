@@ -130,8 +130,7 @@ fn auto_start_missing_binary_shows_actionable_guidance() {
         "startup failure must include Next command line"
     );
     assert!(
-        stderr_text.contains("Next command:\n  test -x '/nonexistent/weaverd'")
-            || stderr_text.contains("WEAVERD_BIN"),
+        stderr_text.contains("Next command:\n  test -x '/nonexistent/weaverd'"),
         "Next command should help verify the configured daemon binary"
     );
 }

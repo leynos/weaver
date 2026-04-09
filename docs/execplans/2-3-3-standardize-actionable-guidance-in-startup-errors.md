@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: IMPLEMENTED
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
@@ -160,16 +160,16 @@ This work is successful when the following are all true:
   `UnknownOperation` payloads and stable exit status `1`.
 - [x] (2026-04-07) Drafted this ExecPlan in
   `docs/execplans/2-3-3-standardize-actionable-guidance-in-startup-errors.md`.
-- [ ] Stage A: add failing unit and behavioural tests for the unified
+- [x] Stage A: add failing unit and behavioural tests for the unified
   three-part template.
-- [ ] Stage B: introduce a small CLI-side actionable-guidance formatter and
+- [x] Stage B: introduce a small CLI-side actionable-guidance formatter and
   refactor bare invocation plus preflight domain guidance to use it.
-- [ ] Stage C: route unknown-operation human rendering and startup/lifecycle
+- [x] Stage C: route unknown-operation human rendering and startup/lifecycle
   failures through the same formatter while preserving existing exit codes and
   daemon payload semantics.
-- [ ] Stage D: update `docs/weaver-design.md`, `docs/users-guide.md`, and
+- [x] Stage D: update `docs/weaver-design.md`, `docs/users-guide.md`, and
   `docs/roadmap.md`.
-- [ ] Stage E: run the full Markdown and Rust validation gates sequentially.
+- [x] Stage E: run the full Markdown and Rust validation gates sequentially.
 
 ## Surprises & Discoveries
 
@@ -610,6 +610,6 @@ The likely touched source files are:
 
 ## Revision note
 
-Initial draft created from roadmap item `2.3.3`, the current CLI and daemon
-code, and the adjacent ExecPlans for `2.3.1` and `2.3.2`. No implementation has
-started yet.
+Implemented from roadmap item `2.3.3` with the shared actionable-guidance
+formatter, matching unit and behavioural tests, and the supporting
+documentation updates completed.

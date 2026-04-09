@@ -110,6 +110,12 @@ fn bare_invocation_uses_three_part_template() {
         usage_pos < next_cmd_pos,
         "Usage block must come before Next command"
     );
+
+    let trimmed = stderr_text.trim_end();
+    assert!(
+        trimmed.ends_with("Next command:\n  weaver --help"),
+        "bare invocation must end with the exact Next command block, got:\n{trimmed}"
+    );
 }
 
 #[test]

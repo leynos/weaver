@@ -8,6 +8,8 @@ mod models;
 mod render;
 mod source;
 
+use std::io;
+
 #[cfg(test)]
 pub(crate) use self::models::UNKNOWN_OPERATION_TYPE;
 pub use crate::cli::OutputFormat;
@@ -87,7 +89,7 @@ pub fn render_human_output(context: &OutputContext, data: &str) -> Option<String
     }
 
     if let Some(unknown_operation) = parse_unknown_operation(trimmed) {
-        return Some(render_unknown_operation(unknown_operation.details));
+        return render_unknown_operation(unknown_operation.details).ok();
     }
 
     let domain = context.domain.to_ascii_lowercase();
@@ -245,7 +247,7 @@ fn render_capability_resolution(resolution: CapabilityResolution) -> String {
     rendered
 }
 
-fn render_unknown_operation(details: UnknownOperationDetails) -> String {
+fn render_unknown_operation(details: UnknownOperationDetails) -> io::Result<String> {
     use crate::actionable_guidance::{ActionableGuidance, write_actionable_guidance};
 
     let problem = format!(
@@ -268,8 +270,8 @@ fn render_unknown_operation(details: UnknownOperationDetails) -> String {
 
     let guidance = ActionableGuidance::new(problem, alternatives, next_command);
     let mut buf = Vec::new();
-    write_actionable_guidance(&mut buf, &guidance).expect("write to vec");
-    String::from_utf8(buf).expect("utf8")
+    write_actionable_guidance(&mut buf, &guidance)?;
+    String::from_utf8(buf).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
 }
 
 fn diagnostic_to_location(

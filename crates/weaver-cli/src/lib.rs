@@ -214,10 +214,8 @@ where
                 ExitCode::SUCCESS
             }
             Err(AppError::Lifecycle(ref lifecycle_err)) => {
-                let _ = actionable_guidance::write_startup_guidance(
-                    &mut *self.io.stderr,
-                    lifecycle_err,
-                );
+                actionable_guidance::write_startup_guidance(&mut *self.io.stderr, lifecycle_err)
+                    .ok();
                 ExitCode::FAILURE
             }
             Err(error) => {
@@ -317,7 +315,7 @@ where
         Ok(connection) => connection,
         Err(error) if is_daemon_not_running(&error) => {
             if let Err(start_error) = try_auto_start_daemon(context, &mut *io.stderr) {
-                let _ = actionable_guidance::write_startup_guidance(&mut *io.stderr, &start_error);
+                actionable_guidance::write_startup_guidance(&mut *io.stderr, &start_error).ok();
                 return ExitCode::FAILURE;
             }
             // Retry briefly after daemon startup to tolerate socket-bind lag.

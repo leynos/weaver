@@ -8,6 +8,8 @@ use std::io::{self, Write};
 
 use ortho_config::{LocalizationArgs, Localizer};
 
+use crate::actionable_guidance::{ActionableGuidance, write_actionable_guidance};
+
 /// A validated, known CLI domain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum KnownDomain {
@@ -179,8 +181,6 @@ pub(crate) fn write_missing_operation_guidance<W: Write>(
     localizer: &dyn Localizer,
     domain: KnownDomain,
 ) -> io::Result<bool> {
-    use crate::actionable_guidance::{ActionableGuidance, write_actionable_guidance};
-
     let operations = operations_for_domain(domain);
     let Some(hint_operation) = operations.first() else {
         return Ok(false);
@@ -221,8 +221,6 @@ pub(crate) fn write_unknown_domain_guidance<W: Write>(
     localizer: &dyn Localizer,
     domain: &str,
 ) -> io::Result<bool> {
-    use crate::actionable_guidance::{ActionableGuidance, write_actionable_guidance};
-
     if KnownDomain::try_parse(domain).is_some() {
         return Ok(false);
     }
@@ -255,12 +253,9 @@ pub(crate) fn write_unknown_domain_guidance<W: Write>(
             &format!("Did you mean '{suggested_domain_str}'?"),
         ));
         alternatives.push(suggestion);
-        // Use the first operation of the suggested domain
-        let hint_op = suggested_domain
-            .operations()
-            .first()
-            .copied()
-            .unwrap_or("get-definition");
+        let Some(hint_op) = suggested_domain.operations().first().copied() else {
+            return Ok(false);
+        };
         format!("weaver {suggested_domain_str} {hint_op} --help")
     } else {
         "weaver --help".to_string()
@@ -334,6 +329,32 @@ mod tests {
         );
     }
 
+    fn assert_three_part_guidance(
+        output: &str,
+        error_text: &str,
+        alternatives_text: &str,
+        next_command: &str,
+    ) {
+        assert_single_error_prefix(output);
+        let error_pos = output.find(error_text).expect("expected error text");
+        let alternatives_pos = output
+            .find(alternatives_text)
+            .expect("expected alternatives text");
+        let next_command_line = format!("Next command:\n  {next_command}");
+        let next_command_pos = output
+            .find(&next_command_line)
+            .expect("expected exact Next command block");
+
+        assert!(
+            error_pos < alternatives_pos,
+            "error line must precede alternatives block: {output}"
+        );
+        assert!(
+            alternatives_pos < next_command_pos,
+            "alternatives block must precede Next command: {output}"
+        );
+    }
+
     #[test]
     fn fluent_missing_operation_guidance_has_single_error_prefix() {
         let localizer = fluent_localizer();
@@ -345,8 +366,12 @@ mod tests {
 
         assert!(emitted, "known domain should emit guidance");
         let output = String::from_utf8(output).expect("guidance must be valid UTF-8");
-        assert_single_error_prefix(&output);
-        assert!(output.contains("error: operation required for domain 'observe'"));
+        assert_three_part_guidance(
+            &output,
+            "error: operation required for domain 'observe'",
+            "Available operations:\n  get-definition",
+            "weaver observe get-definition --help",
+        );
     }
 
     #[test]
@@ -359,76 +384,14 @@ mod tests {
 
         assert!(emitted, "unknown domain should emit guidance");
         let output = String::from_utf8(output).expect("guidance must be valid UTF-8");
-        assert_single_error_prefix(&output);
-        assert!(output.contains("error: unknown domain 'unknown-domain'"));
+        assert_three_part_guidance(
+            &output,
+            "error: unknown domain 'unknown-domain'",
+            "Valid domains: observe, act, verify",
+            "weaver --help",
+        );
     }
 }
 
 #[cfg(test)]
-pub(crate) mod fluent_entries {
-    //! Test-only after-help catalogue builders used to assert localized help
-    //! output without widening the production discoverability surface.
-
-    pub(in crate::discoverability) const HEADER: (&str, &str) =
-        ("weaver-after-help-header", "Domains and operations:");
-
-    fn domain_heading_entry(domain: super::KnownDomain) -> (String, String) {
-        let description = super::DOMAIN_OPERATIONS
-            .iter()
-            .find(|(candidate, _, _)| *candidate == domain.as_str())
-            .map(|(_, description, _)| *description)
-            .unwrap_or_default();
-
-        (
-            format!("weaver-after-help-{}-heading", domain.as_str()),
-            format!("{} \u{2014} {description}", domain.as_str()),
-        )
-    }
-
-    fn pad_to(s: &mut String, width: usize) {
-        if s.len() < width {
-            s.extend(std::iter::repeat_n(' ', width - s.len()));
-        }
-    }
-
-    fn format_operation_row(operations: &[String]) -> String {
-        const SECOND_COLUMN_START: usize = 18;
-        const THIRD_COLUMN_START: usize = 37;
-
-        let mut row = String::new();
-        if let Some(first) = operations.first() {
-            row.push_str(first);
-        }
-        if let Some(second) = operations.get(1) {
-            pad_to(&mut row, SECOND_COLUMN_START);
-            row.push_str(second);
-        }
-        if let Some(third) = operations.get(2) {
-            pad_to(&mut row, THIRD_COLUMN_START);
-            row.push_str(third);
-        }
-        row
-    }
-
-    /// Renders the after-help domains-and-operations catalogue.
-    pub(crate) fn render_after_help(localizer: &dyn ortho_config::Localizer) -> String {
-        let header = localizer.message(HEADER.0, None, HEADER.1);
-        let mut sections = Vec::new();
-        for (domain_str, _, operations) in super::DOMAIN_OPERATIONS {
-            let domain = super::known_domain_from_catalogue_entry(domain_str);
-            let (heading_id, heading_fallback) = domain_heading_entry(domain);
-            let heading = localizer.message(&heading_id, None, &heading_fallback);
-            let rows = operations
-                .chunks(3)
-                .map(|chunk| {
-                    let operations = chunk.iter().map(ToString::to_string).collect::<Vec<_>>();
-                    format!("    {}", format_operation_row(&operations))
-                })
-                .collect::<Vec<_>>()
-                .join("\n");
-            sections.push(format!("  {heading}\n{rows}"));
-        }
-
-        format!("{header}\n\n{}", sections.join("\n\n"))
-    }
-}
+pub(crate) mod fluent_entries;
