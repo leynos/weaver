@@ -90,9 +90,9 @@ behaviour stays consistent.
 ## Migration plan
 
 1. Add stable refusal codes and reason strings.
-1. Make provider resolution emit the selected provider and policy rationale.
-1. Add tests for no-match, policy-reject, and accepted-edit paths.
-1. Feed successful plugin output back through the existing verification path.
+2. Make provider resolution emit the selected provider and policy rationale.
+3. Add tests for no-match, policy-reject, and accepted-edit paths.
+4. Feed successful plugin output back through the existing verification path.
 
 ## Known risks and limitations
 

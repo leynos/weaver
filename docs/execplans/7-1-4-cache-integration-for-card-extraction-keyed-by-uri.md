@@ -20,23 +20,23 @@ Observable behaviour after implementation:
 
 1. A `get-card` request against a supported file returns a symbol card exactly
    as it does today (no change to the JSON schema or response envelope).
-1. A second identical `get-card` request for the same file and revision returns
+2. A second identical `get-card` request for the same file and revision returns
    the same card from cache without invoking Tree-sitter parsing. Integration
    tests verify this by asserting cache hit counts.
-1. When the file is modified on disk (different content hash), the next
+3. When the file is modified on disk (different content hash), the next
    `get-card` request re-extracts the card and the stale entry is evicted.
    Integration tests verify deterministic invalidation.
-1. Cache misses (first request or after invalidation) produce byte-identical
+4. Cache misses (first request or after invalidation) produce byte-identical
    output to the pre-cache implementation, ensuring correctness.
-1. The `provenance.extracted_at` field is populated with the actual extraction
+5. The `provenance.extracted_at` field is populated with the actual extraction
    timestamp (replacing the placeholder `"1970-01-01T00:00:00Z"`), and cache
    hits preserve the original extraction timestamp.
-1. The LRU eviction policy keeps memory bounded: the cache holds at most a
+6. The LRU eviction policy keeps memory bounded: the cache holds at most a
    configurable number of entries (default 128) per language.
-1. A battery of 20 Python and 20 Rust language example fixtures exercises a
+7. A battery of 20 Python and 20 Rust language example fixtures exercises a
    range of symbol scenarios in end-to-end tests using `assert_cmd` and `insta`
    snapshot assertions.
-1. `make check-fmt`, `make lint`, and `make test` all exit 0.
+8. `make check-fmt`, `make lint`, and `make test` all exit 0.
 
 ## Constraints
 
@@ -46,28 +46,28 @@ Observable behaviour after implementation:
    shapes, or ordering. The only schema-visible change is that
    `provenance.extracted_at` transitions from the placeholder to a real ISO
    8601 timestamp.
-1. The workspace enforces strict linting: `unwrap_used`, `expect_used`,
+2. The workspace enforces strict linting: `unwrap_used`, `expect_used`,
    `indexing_slicing`, `string_slice`, `allow_attributes`, `missing_docs`,
    `missing_const_for_fn`, `cognitive_complexity`, and the 400-line file limit
    for code files. All Clippy warnings are denied.
-1. Every new Rust module must begin with a `//!` comment, and all public items
+3. Every new Rust module must begin with a `//!` comment, and all public items
    must have `///` rustdoc comments.
-1. `GetCardResponse` is `#[non_exhaustive]`, so matches in `weaverd` must
+4. `GetCardResponse` is `#[non_exhaustive]`, so matches in `weaverd` must
    retain a wildcard arm.
-1. Behaviour tests must use `rstest-bdd` v0.5.0 with the `world` fixture
+5. Behaviour tests must use `rstest-bdd` v0.5.0 with the `world` fixture
    convention established in the codebase.
-1. The Tree-sitter extraction layer in `crates/weaver-cards/` must remain
+6. The Tree-sitter extraction layer in `crates/weaver-cards/` must remain
    independent of the Language Server Protocol (LSP). LSP enrichment is a
    post-extraction concern owned by the daemon handler in `crates/weaverd/`.
-1. en-GB-oxendict spelling ("-ize" / "-yse" / "-our") for comments and
+7. en-GB-oxendict spelling ("-ize" / "-yse" / "-our") for comments and
    documentation.
-1. No single code file may exceed 400 lines.
-1. The existing `TreeSitterSyntacticLock` in
+8. No single code file may exceed 400 lines.
+9. The existing `TreeSitterSyntacticLock` in
    `crates/weaver-syntax/src/syntactic_lock.rs` already implements a
    `Mutex<HashMap<SupportedLanguage, Arc<Mutex<Parser>>>>` parser registry
    pattern. The card cache should reuse this proven pattern rather than
    inventing a new one.
-1. Earlier roadmap drafts stated "Requires 4.3.4" (parse-cache adapter).
+10. Earlier roadmap drafts stated "Requires 4.3.4" (parse-cache adapter).
    Since 4.3.4 is not yet implemented, this plan implements the cache layer
    directly in the card extraction path as a self-contained prerequisite,
    establishing the URI + language + revision keying contract that 4.3.4 will
@@ -304,12 +304,15 @@ to `crates/weaver-cards/Cargo.toml` dependencies (workspace reference).
 
 Create `crates/weaver-cards/src/cache.rs` containing:
 
-1. A `CardCacheKey` struct with fields: `path: PathBuf`, `content_hash: [u8; 32]`, `language: SupportedLanguage` (from `weaver-syntax`), `detail: DetailLevel`, `line: u32`, `column: u32`. Implement `Hash` and `Eq`.
+1. A `CardCacheKey` struct with fields: `path: PathBuf`,
+   `content_hash: [u8; 32]`, `language: SupportedLanguage` (from
+   `weaver-syntax`), `detail: DetailLevel`, `line: u32`, `column: u32`.
+   Implement `Hash` and `Eq`.
 
-1. A `CardCache` struct wrapping `Mutex<LruCache<CardCacheKey, CachedCard>>`
+2. A `CardCache` struct wrapping `Mutex<LruCache<CardCacheKey, CachedCard>>`
    where `CachedCard` holds the `SymbolCard` and the extraction timestamp.
 
-1. Public methods:
+3. Public methods:
 
    - `CardCache::new(capacity: usize) -> Self` — creates a cache with the
      given maximum entry count.
@@ -323,7 +326,7 @@ Create `crates/weaver-cards/src/cache.rs` containing:
    - `CardCache::len(&self) -> usize` and `CardCache::is_empty(&self) -> bool`
      — cache size introspection.
 
-1. A `content_hash(source: &str) -> [u8; 32]` function using SHA-256 (the
+4. A `content_hash(source: &str) -> [u8; 32]` function using SHA-256 (the
    `sha2` crate is already a dependency of `weaver-cards`).
 
 Export `CardCache`, `CardCacheKey`, and `content_hash` from the crate root.
@@ -339,13 +342,13 @@ time.
    `TreeSitterSyntacticLock` pattern:
    `Mutex<HashMap<SupportedLanguage, Arc<Mutex<Parser>>>>`.
 
-1. Add a method `TreeSitterCardExtractor::extract_with_registry()` that
+2. Add a method `TreeSitterCardExtractor::extract_with_registry()` that
    accepts both `CardExtractionInput` and a `&ParserRegistry`, borrowing a
    parser from the registry instead of creating one. The existing `extract()`
    method remains unchanged for backward compatibility and tests that do not
    need caching.
 
-1. The parser registry lazily initializes parsers on first use and returns
+3. The parser registry lazily initializes parsers on first use and returns
    them to the pool after extraction completes.
 
 ### Stage C: Wire cache into the daemon handler
@@ -356,7 +359,7 @@ Modify `crates/weaverd/src/dispatch/observe/get_card.rs` to use the cache:
    daemon's shared state. These are initialized once at daemon startup in
    `crates/weaverd/src/backends.rs` or a neighbouring module.
 
-1. The handler flow becomes:
+2. The handler flow becomes:
 
    - Parse request arguments (unchanged).
    - Resolve URI to path (unchanged).
@@ -370,20 +373,20 @@ Modify `crates/weaverd/src/dispatch/observe/get_card.rs` to use the cache:
      on server state).
    - Serialize and write response (unchanged).
 
-1. Update `router.rs` to pass the cache and registry references to the handler.
+3. Update `router.rs` to pass the cache and registry references to the handler.
 
 ### Stage D: Replace timestamp placeholder with real timestamps
 
 1. In `crates/weaver-cards/src/extract/mod.rs`, remove the
    `EXTRACTED_AT_PLACEHOLDER` constant.
 
-1. In `build_card()`, generate a real ISO 8601 timestamp for
+2. In `build_card()`, generate a real ISO 8601 timestamp for
    `provenance.extracted_at`. Use `std::time::SystemTime` and format manually
    (the workspace does not depend on `chrono` or `time`; a minimal UTC
    formatter is sufficient, or add a lightweight dependency if needed — but
    prefer a small handwritten formatter to avoid a new dependency).
 
-1. In `CachedCard`, store the extraction timestamp alongside the card so that
+3. In `CachedCard`, store the extraction timestamp alongside the card so that
    cache hits return the original extraction time, not the current time.
 
 ### Stage E: Reduce string cloning in hot paths
@@ -395,14 +398,14 @@ pipeline. Focus on:
    `SymbolIdentity.symbol_id` and `etag`. Consider computing once and moving
    into the struct fields.
 
-1. `provenance_sources()` in `extract/utils.rs` — currently clones a
+2. `provenance_sources()` in `extract/utils.rs` — currently clones a
    `OnceLock<Vec<String>>` base vector on every call. Consider returning a
    `Cow<'static, [String]>` or a small fixed-size array.
 
-1. `leading_attachments()` — clones decorator vectors. Evaluate whether
+3. `leading_attachments()` — clones decorator vectors. Evaluate whether
    borrowing is feasible within the attachment bundling pipeline.
 
-1. Entity candidate collection in `extract/languages/*.rs` — evaluate whether
+4. Entity candidate collection in `extract/languages/*.rs` — evaluate whether
    `String` fields on `EntityCandidate` can be replaced with borrowed
    references or interned strings for the hot paths. If lifetimes become too
    complex, document the decision and defer.
@@ -417,22 +420,22 @@ containing:
 
 1. `cache_hit_returns_same_card` — extract a card, insert into cache, retrieve,
    and assert structural equality.
-1. `cache_miss_returns_none` — query for a key not in cache.
-1. `content_change_invalidates_cache` — insert a card, change the source hash,
+2. `cache_miss_returns_none` — query for a key not in cache.
+3. `content_change_invalidates_cache` — insert a card, change the source hash,
    and assert the old key misses.
-1. `path_invalidation_removes_all_entries` — insert multiple cards for the same
+4. `path_invalidation_removes_all_entries` — insert multiple cards for the same
    path (different positions), call `invalidate(path)`, and assert all are gone.
-1. `lru_eviction_removes_oldest` — fill cache to capacity, insert one more,
+5. `lru_eviction_removes_oldest` — fill cache to capacity, insert one more,
    and assert the least recently used entry is evicted.
-1. `cache_preserves_extraction_timestamp` — verify that cache hits return the
+6. `cache_preserves_extraction_timestamp` — verify that cache hits return the
    original `extracted_at`, not a fresh timestamp.
-1. `content_hash_is_deterministic` — verify that the same source text produces
+7. `content_hash_is_deterministic` — verify that the same source text produces
    the same hash on repeated calls.
-1. `content_hash_differs_for_different_sources` — verify that different source
+8. `content_hash_differs_for_different_sources` — verify that different source
    texts produce different hashes.
-1. `parser_registry_reuses_parsers` — verify that two extraction calls for the
+9. `parser_registry_reuses_parsers` — verify that two extraction calls for the
    same language reuse the same parser instance.
-1. `cache_correctness_after_invalidation` — extract, invalidate, re-extract
+10. `cache_correctness_after_invalidation` — extract, invalidate, re-extract
    with modified source, and assert the new card reflects the modifications.
 
 ### Stage G: BDD tests with `rstest-bdd` v0.5.0
@@ -442,14 +445,14 @@ Create `crates/weaver-cards/tests/features/card_cache.feature` with scenarios:
 1. "Cache hit for unchanged file" — Given a source file and a `get-card`
    extraction, When the same extraction is repeated, Then the cache returns the
    same card without reparsing.
-1. "Cache miss on first request" — Given an empty cache, When a `get-card`
+2. "Cache miss on first request" — Given an empty cache, When a `get-card`
    extraction is performed, Then the card is extracted from source.
-1. "Cache invalidation on content change" — Given a cached card for a file,
+3. "Cache invalidation on content change" — Given a cached card for a file,
    When the file content changes, Then the next extraction produces a fresh
    card.
-1. "LRU eviction under memory pressure" — Given a cache at capacity, When a
+4. "LRU eviction under memory pressure" — Given a cache at capacity, When a
    new entry is inserted, Then the least recently used entry is evicted.
-1. "Cache preserves extraction timestamp" — Given a cached card, When the
+5. "Cache preserves extraction timestamp" — Given a cached card, When the
    cache is queried again, Then the `extracted_at` field matches the original
    extraction.
 
@@ -461,7 +464,7 @@ Add unhappy path scenarios:
 
 1. "Unsupported language bypasses cache" — When extraction fails with
    `UnsupportedLanguage`, Then no cache entry is created.
-1. "Position out of range bypasses cache" — When extraction fails with
+2. "Position out of range bypasses cache" — When extraction fails with
    `PositionOutOfRange`, Then no cache entry is created.
 
 ### Stage H: Author 20 Python and 20 Rust language example fixtures
@@ -474,49 +477,49 @@ a different symbol scenario. The fixtures should cover:
 **Python (20 examples):**
 
 1. Simple function with parameters and return annotation.
-1. Function with default parameter values.
-1. Function with `*args` and `**kwargs`.
-1. Async function definition.
-1. Class with `__init__` and methods.
-1. Class with class methods and static methods (`@classmethod`,
+2. Function with default parameter values.
+3. Function with `*args` and `**kwargs`.
+4. Async function definition.
+5. Class with `__init__` and methods.
+6. Class with class methods and static methods (`@classmethod`,
    `@staticmethod`).
-1. Class with property decorators (`@property`).
-1. Nested function (closure).
-1. Lambda expression.
-1. Generator function (`yield`).
-1. Module-level variable assignment.
-1. Module with import block (stdlib and third-party).
-1. Function with docstring (Google style).
-1. Function with docstring (NumPy style).
-1. Dataclass with fields and methods (`@dataclass`).
-1. Abstract base class with abstract methods.
-1. Function with complex type annotations (`Union`, `Optional`, `Dict`).
-1. Decorator stack (multiple decorators on one function).
-1. Function with control flow (if/elif/else, for, while, try/except).
-1. Empty file with only imports and module docstring.
+7. Class with property decorators (`@property`).
+8. Nested function (closure).
+9. Lambda expression.
+10. Generator function (`yield`).
+11. Module-level variable assignment.
+12. Module with import block (stdlib and third-party).
+13. Function with docstring (Google style).
+14. Function with docstring (NumPy style).
+15. Dataclass with fields and methods (`@dataclass`).
+16. Abstract base class with abstract methods.
+17. Function with complex type annotations (`Union`, `Optional`, `Dict`).
+18. Decorator stack (multiple decorators on one function).
+19. Function with control flow (if/elif/else, for, while, try/except).
+20. Empty file with only imports and module docstring.
 
 **Rust (20 examples):**
 
 1. Simple function with parameters and return type.
-1. Function with generics and trait bounds.
-1. Async function definition.
-1. Struct definition with fields.
-1. Enum definition with variants (unit, tuple, struct).
-1. Impl block with methods (inherent).
-1. Trait definition with methods.
-1. Trait implementation for a struct.
-1. Module-level constant and static.
-1. Function with lifetime parameters.
-1. Closure assigned to a variable.
-1. Function with complex control flow (match, if let, for, while, loop).
-1. Function with doc comments (`///` and `//!`).
-1. Derive macro usage (`#[derive(...)]`) on a struct.
-1. Attribute macros on functions (`#[test]`, `#[cfg(...)]`).
-1. Type alias definition.
-1. Use/import block (stdlib and external crates).
-1. Function returning `Result` with error handling.
-1. Struct with tuple fields (newtype pattern).
-1. Empty module with only `use` statements and a module doc comment.
+2. Function with generics and trait bounds.
+3. Async function definition.
+4. Struct definition with fields.
+5. Enum definition with variants (unit, tuple, struct).
+6. Impl block with methods (inherent).
+7. Trait definition with methods.
+8. Trait implementation for a struct.
+9. Module-level constant and static.
+10. Function with lifetime parameters.
+11. Closure assigned to a variable.
+12. Function with complex control flow (match, if let, for, while, loop).
+13. Function with doc comments (`///` and `//!`).
+14. Derive macro usage (`#[derive(...)]`) on a struct.
+15. Attribute macros on functions (`#[test]`, `#[cfg(...)]`).
+16. Type alias definition.
+17. Use/import block (stdlib and external crates).
+18. Function returning `Result` with error handling.
+19. Struct with tuple fields (newtype pattern).
+20. Empty module with only `use` statements and a module doc comment.
 
 Each fixture should be short (5–30 lines), self-contained, and syntactically
 valid.
@@ -527,11 +530,11 @@ Create `crates/weaver-e2e/tests/get_card_snapshots.rs` containing end-to-end
 tests that:
 
 1. Write each fixture to a temporary file.
-1. Spawn a `weaverd` test daemon (or use the fake TCP server pattern from
+2. Spawn a `weaverd` test daemon (or use the fake TCP server pattern from
    existing e2e tests).
-1. Send `observe get-card` requests via the `weaver` binary using
+3. Send `observe get-card` requests via the `weaver` binary using
    `assert_cmd::Command`.
-1. Capture the JSON response and assert it using
+4. Capture the JSON response and assert it using
    `insta::assert_snapshot!` with `serde_json::to_string_pretty()`.
 
 Structure the tests as parameterized `rstest` cases over the fixture constants,
@@ -574,7 +577,7 @@ considerations" section (lines 953–965), add a note recording:
 
 1. In `docs/roadmap.md`, change the `[ ]` checkboxes for 7.1.4 and its sub-items
    to `[x]`.
-1. Run the full validation suite:
+2. Run the full validation suite:
 
 ```sh
 set -o pipefail; make check-fmt 2>&1 | tee /tmp/7-1-4-check-fmt.log

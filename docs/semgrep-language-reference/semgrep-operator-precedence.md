@@ -16,13 +16,13 @@ Important scope note:
 Highest to lowest in the normalization model:
 
 1. Atomics: `pattern`, `regex` (legacy: `pattern`, `pattern-regex`).
-1. Context wrappers: `inside`, `anywhere` (legacy: `pattern-inside`,
+2. Context wrappers: `inside`, `anywhere` (legacy: `pattern-inside`,
    `semgrep-internal-pattern-anywhere`).
-1. Negation: `not` (legacy: `pattern-not`; composite forms include
+3. Negation: `not` (legacy: `pattern-not`; composite forms include
    `pattern-not-regex` and `pattern-not-inside`).
-1. Conjunction: `all` (legacy: `patterns`).
-1. Disjunction: `any` (legacy: `pattern-either`).
-1. Decorator layer: `where`, `as`, `fix` (post-parse attachments).
+4. Conjunction: `all` (legacy: `patterns`).
+5. Disjunction: `any` (legacy: `pattern-either`).
+6. Decorator layer: `where`, `as`, `fix` (post-parse attachments).
 
 Parser-enforced semantic constraints:
 
@@ -34,26 +34,26 @@ Parser-enforced semantic constraints:
 
 The table fields follow `{token, fixity, precedence_level, associativity}`.
 
-| token | fixity | precedence_level | associativity |
+| token                               | fixity                                | precedence_level | associativity |
 | ----------------------------------- | ------------------------------------- | ---------------- | ------------- |
-| `pattern` | atom (`nud`) | 90 | n/a |
-| `regex` | atom (`nud`) | 90 | n/a |
-| `pattern-regex` | atom (`nud`) | 90 | n/a |
-| `inside` | prefix | 80 | right |
-| `pattern-inside` | prefix | 80 | right |
-| `anywhere` | prefix | 80 | right |
-| `semgrep-internal-pattern-anywhere` | prefix | 80 | right |
-| `not` | prefix | 70 | right |
-| `pattern-not` | prefix | 70 | right |
-| `pattern-not-regex` | prefix composite (`not(regex(...))`) | 70 / 90 | right |
-| `pattern-not-inside` | prefix composite (`not(inside(...))`) | 70 / 80 | right |
-| `all` | n-ary conjunction | 40 | associative |
-| `patterns` | n-ary conjunction | 40 | associative |
-| `any` | n-ary disjunction | 30 | associative |
-| `pattern-either` | n-ary disjunction | 30 | associative |
-| `where` | decorator attachment | 20 | n/a |
-| `as` | decorator attachment | 20 | n/a |
-| `fix` | decorator attachment | 20 | n/a |
+| `pattern`                           | atom (`nud`)                          | 90               | n/a           |
+| `regex`                             | atom (`nud`)                          | 90               | n/a           |
+| `pattern-regex`                     | atom (`nud`)                          | 90               | n/a           |
+| `inside`                            | prefix                                | 80               | right         |
+| `pattern-inside`                    | prefix                                | 80               | right         |
+| `anywhere`                          | prefix                                | 80               | right         |
+| `semgrep-internal-pattern-anywhere` | prefix                                | 80               | right         |
+| `not`                               | prefix                                | 70               | right         |
+| `pattern-not`                       | prefix                                | 70               | right         |
+| `pattern-not-regex`                 | prefix composite (`not(regex(...))`)  | 70 / 90          | right         |
+| `pattern-not-inside`                | prefix composite (`not(inside(...))`) | 70 / 80          | right         |
+| `all`                               | n-ary conjunction                     | 40               | associative   |
+| `patterns`                          | n-ary conjunction                     | 40               | associative   |
+| `any`                               | n-ary disjunction                     | 30               | associative   |
+| `pattern-either`                    | n-ary disjunction                     | 30               | associative   |
+| `where`                             | decorator attachment                  | 20               | n/a           |
+| `as`                                | decorator attachment                  | 20               | n/a           |
+| `fix`                               | decorator attachment                  | 20               | n/a           |
 
 _Table 1: Binding-power normalization model for Semgrep formula operators._
 

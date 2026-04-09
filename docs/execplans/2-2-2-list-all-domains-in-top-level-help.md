@@ -194,11 +194,11 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
 All acceptance criteria met:
 
 1. `weaver --help` lists all three domains (`observe`, `act`, `verify`).
-1. `weaver --help` lists every CLI-supported operation for each domain.
-1. `weaver --help` completes without daemon startup or socket access.
-1. Static clap text and Fluent resources are synchronized (guarded by
+2. `weaver --help` lists every CLI-supported operation for each domain.
+3. `weaver --help` completes without daemon startup or socket access.
+4. Static clap text and Fluent resources are synchronized (guarded by
    `clap_after_help_matches_fluent_render` test).
-1. Fluent and fallback paths produce identical output (guarded by
+5. Fluent and fallback paths produce identical output (guarded by
    `after_help_fluent_and_fallback_are_identical` test).
 
 Quality gates passed: `make check-fmt`, `make lint`, and `make test` (all tests
@@ -221,31 +221,31 @@ The Weaver CLI is a Rust workspace with 12+ crates. The CLI binary lives in
 
 _Table: Key files referenced in this plan._
 
-| File | Lines | Purpose |
+| File                                                  | Lines | Purpose                                  |
 | ----------------------------------------------------- | ----- | ---------------------------------------- |
-| `crates/weaver-cli/src/cli.rs` | 73 | Clap `#[derive(Parser)]` struct |
-| `crates/weaver-cli/src/localizer.rs` | 99 | Fluent localizer + bare-help |
-| `crates/weaver-cli/locales/en-US/messages.ftl` | 7 | Fluent resources |
-| `crates/weaver-cli/src/lib.rs` | 398 | Core runtime (tight on lines) |
-| `crates/weaver-cli/src/tests/unit.rs` | 396 | Unit test root module |
-| `crates/weaver-cli/src/tests/unit/bare_invocation.rs` | 146 | Bare-help unit tests (pattern to follow) |
-| `crates/weaver-cli/src/tests/behaviour.rs` | 340 | BDD step definitions |
-| `crates/weaver-cli/tests/main_entry.rs` | 24 | Integration tests (assert_cmd) |
-| `crates/weaver-cli/tests/features/weaver_cli.feature` | 86 | BDD scenarios |
-| `crates/weaver-cli/build.rs` | 70 | Manpage generation (includes cli.rs) |
-| `crates/weaverd/src/dispatch/router.rs` | 264 | Authoritative domain/operation lists |
-| `docs/users-guide.md` | 889 | Operator documentation |
-| `docs/roadmap.md` | 771 | Roadmap checkboxes |
+| `crates/weaver-cli/src/cli.rs`                        | 73    | Clap `#[derive(Parser)]` struct          |
+| `crates/weaver-cli/src/localizer.rs`                  | 99    | Fluent localizer + bare-help             |
+| `crates/weaver-cli/locales/en-US/messages.ftl`        | 7     | Fluent resources                         |
+| `crates/weaver-cli/src/lib.rs`                        | 398   | Core runtime (tight on lines)            |
+| `crates/weaver-cli/src/tests/unit.rs`                 | 396   | Unit test root module                    |
+| `crates/weaver-cli/src/tests/unit/bare_invocation.rs` | 146   | Bare-help unit tests (pattern to follow) |
+| `crates/weaver-cli/src/tests/behaviour.rs`            | 340   | BDD step definitions                     |
+| `crates/weaver-cli/tests/main_entry.rs`               | 24    | Integration tests (assert_cmd)           |
+| `crates/weaver-cli/tests/features/weaver_cli.feature` | 86    | BDD scenarios                            |
+| `crates/weaver-cli/build.rs`                          | 70    | Manpage generation (includes cli.rs)     |
+| `crates/weaverd/src/dispatch/router.rs`               | 264   | Authoritative domain/operation lists     |
+| `docs/users-guide.md`                                 | 889   | Operator documentation                   |
+| `docs/roadmap.md`                                     | 771   | Roadmap checkboxes                       |
 
 ### Localization pattern
 
 All user-facing text follows this pattern (established in task 5.1.1):
 
 1. Fluent messages in `crates/weaver-cli/locales/en-US/messages.ftl`.
-1. A constants module in `localizer.rs` holding `(fluent_id, fallback)` tuples.
-1. A `msg()` helper that resolves through the localizer with the fallback.
-1. A render function that composes the full text block.
-1. A `fluent_and_fallback_outputs_are_identical` unit test guarding drift.
+2. A constants module in `localizer.rs` holding `(fluent_id, fallback)` tuples.
+3. A `msg()` helper that resolves through the localizer with the fallback.
+4. A render function that composes the full text block.
+5. A `fluent_and_fallback_outputs_are_identical` unit test guarding drift.
 
 ### Authoritative operation list
 
@@ -311,12 +311,12 @@ Run `cargo run -p weaver-cli -- --help` and visually confirm.
 Tests that:
 
 1. `render_after_help()` with `NoOpLocalizer` contains all domains and ops.
-1. `render_after_help()` with `FluentLocalizer` contains all domains and ops.
-1. Fluent and fallback outputs are identical (drift guard).
-1. The static `after_help` text on `Cli::command()` matches the
+2. `render_after_help()` with `FluentLocalizer` contains all domains and ops.
+3. Fluent and fallback outputs are identical (drift guard).
+4. The static `after_help` text on `Cli::command()` matches the
    `render_after_help()` output (sync guard between `concat!` in `cli.rs` and
    the Fluent messages in `localizer.rs`).
-1. Every operation from the authoritative list appears in the rendered text.
+5. Every operation from the authoritative list appears in the rendered text.
 
 **C2. Add `mod after_help;` to `unit.rs`.**
 
@@ -369,27 +369,27 @@ All commands run from the workspace root `/home/user/project`.
 
 1. Edit `crates/weaver-cli/locales/en-US/messages.ftl` — append Fluent
    messages.
-1. Edit `crates/weaver-cli/src/localizer.rs` — add `mod after_help` with
+2. Edit `crates/weaver-cli/src/localizer.rs` — add `mod after_help` with
    constants and `pub(crate) fn render_after_help()`.
-1. Run `cargo check -p weaver-cli` to verify compilation.
+3. Run `cargo check -p weaver-cli` to verify compilation.
 
 ### Stage B
 
 1. Edit `crates/weaver-cli/src/cli.rs` — add `after_help = concat!(...)`.
-1. Run `cargo run -p weaver-cli -- --help` and visually confirm.
+2. Run `cargo run -p weaver-cli -- --help` and visually confirm.
 
 ### Stage C
 
 1. Create `crates/weaver-cli/src/tests/unit/after_help.rs` with unit tests.
-1. Edit `crates/weaver-cli/src/tests/unit.rs` — append `mod after_help;`.
-1. Edit `crates/weaver-cli/tests/main_entry.rs` — append integration test.
-1. Run `make test`.
+2. Edit `crates/weaver-cli/src/tests/unit.rs` — append `mod after_help;`.
+3. Edit `crates/weaver-cli/tests/main_entry.rs` — append integration test.
+4. Run `make test`.
 
 ### Stage D
 
 1. Edit `docs/users-guide.md` — add "Top-level help" subsection.
-1. Edit `docs/roadmap.md` — mark 2.2.2 as done.
-1. Run `make fmt`.
+2. Edit `docs/roadmap.md` — mark 2.2.2 as done.
+3. Run `make fmt`.
 
 ### Stage E
 
@@ -406,13 +406,13 @@ Acceptance criteria (from roadmap):
 
 1. `weaver --help` lists all three domains (`observe`, `act`, `verify`) —
    verified by integration test and unit tests.
-1. `weaver --help` lists every CLI-supported operation for each domain —
+2. `weaver --help` lists every CLI-supported operation for each domain —
    verified by tests checking for all 11 unique operations.
-1. `weaver --help` completes without daemon startup or socket access —
+3. `weaver --help` completes without daemon startup or socket access —
    verified by integration test (runs binary with no daemon).
-1. Static clap text and Fluent resources remain synchronized — verified by
+4. Static clap text and Fluent resources remain synchronized — verified by
    unit test `clap_after_help_matches_fluent_render`.
-1. Fluent and fallback paths produce identical output — verified by unit test
+5. Fluent and fallback paths produce identical output — verified by unit test
    `after_help_fluent_and_fallback_are_identical`.
 
 Quality criteria:
@@ -458,16 +458,16 @@ Modified clap attribute in `crates/weaver-cli/src/cli.rs`:
 
 _Table: Summary of modified files._
 
-| File | Change |
+| File                                                         | Change                                          |
 | ------------------------------------------------------------ | ----------------------------------------------- |
-| `crates/weaver-cli/locales/en-US/messages.ftl` | Append 10 Fluent messages |
-| `crates/weaver-cli/src/localizer.rs` | Add `after_help` module + `render_after_help()` |
-| `crates/weaver-cli/src/cli.rs` | Add `after_help = concat!(...)` attribute |
-| `crates/weaver-cli/src/tests/unit.rs` | Add `mod after_help;` declaration |
-| `crates/weaver-cli/src/tests/unit/after_help.rs` | New: unit tests for after-help |
-| `crates/weaver-cli/tests/main_entry.rs` | Add integration test for `--help` |
-| `docs/users-guide.md` | Add "Top-level help" subsection |
-| `docs/roadmap.md` | Mark 2.2.2 checkboxes as done |
-| `docs/execplans/2-2-2-list-all-domains-in-top-level-help.md` | This ExecPlan |
+| `crates/weaver-cli/locales/en-US/messages.ftl`               | Append 10 Fluent messages                       |
+| `crates/weaver-cli/src/localizer.rs`                         | Add `after_help` module + `render_after_help()` |
+| `crates/weaver-cli/src/cli.rs`                               | Add `after_help = concat!(...)` attribute       |
+| `crates/weaver-cli/src/tests/unit.rs`                        | Add `mod after_help;` declaration               |
+| `crates/weaver-cli/src/tests/unit/after_help.rs`             | New: unit tests for after-help                  |
+| `crates/weaver-cli/tests/main_entry.rs`                      | Add integration test for `--help`               |
+| `docs/users-guide.md`                                        | Add "Top-level help" subsection                 |
+| `docs/roadmap.md`                                            | Mark 2.2.2 checkboxes as done                   |
+| `docs/execplans/2-2-2-list-all-domains-in-top-level-help.md` | This ExecPlan                                   |
 
 Total: 9 files (within 15-file tolerance).

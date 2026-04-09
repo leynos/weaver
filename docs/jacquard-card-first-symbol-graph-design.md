@@ -17,10 +17,10 @@ The design extends Weaver’s existing “Semantic Fusion” approach by combini
 The goal is to make high-signal context cheap by default, and make “read more”
 an explicit escalation step rather than a reflex.
 
-The approach mirrors the core claims of Symbol Delta Ledger (SDL) systems\[^1\]:
-cards, typed edges (call/import/config), budgeted slices, and semantic deltas,
-but fits Weaver’s JSON Lines (JSONL) command model and daemon-backed
-architecture.[^2]
+The approach mirrors the core claims of Symbol Delta Ledger (SDL)
+systems\[^1\]: cards, typed edges (call/import/config), budgeted slices, and
+semantic deltas, but fits Weaver’s JSON Lines (JSONL) command model and
+daemon-backed architecture.[^2]
 
 ## Problem statement
 
@@ -38,9 +38,9 @@ However, common agent workflows still tend to overfetch:
 The requested workflow highlights the missing connective tissue:
 
 1. Symbol discovery via external semantic search (“Sempai”).
-1. Fetch a symbol card (docstring, signature, locals, branches, LSP hover).
-1. Expand a graph neighbourhood (call graph) to depth two.
-1. Diff that neighbourhood over the last five commits.
+2. Fetch a symbol card (docstring, signature, locals, branches, LSP hover).
+3. Expand a graph neighbourhood (call graph) to depth two.
+4. Diff that neighbourhood over the last five commits.
 
 This extension provides that connective tissue as first-class `observe`
 operations in Weaver’s daemon protocol.[^4]
@@ -334,11 +334,11 @@ modes or dynamic languages), `to` becomes an external node reference:
 }
 ```
 
-| Edge type | Semantics | Primary provider | Fallback provider | Typical confidence |
+| Edge type | Semantics                         | Primary provider                     | Fallback provider                              | Typical confidence |
 | --------- | --------------------------------- | ------------------------------------ | ---------------------------------------------- | ------------------ |
-| `call` | caller → callee | LSP call hierarchy | Tree-sitter call-site heuristic | 0.6–0.99 |
-| `import` | symbol/file depends on module | Tree-sitter interstitial import pass | LSP document symbols + imports (lang-specific) | 0.7–0.95 |
-| `config` | symbol depends on config key/flag | Tree-sitter interstitial config pass | grep-based heuristics (optional) | 0.3–0.9 |
+| `call`    | caller → callee                   | LSP call hierarchy                   | Tree-sitter call-site heuristic                | 0.6–0.99           |
+| `import`  | symbol/file depends on module     | Tree-sitter interstitial import pass | LSP document symbols + imports (lang-specific) | 0.7–0.95           |
+| `config`  | symbol depends on config key/flag | Tree-sitter interstitial config pass | grep-based heuristics (optional)               | 0.3–0.9            |
 
 *Table 1: Baseline edge types and the initial extraction strategy.*
 
@@ -348,7 +348,7 @@ Tree-sitter-derived graphs use a default two-pass pipeline:
 
 1. Extract entity regions into a symbol table (plus interstitial regions for
    import/config scanning).
-1. Extract references and resolve them into edges using the symbol table.
+2. Extract references and resolve them into edges using the symbol table.
 
 When `snapshots_on_demand` loads only a subset of files, the symbol table is
 partial by design. Edge records must carry `resolution` alongside `confidence`
@@ -424,13 +424,13 @@ Proposed detail levels:
 
   - Add deps (typed edges), fan-in/out metrics, canonical test mapping (future)
 
-| Detail | Adds | Requires | Expected latency |
+| Detail      | Adds                            | Requires               | Expected latency |
 | ----------- | ------------------------------- | ---------------------- | ---------------- |
-| `minimal` | identity only | none | lowest |
-| `signature` | signature fingerprint | Tree-sitter | low |
-| `structure` | doc/attachments/locals/branches | Tree-sitter | low–medium |
-| `semantic` | hover/types | Tree-sitter (degrades) | low–medium |
-| `full` | deps + fan metrics | Tree-sitter (degrades) | low–medium |
+| `minimal`   | identity only                   | none                   | lowest           |
+| `signature` | signature fingerprint           | Tree-sitter            | low              |
+| `structure` | doc/attachments/locals/branches | Tree-sitter            | low–medium       |
+| `semantic`  | hover/types                     | Tree-sitter (degrades) | low–medium       |
+| `full`      | deps + fan metrics              | Tree-sitter (degrades) | low–medium       |
 
 *Table 2: Progressive card enhancement layers.*
 
@@ -636,10 +636,10 @@ defines its own confidence band and rejection threshold; matches below the
 phase threshold are rejected rather than force-assigned.
 
 1. Phase 1: stable identity match (type + name + parent/container + file hint).
-1. Phase 2: body hash or name-stripped hash (rename detection).
-1. Phase 3: structural hash on AST-normalized shapes.
-1. Phase 4: fuzzy similarity (token overlap, shingles, and doc fingerprints).
-1. Phase 5: graph neighbourhood refinement plus global assignment.
+2. Phase 2: body hash or name-stripped hash (rename detection).
+3. Phase 3: structural hash on AST-normalized shapes.
+4. Phase 4: fuzzy similarity (token overlap, shingles, and doc fingerprints).
+5. Phase 5: graph neighbourhood refinement plus global assignment.
 
 The output must record the winning phase, confidence, and any rejected
 alternates to support debugging and downstream policy decisions.
@@ -1119,8 +1119,8 @@ weave.[^11]
 \[^1\]: SDL systems describe slices connected by `call`, `import`, and `config`
 edges, bounded by budgets, and refreshed via symbol-level deltas. See [6].
 
-\[^2\]: Weaver’s design explicitly frames “Semantic Fusion” as the combination of
-Tree-sitter, LSP, and a graph module, exposed as composable JSONL commands.
+\[^2\]: Weaver’s design explicitly frames “Semantic Fusion” as the combination
+of Tree-sitter, LSP, and a graph module, exposed as composable JSONL commands.
 See [1].
 
 \[^3\]: Weaver already contains an LSP call-hierarchy-based call graph provider
@@ -1130,23 +1130,23 @@ source. See [5].
 \[^4\]: `weaverd`’s routing layer is responsible for dispatching `observe` and
 `act` operations over the JSONL protocol. See [2].
 
-\[^5\]: Backend lifecycle and orchestration is implemented in `weaverd`’s backend
-registry. See [3].
+\[^5\]: Backend lifecycle and orchestration is implemented in `weaverd`’s
+backend registry. See [3].
 
-\[^6\]: `SemanticBackendProvider` defines the LSP-backed semantic backend startup
-path and supported language list. See [4].
+\[^6\]: `SemanticBackendProvider` defines the LSP-backed semantic backend
+startup path and supported language list. See [4].
 
-\[^7\]: weave documents a region-first extraction model that separates entity and
-interstitial spans. See [9].
+\[^7\]: weave documents a region-first extraction model that separates entity
+and interstitial spans. See [9].
 
 \[^8\]: weave’s changelog highlights attachment bundling and performance wins
 from parser reuse and reduced cloning. See [10].
 
-\[^9\]: Sem documents a staged matching approach combining exact, structural, and
-fuzzy similarity phases. See [11].
+\[^9\]: Sem documents a staged matching approach combining exact, structural,
+and fuzzy similarity phases. See [11].
 
-\[^10\]: The JSONL request/response envelope types live alongside request parsing
-and validation logic. See [7].
+\[^10\]: The JSONL request/response envelope types live alongside request
+parsing and validation logic. See [7].
 
 \[^11\]: weave’s public documentation emphasizes benchmark-driven regression
 testing for entity-level tooling. See [12].
@@ -1156,15 +1156,13 @@ history components and must handle non-UTF-8 inputs gracefully. See [8].
 
 ## References
 
-[1]: weaver-design.md
-[2]: ../crates/weaverd/src/dispatch/router.rs
-[3]: ../crates/weaverd/src/backends.rs
-[4]: ../crates/weaverd/src/semantic_provider/mod.rs
-[5]: ../crates/weaver-graph/src/provider.rs
-[6]: https://github.com/GlitterKill/sdl-mcp
-[7]: ../crates/weaverd/src/dispatch/request.rs
-[8]: ../crates/weaver-graph/src/uri.rs
-[9]: https://ataraxy-labs.github.io/weave/docs.html
-[10]: https://ataraxy-labs.github.io/weave/changelog.html
-[11]: https://github.com/Ataraxy-Labs/sem
-[12]: https://ataraxy-labs.github.io/weave/
+[1]: weaver-design.md [2]: ../crates/weaverd/src/dispatch/router.rs [3]:
+../crates/weaverd/src/backends.rs [4]:
+../crates/weaverd/src/semantic_provider/mod.rs [5]:
+../crates/weaver-graph/src/provider.rs [6]:
+<https://github.com/GlitterKill/sdl-mcp> [7]:
+../crates/weaverd/src/dispatch/request.rs [8]:
+../crates/weaver-graph/src/uri.rs [9]:
+<https://ataraxy-labs.github.io/weave/docs.html> [10]:
+<https://ataraxy-labs.github.io/weave/changelog.html> [11]:
+<https://github.com/Ataraxy-Labs/sem> [12]: <https://ataraxy-labs.github.io/weave/>

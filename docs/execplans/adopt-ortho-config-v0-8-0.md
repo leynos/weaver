@@ -44,30 +44,30 @@ Observable success after implementation:
    must keep the current discovery rules, precedence order, environment
    variable names, CLI flag names, and default values unless a migration note
    requires a source-compatible rewrite.
-1. Keep `ortho_config` and `ortho_config_macros` in lockstep at `0.8.0`.
+2. Keep `ortho_config` and `ortho_config_macros` in lockstep at `0.8.0`.
    The macro crate is not declared directly today, so lockfile inspection is
    required after the upgrade.
-1. Raise the Rust floor to 1.88 or newer in a way Cargo will actually
+3. Raise the Rust floor to 1.88 or newer in a way Cargo will actually
    surface. Updating only `[workspace.package].rust-version` is insufficient
    because many member crates currently omit `rust-version.workspace = true`.
-1. Do not introduce direct dependencies on `figment`, `uncased`, or `xdg`
+4. Do not introduce direct dependencies on `figment`, `uncased`, or `xdg`
    unless a source file genuinely needs them for non-generated code.
    Derive-adjacent imports and examples should prefer the `ortho_config::...`
    re-exports.
-1. Preserve the existing localisation behaviour in
+5. Preserve the existing localisation behaviour in
    `crates/weaver-cli/src/localizer.rs`. The Fluent-backed localiser and
    English fallbacks must keep working after the dependency bump.
-1. Treat the `orthohelp` metadata flow as conditional. The current
+6. Treat the `orthohelp` metadata flow as conditional. The current
    repository generates CLI man pages via build scripts, but the audit found no
    `OrthoConfigDocs`, `cargo orthohelp`, or `[package.metadata.ortho_config]`
    wiring. Do not add speculative metadata unless a concrete documentation
    artefact in this repository needs it.
-1. Historical documents should remain truthful. Do not silently rewrite
+7. Historical documents should remain truthful. Do not silently rewrite
    the versioned v0.6.0 migration guide to pretend it was always about v0.8.0.
    If new versioned migration guidance is needed, add a new guide.
-1. Use the repository quality gates and the Makefile targets where they
+8. Use the repository quality gates and the Makefile targets where they
    exist. Long-running commands must use `tee` and `set -o pipefail`.
-1. Comments and documentation must use en-GB-oxendict spelling and remain
+9. Comments and documentation must use en-GB-oxendict spelling and remain
    wrapped to 80 columns.
 
 ## Tolerances
@@ -196,7 +196,7 @@ Observable success after implementation:
 - Decision: Replace `docs/ortho-config-users-guide.md` with the upstream
   v0.8.0 guide from
   `https://raw.githubusercontent.com/leynos/ortho-config/refs/tags/v0.8.0/docs/users-guide.md`
-  instead of hand-editing the in-repo copy. Rationale: the user explicitly
+   instead of hand-editing the in-repo copy. Rationale: the user explicitly
   requested the upstream guide as the replacement artefact, and the fetched
   file already captures the v0.8.0 material around layer composition,
   post-merge hooks, localisation, and dependency aliasing. Date: 2026-03-07.
@@ -292,7 +292,7 @@ correctly.
    rg -n "$migration_audit_pattern" crates docs
    ```
 
-1. Run the current quality gates before any edits, using log capture:
+2. Run the current quality gates before any edits, using log capture:
 
    ```sh
    set -o pipefail; make check-fmt 2>&1 | tee /tmp/ortho-v0-8-check-fmt.before.log
@@ -302,7 +302,7 @@ correctly.
    set -o pipefail; make nixie 2>&1 | tee /tmp/ortho-v0-8-nixie.before.log
    ```
 
-1. If the known `make test` hang reproduces before any migration edits, do
+3. If the known `make test` hang reproduces before any migration edits, do
    not continue blindly. Capture the tail of the test log in this plan and
    treat it as a pre-existing blocker that needs user direction.
 
@@ -318,7 +318,7 @@ tell us whether any source edits are needed.
    `1.85` to `1.88` and change `ortho_config = "0.7.0"` to
    `ortho_config = "0.8.0"`.
 
-1. Add `rust-version.workspace = true` to every member manifest that lacks
+2. Add `rust-version.workspace = true` to every member manifest that lacks
    it today: `crates/weaver-build-util/Cargo.toml`,
    `crates/weaver-cli/Cargo.toml`, `crates/weaver-e2e/Cargo.toml`,
    `crates/weaver-graph/Cargo.toml`, `crates/weaver-lsp-host/Cargo.toml`,
@@ -327,7 +327,7 @@ tell us whether any source edits are needed.
    `crates/weaver-plugins/Cargo.toml`, `crates/weaver-sandbox/Cargo.toml`, and
    `crates/weaverd/Cargo.toml`.
 
-1. Regenerate the lockfile entries. There is no Makefile target for this, so
+3. Regenerate the lockfile entries. There is no Makefile target for this, so
    use Cargo directly:
 
    ```sh
@@ -335,7 +335,7 @@ tell us whether any source edits are needed.
    cargo update -p ortho_config_macros --precise 0.8.0
    ```
 
-1. Verify that `Cargo.lock` now resolves both crates to `0.8.0`.
+4. Verify that `Cargo.lock` now resolves both crates to `0.8.0`.
 
 Acceptance for Stage 2: the workspace manifests declare the new Rust floor and
 dependency version, and the lockfile resolves both runtime and macro crates to
@@ -354,21 +354,21 @@ require.
    rg -n 'use figment|use uncased|use xdg|figment::|uncased::|xdg::' crates
    ```
 
-1. Compile/lint and repair only the affected areas:
+2. Compile/lint and repair only the affected areas:
    `crates/weaver-config/src/lib.rs`, `crates/weaver-cli/src/localizer.rs`,
    `crates/weaver-cli/src/config.rs`, and any directly failing call site
    surfaced by the compiler.
 
-1. If an alias for `ortho_config` is introduced during the migration,
+3. If an alias for `ortho_config` is introduced during the migration,
    annotate every relevant derive with `#[ortho_config(crate = "...")]`,
    including any future `SelectedSubcommandMerge` derives. The audit suggests
    this should not be necessary in Weaver today.
 
-1. If any `cli_default_as_absent` usage is discovered, replace stringly
+4. If any `cli_default_as_absent` usage is discovered, replace stringly
    `default_value = ...` overrides with typed clap defaults (`default_value_t`
    or `default_values_t`) before proceeding.
 
-1. Do not add direct `figment`, `uncased`, or `xdg` dependencies to make
+5. Do not add direct `figment`, `uncased`, or `xdg` dependencies to make
    derive-generated code happy. Prefer the `ortho_config::...` re-export paths
    where source imports are needed.
 
@@ -386,10 +386,10 @@ The code change is small; the documentation clean-up is not optional.
    which notes apply here, and record the audit results for the notes that do
    not apply.
 
-1. Update `docs/contents.md` to include the new migration
+2. Update `docs/contents.md` to include the new migration
    guide without deleting the v0.6.0 guide.
 
-1. Replace `docs/ortho-config-users-guide.md` with the
+3. Replace `docs/ortho-config-users-guide.md` with the
    upstream v0.8.0 guide from:
 
    ```text
@@ -400,20 +400,20 @@ The code change is small; the documentation clean-up is not optional.
    repository-local follow-up edits when they are necessary to keep links,
    formatting, or Markdown tooling valid in this repository.
 
-1. Update `docs/users-guide.md` and
+4. Update `docs/users-guide.md` and
    `docs/weaver-design.md` so they describe the current Weaver configuration
    story accurately. These files should say that Weaver now uses `ortho-config`
    v0.8.0 and Rust 1.88+, and they should not imply that YAML is part of
    Weaver's runtime config path unless it truly is.
 
-1. Update `docs/roadmap.md` item 3.2.5 so it points at
+5. Update `docs/roadmap.md` item 3.2.5 so it points at
    the v0.8.0 guide and no longer asks for already-completed v0.6.0
    documentation work.
 
-1. Update `./README.md` so the build requirements say
+6. Update `./README.md` so the build requirements say
    Rust 1.88+ instead of Rust 1.85+.
 
-1. Explicitly record the `orthohelp` conclusion in the new migration guide:
+7. Explicitly record the `orthohelp` conclusion in the new migration guide:
    either it is not applicable because Weaver does not generate ortho-config
    documentation artefacts today, or it was added because a concrete artefact
    required it.
@@ -433,7 +433,7 @@ After all edits are in place, run every relevant gate and capture the logs.
    set -o pipefail; make fmt 2>&1 | tee /tmp/ortho-v0-8-fmt.after.log
    ```
 
-1. Then run the Rust and docs gates:
+2. Then run the Rust and docs gates:
 
    ```sh
    set -o pipefail; make check-fmt 2>&1 | tee /tmp/ortho-v0-8-check-fmt.after.log
@@ -443,7 +443,7 @@ After all edits are in place, run every relevant gate and capture the logs.
    set -o pipefail; make nixie 2>&1 | tee /tmp/ortho-v0-8-nixie.after.log
    ```
 
-1. Record the key evidence in this plan:
+3. Record the key evidence in this plan:
    `Cargo.lock` versions, successful command completion, and any notable
    warnings or follow-up constraints.
 

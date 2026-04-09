@@ -59,33 +59,33 @@ In this document, Language Server Protocol (LSP) and Continuous Integration
 
 ### Core workspace crates
 
-| Crate | Responsibility | Status |
+| Crate                         | Responsibility                                                                                       | Status      |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------- | ----------- |
-| `weaver-cli` | CLI entrypoint, command parsing, daemon lifecycle commands, and JSON Lines (JSONL) request streaming | Implemented |
-| `weaverd` | Daemon orchestration, command dispatch, and write-operation safety harness | Implemented |
-| `weaver-config` | Shared configuration schema and loading for client and daemon | Implemented |
-| `weaver-lsp-host` | Language server lifecycle, capability detection, and semantic operations | Implemented |
-| `weaver-syntax` | Tree-sitter parsing and structural search or rewrite functionality | Implemented |
-| `weaver-graph` | Relational graph layer with LSP-backed call hierarchy provider | Implemented |
-| `weaver-sandbox` | Sandbox boundary for external tools and plugin execution | Implemented |
-| `weaver-plugins` | Plugin protocol, lifecycle management, and broker integration | Implemented |
-| `weaver-plugin-rope` | Python specialist plugin integration | Implemented |
-| `weaver-plugin-rust-analyzer` | Rust specialist plugin integration | Implemented |
-| `weaver-build-util` | Shared build-time utilities used across crates | Implemented |
-| `weaver-e2e` | End-to-end test support crate and integration scaffolding | Implemented |
-| `sempai-core` | Sempai data model, diagnostics, and planning intermediate representation (IR) types | Implemented |
-| `sempai` | Sempai facade crate with stable public API, re-exports from `sempai-core`, and stub `Engine` | Implemented |
-| `weaver-cards` | Stable JSONL schemas for `observe get-card` symbol card requests and responses | Implemented |
+| `weaver-cli`                  | CLI entrypoint, command parsing, daemon lifecycle commands, and JSON Lines (JSONL) request streaming | Implemented |
+| `weaverd`                     | Daemon orchestration, command dispatch, and write-operation safety harness                           | Implemented |
+| `weaver-config`               | Shared configuration schema and loading for client and daemon                                        | Implemented |
+| `weaver-lsp-host`             | Language server lifecycle, capability detection, and semantic operations                             | Implemented |
+| `weaver-syntax`               | Tree-sitter parsing and structural search or rewrite functionality                                   | Implemented |
+| `weaver-graph`                | Relational graph layer with LSP-backed call hierarchy provider                                       | Implemented |
+| `weaver-sandbox`              | Sandbox boundary for external tools and plugin execution                                             | Implemented |
+| `weaver-plugins`              | Plugin protocol, lifecycle management, and broker integration                                        | Implemented |
+| `weaver-plugin-rope`          | Python specialist plugin integration                                                                 | Implemented |
+| `weaver-plugin-rust-analyzer` | Rust specialist plugin integration                                                                   | Implemented |
+| `weaver-build-util`           | Shared build-time utilities used across crates                                                       | Implemented |
+| `weaver-e2e`                  | End-to-end test support crate and integration scaffolding                                            | Implemented |
+| `sempai-core`                 | Sempai data model, diagnostics, and planning intermediate representation (IR) types                  | Implemented |
+| `sempai`                      | Sempai facade crate with stable public API, re-exports from `sempai-core`, and stub `Engine`         | Implemented |
+| `weaver-cards`                | Stable JSONL schemas for `observe get-card` symbol card requests and responses                       | Implemented |
 
 _Table 1: Implemented crate boundaries and responsibilities._
 
 ### Implemented shared directories
 
-| Path | Purpose | Status |
+| Path                 | Purpose                                                                                               | Status      |
 | -------------------- | ----------------------------------------------------------------------------------------------------- | ----------- |
-| `docs/` | Design docs, architectural decision records (ADRs), roadmap, migration guides, and reference material | Implemented |
-| `test_expect/` | Golden and expectation artefacts used by test suites | Implemented |
-| `.github/workflows/` | CI workflows and automation policy | Implemented |
+| `docs/`              | Design docs, architectural decision records (ADRs), roadmap, migration guides, and reference material | Implemented |
+| `test_expect/`       | Golden and expectation artefacts used by test suites                                                  | Implemented |
+| `.github/workflows/` | CI workflows and automation policy                                                                    | Implemented |
 
 _Table 2: Implemented shared directories and their roles._
 
@@ -94,19 +94,19 @@ _Table 2: Implemented shared directories and their roles._
 Planned components are listed in `docs/roadmap.md` and are not yet fully
 implemented in this repository snapshot.
 
-| Planned component | Intended location | Roadmap reference |
+| Planned component                                                          | Intended location                                                        | Roadmap reference                                    |
 | -------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------- |
-| Rust `extricate-symbol` actuator flow | `crates/weaver-plugin-rust-analyzer/` and `crates/weaverd/` | Proposed in Rust extricate actuator technical design |
+| Rust `extricate-symbol` actuator flow                                      | `crates/weaver-plugin-rust-analyzer/` and `crates/weaverd/`              | Proposed in Rust extricate actuator technical design |
 | Rust extricate plugin overlay and Rust Analyzer (RA) orchestration modules | `crates/weaver-plugin-rust-analyzer/src/lsp/` and related plugin modules | Proposed in Rust extricate actuator technical design |
-| Plugin capability metadata for extrication | `crates/weaver-plugins/src/manifest/mod.rs` | Proposed in Rust extricate actuator technical design |
-| Sempai YAML, DSL, and Tree-sitter backend crates | `crates/sempai-yaml/`, `crates/sempai-dsl/`, and `crates/sempai-ts/` | Proposed in Sempai query language technical design |
-| Sempai integration command surface (`observe`) | `crates/weaver-cli/` and `crates/weaverd/` | Proposed in Sempai query language technical design |
-| `srgn` specialist plugin | `crates/weaver-plugin-srgn/` (expected new crate) | Phase 3, specialist actuator plugins |
-| `jedi` specialist plugin | `crates/weaver-plugin-jedi/` (expected new crate) | Phase 3, specialist sensor plugins |
-| Static analysis provider for `weaver-graph` | `crates/weaver-graph/` provider modules | Phase 3, static analysis provider |
-| `onboard-project` command flow | `crates/weaver-cli/` and `crates/weaverd/` command handlers | Phase 4, advanced agent support |
-| Interactive review mode for lock failures | `crates/weaver-cli/` plus daemon confirmation interfaces | Phase 4, human-in-the-loop mode |
-| Dynamic analysis ingestion provider | `crates/weaver-graph/` provider modules | Phase 4, dynamic analysis ingestion |
+| Plugin capability metadata for extrication                                 | `crates/weaver-plugins/src/manifest/mod.rs`                              | Proposed in Rust extricate actuator technical design |
+| Sempai YAML, DSL, and Tree-sitter backend crates                           | `crates/sempai-yaml/`, `crates/sempai-dsl/`, and `crates/sempai-ts/`     | Proposed in Sempai query language technical design   |
+| Sempai integration command surface (`observe`)                             | `crates/weaver-cli/` and `crates/weaverd/`                               | Proposed in Sempai query language technical design   |
+| `srgn` specialist plugin                                                   | `crates/weaver-plugin-srgn/` (expected new crate)                        | Phase 3, specialist actuator plugins                 |
+| `jedi` specialist plugin                                                   | `crates/weaver-plugin-jedi/` (expected new crate)                        | Phase 3, specialist sensor plugins                   |
+| Static analysis provider for `weaver-graph`                                | `crates/weaver-graph/` provider modules                                  | Phase 3, static analysis provider                    |
+| `onboard-project` command flow                                             | `crates/weaver-cli/` and `crates/weaverd/` command handlers              | Phase 4, advanced agent support                      |
+| Interactive review mode for lock failures                                  | `crates/weaver-cli/` plus daemon confirmation interfaces                 | Phase 4, human-in-the-loop mode                      |
+| Dynamic analysis ingestion provider                                        | `crates/weaver-graph/` provider modules                                  | Phase 4, dynamic analysis ingestion                  |
 
 _Table 3: Planned components and their expected repository placement._
 

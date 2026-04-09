@@ -91,9 +91,9 @@ Risks:
 
 | Option | Delivery speed | Semantic control | Compatibility fit | Complexity |
 | ------ | -------------- | ---------------- | ----------------- | ---------- |
-| A | Low | High | High | Medium |
-| B | High | Medium | Low | Low |
-| C | Medium | High | High | High |
+| A      | Low            | High             | High              | Medium     |
+| B      | High           | Medium           | Low               | Low        |
+| C      | Medium         | High             | High              | High       |
 
 _Table 1: Trade-offs for Semgrep-compatible engine implementation strategies._
 
@@ -105,9 +105,9 @@ Weaver keeps a Semgrep-compatible front-end and internal normalized formula
 representation. Execution is routed as follows:
 
 1. Use ast-grep-backed execution for rules that map cleanly.
-1. Use Weaver-native matching for supported Semgrep-style constructs that do
+2. Use Weaver-native matching for supported Semgrep-style constructs that do
    not map cleanly.
-1. Return explicit unsupported-feature diagnostics when neither path can execute
+3. Return explicit unsupported-feature diagnostics when neither path can execute
    a rule safely.
 
 ## Goals and non-goals
@@ -127,10 +127,10 @@ representation. Execution is routed as follows:
 ## Migration plan
 
 1. Define a rule-capability matrix for routing eligibility.
-1. Implement routing with explicit reason codes.
-1. Add conformance tests for mapped and non-mapped operators.
-1. Add regression suites for capture boundaries and negation behaviour.
-1. Document compatibility boundaries in user-facing reference docs.
+2. Implement routing with explicit reason codes.
+3. Add conformance tests for mapped and non-mapped operators.
+4. Add regression suites for capture boundaries and negation behaviour.
+5. Document compatibility boundaries in user-facing reference docs.
 
 ## Known risks and limitations
 

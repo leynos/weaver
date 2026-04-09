@@ -175,27 +175,27 @@ are safe to re-run.
    "connect\\(" crates/weaver-cli/src/transport.rs rg -n "socket"
    docs/users-guide.md docs/weaver-design.md
 
-1. If the workspace still pins `rstest-bdd` to 0.2.x, update the workspace
+2. If the workspace still pins `rstest-bdd` to 0.2.x, update the workspace
    dependencies in `Cargo.toml` to 0.3.2 and adjust any tests that fail to
    compile.
 
-1. Add a listener module, for example `crates/weaverd/src/transport.rs`, with:
+3. Add a listener module, for example `crates/weaverd/src/transport.rs`, with:
 
    - A `DaemonListener`/`SocketListener` struct that binds to `SocketEndpoint`.
    - A `ConnectionHandler` trait for handling accepted connections.
    - A `ListenerHandle` that owns the accept loop thread and a shutdown flag.
 
-1. Integrate the listener into `crates/weaverd/src/process/launch.rs` so the
+4. Integrate the listener into `crates/weaverd/src/process/launch.rs` so the
    daemon reports ready only after binding. Ensure shutdown signals stop the
    listener and clean up Unix socket files.
 
-1. Add unit tests alongside the listener module to validate:
+5. Add unit tests alongside the listener module to validate:
 
    - TCP binding on an ephemeral port.
    - Unix socket binding (on Unix) and cleanup of stale socket files.
    - Error handling when the socket is already in use.
 
-1. Add BDD coverage using `rstest-bdd` v0.3.2. Add a feature file such as
+6. Add BDD coverage using `rstest-bdd` v0.3.2. Add a feature file such as
    `crates/weaverd/tests/features/daemon_socket.feature` and new step
    definitions under `crates/weaverd/src/tests/` to cover:
 
@@ -203,14 +203,14 @@ are safe to re-run.
    - Unhappy path: binding fails when the socket is already in use.
    - Concurrency: two clients can connect without crashing the daemon.
 
-1. Update documentation:
+7. Update documentation:
 
    - `docs/weaver-design.md` to record the listener strategy and error
      handling decisions.
    - `docs/users-guide.md` to describe any user-visible behaviour changes.
    - `docs/roadmap.md` to mark the socket listener item as done.
 
-1. Format and validate documentation if any docs changed:
+8. Format and validate documentation if any docs changed:
 
    ```sh
    set -o pipefail
@@ -220,7 +220,7 @@ are safe to re-run.
 
    Run `make nixie` only if a Mermaid diagram was edited.
 
-1. Run the Rust quality gates:
+9. Run the Rust quality gates:
 
    ```sh
    set -o pipefail

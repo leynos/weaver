@@ -62,26 +62,26 @@ Observable success for this roadmap item:
    `crates/weaver-plugins/` unless an implementation blocker proves the
    contract is insufficient. That is an escalation event, not an autonomous
    change.
-1. Keep the CLI surface stable. Users still invoke
+2. Keep the CLI surface stable. Users still invoke
    `weaver act refactor --provider rust-analyzer --refactoring rename ...`. The
    daemon performs the internal mapping to `rename-symbol`.
-1. Keep all execution synchronous. Do not introduce async runtimes, async
+3. Keep all execution synchronous. Do not introduce async runtimes, async
    traits, or background tasks.
-1. Preserve the existing Double-Lock path. Successful Rust rename edits must
+4. Preserve the existing Double-Lock path. Successful Rust rename edits must
    still return unified diff output that is forwarded into `act apply-patch`.
-1. Respect the repository-wide 400-line file limit. Current hotspots:
+5. Respect the repository-wide 400-line file limit. Current hotspots:
    `crates/weaver-plugin-rust-analyzer/src/lib.rs` is 358 lines and
    `crates/weaverd/src/dispatch/act/refactor/mod.rs` is 399 lines.
-1. All touched Rust modules must retain module-level `//!` documentation, and
+6. All touched Rust modules must retain module-level `//!` documentation, and
    all public items must remain documented.
-1. Behaviour tests must use `rstest-bdd` v0.5.0 patterns already used in this
+7. Behaviour tests must use `rstest-bdd` v0.5.0 patterns already used in this
    repository, including a fixture parameter named exactly `world`.
-1. Lint suppressions are a last resort. If unavoidable, use tightly scoped
+8. Lint suppressions are a last resort. If unavoidable, use tightly scoped
    `#[expect(..., reason = "...")]`; do not add `#[allow(...)]`.
-1. Comments and documentation must use en-GB-oxendict spelling.
-1. Use existing workspace dependencies only. Adding a new crate dependency is
+9. Comments and documentation must use en-GB-oxendict spelling.
+10. Use existing workspace dependencies only. Adding a new crate dependency is
    out of scope for this item.
-1. The plan must record any new design decisions in `docs/weaver-design.md`
+11. The plan must record any new design decisions in `docs/weaver-design.md`
    as part of implementation, not just in this ExecPlan.
 
 ## Tolerances (exception triggers)
@@ -307,13 +307,13 @@ contract vocabulary.
 Update the behavioural tests in
 `crates/weaver-plugin-rust-analyzer/src/tests/behaviour.rs` and
 `crates/weaver-plugin-rust-analyzer/tests/features/rust_analyzer_plugin.feature`
-to describe the capability contract explicitly. The scenarios should prove:
+ to describe the capability contract explicitly. The scenarios should prove:
 
 1. the plugin accepts a valid `rename-symbol` request and returns diff output;
-1. the plugin rejects missing required arguments with failure diagnostics;
-1. the plugin rejects unsupported operations with a stable failure shape;
-1. adapter failures are surfaced without crashing the dispatcher;
-1. unchanged content is treated as failure.
+2. the plugin rejects missing required arguments with failure diagnostics;
+3. the plugin rejects unsupported operations with a stable failure shape;
+4. adapter failures are surfaced without crashing the dispatcher;
+5. unchanged content is treated as failure.
 
 If line pressure grows in `src/tests/mod.rs`, extract request-building helpers
 into a small test-only support submodule rather than making the file sprawl.
@@ -417,14 +417,14 @@ The minimal evidence expected from the implementation is:
 
 1. a unit test in the rust-analyzer plugin crate proving a valid
    `rename-symbol` request succeeds with diff output;
-1. unit tests proving malformed `position`, missing `uri`, missing
+2. unit tests proving malformed `position`, missing `uri`, missing
    `new_name`, unsupported operation, and unchanged output fail with the
    expected diagnostic shape;
-1. `rstest-bdd` scenarios covering happy and unhappy contract paths using the
+3. `rstest-bdd` scenarios covering happy and unhappy contract paths using the
    repository’s mutable-world pattern;
-1. a daemon-side test proving the Rust provider path sends the
+4. a daemon-side test proving the Rust provider path sends the
    `rename-symbol` operation and contract fields;
-1. passing `make fmt`, `make markdownlint`, `make check-fmt`, `make lint`, and
+5. passing `make fmt`, `make markdownlint`, `make check-fmt`, `make lint`, and
    `make test`.
 
 The feature is complete only when those checks pass and the roadmap entry is

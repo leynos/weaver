@@ -103,9 +103,9 @@ make nixie        # exits 0
   but current contract wording and tests do not yet lock parser-vs-validator
   schema parity via snapshots. Evidence:
   [crates/sempai-core/src/diagnostic.rs](../../crates/sempai-core/src/diagnostic.rs)
-  and
+   and
   [crates/sempai-core/src/tests/diagnostic_tests.rs](../../crates/sempai-core/src/tests/diagnostic_tests.rs).
-  Impact: Work should focus on schema hardening and path parity, not inventing
+   Impact: Work should focus on schema hardening and path parity, not inventing
   a new code set.
 
 - Observation: `rstest-bdd` v0.5.0 is already pinned at workspace level.
@@ -116,7 +116,7 @@ make nixie        # exits 0
   `insta` configuration, while `assert_snapshot!` is available and stable.
   Evidence:
   [crates/sempai-core/src/tests/diagnostic_snapshot_tests.rs](../../crates/sempai-core/src/tests/diagnostic_snapshot_tests.rs).
-  Impact: Snapshot tests should serialize deterministic pretty JSON strings
+   Impact: Snapshot tests should serialize deterministic pretty JSON strings
   and use `assert_snapshot!`.
 
 ## Decision log
@@ -141,12 +141,12 @@ make nixie        # exits 0
 Target outcome at completion:
 
 1. Stable diagnostic payload contract exists and is documented.
-1. Parser-path and validator-path diagnostics serialize to the same schema.
-1. Unit, behavioural, and snapshot tests cover happy/unhappy/edge paths.
-1. `docs/users-guide.md` explains the updated diagnostic contract.
-1. `docs/sempai-query-language-design.md` records decisions made here.
-1. Roadmap item 4.1.2 is checked off.
-1. `make check-fmt`, `make lint`, and `make test` pass.
+2. Parser-path and validator-path diagnostics serialize to the same schema.
+3. Unit, behavioural, and snapshot tests cover happy/unhappy/edge paths.
+4. `docs/users-guide.md` explains the updated diagnostic contract.
+5. `docs/sempai-query-language-design.md` records decisions made here.
+6. Roadmap item 4.1.2 is checked off.
+7. `make check-fmt`, `make lint`, and `make test` pass.
 
 Retrospective notes:
 

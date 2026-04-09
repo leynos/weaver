@@ -150,37 +150,37 @@ the UI gap analysis.[^3][^4]
 ## Progress
 
 - [x] (2026-03-28 00:00Z) Read `docs/roadmap.md`,
-  `docs/ui-gap-analysis.md`, `docs/weaver-design.md`,
-  `docs/users-guide.md`, and the referenced testing guides.
+  `docs/ui-gap-analysis.md`, `docs/weaver-design.md`, `docs/users-guide.md`,
+  and the referenced testing guides.
 - [x] (2026-03-28 00:10Z) Confirmed the live daemon path:
-  `DomainRouter::route_fallback(...)` returns
-  `DispatchError::UnknownOperation` without any operation alternatives, and
-  `ResponseWriter::write_error(...)` serializes only the display string.
+  `DomainRouter::route_fallback(...)` returns `DispatchError::UnknownOperation`
+  without any operation alternatives, and `ResponseWriter::write_error(...)`
+  serializes only the display string.
 - [x] (2026-03-28 00:15Z) Confirmed the live CLI path:
-  `read_daemon_messages(...)` can already human-render typed JSON payloads,
-  but unknown-operation errors arrive only as plain stderr text today.
+  `read_daemon_messages(...)` can already human-render typed JSON payloads, but
+  unknown-operation errors arrive only as plain stderr text today.
 - [x] (2026-03-28 00:20Z) Confirmed that the workspace already pins
-  `rstest-bdd` and `rstest-bdd-macros` at `0.5.0`, so no dependency update
-  is required.
+  `rstest-bdd` and `rstest-bdd-macros` at `0.5.0`, so no dependency update is
+  required.
 - [x] (2026-03-28 00:30Z) Drafted this ExecPlan in
   `docs/execplans/2-3-2-valid-operation-alternatives-for-unknown-operations.md`.
 - [x] (2026-03-28 23:15Z) Stage A: added failing unit and behavioural tests
-  covering daemon payload shape, CLI human rendering, and JSON passthrough
-  for unknown operations.
+  covering daemon payload shape, CLI human rendering, and JSON passthrough for
+  unknown operations.
 - [x] (2026-03-28 23:22Z) Stage B: extended `DispatchError::UnknownOperation`
   with canonical `known_operations` and taught `ResponseWriter` to emit a
   structured `UnknownOperation` JSON payload on stderr.
 - [x] (2026-03-28 23:30Z) Stage C: added CLI parsing and human rendering for
-  `UnknownOperation` payloads and confirmed the new `rstest-bdd` scenarios
-  pass for both daemon and CLI.
+  `UnknownOperation` payloads and confirmed the new `rstest-bdd` scenarios pass
+  for both daemon and CLI.
 - [x] (2026-03-29 12:45Z) Stage D: updated `docs/weaver-design.md`,
   `docs/users-guide.md`, and `docs/roadmap.md` to describe the shipped
-  daemon-routed `UnknownOperation` contract and marked roadmap item
-  `2.3.2` done.
+  daemon-routed `UnknownOperation` contract and marked roadmap item `2.3.2`
+  done.
 - [x] (2026-03-29 12:59Z) Stage E: ran `make fmt`,
   `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
-  `make test` successfully after fixing one daemon unit assertion to parse
-  the inner JSON payload from the stream envelope.
+  `make test` successfully after fixing one daemon unit assertion to parse the
+  inner JSON payload from the stream envelope.
 
 ## Surprises & Discoveries
 
@@ -241,15 +241,15 @@ Target outcome at completion:
 1. `weaverd` emits a structured unknown-operation payload containing
    `domain`, `operation`, and the full `known_operations` array for the routed
    domain.
-1. `weaver --output json <domain> <unknown-operation>` forwards that payload
+2. `weaver --output json <domain> <unknown-operation>` forwards that payload
    unchanged and still exits with code `1`.
-1. `weaver <domain> <unknown-operation>` renders a readable
+3. `weaver <domain> <unknown-operation>` renders a readable
    `Available operations:` block from the structured daemon payload.
-1. The daemon and CLI behavioural suites exercise the new path with
+4. The daemon and CLI behavioural suites exercise the new path with
    `rstest-bdd` using the existing harnesses.
-1. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
+5. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
    reflect the shipped behaviour.
-1. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
+6. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
 Retrospective notes:
@@ -373,11 +373,11 @@ The smallest viable implementation is:
 
 1. Extend `DispatchError::UnknownOperation` so it carries the canonical
    `known_operations` slice for the routed domain.
-1. Change `DomainRouter::route_fallback(...)` to pass that slice into the
+2. Change `DomainRouter::route_fallback(...)` to pass that slice into the
    error.
-1. Add a serializer helper near `ResponseWriter` that converts the error into
+3. Add a serializer helper near `ResponseWriter` that converts the error into
    the structured JSON payload above.
-1. Special-case `DispatchError::UnknownOperation` inside
+4. Special-case `DispatchError::UnknownOperation` inside
    `ResponseWriter::write_error(...)` so callers keep using the same error
    writing path while other errors continue through the display-string branch.
 
@@ -464,20 +464,20 @@ This work is complete only when all of the following are true:
 
 1. Unknown-operation daemon responses carry the routed domain's complete
    `known_operations` set in JSON.
-1. The JSON payload count matches the router slice length for the routed
+2. The JSON payload count matches the router slice length for the routed
    domain.
-1. Human-readable CLI output includes the same full list as an
+3. Human-readable CLI output includes the same full list as an
    `Available operations:` block.
-1. `--output json` forwards the structured payload unchanged.
-1. Unit tests and `rstest-bdd` behavioural tests pass for both daemon and CLI
+4. `--output json` forwards the structured payload unchanged.
+5. Unit tests and `rstest-bdd` behavioural tests pass for both daemon and CLI
    paths.
-1. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md` are
+6. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md` are
    updated.
-1. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
+7. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
-\[^1\]: `docs/roadmap.md` item `2.3.2`.
-\[^2\]: `docs/ui-gap-analysis.md` Level 4.
-\[^3\]: `docs/ui-gap-analysis.md#level-4--unknown-operation-weaver-observe-nonexistent`.
-\[^4\]: `docs/ui-gap-analysis.md#level-10--error-messages-and-exit-codes`.
-\[^5\]: `docs/execplans/2-3-1-validate-domains-client-side-before-daemon-startup.md`.
+[^1]: `docs/roadmap.md` item `2.3.2`.
+[^2]: `docs/ui-gap-analysis.md` Level 8.
+[^3]: `docs/ui-gap-analysis.md#level-4--unknown-operation-weaver-observe-nonexistent`.
+[^4]: `docs/ui-gap-analysis.md#level-10c--error-messages-and-exit-codes`.
+[^5]: `docs/execplans/2-3-1-validate-domains-client-side-before-daemon-startup.md`.

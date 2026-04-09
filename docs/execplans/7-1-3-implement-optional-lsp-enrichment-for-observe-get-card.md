@@ -28,13 +28,13 @@ Observable behaviour after implementation:
    `hover`, `type` (JSON key for the Rust field `type_info`), `deprecated`, and
    `source` attributes, and provenance sources including both `"tree_sitter"`
    and `"lsp_hover"`.
-1. The same request against a file where the LSP is unavailable (no server
+2. The same request against a file where the LSP is unavailable (no server
    registered, hover capability missing, or server error) returns a card with
    `lsp: null` (omitted in JSON) and provenance containing
    `"tree_sitter_degraded_semantic"` — identical to the current behaviour.
-1. Requests at `--detail structure` or lower are unaffected; they never
+3. Requests at `--detail structure` or lower are unaffected; they never
    attempt LSP enrichment.
-1. `make check-fmt`, `make lint`, `make test`, `make markdownlint`, and
+4. `make check-fmt`, `make lint`, `make test`, `make markdownlint`, and
    `make nixie` all exit 0 when run through the repository's required
    `pipefail` plus `tee` pattern.
 
@@ -46,22 +46,22 @@ Observable behaviour after implementation:
    correct field shape (`hover`, `type_info`, `deprecated`, `source`) and
    serializes `type_info` as JSON key `"type"`. This task must populate it, not
    redesign it.
-1. The workspace enforces strict linting: `unwrap_used`, `expect_used`,
+2. The workspace enforces strict linting: `unwrap_used`, `expect_used`,
    `indexing_slicing`, `string_slice`, `allow_attributes`, `missing_docs`,
    `missing_const_for_fn`, `cognitive_complexity`, and the 400-line file limit
    for code files.
-1. Every new Rust module must begin with a `//!` comment, and all public
+3. Every new Rust module must begin with a `//!` comment, and all public
    items must have `///` rustdoc comments.
-1. `GetCardResponse` is `#[non_exhaustive]`, so matches in `weaverd` must
+4. `GetCardResponse` is `#[non_exhaustive]`, so matches in `weaverd` must
    keep a wildcard arm.
-1. Behaviour tests must use `rstest-bdd` v0.5.0 with the `world` fixture
+5. Behaviour tests must use `rstest-bdd` v0.5.0 with the `world` fixture
    convention.
-1. The Tree-sitter extraction layer in `crates/weaver-cards/` must remain
+6. The Tree-sitter extraction layer in `crates/weaver-cards/` must remain
    independent of LSP. LSP enrichment is a post-extraction concern owned by the
    daemon handler in `crates/weaverd/`.
-1. Prerequisites 2.1.9 (LSP host with capability negotiation) and 3.1.3
+7. Prerequisites 2.1.9 (LSP host with capability negotiation) and 3.1.3
    (document sync) are already complete.
-1. en-GB-oxendict spelling for comments and documentation.
+8. en-GB-oxendict spelling for comments and documentation.
 
 ## Tolerances (exception triggers)
 
@@ -170,7 +170,7 @@ Lessons learned:
    tests that iterate over "all capabilities" will fail unless the new
    capability is included in the test's capability set. This should be
    anticipated for future capability additions.
-1. Extracting enrichment into a sibling module was the right call — it
+2. Extracting enrichment into a sibling module was the right call — it
    kept both `get_card.rs` (347 lines) and `enrich.rs` (273 lines) comfortably
    within the 400-line budget.
 
@@ -183,7 +183,7 @@ Post-implementation improvements:
    `CapabilitySummary.position_encoding` to enrichment code. Servers that
    decline UTF-8 negotiation are logged with a debug warning.
 
-1. **UTF-16 offset conversion (2026-03-23)**: Implemented conditional position
+2. **UTF-16 offset conversion (2026-03-23)**: Implemented conditional position
    encoding logic in `crates/weaverd/src/dispatch/observe/enrich.rs`. When the
    server negotiates UTF-8 (LSP 3.17+), Tree-sitter byte offsets are used
    directly as character offsets. Otherwise, byte offsets are converted to
@@ -191,13 +191,13 @@ Post-implementation improvements:
    source string passed to `try_lsp_enrichment()`. This ensures correct hover
    positions for files containing non-ASCII characters across all LSP servers.
 
-1. **Source parameter threading (2026-03-23)**: Updated `try_lsp_enrichment()`
+3. **Source parameter threading (2026-03-23)**: Updated `try_lsp_enrichment()`
    to accept a `source: &str` parameter, eliminating file re-reads during
    UTF-16 conversion. The source text is now passed from
    `get_card.rs::apply_lsp_enrichment()`, which already has it loaded for
    Tree-sitter extraction.
 
-1. **Allocation optimization (2026-03-20)**: Replaced
+4. **Allocation optimization (2026-03-20)**: Replaced
    `contains(&String::from("lsp_hover"))` with
    `iter().any(|s| s == "lsp_hover")` in `apply_lsp_enrichment` to avoid
    allocating a temporary `String` during provenance checks.
@@ -222,22 +222,22 @@ file position. The operation spans three crates:
 
 **Table:** Key types and locations referenced in this plan
 
-| Type | File |
+| Type                      | File                                              |
 | ------------------------- | ------------------------------------------------- |
-| `SymbolCard`, `LspInfo` | `crates/weaver-cards/src/card.rs` |
-| `DetailLevel` | `crates/weaver-cards/src/detail.rs` |
-| `Provenance` | `crates/weaver-cards/src/card.rs` |
-| `provenance_sources()` | `crates/weaver-cards/src/extract/utils.rs` |
-| `CapabilityKind` | `crates/weaver-lsp-host/src/capability.rs` |
-| `ServerCapabilitySet` | `crates/weaver-lsp-host/src/server.rs` |
-| `LanguageServer` trait | `crates/weaver-lsp-host/src/server.rs` |
-| `LspHost` | `crates/weaver-lsp-host/src/host.rs` |
-| `HostOperation` | `crates/weaver-lsp-host/src/errors.rs` |
-| `get_card::handle()` | `crates/weaverd/src/dispatch/observe/get_card.rs` |
-| `route_observe()` | `crates/weaverd/src/dispatch/router.rs` |
-| `SemanticBackendProvider` | `crates/weaverd/src/semantic_provider/mod.rs` |
-| BDD world | `crates/weaverd/src/tests/get_card_behaviour.rs` |
-| BDD feature | `crates/weaverd/tests/features/get_card.feature` |
+| `SymbolCard`, `LspInfo`   | `crates/weaver-cards/src/card.rs`                 |
+| `DetailLevel`             | `crates/weaver-cards/src/detail.rs`               |
+| `Provenance`              | `crates/weaver-cards/src/card.rs`                 |
+| `provenance_sources()`    | `crates/weaver-cards/src/extract/utils.rs`        |
+| `CapabilityKind`          | `crates/weaver-lsp-host/src/capability.rs`        |
+| `ServerCapabilitySet`     | `crates/weaver-lsp-host/src/server.rs`            |
+| `LanguageServer` trait    | `crates/weaver-lsp-host/src/server.rs`            |
+| `LspHost`                 | `crates/weaver-lsp-host/src/host.rs`              |
+| `HostOperation`           | `crates/weaver-lsp-host/src/errors.rs`            |
+| `get_card::handle()`      | `crates/weaverd/src/dispatch/observe/get_card.rs` |
+| `route_observe()`         | `crates/weaverd/src/dispatch/router.rs`           |
+| `SemanticBackendProvider` | `crates/weaverd/src/semantic_provider/mod.rs`     |
+| BDD world                 | `crates/weaverd/src/tests/get_card_behaviour.rs`  |
+| BDD feature               | `crates/weaverd/tests/features/get_card.feature`  |
 
 The `observe get-definition` handler at
 `crates/weaverd/src/dispatch/observe/get_definition.rs` serves as the reference
@@ -341,12 +341,12 @@ The function:
 
 1. Inspects `card.symbol.symbol_ref.language` to derive the LSP
    `Language`.
-1. Calls `backends.ensure_started(BackendKind::Semantic)`. On failure,
+2. Calls `backends.ensure_started(BackendKind::Semantic)`. On failure,
    returns `Degraded`.
-1. Calls `backends.provider().with_lsp_host_mut(...)` to initialize the
+3. Calls `backends.provider().with_lsp_host_mut(...)` to initialize the
    language server and call `hover`. On any error (unknown language, capability
    unavailable, server error), returns `Degraded`.
-1. On success, parses the `Hover` response to extract plain text, type
+4. On success, parses the `Hover` response to extract plain text, type
    info, and deprecation signal. Sets `card.lsp = Some(LspInfo { ... })` and
    returns `Enriched`.
 
@@ -466,20 +466,20 @@ set -o pipefail; make test 2>&1 | tee /tmp/7-1-3-test.log
 All commands are run from the repository root `/home/user/project`.
 
 1. Edit `crates/weaver-lsp-host/src/capability.rs` — add `Hover` variant.
-1. Edit `crates/weaver-lsp-host/src/server.rs` — add `hover` field and
+2. Edit `crates/weaver-lsp-host/src/server.rs` — add `hover` field and
    trait method.
-1. Edit `crates/weaver-lsp-host/src/errors.rs` — add `Hover` operation.
-1. Edit `crates/weaver-lsp-host/src/host.rs` — add `hover` lsp_method.
-1. Update mock servers in tests and add hover capability tests.
-1. Create `crates/weaverd/src/dispatch/observe/enrich.rs`.
-1. Register module in `crates/weaverd/src/dispatch/observe/mod.rs`.
-1. Edit `crates/weaverd/src/dispatch/observe/get_card.rs` — update
+3. Edit `crates/weaver-lsp-host/src/errors.rs` — add `Hover` operation.
+4. Edit `crates/weaver-lsp-host/src/host.rs` — add `hover` lsp_method.
+5. Update mock servers in tests and add hover capability tests.
+6. Create `crates/weaverd/src/dispatch/observe/enrich.rs`.
+7. Register module in `crates/weaverd/src/dispatch/observe/mod.rs`.
+8. Edit `crates/weaverd/src/dispatch/observe/get_card.rs` — update
    handler signature and add enrichment call.
-1. Edit `crates/weaverd/src/dispatch/router.rs` — pass backends.
-1. Update existing unit tests for new handler signature.
-1. Verify BDD tests still pass.
-1. Update documentation.
-1. Run commit gating.
+9. Edit `crates/weaverd/src/dispatch/router.rs` — pass backends.
+10. Update existing unit tests for new handler signature.
+11. Verify BDD tests still pass.
+12. Update documentation.
+13. Run commit gating.
 
 ## Validation and acceptance
 

@@ -11,9 +11,9 @@ Configuration is layered using `ortho-config` with the following precedence
 order:
 
 1. built-in defaults,
-1. configuration files discovered via `--config-path` and the XDG search path,
-1. environment variables, and
-1. CLI flags.
+2. configuration files discovered via `--config-path` and the XDG search path,
+3. environment variables, and
+4. CLI flags.
 
 Each successive layer overrides earlier sources. This guarantees that a
 parameter passed through the CLI is honoured even when a configuration file or
@@ -815,12 +815,12 @@ Arguments:
 
 Table: act refactor command-line flags
 
-| Flag | Description |
+| Flag            | Description                                                                                                                                                                     |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--provider` | Optional compatibility override for the registered plugin (e.g. `rope`, `rust-analyzer`). When omitted, the daemon selects a provider by capability and inferred file language. |
-| `--refactoring` | Refactoring operation to request (currently `rename`). The handler maps `rename` to the `rename-symbol` capability contract internally. |
-| `--file` | Path to the target file (relative to workspace root). |
-| `KEY=VALUE` | Extra key-value arguments forwarded to the plugin. |
+| `--provider`    | Optional compatibility override for the registered plugin (e.g. `rope`, `rust-analyzer`). When omitted, the daemon selects a provider by capability and inferred file language. |
+| `--refactoring` | Refactoring operation to request (currently `rename`). The handler maps `rename` to the `rename-symbol` capability contract internally.                                         |
+| `--file`        | Path to the target file (relative to workspace root).                                                                                                                           |
+| `KEY=VALUE`     | Extra key-value arguments forwarded to the plugin.                                                                                                                              |
 
 The plugin receives the file content in-band as part of the JSONL request and
 does not need filesystem access. The daemon validates the resulting diff
@@ -842,13 +842,13 @@ to the selected plugin.
 
 Table: act refactor parameter semantics and validation
 
-| Parameter | Meaning | Valid values | Failure conditions |
+| Parameter       | Meaning                                                                                                                                                | Valid values                                                                                              | Failure conditions                                                                                                       |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `--provider` | Optional explicit provider override. | Omit for daemon-selected routing, or supply a registered actuator name such as `rope` or `rust-analyzer`. | Unknown providers, or providers that do not support the inferred language and capability, are refused deterministically. |
-| `--refactoring` | Refactoring operation requested from the plugin. The handler maps `rename` to the `rename-symbol` capability contract before forwarding to the plugin. | Currently only `rename` is implemented by built-in `rope` and `rust-analyzer` plugins. | Missing value, or unsupported operation name (for example `extract_method`) causes failure. |
-| `--file` | Target file to load and refactor. | Workspace-relative path to an existing readable file (for example `src/main.py`). | Absolute paths, parent traversal (`..`), or unreadable/missing files cause failure. |
-| `new_name` | New symbol name used by `rename`. | Non-empty string value. | Missing key, non-string value, or empty/whitespace-only value causes failure. |
-| `offset` | UTF-8 byte offset of the symbol occurrence used as rename anchor. The handler maps `offset` to the contract `position` field internally. | Non-negative integer, provided as a number or numeric string (for example `4` or `"4"`). | Missing key, non-numeric value, or negative value causes failure. |
+| `--provider`    | Optional explicit provider override.                                                                                                                   | Omit for daemon-selected routing, or supply a registered actuator name such as `rope` or `rust-analyzer`. | Unknown providers, or providers that do not support the inferred language and capability, are refused deterministically. |
+| `--refactoring` | Refactoring operation requested from the plugin. The handler maps `rename` to the `rename-symbol` capability contract before forwarding to the plugin. | Currently only `rename` is implemented by built-in `rope` and `rust-analyzer` plugins.                    | Missing value, or unsupported operation name (for example `extract_method`) causes failure.                              |
+| `--file`        | Target file to load and refactor.                                                                                                                      | Workspace-relative path to an existing readable file (for example `src/main.py`).                         | Absolute paths, parent traversal (`..`), or unreadable/missing files cause failure.                                      |
+| `new_name`      | New symbol name used by `rename`.                                                                                                                      | Non-empty string value.                                                                                   | Missing key, non-string value, or empty/whitespace-only value causes failure.                                            |
+| `offset`        | UTF-8 byte offset of the symbol occurrence used as rename anchor. The handler maps `offset` to the contract `position` field internally.               | Non-negative integer, provided as a number or numeric string (for example `4` or `"4"`).                  | Missing key, non-numeric value, or negative value causes failure.                                                        |
 
 For `offset`, count bytes from the start of the file (`0`-based), not line and
 column pairs. This matters when multibyte UTF-8 characters appear before the
@@ -859,17 +859,17 @@ target symbol.
 Both examples follow the same execution pipeline:
 
 1. `weaverd` parses `--provider`, `--refactoring`, and `--file`.
-1. It maps `rename` to `rename-symbol`, infers the target language from the
+2. It maps `rename` to `rename-symbol`, infers the target language from the
    path, and resolves the provider automatically or validates the explicit
    override.
-1. It emits a structured `CapabilityResolution` record describing that
+3. It emits a structured `CapabilityResolution` record describing that
    routing decision.
-1. The file content is read from the workspace and sent to the plugin in-band.
-1. The plugin executes `rename-symbol` using `position` and `new_name`.
-1. The plugin returns a unified diff for the modified file.
-1. Weaver validates the diff via the Double-Lock safety harness (syntax then
+4. The file content is read from the workspace and sent to the plugin in-band.
+5. The plugin executes `rename-symbol` using `position` and `new_name`.
+6. The plugin returns a unified diff for the modified file.
+7. Weaver validates the diff via the Double-Lock safety harness (syntax then
    semantic checks).
-1. If validation passes, Weaver writes the file atomically and returns:
+8. If validation passes, Weaver writes the file atomically and returns:
    `{"files_deleted":0,"files_written":1,"status":"ok"}`.
 
 When validation fails, parameters are invalid, or the plugin reports an error,
@@ -1026,15 +1026,15 @@ Plugins are categorized as either **sensors** or **actuators**:
 
 Each plugin is described by a manifest containing:
 
-| Field | Description |
+| Field          | Description                                            |
 | -------------- | ------------------------------------------------------ |
-| `name` | Unique plugin identifier (e.g. `rope`). |
-| `version` | Plugin version string. |
-| `kind` | `sensor` or `actuator`. |
-| `languages` | List of supported languages (case-insensitive). |
-| `executable` | Absolute path to the plugin binary. |
-| `args` | Default arguments passed to the executable (optional). |
-| `timeout_secs` | Maximum execution time in seconds (default: 30). |
+| `name`         | Unique plugin identifier (e.g. `rope`).                |
+| `version`      | Plugin version string.                                 |
+| `kind`         | `sensor` or `actuator`.                                |
+| `languages`    | List of supported languages (case-insensitive).        |
+| `executable`   | Absolute path to the plugin binary.                    |
+| `args`         | Default arguments passed to the executable (optional). |
+| `timeout_secs` | Maximum execution time in seconds (default: 30).       |
 
 ### IPC protocol
 
@@ -1043,8 +1043,8 @@ standard I/O:
 
 1. The broker writes one JSONL request line to the plugin's stdin and closes
    stdin.
-1. The plugin writes one JSONL response line to stdout and exits.
-1. Plugin stderr is captured for diagnostic logging but is not part of the
+2. The plugin writes one JSONL response line to stdout and exits.
+3. Plugin stderr is captured for diagnostic logging but is not part of the
    protocol.
 
 File content is passed in-band as part of the request body, so sandboxed
@@ -1084,13 +1084,13 @@ The following capability identifiers are defined:
 
 Table: Code transformation capabilities.
 
-| Identifier | Description |
+| Identifier          | Description                                          |
 | ------------------- | ---------------------------------------------------- |
-| `rename-symbol` | Rename a symbol across a codebase. |
-| `extricate-symbol` | Move a symbol to a different module or file. |
-| `extract-method` | Extract a code region into a new function or method. |
-| `replace-body` | Replace the body of a function or method. |
-| `extract-predicate` | Extract a conditional expression into a predicate. |
+| `rename-symbol`     | Rename a symbol across a codebase.                   |
+| `extricate-symbol`  | Move a symbol to a different module or file.         |
+| `extract-method`    | Extract a code region into a new function or method. |
+| `replace-body`      | Replace the body of a function or method.            |
+| `extract-predicate` | Extract a conditional expression into a predicate.   |
 
 #### The `rename-symbol` capability contract
 
@@ -1100,10 +1100,10 @@ fields in the `arguments` map:
 
 Table: Required fields for `rename-symbol` requests.
 
-| Field | Type | Description |
+| Field      | Type   | Description                                      |
 | ---------- | ------ | ------------------------------------------------ |
-| `uri` | string | File URI of the symbol to rename. |
-| `position` | string | Position of the symbol as a UTF-8 byte offset. |
+| `uri`      | string | File URI of the symbol to rename.                |
+| `position` | string | Position of the symbol as a UTF-8 byte offset.   |
 | `new_name` | string | The new name for the symbol (must be non-empty). |
 
 Successful responses must contain a `Diff` output with a unified diff patch.
@@ -1123,14 +1123,14 @@ programmatic matching:
 
 Table: Refusal reason codes for plugin diagnostics.
 
-| Reason code | Meaning |
+| Reason code               | Meaning                                              |
 | ------------------------- | ---------------------------------------------------- |
-| `symbol_not_found` | The target symbol could not be located. |
-| `macro_generated` | The symbol is generated by a macro. |
-| `ambiguous_references` | Multiple candidate symbols match the position. |
-| `unsupported_language` | The plugin does not support the target language. |
-| `incomplete_payload` | Required fields are missing from the request. |
-| `name_conflict` | The new name conflicts with an existing symbol. |
+| `symbol_not_found`        | The target symbol could not be located.              |
+| `macro_generated`         | The symbol is generated by a macro.                  |
+| `ambiguous_references`    | Multiple candidate symbols match the position.       |
+| `unsupported_language`    | The plugin does not support the target language.     |
+| `incomplete_payload`      | Required fields are missing from the request.        |
+| `name_conflict`           | The new name conflicts with an existing symbol.      |
 | `operation_not_supported` | The plugin does not support the requested operation. |
 
 Reason codes are stable identifiers intended for automation. They appear in the
@@ -1188,11 +1188,11 @@ The daemon spawns real language server processes for each language and
 communicates via JSON-RPC 2.0 over stdio. The following binaries must be
 available in `PATH`:
 
-| Language | Binary | Example invocation |
+| Language   | Binary          | Example invocation |
 | ---------- | --------------- | ------------------ |
-| Rust | `rust-analyzer` | `rust-analyzer` |
-| Python | `pyrefly` | `pyrefly lsp` |
-| TypeScript | `tsgo` | `tsgo --lsp` |
+| Rust       | `rust-analyzer` | `rust-analyzer`    |
+| Python     | `pyrefly`       | `pyrefly lsp`      |
+| TypeScript | `tsgo`          | `tsgo --lsp`       |
 
 When a language server binary is not found, the daemon returns a clear error
 message identifying the missing command. This allows operators to install the
@@ -1227,7 +1227,7 @@ The harness validates proposed edits in two sequential phases:
    semicolons, or malformed declarations are caught at this stage. Files that
    fail parsing are rejected immediately, and the filesystem remains untouched.
 
-1. **Semantic Lock**: If the syntactic lock passes, the modified content is
+2. **Semantic Lock**: If the syntactic lock passes, the modified content is
    submitted to the configured language server. The daemon requests fresh
    diagnostics and compares them against the pre-edit baseline. Any new errors
    or high-severity warnings cause the semantic lock to fail. Only when both
@@ -1327,22 +1327,23 @@ The `Engine` struct exposes three methods for query compilation and execution:
 normalization of search-mode rules. The pipeline is:
 
 1. **Parse** — Malformed YAML returns `E_SEMPAI_YAML_PARSE`, and schema-shape
-   failures such as missing required rule keys return `E_SEMPAI_SCHEMA_INVALID`,
-   both using the shared structured diagnostic payload with `primary_span`
-   locations when available.
+   failures such as missing required rule keys return
+   `E_SEMPAI_SCHEMA_INVALID`, both using the shared structured diagnostic
+   payload with `primary_span` locations when available.
 
-1. **Mode validation** — `search` rules, including compatibility-only
+2. **Mode validation** — `search` rules, including compatibility-only
    `r2c-internal-project-depends-on` rules, proceed to normalization.
-   Non-search modes (`extract`, `taint`, `join`) and unknown future mode strings
-   fail deterministically with `E_SEMPAI_UNSUPPORTED_MODE`.
-   Unsupported-mode diagnostics point at the rule's `mode` field when that span is
-   available.
+   Non-search modes (`extract`, `taint`, `join`) and unknown future mode
+   strings fail deterministically with `E_SEMPAI_UNSUPPORTED_MODE`.
+   Unsupported-mode diagnostics point at the rule's `mode` field when that span
+   is available.
 
-1. **Normalization** — Valid search-mode rules have both legacy `pattern*` syntax
-   and v2 `match` syntax lowered into a canonical `Formula` model. Semantic
-   validation on the canonical form produces deterministic diagnostics:
+3. **Normalization** — Valid search-mode rules have both legacy `pattern*`
+   syntax and v2 `match` syntax lowered into a canonical `Formula` model.
+   Semantic validation on the canonical form produces deterministic diagnostics:
 
-- `E_SEMPAI_INVALID_NOT_IN_OR` — negation directly inside `pattern-either` or `any`
+- `E_SEMPAI_INVALID_NOT_IN_OR` — negation directly inside `pattern-either` or
+  `any`
 - `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND` — conjunction with only constraints
 
 Valid search-mode rules return real `QueryPlan` values containing the

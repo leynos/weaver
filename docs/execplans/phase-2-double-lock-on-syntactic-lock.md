@@ -15,7 +15,7 @@ The Double-Lock safety harness validates code modifications through two
 sequential phases:
 
 1. **Syntactic Lock**: Ensures modified files produce valid syntax trees
-1. **Semantic Lock**: Verifies no new errors are introduced via Language Server
+2. **Semantic Lock**: Verifies no new errors are introduced via Language Server
    Protocol (LSP) diagnostics
 
 Currently, the syntactic lock uses a placeholder implementation that always
@@ -139,43 +139,43 @@ BDD tests.
 
 ## Files Modified
 
-| File | Status | Description |
+| File                                                          | Status   | Description        |
 | ------------------------------------------------------------- | -------- | ------------------ |
-| `crates/weaverd/Cargo.toml` | Complete | Add dependency |
-| `crates/weaverd/src/safety_harness/verification/syntactic.rs` | Complete | New adapter |
-| `crates/weaverd/src/safety_harness/verification.rs` | Complete | Module declaration |
-| `crates/weaverd/src/safety_harness/mod.rs` | Complete | Public export |
-| `crates/weaverd/src/tests/safety_harness_behaviour.rs` | Complete | BDD world & steps |
-| `crates/weaverd/tests/features/safety_harness.feature` | Complete | BDD scenarios |
-| `docs/roadmap.md` | Complete | Mark complete |
-| `docs/users-guide.md` | Complete | Verify accuracy |
+| `crates/weaverd/Cargo.toml`                                   | Complete | Add dependency     |
+| `crates/weaverd/src/safety_harness/verification/syntactic.rs` | Complete | New adapter        |
+| `crates/weaverd/src/safety_harness/verification.rs`           | Complete | Module declaration |
+| `crates/weaverd/src/safety_harness/mod.rs`                    | Complete | Public export      |
+| `crates/weaverd/src/tests/safety_harness_behaviour.rs`        | Complete | BDD world & steps  |
+| `crates/weaverd/tests/features/safety_harness.feature`        | Complete | BDD scenarios      |
+| `docs/roadmap.md`                                             | Complete | Mark complete      |
+| `docs/users-guide.md`                                         | Complete | Verify accuracy    |
 
 ## Test Coverage
 
 ### Unit Tests
 
 1. Valid Rust code passes validation
-1. Invalid Rust code fails with location information
-1. Unknown file extensions pass through (not validated)
-1. Multiple files collect all failures
-1. Empty context passes validation
-1. Mixed valid/invalid files fail with complete failure list
+2. Invalid Rust code fails with location information
+3. Unknown file extensions pass through (not validated)
+4. Multiple files collect all failures
+5. Empty context passes validation
+6. Mixed valid/invalid files fail with complete failure list
 
 ### BDD Scenarios
 
 1. Valid Rust code passes syntactic validation with Tree-sitter
-1. Invalid Rust code fails syntactic validation with Tree-sitter
-1. Unknown file extensions pass through Tree-sitter validation
-1. Python code validated by Tree-sitter
-1. TypeScript code validated by Tree-sitter
+2. Invalid Rust code fails syntactic validation with Tree-sitter
+3. Unknown file extensions pass through Tree-sitter validation
+4. Python code validated by Tree-sitter
+5. TypeScript code validated by Tree-sitter
 
 ## Risks and Mitigations
 
-| Risk | Impact | Mitigation |
+| Risk                          | Impact | Mitigation                                 |
 | ----------------------------- | ------ | ------------------------------------------ |
-| Parser initialization failure | Medium | Map to backend error, not silent pass |
-| Type conversion overhead | Low | Conversion is O(n) where n = failures |
-| Thread safety concerns | Low | `TreeSitterSyntacticLock` is `Send + Sync` |
+| Parser initialization failure | Medium | Map to backend error, not silent pass      |
+| Type conversion overhead      | Low    | Conversion is O(n) where n = failures      |
+| Thread safety concerns        | Low    | `TreeSitterSyntacticLock` is `Send + Sync` |
 
 ## References
 

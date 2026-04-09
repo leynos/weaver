@@ -142,15 +142,15 @@ for emergent composition.
 
 #### Table 1: Weaver vs. Serena: A Philosophical and Architectural Comparison
 
-| Dimension | Weaver | Serena MCP Server |
+| Dimension             | Weaver                                                       | Serena MCP Server                                          |
 | --------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
-| **Core Philosophy** | Composable UNIX Primitive | Integrated Agent Toolkit |
-| **Interaction Model** | Command-line (JSONL streams over STDIN/STDOUT) | Model Context Protocol (RPC/Tool-Calling) |
-| **Ecosystem** | Universal (any shell tool: `jq`, `xargs`, `find`, etc.) | Specific (MCP-compatible clients: IDEs, GUIs, etc.) |
-| **State Management** | Primarily stateless commands; daemon amortizes startup cost | Stateful session management (project onboarding, memories) |
-| **Security Model** | Process-level sandboxing (zero-trust for all external tools) | Application-level permissions (e.g., read-only mode) |
-| **Extensibility** | Sandboxed plugins (isolated external processes) | Internal tool adaptation and framework integration |
-| **Primary User** | Shell environment (human or AI agent) | LLM via an MCP client |
+| **Core Philosophy**   | Composable UNIX Primitive                                    | Integrated Agent Toolkit                                   |
+| **Interaction Model** | Command-line (JSONL streams over STDIN/STDOUT)               | Model Context Protocol (RPC/Tool-Calling)                  |
+| **Ecosystem**         | Universal (any shell tool: `jq`, `xargs`, `find`, etc.)      | Specific (MCP-compatible clients: IDEs, GUIs, etc.)        |
+| **State Management**  | Primarily stateless commands; daemon amortizes startup cost  | Stateful session management (project onboarding, memories) |
+| **Security Model**    | Process-level sandboxing (zero-trust for all external tools) | Application-level permissions (e.g., read-only mode)       |
+| **Extensibility**     | Sandboxed plugins (isolated external processes)              | Internal tool adaptation and framework integration         |
+| **Primary User**      | Shell environment (human or AI agent)                        | LLM via an MCP client                                      |
 
 ## 2. System Architecture: A Composable, Multi-Layered Approach
 
@@ -346,12 +346,12 @@ responsibilities are to:
 
 1. Parse command-line arguments and flags using the `clap` library.
 
-1. Serialize these arguments into a single JSONL object representing a command
+2. Serialize these arguments into a single JSONL object representing a command
    request.
 
-1. Write this JSONL object to the standard input of the `weaverd` process.
+3. Write this JSONL object to the standard input of the `weaverd` process.
 
-1. Pipe the standard output and standard error from `weaverd` directly to the
+4. Pipe the standard output and standard error from `weaverd` directly to the
    user's terminal.
 
 The `weaverd` daemon, managed by libraries like `daemonize-me`, continuously
@@ -681,15 +681,15 @@ The engine is built on three distinct layers of analysis:
    complex language constructs.^9^ This forms the bedrock of Weaver's
    intelligence.
 
-1. **The Syntactic Scaffolding (Tree-sitter):** Managed by the `weaver-syntax`
-   crate, this layer provides a fast, fault-tolerant, and universally
-   available structural view of the code.^11^ Tree-sitter can build a concrete
-   syntax tree even in the presence of errors, making it exceptionally robust.
-   Its key roles are to provide syntactic guardrails for all edit operations,
-   enable high-precision structural search and manipulation that LSP often
-   lacks, and facilitate context-aware code slicing for prompt engineering.^13^
+2. **The Syntactic Scaffolding (Tree-sitter):** Managed by the `weaver-syntax`
+   crate, this layer provides a fast, fault-tolerant, and universally available
+   structural view of the code.^11^ Tree-sitter can build a concrete syntax
+   tree even in the presence of errors, making it exceptionally robust. Its key
+   roles are to provide syntactic guardrails for all edit operations, enable
+   high-precision structural search and manipulation that LSP often lacks, and
+   facilitate context-aware code slicing for prompt engineering.^13^
 
-1. **Relational Insight (Call-Graph Analysis):** Managed by the `weaver-graph`
+3. **Relational Insight (Call-Graph Analysis):** Managed by the `weaver-graph`
    crate, this layer builds a higher-level model of the program's control flow
    and component relationships. It is not limited to a single data source;
    instead, it fuses evidence from LSP's `callHierarchy` feature, dedicated
@@ -1020,17 +1020,17 @@ modularity, and maintainability. Based on the expanded technical analysis, the
 original structure is refined to better isolate complex functionalities and
 elevate the importance of key components.
 
-| Crate | Purpose and Key Responsibilities |
+| Crate             | Purpose and Key Responsibilities                                                                                                                                                                                                                                |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `weaver-common` | Defines core serializable types (using `serde`) and structured error enums (using `thiserror`). This includes critical types like `CapabilityError` and the request/response objects for the JSONL protocol. |
-| `weaver-config` | Manages hierarchical configuration using `ortho-config`. Defines the crucial **Language Capability Matrix**, allowing users to override or supplement the capabilities reported by LSP servers, thus hardening the system against buggy servers. |
-| `weaver-cli` | The thin client executable (`weaver`). Uses `clap` for argument parsing and is responsible for serializing commands into JSONL and communicating with the `weaverd` daemon. Includes the `--capabilities` command for agent-side planning. |
-| `weaverd` | The main daemon executable. Acts as the central orchestrator and **broker process**. Manages the project registry, hosts the analysis backends, dispatches commands to the appropriate crates, and implements the "Double-Lock" verification logic. |
-| `weaver-lsp-host` | Manages the lifecycle of external LSP servers. Handles initialization, capability detection, request/response multiplexing, and enforces back-pressure on overloaded servers. Contains logic for language-specific workarounds. |
-| `weaver-syntax` | The Tree-sitter powered syntax layer. Implements the `ast-grep` and `srgn`-inspired engine for structural search (`observe grep`) and rewriting (`act apply-rewrite`). Provides the "Syntactic Lock" for the safety harness and context-aware code slicing. |
-| `weaver-sandbox` | A new, dedicated crate encapsulating all security and sandboxing logic. It is responsible for creating and managing the restrictive environments in which all external tools (LSPs, plugins) are executed, using OS primitives like namespaces and seccomp-bpf. |
-| `weaver-graph` | Implements the relational intelligence layer. Orchestrates multiple providers (LSP, static analysis plugins, dynamic profilers) to generate and fuse call graphs and other relational models of the codebase. |
-| `weaver-plugins` | Implements the plugin management and execution framework. Defines the IPC protocol between `weaverd` (as the broker) and sandboxed plugins, and manages the lifecycle of specialist tools. |
+| `weaver-common`   | Defines core serializable types (using `serde`) and structured error enums (using `thiserror`). This includes critical types like `CapabilityError` and the request/response objects for the JSONL protocol.                                                    |
+| `weaver-config`   | Manages hierarchical configuration using `ortho-config`. Defines the crucial **Language Capability Matrix**, allowing users to override or supplement the capabilities reported by LSP servers, thus hardening the system against buggy servers.                |
+| `weaver-cli`      | The thin client executable (`weaver`). Uses `clap` for argument parsing and is responsible for serializing commands into JSONL and communicating with the `weaverd` daemon. Includes the `--capabilities` command for agent-side planning.                      |
+| `weaverd`         | The main daemon executable. Acts as the central orchestrator and **broker process**. Manages the project registry, hosts the analysis backends, dispatches commands to the appropriate crates, and implements the "Double-Lock" verification logic.             |
+| `weaver-lsp-host` | Manages the lifecycle of external LSP servers. Handles initialization, capability detection, request/response multiplexing, and enforces back-pressure on overloaded servers. Contains logic for language-specific workarounds.                                 |
+| `weaver-syntax`   | The Tree-sitter powered syntax layer. Implements the `ast-grep` and `srgn`-inspired engine for structural search (`observe grep`) and rewriting (`act apply-rewrite`). Provides the "Syntactic Lock" for the safety harness and context-aware code slicing.     |
+| `weaver-sandbox`  | A new, dedicated crate encapsulating all security and sandboxing logic. It is responsible for creating and managing the restrictive environments in which all external tools (LSPs, plugins) are executed, using OS primitives like namespaces and seccomp-bpf. |
+| `weaver-graph`    | Implements the relational intelligence layer. Orchestrates multiple providers (LSP, static analysis plugins, dynamic profilers) to generate and fuse call graphs and other relational models of the codebase.                                                   |
+| `weaver-plugins`  | Implements the plugin management and execution framework. Defines the IPC protocol between `weaverd` (as the broker) and sandboxed plugins, and manages the lifecycle of specialist tools.                                                                      |
 
 #### 2.3.1. Configuration contract
 
@@ -1300,19 +1300,19 @@ The key responsibilities of the `weaver-syntax` crate are:
    such as identifying all function definitions or generating a preliminary
    call graph based on call expressions.^12^
 
-1. **Syntactic Guardrails:** Serving as the "Syntactic Lock" in the
+2. **Syntactic Guardrails:** Serving as the "Syntactic Lock" in the
    Double-Lock safety harness. Before any change is committed, this layer
    verifies that all modified files can be successfully parsed into a valid
-   syntax tree. This is a fast, crucial first line of defense against
-   corrupted code.
+   syntax tree. This is a fast, crucial first line of defense against corrupted
+   code.
 
-1. **Contextual Prompt Engineering:** Enabling agents to extract specific,
+3. **Contextual Prompt Engineering:** Enabling agents to extract specific,
    contextually relevant code snippets for inclusion in prompts for Large
    Language Models. An agent can request "the body of the function named
    `calculate_total`" or "the class definition for `UserManager`" without
    needing to parse the file text itself.
 
-1. **LSP Fallback Mechanism:** When an LSP server does not support a specific
+4. **LSP Fallback Mechanism:** When an LSP server does not support a specific
    semantic operation (e.g., `rename`), the syntactic layer provides a robust
    fallback. The agent can be instructed to use `observe grep` to find all
    textual occurrences within the correct syntactic scope (e.g., not inside
@@ -1344,11 +1344,11 @@ solution.
 
 #### Table 3: Phased Call Graph Provider Implementation
 
-| Phase | Provider | Underlying Technology | Pros | Cons |
+| Phase                   | Provider                   | Underlying Technology                                                | Pros                                                                                                            | Cons                                                                                                                  |
 | ----------------------- | -------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **1 (MVP)** | LSP Provider | LSP `textDocument/callHierarchy` request | Fast, deeply integrated with the existing semantic layer, requires no additional tool setup. | Inconsistent support across language servers, may be inaccurate or incomplete, limited to direct calls. |
-| **2 (Specialist)** | Static Analysis Plugin | Language-specific static analysis tools (e.g., PyCG for Python ^25^) | Higher accuracy and recall, better handling of language-specific dynamic features, more comprehensive analysis. | Requires installing and configuring external plugin tools, slower than LSP, implementation is language-specific. |
-| **3 (Execution-Aware)** | Dynamic Analysis Ingestion | Output from profilers (e.g., `gprof` ^27^, `callgrind` ^28^) | Provides "ground truth" for a given execution, accurately captures dynamic dispatch and runtime behaviour. | Incomplete coverage (only shows paths that were executed), requires the ability to run the code (e.g., a test suite). |
+| **1 (MVP)**             | LSP Provider               | LSP `textDocument/callHierarchy` request                             | Fast, deeply integrated with the existing semantic layer, requires no additional tool setup.                    | Inconsistent support across language servers, may be inaccurate or incomplete, limited to direct calls.               |
+| **2 (Specialist)**      | Static Analysis Plugin     | Language-specific static analysis tools (e.g., PyCG for Python ^25^) | Higher accuracy and recall, better handling of language-specific dynamic features, more comprehensive analysis. | Requires installing and configuring external plugin tools, slower than LSP, implementation is language-specific.      |
+| **3 (Execution-Aware)** | Dynamic Analysis Ingestion | Output from profilers (e.g., `gprof` ^27^, `callgrind` ^28^)         | Provides "ground truth" for a given execution, accurately captures dynamic dispatch and runtime behaviour.      | Incomplete coverage (only shows paths that were executed), requires the ability to run the code (e.g., a test suite). |
 
 The `weaver-graph` engine will be responsible for merging the graphs produced
 by these providers. When an agent requests a call graph, it can specify which
@@ -1408,20 +1408,20 @@ for this model:
 
   `jedi` can often provide supplementary or alternative analysis. It can be
   integrated as a sensor plugin, offering another data stream to the Semantic
-  Fusion Engine, which can be particularly useful for cross-validation or
-  when an LSP server is unavailable.
+  Fusion Engine, which can be particularly useful for cross-validation or when
+  an LSP server is unavailable.
 
 - **`rope` as an Actuator Plugin:** `rope` is a dedicated and mature Python
-  refactoring library, recognized as being more powerful and comprehensive
-  for refactoring tasks than `jedi`.^31^ It supports a wide range of complex
+  refactoring library, recognized as being more powerful and comprehensive for
+  refactoring tasks than `jedi`.^31^ It supports a wide range of complex
   operations, such as "Extract Method," "Change Signature," and "Move
   Method".^33^
 
   `rope` will be integrated as a primary actuator plugin for Python, callable
   via a command like
   `weaver act refactor --provider rope --refactoring extract_method...`. This
-  allows an agent to perform sophisticated, language-aware refactorings
-  through the standard `Weaver` interface.
+  allows an agent to perform sophisticated, language-aware refactorings through
+  the standard `Weaver` interface.
 
 This model extends to other domains as well. Tools like `srgn` and `ast-grep`,
 which excel at high-speed, structural search and rewrite operations, can be
@@ -1556,16 +1556,16 @@ The workflow for any modification command (e.g., `act refactor`) is as follows:
      --path src/main.py --offset 123 --new-name new_function_name
    ```
 
-1. **Sandboxed Execution:** The `weaverd` daemon invokes the specified plugin
+2. **Sandboxed Execution:** The `weaverd` daemon invokes the specified plugin
    (`rope`) within the secure, resource-limited sandbox (detailed in Section
    5). The plugin is provided with the necessary context (e.g., file contents,
    arguments) via its standard input.
 
-1. **Diff Capture:** The plugin executes the refactoring logic and, instead of
+3. **Diff Capture:** The plugin executes the refactoring logic and, instead of
    writing directly to the filesystem, it outputs a set of proposed changes
    (e.g., a unified diff or a list of text edits) to its standard output.
 
-1. **Pre-flight Verification (The Double Lock):** `weaverd` captures the
+4. **Pre-flight Verification (The Double Lock):** `weaverd` captures the
    proposed diff and applies it to an *in-memory* copy of the affected files.
    It then subjects these virtual file contents to a rigorous two-phase
    validation:
@@ -1586,7 +1586,7 @@ The workflow for any modification command (e.g., `act refactor`) is as follows:
      introduced compared to the pre-edit state. If the semantic state of the
      project has degraded, the operation is rejected.
 
-1. **Atomic Commit or Rollback:** Only if *both* the syntactic and semantic
+5. **Atomic Commit or Rollback:** Only if *both* the syntactic and semantic
    locks pass is the captured diff applied to the actual files on the
    filesystem. If either check fails, the filesystem is left untouched, and
    `weaverd` returns a detailed, structured error to the agent. For example:
@@ -1633,7 +1633,8 @@ language servers or parsers during development.
 
 **Lock traits**:
 
-- `SyntacticLock::validate(&self, context: &VerificationContext) -> SyntacticLockResult` returns either `Passed` or `Failed { failures }`.
+- `SyntacticLock::validate(&self, context: &VerificationContext) -> SyntacticLockResult`
+   returns either `Passed` or `Failed { failures }`.
 - `SemanticLock::validate(...)` permits the semantic backend to surface
   unavailability errors separately from verification failures.
 
@@ -1658,8 +1659,8 @@ Successful transactions use two-phase commit with rollback:
 
 1. **Prepare phase**: All modified content is written to temporary files in
    the same directory as the target files.
-1. **Commit phase**: Temporary files are atomically renamed to their targets.
-1. **Rollback**: If any rename fails, all previously committed files are
+2. **Commit phase**: Temporary files are atomically renamed to their targets.
+3. **Rollback**: If any rename fails, all previously committed files are
    restored to their original content from the `VerificationContext`.
 
 This ensures multi-file atomicity: either all files are updated or none are.
@@ -1681,12 +1682,12 @@ lock will use LSP's document synchronization protocol:
 
 1. **`textDocument/didOpen`**: Open each affected file at its real URI,
    sending the modified content as the document text.
-1. **Request diagnostics**: The LSP validates the in-memory content as if
+2. **Request diagnostics**: The LSP validates the in-memory content as if
    it were at the actual file path, allowing imports and references to resolve
    correctly.
-1. **Compare diagnostics**: Check for new errors compared to the pre-edit
+3. **Compare diagnostics**: Check for new errors compared to the pre-edit
    baseline.
-1. **`textDocument/didClose`**: Clean up the virtual document state.
+4. **`textDocument/didClose`**: Clean up the virtual document state.
 
 This approach leverages the standard LSP document lifecycle that editors use,
 where the LSP always validates in-memory content rather than disk content. The
@@ -2028,8 +2029,8 @@ threats are:
   exfiltrate data or download further malicious payloads.
 
 - **Resource Exhaustion (Denial of Service):** Consuming excessive CPU or
-  memory, either accidentally (due to a bug) or maliciously, thereby
-  degrading or crashing the host system.
+  memory, either accidentally (due to a bug) or maliciously, thereby degrading
+  or crashing the host system.
 
 - **Process Spawning:** Launching additional, untrusted processes.
 
@@ -2059,11 +2060,11 @@ capabilities.
 
 #### Table 2: Comparison of Rust Sandboxing Crates
 
-| Crate | Supported Platforms | Mechanism | Key Features | Maturity/Status | Recommendation for Weaver |
+| Crate      | Supported Platforms   | Mechanism                               | Key Features                                                         | Maturity/Status                                                                         | Recommendation for Weaver                                                                    |
 | ---------- | --------------------- | --------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `gaol` | Linux, Windows, macOS | Namespaces, Job Objects, `sandbox_init` | Whitelist profiles, multiprocess model, designed for Servo.^36^ | Experimental and explicitly "not battle-tested" in the documentation.^36^ | Helpful reference for cross-platform techniques but too immature for production use. |
-| `birdcage` | Linux, macOS | Namespaces, `sandbox_init` | Focused on filesystem and network restrictions with native APIs.^35^ | Actively used in production by the Phylum CLI, offering a mature and focused scope.^35^ | **Recommended starting point.** Aligns with the primary filesystem and network threat model. |
-| `bastille` | Linux | Namespaces, `pivot_root` | Targets compatibility with the `std::process::Command` API.^37^ | Work in progress and limited to Linux. | Monitor for future development, but currently unsuitable for cross-platform goals. |
+| `gaol`     | Linux, Windows, macOS | Namespaces, Job Objects, `sandbox_init` | Whitelist profiles, multiprocess model, designed for Servo.^36^      | Experimental and explicitly "not battle-tested" in the documentation.^36^               | Helpful reference for cross-platform techniques but too immature for production use.         |
+| `birdcage` | Linux, macOS          | Namespaces, `sandbox_init`              | Focused on filesystem and network restrictions with native APIs.^35^ | Actively used in production by the Phylum CLI, offering a mature and focused scope.^35^ | **Recommended starting point.** Aligns with the primary filesystem and network threat model. |
+| `bastille` | Linux                 | Namespaces, `pivot_root`                | Targets compatibility with the `std::process::Command` API.^37^      | Work in progress and limited to Linux.                                                  | Monitor for future development, but currently unsuitable for cross-platform goals.           |
 
 While libraries like `birdcage` provide the necessary primitives, a truly
 secure architecture requires more than just process isolation. The
@@ -2253,7 +2254,11 @@ suggested fallback strategy. For example:
 - **Request:** `act rename-symbol` for Swift, where LSP rename support is
   known to be limited.
 
-- **Response:** `{"status": "error", "type": "MissingCapability", "details":   {"language": "swift", "feature": "rename"}, "suggestion": "Use 'observe   grep' to find occurrences and 'act apply-edits' for syntactic   replacement."}`
+- **Response:**
+  `{"status": "error", "type": "MissingCapability", "details":
+  {"language": "swift", "feature": "rename"}, "suggestion": "Use
+  'observe grep' to find occurrences and 'act apply-edits' for syntactic
+  replacement."}`
 
 This mechanism for graceful degradation transforms failures from dead ends into
 decision points, enabling the agent to dynamically adapt its plan and still
@@ -2288,15 +2293,15 @@ will be saved as a
    project-wide call graph and dependency graph, identifying key modules and
    their interconnections.
 
-1. **API Surface Extraction:** It will use `weaver-syntax` to traverse the AST
+2. **API Surface Extraction:** It will use `weaver-syntax` to traverse the AST
    of all project files, extracting the public API surface: class definitions,
    function signatures, and their associated docstrings.
 
-1. **Dependency Analysis:** It will parse project configuration files (e.g.,
+3. **Dependency Analysis:** It will parse project configuration files (e.g.,
    `pyproject.toml`, `package.json`, `Cargo.toml`) to identify and list all
    external dependencies.
 
-1. **Synthesis:** It will synthesize these structured data points into a
+4. **Synthesis:** It will synthesize these structured data points into a
    comprehensive yet concise Markdown or JSONL document. This `PROJECT.dna`
    file will contain sections on project structure, key modules, public APIs,
    and dependencies.
@@ -2422,8 +2427,8 @@ a logical, incremental progression.
 - **Language Server Protocol (LSP):** An open, JSON-RPC-based protocol that
   allows code editors and other tools to communicate with language-specific
   servers that provide features like code completion, diagnostics, and
-  refactoring. While it has become the industry standard, its specification
-  is large, implementations are inconsistent, and it has known design flaws
+  refactoring. While it has become the industry standard, its specification is
+  large, implementations are inconsistent, and it has known design flaws
   related to state synchronization and causality, necessitating a defensive
   implementation strategy.^9^
 
@@ -2431,8 +2436,8 @@ a logical, incremental progression.
   Its key advantages are speed, robustness in the face of syntax errors, and
   language agnosticism. It builds a concrete syntax tree, which is a more
   detailed representation than an abstract syntax tree, making it ideal for
-  tools that perform structural search, analysis, and transformation. It is
-  the core technology behind tools like `ast-grep` and is used for syntax
+  tools that perform structural search, analysis, and transformation. It is the
+  core technology behind tools like `ast-grep` and is used for syntax
   highlighting in many modern editors.^11^
 
 - **Structural Search & Rewrite Tools:** Tools like `ast-grep` and `srgn`
@@ -2445,13 +2450,12 @@ a logical, incremental progression.
   `Weaver`'s syntactic layer is directly inspired by their design.
 
 - **Process Sandboxing:** A security mechanism for restricting the
-  environment in which a program executes. On Linux, this is typically
-  achieved using a combination of kernel features: namespaces (to isolate
-  resources like filesystems, network, and process IDs) and seccomp-bpf (to
-  whitelist allowed system calls). The "broker process" is a common
-  architectural pattern where a sandboxed, low-privilege process communicates
-  with a trusted, high-privilege parent to request specific, controlled
-  operations.^36^
+  environment in which a program executes. On Linux, this is typically achieved
+  using a combination of kernel features: namespaces (to isolate resources like
+  filesystems, network, and process IDs) and seccomp-bpf (to whitelist allowed
+  system calls). The "broker process" is a common architectural pattern where a
+  sandboxed, low-privilege process communicates with a trusted, high-privilege
+  parent to request specific, controlled operations.^36^
 
 - **Call Graph Generation:** The process of creating a directed graph
   representing the calling relationships between subroutines in a program.
@@ -2466,8 +2470,8 @@ a logical, incremental progression.
   output of a large language model by providing it with relevant information
   retrieved from an external knowledge source. In the context of code, this
   involves retrieving project-specific documentation, API definitions, or
-  related code snippets to ground the model's responses, improving accuracy
-  and contextual relevance.^38^
+  related code snippets to ground the model's responses, improving accuracy and
+  contextual relevance.^38^
 
 ### B. References
 

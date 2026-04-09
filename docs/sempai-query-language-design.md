@@ -71,14 +71,14 @@ Table 1 describes the proposed crates.
 
 *Table 1: Proposed workspace crates for Sempai.*
 
-| Path | Crate name | Purpose | Public API |
+| Path                     | Crate name        | Purpose                                                            | Public API |
 | ------------------------ | ----------------- | ------------------------------------------------------------------ | ---------- |
-| `crates/sempai` | `sempai` | Facade crate, stable API | Yes |
-| `crates/sempai-core` | `sempai_core` | Data model, diagnostics, planning intermediate representation (IR) | Yes |
-| `crates/sempai-yaml` | `sempai_yaml` | YAML rule parsing via saphyr | Yes |
-| `crates/sempai-dsl` | `sempai_dsl` | One-liner domain-specific language (DSL) parsing via Chumsky | Yes |
-| `crates/sempai-ts` | `sempai_ts` | Tree-sitter backend + matcher | Yes |
-| `crates/sempai-fixtures` | `sempai_fixtures` | Test corpora + helper macros | No |
+| `crates/sempai`          | `sempai`          | Facade crate, stable API                                           | Yes        |
+| `crates/sempai-core`     | `sempai_core`     | Data model, diagnostics, planning intermediate representation (IR) | Yes        |
+| `crates/sempai-yaml`     | `sempai_yaml`     | YAML rule parsing via saphyr                                       | Yes        |
+| `crates/sempai-dsl`      | `sempai_dsl`      | One-liner domain-specific language (DSL) parsing via Chumsky       | Yes        |
+| `crates/sempai-ts`       | `sempai_ts`       | Tree-sitter backend + matcher                                      | Yes        |
+| `crates/sempai-fixtures` | `sempai_fixtures` | Test corpora + helper macros                                       | No         |
 
 The facade crate `sempai` re-exports stable types from `sempai_core` and
 provides top-level convenience entrypoints.
@@ -319,25 +319,25 @@ A Tree-sitter escape hatch is represented as an atom within the plan (see
    - YAML rule file parsing.
    - One-liner DSL parsing.
 
-1. Normalisation:
+2. Normalisation:
 
    - Lower legacy and v2 syntaxes to a shared formula model.[^3]
 
-1. Validation:
+3. Validation:
 
    - Enforce semantic constraints and mode constraints.
 
-1. Compilation:
+4. Compilation:
 
    - Compile pattern atoms to pattern IR (intermediate representation).
    - Select a Tree-sitter language profile and snippet wrapper.
 
-1. Execution:
+5. Execution:
 
    - Parse target source via Tree-sitter.
    - Evaluate the compiled plan over the syntax tree.
 
-1. Projection:
+6. Projection:
 
    - Produce `Match` objects with spans, captures, and focus.
 
@@ -462,16 +462,14 @@ semantics early.
 Implementation note (2026-04-05): `sempai::Engine::compile_yaml` now performs
 full normalization of search-mode rules. Both legacy `pattern*` syntax and v2
 `match` syntax lower into the canonical `Formula` model defined in
-`sempai_core::formula`. Mode-aware validation runs first: search rules
-proceed to normalization, while `extract`, `taint`, `join`, and
-forward-compatible unknown modes fail deterministically with
-`E_SEMPAI_UNSUPPORTED_MODE`. The first unsupported rule in source order is
-reported, and its `primary_span` prefers the `mode` field span before falling
-back to the enclosing rule span.
+`sempai_core::formula`. Mode-aware validation runs first: search rules proceed
+to normalization, while `extract`, `taint`, `join`, and forward-compatible
+unknown modes fail deterministically with `E_SEMPAI_UNSUPPORTED_MODE`. The
+first unsupported rule in source order is reported, and its `primary_span`
+prefers the `mode` field span before falling back to the enclosing rule span.
 
 Semantic validation (`InvalidNotInOr`, `MissingPositiveTermInAnd`) runs on the
-canonical form and produces `E_SEMPAI_*` diagnostics for constraint
-violations.
+canonical form and produces `E_SEMPAI_*` diagnostics for constraint violations.
 
 Extract mode rules require legacy query keys, not `match`.[^1]
 
@@ -612,7 +610,7 @@ A two-stage rewrite is required:
 
 1. Lexical scan of the pattern text to locate Semgrep tokens defined by the
    EBNF.[^2]
-1. Replacement of tokens with parseable placeholders for the chosen wrapper and
+2. Replacement of tokens with parseable placeholders for the chosen wrapper and
    language.
 
 Placeholder forms:
@@ -797,7 +795,7 @@ Conjunction execution proceeds:
 
 1. Compute anchor matches from the first anchor term.
 
-1. For each anchor match:
+2. For each anchor match:
 
    - Apply each constraint term as a predicate:
 
@@ -813,7 +811,7 @@ Conjunction execution proceeds:
      - At least one compatible match must exist for each additional anchor
        term, with metavariable unification across bindings.
 
-1. Emit a match per surviving anchor, projecting:
+3. Emit a match per surviving anchor, projecting:
 
    - `span`: anchor span
    - `captures`: merged bindings
@@ -1277,11 +1275,11 @@ mirrored into `sempai_fixtures` as local test inputs.[^7]
 
 ## References
 
-\[^1\]: `semgrep-rule-schema.yaml` (parser-aligned draft).
+[^1]: `semgrep-rule-schema.yaml` (parser-aligned draft).
 
-\[^2\]: `semgrep-query-language.ebnf` (parser-aligned practical EBNF).
+[^2]: `semgrep-query-language.ebnf` (parser-aligned practical EBNF).
 
-\[^3\]: `semgrep-operator-precedence.md` and `semgrep-legacy-vs-v2-guidance.md`.
+[^3]: `semgrep-operator-precedence.md` and `semgrep-legacy-vs-v2-guidance.md`.
 
 [^4]: %60building-an-error-recovering-parser-with-chumsky.md%60.
 [^5]: %60pratt-parser-for-ddlog-expressions.md%60.

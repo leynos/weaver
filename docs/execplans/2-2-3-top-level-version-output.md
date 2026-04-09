@@ -35,30 +35,30 @@ Observable behaviour after this change:
 1. **400-line file limit.** No single source file may exceed 400 lines.
    `lib.rs` starts at 399 lines (1 line of headroom), requiring a preparatory
    extraction before adding the exit-code fix.
-1. **build.rs dual-compilation.** `cli.rs` is included by `build.rs` via
+2. **build.rs dual-compilation.** `cli.rs` is included by `build.rs` via
    `#[path = "src/cli.rs"]` for manpage generation. Any code added to `cli.rs`
    must compile in the build script context. Clap derive attributes (`version`,
    `about`, `long_about`) are safe because they are processed by the derive
    macro, same as the existing `after_help`.
-1. **Strict Clippy.** Over 30 denied lint categories including `unwrap_used`,
+3. **Strict Clippy.** Over 30 denied lint categories including `unwrap_used`,
    `expect_used`, `indexing_slicing`, `string_slice`, `missing_docs`,
    `cognitive_complexity`, `allow_attributes`, and `str_to_string`. All code
    must pass
    `cargo clippy --workspace --all-targets --all-features -D warnings`.
-1. **en-GB-oxendict spelling.** Comments and documentation use British English
+4. **en-GB-oxendict spelling.** Comments and documentation use British English
    with Oxford "-ize" / "-yse" / "-our" spelling.
-1. **rstest-bdd v0.5.0.** Behaviour-driven development (BDD) tests use
+5. **rstest-bdd v0.5.0.** Behaviour-driven development (BDD) tests use
    v0.5.0. The fixture parameter must be named exactly `world`. Use
    `let _ = world;` to suppress unused warnings.
-1. **`concat!()` for multi-line strings.** Per AGENTS.md, use `concat!()` to
+6. **`concat!()` for multi-line strings.** Per AGENTS.md, use `concat!()` to
    combine long string literals rather than escaping newlines with backslash.
-1. **No new external dependencies.** The change uses only clap features already
+7. **No new external dependencies.** The change uses only clap features already
    available.
-1. **weaver-cli does not opt into workspace lints.** Its `Cargo.toml` has no
+8. **weaver-cli does not opt into workspace lints.** Its `Cargo.toml` has no
    `[lints]` section, so workspace-level `allow_attributes = "deny"` does not
    apply. This means `#[allow(dead_code)]` is acceptable if needed for the
    build.rs dual-compilation case.
-1. **`str_to_string` denied.** Use `String::from()` or `.into()`, not
+9. **`str_to_string` denied.** Use `String::from()` or `.into()`, not
    `.to_string()` on `&str`.
 
 ## Tolerances (exception triggers)
@@ -161,10 +161,10 @@ All acceptance criteria are met:
 
 1. `weaver --version` and `weaver -V` both exit 0 and emit the same
    version string (`weaver 0.1.0`) to stdout.
-1. `weaver --help` exits 0, writes to stdout, and includes a "Quick start:"
+2. `weaver --help` exits 0, writes to stdout, and includes a "Quick start:"
    block with runnable examples including `weaver observe get-definition`.
-1. `weaver` (bare invocation) continues to exit 1 and print to stderr.
-1. `make check-fmt`, `make lint`, and `make test` all pass clean.
+3. `weaver` (bare invocation) continues to exit 1 and print to stderr.
+4. `make check-fmt`, `make lint`, and `make test` all pass clean.
 
 Line budget management was the key constraint. Extracting `is_apply_patch` to
 `command.rs` as a preparatory refactoring reclaimed 7 lines in `lib.rs` (399 to
@@ -311,17 +311,17 @@ prove that version and help output short-circuit before configuration loading:
 
 1. `version_long_flag_exits_with_success` — `--version` returns
    `ExitCode::SUCCESS`.
-1. `version_short_flag_exits_with_success` — `-V` returns
+2. `version_short_flag_exits_with_success` — `-V` returns
    `ExitCode::SUCCESS`.
-1. `version_output_goes_to_stdout` — stdout contains "weaver", stderr is
+3. `version_output_goes_to_stdout` — stdout contains "weaver", stderr is
    empty.
-1. `version_output_contains_version_number` — stdout contains
+4. `version_output_contains_version_number` — stdout contains
    `env!("CARGO_PKG_VERSION")`.
-1. `version_long_and_short_produce_identical_output` — `--version` and `-V`
+5. `version_long_and_short_produce_identical_output` — `--version` and `-V`
    yield the same stdout.
-1. `help_flag_exits_with_success` — `--help` returns `ExitCode::SUCCESS`.
-1. `help_output_goes_to_stdout` — stdout contains "Usage:", stderr is empty.
-1. `help_output_contains_quick_start_example` — stdout contains
+6. `help_flag_exits_with_success` — `--help` returns `ExitCode::SUCCESS`.
+7. `help_output_goes_to_stdout` — stdout contains "Usage:", stderr is empty.
+8. `help_output_contains_quick_start_example` — stdout contains
    "Quick start:" and "weaver observe get-definition".
 
 **`crates/weaver-cli/src/tests/unit.rs`** — Add `mod version_output;` (line
@@ -455,14 +455,14 @@ cargo run -p weaver-cli -- --help
 After both commits, the following must hold:
 
 1. `weaver --version` prints `weaver 0.1.0` to stdout and exits 0.
-1. `weaver -V` prints identical output to `weaver --version`.
-1. `weaver --help` prints to stdout (not stderr), exits 0, and includes
+2. `weaver -V` prints identical output to `weaver --version`.
+3. `weaver --help` prints to stdout (not stderr), exits 0, and includes
    "Quick start:" with at least one runnable example.
-1. `weaver` (bare invocation) still exits 1 and prints to stderr
+4. `weaver` (bare invocation) still exits 1 and prints to stderr
    (unchanged).
-1. `make check-fmt` passes.
-1. `make lint` passes.
-1. `make test` passes (including new unit, BDD, and integration tests).
+5. `make check-fmt` passes.
+6. `make lint` passes.
+7. `make test` passes (including new unit, BDD, and integration tests).
 
 Quality criteria:
 
@@ -503,18 +503,18 @@ Existing reusable code:
 
 ## File change summary
 
-| File | Change | Lines before | Lines after |
+| File                                        | Change                                     | Lines before | Lines after |
 | ------------------------------------------- | ------------------------------------------ | ------------ | ----------- |
-| `src/command.rs` | Add `is_apply_patch` method | 91 | ~98 |
-| `src/lib.rs` | Remove `is_apply_patch`, add exit-code fix | 399 | ~395 |
-| `src/cli.rs` | Add `version`, `about`, `long_about` | 87 | ~102 |
-| `src/tests/unit.rs` | Add `mod version_output` | 397 | 398 |
-| `src/tests/unit/version_output.rs` | New file | 0 | ~100 |
-| `src/tests/behaviour.rs` | Add scenario registration | 340 | ~344 |
-| `tests/features/weaver_cli_version.feature` | New file | 0 | ~20 |
-| `tests/main_entry.rs` | Add version/help integration tests | 54 | ~79 |
-| `docs/users-guide.md` | Add version section, update help section | ~999 | ~1015 |
-| `docs/roadmap.md` | Mark 2.2.3 done | --- | --- |
+| `src/command.rs`                            | Add `is_apply_patch` method                | 91           | ~98         |
+| `src/lib.rs`                                | Remove `is_apply_patch`, add exit-code fix | 399          | ~395        |
+| `src/cli.rs`                                | Add `version`, `about`, `long_about`       | 87           | ~102        |
+| `src/tests/unit.rs`                         | Add `mod version_output`                   | 397          | 398         |
+| `src/tests/unit/version_output.rs`          | New file                                   | 0            | ~100        |
+| `src/tests/behaviour.rs`                    | Add scenario registration                  | 340          | ~344        |
+| `tests/features/weaver_cli_version.feature` | New file                                   | 0            | ~20         |
+| `tests/main_entry.rs`                       | Add version/help integration tests         | 54           | ~79         |
+| `docs/users-guide.md`                       | Add version section, update help section   | ~999         | ~1015       |
+| `docs/roadmap.md`                           | Mark 2.2.3 done                            | ---          | ---         |
 
 All paths are relative to `crates/weaver-cli/` except `docs/` which is relative
 to workspace root.
@@ -528,7 +528,7 @@ to workspace root.
    - No behaviour change.
    - Must pass all quality gates.
 
-1. **Feature commit:** "Add --version/-V support and long_about quick-start
+2. **Feature commit:** "Add --version/-V support and long_about quick-start
    block"
 
    - `cli.rs`: `version`, `about`, `long_about` attributes.

@@ -117,8 +117,8 @@ with the operation list and hint adapted to the supplied domain.
   references, and the current `weaver-cli` implementation.
 - [x] (2026-03-10) Confirm the current call path:
   `Cli::try_parse_from(...)` -> bare-invocation shortcut -> config load ->
-  `CommandInvocation::try_from(cli)`, which means missing-operation
-  guidance is not currently emitted before configuration loading.
+  `CommandInvocation::try_from(cli)`, which means missing-operation guidance is
+  not currently emitted before configuration loading.
 - [x] (2026-03-10) Identify catalogue drift: CLI help omits `observe get-card`
   while the daemon router advertises it.
 - [x] (2026-03-10) Write the initial ExecPlan to
@@ -127,11 +127,10 @@ with the operation list and hint adapted to the supplied domain.
   `crates/weaver-cli/src/discoverability.rs` as the canonical client-side
   domain-operation catalogue and reconciled `observe get-card`.
 - [x] (2026-03-12) Stage B: added a preflight guidance branch in
-  `CliRunner::run_with_handler` that emits contextual guidance before
-  config loading, daemon connection, or auto-start.
+  `CliRunner::run_with_handler` that emits contextual guidance before config
+  loading, daemon connection, or auto-start.
 - [x] (2026-03-12) Stage C: added unit, behavioural, and integration coverage
-  for the new guidance and preserved the complete-command config-failure
-  path.
+  for the new guidance and preserved the complete-command config-failure path.
 - [x] (2026-03-12) Stage D: updated `docs/weaver-design.md`,
   `docs/users-guide.md`, and marked roadmap item 2.2.4 complete.
 - [x] (2026-03-12) Stage E: passed `make fmt`, `make markdownlint`,
@@ -282,14 +281,14 @@ after clap parsing and before `self.loader.load(...)`.
 The branch must:
 
 1. Preserve the existing bare-invocation behaviour.
-1. Detect the new case:
+2. Detect the new case:
    - no lifecycle subcommand;
    - no `--capabilities` probe;
    - `domain` is present and non-blank;
    - `operation` is absent or blank;
    - the supplied domain is recognized by the canonical client-side catalogue.
-1. Write the contextual guidance block to standard error.
-1. Exit with failure without loading configuration, attempting daemon
+3. Write the contextual guidance block to standard error.
+4. Exit with failure without loading configuration, attempting daemon
    connection, or triggering auto-start.
 
 Do not change the low-level `CommandInvocation::try_from` behaviour for unknown
@@ -371,27 +370,29 @@ set -o pipefail; make test 2>&1 | tee /tmp/2-2-4-test.log
 Success means:
 
 1. The new unit tests pass.
-1. The new `rstest-bdd` scenarios pass.
-1. The updated integration test passes.
-1. No existing help, version, bare-invocation, or auto-start regression fails.
-1. The formatted docs and source files remain within repository policy.
+2. The new `rstest-bdd` scenarios pass.
+3. The updated integration test passes.
+4. No existing help, version, bare-invocation, or auto-start regression fails.
+5. The formatted docs and source files remain within repository policy.
 
 ## Acceptance checklist
 
 The implementation is complete only when all of the following are true:
 
 1. `weaver <known-domain>` without an operation exits non-zero.
-1. The output lists every operation registered for that domain.
-1. The output includes one concrete
+2. The output lists every operation registered for that domain.
+3. The output includes one concrete
    `weaver <domain> <operation> --help` hint.
-1. The path does not load configuration, connect to the daemon, or trigger
+4. The path does not load configuration, connect to the daemon, or trigger
    auto-start.
-1. `weaver bogus` is unchanged by this task and remains reserved for roadmap
+5. `weaver bogus` is unchanged by this task and remains reserved for roadmap
    2.3.1.
-1. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md` are
+6. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md` are
    updated.
-1. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
+7. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all succeed.
 
-\[^1\]: [Level 2 — domain without operation (`weaver observe`)](../ui-gap-analysis.md#level-2--domain-without-operation-weaver-observe)
-\[^2\]: [Level 10 — error messages and exit codes](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
+\[^1\]:
+[Level 2 — domain without operation (`weaver observe`)](../ui-gap-analysis.md#level-2--domain-without-operation-weaver-observe)
+ \[^2\]:
+[Level 10 — error messages and exit codes](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes)

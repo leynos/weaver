@@ -249,14 +249,14 @@ pooling, and language-specific extraction together.
 The cache-aware `extract_shared(...)` flow is:
 
 1. Detect `SupportedLanguage` from the request path.
-1. Build a `CardCacheKey` from path, source, detail, and cursor position.
-1. Probe the cache with `peek_shared(...)`.
-1. On a hit, record a cache hit and return the shared card immediately.
-1. On a miss, acquire `lock_population(&cache_key)` so only one thread fills
+2. Build a `CardCacheKey` from path, source, detail, and cursor position.
+3. Probe the cache with `peek_shared(...)`.
+4. On a hit, record a cache hit and return the shared card immediately.
+5. On a miss, acquire `lock_population(&cache_key)` so only one thread fills
    that key.
-1. Re-check the cache with `get_shared(...)` in case another thread won the
+6. Re-check the cache with `get_shared(...)` in case another thread won the
    race while the current thread was waiting.
-1. Parse through `ParserRegistry`, build the card, invalidate stale revisions,
+7. Parse through `ParserRegistry`, build the card, invalidate stale revisions,
    and insert the new shared card into `CardCache`.
 
 Example:

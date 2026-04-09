@@ -27,43 +27,43 @@ ______________________________________________________________________
    success responses. The CLI already handles both streams; daemon currently
    only uses stderr.
 
-1. **Backend wiring**: The `DispatchConnectionHandler` will receive a shared
+2. **Backend wiring**: The `DispatchConnectionHandler` will receive a shared
    reference to `FusionBackends` containing a `SemanticBackendProvider` that
    manages the `LspHost`. This avoids tight coupling between router and LSP.
 
-1. **Argument format**: Follow users-guide.md convention:
+3. **Argument format**: Follow users-guide.md convention:
    `--uri file:///path.rs --position 10:5`. Position uses `LINE:COL` format
    (1-indexed for user-facing, converted to 0-indexed for LSP).
 
-1. **Language inference**: Derive language from URI file extension:
+4. **Language inference**: Derive language from URI file extension:
    `.rs` → Rust, `.py` → Python, `.ts`/`.tsx` → TypeScript. Unknown extensions
    return a structured error.
 
-1. **Response format**: JSON payload per users-guide.md:
+5. **Response format**: JSON payload per users-guide.md:
    `{"uri":"<URI>","line":42,"column":17}` for each definition location.
 
-1. **Error propagation**: New `DispatchError` variants for argument validation,
+6. **Error propagation**: New `DispatchError` variants for argument validation,
    backend startup failures, and LSP host errors. All return exit status 1.
 
 ______________________________________________________________________
 
 ## Critical Files
 
-| File | Purpose |
+| File                                                    | Purpose                      |
 | ------------------------------------------------------- | ---------------------------- |
-| `crates/weaverd/src/dispatch/response.rs` | Add `Stdout` stream target |
-| `crates/weaverd/src/dispatch/router.rs` | Wire observe ops to handlers |
-| `crates/weaverd/src/dispatch/handler.rs` | Pass backends to router |
-| `crates/weaverd/src/dispatch/errors.rs` | New error variants |
-| `crates/weaverd/src/dispatch/observe/mod.rs` | New observe handler module |
-| `crates/weaverd/src/dispatch/observe/get_definition.rs` | Handler implementation |
-| `crates/weaverd/src/dispatch/observe/arguments.rs` | Argument parsing |
-| `crates/weaverd/src/dispatch/observe/responses.rs` | Response serialization |
-| `crates/weaverd/src/semantic_provider.rs` | LSP host backend provider |
-| `crates/weaverd/tests/features/daemon_dispatch.feature` | BDD scenarios |
-| `crates/weaverd/src/tests/dispatch_behaviour.rs` | Step definitions |
-| `docs/users-guide.md` | Documentation updates |
-| `docs/roadmap.md` | Mark task complete |
+| `crates/weaverd/src/dispatch/response.rs`               | Add `Stdout` stream target   |
+| `crates/weaverd/src/dispatch/router.rs`                 | Wire observe ops to handlers |
+| `crates/weaverd/src/dispatch/handler.rs`                | Pass backends to router      |
+| `crates/weaverd/src/dispatch/errors.rs`                 | New error variants           |
+| `crates/weaverd/src/dispatch/observe/mod.rs`            | New observe handler module   |
+| `crates/weaverd/src/dispatch/observe/get_definition.rs` | Handler implementation       |
+| `crates/weaverd/src/dispatch/observe/arguments.rs`      | Argument parsing             |
+| `crates/weaverd/src/dispatch/observe/responses.rs`      | Response serialization       |
+| `crates/weaverd/src/semantic_provider.rs`               | LSP host backend provider    |
+| `crates/weaverd/tests/features/daemon_dispatch.feature` | BDD scenarios                |
+| `crates/weaverd/src/tests/dispatch_behaviour.rs`        | Step definitions             |
+| `docs/users-guide.md`                                   | Documentation updates        |
+| `docs/roadmap.md`                                       | Mark task complete           |
 
 ______________________________________________________________________
 
@@ -644,9 +644,9 @@ ______________________________________________________________________
 
 ## Risks and Mitigations
 
-| Risk | Mitigation |
+| Risk                               | Mitigation                           |
 | ---------------------------------- | ------------------------------------ |
-| LSP host initialization slow | Lazy initialization already in place |
-| Thread safety with shared backends | Use `Arc<Mutex<>>` pattern |
-| Argument parsing edge cases | Comprehensive unit tests |
-| Response format mismatch | Review docs before implementation |
+| LSP host initialization slow       | Lazy initialization already in place |
+| Thread safety with shared backends | Use `Arc<Mutex<>>` pattern           |
+| Argument parsing edge cases        | Comprehensive unit tests             |
+| Response format mismatch           | Review docs before implementation    |

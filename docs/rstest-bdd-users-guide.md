@@ -39,11 +39,11 @@ functions—`StepFn` continues to execute synchronously and exposes results via
 
 ## The three amigos
 
-| Role ("amigo") | Primary concerns | Features provided by `rstest‑bdd` |
+| Role ("amigo")                     | Primary concerns                                                                                                                  | Features provided by `rstest‑bdd`                                                                                                                                                                                                                                                                                                                                                                         |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Business analyst/product owner** | Writing and reviewing business-readable specifications; ensuring that acceptance criteria are expressed clearly. | Gherkin `.feature` files are plain text and start with a `Feature` declaration; each `Scenario` describes a single behaviour. Steps are written using keywords `Given`, `When`, and `Then` ([syntax](gherkin-syntax.md#L72-L91)), producing living documentation that can be read by non-technical stakeholders. |
-| **Developer** | Implementing step definitions in Rust and wiring them to the business specifications; using existing fixtures for setup/teardown. | Attribute macros `#[given]`, `#[when]` and `#[then]` register step functions and their pattern strings in a global step registry. A `#[scenario]` macro reads a feature file at compile time and generates a test that drives the registered steps. Fixtures whose parameter names match are injected automatically; use `#[from(name)]` only when a parameter name differs from the fixture. |
-| **Tester/QA** | Executing behaviour tests, ensuring correct sequencing of steps and verifying outcomes observable by the user. | Scenarios are executed via the standard `cargo test` runner; test functions annotated with `#[scenario]` run each step in order and panic if a step is missing. Assertions belong in `Then` steps; guidelines discourage inspecting internal state and encourage verifying observable outcomes. Testers can use `cargo test` filters and parallelism because the generated tests are ordinary Rust tests. |
+| **Business analyst/product owner** | Writing and reviewing business-readable specifications; ensuring that acceptance criteria are expressed clearly.                  | Gherkin `.feature` files are plain text and start with a `Feature` declaration; each `Scenario` describes a single behaviour. Steps are written using keywords `Given`, `When`, and `Then` ([syntax](gherkin-syntax.md#L72-L91)), producing living documentation that can be read by non-technical stakeholders.                                                                                          |
+| **Developer**                      | Implementing step definitions in Rust and wiring them to the business specifications; using existing fixtures for setup/teardown. | Attribute macros `#[given]`, `#[when]` and `#[then]` register step functions and their pattern strings in a global step registry. A `#[scenario]` macro reads a feature file at compile time and generates a test that drives the registered steps. Fixtures whose parameter names match are injected automatically; use `#[from(name)]` only when a parameter name differs from the fixture.             |
+| **Tester/QA**                      | Executing behaviour tests, ensuring correct sequencing of steps and verifying outcomes observable by the user.                    | Scenarios are executed via the standard `cargo test` runner; test functions annotated with `#[scenario]` run each step in order and panic if a step is missing. Assertions belong in `Then` steps; guidelines discourage inspecting internal state and encourage verifying observable outcomes. Testers can use `cargo test` filters and parallelism because the generated tests are ordinary Rust tests. |
 
 The following sections expand on these responsibilities and show how to use the
 current API effectively.
@@ -414,14 +414,14 @@ focused API for populating, reading, and clearing per-scenario values. Each
 slot starts empty and supports helpers such as `set`, `replace`,
 `get_or_insert_with`, `take`, and predicates `is_empty`/`is_filled`.
 
-Define a state struct whose fields are `Slot<T>` and derive \[`ScenarioState`\].
-The derive macro clears every slot by implementing `ScenarioState::reset` and
-it automatically adds a \[`Default`\] implementation that leaves all slots empty.
-**Do not** also derive or implement `Default`: Rust will report a
-duplicate-implementation error because the macro already provides it. For
-custom initialization, plan to use the future `#[scenario_state(no_default)]`
-flag (or equivalent) to opt out of the generated `Default` and supply bespoke
-logic.
+Define a state struct whose fields are `Slot<T>` and derive
+\[`ScenarioState`\]. The derive macro clears every slot by implementing
+`ScenarioState::reset` and it automatically adds a \[`Default`\] implementation
+that leaves all slots empty. **Do not** also derive or implement `Default`:
+Rust will report a duplicate-implementation error because the macro already
+provides it. For custom initialization, plan to use the future
+`#[scenario_state(no_default)]` flag (or equivalent) to opt out of the
+generated `Default` and supply bespoke logic.
 
 ```rust,no_run
 use rstest::fixture;
@@ -509,12 +509,12 @@ registers an empty pattern instead of inferring one.
 The `#[scenario]` macro is the entry point that ties a Rust test function to a
 scenario defined in a `.feature` file. It accepts four arguments:
 
-| Argument | Purpose | Status |
+| Argument       | Purpose                                               | Status                                                                                    |
 | -------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `path: &str` | Relative path to the feature file (required). | **Implemented**: resolved and parsed at compile time. |
-| `index: usize` | Optional zero-based scenario index (defaults to `0`). | **Implemented**: selects the scenario by position. |
-| `name: &str` | Optional scenario title; resolves when unique. | **Implemented**: errors when missing and directs duplicates to `index`. |
-| `tags: &str` | Optional tag-expression filter applied at expansion. | **Implemented**: filters scenarios and outline example rows; errors when nothing matches. |
+| `path: &str`   | Relative path to the feature file (required).         | **Implemented**: resolved and parsed at compile time.                                     |
+| `index: usize` | Optional zero-based scenario index (defaults to `0`). | **Implemented**: selects the scenario by position.                                        |
+| `name: &str`   | Optional scenario title; resolves when unique.        | **Implemented**: errors when missing and directs duplicates to `index`.                   |
+| `tags: &str`   | Optional tag-expression filter applied at expansion.  | **Implemented**: filters scenarios and outline example rows; errors when nothing matches. |
 
 Tag filters run at macro-expansion time against the union of tags on the
 feature, the matched scenario, and—when dealing with `Scenario Outline`—the
@@ -546,17 +546,17 @@ the following steps:
 
 1. Build a `StepContext` and insert the test’s fixture arguments into it.
 
-1. For each step in the scenario (according to the `Given‑When‑Then` sequence),
+2. For each step in the scenario (according to the `Given‑When‑Then` sequence),
    look up a matching step function by `(keyword, pattern)` in the registry. A
    missing step causes the macro to emit a compile‑time error such as
    `No matching step definition found for: Given an undefined step`, allowing
    detection of incomplete implementations before tests run. Multiple matching
    definitions likewise produce an error.
 
-1. Invoke the registered step function with the `StepContext` so that fixtures
+3. Invoke the registered step function with the `StepContext` so that fixtures
    are available inside the step.
 
-1. After executing all steps, run the original test body. This block can
+4. After executing all steps, run the original test body. This block can
    include extra assertions or cleanup logic beyond the behaviour described in
    the feature.
 
@@ -583,7 +583,7 @@ may freely call `skip!` as long as they eventually run within a step or hook.
 When code outside that context—for example, a unit test or module
 initialization routine—invokes the macro, it panics with the message
 `rstest_bdd::skip! may only be used inside a step or hook generated by rstest-bdd`.
-Each scope tracks the thread that entered it; issuing a skip from another
+ Each scope tracks the thread that entered it; issuing a skip from another
 thread panics with
 `rstest_bdd::skip! may only run on the thread executing the step ...`. Keep
 skip requests on the thread that executes steps, so the runner can intercept
@@ -1206,6 +1206,6 @@ parameterization remain on the horizon, this foundation allows teams to
 integrate acceptance criteria into their Rust test suites and to engage all
 three amigos in the specification process.
 
-[`datatableerror`]: crate::datatable::DataTableError
-[`fluentlanguageloader`]: https://docs.rs/i18n-embed/latest/i18n_embed/fluent/struct.FluentLanguageLoader.html
-[`localizations`]: https://docs.rs/rstest-bdd/latest/rstest_bdd/localization/
+[`datatableerror`]: crate::datatable::DataTableError [`fluentlanguageloader`]:
+<https://docs.rs/i18n-embed/latest/i18n_embed/fluent/struct.FluentLanguageLoader.html>
+ [`localizations`]: <https://docs.rs/rstest-bdd/latest/rstest_bdd/localization/>

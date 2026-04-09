@@ -30,13 +30,13 @@ Observable behaviour after implementation:
 1. Running `weaver observe get-card --uri <file://...> --position <line:col>`
    against fixture Rust, Python, and TypeScript files returns
    `"status":"success"` with a populated card.
-1. Cards for decorated or documented symbols include stable bundled
+2. Cards for decorated or documented symbols include stable bundled
    attachments even when blank lines or indentation are edited.
-1. Nested locals, lambdas, and closures never appear in the entity table or as
+3. Nested locals, lambdas, and closures never appear in the entity table or as
    top-level cards.
-1. Requests for unsupported extensions or symbol-less positions return a
+4. Requests for unsupported extensions or symbol-less positions return a
    structured refusal rather than a daemon crash or ad hoc text.
-1. `make check-fmt`, `make lint`, `make test`, `make markdownlint`, and
+5. `make check-fmt`, `make lint`, `make test`, `make markdownlint`, and
    `make nixie` all exit 0 when run through the repository's required
    `pipefail` plus `tee` pattern.
 
@@ -46,32 +46,32 @@ Observable behaviour after implementation:
    `crates/weaver-cards/src/{card,detail,request,response,symbol}.rs` and
    completed in roadmap item 7.1.1 is already locked. This task must implement
    extraction against that schema, not redesign it.
-1. This is the Tree-sitter-first milestone only. Do not require Language
+2. This is the Tree-sitter-first milestone only. Do not require Language
    Server Protocol (LSP) startup in 7.1.2. Later roadmap item 7.1.3 will enrich
    cards semantically.
-1. Use the existing syntactic foundation in `crates/weaver-syntax/` as the
+3. Use the existing syntactic foundation in `crates/weaver-syntax/` as the
    parsing layer. Extraction logic belongs with the card domain, not in
    `weaverd`.
-1. Keep filesystem and uniform resource identifier (URI) handling in
+4. Keep filesystem and uniform resource identifier (URI) handling in
    `crates/weaverd/`; keep card extraction itself pure over provided source
    text, path, and request position so it is cheap to unit test.
-1. The workspace enforces strict linting from `Cargo.toml`, including
+5. The workspace enforces strict linting from `Cargo.toml`, including
    `unwrap_used`, `expect_used`, `indexing_slicing`, `string_slice`,
    `allow_attributes`, `missing_docs`, `missing_const_for_fn`,
    `cognitive_complexity`, and the 400-line file limit for code files.
-1. Every new Rust module must begin with a `//!` comment, and all public items
+6. Every new Rust module must begin with a `//!` comment, and all public items
    must have `///` rustdoc comments.
-1. Behaviour tests must use `rstest-bdd` v0.5.0, which is already pinned in
+7. Behaviour tests must use `rstest-bdd` v0.5.0, which is already pinned in
    the workspace. Fixture matching is by parameter name; the shared BDD fixture
    must remain named `world`.
-1. Documentation changes are part of scope:
+8. Documentation changes are part of scope:
    `docs/jacquard-card-first-symbol-graph-design.md`, `docs/users-guide.md`,
    and `docs/roadmap.md` must be updated before the work is considered complete.
-1. `docs/users-guide.md` must explain any new user-visible behaviour,
+9. `docs/users-guide.md` must explain any new user-visible behaviour,
    especially successful `get-card` responses, refusal cases, and the fact that
    `semantic` / `full` requests still degrade to Tree-sitter-only sections in
    this milestone.
-1. The roadmap entry must not be marked done until all implementation,
+10. The roadmap entry must not be marked done until all implementation,
    documentation, and validation steps in this plan have completed.
 
 ## Tolerances
@@ -210,11 +210,11 @@ The feature touches three existing areas:
    This crate currently defines the stable `observe get-card` schema from
    7.1.1. Relevant files are `src/card.rs`, `src/detail.rs`, `src/request.rs`,
    `src/response.rs`, and `src/symbol.rs`.
-1. `crates/weaver-syntax/`
+2. `crates/weaver-syntax/`
    This crate already wraps Tree-sitter parsing. `src/parser.rs` exposes
    `Parser` and `ParseResult`; `src/language.rs` exposes
    `SupportedLanguage::{from_extension, from_path, tree_sitter_language}`.
-1. `crates/weaverd/`
+3. `crates/weaverd/`
    `src/dispatch/observe/get_card.rs` is the current placeholder handler.
    `src/dispatch/router.rs` already routes `"get-card"` requests correctly.
 
@@ -273,11 +273,11 @@ Implement the deterministic two-pass extraction pipeline described in
 `docs/jacquard-card-first-symbol-graph-design.md`:
 
 1. Parse the file and build alternating entity and interstitial regions.
-1. Resolve the requested position to either:
+2. Resolve the requested position to either:
    - the smallest eligible entity region that contains it, or
    - the synthetic file/module card when the position is inside a file-level
      interstitial span that the schema attaches to the module.
-1. Extract only the card requested by the position, but keep the intermediate
+3. Extract only the card requested by the position, but keep the intermediate
    entity table available for interstitial attachment and nested filtering.
 
 Language-specific query coverage must be sufficient to satisfy the acceptance
@@ -305,12 +305,12 @@ Implement three related pieces together:
    Capture import/use blocks, top-level headers, and similar between-entity
    spans. Normalize imports into the existing `InterstitialInfo` schema,
    preserving both the raw block and the normalized grouping.
-1. Attachment bundling.
+2. Attachment bundling.
    Starting from the symbol start byte, scan backwards across trivia until a
    non-comment, non-decorator, non-annotation token is found. Attach the
    contiguous leading block to the symbol card and record
    `attachments.bundle_rule = "leading_trivia"`.
-1. In-body documentation extraction where the language requires it.
+3. In-body documentation extraction where the language requires it.
    Python docstrings are inside the entity body, so `doc.docstring` and
    `doc.summary` need a language-specific rule that is separate from backwards
    scanning.
@@ -356,12 +356,12 @@ Update `crates/weaverd/src/dispatch/observe/get_card.rs` so it performs the
 real flow:
 
 1. Parse `GetCardRequest`.
-1. Resolve the `file://` URI to a local path.
-1. Read the file content.
-1. Infer the language from the path extension.
-1. Call the `weaver-cards` extractor.
-1. Serialize `GetCardResponse::Success` on success.
-1. Map extractor failures to the existing refusal reasons:
+2. Resolve the `file://` URI to a local path.
+3. Read the file content.
+4. Infer the language from the path extension.
+5. Call the `weaver-cards` extractor.
+6. Serialize `GetCardResponse::Success` on success.
+7. Map extractor failures to the existing refusal reasons:
    - unsupported language,
    - no symbol at position,
    - backend unavailable only if a future optional backend is missing,
@@ -394,10 +394,10 @@ module in `crates/weaverd/src/tests/`.
 Minimum BDD scenarios:
 
 1. Rust symbol card happy path.
-1. Python decorated symbol happy path.
-1. TypeScript symbol happy path.
-1. Position with no symbol returns a structured refusal.
-1. Unsupported language returns a structured refusal.
+2. Python decorated symbol happy path.
+3. TypeScript symbol happy path.
+4. Position with no symbol returns a structured refusal.
+5. Unsupported language returns a structured refusal.
 
 If the daemon-level BDD becomes too bulky, keep the end-to-end scenarios in
 `weaverd` and place finer-grained edge-case scenarios in `weaver-cards`. Do not

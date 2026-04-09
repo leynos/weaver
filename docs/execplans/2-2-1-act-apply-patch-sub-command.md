@@ -194,11 +194,11 @@ Stage H (quality gates): run `make check-fmt`, `make lint`, `make test`,
 
 1. Reconfirm requirements and decide on request size handling, then update
    `docs/weaver-design.md` with the decision before coding.
-1. Implement CLI JSONL request changes and tests, then run the CLI-focused
+2. Implement CLI JSONL request changes and tests, then run the CLI-focused
    unit and BDD suites.
-1. Implement daemon apply-patch handler, parser, and safety harness changes,
+3. Implement daemon apply-patch handler, parser, and safety harness changes,
    then run unit and BDD suites for `weaverd`.
-1. Update documentation and roadmap, then run the full workspace gates.
+4. Update documentation and roadmap, then run the full workspace gates.
 
 Commands (run from repo root, using `tee` + `pipefail`):
 

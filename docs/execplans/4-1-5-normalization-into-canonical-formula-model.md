@@ -10,8 +10,8 @@ Status: COMPLETE
 ## Purpose / big picture
 
 After this change, Sempai will stop treating successful YAML parsing as a dead
-end. Search-mode Semgrep rules written in either legacy `pattern*` syntax or
-v2 `match` syntax will normalize into one canonical `Formula` model, allowing
+end. Search-mode Semgrep rules written in either legacy `pattern*` syntax or v2
+`match` syntax will normalize into one canonical `Formula` model, allowing
 `sempai::Engine::compile_yaml` to return real search query plans instead of the
 current post-parse `NOT_IMPLEMENTED` placeholder for valid rules.
 
@@ -65,8 +65,8 @@ Implementation must not begin until the user explicitly approves this plan.
   inputs that must lower deterministically into the canonical model without
   silently changing semantics.
 - Add unit tests and behavioural tests using `rstest-bdd` v0.5.0. Cover happy
-  paths, unhappy paths, and edge cases, including paired legacy/v2
-  equivalence fixtures and deterministic semantic-diagnostic fixtures.
+  paths, unhappy paths, and edge cases, including paired legacy/v2 equivalence
+  fixtures and deterministic semantic-diagnostic fixtures.
 - Keep source files under 400 lines by splitting formula types, normalization,
   semantic checks, and tests into focused modules.
 - Record the finalized design decisions in
@@ -83,15 +83,14 @@ Implementation must not begin until the user explicitly approves this plan.
   `crates/sempai-core/`, `crates/sempai/`, their direct tests, and the three
   required docs files, stop and escalate.
 - Interface: if this milestone requires removing or renaming an existing
-  public `sempai` or `sempai_core` API instead of extending it compatibly,
-  stop and escalate.
+  public `sempai` or `sempai_core` API instead of extending it compatibly, stop
+  and escalate.
 - Dependencies: if the work appears to require a new third-party dependency,
   stop and escalate before adding it.
 - Constraint modelling: if the current opaque constraint payloads from
-  `sempai_yaml` are insufficient to implement the
-  `MissingPositiveTermInAnd` exception for metavariable-pattern contexts
-  without substantially implementing 4.1.4 or 4.1.6 first, stop and present
-  options.
+  `sempai_yaml` are insufficient to implement the `MissingPositiveTermInAnd`
+  exception for metavariable-pattern contexts without substantially
+  implementing 4.1.4 or 4.1.6 first, stop and present options.
 - Language mapping: if valid rule-language strings cannot be mapped
   deterministically to `sempai_core::Language` for search query plans without
   undocumented alias policy, stop and escalate.
@@ -110,8 +109,8 @@ Implementation must not begin until the user explicitly approves this plan.
   decorations at different tree levels, making equality checks brittle if they
   compare source syntax instead of canonical form. Severity: medium.
   Likelihood: high. Mitigation: define equivalence through normalized `Formula`
-  snapshots or direct structural equality on the canonical model, never
-  through source-string round trips.
+  snapshots or direct structural equality on the canonical model, never through
+  source-string round trips.
 
 - Risk: `QueryPlan` is currently a placeholder with no stored formula, so
   turning `compile_yaml` into a real success path may ripple through tests and
@@ -134,8 +133,8 @@ Implementation must not begin until the user explicitly approves this plan.
 
 - [x] (2026-04-05 UTC) Reviewed roadmap item 4.1.5, the Sempai design
   document, relevant Semgrep guidance docs, adjacent Sempai ExecPlans, the
-  current `sempai`, `sempai_core`, and `sempai_yaml` code structure, and
-  the requested testing/documentation guidance.
+  current `sempai`, `sempai_core`, and `sempai_yaml` code structure, and the
+  requested testing/documentation guidance.
 - [x] (2026-04-05 UTC) Drafted this ExecPlan.
 - [x] (2026-04-05 UTC) Stage A: Added failing paired-fixture and
   semantic-diagnostic tests.
@@ -153,17 +152,17 @@ Implementation must not begin until the user explicitly approves this plan.
 - Observation: `crates/sempai/src/engine.rs` already calls
   `sempai_yaml::parse_rule_file`, but it still returns
   `DiagnosticReport::not_implemented("compile_yaml query-plan normalization")`
-  after every successful parse. Impact: 4.1.5 can unlock meaningful user
-  value without waiting for Tree-sitter execution.
+  after every successful parse. Impact: 4.1.5 can unlock meaningful user value
+  without waiting for Tree-sitter execution.
 
 - Observation: `crates/sempai-yaml/src/model.rs` already distinguishes
-  `LegacyFormula`, `MatchFormula`, legacy constraint payloads, and decorated
-  v2 formulas. Impact: normalization can be implemented as a second-stage
-  lowering pass instead of reopening the YAML parser.
+  `LegacyFormula`, `MatchFormula`, legacy constraint payloads, and decorated v2
+  formulas. Impact: normalization can be implemented as a second-stage lowering
+  pass instead of reopening the YAML parser.
 
 - Observation: `sempai_core` currently exports diagnostics, spans, languages,
-  and matches, but not any canonical rule or formula model. Impact: 4.1.5
-  needs to add that model before `compile_yaml` can return honest plans.
+  and matches, but not any canonical rule or formula model. Impact: 4.1.5 needs
+  to add that model before `compile_yaml` can return honest plans.
 
 - Observation: `Language` currently parses only `rust`, `python`,
   `typescript`, `go`, and `hcl`, while YAML rule parsing accepts wider schema
@@ -178,8 +177,8 @@ Implementation must not begin until the user explicitly approves this plan.
 - Observation: strict workspace clippy lints (indexing_slicing, unwrap_used,
   panic_in_result_fn) require `#[expect(...)]` attributes on test modules.
   Impact: test code needs explicit lint suppression annotations to avoid
-  warnings for panicking assertions and unwrap() calls that are intentional
-  in test contexts.
+  warnings for panicking assertions and unwrap() calls that are intentional in
+  test contexts.
 
 - Observation: the `metavariable-pattern` exception for
   MissingPositiveTermInAnd requires additional context tracking during
@@ -190,38 +189,31 @@ Implementation must not begin until the user explicitly approves this plan.
 
 - Decision: place canonical `Formula` and related clause types in
   `sempai_core`, but place normalization adapters in `crates/sempai/` where
-  both `sempai_core` and `sempai_yaml` are already available.
-  Rationale: this preserves a clean dependency graph while still making the
-  canonical model part of the stable core vocabulary.
-  Date/Author: 2026-04-05 / Codex.
+  both `sempai_core` and `sempai_yaml` are already available. Rationale: this
+  preserves a clean dependency graph while still making the canonical model
+  part of the stable core vocabulary. Date/Author: 2026-04-05 / Codex.
 
 - Decision: make `compile_yaml` return real `QueryPlan` values for valid
   search-mode rules in this milestone, while leaving `compile_dsl` and
-  `execute` as explicit placeholders.
-  Rationale: this is the smallest honest behaviour change that proves the
-  normalization layer works and removes the current dead-end for valid search
-  YAML.
-  Date/Author: 2026-04-05 / Codex.
+  `execute` as explicit placeholders. Rationale: this is the smallest honest
+  behaviour change that proves the normalization layer works and removes the
+  current dead-end for valid search YAML. Date/Author: 2026-04-05 / Codex.
 
 - Decision: model only the clause types needed for 4.1.5 semantics as typed
-  canonical variants, and preserve everything else as raw payloads.
-  Rationale: this keeps the change bounded while still making semantic checks
-  deterministic and future extension possible.
-  Date/Author: 2026-04-05 / Codex.
+  canonical variants, and preserve everything else as raw payloads. Rationale:
+  this keeps the change bounded while still making semantic checks
+  deterministic and future extension possible. Date/Author: 2026-04-05 / Codex.
 
 - Decision: define equivalence using canonical-form equality between paired
   legacy and v2 fixtures, not by pretty-printing or reparsing one syntax into
-  the other.
-  Rationale: the milestone is about one shared model, so equality should be
-  measured at that level.
-  Date/Author: 2026-04-05 / Codex.
+  the other. Rationale: the milestone is about one shared model, so equality
+  should be measured at that level. Date/Author: 2026-04-05 / Codex.
 
 - Decision: use `#[expect(clippy::unwrap_used, clippy::indexing_slicing)]`
   attributes on test modules rather than rewriting tests to avoid panics.
   Rationale: test code intentionally panics on assertion failures; using
   unwrap() and direct indexing is idiomatic for tests and makes failures
-  immediately visible.
-  Date/Author: 2026-04-05 / Codex.
+  immediately visible. Date/Author: 2026-04-05 / Codex.
 
 ## Outcomes & retrospective
 
@@ -229,18 +221,18 @@ Target outcome at completion:
 
 1. `sempai_core` exposes a canonical `Formula` model and the smallest shared
    clause vocabulary needed by normalization and semantic checks.
-1. `sempai` contains a normalization pass that lowers parsed legacy and v2
+2. `sempai` contains a normalization pass that lowers parsed legacy and v2
    search principals into the same canonical representation.
-1. Valid paired legacy and v2 fixture rules normalize to structurally
+3. Valid paired legacy and v2 fixture rules normalize to structurally
    equivalent formulas.
-1. Invalid semantic states emit stable diagnostics for
+4. Invalid semantic states emit stable diagnostics for
    `InvalidNotInOr` and `MissingPositiveTermInAnd`.
-1. `sempai::Engine::compile_yaml` returns real query plans for valid
+5. `sempai::Engine::compile_yaml` returns real query plans for valid
    search-mode rules instead of a post-parse placeholder.
-1. Unit tests and `rstest-bdd` scenarios cover happy, unhappy, and edge paths.
-1. `docs/sempai-query-language-design.md`, `docs/users-guide.md`, and
+6. Unit tests and `rstest-bdd` scenarios cover happy, unhappy, and edge paths.
+7. `docs/sempai-query-language-design.md`, `docs/users-guide.md`, and
    `docs/roadmap.md` are updated to match the delivered behaviour.
-1. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
+8. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
 Retrospective notes will be filled in during implementation and finalization.
@@ -306,8 +298,8 @@ In `crates/sempai/src/tests/normalization_tests.rs`, add unit tests that:
   useful message fragment.
 
 In `crates/sempai/src/tests/behaviour.rs` and
-`crates/sempai/tests/features/sempai_engine.feature`, add behavioural
-scenarios that prove the facade-level contract:
+`crates/sempai/tests/features/sempai_engine.feature`, add behavioural scenarios
+that prove the facade-level contract:
 
 - valid search YAML compiles successfully,
 - valid paired legacy and v2 YAML produce equivalent plans,
@@ -337,8 +329,8 @@ The model should include:
 - One helper that determines whether a formula can act as a positive term in a
   conjunction.
 
-Keep this crate limited to stable types and pure helpers. It must not depend
-on `sempai_yaml`.
+Keep this crate limited to stable types and pure helpers. It must not depend on
+`sempai_yaml`.
 
 Go / no-go:
 
@@ -347,8 +339,8 @@ Go / no-go:
 
 ### Stage C: implement lowering and semantic checks in `sempai`
 
-Add `crates/sempai/src/normalize.rs` and use it to lower parsed
-`sempai_yaml` search principals into the canonical model.
+Add `crates/sempai/src/normalize.rs` and use it to lower parsed `sempai_yaml`
+search principals into the canonical model.
 
 The lowering rules should be explicit and recursive:
 
@@ -625,19 +617,22 @@ Approved and implemented. Implementation completed 2026-04-05 UTC.
 
 ## Revision note
 
-Initial draft created on 2026-04-05 from roadmap item 4.1.5, the Sempai
-design document, current crate state, and the repository's testing and
-documentation requirements.
+Initial draft created on 2026-04-05 from roadmap item 4.1.5, the Sempai design
+document, current crate state, and the repository's testing and documentation
+requirements.
 
-**2026-04-05 UTC**: Completed implementation. All stages (A-E) finished.
-Key changes from draft:
+**2026-04-05 UTC**: Completed implementation. All stages (A-E) finished. Key
+changes from draft:
 
-- Added `Formula`, `Atom`, `DecoratedFormula`, `WhereClause` types to `sempai_core`
+- Added `Formula`, `Atom`, `DecoratedFormula`, `WhereClause` types to
+  `sempai_core`
 - Implemented `normalize.rs` with legacy and v2 lowering logic
-- Implemented semantic validation for `InvalidNotInOr` and `MissingPositiveTermInAnd`
+- Implemented semantic validation for `InvalidNotInOr` and
+  `MissingPositiveTermInAnd`
 - Updated `Engine::compile_yaml` to return real `QueryPlan` values
 - Added paired fixture tests and BDD scenarios
 - Added test lint suppressions for `unwrap_used` and `indexing_slicing`
-- Deferred metavariable-pattern exception to future milestone (test marked `#[ignore]`)
+- Deferred metavariable-pattern exception to future milestone (test marked
+  `#[ignore]`)
 - Updated `docs/sempai-query-language-design.md` and `docs/users-guide.md`
 - Marked roadmap item 4.1.5 as complete

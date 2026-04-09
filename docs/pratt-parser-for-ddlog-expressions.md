@@ -22,13 +22,13 @@ The key steps are:
 1. **Define the Expression AST**: Create Rust `enum`s and `struct`s to
    represent the structure of all possible DDlog expressions.
 
-1. **Define Operator Precedence and Associativity**: Translate the operator
+2. **Define Operator Precedence and Associativity**: Translate the operator
    table from the Haskell parser analysis into a `chumsky` Pratt parser
    definition.
 
-1. **Implement the Parser**: Build the `chumsky` parser using `chumsky::pratt`.
+3. **Implement the Parser**: Build the `chumsky` parser using `chumsky::pratt`.
 
-1. **Integrate with the CST**: Ensure that when the expression parser is
+4. **Integrate with the CST**: Ensure that when the expression parser is
    invoked, the resulting AST is correctly represented within a `rowan`
    `GreenNode`.
 
@@ -391,12 +391,12 @@ The strategy is as follows:
    expression is expected (e.g., in a rule body or a `return` statement), it
    will invoke `expression_parser()`.
 
-1. The `expression_parser()` will consume tokens from the stream.
+2. The `expression_parser()` will consume tokens from the stream.
 
-1. Crucially, the main parser will continue to feed every single token
+3. Crucially, the main parser will continue to feed every single token
    (including whitespace and comments) into the `rowan::GreenNodeBuilder`.
 
-1. The main parser will wrap the sequence of tokens that were successfully
+4. The main parser will wrap the sequence of tokens that were successfully
    parsed by `expression_parser()` in an `N_EXPR_NODE` `SyntaxKind`.
 
 This approach delivers the best of both worlds:
@@ -564,20 +564,20 @@ section 4). The following operators are now included:
 
 **Binary operators:**
 
-| Operator | `BinaryOp` variant | Binding power | Associativity |
+| Operator | `BinaryOp` variant | Binding power        | Associativity |
 | -------- | ------------------ | -------------------- | ------------- |
-| `++` | `Concat` | 60 (same as `+`/`-`) | left |
-| `<<` | `Shl` | 55 | left |
-| `>>` | `Shr` | 55 | left |
-| `&` | `BitAnd` | 45 | left |
-| `^` | `BitXor` | 40 | left |
-| | | `BitOr` | 35 | left |
-| `==` | `Eq` | 30 | left |
-| `!=` | `Neq` | 30 | left |
-| `<` | `Lt` | 30 | left |
-| `<=` | `Lte` | 30 | left |
-| `>` | `Gt` | 30 | left |
-| `>=` | `Gte` | 30 | left |
+| `++`     | `Concat`           | 60 (same as `+`/`-`) | left          |
+| `<<`     | `Shl`              | 55                   | left          |
+| `>>`     | `Shr`              | 55                   | left          |
+| `&`      | `BitAnd`           | 45                   | left          |
+| `^`      | `BitXor`           | 40                   | left          |
+| `\|`     | `BitOr`            | 35                   | left          |
+| `==`     | `Eq`               | 30                   | left          |
+| `!=`     | `Neq`              | 30                   | left          |
+| `<`      | `Lt`               | 30                   | left          |
+| `<=`     | `Lte`              | 30                   | left          |
+| `>`      | `Gt`               | 30                   | left          |
+| `>=`     | `Gte`              | 30                   | left          |
 
 _Table 2: Binary operators mapped to `BinaryOp` variants with binding powers._
 
@@ -585,8 +585,8 @@ _Table 2: Binary operators mapped to `BinaryOp` variants with binding powers._
 
 | Operator | `UnaryOp` variant | Binding power |
 | -------- | ----------------- | ------------- |
-| `~` | `BitNot` | 80 |
-| `&` | `Ref` | 80 |
+| `~`      | `BitNot`          | 80            |
+| `&`      | `Ref`             | 80            |
 
 _Table 3: Unary prefix operators mapped to `UnaryOp` variants with binding
 powers._

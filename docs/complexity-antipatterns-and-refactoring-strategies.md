@@ -88,11 +88,11 @@ Cognitive Complexity is incremented based on three main rules 8:
    `try-catch` blocks, jumps to labels, and sequences of logical operators like
    `&&` and `||`), a penalty is applied.
 
-1. **Nesting:** Each level of nesting of these flow-breaking structures adds an
+2. **Nesting:** Each level of nesting of these flow-breaking structures adds an
    additional penalty. This is because deeper nesting makes it harder to keep
    the context in mind.
 
-1. **Shorthand Discount:** Structures that allow multiple statements to be read
+3. **Shorthand Discount:** Structures that allow multiple statements to be read
    as a single unit (e.g., a well-named method call) do not incur the same
    penalties as the raw statements they encapsulate. Method calls are generally
    "free" in terms of cognitive complexity, as a well-chosen name summarises
@@ -246,23 +246,23 @@ engineering principles from the outset.
    function or method has one clear, well-defined responsibility.8 When a
    function handles multiple distinct logical blocks, decompose it immediately.
 
-1. **Incremental Refactoring:** Don't wait for complexity to accumulate.
+2. **Incremental Refactoring:** Don't wait for complexity to accumulate.
    Refactor code regularly as part of the development process, not as a
    separate, deferred task.10 "Make the change easy, and then make the easy
    change".12
 
-1. **Early Abstraction:** When a new piece of logic is being added, consider if
+3. **Early Abstraction:** When a new piece of logic is being added, consider if
    it represents a distinct concept that warrants its own function or class.
    Well-named abstractions improve clarity.8
 
-1. **Code Reviews Focused on Structure:** Code reviews should not only check for
+4. **Code Reviews Focused on Structure:** Code reviews should not only check for
    correctness but also for structural integrity and complexity. Reviewers
    should look for emerging "bumps" or excessive nesting.
 
-1. **Using Complexity Metrics:** Regularly monitor Cognitive Complexity scores
+5. **Using Complexity Metrics:** Regularly monitor Cognitive Complexity scores
    using tools like SonarQube.1 Set thresholds and address violations promptly.
 
-1. **Return Early / Guard Clauses:** To avoid deep nesting for validation or
+6. **Return Early / Guard Clauses:** To avoid deep nesting for validation or
    pre-condition checks, process exceptional cases first and return early.8
    This approach flattens the main logic path and reduces nesting. For example,
    instead of:
@@ -311,7 +311,7 @@ Once a Bumpy Road is identified, the primary remediation strategy is the
    corresponds to a specific sub-task or responsibility within the larger
    method.6
 
-1. **Extract to New Methods/Functions:** Encapsulate each identified chunk into
+2. **Extract to New Methods/Functions:** Encapsulate each identified chunk into
    its own well-named method or function.8 The name of the new method should
    clearly describe its purpose.
 
@@ -322,11 +322,11 @@ Once a Bumpy Road is identified, the primary remediation strategy is the
      significantly, the complexity is spread out, making individual functions
      easier to grasp.8
 
-1. **Parameterize Extracted Methods:** Pass necessary data to the new methods as
+3. **Parameterize Extracted Methods:** Pass necessary data to the new methods as
    parameters. Avoid relying on shared mutable state within the original class
    if possible, as this can maintain coupling.
 
-1. **Iterative Refinement:** Refactoring complex code is often an iterative
+4. **Iterative Refinement:** Refactoring complex code is often an iterative
    process. After initial extractions, further opportunities for simplification
    or abstraction may become apparent.10 Sometimes, extracting methods reveals
    that a more significant restructuring, perhaps involving new classes or
@@ -344,30 +344,30 @@ escalating into full-blown Bumpy Roads.
 1. **Increasing Cognitive Complexity Scores:** A rising Cognitive Complexity
    score for a method in static analysis tools is a direct indicator.8
 
-1. **Deeply Nested Logic:** Even a single area of deep nesting (more than 2-3
+2. **Deeply Nested Logic:** Even a single area of deep nesting (more than 2-3
    levels) should be a concern. If multiple such areas appear in the same
    function, it's a strong red flag.6
 
-1. **Functions Doing "Too Much":** If describing what a function does requires
+3. **Functions Doing "Too Much":** If describing what a function does requires
    using the word "and" multiple times (e.g., "it validates the input, AND
    processes the data, AND then updates the UI, AND logs the result"), it's
    likely violating SRP and on its way to becoming bumpy.8
 
-1. **Frequent Modifications to the Same Function for Different Reasons:** If a
+4. **Frequent Modifications to the Same Function for Different Reasons:** If a
    function needs to be changed for various unrelated feature enhancements or
    bug fixes, it indicates it has too many responsibilities (related to the
    "Shotgun Surgery" code smell, which can be a consequence or co-occur with
    Bumpy Roads).2
 
-1. **Difficulty in Unit Testing:** If a method becomes hard to unit test due to
+5. **Difficulty in Unit Testing:** If a method becomes hard to unit test due to
    numerous conditions and paths that need to be set up and verified, it often
    correlates with high complexity that could manifest as a Bumpy Road.
 
-1. **Code "Smells" like Long Method:** A Bumpy Road is often, though not always,
+6. **Code "Smells" like Long Method:** A Bumpy Road is often, though not always,
    a Long Method.15 The length itself isn't the core problem, but it provides
    more space for bumps to accumulate.
 
-1. **Declining Code Health Metrics:** Tools like CodeScene provide "Code Health"
+7. **Declining Code Health Metrics:** Tools like CodeScene provide "Code Health"
    metrics which can degrade if Bumpy Roads are introduced.6
 
 By proactively addressing these red flags through disciplined refactoring,
@@ -482,7 +482,7 @@ spaghetti.24
    achieve a single, well-defined purpose. Don't break down code arbitrarily
    based on length alone; base it on behaviour and meaningful abstractions.10
 
-1. **Balance Abstraction Levels:** Abstraction is about hiding unnecessary
+2. **Balance Abstraction Levels:** Abstraction is about hiding unnecessary
    details and exposing essential features.27
 
    - **Under-abstraction** (common in Spaghetti Code) leads to duplication and
@@ -499,29 +499,29 @@ spaghetti.24
      classes/objects.29 Start with simple, straightforward code and introduce
      abstractions only when genuinely needed.30
 
-1. **Meaningful Naming:** Clear and descriptive names for classes, methods, and
+3. **Meaningful Naming:** Clear and descriptive names for classes, methods, and
    variables are crucial, especially when dealing with many small components.
    Good names help convey the purpose and relationships between different parts
    of the code.10
 
-1. **Consider the "Why," Not Just the "How":** When refactoring, understand the
+4. **Consider the "Why," Not Just the "How":** When refactoring, understand the
    underlying responsibilities and collaborations. Simply breaking code into
    smaller pieces without a clear architectural vision can lead to Ravioli.
    Design patterns, when applied appropriately, can provide a "system metaphor"
    or structure that makes the "ravioli" manageable by revealing symmetries and
    common sense in the design.25
 
-1. **Iterative Refactoring and Review:** Refactoring is not always a one-shot
+5. **Iterative Refactoring and Review:** Refactoring is not always a one-shot
    process. Continuously review the abstractions. Are they helping or hindering
    understanding? Are there too many trivial classes that could be
    consolidated?.10 Pair programming can also help maintain a balanced
    perspective during refactoring.25
 
-1. **The "You Aren't Gonna Need It" (YAGNI) Principle:** This principle helps
+6. **The "You Aren't Gonna Need It" (YAGNI) Principle:** This principle helps
    avoid unnecessary abstractions and features, which can contribute to Ravioli
    code if abstractions are created for anticipated but not actual needs.25
 
-1. **Focus on System Flow:** While individual components in Ravioli code might
+7. **Focus on System Flow:** While individual components in Ravioli code might
    be simple, the difficulty lies in tracing the overall execution flow. Ensure
    that the interactions and dependencies between components are clear and easy
    to follow. A slightly larger, more cohesive component often proves superior

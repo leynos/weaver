@@ -46,30 +46,30 @@ Observable behaviour after this change:
 ## Constraints
 
 1. **No async runtime.** The entire project uses synchronous blocking I/O.
-1. **Edition 2024, Rust 1.85+.** The workspace uses `edition = "2024"`.
-1. **Strict Clippy.** Over 60 denied lint categories including `unwrap_used`,
+2. **Edition 2024, Rust 1.85+.** The workspace uses `edition = "2024"`.
+3. **Strict Clippy.** Over 60 denied lint categories including `unwrap_used`,
    `expect_used`, `indexing_slicing`, `string_slice`, `missing_docs`,
    `cognitive_complexity`, and `allow_attributes`. Both `weaver-plugin-rope`
    and `weaverd` opt into workspace lints. All code must pass
    `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
-1. **400-line file limit.** No single source file may exceed 400 lines.
+4. **400-line file limit.** No single source file may exceed 400 lines.
    `crates/weaver-plugin-rope/src/lib.rs` starts at 384 lines (16 lines of
    headroom). `crates/weaverd/src/dispatch/act/refactor/mod.rs` starts at 375
    lines (25 lines of headroom).
-1. **Error handling.** Library crates use `thiserror`-derived error enums.
-1. **Documentation.** Every module begins with `//!` doc comments. All public
+5. **Error handling.** Library crates use `thiserror`-derived error enums.
+6. **Documentation.** Every module begins with `//!` doc comments. All public
    items have `///` rustdoc comments.
-1. **en-GB-oxendict spelling.** Comments and documentation use British English
+7. **en-GB-oxendict spelling.** Comments and documentation use British English
    with Oxford "-ize" / "-yse" / "-our" spelling.
-1. **rstest-bdd v0.5.0.** BDD tests use v0.5.0 with mutable world fixtures
+8. **rstest-bdd v0.5.0.** BDD tests use v0.5.0 with mutable world fixtures
    (`&mut`). The fixture parameter must be named exactly `world` (not
    `_world`). Use `let _ = world;` to suppress unused warnings.
-1. **Lint suppressions must use `#[expect]` with reason**, not `#[allow]`.
-1. **Do not modify `crates/weaver-plugins/`.** The capability contract types
+9. **Lint suppressions must use `#[expect]` with reason**, not `#[allow]`.
+10. **Do not modify `crates/weaver-plugins/`.** The capability contract types
    from roadmap item 5.2.1 are complete and must not be changed.
-1. **CLI backward compatibility.** Users still pass `--refactoring rename`,
+11. **CLI backward compatibility.** Users still pass `--refactoring rename`,
    `offset=N`, and `new_name=X`. The handler does the translation internally.
-1. **`str_to_string` denied.** Use `String::from()` or `.into()`, not
+12. **`str_to_string` denied.** Use `String::from()` or `.into()`, not
    `.to_string()` on `&str`.
 
 ## Tolerances (exception triggers)
@@ -237,12 +237,12 @@ code analysis and modification. The key crates for this task are:
 The rope plugin currently:
 
 1. Accepts operation `"rename"` (not `"rename-symbol"`).
-1. Expects arguments: `offset` (string or number, parsed to `usize`) and
+2. Expects arguments: `offset` (string or number, parsed to `usize`) and
    `new_name` (string).
-1. Returns `PluginOutput::Diff` on success.
-1. Returns failure via `PluginResponse::failure` with a single
+3. Returns `PluginOutput::Diff` on success.
+4. Returns failure via `PluginResponse::failure` with a single
    `PluginDiagnostic` that has no `reason_code`.
-1. The function `failure_response(message: String)` constructs failures.
+5. The function `failure_response(message: String)` constructs failures.
 
 ### Current manifest registration
 
@@ -297,16 +297,16 @@ Validation: `cargo check -p weaver-plugin-rope` compiles.
 In `crates/weaver-plugin-rope/src/lib.rs`:
 
 1. Add import for `ReasonCode` from `weaver_plugins`.
-1. Define `PluginFailure` struct carrying `message: String` and
+2. Define `PluginFailure` struct carrying `message: String` and
    `reason_code: Option<ReasonCode>`, with `Display` impl and constructors.
-1. Change `execute_request()` match arm from `"rename"` to
+3. Change `execute_request()` match arm from `"rename"` to
    `"rename-symbol"`. The `Err` case for unsupported operations uses
    `PluginFailure::with_reason(message, ReasonCode::OperationNotSupported)`.
-1. Update `execute_rename()` to use `parse_rename_symbol_arguments()` and
+4. Update `execute_rename()` to use `parse_rename_symbol_arguments()` and
    return `PluginFailure` errors with appropriate reason codes.
-1. Update `failure_response()` to accept `PluginFailure` and attach the
+5. Update `failure_response()` to accept `PluginFailure` and attach the
    reason code to the diagnostic when present.
-1. Update `run_with_adapter()` and `read_request()` to use `PluginFailure`
+6. Update `run_with_adapter()` and `read_request()` to use `PluginFailure`
    instead of `String`.
 
 Validation: `cargo check -p weaver-plugin-rope` compiles.
@@ -316,14 +316,14 @@ Validation: `cargo check -p weaver-plugin-rope` compiles.
 In `crates/weaverd/src/dispatch/act/refactor/mod.rs`:
 
 1. Add `use weaver_plugins::CapabilityId;` import.
-1. Add `.with_capabilities(vec![CapabilityId::RenameSymbol])` to the rope
+2. Add `.with_capabilities(vec![CapabilityId::RenameSymbol])` to the rope
    manifest construction.
-1. In `handle()`, after building `plugin_args` from the extras loop:
+3. In `handle()`, after building `plugin_args` from the extras loop:
    - If the refactoring is `"rename"`, set the effective operation to
      `"rename-symbol"`.
    - Inject `uri` from `args.file` if not already present.
    - Map `offset` to `position` if `offset` is present and `position` is not.
-1. Use the effective operation name when constructing the `PluginRequest`.
+4. Use the effective operation name when constructing the `PluginRequest`.
 
 Validation: `cargo check -p weaverd` compiles.
 
@@ -333,29 +333,29 @@ Update `crates/weaver-plugin-rope/src/tests/mod.rs`:
 
 1. Update `rename_arguments()` fixture: add `"uri"` key, rename `"offset"` to
    `"position"`.
-1. Update `request_with_args()`: operation `"rename"` → `"rename-symbol"`.
-1. Update parameterized `rename_argument_validation` test cases for new
+2. Update `request_with_args()`: operation `"rename"` → `"rename-symbol"`.
+3. Update parameterized `rename_argument_validation` test cases for new
    argument names (`position`, `uri`) and `PluginFailure` error type.
-1. Update `unsupported_operation_returns_error` for new return type.
-1. Update `rename_non_mutating_or_error_returns_failure` for new return type.
-1. Update `run_with_adapter_dispatch_layer` for new request JSON.
-1. Add test verifying `ReasonCode` on failure diagnostics.
+4. Update `unsupported_operation_returns_error` for new return type.
+5. Update `rename_non_mutating_or_error_returns_failure` for new return type.
+6. Update `run_with_adapter_dispatch_layer` for new request JSON.
+7. Add test verifying `ReasonCode` on failure diagnostics.
 
 Update `crates/weaver-plugin-rope/src/tests/behaviour.rs`:
 
 1. Update `build_request()`: operation `"rename-symbol"`, add `uri` argument,
    rename `offset` to `position`.
-1. Update `should_invoke_rename()`: check `"rename-symbol"`, `"position"`,
+2. Update `should_invoke_rename()`: check `"rename-symbol"`, `"position"`,
    `"uri"`.
-1. Update `#[given]` step annotations to match new feature file text.
-1. Add `#[then("the failure has reason code {code}")]` step for reason code
+3. Update `#[given]` step annotations to match new feature file text.
+4. Add `#[then("the failure has reason code {code}")]` step for reason code
    assertion.
 
 Update `crates/weaver-plugin-rope/tests/features/rope_plugin.feature`:
 
 1. Rename scenarios to reference "Rename-symbol".
-1. Update step text: "offset" → "position".
-1. Add reason code assertion step to adapter failure scenario.
+2. Update step text: "offset" → "position".
+3. Add reason code assertion step to adapter failure scenario.
 
 Validation: `cargo test -p weaver-plugin-rope` passes.
 
@@ -374,9 +374,9 @@ Validation: `cargo test -p weaverd` passes.
    `"rename-symbol"` internally. Update the parameter table to note that
    `offset` is mapped to `position` in the plugin protocol. Add a note that the
    rope plugin now declares the `rename-symbol` capability.
-1. Mark `docs/roadmap.md` entry 5.2.2 as done (`[x]`).
-1. Run `make fmt` to format all changed files.
-1. Run `make markdownlint` to validate Markdown.
+2. Mark `docs/roadmap.md` entry 5.2.2 as done (`[x]`).
+3. Run `make fmt` to format all changed files.
+4. Run `make markdownlint` to validate Markdown.
 
 Validation: `make check-fmt && make lint && make test` all pass.
 
@@ -469,12 +469,12 @@ Acceptance criteria from the roadmap:
 1. **Plugin advertises `rename-symbol` in capability probes.** The rope
    manifest includes `CapabilityId::RenameSymbol`. Verified by a weaverd unit
    test that inspects the `PluginRequest` operation name.
-1. **Request payloads conform to schema.** The rope plugin accepts
+2. **Request payloads conform to schema.** The rope plugin accepts
    `"rename-symbol"` with `uri`, `position`, `new_name`. Unit tests send
    conforming requests and receive `PluginOutput::Diff`.
-1. **Response payloads conform to schema.** Failure responses include
+3. **Response payloads conform to schema.** Failure responses include
    `ReasonCode` values. BDD scenario checks `reason_code` field.
-1. **Legacy provider routing is not required.** The old `"rename"` operation
+4. **Legacy provider routing is not required.** The old `"rename"` operation
    is rejected with `ReasonCode::OperationNotSupported`. A unit test verifies
    this.
 
@@ -490,15 +490,15 @@ new `arguments.rs` file is additive; existing files are edited in place.
 
 Table: Line-budget projection for files modified by this plan.
 
-| File | Current | Delta | Projected |
+| File                                                    | Current | Delta                               | Projected |
 | ------------------------------------------------------- | ------- | ----------------------------------- | --------- |
-| `weaver-plugin-rope/src/lib.rs` | 384 | -30 (extract) +15 (new logic) = -15 | 369 |
-| `weaver-plugin-rope/src/arguments.rs` | 0 (new) | +70 | 70 |
-| `weaverd/dispatch/act/refactor/mod.rs` | 375 | +12 | 387 |
-| `weaver-plugin-rope/src/tests/mod.rs` | 224 | +30 | 254 |
-| `weaver-plugin-rope/src/tests/behaviour.rs` | 176 | +20 | 196 |
-| `weaver-plugin-rope/tests/features/rope_plugin.feature` | 33 | +5 | 38 |
-| `weaverd/dispatch/act/refactor/tests.rs` | 249 | +30 | 279 |
+| `weaver-plugin-rope/src/lib.rs`                         | 384     | -30 (extract) +15 (new logic) = -15 | 369       |
+| `weaver-plugin-rope/src/arguments.rs`                   | 0 (new) | +70                                 | 70        |
+| `weaverd/dispatch/act/refactor/mod.rs`                  | 375     | +12                                 | 387       |
+| `weaver-plugin-rope/src/tests/mod.rs`                   | 224     | +30                                 | 254       |
+| `weaver-plugin-rope/src/tests/behaviour.rs`             | 176     | +20                                 | 196       |
+| `weaver-plugin-rope/tests/features/rope_plugin.feature` | 33      | +5                                  | 38        |
+| `weaverd/dispatch/act/refactor/tests.rs`                | 249     | +30                                 | 279       |
 
 All files remain within the 400-line limit.
 

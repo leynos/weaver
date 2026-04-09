@@ -66,16 +66,16 @@ Success is observable by reading the updated documents and by running
 
 1. Inventory current docs and link references for the requested files and
    `docs/semgrep-language-reference/`.
-1. Normalize style for headings, list formatting, code-block info strings,
+2. Normalize style for headings, list formatting, code-block info strings,
    footnote ordering, and paragraph wrapping to align with
    `docs/documentation-style-guide.md`.
-1. Repair broken or inconsistent repository-local links.
-1. Add `docs/contents.md` modelled on `../zamburak/docs/contents.md` for Weaver.
-1. Add `docs/repository-layout.md` modelled on
+3. Repair broken or inconsistent repository-local links.
+4. Add `docs/contents.md` modelled on `../zamburak/docs/contents.md` for Weaver.
+5. Add `docs/repository-layout.md` modelled on
    `../zamburak/docs/repository-layout.md`, with separate sections for
    implemented and planned components.
-1. Run markdown quality gates and capture logs.
-1. Commit with a descriptive message.
+6. Run markdown quality gates and capture logs.
+7. Commit with a descriptive message.
 
 ## Validation plan
 
@@ -97,8 +97,8 @@ Then inspect each log tail for failures.
 - [x] (2026-02-28 00:00 UTC) Created this ExecPlan before applying
   documentation updates.
 - [x] (2026-02-28 00:00 UTC) Inventoried requested docs and repaired
-  repository-local link consistency, including removal of non-portable
-  absolute local paths.
+  repository-local link consistency, including removal of non-portable absolute
+  local paths.
 - [x] (2026-02-28 00:00 UTC) Normalized requested docs to
   `docs/documentation-style-guide.md`.
 - [x] (2026-02-28 00:00 UTC) Created `docs/contents.md`.
@@ -106,8 +106,7 @@ Then inspect each log tail for failures.
   implemented and planned component separation.
 - [x] (2026-02-28 00:00 UTC) Ran markdown gates and captured evidence logs:
   `/tmp/markdownlint-weaver-sempai-design.out`,
-  `/tmp/fmt-weaver-sempai-design.out`,
-  `/tmp/nixie-weaver-sempai-design.out`.
+  `/tmp/fmt-weaver-sempai-design.out`, `/tmp/nixie-weaver-sempai-design.out`.
 - [x] (2026-02-28 00:00 UTC) Committed documentation updates with gate
   evidence.
 

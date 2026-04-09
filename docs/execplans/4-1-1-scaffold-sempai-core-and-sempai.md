@@ -166,17 +166,17 @@ All acceptance criteria met:
 
 1. `RUSTDOCFLAGS="-D warnings" cargo doc -p sempai --no-deps` exits 0
    with zero warnings.
-1. Thirteen public types are defined in `sempai_core` and re-exported
+2. Thirteen public types are defined in `sempai_core` and re-exported
    by the `sempai` facade: `Language`, `LanguageParseError`, `LineCol`, `Span`,
    `CapturedNode`, `CaptureValue`, `Match`, `EngineConfig`, `EngineLimits`,
    `DiagnosticCode`, `SourceSpan`, `Diagnostic`, and `DiagnosticReport`. Two
    additional types, `Engine` and `QueryPlan`, are defined in the `sempai`
    facade itself, giving fifteen public types in total.
-1. 63+ tests pass across both crates (unit, BDD, and doc tests) using
+3. 63+ tests pass across both crates (unit, BDD, and doc tests) using
    `rstest-bdd` v0.5.0 with happy and unhappy path scenarios.
-1. `make check-fmt`, `make lint`, and `make test` all exit 0.
-1. `docs/users-guide.md` updated with Sempai query engine section.
-1. Roadmap task 4.1.1 marked as done in `docs/roadmap.md`.
+4. `make check-fmt`, `make lint`, and `make test` all exit 0.
+5. `docs/users-guide.md` updated with Sempai query engine section.
+6. Roadmap task 4.1.1 marked as done in `docs/roadmap.md`.
 
 Net new files: 28 (two crates with source, tests, and features). No existing
 crate APIs were modified.
@@ -232,45 +232,45 @@ specifies the following public types:
    `#[non_exhaustive]`, `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `Hash`,
    `Serialize`, `Deserialize`.
 
-1. `LineCol` struct: `line: u32`, `column: u32` — with `Serialize`,
+2. `LineCol` struct: `line: u32`, `column: u32` — with `Serialize`,
    `Deserialize`.
 
-1. `Span` struct: `start_byte: u32`, `end_byte: u32`, `start: LineCol`,
+3. `Span` struct: `start_byte: u32`, `end_byte: u32`, `start: LineCol`,
    `end: LineCol` — with `Serialize`, `Deserialize`.
 
-1. `CapturedNode` struct: `span: Span`, `kind: String`,
+4. `CapturedNode` struct: `span: Span`, `kind: String`,
    `text: Option<String>` — with `Serialize`, `Deserialize`.
 
-1. `CaptureValue` enum: `Node(CapturedNode)`,
+5. `CaptureValue` enum: `Node(CapturedNode)`,
    `Nodes(Vec<CapturedNode>)` — with `#[non_exhaustive]`, tagged serde,
    `Serialize`, `Deserialize`.
 
-1. `Match` struct: `rule_id: String`, `uri: String`, `span: Span`,
+6. `Match` struct: `rule_id: String`, `uri: String`, `span: Span`,
    `focus: Option<Span>`, `captures: BTreeMap<String, CaptureValue>` — with
    `Serialize`, `Deserialize`.
 
-1. `EngineConfig` struct: `max_matches_per_rule: usize`,
+7. `EngineConfig` struct: `max_matches_per_rule: usize`,
    `max_capture_text_bytes: usize`, `max_deep_search_nodes: usize`,
    `enable_hcl: bool` — with `Default`.
 
-1. `DiagnosticCode` enum: nine `E_SEMPAI_*` codes plus `NotImplemented` for
+8. `DiagnosticCode` enum: nine `E_SEMPAI_*` codes plus `NotImplemented` for
    stubs — with `#[non_exhaustive]`, `Display`, `Serialize`, `Deserialize`
    (design doc lines 969-981).
 
-1. `SourceSpan` struct: `start: u32`, `end: u32`,
+9. `SourceSpan` struct: `start: u32`, `end: u32`,
    `uri: Option<String>` — for diagnostic locations.
 
-1. `Diagnostic` struct: `code: DiagnosticCode`, `message: String`,
+10. `Diagnostic` struct: `code: DiagnosticCode`, `message: String`,
    `span: Option<SourceSpan>`, `notes: Vec<String>`.
 
-1. `DiagnosticReport` struct: wraps `Vec<Diagnostic>`, implements
+11. `DiagnosticReport` struct: wraps `Vec<Diagnostic>`, implements
    `std::error::Error` via `thiserror`.
 
-1. `Engine` struct (in `sempai` facade): holds `EngineConfig`, exposes
+12. `Engine` struct (in `sempai` facade): holds `EngineConfig`, exposes
    `compile_yaml`, `compile_dsl`, `execute` — all returning
    `Result<T, DiagnosticReport>`.
 
-1. `QueryPlan` struct (in `sempai` facade): `rule_id: String`,
+13. `QueryPlan` struct (in `sempai` facade): `rule_id: String`,
    `language: Language`, private placeholder plan field.
 
 ## Plan of work
@@ -570,53 +570,53 @@ All commands run from the workspace root.
    mkdir -p crates/sempai/src crates/sempai/tests/features
    ```
 
-1. Edit `Cargo.toml`: add `"crates/sempai-core"` and `"crates/sempai"` to
+2. Edit `Cargo.toml`: add `"crates/sempai-core"` and `"crates/sempai"` to
    `members`.
 
-1. Create `crates/sempai-core/Cargo.toml` and `crates/sempai/Cargo.toml` (see
+3. Create `crates/sempai-core/Cargo.toml` and `crates/sempai/Cargo.toml` (see
    Stage A plan above).
 
-1. Create minimal `lib.rs` stubs.
+4. Create minimal `lib.rs` stubs.
 
-1. Verify: `cargo check --workspace` — expect exit 0.
+5. Verify: `cargo check --workspace` — expect exit 0.
 
 ### Stage B
 
 1. Create six module files under `crates/sempai-core/src/`.
 
-1. Wire modules and re-exports in `crates/sempai-core/src/lib.rs`.
+2. Wire modules and re-exports in `crates/sempai-core/src/lib.rs`.
 
-1. Verify: `cargo clippy -p sempai_core --all-targets -- -D warnings` —
+3. Verify: `cargo clippy -p sempai_core --all-targets -- -D warnings` —
    expect exit 0.
 
 ### Stage C
 
 1. Create `crates/sempai/src/engine.rs`.
 
-1. Wire re-exports in `crates/sempai/src/lib.rs`.
+2. Wire re-exports in `crates/sempai/src/lib.rs`.
 
-1. Verify: `RUSTDOCFLAGS="-D warnings" cargo doc -p sempai --no-deps` —
+3. Verify: `RUSTDOCFLAGS="-D warnings" cargo doc -p sempai --no-deps` —
    expect exit 0.
 
 ### Stage D
 
 1. Create `crates/sempai-core/src/tests/mod.rs` and six test sub-modules.
 
-1. Create `crates/sempai/src/tests/mod.rs` and two test sub-modules.
+2. Create `crates/sempai/src/tests/mod.rs` and two test sub-modules.
 
-1. Verify: `cargo test -p sempai_core -p sempai` — expect all tests pass.
+3. Verify: `cargo test -p sempai_core -p sempai` — expect all tests pass.
 
 ### Stage E
 
 1. Create `.feature` files and behaviour step definitions.
 
-1. Verify: `cargo test -p sempai_core -p sempai` — expect all tests pass.
+2. Verify: `cargo test -p sempai_core -p sempai` — expect all tests pass.
 
 ### Stage F
 
 1. Update `docs/users-guide.md`, `docs/roadmap.md`.
 
-1. Run `make fmt`.
+2. Run `make fmt`.
 
 ### Stage G
 
@@ -635,14 +635,14 @@ Expected: all exit 0.
 
 1. Public API documentation builds for `sempai` — verified by
    `RUSTDOCFLAGS="-D warnings" cargo doc -p sempai --no-deps` exiting 0.
-1. Stable types cover language, span, match, capture, and diagnostics models —
+2. Stable types cover language, span, match, capture, and diagnostics models —
    verified by unit tests constructing and round-tripping every type.
-1. Unit tests and BDD tests using rstest-bdd v0.5.0 covering happy and unhappy
+3. Unit tests and BDD tests using rstest-bdd v0.5.0 covering happy and unhappy
    paths — verified by `make test` passing.
-1. `make check-fmt`, `make lint`, `make test` all succeed — verified by
+4. `make check-fmt`, `make lint`, `make test` all succeed — verified by
    Stage G.
-1. `docs/users-guide.md` updated — verified by Stage F.
-1. Roadmap entry marked as done — verified by Stage F.
+5. `docs/users-guide.md` updated — verified by Stage F.
+6. Roadmap entry marked as done — verified by Stage F.
 
 **Quality criteria:**
 
@@ -836,34 +836,34 @@ impl Engine {
 
 Summary of files added or modified in this change.
 
-| File | Change |
+| File                                                      | Change |
 | --------------------------------------------------------- | ------ |
-| `Cargo.toml` | Edit |
-| `crates/sempai-core/Cargo.toml` | New |
-| `crates/sempai-core/src/lib.rs` | New |
-| `crates/sempai-core/src/language.rs` | New |
-| `crates/sempai-core/src/span.rs` | New |
-| `crates/sempai-core/src/capture.rs` | New |
-| `crates/sempai-core/src/match_result.rs` | New |
-| `crates/sempai-core/src/config.rs` | New |
-| `crates/sempai-core/src/diagnostic.rs` | New |
-| `crates/sempai-core/src/tests/mod.rs` | New |
-| `crates/sempai-core/src/tests/language_tests.rs` | New |
-| `crates/sempai-core/src/tests/span_tests.rs` | New |
-| `crates/sempai-core/src/tests/capture_tests.rs` | New |
-| `crates/sempai-core/src/tests/match_tests.rs` | New |
-| `crates/sempai-core/src/tests/config_tests.rs` | New |
-| `crates/sempai-core/src/tests/diagnostic_tests.rs` | New |
-| `crates/sempai-core/src/tests/behaviour.rs` | New |
-| `crates/sempai-core/tests/features/sempai_core.feature` | New |
-| `crates/sempai/Cargo.toml` | New |
-| `crates/sempai/src/lib.rs` | New |
-| `crates/sempai/src/engine.rs` | New |
-| `crates/sempai/src/tests/mod.rs` | New |
-| `crates/sempai/src/tests/engine_tests.rs` | New |
-| `crates/sempai/src/tests/reexport_tests.rs` | New |
-| `crates/sempai/src/tests/behaviour.rs` | New |
-| `crates/sempai/tests/features/sempai_engine.feature` | New |
-| `docs/users-guide.md` | Edit |
-| `docs/roadmap.md` | Edit |
-| `docs/execplans/4-1-1-scaffold-sempai-core-and-sempai.md` | New |
+| `Cargo.toml`                                              | Edit   |
+| `crates/sempai-core/Cargo.toml`                           | New    |
+| `crates/sempai-core/src/lib.rs`                           | New    |
+| `crates/sempai-core/src/language.rs`                      | New    |
+| `crates/sempai-core/src/span.rs`                          | New    |
+| `crates/sempai-core/src/capture.rs`                       | New    |
+| `crates/sempai-core/src/match_result.rs`                  | New    |
+| `crates/sempai-core/src/config.rs`                        | New    |
+| `crates/sempai-core/src/diagnostic.rs`                    | New    |
+| `crates/sempai-core/src/tests/mod.rs`                     | New    |
+| `crates/sempai-core/src/tests/language_tests.rs`          | New    |
+| `crates/sempai-core/src/tests/span_tests.rs`              | New    |
+| `crates/sempai-core/src/tests/capture_tests.rs`           | New    |
+| `crates/sempai-core/src/tests/match_tests.rs`             | New    |
+| `crates/sempai-core/src/tests/config_tests.rs`            | New    |
+| `crates/sempai-core/src/tests/diagnostic_tests.rs`        | New    |
+| `crates/sempai-core/src/tests/behaviour.rs`               | New    |
+| `crates/sempai-core/tests/features/sempai_core.feature`   | New    |
+| `crates/sempai/Cargo.toml`                                | New    |
+| `crates/sempai/src/lib.rs`                                | New    |
+| `crates/sempai/src/engine.rs`                             | New    |
+| `crates/sempai/src/tests/mod.rs`                          | New    |
+| `crates/sempai/src/tests/engine_tests.rs`                 | New    |
+| `crates/sempai/src/tests/reexport_tests.rs`               | New    |
+| `crates/sempai/src/tests/behaviour.rs`                    | New    |
+| `crates/sempai/tests/features/sempai_engine.feature`      | New    |
+| `docs/users-guide.md`                                     | Edit   |
+| `docs/roadmap.md`                                         | Edit   |
+| `docs/execplans/4-1-1-scaffold-sempai-core-and-sempai.md` | New    |

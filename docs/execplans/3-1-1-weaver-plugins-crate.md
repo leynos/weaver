@@ -75,26 +75,26 @@ Key files the reader should understand before proceeding:
 
 1. **No async runtime.** The entire project uses synchronous blocking I/O.
    Plugin execution must remain synchronous.
-1. **Single-threaded sandbox.** `birdcage` requires `Sandbox::spawn()` to be
+2. **Single-threaded sandbox.** `birdcage` requires `Sandbox::spawn()` to be
    called from a single-threaded context. The daemon's per-connection handler
    satisfies this naturally.
-1. **Edition 2024, Rust 1.85+.** The workspace uses `edition = "2024"` and
+3. **Edition 2024, Rust 1.85+.** The workspace uses `edition = "2024"` and
    `rust-version = "1.85"`.
-1. **Strict Clippy.** Over 60 denied lint categories including `unwrap_used`,
+4. **Strict Clippy.** Over 60 denied lint categories including `unwrap_used`,
    `expect_used`, `indexing_slicing`, `string_slice`, `missing_docs`, and
    `cognitive_complexity`. All code must pass
    `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
-1. **File size limit.** No single source file may exceed 400 lines.
-1. **Error handling.** Library crates use `thiserror`-derived error enums.
+5. **File size limit.** No single source file may exceed 400 lines.
+6. **Error handling.** Library crates use `thiserror`-derived error enums.
    No `eyre` or `anyhow` in library code.
-1. **Documentation.** Every module must begin with `//!` doc comments. All
+7. **Documentation.** Every module must begin with `//!` doc comments. All
    public items must have `///` rustdoc comments with examples where
    non-trivial.
-1. **en-GB-oxendict spelling.** Comments and documentation use British English
+8. **en-GB-oxendict spelling.** Comments and documentation use British English
    with Oxford "-ize" spelling.
-1. **rstest-bdd v0.5.0.** BDD tests must use v0.5.0 (upgrade from current
+9. **rstest-bdd v0.5.0.** BDD tests must use v0.5.0 (upgrade from current
    v0.4.0), with mutable world fixtures (`&mut`) instead of `RefCell`.
-1. **Workspace dependencies.** New dependencies must use caret requirements
+10. **Workspace dependencies.** New dependencies must use caret requirements
    and be declared in `[workspace.dependencies]` when shared.
 
 ## Tolerances (exception triggers)
@@ -253,31 +253,31 @@ following modules in order (each must compile and pass lint before the next):
    `SpawnFailed`, `Timeout`, `NonZeroExit`, `SerializeRequest`,
    `DeserializeResponse`, `InvalidOutput`, `Io`, `Sandbox`, `Manifest`.
 
-1. `protocol.rs` — IPC message types: `PluginRequest`, `PluginResponse`,
+2. `protocol.rs` — IPC message types: `PluginRequest`, `PluginResponse`,
    `FilePayload`, `PluginOutput` (tagged enum: `Diff`, `Analysis`, `Empty`),
    `PluginDiagnostic`, `DiagnosticSeverity`. All types derive `Serialize` and
    `Deserialize`. Unit tests verify round-trip serialization.
 
-1. `manifest.rs` — `PluginKind` (`Sensor` / `Actuator`),
+3. `manifest.rs` — `PluginKind` (`Sensor` / `Actuator`),
    `PluginManifest` (name, version, kind, languages, executable path, args,
    timeout). Validation: non-empty name, absolute executable path.
 
-1. `registry.rs` — `PluginRegistry` backed by `HashMap<String, PluginManifest>`.
+4. `registry.rs` — `PluginRegistry` backed by `HashMap<String, PluginManifest>`.
    Methods: `register()`, `get()`, `find_by_kind()`, `find_for_language()`,
    `find_actuator_for_language()`.
 
-1. `process.rs` — `ProcessPlugin` struct. The `run()` method:
+5. `process.rs` — `ProcessPlugin` struct. The `run()` method:
    (a) builds a `SandboxProfile` with the plugin executable whitelisted, (b)
    creates a `Sandbox` and spawns the command with stdin/stdout piped, (c)
    writes a single JSONL request line to stdin and closes it, (d) reads a
    single JSONL response line from stdout, (e) waits for exit with timeout, (f)
    returns a `PluginResponse` or `PluginError`.
 
-1. `runner.rs` — `PluginRunner` wrapping `PluginRegistry`. The `execute()`
+6. `runner.rs` — `PluginRunner` wrapping `PluginRegistry`. The `execute()`
    method resolves the manifest, creates a `ProcessPlugin`, calls `run()`, and
    returns the response. Uses a `PluginExecutor` trait to enable test doubles.
 
-1. `lib.rs` — module declarations, `pub use` re-exports, crate-level `//!`
+7. `lib.rs` — module declarations, `pub use` re-exports, crate-level `//!`
    documentation.
 
 ### Stage C: BDD tests
@@ -304,7 +304,7 @@ Wire the plugin system into the `weaverd` dispatch layer:
 1. Add `weaver-plugins = { path = "../weaver-plugins" }` to
    `crates/weaverd/Cargo.toml`.
 
-1. Create `crates/weaverd/src/dispatch/act/refactor/mod.rs` with a `handle()`
+2. Create `crates/weaverd/src/dispatch/act/refactor/mod.rs` with a `handle()`
    function following the `apply_patch::handle()` pattern:
 
    - Parse `--provider` and `--refactoring` arguments from `CommandRequest`.
@@ -317,10 +317,10 @@ Wire the plugin system into the `weaverd` dispatch layer:
      and semantic locks.
    - Return the result via `ResponseWriter`.
 
-1. Update `crates/weaverd/src/dispatch/act/mod.rs` to declare
+3. Update `crates/weaverd/src/dispatch/act/mod.rs` to declare
    `pub mod refactor;`.
 
-1. Update `crates/weaverd/src/dispatch/router.rs` to route `"refactor"` to
+4. Update `crates/weaverd/src/dispatch/router.rs` to route `"refactor"` to
    `act::refactor::handle()` in `route_act()`.
 
 ### Stage E: Documentation and roadmap
@@ -329,20 +329,20 @@ Wire the plugin system into the `weaverd` dispatch layer:
    documenting the implementation decisions (IPC protocol choice, in-band file
    content, plugin trait pattern, safety harness integration).
 
-1. Add a "Plugin system" section to `docs/users-guide.md` documenting:
+2. Add a "Plugin system" section to `docs/users-guide.md` documenting:
 
    - Plugin categories (sensor/actuator).
    - Plugin manifest format.
    - The `act refactor` command syntax.
    - How plugin output is validated through the Double-Lock harness.
 
-1. Mark the first Phase 3 roadmap entry as done in `docs/roadmap.md`.
+3. Mark the first Phase 3 roadmap entry as done in `docs/roadmap.md`.
 
 ### Stage F: Final verification
 
 Run:
 
-```
+```bash
 make check-fmt
 make lint
 make test
@@ -356,21 +356,21 @@ All must pass. Commit the change.
 
 In `Cargo.toml` (root), change:
 
-```
+```toml
 rstest-bdd = { version = "0.4.0", default-features = false }
 rstest-bdd-macros = "0.4.0"
 ```
 
 to:
 
-```
+```toml
 rstest-bdd = { version = "0.5.0", default-features = false }
 rstest-bdd-macros = "0.5.0"
 ```
 
 Run:
 
-```
+```bash
 make test 2>&1 | tee /tmp/rstest-upgrade.log; echo "EXIT: $?"
 ```
 
@@ -379,7 +379,7 @@ If tests fail, migrate affected step definitions from `RefCell<World>` to
 
 ### Step 2: Create crate skeleton
 
-```
+```bash
 mkdir -p crates/weaver-plugins/src/tests
 ```
 
@@ -388,7 +388,7 @@ Add `"crates/weaver-plugins"` to the workspace `members` list in the root
 
 Create `crates/weaver-plugins/Cargo.toml`:
 
-```
+```toml
 [package]
 name = "weaver-plugins"
 edition.workspace = true
@@ -417,7 +417,7 @@ workspace = true
 Create `crates/weaver-plugins/src/lib.rs` with module declarations and
 crate-level documentation. Verify with:
 
-```
+```bash
 cargo check -p weaver-plugins
 ```
 
@@ -426,7 +426,7 @@ cargo check -p weaver-plugins
 Implement `error.rs`, `protocol.rs`, `manifest.rs`, `registry.rs`,
 `process.rs`, and `runner.rs` as described in Stage B. After each module:
 
-```
+```bash
 cargo check -p weaver-plugins
 cargo clippy -p weaver-plugins --all-targets -- -D warnings
 ```
@@ -446,7 +446,7 @@ fixtures. Expected test coverage:
 
 Verify:
 
-```
+```bash
 cargo test -p weaver-plugins 2>&1 | tee /tmp/plugins-test.log
 echo "EXIT: $?"
 ```
@@ -456,7 +456,7 @@ echo "EXIT: $?"
 Create `crates/weaver-plugins/tests/features/plugin_execution.feature` and step
 definitions. Verify:
 
-```
+```bash
 cargo test -p weaver-plugins 2>&1 | tee /tmp/plugins-bdd.log
 echo "EXIT: $?"
 ```
@@ -466,7 +466,7 @@ echo "EXIT: $?"
 Add `weaver-plugins` dependency to `crates/weaverd/Cargo.toml`. Create the
 `refactor` handler module. Update the router. Verify:
 
-```
+```bash
 cargo test -p weaverd 2>&1 | tee /tmp/weaverd-test.log
 echo "EXIT: $?"
 ```
@@ -476,13 +476,13 @@ echo "EXIT: $?"
 Edit `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`.
 Verify:
 
-```
+```bash
 make check-fmt
 ```
 
 ### Step 8: Full quality gate
 
-```
+```bash
 set -o pipefail
 make check-fmt 2>&1 | tee /tmp/check-fmt.log; echo "EXIT: $?"
 make lint 2>&1 | tee /tmp/lint.log; echo "EXIT: $?"
@@ -507,7 +507,7 @@ Quality criteria (what "done" means):
 
 Quality method (how we check):
 
-```
+```bash
 make check-fmt && make lint && make test
 ```
 
@@ -534,7 +534,7 @@ Dev-dependencies: `rstest` (workspace), `rstest-bdd` (workspace),
 
 In `crates/weaver-plugins/src/manifest.rs`:
 
-```
+```rust
 /// Category of a plugin within the Weaver ecosystem.
 pub enum PluginKind { Sensor, Actuator }
 
@@ -552,7 +552,7 @@ pub struct PluginManifest {
 
 In `crates/weaver-plugins/src/protocol.rs`:
 
-```
+```rust
 /// Request sent from weaverd to a plugin on stdin.
 pub struct PluginRequest {
     operation: String,
@@ -580,7 +580,7 @@ pub enum PluginOutput {
 
 In `crates/weaver-plugins/src/runner.rs`:
 
-```
+```rust
 /// Trait abstracting plugin execution for testability.
 pub trait PluginExecutor {
     fn execute(
@@ -599,7 +599,7 @@ pub struct PluginRunner<E> {
 
 In `crates/weaver-plugins/src/error.rs`:
 
-```
+```rust
 /// Errors arising from plugin operations.
 pub enum PluginError {
     NotFound { name: String },
@@ -619,7 +619,7 @@ pub enum PluginError {
 
 Direction: weaverd -> plugin (stdin). A single JSONL line:
 
-```
+```json
 {"operation":"rename","files":[{"path":"/project/src/main.py","content":"def old():\n    pass\n"}],"arguments":{"new_name":"new_func"}}\n
 ```
 
@@ -627,7 +627,7 @@ The broker closes stdin after writing to signal no more input.
 
 Direction: plugin -> weaverd (stdout). A single JSONL line:
 
-```
+```json
 {"success":true,"output":{"kind":"diff",
 "content":"--- a/src/main.py\n+++ b/src/main.py\n
 @@ -1 +1 @@\n-def old():\n+def new_func():\n"},

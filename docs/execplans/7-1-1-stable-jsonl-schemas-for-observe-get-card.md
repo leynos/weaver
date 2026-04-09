@@ -34,23 +34,23 @@ Specifically:
    registered as a workspace member. It exports types for `SymbolCard`,
    `SymbolRef`, `SymbolId`, `DetailLevel`, `GetCardRequest`, `GetCardResponse`
    (success and refusal variants), and all nested sub-structures.
-1. Insta snapshot tests in `weaver-cards` lock the JSON shape of a fully
+2. Insta snapshot tests in `weaver-cards` lock the JSON shape of a fully
    populated success card, a minimal card, and a refusal payload. These
    snapshots are byte-identical across runs for unchanged inputs.
-1. Behaviour-driven development (BDD) feature scenarios in
+3. Behaviour-driven development (BDD) feature scenarios in
    `weaver-cards` exercise the request parsing and response construction via
    `rstest-bdd` v0.5.0.
-1. `weaverd` adds `"get-card"` to the
+4. `weaverd` adds `"get-card"` to the
    `DomainRoutingContext::OBSERVE.known_operations` list so that
    `observe get-card` is recognized by the router.
-1. Because no Tree-sitter extraction exists yet (that is 7.1.2), the handler
+5. Because no Tree-sitter extraction exists yet (that is 7.1.2), the handler
    in `weaverd` returns a structured refusal response (a
    `GetCardResponse::Refusal` variant) rather than a bare "not yet implemented"
    string. This exercises the schema types in the dispatch path and produces a
    JSON payload that tells the caller exactly why no card was produced.
-1. `docs/users-guide.md` is updated with `observe get-card` command
+6. `docs/users-guide.md` is updated with `observe get-card` command
    documentation including syntax, arguments, and response format.
-1. Roadmap item 7.1.1 in `docs/roadmap.md` is marked complete.
+7. Roadmap item 7.1.1 in `docs/roadmap.md` is marked complete.
 
 This satisfies roadmap task 7.1.1 from `docs/roadmap.md`[^1] and closes #75.
 
@@ -358,9 +358,11 @@ Types mapped from the design doc lines 147-170:
 
 Types mapped from design doc lines 176-268:
 
-- `ParamInfo` — `{ name: String, #[serde(rename = "type")] type_annotation: String }`
+- `ParamInfo` —
+  `{ name: String, #[serde(rename = "type")] type_annotation: String }`
 
-- `SignatureInfo` — `{ display: String, params: Vec<ParamInfo>, returns: String }`
+- `SignatureInfo` —
+  `{ display: String, params: Vec<ParamInfo>, returns: String }`
 
 - `DocInfo` — `{ docstring: String, summary: String, source: String }`
 
@@ -380,7 +382,8 @@ Types mapped from design doc lines 176-268:
 
 - `StructureInfo` — `{ locals: Vec<LocalInfo>, branches: Vec<BranchInfo> }`
 
-- `LspInfo` — `{ hover: String, #[serde(rename = "type")] type_info: String, deprecated: bool, source: String }`
+- `LspInfo` — `{ hover: String, #[serde(rename = "type")] type_info: String,
+  deprecated: bool, source: String }`
 
 - `MetricsInfo` —
 
@@ -391,7 +394,8 @@ Types mapped from design doc lines 176-268:
   Fan metrics are `Option` because they are only populated at `full` detail
   from the relational graph layer.
 
-- `DepsInfo` — `{ calls: Vec<String>, imports: Vec<String>, config: Vec<String> }`
+- `DepsInfo` —
+  `{ calls: Vec<String>, imports: Vec<String>, config: Vec<String> }`
 
 - `ImportInterstitialInfo` —
 
@@ -440,8 +444,11 @@ All types derive `Debug, Clone, PartialEq, Eq, Serialize, Deserialize`.
 - `RefusalReason` — `#[non_exhaustive]` enum with
   `#[serde(rename_all = "snake_case")]`: `NoSymbolAtPosition`,
   `UnsupportedLanguage`, `NotYetImplemented`, `BackendUnavailable`
-- `CardRefusal` — `{ reason: RefusalReason, message: String, requested_detail: DetailLevel }`
-- `GetCardResponse` — `#[serde(tag = "status", rename_all = "snake_case")] #[non_exhaustive]` enum: `Success { card: SymbolCard }`, `Refusal { refusal: CardRefusal }`
+- `CardRefusal` —
+  `{ reason: RefusalReason, message: String, requested_detail: DetailLevel }`
+- `GetCardResponse` —
+  `#[serde(tag = "status", rename_all = "snake_case")] #[non_exhaustive]` enum:
+  `Success { card: SymbolCard }`, `Refusal { refusal: CardRefusal }`
 - `GetCardResponse::not_yet_implemented(detail: DetailLevel) -> Self`
   convenience constructor
 
@@ -468,15 +475,15 @@ Fixture builders construct example payloads and snapshot via
 
 1. `snapshot_minimal_card` — card at `minimal` detail (only `symbol` and
    `provenance` populated; all other fields `None` and absent from JSON).
-1. `snapshot_structure_card` — card at `structure` detail (includes
+2. `snapshot_structure_card` — card at `structure` detail (includes
    `signature`, `doc`, `structure`, `metrics` without `fan_in`/`fan_out`;
    `lsp`, `deps`, `etag` absent).
-1. `snapshot_full_card` — card at `full` detail with all fields populated.
-1. `snapshot_refusal_not_implemented` — `GetCardResponse::Refusal` with
+3. `snapshot_full_card` — card at `full` detail with all fields populated.
+4. `snapshot_refusal_not_implemented` — `GetCardResponse::Refusal` with
    `NotYetImplemented` reason.
-1. `snapshot_refusal_no_symbol` — `GetCardResponse::Refusal` with
+5. `snapshot_refusal_no_symbol` — `GetCardResponse::Refusal` with
    `NoSymbolAtPosition` reason.
-1. `snapshot_success_response` — `GetCardResponse::Success` wrapping a
+6. `snapshot_success_response` — `GetCardResponse::Success` wrapping a
    structure-level card.
 
 Each test serializes to JSON via `serde_json::to_string_pretty` and snapshots
@@ -567,7 +574,7 @@ BDD step implementations using `rstest-bdd-macros`, following the pattern from
    ],
    ```
 
-1. Add a match arm in `route_observe()` (lines 196-198):
+2. Add a match arm in `route_observe()` (lines 196-198):
 
    ```rust
    "get-card" => observe::get_card::handle(request, writer),
@@ -582,11 +589,11 @@ Handler module that:
 
 1. Parses `GetCardRequest::parse(&request.arguments)`, mapping
    `GetCardError` to `DispatchError::invalid_arguments(...)`.
-1. Constructs a `GetCardResponse::not_yet_implemented(request.detail)`
+2. Constructs a `GetCardResponse::not_yet_implemented(request.detail)`
    refusal.
-1. Serializes the response to JSON via `serde_json::to_string`.
-1. Writes the JSON to `writer.write_stdout()`.
-1. Returns `Ok(DispatchResult::with_status(1))`.
+3. Serializes the response to JSON via `serde_json::to_string`.
+4. Writes the JSON to `writer.write_stdout()`.
+5. Returns `Ok(DispatchResult::with_status(1))`.
 
 **Modify: `crates/weaverd/src/dispatch/observe/mod.rs`**
 
@@ -908,20 +915,20 @@ Modified files:
 New files (~15):
 
 1. `crates/weaver-cards/Cargo.toml`
-1. `crates/weaver-cards/src/lib.rs`
-1. `crates/weaver-cards/src/symbol.rs`
-1. `crates/weaver-cards/src/detail.rs`
-1. `crates/weaver-cards/src/card.rs`
-1. `crates/weaver-cards/src/request.rs`
-1. `crates/weaver-cards/src/response.rs`
-1. `crates/weaver-cards/src/error.rs`
-1. `crates/weaver-cards/src/tests/mod.rs`
-1. `crates/weaver-cards/src/tests/snapshot_tests.rs`
-1. `crates/weaver-cards/src/tests/round_trip_tests.rs`
-1. `crates/weaver-cards/src/tests/behaviour.rs`
-1. `crates/weaver-cards/tests/features/get_card_schema.feature`
-1. `crates/weaverd/src/dispatch/observe/get_card.rs`
-1. `docs/execplans/7-1-1-stable-jsonl-schemas-for-observe-get-card.md`
+2. `crates/weaver-cards/src/lib.rs`
+3. `crates/weaver-cards/src/symbol.rs`
+4. `crates/weaver-cards/src/detail.rs`
+5. `crates/weaver-cards/src/card.rs`
+6. `crates/weaver-cards/src/request.rs`
+7. `crates/weaver-cards/src/response.rs`
+8. `crates/weaver-cards/src/error.rs`
+9. `crates/weaver-cards/src/tests/mod.rs`
+10. `crates/weaver-cards/src/tests/snapshot_tests.rs`
+11. `crates/weaver-cards/src/tests/round_trip_tests.rs`
+12. `crates/weaver-cards/src/tests/behaviour.rs`
+13. `crates/weaver-cards/tests/features/get_card_schema.feature`
+14. `crates/weaverd/src/dispatch/observe/get_card.rs`
+15. `docs/execplans/7-1-1-stable-jsonl-schemas-for-observe-get-card.md`
 
 Plus insta snapshot files auto-generated in
 `crates/weaver-cards/src/tests/snapshots/`.
@@ -929,13 +936,13 @@ Plus insta snapshot files auto-generated in
 Modified files (8):
 
 1. `Cargo.toml` (workspace root) — add member
-1. `crates/weaverd/Cargo.toml` — add dependency
-1. `crates/weaverd/src/dispatch/router.rs` — add known op and match arm
-1. `crates/weaverd/src/dispatch/observe/mod.rs` — add module declaration
-1. `crates/weaverd/src/dispatch/router/tests.rs` — extend helper
-1. `docs/roadmap.md` — mark 7.1.1 complete
-1. `docs/repository-layout.md` — add crate listing
-1. `docs/users-guide.md` — add `observe get-card` documentation
+2. `crates/weaverd/Cargo.toml` — add dependency
+3. `crates/weaverd/src/dispatch/router.rs` — add known op and match arm
+4. `crates/weaverd/src/dispatch/observe/mod.rs` — add module declaration
+5. `crates/weaverd/src/dispatch/router/tests.rs` — extend helper
+6. `docs/roadmap.md` — mark 7.1.1 complete
+7. `docs/repository-layout.md` — add crate listing
+8. `docs/users-guide.md` — add `observe get-card` documentation
 
 Total: ~23 planned file touches (15 new + 8 modified), excluding the committed
 snapshot outputs from the 25-file tolerance count.
