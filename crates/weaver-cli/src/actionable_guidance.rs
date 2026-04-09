@@ -8,14 +8,20 @@
 //!   Next command:
 //!     `<exact command>`
 
+use std::ffi::OsStr;
 use std::io::{self, Write};
+use std::path::Path;
 
 use crate::lifecycle::LifecycleError;
 
 /// Guidance structure for the unified three-part error template.
 #[derive(Debug, Clone)]
 pub(crate) struct ActionableGuidance {
-    /// The problem statement (e.g., "error: unknown domain 'foo'")
+    /// The problem statement, without a leading `"error: "` prefix
+    /// (e.g., `"unknown domain 'foo'"`).
+    ///
+    /// [`write_actionable_guidance`] prepends the `"error: "` prefix when it
+    /// renders this message.
     pub(crate) problem: String,
     /// Alternative options or context (e.g., valid domains, usage info)
     pub(crate) alternatives: Vec<String>,
@@ -36,6 +42,65 @@ impl ActionableGuidance {
             next_command: next_command.into(),
         }
     }
+}
+
+fn strip_error_prefix(problem: &str) -> &str {
+    problem
+        .strip_prefix("error: ")
+        .or_else(|| problem.strip_prefix("error:"))
+        .unwrap_or(problem)
+}
+
+fn shell_quote(value: &str) -> String {
+    let escaped = value.replace('\'', "'\\''");
+    format!("'{escaped}'")
+}
+
+fn has_configured_binary_path(binary: &OsStr) -> bool {
+    let path = Path::new(binary);
+    path.is_absolute() || path.parent().is_some()
+}
+
+fn launch_binary_name(binary: &OsStr) -> String {
+    Path::new(binary)
+        .file_name()
+        .unwrap_or(binary)
+        .to_string_lossy()
+        .into_owned()
+}
+
+fn launch_binary_check_command(binary: &OsStr) -> String {
+    let binary_str = binary.to_string_lossy();
+    if has_configured_binary_path(binary) {
+        format!(
+            "test -x {} || echo '{} is not executable'",
+            shell_quote(&binary_str),
+            binary_str
+        )
+    } else {
+        format!(
+            "command -v {} || echo '{} not found in PATH'",
+            shell_quote(&binary_str),
+            binary_str
+        )
+    }
+}
+
+fn launch_binary_alternatives(binary: &OsStr) -> Vec<String> {
+    let binary_name = launch_binary_name(binary);
+    let verify_binary = if has_configured_binary_path(binary) {
+        format!("  - Verify {binary_name} exists and is executable")
+    } else {
+        format!("  - Verify {binary_name} is installed and in your PATH")
+    };
+
+    vec![
+        "The daemon binary could not be found or executed.".to_string(),
+        String::new(),
+        "Valid alternatives:".to_string(),
+        verify_binary,
+        "  - Set WEAVERD_BIN to the full path to the daemon binary".to_string(),
+    ]
 }
 
 /// Writes actionable guidance to the given writer using the three-part template.
@@ -77,9 +142,10 @@ pub(crate) fn write_bare_invocation_guidance<W: Write>(
     let observe = msg(&bare_help::OBSERVE);
     let act = msg(&bare_help::ACT);
     let verify = msg(&bare_help::VERIFY);
+    let problem = msg(&bare_help::COMMAND_DOMAIN_REQUIRED);
 
     let guidance = ActionableGuidance::new(
-        "command domain must be provided",
+        problem,
         vec![
             usage,
             String::new(),
@@ -103,16 +169,10 @@ pub(crate) fn write_startup_guidance<W: Write>(
     let (problem, alternatives, next_command) = match error {
         LifecycleError::LaunchDaemon { binary, .. } => {
             let binary_str = binary.to_string_lossy();
-            let problem = format!("failed to spawn weaverd binary '{binary_str}'");
-            let alternatives = vec![
-                "The daemon binary could not be found or executed.".to_string(),
-                String::new(),
-                "Valid alternatives:".to_string(),
-                "  - Verify weaverd is installed and in your PATH".to_string(),
-                "  - Set WEAVERD_BIN to the full path to the weaverd binary".to_string(),
-            ];
-            let next_command = "command -v weaverd || echo 'weaverd not found in PATH'";
-            (problem, alternatives, next_command.to_string())
+            let problem = format!("failed to spawn daemon binary '{binary_str}'");
+            let alternatives = launch_binary_alternatives(binary);
+            let next_command = launch_binary_check_command(binary);
+            (problem, alternatives, next_command)
         }
         LifecycleError::StartupFailed { exit_status } => {
             let problem = format!("daemon exited before reporting ready (status: {exit_status:?})");
@@ -152,7 +212,7 @@ pub(crate) fn write_startup_guidance<W: Write>(
         }
         // For other lifecycle errors, fall back to the Display representation
         other => {
-            let problem = other.to_string();
+            let problem = strip_error_prefix(&other.to_string()).to_string();
             let alternatives = vec!["See error details above.".to_string()];
             let next_command = "weaver daemon status";
             (problem, alternatives, next_command.to_string())
@@ -208,5 +268,86 @@ mod tests {
         assert!(output.contains("verify"));
         assert!(output.contains("Next command:"));
         assert!(output.contains("weaver --help"));
+    }
+
+    #[test]
+    fn launch_daemon_guidance_uses_configured_binary_name() {
+        let error = LifecycleError::LaunchDaemon {
+            binary: "/tmp/tools/custom-weaverd".into(),
+            source: io::Error::new(io::ErrorKind::NotFound, "missing"),
+        };
+
+        let mut buf = Vec::new();
+        write_startup_guidance(&mut buf, &error).expect("write");
+        let output = String::from_utf8(buf).expect("utf8");
+
+        assert!(
+            output.contains("error: failed to spawn daemon binary '/tmp/tools/custom-weaverd'")
+        );
+        assert!(output.contains("Verify custom-weaverd exists and is executable"));
+        assert!(output.contains("Next command:"));
+        assert!(output.contains("test -x '/tmp/tools/custom-weaverd'"));
+    }
+
+    #[test]
+    fn startup_failed_guidance_surfaces_problem_and_next_command() {
+        let error = LifecycleError::StartupFailed {
+            exit_status: Some(17),
+        };
+
+        let mut buf = Vec::new();
+        write_startup_guidance(&mut buf, &error).expect("write");
+        let output = String::from_utf8(buf).expect("utf8");
+
+        assert!(output.contains("error: daemon exited before reporting ready (status: Some(17))"));
+        assert!(output.contains("Next command:"));
+        assert!(output.contains("WEAVER_FOREGROUND=1 weaver daemon start"));
+    }
+
+    #[test]
+    fn startup_timeout_guidance_surfaces_problem_and_next_command() {
+        let error = LifecycleError::StartupTimeout {
+            health_path: "/tmp/weaverd.health".into(),
+            timeout: std::time::Duration::from_secs(5),
+        };
+
+        let mut buf = Vec::new();
+        write_startup_guidance(&mut buf, &error).expect("write");
+        let output = String::from_utf8(buf).expect("utf8");
+
+        assert!(output.contains("error: timed out waiting for daemon to become ready"));
+        assert!(output.contains("Next command:"));
+        assert!(output.contains("WEAVER_FOREGROUND=1 weaver daemon start"));
+    }
+
+    #[test]
+    fn startup_aborted_guidance_surfaces_problem_and_next_command() {
+        let error = LifecycleError::StartupAborted {
+            path: "/tmp/weaverd.health".into(),
+        };
+
+        let mut buf = Vec::new();
+        write_startup_guidance(&mut buf, &error).expect("write");
+        let output = String::from_utf8(buf).expect("utf8");
+
+        assert!(output.contains("error: daemon reported 'stopping' before reaching ready"));
+        assert!(output.contains("Next command:"));
+        assert!(output.contains("WEAVER_FOREGROUND=1 weaver daemon start"));
+    }
+
+    #[test]
+    fn fallback_guidance_strips_existing_error_prefix() {
+        let error = LifecycleError::Io(io::Error::other("error: unit-test fallback"));
+
+        let mut buf = Vec::new();
+        write_startup_guidance(&mut buf, &error).expect("write");
+        let output = String::from_utf8(buf).expect("utf8");
+
+        assert!(
+            output.contains("error: failed to write lifecycle output: error: unit-test fallback")
+        );
+        assert!(!output.contains("error: error: unit-test fallback"));
+        assert!(output.contains("Next command:"));
+        assert!(output.contains("weaver daemon status"));
     }
 }

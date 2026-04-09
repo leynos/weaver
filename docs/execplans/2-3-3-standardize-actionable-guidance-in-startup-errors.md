@@ -36,8 +36,8 @@ Next command:
 ```
 
 The middle block may stay domain-specific (`Usage: ...`, `Valid domains: ...`,
-or `Available operations: ...`), but every path must expose the same
-observable structure: error, alternatives, and one concrete next step.
+or `Available operations: ...`), but every path must expose the same observable
+structure: error, alternatives, and one concrete next step.
 
 This work is successful when the following are all true:
 
@@ -120,10 +120,10 @@ This work is successful when the following are all true:
   and keep the `Usage:` line plus exactly one help pointer in the final output.
 
 - Risk: unknown-operation guidance is intentionally daemon-routed, and the CLI
-  must not rebuild the operation list from `DOMAIN_OPERATIONS`. Severity:
-  high. Likelihood: medium. Mitigation: derive the `Next command:` from the
-  daemon payload's first `known_operations` entry and leave the JSON payload
-  shape unchanged unless a test proves that insufficient.
+  must not rebuild the operation list from `DOMAIN_OPERATIONS`. Severity: high.
+  Likelihood: medium. Mitigation: derive the `Next command:` from the daemon
+  payload's first `known_operations` entry and leave the JSON payload shape
+  unchanged unless a test proves that insufficient.
 
 - Risk: lifecycle errors are surfaced through two different paths today:
   explicit `weaver daemon start` failures go through `AppError::Lifecycle`,
@@ -148,13 +148,12 @@ This work is successful when the following are all true:
 ## Progress
 
 - [x] (2026-04-07) Read `docs/roadmap.md`, `docs/ui-gap-analysis.md`,
-  `docs/weaver-design.md`, `docs/users-guide.md`, and the referenced
-  testing guidance.
+  `docs/weaver-design.md`, `docs/users-guide.md`, and the referenced testing
+  guidance.
 - [x] (2026-04-07) Confirmed the current Level 10 implementation split across
   `crates/weaver-cli/src/localizer.rs`,
   `crates/weaver-cli/src/discoverability.rs`,
-  `crates/weaver-cli/src/output/mod.rs`, and
-  `crates/weaver-cli/src/lib.rs`.
+  `crates/weaver-cli/src/output/mod.rs`, and `crates/weaver-cli/src/lib.rs`.
 - [x] (2026-04-07) Confirmed that the workspace already pins `rstest-bdd` and
   `rstest-bdd-macros` at `0.5.0`; no dependency upgrade is needed.
 - [x] (2026-04-07) Confirmed that the daemon already emits structured
@@ -166,8 +165,8 @@ This work is successful when the following are all true:
 - [ ] Stage B: introduce a small CLI-side actionable-guidance formatter and
   refactor bare invocation plus preflight domain guidance to use it.
 - [ ] Stage C: route unknown-operation human rendering and startup/lifecycle
-  failures through the same formatter while preserving existing exit codes
-  and daemon payload semantics.
+  failures through the same formatter while preserving existing exit codes and
+  daemon payload semantics.
 - [ ] Stage D: update `docs/weaver-design.md`, `docs/users-guide.md`, and
   `docs/roadmap.md`.
 - [ ] Stage E: run the full Markdown and Rust validation gates sequentially.
@@ -462,8 +461,7 @@ If Stage C requires daemon payload changes, add:
 cargo test -p weaverd dispatch_behaviour
 ```
 
-When the feature is ready, run the full validation sequence in this exact
-order:
+When the feature is ready, run the full validation sequence in this exact order:
 
 ```sh
 make fmt
@@ -561,14 +559,14 @@ recent guidance-path changes and rerun the focused test before touching the
 docs. Do not mark the roadmap item done until the full validation sequence is
 green.
 
-If the work unexpectedly requires a daemon wire-contract change, stop,
-document that in `Decision Log`, and re-scope before editing
+If the work unexpectedly requires a daemon wire-contract change, stop, document
+that in `Decision Log`, and re-scope before editing
 `crates/weaver-daemon-types/`.
 
-## Artifacts and notes
+## Artefacts and notes
 
-The most important artefacts for this task are short stderr transcripts and
-the validator output from the final sequential run.
+The most important artefacts for this task are short stderr transcripts and the
+validator output from the final sequential run.
 
 Capture at least one transcript each for:
 
@@ -613,5 +611,5 @@ The likely touched source files are:
 ## Revision note
 
 Initial draft created from roadmap item `2.3.3`, the current CLI and daemon
-code, and the adjacent ExecPlans for `2.3.1` and `2.3.2`. No implementation
-has started yet.
+code, and the adjacent ExecPlans for `2.3.1` and `2.3.2`. No implementation has
+started yet.

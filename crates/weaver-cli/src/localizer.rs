@@ -18,6 +18,10 @@ pub(crate) static WEAVER_EN_US: &str = include_str!("../locales/en-US/messages.f
 /// The fallback values must match `locales/en-US/messages.ftl`; the
 /// `fluent_and_fallback_outputs_are_identical` test guards against drift.
 pub(crate) mod bare_help {
+    pub(crate) const COMMAND_DOMAIN_REQUIRED: (&str, &str) = (
+        "weaver-bare-help-command-domain-required",
+        "command domain must be provided",
+    );
     pub(crate) const USAGE: (&str, &str) = (
         "weaver-bare-help-usage",
         "Usage: weaver <DOMAIN> <OPERATION> [ARG]...",

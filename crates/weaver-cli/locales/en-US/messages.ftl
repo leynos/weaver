@@ -1,4 +1,5 @@
 # Bare-invocation help block shown when weaver is run without arguments.
+weaver-bare-help-command-domain-required = command domain must be provided
 weaver-bare-help-usage = Usage: weaver <DOMAIN> <OPERATION> [ARG]...
 weaver-bare-help-header = Domains:
 weaver-bare-help-domain-observe = observe   Query code structure and relationships
@@ -11,9 +12,9 @@ weaver-bare-help-pointer = Run 'weaver --help' for more information.
 # weaver-domain-guidance-unknown-domain-error, weaver-domain-guidance-valid-domains,
 # and weaver-domain-guidance-did-you-mean-domain.
 weaver-domain-guidance-missing-operation-error =
-    error: operation required for domain '{$domain}'
+    operation required for domain '{$domain}'
 weaver-domain-guidance-unknown-domain-error =
-    error: unknown domain '{$domain}'
+    unknown domain '{$domain}'
 weaver-domain-guidance-available-operations = Available operations:
 weaver-domain-guidance-valid-domains = Valid domains: {$domains}
 weaver-domain-guidance-did-you-mean-domain =
