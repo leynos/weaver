@@ -36,8 +36,10 @@ fn normalize_fixture(
 fn parse_v2_fixture_to_decorated(filename: &str) -> DecoratedFormula {
     use crate::normalize::normalize_v2_formula;
 
-    let yaml = read_fixture(filename);
-    let uri = fixtures_dir().join(filename).to_str().map(String::from);
+    let path = fixtures_dir().join(filename);
+    let yaml = fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("failed to read fixture {filename}: {e}"));
+    let uri = path.to_str().map(String::from);
     let file = parse_rule_file(&yaml, uri.as_deref()).expect("should parse YAML");
 
     // Extract the v2 match formula from the first rule
@@ -50,6 +52,37 @@ fn parse_v2_fixture_to_decorated(filename: &str) -> DecoratedFormula {
         }
         _ => panic!("expected v2 match formula"),
     }
+}
+
+/// Normalises a v2 fixture, asserts the top-level formula is an `Atom`, and
+/// returns the single `WhereClause` from the decorated formula.
+///
+/// Panics if the fixture does not normalise to one rule, the formula is not
+/// an `Atom`, or there is not exactly one where clause.
+fn get_single_where_clause(fixture: &str) -> WhereClause {
+    let rules = normalize_fixture(fixture)
+        .unwrap_or_else(|e| panic!("fixture '{fixture}' failed to normalise: {e:?}"));
+    assert_eq!(
+        rules.len(),
+        1,
+        "fixture '{fixture}' should yield exactly one rule"
+    );
+    assert!(
+        matches!(rules.first().expect("has rule").formula, Formula::Atom(_)),
+        "fixture '{fixture}': expected Atom formula",
+    );
+
+    let decorated = parse_v2_fixture_to_decorated(fixture);
+    assert_eq!(
+        decorated.where_clauses.len(),
+        1,
+        "fixture '{fixture}': expected exactly one where clause",
+    );
+    decorated
+        .where_clauses
+        .into_iter()
+        .next()
+        .expect("expected at least one where clause")
 }
 
 /// Asserts that the legacy and v2 fixtures normalise to the same single formula.
@@ -161,61 +194,19 @@ fn valid_metavariable_pattern_exception_allows_no_positive_term() {
 
 #[test]
 fn v2_where_focus_is_parsed_correctly() {
-    // Verify that the normalized rule has an Atom formula
-    let result = normalize_fixture("v2_where_focus.yaml");
-    let rules = result.expect("should parse v2 with focus where clause");
-    assert_eq!(rules.len(), 1);
-
-    let first_rule = rules.first().expect("should have at least one rule");
-    match &first_rule.formula {
-        Formula::Atom(_) => {}
-        _ => panic!("expected Atom formula"),
-    }
-
-    // Verify that the where clause is correctly parsed by obtaining the DecoratedFormula
-    let decorated = parse_v2_fixture_to_decorated("v2_where_focus.yaml");
-    assert_eq!(
-        decorated.where_clauses.len(),
-        1,
-        "expected exactly one where clause"
-    );
-    let first_where = decorated
-        .where_clauses
-        .first()
-        .expect("expected at least one where clause");
-    match first_where {
+    let where_clause = get_single_where_clause("v2_where_focus.yaml");
+    match where_clause {
         WhereClause::Focus { metavariable } => {
             assert_eq!(metavariable, "FUNC", "expected focus on metavariable $FUNC");
         }
-        _ => panic!("expected Focus where clause, got {first_where:?}"),
+        _ => panic!("expected Focus where clause, got {where_clause:?}"),
     }
 }
 
 #[test]
 fn v2_where_metavariable_regex_is_parsed_correctly() {
-    // Verify that the normalized rule has an Atom formula
-    let result = normalize_fixture("v2_where_metavariable_regex.yaml");
-    let rules = result.expect("should parse v2 with metavariable-regex where clause");
-    assert_eq!(rules.len(), 1);
-
-    let first_rule = rules.first().expect("should have at least one rule");
-    match &first_rule.formula {
-        Formula::Atom(_) => {}
-        _ => panic!("expected Atom formula"),
-    }
-
-    // Verify that the where clause is correctly parsed by obtaining the DecoratedFormula
-    let decorated = parse_v2_fixture_to_decorated("v2_where_metavariable_regex.yaml");
-    assert_eq!(
-        decorated.where_clauses.len(),
-        1,
-        "expected exactly one where clause"
-    );
-    let first_where = decorated
-        .where_clauses
-        .first()
-        .expect("expected at least one where clause");
-    match first_where {
+    let where_clause = get_single_where_clause("v2_where_metavariable_regex.yaml");
+    match where_clause {
         WhereClause::MetavariableRegex {
             metavariable,
             regex,
@@ -223,41 +214,19 @@ fn v2_where_metavariable_regex_is_parsed_correctly() {
             assert_eq!(metavariable, "FUNC", "expected regex on metavariable $FUNC");
             assert_eq!(regex, "^get_.*", "expected regex pattern ^get_.*");
         }
-        _ => panic!("expected MetavariableRegex where clause, got {first_where:?}"),
+        _ => panic!("expected MetavariableRegex where clause, got {where_clause:?}"),
     }
 }
 
 #[test]
 fn v2_where_metavariable_pattern_is_parsed_correctly() {
-    // Verify that the normalized rule has an Atom formula
-    let result = normalize_fixture("v2_where_metavariable_pattern.yaml");
-    let rules = result.expect("should parse v2 with metavariable-pattern where clause");
-    assert_eq!(rules.len(), 1);
-
-    let first_rule = rules.first().expect("should have at least one rule");
-    match &first_rule.formula {
-        Formula::Atom(_) => {}
-        _ => panic!("expected Atom formula"),
-    }
-
-    // Verify that the where clause is correctly parsed by obtaining the DecoratedFormula
-    let decorated = parse_v2_fixture_to_decorated("v2_where_metavariable_pattern.yaml");
-    assert_eq!(
-        decorated.where_clauses.len(),
-        1,
-        "expected exactly one where clause"
-    );
-    let first_where = decorated
-        .where_clauses
-        .first()
-        .expect("expected at least one where clause");
-    match first_where {
+    let where_clause = get_single_where_clause("v2_where_metavariable_pattern.yaml");
+    match where_clause {
         WhereClause::MetavariablePattern {
             metavariable,
             formula,
         } => {
             assert_eq!(metavariable, "X", "expected pattern on metavariable $X");
-            // The pattern should be an Atom containing the inner pattern
             match formula {
                 Formula::Atom(atom) => match atom {
                     sempai_core::Atom::Pattern(p) => {
@@ -270,7 +239,7 @@ fn v2_where_metavariable_pattern_is_parsed_correctly() {
                 _ => panic!("expected Atom formula, got {formula:?}"),
             }
         }
-        _ => panic!("expected MetavariablePattern where clause, got {first_where:?}"),
+        _ => panic!("expected MetavariablePattern where clause, got {where_clause:?}"),
     }
 }
 
