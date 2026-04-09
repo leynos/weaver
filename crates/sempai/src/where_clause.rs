@@ -197,6 +197,23 @@ pub(crate) fn parse_metavariable_clause(
 
     let metavariable = extract_metavariable_name(mapping)?;
 
+    // Detect mixed metavariable constraints (e.g., pattern + type, regex + analyzer)
+    let has_pattern_or_regex = METAVARIABLE_PATTERN_KEYS
+        .iter()
+        .any(|&k| mapping.contains_key(k))
+        || mapping.contains_key("regex");
+    let has_type_constraint = mapping.contains_key("type") || mapping.contains_key("types");
+    let has_analyzer = mapping.contains_key("analyzer");
+
+    if has_pattern_or_regex && (has_type_constraint || has_analyzer) {
+        return Err(DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            "metavariable clause cannot mix pattern/regex with type/types or analyzer".to_owned(),
+            None,
+            vec!["use either pattern/regex OR type/types/analyzer, not both".to_owned()],
+        ));
+    }
+
     if METAVARIABLE_PATTERN_KEYS
         .iter()
         .any(|&k| mapping.contains_key(k))
@@ -204,11 +221,11 @@ pub(crate) fn parse_metavariable_clause(
         parse_metavariable_pattern_clause(metavariable, mapping, normalize_v2_formula)
     } else if let Some(regex_value) = mapping.get("regex") {
         parse_metavariable_regex_clause(metavariable, regex_value)
-    } else if mapping.contains_key("type") || mapping.contains_key("types") {
+    } else if has_type_constraint {
         Err(DiagnosticReport::not_implemented(
             "metavariable type constraint (type/types)",
         ))
-    } else if mapping.contains_key("analyzer") {
+    } else if has_analyzer {
         Err(DiagnosticReport::not_implemented(
             "metavariable analysis constraint (analyzer)",
         ))

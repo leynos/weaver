@@ -425,12 +425,12 @@ commands.
 
 Command Query Responsibility Segregation is an architectural pattern that
 segregates operations that modify state (commands) from operations that read
-state (queries).[^19] Commands are task-based and should represent specific
+state (queries).[^14] Commands are task-based and should represent specific
 business intentions (e.g.,
 
-`BookHotelRoomCommand` rather than `SetReservationStatusCommand`).[^20] Queries
+`BookHotelRoomCommand` rather than `SetReservationStatusCommand`).[^15] Queries
 never alter data and return Data Transfer Objects optimized for display
-needs.[^23]
+needs.[^16]
 
 While Command Query Responsibility Segregation operates at a higher
 architectural level than a single Bumpy Road method, the principles are
@@ -442,7 +442,7 @@ distinct command-like operations, are tangled together.
   distinct commands and queries from the start. This naturally leads to
   smaller, more focused methods or handlers for each command and query,
   reducing the likelihood of a single method accumulating many "bumps" of
-  unrelated logic.[^19] For instance, a method that both fetches data for a
+  unrelated logic.[^14] For instance, a method that both fetches data for a
   complex report, and then allows modifications based on that report, could
   become very complex. Command Query Responsibility Segregation would split
   this into a query to fetch the data and separate commands for any
@@ -452,9 +452,9 @@ distinct command-like operations, are tangled together.
   characteristics because it handles multiple types of updates or decisions
   leading to state changes, Command Query Responsibility Segregation principles
   can guide its refactoring. The different "bumps" that correspond to different
-  update logics could be refactored into separate command handlers.[^15] This
+  update logics could be refactored into separate command handlers.[^16] This
   aligns with the Single Responsibility Principle, as each command handler
-  focuses on a single way of modifying state.[^15]
+  focuses on a single way of modifying state.[^16]
 
 - **God Objects and Command Query Responsibility Segregation:** The "God
   Object" or "God Class" antipattern, where a single class hoards too much
@@ -463,7 +463,7 @@ distinct command-like operations, are tangled together.
   Objects by separating their command-handling responsibilities from their
   query-handling responsibilities, potentially leading to smaller, more focused
   classes (e.g., one class for command processing, another for query
-  processing, or even finer-grained handlers).[^16] This separation simplifies
+  processing, or even finer-grained handlers).[^17] This separation simplifies
   each part, making them easier to manage and reducing the cognitive load
   associated with the original monolithic structure.
 
@@ -472,10 +472,10 @@ prevent the kind of tangled logic that forms Bumpy Roads. By isolating write
 operations (commands) from read operations (queries), and by encouraging
 task-based commands, the system naturally tends towards smaller, more cohesive
 units of behaviour, thus reducing overall cognitive complexity within
-individual components.[^14] The separation allows for independent optimization
+individual components.[^18] The separation allows for independent optimization
 and scaling of read and write sides, but more importantly for this discussion,
 it enforces a structural discipline that discourages methods from accumulating
-diverse responsibilities.[^14]
+diverse responsibilities.[^18]
 
 ### B. Avoiding spaghetti code turning into ravioli code
 
@@ -500,7 +500,7 @@ pieces—making it as difficult to follow as the original spaghetti.[^17]
    details and exposing essential features.[^18]
 
    - **Under-abstraction** (common in Spaghetti Code) leads to duplication and
-     tight coupling.[^19]
+     tight coupling.[^14]
 
    - **Over-abstraction** (risk in creating Ravioli Code) can make code harder
      to understand due to excessive layering and indirection, where simple
@@ -510,8 +510,8 @@ pieces—making it as difficult to follow as the original spaghetti.[^17]
      problem domain without introducing unnecessary complexity. Create
      abstractions when painful duplication emerges or when a clear conceptual
      boundary can be established, not just for the sake of having more
-     classes/objects.[^19] Start with simple, straightforward code and
-     introduce abstractions only when genuinely needed.[^20]
+     classes/objects.[^14] Start with simple, straightforward code and
+     introduce abstractions only when genuinely needed.[^15]
 
 3. **Meaningful Naming:** Clear and descriptive names for classes, methods, and
    variables are crucial, especially when dealing with many small components.
@@ -523,19 +523,19 @@ pieces—making it as difficult to follow as the original spaghetti.[^17]
    smaller pieces without a clear architectural vision can lead to Ravioli.
    Design patterns, when applied appropriately, can provide a "system metaphor"
    or structure that makes the "ravioli" manageable by revealing symmetries and
-   common sense in the design.[^21]
+   common sense in the design.[^19]
 
 5. **Iterative Refactoring and Review:** Refactoring is not always a one-shot
    process. Continuously review the abstractions. Consider whether they help or
    hinder understanding, and whether too many trivial classes could be
    consolidated.[^10] Pair programming can also help maintain a balanced
-   perspective during refactoring.[^21]
+   perspective during refactoring.[^19]
 
-6. **The “Ya Ain't Gonna Need It” (YAGNI) principle:** The initialism
+6. **The “You Aren't Gonna Need It” (YAGNI) principle:** The initialism
    summarizes the reminder that speculative features will probably go unused.
    It helps avoid unnecessary abstractions and features, which can contribute
    to Ravioli code if abstractions are created for anticipated but not actual
-   needs.[^21]
+   needs.[^19]
 
 7. **Focus on System Flow:** While individual components in Ravioli code might
    be simple, the difficulty lies in tracing the overall execution flow. Ensure
@@ -547,7 +547,7 @@ The goal is not to have the fewest classes or methods, but to have a structure
 where each component is easy to understand in isolation, and the interactions
 between components are also clear and manageable. It's about finding a
 "recursive Ravioli" structure, where at each level of containment, one deals
-with a manageable number (e.g., 7 +/- 2) of components.[^21]
+with a manageable number (e.g., 7 +/- 2) of components.[^19]
 
 ### C. Clean refactoring approaches to reduce cognitive complexity
 
@@ -579,26 +579,26 @@ and method structure.
 Structural pattern matching—available in languages like Python (since 3.10 with
 match-case) and C#—offers a declarative and expressive way to handle complex
 conditional logic, often replacing verbose if-elif-else chains or switch
-statements.[^21]
+statements.[^19]
 
 It works by allowing code to match against the *structure* of data—such as its
 type, shape, or specific values within sequences like lists or tuples, or
 mappings such as dictionaries—and simultaneously destructure this data, binding
-parts of it to variables.[^22] This approach can significantly reduce cognitive
+parts of it to variables.[^20] This approach can significantly reduce cognitive
 load. The clarity comes from the direct mapping of data shapes to code blocks,
 making it easier to understand the conditions under which a piece of code
-executes.[^23] For instance, instead of multiple `isinstance` checks followed
+executes.[^21] For instance, instead of multiple `isinstance` checks followed
 by key lookups and value comparisons in a nested `if` structure to parse a JSON
 object, a single `case` statement with a mapping pattern can define the
-expected structure and extract the necessary values concisely.[^22] This shifts
+expected structure and extract the necessary values concisely.[^20] This shifts
 the focus from an imperative sequence of checks to a declarative description of
 data shapes, which is often more intuitive. The destructuring capability is
 particularly powerful, as it eliminates the manual code otherwise needed to
 extract values after a condition has been met, reducing boilerplate while also
-cutting the number of mental steps a developer must follow.[^22]
+cutting the number of mental steps a developer must follow.[^20]
 
 Consider processing different event types from a UI framework, where events are
-represented as dictionaries.[^24]
+represented as dictionaries.[^21]
 
 - *Imperative (Python-like pseudocode):*
 
@@ -634,36 +634,36 @@ The pattern matching version is more readable and directly expresses the
 expected structure of each event type, reducing the cognitive effort to
 understand the conditions and data extraction. Key features like guards (`if`
 conditions on `case` statements) allow for additional non-structural checks,
-further enhancing its power.[^22]
+further enhancing its power.[^20]
 
 #### 2. Embracing declarative programming
 
 Declarative programming focuses on describing what result is desired, rather
 than detailing how to achieve it step-by-step, as is typical in imperative
-programming.[^25] This paradigm shift can significantly reduce cognitive
+programming.[^21] This paradigm shift can significantly reduce cognitive
 complexity by abstracting away low-level control flow and state management.
 
 When developers write declarative code, they operate at a higher level of
 abstraction, allowing them to reason about the program's intent more
-directly.[^25] This often leads to more concise, readable, and maintainable
+directly.[^21] This often leads to more concise, readable, and maintainable
 code because the "noise" of explicit iteration, temporary variables, and manual
-state updates is minimized.[^25] Many declarative approaches also inherently
+state updates is minimized.[^21] Many declarative approaches also inherently
 favour immutability, reduce side effects, and encourage deterministic
 behaviour—common culprits for bugs and increased cognitive load in imperative
-code.[^26]
+code.[^22]
 
 Examples include using Structured Query Language for database queries—
 specifying the desired dataset rather than the retrieval algorithm—or employing
 functional programming constructs like `map`, `filter`, and `reduce` on
-collections instead of writing explicit loops.[^33] Refactoring imperative code
+collections instead of writing explicit loops.[^29] Refactoring imperative code
 to a declarative style can start small, perhaps by converting a loop that
 filters and transforms a list into a chain of `filter` and `map`
-operations.[^26] The broader adoption of declarative approaches in areas like
+operations.[^23] The broader adoption of declarative approaches in areas like
 UI development (e.g., React) and data querying signifies an industry trend
 towards managing complexity by raising abstraction levels. However, the
 effectiveness of declarative programming relies on well-designed underlying
 abstractions; a poorly designed declarative layer might not successfully hide
-complexity or could introduce its own.[^27]
+complexity or could introduce its own.[^24]
 
 #### 3. Employing dispatcher and command patterns
 
@@ -671,7 +671,7 @@ For managing complex conditional logic that selects different behaviours (often
 found in Bumpy Roads or large switch statements), these complementary patterns
 offer a structured and extensible alternative.
 
-The **Command pattern** encapsulates a request or an action as an object.[^28]
+The **Command pattern** encapsulates a request or an action as an object.[^25]
 Each command object implements a common interface (e.g., with an
 
 `execute()` method). This decouples the object that invokes the command from
@@ -680,17 +680,17 @@ checking a type and then executing logic, different command objects can be
 instantiated based on the type, and then their `execute()` method is called.
 This promotes the Single Responsibility Principle, as each command class
 handles a single action, making the system easier to test, extend, and
-evolve.[^29]
+evolve.[^26]
 
 The **Dispatcher pattern** often works in conjunction with the Command pattern.
 A dispatcher is a central component that receives requests (which could be
 command objects or simple identifiers) and routes them to the appropriate
-handler.[^29] For instance, a
+handler.[^26] For instance, a
 
 `switch` statement where each `case` calls a different method can be refactored
 by creating an interface for handlers, a concrete handler class for each
 original `case`, and a dispatcher (perhaps a map from case identifiers to
-handler instances) that looks up and invokes the correct handler.[^30] This
+handler instances) that looks up and invokes the correct handler.[^27] This
 transforms the control flow from a monolithic conditional block into a more
 manageable registration and lookup mechanism. The cognitive load is reduced
 because developers can focus on individual, self-contained handlers while
@@ -755,16 +755,16 @@ Principle). However, it's important to ensure that the dispatch mechanism
 itself remains clear and that the proliferation of small classes doesn't lead
 to Ravioli Code, where the overall system flow becomes obscured.[^17] Maintain
 clear naming conventions, and ensure the logical organization remains
-consistent.[^31]
+consistent.[^28]
 
 The **State pattern** is a related behavioural pattern useful when an object's
-behaviour changes depending on its internal state.[^32] Instead of using large
+behaviour changes depending on its internal state.[^28] Instead of using large
 conditionals based on state variables, each state is encapsulated in its own
 object. The context object delegates behaviour to its current state object.
 Transitions involve changing the context's state object. This is particularly
 effective for refactoring state machines implemented with complex
 
-`if/else` or `switch` statements.[^32]
+`if/else` or `switch` statements.[^29]
 
 Thoughtfully apply these refactoring strategies to significantly reduce
 cognitive complexity, and to create codebases that are more understandable,
@@ -841,48 +841,38 @@ maintain.
 [^13]: How to *resist* refactoring a large spaghetti codebase? :
        r/SoftwareEngineering — Reddit,
        <https://www.reddit.com/r/SoftwareEngineering/comments/11smgtp/how_to_resist_refactoring_a_large_spaghetti/>
-[^14]: Refactoring nested conditional statements — Software Engineering
-       Stack Exchange,
-       <https://softwareengineering.stackexchange.com/questions/47789/>
-[^15]: CodeScene Automatic Code Evolution (ACE): Auto-Refactor Code,
-       <https://codescene.io/docs/auto-refactor/index.html>
-[^16]: Code Smells — Samman Technical Coaching,
-       <https://sammancoaching.org/reference/code_smells/>
-[^17]: src/sas/sascalc/poresize/maxEnt_method.py — CodeScene,
-       <https://codescene.io/projects/64300/delta?repo-id=263464&review-id=3247&biomarker=Overall+Code+Complexity&filename=src%2Fsas%2Fsascalc%2Fporesize%2FmaxEnt_method.py&method=>
-[^18]: Separation of concerns — Wikipedia,
-       <https://en.wikipedia.org/wiki/Separation_of_concerns>
-[^19]: Command Query Responsibility Segregation pattern — Azure Architecture
+[^14]: Command Query Responsibility Segregation pattern — Azure Architecture
        Center | Microsoft Learn,
        <https://learn.microsoft.com/en-us/azure/architecture/patterns/cqrs>
-[^20]: Mastering Command Query Responsibility Segregation: 7 Powerful Benefits,
+[^15]: Mastering Command Query Responsibility Segregation: 7 Powerful Benefits,
        <https://hyscaler.com/insights/mastering-cqrs-benefits-of-command-query/>
-[^21]: Implementing Command Query Responsibility Segregation in the dotnet
+[^16]: CodeScene Automatic Code Evolution (ACE): Auto-Refactor Code,
+       <https://codescene.io/docs/auto-refactor/index.html>
+[^17]: Code Smells — Samman Technical Coaching,
+       <https://sammancoaching.org/reference/code_smells/>
+[^18]: Refactoring nested conditional statements — Software Engineering
+       Stack Exchange,
+       <https://softwareengineering.stackexchange.com/questions/47789/>
+[^19]: Implementing Command Query Responsibility Segregation in the dotnet
        ecosystem — Dev Community,
        <https://dev.to/moh_moh701/enhancing-net-applications-with-cqrs-and-solid-principles-30i8>
-[^22]: Refactoring a God class — Stack Overflow,
+[^20]: Refactoring a God class — Stack Overflow,
        <https://stackoverflow.com/questions/14870377/>
-[^23]: Command Query Responsibility Segregation: Understanding From First
-       Principles — NDepend Blog,
-       <https://blog.ndepend.com/cqrs-understanding-first-principles/>
-[^24]: When to use the Command Query Responsibility Segregation design
-       pattern? — architecture — Stack Overflow,
-       <https://stackoverflow.com/questions/8820748/when-to-use-the-cqrs-design-pattern>
-[^25]: Another pasta-themed programming problem is "ravioli code". That …,
+[^21]: Another pasta-themed programming problem is "ravioli code". That …,
        <https://news.ycombinator.com/item?id=4537664>
-[^26]: Ravioli Code — C2 wiki, <https://wiki.c2.com/?RavioliCode>
-[^27]: Ravioli code — why an antipattern? — Stack Overflow,
+[^22]: "Functional Programming," *Mozilla Developer Network*,
+       <https://developer.mozilla.org/en-US/docs/Glossary/Functional_programming>
+[^23]: Ravioli Code — C2 wiki, <https://wiki.c2.com/?RavioliCode>
+[^24]: Ravioli code — why an antipattern? — Stack Overflow,
        <https://stackoverflow.com/questions/2052017/ravioli-code-why-an-anti-pattern>
-[^28]: A Guide to Data Abstraction and Its Significant Benefits — CelerData,
+[^25]: A Guide to Data Abstraction and Its Significant Benefits — CelerData,
        <https://celerdata.com/glossary/a-guide-to-data-abstraction>
-[^29]: The Role of Abstraction in Software Development | Bebras Armenia,
+[^26]: The Role of Abstraction in Software Development | Bebras Armenia,
        <https://bebras.am/en/blog/The-Role-of-Abstraction-in-Software-Development>
-[^30]: Abstraction, Refactoring, Complexity, and Tradeoffs — Part 1 | Synth
+[^27]: Abstraction, Refactoring, Complexity, and Tradeoffs — Part 1 | Synth
        …, <https://omux.dev/blog/abstraction-refactoring-complexity/>
-[^31]: Don't create over abstractions — Castineiras thoughts -,
+[^28]: Don't create over abstractions — Castineiras thoughts -,
        <https://www.castineiras.com/?p=102>
-[^32]: Refactor `if-else` Statements to `match-case` for Improved Readability
+[^29]: Refactor `if-else` Statements to `match-case` for Improved Readability
        and Maintainability in Python 3.10+ · Issue #453 — GitHub,
        <https://github.com/sourcery-ai/sourcery/issues/453>
-[^33]: "Functional Programming," *Mozilla Developer Network*,
-       <https://developer.mozilla.org/en-US/docs/Glossary/Functional_programming>
