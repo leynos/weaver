@@ -231,11 +231,11 @@ consume:
 
 - `weaver_graph::CallGraphProvider` with:
 
-  fn build_graph(&mut self, position: &SourcePosition, depth: u32) ->
-  Result<CallGraph, GraphError>; fn callers_graph(&mut self, position:
-  &SourcePosition, depth: u32) -> Result<CallGraph, GraphError>; fn
-  callees_graph(&mut self, position: &SourcePosition, depth: u32) ->
-  Result<CallGraph, GraphError>;
+  ```rust
+  fn build_graph(&mut self, position: &SourcePosition, depth: u32) -> Result<CallGraph, GraphError>;
+  fn callers_graph(&mut self, position: &SourcePosition, depth: u32) -> Result<CallGraph, GraphError>;
+  fn callees_graph(&mut self, position: &SourcePosition, depth: u32) -> Result<CallGraph, GraphError>;
+  ```
 
 - `weaver_graph::CallHierarchyClient` trait implemented by an adapter over
   `weaver-lsp-host` so the LSP provider can run without owning the host.

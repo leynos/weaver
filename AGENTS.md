@@ -190,7 +190,7 @@ project:
 
 - Use `rstest` fixtures for shared setup.
 
-- Replace duplicated tests with `#[rstest(...)]` parameterised cases.
+- Replace duplicated tests with `#[rstest(...)]` parameterized cases.
 
 - Prefer `mockall` for mocks/stubs.
 

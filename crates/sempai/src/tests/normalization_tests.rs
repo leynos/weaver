@@ -134,14 +134,12 @@ fn v2_where_focus_is_parsed_correctly() {
     let rules = result.expect("should parse v2 with focus where clause");
     assert_eq!(rules.len(), 1);
 
-    // The formula should be an Atom with a DecoratedFormula containing the where clause
+    // The formula should be an Atom. Note: where_clauses are parsed during normalization
+    // and stored in DecoratedFormula, but normalize_search_principal extracts only the
+    // formula field, discarding decorations. This is a known limitation - where_clauses
+    // are not preserved in NormalizedSearchRule. See normalize_search_principal for details.
     match &rules[0].formula {
-        Formula::Atom(_) => {
-            // The where clause is stored in the DecoratedFormula, which is the outer wrapper
-            // Since normalize_search_principal returns decorated.formula, we lose the decoration
-            // This is expected - the where clauses are preserved during normalization but
-            // then the formula is extracted. We need to verify this differently.
-        }
+        Formula::Atom(_) => {}
         _ => panic!("expected Atom formula"),
     }
 }

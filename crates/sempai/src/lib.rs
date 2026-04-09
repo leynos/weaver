@@ -40,6 +40,7 @@ mod engine;
 mod mode_validation;
 pub(crate) mod normalize;
 mod validate;
+mod where_clause;
 
 // Re-export all stable types from sempai_core.
 pub use sempai_core::{

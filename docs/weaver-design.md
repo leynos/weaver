@@ -2257,10 +2257,15 @@ suggested fallback strategy. For example:
 - **Response:**
   
   ```json
-  {"status": "error", "type": "MissingCapability", "details":
-  {"language": "swift", "feature": "rename"}, "suggestion": "Use
-  'observe grep' to find occurrences and 'act apply-edits' for syntactic
-  replacement."}
+  {
+    "status": "error",
+    "type": "MissingCapability",
+    "details": {
+      "language": "swift",
+      "feature": "rename"
+    },
+    "suggestion": "Use 'observe grep' to find occurrences and 'act apply-edits' for syntactic replacement."
+  }
   ```
 
 This mechanism for graceful degradation transforms failures from dead ends into

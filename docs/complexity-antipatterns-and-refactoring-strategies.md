@@ -885,3 +885,7 @@ maintain.
 [^32]: Refactor `if-else` Statements to `match-case` for Improved Readability
        and Maintainability in Python 3.10+ · Issue #453 — GitHub,
        <https://github.com/sourcery-ai/sourcery/issues/453>
+[^33]: Wikipedia contributors, "SQL," *Wikipedia, The Free Encyclopedia*,
+       <https://en.wikipedia.org/wiki/SQL>
+[^34]: "Functional Programming," *Mozilla Developer Network*,
+       <https://developer.mozilla.org/en-US/docs/Glossary/Functional_programming>
