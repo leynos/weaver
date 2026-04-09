@@ -2255,10 +2255,13 @@ suggested fallback strategy. For example:
   known to be limited.
 
 - **Response:**
-  `{"status": "error", "type": "MissingCapability", "details":
+  
+  ```json
+  {"status": "error", "type": "MissingCapability", "details":
   {"language": "swift", "feature": "rename"}, "suggestion": "Use
   'observe grep' to find occurrences and 'act apply-edits' for syntactic
-  replacement."}`
+  replacement."}
+  ```
 
 This mechanism for graceful degradation transforms failures from dead ends into
 decision points, enabling the agent to dynamically adapt its plan and still
