@@ -15,7 +15,10 @@ fn fixtures_dir() -> PathBuf {
 
 /// Parses and normalizes a rule file from the fixtures directory.
 /// Returns `Err` for parsing/normalization errors so tests can assert on diagnostics.
-#[expect(clippy::panic_in_result_fn, reason = "fixture I/O errors are infrastructure failures, not test failures")]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "fixture I/O errors are infrastructure failures, not test failures"
+)]
 fn normalize_fixture(
     filename: &str,
 ) -> Result<Vec<crate::normalize::NormalizedSearchRule>, DiagnosticReport> {

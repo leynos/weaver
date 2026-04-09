@@ -1344,11 +1344,11 @@ solution.
 
 #### Table 3: Phased Call Graph Provider Implementation
 
-| Phase                   | Provider                   | Underlying Technology                                                | Pros                                                                                                            | Cons                                                                                                                  |
-| ----------------------- | -------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **1 (MVP)**             | LSP Provider               | LSP `textDocument/callHierarchy` request                             | Fast, deeply integrated with the existing semantic layer, requires no additional tool setup.                    | Inconsistent support across language servers, may be inaccurate or incomplete, limited to direct calls.               |
-| **2 (Specialist)**      | Static Analysis Plugin     | Language-specific static analysis tools (e.g., PyCG for Python [^16]) | Higher accuracy and recall, better handling of language-specific dynamic features, more comprehensive analysis. | Requires installing and configuring external plugin tools, slower than LSP, implementation is language-specific.      |
-| **3 (Execution-Aware)** | Dynamic Analysis Ingestion | Output from profilers (e.g., `gprof` [^17], `callgrind` [^18])         | Provides "ground truth" for a given execution, accurately captures dynamic dispatch and runtime behaviour.      | Incomplete coverage (only shows paths that were executed), requires the ability to run the code (e.g., a test suite). |
+| Phase | Provider | Underlying Technology | Pros | Cons |
+| ----- | -------- | --------------------- | ---- | ---- |
+| **1 (MVP)** | LSP Provider | LSP `textDocument/callHierarchy` request | Fast, deeply integrated with the existing semantic layer, requires no additional tool setup. | Inconsistent support across language servers, may be inaccurate or incomplete, limited to direct calls. |
+| **2 (Specialist)** | Static Analysis Plugin | Language-specific static analysis tools (e.g., PyCG for Python [^16]) | Higher accuracy and recall, better handling of language-specific dynamic features, more comprehensive analysis. | Requires installing and configuring external plugin tools, slower than LSP, implementation is language-specific. |
+| **3 (Execution-Aware)** | Dynamic Analysis Ingestion | Output from profilers (e.g., `gprof` [^17], `callgrind` [^18]) | Provides "ground truth" for a given execution, accurately captures dynamic dispatch and runtime behaviour. | Incomplete coverage (only shows paths that were executed), requires the ability to run the code (e.g., a test suite). |
 
 The `weaver-graph` engine will be responsible for merging the graphs produced
 by these providers. When an agent requests a call graph, it can specify which
@@ -2060,11 +2060,11 @@ capabilities.
 
 #### Table 2: Comparison of Rust Sandboxing Crates
 
-| Crate      | Supported Platforms   | Mechanism                               | Key Features                                                         | Maturity/Status                                                                         | Recommendation for Weaver                                                                    |
-| ---------- | --------------------- | --------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `gaol`     | Linux, Windows, macOS | Namespaces, Job Objects, `sandbox_init` | Whitelist profiles, multiprocess model, designed for Servo.[^23]      | Experimental and explicitly "not battle-tested" in the documentation.[^23]               | Helpful reference for cross-platform techniques but too immature for production use.         |
-| `birdcage` | Linux, macOS          | Namespaces, `sandbox_init`              | Focused on filesystem and network restrictions with native APIs.[^22] | Actively used in production by the Phylum CLI, offering a mature and focused scope.[^22] | **Recommended starting point.** Aligns with the primary filesystem and network threat model. |
-| `bastille` | Linux                 | Namespaces, `pivot_root`                | Targets compatibility with the `std::process::Command` API.[^24]      | Work in progress and limited to Linux.                                                  | Monitor for future development, but currently unsuitable for cross-platform goals.           |
+| Crate | Supported Platforms | Mechanism | Key Features | Maturity/Status | Recommendation for Weaver |
+| ----- | ------------------- | --------- | ------------ | --------------- | ------------------------- |
+| `gaol` | Linux, Windows, macOS | Namespaces, Job Objects, `sandbox_init` | Whitelist profiles, multiprocess model, designed for Servo.[^23] | Experimental and explicitly "not battle-tested" in the documentation.[^23] | Helpful reference for cross-platform techniques but too immature for production use. |
+| `birdcage` | Linux, macOS | Namespaces, `sandbox_init` | Focused on filesystem and network restrictions with native APIs.[^22] | Actively used in production by the Phylum CLI, offering a mature and focused scope.[^22] | **Recommended starting point.** Aligns with the primary filesystem and network threat model. |
+| `bastille` | Linux | Namespaces, `pivot_root` | Targets compatibility with the `std::process::Command` API.[^24] | Work in progress and limited to Linux. | Monitor for future development, but currently unsuitable for cross-platform goals. |
 
 While libraries like `birdcage` provide the necessary primitives, a truly
 secure architecture requires more than just process isolation. The

@@ -655,9 +655,10 @@ code.[^26]
 Examples include using Structured Query Language for database queries—
 specifying the desired dataset rather than the retrieval algorithm—or employing
 functional programming constructs like `map`, `filter`, and `reduce` on
-collections instead of writing explicit loops.[^33] Refactoring imperative code to
-a declarative style can start small, perhaps by converting a loop that filters
-and transforms a list into a chain of `filter` and `map` operations.[^26] The broader adoption of declarative approaches in areas like
+collections instead of writing explicit loops.[^33] Refactoring imperative code
+to a declarative style can start small, perhaps by converting a loop that
+filters and transforms a list into a chain of `filter` and `map`
+operations.[^26] The broader adoption of declarative approaches in areas like
 UI development (e.g., React) and data querying signifies an industry trend
 towards managing complexity by raising abstraction levels. However, the
 effectiveness of declarative programming relies on well-designed underlying
