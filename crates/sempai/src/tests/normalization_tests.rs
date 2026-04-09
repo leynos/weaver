@@ -13,19 +13,20 @@ fn fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/normalization")
 }
 
+/// Reads a fixture file and returns its contents as a string.
+/// Panics if the file cannot be read, as fixture I/O errors are infrastructure failures.
+fn read_fixture(filename: &str) -> String {
+    let path = fixtures_dir().join(filename);
+    fs::read_to_string(&path).unwrap_or_else(|e| panic!("failed to read fixture {filename}: {e}"))
+}
+
 /// Parses and normalizes a rule file from the fixtures directory.
 /// Returns `Err` for parsing/normalization errors so tests can assert on diagnostics.
-#[expect(
-    clippy::panic_in_result_fn,
-    reason = "fixture I/O errors are infrastructure failures, not test failures"
-)]
 fn normalize_fixture(
     filename: &str,
 ) -> Result<Vec<crate::normalize::NormalizedSearchRule>, DiagnosticReport> {
-    let path = fixtures_dir().join(filename);
-    let yaml = fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("failed to read fixture {filename}: {e}"));
-    let uri = path.to_str().map(String::from);
+    let yaml = read_fixture(filename);
+    let uri = fixtures_dir().join(filename).to_str().map(String::from);
     let file = parse_rule_file(&yaml, uri.as_deref())?;
     normalize_rule_file(&file)
 }
