@@ -653,7 +653,7 @@ behaviour—common culprits for bugs and increased cognitive load in imperative
 code.[^26]
 
 Examples include using Structured Query Language for database queries—
-specifying the desired dataset rather than the retrieval algorithm[^34]—or
+specifying the desired dataset rather than the retrieval algorithm[^33]—or
 employing functional programming constructs like `map`, `filter`, and `reduce`
 on collections instead of writing explicit loops. Refactoring imperative code
 to a declarative style can start small, perhaps by converting a loop that
@@ -885,7 +885,5 @@ maintain.
 [^32]: Refactor `if-else` Statements to `match-case` for Improved Readability
        and Maintainability in Python 3.10+ · Issue #453 — GitHub,
        <https://github.com/sourcery-ai/sourcery/issues/453>
-[^33]: Wikipedia contributors, "SQL," *Wikipedia, The Free Encyclopedia*,
-       <https://en.wikipedia.org/wiki/SQL>
-[^34]: "Functional Programming," *Mozilla Developer Network*,
+[^33]: "Functional Programming," *Mozilla Developer Network*,
        <https://developer.mozilla.org/en-US/docs/Glossary/Functional_programming>
