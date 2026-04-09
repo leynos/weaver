@@ -678,23 +678,23 @@ The engine is built on three distinct layers of analysis:
    this layer provides the primary source of deep semantic understanding. It
    leverages external Language Server Protocol servers to obtain information
    about definitions, references, type hierarchies, diagnostics, and other
-   complex language constructs.^9^ This forms the bedrock of Weaver's
+   complex language constructs.[^1] This forms the bedrock of Weaver's
    intelligence.
 
 2. **The Syntactic Scaffolding (Tree-sitter):** Managed by the `weaver-syntax`
    crate, this layer provides a fast, fault-tolerant, and universally available
-   structural view of the code.^11^ Tree-sitter can build a concrete syntax
+   structural view of the code.[^2] Tree-sitter can build a concrete syntax
    tree even in the presence of errors, making it exceptionally robust. Its key
    roles are to provide syntactic guardrails for all edit operations, enable
    high-precision structural search and manipulation that LSP often lacks, and
-   facilitate context-aware code slicing for prompt engineering.^13^
+   facilitate context-aware code slicing for prompt engineering.[^3]
 
 3. **Relational Insight (Call-Graph Analysis):** Managed by the `weaver-graph`
    crate, this layer builds a higher-level model of the program's control flow
    and component relationships. It is not limited to a single data source;
    instead, it fuses evidence from LSP's `callHierarchy` feature, dedicated
    static analysis plugins, and potentially the output of dynamic profiling
-   tools to construct a more complete and accurate call graph.^15^
+   tools to construct a more complete and accurate call graph.[^4]
 
 > **Related design:** The call graph is intentionally treated as one relational
 > view. A richer, “cards-first” symbol context layer (symbol cards, typed edges,
@@ -2255,7 +2255,7 @@ suggested fallback strategy. For example:
   known to be limited.
 
 - **Response:**
-  
+
   ```json
   {
     "status": "error",
@@ -2327,106 +2327,95 @@ revised roadmap prioritizes the establishment of core safety features early in
 the development cycle and structures the implementation of advanced features in
 a logical, incremental progression.
 
-### Phase 0: Foundation & Tooling (Complete)
+1. Phase 0: Foundation & Tooling (Complete)
 
-- **Goal:** Set up the project workspace, CI/CD pipeline, and core
-  dependencies.
+   1.1. Goal
+   - [ ] Set up the project workspace, CI/CD pipeline, and core dependencies.
 
-- **Status:** This foundational work is complete.
+   1.2. Status
+   - [x] This foundational work is complete.
 
-### Phase 1: Core MVP & Safety Harness Foundation
+2. Phase 1: Core MVP & Safety Harness Foundation
 
-- **Goal:** Establish the core client/daemon architecture, basic LSP
-  integration, and the foundational security and verification mechanisms. The
-  MVP must be safe for write operations from day one.
+   2.1. Goal
+   - [ ] Establish the core client/daemon architecture, basic LSP
+     integration, and the foundational security and verification mechanisms.
+     The MVP must be safe for write operations from day one.
 
-- **Key Tasks:**
+   2.2. Key Tasks
+   - [ ] 2.2.1 Implement the `weaver-cli` and `weaverd` crates with robust
+         daemonization and process management.
+   - [ ] 2.2.2 Build the `weaver-lsp-host` crate with support for
+         initialization, capability detection, and core LSP features
+         (`definition`, `references`, `diagnostics`) for Rust, Python, and
+         TypeScript.
+   - [ ] 2.2.3 Implement the initial version of the `weaver-sandbox` crate,
+         using `birdcage` for its focused scope and production usage,
+         prioritizing robust Linux support via namespaces and seccomp-bpf.
+   - [ ] 2.2.4 **Implement the full "Double-Lock" safety harness logic in
+         `weaverd`.** This is a critical, non-negotiable feature for the MVP.
+         All `act` commands must pass through this verification layer before
+         committing to the filesystem.
+   - [ ] 2.2.5 Implement atomic edits to ensure that multi-file changes
+         either succeed or fail as a single transaction.
 
-  - Implement the `weaver-cli` and `weaverd` crates with robust
-    daemonization and process management.
+3. Phase 2: Syntactic & Relational Intelligence
 
-  - Build the `weaver-lsp-host` crate with support for initialization,
-    capability detection, and core LSP features (`definition`,
-    `references`, `diagnostics`) for Rust, Python, and TypeScript.
+   3.1. Goal
+   - [ ] Add the Tree-sitter and call graph layers to provide deeper
+     structural and relational understanding of code.
 
-  - Implement the initial version of the `weaver-sandbox` crate, using
-    `birdcage` for its focused scope and production usage, prioritizing
-    robust Linux support via namespaces and seccomp-bpf.
+   3.2. Key Tasks
+   - [ ] 3.2.1 Create the `weaver-syntax` crate and implement the structural
+         search engine for `observe grep` and `act apply-rewrite`, drawing
+         inspiration from `ast-grep`'s pattern language.
+   - [ ] 3.2.2 Integrate the "Syntactic Lock" from `weaver-syntax` into the
+         "Double-Lock" harness. Depends on 2.2.4.
+   - [ ] 3.2.3 Create the `weaver-graph` crate and implement the **LSP
+         Provider** for call graph generation, using the
+         `textDocument/callHierarchy` request as the initial data source.
 
-  - **Implement the full "Double-Lock" safety harness logic in `weaverd`.**
-    This is a critical, non-negotiable feature for the MVP. All `act`
-    commands must pass through this verification layer before committing to
-    the filesystem.
+4. Phase 3: Plugin Ecosystem & Specialist Tools
 
-  - Implement atomic edits to ensure that multi-file changes either succeed
-    or fail as a single transaction.
+   4.1. Goal
+   - [ ] Build the plugin architecture to enable orchestration of
+     best-in-class, language-specific tools.
 
-### Phase 2: Syntactic & Relational Intelligence
+   4.2. Key Tasks
+   - [ ] 4.2.1 Design and implement the `weaver-plugins` crate, including the
+         secure IPC protocol between the `weaverd` broker and sandboxed plugin
+         processes.
+   - [ ] 4.2.2 Develop the first set of actuator plugins:
+         - [ ] 4.2.2.1 A plugin for `rope` to provide advanced Python
+               refactoring.
+         - [ ] 4.2.2.2 A plugin for `srgn` to provide high-performance,
+               precision syntactic editing.
+   - [ ] 4.2.3 Develop the first specialist sensor plugin:
+         - [ ] 4.2.3.1 A plugin for `jedi` to provide supplementary static
+               analysis for Python.
+   - [ ] 4.2.4 Refine the graceful degradation logic to suggest specific
+         plugin-based solutions when core LSP features are missing.
+   - [ ] 4.2.5 Implement the **Static Analysis Provider** for `weaver-graph`
+         (e.g., wrapping `PyCG`) as the first major graph plugin. Depends on
+         3.2.3.
 
-- **Goal:** Add the Tree-sitter and call graph layers to provide deeper
-  structural and relational understanding of code.
+5. Phase 4: Advanced Agent Support & RAG
 
-- **Key Tasks:**
+   5.1. Goal
+   - [ ] Introduce features specifically designed to support advanced agent
+     planning and human-in-the-loop workflows.
 
-  - Create the `weaver-syntax` crate and implement the structural search
-    engine for `observe grep` and `act apply-rewrite`, drawing inspiration
-    from `ast-grep`'s pattern language.
-
-  - Integrate the "Syntactic Lock" from `weaver-syntax` into the
-    "Double-Lock" harness.
-
-  - Create the `weaver-graph` crate and implement the **LSP Provider** for
-    call graph generation, using the `textDocument/callHierarchy` request
-    as the initial data source.
-
-### Phase 3: Plugin Ecosystem & Specialist Tools
-
-- **Goal:** Build the plugin architecture to enable orchestration of
-  best-in-class, language-specific tools.
-
-- **Key Tasks:**
-
-  - Design and implement the `weaver-plugins` crate, including the secure
-    IPC protocol between the `weaverd` broker and sandboxed plugin
-    processes.
-
-  - Develop the first set of actuator plugins:
-
-    - A plugin for `rope` to provide advanced Python refactoring.
-
-    - A plugin for `srgn` to provide high-performance, precision
-      syntactic editing.
-
-  - Develop the first specialist sensor plugin:
-
-    - A plugin for `jedi` to provide supplementary static analysis for
-      Python.
-
-  - Refine the graceful degradation logic to suggest specific plugin-based
-    solutions when core LSP features are missing.
-
-  - Implement the **Static Analysis Provider** for `weaver-graph` (e.g.,
-    wrapping `PyCG`) as the first major graph plugin.
-
-### Phase 4: Advanced Agent Support & RAG
-
-- **Goal:** Introduce features specifically designed to support advanced
-  agent planning and human-in-the-loop workflows.
-
-- **Key Tasks:**
-
-  - Implement the `onboard-project` command based on the "Meta-RAG" design,
-    orchestrating other Weaver components to generate the `PROJECT.dna`
-    summary file.
-
-  - Implement a hybrid interactive mode (`--interactive`) that, in case of
-    a "Double-Lock" verification failure, presents the proposed diff and
-    the resulting errors to a human user for manual review, approval, or
-    rejection.
-
-  - Begin research and development for the **Dynamic Analysis Ingestion**
-    provider for `weaver-graph`, allowing it to consume and merge profiling
-    data from tools like `gprof` and `callgrind`.
+   5.2. Key Tasks
+   - [ ] 5.2.1 Implement the `onboard-project` command based on the "Meta-RAG"
+         design, orchestrating other Weaver components to generate the
+         `PROJECT.dna` summary file.
+   - [ ] 5.2.2 Implement a hybrid interactive mode (`--interactive`) that, in
+         case of a "Double-Lock" verification failure, presents the proposed
+         diff and the resulting errors to a human user for manual review,
+         approval, or rejection. Depends on 2.2.4.
+   - [ ] 5.2.3 Begin research and development for the **Dynamic Analysis
+         Ingestion** provider for `weaver-graph`, allowing it to consume and
+         merge profiling data from tools like `gprof` and `callgrind`.
 
 ## 8. Appendix
 
@@ -2569,3 +2558,8 @@ behaviour-driven development (BDD) scenarios defined in
 expectations for language detection, parse error formatting, and validation
 failure output. The combination of unit, behavioural, and end-to-end tests
 exercises happy and unhappy paths across all supported languages.
+
+[^1]: LSP provides deep semantic understanding through language servers.
+[^2]: Tree-sitter provides fast, fault-tolerant parsing.
+[^3]: Tree-sitter enables structural search and code slicing.
+[^4]: Call-graph analysis fuses data from multiple sources for relational insight.

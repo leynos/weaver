@@ -1,11 +1,5 @@
 //! Tests for legacy/v2 formula normalization into canonical `Formula` model.
 
-#![expect(clippy::indexing_slicing, reason = "tests panic on out-of-bounds")]
-#![expect(
-    clippy::panic_in_result_fn,
-    reason = "test infrastructure may panic on fixture I/O errors"
-)]
-
 use std::fs;
 use std::path::PathBuf;
 
@@ -20,12 +14,19 @@ fn fixtures_dir() -> PathBuf {
 }
 
 /// Parses and normalizes a rule file from the fixtures directory.
+/// Returns `Err` for parsing/normalization errors so tests can assert on diagnostics.
 fn normalize_fixture(
     filename: &str,
 ) -> Result<Vec<crate::normalize::NormalizedSearchRule>, DiagnosticReport> {
     let path = fixtures_dir().join(filename);
-    let yaml = fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("failed to read fixture {filename}: {e}"));
+    let yaml = fs::read_to_string(&path).map_err(|e| {
+        DiagnosticReport::single_error(
+            sempai_core::DiagnosticCode::ESempaiSchemaInvalid,
+            format!("failed to read fixture {filename}: {e}"),
+            None,
+            vec![],
+        )
+    })?;
     let uri = path.to_str().map(String::from);
     let file = parse_rule_file(&yaml, uri.as_deref())?;
     normalize_rule_file(&file)
@@ -48,8 +49,18 @@ fn assert_equivalent_formulas(legacy_fixture: &str, v2_fixture: &str) {
         1,
         "v2 fixture '{v2_fixture}' should yield exactly one rule"
     );
+    let legacy_formula = legacy
+        .first()
+        .expect("legacy should have at least one rule")
+        .formula
+        .clone();
+    let v2_formula = v2
+        .first()
+        .expect("v2 should have at least one rule")
+        .formula
+        .clone();
     assert_eq!(
-        legacy[0].formula, v2[0].formula,
+        legacy_formula, v2_formula,
         "legacy and v2 fixtures should normalise to the same formula",
     );
 }
@@ -138,7 +149,8 @@ fn v2_where_focus_is_parsed_correctly() {
     // and stored in DecoratedFormula, but normalize_search_principal extracts only the
     // formula field, discarding decorations. This is a known limitation - where_clauses
     // are not preserved in NormalizedSearchRule. See normalize_search_principal for details.
-    match &rules[0].formula {
+    let first_rule = rules.first().expect("should have at least one rule");
+    match &first_rule.formula {
         Formula::Atom(_) => {}
         _ => panic!("expected Atom formula"),
     }
@@ -151,7 +163,8 @@ fn v2_where_metavariable_regex_is_parsed_correctly() {
     assert_eq!(rules.len(), 1);
 
     // The formula should be an Atom
-    match &rules[0].formula {
+    let first_rule = rules.first().expect("should have at least one rule");
+    match &first_rule.formula {
         Formula::Atom(_) => {}
         _ => panic!("expected Atom formula"),
     }
@@ -164,7 +177,8 @@ fn v2_where_metavariable_pattern_is_parsed_correctly() {
     assert_eq!(rules.len(), 1);
 
     // The formula should be an Atom
-    match &rules[0].formula {
+    let first_rule = rules.first().expect("should have at least one rule");
+    match &first_rule.formula {
         Formula::Atom(_) => {}
         _ => panic!("expected Atom formula"),
     }
@@ -184,14 +198,13 @@ fn v2_where_unsupported_comparison_returns_not_implemented() {
 }
 
 #[test]
-fn v2_where_focus_array_parses_first_element() {
-    // Focus array should parse the first element
+fn v2_where_focus_array_returns_not_implemented() {
+    // Multi-focus arrays are not yet supported; expect NotImplemented error
     let result = normalize_fixture("v2_where_focus_array.yaml");
-    let rules = result.expect("should parse v2 with focus array where clause");
-    assert_eq!(rules.len(), 1);
-
-    match &rules[0].formula {
-        Formula::Atom(_) => {}
-        _ => panic!("expected Atom formula"),
-    }
+    let report = result.expect_err("should fail with not implemented for multi-focus arrays");
+    let first = report
+        .diagnostics()
+        .first()
+        .expect("expected at least one diagnostic");
+    assert_eq!(first.code(), DiagnosticCode::NotImplemented);
 }

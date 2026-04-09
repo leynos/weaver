@@ -64,11 +64,9 @@ fn compile_yaml_returns_success_for_valid_search_rule() {
 }
 
 #[test]
-fn compile_yaml_succeeds_for_project_depends_on_search_rule() {
+fn compile_yaml_returns_not_implemented_for_project_depends_on() {
     let engine = default_engine();
-    // ProjectDependsOn now normalizes to an empty formula that passes validation.
-    // The actual dependency checking logic is not yet implemented,
-    // but the rule compiles successfully.
+    // ProjectDependsOn is not yet implemented; expect NotImplemented error
     let result = engine.compile_yaml(concat!(
         "rules:\n",
         "  - id: demo.depends\n",
@@ -79,10 +77,8 @@ fn compile_yaml_succeeds_for_project_depends_on_search_rule() {
         "      namespace: pypi\n",
         "      package: requests\n",
     ));
-    let plans = result.expect("should compile successfully");
-    let plan = plans.first().expect("expected a single plan");
-    assert_eq!(plan.rule_id(), "demo.depends");
-    assert_eq!(plan.language(), Language::Python);
+    let (code, _diag) = first_diagnostic_of_err(result);
+    assert_eq!(code, DiagnosticCode::NotImplemented);
 }
 
 fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str) {

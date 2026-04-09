@@ -120,13 +120,9 @@ fn normalize_search_principal(principal: &RulePrincipal) -> Result<Formula, Diag
                 let decorated = normalize_v2_formula(v2)?;
                 Ok(decorated.formula)
             }
-            SearchQueryPrincipal::ProjectDependsOn(_) => {
-                // ProjectDependsOn is a compatibility-only search principal.
-                // For now, we normalize it to an empty conjunction, which is a
-                // valid but non-executable formula. The actual dependency
-                // checking logic will be implemented in a future milestone.
-                Ok(Formula::And(vec![]))
-            }
+            SearchQueryPrincipal::ProjectDependsOn(_) => Err(DiagnosticReport::not_implemented(
+                "ProjectDependsOn search principal",
+            )),
         },
         _ => Err(DiagnosticReport::single_error(
             DiagnosticCode::ESempaiSchemaInvalid,
@@ -189,7 +185,14 @@ fn normalize_legacy_formula(formula: &LegacyFormula) -> Result<Formula, Diagnost
 }
 
 /// Normalizes a legacy clause (formula or constraint) into an optional decorated formula.
-/// Returns `Ok(None)` for constraints that should be skipped.
+///
+/// # Errors
+///
+/// Returns `Err(DiagnosticReport)` for constraint clauses (e.g., `metavariable-pattern`,
+/// `metavariable-regex`) because these are not yet implemented. Returning an error
+/// instead of `Ok(None)` ensures that callers are explicitly informed about unsupported
+/// features rather than silently skipping them, which could lead to unexpected behavior
+/// in rule execution.
 fn normalize_legacy_clause(
     clause: &LegacyClause,
 ) -> Result<Option<DecoratedFormula>, DiagnosticReport> {

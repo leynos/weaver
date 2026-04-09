@@ -1120,9 +1120,9 @@ weave.[^11]
     edges, bounded by budgets, and refreshed via symbol-level deltas. See
     <https://github.com/GlitterKill/sdl-mcp>.
 
-[^2]: Weaver’s design explicitly frames “Semantic Fusion” as the combination
-    of Tree-sitter, LSP, and a graph module, exposed as composable JSONL commands.
-    See [weaver-design.md](weaver-design.md).
+[^2]: Weaver’s design explicitly frames “Semantic Fusion” as the
+    combination of Tree-sitter, LSP, and a graph module, exposed as composable
+    JSONL commands. See [weaver-design.md](weaver-design.md).
 
 [^3]: Weaver already contains an LSP call-hierarchy-based call graph provider
     with depth-limited exploration, suitable as a high-confidence `call` edge

@@ -40,15 +40,29 @@ pub(crate) fn parse_where_clause(
         )
     })?;
 
-    // where clauses have a single key indicating the clause type
-    let (key, inner_value) = mapping.iter().next().ok_or_else(|| {
-        DiagnosticReport::single_error(
+    // where clauses must have exactly one key indicating the clause type
+    if mapping.is_empty() {
+        return Err(DiagnosticReport::single_error(
             DiagnosticCode::ESempaiSchemaInvalid,
             "where clause cannot be empty".to_owned(),
             None,
             vec![],
-        )
-    })?;
+        ));
+    }
+    if mapping.len() > 1 {
+        let keys: Vec<_> = mapping.keys().map(String::as_str).collect();
+        return Err(DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            format!(
+                "where clause must contain exactly one key, found: {}",
+                keys.join(", ")
+            ),
+            None,
+            vec![],
+        ));
+    }
+    #[expect(clippy::expect_used, reason = "length checked above")]
+    let (key, inner_value) = mapping.iter().next().expect("checked len == 1");
 
     match key.as_str() {
         "focus" => parse_focus_clause(inner_value),

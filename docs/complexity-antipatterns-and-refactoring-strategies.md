@@ -653,9 +653,9 @@ behaviour—common culprits for bugs and increased cognitive load in imperative
 code.[^26]
 
 Examples include using Structured Query Language for database queries—
-specifying the desired dataset rather than the retrieval algorithm[^33]—or
+specifying the desired dataset rather than the retrieval algorithm—or
 employing functional programming constructs like `map`, `filter`, and `reduce`
-on collections instead of writing explicit loops. Refactoring imperative code
+on collections instead of writing explicit loops.[^33] Refactoring imperative code
 to a declarative style can start small, perhaps by converting a loop that
 filters and transforms a list into a chain of `filter` and `map`
 operations.[^26] The broader adoption of declarative approaches in areas like
@@ -819,7 +819,6 @@ maintain.
       <https://en.wikipedia.org/wiki/Cyclomatic_complexity>
 [^4]: Cyclomatic complexity: Definition and limits in understanding code
       quality — the Developer Experience platform,
-      <https://getdx.com/blog/cyclomatic-complexity/>
       <https://getdx.com/blog/cyclomatic-complexity/>
 [^5]: Cyclomatic complexity — Wikipedia (risk classification),
       <https://en.wikipedia.org/wiki/Cyclomatic_complexity>
