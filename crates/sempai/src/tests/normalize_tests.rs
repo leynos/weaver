@@ -18,18 +18,8 @@ fn expect_diagnostic(yaml: &str, expected_code: DiagnosticCode) {
     assert_eq!(first.code(), expected_code);
 }
 
-#[test]
-fn normalize_simple_pattern_legacy() {
-    let yaml = concat!(
-        "rules:\n",
-        "  - id: test.rule\n",
-        "    message: test\n",
-        "    languages: [rust]\n",
-        "    severity: ERROR\n",
-        "    pattern: fn $F($X)\n",
-    );
+fn assert_normalizes_to_single_pattern_atom(yaml: &str) {
     let result = parse_and_normalize(yaml).expect("should normalize successfully");
-
     let rule = result.first().expect("expected a single rule");
     assert_eq!(rule.rule_id, "test.rule");
     assert_eq!(rule.language, Language::Rust);
@@ -37,21 +27,27 @@ fn normalize_simple_pattern_legacy() {
 }
 
 #[test]
+fn normalize_simple_pattern_legacy() {
+    assert_normalizes_to_single_pattern_atom(concat!(
+        "rules:\n",
+        "  - id: test.rule\n",
+        "    message: test\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    pattern: fn $F($X)\n",
+    ));
+}
+
+#[test]
 fn normalize_simple_pattern_v2() {
-    let yaml = concat!(
+    assert_normalizes_to_single_pattern_atom(concat!(
         "rules:\n",
         "  - id: test.rule\n",
         "    message: test\n",
         "    languages: [rust]\n",
         "    severity: ERROR\n",
         "    match: fn $F($X)\n",
-    );
-    let result = parse_and_normalize(yaml).expect("should normalize successfully");
-
-    let rule = result.first().expect("expected a single rule");
-    assert_eq!(rule.rule_id, "test.rule");
-    assert_eq!(rule.language, Language::Rust);
-    assert!(matches!(rule.formula, Formula::Atom(Atom::Pattern(_))));
+    ));
 }
 
 #[test]

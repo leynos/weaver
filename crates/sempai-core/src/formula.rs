@@ -205,29 +205,25 @@ mod tests {
         assert!(f.is_positive_term());
     }
 
-    #[test]
-    fn and_with_only_constraints_is_not_positive() {
+    fn only_constraint_children() -> Vec<DecoratedFormula> {
         let not_clause = DecoratedFormula::new(Formula::Not(Box::new(DecoratedFormula::new(
             Formula::Atom(Atom::Pattern(String::from("foo"))),
         ))));
         let inside_clause = DecoratedFormula::new(Formula::Inside(Box::new(
             DecoratedFormula::new(Formula::Atom(Atom::Pattern(String::from("bar")))),
         )));
-        let f = Formula::And(vec![not_clause, inside_clause]);
-        assert!(!f.is_positive_term());
+        vec![not_clause, inside_clause]
+    }
+
+    #[test]
+    fn and_with_only_constraints_is_not_positive() {
+        assert!(!Formula::And(only_constraint_children()).is_positive_term());
     }
 
     #[test]
     fn or_with_only_constraints_is_not_positive() {
         // Regression test: Or with only negations/inside should not be considered positive
-        let not_clause = DecoratedFormula::new(Formula::Not(Box::new(DecoratedFormula::new(
-            Formula::Atom(Atom::Pattern(String::from("foo"))),
-        ))));
-        let inside_clause = DecoratedFormula::new(Formula::Inside(Box::new(
-            DecoratedFormula::new(Formula::Atom(Atom::Pattern(String::from("bar")))),
-        )));
-        let f = Formula::Or(vec![not_clause, inside_clause]);
-        assert!(!f.is_positive_term());
+        assert!(!Formula::Or(only_constraint_children()).is_positive_term());
     }
 
     #[test]

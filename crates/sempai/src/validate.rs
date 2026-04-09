@@ -41,7 +41,9 @@ pub fn validate_formula_semantics(formula: &Formula) -> Result<(), DiagnosticRep
 pub fn validate_invalid_not_in_or(formula: &Formula) -> Result<(), DiagnosticReport> {
     walk_formula(formula, &mut |node| {
         if let Formula::Or(children) = node
-            && children.iter().any(|c| matches!(c.formula, Formula::Not(_)))
+            && children
+                .iter()
+                .any(|c| matches!(c.formula, Formula::Not(_)))
         {
             return Err(DiagnosticReport::single_error(
                 DiagnosticCode::ESempaiInvalidNotInOr,
