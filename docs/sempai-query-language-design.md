@@ -1281,7 +1281,10 @@ mirrored into `sempai_fixtures` as local test inputs.[^7]
 
 [^3]: `semgrep-operator-precedence.md` and `semgrep-legacy-vs-v2-guidance.md`.
 
-[^4]: %60building-an-error-recovering-parser-with-chumsky.md%60.
-[^5]: %60pratt-parser-for-ddlog-expressions.md%60.
-[^6]: %60rust-parser-testing-comprehensive-guide.md%60.
-[^7]: %60semgrep-minimal-examples.md%60.
+[^4]: `building-an-error-recovering-parser-with-chumsky.md`.
+
+[^5]: `pratt-parser-for-ddlog-expressions.md`.
+
+[^6]: `rust-parser-testing-comprehensive-guide.md`.
+
+[^7]: `semgrep-minimal-examples.md`.
