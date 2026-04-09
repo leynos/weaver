@@ -1,5 +1,7 @@
 //! Tests for the `Engine` and `QueryPlan` types.
 
+use rstest::rstest;
+
 use crate::engine::QueryPlan;
 use crate::{
     Diagnostic, DiagnosticCode, DiagnosticReport, Engine, EngineConfig, EngineLimits, Language,
@@ -58,6 +60,7 @@ fn compile_yaml_returns_success_for_valid_search_rule() {
         "rules:\n  - id: demo.rule\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n",
     );
     let plans = result.expect("should compile successfully");
+    assert_eq!(plans.len(), 1, "expected exactly one plan");
     let plan = plans.first().expect("expected a single plan");
     assert_eq!(plan.rule_id(), "demo.rule");
     assert_eq!(plan.language(), Language::Rust);
@@ -159,85 +162,71 @@ fn execute_returns_not_implemented() {
 
 #[test]
 fn compile_yaml_returns_unsupported_mode_error() {
-    let engine = default_engine();
-    // Taint mode rules require taint-specific fields; using a valid taint rule
-    // that will parse successfully but fail at normalization with unsupported mode
-    let result = engine.compile_yaml(
+    // Unsupported modes are rejected during mode validation (before normalization)
+    assert_compile_yaml_unsupported_mode(
         "rules:\n  - id: demo.rule\n    mode: taint\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    taint:\n      sources: []\n      sinks: []\n",
-    );
-    let (code, _diag) = first_diagnostic_of_err(result);
-    assert_eq!(code, DiagnosticCode::ESempaiUnsupportedMode);
-}
-
-#[test]
-fn compile_yaml_returns_invalid_not_in_or_for_legacy_pattern_either() {
-    assert_compile_yaml_diagnostic(
-        concat!(
-            "rules:\n",
-            "  - id: test.rule\n",
-            "    message: test\n",
-            "    languages: [rust]\n",
-            "    severity: ERROR\n",
-            "    pattern-either:\n",
-            "      - pattern-not: fn $F($X)\n",
-            "      - pattern: fn $G($Y)\n",
-        ),
-        DiagnosticCode::ESempaiInvalidNotInOr,
+        "taint",
     );
 }
 
-#[test]
-fn compile_yaml_returns_invalid_not_in_or_for_v2_any() {
-    assert_compile_yaml_diagnostic(
-        concat!(
-            "rules:\n",
-            "  - id: test.rule\n",
-            "    message: test\n",
-            "    languages: [rust]\n",
-            "    severity: ERROR\n",
-            "    match:\n",
-            "      any:\n",
-            "        - not:\n",
-            "            pattern: fn $F($X)\n",
-            "        - pattern: fn $G($Y)\n",
-        ),
-        DiagnosticCode::ESempaiInvalidNotInOr,
-    );
-}
-
-#[test]
-fn compile_yaml_returns_missing_positive_term_for_legacy_patterns() {
-    assert_compile_yaml_diagnostic(
-        concat!(
-            "rules:\n",
-            "  - id: test.rule\n",
-            "    message: test\n",
-            "    languages: [rust]\n",
-            "    severity: ERROR\n",
-            "    patterns:\n",
-            "      - pattern-not: fn $F($X)\n",
-            "      - pattern-inside: impl $T\n",
-        ),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd,
-    );
-}
-
-#[test]
-fn compile_yaml_returns_missing_positive_term_for_v2_all() {
-    assert_compile_yaml_diagnostic(
-        concat!(
-            "rules:\n",
-            "  - id: test.rule\n",
-            "    message: test\n",
-            "    languages: [rust]\n",
-            "    severity: ERROR\n",
-            "    match:\n",
-            "      all:\n",
-            "        - not:\n",
-            "            pattern: fn $F($X)\n",
-            "        - inside:\n",
-            "            pattern: impl $T\n",
-        ),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd,
-    );
+#[rstest]
+#[case(
+    concat!(
+        "rules:\n",
+        "  - id: test.rule\n",
+        "    message: test\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    pattern-either:\n",
+        "      - pattern-not: fn $F($X)\n",
+        "      - pattern: fn $G($Y)\n",
+    ),
+    DiagnosticCode::ESempaiInvalidNotInOr
+)]
+#[case(
+    concat!(
+        "rules:\n",
+        "  - id: test.rule\n",
+        "    message: test\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    match:\n",
+        "      any:\n",
+        "        - not:\n",
+        "            pattern: fn $F($X)\n",
+        "        - pattern: fn $G($Y)\n",
+    ),
+    DiagnosticCode::ESempaiInvalidNotInOr
+)]
+#[case(
+    concat!(
+        "rules:\n",
+        "  - id: test.rule\n",
+        "    message: test\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    patterns:\n",
+        "      - pattern-not: fn $F($X)\n",
+        "      - pattern-inside: impl $T\n",
+    ),
+    DiagnosticCode::ESempaiMissingPositiveTermInAnd
+)]
+#[case(
+    concat!(
+        "rules:\n",
+        "  - id: test.rule\n",
+        "    message: test\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    match:\n",
+        "      all:\n",
+        "        - not:\n",
+        "            pattern: fn $F($X)\n",
+        "        - inside:\n",
+        "            pattern: impl $T\n",
+    ),
+    DiagnosticCode::ESempaiMissingPositiveTermInAnd
+)]
+fn compile_yaml_diagnostic_cases(#[case] yaml: &str, #[case] expected_code: DiagnosticCode) {
+    assert_compile_yaml_diagnostic(yaml, expected_code);
 }
