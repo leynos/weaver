@@ -221,7 +221,9 @@ fn normalize_legacy_value(value: &LegacyValue) -> Result<Formula, DiagnosticRepo
 }
 
 /// Normalizes a v2 match formula into canonical form.
-fn normalize_v2_formula(formula: &MatchFormula) -> Result<DecoratedFormula, DiagnosticReport> {
+pub(crate) fn normalize_v2_formula(
+    formula: &MatchFormula,
+) -> Result<DecoratedFormula, DiagnosticReport> {
     match formula {
         MatchFormula::Pattern(pattern) | MatchFormula::PatternObject(pattern) => Ok(
             DecoratedFormula::new(Formula::Atom(Atom::Pattern(pattern.clone()))),
