@@ -352,6 +352,64 @@ fn parse_focus_clause(value: &serde_json::Value) -> Result<WhereClause, Diagnost
     }
 }
 
+/// Pattern-formula keys that may appear inside a `metavariable` where clause.
+const METAVARIABLE_PATTERN_KEYS: &[&str] = &["pattern", "all", "any", "not", "inside", "anywhere"];
+
+/// Extracts and normalises the `metavariable` field from a where-clause mapping.
+fn extract_metavariable_name(
+    mapping: &serde_json::Map<String, serde_json::Value>,
+) -> Result<String, DiagnosticReport> {
+    let mv_value = mapping.get("metavariable").ok_or_else(|| {
+        DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            "metavariable clause must have a 'metavariable' field".to_owned(),
+            None,
+            vec![],
+        )
+    })?;
+    let mv_str = mv_value.as_str().ok_or_else(|| {
+        DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            "metavariable field must be a string".to_owned(),
+            None,
+            vec![],
+        )
+    })?;
+    Ok(strip_dollar_prefix(mv_str))
+}
+
+/// Builds a `MetavariablePattern` clause from a mapping that contains formula keys.
+fn parse_metavariable_pattern_clause(
+    metavariable: String,
+    mapping: &serde_json::Map<String, serde_json::Value>,
+) -> Result<WhereClause, DiagnosticReport> {
+    let match_formula = build_match_formula_from_mapping(mapping)?;
+    let normalized = normalize_v2_formula(&match_formula)?;
+    Ok(WhereClause::MetavariablePattern {
+        metavariable,
+        formula: normalized.formula,
+    })
+}
+
+/// Builds a `MetavariableRegex` clause from the value of a `"regex"` key.
+fn parse_metavariable_regex_clause(
+    metavariable: String,
+    regex_value: &serde_json::Value,
+) -> Result<WhereClause, DiagnosticReport> {
+    let regex = regex_value.as_str().ok_or_else(|| {
+        DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            "regex field must be a string".to_owned(),
+            None,
+            vec![],
+        )
+    })?;
+    Ok(WhereClause::MetavariableRegex {
+        metavariable,
+        regex: regex.to_owned(),
+    })
+}
+
 /// Parses a `metavariable` where clause into pattern or regex variants.
 fn parse_metavariable_clause(value: &serde_json::Value) -> Result<WhereClause, DiagnosticReport> {
     let mapping = value.as_object().ok_or_else(|| {
@@ -363,53 +421,15 @@ fn parse_metavariable_clause(value: &serde_json::Value) -> Result<WhereClause, D
         )
     })?;
 
-    // Extract the metavariable name (required)
-    let Some(mv_value) = mapping.get("metavariable") else {
-        return Err(DiagnosticReport::single_error(
-            DiagnosticCode::ESempaiSchemaInvalid,
-            "metavariable clause must have a 'metavariable' field".to_owned(),
-            None,
-            vec![],
-        ));
-    };
-    let Some(mv_str) = mv_value.as_str() else {
-        return Err(DiagnosticReport::single_error(
-            DiagnosticCode::ESempaiSchemaInvalid,
-            "metavariable field must be a string".to_owned(),
-            None,
-            vec![],
-        ));
-    };
-    let metavariable = strip_dollar_prefix(mv_str);
+    let metavariable = extract_metavariable_name(mapping)?;
 
-    // Determine the clause type based on which field is present
-    if mapping.contains_key("pattern")
-        || mapping.contains_key("all")
-        || mapping.contains_key("any")
-        || mapping.contains_key("not")
-        || mapping.contains_key("inside")
-        || mapping.contains_key("anywhere")
+    if METAVARIABLE_PATTERN_KEYS
+        .iter()
+        .any(|&k| mapping.contains_key(k))
     {
-        // Metavariable pattern - build MatchFormula from the fields
-        let match_formula = build_match_formula_from_mapping(mapping)?;
-        let normalized = normalize_v2_formula(&match_formula)?;
-        Ok(WhereClause::MetavariablePattern {
-            metavariable,
-            formula: normalized.formula,
-        })
+        parse_metavariable_pattern_clause(metavariable, mapping)
     } else if let Some(regex_value) = mapping.get("regex") {
-        let Some(regex) = regex_value.as_str() else {
-            return Err(DiagnosticReport::single_error(
-                DiagnosticCode::ESempaiSchemaInvalid,
-                "regex field must be a string".to_owned(),
-                None,
-                vec![],
-            ));
-        };
-        Ok(WhereClause::MetavariableRegex {
-            metavariable,
-            regex: regex.to_owned(),
-        })
+        parse_metavariable_regex_clause(metavariable, regex_value)
     } else if mapping.contains_key("type") || mapping.contains_key("types") {
         Err(DiagnosticReport::not_implemented(
             "metavariable type constraint (type/types)",
