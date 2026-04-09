@@ -1,0 +1,9 @@
+rules:
+  - id: v2.where.focus
+    message: detect function with focus on name
+    languages: [rust]
+    severity: ERROR
+    match:
+      pattern: fn $FUNC($X)
+      where:
+        - focus: $FUNC

@@ -1,0 +1,10 @@
+rules:
+  - id: v2.where.unsupported.comparison
+    message: detect with comparison constraint
+    languages: [rust]
+    severity: ERROR
+    match:
+      pattern: $X
+      where:
+        - comparison:
+            comparison: "> 0"

@@ -36,7 +36,9 @@
 //! assert_eq!(rules.len(), 1);
 //! ```
 
-use sempai_core::{Atom, DecoratedFormula, DiagnosticCode, DiagnosticReport, Formula, Language};
+use sempai_core::{
+    Atom, DecoratedFormula, DiagnosticCode, DiagnosticReport, Formula, Language, WhereClause,
+};
 use sempai_yaml::{
     LegacyClause, LegacyFormula, LegacyValue, MatchFormula, Rule, RuleFile, RuleMode,
     RulePrincipal, SearchQueryPrincipal,
@@ -252,7 +254,7 @@ fn normalize_v2_formula(formula: &MatchFormula) -> Result<DecoratedFormula, Diag
             formula: inner,
             as_name,
             fix,
-            ..
+            where_clauses,
         } => {
             let mut normalized = normalize_v2_formula(inner)?;
             // Preserve as_name and fix decorations
@@ -262,11 +264,300 @@ fn normalize_v2_formula(formula: &MatchFormula) -> Result<DecoratedFormula, Diag
             if let Some(fix_text) = fix {
                 normalized = normalized.with_fix(fix_text.clone());
             }
-            // Note: where_clauses are not yet implemented - they would need
-            // to be parsed from the raw YAML Value into WhereClause variants
+            // Parse where_clauses from raw YAML Value into WhereClause variants
+            if !where_clauses.is_empty() {
+                let clauses = parse_where_clauses(where_clauses)?;
+                normalized = normalized.with_where_clauses(clauses);
+            }
             Ok(normalized)
         }
     }
+}
+
+/// Parses a list of raw JSON where clauses into `WhereClause` variants.
+fn parse_where_clauses(
+    clauses: &[serde_json::Value],
+) -> Result<Vec<WhereClause>, DiagnosticReport> {
+    clauses.iter().map(parse_where_clause).collect()
+}
+
+/// Parses a single where clause from JSON Value into a `WhereClause`.
+fn parse_where_clause(value: &serde_json::Value) -> Result<WhereClause, DiagnosticReport> {
+    let mapping = value.as_object().ok_or_else(|| {
+        DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            "where clause must be an object".to_owned(),
+            None,
+            vec![],
+        )
+    })?;
+
+    // where clauses have a single key indicating the clause type
+    let (key, inner_value) = mapping.iter().next().ok_or_else(|| {
+        DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            "where clause cannot be empty".to_owned(),
+            None,
+            vec![],
+        )
+    })?;
+
+    match key.as_str() {
+        "focus" => parse_focus_clause(inner_value),
+        "metavariable" => parse_metavariable_clause(inner_value),
+        "comparison" => Err(DiagnosticReport::not_implemented(
+            "where clause 'comparison' (comparison operator)",
+        )),
+        _ => Err(DiagnosticReport::not_implemented(&format!(
+            "where clause '{key}'"
+        ))),
+    }
+}
+
+/// Parses a `focus` where clause into a `WhereClause::Focus` entry.
+fn parse_focus_clause(value: &serde_json::Value) -> Result<WhereClause, DiagnosticReport> {
+    // focus can be a single string or an array of strings
+    match value {
+        serde_json::Value::String(mv) => Ok(WhereClause::Focus {
+            metavariable: strip_dollar_prefix(mv),
+        }),
+        serde_json::Value::Array(seq) => {
+            // For arrays, we only return the first one for now
+            let first = seq.first().ok_or_else(|| {
+                DiagnosticReport::single_error(
+                    DiagnosticCode::ESempaiSchemaInvalid,
+                    "focus array cannot be empty".to_owned(),
+                    None,
+                    vec![],
+                )
+            })?;
+            let mv = first.as_str().ok_or_else(|| {
+                DiagnosticReport::single_error(
+                    DiagnosticCode::ESempaiSchemaInvalid,
+                    "focus array elements must be strings".to_owned(),
+                    None,
+                    vec![],
+                )
+            })?;
+            Ok(WhereClause::Focus {
+                metavariable: strip_dollar_prefix(mv),
+            })
+        }
+        _ => Err(DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            "focus must be a string or array of strings".to_owned(),
+            None,
+            vec![],
+        )),
+    }
+}
+
+/// Parses a `metavariable` where clause into pattern or regex variants.
+fn parse_metavariable_clause(value: &serde_json::Value) -> Result<WhereClause, DiagnosticReport> {
+    let mapping = value.as_object().ok_or_else(|| {
+        DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            "metavariable clause must be an object".to_owned(),
+            None,
+            vec![],
+        )
+    })?;
+
+    // Extract the metavariable name (required)
+    let Some(mv_value) = mapping.get("metavariable") else {
+        return Err(DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            "metavariable clause must have a 'metavariable' field".to_owned(),
+            None,
+            vec![],
+        ));
+    };
+    let Some(mv_str) = mv_value.as_str() else {
+        return Err(DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            "metavariable field must be a string".to_owned(),
+            None,
+            vec![],
+        ));
+    };
+    let metavariable = strip_dollar_prefix(mv_str);
+
+    // Determine the clause type based on which field is present
+    if mapping.contains_key("pattern")
+        || mapping.contains_key("all")
+        || mapping.contains_key("any")
+        || mapping.contains_key("not")
+        || mapping.contains_key("inside")
+        || mapping.contains_key("anywhere")
+    {
+        // Metavariable pattern - build MatchFormula from the fields
+        let match_formula = build_match_formula_from_mapping(mapping)?;
+        let normalized = normalize_v2_formula(&match_formula)?;
+        Ok(WhereClause::MetavariablePattern {
+            metavariable,
+            formula: normalized.formula,
+        })
+    } else if let Some(regex_value) = mapping.get("regex") {
+        let Some(regex) = regex_value.as_str() else {
+            return Err(DiagnosticReport::single_error(
+                DiagnosticCode::ESempaiSchemaInvalid,
+                "regex field must be a string".to_owned(),
+                None,
+                vec![],
+            ));
+        };
+        Ok(WhereClause::MetavariableRegex {
+            metavariable,
+            regex: regex.to_owned(),
+        })
+    } else if mapping.contains_key("type") || mapping.contains_key("types") {
+        Err(DiagnosticReport::not_implemented(
+            "metavariable type constraint (type/types)",
+        ))
+    } else if mapping.contains_key("analyzer") {
+        Err(DiagnosticReport::not_implemented(
+            "metavariable analysis constraint (analyzer)",
+        ))
+    } else {
+        Err(DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            "metavariable clause must have pattern, regex, type, types, or analyzer".to_owned(),
+            None,
+            vec![],
+        ))
+    }
+}
+
+/// Builds a `MatchFormula` from a JSON object mapping.
+///
+/// This parses the fields manually since `MatchFormula` doesn't implement `Deserialize`.
+#[expect(
+    clippy::too_many_lines,
+    reason = "formula construction requires multiple branches"
+)]
+fn build_match_formula_from_mapping(
+    mapping: &serde_json::Map<String, serde_json::Value>,
+) -> Result<MatchFormula, DiagnosticReport> {
+    // Check for exactly one operator (pattern, regex, all, any, not, inside, anywhere)
+    let operator_keys = [
+        "pattern", "regex", "all", "any", "not", "inside", "anywhere",
+    ];
+    let present_operators: Vec<_> = operator_keys
+        .iter()
+        .filter(|&&key| mapping.contains_key(key))
+        .copied()
+        .collect();
+
+    if present_operators.is_empty() {
+        return Err(DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            "metavariable pattern must have one of: pattern, regex, all, any, not, inside, anywhere".to_owned(),
+            None,
+            vec![],
+        ));
+    }
+
+    if present_operators.len() > 1 {
+        return Err(DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            format!(
+                "metavariable pattern defines multiple operators: {}",
+                present_operators.join(", ")
+            ),
+            None,
+            vec!["keep only one operator per pattern".to_owned()],
+        ));
+    }
+
+    let key = *present_operators.first().ok_or_else(|| {
+        DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            "no operator found in match formula".to_owned(),
+            None,
+            vec![],
+        )
+    })?;
+    let value = mapping.get(key).ok_or_else(|| {
+        DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            format!("operator '{key}' was detected but value is missing"),
+            None,
+            vec![],
+        )
+    })?;
+
+    match key {
+        "pattern" => {
+            let pattern = value.as_str().ok_or_else(|| {
+                DiagnosticReport::single_error(
+                    DiagnosticCode::ESempaiSchemaInvalid,
+                    "pattern must be a string".to_owned(),
+                    None,
+                    vec![],
+                )
+            })?;
+            Ok(MatchFormula::PatternObject(pattern.to_owned()))
+        }
+        "regex" => {
+            let regex = value.as_str().ok_or_else(|| {
+                DiagnosticReport::single_error(
+                    DiagnosticCode::ESempaiSchemaInvalid,
+                    "regex must be a string".to_owned(),
+                    None,
+                    vec![],
+                )
+            })?;
+            Ok(MatchFormula::Regex(regex.to_owned()))
+        }
+        "all" => parse_match_formula_array(value).map(MatchFormula::All),
+        "any" => parse_match_formula_array(value).map(MatchFormula::Any),
+        "not" => parse_nested_match_formula(value).map(|f| MatchFormula::Not(Box::new(f))),
+        "inside" => parse_nested_match_formula(value).map(|f| MatchFormula::Inside(Box::new(f))),
+        "anywhere" => {
+            parse_nested_match_formula(value).map(|f| MatchFormula::Anywhere(Box::new(f)))
+        }
+        _ => Err(DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            format!("unexpected operator '{key}' in match formula"),
+            None,
+            vec![],
+        )),
+    }
+}
+
+/// Parses an array of match formulas from a JSON value.
+fn parse_match_formula_array(
+    value: &serde_json::Value,
+) -> Result<Vec<MatchFormula>, DiagnosticReport> {
+    let array = value.as_array().ok_or_else(|| {
+        DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            "expected an array of match formulas".to_owned(),
+            None,
+            vec![],
+        )
+    })?;
+
+    array.iter().map(parse_nested_match_formula).collect()
+}
+
+/// Parses a nested match formula from a JSON value (string or object).
+fn parse_nested_match_formula(value: &serde_json::Value) -> Result<MatchFormula, DiagnosticReport> {
+    match value {
+        serde_json::Value::String(pattern) => Ok(MatchFormula::Pattern(pattern.clone())),
+        serde_json::Value::Object(mapping) => build_match_formula_from_mapping(mapping),
+        _ => Err(DiagnosticReport::single_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            "match formula must be a string or object".to_owned(),
+            None,
+            vec![],
+        )),
+    }
+}
+
+/// Strips the leading `$` from a metavariable name if present.
+fn strip_dollar_prefix(mv: &str) -> String {
+    mv.strip_prefix('$').unwrap_or(mv).to_owned()
 }
 
 /// Normalizes language strings from the rule into Language enums.

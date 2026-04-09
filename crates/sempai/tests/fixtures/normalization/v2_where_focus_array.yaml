@@ -1,0 +1,11 @@
+rules:
+  - id: v2.where.focus-array
+    message: detect with focus array
+    languages: [rust]
+    severity: ERROR
+    match:
+      pattern: fn $FUNC($X)
+      where:
+        - focus:
+            - $FUNC
+            - $X
