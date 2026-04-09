@@ -82,6 +82,7 @@ fn compile_yaml_succeeds_for_project_depends_on_search_rule() {
     let plans = result.expect("should compile successfully");
     let plan = plans.first().expect("expected a single plan");
     assert_eq!(plan.rule_id(), "demo.depends");
+    assert_eq!(plan.language(), Language::Python);
 }
 
 fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str) {
@@ -161,7 +162,7 @@ fn execute_returns_not_implemented() {
 }
 
 #[test]
-fn compile_yaml_returns_not_implemented_for_unsupported_mode() {
+fn compile_yaml_returns_unsupported_mode_error() {
     let engine = default_engine();
     // Taint mode rules require taint-specific fields; using a valid taint rule
     // that will parse successfully but fail at normalization with unsupported mode
