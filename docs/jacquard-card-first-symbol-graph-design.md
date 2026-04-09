@@ -1117,54 +1117,47 @@ weave.[^11]
 ## Footnotes
 
 [^1]: SDL systems describe slices connected by `call`, `import`, and `config`
-edges, bounded by budgets, and refreshed via symbol-level deltas. See [6].
+edges, bounded by budgets, and refreshed via symbol-level deltas. See
+<https://github.com/GlitterKill/sdl-mcp>.
 
 [^2]: Weaver’s design explicitly frames “Semantic Fusion” as the combination
 of Tree-sitter, LSP, and a graph module, exposed as composable JSONL commands.
-See [1].
+See [weaver-design.md](weaver-design.md).
 
 [^3]: Weaver already contains an LSP call-hierarchy-based call graph provider
 with depth-limited exploration, suitable as a high-confidence `call` edge
-source. See [5].
+source. See
+[`../crates/weaver-graph/src/provider.rs`](../crates/weaver-graph/src/provider.rs).
 
 [^4]: `weaverd`’s routing layer is responsible for dispatching `observe` and
-`act` operations over the JSONL protocol. See [2].
+`act` operations over the JSONL protocol. See
+[`../crates/weaverd/src/dispatch/router.rs`](../crates/weaverd/src/dispatch/router.rs).
 
 [^5]: Backend lifecycle and orchestration is implemented in `weaverd`’s
-backend registry. See [3].
+backend registry. See
+[`../crates/weaverd/src/backends.rs`](../crates/weaverd/src/backends.rs).
 
 [^6]: `SemanticBackendProvider` defines the LSP-backed semantic backend
-startup path and supported language list. See [4].
+startup path and supported language list. See
+[`../crates/weaverd/src/semantic_provider/mod.rs`](../crates/weaverd/src/semantic_provider/mod.rs).
 
 [^7]: weave documents a region-first extraction model that separates entity
-and interstitial spans. See [9].
+and interstitial spans. See <https://ataraxy-labs.github.io/weave/docs.html>.
 
 [^8]: weave’s changelog highlights attachment bundling and performance wins
-from parser reuse and reduced cloning. See [10].
+from parser reuse and reduced cloning. See
+<https://ataraxy-labs.github.io/weave/changelog.html>.
 
 [^9]: Sem documents a staged matching approach combining exact, structural,
-and fuzzy similarity phases. See [11].
+and fuzzy similarity phases. See <https://github.com/Ataraxy-Labs/sem>.
 
 [^10]: The JSONL request/response envelope types live alongside request
-parsing and validation logic. See [7].
+parsing and validation logic. See
+[`../crates/weaverd/src/dispatch/request.rs`](../crates/weaverd/src/dispatch/request.rs).
 
 [^11]: weave’s public documentation emphasizes benchmark-driven regression
-testing for entity-level tooling. See [12].
+testing for entity-level tooling. See <https://ataraxy-labs.github.io/weave/>.
 
 [^12]: URI parsing and path conversion utilities are shared by graph and
-history components and must handle non-UTF-8 inputs gracefully. See [8].
-
-## References
-
-[1]: weaver-design.md
-[2]: ../crates/weaverd/src/dispatch/router.rs
-[3]: ../crates/weaverd/src/backends.rs
-[4]: ../crates/weaverd/src/semantic_provider/mod.rs
-[5]: ../crates/weaver-graph/src/provider.rs
-[6]: <https://github.com/GlitterKill/sdl-mcp>
-[7]: ../crates/weaverd/src/dispatch/request.rs
-[8]: ../crates/weaver-graph/src/uri.rs
-[9]: <https://ataraxy-labs.github.io/weave/docs.html>
-[10]: <https://ataraxy-labs.github.io/weave/changelog.html>
-[11]: <https://github.com/Ataraxy-Labs/sem>
-[12]: <https://ataraxy-labs.github.io/weave/>
+history components and must handle non-UTF-8 inputs gracefully. See
+[`../crates/weaver-graph/src/uri.rs`](../crates/weaver-graph/src/uri.rs).
