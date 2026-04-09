@@ -15,18 +15,13 @@ fn fixtures_dir() -> PathBuf {
 
 /// Parses and normalizes a rule file from the fixtures directory.
 /// Returns `Err` for parsing/normalization errors so tests can assert on diagnostics.
+#[expect(clippy::panic_in_result_fn, reason = "fixture I/O errors are infrastructure failures, not test failures")]
 fn normalize_fixture(
     filename: &str,
 ) -> Result<Vec<crate::normalize::NormalizedSearchRule>, DiagnosticReport> {
     let path = fixtures_dir().join(filename);
-    let yaml = fs::read_to_string(&path).map_err(|e| {
-        DiagnosticReport::single_error(
-            sempai_core::DiagnosticCode::ESempaiSchemaInvalid,
-            format!("failed to read fixture {filename}: {e}"),
-            None,
-            vec![],
-        )
-    })?;
+    let yaml = fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("failed to read fixture {filename}: {e}"));
     let uri = path.to_str().map(String::from);
     let file = parse_rule_file(&yaml, uri.as_deref())?;
     normalize_rule_file(&file)

@@ -4,7 +4,7 @@
 //! `WhereClause` variants, including focus, metavariable patterns, and
 //! metavariable regex constraints.
 
-use sempai_core::{DiagnosticCode, DiagnosticReport, WhereClause};
+use sempai_core::{DecoratedFormula, DiagnosticCode, DiagnosticReport, WhereClause};
 use sempai_yaml::MatchFormula;
 
 /// Pattern-formula keys that may appear inside a `metavariable` where clause.
@@ -355,6 +355,3 @@ pub(crate) fn parse_nested_match_formula(
 pub(crate) fn strip_dollar_prefix(mv: &str) -> String {
     mv.strip_prefix('$').unwrap_or(mv).to_owned()
 }
-
-// Import needed for the function signature
-use sempai_core::DecoratedFormula;

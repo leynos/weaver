@@ -58,7 +58,7 @@ existing approaches to articulate its unique strategic value.
 
 The core vision of `Weaver` is rooted in the enduring principles of the UNIX
 philosophy: build simple, single-purpose tools that interoperate
-effectively.^1^ In an era of increasingly complex and integrated development
+effectively.[^1] In an era of increasingly complex and integrated development
 environments,
 
 `Weaver` champions a return to this model of composability. Its central thesis
@@ -74,7 +74,7 @@ structured JSON objects. This decision ensures immediate and universal
 interoperability with a vast ecosystem of existing tools. An AI agent, or a
 human user, can pipe the output of a `weaver` command directly into powerful
 utilities like `jq` for filtering and transformation, `find` for file system
-operations, and `xargs` for batch processing.^3^ This creates a powerful,
+operations, and `xargs` for batch processing.[^2] This creates a powerful,
 flexible, and extensible environment for scripting complex software engineering
 tasks.
 
@@ -109,13 +109,13 @@ environment-centric model.
 
 Serena is architected as a sophisticated MCP server, designed to integrate
 tightly with MCP-compatible clients such as IDEs, local GUIs, and dedicated
-command-line interfaces.^5^ It functions as a stateful intermediary, managing
+command-line interfaces.[^3] It functions as a stateful intermediary, managing
 project contexts, onboarding processes, and even a "memory" system to enhance
-an LLM's understanding over a session.^5^ The primary interaction model is
+an LLM's understanding over a session.[^4] The primary interaction model is
 conversational or tool-calling, mediated by the MCP specification and its
-corresponding SDKs.^6^ This makes Serena a first-class citizen within the
+corresponding SDKs.[^5] This makes Serena a first-class citizen within the
 burgeoning MCP ecosystem, offering a rich, out-of-the-box experience for
-supported clients.^8^
+supported clients.[^6]
 
 `Weaver`, in contrast, is architected as a suite of command-line tools that
 expose semantic operations directly to the shell environment. Its client-daemon
@@ -129,7 +129,7 @@ each tool's ecosystem and its capacity for future evolution. Serena's ecosystem
 is defined by the set of clients that explicitly implement the Model Context
 Protocol. Its evolution is intertwined with the evolution of the MCP standard
 itself. It operates within what can be considered a structured ecosystem of
-tools that interoperate through a shared, high-level protocol.^2^
+tools that interoperate through a shared, high-level protocol.[^7]
 
 Weaver's ecosystem, by contrast, is the entire universe of past, present, and
 future command-line utilities that can process structured text. Its potential
@@ -371,7 +371,7 @@ echo '{"command": "observe", "subcommand": "get-definition"}' | weaverd
 
 This strict adherence to the standard streams protocol preserves the tool's
 composability and ensures it remains a well-behaved citizen of the shell
-environment.^1^
+environment.[^1]
 
 #### 2.1.1. JSONL command envelope and capability probe
 
@@ -1204,7 +1204,7 @@ operation.
 ### 3.1. The Semantic Foundation: Harnessing and Hardening the Language Server Protocol
 
 The Language Server Protocol (LSP) is the de facto industry standard for
-decoupling language-specific intelligence from code editors and IDEs.^9^ By
+decoupling language-specific intelligence from code editors and IDEs.[^8] By
 leveraging LSP,
 
 `Weaver` gains access to rich semantic analysis for a vast number of languages
@@ -1218,14 +1218,14 @@ robust hardening layer around them.
 The primary value of LSP is its standardized set of JSON-RPC methods for common
 developer tasks, such as `textDocument/definition` for "go to definition,"
 `textDocument/references` for finding all references, and
-`textDocument/publishDiagnostics` for reporting errors and warnings.^10^ This
+`textDocument/publishDiagnostics` for reporting errors and warnings.[^9] This
 provides the semantic bedrock for Weaver's
 
 `observe` and `verify` commands.
 
 However, the protocol's practical application is fraught with challenges. The
 specification is vast, and server implementations vary widely in quality and
-completeness.^19^ A server's self-reported
+completeness.[^10] A server's self-reported
 
 `ServerCapabilities` during the `initialize` handshake cannot always be
 trusted. Some servers may claim to support a feature like `workspace/rename`
@@ -1238,7 +1238,7 @@ This ensures that `Weaver` can work around known bugs and maintain stable
 behavior even when interacting with non-compliant servers.
 
 More problematic are the fundamental design flaws in the protocol itself,
-particularly concerning causality and state synchronization.^19^ LSP operates
+particularly concerning causality and state synchronization.[^10] LSP operates
 asynchronously. A client (like
 
 `Weaver`) can send a `textDocument/didChange` notification to inform the server
@@ -1269,7 +1269,7 @@ The `weaver-syntax` crate provides the second pillar of the intelligence
 engine, offering a fast, robust, and precise understanding of the code's
 structure. It is built upon Tree-sitter, a parser generator and incremental
 parsing library designed to be general enough for any language, fast enough for
-real-time use, and robust enough to handle syntax errors gracefully.^11^ These
+real-time use, and robust enough to handle syntax errors gracefully.[^11] These
 properties make it the ideal foundation for the syntactic layer, which serves
 several critical functions within the
 
@@ -1281,14 +1281,14 @@ Tree-sitter-based command-line tools like `ast-grep` and `srgn`. The
 the intuitive pattern language of `ast-grep`. Instead of complex regular
 expressions, users and agents can provide code-like patterns with metavariables
 (e.g., `console.log($ARG)`) to find and capture specific abstract syntax tree
-(AST) nodes.^13^ This approach is more readable, less error-prone, and far more
+(AST) nodes.[^12] This approach is more readable, less error-prone, and far more
 powerful than text-based searching, as it understands concepts like scope,
 nesting, and language grammar.
 
 Similarly, the `act apply-rewrite` command will draw inspiration from the
 rewriting capabilities of these tools. `srgn`, for example, demonstrates the
 power of combining Tree-sitter queries for precise scoping with a set of
-actions like `delete` or `replace`.^21^ Weaver will adopt this model, allowing
+actions like `delete` or `replace`.[^13] Weaver will adopt this model, allowing
 an agent to perform large-scale, structurally-aware refactoring. For example,
 an agent could convert all instances of a legacy function call to a new format
 across an entire codebase with a single, precise command.
@@ -1298,7 +1298,7 @@ The key responsibilities of the `weaver-syntax` crate are:
 1. **High-Precision Search and Analysis:** Powering the `observe grep` command
    for structural queries and providing the raw data for advanced analysis,
    such as identifying all function definitions or generating a preliminary
-   call graph based on call expressions.^12^
+   call graph based on call expressions.[^14]
 
 2. **Syntactic Guardrails:** Serving as the "Syntactic Lock" in the
    Double-Lock safety harness. Before any change is committed, this layer
@@ -1330,7 +1330,7 @@ Static analysis struggles with dynamic dispatch, function pointers, and
 higher-order functions, often leading to an overapproximation of possible calls
 (including many that are infeasible in practice). Dynamic analysis, conversely,
 produces an exact graph for a specific execution but provides an
-underapproximation of all possible behaviors.^15^
+underapproximation of all possible behaviors.[^15]
 
 Given this complexity, `Weaver` will not attempt to build a single, monolithic
 call graph generator. Instead, the `weaver-graph` crate will adopt a pragmatic,
@@ -1347,8 +1347,8 @@ solution.
 | Phase                   | Provider                   | Underlying Technology                                                | Pros                                                                                                            | Cons                                                                                                                  |
 | ----------------------- | -------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | **1 (MVP)**             | LSP Provider               | LSP `textDocument/callHierarchy` request                             | Fast, deeply integrated with the existing semantic layer, requires no additional tool setup.                    | Inconsistent support across language servers, may be inaccurate or incomplete, limited to direct calls.               |
-| **2 (Specialist)**      | Static Analysis Plugin     | Language-specific static analysis tools (e.g., PyCG for Python ^25^) | Higher accuracy and recall, better handling of language-specific dynamic features, more comprehensive analysis. | Requires installing and configuring external plugin tools, slower than LSP, implementation is language-specific.      |
-| **3 (Execution-Aware)** | Dynamic Analysis Ingestion | Output from profilers (e.g., `gprof` ^27^, `callgrind` ^28^)         | Provides "ground truth" for a given execution, accurately captures dynamic dispatch and runtime behaviour.      | Incomplete coverage (only shows paths that were executed), requires the ability to run the code (e.g., a test suite). |
+| **2 (Specialist)**      | Static Analysis Plugin     | Language-specific static analysis tools (e.g., PyCG for Python [^16]) | Higher accuracy and recall, better handling of language-specific dynamic features, more comprehensive analysis. | Requires installing and configuring external plugin tools, slower than LSP, implementation is language-specific.      |
+| **3 (Execution-Aware)** | Dynamic Analysis Ingestion | Output from profilers (e.g., `gprof` [^17], `callgrind` [^18])         | Provides "ground truth" for a given execution, accurately captures dynamic dispatch and runtime behaviour.      | Incomplete coverage (only shows paths that were executed), requires the ability to run the code (e.g., a test suite). |
 
 The `weaver-graph` engine will be responsible for merging the graphs produced
 by these providers. When an agent requests a call graph, it can specify which
@@ -1404,7 +1404,7 @@ for this model:
 
 - **`jedi` as a Sensor Plugin:** `jedi` is a powerful static analysis library
   with a primary focus on autocompletion, goto definition, and finding
-  references.^29^ While there is some overlap with LSP functionality,
+  references.[^19] While there is some overlap with LSP functionality,
 
   `jedi` can often provide supplementary or alternative analysis. It can be
   integrated as a sensor plugin, offering another data stream to the Semantic
@@ -1413,9 +1413,9 @@ for this model:
 
 - **`rope` as an Actuator Plugin:** `rope` is a dedicated and mature Python
   refactoring library, recognized as being more powerful and comprehensive for
-  refactoring tasks than `jedi`.^31^ It supports a wide range of complex
+  refactoring tasks than `jedi`.[^20] It supports a wide range of complex
   operations, such as "Extract Method," "Change Signature," and "Move
-  Method".^33^
+  Method".[^21]
 
   `rope` will be integrated as a primary actuator plugin for Python, callable
   via a command like
@@ -1425,7 +1425,7 @@ for this model:
 
 This model extends to other domains as well. Tools like `srgn` and `ast-grep`,
 which excel at high-speed, structural search and rewrite operations, can be
-integrated as "precision editing" actuators.^13^ This gives agents a spectrum
+integrated as "precision editing" actuators.[^12] This gives agents a spectrum
 of tools to choose from, ranging from fast, syntactic transformations to
 slower, fully semantic-aware refactorings, all orchestrated and secured by the
 
@@ -2050,7 +2050,7 @@ On Linux, the foundational technologies for sandboxing are well-established.
 `seccomp-bpf` allows for the creation of a syscall whitelist, preventing a
 process from making any system calls not explicitly permitted (e.g., blocking
 `socket` or `fork`). Linux namespaces provide isolation for filesystem mounts,
-network stacks, process IDs, and other system resources.^35^ These primitives
+network stacks, process IDs, and other system resources.[^22] These primitives
 provide a strong basis for process confinement.
 
 A survey of existing Rust sandboxing libraries reveals several potential
@@ -2062,14 +2062,14 @@ capabilities.
 
 | Crate      | Supported Platforms   | Mechanism                               | Key Features                                                         | Maturity/Status                                                                         | Recommendation for Weaver                                                                    |
 | ---------- | --------------------- | --------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `gaol`     | Linux, Windows, macOS | Namespaces, Job Objects, `sandbox_init` | Whitelist profiles, multiprocess model, designed for Servo.^36^      | Experimental and explicitly "not battle-tested" in the documentation.^36^               | Helpful reference for cross-platform techniques but too immature for production use.         |
-| `birdcage` | Linux, macOS          | Namespaces, `sandbox_init`              | Focused on filesystem and network restrictions with native APIs.^35^ | Actively used in production by the Phylum CLI, offering a mature and focused scope.^35^ | **Recommended starting point.** Aligns with the primary filesystem and network threat model. |
-| `bastille` | Linux                 | Namespaces, `pivot_root`                | Targets compatibility with the `std::process::Command` API.^37^      | Work in progress and limited to Linux.                                                  | Monitor for future development, but currently unsuitable for cross-platform goals.           |
+| `gaol`     | Linux, Windows, macOS | Namespaces, Job Objects, `sandbox_init` | Whitelist profiles, multiprocess model, designed for Servo.[^23]      | Experimental and explicitly "not battle-tested" in the documentation.[^23]               | Helpful reference for cross-platform techniques but too immature for production use.         |
+| `birdcage` | Linux, macOS          | Namespaces, `sandbox_init`              | Focused on filesystem and network restrictions with native APIs.[^22] | Actively used in production by the Phylum CLI, offering a mature and focused scope.[^22] | **Recommended starting point.** Aligns with the primary filesystem and network threat model. |
+| `bastille` | Linux                 | Namespaces, `pivot_root`                | Targets compatibility with the `std::process::Command` API.[^24]      | Work in progress and limited to Linux.                                                  | Monitor for future development, but currently unsuitable for cross-platform goals.           |
 
 While libraries like `birdcage` provide the necessary primitives, a truly
 secure architecture requires more than just process isolation. The
 documentation for `gaol` highlights a critical design pattern: the **broker
-process**.^36^ In this model, the sandboxed child process has almost no
+process**.[^23] In this model, the sandboxed child process has almost no
 privileges itself. When it needs to perform a privileged operation (like
 reading a specific file), it does not do so directly. Instead, it sends an
 Inter-Process Communication (IPC) message to its trusted parent process (the
@@ -2238,7 +2238,7 @@ An AI agent that assumes uniform capabilities will be brittle and ineffective.
 
 On startup, `weaverd` performs a capability-discovery process. It queries each
 configured LSP server for its `ServerCapabilities` and combines this
-information with the user-defined override matrix from `weaver-config`.^10^
+information with the user-defined override matrix from `weaver-config`.[^9]
 This fused data is stored in a Capability Registry. Before planning a complex
 sequence of actions, an agent can query this registry via
 
@@ -2283,14 +2283,14 @@ Retrieval-Augmented Generation (RAG) to codebase analysis.
 
 RAG is a technique that enhances the output of LLMs by grounding them in
 relevant, externally retrieved information, which reduces hallucinations and
-improves contextual accuracy.^38^ Research into RAG for code generation has
+improves contextual accuracy.[^25] Research into RAG for code generation has
 shown that retrieving relevant in-context code (like class definitions and API
 documentation) is highly effective, whereas retrieving syntactically "similar"
-but contextually irrelevant code can actually degrade performance.^40^
+but contextually irrelevant code can actually degrade performance.[^26]
 
 The `onboard-project` command implements a form of "Meta-RAG," a concept where
 the retrieval process focuses on metadata and summaries *about* the code,
-rather than the raw code itself.^41^ This creates a dense, token-efficient
+rather than the raw code itself.[^27] This creates a dense, token-efficient
 summary of the project that is ideal for an LLM's initial planning phase. The
 command will orchestrate a multi-step process to generate this summary, which
 will be saved as a
@@ -2427,7 +2427,7 @@ a logical, incremental progression.
   refactoring. While it has become the industry standard, its specification is
   large, implementations are inconsistent, and it has known design flaws
   related to state synchronization and causality, necessitating a defensive
-  implementation strategy.^9^
+  implementation strategy.[^8]
 
 - **Tree-sitter:** A parser generator tool and incremental parsing library.
   Its key advantages are speed, robustness in the face of syntax errors, and
@@ -2435,14 +2435,14 @@ a logical, incremental progression.
   detailed representation than an abstract syntax tree, making it ideal for
   tools that perform structural search, analysis, and transformation. It is the
   core technology behind tools like `ast-grep` and is used for syntax
-  highlighting in many modern editors.^11^
+  highlighting in many modern editors.[^11]
 
 - **Structural Search & Rewrite Tools:** Tools like `ast-grep` and `srgn`
   represent the state-of-the-art in command-line code manipulation. They
   leverage Tree-sitter to allow users to specify patterns and transformations
   based on code structure rather than raw text. This provides a level of
   precision and safety that is impossible to achieve with regular
-  expressions.^13^
+  expressions.[^12]
 
   `Weaver`'s syntactic layer is directly inspired by their design.
 
@@ -2452,7 +2452,7 @@ a logical, incremental progression.
   filesystems, network, and process IDs) and seccomp-bpf (to whitelist allowed
   system calls). The "broker process" is a common architectural pattern where a
   sandboxed, low-privilege process communicates with a trusted, high-privilege
-  parent to request specific, controlled operations.^36^
+  parent to request specific, controlled operations.[^23]
 
 - **Call Graph Generation:** The process of creating a directed graph
   representing the calling relationships between subroutines in a program.
@@ -2461,14 +2461,14 @@ a logical, incremental progression.
   call graphs are generated by observing a program's execution (e.g., with a
   profiler) and are precise for that run but provide incomplete coverage.
   Generating a perfectly accurate static call graph is an undecidable
-  problem.^15^
+  problem.[^15]
 
 - **Retrieval-Augmented Generation (RAG):** An AI technique that enhances the
   output of a large language model by providing it with relevant information
   retrieved from an external knowledge source. In the context of code, this
   involves retrieving project-specific documentation, API definitions, or
   related code snippets to ground the model's responses, improving accuracy and
-  contextual relevance.^38^
+  contextual relevance.[^25]
 
 ### B. References
 
@@ -2562,4 +2562,27 @@ exercises happy and unhappy paths across all supported languages.
 [^1]: LSP provides deep semantic understanding through language servers.
 [^2]: Tree-sitter provides fast, fault-tolerant parsing.
 [^3]: Tree-sitter enables structural search and code slicing.
-[^4]: Call-graph analysis fuses data from multiple sources for relational insight.
+[^4]: Tree-sitter powers syntax highlighting in modern editors.
+[^5]: Call-graph analysis fuses data from multiple sources for relational insight.
+[^6]: MCP enables ecosystem interoperability for agents.
+[^7]: Semantic parsing and code slicing using tree-sitter.
+[^8]: MCP compatible clients include IDEs and local GUIs.
+[^9]: Capability registry from LSP server and user overrides.
+[^10]: LSP specification completeness varies by implementation.
+[^11]: Tree-sitter properties: general, fast, robust.
+[^12]: ast-grep uses Tree-sitter for structural search.
+[^13]: Syntactic transformation and structural refactoring.
+[^14]: PyCG provides practical call graph generation for Python.
+[^15]: Dynamic analysis provides ground truth for execution paths.
+[^16]: Static analysis plugins provide higher accuracy for specific languages.
+[^17]: gprof is a profiler for dynamic analysis.
+[^18]: callgrind is a profiler for dynamic analysis.
+[^19]: jedi is a Python refactoring library.
+[^20]: rope provides comprehensive Python refactoring.
+[^21]: Refactoring operations: Extract Method, Change Signature, Move Method.
+[^22]: Sandboxing libraries: gaol, birdcage, bastille.
+[^23]: gaol: broker process pattern for sandboxing.
+[^24]: bastille targets compatibility with std::process::Command.
+[^25]: RAG improves contextual accuracy for code generation.
+[^26]: Contextually irrelevant code can degrade performance.
+[^27]: Metadata and summaries provide token-efficient code representation.

@@ -425,12 +425,12 @@ commands.
 
 Command Query Responsibility Segregation is an architectural pattern that
 segregates operations that modify state (commands) from operations that read
-state (queries).[^14] Commands are task-based and should represent specific
+state (queries).[^19] Commands are task-based and should represent specific
 business intentions (e.g.,
 
-`BookHotelRoomCommand` rather than `SetReservationStatusCommand`).[^14] Queries
+`BookHotelRoomCommand` rather than `SetReservationStatusCommand`).[^20] Queries
 never alter data and return Data Transfer Objects optimized for display
-needs.[^14]
+needs.[^23]
 
 While Command Query Responsibility Segregation operates at a higher
 architectural level than a single Bumpy Road method, the principles are
@@ -442,7 +442,7 @@ distinct command-like operations, are tangled together.
   distinct commands and queries from the start. This naturally leads to
   smaller, more focused methods or handlers for each command and query,
   reducing the likelihood of a single method accumulating many "bumps" of
-  unrelated logic.[^14] For instance, a method that both fetches data for a
+  unrelated logic.[^19] For instance, a method that both fetches data for a
   complex report, and then allows modifications based on that report, could
   become very complex. Command Query Responsibility Segregation would split
   this into a query to fetch the data and separate commands for any
@@ -653,12 +653,11 @@ behaviour—common culprits for bugs and increased cognitive load in imperative
 code.[^26]
 
 Examples include using Structured Query Language for database queries—
-specifying the desired dataset rather than the retrieval algorithm—or
-employing functional programming constructs like `map`, `filter`, and `reduce`
-on collections instead of writing explicit loops.[^33] Refactoring imperative code
-to a declarative style can start small, perhaps by converting a loop that
-filters and transforms a list into a chain of `filter` and `map`
-operations.[^26] The broader adoption of declarative approaches in areas like
+specifying the desired dataset rather than the retrieval algorithm—or employing
+functional programming constructs like `map`, `filter`, and `reduce` on
+collections instead of writing explicit loops.[^33] Refactoring imperative code to
+a declarative style can start small, perhaps by converting a loop that filters
+and transforms a list into a chain of `filter` and `map` operations.[^26] The broader adoption of declarative approaches in areas like
 UI development (e.g., React) and data querying signifies an industry trend
 towards managing complexity by raising abstraction levels. However, the
 effectiveness of declarative programming relies on well-designed underlying
