@@ -65,20 +65,37 @@ impl fmt::Display for SliceParseError {
 
 impl std::error::Error for SliceParseError {}
 
+/// Maps a string token to an enum variant using a static lookup table.
+///
+/// `variants` is an ordered slice of `(token, variant)` pairs.
+/// Returns `Err(SliceParseError)` if no token matches `s`.
+fn parse_variant<T: Copy>(
+    s: &str,
+    variants: &[(&str, T)],
+    kind: &'static str,
+    expected: &'static str,
+) -> Result<T, SliceParseError> {
+    variants
+        .iter()
+        .find(|(name, _)| *name == s)
+        .map(|(_, v)| *v)
+        .ok_or_else(|| SliceParseError {
+            kind,
+            expected,
+            name: String::from(s),
+        })
+}
+
 impl FromStr for SliceDirection {
     type Err = SliceParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "in" => Ok(Self::In),
-            "out" => Ok(Self::Out),
-            "both" => Ok(Self::Both),
-            _ => Err(SliceParseError {
-                kind: "direction",
-                expected: "in, out, both",
-                name: String::from(s),
-            }),
-        }
+        parse_variant(
+            s,
+            &[("in", Self::In), ("out", Self::Out), ("both", Self::Both)],
+            "direction",
+            "in, out, both",
+        )
     }
 }
 
@@ -102,16 +119,16 @@ impl FromStr for SliceEdgeType {
     type Err = SliceParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "call" => Ok(Self::Call),
-            "import" => Ok(Self::Import),
-            "config" => Ok(Self::Config),
-            _ => Err(SliceParseError {
-                kind: "edge type",
-                expected: "call, import, config",
-                name: String::from(s),
-            }),
-        }
+        parse_variant(
+            s,
+            &[
+                ("call", Self::Call),
+                ("import", Self::Import),
+                ("config", Self::Config),
+            ],
+            "edge type",
+            "call, import, config",
+        )
     }
 }
 
