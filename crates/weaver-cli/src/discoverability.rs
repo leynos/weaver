@@ -286,7 +286,12 @@ pub(crate) fn should_emit_domain_guidance(cli: &crate::Cli) -> bool {
 mod tests {
     //! Unit tests for unknown-domain suggestion helpers.
 
-    use super::{KnownDomain, bounded_levenshtein, suggestion_for_unknown_domain};
+    use super::{
+        KnownDomain, bounded_levenshtein, suggestion_for_unknown_domain,
+        write_missing_operation_guidance, write_unknown_domain_guidance,
+    };
+    use crate::localizer::WEAVER_EN_US;
+    use ortho_config::FluentLocalizer;
     use rstest::rstest;
 
     #[rstest]
@@ -311,6 +316,51 @@ mod tests {
         #[case] expected: Option<KnownDomain>,
     ) {
         assert_eq!(suggestion_for_unknown_domain(input), expected);
+    }
+
+    fn fluent_localizer() -> FluentLocalizer {
+        FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])
+            .expect("embedded Fluent catalogue must parse")
+    }
+
+    fn assert_single_error_prefix(output: &str) {
+        assert!(
+            output.contains("error: "),
+            "output should contain an error prefix"
+        );
+        assert!(
+            !output.contains("error: error:"),
+            "output should not contain a duplicated error prefix: {output}"
+        );
+    }
+
+    #[test]
+    fn fluent_missing_operation_guidance_has_single_error_prefix() {
+        let localizer = fluent_localizer();
+        let mut output = Vec::new();
+
+        let emitted =
+            write_missing_operation_guidance(&mut output, &localizer, KnownDomain::Observe)
+                .expect("guidance write must succeed");
+
+        assert!(emitted, "known domain should emit guidance");
+        let output = String::from_utf8(output).expect("guidance must be valid UTF-8");
+        assert_single_error_prefix(&output);
+        assert!(output.contains("error: operation required for domain 'observe'"));
+    }
+
+    #[test]
+    fn fluent_unknown_domain_guidance_has_single_error_prefix() {
+        let localizer = fluent_localizer();
+        let mut output = Vec::new();
+
+        let emitted = write_unknown_domain_guidance(&mut output, &localizer, "unknown-domain")
+            .expect("guidance write must succeed");
+
+        assert!(emitted, "unknown domain should emit guidance");
+        let output = String::from_utf8(output).expect("guidance must be valid UTF-8");
+        assert_single_error_prefix(&output);
+        assert!(output.contains("error: unknown domain 'unknown-domain'"));
     }
 }
 
