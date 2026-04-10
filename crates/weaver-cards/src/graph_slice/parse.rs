@@ -81,65 +81,111 @@ impl RequestBuilder {
     where
         I: Iterator<Item = &'a String>,
     {
+        if self.try_apply_traversal_flag(flag, iter)?
+            || self.try_apply_budget_flag(flag, iter)?
+            || self.try_apply_detail_flag(flag, iter)?
+        {
+            return Ok(());
+        }
+        skip_unknown_flag_value(iter);
+        Ok(())
+    }
+
+    fn try_apply_traversal_flag<'a, I>(
+        &mut self,
+        flag: &str,
+        iter: &mut I,
+    ) -> Result<bool, GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
         match flag {
             "--uri" => {
                 let raw = require_arg_value(iter, Flag::Uri)?;
                 self.uri = Some(String::from(raw.value));
+                Ok(true)
             }
             "--position" => {
                 let raw = require_arg_value(iter, Flag::Position)?;
                 self.position = Some(parse_position(raw)?);
+                Ok(true)
             }
             "--depth" => {
                 let raw = require_arg_value(iter, Flag::Depth)?;
                 self.depth = Some(parse_u32(raw)?);
+                Ok(true)
             }
             "--direction" => {
                 let raw = require_arg_value(iter, Flag::Direction)?;
                 self.direction = Some(parse_direction(raw)?);
+                Ok(true)
             }
             "--edge-types" => {
                 let raw = require_arg_value(iter, Flag::EdgeTypes)?;
                 self.edge_types = Some(parse_edge_types(raw)?);
+                Ok(true)
             }
             "--min-confidence" => {
                 let raw = require_arg_value(iter, Flag::MinConfidence)?;
                 self.min_confidence = Some(parse_confidence(raw)?);
+                Ok(true)
             }
+            _ => Ok(false),
+        }
+    }
+
+    fn try_apply_budget_flag<'a, I>(
+        &mut self,
+        flag: &str,
+        iter: &mut I,
+    ) -> Result<bool, GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        match flag {
             "--max-cards" => {
                 let raw = require_arg_value(iter, Flag::MaxCards)?;
                 let n = parse_u32(raw)?;
-                self.budget = SliceBudget::new(
-                    n,
-                    self.budget.max_edges(),
-                    self.budget.max_estimated_tokens(),
-                );
+                self.budget = self.budget.with_max_cards(n);
+                Ok(true)
             }
             "--max-edges" => {
                 let raw = require_arg_value(iter, Flag::MaxEdges)?;
                 let n = parse_u32(raw)?;
-                self.budget = SliceBudget::new(
-                    self.budget.max_cards(),
-                    n,
-                    self.budget.max_estimated_tokens(),
-                );
+                self.budget = self.budget.with_max_edges(n);
+                Ok(true)
             }
             "--max-estimated-tokens" => {
                 let raw = require_arg_value(iter, Flag::MaxEstimatedTokens)?;
                 let n = parse_u32(raw)?;
-                self.budget = SliceBudget::new(self.budget.max_cards(), self.budget.max_edges(), n);
+                self.budget = self.budget.with_max_estimated_tokens(n);
+                Ok(true)
             }
+            _ => Ok(false),
+        }
+    }
+
+    fn try_apply_detail_flag<'a, I>(
+        &mut self,
+        flag: &str,
+        iter: &mut I,
+    ) -> Result<bool, GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        match flag {
             "--entry-detail" => {
                 let raw = require_arg_value(iter, Flag::EntryDetail)?;
                 self.entry_detail = Some(parse_detail(raw)?);
+                Ok(true)
             }
             "--node-detail" => {
                 let raw = require_arg_value(iter, Flag::NodeDetail)?;
                 self.node_detail = Some(parse_detail(raw)?);
+                Ok(true)
             }
-            _ => skip_unknown_flag_value(iter),
+            _ => Ok(false),
         }
-        Ok(())
     }
 
     /// Validates required fields and constructs the request.

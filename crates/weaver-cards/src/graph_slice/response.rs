@@ -23,7 +23,7 @@ use super::request::{SliceDirection, SliceEdgeType};
 /// use weaver_cards::graph_slice::ResolutionScope;
 ///
 /// let scope = ResolutionScope::FullSymbolTable;
-/// let json = serde_json::to_string(&scope).unwrap();
+/// let json = serde_json::to_string(&scope).expect("serialization should succeed");
 /// assert_eq!(json, "\"full_symbol_table\"");
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

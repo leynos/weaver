@@ -14,6 +14,17 @@ use crate::dispatch::request::CommandRequest;
 use crate::dispatch::response::ResponseWriter;
 use crate::dispatch::router::DispatchResult;
 
+/// Maps a graph-slice response to its exit status code.
+///
+/// Returns `0` for success, `1` for refusals.
+fn exit_status(response: &GraphSliceResponse) -> i32 {
+    match response {
+        GraphSliceResponse::Success { .. } => 0,
+        GraphSliceResponse::Refusal { .. } => 1,
+        _ => 1,
+    }
+}
+
 /// Handles the `observe graph-slice` command.
 ///
 /// Parses the request through [`GraphSliceRequest`] and serializes a
@@ -35,11 +46,7 @@ pub fn handle<W: Write>(
 
     let response = GraphSliceResponse::not_yet_implemented();
 
-    let status = match &response {
-        GraphSliceResponse::Success { .. } => 0,
-        GraphSliceResponse::Refusal { .. } => 1,
-        _ => 1,
-    };
+    let status = exit_status(&response);
     let json = serde_json::to_string(&response)?;
     writer.write_stdout(json)?;
 

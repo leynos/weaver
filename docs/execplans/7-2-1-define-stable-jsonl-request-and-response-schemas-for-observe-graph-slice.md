@@ -21,14 +21,15 @@ constraints, and any spillover that was excluded when the traversal truncated.
 
 Observable behaviour after implementation:
 
-1. `weaver observe graph-slice --uri <URI> --position <LINE:COL>` parses
-   into a typed request with explicit default values for `depth`, `direction`,
-   `edge_types`, `min_confidence`, `budget.max_cards`, `budget.max_edges`,
-   `budget.max_estimated_tokens`, `entry_detail`, and `node_detail`.
+1. `weaver observe graph-slice --uri <Uniform Resource Identifier (URI)>
+   --position <LINE:COL>` parses into a typed request with explicit default
+   values for `depth`, `direction`, `edge_types`, `min_confidence`,
+   `budget.max_cards`, `budget.max_edges`, `budget.max_estimated_tokens`,
+   `entry_detail`, and `node_detail`.
 2. Stable JSON snapshots lock at least one successful slice, one
    truncated slice with spillover metadata, and one structured refusal.
 3. Every serialized edge reports its resolution scope as exactly one of
-   `full_symbol_table`, `partial_symbol_table`, or `lsp`.
+   `full_symbol_table`, `partial_symbol_table`, or `lsp` (Language Server Protocol).
 4. End-to-end snapshots exercise a dedicated 20-case Rust graph-slice
    battery and a dedicated 20-case Python graph-slice battery through the real
    `weaver` binary using `assert_cmd` and `insta`, requesting semantic detail
@@ -57,9 +58,9 @@ This plan covers roadmap item 7.2.1 in
    than creating duplicate card or detail enums. The graph-slice schema should
    compose `SymbolCard` and `DetailLevel`, not fork them.
 4. Follow the existing repository pattern for stable observe contracts:
-   `weaver-cards` owns serde schema types, request parsing, snapshot tests, and
-   schema-level BDD coverage, while `weaverd` owns transport, dispatch, and
-   filesystem concerns.
+   `weaver-cards` owns serde schema types, request parsing, snapshot tests,
+   and schema-level behaviour-driven development (BDD) coverage, while
+   `weaverd` owns transport, dispatch, and filesystem concerns.
 5. `weaver-cards` already has the serde and testing infrastructure needed
    for this work. Keep `weaver-graph` focused on graph construction and
    provider logic unless a later milestone explicitly needs to expose new

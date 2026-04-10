@@ -84,4 +84,22 @@ impl SliceBudget {
     pub const fn max_estimated_tokens(&self) -> u32 {
         self.estimated_tokens
     }
+
+    /// Returns a new budget with the given maximum number of cards.
+    #[must_use]
+    pub const fn with_max_cards(self, max_cards: u32) -> Self {
+        Self::new(max_cards, self.edges, self.estimated_tokens)
+    }
+
+    /// Returns a new budget with the given maximum number of edges.
+    #[must_use]
+    pub const fn with_max_edges(self, max_edges: u32) -> Self {
+        Self::new(self.cards, max_edges, self.estimated_tokens)
+    }
+
+    /// Returns a new budget with the given maximum estimated token count.
+    #[must_use]
+    pub const fn with_max_estimated_tokens(self, max_tokens: u32) -> Self {
+        Self::new(self.cards, self.edges, max_tokens)
+    }
 }
