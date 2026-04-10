@@ -257,7 +257,10 @@ fn v2_where_metavariable_invalid_all_negative_fails_with_semantic_error() {
     let result = normalize_fixture("v2_where_metavariable_invalid_all_negative.yaml");
     let err = result.expect_err("should fail with MissingPositiveTermInAnd");
     let first = err.diagnostics().first().expect("should have diagnostic");
-    assert_eq!(first.code(), DiagnosticCode::ESempaiMissingPositiveTermInAnd);
+    assert_eq!(
+        first.code(),
+        DiagnosticCode::ESempaiMissingPositiveTermInAnd
+    );
 }
 
 #[test]

@@ -2559,8 +2559,6 @@ expectations for language detection, parse error formatting, and validation
 failure output. The combination of unit, behavioural, and end-to-end tests
 exercises happy and unhappy paths across all supported languages.
 
-
-
 [^1]: UNIX philosophy: composable single-purpose tools that interoperate effectively.
 [^2]: JSON Lines (JSONL) as the native protocol for interoperability with tools like jq, xargs, and find.
 [^3]: Serena Model Context Protocol (MCP) Server as a stateful intermediary for LLM integration.

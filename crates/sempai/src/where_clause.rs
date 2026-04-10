@@ -183,6 +183,10 @@ pub(crate) fn parse_metavariable_regex_clause(
 }
 
 /// Parses a `metavariable` where clause into pattern or regex variants.
+#[expect(
+    clippy::too_many_lines,
+    reason = "metavariable dispatch requires multiple branches with field validation"
+)]
 pub(crate) fn parse_metavariable_clause(
     value: &serde_json::Value,
     normalize_v2_formula: &mut dyn FnMut(
@@ -200,15 +204,14 @@ pub(crate) fn parse_metavariable_clause(
 
     let metavariable = extract_metavariable_name(mapping)?;
 
-    // Detect mixed metavariable constraints (e.g., pattern + type, regex + analyzer)
-    let has_pattern_or_regex = METAVARIABLE_PATTERN_KEYS
+    let has_pattern = METAVARIABLE_PATTERN_KEYS
         .iter()
-        .any(|&k| mapping.contains_key(k))
-        || mapping.contains_key("regex");
-    let has_type_constraint = mapping.contains_key("type") || mapping.contains_key("types");
+        .any(|&k| mapping.contains_key(k));
+    let has_regex = mapping.contains_key("regex");
+    let has_type = mapping.contains_key("type") || mapping.contains_key("types");
     let has_analyzer = mapping.contains_key("analyzer");
 
-    if has_pattern_or_regex && (has_type_constraint || has_analyzer) {
+    if (has_pattern || has_regex) && (has_type || has_analyzer) {
         return Err(DiagnosticReport::single_error(
             DiagnosticCode::ESempaiSchemaInvalid,
             "metavariable clause cannot mix pattern/regex with type/types or analyzer".to_owned(),
@@ -217,18 +220,15 @@ pub(crate) fn parse_metavariable_clause(
         ));
     }
 
-    // Determine which branch we'll take and validate fields
-    let (branch_type, allowed_keys): (&str, Vec<&str>) = if METAVARIABLE_PATTERN_KEYS
-        .iter()
-        .any(|&k| mapping.contains_key(k))
-    {
-        ("pattern", METAVARIABLE_PATTERN_KEYS.to_vec())
-    } else if mapping.contains_key("regex") {
-        ("regex", vec!["regex"])
-    } else if has_type_constraint {
-        ("type", vec!["type", "types"])
+    // Validate fields and determine branch
+    let (branch_type, allowed_keys): (&str, &[&str]) = if has_pattern {
+        ("pattern", METAVARIABLE_PATTERN_KEYS)
+    } else if has_regex {
+        ("regex", &["regex"])
+    } else if has_type {
+        ("type", &["type", "types"])
     } else if has_analyzer {
-        ("analyzer", vec!["analyzer"])
+        ("analyzer", &["analyzer"])
     } else {
         return Err(DiagnosticReport::single_error(
             DiagnosticCode::ESempaiSchemaInvalid,
@@ -238,13 +238,14 @@ pub(crate) fn parse_metavariable_clause(
         ));
     };
 
-    // Build allowed key set including metavariable identifier
-    let mut allowed_set: std::collections::HashSet<&str> = allowed_keys.iter().copied().collect();
-    allowed_set.insert("metavariable");
-
     // Check for unexpected keys
+    let allowed_set: std::collections::HashSet<&str> = allowed_keys.iter().copied().collect();
     let actual_keys: std::collections::HashSet<&str> = mapping.keys().map(String::as_str).collect();
-    let unexpected: Vec<&str> = actual_keys.difference(&allowed_set).copied().collect();
+    let unexpected: Vec<&str> = actual_keys
+        .difference(&allowed_set)
+        .filter(|&&k| k != "metavariable")
+        .copied()
+        .collect();
 
     if !unexpected.is_empty() {
         return Err(DiagnosticReport::single_error(
@@ -259,15 +260,12 @@ pub(crate) fn parse_metavariable_clause(
         ));
     }
 
-    // Now dispatch to the appropriate parser
-    if METAVARIABLE_PATTERN_KEYS
-        .iter()
-        .any(|&k| mapping.contains_key(k))
-    {
+    // Dispatch to appropriate parser
+    if has_pattern {
         parse_metavariable_pattern_clause(metavariable, mapping, normalize_v2_formula)
     } else if let Some(regex_value) = mapping.get("regex") {
         parse_metavariable_regex_clause(metavariable, regex_value)
-    } else if has_type_constraint {
+    } else if has_type {
         Err(DiagnosticReport::not_implemented(
             "metavariable type constraint (type/types)",
         ))
@@ -276,7 +274,6 @@ pub(crate) fn parse_metavariable_clause(
             "metavariable analysis constraint (analyzer)",
         ))
     } else {
-        // This should be unreachable due to the check above
         Err(DiagnosticReport::single_error(
             DiagnosticCode::ESempaiSchemaInvalid,
             "metavariable clause must have pattern, regex, type, types, or analyzer".to_owned(),
