@@ -36,9 +36,8 @@ fn normalize_fixture(
 fn parse_v2_fixture_to_decorated(filename: &str) -> DecoratedFormula {
     use crate::normalize::normalize_v2_formula;
 
+    let yaml = read_fixture(filename);
     let path = fixtures_dir().join(filename);
-    let yaml = fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("failed to read fixture {filename}: {e}"));
     let uri = path.to_str().map(String::from);
     let file = parse_rule_file(&yaml, uri.as_deref()).expect("should parse YAML");
 
@@ -54,14 +53,14 @@ fn parse_v2_fixture_to_decorated(filename: &str) -> DecoratedFormula {
     }
 }
 
-/// Normalises a v2 fixture, asserts the top-level formula is an `Atom`, and
+/// Normalizes a v2 fixture, asserts the top-level formula is an `Atom`, and
 /// returns the single `WhereClause` from the decorated formula.
 ///
-/// Panics if the fixture does not normalise to one rule, the formula is not
+/// Panics if the fixture does not normalize to one rule, the formula is not
 /// an `Atom`, or there is not exactly one where clause.
 fn get_single_where_clause(fixture: &str) -> WhereClause {
     let rules = normalize_fixture(fixture)
-        .unwrap_or_else(|e| panic!("fixture '{fixture}' failed to normalise: {e:?}"));
+        .unwrap_or_else(|e| panic!("fixture '{fixture}' failed to normalize: {e:?}"));
     assert_eq!(
         rules.len(),
         1,
@@ -241,6 +240,24 @@ fn v2_where_metavariable_pattern_is_parsed_correctly() {
         }
         _ => panic!("expected MetavariablePattern where clause, got {where_clause:?}"),
     }
+}
+
+#[test]
+fn v2_where_metavariable_invalid_not_in_or_fails_with_semantic_error() {
+    // Test that a metavariable where clause with `any` containing `not` is rejected
+    let result = normalize_fixture("v2_where_metavariable_invalid_not_in_or.yaml");
+    let err = result.expect_err("should fail with InvalidNotInOr");
+    let first = err.diagnostics().first().expect("should have diagnostic");
+    assert_eq!(first.code(), DiagnosticCode::ESempaiInvalidNotInOr);
+}
+
+#[test]
+fn v2_where_metavariable_invalid_all_negative_fails_with_semantic_error() {
+    // Test that a metavariable where clause with all-negative conjunction is rejected
+    let result = normalize_fixture("v2_where_metavariable_invalid_all_negative.yaml");
+    let err = result.expect_err("should fail with MissingPositiveTermInAnd");
+    let first = err.diagnostics().first().expect("should have diagnostic");
+    assert_eq!(first.code(), DiagnosticCode::ESempaiMissingPositiveTermInAnd);
 }
 
 #[test]

@@ -1,0 +1,14 @@
+rules:
+  - id: v2.where.metavariable.invalid.not.in.or
+    message: metavariable pattern with not inside any should fail
+    languages: [rust]
+    severity: ERROR
+    match:
+      pattern: fn $FUNC($X)
+      where:
+        - metavariable:
+            metavariable: $X
+            any:
+              - not:
+                  pattern: "self"
+              - pattern: "other"
