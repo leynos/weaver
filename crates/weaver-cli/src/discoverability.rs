@@ -8,6 +8,8 @@ use std::io::{self, Write};
 
 use ortho_config::{LocalizationArgs, Localizer};
 
+use crate::actionable_guidance::{ActionableGuidance, write_actionable_guidance};
+
 /// A validated, known CLI domain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum KnownDomain {
@@ -112,14 +114,15 @@ fn valid_domains_list() -> String {
         .join(", ")
 }
 
-fn suggestion_for_unknown_domain(domain: &str) -> Option<KnownDomain> {
-    let normalized_domain = domain.trim().to_ascii_lowercase();
+pub(crate) fn suggestion_for_unknown_domain(domain: &str) -> Option<KnownDomain> {
+    let normalized_domain: Vec<char> = domain.trim().to_ascii_lowercase().chars().collect();
     let mut best_match = None;
     let mut best_distance = usize::MAX;
     let mut tied = false;
 
     for candidate in KnownDomain::catalogue_order() {
-        let Some(distance) = bounded_levenshtein(&normalized_domain, candidate.as_str(), 2) else {
+        let candidate_chars: Vec<char> = candidate.as_str().chars().collect();
+        let Some(distance) = bounded_levenshtein(&normalized_domain, &candidate_chars, 2) else {
             continue;
         };
         if distance < best_distance {
@@ -134,22 +137,23 @@ fn suggestion_for_unknown_domain(domain: &str) -> Option<KnownDomain> {
     if tied { None } else { best_match }
 }
 
-fn bounded_levenshtein(left: &str, right: &str, max_distance: usize) -> Option<usize> {
-    let left_chars: Vec<char> = left.chars().collect();
-    let right_chars: Vec<char> = right.chars().collect();
-
-    if left_chars.len().abs_diff(right_chars.len()) > max_distance {
+pub(crate) fn bounded_levenshtein(
+    left: &[char],
+    right: &[char],
+    max_distance: usize,
+) -> Option<usize> {
+    if left.len().abs_diff(right.len()) > max_distance {
         return None;
     }
 
-    let mut previous: Vec<usize> = (0..=right_chars.len()).collect();
-    let mut current = vec![0; right_chars.len() + 1];
+    let mut previous: Vec<usize> = (0..=right.len()).collect();
+    let mut current = vec![0; right.len() + 1];
 
-    for (left_index, left_char) in left_chars.iter().enumerate() {
+    for (left_index, left_char) in left.iter().enumerate() {
         current[0] = left_index + 1;
         let mut row_min = current[0];
 
-        for (right_index, right_char) in right_chars.iter().enumerate() {
+        for (right_index, right_char) in right.iter().enumerate() {
             let substitution_cost = usize::from(left_char != right_char);
             current[right_index + 1] = usize::min(
                 usize::min(previous[right_index + 1] + 1, current[right_index] + 1),
@@ -165,7 +169,7 @@ fn bounded_levenshtein(left: &str, right: &str, max_distance: usize) -> Option<u
         previous.clone_from_slice(&current);
     }
 
-    let distance = previous[right_chars.len()];
+    let distance = previous[right.len()];
     (distance <= max_distance).then_some(distance)
 }
 
@@ -187,30 +191,28 @@ pub(crate) fn write_missing_operation_guidance<W: Write>(
     let mut args = LocalizationArgs::new();
     args.insert("domain", domain_name.into());
     args.insert("hint_operation", (*hint_operation).into());
-    let error = strip_bidi_isolates(localizer.message(
+
+    let problem = strip_bidi_isolates(localizer.message(
         "weaver-domain-guidance-missing-operation-error",
         Some(&args),
-        &format!("error: operation required for domain '{domain_name}'"),
+        &format!("operation required for domain '{domain_name}'"),
     ));
+
     let available_operations = strip_bidi_isolates(localizer.message(
         "weaver-domain-guidance-available-operations",
         None,
         "Available operations:",
     ));
-    let hint = strip_bidi_isolates(localizer.message(
-        "weaver-domain-guidance-help-hint",
-        Some(&args),
-        &format!("Run 'weaver {domain_name} {hint_operation} --help' for operation details."),
-    ));
 
-    writeln!(writer, "{error}")?;
-    writeln!(writer)?;
-    writeln!(writer, "{available_operations}")?;
+    let mut alternatives = vec![available_operations];
     for operation in operations {
-        writeln!(writer, "  {operation}")?;
+        alternatives.push(format!("  {operation}"));
     }
-    writeln!(writer)?;
-    writeln!(writer, "{hint}")?;
+
+    let next_command = format!("weaver {domain_name} {hint_operation} --help");
+
+    let guidance = ActionableGuidance::new(problem, alternatives, next_command);
+    write_actionable_guidance(writer, &guidance)?;
 
     Ok(true)
 }
@@ -228,31 +230,41 @@ pub(crate) fn write_unknown_domain_guidance<W: Write>(
     args.insert("domain", domain.into());
     let valid_domains = valid_domains_list();
     args.insert("domains", valid_domains.as_str().into());
-    let error = strip_bidi_isolates(localizer.message(
+
+    let problem = strip_bidi_isolates(localizer.message(
         "weaver-domain-guidance-unknown-domain-error",
         Some(&args),
-        &format!("error: unknown domain '{domain}'"),
+        &format!("unknown domain '{domain}'"),
     ));
+
     let valid_domains_message = strip_bidi_isolates(localizer.message(
         "weaver-domain-guidance-valid-domains",
         Some(&args),
         &format!("Valid domains: {valid_domains}"),
     ));
 
-    writeln!(writer, "{error}")?;
-    writeln!(writer)?;
-    writeln!(writer, "{valid_domains_message}")?;
+    let mut alternatives = vec![valid_domains_message];
 
-    if let Some(suggested_domain) = suggestion_for_unknown_domain(domain) {
-        let suggested_domain = suggested_domain.as_str();
-        args.insert("suggested_domain", suggested_domain.into());
+    // Include "Did you mean" in alternatives if there's a suggestion
+    let next_command = if let Some(suggested_domain) = suggestion_for_unknown_domain(domain) {
+        let suggested_domain_str = suggested_domain.as_str();
+        args.insert("suggested_domain", suggested_domain_str.into());
         let suggestion = strip_bidi_isolates(localizer.message(
             "weaver-domain-guidance-did-you-mean-domain",
             Some(&args),
-            &format!("Did you mean '{suggested_domain}'?"),
+            &format!("Did you mean '{suggested_domain_str}'?"),
         ));
-        writeln!(writer, "{suggestion}")?;
-    }
+        alternatives.push(suggestion);
+        let Some(hint_op) = suggested_domain.operations().first().copied() else {
+            return Ok(false);
+        };
+        format!("weaver {suggested_domain_str} {hint_op} --help")
+    } else {
+        "weaver --help".to_string()
+    };
+
+    let guidance = ActionableGuidance::new(problem, alternatives, next_command);
+    write_actionable_guidance(writer, &guidance)?;
 
     Ok(true)
 }
@@ -268,102 +280,4 @@ pub(crate) fn should_emit_domain_guidance(cli: &crate::Cli) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    //! Unit tests for unknown-domain suggestion helpers.
-
-    use super::{KnownDomain, bounded_levenshtein, suggestion_for_unknown_domain};
-    use rstest::rstest;
-
-    #[rstest]
-    #[case("observe", "observe", Some(0))]
-    #[case("obsrve", "observe", Some(1))]
-    #[case("obsve", "observe", Some(2))]
-    #[case("bogus", "observe", None)]
-    fn bounded_levenshtein_respects_threshold(
-        #[case] left: &str,
-        #[case] right: &str,
-        #[case] expected: Option<usize>,
-    ) {
-        assert_eq!(bounded_levenshtein(left, right, 2), expected);
-    }
-
-    #[rstest]
-    #[case("obsrve", Some(KnownDomain::Observe))]
-    #[case("bogus", None)]
-    #[case("obsve", Some(KnownDomain::Observe))]
-    fn suggestion_for_unknown_domain_cases(
-        #[case] input: &str,
-        #[case] expected: Option<KnownDomain>,
-    ) {
-        assert_eq!(suggestion_for_unknown_domain(input), expected);
-    }
-}
-
-#[cfg(test)]
-pub(crate) mod fluent_entries {
-    //! Test-only after-help catalogue builders used to assert localized help
-    //! output without widening the production discoverability surface.
-
-    pub(in crate::discoverability) const HEADER: (&str, &str) =
-        ("weaver-after-help-header", "Domains and operations:");
-
-    fn domain_heading_entry(domain: super::KnownDomain) -> (String, String) {
-        let description = super::DOMAIN_OPERATIONS
-            .iter()
-            .find(|(candidate, _, _)| *candidate == domain.as_str())
-            .map(|(_, description, _)| *description)
-            .unwrap_or_default();
-
-        (
-            format!("weaver-after-help-{}-heading", domain.as_str()),
-            format!("{} \u{2014} {description}", domain.as_str()),
-        )
-    }
-
-    fn pad_to(s: &mut String, width: usize) {
-        if s.len() < width {
-            s.extend(std::iter::repeat_n(' ', width - s.len()));
-        }
-    }
-
-    fn format_operation_row(operations: &[String]) -> String {
-        const SECOND_COLUMN_START: usize = 18;
-        const THIRD_COLUMN_START: usize = 37;
-
-        let mut row = String::new();
-        if let Some(first) = operations.first() {
-            row.push_str(first);
-        }
-        if let Some(second) = operations.get(1) {
-            pad_to(&mut row, SECOND_COLUMN_START);
-            row.push_str(second);
-        }
-        if let Some(third) = operations.get(2) {
-            pad_to(&mut row, THIRD_COLUMN_START);
-            row.push_str(third);
-        }
-        row
-    }
-
-    /// Renders the after-help domains-and-operations catalogue.
-    pub(crate) fn render_after_help(localizer: &dyn ortho_config::Localizer) -> String {
-        let header = localizer.message(HEADER.0, None, HEADER.1);
-        let mut sections = Vec::new();
-        for (domain_str, _, operations) in super::DOMAIN_OPERATIONS {
-            let domain = super::known_domain_from_catalogue_entry(domain_str);
-            let (heading_id, heading_fallback) = domain_heading_entry(domain);
-            let heading = localizer.message(&heading_id, None, &heading_fallback);
-            let rows = operations
-                .chunks(3)
-                .map(|chunk| {
-                    let operations = chunk.iter().map(ToString::to_string).collect::<Vec<_>>();
-                    format!("    {}", format_operation_row(&operations))
-                })
-                .collect::<Vec<_>>()
-                .join("\n");
-            sections.push(format!("  {heading}\n{rows}"));
-        }
-
-        format!("{header}\n\n{}", sections.join("\n\n"))
-    }
-}
+pub(crate) mod fluent_entries;

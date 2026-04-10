@@ -11,6 +11,7 @@ use std::ffi::{OsStr, OsString};
 use std::io::{Read, Write};
 use std::process::ExitCode;
 
+mod actionable_guidance;
 mod cli;
 mod command;
 mod config;
@@ -41,7 +42,7 @@ use lifecycle::{
     LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput, SystemLifecycle,
     try_auto_start_daemon,
 };
-use localizer::{build_localizer, write_bare_help};
+use localizer::build_localizer;
 pub use output::{OutputContext, ResolvedOutputFormat, render_human_output};
 pub(crate) use runtime_utils::exit_code_from_status;
 use runtime_utils::handle_capabilities_mode;
@@ -212,6 +213,11 @@ where
                 let _ = write!(self.io.stdout, "{clap_err}");
                 ExitCode::SUCCESS
             }
+            Err(AppError::Lifecycle(ref lifecycle_err)) => {
+                actionable_guidance::write_startup_guidance(&mut *self.io.stderr, lifecycle_err)
+                    .ok();
+                ExitCode::FAILURE
+            }
             Err(error) => {
                 let _ = writeln!(self.io.stderr, "{error}");
                 ExitCode::FAILURE
@@ -271,7 +277,8 @@ fn handle_preflight<ErrWriter: Write>(
     localizer: &dyn Localizer,
 ) -> Result<(), AppError> {
     if cli.is_bare_invocation() && !split.has_config_flags() {
-        write_bare_help(stderr, localizer).map_err(AppError::EmitBareHelp)?;
+        actionable_guidance::write_bare_invocation_guidance(stderr, localizer)
+            .map_err(AppError::EmitBareHelp)?;
         return Err(AppError::BareInvocation);
     }
     if should_emit_domain_guidance(cli) {
@@ -308,7 +315,7 @@ where
         Ok(connection) => connection,
         Err(error) if is_daemon_not_running(&error) => {
             if let Err(start_error) = try_auto_start_daemon(context, &mut *io.stderr) {
-                let _ = writeln!(io.stderr, "{start_error}");
+                actionable_guidance::write_startup_guidance(&mut *io.stderr, &start_error).ok();
                 return ExitCode::FAILURE;
             }
             // Retry briefly after daemon startup to tolerate socket-bind lag.

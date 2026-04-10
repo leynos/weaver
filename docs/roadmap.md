@@ -217,14 +217,14 @@ does* *not require source inspection or external runbooks.*
   - [x] Acceptance criteria: unknown-operation errors in both JSON and
         human-readable output include the full known-operation set for the
         domain, with a count equal to the router's `known_operations` length.
-- [ ] 2.3.3. Standardize actionable guidance in startup and routing errors.
+- [x] 2.3.3. Standardize actionable guidance in startup and routing errors.
       See
       [Level 10](ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
       (10a-10e).
-  - [ ] Apply a single error template: problem statement, valid alternatives,
+  - [x] Apply a single error template: problem statement, valid alternatives,
         and explicit next command.
-  - [ ] Add startup failure guidance for `WEAVERD_BIN` and installation checks.
-  - [ ] Acceptance criteria: each Level 10 path (10a through 10e) renders the
+  - [x] Add startup failure guidance for `WEAVERD_BIN` and installation checks.
+  - [x] Acceptance criteria: each Level 10 path (10a through 10e) renders the
         same three-part template (error, alternatives, next command), and
         preserves stable non-zero exit-code semantics.
 - [ ] 2.3.4. Return complete argument requirements for `act refactor`.

@@ -220,6 +220,35 @@ Errors that prevent connection but are not related to the daemon being offline
 (such as permission denied or network timeouts) bypass automatic startup and
 are reported immediately.
 
+When the daemon binary cannot be found, the CLI provides actionable guidance:
+
+```text
+$ weaver observe get-definition --symbol main
+Waiting for daemon start...
+error: failed to spawn weaverd binary 'weaverd'
+
+Valid alternatives:
+  - Verify weaverd is installed and in your PATH
+  - Set WEAVERD_BIN to the full path to the weaverd binary
+
+Next command:
+  command -v weaverd || echo 'weaverd not found in PATH'
+```
+
+For other startup failures, the CLI suggests running in the foreground to see
+startup output:
+
+```text
+error: daemon exited before reporting ready (status: Some(1))
+
+Valid alternatives:
+  - Check the daemon logs for errors
+  - Run with WEAVER_FOREGROUND=1 to see startup output
+
+Next command:
+  WEAVER_FOREGROUND=1 weaver daemon start
+```
+
 ## Command reference
 
 `weaver` exposes three command families: the `--capabilities` probe, daemon
@@ -233,6 +262,8 @@ Running `weaver` without any arguments prints a short help summary to standard
 error and exits with a non-zero status code:
 
 ```text
+error: command domain must be provided
+
 Usage: weaver <DOMAIN> <OPERATION> [ARG]...
 
 Domains:
@@ -240,12 +271,14 @@ Domains:
   act       Perform code modifications
   verify    Validate code correctness
 
-Run 'weaver --help' for more information.
+Next command:
+  weaver --help
 ```
 
-This output does not require a configuration file or a running daemon. Use
-`weaver --help` for the full reference, including global options and the
-`daemon` subcommand.
+This output follows the unified three-part error template: an error statement,
+an alternatives block, and a concrete next command. It does not require a
+configuration file or a running daemon. Use `weaver --help` for the full
+reference, including global options and the `daemon` subcommand.
 
 ### Version
 
@@ -302,7 +335,8 @@ Available operations:
   call-hierarchy
   get-card
 
-Run 'weaver observe get-definition --help' for operation details.
+Next command:
+  weaver observe get-definition --help
 ```
 
 Unknown domains list the canonical domains instead of printing the operation
@@ -314,20 +348,27 @@ error: unknown domain 'obsrve'
 
 Valid domains: observe, act, verify
 Did you mean 'observe'?
+
+Next command:
+  weaver observe get-definition --help
 ```
 
 The suggestion line appears only when exactly one valid domain is within edit
-distance 2 of the supplied token. More distant values omit the suggestion:
+distance 2 of the supplied token. More distant values omit the suggestion but
+still provide a next command:
 
 ```text
 $ weaver bogus get-definition --uri file:///tmp/main.rs --position 1:1
 error: unknown domain 'bogus'
 
 Valid domains: observe, act, verify
+
+Next command:
+  weaver --help
 ```
 
-The known-domain follow-up `--help` hint is concrete and deterministic, but
-until operation-level help lands it still resolves to the top-level help output.
+All error messages follow the unified three-part template: error statement,
+alternatives block, and concrete next command.
 
 Unknown operations are handled differently. The request still reaches the
 daemon because the daemon router owns the canonical operation list for each
@@ -345,6 +386,9 @@ Available operations:
   diagnostics
   call-hierarchy
   get-card
+
+Next command:
+  weaver observe get-definition --help
 ```
 
 JSON output forwards the daemon payload unchanged:

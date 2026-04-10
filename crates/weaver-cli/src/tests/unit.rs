@@ -372,8 +372,10 @@ fn is_daemon_not_running_rejects_non_connect_errors() {
     let ser_err = AppError::SerialiseRequest(serde_json::from_str::<()>("bad").unwrap_err());
     assert!(!is_daemon_not_running(&ser_err));
 }
+mod actionable_guidance;
 mod after_help;
 mod auto_start;
 mod bare_invocation;
+mod discoverability;
 mod missing_operation_guidance;
 mod version_output;

@@ -8,6 +8,8 @@ mod models;
 mod render;
 mod source;
 
+use std::io;
+
 #[cfg(test)]
 pub(crate) use self::models::UNKNOWN_OPERATION_TYPE;
 pub use crate::cli::OutputFormat;
@@ -87,7 +89,7 @@ pub fn render_human_output(context: &OutputContext, data: &str) -> Option<String
     }
 
     if let Some(unknown_operation) = parse_unknown_operation(trimmed) {
-        return Some(render_unknown_operation(unknown_operation.details));
+        return render_unknown_operation(unknown_operation.details).ok();
     }
 
     let domain = context.domain.to_ascii_lowercase();
@@ -245,15 +247,31 @@ fn render_capability_resolution(resolution: CapabilityResolution) -> String {
     rendered
 }
 
-fn render_unknown_operation(details: UnknownOperationDetails) -> String {
-    let mut rendered = format!(
-        "error: unknown operation '{}' for domain '{}'\n\nAvailable operations:\n",
+fn render_unknown_operation(details: UnknownOperationDetails) -> io::Result<String> {
+    use crate::actionable_guidance::{ActionableGuidance, write_actionable_guidance};
+
+    let problem = format!(
+        "unknown operation '{}' for domain '{}'",
         details.operation, details.domain
     );
-    for operation in details.known_operations {
-        rendered.push_str(&format!("  {operation}\n"));
+
+    let mut alternatives = vec!["Available operations:".to_string()];
+    for operation in &details.known_operations {
+        alternatives.push(format!("  {operation}"));
     }
-    rendered
+
+    let next_command = if let Some(first_op) = details.known_operations.first() {
+        format!("weaver {} {} --help", details.domain, first_op)
+    } else if details.domain.trim().is_empty() {
+        String::from("weaver --help")
+    } else {
+        format!("weaver {} --help", details.domain)
+    };
+
+    let guidance = ActionableGuidance::new(problem, alternatives, next_command);
+    let mut buf = Vec::new();
+    write_actionable_guidance(&mut buf, &guidance)?;
+    String::from_utf8(buf).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
 }
 
 fn diagnostic_to_location(
@@ -383,5 +401,78 @@ mod tests {
         assert!(rendered.contains("Available operations:"));
         assert!(rendered.contains("get-definition"));
         assert!(rendered.contains("get-card"));
+    }
+
+    /// Verifies the unified three-part error template for unknown operations.
+    /// Per roadmap 2.3.3: error, alternatives, Next command.
+    #[test]
+    fn renders_unknown_operation_with_three_part_template() {
+        let context = OutputContext::new("observe", "nonexistent", Vec::new());
+        let payload = serde_json::to_string(&serde_json::json!({
+            "status": "error",
+            "type": UNKNOWN_OPERATION_TYPE,
+            "details": {
+                "domain": "observe",
+                "operation": "nonexistent",
+                "known_operations": [
+                    "get-definition",
+                    "find-references",
+                    "grep",
+                    "diagnostics",
+                    "call-hierarchy",
+                    "get-card"
+                ]
+            }
+        }))
+        .expect("unknown-operation payload");
+
+        let rendered = render_human_output(&context, &payload).expect("rendered");
+
+        // Part 1: error line
+        assert!(
+            rendered.contains("error: unknown operation 'nonexistent' for domain 'observe'"),
+            "must have explicit error line"
+        );
+
+        // Part 2: alternatives block (Available operations)
+        assert!(rendered.contains("Available operations:"));
+        assert!(rendered.contains("get-definition"));
+
+        // Part 3: Next command line - derived from first known_operation
+        assert!(
+            rendered.contains("Next command:"),
+            "must include Next command line"
+        );
+        assert!(
+            rendered.contains("weaver observe get-definition --help"),
+            "Next command should use first known operation"
+        );
+
+        // Verify structure: error < alternatives < Next command
+        let error_pos = rendered.find("error:").expect("error line");
+        let alt_pos = rendered
+            .find("Available operations:")
+            .expect("alternatives");
+        let next_cmd_pos = rendered.find("Next command:").expect("Next command");
+
+        assert!(error_pos < alt_pos, "error must come before alternatives");
+        assert!(
+            alt_pos < next_cmd_pos,
+            "alternatives must come before Next command"
+        );
+    }
+
+    #[test]
+    fn renders_unknown_operation_without_known_operations_using_domain_help() {
+        let details = UnknownOperationDetails {
+            domain: String::from("observe"),
+            operation: String::from("nonexistent"),
+            known_operations: Vec::new(),
+        };
+
+        let rendered = render_unknown_operation(details).expect("rendered");
+
+        assert!(rendered.contains("Next command:\n  weaver observe --help"));
+        assert!(!rendered.contains("get-definition"));
     }
 }
