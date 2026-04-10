@@ -69,28 +69,46 @@ pub(crate) fn parse_metavariable_regex_clause(
     })
 }
 
-/// Parses a `metavariable` where clause into pattern or regex variants.
-#[expect(
-    clippy::too_many_lines,
-    reason = "metavariable dispatch requires multiple branches with field validation"
-)]
-pub(crate) fn parse_metavariable_clause(
-    value: &serde_json::Value,
-    normalize_v2_formula: &mut dyn FnMut(
-        &MatchFormula,
-    ) -> Result<DecoratedFormula, DiagnosticReport>,
-) -> Result<WhereClause, DiagnosticReport> {
-    let mapping = value.as_object().ok_or_else(|| {
-        DiagnosticReport::single_error(
-            DiagnosticCode::ESempaiSchemaInvalid,
-            "metavariable clause must be an object".to_owned(),
-            None,
-            vec![],
-        )
-    })?;
+/// Classification of metavariable constraint kinds.
+enum MetavariableConstraintKind {
+    Pattern,
+    Regex,
+    Type,
+    Analyzer,
+}
 
-    let metavariable = extract_metavariable_name(mapping)?;
+/// Checks that no unexpected fields are present in the mapping.
+fn check_no_unexpected_fields(
+    mapping: &serde_json::Map<String, serde_json::Value>,
+    allowed_keys: &[&str],
+    branch_type: &str,
+) -> Result<(), DiagnosticReport> {
+    let allowed_set: std::collections::HashSet<&str> = allowed_keys.iter().copied().collect();
+    let mut unexpected: Vec<&str> = mapping
+        .keys()
+        .map(String::as_str)
+        .filter(|&k| k != "metavariable" && !allowed_set.contains(k))
+        .collect();
+    if unexpected.is_empty() {
+        return Ok(());
+    }
+    unexpected.sort_unstable();
+    Err(DiagnosticReport::single_error(
+        DiagnosticCode::ESempaiSchemaInvalid,
+        format!(
+            "metavariable clause for '{}' contains unexpected field(s): {}",
+            branch_type,
+            unexpected.join(", ")
+        ),
+        None,
+        vec![],
+    ))
+}
 
+/// Classifies and validates the metavariable constraint type.
+fn classify_and_validate_metavariable_constraint(
+    mapping: &serde_json::Map<String, serde_json::Value>,
+) -> Result<MetavariableConstraintKind, DiagnosticReport> {
     let has_pattern = METAVARIABLE_PATTERN_KEYS
         .iter()
         .any(|&k| mapping.contains_key(k));
@@ -110,66 +128,71 @@ pub(crate) fn parse_metavariable_clause(
         ));
     }
 
-    // Validate fields and determine branch
-    let (branch_type, allowed_keys): (&str, &[&str]) = if has_pattern {
-        ("pattern", METAVARIABLE_PATTERN_KEYS)
-    } else if has_regex {
-        ("regex", &["regex"])
-    } else if has_type {
-        ("type", &["type", "types"])
-    } else if has_analyzer {
-        ("analyzer", &["analyzer"])
-    } else {
-        return Err(DiagnosticReport::single_error(
+    let (kind, allowed_keys, branch_type): (MetavariableConstraintKind, &[&str], &str) =
+        if has_pattern {
+            (
+                MetavariableConstraintKind::Pattern,
+                METAVARIABLE_PATTERN_KEYS,
+                "pattern",
+            )
+        } else if has_regex {
+            (MetavariableConstraintKind::Regex, &["regex"], "regex")
+        } else if has_type {
+            (MetavariableConstraintKind::Type, &["type", "types"], "type")
+        } else if has_analyzer {
+            (
+                MetavariableConstraintKind::Analyzer,
+                &["analyzer"],
+                "analyzer",
+            )
+        } else {
+            return Err(DiagnosticReport::single_error(
+                DiagnosticCode::ESempaiSchemaInvalid,
+                "metavariable clause must have pattern, regex, type, types, or analyzer".to_owned(),
+                None,
+                vec![],
+            ));
+        };
+
+    check_no_unexpected_fields(mapping, allowed_keys, branch_type)?;
+    Ok(kind)
+}
+
+/// Parses a `metavariable` where clause into pattern or regex variants.
+pub(crate) fn parse_metavariable_clause(
+    value: &serde_json::Value,
+    normalize_v2_formula: &mut dyn FnMut(
+        &MatchFormula,
+    ) -> Result<DecoratedFormula, DiagnosticReport>,
+) -> Result<WhereClause, DiagnosticReport> {
+    let mapping = value.as_object().ok_or_else(|| {
+        DiagnosticReport::single_error(
             DiagnosticCode::ESempaiSchemaInvalid,
-            "metavariable clause must have pattern, regex, type, types, or analyzer".to_owned(),
+            "metavariable clause must be an object".to_owned(),
             None,
             vec![],
-        ));
-    };
+        )
+    })?;
 
-    // Check for unexpected keys
-    let allowed_set: std::collections::HashSet<&str> = allowed_keys.iter().copied().collect();
-    let actual_keys: std::collections::HashSet<&str> = mapping.keys().map(String::as_str).collect();
-    let unexpected: Vec<&str> = actual_keys
-        .difference(&allowed_set)
-        .filter(|&&k| k != "metavariable")
-        .copied()
-        .collect();
+    let metavariable = extract_metavariable_name(mapping)?;
 
-    if !unexpected.is_empty() {
-        return Err(DiagnosticReport::single_error(
-            DiagnosticCode::ESempaiSchemaInvalid,
-            format!(
-                "metavariable clause for '{}' contains unexpected field(s): {}",
-                branch_type,
-                unexpected.join(", ")
-            ),
-            None,
-            vec![],
-        ));
-    }
-
-    // Dispatch to appropriate parser
-    if has_pattern {
-        parse_metavariable_pattern_clause(metavariable, mapping, normalize_v2_formula)
-    } else if let Some(regex_value) = mapping.get("regex") {
-        parse_metavariable_regex_clause(metavariable, regex_value)
-    } else if has_type {
-        Err(DiagnosticReport::not_implemented(
+    match classify_and_validate_metavariable_constraint(mapping)? {
+        MetavariableConstraintKind::Pattern => {
+            parse_metavariable_pattern_clause(metavariable, mapping, normalize_v2_formula)
+        }
+        MetavariableConstraintKind::Regex => {
+            #[expect(clippy::expect_used, reason = "key presence guaranteed by classifier")]
+            let regex_value = mapping
+                .get("regex")
+                .expect("regex key present by classification");
+            parse_metavariable_regex_clause(metavariable, regex_value)
+        }
+        MetavariableConstraintKind::Type => Err(DiagnosticReport::not_implemented(
             "metavariable type constraint (type/types)",
-        ))
-    } else if has_analyzer {
-        Err(DiagnosticReport::not_implemented(
+        )),
+        MetavariableConstraintKind::Analyzer => Err(DiagnosticReport::not_implemented(
             "metavariable analysis constraint (analyzer)",
-        ))
-    } else {
-        Err(DiagnosticReport::single_error(
-            DiagnosticCode::ESempaiSchemaInvalid,
-            "metavariable clause must have pattern, regex, type, types, or analyzer".to_owned(),
-            None,
-            vec![],
-        ))
+        )),
     }
 }
 
