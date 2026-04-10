@@ -327,7 +327,7 @@ fn parse_u32(raw: RawValue<'_>) -> Result<u32, GraphSliceError> {
 
     value.parse().map_err(|_| GraphSliceError::InvalidValue {
         flag: flag.into(),
-        message: format!("expected a positive integer, got: {value}"),
+        message: format!("expected a non-negative integer, got: {value}"),
     })
 }
 

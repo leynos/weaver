@@ -22,14 +22,16 @@ constraints, and any spillover that was excluded when the traversal truncated.
 Observable behaviour after implementation:
 
 1. `weaver observe graph-slice --uri <Uniform Resource Identifier (URI)>
-   --position <LINE:COL>` parses into a typed request with explicit default
-   values for `depth`, `direction`, `edge_types`, `min_confidence`,
-   `budget.max_cards`, `budget.max_edges`, `budget.max_estimated_tokens`,
-   `entry_detail`, and `node_detail`.
+   --position
+   <LINE:COL>` parses into a typed request with explicit default values for `
+   depth`, `direction`, `edge_types`, `min_confidence`, `budget.max_cards`, `
+   budget.max_edges`, `budget.max_estimated_tokens`, `entry_detail`, and `
+   node_detail`.
 2. Stable JSON snapshots lock at least one successful slice, one
    truncated slice with spillover metadata, and one structured refusal.
 3. Every serialized edge reports its resolution scope as exactly one of
-   `full_symbol_table`, `partial_symbol_table`, or `lsp` (Language Server Protocol).
+   `full_symbol_table`, `partial_symbol_table`, or `lsp` (Language Server
+   Protocol).
 4. End-to-end snapshots exercise a dedicated 20-case Rust graph-slice
    battery and a dedicated 20-case Python graph-slice battery through the real
    `weaver` binary using `assert_cmd` and `insta`, requesting semantic detail
@@ -38,13 +40,12 @@ Observable behaviour after implementation:
    documentation gates `make markdownlint` and `make nixie` also exit `0`
    because this task changes Markdown.
 
-This plan covers roadmap item 7.2.1 in
-[docs/roadmap.md](/home/user/project/docs/roadmap.md).
+This plan covers roadmap item 7.2.1 in [docs/roadmap.md](../roadmap.md).
 
 ## Constraints
 
 1. The design source of truth is
-   [docs/jacquard-card-first-symbol-graph-design.md](/home/user/project/docs/jacquard-card-first-symbol-graph-design.md),
+   [docs/jacquard-card-first-symbol-graph-design.md](../jacquard-card-first-symbol-graph-design.md),
     especially the edge model, slice request shape, spillover semantics, and
    the `observe graph-slice` surface in sections 12.1 through 12.3. The
    implementation may clarify ambiguities, but every clarification must be
@@ -58,9 +59,9 @@ This plan covers roadmap item 7.2.1 in
    than creating duplicate card or detail enums. The graph-slice schema should
    compose `SymbolCard` and `DetailLevel`, not fork them.
 4. Follow the existing repository pattern for stable observe contracts:
-   `weaver-cards` owns serde schema types, request parsing, snapshot tests,
-   and schema-level behaviour-driven development (BDD) coverage, while
-   `weaverd` owns transport, dispatch, and filesystem concerns.
+   `weaver-cards` owns serde schema types, request parsing, snapshot tests, and
+   schema-level behaviour-driven development (BDD) coverage, while `weaverd`
+   owns transport, dispatch, and filesystem concerns.
 5. `weaver-cards` already has the serde and testing infrastructure needed
    for this work. Keep `weaver-graph` focused on graph construction and
    provider logic unless a later milestone explicitly needs to expose new
@@ -71,10 +72,10 @@ This plan covers roadmap item 7.2.1 in
 7. Behaviour tests must use `rstest-bdd` v0.5.0. End-to-end CLI coverage
    must use `assert_cmd` and `insta`.
 8. Documentation updates are part of the feature:
-   [docs/jacquard-card-first-symbol-graph-design.md](/home/user/project/docs/jacquard-card-first-symbol-graph-design.md),
-   [docs/users-guide.md](/home/user/project/docs/users-guide.md), and
-   [docs/roadmap.md](/home/user/project/docs/roadmap.md) must all be updated
-   before the work is complete.
+   [docs/jacquard-card-first-symbol-graph-design.md](../jacquard-card-first-symbol-graph-design.md),
+   [docs/users-guide.md](../users-guide.md), and
+   [docs/roadmap.md](../roadmap.md) must all be updated before the work is
+   complete.
 9. The roadmap checkbox for 7.2.1 must not be marked done until all code,
    tests, e2e snapshots, documentation, and validation gates pass.
 
@@ -142,7 +143,7 @@ This plan covers roadmap item 7.2.1 in
 
 - There is no `observe graph-slice` implementation yet anywhere in the
   codebase. The current observe router in
-  [crates/weaverd/src/dispatch/router.rs](/home/user/project/crates/weaverd/src/dispatch/router.rs)
+  [crates/weaverd/src/dispatch/router.rs](../../crates/weaverd/src/dispatch/router.rs)
    only recognizes `get-definition`, `find-references`, `grep`, `diagnostics`,
   `call-hierarchy`, and `get-card`.
 - `crates/weaver-cards/` already matches the stable-contract pattern used
@@ -161,7 +162,7 @@ This plan covers roadmap item 7.2.1 in
   `import`, and `config` edges plus budget truncation.
 - The design document's examples use the field name `resolution`, while the
   roadmap acceptance criteria say "edges carry resolution scope". This must be
-  normalised in the public schema and reflected back into the design document.
+  normalized in the public schema and reflected back into the design document.
 - The design document's example response flattens `max_cards` and
   `max_estimated_tokens` under `constraints`, but the roadmap item speaks about
   `budget` semantics explicitly. This plan resolves that by making the budget
@@ -170,10 +171,10 @@ This plan covers roadmap item 7.2.1 in
 ## Decision Log
 
 - Decision: own the stable graph-slice schema in
-  [crates/weaver-cards/](/home/user/project/crates/weaver-cards/), not in
-  `weaverd` and not in `weaver-graph`. Rationale: this repo already uses
-  `weaver-cards` as the stable observe-contract crate, while `weaver-graph`
-  remains an internal engine/provider crate.
+  [crates/weaver-cards/](../../crates/weaver-cards/), not in `weaverd` and not
+  in `weaver-graph`. Rationale: this repo already uses `weaver-cards` as the
+  stable observe-contract crate, while `weaver-graph` remains an internal
+  engine/provider crate.
 - Decision: add a dedicated module tree such as
   `crates/weaver-cards/src/graph_slice/{mod,budget,request,response}.rs`.
   Rationale: it keeps the existing `get-card` code stable, avoids oversized
@@ -195,7 +196,7 @@ This plan covers roadmap item 7.2.1 in
   `node_detail`. Rationale: it avoids parallel detail enums and keeps the
   card/slice surfaces aligned.
 - Decision: record all of these schema decisions back into
-  [docs/jacquard-card-first-symbol-graph-design.md](/home/user/project/docs/jacquard-card-first-symbol-graph-design.md)
+  [docs/jacquard-card-first-symbol-graph-design.md](../jacquard-card-first-symbol-graph-design.md)
    during implementation so the design stays authoritative.
 
 ## Outcomes & retrospective
@@ -203,8 +204,8 @@ This plan covers roadmap item 7.2.1 in
 Successful completion will mean:
 
 1. `weaver-cards` exports stable schema types for `GraphSliceRequest`,
-   `GraphSliceResponse`, `GraphSlice`, `SliceBudget`, typed slice edges, edge
-   provenance, spillover metadata, and refusal payloads.
+   `GraphSliceResponse`, `SliceBudget`, `SliceEdgeType`, `SliceDirection`,
+   typed slice edges, edge provenance, spillover metadata, and refusal payloads.
 2. The daemon and CLI recognize `observe graph-slice`, and the transport
    path emits schema-valid JSON instead of an ad hoc string.
 3. Snapshot tests lock budget defaults, truncation metadata, and edge
@@ -219,14 +220,14 @@ Successful completion will mean:
 
 The feature touches four main areas.
 
-1. [crates/weaver-cards/](/home/user/project/crates/weaver-cards/)
+1. [crates/weaver-cards/](../../crates/weaver-cards/)
 
    This is the intended home for the graph-slice schema. It already owns the
    stable `observe get-card` contract, request parsing, snapshots, and
    schema-oriented behaviour tests. The graph-slice types should extend that
    existing pattern.
 
-2. [crates/weaver-graph/](/home/user/project/crates/weaver-graph/)
+2. [crates/weaver-graph/](../../crates/weaver-graph/)
 
    This crate remains the likely home for later graph-building engines and
    provider integrations. It should not become the daemon-facing JSONL contract
@@ -254,8 +255,8 @@ the same delivery shape.
 ### Stage A: Add the graph-slice schema surface to `weaver-cards`
 
 Create a dedicated `graph_slice/` module tree under
-[crates/weaver-cards/src/](/home/user/project/crates/weaver-cards/src/) and
-re-export the public types from `lib.rs`.
+[crates/weaver-cards/src/](../../crates/weaver-cards/src/) and re-export the
+public types from `lib.rs`.
 
 The module split should stay narrow and explicit:
 
@@ -271,7 +272,7 @@ The module split should stay narrow and explicit:
   Re-exports the public slice schema surface.
 
 Add the needed dependencies to
-[crates/weaver-cards/Cargo.toml](/home/user/project/crates/weaver-cards/Cargo.toml):
+[crates/weaver-cards/Cargo.toml](../../crates/weaver-cards/Cargo.toml):
 
 - `weaver-graph` only if a shared graph-domain type is genuinely needed
 
@@ -362,7 +363,7 @@ Add the new operation to the observe router and daemon dispatch code.
 
 Expected files:
 
-- [crates/weaverd/src/dispatch/router.rs](/home/user/project/crates/weaverd/src/dispatch/router.rs)
+- [crates/weaverd/src/dispatch/router.rs](../../crates/weaverd/src/dispatch/router.rs)
 - [crates/weaverd/src/dispatch/observe/mod.rs](/home/user/project/crates/weaverd/src/dispatch/observe/mod.rs)
 - a new
   [crates/weaverd/src/dispatch/observe/graph_slice.rs](/home/user/project/crates/weaverd/src/dispatch/observe/graph_slice.rs)
@@ -388,8 +389,8 @@ Add BDD coverage in `weaver-cards` and, if needed for transport semantics, in
 
 Recommended files:
 
-- [crates/weaver-cards/src/tests/graph_slice_behaviour.rs](/home/user/project/crates/weaver-cards/src/tests/graph_slice_behaviour.rs)
-- [crates/weaver-cards/tests/features/graph_slice_schema.feature](/home/user/project/crates/weaver-cards/tests/features/graph_slice_schema.feature)
+- [crates/weaver-cards/src/tests/graph_slice_behaviour.rs](../../crates/weaver-cards/src/tests/graph_slice_behaviour.rs)
+- [crates/weaver-cards/tests/features/graph_slice_schema.feature](../../crates/weaver-cards/tests/features/graph_slice_schema.feature)
 - [crates/weaverd/src/tests/graph_slice_behaviour.rs](/home/user/project/crates/weaverd/src/tests/graph_slice_behaviour.rs)
 - [crates/weaverd/tests/features/graph_slice.feature](/home/user/project/crates/weaverd/tests/features/graph_slice.feature)
 
@@ -461,7 +462,7 @@ Update the user guide with:
 5. how semantic detail interacts with cards embedded in the slice.
 
 Only after code, tests, and docs all match should the roadmap entry be checked
-off in [docs/roadmap.md](/home/user/project/docs/roadmap.md).
+off in [docs/roadmap.md](../roadmap.md).
 
 ### Stage G: Run the full validation and commit gates
 

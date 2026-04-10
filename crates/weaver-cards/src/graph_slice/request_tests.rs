@@ -131,7 +131,7 @@ fn normalizes_edge_types(#[case] input: &str, #[case] expected: &[SliceEdgeType]
 #[case::bad_depth(
     &["--uri", "file:///main.rs", "--position", "1:1",
       "--depth", "abc"],
-    "positive integer"
+    "non-negative integer"
 )]
 #[case::bad_direction(
     &["--uri", "file:///main.rs", "--position", "1:1",

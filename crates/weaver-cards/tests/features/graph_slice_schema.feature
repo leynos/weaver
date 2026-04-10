@@ -21,12 +21,14 @@ Feature: Graph-slice schema contracts
     Given a graph-slice success response with default budget
     When the slice response is serialized to JSON
     Then the slice JSON field "spillover.truncated" has value "false"
+    And the slice JSON field "spillover.frontier" is empty
 
   Scenario: Refusal response includes reason code
     Given a graph-slice refusal with reason "not_yet_implemented"
     When the slice response is serialized to JSON
     Then the slice JSON field "status" has value "refusal"
     And the slice JSON contains a "refusal" field
+    And the slice JSON field "refusal.reason" has value "not_yet_implemented"
 
   Scenario: Default request resolves depth to 2
     Given a graph-slice request with no optional flags

@@ -1,42 +1,12 @@
 //! Behaviour-driven tests for `graph-slice` schema contracts.
 
-use std::str::FromStr;
-
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
 use super::graph_slice_fixtures;
+use super::test_utils::QuotedString;
 use crate::graph_slice::{ResolutionScope, SliceRefusalReason};
 use crate::{GraphSliceRequest, GraphSliceResponse, SliceEdgeType};
-
-// ---------------------------------------------------------------------------
-// QuotedString helper (same pattern as behaviour.rs)
-// ---------------------------------------------------------------------------
-
-#[derive(Debug, thiserror::Error)]
-#[error("expected a double-quoted string, got: {0}")]
-struct QuotedStringParseError(String);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct QuotedString(String);
-
-impl FromStr for QuotedString {
-    type Err = QuotedStringParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let value = s
-            .strip_prefix('"')
-            .and_then(|v| v.strip_suffix('"'))
-            .ok_or_else(|| QuotedStringParseError(s.to_owned()))?;
-        Ok(Self(value.to_owned()))
-    }
-}
-
-impl QuotedString {
-    fn as_str(&self) -> &str {
-        &self.0
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Test world
@@ -71,14 +41,10 @@ fn given_truncated_response(world: &mut TestWorld) {
 
 #[given("a graph-slice refusal with reason {reason}")]
 fn given_refusal(world: &mut TestWorld, reason: QuotedString) {
-    let parsed = match reason.as_str() {
-        "not_yet_implemented" => SliceRefusalReason::NotYetImplemented,
-        "no_symbol_at_position" => SliceRefusalReason::NoSymbolAtPosition,
-        "unsupported_language" => SliceRefusalReason::UnsupportedLanguage,
-        "position_out_of_range" => SliceRefusalReason::PositionOutOfRange,
-        "backend_unavailable" => SliceRefusalReason::BackendUnavailable,
-        other => panic!("unknown refusal reason: {other}"),
-    };
+    let parsed = reason
+        .as_str()
+        .parse::<SliceRefusalReason>()
+        .expect("valid refusal reason");
     world.response = Some(graph_slice_fixtures::sample_refusal(parsed));
 }
 
@@ -183,6 +149,22 @@ fn then_json_field_value(world: &mut TestWorld, key: QuotedString, value: Quoted
     );
 }
 
+#[then("the slice JSON field {key} is empty")]
+fn then_json_field_is_empty(world: &mut TestWorld, key: QuotedString) {
+    let parsed = parse_json(world);
+    let pointer = json_pointer(key.as_str());
+    let actual = parsed
+        .pointer(&pointer)
+        .unwrap_or_else(|| panic!("expected JSON to contain key '{}'", key.as_str()));
+    match actual {
+        serde_json::Value::Array(arr) if arr.is_empty() => {}
+        serde_json::Value::Object(obj) if obj.is_empty() => {}
+        serde_json::Value::String(s) if s.is_empty() => {}
+        serde_json::Value::Null => {}
+        other => panic!("expected '{}' to be empty, got {:?}", key.as_str(), other),
+    }
+}
+
 #[then("the depth is {depth}")]
 fn then_depth_is(world: &mut TestWorld, depth: QuotedString) {
     let request = world.request.as_ref().expect("request should be set");
@@ -241,12 +223,10 @@ fn then_response_contains_resolution_scope(world: &mut TestWorld, scope: QuotedS
         .get("edges")
         .and_then(|v| v.as_array())
         .expect("edges array");
-    let expected_scope = match scope.as_str() {
-        "full_symbol_table" => ResolutionScope::FullSymbolTable,
-        "partial_symbol_table" => ResolutionScope::PartialSymbolTable,
-        "lsp" => ResolutionScope::Lsp,
-        other => panic!("unknown resolution scope: {other}"),
-    };
+    let expected_scope = scope
+        .as_str()
+        .parse::<ResolutionScope>()
+        .expect("valid resolution scope");
     let serialized = serde_json::to_string(&expected_scope).expect("serialize");
     let expected_str = serialized.trim_matches('"');
     let found = edges

@@ -69,7 +69,7 @@ impl std::error::Error for SliceParseError {}
 ///
 /// `variants` is an ordered slice of `(token, variant)` pairs.
 /// Returns `Err(SliceParseError)` if no token matches `s`.
-fn parse_variant<T: Copy>(
+pub(super) fn parse_variant<T: Copy>(
     s: &str,
     variants: &[(&str, T)],
     kind: &'static str,

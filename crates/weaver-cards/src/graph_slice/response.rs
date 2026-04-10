@@ -5,12 +5,14 @@
 //! in [`GraphSliceResponse::Refusal`] explaining why a slice could not be
 //! produced.
 
+use std::str::FromStr;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{DetailLevel, SymbolCard};
 
 use super::budget::SliceBudget;
-use super::request::{SliceDirection, SliceEdgeType};
+use super::request::{SliceDirection, SliceEdgeType, SliceParseError, parse_variant};
 
 /// Resolution scope for an edge, recording how the target was resolved.
 ///
@@ -36,6 +38,23 @@ pub enum ResolutionScope {
     PartialSymbolTable,
     /// Resolved via an LSP-provided identifier.
     Lsp,
+}
+
+impl FromStr for ResolutionScope {
+    type Err = SliceParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        parse_variant(
+            s,
+            &[
+                ("full_symbol_table", Self::FullSymbolTable),
+                ("partial_symbol_table", Self::PartialSymbolTable),
+                ("lsp", Self::Lsp),
+            ],
+            "resolution scope",
+            "full_symbol_table, partial_symbol_table, lsp",
+        )
+    }
 }
 
 /// Provenance metadata for a single edge.
@@ -184,7 +203,7 @@ impl SliceSpillover {
 }
 
 /// Reason why a graph slice could not be produced.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum SliceRefusalReason {
@@ -198,6 +217,25 @@ pub enum SliceRefusalReason {
     NotYetImplemented,
     /// The requested detail level requires a backend that is unavailable.
     BackendUnavailable,
+}
+
+impl FromStr for SliceRefusalReason {
+    type Err = SliceParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        parse_variant(
+            s,
+            &[
+                ("no_symbol_at_position", Self::NoSymbolAtPosition),
+                ("position_out_of_range", Self::PositionOutOfRange),
+                ("unsupported_language", Self::UnsupportedLanguage),
+                ("not_yet_implemented", Self::NotYetImplemented),
+                ("backend_unavailable", Self::BackendUnavailable),
+            ],
+            "refusal reason",
+            "no_symbol_at_position, position_out_of_range, unsupported_language, not_yet_implemented, backend_unavailable",
+        )
+    }
 }
 
 /// Structured refusal payload returned when a slice cannot be produced.
