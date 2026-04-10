@@ -159,11 +159,14 @@ fn startup_output_hint() -> &'static str {
     }
 }
 
-fn startup_socket_hint() -> String {
-    format!(
-        "  - Check whether the daemon is listening on {}",
-        default_daemon_socket()
-    )
+fn startup_socket_hint(path: Option<&Path>) -> String {
+    match path {
+        Some(path) => format!("  - Check health snapshot at {}", path.display()),
+        None => format!(
+            "  - Check whether the daemon is listening on {}",
+            default_daemon_socket()
+        ),
+    }
 }
 
 /// Writes actionable guidance to the given writer using the three-part template.
@@ -244,33 +247,33 @@ pub(crate) fn write_startup_guidance<W: Write>(
                 String::new(),
                 "Valid alternatives:".to_string(),
                 "  - Check the daemon logs for errors".to_string(),
-                startup_socket_hint(),
+                startup_socket_hint(None),
                 startup_output_hint().to_string(),
             ];
             let next_command = startup_retry_command();
             (problem, alternatives, next_command.to_string())
         }
-        LifecycleError::StartupTimeout { .. } => {
+        LifecycleError::StartupTimeout { health_path, .. } => {
             let problem = "timed out waiting for daemon to become ready".to_string();
             let alternatives = vec![
                 "The daemon did not report ready within the timeout period.".to_string(),
                 String::new(),
                 "Valid alternatives:".to_string(),
                 "  - Check if the daemon is stuck or slow to start".to_string(),
-                startup_socket_hint(),
+                startup_socket_hint(Some(health_path)),
                 startup_output_hint().to_string(),
             ];
             let next_command = startup_retry_command();
             (problem, alternatives, next_command.to_string())
         }
-        LifecycleError::StartupAborted { .. } => {
+        LifecycleError::StartupAborted { path } => {
             let problem = "daemon reported 'stopping' before reaching ready".to_string();
             let alternatives = vec![
                 "The daemon started but shut down before becoming ready.".to_string(),
                 String::new(),
                 "Valid alternatives:".to_string(),
                 "  - Check the health snapshot for shutdown reason".to_string(),
-                startup_socket_hint(),
+                startup_socket_hint(Some(path)),
                 startup_output_hint().to_string(),
             ];
             let next_command = startup_retry_command();

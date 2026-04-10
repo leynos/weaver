@@ -45,18 +45,32 @@ fn assert_three_part_output(
     );
 }
 
-fn assert_startup_guidance_template(
-    error: &LifecycleError,
-    expected_problem: &str,
-    expected_alternatives: &str,
-    expected_next_command: &str,
-) {
+struct StartupGuidanceExpectation {
+    problem: &'static str,
+    alternatives: &'static str,
+    socket_hint: Option<&'static str>,
+    next_command: &'static str,
+}
+
+fn assert_startup_guidance_template(error: &LifecycleError, expected: &StartupGuidanceExpectation) {
     let mut buf = Vec::new();
     write_startup_guidance(&mut buf, error).expect("write must succeed");
     let output = String::from_utf8(buf).expect("output must be valid UTF-8");
+    let expected_socket_hint = expected
+        .socket_hint
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| {
+            if cfg!(unix) {
+                String::from(
+                    "  - Check whether the daemon is listening on $XDG_RUNTIME_DIR/weaver/weaverd.sock",
+                )
+            } else {
+                String::from("  - Check whether the daemon is listening on 127.0.0.1:9779")
+            }
+        });
 
     assert!(
-        output.contains(&format!("error: {expected_problem}")),
+        output.contains(&format!("error: {}", expected.problem)),
         "expected problem not found in output:\n{output}"
     );
     assert!(
@@ -64,12 +78,18 @@ fn assert_startup_guidance_template(
         "`Next command:` not found in output:\n{output}"
     );
     assert!(
-        output.contains(expected_alternatives),
-        "expected alternatives text '{expected_alternatives}' not found in output:\n{output}"
+        output.contains(expected.alternatives),
+        "expected alternatives text '{}' not found in output:\n{output}",
+        expected.alternatives
     );
     assert!(
-        output.contains(expected_next_command),
-        "expected next command '{expected_next_command}' not found in output:\n{output}"
+        output.contains(&expected_socket_hint),
+        "expected socket hint '{expected_socket_hint}' not found in output:\n{output}"
+    );
+    assert!(
+        output.contains(expected.next_command),
+        "expected next command '{}' not found in output:\n{output}",
+        expected.next_command
     );
 }
 
@@ -132,39 +152,41 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
     LifecycleError::StartupFailed {
         exit_status: Some(17),
     },
-    "daemon exited before reporting ready (status: Some(17))",
-    "The daemon started but failed to become ready.",
-    "WEAVER_FOREGROUND=1 weaver daemon start"
+    StartupGuidanceExpectation {
+        problem: "daemon exited before reporting ready (status: Some(17))",
+        alternatives: "The daemon started but failed to become ready.",
+        socket_hint: None,
+        next_command: "WEAVER_FOREGROUND=1 weaver daemon start",
+    }
 )]
 #[case(
     LifecycleError::StartupTimeout {
-        health_path: "/tmp/weaverd.health".into(),
+        health_path: "/tmp/test/weaverd.health".into(),
         timeout: std::time::Duration::from_secs(5),
     },
-    "timed out waiting for daemon to become ready",
-    "The daemon did not report ready within the timeout period.",
-    "WEAVER_FOREGROUND=1 weaver daemon start"
+    StartupGuidanceExpectation {
+        problem: "timed out waiting for daemon to become ready",
+        alternatives: "The daemon did not report ready within the timeout period.",
+        socket_hint: Some("  - Check health snapshot at /tmp/test/weaverd.health"),
+        next_command: "WEAVER_FOREGROUND=1 weaver daemon start",
+    }
 )]
 #[case(
     LifecycleError::StartupAborted {
-        path: "/tmp/weaverd.health".into(),
+        path: "/tmp/test/weaverd.health".into(),
     },
-    "daemon reported 'stopping' before reaching ready",
-    "The daemon started but shut down before becoming ready.",
-    "WEAVER_FOREGROUND=1 weaver daemon start"
+    StartupGuidanceExpectation {
+        problem: "daemon reported 'stopping' before reaching ready",
+        alternatives: "The daemon started but shut down before becoming ready.",
+        socket_hint: Some("  - Check health snapshot at /tmp/test/weaverd.health"),
+        next_command: "WEAVER_FOREGROUND=1 weaver daemon start",
+    }
 )]
 fn startup_guidance_surfaces_problem_and_next_command(
     #[case] error: LifecycleError,
-    #[case] expected_problem: &str,
-    #[case] expected_alternatives: &str,
-    #[case] expected_next_command: &str,
+    #[case] expected: StartupGuidanceExpectation,
 ) {
-    assert_startup_guidance_template(
-        &error,
-        expected_problem,
-        expected_alternatives,
-        expected_next_command,
-    );
+    assert_startup_guidance_template(&error, &expected);
 }
 
 #[test]
