@@ -16,7 +16,7 @@ After this change, Weaver will have one stable, serde-annotated contract for
 `observe graph-slice` that downstream code can treat as the source of truth. A
 caller will be able to request a bounded slice rooted at a symbol, specify
 budget limits explicitly, and receive a deterministic JSON response that always
-describes the applied constraints, the cards and edges that fit inside those
+describes the applied constraints, the cards and edges, that fit inside those
 constraints, and any spillover that was excluded when the traversal truncated.
 
 Observable behaviour after implementation:
@@ -234,12 +234,12 @@ The feature touches four main areas.
    provider integrations. It should not become the daemon-facing JSONL contract
    crate in 7.2.1.
 
-3. [crates/weaverd/](/home/user/project/crates/weaverd/)
+3. [crates/weaverd/](../../crates/weaverd/)
 
    The daemon must parse the new request, route the new observe operation, and
    serialize typed responses through the existing JSONL transport.
 
-4. [crates/weaver-e2e/](/home/user/project/crates/weaver-e2e/)
+4. [crates/weaver-e2e/](../../crates/weaver-e2e/)
 
    This crate already contains a reusable CLI daemon harness plus the
    `get-card` fixture catalogue. Graph-slice e2e work should reuse the harness
@@ -367,11 +367,11 @@ Add the new operation to the observe router and daemon dispatch code.
 Expected files:
 
 - [crates/weaverd/src/dispatch/router.rs](../../crates/weaverd/src/dispatch/router.rs)
-- [crates/weaverd/src/dispatch/observe/mod.rs](/home/user/project/crates/weaverd/src/dispatch/observe/mod.rs)
+- [crates/weaverd/src/dispatch/observe/mod.rs](../../crates/weaverd/src/dispatch/observe/mod.rs)
 - a new
-  [crates/weaverd/src/dispatch/observe/graph_slice.rs](/home/user/project/crates/weaverd/src/dispatch/observe/graph_slice.rs)
+  [crates/weaverd/src/dispatch/observe/graph_slice.rs](../../crates/weaverd/src/dispatch/observe/graph_slice.rs)
 - CLI discoverability surfaces in
-  [crates/weaver-cli/src/discoverability.rs](/home/user/project/crates/weaver-cli/src/discoverability.rs)
+  [crates/weaver-cli/src/discoverability.rs](../../crates/weaver-cli/src/discoverability.rs)
    and any related help/localization files
 
 This milestone should keep the runtime narrow:
@@ -394,8 +394,8 @@ Recommended files:
 
 - [crates/weaver-cards/src/tests/graph_slice_behaviour.rs](../../crates/weaver-cards/src/tests/graph_slice_behaviour.rs)
 - [crates/weaver-cards/tests/features/graph_slice_schema.feature](../../crates/weaver-cards/tests/features/graph_slice_schema.feature)
-- [crates/weaverd/src/tests/graph_slice_behaviour.rs](/home/user/project/crates/weaverd/src/tests/graph_slice_behaviour.rs)
-- [crates/weaverd/tests/features/graph_slice.feature](/home/user/project/crates/weaverd/tests/features/graph_slice.feature)
+- [crates/weaverd/src/tests/graph_slice_behaviour.rs](../../crates/weaverd/src/tests/graph_slice_behaviour.rs)
+- [crates/weaverd/tests/features/graph_slice.feature](../../crates/weaverd/tests/features/graph_slice.feature)
 
 The behaviour matrix should cover:
 
@@ -415,11 +415,11 @@ Extend the existing end-to-end harness instead of inventing another one.
 Expected files:
 
 - a new
-  [crates/weaver-e2e/tests/graph_slice_snapshots.rs](/home/user/project/crates/weaver-e2e/tests/graph_slice_snapshots.rs)
+  [crates/weaver-e2e/tests/graph_slice_snapshots.rs](../../crates/weaver-e2e/tests/graph_slice_snapshots.rs)
 - shared helper additions in
-  [crates/weaver-e2e/tests/test_support/mod.rs](/home/user/project/crates/weaver-e2e/tests/test_support/mod.rs)
+  [crates/weaver-e2e/tests/test_support/mod.rs](../../crates/weaver-e2e/tests/test_support/mod.rs)
 - a dedicated
-  [crates/weaver-e2e/src/graph_slice_fixtures/](/home/user/project/crates/weaver-e2e/src)
+  [crates/weaver-e2e/src/graph_slice_fixtures/](../../crates/weaver-e2e/src)
    module tree for graph-shaped workspaces
 
 The e2e suite must cover:

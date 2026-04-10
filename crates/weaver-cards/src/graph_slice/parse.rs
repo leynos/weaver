@@ -262,7 +262,7 @@ where
     I: Iterator<Item = &'a String>,
 {
     match iter.next().map(String::as_str) {
-        Some(value) if value.starts_with('-') => Err(GraphSliceError::InvalidValue {
+        Some(value) if value.starts_with("--") => Err(GraphSliceError::InvalidValue {
             flag: flag.into(),
             message: String::from("requires a value"),
         }),
