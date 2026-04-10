@@ -71,6 +71,25 @@ pub(super) struct RequestBuilder {
 }
 
 impl RequestBuilder {
+    /// Returns `true` if `flag` was recognised and handled, `false` if it is
+    /// an unknown flag whose value (if any) should be skipped.
+    fn try_apply_known_flag<'a, I>(
+        &mut self,
+        flag: &str,
+        iter: &mut std::iter::Peekable<I>,
+    ) -> Result<bool, GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        if self.try_apply_traversal_flag(flag, iter)? {
+            return Ok(true);
+        }
+        if self.try_apply_budget_flag(flag, iter)? {
+            return Ok(true);
+        }
+        self.try_apply_detail_flag(flag, iter)
+    }
+
     /// Dispatches a single `--flag` and consumes its value from the
     /// iterator.
     pub(super) fn apply_flag<'a, I>(
@@ -81,13 +100,9 @@ impl RequestBuilder {
     where
         I: Iterator<Item = &'a String>,
     {
-        if self.try_apply_traversal_flag(flag, iter)?
-            || self.try_apply_budget_flag(flag, iter)?
-            || self.try_apply_detail_flag(flag, iter)?
-        {
-            return Ok(());
+        if !self.try_apply_known_flag(flag, iter)? {
+            skip_unknown_flag_value(iter);
         }
-        skip_unknown_flag_value(iter);
         Ok(())
     }
 
