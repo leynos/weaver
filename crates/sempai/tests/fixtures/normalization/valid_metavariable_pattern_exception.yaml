@@ -3,10 +3,13 @@ rules:
     message: metavariable-pattern context allows no positive term
     languages: [rust]
     severity: ERROR
-    patterns:
-      - pattern: $F($X)
-      - metavariable-pattern:
-          metavariable: $F
-          patterns:
-            - pattern-not: foo
-            - pattern-inside: bar
+    match:
+      pattern: $F($X)
+      where:
+        - metavariable:
+            metavariable: $F
+            all:
+              - not:
+                  pattern: foo
+              - inside:
+                  pattern: bar

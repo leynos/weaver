@@ -176,15 +176,9 @@ fn invalid_no_positive_term_v2_fails_with_semantic_error() {
 }
 
 #[test]
-#[ignore = "metavariable-pattern exception not yet implemented - see normalize.rs validate_positive_terms"]
 fn valid_metavariable_pattern_exception_allows_no_positive_term() {
-    // This should succeed because metavariable-pattern contexts allow
-    // conjunctions without positive terms
+    // Metavariable-pattern contexts allow conjunctions without positive terms
     let result = normalize_fixture("valid_metavariable_pattern_exception.yaml");
-    // Currently this fails because we haven't implemented the exception logic
-    // The exception requires detecting when we're inside a metavariable-pattern
-    // context and allowing no-positive-term conjunctions in that specific case.
-    // For now, this test is ignored until that feature is implemented.
     assert!(
         result.is_ok(),
         "metavariable-pattern exception should allow no-positive-term conjunctions"
@@ -249,18 +243,6 @@ fn v2_where_metavariable_invalid_not_in_or_fails_with_semantic_error() {
     let err = result.expect_err("should fail with InvalidNotInOr");
     let first = err.diagnostics().first().expect("should have diagnostic");
     assert_eq!(first.code(), DiagnosticCode::ESempaiInvalidNotInOr);
-}
-
-#[test]
-fn v2_where_metavariable_invalid_all_negative_fails_with_semantic_error() {
-    // Test that a metavariable where clause with all-negative conjunction is rejected
-    let result = normalize_fixture("v2_where_metavariable_invalid_all_negative.yaml");
-    let err = result.expect_err("should fail with MissingPositiveTermInAnd");
-    let first = err.diagnostics().first().expect("should have diagnostic");
-    assert_eq!(
-        first.code(),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd
-    );
 }
 
 #[test]

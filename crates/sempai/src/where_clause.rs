@@ -4,7 +4,7 @@
 //! `WhereClause` variants, including focus, metavariable patterns, and
 //! metavariable regex constraints.
 
-use crate::validate::validate_formula_semantics;
+use crate::validate::{ValidationContext, validate_formula_semantics};
 use sempai_core::{DecoratedFormula, DiagnosticCode, DiagnosticReport, WhereClause};
 use sempai_yaml::MatchFormula;
 
@@ -156,7 +156,8 @@ pub(crate) fn parse_metavariable_pattern_clause(
     let match_formula = build_match_formula_from_mapping(mapping)?;
     let normalized = normalize_v2_formula(&match_formula)?;
     // Validate semantic constraints on the normalized formula
-    validate_formula_semantics(&normalized.formula)?;
+    // Use MetavariablePattern context to allow conjunctions without positive terms
+    validate_formula_semantics(&normalized.formula, ValidationContext::MetavariablePattern)?;
     Ok(WhereClause::MetavariablePattern {
         metavariable,
         formula: normalized.formula,

@@ -42,7 +42,7 @@ use sempai_yaml::{
     RulePrincipal, SearchQueryPrincipal,
 };
 
-use crate::validate::validate_formula_semantics;
+use crate::validate::{ValidationContext, validate_formula_semantics};
 
 /// A normalized search rule ready for query plan construction.
 #[derive(Debug, Clone)]
@@ -89,7 +89,7 @@ fn normalize_rule(rule: &Rule) -> Result<Vec<NormalizedSearchRule>, DiagnosticRe
             let formula = normalize_search_principal(rule.principal())?;
 
             // Perform semantic validation on the canonical form
-            validate_formula_semantics(&formula)?;
+            validate_formula_semantics(&formula, ValidationContext::Default)?;
 
             // Expand to one rule per supported language
             let languages = normalize_languages(rule.languages())?;
