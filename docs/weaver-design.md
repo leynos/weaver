@@ -687,14 +687,14 @@ The engine is built on three distinct layers of analysis:
    tree even in the presence of errors, making it exceptionally robust. Its key
    roles are to provide syntactic guardrails for all edit operations, enable
    high-precision structural search and manipulation that LSP often lacks, and
-   facilitate context-aware code slicing for prompt engineering.[^3]
+   facilitate context-aware code slicing for prompt engineering.[^11]
 
 3. **Relational Insight (Call-Graph Analysis):** Managed by the `weaver-graph`
    crate, this layer builds a higher-level model of the program's control flow
    and component relationships. It is not limited to a single data source;
    instead, it fuses evidence from LSP's `callHierarchy` feature, dedicated
    static analysis plugins, and potentially the output of dynamic profiling
-   tools to construct a more complete and accurate call graph.[^11]
+   tools to construct a more complete and accurate call graph.[^19]
 
 > **Related design:** The call graph is intentionally treated as one relational
 > view. A richer, “cards-first” symbol context layer (symbol cards, typed edges,
@@ -1238,7 +1238,7 @@ This ensures that `Weaver` can work around known bugs and maintain stable
 behavior even when interacting with non-compliant servers.
 
 More problematic are the fundamental design flaws in the protocol itself,
-particularly concerning causality and state synchronization.[^14] LSP operates
+particularly concerning causality and state synchronization.[^15] LSP operates
 asynchronously. A client (like
 
 `Weaver`) can send a `textDocument/didChange` notification to inform the server
@@ -1269,7 +1269,7 @@ The `weaver-syntax` crate provides the second pillar of the intelligence
 engine, offering a fast, robust, and precise understanding of the code's
 structure. It is built upon Tree-sitter, a parser generator and incremental
 parsing library designed to be general enough for any language, fast enough for
-real-time use, and robust enough to handle syntax errors gracefully.[^15] These
+real-time use, and robust enough to handle syntax errors gracefully.[^16] These
 properties make it the ideal foundation for the syntactic layer, which serves
 several critical functions within the
 
@@ -1281,7 +1281,7 @@ Tree-sitter-based command-line tools like `ast-grep` and `srgn`. The
 the intuitive pattern language of `ast-grep`. Instead of complex regular
 expressions, users and agents can provide code-like patterns with metavariables
 (e.g., `console.log($ARG)`) to find and capture specific abstract syntax tree
-(AST) nodes.[^16] This approach is more readable, less error-prone, and far more
+(AST) nodes.[^18] This approach is more readable, less error-prone, and far more
 powerful than text-based searching, as it understands concepts like scope,
 nesting, and language grammar.
 
@@ -1298,7 +1298,7 @@ The key responsibilities of the `weaver-syntax` crate are:
 1. **High-Precision Search and Analysis:** Powering the `observe grep` command
    for structural queries and providing the raw data for advanced analysis,
    such as identifying all function definitions or generating a preliminary
-   call graph based on call expressions.[^18]
+   call graph based on call expressions.[^20]
 
 2. **Syntactic Guardrails:** Serving as the "Syntactic Lock" in the
    Double-Lock safety harness. Before any change is committed, this layer
@@ -1330,7 +1330,7 @@ Static analysis struggles with dynamic dispatch, function pointers, and
 higher-order functions, often leading to an overapproximation of possible calls
 (including many that are infeasible in practice). Dynamic analysis, conversely,
 produces an exact graph for a specific execution but provides an
-underapproximation of all possible behaviors.[^19]
+underapproximation of all possible behaviors.[^20]
 
 Given this complexity, `Weaver` will not attempt to build a single, monolithic
 call graph generator. Instead, the `weaver-graph` crate will adopt a pragmatic,
@@ -1347,8 +1347,8 @@ solution.
 | Phase | Provider | Underlying Technology | Pros | Cons |
 | ----- | -------- | --------------------- | ---- | ---- |
 | **1 (MVP)** | LSP Provider | LSP `textDocument/callHierarchy` request | Fast, deeply integrated with the existing semantic layer, requires no additional tool setup. | Inconsistent support across language servers, may be inaccurate or incomplete, limited to direct calls. |
-| **2 (Specialist)** | Static Analysis Plugin | Language-specific static analysis tools (e.g., PyCG for Python [^20]) | Higher accuracy and recall, better handling of language-specific dynamic features, more comprehensive analysis. | Requires installing and configuring external plugin tools, slower than LSP, implementation is language-specific. |
-| **3 (Execution-Aware)** | Dynamic Analysis Ingestion | Output from profilers (e.g., `gprof` [^21], `callgrind` [^22]) | Provides "ground truth" for a given execution, accurately captures dynamic dispatch and runtime behaviour. | Incomplete coverage (only shows paths that were executed), requires the ability to run the code (e.g., a test suite). |
+| **2 (Specialist)** | Static Analysis Plugin | Language-specific static analysis tools (e.g., PyCG for Python [^21]) | Higher accuracy and recall, better handling of language-specific dynamic features, more comprehensive analysis. | Requires installing and configuring external plugin tools, slower than LSP, implementation is language-specific. |
+| **3 (Execution-Aware)** | Dynamic Analysis Ingestion | Output from profilers (e.g., `gprof` [^22], `callgrind` [^23]) | Provides "ground truth" for a given execution, accurately captures dynamic dispatch and runtime behaviour. | Incomplete coverage (only shows paths that were executed), requires the ability to run the code (e.g., a test suite). |
 
 The `weaver-graph` engine will be responsible for merging the graphs produced
 by these providers. When an agent requests a call graph, it can specify which
@@ -1425,7 +1425,7 @@ for this model:
 
 This model extends to other domains as well. Tools like `srgn` and `ast-grep`,
 which excel at high-speed, structural search and rewrite operations, can be
-integrated as "precision editing" actuators.[^16] This gives agents a spectrum
+integrated as "precision editing" actuators.[^17] This gives agents a spectrum
 of tools to choose from, ranging from fast, syntactic transformations to
 slower, fully semantic-aware refactorings, all orchestrated and secured by the
 
@@ -2069,7 +2069,7 @@ capabilities.
 While libraries like `birdcage` provide the necessary primitives, a truly
 secure architecture requires more than just process isolation. The
 documentation for `gaol` highlights a critical design pattern: the **broker
-process**.[^27] In this model, the sandboxed child process has almost no
+process**.[^31] In this model, the sandboxed child process has almost no
 privileges itself. When it needs to perform a privileged operation (like
 reading a specific file), it does not do so directly. Instead, it sends an
 Inter-Process Communication (IPC) message to its trusted parent process (the
@@ -2283,7 +2283,7 @@ Retrieval-Augmented Generation (RAG) to codebase analysis.
 
 RAG is a technique that enhances the output of LLMs by grounding them in
 relevant, externally retrieved information, which reduces hallucinations and
-improves contextual accuracy.[^31] Research into RAG for code generation has
+improves contextual accuracy.[^33] Research into RAG for code generation has
 shown that retrieving relevant in-context code (like class definitions and API
 documentation) is highly effective, whereas retrieving syntactically "similar"
 but contextually irrelevant code can actually degrade performance.[^32]
@@ -2427,7 +2427,7 @@ a logical, incremental progression.
   refactoring. While it has become the industry standard, its specification is
   large, implementations are inconsistent, and it has known design flaws
   related to state synchronization and causality, necessitating a defensive
-  implementation strategy.[^12]
+  implementation strategy.[^35]
 
 - **Tree-sitter:** A parser generator tool and incremental parsing library.
   Its key advantages are speed, robustness in the face of syntax errors, and
@@ -2435,14 +2435,14 @@ a logical, incremental progression.
   detailed representation than an abstract syntax tree, making it ideal for
   tools that perform structural search, analysis, and transformation. It is the
   core technology behind tools like `ast-grep` and is used for syntax
-  highlighting in many modern editors.[^15]
+  highlighting in many modern editors.[^13]
 
 - **Structural Search & Rewrite Tools:** Tools like `ast-grep` and `srgn`
   represent the state-of-the-art in command-line code manipulation. They
   leverage Tree-sitter to allow users to specify patterns and transformations
   based on code structure rather than raw text. This provides a level of
   precision and safety that is impossible to achieve with regular
-  expressions.[^16]
+  expressions.[^10]
 
   `Weaver`'s syntactic layer is directly inspired by their design.
 
@@ -2593,3 +2593,4 @@ exercises happy and unhappy paths across all supported languages.
 [^32]: Capability registry combining LSP server advertisement with user-defined overrides.
 [^33]: Retrieval-Augmented Generation (RAG) for improving contextual accuracy in code generation.
 [^34]: Context relevance research showing that irrelevant code can degrade LLM performance.
+[^35]: Implementation strategy for the Call Graph Fusion Engine.
