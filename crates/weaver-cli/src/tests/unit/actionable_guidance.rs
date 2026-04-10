@@ -4,6 +4,7 @@ use std::ffi::OsStr;
 use std::io;
 
 use ortho_config::NoOpLocalizer;
+use rstest::rstest;
 
 use crate::actionable_guidance::{
     ActionableGuidance, has_configured_binary_path, write_actionable_guidance,
@@ -47,6 +48,7 @@ fn assert_three_part_output(
 fn assert_startup_guidance_template(
     error: &LifecycleError,
     expected_problem: &str,
+    expected_alternatives: &str,
     expected_next_command: &str,
 ) {
     let mut buf = Vec::new();
@@ -60,6 +62,10 @@ fn assert_startup_guidance_template(
     assert!(
         output.contains("Next command:"),
         "`Next command:` not found in output:\n{output}"
+    );
+    assert!(
+        output.contains(expected_alternatives),
+        "expected alternatives text '{expected_alternatives}' not found in output:\n{output}"
     );
     assert!(
         output.contains(expected_next_command),
@@ -121,37 +127,43 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
     );
 }
 
-#[test]
-fn startup_failed_guidance_surfaces_problem_and_next_command() {
+#[rstest]
+#[case(
+    LifecycleError::StartupFailed {
+        exit_status: Some(17),
+    },
+    "daemon exited before reporting ready (status: Some(17))",
+    "The daemon started but failed to become ready.",
+    "WEAVER_FOREGROUND=1 weaver daemon start"
+)]
+#[case(
+    LifecycleError::StartupTimeout {
+        health_path: "/tmp/weaverd.health".into(),
+        timeout: std::time::Duration::from_secs(5),
+    },
+    "timed out waiting for daemon to become ready",
+    "The daemon did not report ready within the timeout period.",
+    "WEAVER_FOREGROUND=1 weaver daemon start"
+)]
+#[case(
+    LifecycleError::StartupAborted {
+        path: "/tmp/weaverd.health".into(),
+    },
+    "daemon reported 'stopping' before reaching ready",
+    "The daemon started but shut down before becoming ready.",
+    "WEAVER_FOREGROUND=1 weaver daemon start"
+)]
+fn startup_guidance_surfaces_problem_and_next_command(
+    #[case] error: LifecycleError,
+    #[case] expected_problem: &str,
+    #[case] expected_alternatives: &str,
+    #[case] expected_next_command: &str,
+) {
     assert_startup_guidance_template(
-        &LifecycleError::StartupFailed {
-            exit_status: Some(17),
-        },
-        "daemon exited before reporting ready (status: Some(17))",
-        "WEAVER_FOREGROUND=1 weaver daemon start",
-    );
-}
-
-#[test]
-fn startup_timeout_guidance_surfaces_problem_and_next_command() {
-    assert_startup_guidance_template(
-        &LifecycleError::StartupTimeout {
-            health_path: "/tmp/weaverd.health".into(),
-            timeout: std::time::Duration::from_secs(5),
-        },
-        "timed out waiting for daemon to become ready",
-        "WEAVER_FOREGROUND=1 weaver daemon start",
-    );
-}
-
-#[test]
-fn startup_aborted_guidance_surfaces_problem_and_next_command() {
-    assert_startup_guidance_template(
-        &LifecycleError::StartupAborted {
-            path: "/tmp/weaverd.health".into(),
-        },
-        "daemon reported 'stopping' before reaching ready",
-        "WEAVER_FOREGROUND=1 weaver daemon start",
+        &error,
+        expected_problem,
+        expected_alternatives,
+        expected_next_command,
     );
 }
 

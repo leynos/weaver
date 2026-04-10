@@ -391,6 +391,28 @@ mod tests {
             "weaver --help",
         );
     }
+
+    #[test]
+    fn fluent_unknown_domain_guidance_uses_unique_suggestion_when_available() {
+        let localizer = fluent_localizer();
+        let mut output = Vec::new();
+
+        let emitted = write_unknown_domain_guidance(&mut output, &localizer, "obsrve")
+            .expect("guidance write must succeed");
+
+        assert!(emitted, "unknown domain should emit guidance");
+        let output = String::from_utf8(output).expect("guidance must be valid UTF-8");
+        assert!(
+            output.contains("Did you mean 'observe'?"),
+            "unique suggestion should be rendered: {output}"
+        );
+        assert_three_part_guidance(
+            &output,
+            "error: unknown domain 'obsrve'",
+            "Did you mean 'observe'?",
+            "weaver observe get-definition --help",
+        );
+    }
 }
 
 #[cfg(test)]
