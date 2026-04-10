@@ -211,7 +211,10 @@ pub(crate) fn parse_metavariable_clause(
     let has_type = mapping.contains_key("type") || mapping.contains_key("types");
     let has_analyzer = mapping.contains_key("analyzer");
 
-    if (has_pattern || has_regex) && (has_type || has_analyzer) {
+    let has_match_constraint = has_pattern || has_regex;
+    let has_type_or_analyzer = has_type || has_analyzer;
+
+    if has_match_constraint && has_type_or_analyzer {
         return Err(DiagnosticReport::single_error(
             DiagnosticCode::ESempaiSchemaInvalid,
             "metavariable clause cannot mix pattern/regex with type/types or analyzer".to_owned(),
