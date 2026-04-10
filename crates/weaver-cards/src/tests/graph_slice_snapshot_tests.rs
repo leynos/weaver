@@ -172,48 +172,34 @@ fn snapshot_spillover_with_frontier() {
 // Component unit tests
 // -----------------------------------------------------------------------
 
+fn assert_serializes_as<T: serde::Serialize>(value: &T, expected: &str) {
+    assert_eq!(serde_json::to_string(value).expect("serialize"), expected);
+}
+
 #[test]
 fn resolution_scope_serializes_as_snake_case() {
-    let full = serde_json::to_string(&ResolutionScope::FullSymbolTable).expect("serialize");
-    assert_eq!(full, "\"full_symbol_table\"");
-
-    let partial = serde_json::to_string(&ResolutionScope::PartialSymbolTable).expect("serialize");
-    assert_eq!(partial, "\"partial_symbol_table\"");
-
-    let lsp = serde_json::to_string(&ResolutionScope::Lsp).expect("serialize");
-    assert_eq!(lsp, "\"lsp\"");
+    assert_serializes_as(&ResolutionScope::FullSymbolTable, "\"full_symbol_table\"");
+    assert_serializes_as(
+        &ResolutionScope::PartialSymbolTable,
+        "\"partial_symbol_table\"",
+    );
+    assert_serializes_as(&ResolutionScope::Lsp, "\"lsp\"");
 }
 
-#[test]
-fn slice_direction_serializes_as_snake_case() {
-    assert_eq!(
-        serde_json::to_string(&SliceDirection::In).expect("serialize"),
-        "\"in\""
-    );
-    assert_eq!(
-        serde_json::to_string(&SliceDirection::Out).expect("serialize"),
-        "\"out\""
-    );
-    assert_eq!(
-        serde_json::to_string(&SliceDirection::Both).expect("serialize"),
-        "\"both\""
-    );
+#[rstest]
+#[case(SliceDirection::In, "\"in\"")]
+#[case(SliceDirection::Out, "\"out\"")]
+#[case(SliceDirection::Both, "\"both\"")]
+fn slice_direction_serializes_as_snake_case(#[case] value: SliceDirection, #[case] expected: &str) {
+    assert_serializes_as(&value, expected);
 }
 
-#[test]
-fn slice_edge_type_serializes_as_snake_case() {
-    assert_eq!(
-        serde_json::to_string(&SliceEdgeType::Call).expect("serialize"),
-        "\"call\""
-    );
-    assert_eq!(
-        serde_json::to_string(&SliceEdgeType::Import).expect("serialize"),
-        "\"import\""
-    );
-    assert_eq!(
-        serde_json::to_string(&SliceEdgeType::Config).expect("serialize"),
-        "\"config\""
-    );
+#[rstest]
+#[case(SliceEdgeType::Call, "\"call\"")]
+#[case(SliceEdgeType::Import, "\"import\"")]
+#[case(SliceEdgeType::Config, "\"config\"")]
+fn slice_edge_type_serializes_as_snake_case(#[case] value: SliceEdgeType, #[case] expected: &str) {
+    assert_serializes_as(&value, expected);
 }
 
 #[test]

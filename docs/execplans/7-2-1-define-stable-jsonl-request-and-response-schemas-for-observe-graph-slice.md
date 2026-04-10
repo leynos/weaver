@@ -205,7 +205,8 @@ Successful completion will mean:
 
 1. `weaver-cards` exports stable schema types for `GraphSliceRequest`,
    `GraphSliceResponse`, `SliceBudget`, `SliceEdgeType`, `SliceDirection`,
-   typed slice edges, edge provenance, spillover metadata, and refusal payloads.
+   `EdgeTarget`, typed slice edges, edge provenance, spillover metadata, and
+   refusal payloads.
 2. The daemon and CLI recognize `observe graph-slice`, and the transport
    path emits schema-valid JSON instead of an ad hoc string.
 3. Snapshot tests lock budget defaults, truncation metadata, and edge
@@ -307,7 +308,9 @@ The edge contract should include:
 - `edge_version`
 - `type`
 - `from`
-- `to` or `to_external`
+- `target` (an `EdgeTarget` enum with either `to` for local symbols or
+  `to_external` for unresolved external references; exactly one variant is
+  always present, preventing invalid states)
 - `confidence`
 - `direction`
 - `resolution_scope`

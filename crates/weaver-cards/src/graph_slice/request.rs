@@ -164,6 +164,12 @@ pub enum GraphSliceError {
         /// The unrecognised argument.
         argument: String,
     },
+    /// An unknown flag was provided.
+    #[error("unknown flag: {flag}")]
+    UnknownFlag {
+        /// The unrecognised flag.
+        flag: String,
+    },
 }
 
 /// Parsed request for the `observe graph-slice` operation.

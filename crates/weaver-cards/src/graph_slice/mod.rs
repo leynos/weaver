@@ -24,7 +24,7 @@ pub use request::{
     SliceEdgeType, SliceParseError,
 };
 pub use response::{
-    CallSiteInfo, EdgeProvenance, EdgeProvenanceDetails, ExternalTarget, GraphSliceResponse,
-    ResolutionScope, SliceConstraints, SliceEdge, SliceEntry, SliceRefusal, SliceRefusalReason,
-    SliceSpillover, SpilloverCandidate,
+    CallSiteInfo, EdgeProvenance, EdgeProvenanceDetails, EdgeTarget, ExternalTarget,
+    GraphSliceResponse, ResolutionScope, SliceConstraints, SliceEdge, SliceEntry, SliceRefusal,
+    SliceRefusalReason, SliceSpillover, SpilloverCandidate,
 };

@@ -5,9 +5,9 @@
 //! top of these foundations.
 
 use crate::graph_slice::{
-    CallSiteInfo, EdgeProvenance, EdgeProvenanceDetails, ExternalTarget, GraphSliceResponse,
-    ResolutionScope, SliceConstraints, SliceEdge, SliceEntry, SliceRefusal, SliceRefusalReason,
-    SliceSpillover, SpilloverCandidate,
+    CallSiteInfo, EdgeProvenance, EdgeProvenanceDetails, EdgeTarget, ExternalTarget,
+    GraphSliceResponse, ResolutionScope, SliceConstraints, SliceEdge, SliceEntry, SliceRefusal,
+    SliceRefusalReason, SliceSpillover, SpilloverCandidate,
 };
 use crate::{DetailLevel, SliceBudget, SliceDirection, SliceEdgeType};
 
@@ -69,8 +69,9 @@ pub fn sample_multi_resolution_response() -> GraphSliceResponse {
         edge_version: 1,
         edge_type: SliceEdgeType::Call,
         from: String::from("sym_abc123"),
-        to: Some(String::from("sym_def456")),
-        to_external: None,
+        target: EdgeTarget::Local {
+            to: String::from("sym_def456"),
+        },
         confidence: 0.92,
         direction: SliceDirection::Out,
         resolution_scope: ResolutionScope::FullSymbolTable,
@@ -90,8 +91,9 @@ pub fn sample_multi_resolution_response() -> GraphSliceResponse {
         edge_version: 1,
         edge_type: SliceEdgeType::Import,
         from: String::from("sym_abc123"),
-        to: Some(String::from("sym_ghi789")),
-        to_external: None,
+        target: EdgeTarget::Local {
+            to: String::from("sym_ghi789"),
+        },
         confidence: 0.78,
         direction: SliceDirection::Out,
         resolution_scope: ResolutionScope::PartialSymbolTable,
@@ -105,11 +107,12 @@ pub fn sample_multi_resolution_response() -> GraphSliceResponse {
         edge_version: 1,
         edge_type: SliceEdgeType::Config,
         from: String::from("sym_abc123"),
-        to_external: Some(ExternalTarget {
-            language: String::from("python"),
-            name: String::from("settings.MAX_RETRIES"),
-        }),
-        to: None,
+        target: EdgeTarget::External {
+            to_external: ExternalTarget {
+                language: String::from("python"),
+                name: String::from("settings.MAX_RETRIES"),
+            },
+        },
         confidence: 0.55,
         direction: SliceDirection::Out,
         resolution_scope: ResolutionScope::Lsp,
@@ -174,8 +177,9 @@ pub fn sample_resolved_call_edge() -> SliceEdge {
         edge_version: 1,
         edge_type: SliceEdgeType::Call,
         from: String::from("sym_abc123"),
-        to: Some(String::from("sym_def456")),
-        to_external: None,
+        target: EdgeTarget::Local {
+            to: String::from("sym_def456"),
+        },
         confidence: 0.92,
         direction: SliceDirection::Out,
         resolution_scope: ResolutionScope::FullSymbolTable,
@@ -198,11 +202,12 @@ pub fn sample_external_edge() -> SliceEdge {
         edge_version: 1,
         edge_type: SliceEdgeType::Call,
         from: String::from("sym_abc123"),
-        to: None,
-        to_external: Some(ExternalTarget {
-            language: String::from("python"),
-            name: String::from("requests.get"),
-        }),
+        target: EdgeTarget::External {
+            to_external: ExternalTarget {
+                language: String::from("python"),
+                name: String::from("requests.get"),
+            },
+        },
         confidence: 0.35,
         direction: SliceDirection::Out,
         resolution_scope: ResolutionScope::PartialSymbolTable,

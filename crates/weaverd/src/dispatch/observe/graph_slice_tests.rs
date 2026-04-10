@@ -1,5 +1,7 @@
 //! Unit tests for the `observe graph-slice` dispatch handler.
 
+use rstest::rstest;
+
 use crate::dispatch::request::CommandRequest;
 use crate::dispatch::response::ResponseWriter;
 
@@ -69,18 +71,11 @@ fn valid_request_returns_not_yet_implemented_refusal() {
     );
 }
 
-#[test]
-fn invalid_arguments_returns_dispatch_error() {
-    let request = make_request(&["--position", "10:5"]);
-    let mut buffer = Vec::new();
-    let mut writer = ResponseWriter::new(&mut buffer);
-    let result = handle(&request, &mut writer);
-    assert!(result.is_err());
-}
-
-#[test]
-fn bad_position_format_returns_dispatch_error() {
-    let request = make_request(&["--uri", "file:///src/main.rs", "--position", "bad"]);
+#[rstest]
+#[case(&["--position", "10:5"])]
+#[case(&["--uri", "file:///src/main.rs", "--position", "bad"])]
+fn invalid_arguments_return_dispatch_error(#[case] arguments: &[&str]) {
+    let request = make_request(arguments);
     let mut buffer = Vec::new();
     let mut writer = ResponseWriter::new(&mut buffer);
     let result = handle(&request, &mut writer);

@@ -101,7 +101,9 @@ impl RequestBuilder {
         I: Iterator<Item = &'a String>,
     {
         if !self.try_apply_known_flag(flag, iter)? {
-            skip_unknown_flag_value(iter);
+            return Err(GraphSliceError::UnknownFlag {
+                flag: flag.to_owned(),
+            });
         }
         Ok(())
     }
@@ -269,16 +271,6 @@ where
             flag: flag.into(),
             message: String::from("requires a value"),
         }),
-    }
-}
-
-fn skip_unknown_flag_value<'a, I>(iter: &mut std::iter::Peekable<I>)
-where
-    I: Iterator<Item = &'a String>,
-{
-    let is_value = iter.peek().is_some_and(|next| !next.starts_with('-'));
-    if is_value {
-        iter.next();
     }
 }
 

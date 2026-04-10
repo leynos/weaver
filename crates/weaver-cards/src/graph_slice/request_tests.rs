@@ -169,7 +169,7 @@ fn rejects_invalid_arguments(#[case] arg_list: &[&str], #[case] expected_substri
 }
 
 #[test]
-fn skips_unknown_flags() {
+fn rejects_unknown_flags() {
     let arguments = args(&[
         "--uri",
         "file:///main.rs",
@@ -179,6 +179,10 @@ fn skips_unknown_flags() {
         "whatever",
         "--experimental",
     ]);
-    let request = GraphSliceRequest::parse(&arguments).expect("should parse");
-    assert_eq!(request.uri(), "file:///main.rs");
+    let error = GraphSliceRequest::parse(&arguments).expect_err("should fail");
+    let message = error.to_string();
+    assert!(
+        message.contains("--bogus") || message.contains("unknown"),
+        "expected error to mention unknown flag, got: {message}"
+    );
 }

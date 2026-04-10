@@ -100,11 +100,30 @@ pub struct ExternalTarget {
     pub name: String,
 }
 
+/// The target of an edge in a graph slice.
+///
+/// Ensures exactly one target variant is present, preventing invalid states
+/// where both or neither target is specified.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum EdgeTarget {
+    /// A resolved local symbol ID.
+    Local {
+        /// Symbol ID of the target node.
+        to: String,
+    },
+    /// An unresolved external symbol reference.
+    External {
+        /// External target details.
+        to_external: ExternalTarget,
+    },
+}
+
 /// A typed edge in a graph slice.
 ///
 /// Edges carry their type, endpoints, confidence, direction, resolution
-/// scope, and provenance. When the target cannot be resolved to a local
-/// symbol ID, `to_external` is populated instead of `to`.
+/// scope, and provenance. The target is always specified via the `target`
+/// enum, which ensures exactly one of local or external is present.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SliceEdge {
     /// Schema version for forward compatibility.
@@ -114,12 +133,9 @@ pub struct SliceEdge {
     pub edge_type: SliceEdgeType,
     /// Symbol ID of the source node.
     pub from: String,
-    /// Symbol ID of the target node (when resolved).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub to: Option<String>,
-    /// External target reference (when not resolved to a local symbol).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub to_external: Option<ExternalTarget>,
+    /// Target of this edge (local symbol or external reference).
+    #[serde(flatten)]
+    pub target: EdgeTarget,
     /// Confidence score (0.0–1.0).
     pub confidence: f64,
     /// Traversal direction in which this edge was discovered.
