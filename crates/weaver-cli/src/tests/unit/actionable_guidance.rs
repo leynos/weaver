@@ -49,7 +49,6 @@ struct StartupGuidanceExpectation {
     problem: &'static str,
     alternatives: &'static str,
     socket_hint: Option<&'static str>,
-    next_command: &'static str,
 }
 
 fn assert_startup_guidance_template(error: &LifecycleError, expected: &StartupGuidanceExpectation) {
@@ -68,6 +67,11 @@ fn assert_startup_guidance_template(error: &LifecycleError, expected: &StartupGu
                 String::from("  - Check whether the daemon is listening on 127.0.0.1:9779")
             }
         });
+    let expected_next_command = if cfg!(unix) {
+        "WEAVER_FOREGROUND=1 weaver daemon start"
+    } else {
+        "weaver daemon start"
+    };
 
     assert!(
         output.contains(&format!("error: {}", expected.problem)),
@@ -87,9 +91,9 @@ fn assert_startup_guidance_template(error: &LifecycleError, expected: &StartupGu
         "expected socket hint '{expected_socket_hint}' not found in output:\n{output}"
     );
     assert!(
-        output.contains(expected.next_command),
+        output.contains(expected_next_command),
         "expected next command '{}' not found in output:\n{output}",
-        expected.next_command
+        expected_next_command
     );
 }
 
@@ -138,12 +142,19 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
     let mut buf = Vec::new();
     write_startup_guidance(&mut buf, &error).expect("write");
     let output = String::from_utf8(buf).expect("utf8");
+    let expected_next_command = if cfg!(unix) {
+        "test -x '/tmp/tools/custom-weaverd'"
+    } else if cfg!(windows) {
+        "Test-Path '/tmp/tools/custom-weaverd'"
+    } else {
+        "Ensure '/tmp/tools/custom-weaverd' is installed and runnable"
+    };
 
     assert_three_part_output(
         &output,
         "error: failed to spawn daemon binary '/tmp/tools/custom-weaverd'",
         "Verify custom-weaverd exists and is executable",
-        "test -x '/tmp/tools/custom-weaverd'",
+        expected_next_command,
     );
 }
 
@@ -156,7 +167,6 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
         problem: "daemon exited before reporting ready (status: Some(17))",
         alternatives: "The daemon started but failed to become ready.",
         socket_hint: None,
-        next_command: "WEAVER_FOREGROUND=1 weaver daemon start",
     }
 )]
 #[case(
@@ -168,7 +178,6 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
         problem: "timed out waiting for daemon to become ready",
         alternatives: "The daemon did not report ready within the timeout period.",
         socket_hint: Some("  - Check health snapshot at /tmp/test/weaverd.health"),
-        next_command: "WEAVER_FOREGROUND=1 weaver daemon start",
     }
 )]
 #[case(
@@ -179,7 +188,6 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
         problem: "daemon reported 'stopping' before reaching ready",
         alternatives: "The daemon started but shut down before becoming ready.",
         socket_hint: Some("  - Check health snapshot at /tmp/test/weaverd.health"),
-        next_command: "WEAVER_FOREGROUND=1 weaver daemon start",
     }
 )]
 fn startup_guidance_surfaces_problem_and_next_command(

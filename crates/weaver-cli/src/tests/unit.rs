@@ -376,5 +376,6 @@ mod actionable_guidance;
 mod after_help;
 mod auto_start;
 mod bare_invocation;
+mod discoverability;
 mod missing_operation_guidance;
 mod version_output;

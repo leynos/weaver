@@ -81,15 +81,15 @@ fn launch_binary_name(binary: &OsStr) -> String {
 fn unix_binary_check_command(binary_str: &str, configured: bool) -> String {
     if configured {
         format!(
-            "test -x {} || echo '{} is not executable'",
+            "test -x {} || echo {}",
             shell_quote(binary_str),
-            binary_str
+            shell_quote(&format!("{binary_str} is not executable"))
         )
     } else {
         format!(
-            "command -v {} || echo '{} not found in PATH'",
+            "command -v {} || echo {}",
             shell_quote(binary_str),
-            binary_str
+            shell_quote(&format!("{binary_str} not found in PATH"))
         )
     }
 }
