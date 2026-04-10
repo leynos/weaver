@@ -115,13 +115,14 @@ fn valid_domains_list() -> String {
 }
 
 fn suggestion_for_unknown_domain(domain: &str) -> Option<KnownDomain> {
-    let normalized_domain = domain.trim().to_ascii_lowercase();
+    let normalized_domain: Vec<char> = domain.trim().to_ascii_lowercase().chars().collect();
     let mut best_match = None;
     let mut best_distance = usize::MAX;
     let mut tied = false;
 
     for candidate in KnownDomain::catalogue_order() {
-        let Some(distance) = bounded_levenshtein(&normalized_domain, candidate.as_str(), 2) else {
+        let candidate_chars: Vec<char> = candidate.as_str().chars().collect();
+        let Some(distance) = bounded_levenshtein(&normalized_domain, &candidate_chars, 2) else {
             continue;
         };
         if distance < best_distance {
@@ -136,22 +137,19 @@ fn suggestion_for_unknown_domain(domain: &str) -> Option<KnownDomain> {
     if tied { None } else { best_match }
 }
 
-fn bounded_levenshtein(left: &str, right: &str, max_distance: usize) -> Option<usize> {
-    let left_chars: Vec<char> = left.chars().collect();
-    let right_chars: Vec<char> = right.chars().collect();
-
-    if left_chars.len().abs_diff(right_chars.len()) > max_distance {
+fn bounded_levenshtein(left: &[char], right: &[char], max_distance: usize) -> Option<usize> {
+    if left.len().abs_diff(right.len()) > max_distance {
         return None;
     }
 
-    let mut previous: Vec<usize> = (0..=right_chars.len()).collect();
-    let mut current = vec![0; right_chars.len() + 1];
+    let mut previous: Vec<usize> = (0..=right.len()).collect();
+    let mut current = vec![0; right.len() + 1];
 
-    for (left_index, left_char) in left_chars.iter().enumerate() {
+    for (left_index, left_char) in left.iter().enumerate() {
         current[0] = left_index + 1;
         let mut row_min = current[0];
 
-        for (right_index, right_char) in right_chars.iter().enumerate() {
+        for (right_index, right_char) in right.iter().enumerate() {
             let substitution_cost = usize::from(left_char != right_char);
             current[right_index + 1] = usize::min(
                 usize::min(previous[right_index + 1] + 1, current[right_index] + 1),
@@ -167,7 +165,7 @@ fn bounded_levenshtein(left: &str, right: &str, max_distance: usize) -> Option<u
         previous.clone_from_slice(&current);
     }
 
-    let distance = previous[right_chars.len()];
+    let distance = previous[right.len()];
     (distance <= max_distance).then_some(distance)
 }
 
@@ -299,7 +297,9 @@ mod tests {
         #[case] right: &str,
         #[case] expected: Option<usize>,
     ) {
-        assert_eq!(bounded_levenshtein(left, right, 2), expected);
+        let left_chars: Vec<char> = left.chars().collect();
+        let right_chars: Vec<char> = right.chars().collect();
+        assert_eq!(bounded_levenshtein(&left_chars, &right_chars, 2), expected);
     }
 
     #[rstest]

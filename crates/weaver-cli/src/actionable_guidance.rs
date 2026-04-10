@@ -72,28 +72,39 @@ fn launch_binary_name(binary: &OsStr) -> String {
         .into_owned()
 }
 
+/// Returns the shell check command for a Unix environment.
+fn unix_binary_check_command(binary_str: &str, configured: bool) -> String {
+    if configured {
+        format!(
+            "test -x {} || echo '{} is not executable'",
+            shell_quote(binary_str),
+            binary_str
+        )
+    } else {
+        format!(
+            "command -v {} || echo '{} not found in PATH'",
+            shell_quote(binary_str),
+            binary_str
+        )
+    }
+}
+
+/// Returns the PowerShell check command for a Windows environment.
+fn windows_binary_check_command(binary_str: &str, configured: bool) -> String {
+    if configured {
+        format!("Test-Path {}", shell_quote(&binary_str.replace('\\', "/")))
+    } else {
+        format!("Get-Command {}", shell_quote(binary_str))
+    }
+}
+
 fn launch_binary_check_command(binary: &OsStr) -> String {
     let binary_str = binary.to_string_lossy();
+    let configured = has_configured_binary_path(binary);
     if cfg!(unix) {
-        if has_configured_binary_path(binary) {
-            format!(
-                "test -x {} || echo '{} is not executable'",
-                shell_quote(&binary_str),
-                binary_str
-            )
-        } else {
-            format!(
-                "command -v {} || echo '{} not found in PATH'",
-                shell_quote(&binary_str),
-                binary_str
-            )
-        }
+        unix_binary_check_command(&binary_str, configured)
     } else if cfg!(windows) {
-        if has_configured_binary_path(binary) {
-            format!("Test-Path {}", shell_quote(&binary_str.replace('\\', "/")))
-        } else {
-            format!("Get-Command {}", shell_quote(&binary_str))
-        }
+        windows_binary_check_command(&binary_str, configured)
     } else {
         format!(
             "Ensure {} is installed and runnable",
