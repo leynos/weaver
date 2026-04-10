@@ -399,8 +399,10 @@ the new `actionable_guidance` module or as a focused helper beside the
 lifecycle module. The renderer should map at least these variants:
 
 - `LifecycleError::LaunchDaemon` with missing binary: mention installation/PATH
-  checking and `WEAVERD_BIN`, and use `command -v weaverd` as the deterministic
-  next command;
+  checking and `WEAVERD_BIN`, and derive the deterministic next command from
+  the configured daemon binary. If `WEAVERD_BIN` resolves to an explicit path
+  (contains a slash), render `test -x <path>`; otherwise render
+  `command -v <binary>`;
 - `LifecycleError::StartupFailed`, `LifecycleError::StartupTimeout`, and
   `LifecycleError::StartupAborted`: keep the same three-part layout and direct
   the operator to rerun in the foreground using
@@ -523,7 +525,7 @@ Valid alternatives:
   ...
 
 Next command:
-  command -v weaverd
+  test -x "$WEAVERD_BIN"
 ```
 
 The exact prose may differ slightly after implementation, but the three-part

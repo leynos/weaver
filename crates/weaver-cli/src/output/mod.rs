@@ -260,13 +260,13 @@ fn render_unknown_operation(details: UnknownOperationDetails) -> io::Result<Stri
         alternatives.push(format!("  {operation}"));
     }
 
-    // Derive next command from first known operation
-    let first_op = details
-        .known_operations
-        .first()
-        .map(String::as_str)
-        .unwrap_or("get-definition");
-    let next_command = format!("weaver {} {} --help", details.domain, first_op);
+    let next_command = if let Some(first_op) = details.known_operations.first() {
+        format!("weaver {} {} --help", details.domain, first_op)
+    } else if details.domain.trim().is_empty() {
+        String::from("weaver --help")
+    } else {
+        format!("weaver {} --help", details.domain)
+    };
 
     let guidance = ActionableGuidance::new(problem, alternatives, next_command);
     let mut buf = Vec::new();
@@ -460,5 +460,19 @@ mod tests {
             alt_pos < next_cmd_pos,
             "alternatives must come before Next command"
         );
+    }
+
+    #[test]
+    fn renders_unknown_operation_without_known_operations_using_domain_help() {
+        let details = UnknownOperationDetails {
+            domain: String::from("observe"),
+            operation: String::from("nonexistent"),
+            known_operations: Vec::new(),
+        };
+
+        let rendered = render_unknown_operation(details).expect("rendered");
+
+        assert!(rendered.contains("Next command:\n  weaver observe --help"));
+        assert!(!rendered.contains("get-definition"));
     }
 }
