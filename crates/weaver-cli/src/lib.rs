@@ -18,9 +18,11 @@ mod config;
 mod daemon_output;
 mod discoverability;
 mod errors;
+mod help;
 mod lifecycle;
 mod localizer;
 pub mod output;
+mod preflight;
 mod runtime_utils;
 mod transport;
 
@@ -29,14 +31,10 @@ pub(crate) use cli::{Cli, CliCommand, DaemonAction};
 #[cfg(test)]
 pub(crate) use command::CommandDescriptor;
 pub(crate) use command::{CommandInvocation, CommandRequest};
-use config::{ConfigArgumentSplit, prepare_cli_arguments, split_config_arguments};
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader};
+use config::{prepare_cli_arguments, split_config_arguments};
 pub(crate) use daemon_output::{OutputSettings, read_daemon_messages};
 pub use discoverability::DOMAIN_OPERATIONS;
-use discoverability::KnownDomain;
-use discoverability::should_emit_domain_guidance;
-use discoverability::write_missing_operation_guidance;
-use discoverability::write_unknown_domain_guidance;
 pub(crate) use errors::{AppError, is_daemon_not_running};
 use lifecycle::{
     LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput, SystemLifecycle,
@@ -44,6 +42,7 @@ use lifecycle::{
 };
 use localizer::build_localizer;
 pub use output::{OutputContext, ResolvedOutputFormat, render_human_output};
+use preflight::handle_preflight;
 pub(crate) use runtime_utils::exit_code_from_status;
 use runtime_utils::handle_capabilities_mode;
 use transport::{connect, connect_with_retry};
@@ -58,6 +57,7 @@ const CONFIG_CLI_FLAGS: &[&str] = &[
     "--log-filter",
     "--log-format",
     "--capability-overrides",
+    "--locale",
 ];
 pub(crate) const EMPTY_LINE_LIMIT: usize = 10;
 
@@ -158,8 +158,18 @@ where
         let split = split_config_arguments(&args);
         let cli_arguments = prepare_cli_arguments(&args, &split);
 
-        let result = Cli::try_parse_from(cli_arguments)
-            .map_err(AppError::CliUsage)
+        let parsed_cli = match Cli::try_parse_from(cli_arguments) {
+            Ok(cli) => Ok(cli),
+            Err(error) if error.kind() == clap::error::ErrorKind::DisplayHelp => {
+                if let Err(io_error) = write_help_for_args(&args, &mut *self.io.stdout) {
+                    return self.map_result_to_exit_code(Err(AppError::EmitHelp(io_error)));
+                }
+                return ExitCode::SUCCESS;
+            }
+            Err(error) => Err(AppError::CliUsage(error)),
+        };
+
+        let result = parsed_cli
             .and_then(|cli| {
                 handle_preflight(&cli, &split, &mut *self.io.stderr, localizer)?;
                 self.loader
@@ -238,54 +248,23 @@ where
     run_with_loader(args, io, &OrthoConfigLoader)
 }
 
-fn preflight_result(written: bool) -> Result<(), AppError> {
-    if written {
-        Err(AppError::PreflightGuidance)
-    } else {
-        Ok(())
+fn write_help_for_args<W: Write>(args: &[OsString], writer: &mut W) -> std::io::Result<()> {
+    match help::command().try_get_matches_from(args.iter().cloned()) {
+        Err(error)
+            if matches!(
+                error.kind(),
+                clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion
+            ) =>
+        {
+            write!(writer, "{error}")
+        }
+        Err(error) => write!(writer, "{error}"),
+        Ok(_) => {
+            let mut fallback = help::command();
+            fallback.write_long_help(writer)?;
+            writeln!(writer)
+        }
     }
-}
-
-fn emit_domain_guidance<ErrWriter: Write>(
-    cli: &Cli,
-    stderr: &mut ErrWriter,
-    localizer: &dyn Localizer,
-    raw_domain: &str,
-) -> Result<(), AppError> {
-    let operation_is_missing = cli
-        .operation
-        .as_deref()
-        .is_none_or(|op| op.trim().is_empty());
-
-    match KnownDomain::try_parse(raw_domain) {
-        Some(domain) if operation_is_missing => preflight_result(
-            write_missing_operation_guidance(stderr, localizer, domain)
-                .map_err(AppError::EmitGuidance)?,
-        ),
-        Some(_) => Ok(()),
-        None => preflight_result(
-            write_unknown_domain_guidance(stderr, localizer, raw_domain)
-                .map_err(AppError::EmitGuidance)?,
-        ),
-    }
-}
-
-fn handle_preflight<ErrWriter: Write>(
-    cli: &Cli,
-    split: &ConfigArgumentSplit,
-    stderr: &mut ErrWriter,
-    localizer: &dyn Localizer,
-) -> Result<(), AppError> {
-    if cli.is_bare_invocation() && !split.has_config_flags() {
-        actionable_guidance::write_bare_invocation_guidance(stderr, localizer)
-            .map_err(AppError::EmitBareHelp)?;
-        return Err(AppError::BareInvocation);
-    }
-    if should_emit_domain_guidance(cli) {
-        let raw_domain = cli.domain.as_deref().map(str::trim).unwrap_or_default();
-        emit_domain_guidance(cli, stderr, localizer, raw_domain)?;
-    }
-    Ok(())
 }
 
 fn execute_daemon_command<R, W, E>(

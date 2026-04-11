@@ -291,10 +291,10 @@ does* *not require source inspection or external runbooks.*
       [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces)
       and
       [weaver design §2.3.1](weaver-design.md#231-configuration-contract).
-  - [ ] Register `--config-path`, `--daemon-socket`, `--log-filter`,
+  - [x] Register `--config-path`, `--daemon-socket`, `--log-filter`,
         `--log-format`, `--capability-overrides`, and `--locale` as visible
         global flags.
-  - [ ] Acceptance criteria: all six flags appear in both `weaver --help` and
+  - [x] Acceptance criteria: all six flags appear in both `weaver --help` and
         `weaver daemon start --help`, and existing precedence tests
         (file < env < CLI) continue to pass.
 - [ ] 3.2.2. Extend `daemon start` help with config and environment guidance.
