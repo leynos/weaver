@@ -28,6 +28,7 @@
 mod capture;
 mod config;
 mod diagnostic;
+pub mod formula;
 mod language;
 mod match_result;
 mod span;

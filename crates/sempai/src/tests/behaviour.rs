@@ -2,6 +2,7 @@
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
+use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom};
 use sempai_core::test_support::QuotedString;
 
 use crate::engine::QueryPlan;
@@ -56,7 +57,16 @@ fn when_compile_dsl(world: &mut TestWorld, dsl: QuotedString, lang: QuotedString
 #[when("a query plan is executed")]
 fn when_execute(world: &mut TestWorld) {
     let engine = world.engine.as_ref().expect("engine should be set");
-    let plan = QueryPlan::new(String::from("test-rule"), Language::Rust);
+    let dummy_formula = Decorated {
+        node: Formula::Atom(Atom::Pattern(PatternAtom {
+            text: String::from("dummy"),
+        })),
+        where_clauses: vec![],
+        as_name: None,
+        fix: None,
+        span: None,
+    };
+    let plan = QueryPlan::new(String::from("test-rule"), Language::Rust, dummy_formula);
     world.execute_result = Some(
         engine
             .execute(&plan, "file:///t.rs", "fn main() {}")
