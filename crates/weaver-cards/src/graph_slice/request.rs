@@ -133,6 +133,18 @@ impl FromStr for SliceEdgeType {
 }
 
 impl SliceEdgeType {
+    /// Returns the canonical rank of this edge type for deterministic ordering.
+    ///
+    /// The canonical order is: Call (0), Import (1), Config (2).
+    #[must_use]
+    pub const fn canonical_rank(self) -> u8 {
+        match self {
+            Self::Call => 0,
+            Self::Import => 1,
+            Self::Config => 2,
+        }
+    }
+
     /// Returns all edge types in canonical order.
     #[must_use]
     pub const fn all() -> &'static [Self] {

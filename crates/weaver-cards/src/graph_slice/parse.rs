@@ -124,7 +124,7 @@ impl RequestBuilder {
         match flag {
             "--uri" => {
                 let raw = require_arg_value(iter, Flag::Uri)?;
-                self.uri = Some(String::from(raw.value));
+                self.uri = Some(parse_uri(raw)?);
                 Ok(true)
             }
             "--position" => {
@@ -224,7 +224,7 @@ impl RequestBuilder {
         let mut edge_types = self
             .edge_types
             .unwrap_or_else(|| SliceEdgeType::all().to_vec());
-        edge_types.sort();
+        edge_types.sort_by_key(|e| e.canonical_rank());
         edge_types.dedup();
 
         Ok(GraphSliceRequest {
@@ -277,6 +277,17 @@ where
             message: String::from("requires a value"),
         }),
     }
+}
+
+fn parse_uri(raw: RawValue<'_>) -> Result<String, GraphSliceError> {
+    let value = raw.value;
+    if !value.starts_with("file://") {
+        return Err(GraphSliceError::InvalidValue {
+            flag: raw.flag.into(),
+            message: format!("expected a file URI, got: {value}"),
+        });
+    }
+    Ok(String::from(value))
 }
 
 fn parse_position(raw: RawValue<'_>) -> Result<(u32, u32), GraphSliceError> {

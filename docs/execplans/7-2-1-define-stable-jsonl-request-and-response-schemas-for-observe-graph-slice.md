@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: IN_PROGRESS
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
@@ -126,13 +126,17 @@ This plan covers roadmap item 7.2.1 in [docs/roadmap.md](../roadmap.md).
       `crates/weaverd`, `crates/weaver-cards`, `crates/weaver-graph`,
       `crates/weaver-e2e`, and `docs/users-guide.md`.
 - [x] (2026-04-02 00:00Z) Drafted this ExecPlan.
-- [ ] Stage A: add schema modules and exports in `crates/weaver-cards/`.
-- [ ] Stage B: lock request defaults, budget semantics, spillover metadata,
-      and edge resolution scope with unit tests and snapshots.
-- [ ] Stage C: expose `observe graph-slice` through `weaverd` and CLI
-      discoverability with typed request parsing and structured responses.
-- [ ] Stage D: add `rstest-bdd` happy-path, unhappy-path, and edge-case
-      coverage.
+- [x] (2026-04-11 00:00Z) Stage A: add schema modules and exports in
+      `crates/weaver-cards/`.
+- [x] (2026-04-11 00:00Z) Stage B: lock request defaults, budget semantics,
+      spillover metadata, and edge resolution scope with unit tests and
+      snapshots.
+- [x] (2026-04-11 00:00Z) Stage C: expose `observe graph-slice` through
+      `weaverd` and CLI discoverability with typed request parsing and
+      structured responses.
+- [x] (2026-04-11 00:00Z) Stage D: add `rstest-bdd` happy-path,
+      unhappy-path, and edge-case coverage in
+      `crates/weaver-cards/tests/features/graph_slice_schema.feature`.
 - [ ] Stage E: add `assert_cmd` plus `insta` end-to-end coverage using the
       dedicated 20 Rust and 20 Python graph-slice fixture batteries.
 - [ ] Stage F: update design and user documentation, mark the roadmap
@@ -484,6 +488,8 @@ Review the tail of each log before concluding that the milestone is done.
 
 ## Approval gate
 
-This ExecPlan is complete as a draft. Per the `execplans` skill, the next step
-after drafting is explicit user approval before implementation begins. No code
-changes beyond this plan document should be made until that approval is given.
+This ExecPlan was approved and implementation has begun. Stages A through D have
+been completed, establishing the stable JSON schema contract, daemon routing,
+CLI parsing, and BDD coverage for the `observe graph-slice` operation. Stages E
+and F (end-to-end fixture coverage and documentation updates) remain in
+progress.
