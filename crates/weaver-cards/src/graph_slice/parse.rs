@@ -71,8 +71,13 @@ pub(super) struct RequestBuilder {
 }
 
 impl RequestBuilder {
-    /// Returns `true` if `flag` was recognised and handled, `false` if it is
-    /// an unknown flag whose value (if any) should be skipped.
+    /// Returns `Ok(true)` if `flag` was recognised and handled (via
+    /// `try_apply_traversal_flag`, `try_apply_budget_flag`, or
+    /// `try_apply_detail_flag`), and `Ok(false)` if the flag is unknown.
+    ///
+    /// Importantly, when returning `Ok(false)` the iterator is **not** advanced
+    /// or consumed — the function only returns the boolean and propagates
+    /// `GraphSliceError` on failure.
     fn try_apply_known_flag<'a, I>(
         &mut self,
         flag: &str,

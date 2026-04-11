@@ -16,17 +16,16 @@ After this change, Weaver will have one stable, serde-annotated contract for
 `observe graph-slice` that downstream code can treat as the source of truth. A
 caller will be able to request a bounded slice rooted at a symbol, specify
 budget limits explicitly, and receive a deterministic JSON response that always
-describes the applied constraints, the cards and edges, that fit inside those
+describes the applied constraints, the cards and edges that fit inside those
 constraints, and any spillover that was excluded when the traversal truncated.
 
 Observable behaviour after implementation:
 
 1. `weaver observe graph-slice --uri <Uniform Resource Identifier (URI)>
-   --position
-   <LINE:COL>` parses into a typed request with explicit default values for `
-   depth`, `direction`, `edge_types`, `min_confidence`, `budget.max_cards`, `
-   budget.max_edges`, `budget.max_estimated_tokens`, `entry_detail`, and `
-   node_detail`.
+   --position <LINE:COL>` parses into a typed request with explicit default
+   values for `depth`, `direction`, `edge_types`, `min_confidence`,
+   `budget.max_cards`, `budget.max_edges`, `budget.max_estimated_tokens`,
+   `entry_detail`, and `node_detail`.
 2. Stable JSON snapshots lock at least one successful slice, one
    truncated slice with spillover metadata, and one structured refusal.
 3. Every serialized edge reports its resolution scope as exactly one of
@@ -419,8 +418,8 @@ Expected files:
 - shared helper additions in
   [crates/weaver-e2e/tests/test_support/mod.rs](../../crates/weaver-e2e/tests/test_support/mod.rs)
 - a dedicated
-  [crates/weaver-e2e/src/graph_slice_fixtures/](../../crates/weaver-e2e/src)
-   module tree for graph-shaped workspaces
+  [crates/weaver-e2e/src/graph_slice_fixtures/](../../crates/weaver-e2e/src/graph_slice_fixtures/)
+  module tree for graph-shaped workspaces
 
 The e2e suite must cover:
 
