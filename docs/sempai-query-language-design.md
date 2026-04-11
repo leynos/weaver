@@ -434,6 +434,18 @@ with `E_SEMPAI_UNSUPPORTED_MODE`. The first unsupported rule in source order is
 reported, and its `primary_span` prefers the `mode` field span before falling
 back to the enclosing rule span.
 
+Implementation note (2026-04-11): Normalization into the canonical `Formula`
+model is now implemented in `crates/sempai/src/normalize.rs`. Both legacy
+(`pattern*`) and v2 (`match`) syntaxes are lowered into the shared `Formula`
+enum defined in `sempai_core::formula`. Semantic validation
+(`E_SEMPAI_INVALID_NOT_IN_OR` and `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND`) is
+enforced in `crates/sempai/src/semantic_check.rs`. The
+`r2c-internal-project-depends-on` principal normalizes to a degenerate
+Tree-sitter query atom that will never match real code, preserving forward
+compatibility without inventing execution semantics. `WhereClause` values are
+stored as opaque `serde_json::Value` and will be interpreted semantically in
+future milestones.
+
 Extract mode rules require legacy query keys, not `match`.[^1]
 
 ### Sempai extensions for Tree-sitter queries

@@ -1,6 +1,7 @@
 //! Unit tests for the `sempai` facade crate.
 
-mod engine_tests;
-mod reexport_tests;
-
 mod behaviour;
+mod engine_tests;
+mod normalization_tests;
+mod reexport_tests;
+mod semantic_validation_tests;
