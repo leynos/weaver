@@ -703,6 +703,148 @@ level:
   provenance markers; dependency edges and fan-in/out metrics are not yet
   included.
 
+#### observe graph-slice
+
+Syntax:
+
+```sh
+weaver observe graph-slice --uri <URI> --position <LINE:COL> [OPTIONS]
+```
+
+Arguments:
+
+- `--uri` (required) — file URI of the source file containing the
+  root symbol. Must start with `file://`.
+- `--position` (required) — 1-indexed `LINE:COL` position within the
+  root symbol.
+- `--depth` (optional) — maximum traversal depth. Default: `2`.
+- `--direction` (optional) — traversal direction. One of `in`, `out`,
+  or `both` (default).
+- `--edge-types` (optional) — comma-separated list of edge types to
+  follow. Any combination of `call`, `import`, `config`. Default: all
+  three.
+- `--min-confidence` (optional) — minimum edge confidence threshold
+  between `0.0` and `1.0`. Default: `0.5`.
+- `--max-cards` (optional) — maximum number of cards in the budget.
+  Default: `30`.
+- `--max-edges` (optional) — maximum number of edges in the budget.
+  Default: `200`.
+- `--max-estimated-tokens` (optional) — maximum estimated token count
+  in the budget. Default: `4000`.
+- `--entry-detail` (optional) — detail level for the entry card. One
+  of `minimal`, `signature`, `structure` (default), `semantic`, or
+  `full`.
+- `--node-detail` (optional) — detail level for neighbouring node
+  cards. One of `minimal` (default), `signature`, `structure`,
+  `semantic`, or `full`.
+
+Response:
+
+The response is a discriminated-union JSON envelope keyed on the
+`"status"` field. When `"status"` is `"refusal"`, the envelope carries
+a structured refusal explaining why a slice could not be produced. When
+`"status"` is `"success"`, the envelope contains the graph slice.
+
+When the operation cannot produce a slice, the status is `"refusal"`:
+
+```json
+{
+  "status": "refusal",
+  "refusal": {
+    "reason": "not_yet_implemented",
+    "message": "observe graph-slice: graph-slice traversal is not yet implemented"
+  }
+}
+```
+
+On success, the response wraps the slice with constraints, cards,
+edges, and spillover metadata:
+
+```json
+{
+  "status": "success",
+  "slice_version": 1,
+  "entry": { "symbol_id": "sym_abc123" },
+  "constraints": {
+    "depth": 2,
+    "direction": "both",
+    "edge_types": ["call", "import", "config"],
+    "min_confidence": 0.5,
+    "budget": {
+      "max_cards": 30,
+      "max_edges": 200,
+      "max_estimated_tokens": 4000
+    },
+    "entry_detail": "structure",
+    "node_detail": "minimal"
+  },
+  "cards": [
+    {
+      "card_version": 1,
+      "symbol": {
+        "symbol_id": "sym_abc123",
+        "ref": {
+          "uri": "file:///src/main.rs",
+          "range": {
+            "start": { "line": 10, "column": 0 },
+            "end": { "line": 42, "column": 1 }
+          },
+          "language": "rust",
+          "kind": "function",
+          "name": "process_request",
+          "container": "handlers"
+        }
+      },
+      "provenance": {
+        "extracted_at": "2026-03-03T12:34:56Z",
+        "sources": ["tree_sitter"]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "edge_version": 1,
+      "type": "call",
+      "from": "sym_abc123",
+      "to": "sym_def456",
+      "confidence": 0.92,
+      "direction": "out",
+      "resolution_scope": "full_symbol_table",
+      "provenance": {
+        "source": "lsp_call_hierarchy",
+        "details": {
+          "call_site": {
+            "uri": "file:///src/main.rs",
+            "line": 15,
+            "column": 8
+          }
+        }
+      }
+    }
+  ],
+  "spillover": {
+    "truncated": false,
+    "frontier": []
+  }
+}
+```
+
+The `constraints` object reflects the applied request parameters after
+defaults are resolved. The `cards` array contains the extracted symbol
+cards within the budget. The `edges` array describes the relationships
+between cards. Each edge carries a `resolution_scope` of
+`full_symbol_table`, `partial_symbol_table`, or `lsp` indicating how
+the target was resolved.
+
+When the traversal exceeds the budget, `spillover.truncated` is `true`
+and `spillover.frontier` lists candidate nodes that were reached but
+excluded.
+
+Note: `observe graph-slice` is not yet fully implemented. The daemon
+currently returns a structured `not_yet_implemented` refusal. The
+request parsing, schema types, and response contract are stable and
+locked by snapshot tests.
+
 #### observe grep
 
 Syntax:

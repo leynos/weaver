@@ -287,3 +287,67 @@ The plain `extract(...)` method remains available for callers that want an
 owned `SymbolCard`, but the daemon and other long-lived services should prefer
 shared resources and `extract_shared(...)` so cache hits do not pay for extra
 deep clones.
+
+## Graph-slice request parsing architecture
+
+The `observe graph-slice` request parsing pipeline lives in
+`crates/weaver-cards/src/graph_slice/` and is split across three
+internal modules:
+
+- `request.rs` — public schema types (`GraphSliceRequest`,
+  `SliceDirection`, `SliceEdgeType`, `GraphSliceError`) and the
+  `GraphSliceRequest::parse(&[String])` entry point.
+- `parse.rs` — the `RequestBuilder` accumulator and `Flag` enum that
+  drives the flag-dispatch loop.
+- `parse_helpers.rs` — value-level parsing functions that validate and
+  convert raw string arguments into typed values.
+
+### `RequestBuilder` accumulator pattern
+
+`RequestBuilder` is a private struct with `Option<T>` fields for every
+flag. The parse flow is:
+
+1. `GraphSliceRequest::parse(args)` creates an empty `RequestBuilder`
+   and iterates over `args` using a `Peekable` iterator.
+2. Each `--flag` token is dispatched through
+   `try_apply_known_flag(flag, iter)`, which delegates to
+   `try_apply_traversal_flag`, `try_apply_budget_flag`, and
+   `try_apply_detail_flag` in order.
+3. Each sub-dispatcher calls `require_arg_value(iter, Flag::*)` to
+   consume the next token, then passes the resulting `RawValue` to a
+   typed parser (e.g. `parse_uri`, `parse_position`, `parse_u32`).
+4. After all tokens are consumed, `build()` resolves defaults for
+   missing fields and constructs the final `GraphSliceRequest`.
+
+Unknown flags return `GraphSliceError::UnknownFlag`. Bare positional
+tokens return `GraphSliceError::UnknownArgument`.
+
+### `Flag` enum
+
+`Flag` identifies which CLI flag is being processed. It implements
+`Display` to produce the `--flag-name` string for error messages and
+`Into<String>` for `GraphSliceError` construction. The enum lives in
+`parse.rs` with `pub(in crate::graph_slice)` visibility so
+`parse_helpers.rs` can reference it.
+
+### `parse_helpers` module
+
+`parse_helpers.rs` contains pure parsing functions that accept a
+`RawValue` (a flag–value pair) and return a typed result or
+`GraphSliceError`. The key helpers are:
+
+- `require_arg_value` — consumes the next iterator token, rejecting
+  `--`-prefixed tokens as missing values.
+- `parse_uri` — validates a `file://` URI prefix.
+- `parse_position` — splits `LINE:COL` and validates 1-indexed values.
+- `parse_u32` — parses a non-negative integer.
+- `parse_direction` — delegates to `SliceDirection::from_str`.
+- `parse_edge_types` — splits a comma-separated list and parses each
+  token into a `SliceEdgeType`.
+- `parse_confidence` — parses a float and validates the `[0.0, 1.0]`
+  range.
+- `parse_detail` — delegates to `DetailLevel::from_str`.
+
+Each helper produces a `GraphSliceError::InvalidValue` with the
+originating flag name and a descriptive message on failure, so callers
+do not need to format error context themselves.
