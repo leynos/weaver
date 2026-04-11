@@ -1,23 +1,25 @@
 //! Argument parsing internals for `observe graph-slice` requests.
 //!
 //! The [`RequestBuilder`] accumulates parsed flag values before
-//! constructing a [`GraphSliceRequest`]. All value-level parsing
-//! helpers live in this module so that the public `request` module
-//! stays focused on types and accessors.
+//! constructing a [`GraphSliceRequest`].
 
 use std::fmt;
 
 use crate::DetailLevel;
 
 use super::budget::SliceBudget;
+use super::parse_helpers::{
+    parse_confidence, parse_detail, parse_direction, parse_edge_types, parse_position, parse_u32,
+    parse_uri, require_arg_value,
+};
 use super::request::{
     DEFAULT_DEPTH, DEFAULT_MIN_CONFIDENCE, GraphSliceError, GraphSliceRequest, SliceDirection,
-    SliceEdgeType, SliceParseError,
+    SliceEdgeType,
 };
 
 /// Identifies a recognized CLI flag for error-reporting purposes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Flag {
+pub(in crate::graph_slice) enum Flag {
     Uri,
     Position,
     Depth,
@@ -240,163 +242,4 @@ impl RequestBuilder {
             node_detail: self.node_detail.unwrap_or(DetailLevel::Minimal),
         })
     }
-}
-
-// -------------------------------------------------------------------------
-// Value-level parsing helpers
-// -------------------------------------------------------------------------
-
-/// A raw CLI token together with the flag that produced it.
-///
-/// Bundling both lets parse helpers produce accurate error messages
-/// without accepting a separate `flag` parameter.
-#[derive(Debug, Clone, Copy)]
-struct RawValue<'a> {
-    flag: Flag,
-    value: &'a str,
-}
-
-impl<'a> RawValue<'a> {
-    const fn new(flag: Flag, value: &'a str) -> Self {
-        Self { flag, value }
-    }
-}
-
-fn require_arg_value<'a, I>(iter: &mut I, flag: Flag) -> Result<RawValue<'a>, GraphSliceError>
-where
-    I: Iterator<Item = &'a String>,
-{
-    match iter.next().map(String::as_str) {
-        Some(value) if value.starts_with("--") => Err(GraphSliceError::InvalidValue {
-            flag: flag.into(),
-            message: String::from("requires a value"),
-        }),
-        Some(value) => Ok(RawValue::new(flag, value)),
-        None => Err(GraphSliceError::InvalidValue {
-            flag: flag.into(),
-            message: String::from("requires a value"),
-        }),
-    }
-}
-
-fn parse_uri(raw: RawValue<'_>) -> Result<String, GraphSliceError> {
-    let value = raw.value;
-    if !value.starts_with("file://") {
-        return Err(GraphSliceError::InvalidValue {
-            flag: raw.flag.into(),
-            message: format!("expected a file URI, got: {value}"),
-        });
-    }
-    Ok(String::from(value))
-}
-
-fn parse_position(raw: RawValue<'_>) -> Result<(u32, u32), GraphSliceError> {
-    let flag = raw.flag;
-    let value = raw.value;
-
-    let (line_str, col_str) =
-        value
-            .split_once(':')
-            .ok_or_else(|| GraphSliceError::InvalidValue {
-                flag: flag.into(),
-                message: format!("expected LINE:COL, got: {value}"),
-            })?;
-
-    let line: u32 = line_str
-        .parse()
-        .map_err(|_| GraphSliceError::InvalidValue {
-            flag: flag.into(),
-            message: format!("invalid line number: {line_str}"),
-        })?;
-    let column: u32 = col_str.parse().map_err(|_| GraphSliceError::InvalidValue {
-        flag: flag.into(),
-        message: format!("invalid column number: {col_str}"),
-    })?;
-
-    if line == 0 {
-        return Err(GraphSliceError::InvalidValue {
-            flag: flag.into(),
-            message: String::from("line number must be >= 1"),
-        });
-    }
-    if column == 0 {
-        return Err(GraphSliceError::InvalidValue {
-            flag: flag.into(),
-            message: String::from("column number must be >= 1"),
-        });
-    }
-
-    Ok((line, column))
-}
-
-fn parse_u32(raw: RawValue<'_>) -> Result<u32, GraphSliceError> {
-    let flag = raw.flag;
-    let value = raw.value;
-
-    value.parse().map_err(|_| GraphSliceError::InvalidValue {
-        flag: flag.into(),
-        message: format!("expected a non-negative integer, got: {value}"),
-    })
-}
-
-fn parse_direction(raw: RawValue<'_>) -> Result<SliceDirection, GraphSliceError> {
-    parse_with_fromstr(raw)
-}
-
-fn parse_edge_types(raw: RawValue<'_>) -> Result<Vec<SliceEdgeType>, GraphSliceError> {
-    let flag = raw.flag;
-    let value = raw.value;
-
-    value
-        .split(',')
-        .map(|s| {
-            s.trim()
-                .parse()
-                .map_err(|e: SliceParseError| GraphSliceError::InvalidValue {
-                    flag: flag.into(),
-                    message: e.to_string(),
-                })
-        })
-        .collect()
-}
-
-fn parse_confidence(raw: RawValue<'_>) -> Result<f64, GraphSliceError> {
-    let flag = raw.flag;
-    let value = raw.value;
-
-    let confidence: f64 = value.parse().map_err(|_| GraphSliceError::InvalidValue {
-        flag: flag.into(),
-        message: format!("expected a number between 0.0 and 1.0, got: {value}"),
-    })?;
-    if !(0.0..=1.0).contains(&confidence) {
-        return Err(GraphSliceError::InvalidValue {
-            flag: flag.into(),
-            message: format!("expected a number between 0.0 and 1.0, got: {value}"),
-        });
-    }
-    Ok(confidence)
-}
-
-/// Generic helper for parsing values that implement `FromStr`.
-///
-/// Converts the parse error into a `GraphSliceError::InvalidValue` using
-/// the error's `Display` implementation.
-fn parse_with_fromstr<T>(raw: RawValue<'_>) -> Result<T, GraphSliceError>
-where
-    T: std::str::FromStr,
-    T::Err: std::fmt::Display,
-{
-    let flag = raw.flag;
-    let value = raw.value;
-
-    value
-        .parse::<T>()
-        .map_err(|e| GraphSliceError::InvalidValue {
-            flag: flag.into(),
-            message: e.to_string(),
-        })
-}
-
-fn parse_detail(raw: RawValue<'_>) -> Result<DetailLevel, GraphSliceError> {
-    parse_with_fromstr(raw)
 }

@@ -15,6 +15,7 @@
 
 mod budget;
 mod parse;
+mod parse_helpers;
 mod request;
 mod response;
 
