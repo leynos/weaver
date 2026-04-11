@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
@@ -167,16 +167,25 @@ fiction.
       generation, so the final help solution must be shared there as well.
 - [x] (2026-04-10 00:35Z) Drafted this ExecPlan in
       `docs/execplans/3-2-1-surface-configuration-flags-in-clap-help-output.md`.
-- [ ] Stage A: add failing unit, integration, and `rstest-bdd` coverage for
-      top-level help, `daemon start` help, config-flag ordering, and locale
-      precedence.
-- [ ] Stage B: add `locale` to `weaver-config` and update config-loading
-      support to recognise `--locale`.
-- [ ] Stage C: extract shared config-help metadata and build an augmented
-      help command that advertises the six flags without weakening runtime
-      parsing semantics.
-- [ ] Stage D: update `build.rs`, `docs/weaver-design.md`,
-      `docs/users-guide.md`, and `docs/roadmap.md`, then run all gates.
+- [x] (2026-04-11 00:20Z) Stage A: added unit coverage in
+      `crates/weaver-cli/src/tests/unit/help_output.rs`, integration coverage
+      in `crates/weaver-cli/tests/main_entry.rs`, behavioural coverage in
+      `crates/weaver-cli/tests/features/weaver_cli.feature`, and a feature-gated
+      `rstest-bdd` locale-precedence scenario in
+      `crates/weaver-config/tests/features/configuration_precedence.feature`.
+- [x] (2026-04-11 00:35Z) Stage B: added `Config::locale`, surfaced it as
+      `--locale`, `WEAVER_LOCALE`, and a config-file key, and updated
+      `CONFIG_CLI_FLAGS` so the CLI still strips leading locale config flags
+      before runtime clap parsing.
+- [x] (2026-04-11 00:45Z) Stage C: extracted help rendering into
+      `crates/weaver-cli/src/help.rs`, moved preflight logic into
+      `crates/weaver-cli/src/preflight.rs`, and kept
+      `crates/weaver-cli/src/lib.rs` under 400 lines while rendering help from
+      an augmented clap command only when clap itself requests help.
+- [x] (2026-04-11 01:20Z) Stage D: updated `crates/weaver-cli/build.rs`,
+      `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`,
+      then passed `make fmt`, `make markdownlint`, `make nixie`,
+      `make check-fmt`, `make lint`, and `make test`.
 
 ## Surprises & Discoveries
 
@@ -197,6 +206,11 @@ fiction.
   clap `Command` while leaving the runtime parser strict. That is a more
   deliberate design than simply adding shadow fields to `Cli`.
 
+- `unic_langid::LanguageIdentifier` is not serde-enabled through the current
+  workspace dependency surface, so a direct `Config::locale` field would not
+  compile. A small validated `Locale` newtype in `weaver-config` keeps the
+  config contract honest without adding new dependency churn.
+
 ## Decision Log
 
 - Decision: this plan assumes `--locale` should become a real member of the
@@ -215,6 +229,12 @@ fiction.
   flags, and keep `weaver-cli` as the place where those flags are rendered for
   help and operator guidance. Rationale: that split matches the existing
   architecture and avoids inventing a second config contract. Date: 2026-04-10.
+
+- Decision: ship `locale` in `3.2.1` as a validated newtype inside
+  `weaver-config` instead of storing `unic_langid::LanguageIdentifier`
+  directly. Rationale: the direct type is not serde-enabled in the current
+  workspace dependency graph, while the newtype preserves validation and keeps
+  dependency churn below the tolerance threshold. Date: 2026-04-11.
 
 ## Outcomes & Retrospective
 
@@ -235,14 +255,18 @@ Target outcome at completion:
 7. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
-Retrospective notes to complete when the implementation lands:
+Retrospective notes:
 
-- Record whether the final solution used an augmented help command or a direct
-  clap registration path.
-- Record whether `locale` shipped as a validated newtype or a string-backed
-  field, and why that choice was appropriate for the sequencing with roadmap
-  `3.3.1`.
-- Record any help/manpage drift bugs caught by the shared builder.
+- Final solution: use an augmented help-only clap `Command` in
+  `crates/weaver-cli/src/help.rs`, shared by the runtime help path and
+  `crates/weaver-cli/build.rs`, while leaving the runtime parser strict.
+- `locale` shipped as a validated `weaver-config::Locale` newtype because the
+  direct `unic_langid::LanguageIdentifier` type was not serde-enabled through
+  the current workspace dependency surface. This preserved validation without
+  dragging roadmap `3.3.1` into the current task.
+- Shared builder verification caught the main drift risk up front: top-level
+  help and generated manpages were both sourcing `Cli::command()`, so
+  augmenting only the runtime path would have left the roff output stale.
 
 ## Context and orientation
 

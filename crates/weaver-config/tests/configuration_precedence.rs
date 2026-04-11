@@ -39,8 +39,7 @@ impl Harness {
     }
 
     fn write_config(&self, socket: &SocketEndpoint) {
-        let path = self.temp_dir.path().join("weaver.toml");
-        let toml = match socket {
+        self.write_config_contents(match socket {
             SocketEndpoint::Unix { path } => {
                 format!(
                     "daemon_socket = {{ transport = \"unix\", path = \"{}\" }}\n",
@@ -51,17 +50,7 @@ impl Harness {
                 "daemon_socket = {{ transport = \"tcp\", host = \"{}\", port = {} }}\n",
                 host, port
             ),
-        };
-
-        let dir = Dir::open_ambient_dir(self.temp_dir.path(), cap_std::ambient_authority())
-            .expect("open temp dir");
-        if let Err(error) = dir.write("weaver.toml", toml) {
-            panic!("failed to write configuration: {error}");
-        }
-
-        let mut args = self.cli_args.borrow_mut();
-        args.push(OsString::from("--config-path"));
-        args.push(path.into_os_string());
+        });
     }
 
     fn set_env(&self, key: &str, value: &str) {
@@ -93,6 +82,23 @@ impl Harness {
                 *self.error.borrow_mut() = Some(error.to_string());
             }
         }
+    }
+
+    fn write_locale_config(&self, locale: &str) {
+        self.write_config_contents(format!("locale = \"{locale}\"\n"));
+    }
+
+    fn write_config_contents(&self, contents: String) {
+        let path = self.temp_dir.path().join("weaver.toml");
+        let dir = Dir::open_ambient_dir(self.temp_dir.path(), cap_std::ambient_authority())
+            .expect("open temp dir");
+        if let Err(error) = dir.write("weaver.toml", contents) {
+            panic!("failed to write configuration: {error}");
+        }
+
+        let mut args = self.cli_args.borrow_mut();
+        args.push(OsString::from("--config-path"));
+        args.push(path.into_os_string());
     }
 }
 
@@ -127,13 +133,22 @@ fn given_environment_override(harness: &Harness, socket: String) {
     harness.set_env("WEAVER_DAEMON_SOCKET", &socket);
 }
 
-#[when("the CLI sets the daemon socket to \"{socket}\"")]
+fn given_configuration_file_locale(harness: &Harness, locale: String) {
+    harness.write_locale_config(&locale);
+}
+
+fn given_environment_locale_override(harness: &Harness, locale: String) {
+    harness.set_env("WEAVER_LOCALE", &locale);
+}
 fn when_cli_override(harness: &Harness, socket: String) {
     harness.push_cli_arg("--daemon-socket");
     harness.push_cli_arg(OsString::from(&socket));
 }
 
-#[when("the configuration loads without overrides")]
+fn when_cli_locale_override(harness: &Harness, locale: String) {
+    harness.push_cli_arg("--locale");
+    harness.push_cli_arg(OsString::from(&locale));
+}
 fn when_load_without_overrides(harness: &Harness) { harness.load(); }
 
 #[then("loading the configuration resolves the daemon socket to \"{socket}\"")]
@@ -175,6 +190,7 @@ fn then_defaults_applied(harness: &Harness) {
     assert_eq!(config.daemon_socket(), &default_socket_endpoint());
     assert_eq!(config.log_filter(), default_log_filter());
     assert_eq!(config.log_format(), default_log_format());
+    assert_eq!(config.locale().to_string(), "en-US");
 
     let matrix = config.capability_matrix();
     assert!(
@@ -183,5 +199,19 @@ fn then_defaults_applied(harness: &Harness) {
     );
 }
 
-#[scenario(path = "tests/features/configuration_precedence.feature")]
+fn then_resolved_locale(harness: &Harness, locale: String) {
+    harness.load();
+
+    if let Some(error) = harness.error.borrow().as_ref() {
+        panic!("configuration failed to load: {error}");
+    }
+
+    let loaded = harness.loaded.borrow();
+    let config = match loaded.as_ref() {
+        Some(config) => config,
+        None => panic!("configuration was not loaded"),
+    };
+
+    assert_eq!(config.locale().to_string(), locale);
+}
 fn configuration_precedence(#[from(harness)] _harness: Harness) {}

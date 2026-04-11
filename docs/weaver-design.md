@@ -694,6 +694,14 @@ and pass variable data through `LocalizationArgs`, rather than embedding
 English prose in code. This gives Weaver one message catalogue for static help,
 dynamic errors, and config-derived guidance.
 
+Roadmap item `3.2.1` deliberately stops short of full clap localisation. The
+shipped implementation uses a shared augmented clap `Command` for help and
+manpage generation so the `weaver-config` contract is visible in
+`weaver --help` and `weaver daemon start --help`, while the runtime parser
+remains strict about configuration flag ordering. This keeps the operator
+surface truthful without making post-domain forms such as
+`weaver daemon start --log-filter debug` appear to work.
+
 Localization also requires a single structured command catalogue. The current
 hard-coded `after_help` strings are sufficient for English smoke tests, but
 they duplicate router knowledge and will drift as new operations are added.
@@ -1141,6 +1149,12 @@ artefacts, and other operator-facing strings, but does not affect the JSONL
 protocol or plugin execution environment. Invalid locale identifiers are
 reported as configuration errors instead of silently falling back, preserving
 the fail-fast behaviour expected from the rest of the config loader.
+
+For roadmap item `3.2.1`, `locale` ships as a validated `weaver-config` newtype
+that accepts only well-formed BCP 47 identifiers and defaults to `en-US`. The
+later bootstrap-localizer work in roadmap `3.3.1` remains responsible for
+honouring that setting before clap-only help and parse-error surfaces are
+constructed.
 
 The capability override matrix is expressed as a sequence of directives using
 the syntax `language:capability=directive`. The directive may be `allow`,

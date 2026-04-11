@@ -99,6 +99,20 @@ fn help_output_lists_all_domains_and_operations() {
             );
         }
     }
+
+    for flag in [
+        "--config-path <PATH>",
+        "--daemon-socket <ENDPOINT>",
+        "--log-filter <FILTER>",
+        "--log-format <FORMAT>",
+        "--capability-overrides <DIRECTIVE>",
+        "--locale <LOCALE>",
+    ] {
+        assert!(
+            combined.contains(flag),
+            "weaver --help output missing config flag {flag:?}"
+        );
+    }
 }
 
 #[test]
@@ -128,4 +142,18 @@ fn help_flag_exits_successfully_with_quick_start() {
         .success()
         .stdout(contains("Quick start:"))
         .stdout(contains("weaver observe get-definition"));
+}
+
+fn daemon_start_help_lists_all_config_flags() {
+    let mut command = cargo_bin_cmd!("weaver");
+    command.args(["daemon", "start", "--help"]);
+    command
+        .assert()
+        .success()
+        .stdout(contains("--config-path <PATH>"))
+        .stdout(contains("--daemon-socket <ENDPOINT>"))
+        .stdout(contains("--log-filter <FILTER>"))
+        .stdout(contains("--log-format <FORMAT>"))
+        .stdout(contains("--capability-overrides <DIRECTIVE>"))
+        .stdout(contains("--locale <LOCALE>"));
 }

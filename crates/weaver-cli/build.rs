@@ -4,13 +4,12 @@
 use std::env;
 
 use camino::Utf8PathBuf;
-use clap::CommandFactory;
 use clap_mangen::Man;
 use weaver_build_util::{manual_date_from_env, out_dir_for_target_profile, write_man_page};
 
 #[path = "src/cli.rs"]
 mod cli;
-
+mod help;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Regenerate the manual page when the CLI or metadata changes.
     println!("cargo:rerun-if-changed=src/cli.rs");
@@ -24,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-env-changed=PROFILE");
 
     // The top-level page documents the entire command interface.
-    let cmd = cli::Cli::command();
+    let cmd = help::command();
     let default_name = cmd
         .get_bin_name()
         .unwrap_or_else(|| cmd.get_name())
