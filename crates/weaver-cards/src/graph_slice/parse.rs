@@ -15,7 +15,7 @@ use super::request::{
     SliceEdgeType, SliceParseError,
 };
 
-/// Identifies a recognised CLI flag for error-reporting purposes.
+/// Identifies a recognized CLI flag for error-reporting purposes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Flag {
     Uri,
@@ -71,7 +71,7 @@ pub(super) struct RequestBuilder {
 }
 
 impl RequestBuilder {
-    /// Returns `Ok(true)` if `flag` was recognised and handled (via
+    /// Returns `Ok(true)` if `flag` was recognized and handled (via
     /// `try_apply_traversal_flag`, `try_apply_budget_flag`, or
     /// `try_apply_detail_flag`), and `Ok(false)` if the flag is unknown.
     ///

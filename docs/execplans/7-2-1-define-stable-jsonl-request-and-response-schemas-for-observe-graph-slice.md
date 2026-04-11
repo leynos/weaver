@@ -161,7 +161,7 @@ This plan covers roadmap item 7.2.1 in [docs/roadmap.md](../roadmap.md).
   `import`, and `config` edges plus budget truncation.
 - The design document's examples use the field name `resolution`, while the
   roadmap acceptance criteria say "edges carry resolution scope". This must be
-  normalized in the public schema and reflected back into the design document.
+  normalized in the public schema and reflected into the design document.
 - The design document's example response flattens `max_cards` and
   `max_estimated_tokens` under `constraints`, but the roadmap item speaks about
   `budget` semantics explicitly. This plan resolves that by making the budget
@@ -196,7 +196,7 @@ This plan covers roadmap item 7.2.1 in [docs/roadmap.md](../roadmap.md).
   card/slice surfaces aligned.
 - Decision: record all of these schema decisions back into
   [docs/jacquard-card-first-symbol-graph-design.md](../jacquard-card-first-symbol-graph-design.md)
-   during implementation so the design stays authoritative.
+   during implementation, so the design stays authoritative.
 
 ## Outcomes & retrospective
 
@@ -438,12 +438,12 @@ Recommended approach:
 2. Reuse the existing daemon/snapshot harness and any useful graph-shaped
    seeds already present in `weaver-e2e`, but do not rely on the single-file
    `card_fixtures` battery as the primary graph-slice dataset.
-3. Keep snapshot names aligned with the fixture identifiers so regressions are
+3. Keep snapshot names aligned with the fixture identifiers, so regressions are
    easy to track by scenario.
 
 ### Stage F: Update the design doc, user guide, and roadmap
 
-Update the design doc first so the contract decisions are recorded where future
+Update the design doc first, so the contract decisions are recorded where future
 milestones will find them.
 
 The design doc must explicitly state:
