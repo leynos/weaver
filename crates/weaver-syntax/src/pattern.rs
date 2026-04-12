@@ -136,37 +136,53 @@ impl Pattern {
 
 fn wrap_pattern_for_parse(language: SupportedLanguage, pattern: &str) -> String {
     match language {
-        SupportedLanguage::Rust => {
-            let trimmed = pattern.trim_end();
-            let needs_semicolon =
-                !trimmed.is_empty() && !trimmed.ends_with(';') && !trimmed.ends_with('}');
-            let statement = if needs_semicolon {
-                format!("{trimmed};")
-            } else {
-                trimmed.to_owned()
-            };
-
-            format!("fn __weaver_pattern_wrapper__() {{ {statement} }}")
-        }
-        SupportedLanguage::Python => {
-            let mut out = String::from("def __weaver_pattern_wrapper__():\n");
-            if pattern.trim().is_empty() {
-                out.push_str("    pass\n");
-                return out;
-            }
-
-            for line in pattern.lines() {
-                out.push_str("    ");
-                out.push_str(line);
-                out.push('\n');
-            }
-
-            out
-        }
-        SupportedLanguage::TypeScript => {
-            format!("function __weaver_pattern_wrapper__() {{ {pattern} }}")
-        }
+        SupportedLanguage::Rust => wrap_rust_pattern_for_parse(pattern),
+        SupportedLanguage::Python => wrap_python_pattern_for_parse(pattern),
+        SupportedLanguage::TypeScript => wrap_typescript_pattern_for_parse(pattern),
     }
+}
+
+fn wrap_rust_pattern_for_parse(pattern: &str) -> String {
+    let statement = rust_pattern_statement(pattern);
+    format!("fn __weaver_pattern_wrapper__() {{ {statement} }}")
+}
+
+fn rust_pattern_statement(pattern: &str) -> String {
+    let trimmed = pattern.trim_end();
+    if rust_pattern_needs_semicolon(trimmed) {
+        format!("{trimmed};")
+    } else {
+        trimmed.to_owned()
+    }
+}
+
+fn rust_pattern_needs_semicolon(trimmed_pattern: &str) -> bool {
+    !trimmed_pattern.is_empty()
+        && !trimmed_pattern.ends_with(';')
+        && !trimmed_pattern.ends_with('}')
+}
+
+fn wrap_python_pattern_for_parse(pattern: &str) -> String {
+    let mut out = String::from("def __weaver_pattern_wrapper__():\n");
+    append_python_pattern_body(&mut out, pattern);
+    out
+}
+
+fn append_python_pattern_body(out: &mut String, pattern: &str) {
+    if pattern.trim().is_empty() {
+        out.push_str("    pass\n");
+        return;
+    }
+
+    for line in pattern.lines() {
+        out.push_str("    ");
+        out.push_str(line);
+        out.push('\n');
+    }
+}
+
+fn wrap_typescript_pattern_for_parse(pattern: &str) -> String {
+    format!("function __weaver_pattern_wrapper__() {{ {pattern} }}")
 }
 
 fn normalise_metavariables(source: &str) -> Result<String, SyntaxError> {
@@ -332,5 +348,17 @@ mod tests {
     fn compile_rejects_patterns_with_syntax_errors() {
         let result = Pattern::compile("fn (", SupportedLanguage::Rust);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn wrap_rust_pattern_adds_statement_semicolon() {
+        let wrapped = wrap_pattern_for_parse(SupportedLanguage::Rust, "dbg!($EXPR)");
+        assert_eq!(wrapped, "fn __weaver_pattern_wrapper__() { dbg!($EXPR); }");
+    }
+
+    #[test]
+    fn wrap_python_empty_pattern_uses_pass() {
+        let wrapped = wrap_pattern_for_parse(SupportedLanguage::Python, " \n");
+        assert_eq!(wrapped, "def __weaver_pattern_wrapper__():\n    pass\n");
     }
 }
