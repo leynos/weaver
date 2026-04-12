@@ -129,26 +129,22 @@ fn read_request_line(stream: &mut ConnectionStream) -> Result<Option<Vec<u8>>, D
 
     loop {
         let bytes_read = read_with_retry(stream, &mut chunk)?;
-
         if bytes_read == 0 {
-            return Ok(if buffer.is_empty() {
-                None
-            } else {
-                Some(buffer)
-            });
+            return Ok(finish_request_line(buffer));
         }
-
-        if let Some(newline_pos) = chunk[..bytes_read].iter().position(|b| *b == b'\n') {
-            buffer.extend_from_slice(&chunk[..=newline_pos]);
-            enforce_limit(buffer.len())?;
+        if append_request_chunk(&mut buffer, &chunk[..bytes_read])? {
             return Ok(Some(buffer));
         }
-
-        buffer.extend_from_slice(&chunk[..bytes_read]);
-        enforce_limit(buffer.len())?;
     }
 }
 
+fn finish_request_line(buffer: Vec<u8>) -> Option<Vec<u8>> {
+    if buffer.is_empty() {
+        None
+    } else {
+        Some(buffer)
+    }
+}
 /// Reads from the stream, retrying on interrupts.
 fn read_with_retry(stream: &mut ConnectionStream, buf: &mut [u8]) -> io::Result<usize> {
     loop {
@@ -331,4 +327,15 @@ mod tests {
 
         harness.join();
     }
+}
+
+fn append_request_chunk(buffer: &mut Vec<u8>, chunk: &[u8]) -> Result<bool, DispatchError> {
+    let Some(newline_pos) = chunk.iter().position(|b| *b == b'\n') else {
+        buffer.extend_from_slice(chunk);
+        enforce_limit(buffer.len())?;
+        return Ok(false);
+    };
+    buffer.extend_from_slice(&chunk[..=newline_pos]);
+    enforce_limit(buffer.len())?;
+    Ok(true)
 }
