@@ -22,10 +22,9 @@ fn assert_catalogue_complete(text: &str) {
     // starts with a domain heading (e.g. "  observe — …").
     let sections: Vec<&str> = text.split("\n\n").collect();
     for (domain, _, operations) in DOMAIN_OPERATIONS {
-        let section = sections
-            .iter()
-            .find(|s| s.contains(domain))
-            .unwrap_or_else(|| panic!("after-help missing domain {domain:?}"));
+        let Some(section) = sections.iter().find(|s| s.contains(domain)) else {
+            panic!("after-help missing domain {domain:?}");
+        };
         for op in *operations {
             assert!(
                 section.contains(op),

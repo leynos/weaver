@@ -51,11 +51,11 @@ use lifecycle::{
     SystemLifecycle,
     try_auto_start_daemon,
 };
-use localizer::build_localizer;
+use localizer::{build_localizer, write_bare_help};
 pub use output::{OutputContext, ResolvedOutputFormat, render_human_output};
 pub(crate) use runtime_utils::exit_code_from_status;
 use runtime_utils::handle_capabilities_mode;
-use transport::{connect, connect_with_retry};
+use transport::{Connection, connect, connect_with_retry};
 /// CLI flags recognised by the configuration loader.
 ///
 /// MAINTENANCE: This list must be kept in sync with the configuration flags
@@ -84,11 +84,17 @@ pub struct IoStreams<'a, R: Read, W: Write, E: Write> {
 }
 
 impl<'a, R: Read, W: Write, E: Write> IoStreams<'a, R, W, E> {
-    fn new(io: &'a mut IoStreams<'a, R, W, E>, loader: &'a L) -> Self {
+    pub fn new(
+        stdin: &'a mut R,
+        stdout: &'a mut W,
+        stderr: &'a mut E,
+        stdout_is_terminal: bool,
+    ) -> Self {
         Self {
-            io,
-            loader,
-            daemon_binary: None,
+            stdin,
+            stdout,
+            stderr,
+            stdout_is_terminal,
         }
     }
 
@@ -130,15 +136,16 @@ where
         self
     }
 
-pub fn run<'a, I, R, W, E>(args: I, io: &'a mut IoStreams<'a, R, W, E>) -> ExitCode
-where
-    I: IntoIterator<Item = OsString>,
-    R: Read,
-    W: Write,
-    E: Write,
-{
-    run_with_loader(args, io, &OrthoConfigLoader)
-}
+    fn run<I>(&mut self, args: I) -> ExitCode
+    where
+        I: IntoIterator<Item = OsString>,
+    {
+        let localizer = build_localizer();
+        let mut lifecycle = SystemLifecycle;
+        self.run_with_handler(args, localizer.as_ref(), |invocation, context, output| {
+            lifecycle.handle(invocation, context, output)
+        })
+    }
 
     fn run_with_handler<I, F>(
         &mut self,
@@ -256,18 +263,21 @@ fn emit_domain_guidance<ErrWriter: Write>(
         .operation
         .as_deref()
         .is_none_or(|op| op.trim().is_empty());
-
-    match KnownDomain::try_parse(raw_domain) {
-        Some(domain) if operation_is_missing => preflight_result(
-            write_missing_operation_guidance(stderr, localizer, domain)
-                .map_err(AppError::EmitGuidance)?,
-        ),
-        Some(_) => Ok(()),
-        None => preflight_result(
+    let Some(domain) = KnownDomain::try_parse(raw_domain) else {
+        return preflight_result(
             write_unknown_domain_guidance(stderr, localizer, raw_domain)
                 .map_err(AppError::EmitGuidance)?,
-        ),
+        );
+    };
+
+    if operation_is_missing {
+        return preflight_result(
+            write_missing_operation_guidance(stderr, localizer, domain)
+                .map_err(AppError::EmitGuidance)?,
+        );
     }
+
+    Ok(())
 }
 
 fn handle_preflight<ErrWriter: Write>(
@@ -277,8 +287,7 @@ fn handle_preflight<ErrWriter: Write>(
     localizer: &dyn Localizer,
 ) -> Result<(), AppError> {
     if cli.is_bare_invocation() && !split.has_config_flags() {
-        actionable_guidance::write_bare_invocation_guidance(stderr, localizer)
-            .map_err(AppError::EmitBareHelp)?;
+        write_bare_help(stderr, localizer).map_err(AppError::EmitBareHelp)?;
         return Err(AppError::BareInvocation);
     }
     if should_emit_domain_guidance(cli) {
@@ -306,39 +315,15 @@ where
     );
     let request = match build_request(invocation, &mut *io.stdin) {
         Ok(request) => request,
-        Err(error) => {
-            let _ = writeln!(io.stderr, "{error}");
-            return ExitCode::FAILURE;
-        }
+        Err(error) => return write_error_and_fail(&mut *io.stderr, error),
     };
-    let mut connection = match connect(context.config.daemon_socket()) {
+    let mut connection = match connect_or_start_daemon(context, &mut *io.stderr) {
         Ok(connection) => connection,
-        Err(error) if is_daemon_not_running(&error) => {
-            if let Err(start_error) = try_auto_start_daemon(context, &mut *io.stderr) {
-                actionable_guidance::write_startup_guidance(&mut *io.stderr, &start_error).ok();
-                return ExitCode::FAILURE;
-            }
-            // Retry briefly after daemon startup to tolerate socket-bind lag.
-            match connect_with_retry(
-                context.config.daemon_socket(),
-                transport::CONNECTION_TIMEOUT,
-            ) {
-                Ok(connection) => connection,
-                Err(retry_error) => {
-                    let _ = writeln!(io.stderr, "{retry_error}");
-                    return ExitCode::FAILURE;
-                }
-            }
-        }
-        Err(error) => {
-            let _ = writeln!(io.stderr, "{error}");
-            return ExitCode::FAILURE;
-        }
+        Err(exit_code) => return exit_code,
     };
 
     if let Err(error) = request.write_jsonl(&mut connection) {
-        let _ = writeln!(io.stderr, "{error}");
-        return ExitCode::FAILURE;
+        return write_error_and_fail(&mut *io.stderr, error);
     }
 
     match read_daemon_messages(
@@ -350,13 +335,20 @@ where
         },
     ) {
         Ok(status) => exit_code_from_status(status),
-        Err(error) => {
-            let _ = writeln!(io.stderr, "{error}");
-            ExitCode::FAILURE
-        }
+        Err(error) => write_error_and_fail(&mut *io.stderr, error),
     }
 }
 
+fn connect_or_start_daemon<E: Write>(
+    context: LifecycleContext<'_>,
+    stderr: &mut E,
+) -> Result<Connection, ExitCode> {
+    match connect(context.config.daemon_socket()) {
+        Ok(connection) => Ok(connection),
+        Err(error) if is_daemon_not_running(&error) => start_and_retry_daemon(context, stderr),
+        Err(error) => Err(write_error_and_fail(stderr, error)),
+    }
+}
 fn build_request<R: Read>(
     invocation: CommandInvocation,
     stdin: &mut R,
@@ -424,3 +416,25 @@ where
 
 #[cfg(test)]
 mod tests;
+
+fn write_error_and_fail<W: Write>(stderr: &mut W, error: impl std::fmt::Display) -> ExitCode {
+    let _ = writeln!(stderr, "{error}");
+    ExitCode::FAILURE
+}
+
+fn start_and_retry_daemon<E: Write>(
+    context: LifecycleContext<'_>,
+    stderr: &mut E,
+) -> Result<Connection, ExitCode> {
+    if let Err(error) = try_auto_start_daemon(context, stderr) {
+        actionable_guidance::write_startup_guidance(stderr, &error).ok();
+        return Err(ExitCode::FAILURE);
+    }
+
+    // Retry briefly after daemon startup to tolerate socket-bind lag.
+    connect_with_retry(
+        context.config.daemon_socket(),
+        transport::CONNECTION_TIMEOUT,
+    )
+    .map_err(|error| write_error_and_fail(stderr, error))
+}

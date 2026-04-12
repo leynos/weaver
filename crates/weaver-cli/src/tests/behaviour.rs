@@ -52,7 +52,9 @@ fn assert_output_contains<F>(
     F: FnOnce(&TestWorld) -> anyhow::Result<String>,
 {
     let world = world.borrow();
-    let text = output_getter(&world).unwrap_or_else(|_| panic!("{output_name} text missing"));
+    let Ok(text) = output_getter(&world) else {
+        panic!("{output_name} text missing");
+    };
     let snippet = snippet.trim_matches('"').replace("\\n", "\n");
     assert!(
         text.contains(&snippet),
@@ -71,7 +73,9 @@ fn assert_output_does_not_contain<F>(
     F: FnOnce(&TestWorld) -> anyhow::Result<String>,
 {
     let world = world.borrow();
-    let text = output_getter(&world).unwrap_or_else(|_| panic!("{output_name} text missing"));
+    let Ok(text) = output_getter(&world) else {
+        panic!("{output_name} text missing");
+    };
     let snippet = snippet.trim_matches('"').replace("\\n", "\n");
     assert!(
         !text.contains(&snippet),

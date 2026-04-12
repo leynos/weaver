@@ -83,23 +83,34 @@ impl FakeDaemon {
     ) -> Result<()> {
         let deadline = Instant::now() + Duration::from_secs(2);
         loop {
-            match listener.accept() {
-                Ok((stream, _)) => {
+            match Self::accept_client(&listener, deadline)? {
+                AcceptOutcome::Accepted(stream) => {
                     Self::record_request(&stream, &requests)?;
                     return Self::stream_responses(stream, &lines);
                 }
-                Err(ref error)
-                    if error.kind() == io::ErrorKind::WouldBlock && Instant::now() < deadline =>
-                {
-                    thread::sleep(Duration::from_millis(10));
-                }
-                Err(ref error) if error.kind() == io::ErrorKind::WouldBlock => {
+                AcceptOutcome::Retry => {}
+                AcceptOutcome::TimedOut => {
                     // No connection arrived; exit cleanly so tests do not hang when the CLI
                     // aborts before connecting (e.g. capabilities mode exiting early).
                     return Ok(());
                 }
-                Err(error) => return Err(error).context("accept connection"),
             }
+        }
+    }
+
+    fn accept_client(listener: &TcpListener, deadline: Instant) -> Result<AcceptOutcome> {
+        match listener.accept() {
+            Ok((stream, _)) => Ok(AcceptOutcome::Accepted(stream)),
+            Err(ref error)
+                if error.kind() == io::ErrorKind::WouldBlock && Instant::now() < deadline =>
+            {
+                thread::sleep(Duration::from_millis(10));
+                Ok(AcceptOutcome::Retry)
+            }
+            Err(ref error) if error.kind() == io::ErrorKind::WouldBlock => {
+                Ok(AcceptOutcome::TimedOut)
+            }
+            Err(error) => Err(error).context("accept connection"),
         }
     }
 
@@ -132,6 +143,12 @@ impl Drop for FakeDaemon {
             let _ = handle.join();
         }
     }
+}
+
+enum AcceptOutcome {
+    Accepted(TcpStream),
+    Retry,
+    TimedOut,
 }
 
 // ── Stream utilities ───────────────────────────────────────────────────────────
