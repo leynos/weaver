@@ -103,4 +103,4 @@ cargo test --workspace
 
 ## Licence
 
-Weaver is released under the [MIT Licence](LICENSE).
+Weaver is released under the [ISC License](LICENSE).
