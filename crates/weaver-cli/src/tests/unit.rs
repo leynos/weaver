@@ -3,26 +3,44 @@
 //! Exercises command serialisation, daemon message parsing, configuration
 //! loading, and socket connection establishment (TCP and Unix domain sockets).
 
-#[cfg(unix)]
-use super::support::accept_unix_connection;
-use super::support::{accept_tcp_connection, decode_utf8, default_daemon_lines, read_fixture};
-
-use std::cell::RefCell;
-use std::ffi::OsString;
-use std::io::{self, Cursor};
-use std::net::TcpListener;
-use std::process::ExitCode;
-use std::thread;
-
-use crate::{
-    AppError, Cli, CliCommand, CommandDescriptor, CommandInvocation, CommandRequest, ConfigLoader,
-    DaemonAction, EMPTY_LINE_LIMIT, IoStreams, OutputContext, OutputFormat, OutputSettings,
-    ResolvedOutputFormat, build_request, connect, exit_code_from_status, is_daemon_not_running,
-    read_daemon_messages, run_with_loader,
+use std::{
+    cell::RefCell,
+    ffi::OsString,
+    io::{self, Cursor},
+    net::TcpListener,
+    process::ExitCode,
+    thread,
 };
+
 use clap::Parser;
 use rstest::rstest;
 use weaver_config::{Config, SocketEndpoint};
+
+#[cfg(unix)]
+use super::support::accept_unix_connection;
+use super::support::{accept_tcp_connection, decode_utf8, default_daemon_lines, read_fixture};
+use crate::{
+    AppError,
+    Cli,
+    CliCommand,
+    CommandDescriptor,
+    CommandInvocation,
+    CommandRequest,
+    ConfigLoader,
+    DaemonAction,
+    EMPTY_LINE_LIMIT,
+    IoStreams,
+    OutputContext,
+    OutputFormat,
+    OutputSettings,
+    ResolvedOutputFormat,
+    build_request,
+    connect,
+    exit_code_from_status,
+    is_daemon_not_running,
+    read_daemon_messages,
+    run_with_loader,
+};
 
 #[test]
 fn serialises_command_request_matches_golden() {
@@ -273,8 +291,7 @@ where
 {
     let (endpoint, handle) = setup_listener();
 
-    let mut connection =
-        connect(&endpoint).unwrap_or_else(|error| panic!("connect to daemon: {error}"));
+    let mut connection = connect(&endpoint).expect("connect to daemon");
     let request = CommandRequest {
         command: CommandDescriptor {
             domain: "observe".into(),
@@ -283,9 +300,7 @@ where
         arguments: Vec::new(),
         patch: None,
     };
-    request
-        .write_jsonl(&mut connection)
-        .unwrap_or_else(|error| panic!("write request: {error}"));
+    request.write_jsonl(&mut connection).expect("write request");
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -300,7 +315,7 @@ where
             context: &context,
         },
     )
-    .unwrap_or_else(|error| panic!("read responses: {error}"));
+    .expect("read responses");
     assert_eq!(status, 17);
 
     handle.join().expect("listener thread panicked");

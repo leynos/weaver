@@ -6,15 +6,12 @@
 //! `CommandRequest` and normalizes all optional flags to their documented
 //! defaults.
 
-use std::fmt;
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
+use super::{budget::SliceBudget, parse::RequestBuilder};
 use crate::DetailLevel;
-
-use super::budget::SliceBudget;
-use super::parse::RequestBuilder;
 
 /// Default traversal depth.
 pub const DEFAULT_DEPTH: u32 = 2;
@@ -147,9 +144,7 @@ impl SliceEdgeType {
 
     /// Returns all edge types in canonical order.
     #[must_use]
-    pub const fn all() -> &'static [Self] {
-        &[Self::Call, Self::Import, Self::Config]
-    }
+    pub const fn all() -> &'static [Self] { &[Self::Call, Self::Import, Self::Config] }
 }
 
 /// Errors that can occur during `graph-slice` request parsing.
@@ -196,8 +191,10 @@ pub enum GraphSliceError {
 /// use weaver_cards::{GraphSliceRequest, SliceDirection};
 ///
 /// let args = vec![
-///     String::from("--uri"), String::from("file:///src/main.rs"),
-///     String::from("--position"), String::from("10:5"),
+///     String::from("--uri"),
+///     String::from("file:///src/main.rs"),
+///     String::from("--position"),
+///     String::from("10:5"),
 /// ];
 /// let request = GraphSliceRequest::parse(&args).expect("valid request");
 /// assert_eq!(request.depth(), 2);
@@ -260,61 +257,41 @@ impl GraphSliceRequest {
 
     /// Returns the file URI.
     #[must_use]
-    pub fn uri(&self) -> &str {
-        &self.uri
-    }
+    pub fn uri(&self) -> &str { &self.uri }
 
     /// Returns the 1-indexed line number.
     #[must_use]
-    pub const fn line(&self) -> u32 {
-        self.line
-    }
+    pub const fn line(&self) -> u32 { self.line }
 
     /// Returns the 1-indexed column number.
     #[must_use]
-    pub const fn column(&self) -> u32 {
-        self.column
-    }
+    pub const fn column(&self) -> u32 { self.column }
 
     /// Returns the traversal depth limit.
     #[must_use]
-    pub const fn depth(&self) -> u32 {
-        self.depth
-    }
+    pub const fn depth(&self) -> u32 { self.depth }
 
     /// Returns the traversal direction.
     #[must_use]
-    pub const fn direction(&self) -> SliceDirection {
-        self.direction
-    }
+    pub const fn direction(&self) -> SliceDirection { self.direction }
 
     /// Returns the edge type filter (in canonical order).
     #[must_use]
-    pub fn edge_types(&self) -> &[SliceEdgeType] {
-        &self.edge_types
-    }
+    pub fn edge_types(&self) -> &[SliceEdgeType] { &self.edge_types }
 
     /// Returns the minimum confidence threshold.
     #[must_use]
-    pub const fn min_confidence(&self) -> f64 {
-        self.min_confidence
-    }
+    pub const fn min_confidence(&self) -> f64 { self.min_confidence }
 
     /// Returns the budget constraints.
     #[must_use]
-    pub const fn budget(&self) -> &SliceBudget {
-        &self.budget
-    }
+    pub const fn budget(&self) -> &SliceBudget { &self.budget }
 
     /// Returns the entry card detail level.
     #[must_use]
-    pub const fn entry_detail(&self) -> DetailLevel {
-        self.entry_detail
-    }
+    pub const fn entry_detail(&self) -> DetailLevel { self.entry_detail }
 
     /// Returns the non-entry node detail level.
     #[must_use]
-    pub const fn node_detail(&self) -> DetailLevel {
-        self.node_detail
-    }
+    pub const fn node_detail(&self) -> DetailLevel { self.node_detail }
 }

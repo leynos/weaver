@@ -255,7 +255,10 @@ pub(crate) fn write_unknown_domain_guidance<W: Write>(
             &format!("Did you mean '{suggested_domain_str}'?"),
         ));
         alternatives.push(suggestion);
-        let Some(hint_op) = suggested_domain.operations().first().copied() else {
+        let Some(hint_op) = suggested_domain
+            .operations()
+            .and_then(|operations| operations.first().copied())
+        else {
             return Ok(false);
         };
         format!("weaver {suggested_domain_str} {hint_op} --help")

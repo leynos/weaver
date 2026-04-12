@@ -4,14 +4,29 @@
 //! types. Test modules that need richer or variant data can build on
 //! top of these foundations.
 
-use crate::graph_slice::{
-    CallSiteInfo, EdgeProvenance, EdgeProvenanceDetails, EdgeTarget, ExternalTarget,
-    GraphSliceResponse, ResolutionScope, SliceConstraints, SliceEdge, SliceEntry, SliceRefusal,
-    SliceRefusalReason, SliceSpillover, SpilloverCandidate,
-};
-use crate::{DetailLevel, SliceBudget, SliceDirection, SliceEdgeType};
-
 use super::fixtures;
+use crate::{
+    DetailLevel,
+    SliceBudget,
+    SliceDirection,
+    SliceEdgeType,
+    graph_slice::{
+        CallSiteInfo,
+        EdgeProvenance,
+        EdgeProvenanceDetails,
+        EdgeTarget,
+        ExternalTarget,
+        GraphSliceResponse,
+        ResolutionScope,
+        SliceConstraints,
+        SliceEdge,
+        SliceEntry,
+        SliceRefusal,
+        SliceRefusalReason,
+        SliceSpillover,
+        SpilloverCandidate,
+    },
+};
 
 /// Builds a default-budget success response with one card and one edge.
 pub fn sample_success_response() -> GraphSliceResponse {

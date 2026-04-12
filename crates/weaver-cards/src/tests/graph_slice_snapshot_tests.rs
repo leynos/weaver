@@ -8,10 +8,14 @@ use insta::assert_snapshot;
 use rstest::rstest;
 
 use super::graph_slice_fixtures;
-use crate::graph_slice::{ResolutionScope, SliceRefusalReason};
 use crate::{
-    GraphSliceRequest, GraphSliceResponse, SliceBudget, SliceDirection, SliceEdgeType,
+    GraphSliceRequest,
+    GraphSliceResponse,
+    SliceBudget,
+    SliceDirection,
+    SliceEdgeType,
     SliceSpillover,
+    graph_slice::{ResolutionScope, SliceRefusalReason},
 };
 
 // -----------------------------------------------------------------------

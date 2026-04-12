@@ -1,16 +1,20 @@
 //! Unit tests for actionable guidance formatting and startup recovery hints.
 
-use std::ffi::OsStr;
-use std::io;
+use std::{ffi::OsStr, io};
 
 use ortho_config::NoOpLocalizer;
 use rstest::rstest;
 
-use crate::actionable_guidance::{
-    ActionableGuidance, has_configured_binary_path, write_actionable_guidance,
-    write_bare_invocation_guidance, write_startup_guidance,
+use crate::{
+    actionable_guidance::{
+        ActionableGuidance,
+        has_configured_binary_path,
+        write_actionable_guidance,
+        write_bare_invocation_guidance,
+        write_startup_guidance,
+    },
+    lifecycle::LifecycleError,
 };
-use crate::lifecycle::LifecycleError;
 
 /// Asserts that `output` contains the three-part error template in the
 /// correct order: `error_text`, then `alternatives_text`, then
@@ -24,13 +28,13 @@ fn assert_three_part_output(
 ) {
     let error_pos = output
         .find(error_text)
-        .unwrap_or_else(|| panic!("error text not found: {error_text:?}\noutput:\n{output}"));
-    let alt_pos = output.find(alternatives_text).unwrap_or_else(|| {
-        panic!("alternatives text not found: {alternatives_text:?}\noutput:\n{output}")
-    });
+        .expect("error text should be present");
+    let alt_pos = output
+        .find(alternatives_text)
+        .expect("alternatives text should be present");
     let next_pos = output
         .find("Next command:")
-        .unwrap_or_else(|| panic!("'Next command:' not found\noutput:\n{output}"));
+        .expect("next command header should be present");
     assert!(
         output.contains(next_command_text),
         "next-command text not found: {next_command_text:?}\noutput:\n{output}"
@@ -61,7 +65,8 @@ fn assert_startup_guidance_template(error: &LifecycleError, expected: &StartupGu
         .unwrap_or_else(|| {
             if cfg!(unix) {
                 String::from(
-                    "  - Check whether the daemon is listening on $XDG_RUNTIME_DIR/weaver/weaverd.sock",
+                    "  - Check whether the daemon is listening on \
+                     $XDG_RUNTIME_DIR/weaver/weaverd.sock",
                 )
             } else {
                 String::from("  - Check whether the daemon is listening on 127.0.0.1:9779")

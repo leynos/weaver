@@ -3,11 +3,16 @@
 use ortho_config::FluentLocalizer;
 use rstest::rstest;
 
-use crate::discoverability::{
-    KnownDomain, bounded_levenshtein, suggestion_for_unknown_domain,
-    write_missing_operation_guidance, write_unknown_domain_guidance,
+use crate::{
+    discoverability::{
+        KnownDomain,
+        bounded_levenshtein,
+        suggestion_for_unknown_domain,
+        write_missing_operation_guidance,
+        write_unknown_domain_guidance,
+    },
+    localizer::WEAVER_EN_US,
 };
-use crate::localizer::WEAVER_EN_US;
 
 #[rstest]
 #[case("observe", "observe", Some(0))]
