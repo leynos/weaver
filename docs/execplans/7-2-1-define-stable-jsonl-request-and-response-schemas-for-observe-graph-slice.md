@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: IN_PROGRESS
+Status: COMPLETE
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
@@ -138,9 +138,14 @@ This plan covers roadmap item 7.2.1 in [docs/roadmap.md](../roadmap.md).
 - [x] (2026-04-11 00:00Z) Stage D: add `rstest-bdd` happy-path,
       unhappy-path, and edge-case coverage in
       `crates/weaver-cards/tests/features/graph_slice_schema.feature`.
-- [ ] Stage E: add `assert_cmd` plus `insta` end-to-end coverage using the
+- [x] (2026-04-12 00:20Z) Re-audited the implementation against this plan
+      and confirmed the remaining gaps were the hard-coded daemon refusal, the
+      absent `weaver-e2e` graph-slice battery, and outdated user/design docs.
+- [x] (2026-04-12 21:20Z) Stage E: add `assert_cmd` plus `insta`
+      end-to-end coverage using the
       dedicated 20 Rust and 20 Python graph-slice fixture batteries.
-- [ ] Stage F: update design and user documentation, mark the roadmap
+- [x] (2026-04-12 21:57Z) Stage F: update design and user
+      documentation, mark the roadmap
       entry done, and run all required gates.
 
 ## Surprises & discoveries
@@ -171,6 +176,17 @@ This plan covers roadmap item 7.2.1 in [docs/roadmap.md](../roadmap.md).
   `max_estimated_tokens` under `constraints`, but the roadmap item speaks about
   `budget` semantics explicitly. This plan resolves that by making the budget
   an explicit nested object in the typed request and response.
+- The current codebase already ships the stable request/response schema,
+  routing entry, schema snapshots, and BDD coverage, but the runtime handler
+  still returns `not_yet_implemented` unconditionally after parsing.
+- The MCP-backed Qdrant project-memory tools referenced by the root guidance
+  are not available in this environment, so repo documents and code inspection
+  are the only available sources of project memory for this turn.
+- The local Markdown formatter toolchain in this runner is partially broken:
+  `fd` is unavailable and `/root/.local/bin/mdtablefix` is an empty,
+  non-executable file. `make fmt` still completed successfully by using a
+  temporary PATH shim and then relying on `make markdownlint`,
+  `make nixie`, and `make check-fmt` to verify the resulting tree.
 
 ## Decision Log
 
@@ -202,6 +218,17 @@ This plan covers roadmap item 7.2.1 in [docs/roadmap.md](../roadmap.md).
 - Decision: record all of these schema decisions back into
   [docs/jacquard-card-first-symbol-graph-design.md](../jacquard-card-first-symbol-graph-design.md)
    during implementation, so the design stays authoritative.
+- Decision: implement a deterministic same-file schema exercise in the daemon
+  for 7.2.1 instead of keeping the operation refusal-only. Rationale: this
+  delivers real success responses and budget-driven truncation for the stable
+  contract without pre-empting the real multi-file edge extraction and
+  traversal work reserved for 7.2.2 through 7.2.5.
+- Decision: populate non-entry cards and spillover candidates from a
+  same-file symbol inventory discovered via repeated `TreeSitterCardExtractor`
+  lookups across line starts, while leaving `edges` empty until the extraction
+  milestones land. Rationale: it stays within the existing public extractor
+  surface, keeps the runtime deterministic, and avoids introducing a premature
+  graph-engine API.
 
 ## Outcomes & retrospective
 
@@ -220,6 +247,22 @@ Successful completion will mean:
 5. End-to-end snapshots cover the requested 20 Rust and 20 Python
    graph-slice scenarios at semantic detail.
 6. The design doc, user guide, and roadmap all match the shipped contract.
+
+Completed on 2026-04-12:
+
+1. `observe graph-slice` now returns a deterministic same-file success
+   response instead of a hard-coded refusal, while still deferring real edge
+   extraction and graph traversal to 7.2.2 through 7.2.5.
+2. `weaver-e2e` now ships a dedicated `graph_slice_fixtures` module, a
+   `graph_slice_snapshots.rs` harness, 40 semantic-detail success snapshots,
+   2 truncation snapshots, and 1 refusal snapshot through the real `weaver`
+   binary.
+3. The design doc and user guide now describe the nested `budget` object, the
+   stable `resolution_scope` edge field, always-present `spillover`, and the
+   current same-file runtime behaviour honestly.
+4. All required validation gates succeeded:
+   `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
+   `make lint`, and `make test`.
 
 ## Context and orientation
 
