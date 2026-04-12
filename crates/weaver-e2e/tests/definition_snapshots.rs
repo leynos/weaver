@@ -3,8 +3,12 @@
 //! These tests validate LSP-based definition lookup using Pyrefly for Python.
 //! Tests are skipped gracefully if Pyrefly is not available.
 
+#[path = "support/fixture_io.rs"]
+mod fixture_io;
+
 use std::path::Path;
 
+use fixture_io::write_fixture_path;
 use insta::assert_debug_snapshot;
 use lsp_types::{GotoDefinitionResponse, Location, Uri};
 use rstest::{fixture, rstest};
@@ -123,6 +127,22 @@ impl LocationSnapshot {
             range: link.target_selection_range,
         })
     }
+
+    fn collect_locations(locs: &[Location]) -> DefinitionSnapshot {
+        match locs {
+            [] => DefinitionSnapshot::None,
+            [loc] => DefinitionSnapshot::Single(Self::from_location(loc)),
+            _ => DefinitionSnapshot::Multiple(locs.iter().map(Self::from_location).collect()),
+        }
+    }
+
+    fn collect_links(links: &[lsp_types::LocationLink]) -> DefinitionSnapshot {
+        match links {
+            [] => DefinitionSnapshot::None,
+            [link] => DefinitionSnapshot::Single(Self::from_link(link)),
+            _ => DefinitionSnapshot::Multiple(links.iter().map(Self::from_link).collect()),
+        }
+    }
 }
 
 /// Represents a definition result for snapshot comparison.
@@ -144,26 +164,19 @@ impl From<Option<GotoDefinitionResponse>> for DefinitionSnapshot {
             Some(GotoDefinitionResponse::Scalar(loc)) => {
                 Self::Single(LocationSnapshot::from_location(&loc))
             }
-            Some(GotoDefinitionResponse::Array(locs)) => match locs.as_slice() {
-                [] => Self::None,
-                [loc] => Self::Single(LocationSnapshot::from_location(loc)),
-                _ => Self::Multiple(locs.iter().map(LocationSnapshot::from_location).collect()),
-            },
-            Some(GotoDefinitionResponse::Link(links)) => match links.as_slice() {
-                [] => Self::None,
-                [link] => Self::Single(LocationSnapshot::from_link(link)),
-                _ => Self::Multiple(links.iter().map(LocationSnapshot::from_link).collect()),
-            },
+            Some(GotoDefinitionResponse::Array(locs)) => LocationSnapshot::collect_locations(&locs),
+            Some(GotoDefinitionResponse::Link(links)) => LocationSnapshot::collect_links(&links),
         }
     }
 }
 
-/// Module containing fixtures for definition tests.
 #[expect(
     clippy::expect_used,
     reason = "fixture setup uses expect to panic on failure for clear test diagnostics"
 )]
 mod fixtures_impl {
+    //! Pyrefly-backed fixtures for definition snapshot coverage.
+
     use super::*;
 
     /// Creates a test context with a Python fixture file opened in Pyrefly.
@@ -173,8 +186,7 @@ mod fixtures_impl {
         }
 
         let temp_dir = TempDir::new()?;
-        let file_path = temp_dir.path().join("test.py");
-        std::fs::write(&file_path, fixture_content)?;
+        let file_path = write_fixture_path(&temp_dir, "test.py", fixture_content);
 
         let root_uri = file_uri(temp_dir.path())?;
         let file_uri_val = file_uri(&file_path)?;
@@ -210,8 +222,9 @@ mod fixtures_impl {
 
 use fixtures_impl::{linear_chain_context, python_class_context, python_functions_context};
 
-/// Module containing test implementations.
 mod test_impl {
+    //! Shared assertion helpers for definition snapshot entry points.
+
     use super::*;
 
     /// Gets definition at the given position and returns a snapshot.
@@ -285,10 +298,6 @@ mod test_impl {
     }
 }
 
-// =============================================================================
-// Test Entry Points
-// =============================================================================
-
 #[rstest]
 fn definition_from_call_to_function(
     mut linear_chain_context: Option<TestContext>,
@@ -351,10 +360,6 @@ fn definition_on_whitespace(
         test_impl::definition_on_whitespace_impl
     )
 }
-
-// =============================================================================
-// Error Case Tests
-// =============================================================================
 
 /// Spawns an uninitialized LSP client for error testing.
 fn spawn_uninitialized_client() -> Result<(LspClient, Uri), TestError> {
