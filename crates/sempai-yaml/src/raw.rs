@@ -1,10 +1,9 @@
 //! Raw serde-deserialisable types mirroring the YAML schema.
 //!
-//! These types directly match the YAML structure as consumed by serde and are
-//! converted into the typed `model` types via `TryFrom` implementations.
-//! Conversion can fail with a `DiagnosticReport` when the deserialized shape
-//! does not satisfy semantic constraints (e.g., missing required fields,
-//! multiple conflicting operators, etc.).
+//! These types match the YAML structure as consumed by serde and convert into
+//! the typed `model` layer via `TryFrom`. Conversion can fail with a
+//! `DiagnosticReport` when the deserialised shape violates semantic
+//! constraints such as missing fields or conflicting operators.
 
 use sempai_core::{DiagnosticCode, DiagnosticReport, SourceSpan};
 use serde::Deserialize;
@@ -134,13 +133,10 @@ pub(crate) fn schema_error(
     )
 }
 
-pub(crate) fn singleton_formula<F>(
+pub(crate) fn singleton_formula(
     mut formulas: Vec<LegacyFormula>,
-    make_error: F,
-) -> Result<LegacyFormula, DiagnosticReport>
-where
-    F: FnOnce(usize) -> DiagnosticReport,
-{
+    make_error: impl FnOnce(usize) -> DiagnosticReport,
+) -> Result<LegacyFormula, DiagnosticReport> {
     match formulas.len() {
         1 => Ok(formulas.remove(0)),
         len => Err(make_error(len)),
@@ -174,8 +170,7 @@ impl TryFrom<RawLegacyFormulaObject> for LegacyFormula {
     }
 }
 
-/// Converts a `RawLegacyFormulaObject` to a `LegacyFormula`, using the provided
-/// span for error reporting when validation fails.
+/// Converts a `RawLegacyFormulaObject` to a `LegacyFormula`.
 pub(crate) fn convert_legacy_formula_object(
     value: RawLegacyFormulaObject,
     span: Option<SourceSpan>,
@@ -187,22 +182,12 @@ pub(crate) fn convert_legacy_formula_object(
         value.pattern_regex,
         LegacyFormula::PatternRegex,
     );
-    if let Some(patterns) = value.patterns {
-        formulas.push(LegacyFormula::Patterns(
-            patterns
-                .into_iter()
-                .map(TryInto::try_into)
-                .collect::<Result<Vec<_>, _>>()?,
-        ));
-    }
-    if let Some(pattern_either) = value.pattern_either {
-        formulas.push(LegacyFormula::PatternEither(
-            pattern_either
-                .into_iter()
-                .map(TryInto::try_into)
-                .collect::<Result<Vec<_>, _>>()?,
-        ));
-    }
+    push_optional_legacy_sequence_formula(&mut formulas, value.patterns, LegacyFormula::Patterns)?;
+    push_optional_legacy_sequence_formula(
+        &mut formulas,
+        value.pattern_either,
+        LegacyFormula::PatternEither,
+    )?;
     push_optional_legacy_value_formula(
         &mut formulas,
         value.pattern_not,
@@ -239,7 +224,7 @@ pub(crate) fn convert_legacy_formula_object(
     })
 }
 
-fn push_optional_legacy_formula(
+pub(crate) fn push_optional_legacy_formula(
     formulas: &mut Vec<LegacyFormula>,
     value: Option<String>,
     constructor: fn(String) -> LegacyFormula,
@@ -247,6 +232,25 @@ fn push_optional_legacy_formula(
     if let Some(text) = value {
         formulas.push(constructor(text));
     }
+}
+
+pub(crate) fn push_optional_legacy_sequence_formula<T, U>(
+    formulas: &mut Vec<LegacyFormula>,
+    value: Option<Vec<T>>,
+    constructor: fn(Vec<U>) -> LegacyFormula,
+) -> Result<(), DiagnosticReport>
+where
+    T: TryInto<U, Error = DiagnosticReport>,
+{
+    if let Some(items) = value {
+        formulas.push(constructor(
+            items
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<_>, _>>()?,
+        ));
+    }
+    Ok(())
 }
 
 fn push_optional_legacy_value_formula(
