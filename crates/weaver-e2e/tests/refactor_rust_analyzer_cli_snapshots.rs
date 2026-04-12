@@ -4,6 +4,9 @@
 //! user-facing command ergonomics, including a shell pipeline that chains an
 //! observe query through `jq` into an actuator command.
 
+#[path = "support/weaver_binary.rs"]
+mod weaver_binary;
+
 use std::{
     io,
     io::{BufRead, BufReader, Write},
@@ -18,6 +21,7 @@ use assert_cmd::Command;
 use insta::assert_debug_snapshot;
 use serde::Serialize;
 use serde_json::json;
+use weaver_binary::weaver_binary_path;
 
 #[derive(Debug, Serialize)]
 struct Transcript {
@@ -34,12 +38,6 @@ struct FakeDaemon {
     requests: Arc<Mutex<Vec<serde_json::Value>>>,
     join_handle: thread::JoinHandle<()>,
 }
-
-#[expect(
-    deprecated,
-    reason = "assert_cmd::cargo::cargo_bin resolves workspace binaries for e2e tests"
-)]
-fn weaver_binary_path() -> std::path::PathBuf { assert_cmd::cargo::cargo_bin("weaver") }
 
 impl FakeDaemon {
     fn start(expected_requests: usize) -> Result<Self, std::io::Error> {
@@ -159,12 +157,14 @@ fn respond_to_request(
     let mut request_line = String::new();
     reader.read_line(&mut request_line)?;
 
-    let parsed_request: serde_json::Value = serde_json::from_str(request_line.trim())
-        .unwrap_or_else(|_| {
+    let mut parsed_request_option = serde_json::from_str(request_line.trim()).ok();
+    let parsed_request: serde_json::Value = parsed_request_option
+        .get_or_insert_with(|| {
             json!({
                 "invalid_request": request_line.trim(),
             })
-        });
+        })
+        .clone();
 
     requests
         .lock()

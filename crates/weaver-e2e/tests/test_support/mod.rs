@@ -3,14 +3,14 @@
 use std::{
     io,
     net::{SocketAddr, TcpListener, TcpStream},
-    path::{Path, PathBuf},
+    path::Path,
     process::Output,
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant},
 };
 
-use assert_cmd::{Command, cargo};
+use assert_cmd::Command;
 use insta::assert_snapshot;
 use serde::Serialize;
 use tempfile::TempDir;
@@ -26,6 +26,8 @@ use weaverd::{
     FusionBackends,
     SemanticBackendProvider,
 };
+
+use crate::{fixture_io::write_fixture_path, weaver_binary::weaver_binary_path};
 
 const ACCEPT_TIMEOUT: Duration = Duration::from_secs(10);
 const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
@@ -59,21 +61,6 @@ pub(crate) struct TestDaemon {
     address: SocketAddr,
     backend_manager: BackendManager,
     join_handle: thread::JoinHandle<()>,
-}
-
-fn weaver_binary_path() -> &'static Path {
-    static WEAVER_BINARY: OnceLock<PathBuf> = OnceLock::new();
-    WEAVER_BINARY.get_or_init(resolve_weaver_binary)
-}
-
-#[expect(
-    deprecated,
-    reason = "workspace integration tests need the runtime lookup"
-)]
-fn resolve_weaver_binary() -> PathBuf {
-    // `cargo::cargo_bin!` only resolves binaries for the current integration
-    // test crate. These tests execute the workspace `weaver` binary instead.
-    cargo::cargo_bin("weaver")
 }
 
 impl TestDaemon {
@@ -125,8 +112,7 @@ impl TestDaemon {
 }
 
 pub(crate) fn fixture_uri(temp_dir: &TempDir, case: CardFixtureCase) -> String {
-    let path = temp_dir.path().join(case.file_name);
-    required_result(std::fs::write(&path, case.source), "write fixture");
+    let path = write_fixture_path(temp_dir, case.file_name, case.source);
     let uri = Url::from_file_path(&path).map_err(|()| "fixture path to URI".to_owned());
     required_result(uri, "fixture path to URI").to_string()
 }
@@ -270,10 +256,15 @@ fn normalize_snapshot_value(value: &mut serde_json::Value) {
 }
 
 fn normalize_message_value(value: &mut serde_json::Value) {
-    if let serde_json::Value::String(message) = value
-        && let Some((prefix, _)) = message.split_once("/tmp/")
-    {
-        *message = format!("{prefix}<path>");
+    if let serde_json::Value::String(message) = value {
+        if let Some((prefix, _)) = message.split_once(" for path ") {
+            *message = format!("{prefix} for path <path>");
+            return;
+        }
+
+        if let Some((prefix, _)) = message.split_once("/tmp/") {
+            *message = format!("{prefix}<path>");
+        }
     }
 }
 
