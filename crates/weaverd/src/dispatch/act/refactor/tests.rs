@@ -81,6 +81,8 @@ fn run_rename_handle(
     std::fs::write(workspace.path().join(file), "hello\n").expect("write");
 
     let request = command_request(vec![
+        String::from("--provider"),
+        String::from("rope"),
         String::from("--refactoring"),
         String::from("rename"),
         String::from("--file"),
@@ -149,6 +151,8 @@ fn handle_non_diff_output_returns_status_one(
     std::fs::write(workspace.path().join("notes.py"), "hello\n").expect("write");
 
     let request = command_request(vec![
+        String::from("--provider"),
+        String::from("rope"),
         String::from("--refactoring"),
         String::from("rename"),
         String::from("--file"),
@@ -201,6 +205,8 @@ fn handle_diff_output_applies_patch_through_apply_patch_pipeline(socket_dir: Tem
         })),
     };
     let request = command_request(vec![
+        String::from("--provider"),
+        String::from("rope"),
         String::from("--refactoring"),
         String::from("rename"),
         String::from("--file"),
@@ -256,6 +262,8 @@ fn default_runtime_returns_shared_trait_object() {
 fn handle_returns_error_for_unsupported_refactoring(socket_dir: TempDir) {
     let workspace = TempDir::new().expect("workspace");
     let request = command_request(vec![
+        String::from("--provider"),
+        String::from("rope"),
         String::from("--refactoring"),
         String::from("extract-method"),
         String::from("--file"),
@@ -303,16 +311,51 @@ fn handle_exits_with_error_when_resolution_fails(socket_dir: TempDir) {
 }
 
 #[rstest]
-fn handle_exits_with_error_when_resolution_refused_without_provider(socket_dir: TempDir) {
+fn handle_reports_complete_requirements_when_required_flags_are_missing(socket_dir: TempDir) {
+    let workspace = TempDir::new().expect("workspace");
+    let request = command_request(vec![String::from("--file"), String::from("notes.py")]);
+    let socket_path = socket_dir.path().join("socket.sock");
+    let mut backends = build_backends(&socket_path);
+    let mut output = Vec::new();
+    let mut writer = ResponseWriter::new(&mut output);
+    let runtime = MockRuntime {
+        resolution: MockResolution::Error(String::from("should not resolve")),
+        result: MockRuntimeResult::Panic,
+    };
+
+    let result = handle(
+        &request,
+        &mut writer,
+        RefactorContext {
+            backends: &mut backends,
+            workspace_root: workspace.path(),
+            runtime: &runtime,
+        },
+    );
+
+    let message = match result {
+        Err(DispatchError::InvalidArguments { message }) => message,
+        Err(other) => panic!("expected invalid arguments, got: {other:?}"),
+        Ok(_) => panic!("expected invalid arguments"),
+    };
+    assert!(message.contains("--provider <plugin>"));
+    assert!(message.contains("--refactoring <operation>"));
+    assert!(message.contains("--file <path>"));
+    assert!(message.contains("Providers: rope, rust-analyzer"));
+    assert!(message.contains("Refactorings: rename"));
+}
+
+#[rstest]
+fn handle_exits_with_error_when_resolution_refused_with_provider(socket_dir: TempDir) {
     use crate::dispatch::act::refactor::resolution::RefusalReason::UnsupportedLanguage;
 
     let refused_envelope =
         CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
             capability: weaver_plugins::CapabilityId::RenameSymbol,
             language: Some(String::from("unknown-lang")),
-            requested_provider: None,
+            requested_provider: Some(String::from("rope")),
             selected_provider: None,
-            selection_mode: SelectionMode::Automatic,
+            selection_mode: SelectionMode::ExplicitProvider,
             outcome: ResolutionOutcome::Refused,
             refusal_reason: Some(UnsupportedLanguage),
             candidates: Vec::new(),

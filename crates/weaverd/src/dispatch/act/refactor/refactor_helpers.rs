@@ -59,6 +59,8 @@ pub(super) fn build_backends(socket_path: &Path) -> FusionBackends<SemanticBacke
 
 pub(super) fn standard_rename_args(file: &str) -> Vec<String> {
     vec![
+        String::from("--provider"),
+        String::from(provider_for_file(file)),
         String::from("--refactoring"),
         String::from("rename"),
         String::from("--file"),
@@ -66,6 +68,14 @@ pub(super) fn standard_rename_args(file: &str) -> Vec<String> {
         String::from("offset=1"),
         String::from("new_name=woven"),
     ]
+}
+
+fn provider_for_file(file: &str) -> &'static str {
+    match Path::new(file).extension().and_then(|ext| ext.to_str()) {
+        Some("py") => "rope",
+        Some("rs") => "rust-analyzer",
+        _ => "rope",
+    }
 }
 
 pub(super) fn configure_request(request: &mut CommandRequest, args: Vec<String>) {
