@@ -14,7 +14,7 @@ through a simple, composable interface. It follows the UNIX philosophy: small,
 focused tools that communicate via JSON Lines (JSONL) and play nicely with your
 existing shell utilities like `jq`, `xargs`, and `find`.
 
-Under the hood, Weaver runs a daemon (`weaverd`) that orchestrates language
+Under the bonnet, Weaver runs a daemon (`weaverd`) that orchestrates language
 servers, syntax analysers, and specialised plugins—all sandboxed for
 safety—while the lightweight CLI (`weaver`) lets you issue commands and stream
 results. Whether you're an AI agent planning a refactor or a human debugging a
