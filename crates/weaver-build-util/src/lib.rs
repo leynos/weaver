@@ -179,6 +179,25 @@ fn create_dir_all_cap(base: &Dir, path: &Utf8Path) -> io::Result<()> {
     Ok(())
 }
 
+fn find_existing_ancestor(dir: &Utf8Path) -> &Utf8Path {
+    let mut candidate = dir;
+    while !candidate.as_str().is_empty() && candidate.parent().is_some() {
+        if Dir::open_ambient_dir(candidate, cap_std::ambient_authority()).is_ok() {
+            return candidate;
+        }
+        candidate = candidate.parent().unwrap_or(candidate);
+    }
+    Utf8Path::new(".")
+}
+
+fn ensure_target_dir(base_dir: Dir, relative_path: &Utf8Path) -> io::Result<Dir> {
+    if relative_path.as_str().is_empty() {
+        return Ok(base_dir);
+    }
+    create_dir_all_cap(&base_dir, relative_path)?;
+    base_dir.open_dir(relative_path)
+}
+
 /// Write a man page to the provided directory, ensuring atomic replacement.
 ///
 /// # Errors
@@ -196,50 +215,18 @@ fn create_dir_all_cap(base: &Dir, path: &Utf8Path) -> io::Result<()> {
 /// assert!(path.ends_with("weaver.1"));
 /// ```
 pub fn write_man_page(data: &[u8], dir: &Utf8Path, page_name: &str) -> io::Result<Utf8PathBuf> {
-    // Find the first existing ancestor directory
-    let mut existing_ancestor = dir;
-    while !existing_ancestor.as_str().is_empty() && existing_ancestor.parent().is_some() {
-        if Dir::open_ambient_dir(existing_ancestor, cap_std::ambient_authority()).is_ok() {
-            break;
-        }
-        existing_ancestor = existing_ancestor.parent().unwrap_or(existing_ancestor);
-    }
-
-    // If no existing ancestor found, use current directory
-    if existing_ancestor.as_str().is_empty() {
-        existing_ancestor = Utf8Path::new(".");
-    }
-
-    // Open the existing ancestor directory
+    let existing_ancestor = find_existing_ancestor(dir);
     let base_dir = Dir::open_ambient_dir(existing_ancestor, cap_std::ambient_authority())?;
-
-    // Get the relative path from the ancestor to the target
     let relative_path = dir.strip_prefix(existing_ancestor).unwrap_or(dir);
-
-    // Create all intermediate directories
-    if !relative_path.as_str().is_empty() {
-        create_dir_all_cap(&base_dir, relative_path)?;
-    }
-
-    // Open the target directory
-    let target_dir = if relative_path.as_str().is_empty() {
-        base_dir
-    } else {
-        base_dir.open_dir(relative_path)?
-    };
-
-    let destination = page_name;
+    let target_dir = ensure_target_dir(base_dir, relative_path)?;
     let tmp = format!("{page_name}.tmp");
-
-    // Write to temp file
     target_dir.write(&tmp, data)?;
 
-    // Try atomic rename
-    match target_dir.rename(&tmp, &target_dir, destination) {
+    match target_dir.rename(&tmp, &target_dir, page_name) {
         Ok(()) => {}
         Err(error) if should_retry_replace(&error) => {
-            remove_existing_file(&target_dir, destination)?;
-            target_dir.rename(&tmp, &target_dir, destination)?;
+            remove_existing_file(&target_dir, page_name)?;
+            target_dir.rename(&tmp, &target_dir, page_name)?;
         }
         Err(error) => return Err(error),
     }
