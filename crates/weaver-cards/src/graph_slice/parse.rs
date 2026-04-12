@@ -228,24 +228,33 @@ impl RequestBuilder {
         Ok(())
     }
 
+    fn apply_u32_budget_flag<'a, I>(
+        &mut self,
+        iter: &mut I,
+        flag: Flag,
+        apply: fn(SliceBudget, u32) -> SliceBudget,
+    ) -> Result<(), GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        let raw = require_arg_value(iter, flag)?;
+        let value = parse_u32(raw)?;
+        self.budget = apply(self.budget, value);
+        Ok(())
+    }
+
     fn apply_max_cards_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
     where
         I: Iterator<Item = &'a String>,
     {
-        let raw = require_arg_value(iter, Flag::MaxCards)?;
-        let max_cards = parse_u32(raw)?;
-        self.budget = self.budget.with_max_cards(max_cards);
-        Ok(())
+        self.apply_u32_budget_flag(iter, Flag::MaxCards, SliceBudget::with_max_cards)
     }
 
     fn apply_max_edges_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
     where
         I: Iterator<Item = &'a String>,
     {
-        let raw = require_arg_value(iter, Flag::MaxEdges)?;
-        let max_edges = parse_u32(raw)?;
-        self.budget = self.budget.with_max_edges(max_edges);
-        Ok(())
+        self.apply_u32_budget_flag(iter, Flag::MaxEdges, SliceBudget::with_max_edges)
     }
 
     fn apply_max_estimated_tokens_flag<'a, I>(
@@ -255,10 +264,11 @@ impl RequestBuilder {
     where
         I: Iterator<Item = &'a String>,
     {
-        let raw = require_arg_value(iter, Flag::MaxEstimatedTokens)?;
-        let max_estimated_tokens = parse_u32(raw)?;
-        self.budget = self.budget.with_max_estimated_tokens(max_estimated_tokens);
-        Ok(())
+        self.apply_u32_budget_flag(
+            iter,
+            Flag::MaxEstimatedTokens,
+            SliceBudget::with_max_estimated_tokens,
+        )
     }
 
     fn apply_entry_detail_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>

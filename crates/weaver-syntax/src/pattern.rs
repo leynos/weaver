@@ -80,18 +80,16 @@ impl Pattern {
     /// # Ok::<(), weaver_syntax::SyntaxError>(())
     /// ```
     pub fn compile(source: &str, language: SupportedLanguage) -> Result<Self, SyntaxError> {
-        // Extract metavariables from the source
-        let metavariables = extract_metavariables(source)?;
+        let raw = RawSource(source);
+        let metavariables = extract_metavariables(raw)?;
+        let normalised = normalise_metavariables(raw)?;
 
-        let normalised_source = normalise_metavariables(source)?;
-
-        // Parse the pattern as code
         let mut parser = Parser::new(language)?;
         let mut wrapped_in_function = false;
-        let mut parsed = parser.parse(&normalised_source)?;
+        let mut parsed = parser.parse(normalised.as_str())?;
         if parsed.has_errors() {
-            let wrapped_source = wrap_pattern_for_parse(language, &normalised_source);
-            parsed = parser.parse(&wrapped_source)?;
+            let wrapped = wrap_pattern_for_parse(language, &normalised);
+            parsed = parser.parse(&wrapped)?;
             wrapped_in_function = true;
         }
 
@@ -134,66 +132,66 @@ impl Pattern {
     pub const fn has_metavariables(&self) -> bool { !self.metavariables.is_empty() }
 }
 
-fn wrap_pattern_for_parse(language: SupportedLanguage, pattern: &str) -> String {
+/// Un-normalised pattern source, before metavariable substitution.
+#[derive(Clone, Copy)]
+struct RawSource<'a>(&'a str);
+
+/// Pattern source after metavariable placeholders have been substituted.
+#[derive(Debug)]
+struct NormalisedSource(String);
+
+impl NormalisedSource {
+    fn as_str(&self) -> &str { &self.0 }
+}
+
+fn wrap_pattern_for_parse(language: SupportedLanguage, pattern: &NormalisedSource) -> String {
+    let s = pattern.as_str();
     match language {
-        SupportedLanguage::Rust => wrap_rust_pattern_for_parse(pattern),
-        SupportedLanguage::Python => wrap_python_pattern_for_parse(pattern),
-        SupportedLanguage::TypeScript => wrap_typescript_pattern_for_parse(pattern),
+        SupportedLanguage::Rust => {
+            format!(
+                "fn __weaver_pattern_wrapper__() {{ {} }}",
+                rust_pattern_wrapper_statement(pattern)
+            )
+        }
+        SupportedLanguage::Python => python_pattern_wrapper(pattern),
+        SupportedLanguage::TypeScript => {
+            format!("function __weaver_pattern_wrapper__() {{ {s} }}")
+        }
     }
 }
 
-fn wrap_rust_pattern_for_parse(pattern: &str) -> String {
-    let statement = rust_pattern_statement(pattern);
-    format!("fn __weaver_pattern_wrapper__() {{ {statement} }}")
-}
-
-fn rust_pattern_statement(pattern: &str) -> String {
-    let trimmed = pattern.trim_end();
-    if rust_pattern_needs_semicolon(trimmed) {
-        format!("{trimmed};")
-    } else {
-        trimmed.to_owned()
+fn rust_pattern_wrapper_statement(pattern: &NormalisedSource) -> String {
+    let trimmed = pattern.as_str().trim_end();
+    match trimmed.chars().last() {
+        None | Some(';' | '}') => trimmed.to_owned(),
+        Some(_) => format!("{trimmed};"),
     }
 }
 
-fn rust_pattern_needs_semicolon(trimmed_pattern: &str) -> bool {
-    !trimmed_pattern.is_empty()
-        && !trimmed_pattern.ends_with(';')
-        && !trimmed_pattern.ends_with('}')
-}
-
-fn wrap_python_pattern_for_parse(pattern: &str) -> String {
+fn python_pattern_wrapper(pattern: &NormalisedSource) -> String {
+    let s = pattern.as_str();
     let mut out = String::from("def __weaver_pattern_wrapper__():\n");
-    append_python_pattern_body(&mut out, pattern);
+    if s.trim().is_empty() {
+        out.push_str("    pass\n");
+    } else {
+        for line in s.lines() {
+            out.push_str("    ");
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
     out
 }
 
-fn append_python_pattern_body(out: &mut String, pattern: &str) {
-    if pattern.trim().is_empty() {
-        out.push_str("    pass\n");
-        return;
-    }
-
-    for line in pattern.lines() {
-        out.push_str("    ");
-        out.push_str(line);
-        out.push('\n');
-    }
-}
-
-fn wrap_typescript_pattern_for_parse(pattern: &str) -> String {
-    format!("function __weaver_pattern_wrapper__() {{ {pattern} }}")
-}
-
-fn normalise_metavariables(source: &str) -> Result<String, SyntaxError> {
-    let mut out = String::with_capacity(source.len());
+fn normalise_metavariables(source: RawSource<'_>) -> Result<NormalisedSource, SyntaxError> {
+    let mut out = String::with_capacity(source.0.len());
 
     visit_metavariables(source, |event| match event {
         MetavarEvent::Literal(ch) => out.push(ch),
         MetavarEvent::Metavar(metavar) => out.push_str(&placeholder_for_metavar(&metavar.name)),
     })?;
 
-    Ok(out)
+    Ok(NormalisedSource(out))
 }
 
 #[derive(Debug)]
@@ -209,11 +207,11 @@ enum MetavarEvent {
     Metavar(MetavarReference),
 }
 
-fn visit_metavariables<F>(source: &str, mut handler: F) -> Result<(), SyntaxError>
+fn visit_metavariables<F>(source: RawSource<'_>, mut handler: F) -> Result<(), SyntaxError>
 where
     F: FnMut(MetavarEvent),
 {
-    let mut chars = source.char_indices().peekable();
+    let mut chars = source.0.char_indices().peekable();
     while let Some((offset, ch)) = chars.next() {
         if ch != '$' {
             handler(MetavarEvent::Literal(ch));
@@ -253,7 +251,7 @@ where
 ///
 /// Scans the source for `$VAR` and `$$$VAR` patterns and returns
 /// information about each metavariable found.
-fn extract_metavariables(source: &str) -> Result<Vec<MetaVariable>, SyntaxError> {
+fn extract_metavariables(source: RawSource<'_>) -> Result<Vec<MetaVariable>, SyntaxError> {
     let mut metavariables = Vec::new();
     visit_metavariables(source, |event| {
         let MetavarEvent::Metavar(metavar) = event else {
@@ -284,7 +282,7 @@ mod tests {
 
     #[test]
     fn extract_single_metavariable() {
-        let metavars = extract_metavariables("$VAR").expect("extract");
+        let metavars = extract_metavariables(RawSource("$VAR")).expect("extract");
         assert_eq!(metavars.len(), 1);
         assert_eq!(metavars.first().map(|m| m.name.as_str()), Some("VAR"));
         assert_eq!(metavars.first().map(|m| m.kind), Some(MetaVarKind::Single));
@@ -292,7 +290,7 @@ mod tests {
 
     #[test]
     fn extract_multiple_metavariable() {
-        let metavars = extract_metavariables("$$$ARGS").expect("extract");
+        let metavars = extract_metavariables(RawSource("$$$ARGS")).expect("extract");
         assert_eq!(metavars.len(), 1);
         assert_eq!(metavars.first().map(|m| m.name.as_str()), Some("ARGS"));
         assert_eq!(
@@ -303,7 +301,7 @@ mod tests {
 
     #[test]
     fn extract_multiple_metavariables() {
-        let metavars = extract_metavariables("$FUNC($ARG1, $ARG2)").expect("extract");
+        let metavars = extract_metavariables(RawSource("$FUNC($ARG1, $ARG2)")).expect("extract");
         assert_eq!(metavars.len(), 3);
 
         let names: Vec<_> = metavars.iter().map(|m| m.name.as_str()).collect();
@@ -312,7 +310,7 @@ mod tests {
 
     #[test]
     fn extract_wildcard() {
-        let metavars = extract_metavariables("$_").expect("extract");
+        let metavars = extract_metavariables(RawSource("$_")).expect("extract");
         assert_eq!(metavars.len(), 1);
         assert_eq!(metavars.first().map(|m| m.name.as_str()), Some("_"));
     }
@@ -352,13 +350,15 @@ mod tests {
 
     #[test]
     fn wrap_rust_pattern_adds_statement_semicolon() {
-        let wrapped = wrap_pattern_for_parse(SupportedLanguage::Rust, "dbg!($EXPR)");
+        let src = NormalisedSource("dbg!($EXPR)".to_owned());
+        let wrapped = wrap_pattern_for_parse(SupportedLanguage::Rust, &src);
         assert_eq!(wrapped, "fn __weaver_pattern_wrapper__() { dbg!($EXPR); }");
     }
 
     #[test]
     fn wrap_python_empty_pattern_uses_pass() {
-        let wrapped = wrap_pattern_for_parse(SupportedLanguage::Python, " \n");
+        let src = NormalisedSource(" \n".to_owned());
+        let wrapped = wrap_pattern_for_parse(SupportedLanguage::Python, &src);
         assert_eq!(wrapped, "def __weaver_pattern_wrapper__():\n    pass\n");
     }
 }
