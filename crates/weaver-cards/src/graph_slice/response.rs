@@ -9,10 +9,11 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
+use super::{
+    budget::SliceBudget,
+    request::{SliceDirection, SliceEdgeType, SliceParseError, parse_variant},
+};
 use crate::{DetailLevel, SymbolCard};
-
-use super::budget::SliceBudget;
-use super::request::{SliceDirection, SliceEdgeType, SliceParseError, parse_variant};
 
 /// Resolution scope for an edge, recording how the target was resolved.
 ///
@@ -249,7 +250,8 @@ impl FromStr for SliceRefusalReason {
                 ("backend_unavailable", Self::BackendUnavailable),
             ],
             "refusal reason",
-            "no_symbol_at_position, position_out_of_range, unsupported_language, not_yet_implemented, backend_unavailable",
+            "no_symbol_at_position, position_out_of_range, unsupported_language, \
+             not_yet_implemented, backend_unavailable",
         )
     }
 }

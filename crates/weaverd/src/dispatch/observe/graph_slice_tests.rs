@@ -2,10 +2,8 @@
 
 use rstest::rstest;
 
-use crate::dispatch::request::CommandRequest;
-use crate::dispatch::response::ResponseWriter;
-
 use super::handle;
+use crate::dispatch::{request::CommandRequest, response::ResponseWriter};
 
 fn make_request(arguments: &[&str]) -> CommandRequest {
     let args_json: Vec<String> = arguments

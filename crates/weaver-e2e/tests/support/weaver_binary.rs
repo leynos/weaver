@@ -7,21 +7,18 @@ use std::{
     sync::OnceLock,
 };
 
-use assert_cmd::cargo;
-
 pub(crate) fn weaver_binary_path() -> &'static Path {
     static WEAVER_BINARY: OnceLock<PathBuf> = OnceLock::new();
     WEAVER_BINARY.get_or_init(resolve_weaver_binary)
 }
 
-#[expect(
-    deprecated,
-    reason = "assert_cmd resolves the workspace binary path when Cargo exposes it"
-)]
 fn resolve_weaver_binary() -> PathBuf {
-    let cargo_bin = cargo::cargo_bin("weaver");
-    if cargo_bin.is_file() {
+    if let Some(cargo_bin) = cargo_bin_from_env("weaver") {
         return cargo_bin;
+    }
+
+    if let Some(target_dir_binary) = target_dir_binary_path("weaver") {
+        return target_dir_binary;
     }
 
     let fallback = target_debug_binary_path();
@@ -31,6 +28,24 @@ fn resolve_weaver_binary() -> PathBuf {
 
     build_workspace_binary(&fallback);
     fallback
+}
+
+fn cargo_bin_from_env(name: &str) -> Option<PathBuf> {
+    let variable_name = format!("CARGO_BIN_EXE_{name}");
+    env::var_os(variable_name)
+        .map(PathBuf::from)
+        .filter(|path| path.is_file())
+}
+
+fn target_dir_binary_path(name: &str) -> Option<PathBuf> {
+    let mut target_dir = env::current_exe().ok()?;
+    target_dir.pop();
+    if target_dir.ends_with("deps") {
+        target_dir.pop();
+    }
+
+    let binary_path = target_dir.join(format!("{name}{}", env::consts::EXE_SUFFIX));
+    binary_path.is_file().then_some(binary_path)
 }
 
 fn target_debug_binary_path() -> PathBuf {

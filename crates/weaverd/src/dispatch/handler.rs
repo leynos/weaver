@@ -164,6 +164,17 @@ fn enforce_limit(size: usize) -> Result<(), DispatchError> {
     Ok(())
 }
 
+fn append_request_chunk(buffer: &mut Vec<u8>, chunk: &[u8]) -> Result<bool, DispatchError> {
+    let Some(newline_pos) = chunk.iter().position(|byte| *byte == b'\n') else {
+        buffer.extend_from_slice(chunk);
+        enforce_limit(buffer.len())?;
+        return Ok(false);
+    };
+    buffer.extend_from_slice(&chunk[..=newline_pos]);
+    enforce_limit(buffer.len())?;
+    Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
     //! Unit tests for command dispatch and request handling.
@@ -327,15 +338,4 @@ mod tests {
 
         harness.join();
     }
-}
-
-fn append_request_chunk(buffer: &mut Vec<u8>, chunk: &[u8]) -> Result<bool, DispatchError> {
-    let Some(newline_pos) = chunk.iter().position(|b| *b == b'\n') else {
-        buffer.extend_from_slice(chunk);
-        enforce_limit(buffer.len())?;
-        return Ok(false);
-    };
-    buffer.extend_from_slice(&chunk[..=newline_pos]);
-    enforce_limit(buffer.len())?;
-    Ok(true)
 }
