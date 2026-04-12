@@ -8,9 +8,11 @@
 //!   Next command:
 //!     `<exact command>`
 
-use std::ffi::OsStr;
-use std::io::{self, Write};
-use std::path::Path;
+use std::{
+    ffi::OsStr,
+    io::{self, Write},
+    path::Path,
+};
 
 use crate::lifecycle::LifecycleError;
 

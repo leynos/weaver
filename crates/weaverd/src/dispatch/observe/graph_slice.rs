@@ -9,10 +9,12 @@ use std::io::Write;
 
 use weaver_cards::{GraphSliceRequest, GraphSliceResponse};
 
-use crate::dispatch::errors::DispatchError;
-use crate::dispatch::request::CommandRequest;
-use crate::dispatch::response::ResponseWriter;
-use crate::dispatch::router::DispatchResult;
+use crate::dispatch::{
+    errors::DispatchError,
+    request::CommandRequest,
+    response::ResponseWriter,
+    router::DispatchResult,
+};
 
 /// Maps a graph-slice response to its exit status code.
 ///

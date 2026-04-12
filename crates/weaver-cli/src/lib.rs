@@ -51,7 +51,7 @@ use lifecycle::{
     SystemLifecycle,
     try_auto_start_daemon,
 };
-use localizer::{build_localizer, write_bare_help};
+use localizer::build_localizer;
 pub use output::{OutputContext, ResolvedOutputFormat, render_human_output};
 pub(crate) use runtime_utils::exit_code_from_status;
 use runtime_utils::handle_capabilities_mode;
@@ -287,7 +287,8 @@ fn handle_preflight<ErrWriter: Write>(
     localizer: &dyn Localizer,
 ) -> Result<(), AppError> {
     if cli.is_bare_invocation() && !split.has_config_flags() {
-        write_bare_help(stderr, localizer).map_err(AppError::EmitBareHelp)?;
+        actionable_guidance::write_bare_invocation_guidance(stderr, localizer)
+            .map_err(AppError::EmitBareHelp)?;
         return Err(AppError::BareInvocation);
     }
     if should_emit_domain_guidance(cli) {

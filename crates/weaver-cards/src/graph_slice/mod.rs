@@ -10,8 +10,7 @@
 //!
 //! - [`SliceBudget`] — traversal budget constraints.
 //! - [`GraphSliceRequest`] — request parsing and defaults.
-//! - [`GraphSliceResponse`] — response envelope, edges, spillover,
-//!   and refusal types.
+//! - [`GraphSliceResponse`] — response envelope, edges, spillover, and refusal types.
 
 mod budget;
 mod parse;
@@ -26,11 +25,27 @@ mod request_tests;
 
 pub use budget::{DEFAULT_MAX_CARDS, DEFAULT_MAX_EDGES, DEFAULT_MAX_ESTIMATED_TOKENS, SliceBudget};
 pub use request::{
-    DEFAULT_DEPTH, DEFAULT_MIN_CONFIDENCE, GraphSliceError, GraphSliceRequest, SliceDirection,
-    SliceEdgeType, SliceParseError,
+    DEFAULT_DEPTH,
+    DEFAULT_MIN_CONFIDENCE,
+    GraphSliceError,
+    GraphSliceRequest,
+    SliceDirection,
+    SliceEdgeType,
+    SliceParseError,
 };
 pub use response::{
-    CallSiteInfo, EdgeProvenance, EdgeProvenanceDetails, EdgeTarget, ExternalTarget,
-    GraphSliceResponse, ResolutionScope, SliceConstraints, SliceEdge, SliceEntry, SliceRefusal,
-    SliceRefusalReason, SliceSpillover, SpilloverCandidate,
+    CallSiteInfo,
+    EdgeProvenance,
+    EdgeProvenanceDetails,
+    EdgeTarget,
+    ExternalTarget,
+    GraphSliceResponse,
+    ResolutionScope,
+    SliceConstraints,
+    SliceEdge,
+    SliceEntry,
+    SliceRefusal,
+    SliceRefusalReason,
+    SliceSpillover,
+    SpilloverCandidate,
 };
