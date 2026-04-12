@@ -6,16 +6,10 @@
 //! limit for handler threads, and cleans up Unix socket files during shutdown
 //! or early error paths.
 
-#[cfg(unix)]
-use std::fs;
 #[cfg(test)]
 use std::net::SocketAddr;
 #[cfg(unix)]
-use std::os::unix::fs::FileTypeExt;
-#[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
-#[cfg(unix)]
-use std::path::Path;
 use std::{
     io,
     net::{TcpListener, ToSocketAddrs},
@@ -30,6 +24,8 @@ use std::{
 use tracing::{info, warn};
 use weaver_config::SocketEndpoint;
 
+#[cfg(unix)]
+use super::listener_unix::{bind_unix, cleanup_unix_socket};
 use super::{ConnectionHandler, ConnectionStream, LISTENER_TARGET, ListenerError};
 
 const ACCEPT_BACKOFF: Duration = Duration::from_millis(25);
@@ -251,37 +247,49 @@ fn handle_accept_cycle(
     last_error: &mut Option<io::ErrorKind>,
 ) -> Option<Duration> {
     match accept_connection(listener) {
-        Ok(Some(stream)) => {
-            *last_error = None;
-            if let Some(permit) = limiter.try_acquire() {
-                let handler = Arc::clone(handler);
-                thread::spawn(move || {
-                    let _permit = permit;
-                    handler.handle(stream);
-                });
-            } else {
-                warn!(
-                    target: LISTENER_TARGET,
-                    max_threads = limiter.max,
-                    "listener at capacity, dropping connection"
-                );
-            }
-            None
-        }
+        Ok(Some(stream)) => handle_accepted_stream(stream, handler, limiter, last_error),
         Ok(None) => Some(ACCEPT_BACKOFF),
-        Err(error) => {
-            let kind = error.kind();
-            if *last_error != Some(kind) {
-                warn!(
-                    target: LISTENER_TARGET,
-                    error = %error,
-                    "socket accept error"
-                );
-            }
-            *last_error = Some(kind);
-            Some(ERROR_BACKOFF)
-        }
+        Err(error) => handle_accept_error(error, last_error),
     }
+}
+
+fn handle_accepted_stream(
+    stream: ConnectionStream,
+    handler: &Arc<dyn ConnectionHandler>,
+    limiter: &HandlerLimiter,
+    last_error: &mut Option<io::ErrorKind>,
+) -> Option<Duration> {
+    *last_error = None;
+    if let Some(permit) = limiter.try_acquire() {
+        let handler = Arc::clone(handler);
+        thread::spawn(move || {
+            let _permit = permit;
+            handler.handle(stream);
+        });
+    } else {
+        warn!(
+            target: LISTENER_TARGET,
+            max_threads = limiter.max,
+            "listener at capacity, dropping connection"
+        );
+    }
+    None
+}
+
+fn handle_accept_error(
+    error: io::Error,
+    last_error: &mut Option<io::ErrorKind>,
+) -> Option<Duration> {
+    let kind = error.kind();
+    if *last_error != Some(kind) {
+        warn!(
+            target: LISTENER_TARGET,
+            error = %error,
+            "socket accept error"
+        );
+    }
+    *last_error = Some(kind);
+    Some(ERROR_BACKOFF)
 }
 
 /// Configures a TCP stream for blocking operation with read timeout.
@@ -332,64 +340,4 @@ fn bind_tcp(host: &str, port: u16) -> Result<TcpListener, ListenerError> {
         port,
     })?;
     TcpListener::bind(addr).map_err(|source| ListenerError::BindTcp { addr, source })
-}
-
-#[cfg(unix)]
-fn bind_unix(path: &Path) -> Result<UnixListener, ListenerError> {
-    if path.exists() {
-        let metadata =
-            fs::symlink_metadata(path).map_err(|source| ListenerError::UnixMetadata {
-                path: path.display().to_string(),
-                source,
-            })?;
-        if !metadata.file_type().is_socket() {
-            return Err(ListenerError::UnixNotSocket {
-                path: path.display().to_string(),
-            });
-        }
-        match UnixStream::connect(path) {
-            Ok(_stream) => {
-                return Err(ListenerError::UnixInUse {
-                    path: path.display().to_string(),
-                });
-            }
-            Err(error)
-                if error.kind() == io::ErrorKind::ConnectionRefused
-                    || error.kind() == io::ErrorKind::NotFound =>
-            {
-                fs::remove_file(path).map_err(|source| ListenerError::UnixCleanup {
-                    path: path.display().to_string(),
-                    source,
-                })?;
-            }
-            Err(error) => {
-                return Err(ListenerError::UnixConnect {
-                    path: path.display().to_string(),
-                    source: error,
-                });
-            }
-        }
-    }
-
-    UnixListener::bind(path).map_err(|source| ListenerError::BindUnix {
-        path: path.display().to_string(),
-        source,
-    })
-}
-
-#[cfg(unix)]
-fn cleanup_unix_socket(endpoint: &SocketEndpoint) {
-    let SocketEndpoint::Unix { path } = endpoint else {
-        return;
-    };
-    if let Err(error) = fs::remove_file(path.as_std_path())
-        && error.kind() != io::ErrorKind::NotFound
-    {
-        warn!(
-            target: LISTENER_TARGET,
-            error = %error,
-            path = %path,
-            "failed to remove unix socket file"
-        );
-    }
 }
