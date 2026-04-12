@@ -50,6 +50,7 @@ mod plugin_paths;
 #[cfg(test)]
 pub(super) mod refactor_helpers;
 mod refusal;
+mod requirements;
 
 mod request_building;
 mod resolution;
@@ -162,6 +163,7 @@ pub(crate) struct RefactorContext<'a> {
     /// Runtime used to execute the refactor plugin process.
     pub runtime: &'a dyn RefactorPluginRuntime,
 }
+
 /// Parameters required for provider resolution.
 struct ResolutionParams<'a> {
     runtime: &'a dyn RefactorPluginRuntime,
@@ -184,9 +186,7 @@ fn resolve_provider_with_fallback(
         Err(error) => {
             writer.write_stderr(format!(
                 "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
-                args.provider.as_deref().unwrap_or("<auto>"),
-                args.refactoring,
-                args.file
+                args.provider, args.refactoring, args.file
             ))?;
             Ok(None)
         }
@@ -212,11 +212,11 @@ fn handle_successful_execution<W: Write>(
         .map_err(DispatchError::backend_startup)?;
     handle_plugin_response(response, writer, context.backends, context.workspace_root)
 }
+
 /// Handles `act refactor` requests.
 ///
-/// Expects `--refactoring <operation>` and `--file <path>` in the request
-/// arguments. `--provider <plugin>` is optional and acts as an explicit
-/// compatibility override when supplied.
+/// Expects `--provider <plugin>`, `--refactoring <operation>`, and
+/// `--file <path>` in the request arguments.
 ///
 /// The handler reads the file content, executes the plugin, and forwards
 /// successful diff output through `act apply-patch` for Double-Lock
@@ -230,7 +230,7 @@ pub fn handle<W: Write>(
 
     debug!(
         target: DISPATCH_TARGET,
-        provider = args.provider.as_deref().unwrap_or("<auto>"),
+        provider = args.provider,
         refactoring = args.refactoring,
         file = args.file,
         "handling act refactor"
@@ -238,12 +238,11 @@ pub fn handle<W: Write>(
 
     let (plugin_request, capability, file_path) =
         prepare_plugin_request(context.workspace_root, &args)?;
-
     let resolution_params = ResolutionParams {
         runtime: context.runtime,
         capability,
         file_path: file_path.as_path(),
-        provider_override: args.provider.as_deref(),
+        provider_override: Some(args.provider.as_str()),
     };
 
     let Some(resolution) = resolve_provider_with_fallback(resolution_params, &args, writer)? else {
@@ -263,6 +262,7 @@ pub fn handle<W: Write>(
 
     execute_plugin_and_handle_response(execution_params, &args, writer, &mut context)
 }
+
 fn write_capability_resolution<W: Write>(
     writer: &mut ResponseWriter<W>,
     resolution: &CapabilityResolutionEnvelope,

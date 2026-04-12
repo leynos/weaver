@@ -40,6 +40,8 @@ pub(crate) mod builders {
 
     pub(crate) fn standard_rename_args(file: &str) -> Vec<String> {
         vec![
+            String::from("--provider"),
+            String::from(provider_for_file(file)),
             String::from("--refactoring"),
             String::from("rename"),
             String::from("--file"),
@@ -49,12 +51,20 @@ pub(crate) mod builders {
         ]
     }
 
+    fn provider_for_file(file: &str) -> &'static str {
+        match Path::new(file).extension().and_then(|ext| ext.to_str()) {
+            Some("rs") => "rust-analyzer",
+            _ => "rope",
+        }
+    }
+
     pub(crate) fn configure_request(request: &mut CommandRequest, args: Vec<String>) {
         *request = command_request(args);
     }
 
     const _: fn(&Path) -> FusionBackends<SemanticBackendProvider> = build_backends;
     const _: fn(&str) -> Vec<String> = standard_rename_args;
+    const _: fn(&str) -> &'static str = provider_for_file;
     const _: fn(&mut CommandRequest, Vec<String>) = configure_request;
 }
 

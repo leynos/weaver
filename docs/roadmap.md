@@ -227,12 +227,12 @@ does* *not require source inspection or external runbooks.*
   - [x] Acceptance criteria: each Level 10 path (10a through 10e) renders the
         same three-part template (error, alternatives, next command), and
         preserves stable non-zero exit-code semantics.
-- [ ] 2.3.4. Return complete argument requirements for `act refactor`.
+- [x] 2.3.4. Return complete argument requirements for `act refactor`.
       See
       [Gap 5b](ui-gap-analysis.md#gap-5b--act-refactor-without-arguments).
-  - [ ] List all required flags, valid provider names, and known refactoring
+  - [x] List all required flags, valid provider names, and known refactoring
         operations.
-  - [ ] Acceptance criteria: `weaver act refactor` without arguments reports
+  - [x] Acceptance criteria: `weaver act refactor` without arguments reports
         all three required flags (`--provider`, `--refactoring`, `--file`) in
         one response, plus at least one valid provider and refactoring value.
 

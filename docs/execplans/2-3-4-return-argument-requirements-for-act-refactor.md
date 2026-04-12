@@ -5,9 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
-
-Implementation must not begin until this plan is explicitly approved.
+Status: IMPLEMENTED
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
@@ -153,15 +151,15 @@ This work is successful when the following are all true:
   still describe automatic provider routing when `--provider` is omitted.
 - [x] (2026-04-10) Drafted this ExecPlan in
   `docs/execplans/2-3-4-return-argument-requirements-for-act-refactor.md`.
-- [ ] Stage A: add failing unit, behavioural, and end-to-end assertions for
+- [x] Stage A: add failing unit, behavioural, and end-to-end assertions for
   the new required-arguments contract.
-- [ ] Stage B: introduce one canonical requirements helper for valid providers,
+- [x] Stage B: introduce one canonical requirements helper for valid providers,
   valid refactorings, and complete missing-argument rendering.
-- [ ] Stage C: update `act refactor` parsing and routing so the new
+- [x] Stage C: update `act refactor` parsing and routing so the new
   requirements are enforced consistently.
-- [ ] Stage D: update `docs/weaver-design.md`, `docs/users-guide.md`, and
+- [x] Stage D: update `docs/weaver-design.md`, `docs/users-guide.md`, and
   `docs/roadmap.md`.
-- [ ] Stage E: run the full Markdown and Rust validation gates sequentially.
+- [x] Stage E: run the full Markdown and Rust validation gates sequentially.
 
 ## Surprises & Discoveries
 
@@ -229,7 +227,15 @@ Target outcome at completion:
 8. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
-Retrospective notes will be added after implementation.
+Retrospective notes:
+
+- The required-provider contract fit cleanly at the parser boundary, which
+  avoided disturbing the safety-critical plugin execution and apply-patch
+  pipeline.
+- Keeping providers and refactorings in one dedicated helper reduced drift
+  across parser validation, handler tests, behavioural scenarios, and docs.
+- The existing behavioural harness was sufficient; extending it with a missing
+  arguments scenario gave coverage without adding a second test stack.
 
 ## Context and orientation
 

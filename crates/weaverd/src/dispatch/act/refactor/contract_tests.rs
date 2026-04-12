@@ -49,9 +49,9 @@ impl RefactorPluginRuntime for InspectingRuntime {
             CapabilityResolutionDetails {
                 capability: CapabilityId::RenameSymbol,
                 language: Some(String::from(self.language)),
-                requested_provider: None,
+                requested_provider: Some(String::from(self.provider)),
                 selected_provider: Some(String::from(self.provider)),
-                selection_mode: SelectionMode::Automatic,
+                selection_mode: SelectionMode::ExplicitProvider,
                 outcome: ResolutionOutcome::Selected,
                 refusal_reason: None,
                 candidates: vec![CandidateEvaluation {
@@ -133,6 +133,8 @@ fn dispatch_inspecting_rename(
         language: config.language,
     };
     let mut args = vec![
+        String::from("--provider"),
+        String::from(config.provider),
         String::from("--refactoring"),
         String::from("rename"),
         String::from("--file"),
