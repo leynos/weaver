@@ -201,9 +201,10 @@ fn handle_returns_success_for_supported_rust_symbol(
     assert_eq!(payload["card"]["symbol"]["ref"]["name"], "greet");
 }
 
-#[rstest]
-fn handle_returns_semantic_success_with_enrichment_and_rewritten_provenance(
+fn assert_semantic_success(
     temp_dir: TempDir,
+    server: StubLanguageServer,
+    assert_fn: impl FnOnce(&serde_json::Value),
 ) -> Result<(), String> {
     let path = write_source(
         &temp_dir,
@@ -213,8 +214,26 @@ fn handle_returns_semantic_success_with_enrichment_and_rewritten_provenance(
                       name.len();\n    count\n}\n",
         },
     );
-    let uri = Url::from_file_path(&path).expect("file uri").to_string();
+    let uri = Url::from_file_path(&path)
+        .map_err(|()| String::from("failed to convert source path to file URI"))?
+        .to_string();
     let request = make_request(&uri, 2, 4, DetailLevel::Semantic);
+    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server)?;
+    let mut output = Vec::new();
+    let mut writer = ResponseWriter::new(&mut output);
+    let result = handle(&request, &mut writer, &mut backends).expect("handler should succeed");
+    let payload = response_payload(output);
+
+    assert_eq!(result.status, 0);
+    assert_eq!(payload["status"], "success");
+    assert_fn(&payload);
+    Ok(())
+}
+
+#[rstest]
+fn handle_returns_semantic_success_with_enrichment_and_rewritten_provenance(
+    temp_dir: TempDir,
+) -> Result<(), String> {
     let (server, _hover_params) = StubLanguageServer::with_hover(
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         markdown_hover(concat!(
@@ -222,59 +241,33 @@ fn handle_returns_semantic_success_with_enrichment_and_rewritten_provenance(
             "**Deprecated**: use `welcome` instead"
         )),
     );
-    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server)?;
-    let mut output = Vec::new();
-    let mut writer = ResponseWriter::new(&mut output);
-
-    let result = handle(&request, &mut writer, &mut backends).expect("handler should succeed");
-
-    assert_eq!(result.status, 0);
-    let payload = response_payload(output);
-    assert_eq!(payload["status"], "success");
-    assert_eq!(payload["card"]["lsp"]["source"], "lsp_hover");
-    assert_eq!(
-        payload["card"]["lsp"]["type"],
-        "fn greet(name: &str) -> usize"
-    );
-    assert_eq!(payload["card"]["lsp"]["deprecated"], true);
-    assert_eq!(
-        payload["card"]["provenance"]["sources"],
-        serde_json::json!(["tree_sitter", "lsp_hover"])
-    );
-    Ok(())
+    assert_semantic_success(temp_dir, server, |payload| {
+        assert_eq!(payload["card"]["lsp"]["source"], "lsp_hover");
+        assert_eq!(
+            payload["card"]["lsp"]["type"],
+            "fn greet(name: &str) -> usize"
+        );
+        assert_eq!(payload["card"]["lsp"]["deprecated"], true);
+        assert_eq!(
+            payload["card"]["provenance"]["sources"],
+            serde_json::json!(["tree_sitter", "lsp_hover"])
+        );
+    })
 }
 
 #[rstest]
 fn handle_returns_semantic_success_with_degraded_provenance_when_hover_is_unavailable(
     temp_dir: TempDir,
 ) -> Result<(), String> {
-    let path = write_source(
-        &temp_dir,
-        SourceFile {
-            name: "card.rs",
-            content: "/// Greets callers.\nfn greet(name: &str) -> usize {\n    let count = \
-                      name.len();\n    count\n}\n",
-        },
-    );
-    let uri = Url::from_file_path(&path).expect("file uri").to_string();
-    let request = make_request(&uri, 2, 4, DetailLevel::Semantic);
     let (server, _hover_params) =
         StubLanguageServer::missing_hover(ServerCapabilitySet::new(false, false, false));
-    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server)?;
-    let mut output = Vec::new();
-    let mut writer = ResponseWriter::new(&mut output);
-
-    let result = handle(&request, &mut writer, &mut backends).expect("handler should succeed");
-
-    assert_eq!(result.status, 0);
-    let payload = response_payload(output);
-    assert_eq!(payload["status"], "success");
-    assert!(payload["card"]["lsp"].is_null());
-    assert_eq!(
-        payload["card"]["provenance"]["sources"],
-        serde_json::json!(["tree_sitter", "tree_sitter_degraded_semantic"])
-    );
-    Ok(())
+    assert_semantic_success(temp_dir, server, |payload| {
+        assert!(payload["card"]["lsp"].is_null());
+        assert_eq!(
+            payload["card"]["provenance"]["sources"],
+            serde_json::json!(["tree_sitter", "tree_sitter_degraded_semantic"])
+        );
+    })
 }
 
 #[rstest]
