@@ -169,6 +169,8 @@ impl RefactorWorld {
             workspace: TempDir::new().expect("workspace"),
             socket_dir: TempDir::new().expect("socket dir"),
             request: command_request(vec![
+                String::from("--provider"),
+                String::from("rope"),
                 String::from("--refactoring"),
                 String::from("rename"),
                 String::from("--file"),
@@ -255,14 +257,14 @@ fn given_workspace_file(
     // This step exists for BDD readability but performs no action
 }
 
-#[given("a valid auto-routed act refactor request resolved to rope")]
+#[given("a valid act refactor request for rope")]
 fn given_valid_rope_request(world: &mut RefactorWorld) {
     configure_request(&mut world.request, standard_rename_args("notes.py"));
     world.routing_mode = RoutingMode::AutomaticPython;
     world.prepare_routed_fixture("notes.py");
 }
 
-#[given("a valid auto-routed act refactor request resolved to rust-analyzer")]
+#[given("a valid act refactor request for rust-analyzer")]
 fn given_valid_rust_request(world: &mut RefactorWorld) {
     configure_request(&mut world.request, standard_rename_args("notes.rs"));
     world.routing_mode = RoutingMode::AutomaticRust;
@@ -273,6 +275,11 @@ fn given_valid_rust_request(world: &mut RefactorWorld) {
 fn given_unsupported_language_request(world: &mut RefactorWorld) {
     configure_request(&mut world.request, standard_rename_args("notes.txt"));
     world.routing_mode = RoutingMode::UnsupportedLanguage;
+}
+
+#[given("an act refactor request without the required flags")]
+fn given_missing_required_arguments_request(world: &mut RefactorWorld) {
+    configure_request(&mut world.request, Vec::new());
 }
 
 #[given("a Python act refactor request with an incompatible provider override")]
@@ -314,8 +321,10 @@ fn then_refactor_succeeds(world: &mut RefactorWorld) {
 #[then("the refactor command fails with status 1")]
 fn then_refactor_fails_status_one(world: &mut RefactorWorld) {
     let result = world.dispatch_result.as_ref().expect("result missing");
-    let status = result.as_ref().expect("status should be present");
-    assert_eq!(*status, 1);
+    match result {
+        Ok(status) => assert_eq!(*status, 1),
+        Err(error) => assert_eq!(error.exit_status(), 1),
+    }
 }
 
 #[then("the target file is updated")]
@@ -343,6 +352,20 @@ fn then_stderr_contains(world: &mut RefactorWorld, text: String) {
         world.response_stream.contains(needle),
         "expected response stream to contain '{needle}', got: {}",
         world.response_stream
+    );
+}
+
+#[then("the dispatch error contains {text}")]
+fn then_dispatch_error_contains(world: &mut RefactorWorld, text: String) {
+    let needle = text.trim_matches('"');
+    let result = world.dispatch_result.as_ref().expect("result missing");
+    let Err(error) = result else {
+        panic!("expected dispatch error, got status: {result:?}");
+    };
+    let rendered = error.to_string();
+    assert!(
+        rendered.contains(needle),
+        "expected dispatch error to contain '{needle}', got: {rendered}"
     );
 }
 

@@ -67,6 +67,27 @@ pub(crate) mod resolutions {
         pub(crate) candidates: Vec<CandidateEvaluation>,
     }
 
+pub(super) fn standard_rename_args(file: &str) -> Vec<String> {
+    vec![
+        String::from("--provider"),
+        String::from(provider_for_file(file)),
+        String::from("--refactoring"),
+        String::from("rename"),
+        String::from("--file"),
+        String::from(file),
+        String::from("offset=1"),
+        String::from("new_name=woven"),
+    ]
+}
+
+fn provider_for_file(file: &str) -> &'static str {
+    match Path::new(file).extension().and_then(|ext| ext.to_str()) {
+        Some("py") => "rope",
+        Some("rs") => "rust-analyzer",
+        _ => "rope",
+    }
+}
+
     pub(crate) struct SelectedResolution<'a> {
         pub(crate) capability: CapabilityId,
         pub(crate) language: &'a str,

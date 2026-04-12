@@ -5,10 +5,12 @@
 
 use crate::dispatch::errors::DispatchError;
 
+use super::requirements::{missing_requirements_error, validate_provider, validate_refactoring};
+
 /// Parsed `act refactor` arguments.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RefactorArgs {
-    pub(crate) provider: Option<String>,
+    pub(crate) provider: String,
     pub(crate) refactoring: String,
     pub(crate) file: String,
     pub(crate) extra: Vec<String>,
@@ -24,16 +26,25 @@ struct RefactorArgsBuilder {
 }
 
 impl RefactorArgsBuilder {
-    /// Finalizes the builder, requiring the non-optional flags.
+    /// Finalizes the builder and validates the operator-facing contract.
     fn build(self) -> Result<RefactorArgs, DispatchError> {
+        let Some(provider) = self.provider else {
+            return Err(missing_requirements_error());
+        };
+        let Some(refactoring) = self.refactoring else {
+            return Err(missing_requirements_error());
+        };
+        let Some(file) = self.file else {
+            return Err(missing_requirements_error());
+        };
+
+        validate_provider(&provider)?;
+        validate_refactoring(&refactoring)?;
+
         Ok(RefactorArgs {
-            provider: self.provider,
-            refactoring: self.refactoring.ok_or_else(|| {
-                DispatchError::invalid_arguments("act refactor requires --refactoring <operation>")
-            })?,
-            file: self.file.ok_or_else(|| {
-                DispatchError::invalid_arguments("act refactor requires --file <path>")
-            })?,
+            provider,
+            refactoring,
+            file,
             extra: self.extra,
         })
     }
@@ -86,11 +97,23 @@ fn parse_flag_value<'a>(
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::parse_refactor_args;
+    use crate::dispatch::errors::DispatchError;
+
+    fn invalid_arguments_message(error: DispatchError) -> String {
+        match error {
+            DispatchError::InvalidArguments { message } => message,
+            other => panic!("expected invalid arguments error, got: {other:?}"),
+        }
+    }
 
     #[test]
-    fn provider_is_optional() {
+    fn parses_complete_argument_set() {
         let args = vec![
+            String::from("--provider"),
+            String::from("rope"),
             String::from("--refactoring"),
             String::from("rename"),
             String::from("--file"),
@@ -98,14 +121,55 @@ mod tests {
         ];
 
         let parsed = parse_refactor_args(&args).expect("parse succeeds");
-        assert_eq!(parsed.provider, None);
+        assert_eq!(parsed.provider, "rope");
         assert_eq!(parsed.refactoring, "rename");
         assert_eq!(parsed.file, "src/main.py");
     }
 
+    #[rstest]
+    #[case::no_arguments(vec![])]
+    #[case::missing_provider(vec![
+        String::from("--refactoring"),
+        String::from("rename"),
+        String::from("--file"),
+        String::from("src/main.py"),
+    ])]
+    #[case::missing_refactoring(vec![
+        String::from("--provider"),
+        String::from("rope"),
+        String::from("--file"),
+        String::from("src/main.py"),
+    ])]
+    #[case::missing_file(vec![
+        String::from("--provider"),
+        String::from("rope"),
+        String::from("--refactoring"),
+        String::from("rename"),
+    ])]
+    fn missing_required_flags_report_full_contract(#[case] args: Vec<String>) {
+        let message =
+            invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
+
+        for required in [
+            "--provider <plugin>",
+            "--refactoring <operation>",
+            "--file <path>",
+        ] {
+            assert!(
+                message.contains(required),
+                "missing '{required}' from: {message}"
+            );
+        }
+        assert!(message.contains("Providers: rope, rust-analyzer"));
+        assert!(message.contains("Refactorings: rename"));
+        assert!(message.contains("Next command:"));
+    }
+
     #[test]
-    fn missing_file_is_rejected() {
+    fn missing_flag_value_is_rejected() {
         let args = vec![
+            String::from("--provider"),
+            String::from("rope"),
             String::from("--refactoring"),
             String::from("rename"),
             String::from("--file"),
@@ -121,6 +185,8 @@ mod tests {
     #[test]
     fn flag_as_value_is_rejected() {
         let args = vec![
+            String::from("--provider"),
+            String::from("rope"),
             String::from("--refactoring"),
             String::from("rename"),
             String::from("--file"),
@@ -132,5 +198,39 @@ mod tests {
             error,
             crate::dispatch::errors::DispatchError::InvalidArguments { .. }
         ));
+    }
+
+    #[test]
+    fn unsupported_provider_is_rejected_before_runtime_resolution() {
+        let args = vec![
+            String::from("--provider"),
+            String::from("missing-provider"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("src/main.py"),
+        ];
+
+        let message =
+            invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
+        assert!(message.contains("does not support provider 'missing-provider'"));
+        assert!(message.contains("Providers: rope, rust-analyzer"));
+    }
+
+    #[test]
+    fn unsupported_refactoring_is_rejected_with_supported_values() {
+        let args = vec![
+            String::from("--provider"),
+            String::from("rope"),
+            String::from("--refactoring"),
+            String::from("extract-method"),
+            String::from("--file"),
+            String::from("src/main.py"),
+        ];
+
+        let message =
+            invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
+        assert!(message.contains("does not support refactoring 'extract-method'"));
+        assert!(message.contains("Refactorings: rename"));
     }
 }
