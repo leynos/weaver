@@ -1,13 +1,14 @@
 //! Build script: generate the CLI manual page into target/generated-man/<target>/<profile> for
 //! release packaging.
 
-use clap::CommandFactory;
 use clap_mangen::Man;
 use std::{env, path::PathBuf};
 use weaver_build_util::{manual_date_from_env, out_dir_for_target_profile, write_man_page};
 
 #[path = "src/cli.rs"]
 mod cli;
+#[path = "src/help.rs"]
+mod help;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Regenerate the manual page when the CLI or metadata changes.
@@ -22,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-env-changed=PROFILE");
 
     // The top-level page documents the entire command interface.
-    let cmd = cli::Cli::command();
+    let cmd = help::command();
     let default_name = cmd
         .get_bin_name()
         .unwrap_or_else(|| cmd.get_name())
