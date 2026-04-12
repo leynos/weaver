@@ -9,5 +9,8 @@ cap-std = { workspace = true }
 camino = { workspace = true }
 time = { version = "0.3", features = ["formatting"] }
 
+[dev-dependencies]
+tempfile = { workspace = true }
+
 [lints]
 workspace = true
