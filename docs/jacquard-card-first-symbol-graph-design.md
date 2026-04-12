@@ -833,7 +833,15 @@ Response:
 {
   "slice_version": 1,
   "entry": { "symbol_id": "sym_…" },
-  "constraints": { "depth": 2, "max_cards": 30, "max_estimated_tokens": 4000 },
+  "constraints": {
+    "depth": 2,
+    "direction": "both",
+    "edge_types": ["call", "import", "config"],
+    "min_confidence": 0.5,
+    "budget": { "max_cards": 30, "max_edges": 200, "max_estimated_tokens": 4000 },
+    "entry_detail": "structure",
+    "node_detail": "minimal"
+  },
   "cards": [ /* SymbolCard objects (possibly minimal) */ ],
   "edges": [ /* typed edges */ ],
   "spillover": {
@@ -842,6 +850,14 @@ Response:
   }
 }
 ```
+
+For roadmap item 7.2.1, the shipped runtime uses this stable response shape to
+return a deterministic same-file slice: the entry card plus any same-file
+symbol cards that fit within `budget.max_cards`, with `spillover` populated
+when additional local symbols are excluded. Edge extraction remains deferred to
+7.2.2 through 7.2.4, so the stable schema already exposes typed edges and
+`resolution_scope`, but the runtime may legitimately emit an empty `edges`
+array until those milestones land.
 
 ### `observe graph-history`
 

@@ -56,7 +56,14 @@ pub(crate) struct GetCardRequest<'a> {
     pub(crate) detail: &'a str,
 }
 
-#[derive(Debug)]
+pub(crate) struct GraphSliceRequest<'a> {
+    pub(crate) uri: &'a str,
+    pub(crate) line: u32,
+    pub(crate) column: u32,
+    pub(crate) entry_detail: &'a str,
+    pub(crate) node_detail: &'a str,
+    pub(crate) max_cards: Option<u32>,
+}
 pub(crate) struct TestDaemon {
     address: SocketAddr,
     backend_manager: BackendManager,
@@ -146,6 +153,44 @@ pub(crate) fn run_get_card(daemon: &TestDaemon, request: GetCardRequest<'_>) -> 
     output_to_transcript(command, &output)
 }
 
+pub(crate) fn run_graph_slice(daemon: &TestDaemon, request: GraphSliceRequest<'_>) -> Transcript {
+    let mut command = format!(
+        concat!(
+            "weaver --daemon-socket tcp://<daemon-endpoint> --output json ",
+            "observe graph-slice --uri <uri> --position {}:{} ",
+            "--entry-detail {} --node-detail {}"
+        ),
+        request.line, request.column, request.entry_detail, request.node_detail
+    );
+    let mut cli_args = vec![
+        String::from("--daemon-socket"),
+        daemon.endpoint(),
+        String::from("--output"),
+        String::from("json"),
+        String::from("observe"),
+        String::from("graph-slice"),
+        String::from("--uri"),
+        String::from(request.uri),
+        String::from("--position"),
+        format!("{}:{}", request.line, request.column),
+        String::from("--entry-detail"),
+        String::from(request.entry_detail),
+        String::from("--node-detail"),
+        String::from(request.node_detail),
+    ];
+    if let Some(max_cards) = request.max_cards {
+        command.push_str(" --max-cards ");
+        command.push_str(&max_cards.to_string());
+        cli_args.push(String::from("--max-cards"));
+        cli_args.push(max_cards.to_string());
+    }
+
+    let output = required_result(
+        Command::new(weaver_binary_path()).args(&cli_args).output(),
+        "CLI should execute",
+    );
+    output_to_transcript(command, &output)
+}
 pub(crate) fn assert_named_snapshot(name: &str, content: &str) {
     let mut settings = insta::Settings::clone_current();
     settings.set_snapshot_path(Path::new(concat!(
