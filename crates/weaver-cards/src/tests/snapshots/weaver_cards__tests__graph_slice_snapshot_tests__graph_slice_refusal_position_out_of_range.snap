@@ -1,0 +1,11 @@
+---
+source: crates/weaver-cards/src/tests/graph_slice_snapshot_tests.rs
+expression: json
+---
+{
+  "status": "refusal",
+  "refusal": {
+    "reason": "position_out_of_range",
+    "message": "position is outside the file bounds"
+  }
+}

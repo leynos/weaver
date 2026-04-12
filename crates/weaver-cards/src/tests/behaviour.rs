@@ -1,43 +1,11 @@
 //! Behaviour-driven tests for `weaver-cards` schema contracts.
 
-use std::str::FromStr;
-
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 
 use super::fixtures;
+use super::test_utils::QuotedString;
 use crate::{CardRefusal, DetailLevel, GetCardRequest, GetCardResponse, RefusalReason, SymbolCard};
-
-// ---------------------------------------------------------------------------
-// QuotedString helper (same pattern as sempai_core::test_support)
-// ---------------------------------------------------------------------------
-
-/// Error returned when a string is not wrapped in balanced double-quotes.
-#[derive(Debug, thiserror::Error)]
-#[error("expected a double-quoted string, got: {0}")]
-struct QuotedStringParseError(String);
-
-/// A quoted string value from a Gherkin feature file.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct QuotedString(String);
-
-impl FromStr for QuotedString {
-    type Err = QuotedStringParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let value = s
-            .strip_prefix('"')
-            .and_then(|v| v.strip_suffix('"'))
-            .ok_or_else(|| QuotedStringParseError(s.to_owned()))?;
-        Ok(Self(value.to_owned()))
-    }
-}
-
-impl QuotedString {
-    fn as_str(&self) -> &str {
-        &self.0
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Test world

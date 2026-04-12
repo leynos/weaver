@@ -46,6 +46,9 @@ fn invalid_arguments_message(domain: &str, operation: &str) -> Option<&'static s
         ("observe", "get-card") => {
             Some("observe get-card should fail with InvalidArguments (no args provided)")
         }
+        ("observe", "graph-slice") => {
+            Some("observe graph-slice should fail with InvalidArguments (no args provided)")
+        }
         ("act", "apply-patch") => {
             Some("act apply-patch should fail with InvalidArguments (missing patch)")
         }

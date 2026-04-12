@@ -256,7 +256,8 @@ fn then_unknown_operation_payload_lists_known_operations(
             "grep",
             "diagnostics",
             "call-hierarchy",
-            "get-card"
+            "get-card",
+            "graph-slice"
         ]),
         "act" => serde_json::json!([
             "rename-symbol",

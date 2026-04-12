@@ -33,6 +33,7 @@ weaver-after-help-observe-grep = grep
 weaver-after-help-observe-diagnostics = diagnostics
 weaver-after-help-observe-call-hierarchy = call-hierarchy
 weaver-after-help-observe-get-card = get-card
+weaver-after-help-observe-graph-slice = graph-slice
 weaver-after-help-act-heading = act — Perform code modifications
 weaver-after-help-act-rename-symbol = rename-symbol
 weaver-after-help-act-apply-edits = apply-edits

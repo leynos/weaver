@@ -319,7 +319,8 @@ mod tests {
                 "grep",
                 "diagnostics",
                 "call-hierarchy",
-                "get-card"
+                "get-card",
+                "graph-slice"
             ])
         );
         assert!(lines.iter().any(|line| line.contains(r#""status":1"#)));

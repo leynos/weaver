@@ -1,0 +1,23 @@
+---
+source: crates/weaver-cards/src/tests/graph_slice_snapshot_tests.rs
+expression: json
+---
+{
+  "uri": "file:///src/lib.rs",
+  "line": 42,
+  "column": 17,
+  "depth": 3,
+  "direction": "out",
+  "edge_types": [
+    "call",
+    "import"
+  ],
+  "min_confidence": 0.8,
+  "budget": {
+    "max_cards": 10,
+    "max_edges": 50,
+    "max_estimated_tokens": 2000
+  },
+  "entry_detail": "semantic",
+  "node_detail": "signature"
+}

@@ -1,0 +1,11 @@
+---
+source: crates/weaver-cards/src/tests/graph_slice_snapshot_tests.rs
+expression: json
+---
+{
+  "status": "refusal",
+  "refusal": {
+    "reason": "not_yet_implemented",
+    "message": "observe graph-slice: graph-slice traversal is not yet implemented"
+  }
+}

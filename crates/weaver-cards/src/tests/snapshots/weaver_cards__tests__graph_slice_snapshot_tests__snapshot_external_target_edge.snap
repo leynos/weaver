@@ -1,0 +1,19 @@
+---
+source: crates/weaver-cards/src/tests/graph_slice_snapshot_tests.rs
+expression: json
+---
+{
+  "edge_version": 1,
+  "type": "call",
+  "from": "sym_abc123",
+  "to_external": {
+    "language": "python",
+    "name": "requests.get"
+  },
+  "confidence": 0.35,
+  "direction": "out",
+  "resolution_scope": "partial_symbol_table",
+  "provenance": {
+    "source": "tree_sitter_heuristic"
+  }
+}
