@@ -8,6 +8,8 @@ mod handler;
 mod listener;
 #[cfg(test)]
 mod listener_tests;
+#[cfg(unix)]
+mod listener_unix;
 #[cfg(test)]
 mod test_utils;
 
