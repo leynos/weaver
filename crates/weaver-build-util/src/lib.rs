@@ -165,18 +165,15 @@ pub fn out_dir_for_target_profile(
 
 /// Creates a directory and all its parents using capability-based filesystem operations.
 fn create_dir_all_cap(base: &Dir, path: &Utf8Path) -> io::Result<()> {
-    let current = base;
-    let mut components = Vec::new();
+    let mut current_path = Utf8PathBuf::new();
 
-    // Collect all components that need to be created
     for component in path.components() {
-        let name = component.as_str();
-        match current.create_dir(name) {
+        current_path.push(component.as_str());
+        match base.create_dir(&current_path) {
             Ok(()) => {}
             Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
             Err(err) => return Err(err),
         }
-        components.push(name.to_owned());
     }
 
     Ok(())
@@ -260,5 +257,36 @@ fn remove_existing_file(dir: &Dir, name: &str) -> io::Result<()> {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(error),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Regression tests for capability-based filesystem helpers.
+
+    use super::*;
+
+    #[test]
+    fn write_man_page_creates_nested_directories() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let temp_path =
+            Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).expect("utf-8 tempdir");
+        let nested_dir = temp_path.join("target/generated-man/test-target/debug");
+        let temp_dir_handle =
+            Dir::open_ambient_dir(&temp_path, cap_std::ambient_authority()).expect("open tempdir");
+
+        let output_path =
+            write_man_page(b".TH WEAVER 1\n", &nested_dir, "weaver.1").expect("write man page");
+        let relative_output_path = output_path
+            .strip_prefix(&temp_path)
+            .expect("output path should live under tempdir");
+
+        assert_eq!(output_path, nested_dir.join("weaver.1"));
+        assert_eq!(
+            temp_dir_handle
+                .read_to_string(relative_output_path)
+                .expect("read man page"),
+            ".TH WEAVER 1\n"
+        );
     }
 }
