@@ -22,10 +22,11 @@ constraints, and any spillover that was excluded when the traversal truncated.
 Observable behaviour after implementation:
 
 1. `weaver observe graph-slice --uri <Uniform Resource Identifier (URI)>
-   --position <LINE:COL>` parses into a typed request with explicit default
-   values for `depth`, `direction`, `edge_types`, `min_confidence`,
-   `budget.max_cards`, `budget.max_edges`, `budget.max_estimated_tokens`,
-   `entry_detail`, and `node_detail`.
+   --position
+   <LINE:COL>` parses into a typed request with explicit default values for `
+   depth`, `direction`, `edge_types`, `min_confidence`, `budget.max_cards`, `
+   budget.max_edges`, `budget.max_estimated_tokens`, `entry_detail`, and `
+   node_detail`.
 2. Stable JSON snapshots lock at least one successful slice, one
    truncated slice with spillover metadata, and one structured refusal.
 3. Every serialized edge reports its resolution scope as exactly one of
@@ -423,7 +424,7 @@ Expected files:
   [crates/weaver-e2e/tests/test_support/mod.rs](../../crates/weaver-e2e/tests/test_support/mod.rs)
 - a dedicated
   [crates/weaver-e2e/src/graph_slice_fixtures/](../../crates/weaver-e2e/src/graph_slice_fixtures/)
-  module tree for graph-shaped workspaces
+   module tree for graph-shaped workspaces
 
 The e2e suite must cover:
 
@@ -447,8 +448,8 @@ Recommended approach:
 
 ### Stage F: Update the design doc, user guide, and roadmap
 
-Update the design doc first, so the contract decisions are recorded where future
-milestones will find them.
+Update the design doc first, so the contract decisions are recorded where
+future milestones will find them.
 
 The design doc must explicitly state:
 
@@ -488,8 +489,8 @@ Review the tail of each log before concluding that the milestone is done.
 
 ## Approval gate
 
-This ExecPlan was approved and implementation has begun. Stages A through D have
-been completed, establishing the stable JSON schema contract, daemon routing,
-CLI parsing, and BDD coverage for the `observe graph-slice` operation. Stages E
-and F (end-to-end fixture coverage and documentation updates) remain in
-progress.
+This ExecPlan was approved and implementation has begun. Stages A through D
+have been completed, establishing the stable JSON schema contract, daemon
+routing, CLI parsing, and BDD coverage for the `observe graph-slice` operation.
+Stages E and F (end-to-end fixture coverage and documentation updates) remain
+in progress.

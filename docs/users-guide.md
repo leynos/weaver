@@ -721,8 +721,7 @@ Arguments:
 - `--direction` (optional) — traversal direction. One of `in`, `out`,
   or `both` (default).
 - `--edge-types` (optional) — comma-separated list of edge types to
-  follow. Any combination of `call`, `import`, `config`. Default: all
-  three.
+  follow. Any combination of `call`, `import`, `config`. Default: all three.
 - `--min-confidence` (optional) — minimum edge confidence threshold
   between `0.0` and `1.0`. Default: `0.5`.
 - `--max-cards` (optional) — maximum number of cards in the budget.
@@ -732,18 +731,17 @@ Arguments:
 - `--max-estimated-tokens` (optional) — maximum estimated token count
   in the budget. Default: `4000`.
 - `--entry-detail` (optional) — detail level for the entry card. One
-  of `minimal`, `signature`, `structure` (default), `semantic`, or
-  `full`.
+  of `minimal`, `signature`, `structure` (default), `semantic`, or `full`.
 - `--node-detail` (optional) — detail level for neighbouring node
-  cards. One of `minimal` (default), `signature`, `structure`,
-  `semantic`, or `full`.
+  cards. One of `minimal` (default), `signature`, `structure`, `semantic`, or
+  `full`.
 
 Response:
 
-The response is a discriminated-union JSON envelope keyed on the
-`"status"` field. When `"status"` is `"refusal"`, the envelope carries
-a structured refusal explaining why a slice could not be produced. When
-`"status"` is `"success"`, the envelope contains the graph slice.
+The response is a discriminated-union JSON envelope keyed on the `"status"`
+field. When `"status"` is `"refusal"`, the envelope carries a structured
+refusal explaining why a slice could not be produced. When `"status"` is
+`"success"`, the envelope contains the graph slice.
 
 When the operation cannot produce a slice, the status is `"refusal"`:
 
@@ -757,8 +755,8 @@ When the operation cannot produce a slice, the status is `"refusal"`:
 }
 ```
 
-On success, the response wraps the slice with constraints, cards,
-edges, and spillover metadata:
+On success, the response wraps the slice with constraints, cards, edges, and
+spillover metadata:
 
 ```json
 {
@@ -829,21 +827,18 @@ edges, and spillover metadata:
 }
 ```
 
-The `constraints` object reflects the applied request parameters after
-defaults are resolved. The `cards` array contains the extracted symbol
-cards within the budget. The `edges` array describes the relationships
-between cards. Each edge carries a `resolution_scope` of
-`full_symbol_table`, `partial_symbol_table`, or `lsp` indicating how
-the target was resolved.
+The `constraints` object reflects the applied request parameters after defaults
+are resolved. The `cards` array contains the extracted symbol cards within the
+budget. The `edges` array describes the relationships between cards. Each edge
+carries a `resolution_scope` that is either `full_symbol_table`,
+`partial_symbol_table`, or `lsp`, indicating how the target was resolved.
 
-When the traversal exceeds the budget, `spillover.truncated` is `true`
-and `spillover.frontier` lists candidate nodes that were reached but
-excluded.
+When the traversal exceeds the budget, `spillover.truncated` is `true` and
+`spillover.frontier` lists candidate nodes that were reached but excluded.
 
-Note: `observe graph-slice` is not yet fully implemented. The daemon
-currently returns a structured `not_yet_implemented` refusal. The
-request parsing, schema types, and response contract are stable and
-locked by snapshot tests.
+Note: `observe graph-slice` is not yet fully implemented. The daemon currently
+returns a structured `not_yet_implemented` refusal. The request parsing, schema
+types, and response contract are stable and locked by snapshot tests.
 
 #### observe grep
 

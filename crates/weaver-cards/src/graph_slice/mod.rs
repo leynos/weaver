@@ -19,6 +19,11 @@ mod parse_helpers;
 mod request;
 mod response;
 
+#[cfg(test)]
+mod parse_helpers_tests;
+#[cfg(test)]
+mod request_tests;
+
 pub use budget::{DEFAULT_MAX_CARDS, DEFAULT_MAX_EDGES, DEFAULT_MAX_ESTIMATED_TOKENS, SliceBudget};
 pub use request::{
     DEFAULT_DEPTH, DEFAULT_MIN_CONFIDENCE, GraphSliceError, GraphSliceRequest, SliceDirection,

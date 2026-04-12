@@ -318,7 +318,3 @@ impl GraphSliceRequest {
         self.node_detail
     }
 }
-
-#[cfg(test)]
-#[path = "request_tests.rs"]
-mod tests;

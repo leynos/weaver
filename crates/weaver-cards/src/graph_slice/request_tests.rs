@@ -2,6 +2,8 @@
 
 use rstest::rstest;
 
+use crate::DetailLevel;
+
 use super::*;
 
 fn args(items: &[&str]) -> Vec<String> {
