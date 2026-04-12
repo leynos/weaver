@@ -793,8 +793,8 @@ When the operation cannot produce a slice, the status is `"refusal"`:
 {
   "status": "refusal",
   "refusal": {
-    "reason": "not_yet_implemented",
-    "message": "observe graph-slice: graph-slice traversal is not yet implemented"
+    "reason": "unsupported_language",
+    "message": "observe graph-slice: unsupported language for path /workspace/notes.txt"
   }
 }
 ```
@@ -843,27 +843,7 @@ spillover metadata:
       }
     }
   ],
-  "edges": [
-    {
-      "edge_version": 1,
-      "type": "call",
-      "from": "sym_abc123",
-      "to": "sym_def456",
-      "confidence": 0.92,
-      "direction": "out",
-      "resolution_scope": "full_symbol_table",
-      "provenance": {
-        "source": "lsp_call_hierarchy",
-        "details": {
-          "call_site": {
-            "uri": "file:///src/main.rs",
-            "line": 15,
-            "column": 8
-          }
-        }
-      }
-    }
-  ],
+  "edges": [],
   "spillover": {
     "truncated": false,
     "frontier": []
@@ -873,16 +853,20 @@ spillover metadata:
 
 The `constraints` object reflects the applied request parameters after defaults
 are resolved. The `cards` array contains the extracted symbol cards within the
-budget. The `edges` array describes the relationships between cards. Each edge
-carries a `resolution_scope` that is either `full_symbol_table`,
-`partial_symbol_table`, or `lsp`, indicating how the target was resolved.
+budget. For roadmap item 7.2.1, Weaver builds a deterministic same-file slice:
+the entry card plus additional same-file symbol cards that fit within
+`budget.max_cards`. The `edges` array is therefore currently empty in runtime
+responses, while the stable schema already reserves the typed edge shape for
+later milestones.
 
 When the traversal exceeds the budget, `spillover.truncated` is `true` and
-`spillover.frontier` lists candidate nodes that were reached but excluded.
+`spillover.frontier` lists candidate same-file symbols that were discovered but
+excluded. This gives callers a stable way to detect truncation before the
+multi-file traversal engine lands.
 
-Note: `observe graph-slice` is not yet fully implemented. The daemon currently
-returns a structured `not_yet_implemented` refusal. The request parsing, schema
-types, and response contract are stable and locked by snapshot tests.
+The stable edge schema is already locked even though runtime edges are deferred
+to later milestones. When present, every edge will carry a `resolution_scope`
+of `full_symbol_table`, `partial_symbol_table`, or `lsp`.
 
 #### observe grep
 

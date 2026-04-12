@@ -898,10 +898,10 @@ to Tree-sitter extraction and optionally enriches via LSP when available. See
 (`call`, `import`, and `config`) and explicit budget constraints. See
 `docs/jacquard-card-first-symbol-graph-design.md` §12.1-§12.3.*
 
-- [ ] 7.2.1. Define stable JSONL request and response schemas for
+- [x] 7.2.1. Define stable JSONL request and response schemas for
       `observe graph-slice`, including budgets, spillover metadata, and
       provenance for edges. Requires 2.1.7.
-  - [ ] Acceptance criteria: schema fixtures lock `budget` semantics and
+  - [x] Acceptance criteria: schema fixtures lock `budget` semantics and
     default values; responses are deterministic for a fixed repo revision; and
     spillover metadata is present when traversal is truncated; and edges carry
     resolution scope (`full_symbol_table`, `partial_symbol_table`, or `lsp`).

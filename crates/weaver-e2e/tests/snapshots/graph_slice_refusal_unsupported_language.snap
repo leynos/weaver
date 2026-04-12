@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/test_support/mod.rs
+---
+{
+  "command": "weaver --daemon-socket tcp://<daemon-endpoint> --output json observe graph-slice --uri <uri> --position 1:1 --entry-detail semantic --node-detail semantic",
+  "status": 1,
+  "stdout": "{\n  \"refusal\": {\n    \"message\": \"observe graph-slice: unsupported language for path <path>\",\n    \"reason\": \"unsupported_language\"\n  },\n  \"status\": \"refusal\"\n}",
+  "stderr": ""
+}
