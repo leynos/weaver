@@ -16,7 +16,14 @@ use crate::{
         SearchQueryPrincipal,
         TaintQueryPrincipal,
     },
-    raw::{RawRule, convert_match_formula_object, schema_error, singleton_formula},
+    raw::{
+        RawRule,
+        convert_match_formula_object,
+        push_optional_legacy_formula,
+        push_optional_legacy_sequence_formula,
+        schema_error,
+        singleton_formula,
+    },
     source_map::SourceMap,
 };
 
@@ -325,32 +332,30 @@ fn build_legacy_principal(
     rule_span: Option<&SourceSpan>,
 ) -> Result<LegacyFormula, DiagnosticReport> {
     let mut formulas = Vec::new();
-    if let Some(pattern) = &raw.pattern {
-        formulas.push(LegacyFormula::Pattern(pattern.value.clone()));
-    }
-    if let Some(pattern_regex) = &raw.pattern_regex {
-        formulas.push(LegacyFormula::PatternRegex(pattern_regex.value.clone()));
-    }
-    if let Some(patterns) = &raw.patterns {
-        formulas.push(LegacyFormula::Patterns(
-            patterns
-                .value
-                .clone()
-                .into_iter()
-                .map(TryInto::try_into)
-                .collect::<Result<Vec<_>, _>>()?,
-        ));
-    }
-    if let Some(pattern_either) = &raw.pattern_either {
-        formulas.push(LegacyFormula::PatternEither(
-            pattern_either
-                .value
-                .clone()
-                .into_iter()
-                .map(TryInto::try_into)
-                .collect::<Result<Vec<_>, _>>()?,
-        ));
-    }
+    push_optional_legacy_formula(
+        &mut formulas,
+        raw.pattern.as_ref().map(|pattern| pattern.value.clone()),
+        LegacyFormula::Pattern,
+    );
+    push_optional_legacy_formula(
+        &mut formulas,
+        raw.pattern_regex
+            .as_ref()
+            .map(|pattern_regex| pattern_regex.value.clone()),
+        LegacyFormula::PatternRegex,
+    );
+    push_optional_legacy_sequence_formula(
+        &mut formulas,
+        raw.patterns.as_ref().map(|patterns| patterns.value.clone()),
+        LegacyFormula::Patterns,
+    )?;
+    push_optional_legacy_sequence_formula(
+        &mut formulas,
+        raw.pattern_either
+            .as_ref()
+            .map(|pattern_either| pattern_either.value.clone()),
+        LegacyFormula::PatternEither,
+    )?;
 
     singleton_formula(formulas, |len| match len {
         0 => schema_error(
