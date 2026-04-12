@@ -260,9 +260,11 @@ fn execute_rename<R: RustAnalyzerAdapter>(
 
 /// Creates a directory and all its parents using capability-based filesystem operations.
 fn create_dir_all_cap(base: &Dir, path: &Utf8Path) -> io::Result<()> {
+    let mut current_path = Utf8PathBuf::new();
+
     for component in path.components() {
-        let name = component.as_str();
-        match base.create_dir(name) {
+        current_path.push(component.as_str());
+        match base.create_dir(&current_path) {
             Ok(()) => {}
             Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
             Err(err) => return Err(err),
@@ -277,54 +279,58 @@ pub(crate) fn write_workspace_file(
     relative_path: &Path,
     content: &str,
 ) -> Result<PathBuf, RustAnalyzerAdapterError> {
-    let absolute_path = workspace_root.join(relative_path);
-    let utf8_path = Utf8PathBuf::from_path_buf(absolute_path.clone()).map_err(|_| {
-        RustAnalyzerAdapterError::InvalidPath {
-            message: String::from("path contains invalid UTF-8"),
-        }
-    })?;
-
-    // Open the workspace root as a capability
-    let workspace_dir = Dir::open_ambient_dir(workspace_root, cap_std::ambient_authority())
-        .map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
-            path: workspace_root.to_path_buf(),
-            source,
-        })?;
-
-    // Get the parent directory and file name
-    let parent_path = utf8_path.parent().unwrap_or_else(|| Utf8Path::new(""));
+    let (absolute_path, utf8_path) = resolve_workspace_path(workspace_root, relative_path)?;
     let file_name = utf8_path.file_name().unwrap_or("file");
-
-    // Create parent directories if needed
-    if !parent_path.as_str().is_empty() {
-        create_dir_all_cap(&workspace_dir, parent_path).map_err(|source| {
-            RustAnalyzerAdapterError::WorkspaceWrite {
-                path: parent_path.into(),
-                source,
-            }
-        })?;
-    }
-
-    // Open the target directory and write the file
-    let target_dir = if parent_path.as_str().is_empty() {
-        workspace_dir
-    } else {
-        workspace_dir.open_dir(parent_path).map_err(|source| {
-            RustAnalyzerAdapterError::WorkspaceWrite {
-                path: parent_path.into(),
-                source,
-            }
-        })?
-    };
-
+    let target_dir = open_workspace_target_dir(workspace_root, &utf8_path)?;
     target_dir
         .write(file_name, content.as_bytes())
         .map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
             path: absolute_path.clone(),
             source,
         })?;
-
     Ok(absolute_path)
+}
+
+fn resolve_workspace_path(
+    workspace_root: &Path,
+    relative_path: &Path,
+) -> Result<(PathBuf, Utf8PathBuf), RustAnalyzerAdapterError> {
+    let absolute_path = workspace_root.join(relative_path);
+    let utf8_path = Utf8PathBuf::from_path_buf(absolute_path.clone()).map_err(|_| {
+        RustAnalyzerAdapterError::InvalidPath {
+            message: String::from("path contains invalid UTF-8"),
+        }
+    })?;
+    Ok((absolute_path, utf8_path))
+}
+
+fn open_workspace_target_dir(
+    workspace_root: &Path,
+    utf8_path: &Utf8Path,
+) -> Result<Dir, RustAnalyzerAdapterError> {
+    let workspace_dir = Dir::open_ambient_dir(workspace_root, cap_std::ambient_authority())
+        .map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
+            path: workspace_root.to_path_buf(),
+            source,
+        })?;
+    let parent_path = utf8_path.parent().unwrap_or_else(|| Utf8Path::new(""));
+
+    if parent_path.as_str().is_empty() {
+        return Ok(workspace_dir);
+    }
+
+    create_dir_all_cap(&workspace_dir, parent_path).map_err(|source| {
+        RustAnalyzerAdapterError::WorkspaceWrite {
+            path: parent_path.into(),
+            source,
+        }
+    })?;
+    workspace_dir
+        .open_dir(parent_path)
+        .map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
+            path: parent_path.into(),
+            source,
+        })
 }
 
 fn validate_relative_path(path: &Path) -> Result<(), RustAnalyzerAdapterError> {

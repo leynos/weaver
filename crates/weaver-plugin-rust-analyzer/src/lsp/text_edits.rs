@@ -46,13 +46,12 @@ pub(super) fn ensure_response_is_object(
     response: &serde_json::Value,
     method: &str,
 ) -> Result<(), RustAnalyzerAdapterError> {
-    if response.is_object() {
-        return Ok(());
-    }
-
-    Err(RustAnalyzerAdapterError::InvalidOutput {
-        message: format!("{method} response payload was not a JSON object"),
-    })
+    response
+        .is_object()
+        .then_some(())
+        .ok_or_else(|| RustAnalyzerAdapterError::InvalidOutput {
+            message: format!("{method} response payload was not a JSON object"),
+        })
 }
 
 /// Converts a byte offset into an LSP UTF-16 position.
@@ -251,59 +250,71 @@ fn lsp_position_to_byte_offset(
 
     match encoding {
         PositionEncoding::Utf8 => {
-            let character_offset = usize::try_from(position.character).map_err(|source| {
-                RustAnalyzerAdapterError::InvalidOutput {
-                    message: format!("UTF-8 character offset conversion failed: {source}"),
-                }
-            })?;
-            let byte_offset = line_start + character_offset;
-            if byte_offset > line_end {
-                return Err(RustAnalyzerAdapterError::InvalidOutput {
-                    message: format!(
-                        "position {position:?} exceeds line UTF-8 width {}",
-                        line_content.len()
-                    ),
-                });
-            }
-            if !content.is_char_boundary(byte_offset) {
-                return Err(RustAnalyzerAdapterError::InvalidOutput {
-                    message: format!("position {position:?} splits a UTF-8 code point"),
-                });
-            }
-            Ok(byte_offset)
+            utf8_position_to_byte_offset(content, line_content, position, (line_start, line_end))
         }
         PositionEncoding::Utf16 => {
-            let mut utf16_units = 0_u32;
-            for (index, character) in line_content.char_indices() {
-                if utf16_units == position.character {
-                    return Ok(line_start + index);
-                }
-
-                let char_width = u32::try_from(character.len_utf16()).map_err(|source| {
-                    RustAnalyzerAdapterError::InvalidOutput {
-                        message: format!("character width conversion failed: {source}"),
-                    }
-                })?;
-                utf16_units += char_width;
-
-                if utf16_units > position.character {
-                    return Err(RustAnalyzerAdapterError::InvalidOutput {
-                        message: format!(
-                            "position {position:?} splits a UTF-16 code unit sequence"
-                        ),
-                    });
-                }
-            }
-
-            if utf16_units == position.character {
-                return Ok(line_end);
-            }
-
-            Err(RustAnalyzerAdapterError::InvalidOutput {
-                message: format!("position {position:?} exceeds line UTF-16 width {utf16_units}"),
-            })
+            utf16_position_to_byte_offset(line_content, position, line_start, line_end)
         }
     }
+}
+
+fn utf8_position_to_byte_offset(
+    content: &str,
+    line_content: &str,
+    position: Position,
+    line_bounds: (usize, usize),
+) -> Result<usize, RustAnalyzerAdapterError> {
+    let (line_start, line_end) = line_bounds;
+    let character_offset = usize::try_from(position.character).map_err(|source| {
+        RustAnalyzerAdapterError::InvalidOutput {
+            message: format!("UTF-8 character offset conversion failed: {source}"),
+        }
+    })?;
+    let byte_offset = line_start + character_offset;
+    if byte_offset > line_end {
+        return Err(RustAnalyzerAdapterError::InvalidOutput {
+            message: format!(
+                "position {position:?} exceeds line UTF-8 width {}",
+                line_content.len()
+            ),
+        });
+    }
+    if !content.is_char_boundary(byte_offset) {
+        return Err(RustAnalyzerAdapterError::InvalidOutput {
+            message: format!("position {position:?} splits a UTF-8 code point"),
+        });
+    }
+    Ok(byte_offset)
+}
+
+fn utf16_position_to_byte_offset(
+    line_content: &str,
+    position: Position,
+    line_start: usize,
+    line_end: usize,
+) -> Result<usize, RustAnalyzerAdapterError> {
+    let mut utf16_units = 0_u32;
+    for (index, character) in line_content.char_indices() {
+        if utf16_units == position.character {
+            return Ok(line_start + index);
+        }
+        utf16_units += u32::try_from(character.len_utf16()).map_err(|source| {
+            RustAnalyzerAdapterError::InvalidOutput {
+                message: format!("character width conversion failed: {source}"),
+            }
+        })?;
+        if utf16_units > position.character {
+            return Err(RustAnalyzerAdapterError::InvalidOutput {
+                message: format!("position {position:?} splits a UTF-16 code unit sequence"),
+            });
+        }
+    }
+    if utf16_units == position.character {
+        return Ok(line_end);
+    }
+    Err(RustAnalyzerAdapterError::InvalidOutput {
+        message: format!("position {position:?} exceeds line UTF-16 width {utf16_units}"),
+    })
 }
 
 fn find_line_start_offset(
@@ -313,7 +324,6 @@ fn find_line_start_offset(
     if target_line == 0 {
         return Ok(0);
     }
-
     let mut current_line = 0_u32;
     for (index, character) in content.char_indices() {
         if character == '\n' {
@@ -323,7 +333,6 @@ fn find_line_start_offset(
             }
         }
     }
-
     Err(RustAnalyzerAdapterError::InvalidOutput {
         message: format!("line {target_line} is beyond the end of the document"),
     })
@@ -366,7 +375,6 @@ pub(super) fn path_to_file_uri(path: &Path) -> Result<Uri, RustAnalyzerAdapterEr
         url::Url::from_file_path(path).map_err(|()| RustAnalyzerAdapterError::InvalidPath {
             message: format!("failed to convert '{}' to file:// URI", path.display()),
         })?;
-
     file_url
         .as_str()
         .parse()
