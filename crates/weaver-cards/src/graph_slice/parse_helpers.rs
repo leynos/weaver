@@ -184,36 +184,49 @@ mod tests {
 
     use super::*;
 
+    fn assert_err_contains(result: Result<impl std::fmt::Debug, GraphSliceError>, substring: &str) {
+        let error = result.expect_err("should fail");
+        let message = error.to_string();
+        assert!(
+            message.contains(substring),
+            "expected error to contain {substring:?}, got: {message}"
+        );
+    }
+
     // -----------------------------------------------------------------------
     // require_arg_value
     // -----------------------------------------------------------------------
 
     #[test]
     fn require_arg_value_returns_value() {
-        let args = vec![String::from("hello")];
-        let raw = require_arg_value(&mut args.iter(), Flag::Uri).unwrap();
+        let args = [String::from("hello")];
+        let raw = require_arg_value(&mut args.iter(), Flag::Uri).expect("should parse");
         assert_eq!(raw.value, "hello");
     }
 
     #[test]
     fn require_arg_value_rejects_double_dash_token() {
-        let args = vec![String::from("--other")];
-        let err = require_arg_value(&mut args.iter(), Flag::Uri).unwrap_err();
-        assert!(err.to_string().contains("requires a value"), "{err}");
+        let args = [String::from("--other")];
+        assert_err_contains(
+            require_arg_value(&mut args.iter(), Flag::Uri),
+            "requires a value",
+        );
     }
 
     #[test]
     fn require_arg_value_allows_single_dash_token() {
-        let args = vec![String::from("-0.1")];
-        let raw = require_arg_value(&mut args.iter(), Flag::MinConfidence).unwrap();
+        let args = [String::from("-0.1")];
+        let raw = require_arg_value(&mut args.iter(), Flag::MinConfidence).expect("should parse");
         assert_eq!(raw.value, "-0.1");
     }
 
     #[test]
     fn require_arg_value_fails_on_empty_iterator() {
-        let args: Vec<String> = vec![];
-        let err = require_arg_value(&mut args.iter(), Flag::Depth).unwrap_err();
-        assert!(err.to_string().contains("requires a value"), "{err}");
+        let args: [String; 0] = [];
+        assert_err_contains(
+            require_arg_value(&mut args.iter(), Flag::Depth),
+            "requires a value",
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -223,7 +236,7 @@ mod tests {
     #[test]
     fn parse_uri_accepts_file_uri() {
         let raw = RawValue::new(Flag::Uri, "file:///src/main.rs");
-        assert_eq!(parse_uri(raw).unwrap(), "file:///src/main.rs");
+        assert_eq!(parse_uri(raw).expect("should parse"), "file:///src/main.rs");
     }
 
     #[rstest]
@@ -233,8 +246,7 @@ mod tests {
     #[case("")]
     fn parse_uri_rejects_non_file_uri(#[case] input: &str) {
         let raw = RawValue::new(Flag::Uri, input);
-        let err = parse_uri(raw).unwrap_err();
-        assert!(err.to_string().contains("expected a file URI"), "{err}");
+        assert_err_contains(parse_uri(raw), "expected a file URI");
     }
 
     // -----------------------------------------------------------------------
@@ -244,45 +256,37 @@ mod tests {
     #[test]
     fn parse_position_accepts_valid_pair() {
         let raw = RawValue::new(Flag::Position, "10:5");
-        assert_eq!(parse_position(raw).unwrap(), (10, 5));
+        assert_eq!(parse_position(raw).expect("should parse"), (10, 5));
     }
 
     #[test]
     fn parse_position_rejects_missing_colon() {
         let raw = RawValue::new(Flag::Position, "105");
-        let err = parse_position(raw).unwrap_err();
-        assert!(err.to_string().contains("expected LINE:COL"), "{err}");
+        assert_err_contains(parse_position(raw), "expected LINE:COL");
     }
 
     #[test]
     fn parse_position_rejects_zero_line() {
         let raw = RawValue::new(Flag::Position, "0:5");
-        let err = parse_position(raw).unwrap_err();
-        assert!(err.to_string().contains("line number must be >= 1"), "{err}");
+        assert_err_contains(parse_position(raw), "line number must be >= 1");
     }
 
     #[test]
     fn parse_position_rejects_zero_column() {
         let raw = RawValue::new(Flag::Position, "1:0");
-        let err = parse_position(raw).unwrap_err();
-        assert!(
-            err.to_string().contains("column number must be >= 1"),
-            "{err}"
-        );
+        assert_err_contains(parse_position(raw), "column number must be >= 1");
     }
 
     #[test]
     fn parse_position_rejects_non_numeric_line() {
         let raw = RawValue::new(Flag::Position, "abc:5");
-        let err = parse_position(raw).unwrap_err();
-        assert!(err.to_string().contains("invalid line number"), "{err}");
+        assert_err_contains(parse_position(raw), "invalid line number");
     }
 
     #[test]
     fn parse_position_rejects_non_numeric_column() {
         let raw = RawValue::new(Flag::Position, "5:abc");
-        let err = parse_position(raw).unwrap_err();
-        assert!(err.to_string().contains("invalid column number"), "{err}");
+        assert_err_contains(parse_position(raw), "invalid column number");
     }
 
     // -----------------------------------------------------------------------
@@ -292,13 +296,13 @@ mod tests {
     #[test]
     fn parse_u32_accepts_valid_integer() {
         let raw = RawValue::new(Flag::Depth, "42");
-        assert_eq!(parse_u32(raw).unwrap(), 42);
+        assert_eq!(parse_u32(raw).expect("should parse"), 42);
     }
 
     #[test]
     fn parse_u32_accepts_zero() {
         let raw = RawValue::new(Flag::MaxCards, "0");
-        assert_eq!(parse_u32(raw).unwrap(), 0);
+        assert_eq!(parse_u32(raw).expect("should parse"), 0);
     }
 
     #[rstest]
@@ -307,11 +311,7 @@ mod tests {
     #[case("3.14")]
     fn parse_u32_rejects_invalid_input(#[case] input: &str) {
         let raw = RawValue::new(Flag::Depth, input);
-        let err = parse_u32(raw).unwrap_err();
-        assert!(
-            err.to_string().contains("expected a non-negative integer"),
-            "{err}"
-        );
+        assert_err_contains(parse_u32(raw), "expected a non-negative integer");
     }
 
     // -----------------------------------------------------------------------
@@ -322,19 +322,15 @@ mod tests {
     #[case("in", SliceDirection::In)]
     #[case("out", SliceDirection::Out)]
     #[case("both", SliceDirection::Both)]
-    fn parse_direction_accepts_valid_values(
-        #[case] input: &str,
-        #[case] expected: SliceDirection,
-    ) {
+    fn parse_direction_accepts_valid_values(#[case] input: &str, #[case] expected: SliceDirection) {
         let raw = RawValue::new(Flag::Direction, input);
-        assert_eq!(parse_direction(raw).unwrap(), expected);
+        assert_eq!(parse_direction(raw).expect("should parse"), expected);
     }
 
     #[test]
     fn parse_direction_rejects_unknown_value() {
         let raw = RawValue::new(Flag::Direction, "sideways");
-        let err = parse_direction(raw).unwrap_err();
-        assert!(err.to_string().contains("--direction"), "{err}");
+        assert_err_contains(parse_direction(raw), "--direction");
     }
 
     // -----------------------------------------------------------------------
@@ -344,17 +340,17 @@ mod tests {
     #[test]
     fn parse_edge_types_single_value() {
         let raw = RawValue::new(Flag::EdgeTypes, "call");
-        let types = parse_edge_types(raw).unwrap();
-        assert_eq!(types, vec![SliceEdgeType::Call]);
+        let types = parse_edge_types(raw).expect("should parse");
+        assert_eq!(types, [SliceEdgeType::Call]);
     }
 
     #[test]
     fn parse_edge_types_comma_separated() {
         let raw = RawValue::new(Flag::EdgeTypes, "call,import,config");
-        let types = parse_edge_types(raw).unwrap();
+        let types = parse_edge_types(raw).expect("should parse");
         assert_eq!(
             types,
-            vec![
+            [
                 SliceEdgeType::Call,
                 SliceEdgeType::Import,
                 SliceEdgeType::Config,
@@ -365,15 +361,14 @@ mod tests {
     #[test]
     fn parse_edge_types_trims_whitespace() {
         let raw = RawValue::new(Flag::EdgeTypes, "call , import");
-        let types = parse_edge_types(raw).unwrap();
-        assert_eq!(types, vec![SliceEdgeType::Call, SliceEdgeType::Import]);
+        let types = parse_edge_types(raw).expect("should parse");
+        assert_eq!(types, [SliceEdgeType::Call, SliceEdgeType::Import]);
     }
 
     #[test]
     fn parse_edge_types_rejects_unknown_type() {
         let raw = RawValue::new(Flag::EdgeTypes, "call,unknown");
-        let err = parse_edge_types(raw).unwrap_err();
-        assert!(err.to_string().contains("--edge-types"), "{err}");
+        assert_err_contains(parse_edge_types(raw), "--edge-types");
     }
 
     // -----------------------------------------------------------------------
@@ -381,14 +376,18 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[rstest]
-    #[case("0.0", 0.0)]
-    #[case("0.5", 0.5)]
-    #[case("1.0", 1.0)]
-    #[case("0.92", 0.92)]
-    fn parse_confidence_accepts_valid_range(#[case] input: &str, #[case] expected: f64) {
+    #[case("0.0", "0")]
+    #[case("0.5", "0.5")]
+    #[case("1.0", "1")]
+    #[case("0.92", "0.92")]
+    fn parse_confidence_accepts_valid_range(#[case] input: &str, #[case] expected_prefix: &str) {
         let raw = RawValue::new(Flag::MinConfidence, input);
-        let result = parse_confidence(raw).unwrap();
-        assert!((result - expected).abs() < f64::EPSILON, "{result}");
+        let result = parse_confidence(raw).expect("should parse");
+        let formatted = format!("{result}");
+        assert!(
+            formatted.starts_with(expected_prefix),
+            "expected {expected_prefix}, got: {formatted}"
+        );
     }
 
     #[rstest]
@@ -397,22 +396,18 @@ mod tests {
     #[case("2.0")]
     fn parse_confidence_rejects_out_of_range(#[case] input: &str) {
         let raw = RawValue::new(Flag::MinConfidence, input);
-        let err = parse_confidence(raw).unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("expected a number between 0.0 and 1.0"),
-            "{err}"
+        assert_err_contains(
+            parse_confidence(raw),
+            "expected a number between 0.0 and 1.0",
         );
     }
 
     #[test]
     fn parse_confidence_rejects_non_numeric() {
         let raw = RawValue::new(Flag::MinConfidence, "abc");
-        let err = parse_confidence(raw).unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("expected a number between 0.0 and 1.0"),
-            "{err}"
+        assert_err_contains(
+            parse_confidence(raw),
+            "expected a number between 0.0 and 1.0",
         );
     }
 
@@ -426,18 +421,14 @@ mod tests {
     #[case("structure", DetailLevel::Structure)]
     #[case("semantic", DetailLevel::Semantic)]
     #[case("full", DetailLevel::Full)]
-    fn parse_detail_accepts_valid_levels(
-        #[case] input: &str,
-        #[case] expected: DetailLevel,
-    ) {
+    fn parse_detail_accepts_valid_levels(#[case] input: &str, #[case] expected: DetailLevel) {
         let raw = RawValue::new(Flag::EntryDetail, input);
-        assert_eq!(parse_detail(raw).unwrap(), expected);
+        assert_eq!(parse_detail(raw).expect("should parse"), expected);
     }
 
     #[test]
     fn parse_detail_rejects_unknown_level() {
         let raw = RawValue::new(Flag::EntryDetail, "verbose");
-        let err = parse_detail(raw).unwrap_err();
-        assert!(err.to_string().contains("--entry-detail"), "{err}");
+        assert_err_contains(parse_detail(raw), "--entry-detail");
     }
 }
