@@ -183,7 +183,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("system time")
             .as_secs();
-        write_health_json(&health_path, "ready", 12345, timestamp);
+        write_health_json(&health_path, "ready", 12345, timestamp).expect("write health snapshot");
 
         let context = LifecycleContext {
             config: &config,

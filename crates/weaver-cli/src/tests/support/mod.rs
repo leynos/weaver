@@ -10,12 +10,13 @@ mod lifecycle;
 use std::{
     cell::RefCell,
     ffi::OsString,
-    fs,
+    io,
     path::{Component, PathBuf},
     process::ExitCode,
 };
 
 use anyhow::{Context, Result, ensure};
+use cap_std::fs::Dir;
 #[cfg(unix)]
 pub(super) use fake_daemon::accept_unix_connection;
 pub(super) use fake_daemon::{FakeDaemon, accept_tcp_connection, respond_to_request};
@@ -103,7 +104,7 @@ impl TestWorld {
     /// Creates a source file fixture and stores its location metadata.
     pub fn create_source_file(&mut self, filename: &str, content: &str) -> Result<()> {
         let (temp_dir, path, uri) = Self::prepare_source_location(filename)?;
-        fs::write(&path, content)?;
+        write_test_file(&path, content.as_bytes())?;
         self.store_source_location(temp_dir, path, uri);
         Ok(())
     }
@@ -128,9 +129,9 @@ impl TestWorld {
             "source filename must not traverse outside the temp dir: {filename}"
         );
         let temp_dir = tempfile::tempdir()?;
-        let path = temp_dir.path().join(candidate);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+        let path = temp_dir.path().join(&candidate);
+        if let Some(parent) = candidate.parent() {
+            ensure_relative_dirs(temp_dir.path(), parent)?;
         }
         let uri = Url::from_file_path(&path)
             .map_err(|_| anyhow::anyhow!("failed to convert path to URI"))?
@@ -266,13 +267,59 @@ impl TestWorld {
 
 // ── Helper functions ───────────────────────────────────────────────────────────
 
+fn open_parent_dir(path: &std::path::Path) -> io::Result<(Dir, PathBuf)> {
+    let parent = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+    let file_name = path.file_name().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("path has no file name: {}", path.display()),
+        )
+    })?;
+    let dir = Dir::open_ambient_dir(parent, cap_std::ambient_authority())?;
+    Ok((dir, PathBuf::from(file_name)))
+}
+
+fn ensure_relative_dirs(root: &std::path::Path, relative: &std::path::Path) -> io::Result<()> {
+    let mut dir = Dir::open_ambient_dir(root, cap_std::ambient_authority())?;
+    for component in relative.components() {
+        match component {
+            Component::CurDir => {}
+            Component::Normal(name) => {
+                match dir.create_dir(name) {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+                    Err(error) => return Err(error),
+                }
+                dir = dir.open_dir(name)?;
+            }
+            other => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("unexpected relative path component: {other:?}"),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn write_test_file(path: &std::path::Path, content: &[u8]) -> io::Result<()> {
+    let (dir, file_name) = open_parent_dir(path)?;
+    dir.write(file_name, content)
+}
+
+pub(crate) fn read_test_file_to_string(path: &std::path::Path) -> io::Result<String> {
+    let (dir, file_name) = open_parent_dir(path)?;
+    dir.read_to_string(file_name)
+}
+
 pub(super) fn read_fixture(name: &str) -> Result<String> {
     let normalized = name.trim().trim_matches('"');
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("tests");
     path.push("golden");
     path.push(normalized);
-    fs::read_to_string(&path).with_context(|| format!("read fixture at {}", path.display()))
+    read_test_file_to_string(&path).with_context(|| format!("read fixture at {}", path.display()))
 }
 
 pub(super) fn decode_utf8(buffer: Vec<u8>, label: &str) -> Result<String> {

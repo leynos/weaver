@@ -4,8 +4,6 @@
 //! connection-refused errors, and that spawn failures are reported appropriately.
 
 #[cfg(unix)]
-use std::fs;
-#[cfg(unix)]
 use std::os::unix::net::UnixListener;
 #[cfg(unix)]
 use std::thread;
@@ -24,7 +22,7 @@ use crate::{
     ResolvedOutputFormat,
     execute_daemon_command,
     lifecycle::LifecycleContext,
-    tests::support::{decode_utf8, default_daemon_lines, respond_to_request},
+    tests::support::{decode_utf8, default_daemon_lines, respond_to_request, write_health_json},
 };
 
 /// Creates a minimal test invocation for daemon command tests.
@@ -141,24 +139,6 @@ fn auto_start_missing_binary_shows_actionable_guidance() {
 
 /// Writes a health snapshot JSON file to the specified path.
 #[cfg(unix)]
-fn write_health_snapshot(path: &std::path::Path, status: &str, pid: u32, timestamp: u64) {
-    let snapshot = serde_json::json!({
-        "status": status,
-        "pid": pid,
-        "timestamp": timestamp
-    });
-    let json = serde_json::to_string(&snapshot).expect("serialize health snapshot");
-    fs::write(path, json).expect("write health snapshot");
-}
-
-/// Binds a Unix socket shortly after the test starts so the first connect fails
-/// but the retry succeeds once auto-start wait handling completes.
-///
-/// The 100 ms delay is longer than the initial connection attempt but shorter
-/// than `AUTO_START_TIMEOUT`. The CLI's probe path takes much longer to fail,
-/// so the socket bind reliably happens before the retry without needing precise
-/// cross-thread synchronisation.
-#[cfg(unix)]
 fn spawn_delayed_unix_listener(
     socket_path: std::path::PathBuf,
 ) -> thread::JoinHandle<Result<(), String>> {
@@ -244,7 +224,7 @@ fn auto_start_succeeds_and_proceeds() {
         .duration_since(UNIX_EPOCH)
         .expect("system time")
         .as_secs();
-    write_health_snapshot(&health_path, "ready", 12345, timestamp);
+    write_health_json(&health_path, "ready", 12345, timestamp).expect("write health snapshot");
 
     // Bind the socket on a short delay so the first connect fails and the retry
     // succeeds once auto-start wait handling completes. See
