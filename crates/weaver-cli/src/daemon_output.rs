@@ -33,22 +33,36 @@ where
     W: Write,
     E: Write,
 {
-    match message {
-        DaemonMessage::Stream { stream, data } => {
-            let rendered = match settings.format {
-                ResolvedOutputFormat::Human => render_human_output(settings.context, &data),
-                ResolvedOutputFormat::Json => None,
-            };
-            let payload = rendered.as_deref().unwrap_or(&data);
-            match stream {
-                StreamTarget::Stdout => io.stdout.write_all(payload.as_bytes()),
-                StreamTarget::Stderr => io.stderr.write_all(payload.as_bytes()),
-            }
-            .map_err(AppError::ForwardResponse)?;
-        }
-        DaemonMessage::Exit { .. } => {}
-    }
+    let DaemonMessage::Stream { stream, data } = message else {
+        return Ok(());
+    };
+    let rendered = render_stream_payload(settings, &data);
+    forward_stream_payload(stream, rendered.as_deref().unwrap_or(&data), io)?;
     Ok(())
+}
+
+fn render_stream_payload(settings: &OutputSettings<'_>, data: &str) -> Option<String> {
+    match settings.format {
+        ResolvedOutputFormat::Human => render_human_output(settings.context, data),
+        ResolvedOutputFormat::Json => None,
+    }
+}
+
+fn forward_stream_payload<W, E, S>(
+    stream: StreamTarget,
+    payload: &str,
+    io: &mut IoStreams<'_, S, W, E>,
+) -> Result<(), AppError>
+where
+    S: Read,
+    W: Write,
+    E: Write,
+{
+    match stream {
+        StreamTarget::Stdout => io.stdout.write_all(payload.as_bytes()),
+        StreamTarget::Stderr => io.stderr.write_all(payload.as_bytes()),
+    }
+    .map_err(AppError::ForwardResponse)
 }
 
 /// Checks if the empty line limit has been reached and writes a warning if so.
