@@ -669,6 +669,67 @@ impl QueryPlan {
 }
 ```
 
+## Practice documentation
+
+The following project guidance documents are relevant to this milestone.
+Implementors should consult them for conventions, patterns, and constraints.
+
+### Testing
+
+- [docs/rstest-bdd-users-guide.md](../rstest-bdd-users-guide.md) — BDD
+  framework usage: feature files, step definitions, fixture injection,
+  `Slot<T>` state, `ScenarioState`, data tables, and `#[scenario]`
+  binding. All behavioural tests in this milestone use `rstest-bdd`
+  v0.5.0.
+- [docs/rust-testing-with-rstest-fixtures.md](../rust-testing-with-rstest-fixtures.md)
+  — `rstest` fixture injection, `#[case]` parameterised tests,
+  `#[values]` combinatorial tests, `#[from]` and `#[with]` overrides.
+  Unit tests in the normalization and constraint modules should use
+  `rstest` parameterised cases for the mapping tables.
+- [docs/reliable-testing-in-rust-via-dependency-injection.md](../reliable-testing-in-rust-via-dependency-injection.md)
+  — dependency injection patterns for testable Rust code. Normalization
+  functions are pure and need no DI, but the engine integration path
+  should remain injectable for future backend substitution.
+- [docs/rust-doctest-dry-guide.md](../rust-doctest-dry-guide.md) —
+  DRY doctest patterns, `concat!()` for multi-line literals, hidden
+  setup lines, and `no_run` annotations. All new public types and
+  functions require Rustdoc examples.
+
+### Design and architecture
+
+- [docs/sempai-query-language-design.md](../sempai-query-language-design.md)
+  — primary design reference for the normalised formula model, operator
+  mappings, semantic constraints, and the parser-to-validation pipeline.
+  Implementation decisions must be recorded here.
+- [docs/weaver-design.md](../weaver-design.md) — system architecture,
+  the observe/act/verify command model, JSONL protocol, and the
+  Double-Lock safety harness. Relevant for understanding how query
+  plans flow through the daemon.
+- [docs/semgrep-language-reference/semgrep-operator-precedence.md](../semgrep-language-reference/semgrep-operator-precedence.md)
+  — Semgrep operator precedence ladder and Pratt binding powers.
+  Defines the normalization model that this milestone implements.
+- [docs/semgrep-language-reference/semgrep-legacy-vs-v2-guidance.md](../semgrep-language-reference/semgrep-legacy-vs-v2-guidance.md)
+  — legacy-to-v2 equivalence table. Paired test fixtures should
+  mirror the equivalences documented here.
+
+### Code quality
+
+- [docs/complexity-antipatterns-and-refactoring-strategies.md](../complexity-antipatterns-and-refactoring-strategies.md)
+  — Cyclomatic and Cognitive Complexity metrics, the "Bumpy Road"
+  antipattern, extract-method and dispatcher-pattern refactoring
+  strategies. Relevant for keeping the recursive normalization and
+  constraint-walking functions simple and well-factored.
+- [AGENTS.md](../../AGENTS.md) — code style, 400-line file limit,
+  en-GB spelling, commit gating (`make check-fmt`, `make lint`,
+  `make test`), module-level `//!` comments, and Rustdoc requirements.
+
+### Configuration
+
+- [docs/ortho-config-users-guide.md](../ortho-config-users-guide.md)
+  — OrthoConfig usage for CLI/env/file configuration merging.
+  Not directly exercised in normalization but relevant for
+  understanding how `EngineConfig` reaches the engine.
+
 ## Revision note
 
 Initial draft created on 2026-04-12. No revisions yet. Implements roadmap
