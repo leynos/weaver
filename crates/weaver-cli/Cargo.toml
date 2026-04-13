@@ -27,7 +27,9 @@ libc = "0.2"
 [build-dependencies]
 clap = { workspace = true }
 clap_mangen = "0.2"
+ortho_config = { workspace = true }
 weaver-build-util = { path = "../weaver-build-util" }
+weaver-config = { path = "../weaver-config", features = ["cli"] }
 
 [dev-dependencies]
 anyhow = { workspace = true }

@@ -19,6 +19,8 @@ pub(crate) enum AppError {
     MissingOperation,
     #[error("failed to emit bare help: {0}")]
     EmitBareHelp(io::Error),
+    #[error("failed to emit clap help: {0}")]
+    EmitHelp(io::Error),
     /// Sentinel for bare invocation — help has already been written.
     #[error("bare invocation")]
     BareInvocation,
