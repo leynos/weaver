@@ -43,6 +43,7 @@ jobs:
           fi
           whitaker-installer
       # Stopgap until Whitaker can provision cranelift support directly.
+      # Tracking issue: https://github.com/leynos/whitaker/issues/207
       - name: Install rustc-codegen-cranelift
         run: rustup component add rustc-codegen-cranelift --toolchain nightly-2025-09-18
       - name: Lint
