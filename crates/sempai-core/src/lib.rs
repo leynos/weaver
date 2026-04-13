@@ -14,6 +14,7 @@
 //! - [`CaptureValue`] and [`CapturedNode`] — metavariable bindings
 //! - [`DiagnosticReport`] and [`Diagnostic`] — structured error reporting
 //! - [`EngineConfig`] and [`EngineLimits`] — performance and safety limits
+//! - [`Formula`], [`Atom`], and [`Decorated`] — canonical normalised formula model
 //!
 //! # Example
 //!
@@ -28,6 +29,7 @@
 mod capture;
 mod config;
 mod diagnostic;
+pub mod formula;
 mod language;
 mod match_result;
 mod span;
@@ -35,6 +37,7 @@ mod span;
 pub use capture::{CaptureValue, CapturedNode};
 pub use config::{EngineConfig, EngineLimits};
 pub use diagnostic::{Diagnostic, DiagnosticCode, DiagnosticReport, SourceSpan};
+pub use formula::{Atom, Decorated, Formula};
 pub use language::{Language, LanguageParseError};
 pub use match_result::Match;
 pub use span::{LineCol, Span};

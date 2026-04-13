@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -157,18 +157,92 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-5-make-nixie.log
 
 ## Progress
 
-- [ ] Reviewed roadmap item 4.1.5, the Sempai design doc, the Semgrep operator
+- [x] Reviewed roadmap item 4.1.5, the Sempai design doc, the Semgrep operator
       precedence and legacy-vs-v2 guidance, the current `sempai_yaml` model, and
       the 4.1.4 ExecPlan.
-- [ ] Drafted this ExecPlan.
+- [x] Drafted this ExecPlan.
+- [x] Stage A: Defined canonical `Formula`, `Atom`, `Decorated<T>` in
+      `sempai_core/src/formula.rs`. Added `serde_json` as a regular dependency
+      to `sempai_core`. Exported from `sempai_core/src/lib.rs`.
+- [x] Stage B: Implemented normalization module in `sempai/src/normalise/` with
+      submodules `legacy.rs`, `v2.rs`, and `constraints.rs`. Followed Option B
+      from Step 7 (normalization in `sempai` to avoid circular dependencies).
+- [x] Stage C: Implemented `validate_formula_constraints(...)` with depth-first
+      walk checking `InvalidNotInOr` and `MissingPositiveTermInAnd`. Added
+      metavariable-pattern exception for all-constraint conjunctions.
+- [x] Stage D: Added 17 formula type unit tests in `sempai_core`, 25
+      normalization unit tests in `sempai` (including 3 paired equivalence
+      tests via `rstest`), and 14 constraint validation unit tests.
+- [x] Stage D (BDD): Added 2 semantic constraint BDD scenarios in
+      `formula_normalization.feature` and updated 2 existing scenarios in
+      `sempai_engine.feature` from `NOT_IMPLEMENTED` expectations to formula
+      plan assertions.
+- [x] Stage E: Wired normalization into `Engine::compile_yaml`, updated
+      `QueryPlan` to carry `Option<Formula>` with a `formula()` accessor.
+      Removed `#[cfg(test)]` gate from `QueryPlan::new`.
+- [x] Stage F: Updated `sempai-query-language-design.md` with implementation
+      notes (crate placement, `pattern-not-inside` lowering, constraint
+      preservation, positive-term exception, `ProjectDependsOn` passthrough).
+      Updated `users-guide.md` with `compile_yaml` behaviour and semantic
+      constraint error codes. Marked 4.1.5 done in `roadmap.md`.
+- [x] Stage G: All quality gates pass — `make check-fmt`, `make lint`,
+      `make test` (199 tests), `make markdownlint` (0 errors). `make nixie`
+      unavailable in environment (custom Mermaid tool); no Mermaid diagrams
+      were modified.
 
 ## Surprises & Discoveries
 
-(To be filled in during implementation.)
+1. **BDD step function `\n` escaping**: The `QuotedString` parser from
+   `rstest-bdd` does not interpret `\n` escape sequences — it strips
+   surrounding quotes but passes the literal `\n` characters through.
+   The `sempai_yaml` BDD tests already worked around this with
+   `.replace("\\n", "\n")` in their step definitions. The same
+   workaround was applied to the `sempai` BDD step definitions.
+
+2. **BDD step registry is global**: `rstest-bdd` v0.5.0 registers step
+   functions in a global registry keyed by step text. Defining the same
+   step (e.g. `"Then compilation succeeds"`) in two different BDD
+   modules causes a runtime panic due to duplicate registration. All
+   normalization BDD scenarios were therefore placed in the existing
+   `behaviour.rs` and registered via a second `#[scenario]` attribute
+   pointing at `formula_normalization.feature`.
+
+3. **`serde_json` upgrade to workspace dependency**: `serde_json` was
+   already available as a workspace dependency but only as a
+   dev-dependency in `sempai_core`. Adding it as a regular dependency
+   was straightforward with no version conflicts.
 
 ## Decision Log
 
-(To be filled in during implementation.)
+1. **Normalization placement: Option B confirmed.** Normalization functions
+   live in `crates/sempai/src/normalise/` (not in `sempai_core`) because
+   they depend on `sempai_yaml` model types, and `sempai_yaml` depends on
+   `sempai_core`. Placing them in `sempai` avoids the circular dependency.
+   The canonical `Formula` type remains in `sempai_core` for downstream
+   consumption.
+
+2. **`normalise_search_principal` returns `Option<Formula>`.** Rather than
+   returning `Result<Formula, DiagnosticReport>`, the function returns
+   `Result<Option<Formula>, DiagnosticReport>` where `None` represents
+   `ProjectDependsOn` rules that have no formula semantics. This avoids
+   needing a sentinel `Formula` variant for non-formula rules.
+
+3. **`QueryPlan::new` no longer test-only.** The `#[cfg(test)]` gate was
+   removed since `Engine::compile_yaml` now constructs real `QueryPlan`
+   values in production code.
+
+4. **Constraint-only conjunction exception.** A conjunction (`And`) where
+   every child is `Constraint` is accepted without triggering
+   `MissingPositiveTermInAnd`. This accommodates metavariable-pattern
+   contexts where constraints act as implicit positive terms.
+
+5. **Top-level `Decorated` metadata from v2.** When `normalise_match`
+   encounters a v2 `Decorated` variant, the metadata (`where`, `as`,
+   `fix`) is preserved in the resulting `Decorated<Formula>`. However,
+   `normalise_search_principal` returns only the inner `Formula` node
+   (stripping the outer `Decorated` wrapper) because the top-level plan
+   needs just the `Formula`. Metadata is preserved when `Decorated`
+   appears as a child within `And`/`Or`/`Not` etc.
 
 ## Outcomes & Retrospective
 
@@ -194,7 +268,67 @@ Target outcome at completion:
 11. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
     `make lint`, and `make test` all pass.
 
-Retrospective notes: (to be filled in after completion.)
+Retrospective notes:
+
+**What went well:**
+
+- The plan's dependency graph (Steps 1→2→3→5→6→8→9) held throughout. No
+  backtracking was required between stages.
+- Option B (normalization in `sempai`) was the correct crate-placement call.
+  The alternative (Option A, normalization in `sempai_core`) would have
+  introduced a circular dependency with `sempai_yaml`.
+- The paired equivalence tests (legacy ↔ v2 producing identical `Formula`
+  values) gave high confidence that the two lowering paths are consistent.
+- The metavariable-pattern exception (all-constraint conjunction) was
+  anticipated in the plan and handled smoothly.
+- The 400-line file limit was maintained across all new modules by splitting
+  normalization into `legacy.rs`, `v2.rs`, `constraints.rs`, and `mod.rs`.
+
+**What was harder than expected:**
+
+- `rstest-bdd` v0.5.0's global step registry caused a runtime panic when
+  step definitions were split across two modules. The workaround (a second
+  `#[scenario]` attribute on the existing `behaviour.rs` test function)
+  was effective but non-obvious. This should be documented as a project
+  gotcha.
+- The `QuotedString` type from `rstest-bdd` does not unescape `\n`, which
+  caused BDD scenarios with multi-line YAML to fail silently. The fix
+  (`.replace("\\n", "\n")`) mirrors the existing `sempai_yaml` BDD tests
+  but cost a debugging cycle to rediscover.
+- Clippy's `excessive_nesting` and `manual_let_else` lints required
+  extracting a helper function and restructuring control flow in
+  `engine.rs`. This was ultimately beneficial for readability.
+
+**Outcomes vs. targets:**
+
+All eleven target outcomes from the plan are met:
+
+1. ✓ `sempai_core` exports `Formula`, `Atom`, `Decorated<T>`.
+2. ✓ Normalization dispatches through `normalise_search_principal()` in
+   `sempai` (not `sempai_core`, per Option B — the plan's public API
+   section listed `sempai_core` but Decision Log entry 1 corrected this).
+3. ✓ `validate_formula_constraints()` checks both semantic invariants.
+4. ✓ Three paired equivalence tests confirm legacy ↔ v2 structural
+   equality.
+5. ✓ Invalid formula shapes emit `ESempaiInvalidNotInOr` and
+   `ESempaiMissingPositiveTermInAnd` diagnostics.
+6. ✓ `Engine::compile_yaml()` returns `Ok(Vec<QueryPlan>)` with formulas.
+7. ✓ `Engine::execute()` still returns `NOT_IMPLEMENTED`.
+8. ✓ `sempai-query-language-design.md` updated with implementation notes.
+9. ✓ `users-guide.md` documents the new `compile_yaml` behaviour.
+10. ✓ `roadmap.md` marks 4.1.5 as `[x]`.
+11. ✓ `make check-fmt`, `make lint`, `make test`, `make markdownlint` all
+    pass. `make nixie` unavailable in environment.
+
+**Test coverage summary:**
+
+- 17 formula type unit tests (`sempai_core`).
+- 25 normalization unit tests (`sempai`), including 3 paired
+  `#[rstest]` `#[case]` equivalence tests.
+- 14 semantic constraint unit tests (`sempai`).
+- 2 BDD scenarios for semantic constraint rejection.
+- 2 updated BDD scenarios for engine integration.
+- 199 total workspace tests passing.
 
 ## Context and orientation
 
@@ -732,5 +866,10 @@ Implementors should consult them for conventions, patterns, and constraints.
 
 ## Revision note
 
-Initial draft created on 2026-04-12. No revisions yet. Implements roadmap
-item 4.1.5 from [docs/roadmap.md](../roadmap.md).
+Initial draft created on 2026-04-12. Implements roadmap item 4.1.5 from
+[docs/roadmap.md](../roadmap.md).
+
+- 2026-04-13: Implementation completed. Normalization placed in `sempai`
+  (Option B confirmed). All unit and BDD tests passing (199 total). All
+  quality gates pass. Documentation updated. `ExecPlan` status set to
+  COMPLETE.

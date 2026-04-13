@@ -1,5 +1,7 @@
 //! Tests for the `Engine` and `QueryPlan` types.
 
+use sempai_core::formula::{Atom, Formula};
+
 use crate::engine::QueryPlan;
 use crate::{
     Diagnostic, DiagnosticCode, DiagnosticReport, Engine, EngineConfig, EngineLimits, Language,
@@ -52,32 +54,47 @@ fn compile_yaml_returns_schema_diagnostic_for_missing_rule_id() {
 }
 
 #[test]
-fn compile_yaml_returns_not_implemented_after_successful_parse() {
+fn compile_yaml_produces_plan_with_formula_for_valid_search_rule() {
     let engine = default_engine();
-    let result = engine.compile_yaml(
-        "rules:\n  - id: demo.rule\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n",
+    let plans = engine
+        .compile_yaml(concat!(
+            "rules:\n",
+            "  - id: demo.rule\n",
+            "    message: oops\n",
+            "    languages: [rust]\n",
+            "    severity: ERROR\n",
+            "    pattern: foo($X)\n",
+        ))
+        .expect("valid search rule should produce plans");
+    assert_eq!(plans.len(), 1);
+    let plan = plans.first().expect("one plan");
+    assert_eq!(plan.rule_id(), "demo.rule");
+    assert_eq!(plan.language(), Language::Rust);
+    assert_eq!(
+        plan.formula(),
+        Some(&Formula::Atom(Atom::Pattern(String::from("foo($X)")))),
     );
-    let (code, diag) = first_diagnostic_of_err(result);
-    assert_eq!(code, DiagnosticCode::NotImplemented);
-    assert!(diag.message().contains("normalization"));
 }
 
 #[test]
-fn compile_yaml_returns_not_implemented_for_project_depends_on_search_rule() {
+fn compile_yaml_produces_plan_without_formula_for_project_depends_on() {
     let engine = default_engine();
-    let result = engine.compile_yaml(concat!(
-        "rules:\n",
-        "  - id: demo.depends\n",
-        "    message: detect vulnerable dependency\n",
-        "    languages: [python]\n",
-        "    severity: WARNING\n",
-        "    r2c-internal-project-depends-on:\n",
-        "      namespace: pypi\n",
-        "      package: requests\n",
-    ));
-    let (code, diag) = first_diagnostic_of_err(result);
-    assert_eq!(code, DiagnosticCode::NotImplemented);
-    assert!(diag.message().contains("normalization"));
+    let plans = engine
+        .compile_yaml(concat!(
+            "rules:\n",
+            "  - id: demo.depends\n",
+            "    message: detect vulnerable dependency\n",
+            "    languages: [python]\n",
+            "    severity: WARNING\n",
+            "    r2c-internal-project-depends-on:\n",
+            "      namespace: pypi\n",
+            "      package: requests\n",
+        ))
+        .expect("project-depends-on rule should produce plans");
+    assert_eq!(plans.len(), 1);
+    let plan = plans.first().expect("one plan");
+    assert_eq!(plan.rule_id(), "demo.depends");
+    assert!(plan.formula().is_none());
 }
 
 fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str) {
@@ -140,7 +157,7 @@ fn compile_dsl_returns_not_implemented() {
 #[test]
 fn execute_returns_not_implemented() {
     let engine = default_engine();
-    let plan = QueryPlan::new(String::from("test-rule"), Language::Rust);
+    let plan = QueryPlan::new(String::from("test-rule"), Language::Rust, None);
     let result = engine.execute(&plan, "file:///test.rs", "fn main() {}");
     let (code, diag) = first_diagnostic_of_err(result);
     assert_eq!(code, DiagnosticCode::NotImplemented);

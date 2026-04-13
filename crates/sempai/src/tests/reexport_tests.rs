@@ -7,8 +7,8 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    CaptureValue, CapturedNode, Diagnostic, DiagnosticCode, DiagnosticReport, EngineConfig,
-    Language, LineCol, Match, SourceSpan, Span,
+    Atom, CaptureValue, CapturedNode, Decorated, Diagnostic, DiagnosticCode, DiagnosticReport,
+    EngineConfig, Formula, Language, LineCol, Match, SourceSpan, Span,
 };
 
 #[test]
@@ -61,4 +61,12 @@ fn diagnostic_types_are_accessible() {
 fn engine_config_is_accessible() {
     let config = EngineConfig::default();
     assert_eq!(config.max_matches_per_rule(), 10_000);
+}
+
+#[test]
+fn formula_types_are_accessible() {
+    let atom = Atom::Pattern(String::from("foo"));
+    let formula = Formula::Atom(atom);
+    let decorated = Decorated::bare(formula);
+    assert!(decorated.where_clauses.is_empty());
 }

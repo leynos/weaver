@@ -428,11 +428,33 @@ semantics early.
 
 Implementation note (2026-03-29): `sempai::Engine::compile_yaml` now applies a
 mode-aware validation pass after parsing. Search rules continue to the
-deliberate `NOT_IMPLEMENTED` normalization placeholder, while `extract`,
-`taint`, `join`, and forward-compatible unknown modes fail deterministically
-with `E_SEMPAI_UNSUPPORTED_MODE`. The first unsupported rule in source order is
+normalization pipeline (see below), while `extract`, `taint`, `join`, and
+forward-compatible unknown modes fail deterministically with
+`E_SEMPAI_UNSUPPORTED_MODE`. The first unsupported rule in source order is
 reported, and its `primary_span` prefers the `mode` field span before falling
 back to the enclosing rule span.
+
+Implementation note (2026-04-13): `sempai_core` now exports a canonical
+`Formula` enum, `Atom` enum, and `Decorated<T>` wrapper. The normalization
+module in `crates/sempai/src/normalise/` lowers both legacy Semgrep operators
+and v2 `match` operators into this representation. Key implementation
+decisions:
+
+- **Crate placement**: `Formula` lives in `sempai_core::formula` for
+  downstream consumption. Normalization functions live in `sempai`
+  (`crates/sempai/src/normalise/`) because they depend on `sempai_yaml`
+  model types, and placing them in `sempai_core` would create a circular
+  dependency.
+- **`pattern-not-inside` lowering**: normalises to `Not(Inside(...))` rather
+  than a distinct `NotInside` variant, matching the Semgrep specification's
+  desugaring semantics.
+- **Constraint preservation**: legacy `LegacyClause::Constraint` objects are
+  preserved as `Formula::Constraint(serde_json::Value)` for later evaluation.
+- **Positive-term exception**: conjunctions containing only `Constraint`
+  children do not trigger `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND`, because
+  metavariable-pattern constraints may act as implicit positive terms.
+- **`ProjectDependsOn` passthrough**: these rules produce `QueryPlan` values
+  with `formula: None` and skip normalization entirely.
 
 Extract mode rules require legacy query keys, not `match`.[^1]
 
