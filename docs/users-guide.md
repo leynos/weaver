@@ -1504,29 +1504,46 @@ The `Engine` struct exposes three methods for query compilation and execution:
 - `execute(plan, uri, source)` — executes a compiled plan against a source
   snapshot.
 
-`compile_yaml(yaml)` now performs real YAML parsing plus a mode-aware
-validation pass. Malformed YAML returns `E_SEMPAI_YAML_PARSE`, and schema-shape
-failures such as missing required rule keys return `E_SEMPAI_SCHEMA_INVALID`,
-both using the shared structured diagnostic payload with `primary_span`
-locations when available.
+`compile_yaml(yaml)` performs YAML parsing, mode-aware validation, and
+formula normalization. Malformed YAML returns `E_SEMPAI_YAML_PARSE`, and
+schema-shape failures such as missing required rule keys return
+`E_SEMPAI_SCHEMA_INVALID`, both using the shared structured diagnostic
+payload with `primary_span` locations when available.
 
-After parsing succeeds, `compile_yaml(yaml)` now distinguishes parseable rules
+After parsing succeeds, `compile_yaml(yaml)` distinguishes parseable rules
 from executable ones:
 
-- Valid `search` rules, including compatibility-only
-  `r2c-internal-project-depends-on` rules, continue to the existing
-  `NOT_IMPLEMENTED` normalization placeholder.
-- Valid `extract`, `taint`, `join`, and unknown future mode strings now fail
-  deterministically with `E_SEMPAI_UNSUPPORTED_MODE` instead of falling through
-  to the generic placeholder.
+- Valid `search` rules are normalised into a canonical `Formula` model.
+  Both legacy Semgrep operators (`pattern`, `patterns`, `pattern-either`,
+  `pattern-not`, `pattern-inside`, `pattern-not-inside`, `pattern-not-regex`,
+  `semgrep-internal-pattern-anywhere`) and v2 `match` operators (`pattern`,
+  `regex`, `all`, `any`, `not`, `inside`, `anywhere`) lower into the same
+  `Formula` tree.  Paired legacy and v2 rules that express equivalent
+  queries produce structurally identical formulas.
+- Compatibility-only `r2c-internal-project-depends-on` rules produce query
+  plans with no formula (`formula()` returns `None`), since they have no
+  formula semantics.
+- Valid `extract`, `taint`, `join`, and unknown future mode strings fail
+  deterministically with `E_SEMPAI_UNSUPPORTED_MODE`.
 
-Unsupported-mode diagnostics point at the rule's `mode` field when that span is
-available, which makes whole-document failures deterministic even though the
-execution backend is still pending.
+After normalization, semantic constraint checks validate the formula tree:
+
+- `E_SEMPAI_INVALID_NOT_IN_OR`: a negated formula inside a disjunction
+  (`pattern-either` / `any`) is not permitted.
+- `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND`: a conjunction (`patterns` /
+  `all`) must contain at least one positive match-producing term.
+
+On success, `compile_yaml(yaml)` returns `Vec<QueryPlan>` with one plan
+per rule per declared language. Each plan carries the normalised `Formula`
+accessible via `plan.formula()`.
+
+Unsupported-mode diagnostics point at the rule's `mode` field when that
+span is available, which makes whole-document failures deterministic even
+though the execution backend is still pending.
 
 `compile_dsl(...)` and `execute(...)` still return "not implemented"
-diagnostics. They will be wired to the DSL parser and Tree-sitter backend as
-those components are delivered in subsequent roadmap phases.
+diagnostics. They will be wired to the DSL parser and Tree-sitter backend
+as those components are delivered in subsequent roadmap phases.
 
 All error conditions are reported through `DiagnosticReport`, which carries
 stable diagnostic codes suitable for programmatic consumption. Stub methods

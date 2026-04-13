@@ -19,6 +19,7 @@
 //! - [`CaptureValue`] and [`CapturedNode`] — metavariable bindings
 //! - [`DiagnosticReport`] and [`Diagnostic`] — structured error reporting
 //! - [`EngineConfig`] and [`EngineLimits`] — performance and safety limits
+//! - [`Formula`], [`Atom`], and [`Decorated`] — canonical normalised formula model
 //! - [`Engine`] — the query compilation and execution entrypoint
 //! - [`QueryPlan`] — a compiled query plan
 //!
@@ -37,11 +38,13 @@
 
 mod engine;
 mod mode_validation;
+mod normalise;
 
 // Re-export all stable types from sempai_core.
 pub use sempai_core::{
-    CaptureValue, CapturedNode, Diagnostic, DiagnosticCode, DiagnosticReport, EngineConfig,
-    EngineLimits, Language, LanguageParseError, LineCol, Match, SourceSpan, Span,
+    Atom, CaptureValue, CapturedNode, Decorated, Diagnostic, DiagnosticCode, DiagnosticReport,
+    EngineConfig, EngineLimits, Formula, Language, LanguageParseError, LineCol, Match, SourceSpan,
+    Span,
 };
 
 pub use engine::{Engine, QueryPlan};
