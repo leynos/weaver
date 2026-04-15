@@ -9,12 +9,14 @@ use std::path::Path;
 
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
-use weaver_plugins::CapabilityId;
+use weaver_plugins::{CapabilityId, PluginError, PluginRequest, PluginResponse};
 
 use crate::backends::FusionBackends;
+use crate::dispatch::act::refactor::RefactorPluginRuntime;
 use crate::dispatch::act::refactor::resolution::{
     CandidateEvaluation, CandidateReason, CapabilityResolutionDetails,
-    CapabilityResolutionEnvelope, RefusalReason, ResolutionOutcome, SelectionMode,
+    CapabilityResolutionEnvelope, RefusalReason, ResolutionOutcome, ResolutionRequest,
+    SelectionMode,
 };
 use crate::dispatch::request::{CommandDescriptor, CommandRequest};
 use crate::semantic_provider::SemanticBackendProvider;
@@ -34,6 +36,38 @@ pub(super) struct SelectedResolution<'a> {
     pub(super) provider: &'a str,
     pub(super) selection_mode: SelectionMode,
     pub(super) requested_provider: Option<&'a str>,
+}
+
+pub(super) struct RollbackRuntime {
+    pub(super) resolution: CapabilityResolutionEnvelope,
+    pub(super) execute_result: ExecuteResult,
+}
+
+pub(super) enum ExecuteResult {
+    Success(PluginResponse),
+    MissingPlugin(&'static str),
+}
+
+impl RefactorPluginRuntime for RollbackRuntime {
+    fn resolve(
+        &self,
+        _request: ResolutionRequest<'_>,
+    ) -> Result<CapabilityResolutionEnvelope, PluginError> {
+        Ok(self.resolution.clone())
+    }
+
+    fn execute(
+        &self,
+        _provider: &str,
+        _request: &PluginRequest,
+    ) -> Result<PluginResponse, PluginError> {
+        match &self.execute_result {
+            ExecuteResult::Success(response) => Ok(response.clone()),
+            ExecuteResult::MissingPlugin(name) => Err(PluginError::NotFound {
+                name: String::from(*name),
+            }),
+        }
+    }
 }
 
 pub(super) fn command_request(arguments: Vec<String>) -> CommandRequest {
@@ -87,6 +121,26 @@ pub(super) fn selected_resolution(config: SelectedResolution<'_>) -> CapabilityR
             reason: CandidateReason::MatchedLanguageAndCapability,
         }],
     })
+}
+
+pub(super) fn selected_runtime(
+    config: SelectedResolution<'_>,
+    execute_result: ExecuteResult,
+) -> RollbackRuntime {
+    RollbackRuntime {
+        resolution: selected_resolution(config),
+        execute_result,
+    }
+}
+
+pub(super) fn rollback_runtime(
+    resolution: CapabilityResolutionEnvelope,
+    execute_result: ExecuteResult,
+) -> RollbackRuntime {
+    RollbackRuntime {
+        resolution,
+        execute_result,
+    }
 }
 
 pub(super) fn refused_resolution(config: RefusedResolution<'_>) -> CapabilityResolutionEnvelope {

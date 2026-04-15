@@ -30,10 +30,10 @@ After this change:
 - Behavioural tests (BDD via `rstest-bdd` v0.5.0) cover happy paths, unhappy
   paths, and edge cases across all three layers (plugin contract, plugin
   execution, daemon routing).
-- End-to-end tests in `weaver-e2e` validate that the CLI-to-daemon-to-plugin
-  pipeline produces correct observable output for both automatic and explicit
-  provider routing, and that refusal scenarios emit deterministic structured
-  diagnostics.
+- End-to-end tests in `weaver-e2e` validate that the command-line interface
+  (CLI)-to-daemon-to-plugin pipeline produces correct observable output for
+  both automatic and explicit provider routing, and that refusal scenarios emit
+  deterministic structured diagnostics.
 - Rollback guarantees are proven: every refusal path and every adapter-failure
   path leaves the filesystem unchanged, and this invariant is asserted
   explicitly in the behavioural and end-to-end tests.
@@ -53,8 +53,9 @@ plugins.
 - The daemon resolution layer in
   `crates/weaverd/src/dispatch/act/refactor/resolution.rs` is stable. This plan
   must not change resolution semantics; it adds coverage only.
-- The CLI command shape is stable. `--refactoring rename`, `offset`, and
-  `new_name` remain the operator-facing inputs. `--provider` is optional.
+- The command-line interface (CLI) command shape is stable. `--refactoring
+  rename`, `offset`, and `new_name` remain the operator-facing inputs. `
+  --provider` is optional.
 - Preserve synchronous execution. Do not introduce async runtimes, async
   traits, or background work queues.
 - The repository enforces a 400-line-per-file limit. New test files must
@@ -79,7 +80,7 @@ plugins.
 - Workspace Clippy denies warnings across all targets, including tests. Helper
   functions with many parameters must group them into small context structs to
   avoid `clippy::too_many_arguments`.
-- Insta snapshots with rstest parameterised tests need explicit names to avoid
+- Insta snapshots with rstest parameterized tests need explicit names to avoid
   execution-order-dependent numbering.
 
 ## Tolerances (exception triggers)
@@ -106,20 +107,21 @@ plugins.
 
 - Risk: shared contract fixtures require both plugins to accept the same input
   shape. The rope plugin currently accepts a bare `uri` string while
-  rust-analyzer expects a `file:///` URI. Fixtures must account for this
-  difference. Severity: medium. Likelihood: high. Mitigation: design the shared
-  fixture data at the `weaver-plugins` contract-validation level (which
-  validates the abstract schema shape) rather than at the plugin-execution
-  level (which handles URI normalisation internally). Each plugin's
-  execution-level tests continue to use their own URI conventions.
+  rust-analyzer expects a `file:///` Uniform Resource Identifier (URI).
+  Fixtures must account for this difference. Severity: medium. Likelihood:
+  high. Mitigation: design the shared fixture data at the `weaver-plugins`
+  contract-validation level (which validates the abstract schema shape) rather
+  than at the plugin-execution level (which handles URI normalization
+  internally). Each plugin's execution-level tests continue to use their own
+  URI conventions.
 
-- Risk: end-to-end tests in `weaver-e2e` use real `weaver` binary invocations
-  with a `FakeDaemon`. Adding new e2e tests for capability-routed flows
-  requires the fake daemon to understand the resolution envelope. Severity:
-  medium. Likelihood: medium. Mitigation: extend the existing `FakeDaemon`
-  response logic to handle both explicit-provider and automatic-routing request
-  shapes, or add focused e2e tests that capture the CLI request shape without
-  requiring a fully capable daemon response.
+- Risk: end-to-end (e2e) tests in `weaver-e2e` use real `weaver` binary
+  invocations with a `FakeDaemon`. Adding new e2e tests for capability-routed
+  flows requires the fake daemon to understand the resolution envelope.
+  Severity: medium. Likelihood: medium. Mitigation: extend the existing
+  `FakeDaemon` response logic to handle both explicit-provider and
+  automatic-routing request shapes, or add focused e2e tests that capture the
+  CLI request shape without requiring a fully capable daemon response.
 
 - Risk: rollback-guarantee tests need to assert filesystem immutability on
   failure. The existing BDD harness in `weaverd` uses in-memory response
@@ -170,14 +172,14 @@ plugins.
   import shared fixtures via `weaver-plugins/test-support` dev-dependency.
   Date: 2026-03-24.
 
-- Decision: structure the shared contract fixtures as parameterised `rstest`
+- Decision: structure the shared contract fixtures as parameterized `rstest`
   cases that exercise the `RenameSymbolContract::validate_request()` and
   `RenameSymbolContract::validate_response()` methods with a fixed set of
   inputs (valid request, missing fields, empty fields, wrong operation, valid
   diff response, non-diff response, failure with reason code). Rationale: this
   validates that both plugins conform to the same abstract contract without
   coupling the fixtures to plugin-specific execution details like URI
-  normalisation or adapter mocking. Date: 2026-03-24.
+  normalization or adapter mocking. Date: 2026-03-24.
 
 - Decision: add new BDD feature files rather than growing existing ones past
   the 400-line budget. The new files are:
@@ -304,7 +306,7 @@ The `weaver-e2e` crate contains CLI ergonomics snapshot tests:
 
 ## Plan of work
 
-The work is organised into five milestones. Each milestone ends with a
+The work is organized into five milestones. Each milestone ends with a
 validation step that must pass before proceeding.
 
 ### Milestone 1: Shared contract test fixtures in `weaver-plugins`
@@ -448,7 +450,7 @@ level:
   does not write to the filesystem.
 
 These assertions complement the existing `behaviour.rs` scenarios but make the
-"no side-effect on failure" invariant explicit and unit-testable.
+"no side effect on failure" invariant explicit and unit-testable.
 
 #### 3c: BDD coverage for routing edge cases
 
@@ -514,10 +516,10 @@ Validation: `cargo test -p weaver-e2e` passes. Snapshot files are committed.
 
 #### 5a: Review and update `docs/users-guide.md`
 
-Review the users guide for any changes to observable behaviour surfaced during
+Review the user's guide for any changes to observable behaviour surfaced during
 testing. If new refusal reasons or edge-case behaviours were discovered, add
 them to the relevant sections. If no behaviour changes are needed, record in
-the Decision Log that the users guide was reviewed and found current.
+the Decision Log that the user's guide was reviewed and found current.
 
 #### 5b: Mark roadmap 5.2.5 as done
 
@@ -545,7 +547,7 @@ Quality criteria (what "done" means):
 
 - Tests: `make test` passes with no regressions. The new shared contract
   fixture cases pass identically for both plugins. New BDD scenarios pass. New
-  e2e snapshot tests pass.
+  end-to-end (e2e) snapshot tests pass.
 - Lint/typecheck: `make check-fmt` and `make lint` both pass.
 - Documentation: `make markdownlint` and `make nixie` pass.
   `docs/users-guide.md` is reviewed and current. `docs/roadmap.md` marks 5.2.5
@@ -556,7 +558,7 @@ Quality criteria (what "done" means):
 - Cross-plugin parity: both plugins pass the same shared contract fixture
   cases with identical pass/fail verdicts.
 
-Quality method (how we check):
+Quality method (how this is checked):
 
 - Run `make check-fmt && make lint && make test` and verify exit code 0.
 - Run `make fmt && make markdownlint && make nixie` and verify exit code 0.

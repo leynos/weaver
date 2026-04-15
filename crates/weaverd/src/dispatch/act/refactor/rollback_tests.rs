@@ -1,7 +1,7 @@
 //! Rollback-oriented tests for `act refactor` failure paths.
 
 use tempfile::TempDir;
-use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
+use weaver_plugins::{PluginOutput, PluginResponse};
 
 #[expect(
     clippy::duplicate_mod,
@@ -10,46 +10,12 @@ use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 #[path = "refactor_helpers.rs"]
 mod refactor_helpers;
 
-use crate::dispatch::act::refactor::resolution::{CapabilityResolutionEnvelope, ResolutionRequest};
-use crate::dispatch::act::refactor::{
-    RefactorContext, RefactorPluginRuntime, ResponseWriter, handle,
-};
+use crate::dispatch::act::refactor::{RefactorContext, ResponseWriter, handle};
 use refactor_helpers::{
-    RefusedResolution, SelectedResolution, build_backends, command_request, original_content_for,
-    refused_resolution, selected_resolution, standard_rename_args,
+    ExecuteResult, RefusedResolution, RollbackRuntime, SelectedResolution, build_backends,
+    command_request, original_content_for, refused_resolution, rollback_runtime, selected_runtime,
+    standard_rename_args,
 };
-
-struct RollbackRuntime {
-    resolution: CapabilityResolutionEnvelope,
-    execute_result: ExecuteResult,
-}
-
-enum ExecuteResult {
-    Success(PluginResponse),
-    MissingPlugin(&'static str),
-}
-
-impl RefactorPluginRuntime for RollbackRuntime {
-    fn resolve(
-        &self,
-        _request: ResolutionRequest<'_>,
-    ) -> Result<CapabilityResolutionEnvelope, PluginError> {
-        Ok(self.resolution.clone())
-    }
-
-    fn execute(
-        &self,
-        _provider: &str,
-        _request: &PluginRequest,
-    ) -> Result<PluginResponse, PluginError> {
-        match &self.execute_result {
-            ExecuteResult::Success(response) => Ok(response.clone()),
-            ExecuteResult::MissingPlugin(name) => Err(PluginError::NotFound {
-                name: String::from(*name),
-            }),
-        }
-    }
-}
 
 struct RollbackOutcome {
     status: i32,
@@ -58,8 +24,8 @@ struct RollbackOutcome {
 }
 
 fn refused_runtime() -> RollbackRuntime {
-    RollbackRuntime {
-        resolution: refused_resolution(RefusedResolution {
+    rollback_runtime(
+        refused_resolution(RefusedResolution {
             capability: weaver_plugins::CapabilityId::RenameSymbol,
             language: Some("python"),
             requested_provider: None,
@@ -67,21 +33,21 @@ fn refused_runtime() -> RollbackRuntime {
             refusal_reason: super::resolution::RefusalReason::UnsupportedLanguage,
             candidates: Vec::new(),
         }),
-        execute_result: ExecuteResult::Success(PluginResponse::success(PluginOutput::Empty)),
-    }
+        ExecuteResult::Success(PluginResponse::success(PluginOutput::Empty)),
+    )
 }
 
 fn rope_python_runtime(execute_result: ExecuteResult) -> RollbackRuntime {
-    RollbackRuntime {
-        resolution: selected_resolution(SelectedResolution {
+    selected_runtime(
+        SelectedResolution {
             capability: weaver_plugins::CapabilityId::RenameSymbol,
             language: "python",
             provider: "rope",
             selection_mode: super::resolution::SelectionMode::Automatic,
             requested_provider: None,
-        }),
+        },
         execute_result,
-    }
+    )
 }
 
 fn run_failure_case(runtime: RollbackRuntime) -> RollbackOutcome {
@@ -126,13 +92,7 @@ fn assert_rollback_invariants(outcome: &RollbackOutcome, stderr_fragment: &str) 
 #[test]
 fn refused_resolution_leaves_target_file_unchanged() {
     let outcome = run_failure_case(refused_runtime());
-
-    assert_eq!(outcome.status, 1);
-    assert_eq!(
-        outcome.content,
-        original_content_for(std::path::Path::new("notes.py"))
-    );
-    assert!(outcome.stderr.contains("unsupported_language"));
+    assert_rollback_invariants(&outcome, "unsupported_language");
 }
 
 #[test]

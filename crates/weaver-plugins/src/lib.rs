@@ -52,10 +52,26 @@ pub mod runner;
 #[cfg(test)]
 mod tests;
 
+/// Shared `rename-symbol` fixture types and fixture collections used by
+/// downstream plugin tests.
+///
+/// Enable the `test-support` feature to make these fixtures available outside
+/// this crate.
 #[cfg(feature = "test-support")]
 pub use self::capability::test_support::{
     RenameSymbolRequestFixture, RenameSymbolResponseFixture, rename_symbol_request_fixtures,
     rename_symbol_response_fixtures,
+};
+/// Shared fixture lookup and contract-validation helpers used by downstream
+/// plugin tests.
+///
+/// Enable the `test-support` feature to make these helpers available outside
+/// this crate.
+#[cfg(feature = "test-support")]
+pub use self::capability::test_support::{
+    assert_rename_symbol_request_fixture_contract, assert_rename_symbol_response_fixture_contract,
+    rename_symbol_request_fixture_named, rename_symbol_response_fixture_named,
+    validate_rename_symbol_request_fixture, validate_rename_symbol_response_fixture,
 };
 pub use self::capability::{
     CapabilityContract, CapabilityId, ContractVersion, ReasonCode, RenameSymbolContract,

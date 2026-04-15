@@ -3,10 +3,12 @@
 //! This module is feature-gated so plugin crates can reuse one canonical suite
 //! of request and response examples without duplicating fixture data.
 
-use crate::capability::ReasonCode;
+use crate::capability::{CapabilityContract, ReasonCode, RenameSymbolContract};
+use crate::error::PluginError;
 use crate::protocol::{
     DiagnosticSeverity, PluginDiagnostic, PluginOutput, PluginRequest, PluginResponse,
 };
+use serde_json::json;
 
 /// Shared fixture for `rename-symbol` contract validation payloads.
 #[derive(Debug, Clone)]
@@ -55,53 +57,50 @@ pub type RenameSymbolRequestFixture = RenameSymbolFixture<PluginRequest>;
 /// Shared response fixture alias for `rename-symbol` contract validation.
 pub type RenameSymbolResponseFixture = RenameSymbolFixture<PluginResponse>;
 
+/// Finds a named shared request fixture.
+#[must_use]
+pub fn rename_symbol_request_fixture_named(name: &str) -> RenameSymbolRequestFixture {
+    fixture_named(rename_symbol_request_fixtures(), name, "request")
+}
+
+/// Finds a named shared response fixture.
+#[must_use]
+pub fn rename_symbol_response_fixture_named(name: &str) -> RenameSymbolResponseFixture {
+    fixture_named(rename_symbol_response_fixtures(), name, "response")
+}
+
 /// Returns the canonical request fixtures shared by rename-capable plugins.
 #[must_use]
 pub fn rename_symbol_request_fixtures() -> Vec<RenameSymbolRequestFixture> {
-    vec![
-        RenameSymbolFixture::new(
-            "valid_request",
-            PluginRequest::with_arguments("rename-symbol", Vec::new(), valid_arguments()),
-            None,
-        ),
-        RenameSymbolFixture::new(
+    let mut fixtures = vec![
+        request_fixture("valid_request", "rename-symbol", valid_arguments(), None),
+        request_fixture(
             "wrong_operation",
-            PluginRequest::with_arguments("extract-method", Vec::new(), valid_arguments()),
+            "extract-method",
+            valid_arguments(),
             Some("expects operation"),
         ),
-        RenameSymbolFixture::new(
+        request_fixture(
             "missing_uri",
-            PluginRequest::with_arguments("rename-symbol", Vec::new(), arguments_without("uri")),
+            "rename-symbol",
+            arguments_without("uri"),
             Some("uri"),
         ),
-        RenameSymbolFixture::new(
+        request_fixture(
             "missing_position",
-            PluginRequest::with_arguments(
-                "rename-symbol",
-                Vec::new(),
-                arguments_without("position"),
-            ),
+            "rename-symbol",
+            arguments_without("position"),
             Some("position"),
         ),
-        RenameSymbolFixture::new(
+        request_fixture(
             "missing_new_name",
-            PluginRequest::with_arguments(
-                "rename-symbol",
-                Vec::new(),
-                arguments_without("new_name"),
-            ),
+            "rename-symbol",
+            arguments_without("new_name"),
             Some("new_name"),
         ),
-        RenameSymbolFixture::new(
-            "empty_new_name",
-            PluginRequest::with_arguments(
-                "rename-symbol",
-                Vec::new(),
-                arguments_with_string("new_name", "   "),
-            ),
-            Some("new_name"),
-        ),
-    ]
+    ];
+    fixtures.extend(request_edge_case_fixtures());
+    fixtures
 }
 
 /// Returns the canonical response fixtures shared by rename-capable plugins.
@@ -133,21 +132,135 @@ pub fn rename_symbol_response_fixtures() -> Vec<RenameSymbolResponseFixture> {
     ]
 }
 
+/// Validates one shared request fixture against the `rename-symbol` contract.
+///
+/// # Errors
+///
+/// Returns [`PluginError`] when the fixture payload violates the shared
+/// `rename-symbol` request contract.
+pub fn validate_rename_symbol_request_fixture(
+    fixture: &RenameSymbolRequestFixture,
+) -> Result<(), PluginError> {
+    RenameSymbolContract.validate_request(fixture.payload())
+}
+
+/// Validates one shared response fixture against the `rename-symbol` contract.
+///
+/// # Errors
+///
+/// Returns [`PluginError`] when the fixture payload violates the shared
+/// `rename-symbol` response contract.
+pub fn validate_rename_symbol_response_fixture(
+    fixture: &RenameSymbolResponseFixture,
+) -> Result<(), PluginError> {
+    RenameSymbolContract.validate_response(fixture.payload())
+}
+
+/// Asserts that one shared request fixture matches the contract expectation.
+pub fn assert_rename_symbol_request_fixture_contract(fixture: &RenameSymbolRequestFixture) {
+    assert_fixture_contract(
+        fixture,
+        validate_rename_symbol_request_fixture(fixture),
+        "request",
+    );
+}
+
+/// Asserts that one shared response fixture matches the contract expectation.
+pub fn assert_rename_symbol_response_fixture_contract(fixture: &RenameSymbolResponseFixture) {
+    assert_fixture_contract(
+        fixture,
+        validate_rename_symbol_response_fixture(fixture),
+        "response",
+    );
+}
+
+fn fixture_named<T: Clone>(
+    fixtures: Vec<RenameSymbolFixture<T>>,
+    name: &str,
+    fixture_kind: &str,
+) -> RenameSymbolFixture<T> {
+    fixtures
+        .into_iter()
+        .find(|fixture| fixture.name() == name)
+        .unwrap_or_else(|| panic!("missing {fixture_kind} fixture '{name}'"))
+}
+
+fn assert_fixture_contract<T>(
+    fixture: &RenameSymbolFixture<T>,
+    result: Result<(), PluginError>,
+    fixture_kind: &str,
+) {
+    match fixture.expected_error_fragment() {
+        None => assert!(
+            result.is_ok(),
+            "{fixture_kind} fixture '{}' should be valid, got: {result:?}",
+            fixture.name()
+        ),
+        Some(needle) => {
+            let error = match result {
+                Ok(()) => panic!("invalid fixture should fail contract validation"),
+                Err(error) => error,
+            };
+            assert!(
+                error.to_string().contains(needle),
+                "{fixture_kind} fixture '{}' should mention '{needle}', got: {error}",
+                fixture.name()
+            );
+        }
+    }
+}
+
 fn valid_arguments() -> std::collections::HashMap<String, serde_json::Value> {
     [
-        (
-            "uri",
-            serde_json::Value::String(String::from("file:///src/main.py")),
-        ),
-        ("position", serde_json::Value::String(String::from("4"))),
-        (
-            "new_name",
-            serde_json::Value::String(String::from("renamed_symbol")),
-        ),
+        ("uri", json!("file:///src/main.py")),
+        ("position", json!("4")),
+        ("new_name", json!("renamed_symbol")),
     ]
     .into_iter()
     .map(|(key, value)| (String::from(key), value))
     .collect()
+}
+
+fn request_edge_case_fixtures() -> [RenameSymbolRequestFixture; 4] {
+    [
+        request_fixture(
+            "empty_uri",
+            "rename-symbol",
+            arguments_with_string("uri", "   "),
+            Some("uri"),
+        ),
+        request_fixture(
+            "empty_position",
+            "rename-symbol",
+            arguments_with_string("position", "   "),
+            Some("position"),
+        ),
+        request_fixture(
+            "position_not_string",
+            "rename-symbol",
+            arguments_with_value("position", json!(4)),
+            Some("position"),
+        ),
+        request_fixture(
+            "empty_new_name",
+            "rename-symbol",
+            arguments_with_string("new_name", "   "),
+            Some("new_name"),
+        ),
+    ]
+}
+
+fn request_fixture(
+    name: &'static str,
+    operation: &str,
+    arguments: std::collections::HashMap<String, serde_json::Value>,
+    expected_error_fragment: Option<&'static str>,
+) -> RenameSymbolRequestFixture {
+    RenameSymbolFixture::new(
+        name,
+        PluginRequest::with_arguments(operation, Vec::new(), arguments),
+        expected_error_fragment,
+    )
 }
 
 fn arguments_without(field: &str) -> std::collections::HashMap<String, serde_json::Value> {
@@ -160,10 +273,14 @@ fn arguments_with_string(
     field: &str,
     value: &str,
 ) -> std::collections::HashMap<String, serde_json::Value> {
+    arguments_with_value(field, json!(value))
+}
+
+fn arguments_with_value(
+    field: &str,
+    value: serde_json::Value,
+) -> std::collections::HashMap<String, serde_json::Value> {
     let mut arguments = valid_arguments();
-    arguments.insert(
-        String::from(field),
-        serde_json::Value::String(String::from(value)),
-    );
+    arguments.insert(String::from(field), value);
     arguments
 }
