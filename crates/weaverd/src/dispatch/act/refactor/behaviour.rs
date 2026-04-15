@@ -8,20 +8,12 @@ use tempfile::TempDir;
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 use weaver_syntax::SupportedLanguage;
 
+use super::refactor_helpers::*;
 use super::resolution::{
     CandidateEvaluation, CandidateReason, CapabilityResolutionEnvelope, RefusalReason,
     ResolutionRequest, SelectionMode,
 };
 use super::*;
-
-#[expect(
-    clippy::duplicate_mod,
-    reason = "Shared test helpers loaded by multiple test modules"
-)]
-#[path = "refactor_helpers.rs"]
-mod refactor_helpers;
-
-use refactor_helpers::*;
 
 #[derive(Clone, Copy, Default)]
 enum RuntimeMode {

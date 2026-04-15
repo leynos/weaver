@@ -16,7 +16,10 @@ use std::{io, thread};
 
 use assert_cmd::Command;
 use insta::assert_debug_snapshot;
-use refactor_test_support::{request_arguments, write_refactor_response, write_stdout_exit};
+use refactor_test_support::{
+    Operation, classify_operation, request_arguments, write_refactor_response,
+    write_stdout_exit,
+};
 use rstest::rstest;
 use serde::Serialize;
 use serde_json::json;
@@ -141,16 +144,25 @@ fn accept_before_deadline(listener: &TcpListener) -> Option<TcpStream> {
     }
 }
 
-fn response_payload_for_operation(operation: &str) -> String {
+fn response_payload_for_operation(operation: Operation) -> String {
     match operation {
-        "get-definition" => json!([{ "symbol": "renamed_name" }]).to_string(),
-        "refactor" => json!({
+        Operation::Refactor => json!({
             "status": "ok",
             "files_written": 1,
             "files_deleted": 0
         })
         .to_string(),
-        _ => json!({ "status": "unexpected", "operation": operation }).to_string(),
+        Operation::Other => json!({ "status": "unexpected", "operation": "other" }).to_string(),
+    }
+}
+
+fn response_payload_for_command(operation: &str) -> String {
+    match classify_operation(operation) {
+        Operation::Refactor => response_payload_for_operation(Operation::Refactor),
+        Operation::Other if operation == "get-definition" => {
+            json!([{ "symbol": "renamed_name" }]).to_string()
+        }
+        Operation::Other => json!({ "status": "unexpected", "operation": operation }).to_string(),
     }
 }
 
@@ -186,15 +198,15 @@ fn respond_to_request(
     let arguments = request_arguments(&parsed_request);
 
     let mut writer = stream;
-    if operation == "refactor" {
+    if matches!(operation, "refactor") {
         write_refactor_response(
             &mut writer,
-            operation,
+            Operation::Refactor,
             &arguments,
             &response_payload_for_operation,
         )
     } else {
-        write_stdout_exit(&mut writer, &response_payload_for_operation(operation), 0)
+        write_stdout_exit(&mut writer, &response_payload_for_command(operation), 0)
     }
 }
 

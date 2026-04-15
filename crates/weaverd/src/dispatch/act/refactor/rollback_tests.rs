@@ -3,19 +3,12 @@
 use tempfile::TempDir;
 use weaver_plugins::{PluginOutput, PluginResponse};
 
-#[expect(
-    clippy::duplicate_mod,
-    reason = "Shared test helpers loaded by multiple test modules"
-)]
-#[path = "refactor_helpers.rs"]
-mod refactor_helpers;
-
-use crate::dispatch::act::refactor::{RefactorContext, ResponseWriter, handle};
-use refactor_helpers::{
+use super::refactor_helpers::{
     ExecuteResult, RefusedResolution, RollbackRuntime, SelectedResolution, build_backends,
     command_request, original_content_for, refused_resolution, rollback_runtime, selected_runtime,
     standard_rename_args,
 };
+use crate::dispatch::act::refactor::{RefactorContext, ResponseWriter, handle};
 
 struct RollbackOutcome {
     status: i32,

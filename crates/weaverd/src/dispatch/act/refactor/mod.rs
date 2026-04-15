@@ -347,6 +347,8 @@ mod behaviour;
 #[cfg(test)]
 mod contract_tests;
 #[cfg(test)]
+pub(super) mod refactor_helpers;
+#[cfg(test)]
 mod resolution_tests;
 #[cfg(test)]
 mod rollback_tests;

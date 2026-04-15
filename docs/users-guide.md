@@ -1278,8 +1278,8 @@ Table: Code transformation capabilities.
 The `rename-symbol` capability is the first fully specified contract. Plugins
 that declare this capability must accept requests containing three required
 fields in the `arguments` map. The built-in `rope` and `rust-analyzer` rename
-plugins are validated against the same shared contract fixtures, so request and
-response checks stay aligned across Python and Rust rename flows.
+plugins are validated against the same shared contract fixtures. Request and
+response checks therefore stay aligned across Python and Rust rename flows.
 
 Table: Required fields for `rename-symbol` requests.
 

@@ -4,13 +4,7 @@ use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 
-#[expect(
-    clippy::duplicate_mod,
-    reason = "Shared test helpers loaded by multiple test modules"
-)]
-#[path = "refactor_helpers.rs"]
-mod refactor_helpers;
-
+use super::refactor_helpers::{build_backends, command_request};
 use crate::dispatch::act::refactor::resolution::{
     CandidateEvaluation, CapabilityResolutionDetails, CapabilityResolutionEnvelope,
     ResolutionOutcome, ResolutionRequest, SelectionMode,
@@ -19,7 +13,6 @@ use crate::dispatch::act::refactor::{
     DispatchError, RefactorContext, RefactorPluginRuntime, ResponseWriter, default_runtime, handle,
     resolve_rope_plugin_path, resolve_rust_analyzer_plugin_path,
 };
-use refactor_helpers::{build_backends, command_request};
 
 enum MockRuntimeResult {
     Success(PluginResponse),
