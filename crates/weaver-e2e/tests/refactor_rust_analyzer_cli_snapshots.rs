@@ -4,7 +4,8 @@
 //! user-facing command ergonomics, including a shell pipeline that chains an
 //! observe query through `jq` into an actuator command.
 
-mod test_support;
+#[path = "test_support/refactor_routing.rs"]
+mod refactor_test_support;
 
 use std::io::{BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -15,10 +16,10 @@ use std::{io, thread};
 
 use assert_cmd::Command;
 use insta::assert_debug_snapshot;
+use refactor_test_support::{request_arguments, write_refactor_response, write_stdout_exit};
 use rstest::rstest;
 use serde::Serialize;
 use serde_json::json;
-use test_support::{request_arguments, write_refactor_response, write_stdout_exit};
 
 #[derive(Debug, Serialize)]
 struct Transcript {
