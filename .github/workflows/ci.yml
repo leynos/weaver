@@ -50,6 +50,9 @@ jobs:
         run: make lint
       - name: Test and Measure Coverage
         uses: leynos/shared-actions/.github/actions/generate-coverage@684e8da51a590c875c03bd8ee2ccee52dccde61d
+        env:
+          CARGO_PROFILE_DEV_CODEGEN_BACKEND: llvm
+          CARGO_PROFILE_TEST_CODEGEN_BACKEND: llvm
         with:
           output-path: lcov.info
           format: lcov
