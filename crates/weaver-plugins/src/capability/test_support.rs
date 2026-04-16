@@ -241,7 +241,7 @@ fn valid_arguments() -> std::collections::HashMap<String, serde_json::Value> {
     .collect()
 }
 
-fn request_edge_case_fixtures() -> [RenameSymbolRequestFixture; 6] {
+fn request_edge_case_fixtures() -> [RenameSymbolRequestFixture; 7] {
     [
         request_fixture(
             "empty_uri",
@@ -265,6 +265,12 @@ fn request_edge_case_fixtures() -> [RenameSymbolRequestFixture; 6] {
             "position_not_string",
             FixtureOperation::RenameSymbol,
             arguments_with_value("position", json!(4)),
+            Some("position"),
+        ),
+        request_fixture(
+            "negative_position",
+            FixtureOperation::RenameSymbol,
+            arguments_with_value("position", json!(-1)),
             Some("position"),
         ),
         request_fixture(

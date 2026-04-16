@@ -54,8 +54,8 @@ plugins.
   `crates/weaverd/src/dispatch/act/refactor/resolution.rs` is stable. This plan
   must not change resolution semantics; it adds coverage only.
 - The command-line interface (CLI) command shape is stable. `--refactoring
-  rename`, `offset`, and `new_name` remain the operator-facing inputs. `
-  --provider` is optional.
+  rename`, `offset`, `new_name`, and `--provider
+  ` remain the operator-facing inputs. `--provider` is optional.
 - Preserve synchronous execution. Do not introduce async runtimes, async
   traits, or background work queues.
 - The repository enforces a 400-line-per-file limit. New test files must
@@ -181,13 +181,13 @@ plugins.
   coupling the fixtures to plugin-specific execution details like URI
   normalization or adapter mocking. Date: 2026-03-24.
 
-- Decision: add new BDD feature files rather than growing existing ones past
-  the 400-line budget. The new files are:
+- Decision: add new plugin BDD feature files where needed, but extend the
+  existing daemon refactor feature coverage in place. The resulting files are
   `crates/weaver-plugin-rope/tests/features/rename_symbol_contract.feature`,
   `crates/weaver-plugin-rust-analyzer/tests/features/rename_symbol_contract.feature`,
-   and `crates/weaverd/tests/features/rename_symbol_coverage.feature`.
-  Rationale: keeps each feature file focused and within budget. Date:
-  2026-03-24.
+   and `crates/weaverd/tests/features/refactor.feature`. Rationale: keeps each
+  feature file focused and within budget while avoiding unnecessary daemon-side
+  feature-file churn. Date: 2026-03-24.
 
 - Decision: keep the shared-fixture seam lightweight by exporting immutable
   request and response examples rather than a bespoke assertion framework.
@@ -319,23 +319,21 @@ contract.
 In `crates/weaver-plugins/Cargo.toml`, add a `test-support` feature flag (no
 additional dependencies).
 
-In `crates/weaver-plugins/src/lib.rs`, add a
-`#[cfg(any(test, feature = "test-support"))]` public module `test_support`.
+In `crates/weaver-plugins/src/lib.rs`, expose the feature-gated shared fixture
+API backed by `crates/weaver-plugins/src/capability/test_support.rs`.
 
-Create `crates/weaver-plugins/src/test_support.rs` containing:
+That module contains typed `RenameSymbolFixture<T>` payload fixtures, request
+and response fixture collections, fixture lookup helpers, and shared contract
+assertion helpers:
 
-- `valid_rename_request()`: returns a `PluginRequest` with operation
-  `"rename-symbol"` and all three required arguments (`uri`, `position`,
-  `new_name`) populated with representative values.
-- `valid_rename_response()`: returns a `PluginResponse` with a
-  `PluginOutput::Diff` payload.
-- `failure_response_with_reason(reason: ReasonCode)`: returns a failure
-  `PluginResponse` with a `PluginDiagnostic` carrying the given reason code.
-- `contract_fixture_cases()`: a set of
-  `(description, PluginRequest, expected_valid: bool)` tuples covering the
-  canonical contract scenarios: valid request, missing `uri`, missing
-  `position`, missing `new_name`, empty `uri`, empty `position`, empty
-  `new_name`, wrong operation.
+- `rename_symbol_request_fixtures()`
+- `rename_symbol_response_fixtures()`
+- `rename_symbol_request_fixture_named(...)`
+- `rename_symbol_response_fixture_named(...)`
+- `validate_rename_symbol_request_fixture(...)`
+- `validate_rename_symbol_response_fixture(...)`
+- `assert_rename_symbol_request_fixture_contract(...)`
+- `assert_rename_symbol_response_fixture_contract(...)`
 
 These helpers are intentionally stateless and deterministic. They validate the
 abstract contract schema, not plugin-specific execution behaviour.
@@ -361,20 +359,14 @@ In each plugin crate's `Cargo.toml`, add
 to `[dev-dependencies]`.
 
 Create a new test module in each plugin crate
-(`src/tests/contract_conformance.rs`) that imports the shared fixtures from
-`weaver_plugins::test_support` and runs every fixture case through the plugin's
-`execute_request()` function. The test asserts that the plugin's response
-matches the expected contract shape:
+(`src/tests/contract_fixtures.rs`) that imports the shared fixtures from
+`weaver_plugins` and validates that each shared fixture still matches the
+canonical `RenameSymbolContract`.
 
-- Valid requests produce a success response with `PluginOutput::Diff`.
-- Invalid requests (missing/empty fields) produce a failure response with a
-  `PluginDiagnostic` that includes the appropriate field name in the message
-  and (where applicable) a `ReasonCode`.
-- Wrong-operation requests produce a failure response with
-  `ReasonCode::OperationNotSupported`.
-
-These tests use `MockAdapter` (already available in both crates) to isolate
-contract validation from adapter execution.
+The shipped tests exercise both request and response fixtures through the
+shared assertion helpers rather than through plugin execution. This keeps the
+fixture layer focused on contract parity while plugin-specific execution
+details remain covered by the existing unit and behaviour suites.
 
 #### 2b: Rollback-guarantee unit tests
 
@@ -454,8 +446,7 @@ These assertions complement the existing `behaviour.rs` scenarios but make the
 
 #### 3c: BDD coverage for routing edge cases
 
-Add a new feature file
-`crates/weaverd/tests/features/rename_symbol_coverage.feature` with scenarios:
+Extend `crates/weaverd/tests/features/refactor.feature` with scenarios:
 
 - Provider lacks capability: refused deterministically.
 - Non-existent provider: refused deterministically.
@@ -464,8 +455,10 @@ Add a new feature file
 - Automatic routing emits structured `CapabilityResolution` with correct
   `selection_mode` and `candidates` array.
 
-Step definitions for the new feature file live in a new behaviour module (e.g.
-`resolution_behaviour.rs` or by extending `behaviour.rs` if within budget).
+Step definitions live in the existing
+`crates/weaverd/src/dispatch/act/refactor/behaviour.rs` module, backed by the
+shared fixtures in
+`crates/weaverd/src/dispatch/act/refactor/refactor_helpers.rs`.
 
 Validation: `cargo test -p weaverd dispatch::act::refactor` passes. `make lint`
 passes.
@@ -477,8 +470,9 @@ for capability-routed rename flows.
 
 #### 4a: Automatic-routing e2e tests
 
-Add a new test file
-`crates/weaver-e2e/tests/refactor_capability_routing_snapshots.rs` containing:
+Extend the existing snapshot files
+`crates/weaver-e2e/tests/refactor_rope_cli_snapshots.rs` and
+`crates/weaver-e2e/tests/refactor_rust_analyzer_cli_snapshots.rs` with:
 
 - Python automatic routing: CLI invocation without `--provider` for a `.py`
   file. Assert that the daemon request includes the correct command shape and
@@ -486,10 +480,10 @@ Add a new test file
 - Rust automatic routing: CLI invocation without `--provider` for a `.rs`
   file. Assert the same.
 
-These tests use the existing `FakeDaemon` pattern from the sibling snapshot
-test files. The `FakeDaemon` response logic is extended (or a new response
-handler added) to emit a `CapabilityResolution` envelope in the stream before
-the exit message.
+These tests use the shared fake-daemon support in
+`crates/weaver-e2e/tests/test_support/daemon_harness.rs` and the routing helper
+logic in `crates/weaver-e2e/tests/test_support/refactor_routing.rs` to emit a
+`CapabilityResolution` envelope in the stream before the exit message.
 
 #### 4b: Refusal e2e tests
 
@@ -601,6 +595,8 @@ New files:
 - `crates/weaverd/src/dispatch/act/refactor/rollback_tests.rs`
 - `crates/weaverd/src/dispatch/act/refactor/refactor_helpers.rs`
 - `crates/weaver-e2e/tests/test_support/mod.rs`
+- `crates/weaver-e2e/tests/test_support/daemon_harness.rs`
+- `crates/weaver-e2e/tests/test_support/refactor_routing.rs`
 
 Modified files:
 
@@ -623,7 +619,7 @@ Modified files:
 
 ### Shared test support module
 
-In `crates/weaver-plugins/src/capability/test_support.rs`, define:
+In `crates/weaver-plugins/src/capability/test_support.rs`, define and export:
 
 ```rust
 //! Shared test fixtures for the `rename-symbol` capability contract.
@@ -632,30 +628,22 @@ In `crates/weaver-plugins/src/capability/test_support.rs`, define:
 //! intended for use by plugin crates that need to prove conformance
 //! to the shared contract.
 
-use crate::capability::rename_symbol::RenameSymbolContract;
-use crate::capability::CapabilityContract;
-use crate::protocol::{PluginRequest, PluginResponse};
+pub struct RenameSymbolFixture<T> { /* ... */ }
 
-/// Returns a `PluginRequest` with all required `rename-symbol` fields.
-pub fn valid_rename_request() -> PluginRequest { /* ... */ }
+pub type RenameSymbolRequestFixture = RenameSymbolFixture<PluginRequest>;
+pub type RenameSymbolResponseFixture = RenameSymbolFixture<PluginResponse>;
 
-/// Returns a success `PluginResponse` containing a `Diff` output.
-pub fn valid_rename_response() -> PluginResponse { /* ... */ }
+pub fn rename_symbol_request_fixtures() -> Vec<RenameSymbolRequestFixture> { /* ... */ }
 
-/// Returns a failure `PluginResponse` with the given reason code.
-pub fn failure_response_with_reason(
-    reason: crate::capability::reason_code::ReasonCode,
-) -> PluginResponse { /* ... */ }
+pub fn rename_symbol_response_fixtures() -> Vec<RenameSymbolResponseFixture> { /* ... */ }
 
-/// Describes a single contract fixture case.
-pub struct ContractFixtureCase {
-    pub description: &'static str,
-    pub request: PluginRequest,
-    pub expected_valid: bool,
-}
+pub fn assert_rename_symbol_request_fixture_contract(
+    fixture: &RenameSymbolRequestFixture,
+) { /* ... */ }
 
-/// Returns the canonical set of contract fixture cases.
-pub fn contract_fixture_cases() -> Vec<ContractFixtureCase> { /* ... */ }
+pub fn assert_rename_symbol_response_fixture_contract(
+    fixture: &RenameSymbolResponseFixture,
+) { /* ... */ }
 ```
 
 ### Plugin contract-fixture test pattern
@@ -672,15 +660,13 @@ use weaver_plugins::test_support::{
     rename_symbol_response_fixtures,
 };
 
-#[test]
-fn shared_request_fixtures_match_contract() {
+fn validate_request_fixtures() {
     for fixture in rename_symbol_request_fixtures() {
         assert_rename_symbol_request_fixture_contract(&fixture);
     }
 }
 
-#[test]
-fn shared_response_fixtures_match_contract() {
+fn validate_response_fixtures() {
     for fixture in rename_symbol_response_fixtures() {
         assert_rename_symbol_response_fixture_contract(&fixture);
     }

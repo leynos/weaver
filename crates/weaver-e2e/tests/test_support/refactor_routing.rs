@@ -223,6 +223,13 @@ fn requested_provider(arguments: &[&str]) -> Option<RequestedProvider> {
 }
 
 fn validate_refactor_request<'a>(arguments: &'a [&'a str]) -> ValidatedRefactorRequest<'a> {
+    let Some(refactoring) = argument_value(arguments, "--refactoring") else {
+        panic!("refactor snapshot requests must include --refactoring");
+    };
+    assert_eq!(
+        refactoring, "rename",
+        "refactor snapshot requests only support --refactoring rename"
+    );
     let Some(file) = argument_value(arguments, "--file") else {
         panic!("refactor snapshot requests must include --file");
     };
