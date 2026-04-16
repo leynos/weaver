@@ -302,7 +302,7 @@ The `weaver-e2e` crate contains CLI ergonomics snapshot tests:
 
 - `docs/users-guide.md`: documents `act refactor` syntax, parameter
   semantics, routing rationale, and plugin inventory.
-- `docs/roadmap.md`: section 5.2.5 is currently unchecked.
+- `docs/roadmap.md`: section 5.2.5 is marked done.
 
 ## Plan of work
 
@@ -591,30 +591,31 @@ Key file paths created or modified by this plan:
 
 New files:
 
-- `crates/weaver-plugins/src/test_support.rs`
-- `crates/weaver-plugin-rope/src/tests/contract_conformance.rs`
+- `crates/weaver-plugins/src/capability/test_support.rs`
+- `crates/weaver-plugin-rope/src/tests/contract_fixtures.rs`
 - `crates/weaver-plugin-rope/tests/features/rename_symbol_contract.feature`
 - `crates/weaver-plugin-rope/src/tests/contract_behaviour.rs`
-- `crates/weaver-plugin-rust-analyzer/src/tests/contract_conformance.rs`
+- `crates/weaver-plugin-rust-analyzer/src/tests/contract_fixtures.rs`
 - `crates/weaver-plugin-rust-analyzer/tests/features/rename_symbol_contract.feature`
 - `crates/weaver-plugin-rust-analyzer/src/tests/contract_behaviour.rs`
-- `crates/weaverd/src/dispatch/act/refactor/resolution_coverage.rs`
-- `crates/weaverd/tests/features/rename_symbol_coverage.feature`
-- `crates/weaverd/src/dispatch/act/refactor/resolution_behaviour.rs`
-  (or extend `behaviour.rs`)
-- `crates/weaver-e2e/tests/refactor_capability_routing_snapshots.rs`
+- `crates/weaverd/src/dispatch/act/refactor/rollback_tests.rs`
+- `crates/weaverd/src/dispatch/act/refactor/refactor_helpers.rs`
+- `crates/weaver-e2e/tests/test_support/mod.rs`
 
 Modified files:
 
 - `crates/weaver-plugins/Cargo.toml` (add `test-support` feature)
-- `crates/weaver-plugins/src/lib.rs` (add `test_support` module)
-- `crates/weaver-plugins/src/capability/tests.rs` (or new sibling)
+- `crates/weaver-plugins/src/capability/mod.rs` (expose `test_support`)
+- `crates/weaver-plugins/src/lib.rs` (re-export shared test support)
 - `crates/weaver-plugin-rope/Cargo.toml` (add `test-support` dev-dep)
 - `crates/weaver-plugin-rope/src/tests/mod.rs` (register new modules)
 - `crates/weaver-plugin-rust-analyzer/Cargo.toml` (add `test-support` dev-dep)
 - `crates/weaver-plugin-rust-analyzer/src/tests/mod.rs` (register new modules)
 - `crates/weaverd/src/dispatch/act/refactor/mod.rs` (register new test
-  modules)
+  modules and shared helpers)
+- `crates/weaverd/tests/features/refactor.feature` (extend routing coverage)
+- `crates/weaver-e2e/tests/refactor_rope_cli_snapshots.rs`
+- `crates/weaver-e2e/tests/refactor_rust_analyzer_cli_snapshots.rs`
 - `docs/users-guide.md` (review; update only if needed)
 - `docs/roadmap.md` (mark 5.2.5 as done)
 
@@ -622,7 +623,7 @@ Modified files:
 
 ### Shared test support module
 
-In `crates/weaver-plugins/src/test_support.rs`, define:
+In `crates/weaver-plugins/src/capability/test_support.rs`, define:
 
 ```rust
 //! Shared test fixtures for the `rename-symbol` capability contract.
@@ -657,33 +658,31 @@ pub struct ContractFixtureCase {
 pub fn contract_fixture_cases() -> Vec<ContractFixtureCase> { /* ... */ }
 ```
 
-### Plugin contract conformance test pattern
+### Plugin contract-fixture test pattern
 
-Each plugin crate's `src/tests/contract_conformance.rs` follows this pattern:
+Each plugin crate's `src/tests/contract_fixtures.rs` follows this pattern:
 
 ```rust
-//! Shared contract conformance tests for the `rename-symbol` capability.
+//! Shared contract fixture tests for the `rename-symbol` capability.
 
 use weaver_plugins::test_support::{
-    contract_fixture_cases, valid_rename_request,
+    assert_rename_symbol_request_fixture_contract,
+    assert_rename_symbol_response_fixture_contract,
+    rename_symbol_request_fixtures,
+    rename_symbol_response_fixtures,
 };
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use rstest::rstest;
+#[test]
+fn shared_request_fixtures_match_contract() {
+    for fixture in rename_symbol_request_fixtures() {
+        assert_rename_symbol_request_fixture_contract(&fixture);
+    }
+}
 
-    #[rstest]
-    #[case::valid_request(0, true)]
-    #[case::missing_uri(1, false)]
-    // ... one case per fixture
-    fn contract_fixture_conformance(
-        #[case] fixture_index: usize,
-        #[case] expected_valid: bool,
-    ) {
-        let cases = contract_fixture_cases();
-        let case = &cases[fixture_index];
-        // ... validate via plugin's execute_request()
+#[test]
+fn shared_response_fixtures_match_contract() {
+    for fixture in rename_symbol_response_fixtures() {
+        assert_rename_symbol_response_fixture_contract(&fixture);
     }
 }
 ```

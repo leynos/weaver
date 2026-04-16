@@ -57,6 +57,21 @@ pub type RenameSymbolRequestFixture = RenameSymbolFixture<PluginRequest>;
 /// Shared response fixture alias for `rename-symbol` contract validation.
 pub type RenameSymbolResponseFixture = RenameSymbolFixture<PluginResponse>;
 
+#[derive(Clone, Copy)]
+enum FixtureOperation {
+    RenameSymbol,
+    ExtractMethod,
+}
+
+impl FixtureOperation {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::RenameSymbol => "rename-symbol",
+            Self::ExtractMethod => "extract-method",
+        }
+    }
+}
+
 /// Finds a named shared request fixture.
 #[must_use]
 pub fn rename_symbol_request_fixture_named(name: &str) -> RenameSymbolRequestFixture {
@@ -73,28 +88,33 @@ pub fn rename_symbol_response_fixture_named(name: &str) -> RenameSymbolResponseF
 #[must_use]
 pub fn rename_symbol_request_fixtures() -> Vec<RenameSymbolRequestFixture> {
     let mut fixtures = vec![
-        request_fixture("valid_request", "rename-symbol", valid_arguments(), None),
+        request_fixture(
+            "valid_request",
+            FixtureOperation::RenameSymbol,
+            valid_arguments(),
+            None,
+        ),
         request_fixture(
             "wrong_operation",
-            "extract-method",
+            FixtureOperation::ExtractMethod,
             valid_arguments(),
             Some("expects operation"),
         ),
         request_fixture(
             "missing_uri",
-            "rename-symbol",
+            FixtureOperation::RenameSymbol,
             arguments_without("uri"),
             Some("uri"),
         ),
         request_fixture(
             "missing_position",
-            "rename-symbol",
+            FixtureOperation::RenameSymbol,
             arguments_without("position"),
             Some("position"),
         ),
         request_fixture(
             "missing_new_name",
-            "rename-symbol",
+            FixtureOperation::RenameSymbol,
             arguments_without("new_name"),
             Some("new_name"),
         ),
@@ -221,30 +241,42 @@ fn valid_arguments() -> std::collections::HashMap<String, serde_json::Value> {
     .collect()
 }
 
-fn request_edge_case_fixtures() -> [RenameSymbolRequestFixture; 4] {
+fn request_edge_case_fixtures() -> [RenameSymbolRequestFixture; 6] {
     [
         request_fixture(
             "empty_uri",
-            "rename-symbol",
+            FixtureOperation::RenameSymbol,
             arguments_with_string("uri", "   "),
             Some("uri"),
         ),
         request_fixture(
+            "uri_not_string",
+            FixtureOperation::RenameSymbol,
+            arguments_with_value("uri", json!(4)),
+            Some("uri"),
+        ),
+        request_fixture(
             "empty_position",
-            "rename-symbol",
+            FixtureOperation::RenameSymbol,
             arguments_with_string("position", "   "),
             Some("position"),
         ),
         request_fixture(
             "position_not_string",
-            "rename-symbol",
+            FixtureOperation::RenameSymbol,
             arguments_with_value("position", json!(4)),
             Some("position"),
         ),
         request_fixture(
             "empty_new_name",
-            "rename-symbol",
+            FixtureOperation::RenameSymbol,
             arguments_with_string("new_name", "   "),
+            Some("new_name"),
+        ),
+        request_fixture(
+            "new_name_not_string",
+            FixtureOperation::RenameSymbol,
+            arguments_with_value("new_name", json!(4)),
             Some("new_name"),
         ),
     ]
@@ -252,13 +284,13 @@ fn request_edge_case_fixtures() -> [RenameSymbolRequestFixture; 4] {
 
 fn request_fixture(
     name: &'static str,
-    operation: &str,
+    operation: FixtureOperation,
     arguments: std::collections::HashMap<String, serde_json::Value>,
     expected_error_fragment: Option<&'static str>,
 ) -> RenameSymbolRequestFixture {
     RenameSymbolFixture::new(
         name,
-        PluginRequest::with_arguments(operation, Vec::new(), arguments),
+        PluginRequest::with_arguments(operation.as_str(), Vec::new(), arguments),
         expected_error_fragment,
     )
 }

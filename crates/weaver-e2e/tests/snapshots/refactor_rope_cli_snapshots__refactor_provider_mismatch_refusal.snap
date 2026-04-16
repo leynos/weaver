@@ -6,7 +6,7 @@ Transcript {
     command: "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider rust-analyzer --refactoring rename --file src/main.py new_name=renamed_symbol offset=4",
     status: 1,
     stdout: "",
-    stderr: "{\"details\":{\"candidates\":[{\"accepted\":false,\"provider\":\"rust-analyzer\",\"reason\":\"explicit_provider_mismatch\"}],\"capability\":\"rename-symbol\",\"language\":\"python\",\"outcome\":\"refused\",\"refusal_reason\":\"explicit_provider_mismatch\",\"requested_provider\":\"rust-analyzer\",\"selection_mode\":\"explicit_provider\"},\"status\":\"ok\",\"type\":\"CapabilityResolution\"}",
+    stderr: "{\"details\":{\"candidates\":[{\"accepted\":false,\"provider\":\"rope\",\"reason\":\"not_requested\"},{\"accepted\":false,\"provider\":\"rust-analyzer\",\"reason\":\"explicit_provider_mismatch\"}],\"capability\":\"rename-symbol\",\"language\":\"python\",\"outcome\":\"refused\",\"refusal_reason\":\"explicit_provider_mismatch\",\"requested_provider\":\"rust-analyzer\",\"selection_mode\":\"explicit_provider\"},\"status\":\"error\",\"type\":\"CapabilityResolution\"}",
     requests: [
         Object {
             "arguments": Array [

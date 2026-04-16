@@ -6,7 +6,7 @@ Transcript {
     command: "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider rope --refactoring rename --file src/main.rs new_name=renamed_name offset=3",
     status: 1,
     stdout: "",
-    stderr: "{\"details\":{\"candidates\":[{\"accepted\":false,\"provider\":\"rope\",\"reason\":\"explicit_provider_mismatch\"}],\"capability\":\"rename-symbol\",\"language\":\"rust\",\"outcome\":\"refused\",\"refusal_reason\":\"explicit_provider_mismatch\",\"requested_provider\":\"rope\",\"selection_mode\":\"explicit_provider\"},\"status\":\"ok\",\"type\":\"CapabilityResolution\"}",
+    stderr: "{\"details\":{\"candidates\":[{\"accepted\":false,\"provider\":\"rust-analyzer\",\"reason\":\"not_requested\"},{\"accepted\":false,\"provider\":\"rope\",\"reason\":\"explicit_provider_mismatch\"}],\"capability\":\"rename-symbol\",\"language\":\"rust\",\"outcome\":\"refused\",\"refusal_reason\":\"explicit_provider_mismatch\",\"requested_provider\":\"rope\",\"selection_mode\":\"explicit_provider\"},\"status\":\"error\",\"type\":\"CapabilityResolution\"}",
     requests: [
         Object {
             "arguments": Array [
