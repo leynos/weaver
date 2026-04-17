@@ -98,6 +98,8 @@ fn dispatch_inspecting_rename(config: RenameDispatch<'_>) -> PluginRequest {
         language: config.language,
     };
     let mut args = vec![
+        String::from("--provider"),
+        String::from(config.provider),
         String::from("--refactoring"),
         String::from("rename"),
         String::from("--file"),

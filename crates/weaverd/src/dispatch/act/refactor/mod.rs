@@ -41,6 +41,7 @@ mod candidates;
 mod manifests;
 mod plugin_paths;
 mod refusal;
+mod requirements;
 mod resolution;
 mod response_handling;
 
@@ -198,9 +199,8 @@ fn prepare_plugin_request(
 
 /// Handles `act refactor` requests.
 ///
-/// Expects `--refactoring <operation>` and `--file <path>` in the request
-/// arguments. `--provider <plugin>` is optional and acts as an explicit
-/// compatibility override when supplied.
+/// Expects `--provider <plugin>`, `--refactoring <operation>`, and
+/// `--file <path>` in the request arguments.
 ///
 /// The handler reads the file content, executes the plugin, and forwards
 /// successful diff output through `act apply-patch` for Double-Lock
@@ -214,7 +214,7 @@ pub fn handle<W: Write>(
 
     debug!(
         target: DISPATCH_TARGET,
-        provider = args.provider.as_deref().unwrap_or("<auto>"),
+        provider = args.provider,
         refactoring = args.refactoring,
         file = args.file,
         "handling act refactor"
@@ -225,15 +225,13 @@ pub fn handle<W: Write>(
     let resolution = match context.runtime.resolve(ResolutionRequest::new(
         capability,
         file_path.as_path(),
-        args.provider.as_deref(),
+        Some(&args.provider),
     )) {
         Ok(resolution) => resolution,
         Err(error) => {
             writer.write_stderr(format!(
                 "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
-                args.provider.as_deref().unwrap_or("<auto>"),
-                args.refactoring,
-                args.file
+                args.provider, args.refactoring, args.file
             ))?;
             return Ok(DispatchResult::with_status(1));
         }

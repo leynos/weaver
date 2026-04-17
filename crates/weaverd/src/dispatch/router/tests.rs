@@ -53,7 +53,7 @@ fn invalid_arguments_message(domain: &str, operation: &str) -> Option<&'static s
             Some("act apply-patch should fail with InvalidArguments (missing patch)")
         }
         ("act", "refactor") => {
-            Some("act refactor should fail with InvalidArguments (missing --provider)")
+            Some("act refactor should fail with InvalidArguments (missing required flags)")
         }
         _ => None,
     }
