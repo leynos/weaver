@@ -196,6 +196,10 @@ pub fn write_refactor_response(
 ) -> Result<(), io::Error> {
     let request = validate_refactor_request(arguments);
 
+    if language_for_extension(request.file).is_none() {
+        panic_unsupported_extension(request.file);
+    }
+
     if let Some(provider) = request.requested_provider
         && let Some(payload) = provider_mismatch_payload(request.file, provider)
     {
@@ -221,10 +225,6 @@ pub fn write_refactor_response(
                 "data": payload,
             }),
         )?;
-    }
-
-    if request.requested_provider.is_none() && language_for_extension(request.file).is_none() {
-        panic_unsupported_extension(request.file);
     }
 
     write_stdout_exit(

@@ -42,10 +42,6 @@ pub struct FakeDaemon {
 const ACCEPT_TIMEOUT: Duration = Duration::from_secs(10);
 const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
-#[expect(
-    deprecated,
-    reason = "assert_cmd::cargo::cargo_bin resolves workspace binaries for e2e tests"
-)]
 /// Returns the path to the compiled `weaver` binary for use in end-to-end
 /// tests.
 ///
@@ -53,6 +49,10 @@ const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 /// Use `assert_cmd::cargo::cargo_bin("weaver")` directly. This wrapper is
 /// retained for backwards compatibility with test modules that already
 /// import it.
+#[expect(
+    deprecated,
+    reason = "assert_cmd::cargo::cargo_bin resolves workspace binaries for e2e tests"
+)]
 pub fn weaver_binary_path() -> std::path::PathBuf {
     assert_cmd::cargo::cargo_bin("weaver")
 }
@@ -153,9 +153,8 @@ fn serve_requests(
         .expect("non-blocking mode should be supported");
 
     for _ in 0..expected_requests {
-        let Some(stream) = accept_before_deadline(listener) else {
-            return;
-        };
+        let stream = accept_before_deadline(listener)
+            .expect("fake daemon should accept CLI connection before deadline");
         respond_to_request(stream, requests, renamed_symbol)
             .expect("fake daemon should respond without I/O error");
     }
@@ -166,7 +165,7 @@ fn serve_requests(
     clippy::expect_used,
     reason = "restoring blocking mode on accepted stream must succeed for correct I/O"
 )]
-fn accept_before_deadline(listener: &TcpListener) -> Option<TcpStream> {
+fn accept_before_deadline(listener: &TcpListener) -> Result<TcpStream, io::Error> {
     let deadline = Instant::now() + ACCEPT_TIMEOUT;
 
     loop {
@@ -175,17 +174,20 @@ fn accept_before_deadline(listener: &TcpListener) -> Option<TcpStream> {
                 stream
                     .set_nonblocking(false)
                     .expect("blocking mode should be supported");
-                return Some(stream);
+                return Ok(stream);
             }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                assert!(
-                    Instant::now() < deadline,
-                    "fake daemon timed out waiting for CLI connection \
-                     after {ACCEPT_TIMEOUT:?}"
-                );
+                if Instant::now() >= deadline {
+                    return Err(io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        format!(
+                            "fake daemon timed out waiting for CLI connection after {ACCEPT_TIMEOUT:?}"
+                        ),
+                    ));
+                }
                 thread::sleep(ACCEPT_POLL_INTERVAL);
             }
-            Err(_) => return None,
+            Err(error) => return Err(error),
         }
     }
 }

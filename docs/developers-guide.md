@@ -366,6 +366,12 @@ access:
   for the request and response sides of the contract.
 - `rename_symbol_request_fixtures()` / `rename_symbol_response_fixtures()` —
   the canonical fixture collections consumed by plugin contract tests.
+- `rename_symbol_request_fixture_named(name)` /
+  `rename_symbol_response_fixture_named(name)` — look up a single named request
+  or response fixture by key.
+- `validate_rename_symbol_request_fixture(fixture)` /
+  `validate_rename_symbol_response_fixture(fixture)` — run contract validation
+  without panicking and return the validation result to the caller.
 - `assert_rename_symbol_request_fixture_contract` /
   `assert_rename_symbol_response_fixture_contract` — assertion helpers that
   validate a fixture against the `RenameSymbolContract` and panic with a
