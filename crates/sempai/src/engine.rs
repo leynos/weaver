@@ -5,10 +5,38 @@
 //! Compilation and execution are separate phases, allowing a compiled
 //! [`QueryPlan`] to be reused across multiple source files.
 
-use sempai_core::{DiagnosticReport, EngineConfig, Language, Match};
-use sempai_yaml::parse_rule_file;
+use sempai_core::formula::{Decorated, Formula};
+use sempai_core::{DiagnosticCode, DiagnosticReport, EngineConfig, Language, Match};
+use sempai_yaml::{Rule, RulePrincipal, parse_rule_file};
 
 use crate::mode_validation::validate_supported_modes;
+use crate::normalize::normalize_search_principal;
+use crate::semantic_check::validate_formula;
+
+/// Compiles query plans for a single rule's languages.
+fn compile_rule_plans(
+    rule: &Rule,
+    formula: &Decorated<Formula>,
+) -> Result<Vec<QueryPlan>, DiagnosticReport> {
+    rule.languages()
+        .iter()
+        .map(|lang_str| {
+            let language = lang_str.parse::<Language>().map_err(|e| {
+                DiagnosticReport::validation_error(
+                    DiagnosticCode::ESempaiSchemaInvalid,
+                    format!("unsupported language '{lang_str}': {e}"),
+                    rule.rule_span().cloned(),
+                    vec![],
+                )
+            })?;
+            Ok(QueryPlan::new(
+                rule.id().to_owned(),
+                language,
+                formula.clone(),
+            ))
+        })
+        .collect()
+}
 
 /// A compiled query plan for one rule and one language.
 ///
@@ -30,26 +58,22 @@ use crate::mode_validation::validate_supported_modes;
 pub struct QueryPlan {
     rule_id: String,
     language: Language,
-    /// Placeholder for the internal plan representation.  Will be replaced
-    /// by `sempai_core::PlanNode` once the normalization layer is built.
-    _plan: (),
+    /// The normalized canonical formula.
+    formula: Decorated<Formula>,
 }
 
 impl QueryPlan {
     /// Creates a new query plan (crate-internal).
-    // FIXME: remove `#[cfg(test)]` when `compile_yaml` / `compile_dsl` produce
-    // real plans — https://github.com/leynos/weaver/issues/67
-    #[cfg(test)]
     #[must_use]
     #[expect(
         clippy::missing_const_for_fn,
         reason = "heap types cannot be used in const contexts"
     )]
-    pub(crate) fn new(rule_id: String, language: Language) -> Self {
+    pub(crate) fn new(rule_id: String, language: Language, formula: Decorated<Formula>) -> Self {
         Self {
             rule_id,
             language,
-            _plan: (),
+            formula,
         }
     }
 
@@ -63,6 +87,12 @@ impl QueryPlan {
     #[must_use]
     pub const fn language(&self) -> Language {
         self.language
+    }
+
+    /// Returns the normalized canonical formula.
+    #[must_use]
+    pub const fn formula(&self) -> &Decorated<Formula> {
+        &self.formula
     }
 }
 
@@ -80,9 +110,13 @@ impl QueryPlan {
 /// use sempai::{Engine, EngineConfig};
 ///
 /// let engine = Engine::new(EngineConfig::default());
-/// let result = engine.compile_yaml("rules: []");
-/// // Malformed YAML and schema errors now surface parser diagnostics.
-/// assert!(result.is_err());
+/// // Valid YAML with rules compiles successfully
+/// let result = engine.compile_yaml("rules:\n  - id: test\n    message: test\n    languages: [rust]\n    severity: ERROR\n    pattern: foo\n");
+/// assert!(result.is_ok());
+///
+/// // Malformed YAML returns a parser diagnostic
+/// let bad_result = engine.compile_yaml("{ invalid yaml");
+/// assert!(bad_result.is_err());
 /// ```
 #[derive(Debug)]
 pub struct Engine {
@@ -106,16 +140,27 @@ impl Engine {
     ///
     /// # Errors
     ///
-    /// Returns a diagnostic report if parsing or validation fails.
-    ///
-    /// Successful YAML parsing still stops at the post-parse placeholder until
-    /// rule normalization is implemented.
+    /// Returns a diagnostic report if parsing, normalization, or validation fails.
     pub fn compile_yaml(&self, yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
         let file = parse_rule_file(yaml, None)?;
         validate_supported_modes(&file)?;
-        Err(DiagnosticReport::not_implemented(
-            "compile_yaml query-plan normalization",
-        ))
+
+        file.rules()
+            .iter()
+            .filter_map(|rule| {
+                if let RulePrincipal::Search(principal) = rule.principal() {
+                    Some((rule, principal))
+                } else {
+                    None
+                }
+            })
+            .try_fold(Vec::new(), |mut plans, (rule, principal)| {
+                let formula = normalize_search_principal(principal, rule.rule_span())?;
+                validate_formula(&formula)?;
+                let rule_plans = compile_rule_plans(rule, &formula)?;
+                plans.extend(rule_plans);
+                Ok(plans)
+            })
     }
 
     /// Compiles a one-liner query DSL expression into a query plan.

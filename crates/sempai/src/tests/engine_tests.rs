@@ -4,6 +4,7 @@ use crate::engine::QueryPlan;
 use crate::{
     Diagnostic, DiagnosticCode, DiagnosticReport, Engine, EngineConfig, EngineLimits, Language,
 };
+use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom};
 
 fn default_engine() -> Engine {
     Engine::new(EngineConfig::default())
@@ -16,6 +17,18 @@ fn first_diagnostic_of_err<T>(result: Result<T, DiagnosticReport>) -> (Diagnosti
         .first()
         .expect("expected at least one diagnostic");
     (first.code(), first.clone())
+}
+
+fn dummy_formula() -> Decorated<Formula> {
+    Decorated {
+        node: Formula::Atom(Atom::Pattern(PatternAtom {
+            text: String::from("dummy"),
+        })),
+        where_clauses: vec![],
+        as_name: None,
+        fix: None,
+        span: None,
+    }
 }
 
 #[test]
@@ -52,18 +65,20 @@ fn compile_yaml_returns_schema_diagnostic_for_missing_rule_id() {
 }
 
 #[test]
-fn compile_yaml_returns_not_implemented_after_successful_parse() {
+fn compile_yaml_normalizes_and_returns_query_plans() {
     let engine = default_engine();
     let result = engine.compile_yaml(
         "rules:\n  - id: demo.rule\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n",
     );
-    let (code, diag) = first_diagnostic_of_err(result);
-    assert_eq!(code, DiagnosticCode::NotImplemented);
-    assert!(diag.message().contains("normalization"));
+    let plans = result.expect("should successfully compile");
+    assert_eq!(plans.len(), 1);
+    let plan = plans.first().expect("should have first plan");
+    assert_eq!(plan.rule_id(), "demo.rule");
+    assert_eq!(plan.language(), Language::Rust);
 }
 
 #[test]
-fn compile_yaml_returns_not_implemented_for_project_depends_on_search_rule() {
+fn compile_yaml_normalizes_project_depends_on_search_rule() {
     let engine = default_engine();
     let result = engine.compile_yaml(concat!(
         "rules:\n",
@@ -75,9 +90,11 @@ fn compile_yaml_returns_not_implemented_for_project_depends_on_search_rule() {
         "      namespace: pypi\n",
         "      package: requests\n",
     ));
-    let (code, diag) = first_diagnostic_of_err(result);
-    assert_eq!(code, DiagnosticCode::NotImplemented);
-    assert!(diag.message().contains("normalization"));
+    let plans = result.expect("should successfully compile");
+    assert_eq!(plans.len(), 1);
+    let plan = plans.first().expect("should have first plan");
+    assert_eq!(plan.rule_id(), "demo.depends");
+    assert_eq!(plan.language(), Language::Python);
 }
 
 fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str) {
@@ -140,7 +157,7 @@ fn compile_dsl_returns_not_implemented() {
 #[test]
 fn execute_returns_not_implemented() {
     let engine = default_engine();
-    let plan = QueryPlan::new(String::from("test-rule"), Language::Rust);
+    let plan = QueryPlan::new(String::from("test-rule"), Language::Rust, dummy_formula());
     let result = engine.execute(&plan, "file:///test.rs", "fn main() {}");
     let (code, diag) = first_diagnostic_of_err(result);
     assert_eq!(code, DiagnosticCode::NotImplemented);
