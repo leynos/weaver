@@ -22,27 +22,23 @@ pub(crate) fn supported_provider_names() -> &'static [&'static str] { SUPPORTED_
 pub(crate) fn supported_refactoring_names() -> &'static [&'static str] { SUPPORTED_REFACTORINGS }
 
 pub(crate) fn validate_provider(provider: &str) -> Result<(), DispatchError> {
-    if supported_provider_names().contains(&provider) {
-        Ok(())
-    } else {
-        Err(DispatchError::invalid_arguments(format!(
-            "act refactor does not support provider '{provider}'\n\n{}",
-            guidance_lines()
-        )))
-    }
+    validate_value("provider", supported_provider_names(), provider)
 }
 
 pub(crate) fn validate_refactoring(refactoring: &str) -> Result<(), DispatchError> {
-    if supported_refactoring_names().contains(&refactoring) {
+    validate_value("refactoring", supported_refactoring_names(), refactoring)
+}
+
+fn validate_value(kind: &str, supported: &[&str], value: &str) -> Result<(), DispatchError> {
+    if supported.contains(&value) {
         Ok(())
     } else {
         Err(DispatchError::invalid_arguments(format!(
-            "act refactor does not support refactoring '{refactoring}'\n\n{}",
+            "act refactor does not support {kind} '{value}'\n\n{}",
             guidance_lines()
         )))
     }
 }
-
 pub(crate) fn missing_requirements_error() -> DispatchError {
     DispatchError::invalid_arguments(format!(
         "act refactor requires {}\n\n{}",
