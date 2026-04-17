@@ -53,9 +53,9 @@ plugins.
 - The daemon resolution layer in
   `crates/weaverd/src/dispatch/act/refactor/resolution.rs` is stable. This plan
   must not change resolution semantics; it adds coverage only.
-- The command-line interface (CLI) command shape is stable. `--refactoring
-  rename`, `offset`, `new_name`, and `--provider
-  ` remain the operator-facing inputs. `--provider` is optional.
+- The command-line interface (CLI) command shape is stable. Operator-facing
+  inputs remain `--refactoring rename`, `offset`, `new_name`, and `--provider`.
+  `--provider` is optional.
 - Preserve synchronous execution. Do not introduce async runtimes, async
   traits, or background work queues.
 - The repository enforces a 400-line-per-file limit. New test files must

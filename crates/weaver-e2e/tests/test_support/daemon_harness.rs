@@ -11,7 +11,8 @@ use serde::Serialize;
 use serde_json::json;
 
 use super::refactor_routing::{
-    request_arguments, response_payload_for_operation, write_refactor_response, write_stdout_exit,
+    Operation, request_arguments, response_payload_for_operation, write_refactor_response,
+    write_stdout_exit,
 };
 
 #[derive(Debug, Serialize)]
@@ -185,15 +186,16 @@ fn respond_to_request(
         .expect("request mutex should not be poisoned")
         .push(parsed_request.clone());
 
-    let operation = parsed_request
+    let operation_str = parsed_request
         .get("command")
         .and_then(|command| command.get("operation"))
         .and_then(serde_json::Value::as_str)
         .unwrap_or_default();
+    let operation = Operation::from(operation_str);
     let arguments = request_arguments(&parsed_request);
 
     let mut writer = stream;
-    if operation == "refactor" {
+    if matches!(&operation, Operation::Refactor) {
         write_refactor_response(&mut writer, operation, &arguments, renamed_symbol)
     } else {
         write_stdout_exit(

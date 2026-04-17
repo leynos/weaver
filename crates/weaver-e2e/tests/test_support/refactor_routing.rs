@@ -2,17 +2,20 @@
 
 use std::io::{self, Write};
 use std::net::TcpStream;
+use std::path::Path;
 
 use serde_json::json;
 
+/// Explicit provider override values supported by the refactor snapshots.
 #[derive(Clone, Copy)]
-enum RequestedProvider {
+pub enum RequestedProvider {
     Rope,
     RustAnalyzer,
 }
 
 impl RequestedProvider {
-    const fn as_str(self) -> &'static str {
+    /// Returns the CLI spelling used by the daemon payloads.
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Rope => "rope",
             Self::RustAnalyzer => "rust-analyzer",
@@ -20,8 +23,26 @@ impl RequestedProvider {
     }
 }
 
+/// The daemon operation being exercised in a snapshot test.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Operation {
+    GetDefinition,
+    Refactor,
+    Other(String),
+}
+
+impl<'a> From<&'a str> for Operation {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "get-definition" => Self::GetDefinition,
+            "refactor" => Self::Refactor,
+            other => Self::Other(other.to_owned()),
+        }
+    }
+}
+
 struct ValidatedRefactorRequest<'a> {
-    file: &'a str,
+    file: &'a Path,
     requested_provider: Option<RequestedProvider>,
 }
 
@@ -48,18 +69,15 @@ pub fn argument_value<'a>(arguments: &'a [&str], flag: &str) -> Option<&'a str> 
     })
 }
 
-pub fn language_for_extension(file: &str) -> Option<&'static str> {
-    match std::path::Path::new(file)
-        .extension()
-        .and_then(|ext| ext.to_str())
-    {
+pub fn language_for_extension(file: &Path) -> Option<&'static str> {
+    match file.extension().and_then(|ext| ext.to_str()) {
         Some("py") => Some("python"),
         Some("rs") => Some("rust"),
         _ => None,
     }
 }
 
-pub fn automatic_resolution_payload(file: &str) -> Option<String> {
+pub fn automatic_resolution_payload(file: &Path) -> Option<String> {
     match language_for_extension(file) {
         Some("python") => Some(
             json!({
@@ -101,11 +119,11 @@ pub fn automatic_resolution_payload(file: &str) -> Option<String> {
     }
 }
 
-pub fn provider_mismatch_payload(file: &str, provider: &str) -> Option<String> {
+pub fn provider_mismatch_payload(file: &Path, provider: RequestedProvider) -> Option<String> {
     let language = language_for_extension(file)?;
     let mismatched = matches!(
         (language, provider),
-        ("python", "rust-analyzer") | ("rust", "rope")
+        ("python", RequestedProvider::RustAnalyzer) | ("rust", RequestedProvider::Rope)
     );
     if !mismatched {
         return None;
@@ -118,7 +136,7 @@ pub fn provider_mismatch_payload(file: &str, provider: &str) -> Option<String> {
             "details": {
                 "capability": "rename-symbol",
                 "language": language,
-                "requested_provider": provider,
+                "requested_provider": provider.as_str(),
                 "selection_mode": "explicit_provider",
                 "outcome": "refused",
                 "refusal_reason": "explicit_provider_mismatch",
@@ -129,7 +147,7 @@ pub fn provider_mismatch_payload(file: &str, provider: &str) -> Option<String> {
                         "reason": "not_requested"
                     },
                     {
-                        "provider": provider,
+                        "provider": provider.as_str(),
                         "accepted": false,
                         "reason": "explicit_provider_mismatch"
                     }
@@ -142,14 +160,14 @@ pub fn provider_mismatch_payload(file: &str, provider: &str) -> Option<String> {
 
 pub fn write_refactor_response(
     writer: &mut TcpStream,
-    operation: &str,
+    operation: Operation,
     arguments: &[&str],
     renamed_symbol: &str,
 ) -> Result<(), io::Error> {
     let request = validate_refactor_request(arguments);
 
     if let Some(provider) = request.requested_provider
-        && let Some(payload) = provider_mismatch_payload(request.file, provider.as_str())
+        && let Some(payload) = provider_mismatch_payload(request.file, provider)
     {
         write_json_line(
             writer,
@@ -198,16 +216,16 @@ pub fn write_stdout_exit(
     write_json_line(writer, &json!({ "kind": "exit", "status": status }))
 }
 
-pub fn response_payload_for_operation(operation: &str, renamed_symbol: &str) -> String {
+pub fn response_payload_for_operation(operation: Operation, renamed_symbol: &str) -> String {
     match operation {
-        "get-definition" => json!([{ "symbol": renamed_symbol }]).to_string(),
-        "refactor" => json!({
+        Operation::GetDefinition => json!([{ "symbol": renamed_symbol }]).to_string(),
+        Operation::Refactor => json!({
             "status": "ok",
             "files_written": 1,
             "files_deleted": 0
         })
         .to_string(),
-        _ => json!({ "status": "unexpected", "operation": operation }).to_string(),
+        Operation::Other(op) => json!({ "status": "unexpected", "operation": op }).to_string(),
     }
 }
 
@@ -247,7 +265,7 @@ fn validate_refactor_request<'a>(arguments: &'a [&'a str]) -> ValidatedRefactorR
     );
 
     ValidatedRefactorRequest {
-        file,
+        file: Path::new(file),
         requested_provider: requested_provider(arguments),
     }
 }
