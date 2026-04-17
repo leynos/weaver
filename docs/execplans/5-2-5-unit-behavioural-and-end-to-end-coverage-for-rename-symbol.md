@@ -517,8 +517,8 @@ the Decision Log that the user's guide was reviewed and found current.
 
 #### 5b: Mark roadmap 5.2.5 as done
 
-In `docs/roadmap.md`, change the `- [ ]` checkbox on line 590 to `- [x]` for
-item 5.2.5.
+In `docs/roadmap.md`, find roadmap item `5.2.5` and change its checkbox from
+`- [ ]` to `- [x]`.
 
 #### 5c: Final validation
 
