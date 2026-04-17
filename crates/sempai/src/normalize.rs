@@ -176,6 +176,30 @@ fn normalize_legacy_patterns(
     }
 }
 
+/// Normalizes a unary v2 match formula (Not, Inside, Anywhere).
+fn normalize_unary<F>(
+    inner: &MatchFormula,
+    fallback_span: Option<SourceSpan>,
+    wrap: F,
+) -> Decorated<Formula>
+where
+    F: FnOnce(Box<Decorated<Formula>>) -> Formula,
+{
+    let child = normalize_match(inner, fallback_span.clone());
+    bare(wrap(Box::new(child)), fallback_span)
+}
+
+/// Normalizes a list of v2 match formula branches (All, Any).
+fn normalize_branches(
+    branches: &[MatchFormula],
+    fallback_span: Option<&SourceSpan>,
+) -> Vec<Decorated<Formula>> {
+    branches
+        .iter()
+        .map(|b| normalize_match(b, fallback_span.cloned()))
+        .collect()
+}
+
 /// Normalizes a v2 match formula into canonical form.
 fn normalize_match(
     formula: &MatchFormula,
@@ -192,32 +216,17 @@ fn normalize_match(
             })),
             fallback_span,
         ),
-        MatchFormula::All(branches) => {
-            let normalized_branches = branches
-                .iter()
-                .map(|branch| normalize_match(branch, fallback_span.clone()))
-                .collect();
-            bare(Formula::And(normalized_branches), fallback_span)
-        }
-        MatchFormula::Any(branches) => {
-            let normalized_branches = branches
-                .iter()
-                .map(|branch| normalize_match(branch, fallback_span.clone()))
-                .collect();
-            bare(Formula::Or(normalized_branches), fallback_span)
-        }
-        MatchFormula::Not(inner) => {
-            let normalized_inner = normalize_match(inner, fallback_span.clone());
-            bare(Formula::Not(Box::new(normalized_inner)), fallback_span)
-        }
-        MatchFormula::Inside(inner) => {
-            let normalized_inner = normalize_match(inner, fallback_span.clone());
-            bare(Formula::Inside(Box::new(normalized_inner)), fallback_span)
-        }
-        MatchFormula::Anywhere(inner) => {
-            let normalized_inner = normalize_match(inner, fallback_span.clone());
-            bare(Formula::Anywhere(Box::new(normalized_inner)), fallback_span)
-        }
+        MatchFormula::All(branches) => bare(
+            Formula::And(normalize_branches(branches, fallback_span.as_ref())),
+            fallback_span,
+        ),
+        MatchFormula::Any(branches) => bare(
+            Formula::Or(normalize_branches(branches, fallback_span.as_ref())),
+            fallback_span,
+        ),
+        MatchFormula::Not(inner) => normalize_unary(inner, fallback_span, Formula::Not),
+        MatchFormula::Inside(inner) => normalize_unary(inner, fallback_span, Formula::Inside),
+        MatchFormula::Anywhere(inner) => normalize_unary(inner, fallback_span, Formula::Anywhere),
         MatchFormula::Decorated {
             formula: inner_formula,
             where_clauses: raw_where,

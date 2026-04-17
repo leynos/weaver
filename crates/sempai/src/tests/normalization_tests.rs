@@ -5,13 +5,27 @@ use sempai_yaml::{LegacyFormula, LegacyValue, MatchFormula, SearchQueryPrincipal
 
 use crate::normalize::normalize_search_principal;
 
+/// Helper to normalize a legacy formula and extract the node.
+fn normalize_legacy(formula: LegacyFormula) -> Formula {
+    let principal = SearchQueryPrincipal::Legacy(formula);
+    normalize_search_principal(&principal, None)
+        .expect("should normalize")
+        .node
+}
+
+/// Helper to normalize a v2 match formula and extract the node.
+fn normalize_v2(formula: MatchFormula) -> Formula {
+    let principal = SearchQueryPrincipal::Match(formula);
+    normalize_search_principal(&principal, None)
+        .expect("should normalize")
+        .node
+}
+
 #[test]
 fn legacy_pattern_normalizes_to_atom() {
-    let legacy = LegacyFormula::Pattern(String::from("foo($X)"));
-    let principal = SearchQueryPrincipal::Legacy(legacy);
-    let result = normalize_search_principal(&principal, None).expect("should normalize");
+    let result = normalize_legacy(LegacyFormula::Pattern(String::from("foo($X)")));
     assert_eq!(
-        result.node,
+        result,
         Formula::Atom(Atom::Pattern(PatternAtom {
             text: String::from("foo($X)")
         }))
@@ -20,11 +34,9 @@ fn legacy_pattern_normalizes_to_atom() {
 
 #[test]
 fn legacy_pattern_regex_normalizes_to_regex_atom() {
-    let legacy = LegacyFormula::PatternRegex(String::from(r"foo_\d+"));
-    let principal = SearchQueryPrincipal::Legacy(legacy);
-    let result = normalize_search_principal(&principal, None).expect("should normalize");
+    let result = normalize_legacy(LegacyFormula::PatternRegex(String::from(r"foo_\d+")));
     assert_eq!(
-        result.node,
+        result,
         Formula::Atom(Atom::Regex(RegexAtom {
             pattern: String::from(r"foo_\d+")
         }))
@@ -33,10 +45,8 @@ fn legacy_pattern_regex_normalizes_to_regex_atom() {
 
 #[test]
 fn legacy_pattern_not_regex_normalizes_to_not_regex() {
-    let legacy = LegacyFormula::PatternNotRegex(String::from(r"bar.*"));
-    let principal = SearchQueryPrincipal::Legacy(legacy);
-    let result = normalize_search_principal(&principal, None).expect("should normalize");
-    match result.node {
+    let result = normalize_legacy(LegacyFormula::PatternNotRegex(String::from(r"bar.*")));
+    match result {
         Formula::Not(inner) => match inner.node {
             Formula::Atom(Atom::Regex(regex)) => {
                 assert_eq!(regex.pattern, r"bar.*");
@@ -49,11 +59,10 @@ fn legacy_pattern_not_regex_normalizes_to_not_regex() {
 
 #[test]
 fn legacy_pattern_not_inside_normalizes_to_not_inside() {
-    let legacy =
-        LegacyFormula::PatternNotInside(Box::new(LegacyValue::String(String::from("class Foo:"))));
-    let principal = SearchQueryPrincipal::Legacy(legacy);
-    let result = normalize_search_principal(&principal, None).expect("should normalize");
-    match result.node {
+    let result = normalize_legacy(LegacyFormula::PatternNotInside(Box::new(
+        LegacyValue::String(String::from("class Foo:")),
+    )));
+    match result {
         Formula::Not(not_inner) => match not_inner.node {
             Formula::Inside(inside_inner) => match inside_inner.node {
                 Formula::Atom(Atom::Pattern(pat)) => {
@@ -69,11 +78,9 @@ fn legacy_pattern_not_inside_normalizes_to_not_inside() {
 
 #[test]
 fn v2_pattern_shorthand_normalizes_to_atom() {
-    let v2 = MatchFormula::Pattern(String::from("bar($Y)"));
-    let principal = SearchQueryPrincipal::Match(v2);
-    let result = normalize_search_principal(&principal, None).expect("should normalize");
+    let result = normalize_v2(MatchFormula::Pattern(String::from("bar($Y)")));
     assert_eq!(
-        result.node,
+        result,
         Formula::Atom(Atom::Pattern(PatternAtom {
             text: String::from("bar($Y)")
         }))
@@ -82,11 +89,9 @@ fn v2_pattern_shorthand_normalizes_to_atom() {
 
 #[test]
 fn v2_regex_normalizes_to_regex_atom() {
-    let v2 = MatchFormula::Regex(String::from(r"baz_\w+"));
-    let principal = SearchQueryPrincipal::Match(v2);
-    let result = normalize_search_principal(&principal, None).expect("should normalize");
+    let result = normalize_v2(MatchFormula::Regex(String::from(r"baz_\w+")));
     assert_eq!(
-        result.node,
+        result,
         Formula::Atom(Atom::Regex(RegexAtom {
             pattern: String::from(r"baz_\w+")
         }))
@@ -95,65 +100,42 @@ fn v2_regex_normalizes_to_regex_atom() {
 
 #[test]
 fn v2_all_normalizes_to_and() {
-    let v2 = MatchFormula::All(vec![
+    let result = normalize_v2(MatchFormula::All(vec![
         MatchFormula::Pattern(String::from("foo")),
         MatchFormula::Pattern(String::from("bar")),
-    ]);
-    let principal = SearchQueryPrincipal::Match(v2);
-    let result = normalize_search_principal(&principal, None).expect("should normalize");
-    match result.node {
-        Formula::And(branches) => {
-            assert_eq!(branches.len(), 2);
-        }
-        _ => panic!("expected And formula"),
-    }
+    ]));
+    assert!(matches!(result, Formula::And(ref branches) if branches.len() == 2));
 }
 
 #[test]
 fn v2_any_normalizes_to_or() {
-    let v2 = MatchFormula::Any(vec![
+    let result = normalize_v2(MatchFormula::Any(vec![
         MatchFormula::Pattern(String::from("foo")),
         MatchFormula::Pattern(String::from("bar")),
-    ]);
-    let principal = SearchQueryPrincipal::Match(v2);
-    let result = normalize_search_principal(&principal, None).expect("should normalize");
-    match result.node {
-        Formula::Or(branches) => {
-            assert_eq!(branches.len(), 2);
-        }
-        _ => panic!("expected Or formula"),
-    }
+    ]));
+    assert!(matches!(result, Formula::Or(ref branches) if branches.len() == 2));
 }
 
 #[test]
 fn v2_not_normalizes_to_not() {
-    let v2 = MatchFormula::Not(Box::new(MatchFormula::Pattern(String::from("baz"))));
-    let principal = SearchQueryPrincipal::Match(v2);
-    let result = normalize_search_principal(&principal, None).expect("should normalize");
-    match result.node {
-        Formula::Not(_) => {}
-        _ => panic!("expected Not formula"),
-    }
+    let result = normalize_v2(MatchFormula::Not(Box::new(MatchFormula::Pattern(
+        String::from("baz"),
+    ))));
+    assert!(matches!(result, Formula::Not(_)));
 }
 
 #[test]
 fn v2_inside_normalizes_to_inside() {
-    let v2 = MatchFormula::Inside(Box::new(MatchFormula::Pattern(String::from("class X:"))));
-    let principal = SearchQueryPrincipal::Match(v2);
-    let result = normalize_search_principal(&principal, None).expect("should normalize");
-    match result.node {
-        Formula::Inside(_) => {}
-        _ => panic!("expected Inside formula"),
-    }
+    let result = normalize_v2(MatchFormula::Inside(Box::new(MatchFormula::Pattern(
+        String::from("class X:"),
+    ))));
+    assert!(matches!(result, Formula::Inside(_)));
 }
 
 #[test]
 fn v2_anywhere_normalizes_to_anywhere() {
-    let v2 = MatchFormula::Anywhere(Box::new(MatchFormula::Pattern(String::from("unsafe"))));
-    let principal = SearchQueryPrincipal::Match(v2);
-    let result = normalize_search_principal(&principal, None).expect("should normalize");
-    match result.node {
-        Formula::Anywhere(_) => {}
-        _ => panic!("expected Anywhere formula"),
-    }
+    let result = normalize_v2(MatchFormula::Anywhere(Box::new(MatchFormula::Pattern(
+        String::from("unsafe"),
+    ))));
+    assert!(matches!(result, Formula::Anywhere(_)));
 }
