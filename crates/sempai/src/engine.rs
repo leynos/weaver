@@ -7,7 +7,7 @@
 
 use sempai_core::formula::{Decorated, Formula};
 use sempai_core::{DiagnosticCode, DiagnosticReport, EngineConfig, Language, Match};
-use sempai_yaml::{parse_rule_file, Rule, RulePrincipal};
+use sempai_yaml::{Rule, RulePrincipal, parse_rule_file};
 
 use crate::mode_validation::validate_supported_modes;
 use crate::normalize::normalize_search_principal;

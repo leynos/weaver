@@ -44,7 +44,10 @@ use sempai_yaml::{
 ///
 /// Returns a diagnostic report if the principal cannot be normalized
 /// (e.g., unsupported formula structure or missing required data).
-#[expect(clippy::unnecessary_wraps, reason = "future normalization steps may return errors")]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "future normalization steps may return errors"
+)]
 pub(crate) fn normalize_search_principal(
     principal: &SearchQueryPrincipal,
     rule_span: Option<&SourceSpan>,
@@ -58,107 +61,73 @@ pub(crate) fn normalize_search_principal(
     }
 }
 
+/// Constructs a bare [`Decorated`] node with no metadata attached.
+///
+/// All metadata fields (`where_clauses`, `as_name`, `fix`) are zeroed;
+/// only the canonical `node` and its associated `span` are set.
+#[expect(
+    clippy::missing_const_for_fn,
+    reason = "Vec allocation requires runtime"
+)]
+fn bare(node: Formula, span: Option<SourceSpan>) -> Decorated<Formula> {
+    Decorated {
+        node,
+        where_clauses: vec![],
+        as_name: None,
+        fix: None,
+        span,
+    }
+}
+
 /// Normalizes a legacy formula into canonical form.
-#[expect(clippy::too_many_lines, reason = "formula enumeration requires exhaustive matching")]
 fn normalize_legacy(
     formula: &LegacyFormula,
     fallback_span: Option<SourceSpan>,
 ) -> Decorated<Formula> {
     match formula {
-        LegacyFormula::Pattern(text) => Decorated {
-            node: Formula::Atom(Atom::Pattern(PatternAtom { text: text.clone() })),
-            where_clauses: vec![],
-            as_name: None,
-            fix: None,
-            span: fallback_span,
-        },
-        LegacyFormula::PatternRegex(pattern) => Decorated {
-            node: Formula::Atom(Atom::Regex(RegexAtom {
+        LegacyFormula::Pattern(text) => bare(
+            Formula::Atom(Atom::Pattern(PatternAtom { text: text.clone() })),
+            fallback_span,
+        ),
+        LegacyFormula::PatternRegex(pattern) => bare(
+            Formula::Atom(Atom::Regex(RegexAtom {
                 pattern: pattern.clone(),
             })),
-            where_clauses: vec![],
-            as_name: None,
-            fix: None,
-            span: fallback_span,
-        },
+            fallback_span,
+        ),
         LegacyFormula::Patterns(clauses) => normalize_legacy_patterns(clauses, fallback_span),
         LegacyFormula::PatternEither(branches) => {
             let normalized_branches = branches
                 .iter()
                 .map(|branch| normalize_legacy(branch, fallback_span.clone()))
                 .collect();
-            Decorated {
-                node: Formula::Or(normalized_branches),
-                where_clauses: vec![],
-                as_name: None,
-                fix: None,
-                span: fallback_span,
-            }
+            bare(Formula::Or(normalized_branches), fallback_span)
         }
         LegacyFormula::PatternNot(value) => {
             let inner = normalize_legacy_value(value, fallback_span.clone());
-            Decorated {
-                node: Formula::Not(Box::new(inner)),
-                where_clauses: vec![],
-                as_name: None,
-                fix: None,
-                span: fallback_span,
-            }
+            bare(Formula::Not(Box::new(inner)), fallback_span)
         }
         LegacyFormula::PatternInside(value) => {
             let inner = normalize_legacy_value(value, fallback_span.clone());
-            Decorated {
-                node: Formula::Inside(Box::new(inner)),
-                where_clauses: vec![],
-                as_name: None,
-                fix: None,
-                span: fallback_span,
-            }
+            bare(Formula::Inside(Box::new(inner)), fallback_span)
         }
         LegacyFormula::PatternNotInside(value) => {
             let inner = normalize_legacy_value(value, fallback_span.clone());
-            let inside = Decorated {
-                node: Formula::Inside(Box::new(inner)),
-                where_clauses: vec![],
-                as_name: None,
-                fix: None,
-                span: fallback_span.clone(),
-            };
-            Decorated {
-                node: Formula::Not(Box::new(inside)),
-                where_clauses: vec![],
-                as_name: None,
-                fix: None,
-                span: fallback_span,
-            }
+            let inside = bare(Formula::Inside(Box::new(inner)), fallback_span.clone());
+            bare(Formula::Not(Box::new(inside)), fallback_span)
         }
         LegacyFormula::PatternNotRegex(pattern) => {
-            let regex_atom = Decorated {
-                node: Formula::Atom(Atom::Regex(RegexAtom {
+            let regex_atom = bare(
+                Formula::Atom(Atom::Regex(RegexAtom {
                     pattern: pattern.clone(),
                 })),
-                where_clauses: vec![],
-                as_name: None,
-                fix: None,
-                span: fallback_span.clone(),
-            };
-            Decorated {
-                node: Formula::Not(Box::new(regex_atom)),
-                where_clauses: vec![],
-                as_name: None,
-                fix: None,
-                span: fallback_span,
-            }
+                fallback_span.clone(),
+            );
+            bare(Formula::Not(Box::new(regex_atom)), fallback_span)
         }
         LegacyFormula::Anywhere(value) => {
             let inner = normalize_legacy_value(value, fallback_span.clone());
-            Decorated {
-                node: Formula::Anywhere(Box::new(inner)),
-                where_clauses: vec![],
-                as_name: None,
-                fix: None,
-                span: fallback_span,
-            }
+            bare(Formula::Anywhere(Box::new(inner)), fallback_span)
         }
     }
 }
@@ -169,13 +138,10 @@ fn normalize_legacy_value(
     fallback_span: Option<SourceSpan>,
 ) -> Decorated<Formula> {
     match value {
-        LegacyValue::String(text) => Decorated {
-            node: Formula::Atom(Atom::Pattern(PatternAtom { text: text.clone() })),
-            where_clauses: vec![],
-            as_name: None,
-            fix: None,
-            span: fallback_span,
-        },
+        LegacyValue::String(text) => bare(
+            Formula::Atom(Atom::Pattern(PatternAtom { text: text.clone() })),
+            fallback_span,
+        ),
         LegacyValue::Formula(formula) => normalize_legacy(formula, fallback_span),
     }
 }
@@ -211,83 +177,46 @@ fn normalize_legacy_patterns(
 }
 
 /// Normalizes a v2 match formula into canonical form.
-#[expect(clippy::too_many_lines, reason = "formula enumeration requires exhaustive matching")]
 fn normalize_match(
     formula: &MatchFormula,
     fallback_span: Option<SourceSpan>,
 ) -> Decorated<Formula> {
     match formula {
-        MatchFormula::Pattern(text) | MatchFormula::PatternObject(text) => Decorated {
-            node: Formula::Atom(Atom::Pattern(PatternAtom { text: text.clone() })),
-            where_clauses: vec![],
-            as_name: None,
-            fix: None,
-            span: fallback_span,
-        },
-        MatchFormula::Regex(pattern) => Decorated {
-            node: Formula::Atom(Atom::Regex(RegexAtom {
+        MatchFormula::Pattern(text) | MatchFormula::PatternObject(text) => bare(
+            Formula::Atom(Atom::Pattern(PatternAtom { text: text.clone() })),
+            fallback_span,
+        ),
+        MatchFormula::Regex(pattern) => bare(
+            Formula::Atom(Atom::Regex(RegexAtom {
                 pattern: pattern.clone(),
             })),
-            where_clauses: vec![],
-            as_name: None,
-            fix: None,
-            span: fallback_span,
-        },
+            fallback_span,
+        ),
         MatchFormula::All(branches) => {
             let normalized_branches = branches
                 .iter()
                 .map(|branch| normalize_match(branch, fallback_span.clone()))
                 .collect();
-            Decorated {
-                node: Formula::And(normalized_branches),
-                where_clauses: vec![],
-                as_name: None,
-                fix: None,
-                span: fallback_span,
-            }
+            bare(Formula::And(normalized_branches), fallback_span)
         }
         MatchFormula::Any(branches) => {
             let normalized_branches = branches
                 .iter()
                 .map(|branch| normalize_match(branch, fallback_span.clone()))
                 .collect();
-            Decorated {
-                node: Formula::Or(normalized_branches),
-                where_clauses: vec![],
-                as_name: None,
-                fix: None,
-                span: fallback_span,
-            }
+            bare(Formula::Or(normalized_branches), fallback_span)
         }
         MatchFormula::Not(inner) => {
             let normalized_inner = normalize_match(inner, fallback_span.clone());
-            Decorated {
-                node: Formula::Not(Box::new(normalized_inner)),
-                where_clauses: vec![],
-                as_name: None,
-                fix: None,
-                span: fallback_span,
-            }
+            bare(Formula::Not(Box::new(normalized_inner)), fallback_span)
         }
         MatchFormula::Inside(inner) => {
             let normalized_inner = normalize_match(inner, fallback_span.clone());
-            Decorated {
-                node: Formula::Inside(Box::new(normalized_inner)),
-                where_clauses: vec![],
-                as_name: None,
-                fix: None,
-                span: fallback_span,
-            }
+            bare(Formula::Inside(Box::new(normalized_inner)), fallback_span)
         }
         MatchFormula::Anywhere(inner) => {
             let normalized_inner = normalize_match(inner, fallback_span.clone());
-            Decorated {
-                node: Formula::Anywhere(Box::new(normalized_inner)),
-                where_clauses: vec![],
-                as_name: None,
-                fix: None,
-                span: fallback_span,
-            }
+            bare(Formula::Anywhere(Box::new(normalized_inner)), fallback_span)
         }
         MatchFormula::Decorated {
             formula: inner_formula,
@@ -318,13 +247,10 @@ fn normalize_dependency_principal(
     // For now, represent as a degenerate pattern that will never match
     // real code. This allows the rule to parse and normalize successfully
     // without inventing execution semantics prematurely.
-    Decorated {
-        node: Formula::Atom(Atom::TreeSitterQuery(TreeSitterQueryAtom {
+    bare(
+        Formula::Atom(Atom::TreeSitterQuery(TreeSitterQueryAtom {
             query: String::from("(ERROR) @_dependency_check"),
         })),
-        where_clauses: vec![],
-        as_name: None,
-        fix: None,
-        span: fallback_span,
-    }
+        fallback_span,
+    )
 }
