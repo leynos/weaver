@@ -350,3 +350,68 @@ helpers are:
 Each helper produces a `GraphSliceError::InvalidValue` with the originating
 flag name and a descriptive message on failure, so callers do not need to
 format error context themselves.
+
+## Test infrastructure for rename-symbol coverage
+
+### `test-support` feature (`weaver-plugins`)
+
+The `weaver-plugins` crate exposes shared contract fixtures behind the
+`test-support` Cargo feature. Activate it in a crate's `[dev-dependencies]` to
+access:
+
+- `RenameSymbolFixture<T>` — a generic fixture carrying a name, a typed
+  payload (`PluginRequest` or `PluginResponse`), and an optional expected
+  error-message fragment.
+- `RenameSymbolRequestFixture` / `RenameSymbolResponseFixture` — type aliases
+  for the request and response sides of the contract.
+- `rename_symbol_request_fixtures()` / `rename_symbol_response_fixtures()` —
+  the canonical fixture collections consumed by plugin contract tests.
+- `assert_rename_symbol_request_fixture_contract` /
+  `assert_rename_symbol_response_fixture_contract` — assertion helpers that
+  validate a fixture against the `RenameSymbolContract` and panic with a
+  descriptive message on failure.
+
+```toml
+[dev-dependencies]
+weaver-plugins = { path = "../weaver-plugins", features = ["test-support"] }
+```
+
+### `FakeDaemon` (`weaver-e2e/tests/test_support/daemon_harness.rs`)
+
+`FakeDaemon` is a lightweight in-process TCP server used by end-to-end snapshot
+tests. It binds an ephemeral port, records incoming JSON request payloads, and
+writes deterministic responses so that tests run without a real daemon process.
+
+Typical usage:
+
+```rust
+let daemon = FakeDaemon::start(1, "renamed_symbol").expect("fake daemon should start");
+let endpoint = daemon.endpoint(); // pass to --daemon-socket
+// … run CLI command …
+let requests = daemon.requests();
+daemon.join();
+```
+
+Pass `endpoint()` to the `--daemon-socket` flag of the `weaver` binary under
+test. Call `join()` after the CLI exits to assert that the background thread
+did not panic.
+
+### Request-routing helpers (`weaver-e2e/tests/test_support/refactor_routing.rs`)
+
+`refactor_routing` provides the routing logic used inside `FakeDaemon` to
+produce capability-resolution payloads:
+
+- `language_for_extension(&Path)` — maps `.py` → `"python"`, `.rs` →
+  `"rust"`.
+- `automatic_resolution_payload(&Path)` — builds the `stderr` JSON for
+  automatic provider selection.
+- `provider_mismatch_payload(&Path, RequestedProvider)` — builds the `stderr`
+  JSON for an explicit-provider mismatch refusal.
+- `write_refactor_response(writer, Operation, arguments, renamed_symbol)` —
+  orchestrates the full response sequence (optional `stderr` stream, `stdout`
+  payload, exit record).
+- `response_payload_for_operation(Operation, renamed_symbol)` — returns the
+  per-operation `stdout` JSON payload.
+
+The `RequestedProvider` and `Operation` enums replace stringly-typed parameters
+to reduce the risk of typos in test fixtures.

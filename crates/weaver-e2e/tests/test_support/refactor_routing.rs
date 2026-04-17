@@ -46,12 +46,8 @@ struct ValidatedRefactorRequest<'a> {
     requested_provider: Option<RequestedProvider>,
 }
 
-/// Extracts the string CLI arguments from a daemon request envelope.
-///
-/// The request JSON is expected to carry an `arguments` array at the top
-/// level. Non-string entries are ignored so malformed requests can still be
-/// inspected in tests. Example: `{"arguments":["act","refactor"]}` yields
-/// `vec!["act", "refactor"]`.
+/// Extracts the flat list of CLI argument strings from a parsed daemon
+/// request JSON value.
 pub fn request_arguments(parsed_request: &serde_json::Value) -> Vec<&str> {
     parsed_request
         .get("arguments")
@@ -75,11 +71,10 @@ pub fn argument_value<'a>(arguments: &'a [&str], flag: &str) -> Option<&'a str> 
     })
 }
 
-/// Maps a file path to the language label used by refactor routing snapshots.
+/// Infers the language identifier from a file's extension.
 ///
-/// `.py` resolves to `python`, `.rs` resolves to `rust`, and unsupported
-/// extensions return `None`. Example: `Path::new("src/main.py")` returns
-/// `Some("python")`.
+/// Returns `Some("python")` for `.py`, `Some("rust")` for `.rs`, and `None`
+/// for all other extensions.
 pub fn language_for_extension(file: &Path) -> Option<&'static str> {
     match file.extension().and_then(|ext| ext.to_str()) {
         Some("py") => Some("python"),
@@ -88,11 +83,10 @@ pub fn language_for_extension(file: &Path) -> Option<&'static str> {
     }
 }
 
-/// Builds the automatic routing payload written to stderr for supported files.
+/// Builds a capability-resolution `stderr` JSON payload for automatic
+/// provider selection based on the file extension.
 ///
-/// The returned JSON string mirrors the daemon's `CapabilityResolution`
-/// selection envelope. Unsupported extensions return `None` so callers can
-/// emit an explicit refusal instead of a success transcript.
+/// Returns `None` when the file extension is not recognised.
 pub fn automatic_resolution_payload(file: &Path) -> Option<String> {
     match language_for_extension(file) {
         Some("python") => Some(
@@ -135,11 +129,12 @@ pub fn automatic_resolution_payload(file: &Path) -> Option<String> {
     }
 }
 
-/// Builds the explicit-provider mismatch refusal payload for supported files.
+/// Builds a refused capability-resolution `stderr` JSON payload for the case
+/// where an explicitly requested provider does not support the file's
+/// language.
 ///
-/// The JSON mirrors the daemon's stderr refusal envelope with
-/// `status: "error"` and a full candidate list. Matching providers or
-/// unsupported extensions return `None`.
+/// Returns `None` when the provider and language are compatible, or when the
+/// file extension is not recognised.
 pub fn provider_mismatch_payload(file: &Path, provider: RequestedProvider) -> Option<String> {
     let language = language_for_extension(file)?;
     let mismatched = matches!(
@@ -179,12 +174,20 @@ pub fn provider_mismatch_payload(file: &Path, provider: RequestedProvider) -> Op
     )
 }
 
-/// Writes the fake daemon response for a refactor request.
+/// Writes the complete fake-daemon response for a `refactor` operation to
+/// `writer`.
 ///
-/// Capability-resolution notifications and refusals are written to stderr.
-/// Successful synthetic operation payloads are written to stdout, followed by
-/// an `exit` record. Unsupported extensions without an explicit provider are
-/// refused with exit status `1`.
+/// Depending on the requested provider and the file extension, this writes
+/// an optional capability-resolution `stderr` stream record followed by a
+/// `stdout` payload and an exit record.
+///
+/// # Panics
+/// Panics if the `--file` argument is missing, the refactoring is not
+/// `rename`, `new_name` or `offset` is absent, the file extension is not
+/// recognised, or the `--provider` value is not `rope` or `rust-analyzer`.
+///
+/// # Errors
+/// Returns an `io::Error` if writing to `writer` fails.
 pub fn write_refactor_response(
     writer: &mut TcpStream,
     operation: Operation,
@@ -207,18 +210,6 @@ pub fn write_refactor_response(
         return write_json_line(writer, &json!({ "kind": "exit", "status": 1 }));
     }
 
-    if request.requested_provider.is_none() && language_for_extension(request.file).is_none() {
-        write_json_line(
-            writer,
-            &json!({
-                "kind": "stream",
-                "stream": "stderr",
-                "data": unsupported_language_payload(),
-            }),
-        )?;
-        return write_json_line(writer, &json!({ "kind": "exit", "status": 1 }));
-    }
-
     if request.requested_provider.is_none()
         && let Some(payload) = automatic_resolution_payload(request.file)
     {
@@ -232,6 +223,10 @@ pub fn write_refactor_response(
         )?;
     }
 
+    if request.requested_provider.is_none() && language_for_extension(request.file).is_none() {
+        panic_unsupported_extension(request.file);
+    }
+
     write_stdout_exit(
         writer,
         &response_payload_for_operation(operation, renamed_symbol),
@@ -239,10 +234,11 @@ pub fn write_refactor_response(
     )
 }
 
-/// Writes a stdout stream event followed by an exit event.
+/// Writes a `stdout` stream record containing `payload` followed by an exit
+/// record with the given `status` code.
 ///
-/// `payload` is embedded as the `data` field of the stdout event and `status`
-/// becomes the process-style exit code in the trailing event.
+/// # Errors
+/// Returns an `io::Error` if writing to `writer` fails.
 pub fn write_stdout_exit(
     writer: &mut TcpStream,
     payload: &str,
@@ -259,11 +255,9 @@ pub fn write_stdout_exit(
     write_json_line(writer, &json!({ "kind": "exit", "status": status }))
 }
 
-/// Builds the stdout payload for a successful synthetic operation.
-///
-/// `get-definition` returns a one-element symbol array, `refactor` returns the
-/// summary object used by the snapshot harness, and unknown operations are
-/// wrapped in an `unexpected` diagnostic object.
+/// Returns a deterministic JSON string suitable for the `stdout` stream of
+/// the given operation, incorporating `renamed_symbol` where the response
+/// schema requires a symbol name.
 pub fn response_payload_for_operation(operation: Operation, renamed_symbol: &str) -> String {
     match operation {
         Operation::GetDefinition => json!([{ "symbol": renamed_symbol }]).to_string(),
@@ -286,6 +280,14 @@ fn requested_provider(arguments: &[&str]) -> Option<RequestedProvider> {
         ),
         None => None,
     }
+}
+
+fn panic_unsupported_extension(file: &Path) -> ! {
+    panic!(
+        "fake daemon received a refactor request for unsupported file extension: {}; \
+         add a routing rule to language_for_extension or use an explicit --provider",
+        file.display()
+    );
 }
 
 fn validate_refactor_request<'a>(arguments: &'a [&'a str]) -> ValidatedRefactorRequest<'a> {
@@ -316,33 +318,6 @@ fn validate_refactor_request<'a>(arguments: &'a [&'a str]) -> ValidatedRefactorR
         file: Path::new(file),
         requested_provider: requested_provider(arguments),
     }
-}
-
-fn unsupported_language_payload() -> String {
-    json!({
-        "status": "error",
-        "type": "CapabilityResolution",
-        "details": {
-            "capability": "rename-symbol",
-            "language": serde_json::Value::Null,
-            "selection_mode": "automatic",
-            "outcome": "refused",
-            "refusal_reason": "unsupported_language",
-            "candidates": [
-                {
-                    "provider": "rope",
-                    "accepted": false,
-                    "reason": "unsupported_language"
-                },
-                {
-                    "provider": "rust-analyzer",
-                    "accepted": false,
-                    "reason": "unsupported_language"
-                }
-            ]
-        }
-    })
-    .to_string()
 }
 
 fn write_json_line(writer: &mut impl Write, payload: &serde_json::Value) -> Result<(), io::Error> {
