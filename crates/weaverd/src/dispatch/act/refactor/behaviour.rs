@@ -101,52 +101,23 @@ impl RefactorPluginRuntime for StubRuntime {
                 ),
             }));
         }
+        let language = language_name.unwrap_or_default();
 
         Ok(match self.routing {
-            RoutingMode::AutomaticPython => {
-                let Some(language) = language_name else {
-                    return Ok(refused_resolution(RefusedResolution {
-                        capability: request.capability(),
-                        language: None,
-                        requested_provider,
-                        selection_mode,
-                        refusal_reason: RefusalReason::UnsupportedLanguage,
-                        candidates: refused_candidates(
-                            requested_provider,
-                            CandidateReason::UnsupportedLanguage,
-                        ),
-                    }));
-                };
-                selected_resolution(SelectedResolution {
-                    capability: request.capability(),
-                    language,
-                    provider: "rope",
-                    selection_mode,
-                    requested_provider,
-                })
-            }
-            RoutingMode::AutomaticRust => {
-                let Some(language) = language_name else {
-                    return Ok(refused_resolution(RefusedResolution {
-                        capability: request.capability(),
-                        language: None,
-                        requested_provider,
-                        selection_mode,
-                        refusal_reason: RefusalReason::UnsupportedLanguage,
-                        candidates: refused_candidates(
-                            requested_provider,
-                            CandidateReason::UnsupportedLanguage,
-                        ),
-                    }));
-                };
-                selected_resolution(SelectedResolution {
-                    capability: request.capability(),
-                    language,
-                    provider: "rust-analyzer",
-                    selection_mode,
-                    requested_provider,
-                })
-            }
+            RoutingMode::AutomaticPython => selected_resolution(SelectedResolution {
+                capability: request.capability(),
+                language,
+                provider: "rope",
+                selection_mode,
+                requested_provider,
+            }),
+            RoutingMode::AutomaticRust => selected_resolution(SelectedResolution {
+                capability: request.capability(),
+                language,
+                provider: "rust-analyzer",
+                selection_mode,
+                requested_provider,
+            }),
             RoutingMode::UnsupportedLanguage => refused_resolution(RefusedResolution {
                 capability: request.capability(),
                 language: language_name,

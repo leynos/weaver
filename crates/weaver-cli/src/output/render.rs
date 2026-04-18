@@ -198,8 +198,13 @@ fn render_caret_line(output: &mut String, context: CaretContext<'_>) {
 }
 
 fn read_source_content(path: &Path) -> std::io::Result<String> {
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let file_name = path.file_name().unwrap_or_default();
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let file_name = path.file_name().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing file name")
+    })?;
     let directory = Dir::open_ambient_dir(parent, cap_std::ambient_authority())?;
     directory.read_to_string(file_name)
 }

@@ -9,25 +9,28 @@ use std::{
 
 pub(crate) fn weaver_binary_path() -> &'static Path {
     static WEAVER_BINARY: OnceLock<PathBuf> = OnceLock::new();
-    WEAVER_BINARY.get_or_init(resolve_weaver_binary)
+    WEAVER_BINARY.get_or_init(|| match resolve_weaver_binary() {
+        Ok(path) => path,
+        Err(error) => panic!("failed to locate weaver binary: {error}"),
+    })
 }
 
-fn resolve_weaver_binary() -> PathBuf {
+fn resolve_weaver_binary() -> Result<PathBuf, String> {
     if let Some(cargo_bin) = cargo_bin_from_env("weaver") {
-        return cargo_bin;
+        return Ok(cargo_bin);
     }
 
-    if let Some(target_dir_binary) = target_dir_binary_path("weaver") {
-        return target_dir_binary;
+    if let Some(target_dir_binary) = target_dir_binary_path("weaver")? {
+        return Ok(target_dir_binary);
     }
 
-    let fallback = target_debug_binary_path();
+    let fallback = target_debug_binary_path()?;
     if fallback.is_file() {
-        return fallback;
+        return Ok(fallback);
     }
 
-    build_workspace_binary(&fallback);
-    fallback
+    build_workspace_binary(&fallback)?;
+    Ok(fallback)
 }
 
 fn cargo_bin_from_env(name: &str) -> Option<PathBuf> {
@@ -37,49 +40,47 @@ fn cargo_bin_from_env(name: &str) -> Option<PathBuf> {
         .filter(|path| path.is_file())
 }
 
-fn target_dir_binary_path(name: &str) -> Option<PathBuf> {
-    let mut target_dir = env::current_exe().ok()?;
+fn target_dir_binary_path(name: &str) -> Result<Option<PathBuf>, String> {
+    let mut target_dir =
+        env::current_exe().map_err(|error| format!("current executable path: {error}"))?;
     target_dir.pop();
     if target_dir.ends_with("deps") {
         target_dir.pop();
     }
 
     let binary_path = target_dir.join(format!("{name}{}", env::consts::EXE_SUFFIX));
-    binary_path.is_file().then_some(binary_path)
+    Ok(binary_path.is_file().then_some(binary_path))
 }
 
-fn target_debug_binary_path() -> PathBuf {
-    workspace_root()
+fn target_debug_binary_path() -> Result<PathBuf, String> {
+    Ok(workspace_root()?
         .join("target")
         .join("debug")
-        .join(format!("weaver{}", env::consts::EXE_SUFFIX))
+        .join(format!("weaver{}", env::consts::EXE_SUFFIX)))
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "test binary discovery should panic with an explicit setup message"
-)]
-fn workspace_root() -> PathBuf {
+fn workspace_root() -> Result<PathBuf, String> {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest_dir
         .parent()
         .and_then(Path::parent)
-        .expect("workspace root should exist for e2e tests")
-        .to_path_buf()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| String::from("workspace root should exist for e2e tests"))
 }
 
-fn build_workspace_binary(expected_path: &Path) {
-    let status_result = Command::new("cargo")
-        .current_dir(workspace_root())
+fn build_workspace_binary(expected_path: &Path) -> Result<(), String> {
+    let status = Command::new("cargo")
+        .current_dir(workspace_root()?)
         .args(["build", "-p", "weaver-cli", "--bin", "weaver"])
-        .status();
+        .status()
+        .map_err(|error| format!("failed to build workspace weaver binary: {error}"))?;
 
-    match status_result {
-        Ok(status) if status.success() && expected_path.is_file() => {}
-        Ok(status) => panic!(
+    if status.success() && expected_path.is_file() {
+        Ok(())
+    } else {
+        Err(format!(
             "building workspace weaver binary failed with status {status}: {}",
             expected_path.display()
-        ),
-        Err(error) => panic!("failed to build workspace weaver binary: {error}"),
+        ))
     }
 }

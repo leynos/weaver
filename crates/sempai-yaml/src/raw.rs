@@ -1,10 +1,7 @@
 //! Raw serde-deserializable types mirroring the YAML schema.
 //!
-//! These types match the YAML structure as consumed by serde and convert into
-//! the typed `model` layer via `TryFrom`. Conversion can fail with a
-//! `DiagnosticReport` when the deserialized shape violates semantic
-//! constraints such as missing fields or conflicting operators.
-
+//! These types mirror the serde input and convert into the typed `model` layer
+//! via `TryFrom`, returning `DiagnosticReport` when semantic constraints fail.
 use sempai_core::{DiagnosticCode, DiagnosticReport, SourceSpan};
 use serde::Deserialize;
 use serde_json::Value;
@@ -18,15 +15,12 @@ use crate::model::{
     RuleMode,
     RuleSeverity,
 };
-
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawRuleFile {
     pub(crate) rules: Vec<RawRule>,
 }
-
 // Allow unknown fields for forward compatibility with future Semgrep rule extensions.
-// The official Semgrep schema sets `additionalProperties: true` on the rule object.
 #[derive(Debug, Deserialize)]
 pub(crate) struct RawRule {
     pub(crate) id: Option<Spanned<String>>,
@@ -391,8 +385,11 @@ pub(crate) fn parse_severity(
         schema_error(
             format!("unsupported severity `{}`", value.value),
             fallback_span.cloned(),
-            "use one of ERROR, WARNING, INFO, INVENTORY, EXPERIMENT, CRITICAL, HIGH, MEDIUM, or \
-             LOW",
+            concat!(
+                "use one of ERROR, WARNING, INFO, ",
+                "INVENTORY, EXPERIMENT, CRITICAL, ",
+                "HIGH, MEDIUM, or LOW"
+            ),
         )
     })
 }

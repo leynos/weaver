@@ -1,9 +1,10 @@
 //! Unit tests for the `rename-symbol` request mapping contract.
 
-use std::sync::Mutex;
+use std::{path::PathBuf, sync::Mutex};
 
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
+use url::Url;
 use weaver_plugins::{CapabilityId, PluginError, PluginOutput, PluginRequest, PluginResponse};
 use weaver_test_macros::allow_fixture_expansion_lints;
 
@@ -101,10 +102,12 @@ struct RenameDispatch<'a> {
 
 /// Dispatches a rename request through the handler and returns the captured
 /// `PluginRequest` for inspection.
-fn dispatch_inspecting_rename(config: RenameDispatch<'_>) -> Result<PluginRequest, String> {
+fn dispatch_inspecting_rename(
+    config: RenameDispatch<'_>,
+) -> Result<(PluginRequest, PathBuf), String> {
     let workspace = TempDir::new().map_err(|e| format!("workspace: {e}"))?;
-    std::fs::write(workspace.path().join(config.file), "hello world\n")
-        .map_err(|e| format!("write: {e}"))?;
+    let file_path = workspace.path().join(config.file);
+    std::fs::write(&file_path, "hello world\n").map_err(|e| format!("write: {e}"))?;
     let runtime = InspectingRuntime {
         captured: Mutex::new(None),
         response: PluginResponse::success(PluginOutput::Diff {
@@ -140,7 +143,7 @@ fn dispatch_inspecting_rename(config: RenameDispatch<'_>) -> Result<PluginReques
         .into_inner()
         .map_err(|_| "lock poisoned")?
         .ok_or("request should be captured")?;
-    Ok(captured)
+    Ok((captured, file_path))
 }
 
 #[rstest]
@@ -148,19 +151,22 @@ fn handler_sends_rename_symbol_contract_conforming_request(
     socket_dir: Result<TempDir, String>,
 ) -> Result<(), String> {
     let socket_dir = socket_dir?;
-    let plugin_request = dispatch_inspecting_rename(RenameDispatch {
+    let (plugin_request, file_path) = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.py",
         provider: "rope",
         language: "python",
         extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
         socket_dir: &socket_dir,
     })?;
+    let expected_uri = Url::from_file_path(&file_path)
+        .map_err(|()| format!("failed to build URI for '{}'", file_path.display()))?
+        .to_string();
 
     assert_eq!(plugin_request.operation(), "rename-symbol");
     let args = plugin_request.arguments();
     assert_eq!(
         args.get("uri").and_then(|value| value.as_str()),
-        Some("file:///notes.py"),
+        Some(expected_uri.as_str()),
     );
     assert_eq!(
         args.get("position").and_then(|value| value.as_str()),
@@ -179,7 +185,7 @@ fn handler_overwrites_pre_existing_uri_with_file_path(
     socket_dir: Result<TempDir, String>,
 ) -> Result<(), String> {
     let socket_dir = socket_dir?;
-    let plugin_request = dispatch_inspecting_rename(RenameDispatch {
+    let (plugin_request, file_path) = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.py",
         provider: "rope",
         language: "python",
@@ -190,13 +196,16 @@ fn handler_overwrites_pre_existing_uri_with_file_path(
         ],
         socket_dir: &socket_dir,
     })?;
+    let expected_uri = Url::from_file_path(&file_path)
+        .map_err(|()| format!("failed to build URI for '{}'", file_path.display()))?
+        .to_string();
 
     assert_eq!(
         plugin_request
             .arguments()
             .get("uri")
             .and_then(|value| value.as_str()),
-        Some("file:///notes.py"),
+        Some(expected_uri.as_str()),
     );
     Ok(())
 }
@@ -206,7 +215,7 @@ fn handler_omits_position_when_offset_not_provided(
     socket_dir: Result<TempDir, String>,
 ) -> Result<(), String> {
     let socket_dir = socket_dir?;
-    let plugin_request = dispatch_inspecting_rename(RenameDispatch {
+    let (plugin_request, _) = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.py",
         provider: "rope",
         language: "python",
@@ -223,13 +232,16 @@ fn rust_analyzer_provider_uses_rename_symbol_contract(
     socket_dir: Result<TempDir, String>,
 ) -> Result<(), String> {
     let socket_dir = socket_dir?;
-    let plugin_request = dispatch_inspecting_rename(RenameDispatch {
+    let (plugin_request, file_path) = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.rs",
         provider: "rust-analyzer",
         language: "rust",
         extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
         socket_dir: &socket_dir,
     })?;
+    let expected_uri = Url::from_file_path(&file_path)
+        .map_err(|()| format!("failed to build URI for '{}'", file_path.display()))?
+        .to_string();
 
     assert_eq!(plugin_request.operation(), "rename-symbol");
     assert_eq!(
@@ -237,7 +249,7 @@ fn rust_analyzer_provider_uses_rename_symbol_contract(
             .arguments()
             .get("uri")
             .and_then(|value| value.as_str()),
-        Some("file:///notes.rs"),
+        Some(expected_uri.as_str()),
     );
     assert_eq!(
         plugin_request

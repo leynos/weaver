@@ -263,7 +263,7 @@ fn record_health_event(path: &Path, status: &'static str) -> Result<(), String> 
     let mut guard = HEALTH_EVENTS
         .get_or_init(|| Mutex::new(HashMap::new()))
         .lock()
-        .map_err(|_| "health event mutex poisoned")?;
+        .map_err(|error| format!("health event mutex poisoned: {error}"))?;
     guard.entry(path.to_path_buf()).or_default().push(status);
     Ok(())
 }
