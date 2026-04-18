@@ -223,7 +223,9 @@ fn execute_rename<R: RustAnalyzerAdapter>(
         PluginFailure::with_reason(error.to_string(), ReasonCode::IncompletePayload)
     })?;
 
-    let request_path = path_to_slash(file.path());
+    let request_path = path_to_slash(file.path()).map_err(|error| {
+        PluginFailure::with_reason(error.to_string(), ReasonCode::IncompletePayload)
+    })?;
     let uri_path = normalize_request_uri(arguments.uri()).map_err(|error| {
         PluginFailure::with_reason(error.to_string(), ReasonCode::IncompletePayload)
     })?;
@@ -253,18 +255,22 @@ fn execute_rename<R: RustAnalyzerAdapter>(
         ));
     }
 
-    let patch = build_search_replace_patch(file.path(), file.content(), &modified);
+    let patch = build_search_replace_patch(file.path(), file.content(), &modified)?;
     Ok(PluginResponse::success(PluginOutput::Diff {
         content: patch,
     }))
 }
 
-fn build_search_replace_patch(path: &Path, original: &str, modified: &str) -> String {
-    let unix_path = path_to_slash(path);
+fn build_search_replace_patch(
+    path: &Path,
+    original: &str,
+    modified: &str,
+) -> Result<String, PluginFailure> {
+    let unix_path = path_to_slash(path).map_err(|error| PluginFailure::plain(error.to_string()))?;
     let sep_after_original = if original.ends_with('\n') { "" } else { "\n" };
     let sep_after_modified = if modified.ends_with('\n') { "" } else { "\n" };
 
-    format!(
+    Ok(format!(
         concat!(
             "diff --git a/{unix_path} b/{unix_path}\n",
             "<<<<<<< SEARCH\n",
@@ -278,5 +284,5 @@ fn build_search_replace_patch(path: &Path, original: &str, modified: &str) -> St
         sep_a = sep_after_original,
         modified = modified,
         sep_b = sep_after_modified,
-    )
+    ))
 }
