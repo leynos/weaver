@@ -6,22 +6,23 @@
 
 mod arguments;
 mod failure;
+mod fs_helpers;
 
 #[cfg(test)]
 mod tests;
 
 mod lsp;
+mod path_utils;
 
 use std::{
-    io::{self, BufRead, Write},
-    path::{Component, Path, PathBuf},
+    io::{BufRead, Write},
+    path::{Path, PathBuf},
 };
 
-use camino::{Utf8Path, Utf8PathBuf};
-use cap_std::fs::Dir;
+pub(crate) use fs_helpers::write_workspace_file;
 pub use lsp::RustAnalyzerLspAdapter;
+use path_utils::{normalize_request_uri, path_to_slash, validate_relative_path};
 use thiserror::Error;
-use url::Url;
 use weaver_plugins::{
     capability::ReasonCode,
     protocol::{FilePayload, PluginOutput, PluginRequest, PluginResponse},
@@ -258,132 +259,6 @@ fn execute_rename<R: RustAnalyzerAdapter>(
     }))
 }
 
-/// Creates a directory and all its parents using capability-based filesystem operations.
-fn create_dir_all_cap(base: &Dir, path: &Utf8Path) -> io::Result<()> {
-    let mut current_path = Utf8PathBuf::new();
-
-    for component in path.components() {
-        current_path.push(component.as_str());
-        match base.create_dir(&current_path) {
-            Ok(()) => {}
-            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
-            Err(err) => return Err(err),
-        }
-    }
-
-    Ok(())
-}
-
-pub(crate) fn write_workspace_file(
-    workspace_root: &Path,
-    relative_path: &Path,
-    content: &str,
-) -> Result<PathBuf, RustAnalyzerAdapterError> {
-    validate_relative_path(relative_path)?;
-    let (absolute_path, workspace_relative_path) =
-        resolve_workspace_path(workspace_root, relative_path)?;
-    let file_name = workspace_relative_path.file_name().ok_or_else(|| {
-        RustAnalyzerAdapterError::InvalidPath {
-            message: format!(
-                "path must refer to a file: {}",
-                workspace_relative_path.as_str()
-            ),
-        }
-    })?;
-    let target_dir = open_workspace_target_dir(workspace_root, &workspace_relative_path)?;
-    target_dir
-        .write(file_name, content.as_bytes())
-        .map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
-            path: absolute_path.clone(),
-            source,
-        })?;
-    Ok(absolute_path)
-}
-
-fn resolve_workspace_path(
-    workspace_root: &Path,
-    relative_path: &Path,
-) -> Result<(PathBuf, Utf8PathBuf), RustAnalyzerAdapterError> {
-    let absolute_path = workspace_root.join(relative_path);
-    let workspace_relative_path =
-        Utf8PathBuf::from_path_buf(relative_path.to_path_buf()).map_err(|_| {
-            RustAnalyzerAdapterError::InvalidPath {
-                message: String::from("path contains invalid UTF-8"),
-            }
-        })?;
-    Ok((absolute_path, workspace_relative_path))
-}
-
-fn open_workspace_target_dir(
-    workspace_root: &Path,
-    workspace_relative_path: &Utf8Path,
-) -> Result<Dir, RustAnalyzerAdapterError> {
-    let workspace_dir = Dir::open_ambient_dir(workspace_root, cap_std::ambient_authority())
-        .map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
-            path: workspace_root.to_path_buf(),
-            source,
-        })?;
-    let parent_path = workspace_relative_path
-        .parent()
-        .unwrap_or_else(|| Utf8Path::new(""));
-
-    if parent_path.as_str().is_empty() {
-        return Ok(workspace_dir);
-    }
-
-    create_dir_all_cap(&workspace_dir, parent_path).map_err(|source| {
-        RustAnalyzerAdapterError::WorkspaceWrite {
-            path: workspace_root.join(parent_path.as_std_path()),
-            source,
-        }
-    })?;
-    workspace_dir
-        .open_dir(parent_path)
-        .map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
-            path: workspace_root.join(parent_path.as_std_path()),
-            source,
-        })
-}
-
-fn validate_relative_path(path: &Path) -> Result<(), RustAnalyzerAdapterError> {
-    if path.is_absolute() {
-        return Err(RustAnalyzerAdapterError::InvalidPath {
-            message: String::from("absolute paths are not allowed"),
-        });
-    }
-
-    let components = path.components().collect::<Vec<_>>();
-    if components.is_empty()
-        || components
-            .iter()
-            .all(|component| matches!(component, Component::CurDir))
-    {
-        return Err(RustAnalyzerAdapterError::InvalidPath {
-            message: String::from("path must not be empty or only '.'"),
-        });
-    }
-
-    let has_parent_traversal = components
-        .iter()
-        .any(|component| matches!(component, Component::ParentDir));
-    if has_parent_traversal {
-        return Err(RustAnalyzerAdapterError::InvalidPath {
-            message: String::from("path traversal is not allowed"),
-        });
-    }
-
-    let has_windows_prefix = components
-        .iter()
-        .any(|component| matches!(component, Component::Prefix(_)));
-    if has_windows_prefix {
-        return Err(RustAnalyzerAdapterError::InvalidPath {
-            message: String::from("windows path prefixes are not allowed"),
-        });
-    }
-
-    Ok(())
-}
-
 fn build_search_replace_patch(path: &Path, original: &str, modified: &str) -> String {
     let unix_path = path_to_slash(path);
     let sep_after_original = if original.ends_with('\n') { "" } else { "\n" };
@@ -404,42 +279,4 @@ fn build_search_replace_patch(path: &Path, original: &str, modified: &str) -> St
         modified = modified,
         sep_b = sep_after_modified,
     )
-}
-
-fn normalize_request_uri(uri: &str) -> Result<String, RustAnalyzerAdapterError> {
-    let parsed = Url::parse(uri).map_err(|_| invalid_file_uri_error())?;
-    if parsed.scheme() != "file" || parsed.has_host() {
-        return Err(invalid_file_uri_error());
-    }
-
-    let path = parsed
-        .to_file_path()
-        .map_err(|()| invalid_file_uri_error())?;
-    let relative_path = strip_file_uri_root(&path)?;
-    validate_relative_path(relative_path.as_path())?;
-    Ok(path_to_slash(relative_path.as_path()))
-}
-
-fn invalid_file_uri_error() -> RustAnalyzerAdapterError {
-    RustAnalyzerAdapterError::InvalidPath {
-        message: String::from("uri argument must be a valid file:// URI without an authority"),
-    }
-}
-
-fn strip_file_uri_root(path: &Path) -> Result<PathBuf, RustAnalyzerAdapterError> {
-    let mut components = path.components();
-    if !matches!(components.next(), Some(Component::RootDir)) {
-        return Err(invalid_file_uri_error());
-    }
-    Ok(components.as_path().to_path_buf())
-}
-
-fn path_to_slash(path: &Path) -> String {
-    path.components()
-        .filter_map(|component| match component {
-            Component::Normal(part) => Some(part.to_string_lossy().into_owned()),
-            _ => None,
-        })
-        .collect::<Vec<String>>()
-        .join("/")
 }

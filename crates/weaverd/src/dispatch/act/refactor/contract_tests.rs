@@ -106,6 +106,15 @@ struct RenameExpectation<'a> {
     new_name: Option<&'a str>,
 }
 
+struct RenameContractCase {
+    file: &'static str,
+    provider: &'static str,
+    language: &'static str,
+    extra_args: Vec<String>,
+    position: Option<&'static str>,
+    new_name: Option<&'static str>,
+}
+
 /// Dispatches a rename request through the handler and returns the captured
 /// `PluginRequest` for inspection.
 fn dispatch_inspecting_rename(
@@ -182,88 +191,58 @@ fn assert_rename_request(
 }
 
 #[rstest]
-fn handler_sends_rename_symbol_contract_conforming_request(
+#[case(RenameContractCase {
+    file: "notes.py",
+    provider: "rope",
+    language: "python",
+    extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
+    position: Some("4"),
+    new_name: Some("woven"),
+})]
+#[case(RenameContractCase {
+    file: "notes.py",
+    provider: "rope",
+    language: "python",
+    extra_args: vec![
+        String::from("uri=stale_value"),
+        String::from("offset=4"),
+        String::from("new_name=woven"),
+    ],
+    position: Some("4"),
+    new_name: Some("woven"),
+})]
+#[case(RenameContractCase {
+    file: "notes.py",
+    provider: "rope",
+    language: "python",
+    extra_args: vec![String::from("new_name=woven")],
+    position: None,
+    new_name: Some("woven"),
+})]
+#[case(RenameContractCase {
+    file: "notes.rs",
+    provider: "rust-analyzer",
+    language: "rust",
+    extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
+    position: Some("4"),
+    new_name: Some("woven"),
+})]
+fn handler_rename_contract_parametrised(
     socket_dir: Result<TempDir, String>,
-) -> Result<(), String> {
-    let socket_dir = socket_dir?;
-    assert_rename_request(
-        RenameDispatch {
-            file: "notes.py",
-            provider: "rope",
-            language: "python",
-            extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
-            socket_dir: &socket_dir,
-        },
-        RenameExpectation {
-            position: Some("4"),
-            new_name: Some("woven"),
-        },
-    )?;
-    Ok(())
-}
-
-#[rstest]
-fn handler_overwrites_pre_existing_uri_with_file_path(
-    socket_dir: Result<TempDir, String>,
-) -> Result<(), String> {
-    let socket_dir = socket_dir?;
-    let _ = assert_rename_request(
-        RenameDispatch {
-            file: "notes.py",
-            provider: "rope",
-            language: "python",
-            extra_args: vec![
-                String::from("uri=stale_value"),
-                String::from("offset=4"),
-                String::from("new_name=woven"),
-            ],
-            socket_dir: &socket_dir,
-        },
-        RenameExpectation {
-            position: Some("4"),
-            new_name: Some("woven"),
-        },
-    )?;
-    Ok(())
-}
-
-#[rstest]
-fn handler_omits_position_when_offset_not_provided(
-    socket_dir: Result<TempDir, String>,
+    #[case] case: RenameContractCase,
 ) -> Result<(), String> {
     let socket_dir = socket_dir?;
     let _ = assert_rename_request(
         RenameDispatch {
-            file: "notes.py",
-            provider: "rope",
-            language: "python",
-            extra_args: vec![String::from("new_name=woven")],
+            file: case.file,
+            provider: case.provider,
+            language: case.language,
+            extra_args: case.extra_args,
             socket_dir: &socket_dir,
         },
         RenameExpectation {
-            position: None,
-            new_name: Some("woven"),
-        },
-    )?;
-    Ok(())
-}
-
-#[rstest]
-fn rust_analyzer_provider_uses_rename_symbol_contract(
-    socket_dir: Result<TempDir, String>,
-) -> Result<(), String> {
-    let socket_dir = socket_dir?;
-    assert_rename_request(
-        RenameDispatch {
-            file: "notes.rs",
-            provider: "rust-analyzer",
-            language: "rust",
-            extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
-            socket_dir: &socket_dir,
-        },
-        RenameExpectation {
-            position: Some("4"),
-            new_name: Some("woven"),
+            position: case.position,
+            new_name: case.new_name,
         },
     )?;
     Ok(())

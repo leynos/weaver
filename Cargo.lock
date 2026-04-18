@@ -3048,6 +3048,7 @@ dependencies = [
  "weaver-graph",
  "weaver-lsp-host",
  "weaver-syntax",
+ "weaver-test-macros",
  "weaverd",
 ]
 
