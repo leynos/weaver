@@ -82,13 +82,13 @@ impl Pattern {
     pub fn compile(source: &str, language: SupportedLanguage) -> Result<Self, SyntaxError> {
         let raw = RawSource(source);
         let metavariables = extract_metavariables(raw)?;
-        let normalised = normalise_metavariables(raw)?;
+        let normalized = normalize_metavariables(raw)?;
 
         let mut parser = Parser::new(language)?;
         let mut wrapped_in_function = false;
-        let mut parsed = parser.parse(normalised.as_str())?;
+        let mut parsed = parser.parse(normalized.as_str())?;
         if parsed.has_errors() {
-            let wrapped = wrap_pattern_for_parse(language, &normalised);
+            let wrapped = wrap_pattern_for_parse(language, &normalized);
             parsed = parser.parse(&wrapped)?;
             wrapped_in_function = true;
         }
@@ -138,13 +138,13 @@ struct RawSource<'a>(&'a str);
 
 /// Pattern source after metavariable placeholders have been substituted.
 #[derive(Debug)]
-struct NormalisedSource(String);
+struct NormalizedSource(String);
 
-impl NormalisedSource {
+impl NormalizedSource {
     fn as_str(&self) -> &str { &self.0 }
 }
 
-fn wrap_pattern_for_parse(language: SupportedLanguage, pattern: &NormalisedSource) -> String {
+fn wrap_pattern_for_parse(language: SupportedLanguage, pattern: &NormalizedSource) -> String {
     let s = pattern.as_str();
     match language {
         SupportedLanguage::Rust => {
@@ -160,7 +160,7 @@ fn wrap_pattern_for_parse(language: SupportedLanguage, pattern: &NormalisedSourc
     }
 }
 
-fn rust_pattern_wrapper_statement(pattern: &NormalisedSource) -> String {
+fn rust_pattern_wrapper_statement(pattern: &NormalizedSource) -> String {
     let trimmed = pattern.as_str().trim_end();
     match trimmed.chars().last() {
         None | Some(';' | '}') => trimmed.to_owned(),
@@ -168,7 +168,7 @@ fn rust_pattern_wrapper_statement(pattern: &NormalisedSource) -> String {
     }
 }
 
-fn python_pattern_wrapper(pattern: &NormalisedSource) -> String {
+fn python_pattern_wrapper(pattern: &NormalizedSource) -> String {
     let s = pattern.as_str();
     let mut out = String::from("def __weaver_pattern_wrapper__():\n");
     if s.trim().is_empty() {
@@ -183,7 +183,7 @@ fn python_pattern_wrapper(pattern: &NormalisedSource) -> String {
     out
 }
 
-fn normalise_metavariables(source: RawSource<'_>) -> Result<NormalisedSource, SyntaxError> {
+fn normalize_metavariables(source: RawSource<'_>) -> Result<NormalizedSource, SyntaxError> {
     let mut out = String::with_capacity(source.0.len());
 
     visit_metavariables(source, |event| match event {
@@ -191,7 +191,7 @@ fn normalise_metavariables(source: RawSource<'_>) -> Result<NormalisedSource, Sy
         MetavarEvent::Metavar(metavar) => out.push_str(&placeholder_for_metavar(&metavar.name)),
     })?;
 
-    Ok(NormalisedSource(out))
+    Ok(NormalizedSource(out))
 }
 
 #[derive(Debug)]
@@ -350,14 +350,14 @@ mod tests {
 
     #[test]
     fn wrap_rust_pattern_adds_statement_semicolon() {
-        let src = NormalisedSource("dbg!($EXPR)".to_owned());
+        let src = NormalizedSource("dbg!($EXPR)".to_owned());
         let wrapped = wrap_pattern_for_parse(SupportedLanguage::Rust, &src);
         assert_eq!(wrapped, "fn __weaver_pattern_wrapper__() { dbg!($EXPR); }");
     }
 
     #[test]
     fn wrap_python_empty_pattern_uses_pass() {
-        let src = NormalisedSource(" \n".to_owned());
+        let src = NormalizedSource(" \n".to_owned());
         let wrapped = wrap_pattern_for_parse(SupportedLanguage::Python, &src);
         assert_eq!(wrapped, "def __weaver_pattern_wrapper__():\n    pass\n");
     }

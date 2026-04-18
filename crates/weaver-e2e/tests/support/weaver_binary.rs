@@ -55,12 +55,17 @@ fn target_debug_binary_path() -> PathBuf {
         .join(format!("weaver{}", env::consts::EXE_SUFFIX))
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "test binary discovery should panic with an explicit setup message"
+)]
 fn workspace_root() -> PathBuf {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir.parent().and_then(Path::parent).map_or_else(
-        || panic!("workspace root should exist for e2e tests"),
-        Path::to_path_buf,
-    )
+    manifest_dir
+        .parent()
+        .and_then(Path::parent)
+        .expect("workspace root should exist for e2e tests")
+        .to_path_buf()
 }
 
 fn build_workspace_binary(expected_path: &Path) {

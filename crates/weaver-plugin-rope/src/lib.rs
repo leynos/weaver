@@ -343,7 +343,11 @@ fn write_workspace_file(
     content: &str,
 ) -> Result<PathBuf, RopeAdapterError> {
     let (absolute_path, utf8_path) = resolve_workspace_path(workspace_root, relative_path)?;
-    let file_name = utf8_path.file_name().unwrap_or("file");
+    let file_name = utf8_path
+        .file_name()
+        .ok_or_else(|| RopeAdapterError::InvalidPath {
+            message: String::from("path must refer to a file"),
+        })?;
     let target_dir = open_workspace_target_dir(workspace_root, &utf8_path)?;
     target_dir
         .write(file_name, content.as_bytes())

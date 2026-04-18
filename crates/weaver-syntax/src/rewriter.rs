@@ -248,7 +248,7 @@ fn try_substitute_metavar(
 
 /// Processes a metavariable reference and adds it to vars if valid.
 fn process_metavar_ref(
-    chars: &mut std::iter::Peekable<std::str::CharIndices>,
+    chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>,
     vars: &mut Vec<String>,
 ) {
     let dollars = count_dollars(chars);

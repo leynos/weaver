@@ -47,30 +47,30 @@ impl TryFrom<Value> for ProjectDependsOnPayload {
         let has_namespace = object.get("namespace").and_then(Value::as_str).is_some();
         let has_package = object.get("package").and_then(Value::as_str).is_some();
         if !(has_namespace && has_package) {
-            return Err(String::from(
-                "`r2c-internal-project-depends-on` must define string `namespace` and `package` \
-                 fields",
-            ));
+            return Err(String::from(concat!(
+                "`r2c-internal-project-depends-on` must define string `namespace` ",
+                "and `package` fields",
+            )));
         }
 
         let namespace = object
             .get("namespace")
             .and_then(Value::as_str)
             .ok_or_else(|| {
-                String::from(
-                    "`r2c-internal-project-depends-on` must define string `namespace` and \
-                     `package` fields",
-                )
+                String::from(concat!(
+                    "`r2c-internal-project-depends-on` must define string `namespace` ",
+                    "and `package` fields",
+                ))
             })?
             .to_owned();
         let package = object
             .get("package")
             .and_then(Value::as_str)
             .ok_or_else(|| {
-                String::from(
-                    "`r2c-internal-project-depends-on` must define string `namespace` and \
-                     `package` fields",
-                )
+                String::from(concat!(
+                    "`r2c-internal-project-depends-on` must define string `namespace` ",
+                    "and `package` fields",
+                ))
             })?
             .to_owned();
 

@@ -71,23 +71,23 @@ impl ServerCapabilitySet {
 
     /// Whether the server reports support for `textDocument/definition`.
     #[must_use]
-    pub fn supports_definition(&self) -> bool { self.definition }
+    pub const fn supports_definition(&self) -> bool { self.definition }
 
     /// Whether the server reports support for `textDocument/references`.
     #[must_use]
-    pub fn supports_references(&self) -> bool { self.references }
+    pub const fn supports_references(&self) -> bool { self.references }
 
     /// Whether the server reports support for diagnostics.
     #[must_use]
-    pub fn supports_diagnostics(&self) -> bool { self.diagnostics }
+    pub const fn supports_diagnostics(&self) -> bool { self.diagnostics }
 
     /// Whether the server reports support for `textDocument/prepareCallHierarchy`.
     #[must_use]
-    pub fn supports_call_hierarchy(&self) -> bool { self.call_hierarchy }
+    pub const fn supports_call_hierarchy(&self) -> bool { self.call_hierarchy }
 
     /// Whether the server reports support for `textDocument/hover`.
     #[must_use]
-    pub fn supports_hover(&self) -> bool { self.hover }
+    pub const fn supports_hover(&self) -> bool { self.hover }
 
     /// Returns the negotiated position encoding.
     ///

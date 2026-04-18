@@ -74,27 +74,27 @@ pub(crate) fn assert_deprecation(text: &str, expected: bool) {
 pub(crate) fn run_enrichment_with_server(
     server: StubLanguageServer,
     source: &str,
-) -> (
-    EnrichmentOutcome,
-    FusionBackends<SemanticBackendProvider>,
-    SymbolCard,
-    TempDir,
-) {
-    let (mut backends, dir) = match semantic_backends_with_server(Language::Rust, server) {
-        Ok(result) => result,
-        Err(e) => panic!("semantic_backends_with_server failed: {}", e),
-    };
+) -> Result<
+    (
+        EnrichmentOutcome,
+        FusionBackends<SemanticBackendProvider>,
+        SymbolCard,
+        TempDir,
+    ),
+    String,
+> {
+    let (mut backends, dir) = semantic_backends_with_server(Language::Rust, server)?;
     let mut card = rust_card();
     let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
-    (outcome, backends, card, dir)
+    Ok((outcome, backends, card, dir))
 }
 
 /// Asserts that enrichment degrades with the given server configuration.
 pub(crate) fn assert_enrichment_degrades(
     server: StubLanguageServer,
-) -> (FusionBackends<SemanticBackendProvider>, TempDir) {
+) -> Result<(FusionBackends<SemanticBackendProvider>, TempDir), String> {
     let source = "// comment\nfn greet(name: &str) -> usize { 0 }";
-    let (outcome, backends, card, dir) = run_enrichment_with_server(server, source);
+    let (outcome, backends, card, dir) = run_enrichment_with_server(server, source)?;
     assert_eq!(outcome, EnrichmentOutcome::Degraded);
     assert!(card.lsp.is_none());
     // Verify that degradation leaves provenance unchanged
@@ -103,7 +103,7 @@ pub(crate) fn assert_enrichment_degrades(
         vec![String::from("tree_sitter")],
         "degradation should not modify provenance"
     );
-    (backends, dir)
+    Ok((backends, dir))
 }
 
 /// Creates a sample Rust symbol card for testing.

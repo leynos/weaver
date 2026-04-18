@@ -265,7 +265,7 @@ fn resolve_health_outcome(
 fn next_poll_interval(deadline: Option<Instant>) -> Duration {
     deadline
         .and_then(|limit| limit.checked_duration_since(Instant::now()))
-        .map_or(POLL_INTERVAL, |remaining| remaining.min(POLL_INTERVAL))
+        .map_or(Duration::ZERO, |remaining| remaining.min(POLL_INTERVAL))
 }
 
 define_reader! {

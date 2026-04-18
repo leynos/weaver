@@ -30,7 +30,7 @@ target/%/$(TARGET): ## Build binary in debug or release mode
 	$(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) --bin $(TARGET)
 
 lint: ## Run Clippy with warnings denied
-	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps
+	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps --workspace
 	$(CARGO) clippy $(CLIPPY_FLAGS)
 	RUSTFLAGS="$(RUST_FLAGS)" whitaker --all -- $(CARGO_FLAGS)
 

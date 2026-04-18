@@ -139,11 +139,7 @@ fn read_request_line(stream: &mut ConnectionStream) -> Result<Option<Vec<u8>>, D
 }
 
 fn finish_request_line(buffer: Vec<u8>) -> Option<Vec<u8>> {
-    if buffer.is_empty() {
-        None
-    } else {
-        Some(buffer)
-    }
+    (!buffer.is_empty()).then_some(buffer)
 }
 /// Reads from the stream, retrying on interrupts.
 fn read_with_retry(stream: &mut ConnectionStream, buf: &mut [u8]) -> io::Result<usize> {
