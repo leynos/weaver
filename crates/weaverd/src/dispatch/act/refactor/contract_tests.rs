@@ -100,6 +100,11 @@ struct RenameDispatch<'a> {
     socket_dir: &'a TempDir,
 }
 
+struct RenameExpectation<'a> {
+    position: Option<&'a str>,
+    new_name: Option<&'a str>,
+}
+
 /// Dispatches a rename request through the handler and returns the captured
 /// `PluginRequest` for inspection.
 fn dispatch_inspecting_rename(
@@ -141,23 +146,16 @@ fn dispatch_inspecting_rename(
     let captured = runtime
         .captured
         .into_inner()
-        .map_err(|_| "lock poisoned")?
-        .ok_or("request should be captured")?;
+        .map_err(|error| format!("captured request lock poisoned: {error}"))?
+        .ok_or_else(|| String::from("request should be captured"))?;
     Ok((captured, file_path))
 }
 
-#[rstest]
-fn handler_sends_rename_symbol_contract_conforming_request(
-    socket_dir: Result<TempDir, String>,
-) -> Result<(), String> {
-    let socket_dir = socket_dir?;
-    let (plugin_request, file_path) = dispatch_inspecting_rename(RenameDispatch {
-        file: "notes.py",
-        provider: "rope",
-        language: "python",
-        extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
-        socket_dir: &socket_dir,
-    })?;
+fn assert_rename_request(
+    config: RenameDispatch<'_>,
+    expectation: RenameExpectation<'_>,
+) -> Result<(PluginRequest, PathBuf), String> {
+    let (plugin_request, file_path) = dispatch_inspecting_rename(config)?;
     let expected_uri = Url::from_file_path(&file_path)
         .map_err(|()| format!("failed to build URI for '{}'", file_path.display()))?
         .to_string();
@@ -170,13 +168,35 @@ fn handler_sends_rename_symbol_contract_conforming_request(
     );
     assert_eq!(
         args.get("position").and_then(|value| value.as_str()),
-        Some("4")
+        expectation.position
     );
     assert!(!args.contains_key("offset"));
     assert_eq!(
         args.get("new_name").and_then(|value| value.as_str()),
-        Some("woven")
+        expectation.new_name
     );
+
+    Ok((plugin_request, file_path))
+}
+
+#[rstest]
+fn handler_sends_rename_symbol_contract_conforming_request(
+    socket_dir: Result<TempDir, String>,
+) -> Result<(), String> {
+    let socket_dir = socket_dir?;
+    assert_rename_request(
+        RenameDispatch {
+            file: "notes.py",
+            provider: "rope",
+            language: "python",
+            extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
+            socket_dir: &socket_dir,
+        },
+        RenameExpectation {
+            position: Some("4"),
+            new_name: Some("woven"),
+        },
+    )?;
     Ok(())
 }
 
@@ -185,17 +205,23 @@ fn handler_overwrites_pre_existing_uri_with_file_path(
     socket_dir: Result<TempDir, String>,
 ) -> Result<(), String> {
     let socket_dir = socket_dir?;
-    let (plugin_request, file_path) = dispatch_inspecting_rename(RenameDispatch {
-        file: "notes.py",
-        provider: "rope",
-        language: "python",
-        extra_args: vec![
-            String::from("uri=stale_value"),
-            String::from("offset=4"),
-            String::from("new_name=woven"),
-        ],
-        socket_dir: &socket_dir,
-    })?;
+    let (plugin_request, file_path) = assert_rename_request(
+        RenameDispatch {
+            file: "notes.py",
+            provider: "rope",
+            language: "python",
+            extra_args: vec![
+                String::from("uri=stale_value"),
+                String::from("offset=4"),
+                String::from("new_name=woven"),
+            ],
+            socket_dir: &socket_dir,
+        },
+        RenameExpectation {
+            position: Some("4"),
+            new_name: Some("woven"),
+        },
+    )?;
     let expected_uri = Url::from_file_path(&file_path)
         .map_err(|()| format!("failed to build URI for '{}'", file_path.display()))?
         .to_string();
@@ -215,13 +241,19 @@ fn handler_omits_position_when_offset_not_provided(
     socket_dir: Result<TempDir, String>,
 ) -> Result<(), String> {
     let socket_dir = socket_dir?;
-    let (plugin_request, _) = dispatch_inspecting_rename(RenameDispatch {
-        file: "notes.py",
-        provider: "rope",
-        language: "python",
-        extra_args: vec![String::from("new_name=woven")],
-        socket_dir: &socket_dir,
-    })?;
+    let (plugin_request, _) = assert_rename_request(
+        RenameDispatch {
+            file: "notes.py",
+            provider: "rope",
+            language: "python",
+            extra_args: vec![String::from("new_name=woven")],
+            socket_dir: &socket_dir,
+        },
+        RenameExpectation {
+            position: None,
+            new_name: Some("woven"),
+        },
+    )?;
 
     assert!(!plugin_request.arguments().contains_key("position"));
     Ok(())
@@ -232,32 +264,19 @@ fn rust_analyzer_provider_uses_rename_symbol_contract(
     socket_dir: Result<TempDir, String>,
 ) -> Result<(), String> {
     let socket_dir = socket_dir?;
-    let (plugin_request, file_path) = dispatch_inspecting_rename(RenameDispatch {
-        file: "notes.rs",
-        provider: "rust-analyzer",
-        language: "rust",
-        extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
-        socket_dir: &socket_dir,
-    })?;
-    let expected_uri = Url::from_file_path(&file_path)
-        .map_err(|()| format!("failed to build URI for '{}'", file_path.display()))?
-        .to_string();
-
-    assert_eq!(plugin_request.operation(), "rename-symbol");
-    assert_eq!(
-        plugin_request
-            .arguments()
-            .get("uri")
-            .and_then(|value| value.as_str()),
-        Some(expected_uri.as_str()),
-    );
-    assert_eq!(
-        plugin_request
-            .arguments()
-            .get("position")
-            .and_then(|value| value.as_str()),
-        Some("4"),
-    );
+    assert_rename_request(
+        RenameDispatch {
+            file: "notes.rs",
+            provider: "rust-analyzer",
+            language: "rust",
+            extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
+            socket_dir: &socket_dir,
+        },
+        RenameExpectation {
+            position: Some("4"),
+            new_name: Some("woven"),
+        },
+    )?;
     Ok(())
 }
 

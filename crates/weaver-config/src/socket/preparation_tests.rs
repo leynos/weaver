@@ -42,18 +42,14 @@ fn prepare_filesystem_rejects_symlink_directories() {
 
 #[test]
 fn prepare_filesystem_rejects_non_directory_parent() {
-    let tmp = tempdir().expect("temporary directory");
-    let file_path = tmp.path().join("not_a_directory");
-    std::fs::File::create(&file_path).expect("create placeholder file");
-
-    let socket_path = file_path.join("daemon.sock");
-    let socket_path = Utf8PathBuf::from_path_buf(socket_path).expect("utf8 path");
-    let endpoint = SocketEndpoint::unix(socket_path);
-
-    let error = endpoint
-        .prepare_filesystem()
-        .expect_err("reject non-directory parent");
-    assert!(matches!(error, SocketPreparationError::NotDirectory { .. }));
+    assert_prepare_filesystem_fails(
+        |base| {
+            let file_path = base.join("not_a_directory");
+            std::fs::File::create(&file_path).expect("create placeholder file");
+            file_path.join("daemon.sock")
+        },
+        |error| matches!(error, SocketPreparationError::NotDirectory { .. }),
+    );
 }
 
 #[test]

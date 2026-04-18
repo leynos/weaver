@@ -17,8 +17,14 @@ pub(super) fn prepare_plugin_request(
     workspace_root: &Path,
     args: &arguments::RefactorArgs,
 ) -> Result<(PluginRequest, CapabilityId, PathBuf), DispatchError> {
-    let file_path = resolve_file(workspace_root, &args.file)?;
-    let relative_file_path = file_path.strip_prefix(workspace_root).map_err(|_| {
+    let canonical_workspace = workspace_root.canonicalize().map_err(|error| {
+        DispatchError::invalid_arguments(format!(
+            "cannot canonicalize workspace root '{}': {error}",
+            workspace_root.display()
+        ))
+    })?;
+    let file_path = resolve_file(&canonical_workspace, &args.file)?;
+    let relative_file_path = file_path.strip_prefix(&canonical_workspace).map_err(|_| {
         DispatchError::invalid_arguments("resolved file path escapes the workspace root")
     })?;
     let file_content = std::fs::read_to_string(&file_path).map_err(|err| {
@@ -87,52 +93,39 @@ fn resolve_file(workspace_root: &Path, file: &str) -> Result<PathBuf, DispatchEr
             "path traversal is not allowed",
         ));
     }
-    let canonical_workspace = workspace_root.canonicalize().map_err(|error| {
-        DispatchError::invalid_arguments(format!(
-            "cannot canonicalize workspace root '{}': {error}",
-            workspace_root.display()
-        ))
-    })?;
     let resolved = workspace_root.join(path);
     let canonical_resolved = resolved.canonicalize().map_err(|error| {
         DispatchError::invalid_arguments(format!("cannot resolve file '{}': {error}", file))
     })?;
-    if !canonical_resolved.starts_with(&canonical_workspace) {
+    if !canonical_resolved.starts_with(workspace_root) {
         return Err(DispatchError::invalid_arguments(
             "path traversal is not allowed",
         ));
     }
-    Ok(resolved)
+    Ok(canonical_resolved)
 }
 
 fn apply_rename_symbol_mapping(
     plugin_args: &mut HashMap<String, serde_json::Value>,
     file: &Path,
 ) -> Result<(), DispatchError> {
-    let display_path = file.display().to_string();
     plugin_args.insert(
         String::from("uri"),
-        serde_json::Value::String(to_file_uri(file).map_err(|error| {
-            DispatchError::invalid_arguments(format!(
-                "cannot construct file URI for '{display_path}': {error}"
-            ))
-        })?),
+        serde_json::Value::String(
+            Url::from_file_path(file)
+                .map_err(|()| {
+                    DispatchError::invalid_arguments(format!(
+                        "cannot construct file URI for '{}'",
+                        file.display()
+                    ))
+                })?
+                .to_string(),
+        ),
     );
     if let Some(offset_val) = plugin_args.remove("offset") {
         plugin_args.insert(String::from("position"), offset_val);
     }
     Ok(())
-}
-
-fn to_file_uri(path: &Path) -> Result<String, url::ParseError> {
-    let mut url = Url::parse("file:///")?;
-    {
-        let mut segments = url
-            .path_segments_mut()
-            .map_err(|()| url::ParseError::RelativeUrlWithoutBase)?;
-        segments.extend(path.to_string_lossy().split('/'));
-    }
-    Ok(url.to_string())
 }
 
 fn capability_from_operation(operation: &str) -> Result<CapabilityId, DispatchError> {
