@@ -419,7 +419,7 @@ where
 mod tests;
 
 fn write_error_and_fail<W: Write>(stderr: &mut W, error: impl std::fmt::Display) -> ExitCode {
-    let _ = writeln!(stderr, "{error}");
+    writeln!(stderr, "{error}").ok();
     ExitCode::FAILURE
 }
 

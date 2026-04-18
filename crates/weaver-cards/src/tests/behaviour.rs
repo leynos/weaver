@@ -178,9 +178,13 @@ fn then_json_does_not_contain_field(world: &mut TestWorld, field: QuotedString) 
 #[then("the JSON field {key} has value {value}")]
 fn then_json_field_has_value(world: &mut TestWorld, key: QuotedString, value: QuotedString) {
     let (parsed, pointer) = parse_json_and_pointer(world, &key);
+    let missing_key_message = format!(
+        "expected JSON to contain key '{}': {parsed}",
+        key.as_str()
+    );
     let actual = parsed
         .pointer(&pointer)
-        .expect("expected JSON to contain key");
+        .expect(&missing_key_message);
     let expected: serde_json::Value = serde_json::from_str(value.as_str())
         .unwrap_or_else(|_| serde_json::Value::String(String::from(value.as_str())));
     assert_eq!(

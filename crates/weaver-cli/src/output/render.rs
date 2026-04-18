@@ -204,9 +204,7 @@ fn read_source_content(path: &Path) -> std::io::Result<String> {
     directory.read_to_string(file_name)
 }
 
-fn write_render_line(output: &mut String, args: fmt::Arguments<'_>) {
-    let _ = output.write_fmt(args);
-}
+fn write_render_line(output: &mut String, args: fmt::Arguments<'_>) { output.write_fmt(args).ok(); }
 
 fn caret_display_offset(text: &str, target_units: u32) -> usize {
     let mut units_consumed = 0u32;

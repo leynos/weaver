@@ -61,6 +61,7 @@ fn error_message_includes_name_and_detail(
     PluginError::Timeout {
         name: "slow".into(),
         timeout_secs: 42,
+        message: "terminated timed-out process".into(),
     },
     "42"
 )]
