@@ -181,6 +181,20 @@ fn spawn_uninitialized_client() -> Result<(LspClient, Uri), TestError> {
     Ok((client, uri))
 }
 
+fn assert_not_initialized_op<R>(
+    op: impl FnOnce(&mut LspClient, &Uri) -> Result<R, LspClientError>,
+) -> Result<(), TestError> {
+    require_pyrefly!();
+    let (mut client, uri) = spawn_uninitialized_client()?;
+    match op(&mut client, &uri) {
+        Err(LspClientError::NotInitialized) => Ok(()),
+        Err(other) => Err(TestError::WrongErrorType {
+            actual: other.to_string(),
+        }),
+        Ok(_) => Err(TestError::ExpectedError),
+    }
+}
+
 #[rstest]
 fn definition_from_call_to_function(
     mut linear_chain_context: Option<TestContext>,
@@ -246,28 +260,12 @@ fn definition_on_whitespace(
 
 #[test]
 fn lsp_operation_before_init_returns_error() -> Result<(), TestError> {
-    require_pyrefly!();
-    let (mut client, uri) = spawn_uninitialized_client()?;
-
-    match client.did_open(uri, "python", "def foo(): pass") {
-        Err(LspClientError::NotInitialized) => Ok(()),
-        Err(other) => Err(TestError::WrongErrorType {
-            actual: other.to_string(),
-        }),
-        Ok(()) => Err(TestError::ExpectedError),
-    }
+    assert_not_initialized_op(|client, uri| {
+        client.did_open(uri.clone(), "python", "def foo(): pass")
+    })
 }
 
 #[test]
 fn lsp_goto_definition_before_init_returns_error() -> Result<(), TestError> {
-    require_pyrefly!();
-    let (mut client, uri) = spawn_uninitialized_client()?;
-
-    match client.goto_definition_at(&uri, 0, 0) {
-        Err(LspClientError::NotInitialized) => Ok(()),
-        Err(other) => Err(TestError::WrongErrorType {
-            actual: other.to_string(),
-        }),
-        Ok(_) => Err(TestError::ExpectedError),
-    }
+    assert_not_initialized_op(|client, uri| client.goto_definition_at(uri, 0, 0))
 }
