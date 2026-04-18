@@ -181,7 +181,7 @@ pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> Res
 
     let hover_params = hover_params_ref
         .lock()
-        .map_err(|_| "failed to lock hover_params_ref")?;
+        .map_err(|error| format!("failed to lock hover_params_ref: {error}"))?;
     let params = hover_params
         .as_ref()
         .ok_or("hover should have been called")?;

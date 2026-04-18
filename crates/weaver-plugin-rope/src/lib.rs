@@ -5,19 +5,18 @@
 //! executes a refactoring operation, and writes one JSONL response to stdout.
 
 mod arguments;
+mod workspace_fs;
 
 #[cfg(test)]
 mod tests;
 
 use std::{
     fmt,
-    io::{self, BufRead, Write},
+    io::{BufRead, Write},
     path::{Component, Path, PathBuf},
     process::Command,
 };
 
-use camino::{Utf8Path, Utf8PathBuf};
-use cap_std::fs::Dir;
 use tempfile::TempDir;
 use thiserror::Error;
 use weaver_plugins::{
@@ -33,6 +32,7 @@ use weaver_plugins::{
 };
 
 use crate::arguments::parse_rename_symbol_arguments;
+pub(crate) use crate::workspace_fs::write_workspace_file;
 
 const PYTHON_BINARY: &str = "python3";
 const PYTHON_RENAME_SCRIPT: &str = concat!(
@@ -319,107 +319,6 @@ fn execute_rename<R: RopeAdapter>(
     Ok(PluginResponse::success(PluginOutput::Diff {
         content: patch,
     }))
-}
-
-/// Creates a directory and all its parents using capability-based filesystem operations.
-fn create_dir_all_cap(base: &Dir, path: &Utf8Path) -> io::Result<()> {
-    let mut current_path = Utf8PathBuf::new();
-
-    for component in path.components() {
-        current_path.push(component.as_str());
-        match base.create_dir(&current_path) {
-            Ok(()) => {}
-            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
-            Err(err) => return Err(err),
-        }
-    }
-
-    Ok(())
-}
-
-fn write_workspace_file(
-    workspace_root: &Path,
-    relative_path: &Path,
-    content: &str,
-) -> Result<PathBuf, RopeAdapterError> {
-    let (absolute_path, utf8_path) = resolve_workspace_path(workspace_root, relative_path)?;
-    let file_name = utf8_path
-        .file_name()
-        .ok_or_else(|| RopeAdapterError::InvalidPath {
-            message: String::from("path must refer to a file"),
-        })?;
-    let target_dir = open_workspace_target_dir(workspace_root, &utf8_path)?;
-    target_dir
-        .write(file_name, content.as_bytes())
-        .map_err(|source| RopeAdapterError::WorkspaceWrite {
-            path: absolute_path.clone(),
-            source,
-        })?;
-    Ok(absolute_path)
-}
-
-fn resolve_workspace_path(
-    workspace_root: &Path,
-    relative_path: &Path,
-) -> Result<(PathBuf, Utf8PathBuf), RopeAdapterError> {
-    let absolute_path = workspace_root.join(relative_path);
-    let utf8_path = Utf8PathBuf::from_path_buf(absolute_path.clone()).map_err(|_| {
-        RopeAdapterError::InvalidPath {
-            message: String::from("path contains invalid UTF-8"),
-        }
-    })?;
-    Ok((absolute_path, utf8_path))
-}
-
-fn open_workspace_target_dir(
-    workspace_root: &Path,
-    utf8_path: &Utf8Path,
-) -> Result<Dir, RopeAdapterError> {
-    let workspace_dir = Dir::open_ambient_dir(workspace_root, cap_std::ambient_authority())
-        .map_err(|source| RopeAdapterError::WorkspaceWrite {
-            path: workspace_root.to_path_buf(),
-            source,
-        })?;
-    let parent_path = workspace_relative_parent_path(workspace_root, utf8_path)?;
-
-    if parent_path.as_str().is_empty() {
-        return Ok(workspace_dir);
-    }
-
-    create_dir_all_cap(&workspace_dir, &parent_path).map_err(|source| {
-        RopeAdapterError::WorkspaceWrite {
-            path: parent_path.clone().into(),
-            source,
-        }
-    })?;
-    workspace_dir
-        .open_dir(&parent_path)
-        .map_err(|source| RopeAdapterError::WorkspaceWrite {
-            path: parent_path.into(),
-            source,
-        })
-}
-
-fn workspace_relative_parent_path(
-    workspace_root: &Path,
-    utf8_path: &Utf8Path,
-) -> Result<Utf8PathBuf, RopeAdapterError> {
-    let parent_path = utf8_path.parent().unwrap_or_else(|| Utf8Path::new(""));
-    if parent_path.as_str().is_empty() {
-        return Ok(Utf8PathBuf::new());
-    }
-
-    let relative_parent = parent_path
-        .as_std_path()
-        .strip_prefix(workspace_root)
-        .map_err(|_| RopeAdapterError::InvalidPath {
-            message: String::from("resolved path escapes workspace root"),
-        })?;
-    Utf8PathBuf::from_path_buf(relative_parent.to_path_buf()).map_err(|_| {
-        RopeAdapterError::InvalidPath {
-            message: String::from("path contains invalid UTF-8"),
-        }
-    })
 }
 
 fn validate_relative_path(path: &Path) -> Result<(), RopeAdapterError> {

@@ -36,8 +36,13 @@ jobs:
           key: whitaker-installer-${{ runner.os }}-${{ runner.arch }}-${{ env.WHITAKER_INSTALLER_VERSION }}
       - name: Install Whitaker
         run: |
+          installed_version=""
           if command -v whitaker-installer >/dev/null 2>&1; then
-            echo "whitaker-installer already present; skipping cargo binstall"
+            installed_version=$(whitaker-installer --version 2>/dev/null | grep -Eo '[0-9]+(\.[0-9]+){2,}' | head -n1 || true)
+          fi
+
+          if [ "${installed_version}" = "${WHITAKER_INSTALLER_VERSION}" ]; then
+            echo "whitaker-installer ${installed_version} already present; skipping cargo binstall"
           else
             cargo binstall --no-confirm whitaker-installer@${{ env.WHITAKER_INSTALLER_VERSION }}
           fi

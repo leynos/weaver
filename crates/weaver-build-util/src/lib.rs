@@ -1,12 +1,19 @@
 //! Build-time utilities shared across Weaver build scripts.
 
-use std::{env, io};
+use std::{
+    env,
+    io,
+    process,
+    sync::atomic::{AtomicU64, Ordering},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::fs::Dir;
 use time::{OffsetDateTime, format_description::well_known::Iso8601};
 
 const FALLBACK_DATE: &str = "1970-01-01";
+static MAN_PAGE_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 struct SourceDate {
     raw: String,
@@ -204,6 +211,15 @@ fn ensure_target_dir(base_dir: Dir, relative_path: &Utf8Path) -> io::Result<Dir>
     base_dir.open_dir(relative_path)
 }
 
+fn staging_file_name(page_name: &str) -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    let counter = MAN_PAGE_TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("{page_name}.tmp-{}-{nanos}-{counter}", process::id())
+}
+
 /// Write a man page to the provided directory, ensuring atomic replacement.
 ///
 /// # Errors
@@ -225,7 +241,7 @@ pub fn write_man_page(data: &[u8], dir: &Utf8Path, page_name: &str) -> io::Resul
     let base_dir = Dir::open_ambient_dir(existing_ancestor, cap_std::ambient_authority())?;
     let relative_path = dir.strip_prefix(existing_ancestor).unwrap_or(dir);
     let target_dir = ensure_target_dir(base_dir, relative_path)?;
-    let tmp = format!("{page_name}.tmp");
+    let tmp = staging_file_name(page_name);
     target_dir.write(&tmp, data)?;
 
     match target_dir.rename(&tmp, &target_dir, page_name) {
@@ -260,26 +276,36 @@ mod tests {
     use super::*;
 
     #[test]
-    fn write_man_page_creates_nested_directories() {
-        let temp_dir = tempfile::tempdir().expect("tempdir");
-        let temp_path =
-            Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).expect("utf-8 tempdir");
+    fn write_man_page_creates_nested_directories() -> Result<(), String> {
+        let temp_dir = tempfile::tempdir().map_err(|error| format!("tempdir: {error}"))?;
+        let temp_path = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf())
+            .map_err(|path| format!("utf-8 tempdir: {}", path.display()))?;
         let nested_dir = temp_path.join("target/generated-man/test-target/debug");
-        let temp_dir_handle =
-            Dir::open_ambient_dir(&temp_path, cap_std::ambient_authority()).expect("open tempdir");
+        let temp_dir_handle = Dir::open_ambient_dir(&temp_path, cap_std::ambient_authority())
+            .map_err(|error| format!("open tempdir: {error}"))?;
 
-        let output_path =
-            write_man_page(b".TH WEAVER 1\n", &nested_dir, "weaver.1").expect("write man page");
+        let output_path = write_man_page(b".TH WEAVER 1\n", &nested_dir, "weaver.1")
+            .map_err(|error| format!("write man page: {error}"))?;
         let relative_output_path = output_path
             .strip_prefix(&temp_path)
-            .expect("output path should live under tempdir");
+            .map_err(|error| format!("output path should live under tempdir: {error}"))?;
 
-        assert_eq!(output_path, nested_dir.join("weaver.1"));
-        assert_eq!(
-            temp_dir_handle
-                .read_to_string(relative_output_path)
-                .expect("read man page"),
-            ".TH WEAVER 1\n"
-        );
+        let expected_output_path = nested_dir.join("weaver.1");
+        if output_path != expected_output_path {
+            return Err(format!(
+                "unexpected output path: expected {expected_output_path}, got {output_path}"
+            ));
+        }
+
+        let written_content = temp_dir_handle
+            .read_to_string(relative_output_path)
+            .map_err(|error| format!("read man page: {error}"))?;
+        if written_content != ".TH WEAVER 1\n" {
+            return Err(format!(
+                "unexpected man page content: expected {:?}, got {:?}",
+                ".TH WEAVER 1\n", written_content
+            ));
+        }
+        Ok(())
     }
 }

@@ -266,7 +266,21 @@ fn handle_timeout(
             Ok(status) => format!("terminated timed-out process with status {status}"),
             Err(error) => format!("failed to wait for timed-out process after kill: {error}"),
         },
-        Err(error) => format!("failed to kill timed-out process: {error}"),
+        Err(error) => match child.try_wait() {
+            Ok(Some(status)) => {
+                format!(
+                    "failed to kill timed-out process: {error}; process had already exited with \
+                     status {status}"
+                )
+            }
+            Ok(None) => {
+                format!("failed to kill timed-out process: {error}; process is still running")
+            }
+            Err(wait_error) => format!(
+                "failed to kill timed-out process: {error}; additionally failed to poll timed-out \
+                 process: {wait_error}"
+            ),
+        },
     };
     Err(PluginError::Timeout {
         name: name.to_owned(),

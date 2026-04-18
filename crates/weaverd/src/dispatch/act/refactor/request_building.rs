@@ -25,7 +25,7 @@ pub(super) fn prepare_plugin_request(
         DispatchError::invalid_arguments(format!("cannot read file '{}': {err}", args.file))
     })?;
     let mut plugin_args = build_plugin_args(args);
-    let effective_operation = effective_operation(&mut plugin_args, args, relative_file_path)?;
+    let effective_operation = effective_operation(&mut plugin_args, args, &file_path)?;
     let plugin_request = PluginRequest::with_arguments(
         &effective_operation,
         vec![FilePayload::new(
@@ -59,11 +59,11 @@ fn build_plugin_args(args: &arguments::RefactorArgs) -> HashMap<String, serde_js
 fn effective_operation(
     plugin_args: &mut HashMap<String, serde_json::Value>,
     args: &arguments::RefactorArgs,
-    relative_file_path: &Path,
+    file_path: &Path,
 ) -> Result<String, DispatchError> {
     match args.refactoring.as_str() {
         "rename" => {
-            apply_rename_symbol_mapping(plugin_args, relative_file_path)?;
+            apply_rename_symbol_mapping(plugin_args, file_path)?;
             Ok(String::from("rename-symbol"))
         }
         _ => Ok(args.refactoring.clone()),
@@ -87,8 +87,17 @@ fn resolve_file(workspace_root: &Path, file: &str) -> Result<PathBuf, DispatchEr
             "path traversal is not allowed",
         ));
     }
+    let canonical_workspace = workspace_root.canonicalize().map_err(|error| {
+        DispatchError::invalid_arguments(format!(
+            "cannot canonicalize workspace root '{}': {error}",
+            workspace_root.display()
+        ))
+    })?;
     let resolved = workspace_root.join(path);
-    if !resolved.starts_with(workspace_root) {
+    let canonical_resolved = resolved.canonicalize().map_err(|error| {
+        DispatchError::invalid_arguments(format!("cannot resolve file '{}': {error}", file))
+    })?;
+    if !canonical_resolved.starts_with(&canonical_workspace) {
         return Err(DispatchError::invalid_arguments(
             "path traversal is not allowed",
         ));
