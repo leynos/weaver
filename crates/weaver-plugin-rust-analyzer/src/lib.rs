@@ -313,24 +313,46 @@ fn open_workspace_target_dir(
             path: workspace_root.to_path_buf(),
             source,
         })?;
-    let parent_path = utf8_path.parent().unwrap_or_else(|| Utf8Path::new(""));
+    let parent_path = workspace_relative_parent_path(workspace_root, utf8_path)?;
 
     if parent_path.as_str().is_empty() {
         return Ok(workspace_dir);
     }
 
-    create_dir_all_cap(&workspace_dir, parent_path).map_err(|source| {
+    create_dir_all_cap(&workspace_dir, &parent_path).map_err(|source| {
+        RustAnalyzerAdapterError::WorkspaceWrite {
+            path: parent_path.clone().into(),
+            source,
+        }
+    })?;
+    workspace_dir.open_dir(&parent_path).map_err(|source| {
         RustAnalyzerAdapterError::WorkspaceWrite {
             path: parent_path.into(),
             source,
         }
-    })?;
-    workspace_dir
-        .open_dir(parent_path)
-        .map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
-            path: parent_path.into(),
-            source,
-        })
+    })
+}
+
+fn workspace_relative_parent_path(
+    workspace_root: &Path,
+    utf8_path: &Utf8Path,
+) -> Result<Utf8PathBuf, RustAnalyzerAdapterError> {
+    let parent_path = utf8_path.parent().unwrap_or_else(|| Utf8Path::new(""));
+    if parent_path.as_str().is_empty() {
+        return Ok(Utf8PathBuf::new());
+    }
+
+    let relative_parent = parent_path
+        .as_std_path()
+        .strip_prefix(workspace_root)
+        .map_err(|_| RustAnalyzerAdapterError::InvalidPath {
+            message: String::from("resolved path escapes workspace root"),
+        })?;
+    Utf8PathBuf::from_path_buf(relative_parent.to_path_buf()).map_err(|_| {
+        RustAnalyzerAdapterError::InvalidPath {
+            message: String::from("path contains invalid UTF-8"),
+        }
+    })
 }
 
 fn validate_relative_path(path: &Path) -> Result<(), RustAnalyzerAdapterError> {
