@@ -64,6 +64,33 @@ macro_rules! require_pyrefly {
     };
 }
 
+fn assert_error_before_init<F, A>(mut action: F, assert_extra: A) -> Result<(), TestError>
+where
+    F: FnMut(&mut LspClient, &Uri) -> Result<(), LspClientError>,
+    A: FnOnce(&LspClientError),
+{
+    require_pyrefly!();
+    let (mut client, uri) = spawn_uninitialized_client()?;
+
+    let err = match action(&mut client, &uri) {
+        Ok(()) => return Err(TestError::ExpectedError),
+        Err(error) => error,
+    };
+
+    match &err {
+        LspClientError::NotInitialized => {}
+        other => {
+            return Err(TestError::WrongErrorType {
+                actual: other.to_string(),
+            });
+        }
+    }
+
+    assert_extra(&err);
+    drop(client.shutdown());
+    Ok(())
+}
+
 /// Runs a test implementation with the given fixture context.
 macro_rules! run_test_with_context {
     ($fixture:expr, $impl_fn:path) => {{
@@ -181,20 +208,6 @@ fn spawn_uninitialized_client() -> Result<(LspClient, Uri), TestError> {
     Ok((client, uri))
 }
 
-fn assert_not_initialized_op<R>(
-    op: impl FnOnce(&mut LspClient, &Uri) -> Result<R, LspClientError>,
-) -> Result<(), TestError> {
-    require_pyrefly!();
-    let (mut client, uri) = spawn_uninitialized_client()?;
-    match op(&mut client, &uri) {
-        Err(LspClientError::NotInitialized) => Ok(()),
-        Err(other) => Err(TestError::WrongErrorType {
-            actual: other.to_string(),
-        }),
-        Ok(_) => Err(TestError::ExpectedError),
-    }
-}
-
 #[rstest]
 fn definition_from_call_to_function(
     mut linear_chain_context: Option<TestContext>,
@@ -260,12 +273,16 @@ fn definition_on_whitespace(
 
 #[test]
 fn lsp_operation_before_init_returns_error() -> Result<(), TestError> {
-    assert_not_initialized_op(|client, uri| {
-        client.did_open(uri.clone(), "python", "def foo(): pass")
-    })
+    assert_error_before_init(
+        |client, uri| client.did_open(uri.clone(), "python", "def foo(): pass"),
+        |_| {},
+    )
 }
 
 #[test]
 fn lsp_goto_definition_before_init_returns_error() -> Result<(), TestError> {
-    assert_not_initialized_op(|client, uri| client.goto_definition_at(uri, 0, 0))
+    assert_error_before_init(
+        |client, uri| client.goto_definition_at(uri, 0, 0).map(|_| ()),
+        |_| {},
+    )
 }
