@@ -13,6 +13,11 @@ use crate::{
 
 fn default_engine() -> Engine { Engine::new(EngineConfig::default()) }
 
+fn compile_yaml_text(yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
+    let engine = Engine::new(EngineConfig::default());
+    engine.compile_yaml(yaml)
+}
+
 fn first_diagnostic_of_err<T>(result: Result<T, DiagnosticReport>) -> (DiagnosticCode, Diagnostic) {
     let report = result.err().expect("expected an error result");
     let first: &Diagnostic = report
@@ -38,8 +43,7 @@ fn engine_new_with_custom_config() {
 
 #[test]
 fn compile_yaml_returns_yaml_parse_diagnostic_for_malformed_yaml() {
-    let engine = default_engine();
-    let result = engine.compile_yaml(concat!(
+    let result = compile_yaml_text(concat!(
         "rules:\n",
         "  - id: bad\n",
         "    message: oops\n",
@@ -54,8 +58,7 @@ fn compile_yaml_returns_yaml_parse_diagnostic_for_malformed_yaml() {
 
 #[test]
 fn compile_yaml_returns_schema_diagnostic_for_missing_rule_id() {
-    let engine = default_engine();
-    let result = engine.compile_yaml(concat!(
+    let result = compile_yaml_text(concat!(
         "rules:\n",
         "  - message: oops\n",
         "    languages: [rust]\n",
@@ -68,8 +71,7 @@ fn compile_yaml_returns_schema_diagnostic_for_missing_rule_id() {
 
 #[test]
 fn compile_yaml_returns_not_implemented_after_successful_parse() {
-    let engine = default_engine();
-    let result = engine.compile_yaml(concat!(
+    let result = compile_yaml_text(concat!(
         "rules:\n",
         "  - id: demo.rule\n",
         "    message: oops\n",
