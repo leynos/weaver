@@ -67,10 +67,18 @@ fn invalid_file_uri_error() -> RustAnalyzerAdapterError {
 
 fn strip_file_uri_root(path: &Path) -> Result<PathBuf, RustAnalyzerAdapterError> {
     let mut components = path.components();
-    if !matches!(components.next(), Some(Component::RootDir)) {
-        return Err(invalid_file_uri_error());
+    match components.next() {
+        Some(Component::RootDir) => {}
+        Some(Component::Prefix(_)) => {
+            if !matches!(components.next(), Some(Component::RootDir)) {
+                return Err(invalid_file_uri_error());
+            }
+        }
+        _ => return Err(invalid_file_uri_error()),
     }
-    Ok(components.as_path().to_path_buf())
+    let stripped = components.as_path().to_path_buf();
+    validate_relative_path(&stripped)?;
+    Ok(stripped)
 }
 
 pub(crate) fn path_to_slash(path: &Path) -> Result<String, RustAnalyzerAdapterError> {
@@ -85,4 +93,140 @@ pub(crate) fn path_to_slash(path: &Path) -> Result<String, RustAnalyzerAdapterEr
         })
         .collect::<Result<Vec<String>, RustAnalyzerAdapterError>>()
         .map(|parts| parts.join("/"))
+}
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for request-path validation and normalization helpers.
+
+    #[cfg(unix)]
+    use std::os::unix::ffi::OsStrExt;
+    use std::path::{Path, PathBuf};
+
+    use super::{
+        RustAnalyzerAdapterError,
+        normalize_request_uri,
+        path_to_slash,
+        strip_file_uri_root,
+        validate_relative_path,
+    };
+
+    #[test]
+    fn validate_relative_path_allows_dot_prefixed_file_path() {
+        assert!(validate_relative_path(Path::new("./foo")).is_ok());
+    }
+
+    #[test]
+    fn validate_relative_path_rejects_empty_and_curdir_paths() {
+        let empty = validate_relative_path(Path::new(""));
+        let curdir = validate_relative_path(Path::new("."));
+
+        assert!(matches!(
+            empty,
+            Err(RustAnalyzerAdapterError::InvalidPath { message })
+                if message == "path must not be empty or only '.'"
+        ));
+        assert!(matches!(
+            curdir,
+            Err(RustAnalyzerAdapterError::InvalidPath { message })
+                if message == "path must not be empty or only '.'"
+        ));
+    }
+
+    #[test]
+    fn validate_relative_path_rejects_parent_traversal() {
+        assert!(matches!(
+            validate_relative_path(Path::new("../foo")),
+            Err(RustAnalyzerAdapterError::InvalidPath { message })
+                if message == "path traversal is not allowed"
+        ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn validate_relative_path_rejects_windows_prefixes() {
+        assert!(matches!(
+            validate_relative_path(Path::new(r"C:\foo")),
+            Err(RustAnalyzerAdapterError::InvalidPath { message })
+                if message == "windows path prefixes are not allowed"
+        ));
+    }
+
+    #[test]
+    fn normalize_request_uri_rejects_authority_and_non_file_schemes() {
+        assert!(matches!(
+            normalize_request_uri("file://host/src/main.rs"),
+            Err(RustAnalyzerAdapterError::InvalidPath { message })
+                if message == "uri argument must be a valid file:// URI without an authority"
+        ));
+        assert!(matches!(
+            normalize_request_uri("https://example.com/src/main.rs"),
+            Err(RustAnalyzerAdapterError::InvalidPath { message })
+                if message == "uri argument must be a valid file:// URI without an authority"
+        ));
+    }
+
+    #[test]
+    fn normalize_request_uri_rejects_empty_root_and_invalid_uris() {
+        assert!(matches!(
+            normalize_request_uri("file:///"),
+            Err(RustAnalyzerAdapterError::InvalidPath { message })
+                if message == "path must not be empty or only '.'"
+        ));
+        assert!(matches!(
+            normalize_request_uri("not a uri"),
+            Err(RustAnalyzerAdapterError::InvalidPath { message })
+                if message == "uri argument must be a valid file:// URI without an authority"
+        ));
+    }
+
+    #[test]
+    fn normalize_request_uri_normalizes_dot_segments() {
+        let normalized = normalize_request_uri("file:///./src/lib.rs");
+
+        assert!(matches!(normalized, Ok(ref path) if path == "src/lib.rs"));
+    }
+
+    #[test]
+    fn path_to_slash_joins_normal_components() {
+        let converted = path_to_slash(Path::new("./src/lib.rs"));
+
+        assert!(matches!(converted, Ok(ref path) if path == "src/lib.rs"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn path_to_slash_rejects_non_utf8_components() {
+        let non_utf8 = PathBuf::from(std::ffi::OsStr::from_bytes(b"src/\xFF.rs"));
+
+        assert!(matches!(
+            path_to_slash(&non_utf8),
+            Err(RustAnalyzerAdapterError::InvalidPath { message })
+                if message.contains("path contains non-UTF-8 component")
+        ));
+    }
+
+    #[test]
+    fn strip_file_uri_root_rejects_paths_without_root() {
+        assert!(matches!(
+            strip_file_uri_root(Path::new("relative/path")),
+            Err(RustAnalyzerAdapterError::InvalidPath { message })
+                if message == "uri argument must be a valid file:// URI without an authority"
+        ));
+    }
+
+    #[test]
+    fn strip_file_uri_root_strips_rooted_paths() {
+        let stripped = strip_file_uri_root(Path::new("/src/lib.rs"));
+
+        assert!(matches!(stripped, Ok(ref path) if path == Path::new("src/lib.rs")));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn strip_file_uri_root_strips_windows_drive_prefix() {
+        let stripped = strip_file_uri_root(Path::new(r"C:\src\lib.rs"));
+
+        assert!(matches!(stripped, Ok(ref path) if path == Path::new(r"src\lib.rs")));
+    }
 }
