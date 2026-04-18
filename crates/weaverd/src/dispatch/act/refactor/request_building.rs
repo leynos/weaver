@@ -54,27 +54,29 @@ fn build_plugin_args(
     );
     for extra in &args.extra {
         let parts: Vec<&str> = extra.splitn(2, '=').collect();
-        let key = parts.first().copied().ok_or_else(|| {
-            DispatchError::invalid_arguments("refactor extra argument cannot be empty")
-        })?;
-        if key.trim().is_empty() {
+        let key = parts
+            .first()
+            .copied()
+            .ok_or_else(|| {
+                DispatchError::invalid_arguments("refactor extra argument cannot be empty")
+            })?
+            .trim()
+            .to_owned();
+        if key.is_empty() {
             return Err(DispatchError::invalid_arguments(format!(
                 "refactor extra argument has an empty key: '{extra}'"
             )));
         }
-        if key.trim() == "refactoring" {
+        if key == "refactoring" {
             return Err(DispatchError::invalid_arguments(
                 "refactor extra argument must not override reserved key 'refactoring'",
             ));
         }
         if parts.len() == 2 {
-            plugin_args.insert(
-                key.to_owned(),
-                serde_json::Value::String(parts[1].to_owned()),
-            );
+            plugin_args.insert(key.clone(), serde_json::Value::String(parts[1].to_owned()));
         } else if parts.len() == 1 {
             // Bare extra arguments are interpreted as boolean flags.
-            plugin_args.insert(key.to_owned(), serde_json::Value::Bool(true));
+            plugin_args.insert(key, serde_json::Value::Bool(true));
         }
     }
     Ok(plugin_args)
