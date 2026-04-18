@@ -18,6 +18,26 @@ fn compile_yaml_text(yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
     engine.compile_yaml(yaml)
 }
 
+fn compile_and_first(yaml: &str) -> (DiagnosticCode, Diagnostic) {
+    first_diagnostic_of_err(compile_yaml_text(yaml))
+}
+
+fn simple_rule_yaml(id: Option<&str>, pattern_line: &str) -> String {
+    let id_line = id.map_or_else(String::new, |rule_id| format!("id: {rule_id}"));
+    format!(
+        concat!(
+            "rules:\n",
+            "  - {id_line}\n",
+            "    message: oops\n",
+            "    languages: [rust]\n",
+            "    severity: ERROR\n",
+            "    {pattern_line}\n",
+        ),
+        id_line = id_line,
+        pattern_line = pattern_line,
+    )
+}
+
 fn first_diagnostic_of_err<T>(result: Result<T, DiagnosticReport>) -> (DiagnosticCode, Diagnostic) {
     let report = result.err().expect("expected an error result");
     let first: &Diagnostic = report
@@ -43,43 +63,20 @@ fn engine_new_with_custom_config() {
 
 #[test]
 fn compile_yaml_returns_yaml_parse_diagnostic_for_malformed_yaml() {
-    let result = compile_yaml_text(concat!(
-        "rules:\n",
-        "  - id: bad\n",
-        "    message: oops\n",
-        "    languages: [rust]\n",
-        "    severity: ERROR\n",
-        "    pattern: [",
-    ));
-    let (code, first) = first_diagnostic_of_err(result);
+    let (code, first) = compile_and_first(&simple_rule_yaml(Some("bad"), "pattern: ["));
     assert_eq!(code, DiagnosticCode::ESempaiYamlParse);
     assert!(first.primary_span().is_some());
 }
 
 #[test]
 fn compile_yaml_returns_schema_diagnostic_for_missing_rule_id() {
-    let result = compile_yaml_text(concat!(
-        "rules:\n",
-        "  - message: oops\n",
-        "    languages: [rust]\n",
-        "    severity: ERROR\n",
-        "    pattern: foo($X)\n",
-    ));
-    let (code, _diag) = first_diagnostic_of_err(result);
+    let (code, _diag) = compile_and_first(&simple_rule_yaml(None, "pattern: foo($X)"));
     assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
 }
 
 #[test]
 fn compile_yaml_returns_not_implemented_after_successful_parse() {
-    let result = compile_yaml_text(concat!(
-        "rules:\n",
-        "  - id: demo.rule\n",
-        "    message: oops\n",
-        "    languages: [rust]\n",
-        "    severity: ERROR\n",
-        "    pattern: foo($X)\n",
-    ));
-    let (code, diag) = first_diagnostic_of_err(result);
+    let (code, diag) = compile_and_first(&simple_rule_yaml(Some("demo.rule"), "pattern: foo($X)"));
     assert_eq!(code, DiagnosticCode::NotImplemented);
     assert!(diag.message().contains("normalization"));
 }
