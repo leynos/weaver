@@ -281,7 +281,14 @@ pub(crate) fn write_workspace_file(
 ) -> Result<PathBuf, RustAnalyzerAdapterError> {
     let (absolute_path, workspace_relative_path) =
         resolve_workspace_path(workspace_root, relative_path)?;
-    let file_name = workspace_relative_path.file_name().unwrap_or("file");
+    let file_name = workspace_relative_path.file_name().ok_or_else(|| {
+        RustAnalyzerAdapterError::InvalidPath {
+            message: format!(
+                "path must refer to a file: {}",
+                workspace_relative_path.as_str()
+            ),
+        }
+    })?;
     let target_dir = open_workspace_target_dir(workspace_root, &workspace_relative_path)?;
     target_dir
         .write(file_name, content.as_bytes())
