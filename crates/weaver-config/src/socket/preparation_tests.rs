@@ -5,6 +5,7 @@ use std::{
     path::Path,
 };
 
+use rstest::rstest;
 use tempfile::tempdir;
 
 use super::*;
@@ -96,26 +97,13 @@ fn prepare_filesystem_allows_lexically_normalized_path() {
         .expect("lexically normalized path should remain in-tree");
 }
 
-#[test]
-fn prepare_filesystem_rejects_relative_socket_path_in_current_directory() {
+#[rstest]
+#[case("daemon.sock")]
+#[case("run/daemon.sock")]
+#[case("./run/daemon.sock")]
+fn prepare_filesystem_rejects_relative_socket_paths(#[case] path: &str) {
     assert_prepare_filesystem_fails(
-        |_| std::path::PathBuf::from("daemon.sock"),
-        |error| matches!(error, SocketPreparationError::PathTraversal { .. }),
-    );
-}
-
-#[test]
-fn prepare_filesystem_rejects_relative_socket_path_in_nested_directory() {
-    assert_prepare_filesystem_fails(
-        |_| std::path::PathBuf::from("run/daemon.sock"),
-        |error| matches!(error, SocketPreparationError::PathTraversal { .. }),
-    );
-}
-
-#[test]
-fn prepare_filesystem_rejects_dot_relative_socket_path_in_nested_directory() {
-    assert_prepare_filesystem_fails(
-        |_| std::path::PathBuf::from("./run/daemon.sock"),
+        |_| std::path::PathBuf::from(path),
         |error| matches!(error, SocketPreparationError::PathTraversal { .. }),
     );
 }

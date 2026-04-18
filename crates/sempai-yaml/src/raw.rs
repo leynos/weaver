@@ -396,4 +396,5 @@ pub(crate) fn parse_severity(
     })
 }
 
+/// Parses an optional raw rule mode string into the corresponding [`RuleMode`].
 pub(crate) fn parse_mode(value: Option<&str>) -> RuleMode { RuleMode::from_optional(value) }

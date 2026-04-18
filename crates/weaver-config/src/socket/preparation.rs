@@ -82,6 +82,12 @@ pub fn prepare_endpoint_filesystem(
     let Some(path) = endpoint.unix_path() else {
         return Ok(());
     };
+    if !path.is_absolute() {
+        return Err(SocketPreparationError::PathTraversal {
+            path: path.to_path_buf(),
+            canonical: path.to_path_buf(),
+        });
+    }
     let Some(parent) = path.parent() else {
         return Err(SocketPreparationError::MissingParent {
             path: path.to_path_buf(),
@@ -265,7 +271,7 @@ fn check_directory_permissions(parent: &Utf8Path) -> Result<(), SocketPreparatio
 
     let mut permissions = metadata.permissions();
     let mode = permissions.mode();
-    if mode & 0o077 != 0 {
+    if mode & 0o777 != 0o700 {
         permissions.set_mode(0o700);
         fs::set_permissions(parent.as_std_path(), permissions).map_err(|source| {
             SocketPreparationError::SetPermissions {

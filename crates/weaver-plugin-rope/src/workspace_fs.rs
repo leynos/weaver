@@ -2,7 +2,7 @@
 
 use std::{
     io,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
 use camino::{Utf8Path, Utf8PathBuf};
@@ -63,6 +63,19 @@ fn resolve_workspace_path(
     workspace_root: &Path,
     relative_path: &Path,
 ) -> Result<(PathBuf, Utf8PathBuf), RopeAdapterError> {
+    if relative_path.is_absolute() {
+        return Err(RopeAdapterError::InvalidPath {
+            message: String::from("path must be relative to the workspace root"),
+        });
+    }
+    if relative_path
+        .components()
+        .any(|component| matches!(component, Component::ParentDir))
+    {
+        return Err(RopeAdapterError::InvalidPath {
+            message: String::from("path must not contain parent-directory traversal"),
+        });
+    }
     let absolute_path = workspace_root.join(relative_path);
     let workspace_relative_path =
         Utf8PathBuf::from_path_buf(relative_path.to_path_buf()).map_err(|_| {

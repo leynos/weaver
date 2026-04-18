@@ -57,6 +57,9 @@ fn build_plugin_args(args: &arguments::RefactorArgs) -> HashMap<String, serde_js
                 parts[0].to_owned(),
                 serde_json::Value::String(parts[1].to_owned()),
             );
+        } else if parts.len() == 1 {
+            // Bare extra arguments are interpreted as boolean flags.
+            plugin_args.insert(parts[0].to_owned(), serde_json::Value::Bool(true));
         }
     }
     plugin_args
