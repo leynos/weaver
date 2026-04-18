@@ -41,6 +41,11 @@ impl<'a> From<&'a str> for Operation {
     }
 }
 
+/// Carries the validated refactor request returned from
+/// `validate_refactor_request`.
+///
+/// `file` is the path to the target file, and `requested_provider` is the
+/// optional `RequestedProvider` chosen during validation.
 struct ValidatedRefactorRequest<'a> {
     file: &'a Path,
     requested_provider: Option<RequestedProvider>,

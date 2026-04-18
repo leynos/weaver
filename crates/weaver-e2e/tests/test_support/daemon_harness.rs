@@ -108,8 +108,12 @@ impl FakeDaemon {
             .clone()
     }
 
-    /// Waits for the background server thread to finish and panics if it
-    /// panicked.
+    /// Consumes this `FakeDaemon` and blocks until the background server thread
+    /// exits.
+    ///
+    /// This asserts that `join_handle.join().is_ok()`, so any panic from the
+    /// background thread is propagated as a test failure. That fail-fast
+    /// behaviour is intentional for this test harness.
     pub fn join(self) {
         assert!(
             self.join_handle.join().is_ok(),
