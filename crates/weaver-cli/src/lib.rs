@@ -217,7 +217,7 @@ where
             Err(AppError::BareInvocation) => ExitCode::FAILURE,
             Err(AppError::PreflightGuidance) => ExitCode::FAILURE,
             Err(AppError::CliUsage(ref clap_err)) if !clap_err.use_stderr() => {
-                let _ = write!(self.io.stdout, "{clap_err}");
+                write!(self.io.stdout, "{clap_err}").ok();
                 ExitCode::SUCCESS
             }
             Err(AppError::Lifecycle(ref lifecycle_err)) => {
@@ -226,7 +226,7 @@ where
                 ExitCode::FAILURE
             }
             Err(error) => {
-                let _ = writeln!(self.io.stderr, "{error}");
+                writeln!(self.io.stderr, "{error}").ok();
                 ExitCode::FAILURE
             }
         }

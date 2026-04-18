@@ -81,7 +81,10 @@ configuration layering, and the complete command reference.
 
 ## Building from source
 
-Weaver requires **Rust 1.88+** (edition 2024). To build:
+Weaver requires the pinned **Nightly Rust toolchain `nightly-2026-03-26`** for
+local builds. The workspace `.cargo/config.toml` enables Nightly-only options,
+so the earlier Rust 1.88+ baseline does not apply to local Cargo builds in this
+checkout. To build:
 
 ```sh
 cargo +nightly-2026-03-26 build --release
@@ -105,18 +108,25 @@ rustup toolchain install nightly-2026-03-26
 rustup component add rustc-codegen-cranelift --toolchain nightly-2026-03-26
 ```
 
-If you want Cargo to pick that toolchain automatically in this checkout, set a
-local override:
+Set a local override so Cargo uses that pinned Nightly automatically in this
+checkout:
 
 ```sh
 rustup override set nightly-2026-03-26
 ```
 
 You also need `clang` and `mold` available on your system because the target
-configuration passes `-C link-arg=-fuse-ld=mold`:
+configuration passes `-C link-arg=-fuse-ld=mold`.
+
+Debian/Ubuntu:
 
 ```sh
 sudo apt-get install clang mold
+```
+
+Fedora:
+
+```sh
 sudo dnf install clang mold
 ```
 

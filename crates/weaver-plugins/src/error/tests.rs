@@ -78,6 +78,15 @@ fn error_message_includes_numeric_field(#[case] error: PluginError, #[case] expe
         message.contains(expected_value),
         "expected {expected_value} in message: {message}"
     );
+    if let PluginError::Timeout {
+        message: detail, ..
+    } = &error
+    {
+        assert!(
+            message.contains(detail),
+            "expected timeout detail in message: {message}"
+        );
+    }
 }
 
 #[test]

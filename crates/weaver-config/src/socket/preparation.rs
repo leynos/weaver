@@ -2,7 +2,7 @@
 
 use std::{fs, fs::DirBuilder};
 
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::{Utf8Component, Utf8Path, Utf8PathBuf};
 #[cfg(unix)]
 use libc::geteuid;
 use thiserror::Error;
@@ -119,19 +119,25 @@ fn split_existing_prefix(
                 ));
             }
             Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
-                let file_name =
-                    current
-                        .file_name()
-                        .ok_or_else(|| SocketPreparationError::MissingParent {
+                let file_name = match current.file_name() {
+                    Some(file_name) => file_name.to_owned(),
+                    None if current.as_str().is_empty() => String::from("."),
+                    None => {
+                        return Err(SocketPreparationError::MissingParent {
                             path: parent.to_path_buf(),
-                        })?;
-                missing_suffix.push(file_name.to_owned());
-                current =
+                        });
+                    }
+                };
+                missing_suffix.push(file_name);
+                current = if current.as_str().is_empty() {
+                    Utf8Path::new(".")
+                } else {
                     current
                         .parent()
                         .ok_or_else(|| SocketPreparationError::MissingParent {
                             path: parent.to_path_buf(),
-                        })?;
+                        })?
+                };
             }
             Err(source) => {
                 return Err(SocketPreparationError::ReadMetadata {
@@ -273,10 +279,11 @@ fn validate_no_path_traversal(parent: &Utf8Path) -> Result<(), SocketPreparation
     })?;
     let canonical = Utf8PathBuf::from_path_buf(canonical)
         .map_err(|path| SocketPreparationError::NonUtf8CanonicalPath { path })?;
+    let normalized_parent = normalize_parent_path(parent);
 
-    if !canonical.ends_with(parent) {
+    if !canonical.ends_with(&normalized_parent) {
         return Err(SocketPreparationError::PathTraversal {
-            path: parent.to_path_buf(),
+            path: normalized_parent,
             canonical,
         });
     }
@@ -285,106 +292,46 @@ fn validate_no_path_traversal(parent: &Utf8Path) -> Result<(), SocketPreparation
 }
 
 #[cfg(unix)]
-#[cfg(test)]
-mod tests {
-    //! Unix-specific tests for socket directory preparation and hardening.
+fn normalize_parent_path(parent: &Utf8Path) -> Utf8PathBuf {
+    let mut components = Vec::new();
+    let mut is_absolute = false;
 
-    use std::{
-        os::unix::fs::{PermissionsExt, symlink},
-        path::Path,
+    for component in parent.components() {
+        match component {
+            Utf8Component::RootDir => {
+                is_absolute = true;
+                components.clear();
+            }
+            Utf8Component::CurDir => {}
+            Utf8Component::ParentDir => match components.last() {
+                Some(last) if *last != ".." => {
+                    components.pop();
+                }
+                _ if !is_absolute => components.push(".."),
+                _ => {}
+            },
+            Utf8Component::Normal(component) => components.push(component),
+            Utf8Component::Prefix(_) => {}
+        }
+    }
+
+    let mut normalized = if is_absolute {
+        Utf8PathBuf::from("/")
+    } else {
+        Utf8PathBuf::new()
     };
-
-    use tempfile::tempdir;
-
-    use super::*;
-
-    fn assert_prepare_filesystem_fails<Setup, Predicate>(setup: Setup, predicate: Predicate)
-    where
-        Setup: FnOnce(&Path) -> std::path::PathBuf,
-        Predicate: Fn(&SocketPreparationError) -> bool,
-    {
-        let tmp = tempdir().expect("temporary directory");
-        let socket_path = setup(tmp.path());
-        let socket_path =
-            Utf8PathBuf::from_path_buf(socket_path).expect("socket path should be UTF-8");
-        let endpoint = SocketEndpoint::unix(socket_path);
-
-        let error = endpoint
-            .prepare_filesystem()
-            .expect_err("filesystem preparation should fail");
-        assert!(predicate(&error), "unexpected error variant: {error}");
+    for component in components {
+        normalized.push(component);
     }
 
-    #[test]
-    fn prepare_filesystem_rejects_symlink_directories() {
-        assert_prepare_filesystem_fails(
-            |base| {
-                let target = base.join("real");
-                std::fs::create_dir(&target).expect("create target directory");
-
-                let link = base.join("link");
-                symlink(&target, &link).expect("create symlink");
-                link.join("daemon.sock")
-            },
-            |error| matches!(error, SocketPreparationError::SymlinkDetected { .. }),
-        );
-    }
-
-    #[test]
-    fn prepare_filesystem_rejects_non_directory_parent() {
-        let tmp = tempdir().expect("temporary directory");
-        let file_path = tmp.path().join("not_a_directory");
-        std::fs::File::create(&file_path).expect("create placeholder file");
-
-        let socket_path = file_path.join("daemon.sock");
-        let socket_path = Utf8PathBuf::from_path_buf(socket_path).expect("utf8 path");
-        let endpoint = SocketEndpoint::unix(socket_path);
-
-        let error = endpoint
-            .prepare_filesystem()
-            .expect_err("reject non-directory parent");
-        assert!(matches!(error, SocketPreparationError::NotDirectory { .. }));
-    }
-
-    #[test]
-    fn prepare_filesystem_enforces_permissions() {
-        let tmp = tempdir().expect("temporary directory");
-        let socket_dir = tmp.path().join("insecure");
-        std::fs::create_dir(&socket_dir).expect("create insecure directory");
-
-        let mut perms = std::fs::metadata(&socket_dir)
-            .expect("metadata before hardening")
-            .permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(&socket_dir, perms).expect("loosen permissions");
-
-        let socket_path = socket_dir.join("daemon.sock");
-        let socket_path = Utf8PathBuf::from_path_buf(socket_path).expect("utf8 path");
-        let endpoint = SocketEndpoint::unix(socket_path);
-
-        endpoint
-            .prepare_filesystem()
-            .expect("harden insecure directory");
-
-        let mode = std::fs::metadata(socket_dir)
-            .expect("metadata after hardening")
-            .permissions()
-            .mode();
-        assert_eq!(mode & 0o777, 0o700);
-    }
-
-    #[test]
-    fn prepare_filesystem_rejects_path_traversal() {
-        assert_prepare_filesystem_fails(
-            |base| {
-                let real_dir = base.join("real");
-                std::fs::create_dir(&real_dir).expect("create real directory");
-                let other_dir = base.join("other");
-                std::fs::create_dir(&other_dir).expect("create other directory");
-
-                real_dir.join("..").join("other").join("daemon.sock")
-            },
-            |error| matches!(error, SocketPreparationError::PathTraversal { .. }),
-        );
+    if normalized.as_str().is_empty() {
+        Utf8PathBuf::from(".")
+    } else {
+        normalized
     }
 }
+
+#[cfg(unix)]
+#[cfg(test)]
+#[path = "preparation_tests.rs"]
+mod tests;

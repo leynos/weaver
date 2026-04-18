@@ -3,6 +3,11 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+const MISSING_NS_PKG_MSG: &str = concat!(
+    "`r2c-internal-project-depends-on` must define string `namespace` ",
+    "and `package` fields",
+);
+
 /// Validated payload for the Semgrep compatibility dependency principal.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "Value", into = "Value")]
@@ -47,31 +52,18 @@ impl TryFrom<Value> for ProjectDependsOnPayload {
         let has_namespace = object.get("namespace").and_then(Value::as_str).is_some();
         let has_package = object.get("package").and_then(Value::as_str).is_some();
         if !(has_namespace && has_package) {
-            return Err(String::from(concat!(
-                "`r2c-internal-project-depends-on` must define string `namespace` ",
-                "and `package` fields",
-            )));
+            return Err(String::from(MISSING_NS_PKG_MSG));
         }
 
         let namespace = object
             .get("namespace")
             .and_then(Value::as_str)
-            .ok_or_else(|| {
-                String::from(concat!(
-                    "`r2c-internal-project-depends-on` must define string `namespace` ",
-                    "and `package` fields",
-                ))
-            })?
+            .ok_or_else(|| String::from(MISSING_NS_PKG_MSG))?
             .to_owned();
         let package = object
             .get("package")
             .and_then(Value::as_str)
-            .ok_or_else(|| {
-                String::from(concat!(
-                    "`r2c-internal-project-depends-on` must define string `namespace` ",
-                    "and `package` fields",
-                ))
-            })?
+            .ok_or_else(|| String::from(MISSING_NS_PKG_MSG))?
             .to_owned();
 
         Ok(Self { namespace, package })

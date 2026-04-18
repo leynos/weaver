@@ -10,12 +10,11 @@ fn storage() -> &'static Mutex<HashMap<PathBuf, Vec<&'static str>>> {
 pub fn clear_health_events(path: &Path) -> Result<(), String> {
     let mut guard = storage()
         .lock()
-        .map_err(|_| "health event mutex poisoned")?;
+        .map_err(|error| format!("health event mutex poisoned: {error}"))?;
     guard.remove(path);
     Ok(())
 }
 
-#[must_use]
 /// Returns the recorded health event names for the provided storage path.
 ///
 /// The `path` argument identifies the health snapshot storage file whose event
@@ -23,6 +22,7 @@ pub fn clear_health_events(path: &Path) -> Result<(), String> {
 /// names in insertion order. If the internal mutex cannot be locked, this
 /// helper returns an empty vector instead of panicking so tests can report the
 /// missing events explicitly.
+#[must_use]
 pub fn health_events(path: &Path) -> Vec<&'static str> {
     storage().lock().map_or_else(
         |_| Vec::new(),

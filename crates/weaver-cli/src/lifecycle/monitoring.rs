@@ -1,7 +1,4 @@
 //! Daemon health monitoring utilities.
-//!
-//! Provides helpers for reading and evaluating health snapshots, waiting for
-//! the daemon to become ready, and reading PID files.
 
 use std::{
     io,
@@ -21,9 +18,8 @@ pub(super) const PID_FILENAME: &str = "weaverd.pid";
 /// Filename for the daemon's health snapshot within the runtime directory.
 pub(super) const HEALTH_FILENAME: &str = "weaverd.health";
 /// Interval between health snapshot checks during daemon startup polling.
-/// A 200ms interval balances responsiveness (detecting ready state quickly)
-/// against CPU usage and filesystem pressure. This is used by [`wait_for_ready`]
-/// to periodically check the daemon's health file.
+/// A 200ms interval balances responsiveness against CPU and filesystem pressure.
+/// [`wait_for_ready`] uses it to poll the daemon's health file.
 const POLL_INTERVAL: Duration = Duration::from_millis(200);
 
 /// Current operational state of the daemon.
@@ -263,9 +259,12 @@ fn resolve_health_outcome(
 }
 
 fn next_poll_interval(deadline: Option<Instant>) -> Duration {
-    deadline
-        .and_then(|limit| limit.checked_duration_since(Instant::now()))
-        .map_or(Duration::ZERO, |remaining| remaining.min(POLL_INTERVAL))
+    match deadline {
+        None => POLL_INTERVAL,
+        Some(limit) => limit
+            .checked_duration_since(Instant::now())
+            .map_or(Duration::ZERO, |remaining| remaining.min(POLL_INTERVAL)),
+    }
 }
 
 define_reader! {
