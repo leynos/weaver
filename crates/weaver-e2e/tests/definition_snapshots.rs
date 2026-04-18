@@ -73,13 +73,17 @@ where
     let (mut client, uri) = spawn_uninitialized_client()?;
 
     let err = match action(&mut client, &uri) {
-        Ok(()) => return Err(TestError::ExpectedError),
+        Ok(()) => {
+            client.shutdown().ok();
+            return Err(TestError::ExpectedError);
+        }
         Err(error) => error,
     };
 
     match &err {
         LspClientError::NotInitialized => {}
         other => {
+            client.shutdown().ok();
             return Err(TestError::WrongErrorType {
                 actual: other.to_string(),
             });
@@ -87,7 +91,7 @@ where
     }
 
     assert_extra(&err);
-    drop(client.shutdown());
+    client.shutdown().ok();
     Ok(())
 }
 

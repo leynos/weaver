@@ -220,11 +220,13 @@ fn staging_file_name(page_name: &str) -> String {
     format!("{page_name}.tmp-{}-{nanos}-{counter}", process::id())
 }
 
-/// Write a man page to the provided directory, ensuring atomic replacement.
+/// Write a man page to the provided directory with best-effort replacement.
 ///
 /// # Errors
-/// Returns any filesystem errors encountered while creating the directory or
-/// writing the file.
+/// Returns any filesystem errors encountered while creating the directory,
+/// writing the file, or replacing an existing page. On platforms where
+/// overwriting a destination rename is unavailable, replacement falls back to a
+/// non-atomic delete-then-rename sequence.
 ///
 /// # Examples
 /// ```no_run
@@ -289,6 +291,19 @@ mod tests {
         let nested_dir = temp_path.join("target/generated-man/test-target/debug");
         let temp_dir_handle = Dir::open_ambient_dir(&temp_path, cap_std::ambient_authority())
             .map_err(|error| format!("open tempdir: {error}"))?;
+        let existing_output_path = nested_dir.join("weaver.1");
+        let existing_relative_path = existing_output_path
+            .strip_prefix(&temp_path)
+            .map_err(|error| format!("existing path should live under tempdir: {error}"))?;
+        let existing_parent = existing_relative_path
+            .parent()
+            .ok_or_else(|| String::from("existing path should have parent"))?;
+        temp_dir_handle
+            .create_dir_all(existing_parent)
+            .map_err(|error| format!("create existing parent dirs: {error}"))?;
+        temp_dir_handle
+            .write(existing_relative_path, b"old content\n")
+            .map_err(|error| format!("seed existing man page: {error}"))?;
 
         let output_path = write_man_page(b".TH WEAVER 1\n", &nested_dir, "weaver.1")
             .map_err(|error| format!("write man page: {error}"))?;
