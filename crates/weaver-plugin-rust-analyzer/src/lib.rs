@@ -329,12 +329,12 @@ fn open_workspace_target_dir(
             source,
         }
     })?;
-    workspace_dir.open_dir(parent_path).map_err(|source| {
-        RustAnalyzerAdapterError::WorkspaceWrite {
+    workspace_dir
+        .open_dir(parent_path)
+        .map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
             path: parent_path.into(),
             source,
-        }
-    })
+        })
 }
 
 fn validate_relative_path(path: &Path) -> Result<(), RustAnalyzerAdapterError> {

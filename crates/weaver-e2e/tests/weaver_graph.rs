@@ -133,9 +133,14 @@ struct GraphTestContext {
 }
 
 impl GraphTestContext {
+    #[expect(
+        clippy::expect_used,
+        reason = "test fixture setup should panic with an explicit message"
+    )]
     fn new(fixture: &str) -> Result<Self, TestError> {
         let temp_dir = TempDir::new()?;
-        let file_path = write_fixture_path(&temp_dir, "test.py", fixture);
+        let file_path =
+            write_fixture_path(&temp_dir, "test.py", fixture).expect("write fixture path");
 
         let root_uri = file_uri(temp_dir.path())?;
         let file_uri_val = file_uri(&file_path)?;

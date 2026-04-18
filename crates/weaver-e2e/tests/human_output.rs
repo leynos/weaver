@@ -73,7 +73,8 @@ fn first_location(response: Option<GotoDefinitionResponse>) -> Option<Location> 
 #[ignore = "requires pyrefly tooling to be available on PATH"]
 fn renders_definition_output_with_context() -> Result<(), TestError> {
     let temp_dir = TempDir::new()?;
-    let file_path = write_fixture_path(&temp_dir, "test.py", fixtures::LINEAR_CHAIN);
+    let file_path = write_fixture_path(&temp_dir, "test.py", fixtures::LINEAR_CHAIN)
+        .expect("write fixture path");
 
     let root_uri = file_uri(temp_dir.path())?;
     let file_uri_value = file_uri(&file_path)?;
