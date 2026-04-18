@@ -56,7 +56,7 @@ pub(crate) fn normalize_request_uri(uri: &str) -> Result<String, RustAnalyzerAda
         .map_err(|()| invalid_file_uri_error())?;
     let relative_path = strip_file_uri_root(&path)?;
     validate_relative_path(relative_path.as_path())?;
-    Ok(path_to_slash(relative_path.as_path()))
+    path_to_slash(relative_path.as_path())
 }
 
 fn invalid_file_uri_error() -> RustAnalyzerAdapterError {
@@ -73,12 +73,16 @@ fn strip_file_uri_root(path: &Path) -> Result<PathBuf, RustAnalyzerAdapterError>
     Ok(components.as_path().to_path_buf())
 }
 
-pub(crate) fn path_to_slash(path: &Path) -> String {
+pub(crate) fn path_to_slash(path: &Path) -> Result<String, RustAnalyzerAdapterError> {
     path.components()
         .filter_map(|component| match component {
-            Component::Normal(part) => Some(part.to_string_lossy().into_owned()),
+            Component::Normal(part) => Some(part.to_str().map(str::to_owned).ok_or_else(|| {
+                RustAnalyzerAdapterError::InvalidPath {
+                    message: format!("path contains non-UTF-8 component: {}", path.display()),
+                }
+            })),
             _ => None,
         })
-        .collect::<Vec<String>>()
-        .join("/")
+        .collect::<Result<Vec<String>, RustAnalyzerAdapterError>>()
+        .map(|parts| parts.join("/"))
 }

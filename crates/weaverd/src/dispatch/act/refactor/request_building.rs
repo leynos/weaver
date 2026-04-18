@@ -11,6 +11,12 @@ use weaver_plugins::{PluginRequest, capability::CapabilityId, protocol::FilePayl
 use super::arguments;
 use crate::dispatch::errors::DispatchError;
 
+struct ResolvedFile {
+    path: PathBuf,
+    relative_path: PathBuf,
+    content: String,
+}
+
 /// Resolves the target file, reads its content, builds the [`PluginRequest`],
 /// and maps the refactoring operation to the corresponding [`CapabilityId`].
 pub(super) fn prepare_plugin_request(
@@ -23,28 +29,19 @@ pub(super) fn prepare_plugin_request(
             workspace_root.display()
         ))
     })?;
-    let file_path = resolve_file(&canonical_workspace, &args.file)?;
-    let relative_file_path = file_path.strip_prefix(&canonical_workspace).map_err(|_| {
-        DispatchError::invalid_arguments("resolved file path escapes the workspace root")
-    })?;
+    let resolved_file = resolve_file(&canonical_workspace, &args.file)?;
     let mut plugin_args = build_plugin_args(args)?;
-    let effective_operation = effective_operation(&mut plugin_args, args, &file_path)?;
+    let effective_operation = effective_operation(&mut plugin_args, args, &resolved_file.path)?;
     let capability = capability_from_operation(&effective_operation)?;
-    let file_content = std::fs::read_to_string(&file_path).map_err(|err| {
-        DispatchError::invalid_arguments(format!(
-            "cannot read file '{}': {err}",
-            file_path.display()
-        ))
-    })?;
     let plugin_request = PluginRequest::with_arguments(
         &effective_operation,
         vec![FilePayload::new(
-            relative_file_path.to_path_buf(),
-            file_content,
+            resolved_file.relative_path,
+            resolved_file.content,
         )],
         plugin_args,
     );
-    Ok((plugin_request, capability, file_path))
+    Ok((plugin_request, capability, resolved_file.path))
 }
 
 fn build_plugin_args(
@@ -64,6 +61,11 @@ fn build_plugin_args(
             return Err(DispatchError::invalid_arguments(format!(
                 "refactor extra argument has an empty key: '{extra}'"
             )));
+        }
+        if key.trim() == "refactoring" {
+            return Err(DispatchError::invalid_arguments(
+                "refactor extra argument must not override reserved key 'refactoring'",
+            ));
         }
         if parts.len() == 2 {
             plugin_args.insert(
@@ -97,7 +99,7 @@ fn contains_parent_traversal(path: &Path) -> bool {
         .any(|c| matches!(c, std::path::Component::ParentDir))
 }
 
-fn resolve_file(workspace_root: &Path, file: &str) -> Result<PathBuf, DispatchError> {
+fn resolve_file(workspace_root: &Path, file: &str) -> Result<ResolvedFile, DispatchError> {
     let path = Path::new(file);
     if path.is_absolute() {
         return Err(DispatchError::invalid_arguments(
@@ -118,7 +120,23 @@ fn resolve_file(workspace_root: &Path, file: &str) -> Result<PathBuf, DispatchEr
             "path traversal is not allowed",
         ));
     }
-    Ok(canonical_resolved)
+    let relative_path = canonical_resolved
+        .strip_prefix(workspace_root)
+        .map_err(|_| {
+            DispatchError::invalid_arguments("resolved file path escapes the workspace root")
+        })?
+        .to_path_buf();
+    let content = std::fs::read_to_string(&canonical_resolved).map_err(|error| {
+        DispatchError::invalid_arguments(format!(
+            "cannot read file '{}': {error}",
+            canonical_resolved.display()
+        ))
+    })?;
+    Ok(ResolvedFile {
+        path: canonical_resolved,
+        relative_path,
+        content,
+    })
 }
 
 fn apply_rename_symbol_mapping(
