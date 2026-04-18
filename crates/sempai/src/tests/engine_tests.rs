@@ -1,5 +1,7 @@
 //! Tests for the `Engine` and `QueryPlan` types.
 
+use rstest::rstest;
+
 use crate::{
     Diagnostic,
     DiagnosticCode,
@@ -14,7 +16,7 @@ use crate::{
 fn default_engine() -> Engine { Engine::new(EngineConfig::default()) }
 
 fn compile_yaml_text(yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
-    let engine = Engine::new(EngineConfig::default());
+    let engine = default_engine();
     engine.compile_yaml(yaml)
 }
 
@@ -36,6 +38,14 @@ fn simple_rule_yaml(id: Option<&str>, pattern_line: &str) -> String {
         id_line = id_line,
         pattern_line = pattern_line,
     )
+}
+
+struct SingleRuleDiagnosticCase {
+    rule_id: Option<&'static str>,
+    yaml_body: &'static str,
+    expected_code: DiagnosticCode,
+    check_primary_span: bool,
+    check_message: Option<&'static str>,
 }
 
 fn first_diagnostic_of_err<T>(result: Result<T, DiagnosticReport>) -> (DiagnosticCode, Diagnostic) {
@@ -61,24 +71,45 @@ fn engine_new_with_custom_config() {
     assert!(engine.config().enable_hcl());
 }
 
-#[test]
-fn compile_yaml_returns_yaml_parse_diagnostic_for_malformed_yaml() {
-    let (code, first) = compile_and_first(&simple_rule_yaml(Some("bad"), "pattern: ["));
-    assert_eq!(code, DiagnosticCode::ESempaiYamlParse);
-    assert!(first.primary_span().is_some());
-}
-
-#[test]
-fn compile_yaml_returns_schema_diagnostic_for_missing_rule_id() {
-    let (code, _diag) = compile_and_first(&simple_rule_yaml(None, "pattern: foo($X)"));
-    assert_eq!(code, DiagnosticCode::ESempaiSchemaInvalid);
-}
-
-#[test]
-fn compile_yaml_returns_not_implemented_after_successful_parse() {
-    let (code, diag) = compile_and_first(&simple_rule_yaml(Some("demo.rule"), "pattern: foo($X)"));
-    assert_eq!(code, DiagnosticCode::NotImplemented);
-    assert!(diag.message().contains("normalization"));
+#[rstest]
+#[case(
+    SingleRuleDiagnosticCase {
+        rule_id: Some("bad"),
+        yaml_body: "pattern: [",
+        expected_code: DiagnosticCode::ESempaiYamlParse,
+        check_primary_span: true,
+        check_message: None,
+    }
+)]
+#[case(
+    SingleRuleDiagnosticCase {
+        rule_id: None,
+        yaml_body: "pattern: foo($X)",
+        expected_code: DiagnosticCode::ESempaiSchemaInvalid,
+        check_primary_span: false,
+        check_message: None,
+    }
+)]
+#[case(
+    SingleRuleDiagnosticCase {
+        rule_id: Some("demo.rule"),
+        yaml_body: "pattern: foo($X)",
+        expected_code: DiagnosticCode::NotImplemented,
+        check_primary_span: false,
+        check_message: Some("normalization"),
+    }
+)]
+fn compile_yaml_returns_expected_diagnostic_for_single_rule_cases(
+    #[case] case: SingleRuleDiagnosticCase,
+) {
+    let (code, diag) = compile_and_first(&simple_rule_yaml(case.rule_id, case.yaml_body));
+    assert_eq!(code, case.expected_code);
+    if case.check_primary_span {
+        assert!(diag.primary_span().is_some());
+    }
+    if let Some(expected_message) = case.check_message {
+        assert!(diag.message().contains(expected_message));
+    }
 }
 
 #[test]

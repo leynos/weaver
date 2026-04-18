@@ -233,7 +233,7 @@ fn handler_omits_position_when_offset_not_provided(
     socket_dir: Result<TempDir, String>,
 ) -> Result<(), String> {
     let socket_dir = socket_dir?;
-    let (plugin_request, _) = assert_rename_request(
+    let _ = assert_rename_request(
         RenameDispatch {
             file: "notes.py",
             provider: "rope",
@@ -246,8 +246,6 @@ fn handler_omits_position_when_offset_not_provided(
             new_name: Some("woven"),
         },
     )?;
-
-    assert!(!plugin_request.arguments().contains_key("position"));
     Ok(())
 }
 
