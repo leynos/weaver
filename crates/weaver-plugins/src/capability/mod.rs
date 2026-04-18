@@ -11,6 +11,11 @@
 
 pub mod reason_code;
 pub mod rename_symbol;
+/// Shared test fixtures and validation helpers for capability contract tests.
+///
+/// This module is available only when the `test-support` feature is enabled.
+#[cfg(feature = "test-support")]
+pub mod test_support;
 
 #[cfg(test)]
 mod tests;
