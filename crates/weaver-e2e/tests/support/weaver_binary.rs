@@ -7,6 +7,7 @@ use std::{
     sync::OnceLock,
 };
 
+/// Returns the resolved path to the `weaver` binary used by e2e tests.
 pub(crate) fn weaver_binary_path() -> &'static Path {
     static WEAVER_BINARY: OnceLock<PathBuf> = OnceLock::new();
     WEAVER_BINARY.get_or_init(|| match resolve_weaver_binary() {
@@ -20,8 +21,9 @@ fn resolve_weaver_binary() -> Result<PathBuf, String> {
         return Ok(cargo_bin);
     }
 
-    if let Some(target_dir_binary) = target_dir_binary_path("weaver")? {
-        return Ok(target_dir_binary);
+    let target_dir_candidate = target_dir_binary_path("weaver")?;
+    if let Some(candidate) = target_dir_candidate.as_ref().filter(|path| path.is_file()) {
+        return Ok(candidate.clone());
     }
 
     let fallback = target_debug_binary_path()?;
@@ -30,7 +32,17 @@ fn resolve_weaver_binary() -> Result<PathBuf, String> {
     }
 
     build_workspace_binary(&fallback)?;
-    Ok(fallback)
+    if let Some(candidate) = target_dir_candidate.filter(|path| path.is_file()) {
+        return Ok(candidate);
+    }
+    if fallback.is_file() {
+        return Ok(fallback);
+    }
+
+    Err(format!(
+        "failed to locate built weaver binary after cargo build: {}",
+        fallback.display()
+    ))
 }
 
 fn cargo_bin_from_env(name: &str) -> Option<PathBuf> {
@@ -49,7 +61,7 @@ fn target_dir_binary_path(name: &str) -> Result<Option<PathBuf>, String> {
     }
 
     let binary_path = target_dir.join(format!("{name}{}", env::consts::EXE_SUFFIX));
-    Ok(binary_path.is_file().then_some(binary_path))
+    Ok(Some(binary_path))
 }
 
 fn target_debug_binary_path() -> Result<PathBuf, String> {
@@ -75,7 +87,7 @@ fn build_workspace_binary(expected_path: &Path) -> Result<(), String> {
         .status()
         .map_err(|error| format!("failed to build workspace weaver binary: {error}"))?;
 
-    if status.success() && expected_path.is_file() {
+    if status.success() {
         Ok(())
     } else {
         Err(format!(

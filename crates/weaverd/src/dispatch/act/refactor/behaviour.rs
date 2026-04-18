@@ -90,11 +90,7 @@ impl RefactorPluginRuntime for StubRuntime {
 
         Ok(match self.routing {
             mode @ (RoutingMode::AutomaticPython | RoutingMode::AutomaticRust) => {
-                resolve_auto_language(
-                    auto_context,
-                    language_name,
-                    provider_for_auto(mode),
-                )
+                resolve_auto_language(auto_context, language_name, provider_for_auto(mode))
             }
             RoutingMode::UnsupportedLanguage => refused_resolution(RefusedResolution {
                 capability: request.capability(),

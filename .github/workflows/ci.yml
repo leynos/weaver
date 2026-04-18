@@ -52,6 +52,10 @@ jobs:
       - name: Install rustc-codegen-cranelift
         run: |
           toolchain=$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)
+          if [ -z "$toolchain" ]; then
+            echo "error: failed to extract Rust toolchain from rust-toolchain.toml" >&2
+            exit 1
+          fi
           rustup component add rustc-codegen-cranelift --toolchain "$toolchain"
       - name: Lint
         run: make lint

@@ -51,7 +51,7 @@ pub(crate) fn check_utf16_offset(
 ) -> Result<(), String> {
     use crate::dispatch::observe::enrich::byte_col_to_utf16;
     let byte_col_u32 =
-        u32::try_from(byte_col).map_err(|_| "byte_col must fit in u32".to_string())?;
+        u32::try_from(byte_col).map_err(|error| format!("byte_col must fit in u32: {error}"))?;
     assert_eq!(
         byte_col_to_utf16(line, byte_col_u32),
         expected,

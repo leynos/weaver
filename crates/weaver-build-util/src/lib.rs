@@ -247,8 +247,14 @@ pub fn write_man_page(data: &[u8], dir: &Utf8Path, page_name: &str) -> io::Resul
     match target_dir.rename(&tmp, &target_dir, page_name) {
         Ok(()) => {}
         Err(error) if should_retry_replace(&error) => {
-            remove_existing_file(&target_dir, page_name)?;
-            target_dir.rename(&tmp, &target_dir, page_name)?;
+            match target_dir.rename(&tmp, &target_dir, page_name) {
+                Ok(()) => {}
+                Err(retry_error) if should_retry_replace(&retry_error) => {
+                    remove_existing_file(&target_dir, page_name)?;
+                    target_dir.rename(&tmp, &target_dir, page_name)?;
+                }
+                Err(retry_error) => return Err(retry_error),
+            }
         }
         Err(error) => return Err(error),
     }
