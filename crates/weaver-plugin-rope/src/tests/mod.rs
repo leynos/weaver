@@ -4,6 +4,7 @@ mod behaviour;
 
 use std::{collections::HashMap, path::PathBuf};
 
+use cap_std::{ambient_authority, fs::Dir};
 use mockall::mock;
 use rstest::{fixture, rstest};
 use weaver_plugins::{
@@ -230,6 +231,26 @@ fn missing_arguments_include_incomplete_payload_reason_code() {
     let failure = execute_request(&adapter, &request_with_args(arguments))
         .expect_err("empty arguments should fail");
     assert_eq!(failure.reason_code, Some(ReasonCode::IncompletePayload));
+}
+
+#[test]
+fn write_workspace_file_creates_nested_parent_directories() {
+    let workspace = tempfile::tempdir().expect("temporary workspace should be created");
+    let relative_path = PathBuf::from("src/nested/main.py");
+    let content = "def renamed():\n    return 1\n";
+
+    let written_path = crate::write_workspace_file(workspace.path(), &relative_path, content)
+        .expect("nested workspace writes should succeed");
+    let workspace_dir = Dir::open_ambient_dir(workspace.path(), ambient_authority())
+        .expect("workspace directory should open");
+
+    assert_eq!(written_path, workspace.path().join(&relative_path));
+    assert_eq!(
+        workspace_dir
+            .read_to_string("src/nested/main.py")
+            .expect("written file should be readable"),
+        content,
+    );
 }
 
 // ---------------------------------------------------------------------------
