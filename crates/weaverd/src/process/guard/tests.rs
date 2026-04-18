@@ -24,7 +24,8 @@ fn build_paths() -> (TempDir, RuntimePaths) {
 
 /// Acquires a guard, records the provided health state, and returns the guard for assertions.
 fn setup_guard_with_health(paths: &RuntimePaths, state: HealthState) -> ProcessGuard {
-    let _ = test_support::clear_health_events(paths.health_path());
+    test_support::clear_health_events(paths.health_path())
+        .expect("clear health events should succeed");
     let mut guard = ProcessGuard::acquire(paths.clone()).expect("lock should be acquired");
     let pid = std::process::id();
     guard.write_pid(pid).expect("pid write should succeed");

@@ -250,8 +250,10 @@ impl FromStr for SliceRefusalReason {
                 ("backend_unavailable", Self::BackendUnavailable),
             ],
             "refusal reason",
-            "no_symbol_at_position, position_out_of_range, unsupported_language, \
-             not_yet_implemented, backend_unavailable",
+            concat!(
+                "no_symbol_at_position, position_out_of_range, unsupported_language, ",
+                "not_yet_implemented, backend_unavailable",
+            ),
         )
     }
 }

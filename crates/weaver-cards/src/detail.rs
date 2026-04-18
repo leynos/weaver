@@ -59,8 +59,10 @@ impl fmt::Display for DetailLevelParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "unknown detail level: {}; expected one of: minimal, signature, structure, semantic, \
-             full",
+            concat!(
+                "unknown detail level: {}; expected one of: minimal, signature, structure, ",
+                "semantic, full"
+            ),
             self.name
         )
     }

@@ -91,7 +91,12 @@ pub fn prepare_endpoint_filesystem(
         });
     };
 
-    create_socket_directory(parent)?;
+    let (existing_prefix, missing_suffix) = split_existing_prefix(parent)?;
+
+    #[cfg(unix)]
+    ensure_secure_directory(&existing_prefix)?;
+
+    create_missing_socket_directories(existing_prefix, &missing_suffix)?;
 
     #[cfg(unix)]
     ensure_secure_directory(parent)?;
@@ -99,10 +104,62 @@ pub fn prepare_endpoint_filesystem(
     Ok(())
 }
 
-/// Creates the socket directory with appropriate permissions.
+fn split_existing_prefix(
+    parent: &Utf8Path,
+) -> Result<(Utf8PathBuf, Vec<String>), SocketPreparationError> {
+    let mut current = parent;
+    let mut missing_suffix = Vec::new();
+
+    loop {
+        match fs::symlink_metadata(current.as_std_path()) {
+            Ok(_) => {
+                return Ok((
+                    current.to_path_buf(),
+                    missing_suffix.into_iter().rev().collect(),
+                ));
+            }
+            Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
+                let file_name =
+                    current
+                        .file_name()
+                        .ok_or_else(|| SocketPreparationError::MissingParent {
+                            path: parent.to_path_buf(),
+                        })?;
+                missing_suffix.push(file_name.to_owned());
+                current =
+                    current
+                        .parent()
+                        .ok_or_else(|| SocketPreparationError::MissingParent {
+                            path: parent.to_path_buf(),
+                        })?;
+            }
+            Err(source) => {
+                return Err(SocketPreparationError::ReadMetadata {
+                    path: current.to_path_buf(),
+                    source,
+                });
+            }
+        }
+    }
+}
+
+fn create_missing_socket_directories(
+    mut existing_prefix: Utf8PathBuf,
+    missing_suffix: &[String],
+) -> Result<(), SocketPreparationError> {
+    for component in missing_suffix {
+        existing_prefix.push(component);
+        create_socket_directory(&existing_prefix)?;
+        #[cfg(unix)]
+        ensure_secure_directory(&existing_prefix)?;
+    }
+
+    Ok(())
+}
+
+/// Creates one socket directory path segment with appropriate permissions.
 fn create_socket_directory(parent: &Utf8Path) -> Result<(), SocketPreparationError> {
     let mut builder = DirBuilder::new();
-    builder.recursive(true);
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;

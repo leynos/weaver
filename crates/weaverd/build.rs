@@ -5,6 +5,19 @@ use std::env;
 use camino::Utf8PathBuf;
 use weaver_build_util::{manual_date_from_env, out_dir_for_target_profile, write_man_page};
 
+fn cargo_out_dir() -> Option<Utf8PathBuf> {
+    match env::var_os("OUT_DIR") {
+        Some(path) => match path.to_str() {
+            Some(utf8) => Some(Utf8PathBuf::from(utf8)),
+            None => {
+                println!("cargo:warning=OUT_DIR was non-UTF-8; skipping OUT_DIR staging");
+                None
+            }
+        },
+        None => None,
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-env-changed=CARGO_PKG_VERSION");
     println!("cargo:rerun-if-env-changed=CARGO_PKG_NAME");
@@ -49,8 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Man page generation is pure file output, so it works during cross-compilation.
     let target = env::var("TARGET").unwrap_or_else(|_| "unknown-target".into());
     let profile = env::var("PROFILE").unwrap_or_else(|_| "unknown-profile".into());
-    let out_dir_env: Option<Utf8PathBuf> =
-        env::var_os("OUT_DIR").and_then(|p| p.to_str().map(Utf8PathBuf::from));
+    let out_dir_env = cargo_out_dir();
     let out_dir = out_dir_for_target_profile(&target, &profile, out_dir_env.as_deref());
     write_man_page(man_page.as_bytes(), &out_dir, &page_name)?;
 

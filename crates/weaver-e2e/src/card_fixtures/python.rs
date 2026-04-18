@@ -22,8 +22,10 @@ pub const PYTHON_CASES: [CardFixtureCase; 20] = [
     CardFixtureCase {
         name: "python_varargs_kwargs",
         file_name: "varargs.py",
-        source: "def collect(*items: str, **meta: str) -> tuple[int, int]:\n    return \
-                 len(items), len(meta)\n",
+        source: concat!(
+            "def collect(*items: str, **meta: str) -> tuple[int, int]:\n",
+            "    return len(items), len(meta)\n",
+        ),
         line: 1,
         column: 5,
     },
@@ -37,34 +39,58 @@ pub const PYTHON_CASES: [CardFixtureCase; 20] = [
     CardFixtureCase {
         name: "python_class_init_methods",
         file_name: "class_init.py",
-        source: "class Greeter:\n    def __init__(self, prefix: str) -> None:\n        \
-                 self.prefix = prefix\n\n    def greet(self, name: str) -> str:\n        return \
-                 f\"{self.prefix} {name}\"\n",
+        source: concat!(
+            "class Greeter:\n",
+            "    def __init__(self, prefix: str) -> None:\n",
+            "        self.prefix = prefix\n",
+            "\n",
+            "    def greet(self, name: str) -> str:\n",
+            "        return f\"{self.prefix} {name}\"\n",
+        ),
         line: 1,
         column: 7,
     },
     CardFixtureCase {
         name: "python_classmethod_staticmethod",
         file_name: "class_methods.py",
-        source: "class Factory:\n    @classmethod\n    def build(cls) -> \"Factory\":\n        \
-                 return cls()\n\n    @staticmethod\n    def version() -> str:\n        return \
-                 \"1.0\"\n",
+        source: concat!(
+            "class Factory:\n",
+            "    @classmethod\n",
+            "    def build(cls) -> \"Factory\":\n",
+            "        return cls()\n",
+            "\n",
+            "    @staticmethod\n",
+            "    def version() -> str:\n",
+            "        return \"1.0\"\n",
+        ),
         line: 1,
         column: 7,
     },
     CardFixtureCase {
         name: "python_property_decorator",
         file_name: "property.py",
-        source: "class User:\n    def __init__(self, name: str) -> None:\n        self._name = \
-                 name\n\n    @property\n    def name(self) -> str:\n        return self._name\n",
+        source: concat!(
+            "class User:\n",
+            "    def __init__(self, name: str) -> None:\n",
+            "        self._name = name\n",
+            "\n",
+            "    @property\n",
+            "    def name(self) -> str:\n",
+            "        return self._name\n",
+        ),
         line: 1,
         column: 7,
     },
     CardFixtureCase {
         name: "python_nested_function",
         file_name: "nested.py",
-        source: "def outer(value: int) -> int:\n    def inner(delta: int) -> int:\n        return \
-                 value + delta\n\n    return inner(1)\n",
+        source: concat!(
+            "def outer(value: int) -> int:\n",
+            "    def inner(delta: int) -> int:\n",
+            "        return value + delta\n",
+            "\n",
+            "    return inner(1)\n",
+        ),
         line: 1,
         column: 5,
     },
@@ -99,62 +125,102 @@ pub const PYTHON_CASES: [CardFixtureCase; 20] = [
     CardFixtureCase {
         name: "python_google_docstring",
         file_name: "google_docstring.py",
-        source: "def parse(text: str) -> list[str]:\n    \"\"\"Parse words.\n\n    Args:\n        \
-                 text: Input text.\n    \"\"\"\n    return text.split()\n",
+        source: concat!(
+            "def parse(text: str) -> list[str]:\n",
+            "    \"\"\"Parse words.\n",
+            "\n",
+            "    Args:\n",
+            "        text: Input text.\n",
+            "    \"\"\"\n",
+            "    return text.split()\n",
+        ),
         line: 1,
         column: 5,
     },
     CardFixtureCase {
         name: "python_numpy_docstring",
         file_name: "numpy_docstring.py",
-        source:
-            "def normalise(values: list[int]) -> list[int]:\n    \"\"\"Normalise values.\n\n    \
-             Parameters\n    ----------\n    values:\n        Numbers to scale.\n    \"\"\"\n    \
-             return values\n",
+        source: concat!(
+            "def normalise(values: list[int]) -> list[int]:\n",
+            "    \"\"\"Normalise values.\n",
+            "\n",
+            "    Parameters\n",
+            "    ----------\n",
+            "    values:\n",
+            "        Numbers to scale.\n",
+            "    \"\"\"\n",
+            "    return values\n",
+        ),
         line: 1,
         column: 5,
     },
     CardFixtureCase {
         name: "python_dataclass",
         file_name: "dataclass_case.py",
-        source: "from dataclasses import dataclass\n\n@dataclass\nclass Point:\n    x: int\n    \
-                 y: int\n",
+        source: concat!(
+            "from dataclasses import dataclass\n",
+            "\n",
+            "@dataclass\n",
+            "class Point:\n",
+            "    x: int\n",
+            "    y: int\n",
+        ),
         line: 4,
         column: 7,
     },
     CardFixtureCase {
         name: "python_abstract_base_class",
         file_name: "abc_case.py",
-        source:
-            "from abc import ABC, abstractmethod\n\nclass Loader(ABC):\n    @abstractmethod\n    \
-             def load(self) -> str:\n        raise NotImplementedError\n",
+        source: concat!(
+            "from abc import ABC, abstractmethod\n",
+            "\n",
+            "class Loader(ABC):\n",
+            "    @abstractmethod\n",
+            "    def load(self) -> str:\n",
+            "        raise NotImplementedError\n",
+        ),
         line: 3,
         column: 7,
     },
     CardFixtureCase {
         name: "python_complex_types",
         file_name: "complex_types.py",
-        source: "from typing import Dict, Optional, Union\n\ndef project(values: Dict[str, \
-                 Union[int, str]], key: Optional[str]) -> str:\n    return str(values.get(key or \
-                 \"id\", \"0\"))\n",
+        source: concat!(
+            "from typing import Dict, Optional, Union\n",
+            "\n",
+            "def project(values: Dict[str, Union[int, str]], key: Optional[str]) -> str:\n",
+            "    return str(values.get(key or \"id\", \"0\"))\n",
+        ),
         line: 3,
         column: 5,
     },
     CardFixtureCase {
         name: "python_decorator_stack",
         file_name: "decorator_stack.py",
-        source: "def trace(func):\n    return func\n\n@trace\n@trace\ndef run() -> None:\n    \
-                 pass\n",
+        source: concat!(
+            "def trace(func):\n",
+            "    return func\n",
+            "\n",
+            "@trace\n",
+            "@trace\n",
+            "def run() -> None:\n",
+            "    pass\n",
+        ),
         line: 6,
         column: 5,
     },
     CardFixtureCase {
         name: "python_control_flow",
         file_name: "control_flow.py",
-        source:
-            "def classify(value: int) -> str:\n    if value > 10:\n        return \"big\"\n    for \
-             item in range(value):\n        if item == 2:\n            break\n    return \
-             \"small\"\n",
+        source: concat!(
+            "def classify(value: int) -> str:\n",
+            "    if value > 10:\n",
+            "        return \"big\"\n",
+            "    for item in range(value):\n",
+            "        if item == 2:\n",
+            "            break\n",
+            "    return \"small\"\n",
+        ),
         line: 1,
         column: 5,
     },

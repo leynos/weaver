@@ -290,16 +290,16 @@ fn execute_plugin_and_handle_response<W: Write>(
     writer: &mut ResponseWriter<W>,
     context: &mut RefactorContext<'_>,
 ) -> Result<DispatchResult, DispatchError> {
-    let result = params
+    match params
         .runtime
-        .execute(params.selected_provider, params.plugin_request);
-
-    if let Ok(response) = result {
-        return handle_successful_execution(response, writer, context);
+        .execute(params.selected_provider, params.plugin_request)
+    {
+        Ok(response) => handle_successful_execution(response, writer, context),
+        Err(error) => {
+            write_execution_error(&error, params.selected_provider, args, writer)?;
+            Ok(DispatchResult::with_status(1))
+        }
     }
-
-    write_execution_error(&result.unwrap_err(), params.selected_provider, args, writer)?;
-    Ok(DispatchResult::with_status(1))
 }
 
 /// Writes an error message for a failed plugin execution.

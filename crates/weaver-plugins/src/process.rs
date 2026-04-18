@@ -261,11 +261,17 @@ fn handle_timeout(
         timeout_secs,
         "plugin timed out, killing process"
     );
-    drop(child.kill());
-    drop(child.wait());
+    let message = match child.kill() {
+        Ok(()) => match child.wait() {
+            Ok(status) => format!("terminated timed-out process with status {status}"),
+            Err(error) => format!("failed to wait for timed-out process after kill: {error}"),
+        },
+        Err(error) => format!("failed to kill timed-out process: {error}"),
+    };
     Err(PluginError::Timeout {
         name: name.to_owned(),
         timeout_secs,
+        message,
     })
 }
 

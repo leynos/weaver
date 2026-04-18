@@ -18,14 +18,20 @@ pub(super) fn prepare_plugin_request(
     args: &arguments::RefactorArgs,
 ) -> Result<(PluginRequest, CapabilityId, PathBuf), DispatchError> {
     let file_path = resolve_file(workspace_root, &args.file)?;
+    let relative_file_path = file_path.strip_prefix(workspace_root).map_err(|_| {
+        DispatchError::invalid_arguments("resolved file path escapes the workspace root")
+    })?;
     let file_content = std::fs::read_to_string(&file_path).map_err(|err| {
         DispatchError::invalid_arguments(format!("cannot read file '{}': {err}", args.file))
     })?;
     let mut plugin_args = build_plugin_args(args);
-    let effective_operation = effective_operation(&mut plugin_args, args)?;
+    let effective_operation = effective_operation(&mut plugin_args, args, relative_file_path)?;
     let plugin_request = PluginRequest::with_arguments(
         &effective_operation,
-        vec![FilePayload::new(PathBuf::from(&args.file), file_content)],
+        vec![FilePayload::new(
+            relative_file_path.to_path_buf(),
+            file_content,
+        )],
         plugin_args,
     );
     let capability = capability_from_operation(&effective_operation)?;
@@ -53,10 +59,11 @@ fn build_plugin_args(args: &arguments::RefactorArgs) -> HashMap<String, serde_js
 fn effective_operation(
     plugin_args: &mut HashMap<String, serde_json::Value>,
     args: &arguments::RefactorArgs,
+    relative_file_path: &Path,
 ) -> Result<String, DispatchError> {
     match args.refactoring.as_str() {
         "rename" => {
-            apply_rename_symbol_mapping(plugin_args, &args.file)?;
+            apply_rename_symbol_mapping(plugin_args, relative_file_path)?;
             Ok(String::from("rename-symbol"))
         }
         _ => Ok(args.refactoring.clone()),
@@ -91,13 +98,14 @@ fn resolve_file(workspace_root: &Path, file: &str) -> Result<PathBuf, DispatchEr
 
 fn apply_rename_symbol_mapping(
     plugin_args: &mut HashMap<String, serde_json::Value>,
-    file: &str,
+    file: &Path,
 ) -> Result<(), DispatchError> {
+    let display_path = file.display().to_string();
     plugin_args.insert(
         String::from("uri"),
         serde_json::Value::String(to_file_uri(file).map_err(|error| {
             DispatchError::invalid_arguments(format!(
-                "cannot construct file URI for '{file}': {error}"
+                "cannot construct file URI for '{display_path}': {error}"
             ))
         })?),
     );
@@ -107,13 +115,13 @@ fn apply_rename_symbol_mapping(
     Ok(())
 }
 
-fn to_file_uri(path: &str) -> Result<String, url::ParseError> {
+fn to_file_uri(path: &Path) -> Result<String, url::ParseError> {
     let mut url = Url::parse("file:///")?;
     {
         let mut segments = url
             .path_segments_mut()
             .map_err(|()| url::ParseError::RelativeUrlWithoutBase)?;
-        segments.extend(path.split('/'));
+        segments.extend(path.to_string_lossy().split('/'));
     }
     Ok(url.to_string())
 }

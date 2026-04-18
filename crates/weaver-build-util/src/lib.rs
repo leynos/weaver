@@ -181,11 +181,17 @@ fn create_dir_all_cap(base: &Dir, path: &Utf8Path) -> io::Result<()> {
 
 fn find_existing_ancestor(dir: &Utf8Path) -> &Utf8Path {
     let mut candidate = dir;
-    while !candidate.as_str().is_empty() && candidate.parent().is_some() {
+    loop {
         if Dir::open_ambient_dir(candidate, cap_std::ambient_authority()).is_ok() {
             return candidate;
         }
-        candidate = candidate.parent().unwrap_or(candidate);
+        let Some(parent) = candidate.parent() else {
+            break;
+        };
+        if parent == candidate {
+            break;
+        }
+        candidate = parent;
     }
     Utf8Path::new(".")
 }

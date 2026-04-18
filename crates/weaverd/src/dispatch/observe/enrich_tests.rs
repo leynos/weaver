@@ -57,30 +57,33 @@ fn try_lsp_enrichment_starts_backend_and_populates_hover_info() {
 }
 
 #[test]
-fn try_lsp_enrichment_degrades_when_initialization_fails() {
+fn try_lsp_enrichment_degrades_when_initialization_fails() -> Result<(), String> {
     let (server, _hover_params) = StubLanguageServer::failing_initialize(
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         "boom",
     );
-    let (backends, _dir) = assert_enrichment_degrades(server);
+    let (backends, _dir) = assert_enrichment_degrades(server)?;
     assert!(backends.is_started(BackendKind::Semantic));
+    Ok(())
 }
 
 #[test]
-fn try_lsp_enrichment_degrades_when_hover_is_missing() {
+fn try_lsp_enrichment_degrades_when_hover_is_missing() -> Result<(), String> {
     let (server, _hover_params) = StubLanguageServer::missing_hover(
         ServerCapabilitySet::new(false, false, false).with_hover(true),
     );
-    let (_backends, _dir) = assert_enrichment_degrades(server);
+    let (_backends, _dir) = assert_enrichment_degrades(server)?;
+    Ok(())
 }
 
 #[test]
-fn try_lsp_enrichment_degrades_when_hover_request_fails() {
+fn try_lsp_enrichment_degrades_when_hover_request_fails() -> Result<(), String> {
     let (server, _hover_params) = StubLanguageServer::failing_hover(
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         "hover RPC failed",
     );
-    let (_backends, _dir) = assert_enrichment_degrades(server);
+    let (_backends, _dir) = assert_enrichment_degrades(server)?;
+    Ok(())
 }
 
 #[test]

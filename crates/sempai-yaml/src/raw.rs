@@ -1,8 +1,8 @@
-//! Raw serde-deserialisable types mirroring the YAML schema.
+//! Raw serde-deserializable types mirroring the YAML schema.
 //!
 //! These types match the YAML structure as consumed by serde and convert into
 //! the typed `model` layer via `TryFrom`. Conversion can fail with a
-//! `DiagnosticReport` when the deserialised shape violates semantic
+//! `DiagnosticReport` when the deserialized shape violates semantic
 //! constraints such as missing fields or conflicting operators.
 
 use sempai_core::{DiagnosticCode, DiagnosticReport, SourceSpan};

@@ -68,7 +68,14 @@ impl ProcessGuard {
         })?;
         #[cfg(test)]
         {
-            let _ = record_health_event(path, snapshot.status);
+            if let Err(error) = record_health_event(path, snapshot.status) {
+                eprintln!(
+                    "failed to record health event for {} ({:?}): {}",
+                    path.display(),
+                    snapshot.status,
+                    error
+                );
+            }
         }
         info!(
             target: PROCESS_TARGET,
