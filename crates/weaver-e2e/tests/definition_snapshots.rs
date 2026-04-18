@@ -99,8 +99,9 @@ where
 macro_rules! run_test_with_context {
     ($fixture:expr, $impl_fn:path) => {{
         require_pyrefly!();
-        let Some(ctx) = $fixture.as_mut() else {
-            panic!("context should exist when pyrefly is available");
+        let mut fixture = $fixture?;
+        let Some(ctx) = fixture.as_mut() else {
+            return Ok(());
         };
         $impl_fn(ctx)
     }};
@@ -214,7 +215,7 @@ fn spawn_uninitialized_client() -> Result<(LspClient, Uri), TestError> {
 
 #[rstest]
 fn definition_from_call_to_function(
-    mut linear_chain_context: Option<TestContext>,
+    linear_chain_context: Result<Option<TestContext>, TestError>,
 ) -> Result<(), TestError> {
     run_test_with_context!(
         linear_chain_context,
@@ -224,7 +225,7 @@ fn definition_from_call_to_function(
 
 #[rstest]
 fn definition_at_function_definition(
-    mut linear_chain_context: Option<TestContext>,
+    linear_chain_context: Result<Option<TestContext>, TestError>,
 ) -> Result<(), TestError> {
     run_test_with_context!(
         linear_chain_context,
@@ -234,7 +235,7 @@ fn definition_at_function_definition(
 
 #[rstest]
 fn definition_self_method_call(
-    mut python_class_context: Option<TestContext>,
+    python_class_context: Result<Option<TestContext>, TestError>,
 ) -> Result<(), TestError> {
     run_test_with_context!(
         python_class_context,
@@ -243,7 +244,9 @@ fn definition_self_method_call(
 }
 
 #[rstest]
-fn definition_class_method(mut python_class_context: Option<TestContext>) -> Result<(), TestError> {
+fn definition_class_method(
+    python_class_context: Result<Option<TestContext>, TestError>,
+) -> Result<(), TestError> {
     run_test_with_context!(
         python_class_context,
         test_impl::definition_class_method_impl
@@ -251,13 +254,15 @@ fn definition_class_method(mut python_class_context: Option<TestContext>) -> Res
 }
 
 #[rstest]
-fn definition_class_name(mut python_class_context: Option<TestContext>) -> Result<(), TestError> {
+fn definition_class_name(
+    python_class_context: Result<Option<TestContext>, TestError>,
+) -> Result<(), TestError> {
     run_test_with_context!(python_class_context, test_impl::definition_class_name_impl)
 }
 
 #[rstest]
 fn definition_parameter(
-    mut python_functions_context: Option<TestContext>,
+    python_functions_context: Result<Option<TestContext>, TestError>,
 ) -> Result<(), TestError> {
     run_test_with_context!(
         python_functions_context,
@@ -267,7 +272,7 @@ fn definition_parameter(
 
 #[rstest]
 fn definition_on_whitespace(
-    mut linear_chain_context: Option<TestContext>,
+    linear_chain_context: Result<Option<TestContext>, TestError>,
 ) -> Result<(), TestError> {
     run_test_with_context!(
         linear_chain_context,

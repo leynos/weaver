@@ -30,25 +30,16 @@ fn create_test_context(fixture_content: &str) -> Result<Option<TestContext>, Tes
 }
 
 #[fixture]
-pub fn linear_chain_context() -> Option<TestContext> {
-    match create_test_context(fixtures::LINEAR_CHAIN) {
-        Ok(context) => context,
-        Err(error) => panic!("failed to create test context: {error}"),
-    }
+pub fn linear_chain_context() -> Result<Option<TestContext>, TestError> {
+    create_test_context(fixtures::LINEAR_CHAIN)
 }
 
 #[fixture]
-pub fn python_class_context() -> Option<TestContext> {
-    match create_test_context(fixtures::PYTHON_CLASS) {
-        Ok(context) => context,
-        Err(error) => panic!("failed to create test context: {error}"),
-    }
+pub fn python_class_context() -> Result<Option<TestContext>, TestError> {
+    create_test_context(fixtures::PYTHON_CLASS)
 }
 
 #[fixture]
-pub fn python_functions_context() -> Option<TestContext> {
-    match create_test_context(fixtures::PYTHON_FUNCTIONS) {
-        Ok(context) => context,
-        Err(error) => panic!("failed to create test context: {error}"),
-    }
+pub fn python_functions_context() -> Result<Option<TestContext>, TestError> {
+    create_test_context(fixtures::PYTHON_FUNCTIONS)
 }
