@@ -125,17 +125,16 @@ impl RefactorPluginRuntime for StubRuntime {
             .ok_or_else(|| PluginError::NotFound {
                 name: String::from("file payload"),
             })?;
-        let relative_path = file_payload.path().to_string_lossy().into_owned();
 
         match self.execution {
             RuntimeMode::DiffSuccess => Ok(PluginResponse::success(PluginOutput::Diff {
-                content: routed_diff_for(Path::new(&relative_path)),
+                content: routed_diff_for(file_payload.path()),
             })),
             RuntimeMode::RuntimeError => Err(PluginError::NotFound {
                 name: String::from("rope"),
             }),
             RuntimeMode::MalformedDiff => Ok(PluginResponse::success(PluginOutput::Diff {
-                content: routed_malformed_diff_for(Path::new(&relative_path)),
+                content: routed_malformed_diff_for(file_payload.path()),
             })),
             RuntimeMode::EmptySuccess => Ok(PluginResponse::success(PluginOutput::Empty)),
         }
@@ -295,41 +294,41 @@ fn given_non_diff_success(world: &mut RefactorWorld) {
 #[when("the act refactor command executes")]
 fn when_refactor_executes(world: &mut RefactorWorld) -> Result<(), String> { world.execute() }
 
-#[then("the refactor command succeeds")]
-fn then_refactor_succeeds(world: &mut RefactorWorld) -> Result<(), String> {
+fn extract_status(world: &RefactorWorld) -> Result<i32, String> {
     let result = world.dispatch_result.as_ref().ok_or("result missing")?;
-    let status = result.as_ref().map_err(|e| format!("status error: {e}"))?;
-    assert_eq!(*status, 0);
+    result
+        .as_ref()
+        .map(|status| *status)
+        .map_err(|e| format!("status error: {e}"))
+}
+fn then_refactor_succeeds(world: &mut RefactorWorld) -> Result<(), String> {
+    assert_eq!(extract_status(world)?, 0);
     Ok(())
 }
 
 #[then("the refactor command fails with status 1")]
 fn then_refactor_fails_status_one(world: &mut RefactorWorld) -> Result<(), String> {
-    let result = world.dispatch_result.as_ref().ok_or("result missing")?;
-    let status = result.as_ref().map_err(|e| format!("status error: {e}"))?;
-    assert_eq!(*status, 1);
+    assert_eq!(extract_status(world)?, 1);
     Ok(())
 }
 
 #[then("the target file is updated")]
 fn then_target_file_updated(world: &mut RefactorWorld) -> Result<(), String> {
     let target_file = world.target_file()?;
-    let target_path = Path::new(&target_file);
-    let patch_target = routed_patch_path(target_path);
-    let path_str = patch_target.to_str().ok_or("invalid UTF-8 path")?;
-    let updated = world.read_file(path_str)?;
-    assert_eq!(updated, updated_content_for(target_path));
+    assert_eq!(
+        read_routed_target(world)?,
+        updated_content_for(Path::new(&target_file))
+    );
     Ok(())
 }
 
 #[then("the target file is unchanged")]
 fn then_target_file_unchanged(world: &mut RefactorWorld) -> Result<(), String> {
     let target_file = world.target_file()?;
-    let target_path = Path::new(&target_file);
-    let patch_target = routed_patch_path(target_path);
-    let path_str = patch_target.to_str().ok_or("invalid UTF-8 path")?;
-    let updated = world.read_file(path_str)?;
-    assert_eq!(updated, original_content_for(target_path));
+    assert_eq!(
+        read_routed_target(world)?,
+        original_content_for(Path::new(&target_file))
+    );
     Ok(())
 }
 
@@ -380,4 +379,11 @@ fn resolve_auto_language(
             ),
         })
     }
+}
+
+fn read_routed_target(world: &RefactorWorld) -> Result<String, String> {
+    let target_file = world.target_file()?;
+    let patch_target = routed_patch_path(Path::new(&target_file));
+    let path_str = patch_target.to_str().ok_or("invalid UTF-8 path")?;
+    world.read_file(path_str)
 }

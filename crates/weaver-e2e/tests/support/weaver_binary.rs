@@ -22,8 +22,8 @@ fn resolve_weaver_binary() -> Result<PathBuf, String> {
     }
 
     let target_dir_candidate = target_dir_binary_path("weaver")?;
-    if let Some(candidate) = target_dir_candidate.as_ref().filter(|path| path.is_file()) {
-        return Ok(candidate.clone());
+    if target_dir_candidate.is_file() {
+        return Ok(target_dir_candidate.clone());
     }
 
     let fallback = target_debug_binary_path()?;
@@ -32,8 +32,8 @@ fn resolve_weaver_binary() -> Result<PathBuf, String> {
     }
 
     build_workspace_binary(&fallback)?;
-    if let Some(candidate) = target_dir_candidate.filter(|path| path.is_file()) {
-        return Ok(candidate);
+    if target_dir_candidate.is_file() {
+        return Ok(target_dir_candidate);
     }
     if fallback.is_file() {
         return Ok(fallback);
@@ -52,7 +52,7 @@ fn cargo_bin_from_env(name: &str) -> Option<PathBuf> {
         .filter(|path| path.is_file())
 }
 
-fn target_dir_binary_path(name: &str) -> Result<Option<PathBuf>, String> {
+fn target_dir_binary_path(name: &str) -> Result<PathBuf, String> {
     let mut target_dir =
         env::current_exe().map_err(|error| format!("current executable path: {error}"))?;
     target_dir.pop();
@@ -61,7 +61,7 @@ fn target_dir_binary_path(name: &str) -> Result<Option<PathBuf>, String> {
     }
 
     let binary_path = target_dir.join(format!("{name}{}", env::consts::EXE_SUFFIX));
-    Ok(Some(binary_path))
+    Ok(binary_path)
 }
 
 fn target_debug_binary_path() -> Result<PathBuf, String> {
