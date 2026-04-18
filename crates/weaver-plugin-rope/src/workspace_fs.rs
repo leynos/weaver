@@ -26,6 +26,16 @@ fn create_dir_all_cap(base: &Dir, path: &Utf8Path) -> io::Result<()> {
     Ok(())
 }
 
+/// Writes `content` to a workspace-relative file, creating parent directories.
+///
+/// `workspace_root` is the capability root for filesystem operations and
+/// `relative_path` must refer to a file beneath that root. On success this
+/// returns the absolute path that was written.
+///
+/// # Errors
+///
+/// Returns [`RopeAdapterError`] when the path is invalid, does not resolve to a
+/// file name, or any capability-based filesystem operation fails.
 pub(crate) fn write_workspace_file(
     workspace_root: &Path,
     relative_path: &Path,

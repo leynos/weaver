@@ -45,10 +45,7 @@ pub enum SocketPreparationError {
     /// Socket directory canonicalization produced a non-UTF-8 path.
     #[cfg(unix)]
     #[error("socket directory canonicalizes to a non-UTF-8 path: {path:?}")]
-    NonUtf8CanonicalPath {
-        #[cfg(unix)]
-        path: std::path::PathBuf,
-    },
+    NonUtf8CanonicalPath { path: std::path::PathBuf },
     /// Socket directory escapes the configured base path.
     #[cfg(unix)]
     #[error("socket directory '{path}' escapes to '{canonical}' when canonicalized")]
@@ -107,7 +104,7 @@ pub fn prepare_endpoint_filesystem(
 fn split_existing_prefix(
     parent: &Utf8Path,
 ) -> Result<(Utf8PathBuf, Vec<String>), SocketPreparationError> {
-    let mut current = parent;
+    let mut current = parent.to_path_buf();
     let mut missing_suffix = Vec::new();
 
     loop {
@@ -119,25 +116,7 @@ fn split_existing_prefix(
                 ));
             }
             Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
-                let file_name = match current.file_name() {
-                    Some(file_name) => file_name.to_owned(),
-                    None if current.as_str().is_empty() => String::from("."),
-                    None => {
-                        return Err(SocketPreparationError::MissingParent {
-                            path: parent.to_path_buf(),
-                        });
-                    }
-                };
-                missing_suffix.push(file_name);
-                current = if current.as_str().is_empty() {
-                    Utf8Path::new(".")
-                } else {
-                    current
-                        .parent()
-                        .ok_or_else(|| SocketPreparationError::MissingParent {
-                            path: parent.to_path_buf(),
-                        })?
-                };
+                current = handle_not_found(&current, parent, &mut missing_suffix)?;
             }
             Err(source) => {
                 return Err(SocketPreparationError::ReadMetadata {
@@ -146,6 +125,33 @@ fn split_existing_prefix(
                 });
             }
         }
+    }
+}
+
+fn handle_not_found(
+    current: &Utf8Path,
+    parent: &Utf8Path,
+    missing_suffix: &mut Vec<String>,
+) -> Result<Utf8PathBuf, SocketPreparationError> {
+    let file_name = match current.file_name() {
+        Some(file_name) => file_name.to_owned(),
+        None if current.as_str().is_empty() => String::from("."),
+        None => {
+            return Err(SocketPreparationError::MissingParent {
+                path: parent.to_path_buf(),
+            });
+        }
+    };
+    missing_suffix.push(file_name);
+
+    if current.as_str().is_empty() {
+        Ok(Utf8PathBuf::from("."))
+    } else {
+        current.parent().map(Utf8Path::to_path_buf).ok_or_else(|| {
+            SocketPreparationError::MissingParent {
+                path: parent.to_path_buf(),
+            }
+        })
     }
 }
 
@@ -187,6 +193,9 @@ fn create_socket_directory(parent: &Utf8Path) -> Result<(), SocketPreparationErr
 /// Ensures the socket directory is secure (Unix-only).
 #[cfg(unix)]
 pub fn ensure_secure_directory(parent: &Utf8Path) -> Result<(), SocketPreparationError> {
+    // SAFETY: `geteuid` is a read-only libc FFI call with no pointer
+    // arguments or side effects. We cast its return value to `u32`
+    // immediately and use it only for ownership checks.
     let expected_uid = unsafe { geteuid() } as u32;
     let mut current = Utf8PathBuf::new();
 
@@ -303,13 +312,13 @@ fn normalize_parent_path(parent: &Utf8Path) -> Utf8PathBuf {
                 components.clear();
             }
             Utf8Component::CurDir => {}
-            Utf8Component::ParentDir => match components.last() {
-                Some(last) if *last != ".." => {
+            Utf8Component::ParentDir => {
+                if parent_dir_should_pop(components.last().copied()) {
                     components.pop();
+                } else if !is_absolute {
+                    components.push("..");
                 }
-                _ if !is_absolute => components.push(".."),
-                _ => {}
-            },
+            }
             Utf8Component::Normal(component) => components.push(component),
             Utf8Component::Prefix(_) => {}
         }
@@ -329,6 +338,11 @@ fn normalize_parent_path(parent: &Utf8Path) -> Utf8PathBuf {
     } else {
         normalized
     }
+}
+
+#[cfg(unix)]
+fn parent_dir_should_pop(last: Option<&str>) -> bool {
+    matches!(last, Some(component) if component != "..")
 }
 
 #[cfg(unix)]

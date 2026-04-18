@@ -127,6 +127,7 @@ pub(crate) fn schema_error(
     )
 }
 
+/// Returns the sole parsed legacy formula or the diagnostic from `make_error`.
 pub(crate) fn singleton_formula(
     mut formulas: Vec<LegacyFormula>,
     make_error: impl FnOnce(usize) -> DiagnosticReport,
@@ -218,6 +219,7 @@ pub(crate) fn convert_legacy_formula_object(
     })
 }
 
+/// Appends an optional string-backed legacy operator to `formulas`.
 pub(crate) fn push_optional_legacy_formula(
     formulas: &mut Vec<LegacyFormula>,
     value: Option<String>,
@@ -228,6 +230,7 @@ pub(crate) fn push_optional_legacy_formula(
     }
 }
 
+/// Appends an optional sequence-backed legacy operator to `formulas`.
 pub(crate) fn push_optional_legacy_sequence_formula<T, U>(
     formulas: &mut Vec<LegacyFormula>,
     value: Option<Vec<T>>,
@@ -334,8 +337,7 @@ impl TryFrom<RawMatchFormulaObject> for MatchFormula {
     }
 }
 
-/// Converts a `RawMatchFormulaObject` to a `MatchFormula`, using the provided
-/// span for error reporting when validation fails.
+/// Converts a raw `match` formula object into a validated `MatchFormula`.
 pub(crate) fn convert_match_formula_object(
     value: RawMatchFormulaObject,
     span: Option<SourceSpan>,
