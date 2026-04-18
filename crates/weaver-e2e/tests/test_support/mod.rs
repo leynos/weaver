@@ -111,8 +111,13 @@ impl TestDaemon {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "test fixture setup should panic with an explicit message"
+)]
 pub(crate) fn fixture_uri(temp_dir: &TempDir, case: CardFixtureCase) -> String {
-    let path = write_fixture_path(temp_dir, case.file_name, case.source);
+    let path =
+        write_fixture_path(temp_dir, case.file_name, case.source).expect("write fixture path");
     let uri = Url::from_file_path(&path).map_err(|()| "fixture path to URI".to_owned());
     required_result(uri, "fixture path to URI").to_string()
 }

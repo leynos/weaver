@@ -97,7 +97,8 @@ const fn snapshot_harness() -> SnapshotHarness {
     reason = "test helper failures should panic with explicit setup messages"
 )]
 fn unsupported_fixture_uri(temp_dir: &TempDir) -> String {
-    let path = write_fixture_path(temp_dir, "notes.txt", "plain text\n");
+    let path =
+        write_fixture_path(temp_dir, "notes.txt", "plain text\n").expect("write fixture path");
     Url::from_file_path(&path)
         .map(|uri| uri.to_string())
         .expect("unsupported path to URI")
