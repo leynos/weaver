@@ -279,6 +279,7 @@ pub(crate) fn write_workspace_file(
     relative_path: &Path,
     content: &str,
 ) -> Result<PathBuf, RustAnalyzerAdapterError> {
+    validate_relative_path(relative_path)?;
     let (absolute_path, workspace_relative_path) =
         resolve_workspace_path(workspace_root, relative_path)?;
     let file_name = workspace_relative_path.file_name().ok_or_else(|| {
