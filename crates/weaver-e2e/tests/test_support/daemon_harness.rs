@@ -161,35 +161,36 @@ fn serve_requests(
 }
 
 /// Polls `listener.accept()` until a connection arrives or the deadline elapses.
-#[expect(
-    clippy::expect_used,
-    reason = "restoring blocking mode on accepted stream must succeed for correct I/O"
-)]
 fn accept_before_deadline(listener: &TcpListener) -> Result<TcpStream, io::Error> {
     let deadline = Instant::now() + ACCEPT_TIMEOUT;
 
     loop {
         match listener.accept() {
-            Ok((stream, _)) => {
-                stream
-                    .set_nonblocking(false)
-                    .expect("blocking mode should be supported");
-                return Ok(stream);
-            }
-            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
-                if Instant::now() >= deadline {
-                    return Err(io::Error::new(
-                        io::ErrorKind::TimedOut,
-                        format!(
-                            "fake daemon timed out waiting for CLI connection after {ACCEPT_TIMEOUT:?}"
-                        ),
-                    ));
-                }
-                thread::sleep(ACCEPT_POLL_INTERVAL);
-            }
-            Err(error) => return Err(error),
+            Ok((stream, _)) => return restore_blocking_stream(stream),
+            Err(error) => handle_accept_error(error, deadline)?,
         }
     }
+}
+
+fn restore_blocking_stream(stream: TcpStream) -> Result<TcpStream, io::Error> {
+    stream.set_nonblocking(false)?;
+    Ok(stream)
+}
+
+fn handle_accept_error(error: io::Error, deadline: Instant) -> Result<(), io::Error> {
+    if error.kind() != io::ErrorKind::WouldBlock {
+        return Err(error);
+    }
+
+    if Instant::now() >= deadline {
+        return Err(io::Error::new(
+            io::ErrorKind::TimedOut,
+            format!("fake daemon timed out waiting for CLI connection after {ACCEPT_TIMEOUT:?}"),
+        ));
+    }
+
+    thread::sleep(ACCEPT_POLL_INTERVAL);
+    Ok(())
 }
 
 #[expect(

@@ -1006,7 +1006,10 @@ Table: act refactor command-line flags
 The plugin receives the file content in-band as part of the JSONL request and
 does not need filesystem access. The daemon validates the resulting diff
 through both the syntactic (Tree-sitter) and semantic (LSP) locks before
-writing to disk.
+writing to disk. A plugin response that claims success but does not carry diff
+output is refused as a failure: Weaver exits with status `1`, prints
+`act refactor failed: plugin succeeded but did not return diff output`, and
+leaves the filesystem unchanged.
 
 For the built-in actuators, `rename` requires `offset=<BYTE_OFFSET>` and
 `new_name=<IDENTIFIER>` in the trailing `KEY=VALUE` arguments. When
@@ -1055,6 +1058,9 @@ Both examples follow the same execution pipeline:
 
 When validation fails, parameters are invalid, or the plugin reports an error,
 the command exits non-zero and leaves the filesystem unchanged.
+A plugin response that reports success without a `Diff` payload is treated the
+same way: Weaver refuses the response, exits with status `1`, and does not
+touch the filesystem.
 
 Worked examples:
 
@@ -1290,6 +1296,8 @@ Table: Required fields for `rename-symbol` requests.
 | `new_name` | string | The new name for the symbol (must be non-empty). |
 
 Successful responses must contain a `Diff` output with a unified diff patch.
+If a plugin reports success with any other output shape, Weaver refuses the
+response, exits with status `1`, and makes no filesystem changes.
 Failed responses may include diagnostics with an optional `reason_code` field.
 
 #### Contract versioning

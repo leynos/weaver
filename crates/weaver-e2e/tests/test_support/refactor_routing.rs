@@ -285,7 +285,7 @@ fn requested_provider(arguments: &[&str]) -> Option<RequestedProvider> {
 fn panic_unsupported_extension(file: &Path) -> ! {
     panic!(
         "fake daemon received a refactor request for unsupported file extension: {}; \
-         add a routing rule to language_for_extension or use an explicit --provider",
+         add a routing rule to language_for_extension",
         file.display()
     );
 }

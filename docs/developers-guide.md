@@ -368,10 +368,12 @@ access:
   the canonical fixture collections consumed by plugin contract tests.
 - `rename_symbol_request_fixture_named(name)` /
   `rename_symbol_response_fixture_named(name)` — look up a single named request
-  or response fixture by key.
+  or response fixture by key and panic when the requested fixture name is
+  unknown.
 - `validate_rename_symbol_request_fixture(fixture)` /
   `validate_rename_symbol_response_fixture(fixture)` — run contract validation
-  without panicking and return the validation result to the caller.
+  without panicking and return `Result<(), PluginError>` so callers can inspect
+  the exact contract failure.
 - `assert_rename_symbol_request_fixture_contract` /
   `assert_rename_symbol_response_fixture_contract` — assertion helpers that
   validate a fixture against the `RenameSymbolContract` and panic with a
@@ -380,6 +382,18 @@ access:
 ```toml
 [dev-dependencies]
 weaver-plugins = { path = "../weaver-plugins", features = ["test-support"] }
+```
+
+Typical lookup and validation usage:
+
+```rust
+use weaver_plugins::{
+    rename_symbol_request_fixture_named, validate_rename_symbol_request_fixture,
+};
+
+let fixture = rename_symbol_request_fixture_named("valid_request");
+let result = validate_rename_symbol_request_fixture(&fixture);
+assert!(result.is_ok(), "fixture should satisfy the shared contract");
 ```
 
 ### `FakeDaemon` (`weaver-e2e/tests/test_support/daemon_harness.rs`)
@@ -407,6 +421,12 @@ did not panic.
 `refactor_routing` provides the routing logic used inside `FakeDaemon` to
 produce capability-resolution payloads:
 
+- `request_arguments(&serde_json::Value)` — extracts the daemon request's flat
+  CLI-style argument vector, for example a list containing `--refactoring`,
+  `rename`, `--file`, `src/main.py`, `new_name=renamed_symbol`, and `offset=4`.
+- `argument_value(arguments, "--file")` — returns the value paired with a flag
+  from that flat argument vector, normalizing access to values such as
+  `Some("src/main.py")`.
 - `language_for_extension(&Path)` — maps `.py` → `"python"`, `.rs` →
   `"rust"`.
 - `automatic_resolution_payload(&Path)` — builds the `stderr` JSON for
@@ -416,8 +436,20 @@ produce capability-resolution payloads:
 - `write_refactor_response(writer, Operation, arguments, renamed_symbol)` —
   orchestrates the full response sequence (optional `stderr` stream, `stdout`
   payload, exit record).
+- `write_stdout_exit(writer, payload, status)` — emits the `stdout` stream
+  record and the trailing exit envelope used by `FakeDaemon`, for example
+  `{"kind":"stream","stream":"stdout","data":"..."}` followed by
+  `{"kind":"exit","status":0}`.
 - `response_payload_for_operation(Operation, renamed_symbol)` — returns the
   per-operation `stdout` JSON payload.
 
 The `RequestedProvider` and `Operation` enums replace stringly-typed parameters
 to reduce the risk of typos in test fixtures.
+
+Typical routing flow inside the fake daemon:
+
+```rust
+let arguments = request_arguments(&parsed_request);
+let file = argument_value(&arguments, "--file").expect("refactor requests need --file");
+let payload = automatic_resolution_payload(std::path::Path::new(file));
+```
