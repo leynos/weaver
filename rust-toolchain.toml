@@ -3,7 +3,6 @@ channel = "nightly-2026-03-26"
 components = [
     "rustfmt",
     "clippy",
-    "codegen-backends",
     "rustc-codegen-cranelift",
     "rust-analyzer",
 ]
