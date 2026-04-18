@@ -31,7 +31,7 @@ fn resolve_weaver_binary() -> Result<PathBuf, String> {
         return Ok(fallback);
     }
 
-    build_workspace_binary(&fallback)?;
+    build_workspace_binary()?;
     if target_dir_candidate.is_file() {
         return Ok(target_dir_candidate);
     }
@@ -81,7 +81,7 @@ fn workspace_root() -> Result<PathBuf, String> {
         .ok_or_else(|| String::from("workspace root should exist for e2e tests"))
 }
 
-fn build_workspace_binary(expected_path: &Path) -> Result<(), String> {
+fn build_workspace_binary() -> Result<(), String> {
     let status = Command::new("cargo")
         .current_dir(workspace_root()?)
         .args(["build", "-p", "weaver-cli", "--bin", "weaver"])
@@ -92,8 +92,7 @@ fn build_workspace_binary(expected_path: &Path) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "building workspace weaver binary failed with status {status}: {}",
-            expected_path.display()
+            "building workspace weaver binary failed with status {status}"
         ))
     }
 }

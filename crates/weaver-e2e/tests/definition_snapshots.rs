@@ -98,7 +98,6 @@ where
 /// Runs a test implementation with the given fixture context.
 macro_rules! run_test_with_context {
     ($fixture:expr, $impl_fn:path) => {{
-        require_pyrefly!();
         let mut fixture = $fixture?;
         let Some(ctx) = fixture.as_mut() else {
             return Ok(());

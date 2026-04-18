@@ -31,7 +31,10 @@ pub(super) fn prepare_plugin_request(
     let effective_operation = effective_operation(&mut plugin_args, args, &file_path)?;
     let capability = capability_from_operation(&effective_operation)?;
     let file_content = std::fs::read_to_string(&file_path).map_err(|err| {
-        DispatchError::invalid_arguments(format!("cannot read file '{}': {err}", args.file))
+        DispatchError::invalid_arguments(format!(
+            "cannot read file '{}': {err}",
+            file_path.display()
+        ))
     })?;
     let plugin_request = PluginRequest::with_arguments(
         &effective_operation,
