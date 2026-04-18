@@ -40,7 +40,8 @@ fn resolve_weaver_binary() -> Result<PathBuf, String> {
     }
 
     Err(format!(
-        "failed to locate built weaver binary after cargo build: {}",
+        "failed to locate built weaver binary after cargo build: checked {} and {}",
+        target_dir_candidate.display(),
         fallback.display()
     ))
 }

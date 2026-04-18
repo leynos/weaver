@@ -27,11 +27,12 @@ pub(super) fn prepare_plugin_request(
     let relative_file_path = file_path.strip_prefix(&canonical_workspace).map_err(|_| {
         DispatchError::invalid_arguments("resolved file path escapes the workspace root")
     })?;
+    let mut plugin_args = build_plugin_args(args)?;
+    let effective_operation = effective_operation(&mut plugin_args, args, &file_path)?;
+    let capability = capability_from_operation(&effective_operation)?;
     let file_content = std::fs::read_to_string(&file_path).map_err(|err| {
         DispatchError::invalid_arguments(format!("cannot read file '{}': {err}", args.file))
     })?;
-    let mut plugin_args = build_plugin_args(args);
-    let effective_operation = effective_operation(&mut plugin_args, args, &file_path)?;
     let plugin_request = PluginRequest::with_arguments(
         &effective_operation,
         vec![FilePayload::new(
@@ -40,11 +41,12 @@ pub(super) fn prepare_plugin_request(
         )],
         plugin_args,
     );
-    let capability = capability_from_operation(&effective_operation)?;
     Ok((plugin_request, capability, file_path))
 }
 
-fn build_plugin_args(args: &arguments::RefactorArgs) -> HashMap<String, serde_json::Value> {
+fn build_plugin_args(
+    args: &arguments::RefactorArgs,
+) -> Result<HashMap<String, serde_json::Value>, DispatchError> {
     let mut plugin_args = HashMap::new();
     plugin_args.insert(
         "refactoring".into(),
@@ -52,17 +54,25 @@ fn build_plugin_args(args: &arguments::RefactorArgs) -> HashMap<String, serde_js
     );
     for extra in &args.extra {
         let parts: Vec<&str> = extra.splitn(2, '=').collect();
+        let key = parts.first().copied().ok_or_else(|| {
+            DispatchError::invalid_arguments("refactor extra argument cannot be empty")
+        })?;
+        if key.trim().is_empty() {
+            return Err(DispatchError::invalid_arguments(format!(
+                "refactor extra argument has an empty key: '{extra}'"
+            )));
+        }
         if parts.len() == 2 {
             plugin_args.insert(
-                parts[0].to_owned(),
+                key.to_owned(),
                 serde_json::Value::String(parts[1].to_owned()),
             );
         } else if parts.len() == 1 {
             // Bare extra arguments are interpreted as boolean flags.
-            plugin_args.insert(parts[0].to_owned(), serde_json::Value::Bool(true));
+            plugin_args.insert(key.to_owned(), serde_json::Value::Bool(true));
         }
     }
-    plugin_args
+    Ok(plugin_args)
 }
 
 fn effective_operation(
