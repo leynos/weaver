@@ -59,7 +59,12 @@ pub fn request_arguments(parsed_request: &serde_json::Value) -> Vec<&str> {
         .and_then(serde_json::Value::as_array)
         .into_iter()
         .flatten()
-        .filter_map(serde_json::Value::as_str)
+        .map(|argument| {
+            argument.as_str().map_or_else(
+                || panic!("daemon request arguments must all be JSON strings"),
+                |value| value,
+            )
+        })
         .collect()
 }
 
@@ -306,17 +311,25 @@ fn validate_refactor_request<'a>(arguments: &'a [&'a str]) -> ValidatedRefactorR
     let Some(file) = argument_value(arguments, "--file") else {
         panic!("refactor snapshot requests must include --file");
     };
+    let Some(new_name) = arguments
+        .iter()
+        .find_map(|argument| argument.strip_prefix("new_name="))
+    else {
+        panic!("refactor snapshot requests must include new_name=<value>");
+    };
     assert!(
-        arguments
-            .iter()
-            .any(|argument| argument.starts_with("new_name=")),
-        "refactor snapshot requests must include new_name=<value>"
+        !new_name.is_empty(),
+        "refactor snapshot requests must include non-empty new_name=<value>"
     );
+    let Some(offset) = arguments
+        .iter()
+        .find_map(|argument| argument.strip_prefix("offset="))
+    else {
+        panic!("refactor snapshot requests must include offset=<value>");
+    };
     assert!(
-        arguments
-            .iter()
-            .any(|argument| argument.starts_with("offset=")),
-        "refactor snapshot requests must include offset=<value>"
+        offset.parse::<usize>().is_ok(),
+        "refactor snapshot requests must include numeric offset=<value>"
     );
 
     ValidatedRefactorRequest {
