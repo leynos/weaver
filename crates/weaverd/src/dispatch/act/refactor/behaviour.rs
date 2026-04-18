@@ -69,6 +69,50 @@ fn refused_candidates(
         .collect()
 }
 
+#[inline]
+fn provider_for_auto(mode: RoutingMode) -> &'static str {
+    match mode {
+        RoutingMode::AutomaticPython => "rope",
+        RoutingMode::AutomaticRust => "rust-analyzer",
+        _ => unreachable!("provider_for_auto is only for automatic modes"),
+    }
+}
+
+#[derive(Clone, Copy)]
+struct AutoResolutionContext<'a> {
+    capability: weaver_plugins::CapabilityId,
+    requested_provider: Option<&'a str>,
+    selection_mode: SelectionMode,
+}
+
+fn resolve_auto_language(
+    context: AutoResolutionContext<'_>,
+    language_name: Option<&'static str>,
+    provider: &'static str,
+) -> CapabilityResolutionEnvelope {
+    if let Some(language) = language_name {
+        selected_resolution(SelectedResolution {
+            capability: context.capability,
+            language,
+            provider,
+            selection_mode: context.selection_mode,
+            requested_provider: context.requested_provider,
+        })
+    } else {
+        refused_resolution(RefusedResolution {
+            capability: context.capability,
+            language: None,
+            requested_provider: context.requested_provider,
+            selection_mode: context.selection_mode,
+            refusal_reason: RefusalReason::UnsupportedLanguage,
+            candidates: refused_candidates(
+                context.requested_provider,
+                CandidateReason::UnsupportedLanguage,
+            ),
+        })
+    }
+}
+
 impl RefactorPluginRuntime for StubRuntime {
     fn resolve(
         &self,
@@ -82,42 +126,20 @@ impl RefactorPluginRuntime for StubRuntime {
         } else {
             SelectionMode::Automatic
         };
-
-        // Automatic routing modes require a valid language
-        let requires_language = matches!(
-            self.routing,
-            RoutingMode::AutomaticPython | RoutingMode::AutomaticRust
-        );
-        if requires_language && language_name.is_none() {
-            return Ok(refused_resolution(RefusedResolution {
-                capability: request.capability(),
-                language: None,
-                requested_provider,
-                selection_mode,
-                refusal_reason: RefusalReason::UnsupportedLanguage,
-                candidates: refused_candidates(
-                    requested_provider,
-                    CandidateReason::UnsupportedLanguage,
-                ),
-            }));
-        }
-        let language = language_name.unwrap_or_default();
+        let auto_context = AutoResolutionContext {
+            capability: request.capability(),
+            requested_provider,
+            selection_mode,
+        };
 
         Ok(match self.routing {
-            RoutingMode::AutomaticPython => selected_resolution(SelectedResolution {
-                capability: request.capability(),
-                language,
-                provider: "rope",
-                selection_mode,
-                requested_provider,
-            }),
-            RoutingMode::AutomaticRust => selected_resolution(SelectedResolution {
-                capability: request.capability(),
-                language,
-                provider: "rust-analyzer",
-                selection_mode,
-                requested_provider,
-            }),
+            mode @ (RoutingMode::AutomaticPython | RoutingMode::AutomaticRust) => {
+                resolve_auto_language(
+                    auto_context,
+                    language_name,
+                    provider_for_auto(mode),
+                )
+            }
             RoutingMode::UnsupportedLanguage => refused_resolution(RefusedResolution {
                 capability: request.capability(),
                 language: language_name,
