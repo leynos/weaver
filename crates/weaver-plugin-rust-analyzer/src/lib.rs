@@ -333,14 +333,14 @@ fn open_workspace_target_dir(
 
     create_dir_all_cap(&workspace_dir, parent_path).map_err(|source| {
         RustAnalyzerAdapterError::WorkspaceWrite {
-            path: parent_path.into(),
+            path: workspace_root.join(parent_path.as_std_path()),
             source,
         }
     })?;
     workspace_dir
         .open_dir(parent_path)
         .map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
-            path: parent_path.into(),
+            path: workspace_root.join(parent_path.as_std_path()),
             source,
         })
 }
