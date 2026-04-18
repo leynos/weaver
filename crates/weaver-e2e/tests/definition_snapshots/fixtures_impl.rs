@@ -35,35 +35,35 @@ fn create_test_context(fixture_content: &str) -> Result<Option<TestContext>, Tes
     }))
 }
 
-#[allow_fixture_expansion_lints]
-#[fixture]
 /// Provides a Pyrefly-backed context for the linear call-chain fixture.
 ///
 /// Returns `Ok(Some(...))` when Pyrefly is available and the fixture is ready,
 /// `Ok(None)` when the test should be skipped because Pyrefly is unavailable,
 /// and `Err(...)` when fixture setup fails.
+#[allow_fixture_expansion_lints]
+#[fixture]
 pub fn linear_chain_context() -> Result<Option<TestContext>, TestError> {
     create_test_context(fixtures::LINEAR_CHAIN)
 }
 
-#[allow_fixture_expansion_lints]
-#[fixture]
 /// Provides a Pyrefly-backed context for the Python class fixture.
 ///
 /// Returns `Ok(Some(...))` when Pyrefly is available and the fixture is ready,
 /// `Ok(None)` when the test should be skipped because Pyrefly is unavailable,
 /// and `Err(...)` when fixture setup fails.
+#[allow_fixture_expansion_lints]
+#[fixture]
 pub fn python_class_context() -> Result<Option<TestContext>, TestError> {
     create_test_context(fixtures::PYTHON_CLASS)
 }
 
-#[allow_fixture_expansion_lints]
-#[fixture]
 /// Provides a Pyrefly-backed context for the Python functions fixture.
 ///
 /// Returns `Ok(Some(...))` when Pyrefly is available and the fixture is ready,
 /// `Ok(None)` when the test should be skipped because Pyrefly is unavailable,
 /// and `Err(...)` when fixture setup fails.
+#[allow_fixture_expansion_lints]
+#[fixture]
 pub fn python_functions_context() -> Result<Option<TestContext>, TestError> {
     create_test_context(fixtures::PYTHON_FUNCTIONS)
 }
