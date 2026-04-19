@@ -55,7 +55,6 @@ pub(crate) fn normalize_request_uri(uri: &str) -> Result<String, RustAnalyzerAda
         .to_file_path()
         .map_err(|()| invalid_file_uri_error())?;
     let relative_path = strip_file_uri_root(&path)?;
-    validate_relative_path(relative_path.as_path())?;
     path_to_slash(relative_path.as_path())
 }
 
@@ -103,6 +102,8 @@ mod tests {
     use std::os::unix::ffi::OsStrExt;
     use std::path::{Path, PathBuf};
 
+    use rstest::rstest;
+
     use super::{
         RustAnalyzerAdapterError,
         normalize_request_uri,
@@ -116,67 +117,58 @@ mod tests {
         assert!(validate_relative_path(Path::new("./foo")).is_ok());
     }
 
-    #[test]
-    fn validate_relative_path_rejects_empty_and_curdir_paths() {
-        let empty = validate_relative_path(Path::new(""));
-        let curdir = validate_relative_path(Path::new("."));
-
+    #[rstest]
+    #[case("", "path must not be empty or only '.'")]
+    #[case(".", "path must not be empty or only '.'")]
+    #[case("../foo", "path traversal is not allowed")]
+    fn validate_relative_path_rejects_invalid_inputs(
+        #[case] input: &str,
+        #[case] expected_message: &str,
+    ) {
+        let result = validate_relative_path(Path::new(input));
         assert!(matches!(
-            empty,
+            result,
             Err(RustAnalyzerAdapterError::InvalidPath { message })
-                if message == "path must not be empty or only '.'"
-        ));
-        assert!(matches!(
-            curdir,
-            Err(RustAnalyzerAdapterError::InvalidPath { message })
-                if message == "path must not be empty or only '.'"
-        ));
-    }
-
-    #[test]
-    fn validate_relative_path_rejects_parent_traversal() {
-        assert!(matches!(
-            validate_relative_path(Path::new("../foo")),
-            Err(RustAnalyzerAdapterError::InvalidPath { message })
-                if message == "path traversal is not allowed"
+                if message == expected_message
         ));
     }
 
     #[cfg(windows)]
-    #[test]
-    fn validate_relative_path_rejects_windows_prefixes() {
+    #[rstest]
+    #[case(r"C:\foo", "windows path prefixes are not allowed")]
+    fn validate_relative_path_rejects_windows_prefixes(
+        #[case] input: &str,
+        #[case] expected_message: &str,
+    ) {
         assert!(matches!(
-            validate_relative_path(Path::new(r"C:\foo")),
+            validate_relative_path(Path::new(input)),
             Err(RustAnalyzerAdapterError::InvalidPath { message })
-                if message == "windows path prefixes are not allowed"
+                if message == expected_message
         ));
     }
 
-    #[test]
-    fn normalize_request_uri_rejects_authority_and_non_file_schemes() {
+    #[rstest]
+    #[case(
+        "file://host/src/main.rs",
+        "uri argument must be a valid file:// URI without an authority"
+    )]
+    #[case(
+        "https://example.com/src/main.rs",
+        "uri argument must be a valid file:// URI without an authority"
+    )]
+    #[case("file:///", "path must not be empty or only '.'")]
+    #[case(
+        "not a uri",
+        "uri argument must be a valid file:// URI without an authority"
+    )]
+    fn normalize_request_uri_rejects_invalid_inputs(
+        #[case] input: &str,
+        #[case] expected_message: &str,
+    ) {
         assert!(matches!(
-            normalize_request_uri("file://host/src/main.rs"),
+            normalize_request_uri(input),
             Err(RustAnalyzerAdapterError::InvalidPath { message })
-                if message == "uri argument must be a valid file:// URI without an authority"
-        ));
-        assert!(matches!(
-            normalize_request_uri("https://example.com/src/main.rs"),
-            Err(RustAnalyzerAdapterError::InvalidPath { message })
-                if message == "uri argument must be a valid file:// URI without an authority"
-        ));
-    }
-
-    #[test]
-    fn normalize_request_uri_rejects_empty_root_and_invalid_uris() {
-        assert!(matches!(
-            normalize_request_uri("file:///"),
-            Err(RustAnalyzerAdapterError::InvalidPath { message })
-                if message == "path must not be empty or only '.'"
-        ));
-        assert!(matches!(
-            normalize_request_uri("not a uri"),
-            Err(RustAnalyzerAdapterError::InvalidPath { message })
-                if message == "uri argument must be a valid file:// URI without an authority"
+                if message == expected_message
         ));
     }
 
