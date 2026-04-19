@@ -1,16 +1,16 @@
 //! Behavioural tests for the apply-patch command.
 
-use std::cell::RefCell;
-use std::fs;
-use std::path::PathBuf;
+use std::{cell::RefCell, fs, path::PathBuf};
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use tempfile::TempDir;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use crate::dispatch::act::apply_patch::{ApplyPatchError, ApplyPatchExecutor, ApplyPatchFailure};
-use crate::safety_harness::VerificationFailure;
-use crate::safety_harness::{ConfigurableSemanticLock, ConfigurableSyntacticLock};
+use crate::{
+    dispatch::act::apply_patch::{ApplyPatchError, ApplyPatchExecutor, ApplyPatchFailure},
+    safety_harness::{ConfigurableSemanticLock, ConfigurableSyntacticLock, VerificationFailure},
+};
 
 const DEFAULT_SOURCE: &str = "fn main() {\n    println!(\"Old Message\");\n}\n";
 const MODIFY_PATCH: &str = concat!(
@@ -93,17 +93,11 @@ impl ApplyPatchWorld {
         fs::read_to_string(self.path(relative)).expect("read file")
     }
 
-    fn file_exists(&self, relative: &str) -> bool {
-        self.path(relative).exists()
-    }
+    fn file_exists(&self, relative: &str) -> bool { self.path(relative).exists() }
 
-    fn path(&self, relative: &str) -> PathBuf {
-        self.temp_dir.path().join(relative)
-    }
+    fn path(&self, relative: &str) -> PathBuf { self.temp_dir.path().join(relative) }
 
-    fn set_patch(&mut self, patch: &str) {
-        self.patch = Some(patch.to_string());
-    }
+    fn set_patch(&mut self, patch: &str) { self.patch = Some(patch.to_string()); }
 
     fn apply_patch(&mut self) {
         let patch = self.patch.clone().expect("patch should be set");
@@ -116,10 +110,9 @@ impl ApplyPatchWorld {
     }
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> RefCell<ApplyPatchWorld> {
-    RefCell::new(ApplyPatchWorld::new())
-}
+fn world() -> RefCell<ApplyPatchWorld> { RefCell::new(ApplyPatchWorld::new()) }
 
 #[given("a workspace with the default source file")]
 fn given_default_source(world: &RefCell<ApplyPatchWorld>) {
@@ -193,9 +186,7 @@ fn given_semantic_fails(world: &RefCell<ApplyPatchWorld>, path: String, message:
 }
 
 #[when("the patch is applied")]
-fn when_patch_applied(world: &RefCell<ApplyPatchWorld>) {
-    world.borrow_mut().apply_patch();
-}
+fn when_patch_applied(world: &RefCell<ApplyPatchWorld>) { world.borrow_mut().apply_patch(); }
 
 #[then("the apply-patch file {path} contains {snippet}")]
 fn then_file_contains(world: &RefCell<ApplyPatchWorld>, path: String, snippet: String) {
@@ -267,6 +258,4 @@ fn then_patch_fails(world: &RefCell<ApplyPatchWorld>, kind: String) {
 fn strip_quotes(value: &str) -> &str { value.trim_matches('"') }
 
 #[scenario(path = "tests/features/apply_patch.feature")]
-fn apply_patch_scenarios(#[from(world)] world: RefCell<ApplyPatchWorld>) {
-    drop(world);
-}
+fn apply_patch_scenarios(#[from(world)] world: RefCell<ApplyPatchWorld>) { drop(world); }

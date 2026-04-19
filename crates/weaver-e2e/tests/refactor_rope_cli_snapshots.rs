@@ -4,17 +4,24 @@
 //! user-facing command ergonomics, including a shell pipeline that chains an
 //! observe query through `jq` into an actuator command.
 
-use std::io::{BufRead, BufReader, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::process::Output;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
-use std::{io, thread};
+#[path = "support/weaver_binary.rs"]
+mod weaver_binary;
+
+use std::{
+    io,
+    io::{BufRead, BufReader, Write},
+    net::{SocketAddr, TcpListener, TcpStream},
+    process::Output,
+    sync::{Arc, Mutex},
+    thread,
+    time::{Duration, Instant},
+};
 
 use assert_cmd::Command;
 use insta::assert_debug_snapshot;
 use serde::Serialize;
 use serde_json::json;
+use weaver_binary::weaver_binary_path;
 
 #[derive(Debug, Serialize)]
 struct Transcript {
@@ -30,14 +37,6 @@ struct FakeDaemon {
     address: SocketAddr,
     requests: Arc<Mutex<Vec<serde_json::Value>>>,
     join_handle: thread::JoinHandle<()>,
-}
-
-#[expect(
-    deprecated,
-    reason = "assert_cmd::cargo::cargo_bin resolves workspace binaries for e2e tests"
-)]
-fn weaver_binary_path() -> std::path::PathBuf {
-    assert_cmd::cargo::cargo_bin("weaver")
 }
 
 impl FakeDaemon {
@@ -58,9 +57,7 @@ impl FakeDaemon {
         })
     }
 
-    fn endpoint(&self) -> String {
-        format!("tcp://{}", self.address)
-    }
+    fn endpoint(&self) -> String { format!("tcp://{}", self.address) }
 
     #[expect(
         clippy::expect_used,
@@ -126,8 +123,7 @@ fn accept_before_deadline(listener: &TcpListener) -> Option<TcpStream> {
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                 assert!(
                     Instant::now() < deadline,
-                    "fake daemon timed out waiting for CLI connection \
-                     after {ACCEPT_TIMEOUT:?}"
+                    "fake daemon timed out waiting for CLI connection after {ACCEPT_TIMEOUT:?}"
                 );
                 thread::sleep(ACCEPT_POLL_INTERVAL);
             }
@@ -161,12 +157,14 @@ fn respond_to_request(
     let mut request_line = String::new();
     reader.read_line(&mut request_line)?;
 
-    let parsed_request: serde_json::Value = serde_json::from_str(request_line.trim())
-        .unwrap_or_else(|_| {
+    let mut parsed_request_option = serde_json::from_str(request_line.trim()).ok();
+    let parsed_request: serde_json::Value = parsed_request_option
+        .get_or_insert_with(|| {
             json!({
                 "invalid_request": request_line.trim(),
             })
-        });
+        })
+        .clone();
 
     requests
         .lock()
@@ -225,7 +223,8 @@ fn refactor_actuator_isolation_cli_snapshot() {
     let endpoint = daemon.endpoint();
 
     let command_string = String::from(
-        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider rope --refactoring rename --file src/main.py new_name=renamed_symbol offset=4",
+        "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider \
+         rope --refactoring rename --file src/main.py new_name=renamed_symbol offset=4",
     );
 
     let mut command = Command::new(weaver_binary_path());

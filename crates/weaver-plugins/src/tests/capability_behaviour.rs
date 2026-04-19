@@ -1,19 +1,22 @@
 //! Behaviour-driven tests for capability contract validation.
 
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use crate::capability::{
-    CapabilityContract, CapabilityId, ContractVersion, ReasonCode, RenameSymbolContract,
-};
-use crate::error::PluginError;
-use crate::manifest::{PluginKind, PluginManifest, PluginMetadata};
-use crate::protocol::{
-    DiagnosticSeverity, PluginDiagnostic, PluginOutput, PluginRequest, PluginResponse,
+use crate::{
+    capability::{
+        CapabilityContract,
+        CapabilityId,
+        ContractVersion,
+        ReasonCode,
+        RenameSymbolContract,
+    },
+    error::PluginError,
+    manifest::{PluginKind, PluginManifest, PluginMetadata},
+    protocol::{DiagnosticSeverity, PluginDiagnostic, PluginOutput, PluginRequest, PluginResponse},
 };
 
 // ---------------------------------------------------------------------------
@@ -27,15 +30,11 @@ struct QuotedString(String);
 impl FromStr for QuotedString {
     type Err = std::convert::Infallible;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(s.trim_matches('"').to_owned()))
-    }
+    fn from_str(s: &str) -> Result<Self, Self::Err> { Ok(Self(s.trim_matches('"').to_owned())) }
 }
 
 impl QuotedString {
-    fn as_str(&self) -> &str {
-        &self.0
-    }
+    fn as_str(&self) -> &str { &self.0 }
 }
 
 // ---------------------------------------------------------------------------
@@ -53,10 +52,9 @@ struct CapabilityWorld {
     version_b: Option<ContractVersion>,
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> CapabilityWorld {
-    CapabilityWorld::default()
-}
+fn world() -> CapabilityWorld { CapabilityWorld::default() }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -84,9 +82,7 @@ fn parse_kv_pairs(input: &str) -> HashMap<String, serde_json::Value> {
 // ---------------------------------------------------------------------------
 
 #[given("a rename-symbol contract")]
-fn given_contract(world: &mut CapabilityWorld) {
-    world.contract = Some(RenameSymbolContract);
-}
+fn given_contract(world: &mut CapabilityWorld) { world.contract = Some(RenameSymbolContract); }
 
 #[given("a plugin request with operation {operation} and arguments {args}")]
 fn given_request_with_args(world: &mut CapabilityWorld, operation: QuotedString, args: String) {
@@ -263,6 +259,4 @@ fn parse_kv_pairs_ignores_tokens_without_equals() {
 // ---------------------------------------------------------------------------
 
 #[scenario(path = "tests/features/capability_contract.feature")]
-fn capability_contract_behaviour(world: CapabilityWorld) {
-    let _ = world;
-}
+fn capability_contract_behaviour(world: CapabilityWorld) { let _ = world; }

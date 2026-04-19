@@ -7,8 +7,16 @@
 use rstest::{fixture, rstest};
 
 use crate::{
-    CardLanguage, CardSymbolKind, DetailLevel, GetCardResponse, Provenance, SourcePosition,
-    SourceRange, SymbolCard, SymbolIdentity, SymbolRef,
+    CardLanguage,
+    CardSymbolKind,
+    DetailLevel,
+    GetCardResponse,
+    Provenance,
+    SourcePosition,
+    SourceRange,
+    SymbolCard,
+    SymbolIdentity,
+    SymbolRef,
 };
 
 #[fixture]

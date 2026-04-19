@@ -1,16 +1,20 @@
 //! Tests for daemon shutdown utilities.
 
-use std::fs;
-use std::net::TcpListener;
-use std::thread;
-use std::time::Duration;
+use std::{io, net::TcpListener, path::Path, thread, time::Duration};
 
+use anyhow::Result;
+use cap_std::fs::Dir;
 use rstest::rstest;
 use tempfile::TempDir;
 use weaver_config::{Config, RuntimePaths, SocketEndpoint};
 
-use crate::lifecycle::LifecycleError;
-use crate::lifecycle::shutdown::{signal_daemon, wait_for_shutdown};
+use crate::{
+    lifecycle::{
+        LifecycleError,
+        shutdown::{signal_daemon, wait_for_shutdown},
+    },
+    tests::support::write_test_file,
+};
 
 #[cfg(unix)]
 #[test]
@@ -76,23 +80,35 @@ fn signal_daemon_rejects_invalid_pid(#[case] invalid_pid: u32, #[case] expected_
 /// Returns both the TempDir (which must be kept alive) and the RuntimePaths.
 /// The RuntimePaths is configured with a Unix socket endpoint pointing to the
 /// temp directory, which ensures the runtime files are written there.
-fn create_temp_runtime_paths() -> (TempDir, RuntimePaths) {
-    let temp_dir = TempDir::new().expect("create temp dir");
+fn create_temp_runtime_paths() -> Result<(TempDir, RuntimePaths)> {
+    let temp_dir = TempDir::new()?;
     let socket_path = temp_dir.path().join("test.sock");
     let config = Config {
         daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().into_owned()),
         ..Config::default()
     };
-    let paths = RuntimePaths::from_config(&config).expect("derive runtime paths");
-    (temp_dir, paths)
+    let paths = RuntimePaths::from_config(&config)?;
+    Ok((temp_dir, paths))
+}
+
+fn remove_test_file(path: &Path) -> io::Result<()> {
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let file_name = path.file_name().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("path has no file name: {}", path.display()),
+        )
+    })?;
+    let dir = Dir::open_ambient_dir(parent, cap_std::ambient_authority())?;
+    dir.remove_file(file_name)
 }
 
 #[test]
 fn wait_for_shutdown_succeeds_when_pid_and_socket_disappear() {
-    let (_temp_dir, paths) = create_temp_runtime_paths();
+    let (_temp_dir, paths) = create_temp_runtime_paths().expect("create temp runtime paths");
 
     // Create PID file to simulate running daemon.
-    fs::write(paths.pid_path(), "12345").expect("write pid file");
+    write_test_file(paths.pid_path(), b"12345").expect("write pid file");
 
     // Bind a TCP socket to simulate daemon listening.
     let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind listener");
@@ -103,7 +119,7 @@ fn wait_for_shutdown_succeeds_when_pid_and_socket_disappear() {
     let pid_path = paths.pid_path().to_path_buf();
     let shutdown_thread = thread::spawn(move || {
         thread::sleep(Duration::from_millis(100));
-        fs::remove_file(&pid_path).expect("remove pid file");
+        remove_test_file(&pid_path).expect("remove pid file");
         drop(listener);
     });
 
@@ -122,49 +138,20 @@ fn wait_for_shutdown_succeeds_when_pid_and_socket_disappear() {
 #[cfg(unix)]
 #[test]
 fn wait_for_shutdown_propagates_socket_probe_errors() {
-    use std::os::unix::fs::PermissionsExt;
-
-    // Skip on root to avoid permission errors being bypassed.
-    // SAFETY: geteuid() is always safe to call.
-    if unsafe { libc::geteuid() } == 0 {
-        eprintln!("skipping test: running as root");
-        return;
-    }
-
-    let (_temp_dir, paths) = create_temp_runtime_paths();
+    let (_temp_dir, paths) = create_temp_runtime_paths().expect("create temp runtime paths");
 
     // Create PID file so we actually need to check the socket.
-    fs::write(paths.pid_path(), "12345").expect("write pid file");
-
-    // Create a directory without execute permission.
-    // Trying to access a socket in this directory will return EACCES.
-    let restricted_dir = paths.runtime_dir().join("restricted");
-    fs::create_dir(&restricted_dir).expect("create restricted dir");
-
-    // Set permissions to read-only (no execute = can't access files inside).
-    let mut perms = fs::metadata(&restricted_dir)
-        .expect("get metadata")
-        .permissions();
-    perms.set_mode(0o000);
-    fs::set_permissions(&restricted_dir, perms).expect("set restrictive permissions");
-
-    let socket_path = restricted_dir.join("daemon.sock");
-    let endpoint = SocketEndpoint::unix(socket_path.to_string_lossy().into_owned());
+    write_test_file(paths.pid_path(), b"12345").expect("write pid file");
+    let endpoint = SocketEndpoint::tcp("definitely.invalid", 65535);
 
     let result = wait_for_shutdown(&paths, &endpoint);
 
-    // Restore permissions so cleanup can proceed.
-    let mut perms = fs::metadata(&restricted_dir)
-        .expect("get metadata")
-        .permissions();
-    perms.set_mode(0o755);
-    fs::set_permissions(&restricted_dir, perms).expect("restore permissions");
-
-    // The socket probe should fail with permission denied.
+    // The socket probe should surface the resolution failure rather than
+    // treating it as an "available" socket.
     let Err(LifecycleError::SocketProbe { endpoint: ep, .. }) = result else {
         panic!("expected SocketProbe error, got {result:?}");
     };
-    assert!(ep.contains("daemon.sock"));
+    assert!(ep.contains("definitely.invalid"));
 }
 
 /// Tests that wait_for_shutdown returns ShutdownTimeout when conditions persist.
@@ -174,10 +161,10 @@ fn wait_for_shutdown_propagates_socket_probe_errors() {
 #[test]
 #[ignore]
 fn wait_for_shutdown_times_out_when_conditions_persist() {
-    let (_temp_dir, paths) = create_temp_runtime_paths();
+    let (_temp_dir, paths) = create_temp_runtime_paths().expect("create temp runtime paths");
 
     // Create PID file that will persist throughout the test.
-    fs::write(paths.pid_path(), "12345").expect("write pid file");
+    write_test_file(paths.pid_path(), b"12345").expect("write pid file");
 
     // Bind a TCP socket that remains open throughout the test.
     let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind listener");
@@ -200,9 +187,7 @@ fn wait_for_shutdown_times_out_when_conditions_persist() {
 #[cfg(unix)]
 #[test]
 fn signal_daemon_succeeds_for_child_process() {
-    use std::io::ErrorKind;
-    use std::os::unix::process::ExitStatusExt;
-    use std::process::Command;
+    use std::{io::ErrorKind, os::unix::process::ExitStatusExt, process::Command};
 
     // Spawn a child process that sleeps indefinitely.
     let mut child = match Command::new("sleep").arg("60").spawn() {

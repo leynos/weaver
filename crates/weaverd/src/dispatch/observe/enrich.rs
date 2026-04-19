@@ -7,16 +7,22 @@
 //! outcome records a graceful degradation.
 
 use lsp_types::{
-    HoverContents, HoverParams, MarkedString, Position, TextDocumentIdentifier,
+    HoverContents,
+    HoverParams,
+    MarkedString,
+    Position,
+    TextDocumentIdentifier,
     TextDocumentPositionParams,
 };
 use tracing::debug;
 use weaver_cards::{CardLanguage, LspInfo, SymbolCard};
 use weaver_lsp_host::Language;
 
-use crate::backends::{BackendKind, FusionBackends};
-use crate::dispatch::router::DISPATCH_TARGET;
-use crate::semantic_provider::SemanticBackendProvider;
+use crate::{
+    backends::{BackendKind, FusionBackends},
+    dispatch::router::DISPATCH_TARGET,
+    semantic_provider::SemanticBackendProvider,
+};
 
 /// Result of an LSP enrichment attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

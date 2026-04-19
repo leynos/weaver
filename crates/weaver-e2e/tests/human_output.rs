@@ -1,14 +1,19 @@
 //! End-to-end tests for human-readable output rendering.
 
+#[path = "support/fixture_io.rs"]
+mod fixture_io;
+
 use std::path::Path;
 
+use fixture_io::write_fixture_path;
 use lsp_types::{GotoDefinitionResponse, Location, Uri};
 use tempfile::TempDir;
 use url::Url;
-
 use weaver_cli::{OutputContext, render_human_output};
-use weaver_e2e::fixtures;
-use weaver_e2e::lsp_client::{LspClient, LspClientError};
+use weaver_e2e::{
+    fixtures,
+    lsp_client::{LspClient, LspClientError},
+};
 
 /// Test error type for human output rendering.
 #[derive(Debug, thiserror::Error)]
@@ -68,8 +73,7 @@ fn first_location(response: Option<GotoDefinitionResponse>) -> Option<Location> 
 #[ignore = "requires pyrefly tooling to be available on PATH"]
 fn renders_definition_output_with_context() -> Result<(), TestError> {
     let temp_dir = TempDir::new()?;
-    let file_path = temp_dir.path().join("test.py");
-    std::fs::write(&file_path, fixtures::LINEAR_CHAIN)?;
+    let file_path = write_fixture_path(&temp_dir, "test.py", fixtures::LINEAR_CHAIN)?;
 
     let root_uri = file_uri(temp_dir.path())?;
     let file_uri_value = file_uri(&file_path)?;

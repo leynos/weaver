@@ -1,10 +1,17 @@
 //! Shared cache and parser-pool infrastructure for card extraction.
 
-use std::collections::{HashMap, HashSet};
-use std::num::NonZeroUsize;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::{
+    collections::{HashMap, HashSet},
+    num::NonZeroUsize,
+    path::{Path, PathBuf},
+    sync::{
+        Arc,
+        Condvar,
+        Mutex,
+        MutexGuard,
+        atomic::{AtomicU64, Ordering},
+    },
+};
 
 use lru::LruCache;
 use sha2::{Digest, Sha256};
@@ -55,15 +62,11 @@ impl CardCacheKey {
 
     /// Returns the source path associated with the key.
     #[must_use]
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
+    pub fn path(&self) -> &Path { &self.path }
 
     /// Returns the content hash associated with the key.
     #[must_use]
-    pub const fn content_hash(&self) -> &[u8; 32] {
-        &self.content_hash
-    }
+    pub const fn content_hash(&self) -> &[u8; 32] { &self.content_hash }
 }
 
 /// Point-in-time cache counters.
@@ -157,9 +160,7 @@ impl CardCache {
     /// Path matching is based on the exact `PathBuf` stored in the cache key.
     /// Callers that need symlink or relative-path canonicalisation must do so
     /// before building cache keys.
-    pub fn invalidate(&self, path: &Path) {
-        self.evict_matching(|key| key.path() == path);
-    }
+    pub fn invalidate(&self, path: &Path) { self.evict_matching(|key| key.path() == path); }
 
     /// Invalidates cached entries for older revisions of the same path.
     pub fn invalidate_stale_revisions(&self, path: &Path, current_hash: &[u8; 32]) {
@@ -175,13 +176,9 @@ impl CardCache {
             .and_then(|mut guard| guard.get(key).cloned())
     }
 
-    pub(crate) fn record_hit(&self) {
-        self.hits.fetch_add(1, Ordering::Relaxed);
-    }
+    pub(crate) fn record_hit(&self) { self.hits.fetch_add(1, Ordering::Relaxed); }
 
-    pub(crate) fn record_miss(&self) {
-        self.misses.fetch_add(1, Ordering::Relaxed);
-    }
+    pub(crate) fn record_miss(&self) { self.misses.fetch_add(1, Ordering::Relaxed); }
 
     fn evict_matching<F>(&self, predicate: F)
     where
@@ -203,15 +200,11 @@ impl CardCache {
 
     /// Returns the number of cached entries.
     #[must_use]
-    pub fn len(&self) -> usize {
-        self.inner.lock().map_or(0, |guard| guard.len())
-    }
+    pub fn len(&self) -> usize { self.inner.lock().map_or(0, |guard| guard.len()) }
 
     /// Returns `true` when the cache holds no entries.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
+    pub fn is_empty(&self) -> bool { self.len() == 0 }
 
     /// Returns the current hit/miss counters.
     #[must_use]
@@ -224,9 +217,7 @@ impl CardCache {
 }
 
 impl Default for CardCache {
-    fn default() -> Self {
-        Self::new(DEFAULT_CACHE_CAPACITY)
-    }
+    fn default() -> Self { Self::new(DEFAULT_CACHE_CAPACITY) }
 }
 
 impl std::fmt::Debug for CardCache {
@@ -310,9 +301,7 @@ impl ParserRegistry {
 }
 
 impl Default for ParserRegistry {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 impl std::fmt::Debug for ParserRegistry {
@@ -331,9 +320,7 @@ impl std::fmt::Debug for ParserRegistry {
 
 /// Computes the SHA-256 content hash used for cache keying.
 #[must_use]
-pub fn content_hash(source: &str) -> [u8; 32] {
-    Sha256::digest(source.as_bytes()).into()
-}
+pub fn content_hash(source: &str) -> [u8; 32] { Sha256::digest(source.as_bytes()).into() }
 
 fn non_zero_capacity(capacity: usize) -> NonZeroUsize {
     assert!(

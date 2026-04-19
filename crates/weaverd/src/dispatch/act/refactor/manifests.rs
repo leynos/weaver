@@ -6,12 +6,17 @@
 
 use std::path::PathBuf;
 
-use weaver_plugins::CapabilityId;
-use weaver_plugins::manifest::{PluginKind, PluginManifest, PluginMetadata};
+use weaver_plugins::{
+    CapabilityId,
+    manifest::{PluginKind, PluginManifest, PluginMetadata},
+};
 
 use super::plugin_paths::{
-    ROPE_PLUGIN_NAME, ROPE_PLUGIN_VERSION, RUST_ANALYZER_PLUGIN_NAME,
-    RUST_ANALYZER_PLUGIN_TIMEOUT_SECS, RUST_ANALYZER_PLUGIN_VERSION,
+    ROPE_PLUGIN_NAME,
+    ROPE_PLUGIN_VERSION,
+    RUST_ANALYZER_PLUGIN_NAME,
+    RUST_ANALYZER_PLUGIN_TIMEOUT_SECS,
+    RUST_ANALYZER_PLUGIN_VERSION,
 };
 
 /// Builds the default rope plugin manifest.

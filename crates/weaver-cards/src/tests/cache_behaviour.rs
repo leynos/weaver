@@ -7,9 +7,7 @@ use rstest_bdd_macros::{given, scenario, then, when};
 
 use crate::{CardExtractionError, CardExtractionInput, DetailLevel, TreeSitterCardExtractor};
 
-fn rust_fixture_source(name: &str) -> String {
-    format!("fn {name}() -> usize {{\n    1\n}}\n")
-}
+fn rust_fixture_source(name: &str) -> String { format!("fn {name}() -> usize {{\n    1\n}}\n") }
 
 #[derive(Default)]
 struct CacheWorld {
@@ -154,6 +152,4 @@ fn then_cache_entries(world: &mut CacheWorld, entries: usize) {
 }
 
 #[scenario(path = "tests/features/card_cache.feature")]
-fn card_cache_behaviour(#[from(world)] world: CacheWorld) {
-    let _ = world;
-}
+fn card_cache_behaviour(#[from(world)] world: CacheWorld) { let _ = world; }

@@ -1,10 +1,12 @@
 //! Unit tests for the `rename-symbol` request mapping contract.
 
-use std::sync::Mutex;
+use std::{path::PathBuf, sync::Mutex};
 
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
+use url::Url;
 use weaver_plugins::{CapabilityId, PluginError, PluginOutput, PluginRequest, PluginResponse};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 #[expect(
     clippy::duplicate_mod,
@@ -13,14 +15,23 @@ use weaver_plugins::{CapabilityId, PluginError, PluginOutput, PluginRequest, Plu
 #[path = "refactor_helpers.rs"]
 mod refactor_helpers;
 
-use crate::dispatch::act::refactor::resolution::{
-    CandidateEvaluation, CapabilityResolutionDetails, CapabilityResolutionEnvelope,
-    ResolutionOutcome, ResolutionRequest, SelectionMode,
-};
-use crate::dispatch::act::refactor::{
-    RefactorContext, RefactorPluginRuntime, ResponseWriter, handle, rust_analyzer_manifest,
-};
 use refactor_helpers::{build_backends, command_request};
+
+use crate::dispatch::act::refactor::{
+    RefactorContext,
+    RefactorPluginRuntime,
+    ResponseWriter,
+    handle,
+    resolution::{
+        CandidateEvaluation,
+        CapabilityResolutionDetails,
+        CapabilityResolutionEnvelope,
+        ResolutionOutcome,
+        ResolutionRequest,
+        SelectionMode,
+    },
+    rust_analyzer_manifest,
+};
 
 struct InspectingRuntime {
     captured: Mutex<Option<PluginRequest>>,
@@ -57,7 +68,14 @@ impl RefactorPluginRuntime for InspectingRuntime {
         _provider: &str,
         request: &PluginRequest,
     ) -> Result<PluginResponse, PluginError> {
-        *self.captured.lock().expect("lock") = Some(request.clone());
+        let mut guard = self
+            .captured
+            .lock()
+            .map_err(|error| PluginError::NotFound {
+                name: format!("lock poisoned: {error}"),
+            })?;
+        *guard = Some(request.clone());
+        drop(guard);
         Ok(self.response.clone())
     }
 }
@@ -71,9 +89,10 @@ const NOTES_DIFF: &str = concat!(
     ">>>>>>> REPLACE\n",
 );
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn socket_dir() -> TempDir {
-    TempDir::new().expect("socket dir")
+fn socket_dir() -> Result<TempDir, String> {
+    TempDir::new().map_err(|e| format!("failed to create socket dir: {e}"))
 }
 
 struct RenameDispatch<'a> {
@@ -84,11 +103,28 @@ struct RenameDispatch<'a> {
     socket_dir: &'a TempDir,
 }
 
+struct RenameExpectation<'a> {
+    position: Option<&'a str>,
+    new_name: Option<&'a str>,
+}
+
+struct RenameContractCase {
+    file: &'static str,
+    provider: &'static str,
+    language: &'static str,
+    extra_args: Vec<String>,
+    position: Option<&'static str>,
+    new_name: Option<&'static str>,
+}
+
 /// Dispatches a rename request through the handler and returns the captured
 /// `PluginRequest` for inspection.
-fn dispatch_inspecting_rename(config: RenameDispatch<'_>) -> PluginRequest {
-    let workspace = TempDir::new().expect("workspace");
-    std::fs::write(workspace.path().join(config.file), "hello world\n").expect("write");
+fn dispatch_inspecting_rename(
+    config: RenameDispatch<'_>,
+) -> Result<(PluginRequest, PathBuf), String> {
+    let workspace = TempDir::new().map_err(|e| format!("workspace: {e}"))?;
+    let file_path = workspace.path().join(config.file);
+    std::fs::write(&file_path, "hello world\n").map_err(|e| format!("write: {e}"))?;
     let runtime = InspectingRuntime {
         captured: Mutex::new(None),
         response: PluginResponse::success(PluginOutput::Diff {
@@ -118,102 +154,99 @@ fn dispatch_inspecting_rename(config: RenameDispatch<'_>) -> PluginRequest {
             runtime: &runtime,
         },
     )
-    .expect("dispatch result");
-    runtime
+    .map_err(|e| format!("dispatch result: {e}"))?;
+    let captured = runtime
         .captured
         .into_inner()
-        .expect("lock")
-        .expect("request should be captured")
+        .map_err(|error| format!("captured request lock poisoned: {error}"))?
+        .ok_or_else(|| String::from("request should be captured"))?;
+    Ok((captured, file_path))
 }
 
-#[rstest]
-fn handler_sends_rename_symbol_contract_conforming_request(socket_dir: TempDir) {
-    let plugin_request = dispatch_inspecting_rename(RenameDispatch {
-        file: "notes.py",
-        provider: "rope",
-        language: "python",
-        extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
-        socket_dir: &socket_dir,
-    });
+fn assert_rename_request(
+    config: RenameDispatch<'_>,
+    expectation: RenameExpectation<'_>,
+) -> Result<(PluginRequest, PathBuf), String> {
+    let (plugin_request, file_path) = dispatch_inspecting_rename(config)?;
+    let expected_uri = Url::from_file_path(&file_path)
+        .map_err(|()| format!("failed to build URI for '{}'", file_path.display()))?
+        .to_string();
 
     assert_eq!(plugin_request.operation(), "rename-symbol");
     let args = plugin_request.arguments();
     assert_eq!(
         args.get("uri").and_then(|value| value.as_str()),
-        Some("file:///notes.py"),
+        Some(expected_uri.as_str()),
     );
     assert_eq!(
         args.get("position").and_then(|value| value.as_str()),
-        Some("4")
+        expectation.position
     );
     assert!(!args.contains_key("offset"));
     assert_eq!(
         args.get("new_name").and_then(|value| value.as_str()),
-        Some("woven")
+        expectation.new_name
     );
+
+    Ok((plugin_request, file_path))
 }
 
 #[rstest]
-fn handler_overwrites_pre_existing_uri_with_file_path(socket_dir: TempDir) {
-    let plugin_request = dispatch_inspecting_rename(RenameDispatch {
-        file: "notes.py",
-        provider: "rope",
-        language: "python",
-        extra_args: vec![
-            String::from("uri=stale_value"),
-            String::from("offset=4"),
-            String::from("new_name=woven"),
-        ],
-        socket_dir: &socket_dir,
-    });
-
-    assert_eq!(
-        plugin_request
-            .arguments()
-            .get("uri")
-            .and_then(|value| value.as_str()),
-        Some("file:///notes.py"),
-    );
-}
-
-#[rstest]
-fn handler_omits_position_when_offset_not_provided(socket_dir: TempDir) {
-    let plugin_request = dispatch_inspecting_rename(RenameDispatch {
-        file: "notes.py",
-        provider: "rope",
-        language: "python",
-        extra_args: vec![String::from("new_name=woven")],
-        socket_dir: &socket_dir,
-    });
-
-    assert!(!plugin_request.arguments().contains_key("position"));
-}
-
-#[rstest]
-fn rust_analyzer_provider_uses_rename_symbol_contract(socket_dir: TempDir) {
-    let plugin_request = dispatch_inspecting_rename(RenameDispatch {
-        file: "notes.rs",
-        provider: "rust-analyzer",
-        language: "rust",
-        extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
-        socket_dir: &socket_dir,
-    });
-
-    assert_eq!(plugin_request.operation(), "rename-symbol");
-    assert_eq!(
-        plugin_request
-            .arguments()
-            .get("uri")
-            .and_then(|value| value.as_str()),
-        Some("file:///notes.rs"),
-    );
-    assert_eq!(
-        plugin_request
-            .arguments()
-            .get("position")
-            .and_then(|value| value.as_str()),
-        Some("4"),
-    );
+#[case(RenameContractCase {
+    file: "notes.py",
+    provider: "rope",
+    language: "python",
+    extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
+    position: Some("4"),
+    new_name: Some("woven"),
+})]
+#[case(RenameContractCase {
+    file: "notes.py",
+    provider: "rope",
+    language: "python",
+    extra_args: vec![
+        String::from("uri=stale_value"),
+        String::from("offset=4"),
+        String::from("new_name=woven"),
+    ],
+    position: Some("4"),
+    new_name: Some("woven"),
+})]
+#[case(RenameContractCase {
+    file: "notes.py",
+    provider: "rope",
+    language: "python",
+    extra_args: vec![String::from("new_name=woven")],
+    position: None,
+    new_name: Some("woven"),
+})]
+#[case(RenameContractCase {
+    file: "notes.rs",
+    provider: "rust-analyzer",
+    language: "rust",
+    extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
+    position: Some("4"),
+    new_name: Some("woven"),
+})]
+fn handler_rename_contract_parametrised(
+    socket_dir: Result<TempDir, String>,
+    #[case] case: RenameContractCase,
+) -> Result<(), String> {
+    let socket_dir = socket_dir?;
+    let _ = assert_rename_request(
+        RenameDispatch {
+            file: case.file,
+            provider: case.provider,
+            language: case.language,
+            extra_args: case.extra_args,
+            socket_dir: &socket_dir,
+        },
+        RenameExpectation {
+            position: case.position,
+            new_name: case.new_name,
+        },
+    )?;
+    Ok(())
 }
 
 #[test]

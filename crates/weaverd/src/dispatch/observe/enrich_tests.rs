@@ -1,20 +1,32 @@
 //! Unit tests for `observe::enrich`.
 
 use lsp_types::{Hover, HoverContents, MarkedString, MarkupContent, MarkupKind};
+use rstest::rstest;
 use weaver_lsp_host::{Language, ServerCapabilitySet};
 
-use super::enrich_test_utils::{
-    ExpectedLspInfo, assert_deprecation, assert_enrichment_degrades, assert_lsp_info,
-    check_utf16_offset, run_non_ascii_enrichment, rust_card,
+use super::{
+    enrich_test_utils::{
+        ExpectedLspInfo,
+        assert_deprecation,
+        assert_enrichment_degrades,
+        assert_lsp_info,
+        check_utf16_offset,
+        run_non_ascii_enrichment,
+        rust_card,
+    },
+    *,
 };
-use super::*;
-use crate::backends::BackendKind;
-use crate::dispatch::observe::test_support::{
-    StubLanguageServer, markdown_hover, semantic_backends_with_server,
+use crate::{
+    backends::BackendKind,
+    dispatch::observe::test_support::{
+        StubLanguageServer,
+        markdown_hover,
+        semantic_backends_with_server,
+    },
 };
 
 #[test]
-fn try_lsp_enrichment_starts_backend_and_populates_hover_info() {
+fn try_lsp_enrichment_starts_backend_and_populates_hover_info() -> Result<(), String> {
     let source = "// comment\nfn greet(name: &str) -> usize { 0 }";
     let hover = markdown_hover(concat!(
         "```rust\nfn greet(name: &str) -> usize\n```\n",
@@ -24,7 +36,7 @@ fn try_lsp_enrichment_starts_backend_and_populates_hover_info() {
         ServerCapabilitySet::new(false, false, false).with_hover(true),
         hover,
     );
-    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
+    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server)?;
     let mut card = rust_card();
 
     let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
@@ -42,33 +54,50 @@ fn try_lsp_enrichment_starts_backend_and_populates_hover_info() {
             deprecated: true,
         },
     );
+    Ok(())
 }
 
-#[test]
-fn try_lsp_enrichment_degrades_when_initialization_fails() {
-    let (server, _hover_params) = StubLanguageServer::failing_initialize(
-        ServerCapabilitySet::new(false, false, false).with_hover(true),
-        "boom",
-    );
-    let (backends, _dir) = assert_enrichment_degrades(server);
-    assert!(backends.is_started(BackendKind::Semantic));
+#[derive(Clone, Copy, Debug)]
+enum DegradedServerCase {
+    InitializationFails,
+    HoverMissing,
+    HoverRequestFails,
 }
 
-#[test]
-fn try_lsp_enrichment_degrades_when_hover_is_missing() {
-    let (server, _hover_params) = StubLanguageServer::missing_hover(
-        ServerCapabilitySet::new(false, false, false).with_hover(true),
-    );
-    let _result = assert_enrichment_degrades(server);
+impl DegradedServerCase {
+    fn build(self) -> (StubLanguageServer, bool) {
+        let capabilities = ServerCapabilitySet::new(false, false, false).with_hover(true);
+        match self {
+            Self::InitializationFails => {
+                let (server, _hover_params) =
+                    StubLanguageServer::failing_initialize(capabilities, "boom");
+                (server, true)
+            }
+            Self::HoverMissing => {
+                let (server, _hover_params) = StubLanguageServer::missing_hover(capabilities);
+                (server, true)
+            }
+            Self::HoverRequestFails => {
+                let (server, _hover_params) =
+                    StubLanguageServer::failing_hover(capabilities, "hover RPC failed");
+                (server, true)
+            }
+        }
+    }
 }
 
-#[test]
-fn try_lsp_enrichment_degrades_when_hover_request_fails() {
-    let (server, _hover_params) = StubLanguageServer::failing_hover(
-        ServerCapabilitySet::new(false, false, false).with_hover(true),
-        "hover RPC failed",
+#[rstest]
+#[case(DegradedServerCase::InitializationFails)]
+#[case(DegradedServerCase::HoverMissing)]
+#[case(DegradedServerCase::HoverRequestFails)]
+fn try_lsp_enrichment_degrades(#[case] case: DegradedServerCase) -> Result<(), String> {
+    let (server, should_start_backend) = case.build();
+    let (backends, _dir) = assert_enrichment_degrades(server)?;
+    assert_eq!(
+        backends.is_started(BackendKind::Semantic),
+        should_start_backend
     );
-    let _result = assert_enrichment_degrades(server);
+    Ok(())
 }
 
 #[test]
@@ -162,63 +191,70 @@ fn maps_card_languages_to_lsp() {
 }
 
 #[test]
-fn byte_col_to_utf16_converts_ascii_correctly() {
+fn byte_col_to_utf16_converts_ascii_correctly() -> Result<(), String> {
     let line = "fn foo() {}";
-    check_utf16_offset(line, 0, Some(0));
-    check_utf16_offset(line, 3, Some(3)); // at 'foo'
-    check_utf16_offset(line, 11, Some(11)); // at end
+    check_utf16_offset(line, 0, Some(0))?;
+    check_utf16_offset(line, 3, Some(3))?; // at 'foo'
+    check_utf16_offset(line, 11, Some(11))?; // at end
+    Ok(())
 }
 
 #[test]
-fn byte_col_to_utf16_converts_multibyte_utf8_correctly() {
+fn byte_col_to_utf16_converts_multibyte_utf8_correctly() -> Result<(), String> {
     // "// café" — 'é' is 2 bytes in UTF-8 (U+00E9 = 0xC3 0xA9), but 1 UTF-16 code unit
     // Bytes: 2f 2f 20 63 61 66 c3 a9
     let line = "// café";
-    check_utf16_offset(line, 0, Some(0)); // at start (before '/')
-    check_utf16_offset(line, 3, Some(3)); // at ' ' (after '//')
-    check_utf16_offset(line, 4, Some(4)); // at 'c'
-    check_utf16_offset(line, 5, Some(5)); // at 'a'
-    check_utf16_offset(line, 6, Some(6)); // at 'f'
-    check_utf16_offset(line, 8, Some(7)); // after 'é' (byte 6-7 is 'é', byte 8 is end)
+    check_utf16_offset(line, 0, Some(0))?; // at start (before '/')
+    check_utf16_offset(line, 3, Some(3))?; // at ' ' (after '//')
+    check_utf16_offset(line, 4, Some(4))?; // at 'c'
+    check_utf16_offset(line, 5, Some(5))?; // at 'a'
+    check_utf16_offset(line, 6, Some(6))?; // at 'f'
+    check_utf16_offset(line, 8, Some(7))?; // after 'é' (byte 6-7 is 'é', byte 8 is end)
+    Ok(())
 }
 
 #[test]
-fn byte_col_to_utf16_converts_emoji_correctly() {
+fn byte_col_to_utf16_converts_emoji_correctly() -> Result<(), String> {
     // "// 🦀 Rust" — '🦀' is 4 bytes (U+1F980), but 2 UTF-16 code units (surrogate pair)
     let line = "// 🦀 Rust";
-    check_utf16_offset(line, 0, Some(0)); // at start
-    check_utf16_offset(line, 3, Some(3)); // at '🦀'
-    check_utf16_offset(line, 7, Some(5)); // after '🦀' (4 bytes → 2 UTF-16)
-    check_utf16_offset(line, 8, Some(6)); // at ' '
+    check_utf16_offset(line, 0, Some(0))?; // at start
+    check_utf16_offset(line, 3, Some(3))?; // at '🦀'
+    check_utf16_offset(line, 7, Some(5))?; // after '🦀' (4 bytes → 2 UTF-16)
+    check_utf16_offset(line, 8, Some(6))?; // at ' '
+    Ok(())
 }
 
 #[test]
-fn byte_col_to_utf16_rejects_out_of_range_offset() {
+fn byte_col_to_utf16_rejects_out_of_range_offset() -> Result<(), String> {
     let line = "hello";
-    check_utf16_offset(line, 100, None);
+    check_utf16_offset(line, 100, None)?;
+    Ok(())
 }
 
 #[test]
-fn byte_col_to_utf16_rejects_non_char_boundary() {
+fn byte_col_to_utf16_rejects_non_char_boundary() -> Result<(), String> {
     let line = "café";
     // 'é' starts at byte 3 and is 2 bytes; byte 4 is mid-character
-    check_utf16_offset(line, 4, None);
+    check_utf16_offset(line, 4, None)?;
+    Ok(())
 }
 
 #[test]
-fn try_lsp_enrichment_with_non_ascii_source() {
+fn try_lsp_enrichment_with_non_ascii_source() -> Result<(), String> {
     let caps = ServerCapabilitySet::new(false, false, false).with_hover(true);
-    let character = run_non_ascii_enrichment(caps);
+    let character = run_non_ascii_enrichment(caps)?;
     // 'é' saves one position: byte offset 12 → UTF-16 offset 11
     assert_eq!(character, 11);
+    Ok(())
 }
 
 #[test]
-fn try_lsp_enrichment_with_non_ascii_source_utf8_negotiated() {
+fn try_lsp_enrichment_with_non_ascii_source_utf8_negotiated() -> Result<(), String> {
     let caps = ServerCapabilitySet::new(false, false, false)
         .with_hover(true)
         .with_position_encoding(Some(lsp_types::PositionEncodingKind::UTF8));
-    let character = run_non_ascii_enrichment(caps);
+    let character = run_non_ascii_enrichment(caps)?;
     // UTF-8 negotiated: byte offset 12 is passed through unchanged
     assert_eq!(character, 12);
+    Ok(())
 }

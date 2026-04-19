@@ -5,19 +5,21 @@
 //! line, reading the response from stdout, and enforcing a timeout. This
 //! module is the primary integration point with the `weaver-sandbox` crate.
 
-use std::io::{BufRead, BufReader, Read, Write};
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::{
+    io::{BufRead, BufReader, Read, Write},
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use tracing::{debug, warn};
+use weaver_sandbox::{SandboxProfile, process::Stdio};
 
-use weaver_sandbox::SandboxProfile;
-use weaver_sandbox::process::Stdio;
-
-use crate::error::PluginError;
-use crate::manifest::PluginManifest;
-use crate::protocol::{PluginRequest, PluginResponse};
-use crate::runner::PluginExecutor;
+use crate::{
+    error::PluginError,
+    manifest::PluginManifest,
+    protocol::{PluginRequest, PluginResponse},
+    runner::PluginExecutor,
+};
 
 /// Tracing target for plugin process operations.
 const PLUGIN_TARGET: &str = "weaver_plugins::process";
@@ -31,10 +33,16 @@ const PLUGIN_TARGET: &str = "weaver_plugins::process";
 /// # Example
 ///
 /// ```rust,no_run
-/// use weaver_plugins::process::SandboxExecutor;
-/// use weaver_plugins::runner::PluginExecutor;
-/// use weaver_plugins::{PluginManifest, PluginMetadata, PluginKind, PluginRequest};
 /// use std::path::PathBuf;
+///
+/// use weaver_plugins::{
+///     PluginKind,
+///     PluginManifest,
+///     PluginMetadata,
+///     PluginRequest,
+///     process::SandboxExecutor,
+///     runner::PluginExecutor,
+/// };
 ///
 /// let executor = SandboxExecutor;
 /// let meta = PluginMetadata::new("example", "0.1.0", PluginKind::Actuator);
@@ -224,6 +232,63 @@ fn poll_child(
     }
 }
 
+/// Handles a child process that has exited.
+fn handle_exited(name: &str, status: std::process::ExitStatus) -> Result<(), PluginError> {
+    debug!(
+        target: PLUGIN_TARGET,
+        plugin = name,
+        ?status,
+        "plugin process exited"
+    );
+    if status.success() {
+        return Ok(());
+    }
+    Err(PluginError::NonZeroExit {
+        name: name.to_owned(),
+        status: status.code().unwrap_or(-1),
+    })
+}
+
+/// Handles timeout for a still-running child process.
+fn handle_timeout(
+    name: &str,
+    child: &mut weaver_sandbox::SandboxChild,
+    timeout_secs: u64,
+) -> Result<(), PluginError> {
+    warn!(
+        target: PLUGIN_TARGET,
+        plugin = name,
+        timeout_secs,
+        "plugin timed out, killing process"
+    );
+    let message = match child.kill() {
+        Ok(()) => match child.wait() {
+            Ok(status) => format!("terminated timed-out process with status {status}"),
+            Err(error) => format!("failed to wait for timed-out process after kill: {error}"),
+        },
+        Err(error) => match child.try_wait() {
+            Ok(Some(status)) => {
+                format!(
+                    "failed to kill timed-out process: {error}; process had already exited with \
+                     status {status}"
+                )
+            }
+            Ok(None) => {
+                format!("failed to kill timed-out process: {error}; process is still running")
+            }
+            Err(wait_error) => format!(
+                "failed to kill timed-out process: {error}; additionally failed to poll timed-out \
+                 process: {wait_error}"
+            ),
+        },
+    };
+    Err(PluginError::Timeout {
+        name: name.to_owned(),
+        timeout_secs,
+        message,
+    })
+}
+
 /// Waits for the child process to exit, enforcing the timeout.
 fn wait_for_exit(
     name: &str,
@@ -237,34 +302,11 @@ fn wait_for_exit(
     loop {
         match poll_child(name, child)? {
             ChildPollResult::Exited(status) => {
-                debug!(
-                    target: PLUGIN_TARGET,
-                    plugin = name,
-                    ?status,
-                    "plugin process exited"
-                );
-                if status.success() {
-                    return Ok(());
-                }
-                return Err(PluginError::NonZeroExit {
-                    name: name.to_owned(),
-                    status: status.code().unwrap_or(-1),
-                });
+                return handle_exited(name, status);
             }
             ChildPollResult::StillRunning => {
                 if start.elapsed() > timeout {
-                    warn!(
-                        target: PLUGIN_TARGET,
-                        plugin = name,
-                        timeout_secs,
-                        "plugin timed out, killing process"
-                    );
-                    drop(child.kill());
-                    drop(child.wait());
-                    return Err(PluginError::Timeout {
-                        name: name.to_owned(),
-                        timeout_secs,
-                    });
+                    return handle_timeout(name, child, timeout_secs);
                 }
                 std::thread::sleep(poll_interval);
             }

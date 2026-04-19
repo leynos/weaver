@@ -2,9 +2,16 @@
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use crate::test_support::{QuotedString, parse_byte_range, parse_line_range};
-use crate::{DiagnosticCode, DiagnosticReport, Language, SourceSpan, Span};
+use crate::{
+    DiagnosticCode,
+    DiagnosticReport,
+    Language,
+    SourceSpan,
+    Span,
+    test_support::{QuotedString, parse_byte_range, parse_line_range},
+};
 
 // ---------------------------------------------------------------------------
 // Test world
@@ -22,14 +29,18 @@ struct TestWorld {
     deserialization_error: Option<String>,
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> TestWorld {
-    TestWorld::default()
-}
+fn world() -> TestWorld { TestWorld::default() }
 
+#[expect(
+    clippy::expect_fun_call,
+    reason = "Test helper needs string interpolation in expect message; will be addressed when \
+              whitaker permits unwrap_or_else panic in test interpolation contexts"
+)]
 fn parse_diagnostic_code(code: &str) -> DiagnosticCode {
     let json = serde_json::to_string(code).expect("serialise diagnostic code");
-    serde_json::from_str(&json).unwrap_or_else(|_| panic!("unrecognised diagnostic code: {code}"))
+    serde_json::from_str(&json).expect(&format!("unrecognised diagnostic code: {code}"))
 }
 
 // ---------------------------------------------------------------------------
@@ -161,17 +172,20 @@ fn assert_str_contains(haystack: &str, needle: &str, label: &str) {
     );
 }
 
+#[expect(
+    clippy::expect_fun_call,
+    reason = "Test step needs string interpolation in expect message; will be addressed when \
+              whitaker permits unwrap_or_else panic in test interpolation contexts"
+)]
 #[then("the JSON contains key {key} with value {value}")]
 fn then_json_contains(world: &mut TestWorld, key: QuotedString, value: QuotedString) {
     let json = world.json_output.as_ref().expect("JSON should be set");
     let parsed: serde_json::Value =
         serde_json::from_str(json).expect("JSON output should be valid");
-    let actual = parsed.get(key.as_str()).unwrap_or_else(|| {
-        panic!(
-            "expected JSON to contain key '{}', got: {json}",
-            key.as_str()
-        )
-    });
+    let actual = parsed.get(key.as_str()).expect(&format!(
+        "expected JSON to contain key '{}', got: {json}",
+        key.as_str()
+    ));
     let expected: serde_json::Value = serde_json::from_str(value.as_str())
         .unwrap_or_else(|_| serde_json::Value::String(value.as_str().to_owned()));
     assert_eq!(
@@ -202,6 +216,11 @@ fn then_first_diagnostic_does_not_contain_key(world: &mut TestWorld, key: Quoted
     );
 }
 
+#[expect(
+    clippy::expect_fun_call,
+    reason = "Test step needs string interpolation in expect message; will be addressed when \
+              whitaker permits unwrap_or_else panic in test interpolation contexts"
+)]
 #[then("the first diagnostic JSON contains key {key} with value {value}")]
 fn then_first_diagnostic_contains_key_with_value(
     world: &mut TestWorld,
@@ -209,12 +228,10 @@ fn then_first_diagnostic_contains_key_with_value(
     value: QuotedString,
 ) {
     let first = first_diagnostic_object(world);
-    let actual = first.get(key.as_str()).unwrap_or_else(|| {
-        panic!(
-            "expected first diagnostic JSON to contain key '{}', got: {first:?}",
-            key.as_str()
-        )
-    });
+    let actual = first.get(key.as_str()).expect(&format!(
+        "expected first diagnostic JSON to contain key '{}', got: {first:?}",
+        key.as_str()
+    ));
     let expected: serde_json::Value = serde_json::from_str(value.as_str())
         .unwrap_or_else(|_| serde_json::Value::String(value.as_str().to_owned()));
     assert_eq!(
@@ -257,6 +274,4 @@ fn then_deserialization_fails(world: &mut TestWorld, snippet: QuotedString) {
 // ---------------------------------------------------------------------------
 
 #[scenario(path = "tests/features/sempai_core.feature")]
-fn sempai_core_behaviour(world: TestWorld) {
-    let _ = world;
-}
+fn sempai_core_behaviour(world: TestWorld) { let _ = world; }

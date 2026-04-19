@@ -1,14 +1,23 @@
 //! End-to-end snapshots for `observe get-card`.
 
+#[path = "support/fixture_io.rs"]
+mod fixture_io;
 mod test_support;
+#[path = "support/weaver_binary.rs"]
+mod weaver_binary;
 
+use fixture_io::write_fixture_path;
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
-use url::Url;
-
 use test_support::{
-    CacheTranscript, GetCardRequest, TestDaemon, assert_named_snapshot, fixture_uri, run_get_card,
+    CacheTranscript,
+    GetCardRequest,
+    TestDaemon,
+    assert_named_snapshot,
+    fixture_uri,
+    run_get_card,
 };
+use url::Url;
 use weaver_e2e::card_fixtures::{PYTHON_CASES, RUST_CASES};
 
 struct WorkspaceUri {
@@ -88,8 +97,8 @@ const fn snapshot_harness() -> SnapshotHarness {
     reason = "test helper failures should panic with explicit setup messages"
 )]
 fn unsupported_fixture_uri(temp_dir: &TempDir) -> String {
-    let path = temp_dir.path().join("notes.txt");
-    std::fs::write(&path, "plain text\n").expect("write unsupported fixture");
+    let path =
+        write_fixture_path(temp_dir, "notes.txt", "plain text\n").expect("write fixture path");
     Url::from_file_path(&path)
         .map(|uri| uri.to_string())
         .expect("unsupported path to URI")

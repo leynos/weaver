@@ -1,10 +1,11 @@
 //! Connection handling abstractions for the daemon listener.
 
-use std::io::{self, Read, Write};
-use std::net::TcpStream;
-
 #[cfg(unix)]
 use std::os::unix::net::UnixStream;
+use std::{
+    io::{self, Read, Write},
+    net::TcpStream,
+};
 
 /// Stream types accepted by the daemon listener.
 pub enum ConnectionStream {

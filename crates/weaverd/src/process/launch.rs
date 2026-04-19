@@ -1,24 +1,31 @@
 //! Supervises daemon launch sequencing and runtime orchestration.
 
-use std::env;
-use std::sync::{Arc, Mutex};
+use std::{
+    env,
+    sync::{Arc, Mutex},
+};
 
 use tracing::info;
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
-
-use crate::StructuredHealthReporter;
-use crate::bootstrap::{ConfigLoader, StaticConfigLoader, SystemConfigLoader, bootstrap_with};
-use crate::dispatch::{BackendManager, DispatchConnectionHandler};
-use crate::health::HealthReporter;
-use crate::semantic_provider::SemanticBackendProvider;
-use crate::transport::SocketListener;
-
-use super::daemonizer::{Daemonizer, SystemDaemonizer};
-use super::errors::LaunchError;
-use super::guard::{HealthState, ProcessGuard};
-use super::shutdown::{ShutdownSignal, SystemShutdownSignal};
-use super::{FOREGROUND_ENV_VAR, PROCESS_TARGET, SHUTDOWN_TIMEOUT};
 use weaver_config::RuntimePaths;
+
+use super::{
+    FOREGROUND_ENV_VAR,
+    PROCESS_TARGET,
+    SHUTDOWN_TIMEOUT,
+    daemonizer::{Daemonizer, SystemDaemonizer},
+    errors::LaunchError,
+    guard::{HealthState, ProcessGuard},
+    shutdown::{ShutdownSignal, SystemShutdownSignal},
+};
+use crate::{
+    StructuredHealthReporter,
+    bootstrap::{ConfigLoader, StaticConfigLoader, SystemConfigLoader, bootstrap_with},
+    dispatch::{BackendManager, DispatchConnectionHandler},
+    health::HealthReporter,
+    semantic_provider::SemanticBackendProvider,
+    transport::SocketListener,
+};
 
 /// Launch mode for the daemon.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

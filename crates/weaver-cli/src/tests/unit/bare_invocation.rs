@@ -4,19 +4,26 @@
 //! block to stderr and exits non-zero, without requiring configuration
 //! loading or daemon connectivity.
 
-use std::ffi::OsString;
-use std::io::{self, Cursor, Write};
-use std::process::ExitCode;
+use std::{
+    ffi::OsString,
+    io::{self, Cursor, Write},
+    process::ExitCode,
+};
 
 use ortho_config::{FluentLocalizer, Localizer, NoOpLocalizer};
 use rstest::rstest;
+use weaver_config::Config;
 
-use crate::localizer::{WEAVER_EN_US, write_bare_help};
 use crate::{
-    AppError, Cli, ConfigLoader, IoStreams, handle_preflight, run_with_loader,
+    AppError,
+    Cli,
+    ConfigLoader,
+    IoStreams,
+    handle_preflight,
+    localizer::{WEAVER_EN_US, write_bare_help},
+    run_with_loader,
     split_config_arguments,
 };
-use weaver_config::Config;
 
 /// A config loader that panics if called, proving that bare invocation
 /// short-circuits before configuration loading.
@@ -48,7 +55,7 @@ fn run_bare_invocation() -> (ExitCode, Vec<u8>, Vec<u8>) {
 
 #[test]
 fn bare_invocation_exits_with_failure() {
-    let (exit, _, _) = run_bare_invocation();
+    let (exit, ..) = run_bare_invocation();
     assert_eq!(exit, ExitCode::FAILURE);
 }
 
@@ -210,9 +217,7 @@ impl Write for FailingWriter {
         Err(io::Error::other("simulated stderr failure"))
     }
 
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
+    fn flush(&mut self) -> io::Result<()> { Ok(()) }
 }
 
 #[test]

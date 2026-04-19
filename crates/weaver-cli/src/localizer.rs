@@ -13,11 +13,12 @@ use ortho_config::{FluentLocalizer, Localizer, NoOpLocalizer};
 /// Embedded en-US Fluent catalogue for the Weaver CLI.
 pub(crate) static WEAVER_EN_US: &str = include_str!("../locales/en-US/messages.ftl");
 
-/// Bare-help message definitions: `(fluent_id, english_fallback)`.
-///
-/// The fallback values must match `locales/en-US/messages.ftl`; the
-/// `fluent_and_fallback_outputs_are_identical` test guards against drift.
 pub(crate) mod bare_help {
+    //! Bare-help message definitions used by actionable guidance and tests.
+    //!
+    //! The fallback values must match `locales/en-US/messages.ftl`; the
+    //! `fluent_and_fallback_outputs_are_identical` test guards against drift.
+
     pub(crate) const COMMAND_DOMAIN_REQUIRED: (&str, &str) = (
         "weaver-bare-help-command-domain-required",
         "command domain must be provided",
@@ -39,7 +40,7 @@ pub(crate) mod bare_help {
         "weaver-bare-help-domain-verify",
         "verify    Validate code correctness",
     );
-    // Kept for backwards compatibility; new code uses actionable_guidance.
+    // Kept for backwards compatibility; new code uses actionable guidance.
     #[cfg(test)]
     pub(crate) const POINTER: (&str, &str) = (
         "weaver-bare-help-pointer",

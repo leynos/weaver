@@ -2,22 +2,19 @@
 
 use rstest::rstest;
 
+use super::*;
 use crate::DetailLevel;
 
-use super::*;
+fn args(items: &[&str]) -> Vec<String> { items.iter().map(|s| String::from(*s)).collect() }
 
-fn args(items: &[&str]) -> Vec<String> {
-    items.iter().map(|s| String::from(*s)).collect()
-}
-
-fn parse_minimal() -> GraphSliceRequest {
+fn parse_minimal() -> Result<GraphSliceRequest, GraphSliceError> {
     let arguments = args(&["--uri", "file:///src/main.rs", "--position", "10:5"]);
-    GraphSliceRequest::parse(&arguments).expect("should parse")
+    GraphSliceRequest::parse(&arguments)
 }
 
 #[test]
 fn parses_minimal_position_and_uri() {
-    let request = parse_minimal();
+    let request = parse_minimal().expect("should parse");
     assert_eq!(request.uri(), "file:///src/main.rs");
     assert_eq!(request.line(), 10);
     assert_eq!(request.column(), 5);
@@ -25,7 +22,7 @@ fn parses_minimal_position_and_uri() {
 
 #[test]
 fn parses_minimal_defaults() {
-    let request = parse_minimal();
+    let request = parse_minimal().expect("should parse");
     assert_eq!(request.depth(), DEFAULT_DEPTH);
     assert_eq!(request.direction(), SliceDirection::Both);
     assert_eq!(request.edge_types(), SliceEdgeType::all());
@@ -35,7 +32,7 @@ fn parses_minimal_defaults() {
     assert_eq!(request.node_detail(), DetailLevel::Minimal);
 }
 
-fn parse_all_flags() -> GraphSliceRequest {
+fn parse_all_flags() -> Result<GraphSliceRequest, GraphSliceError> {
     let arguments = args(&[
         "--uri",
         "file:///src/lib.rs",
@@ -60,12 +57,12 @@ fn parse_all_flags() -> GraphSliceRequest {
         "--node-detail",
         "signature",
     ]);
-    GraphSliceRequest::parse(&arguments).expect("should parse")
+    GraphSliceRequest::parse(&arguments)
 }
 
 #[test]
 fn parses_all_flags_position_and_uri() {
-    let request = parse_all_flags();
+    let request = parse_all_flags().expect("should parse");
     assert_eq!(request.uri(), "file:///src/lib.rs");
     assert_eq!(request.line(), 42);
     assert_eq!(request.column(), 17);
@@ -73,7 +70,7 @@ fn parses_all_flags_position_and_uri() {
 
 #[test]
 fn parses_all_flags_traversal() {
-    let request = parse_all_flags();
+    let request = parse_all_flags().expect("should parse");
     assert_eq!(request.depth(), 3);
     assert_eq!(request.direction(), SliceDirection::Out);
     assert_eq!(
@@ -85,7 +82,7 @@ fn parses_all_flags_traversal() {
 
 #[test]
 fn parses_all_flags_budget_and_detail() {
-    let request = parse_all_flags();
+    let request = parse_all_flags().expect("should parse");
     assert_eq!(request.budget().max_cards(), 10);
     assert_eq!(request.budget().max_edges(), 50);
     assert_eq!(request.budget().max_estimated_tokens(), 2000);
@@ -165,8 +162,7 @@ fn rejects_invalid_arguments(#[case] arg_list: &[&str], #[case] expected_substri
     let message = error.to_string();
     assert!(
         message.contains(expected_substring),
-        "expected error to contain {expected_substring:?}, \
-         got: {message}"
+        "expected error to contain {expected_substring:?}, got: {message}"
     );
 }
 

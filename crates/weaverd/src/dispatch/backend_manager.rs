@@ -6,10 +6,8 @@
 
 use std::sync::{Arc, Mutex};
 
-use crate::backends::FusionBackends;
-use crate::semantic_provider::SemanticBackendProvider;
-
 use super::errors::DispatchError;
+use crate::{backends::FusionBackends, semantic_provider::SemanticBackendProvider};
 
 /// Manager providing access to shared backends with encapsulated locking.
 ///
@@ -46,6 +44,8 @@ impl BackendManager {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for backend manager initialisation and access.
+
     use rstest::{fixture, rstest};
     use weaver_cards::DEFAULT_CACHE_CAPACITY;
     use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};

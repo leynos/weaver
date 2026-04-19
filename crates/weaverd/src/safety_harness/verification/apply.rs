@@ -5,8 +5,7 @@
 
 use std::path::Path;
 
-use crate::safety_harness::edit::FileEdit;
-use crate::safety_harness::error::SafetyHarnessError;
+use crate::safety_harness::{edit::FileEdit, error::SafetyHarnessError};
 
 /// Applies text edits to the original content to produce modified content.
 ///
@@ -115,6 +114,8 @@ fn line_column_to_offset(
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for edit application and text transformation.
+
     use std::path::PathBuf;
 
     use rstest::rstest;

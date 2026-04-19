@@ -5,15 +5,24 @@ mod behaviour;
 mod dispatch_layer;
 mod support;
 
-use rstest::rstest;
-use weaver_plugins::capability::ReasonCode;
-use weaver_plugins::protocol::{PluginOutput, PluginRequest};
+use std::path::PathBuf;
 
-use crate::{RustAnalyzerAdapterError, execute_request};
+use cap_std::{ambient_authority, fs::Dir};
+use rstest::rstest;
 use support::{
-    adapter_returning, adapter_returning_with_path, adapter_unused, rename_arguments,
-    request_with_args, request_with_path,
+    adapter_returning,
+    adapter_returning_with_path,
+    adapter_unused,
+    rename_arguments,
+    request_with_args,
+    request_with_path,
 };
+use weaver_plugins::{
+    capability::ReasonCode,
+    protocol::{PluginOutput, PluginRequest},
+};
+
+use crate::{RustAnalyzerAdapterError, execute_request, write_workspace_file};
 
 #[test]
 fn rename_success_returns_diff_output() {
@@ -148,4 +157,24 @@ fn rename_rejects_empty_or_curdir_path(#[case] path: &str) {
         "expected empty-path error, got: {error}",
     );
     assert_eq!(error.reason_code(), Some(ReasonCode::IncompletePayload));
+}
+
+#[test]
+fn write_workspace_file_creates_nested_parent_directories() {
+    let workspace = tempfile::tempdir().expect("temporary workspace should be created");
+    let relative_path = PathBuf::from("src/nested/main.rs");
+    let content = "fn renamed() -> i32 {\n    1\n}\n";
+
+    let written_path = write_workspace_file(workspace.path(), &relative_path, content)
+        .expect("nested workspace writes should succeed");
+    let workspace_dir = Dir::open_ambient_dir(workspace.path(), ambient_authority())
+        .expect("workspace directory should open");
+
+    assert_eq!(written_path, workspace.path().join(&relative_path));
+    assert_eq!(
+        workspace_dir
+            .read_to_string("src/nested/main.rs")
+            .expect("written file should be readable"),
+        content,
+    );
 }

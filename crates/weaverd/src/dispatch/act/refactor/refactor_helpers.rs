@@ -11,13 +11,22 @@ use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_plugins::CapabilityId;
 
-use crate::backends::FusionBackends;
-use crate::dispatch::act::refactor::resolution::{
-    CandidateEvaluation, CandidateReason, CapabilityResolutionDetails,
-    CapabilityResolutionEnvelope, RefusalReason, ResolutionOutcome, SelectionMode,
+use crate::{
+    backends::FusionBackends,
+    dispatch::{
+        act::refactor::resolution::{
+            CandidateEvaluation,
+            CandidateReason,
+            CapabilityResolutionDetails,
+            CapabilityResolutionEnvelope,
+            RefusalReason,
+            ResolutionOutcome,
+            SelectionMode,
+        },
+        request::{CommandDescriptor, CommandRequest},
+    },
+    semantic_provider::SemanticBackendProvider,
 };
-use crate::dispatch::request::{CommandDescriptor, CommandRequest};
-use crate::semantic_provider::SemanticBackendProvider;
 
 pub(super) struct RefusedResolution<'a> {
     pub(super) capability: CapabilityId,

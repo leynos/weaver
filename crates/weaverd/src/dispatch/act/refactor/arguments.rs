@@ -86,6 +86,8 @@ fn parse_flag_value<'a>(
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for refactoring argument parsing and validation.
+
     use super::parse_refactor_args;
 
     #[test]

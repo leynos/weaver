@@ -4,8 +4,10 @@
 //! Verification failures (syntactic/semantic lock failures) are returned as
 //! `TransactionOutcome` variants, not as errors.
 
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use thiserror::Error;
 
@@ -44,27 +46,19 @@ impl VerificationFailure {
 
     /// Path to the affected file.
     #[must_use]
-    pub fn file(&self) -> &Path {
-        &self.file
-    }
+    pub fn file(&self) -> &Path { &self.file }
 
     /// Optional line number (one-based for display).
     #[must_use]
-    pub fn line(&self) -> Option<u32> {
-        self.line
-    }
+    pub fn line(&self) -> Option<u32> { self.line }
 
     /// Optional column number (one-based for display).
     #[must_use]
-    pub fn column(&self) -> Option<u32> {
-        self.column
-    }
+    pub fn column(&self) -> Option<u32> { self.column }
 
     /// Human-readable message describing the problem.
     #[must_use]
-    pub fn message(&self) -> &str {
-        &self.message
-    }
+    pub fn message(&self) -> &str { &self.message }
 }
 
 impl std::fmt::Display for VerificationFailure {
@@ -193,6 +187,8 @@ impl SafetyHarnessError {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for verification error types and display formatting.
+
     use super::*;
 
     #[test]

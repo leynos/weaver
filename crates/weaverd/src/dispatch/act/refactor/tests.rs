@@ -3,6 +3,7 @@
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 #[expect(
     clippy::duplicate_mod,
@@ -11,15 +12,26 @@ use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 #[path = "refactor_helpers.rs"]
 mod refactor_helpers;
 
-use crate::dispatch::act::refactor::resolution::{
-    CandidateEvaluation, CapabilityResolutionDetails, CapabilityResolutionEnvelope,
-    ResolutionOutcome, ResolutionRequest, SelectionMode,
-};
-use crate::dispatch::act::refactor::{
-    DispatchError, RefactorContext, RefactorPluginRuntime, ResponseWriter, default_runtime, handle,
-    resolve_rope_plugin_path, resolve_rust_analyzer_plugin_path,
-};
 use refactor_helpers::{build_backends, command_request};
+
+use crate::dispatch::act::refactor::{
+    DispatchError,
+    RefactorContext,
+    RefactorPluginRuntime,
+    ResponseWriter,
+    default_runtime,
+    handle,
+    resolution::{
+        CandidateEvaluation,
+        CapabilityResolutionDetails,
+        CapabilityResolutionEnvelope,
+        ResolutionOutcome,
+        ResolutionRequest,
+        SelectionMode,
+    },
+    resolve_rope_plugin_path,
+    resolve_rust_analyzer_plugin_path,
+};
 
 enum MockRuntimeResult {
     Success(PluginResponse),
@@ -66,10 +78,9 @@ impl RefactorPluginRuntime for MockRuntime {
     }
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn socket_dir() -> TempDir {
-    TempDir::new().expect("socket dir")
-}
+fn socket_dir() -> TempDir { TempDir::new().expect("socket dir") }
 
 fn run_rename_handle(
     socket_dir: &TempDir,

@@ -1,16 +1,19 @@
 //! Tests for the socket listener.
 
-use std::net::TcpStream;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
+use std::{
+    net::TcpStream,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::{Duration, Instant},
+};
 
 use rstest::{fixture, rstest};
-
 use weaver_config::SocketEndpoint;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use super::listener::SocketListener;
-use super::{ConnectionHandler, CountingHandler, ListenerError};
+use super::{ConnectionHandler, CountingHandler, ListenerError, listener::SocketListener};
 
 #[derive(Clone)]
 struct CountingFixture {
@@ -24,10 +27,9 @@ fn counting_fixture() -> CountingFixture {
     CountingFixture { count, handler }
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn tcp_endpoint() -> SocketEndpoint {
-    SocketEndpoint::tcp("127.0.0.1", 0)
-}
+fn tcp_endpoint() -> SocketEndpoint { SocketEndpoint::tcp("127.0.0.1", 0) }
 
 fn wait_for_count(count: &AtomicUsize, expected: usize) -> bool {
     let deadline = Instant::now() + Duration::from_secs(2);
@@ -62,14 +64,18 @@ fn tcp_listener_accepts_connections(
 }
 
 #[cfg(unix)]
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn unix_tempdir() -> tempfile::TempDir {
-    tempfile::tempdir().expect("temp dir")
+fn unix_tempdir() -> Result<tempfile::TempDir, String> {
+    tempfile::tempdir().map_err(|e| format!("failed to create temp dir: {e}"))
 }
 
 #[cfg(unix)]
 #[rstest]
-fn unix_listener_cleans_stale_socket_files(unix_tempdir: tempfile::TempDir) {
+fn unix_listener_cleans_stale_socket_files(
+    unix_tempdir: Result<tempfile::TempDir, String>,
+) -> Result<(), String> {
+    let unix_tempdir = unix_tempdir?;
     let path = unix_tempdir.path().join("weaverd.sock");
     {
         let _stale = std::os::unix::net::UnixListener::bind(&path).expect("bind stale listener");
@@ -89,15 +95,20 @@ fn unix_listener_cleans_stale_socket_files(unix_tempdir: tempfile::TempDir) {
         !path.exists(),
         "listener should remove unix socket on shutdown"
     );
+    Ok(())
 }
 
 #[cfg(unix)]
 #[rstest]
-fn unix_listener_rejects_in_use_socket(unix_tempdir: tempfile::TempDir) {
+fn unix_listener_rejects_in_use_socket(
+    unix_tempdir: Result<tempfile::TempDir, String>,
+) -> Result<(), String> {
+    let unix_tempdir = unix_tempdir?;
     let path = unix_tempdir.path().join("weaverd.sock");
     let _existing = std::os::unix::net::UnixListener::bind(&path).expect("bind existing listener");
 
     let endpoint = SocketEndpoint::unix(path.to_str().expect("utf8 path").to_string());
     let error = SocketListener::bind(&endpoint).expect_err("should fail bind");
     assert!(matches!(error, ListenerError::UnixInUse { .. }));
+    Ok(())
 }

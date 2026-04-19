@@ -1,11 +1,11 @@
 //! Matching algorithms for the [`Matcher`] implementation.
 
-use crate::matcher::MatchResult;
-use crate::matcher::capture::Captures;
-use crate::matcher::context::MatchContext;
-use crate::metavariables::metavar_name_from_placeholder;
-use crate::parser::ParseResult;
-use crate::pattern::{MetaVarKind, MetaVariable, Pattern};
+use crate::{
+    matcher::{MatchResult, capture::Captures, context::MatchContext},
+    metavariables::metavar_name_from_placeholder,
+    parser::ParseResult,
+    pattern::{MetaVarKind, MetaVariable, Pattern},
+};
 
 /// Returns true if the node kind represents a block construct that should not
 /// be traversed when searching for metavariables.

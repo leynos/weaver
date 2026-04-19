@@ -2,18 +2,16 @@
 //!
 //! Exercises pattern matching, capture extraction, and match positioning.
 
-use super::*;
-
 use rstest::*;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use crate::language::SupportedLanguage;
-use crate::parser::Parser;
+use super::*;
+use crate::{language::SupportedLanguage, parser::Parser};
 
 /// Fixture providing a Rust parser.
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn rust_parser() -> Parser {
-    Parser::new(SupportedLanguage::Rust).expect("parser")
-}
+fn rust_parser() -> Parser { Parser::new(SupportedLanguage::Rust).expect("parser") }
 
 /// Helper to parse source and compile a pattern.
 fn parse_and_pattern(
@@ -47,15 +45,20 @@ fn extract_multiple_capture_text(
 }
 
 /// Helper to extract a multiple metavariable capture from a match result.
+#[expect(
+    clippy::expect_fun_call,
+    reason = "Test helper needs string interpolation in expect message; will be addressed when \
+              whitaker permits unwrap_or_else panic in test interpolation contexts"
+)]
 fn extract_multiple_capture<'a>(
     match_result: &'a MatchResult<'a>,
     var_name: &str,
 ) -> &'a CapturedNodes<'a> {
     match_result
         .capture(var_name)
-        .unwrap_or_else(|| panic!("should capture {var_name}"))
+        .expect(&format!("should capture {var_name}"))
         .as_multiple()
-        .unwrap_or_else(|| panic!("{var_name} should be multiple"))
+        .expect(&format!("{var_name} should be multiple"))
 }
 
 #[rstest]

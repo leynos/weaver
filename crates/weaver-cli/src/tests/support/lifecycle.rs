@@ -3,19 +3,20 @@
 //! Provides mocks for lifecycle operations and fixtures for creating temporary
 //! runtime directories with health snapshots for daemon monitoring tests.
 
-use std::cell::RefCell;
-use std::collections::VecDeque;
-use std::fs;
-use std::io::Write;
-use std::path::Path;
-use std::process::ExitCode;
+use std::{cell::RefCell, collections::VecDeque, io::Write, path::Path, process::ExitCode};
 
+use anyhow::{Context, Result};
 use rstest::fixture;
 use tempfile::TempDir;
 use weaver_config::{Config, RuntimePaths, SocketEndpoint};
 
+use super::write_test_file;
 use crate::lifecycle::{
-    LifecycleCommand, LifecycleContext, LifecycleError, LifecycleInvocation, LifecycleOutput,
+    LifecycleCommand,
+    LifecycleContext,
+    LifecycleError,
+    LifecycleInvocation,
+    LifecycleOutput,
 };
 
 /// Captures lifecycle invocations and replays queued results for behavioural tests.
@@ -33,9 +34,7 @@ pub(in crate::tests) struct LifecycleCall {
 
 impl TestLifecycle {
     /// Returns all recorded lifecycle calls.
-    pub fn record(&self) -> Vec<LifecycleCall> {
-        self.calls.borrow().clone()
-    }
+    pub fn record(&self) -> Vec<LifecycleCall> { self.calls.borrow().clone() }
 
     /// Enqueues a result to be returned by the next `handle` call.
     pub fn enqueue(&self, result: Result<ExitCode, LifecycleError>) {
@@ -86,17 +85,22 @@ pub(crate) fn temp_paths() -> (TempDir, RuntimePaths) {
 ///
 /// Used by lifecycle tests to simulate daemon health state. This helper
 /// constructs the JSON using `serde_json::json!` to ensure proper escaping.
-pub(crate) fn write_health_json(path: &Path, status: &str, pid: u32, timestamp: u64) {
+pub(crate) fn write_health_json(path: &Path, status: &str, pid: u32, timestamp: u64) -> Result<()> {
     let snapshot = serde_json::json!({
         "status": status,
         "pid": pid,
         "timestamp": timestamp
     });
-    let json = serde_json::to_string(&snapshot).expect("serialize health snapshot");
-    fs::write(path, json).expect("write health snapshot");
+    let json = serde_json::to_string(&snapshot).context("serialize health snapshot")?;
+    write_test_file(path, json.as_bytes()).context("write health snapshot")
 }
 
 /// Convenience wrapper that writes a health snapshot to the standard health path.
-pub(crate) fn write_health_snapshot(paths: &RuntimePaths, status: &str, pid: u32, timestamp: u64) {
-    write_health_json(paths.health_path(), status, pid, timestamp);
+pub(crate) fn write_health_snapshot(
+    paths: &RuntimePaths,
+    status: &str,
+    pid: u32,
+    timestamp: u64,
+) -> Result<()> {
+    write_health_json(paths.health_path(), status, pid, timestamp)
 }

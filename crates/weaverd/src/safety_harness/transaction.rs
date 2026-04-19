@@ -14,14 +14,18 @@ mod test_support;
 #[cfg(test)]
 mod tests;
 
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use self::commit::{DeletePlan, commit_changes_with_deletes};
-use super::edit::FileEdit;
-use super::error::{SafetyHarnessError, VerificationFailure};
-use super::locks::{SemanticLockResult, SyntacticLockResult};
-use super::verification::{SemanticLock, SyntacticLock, VerificationContext, apply_edits};
+use super::{
+    edit::FileEdit,
+    error::{SafetyHarnessError, VerificationFailure},
+    locks::{SemanticLockResult, SyntacticLockResult},
+    verification::{SemanticLock, SyntacticLock, VerificationContext, apply_edits},
+};
 
 /// Outcome of an edit transaction.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,9 +52,7 @@ pub enum TransactionOutcome {
 impl TransactionOutcome {
     /// Returns true when the transaction committed successfully.
     #[must_use]
-    pub const fn committed(&self) -> bool {
-        matches!(self, Self::Committed { .. })
-    }
+    pub const fn committed(&self) -> bool { matches!(self, Self::Committed { .. }) }
 
     /// Returns the number of files modified, if the transaction committed.
     #[must_use]
@@ -74,15 +76,11 @@ pub enum ContentChange {
 impl ContentChange {
     /// Creates a write change.
     #[must_use]
-    pub fn write(path: PathBuf, content: String) -> Self {
-        Self::Write { path, content }
-    }
+    pub fn write(path: PathBuf, content: String) -> Self { Self::Write { path, content } }
 
     /// Creates a delete change.
     #[must_use]
-    pub fn delete(path: PathBuf) -> Self {
-        Self::Delete { path }
-    }
+    pub fn delete(path: PathBuf) -> Self { Self::Delete { path } }
 
     /// Path targeted by this change.
     #[must_use]
@@ -112,9 +110,7 @@ impl<'a> ContentTransaction<'a> {
     }
 
     /// Adds a content change to the transaction.
-    pub fn add_change(&mut self, change: ContentChange) {
-        self.changes.push(change);
-    }
+    pub fn add_change(&mut self, change: ContentChange) { self.changes.push(change); }
 
     /// Adds multiple content changes to the transaction.
     pub fn add_changes(&mut self, changes: impl IntoIterator<Item = ContentChange>) {

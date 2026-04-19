@@ -3,19 +3,30 @@
 //! These tests exercise the call hierarchy features against a real Pyrefly
 //! language server. Tests are skipped gracefully if Pyrefly is not available.
 
+#[path = "support/fixture_io.rs"]
+mod fixture_io;
+
 use std::path::Path;
 
+use fixture_io::write_fixture_path;
 use lsp_types::{
-    CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    Position, TextDocumentIdentifier, TextDocumentPositionParams, Uri, WorkDoneProgressParams,
+    CallHierarchyIncomingCallsParams,
+    CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams,
+    Position,
+    TextDocumentIdentifier,
+    TextDocumentPositionParams,
+    Uri,
+    WorkDoneProgressParams,
 };
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use url::Url;
-
-use weaver_e2e::fixtures;
-use weaver_e2e::lsp_client::{LspClient, LspClientError};
-use weaver_e2e::pyrefly_available;
+use weaver_e2e::{
+    fixtures,
+    lsp_client::{LspClient, LspClientError},
+    pyrefly_available,
+};
 
 /// Test error type for call hierarchy tests.
 #[derive(Debug, thiserror::Error)]
@@ -77,12 +88,7 @@ macro_rules! require_pyrefly {
     };
 }
 
-/// Runs a test implementation with the given fixture context.
-///
-/// This macro handles the common pattern of:
-/// 1. Checking if Pyrefly is available
-/// 2. Unwrapping the fixture Option
-/// 3. Delegating to the test implementation function
+/// Runs a test implementation with an optional fixture context.
 macro_rules! run_test_with_context {
     ($fixture:expr, $impl_fn:path) => {{
         require_pyrefly!();
@@ -93,9 +99,7 @@ macro_rules! run_test_with_context {
     }};
 }
 
-/// Test context containing an initialized LSP client and file URIs.
-///
-/// Implements `Drop` to ensure the LSP client is shut down even on early panics.
+/// Test context containing an initialized LSP client and file URI.
 struct TestContext {
     client: LspClient,
     file_uri: Uri,
@@ -103,30 +107,30 @@ struct TestContext {
 }
 
 impl Drop for TestContext {
-    fn drop(&mut self) {
-        // Attempt to shut down the client gracefully; ignore errors since
-        // we may be dropping due to a panic or the server may have crashed.
-        drop(self.client.shutdown());
-    }
+    fn drop(&mut self) { drop(self.client.shutdown()); }
 }
 
-/// Module containing fixtures for call hierarchy tests.
 #[expect(
     clippy::expect_used,
     reason = "fixture setup uses expect to panic on failure for clear test diagnostics"
 )]
 mod fixtures_impl {
+    //! Pyrefly-backed fixtures for call hierarchy coverage.
+
     use super::*;
 
-    /// Creates a test context with a Python fixture file opened in Pyrefly.
+    #[expect(
+        clippy::expect_used,
+        reason = "test fixture setup should panic with an explicit message"
+    )]
     fn create_test_context(fixture_content: &str) -> Result<Option<TestContext>, TestError> {
         if !pyrefly_available() {
             return Ok(None);
         }
 
         let temp_dir = TempDir::new()?;
-        let file_path = temp_dir.path().join("test.py");
-        std::fs::write(&file_path, fixture_content)?;
+        let file_path =
+            write_fixture_path(&temp_dir, "test.py", fixture_content).expect("write fixture path");
 
         let root_uri = file_uri(temp_dir.path())?;
         let file_uri_val = file_uri(&file_path)?;
@@ -142,19 +146,11 @@ mod fixtures_impl {
         }))
     }
 
-    /// Creates a test context with a linear call chain fixture opened in Pyrefly.
-    ///
-    /// # Panics
-    /// Panics if the test context cannot be created (e.g., spawn or initialization fails).
     #[fixture]
     pub fn linear_chain_context() -> Option<TestContext> {
         create_test_context(fixtures::LINEAR_CHAIN).expect("failed to create test context")
     }
 
-    /// Creates a test context for standalone function tests.
-    ///
-    /// # Panics
-    /// Panics if the test context cannot be created (e.g., spawn or initialization fails).
     #[fixture]
     pub fn no_calls_context() -> Option<TestContext> {
         create_test_context(fixtures::NO_CALLS).expect("failed to create test context")
@@ -163,10 +159,12 @@ mod fixtures_impl {
 
 use fixtures_impl::{linear_chain_context, no_calls_context};
 
-/// Module containing test implementations.
 mod test_impl {
-    use super::*;
+    //! Shared assertion helpers for call hierarchy entry points.
+
     use lsp_types::CallHierarchyItem;
+
+    use super::*;
 
     /// Prepares call hierarchy at the given position and returns the first item.
     fn prepare_call_hierarchy_item(
@@ -199,64 +197,64 @@ mod test_impl {
         Outgoing,
     }
 
-    /// Common implementation for asserting call hierarchy contains an expected name.
+    fn incoming_call_names(
+        ctx: &mut TestContext,
+        item: CallHierarchyItem,
+    ) -> Result<Vec<String>, TestError> {
+        let incoming_params = CallHierarchyIncomingCallsParams {
+            item,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: lsp_types::PartialResultParams::default(),
+        };
+
+        let calls = ctx
+            .client
+            .incoming_calls(incoming_params)?
+            .ok_or(TestError::NoCallsFound)?;
+        Ok(calls.iter().map(|call| call.from.name.clone()).collect())
+    }
+
+    fn outgoing_call_names(
+        ctx: &mut TestContext,
+        item: CallHierarchyItem,
+    ) -> Result<Vec<String>, TestError> {
+        let outgoing_params = CallHierarchyOutgoingCallsParams {
+            item,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: lsp_types::PartialResultParams::default(),
+        };
+
+        let calls = ctx
+            .client
+            .outgoing_calls(outgoing_params)?
+            .ok_or(TestError::NoCallsFound)?;
+        Ok(calls.iter().map(|call| call.to.name.clone()).collect())
+    }
+
+    fn ensure_expected_call(names: Vec<String>, expected_name: &str) -> Result<(), TestError> {
+        if names.is_empty() {
+            return Err(TestError::NoCallsFound);
+        }
+        if names.iter().any(|name| name == expected_name) {
+            return Ok(());
+        }
+        Err(TestError::ExpectedCallNotFound {
+            expected: expected_name.to_owned(),
+            actual: names,
+        })
+    }
+
     fn assert_calls_contain_impl(
         ctx: &mut TestContext,
         item: CallHierarchyItem,
         direction: CallDirection,
         expected_name: &str,
     ) -> Result<(), TestError> {
-        match direction {
-            CallDirection::Incoming => {
-                let incoming_params = CallHierarchyIncomingCallsParams {
-                    item,
-                    work_done_progress_params: WorkDoneProgressParams::default(),
-                    partial_result_params: lsp_types::PartialResultParams::default(),
-                };
-
-                let calls = ctx
-                    .client
-                    .incoming_calls(incoming_params)?
-                    .ok_or(TestError::NoCallsFound)?;
-
-                if calls.is_empty() {
-                    return Err(TestError::NoCallsFound);
-                }
-
-                let caller_names: Vec<_> = calls.iter().map(|c| c.from.name.clone()).collect();
-                if !caller_names.iter().any(|n| n == expected_name) {
-                    return Err(TestError::ExpectedCallNotFound {
-                        expected: expected_name.to_owned(),
-                        actual: caller_names,
-                    });
-                }
-            }
-            CallDirection::Outgoing => {
-                let outgoing_params = CallHierarchyOutgoingCallsParams {
-                    item,
-                    work_done_progress_params: WorkDoneProgressParams::default(),
-                    partial_result_params: lsp_types::PartialResultParams::default(),
-                };
-
-                let calls = ctx
-                    .client
-                    .outgoing_calls(outgoing_params)?
-                    .ok_or(TestError::NoCallsFound)?;
-
-                if calls.is_empty() {
-                    return Err(TestError::NoCallsFound);
-                }
-
-                let callee_names: Vec<_> = calls.iter().map(|c| c.to.name.clone()).collect();
-                if !callee_names.iter().any(|n| n == expected_name) {
-                    return Err(TestError::ExpectedCallNotFound {
-                        expected: expected_name.to_owned(),
-                        actual: callee_names,
-                    });
-                }
-            }
-        }
-        Ok(())
+        let names = match direction {
+            CallDirection::Incoming => incoming_call_names(ctx, item)?,
+            CallDirection::Outgoing => outgoing_call_names(ctx, item)?,
+        };
+        ensure_expected_call(names, expected_name)
     }
 
     /// Verifies that `prepare_call_hierarchy` correctly identifies function `a`.
@@ -307,7 +305,6 @@ mod test_impl {
     pub fn no_calls_for_standalone_function_impl(ctx: &mut TestContext) -> Result<(), TestError> {
         let item = prepare_call_hierarchy_item(ctx, 0, 4)?;
 
-        // Check incoming calls - should be empty or None
         let incoming_params = CallHierarchyIncomingCallsParams {
             item: item.clone(),
             work_done_progress_params: WorkDoneProgressParams::default(),
@@ -323,8 +320,6 @@ mod test_impl {
             });
         }
 
-        // Check outgoing calls - should be empty or None (no user-defined function calls)
-        // Note: outgoing may include built-in function calls, so we just check it doesn't error
         let outgoing_params = CallHierarchyOutgoingCallsParams {
             item,
             work_done_progress_params: WorkDoneProgressParams::default(),
@@ -376,23 +371,16 @@ fn no_calls_for_standalone_function(
     )
 }
 
-// =============================================================================
-// Error Case Tests
-// =============================================================================
-
 #[test]
 fn lsp_prepare_call_hierarchy_before_init_returns_error() -> Result<(), TestError> {
     require_pyrefly!();
 
-    // Spawn client but don't call initialize()
     let mut client = LspClient::spawn("uvx", &["pyrefly", "lsp"])?;
 
-    // Create a dummy URI
     let uri: Uri = "file:///tmp/test.py"
         .parse()
         .map_err(|_| TestError::InvalidUri("file:///tmp/test.py".to_owned()))?;
 
-    // Try to call prepare_call_hierarchy before initialize - should fail
     let params = CallHierarchyPrepareParams {
         text_document_position_params: TextDocumentPositionParams {
             text_document: TextDocumentIdentifier { uri },

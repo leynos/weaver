@@ -1,7 +1,6 @@
 //! Supported host language identifiers for Sempai queries.
 
-use std::fmt;
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 

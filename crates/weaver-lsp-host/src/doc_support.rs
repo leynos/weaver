@@ -8,17 +8,30 @@
 //! user-facing docs and doctests.
 
 use lsp_types::{
-    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
-    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams,
-    CallHierarchyPrepareParams as PrepareParams, Diagnostic,
-    DidChangeTextDocumentParams as DidChangeParams, DidCloseTextDocumentParams as DidCloseParams,
-    DidOpenTextDocumentParams as DidOpenParams, GotoDefinitionParams, GotoDefinitionResponse,
-    Hover, HoverParams, Location, ReferenceParams, Uri,
+    CallHierarchyIncomingCall,
+    CallHierarchyIncomingCallsParams,
+    CallHierarchyItem,
+    CallHierarchyOutgoingCall,
+    CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams as PrepareParams,
+    Diagnostic,
+    DidChangeTextDocumentParams as DidChangeParams,
+    DidCloseTextDocumentParams as DidCloseParams,
+    DidOpenTextDocumentParams as DidOpenParams,
+    GotoDefinitionParams,
+    GotoDefinitionResponse,
+    Hover,
+    HoverParams,
+    Location,
+    ReferenceParams,
+    Uri,
 };
 
-use crate::LspHost;
-use crate::language::Language;
-use crate::server::{LanguageServer, LanguageServerError, ServerCapabilitySet};
+use crate::{
+    LspHost,
+    language::Language,
+    server::{LanguageServer, LanguageServerError, ServerCapabilitySet},
+};
 
 /// Stub server used in rustdoc examples.
 #[derive(Default)]

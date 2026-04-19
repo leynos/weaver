@@ -1,8 +1,8 @@
 //! Patch parser for the apply-patch command.
 
-use crate::dispatch::act::apply_patch::errors::ApplyPatchError;
-use crate::dispatch::act::apply_patch::types::{
-    DiffHeaderLine, FilePath, PatchOperation, PatchText,
+use crate::dispatch::act::apply_patch::{
+    errors::ApplyPatchError,
+    types::{DiffHeaderLine, FilePath, PatchOperation, PatchText},
 };
 
 mod state;
@@ -269,9 +269,7 @@ fn construct_operation(
     }
 }
 
-fn trim_line(line: &str) -> &str {
-    line.trim_end_matches(['\n', '\r'])
-}
+fn trim_line(line: &str) -> &str { line.trim_end_matches(['\n', '\r']) }
 
 fn parse_diff_paths(line: &str) -> Result<(String, String), ApplyPatchError> {
     let remainder =

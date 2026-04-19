@@ -1,7 +1,6 @@
 //! Unit tests for plugin error types.
 
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use rstest::rstest;
 
@@ -62,6 +61,7 @@ fn error_message_includes_name_and_detail(
     PluginError::Timeout {
         name: "slow".into(),
         timeout_secs: 42,
+        message: "terminated timed-out process".into(),
     },
     "42"
 )]
@@ -78,6 +78,15 @@ fn error_message_includes_numeric_field(#[case] error: PluginError, #[case] expe
         message.contains(expected_value),
         "expected {expected_value} in message: {message}"
     );
+    if let PluginError::Timeout {
+        message: detail, ..
+    } = &error
+    {
+        assert!(
+            message.contains(detail),
+            "expected timeout detail in message: {message}"
+        );
+    }
 }
 
 #[test]

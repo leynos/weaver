@@ -12,9 +12,7 @@ static REQUEST_ID: AtomicI64 = AtomicI64::new(1);
 ///
 /// IDs are monotonically increasing and thread-safe.
 #[must_use]
-pub fn next_request_id() -> i64 {
-    REQUEST_ID.fetch_add(1, Ordering::SeqCst)
-}
+pub fn next_request_id() -> i64 { REQUEST_ID.fetch_add(1, Ordering::SeqCst) }
 
 /// A JSON-RPC 2.0 request message.
 #[derive(Debug, Clone, Serialize)]
@@ -158,6 +156,8 @@ pub struct JsonRpcError {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for JSON-RPC message serialisation and deserialisation.
+
     use rstest::rstest;
     use serde_json::json;
 

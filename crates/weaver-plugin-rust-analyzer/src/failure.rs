@@ -1,8 +1,10 @@
 //! Structured plugin failures and response conversion helpers.
 
 use thiserror::Error;
-use weaver_plugins::capability::ReasonCode;
-use weaver_plugins::protocol::{DiagnosticSeverity, PluginDiagnostic, PluginResponse};
+use weaver_plugins::{
+    capability::ReasonCode,
+    protocol::{DiagnosticSeverity, PluginDiagnostic, PluginResponse},
+};
 
 /// Structured failure carrying an optional reason code for diagnostics.
 #[derive(Debug, Error, Clone)]
@@ -31,15 +33,11 @@ impl PluginFailure {
 
     /// Returns the failure message.
     #[cfg(test)]
-    pub(crate) fn message(&self) -> &str {
-        &self.message
-    }
+    pub(crate) fn message(&self) -> &str { &self.message }
 
     /// Returns the failure reason code, if present.
     #[cfg(test)]
-    pub(crate) const fn reason_code(&self) -> Option<ReasonCode> {
-        self.reason_code
-    }
+    pub(crate) const fn reason_code(&self) -> Option<ReasonCode> { self.reason_code }
 }
 
 /// Converts a structured plugin failure into a protocol failure response.

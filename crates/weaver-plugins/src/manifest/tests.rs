@@ -5,9 +5,7 @@ use std::path::PathBuf;
 use rstest::rstest;
 
 use super::*;
-use crate::capability::CapabilityId;
-use crate::error::PluginError;
-use crate::manifest::PluginMetadata;
+use crate::{capability::CapabilityId, error::PluginError, manifest::PluginMetadata};
 
 // ---------------------------------------------------------------------------
 // PluginKind

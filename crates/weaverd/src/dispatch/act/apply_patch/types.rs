@@ -36,15 +36,11 @@ macro_rules! string_newtype {
 string_newtype!(pub(crate) struct PatchText, "Raw patch input text.");
 
 impl From<String> for PatchText {
-    fn from(value: String) -> Self {
-        Self(value)
-    }
+    fn from(value: String) -> Self { Self(value) }
 }
 
 impl From<&str> for PatchText {
-    fn from(value: &str) -> Self {
-        Self(value.to_string())
-    }
+    fn from(value: &str) -> Self { Self(value.to_string()) }
 }
 
 string_newtype!(pub(crate) struct DiffHeaderLine, "Diff header line from a patch stream.");
@@ -52,9 +48,7 @@ string_newtype!(pub(crate) struct DiffHeaderLine, "Diff header line from a patch
 string_newtype!(pub(crate) struct FilePath, "Path for a patch operation target.");
 
 impl FilePath {
-    pub(crate) fn into_string(self) -> String {
-        self.0
-    }
+    pub(crate) fn into_string(self) -> String { self.0 }
 }
 
 impl std::fmt::Display for FilePath {
@@ -69,9 +63,7 @@ string_newtype!(
 );
 
 impl FileContent {
-    pub(crate) fn into_string(self) -> String {
-        self.0
-    }
+    pub(crate) fn into_string(self) -> String { self.0 }
 
     pub(crate) fn replace_range(&mut self, range: std::ops::Range<usize>, replacement: &str) {
         self.0.replace_range(range, replacement);

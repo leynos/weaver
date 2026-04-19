@@ -5,9 +5,24 @@
 //! these foundations.
 
 use crate::{
-    BranchInfo, CardLanguage, CardSymbolKind, DepsInfo, DetailLevel, DocInfo, LocalInfo, LspInfo,
-    MetricsInfo, ParamInfo, Provenance, SignatureInfo, SourcePosition, SourceRange, StructureInfo,
-    SymbolCard, SymbolIdentity, SymbolRef,
+    BranchInfo,
+    CardLanguage,
+    CardSymbolKind,
+    DepsInfo,
+    DetailLevel,
+    DocInfo,
+    LocalInfo,
+    LspInfo,
+    MetricsInfo,
+    ParamInfo,
+    Provenance,
+    SignatureInfo,
+    SourcePosition,
+    SourceRange,
+    StructureInfo,
+    SymbolCard,
+    SymbolIdentity,
+    SymbolRef,
 };
 
 /// Identity block with an optional container name.

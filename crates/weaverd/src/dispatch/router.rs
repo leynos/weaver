@@ -5,20 +5,18 @@
 //! own set of supported operations. Unknown domains or operations are rejected
 //! with structured errors.
 
-use std::io::Write;
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{io::Write, path::PathBuf, sync::Arc};
 
 use tracing::debug;
 
-use crate::backends::FusionBackends;
-use crate::semantic_provider::SemanticBackendProvider;
-
-use super::act;
-use super::errors::DispatchError;
-use super::observe;
-use super::request::CommandRequest;
-use super::response::ResponseWriter;
+use super::{
+    act,
+    errors::DispatchError,
+    observe,
+    request::CommandRequest,
+    response::ResponseWriter,
+};
+use crate::{backends::FusionBackends, semantic_provider::SemanticBackendProvider};
 
 /// Tracing target for dispatch operations.
 pub(crate) const DISPATCH_TARGET: &str = concat!(env!("CARGO_PKG_NAME"), "::dispatch");
@@ -68,14 +66,10 @@ pub struct DispatchResult {
 
 impl DispatchResult {
     /// Creates a successful result (status 0).
-    pub const fn success() -> Self {
-        Self { status: 0 }
-    }
+    pub const fn success() -> Self { Self { status: 0 } }
 
     /// Creates a result with the given status code.
-    pub const fn with_status(status: i32) -> Self {
-        Self { status }
-    }
+    pub const fn with_status(status: i32) -> Self { Self { status } }
 }
 
 /// Context for routing operations within a domain.
