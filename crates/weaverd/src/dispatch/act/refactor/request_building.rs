@@ -14,7 +14,6 @@ use crate::dispatch::errors::DispatchError;
 struct ResolvedFile {
     path: PathBuf,
     relative_path: PathBuf,
-    content: String,
 }
 
 /// Resolves the target file, reads its content, builds the [`PluginRequest`],
@@ -32,13 +31,15 @@ pub(super) fn prepare_plugin_request(
     let resolved_file = resolve_file(&canonical_workspace, &args.file)?;
     let mut plugin_args = build_plugin_args(args)?;
     let effective_operation = effective_operation(&mut plugin_args, args, &resolved_file.path)?;
+    plugin_args.insert(
+        String::from("refactoring"),
+        serde_json::Value::String(effective_operation.clone()),
+    );
     let capability = capability_from_operation(&effective_operation)?;
+    let file_content = load_file_contents(&resolved_file.path)?;
     let plugin_request = PluginRequest::with_arguments(
         &effective_operation,
-        vec![FilePayload::new(
-            resolved_file.relative_path,
-            resolved_file.content,
-        )],
+        vec![FilePayload::new(resolved_file.relative_path, file_content)],
         plugin_args,
     );
     Ok((plugin_request, capability, resolved_file.path))
@@ -128,16 +129,15 @@ fn resolve_file(workspace_root: &Path, file: &str) -> Result<ResolvedFile, Dispa
             DispatchError::invalid_arguments("resolved file path escapes the workspace root")
         })?
         .to_path_buf();
-    let content = std::fs::read_to_string(&canonical_resolved).map_err(|error| {
-        DispatchError::invalid_arguments(format!(
-            "cannot read file '{}': {error}",
-            canonical_resolved.display()
-        ))
-    })?;
     Ok(ResolvedFile {
         path: canonical_resolved,
         relative_path,
-        content,
+    })
+}
+
+fn load_file_contents(path: &Path) -> Result<String, DispatchError> {
+    std::fs::read_to_string(path).map_err(|error| {
+        DispatchError::invalid_arguments(format!("cannot read file '{}': {error}", path.display()))
     })
 }
 
