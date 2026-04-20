@@ -34,3 +34,4 @@ tempfile.workspace = true
 once_cell.workspace = true
 weaver-test-macros = { path = "../weaver-test-macros" }
 cap-std = { workspace = true }
+proptest = "1.5"

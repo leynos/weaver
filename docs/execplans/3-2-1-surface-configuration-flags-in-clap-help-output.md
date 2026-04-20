@@ -258,6 +258,12 @@ Target outcome at completion:
 Retrospective notes:
 
 - Final solution: use an augmented help-only clap `Command` in
+  `crates/weaver-cli/src/help.rs` for runtime `--help` output and `clap_mangen`
+  generation, while leaving the runtime parser strict about where configuration
+  flags are honoured.
+- Follow-on roadmap note: item `3.2.6` now tracks adoption of
+  `cargo orthohelp` in CI to replace the current `clap_mangen` infrastructure
+  once the help metadata and locale surfaces are stable.
   `crates/weaver-cli/src/help.rs`, shared by the runtime help path and
   `crates/weaver-cli/build.rs`, while leaving the runtime parser strict.
 - `locale` shipped as a validated `weaver-config::Locale` newtype because the

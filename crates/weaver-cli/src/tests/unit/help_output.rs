@@ -4,6 +4,7 @@ use std::ffi::OsString;
 use std::io::Cursor;
 use std::process::ExitCode;
 
+use crate::help;
 use crate::{AppError, ConfigLoader, IoStreams, run_with_loader};
 use weaver_config::Config;
 
@@ -59,4 +60,24 @@ fn daemon_start_help_lists_shared_config_flags() {
     assert_eq!(exit, ExitCode::SUCCESS);
     assert!(stderr.is_empty(), "help output must not write to stderr");
     assert_config_flags_present(&stdout);
+}
+
+#[test]
+fn top_level_help_snapshot_matches_augmented_command() {
+    let rendered = help::command().render_long_help().to_string();
+    insta::assert_snapshot!("top_level_augmented_help", rendered);
+}
+
+#[test]
+fn daemon_start_help_snapshot_matches_augmented_command() {
+    let mut command = help::command();
+    let daemon = command
+        .find_subcommand_mut("daemon")
+        .expect("daemon subcommand must exist");
+    let rendered = daemon
+        .find_subcommand_mut("start")
+        .expect("daemon start subcommand must exist")
+        .render_long_help()
+        .to_string();
+    insta::assert_snapshot!("daemon_start_augmented_help", rendered);
 }

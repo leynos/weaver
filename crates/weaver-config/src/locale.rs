@@ -77,7 +77,8 @@ impl<'de> Deserialize<'de> for Locale {
 
 #[cfg(test)]
 mod tests {
-    use super::Locale;
+    use super::{Locale, LocaleParseError};
+    use proptest::prelude::*;
 
     #[test]
     fn parses_valid_locale() {
@@ -91,5 +92,48 @@ mod tests {
             .parse::<Locale>()
             .expect_err("invalid locale should fail");
         assert_eq!(error.to_string(), "invalid locale `not a locale`");
+    }
+
+    prop_compose! {
+        fn ascii_string()(bytes in proptest::collection::vec(0u8..=0x7f, 0..24)) -> String {
+            bytes.into_iter().map(char::from).collect()
+        }
+    }
+
+    prop_compose! {
+        fn string_with_space_or_control()(
+            prefix in proptest::collection::vec(0x21u8..=0x7eu8, 0..12),
+            separator in prop_oneof![
+                Just(' '),
+                (0u8..=0x1f).prop_map(char::from),
+                Just('\u{007f}'),
+            ],
+            suffix in proptest::collection::vec(0x21u8..=0x7eu8, 0..12),
+        ) -> String {
+            prefix
+                .into_iter()
+                .map(char::from)
+                .chain(std::iter::once(separator))
+                .chain(suffix.into_iter().map(char::from))
+                .collect()
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn locale_display_round_trips_ascii_inputs_when_parsing_succeeds(input in ascii_string()) {
+            if let Ok(locale) = input.parse::<Locale>() {
+                let displayed = locale.to_string();
+                let reparsed = displayed.parse::<Locale>().expect("display output should parse");
+                prop_assert_eq!(reparsed.to_string(), displayed);
+                prop_assert_eq!(reparsed, locale);
+            }
+        }
+
+        #[test]
+        fn locale_rejects_strings_with_spaces_or_control_chars(input in string_with_space_or_control()) {
+            let error = input.parse::<Locale>().expect_err("invalid locale should fail");
+            let LocaleParseError { .. } = error;
+        }
     }
 }

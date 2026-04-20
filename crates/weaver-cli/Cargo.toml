@@ -41,3 +41,4 @@ assert_cmd = "2.0"
 predicates = "3.0"
 tempfile = { workspace = true }
 weaver-test-macros = { path = "../weaver-test-macros" }
+insta = "1.39"
