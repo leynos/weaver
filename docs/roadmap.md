@@ -841,7 +841,7 @@ harness.*
 as first-class `observe` operations, then extend them to deterministic,
 budgeted history diffs over recent commits. This phase operationalizes the
 design in
-[`docs/jacquard-card-first-symbol-graph-design.md`](jacquard-card-first-symbol-graph-design.md)
+[`jacquard-card-first-symbol-graph-design.md`](jacquard-card-first-symbol-graph-design.md)
  within Weaver’s existing Semantic Fusion architecture.*
 
 ### 7.1. Deliver `observe get-card` (Tree-sitter first)
@@ -1210,6 +1210,11 @@ implementation. See `docs/jacquard-card-first-symbol-graph-design.md` §13.2 and
         normalization kernels without trying to verify external parser or
         runtime dependencies wholesale.
 
+*Prerequisites note: Phases 9–11 depend on tasks from earlier phases (e.g.
+"Requires 4.1.5" or "Requires 7.2.3"). Each prerequisite uses the dotted-number
+identifier from its parent phase above — search this document for the number to
+locate the full task description and its own dependency chain.*
+
 ## 9. Vertical slice (Sempai → Jacquard → one-hop traversal)
 
 *Goal: Cut one thin, end-to-end path from a Sempai query through canonical
@@ -1217,9 +1222,7 @@ symbol resolution to a JacquardCard with one navigable relation, proving the
 core Weaver loop in an agent-consumable CLI surface. The definition of done is:
 an agent sends a symbol-ish query to Sempai, receives a canonical JacquardCard
 over the CLI, then follows one returned relation to a second card, with no
-interactive prompts. See
-[`docs/sempai-query-language-design.md`](sempai-query-language-design.md), [`docs/jacquard-card-first-symbol-graph-design.md`](jacquard-card-first-symbol-graph-design.md)
- §9–§10 and §12, and [`docs/weaver-design.md`](weaver-design.md) §1.1 and §2.1.*
+interactive prompts.[^1][^2][^3]*
 
 ### 9.1. Deliver minimal Sempai `search` execution (YAML only)
 
@@ -1227,98 +1230,107 @@ interactive prompts. See
 from a YAML rule file, returning deterministic match spans for one language.
 This deliberately limits scope to YAML input (not the one-liner DSL), a single
 `pattern` or `match.pattern` principal, and no conjunctions, negation, ellipsis
-families, or `where` clauses. See
-[`docs/sempai-query-language-design.md`](sempai-query-language-design.md).*
+families, or `where` clauses.[^1]*
 
-- [ ] 9.1.1. Implement minimal positive-anchor normalization into a canonical
-      `Formula::Atom(Pattern)` form for `pattern` and `match.pattern`
-      principals. Requires 4.1.5.
-  - [ ] Acceptance criteria: paired legacy `pattern` and v2 `match.pattern`
-        fixtures normalize to equivalent `Formula::Atom` values; unsupported
-        operators (`patterns`, `pattern-either`, `pattern-not`, `inside`,
-        `where`) return deterministic `E_SEMPAI_*` diagnostics; and no
-        ellipsis, deep-ellipsis, or conjunction forms are accepted.
-- [ ] 9.1.2. Implement token rewriting and pattern intermediate representation
-      (IR) compilation for a single language (Rust or Python). Requires 9.1.1
-      and 4.2.1.
-  - [ ] Acceptance criteria: rewritten snippets compile into `PatNode`-based
-        IR with span traceability; metavariables `$X` and `$_` are supported;
-        ellipsis and deep-ellipsis forms are rejected with structured
-        diagnostics; and snapshot tests lock IR shapes for positive-anchor
-        patterns.
-- [ ] 9.1.3. Implement node-kind matching and metavariable unification over
-      Tree-sitter syntax trees for the chosen first language. Requires 9.1.2
-      and 4.2.4.
-  - [ ] Acceptance criteria: repeated metavariables unify across compatible
-        nodes; mismatches fail deterministically; and end-to-end match output
-        includes `uri`, `span`, and default `focus` fields.
-- [ ] 9.1.4. Add Sempai execution routing in `weaverd` for `observe query`
-      limited to the minimal `search` subset. Requires 9.1.3.
-  - [ ] Acceptance criteria: daemon routes `observe.query` requests through
-        the minimal Sempai pipeline; responses are deterministic JSONL match
-        streams with `uri`, `span`, and `focus`; unsupported query forms
-        return structured diagnostics without daemon failure.
-- [ ] 9.1.5. Add `weaver observe query --lang --uri --rule-file` command
-      surface for the minimal `search` subset. Requires 9.1.4.
-  - [ ] Acceptance criteria: CLI validates input combinations; `--rule-file`
-        accepts YAML rule files; `--rule` accepts inline YAML; `--q` is
-        explicitly absent from this step; and stable error messaging covers
-        missing file, unsupported mode, and parse failure paths.
+- [ ] 9.1.1. Implement minimal positive-anchor normalization into
+      a canonical `Formula::Atom(Pattern)` form for `pattern` and
+      `match.pattern` principals. Requires 4.1.5.
+  - [ ] Acceptance criteria: paired legacy `pattern` and v2
+        `match.pattern` fixtures normalize to equivalent
+        `Formula::Atom` values; unsupported operators (`patterns`,
+        `pattern-either`, `pattern-not`, `inside`, `where`) return
+        deterministic `E_SEMPAI_*` diagnostics; and no ellipsis,
+        deep-ellipsis, or conjunction forms are accepted.
+- [ ] 9.1.2. Implement token rewriting and pattern intermediate
+      representation (IR) compilation for a single language (Rust
+      or Python). Requires 9.1.1 and 4.2.1.
+  - [ ] Acceptance criteria: rewritten snippets compile into
+        `PatNode`-based IR with span traceability; metavariables
+        `$X` and `$_` are supported; ellipsis and deep-ellipsis
+        forms are rejected with structured diagnostics; and
+        snapshot tests lock IR shapes for positive-anchor patterns.
+- [ ] 9.1.3. Implement node-kind matching and metavariable
+      unification over Tree-sitter syntax trees for the chosen
+      first language. Requires 9.1.2 and 4.2.4.
+  - [ ] Acceptance criteria: repeated metavariables unify across
+        compatible nodes; mismatches fail deterministically; and
+        end-to-end match output includes `uri`, `span`, and
+        default `focus` fields.
+- [ ] 9.1.4. Add Sempai execution routing in `weaverd` for
+      `observe query` limited to the minimal `search` subset.
+      Requires 9.1.3.
+  - [ ] Acceptance criteria: daemon routes `observe.query`
+        requests through the minimal Sempai pipeline; responses
+        are deterministic JSONL match streams with `uri`, `span`,
+        and `focus`; unsupported query forms return structured
+        diagnostics without daemon failure.
+- [ ] 9.1.5. Add `weaver observe query --lang --uri --rule-file`
+      command surface for the minimal `search` subset.
+      Requires 9.1.4.
+  - [ ] Acceptance criteria: CLI validates input combinations;
+        `--rule-file` accepts YAML rule files; `--rule` accepts
+        inline YAML; `--q` is explicitly absent from this step;
+        and stable error messaging covers missing file,
+        unsupported mode, and parse failure paths.
 
 ### 9.2. Deliver symbol-first card retrieval
 
 *Outcome: Allow agents to retrieve a JacquardCard by symbol name or
 qualified-name selector, without requiring a line-and-column position. This
 bridges the gap between Sempai match output and the existing position-based
-`observe get-card` path. See
-[`docs/jacquard-card-first-symbol-graph-design.md`](jacquard-card-first-symbol-graph-design.md)
- §9.1–§9.3.*
+`observe get-card` path.[^2]*
 
-- [ ] 9.2.1. Add a `--symbol` selector to `observe get-card` that accepts
-      symbol names, qualified names, and path-qualified names. Requires 7.1.2.
-  - [ ] Acceptance criteria: `weaver observe get-card --uri <URI> --symbol
-        <NAME>` resolves a symbol by name within the file's entity table and
-        returns the same `GetCardResponse` envelope as the position-based
-        path; ambiguous matches return a structured refusal listing candidates
-        with positions; and the position-based `--position` path remains
-        unchanged.
-- [ ] 9.2.2. Add path-qualified disambiguation for `--symbol` selectors.
-      Requires 9.2.1.
-  - [ ] Acceptance criteria: selectors of the form `path:Symbol` and
-        `path:Parent.Symbol` filter the entity table by file path pattern
-        before name matching; and disambiguation tests cover multi-file
-        workspaces with identically named symbols.
-- [ ] 9.2.3. Wire Sempai match output into symbol-first card retrieval so
-      `observe query` results can feed `observe get-card` without manual
-      position extraction. Requires 9.1.5 and 9.2.1.
-  - [ ] Acceptance criteria: the Sempai match span is usable as a
-        `--position` input to `observe get-card`; and an end-to-end test
-        demonstrates the query-to-card loop for a single fixture.
+- [ ] 9.2.1. Add a `--symbol` selector to `observe get-card` that
+      accepts symbol names, qualified names, and path-qualified
+      names. Requires 7.1.2.
+  - [ ] Acceptance criteria: `weaver observe get-card --uri <URI>
+        --symbol <NAME>` resolves a symbol by name within the
+        file's entity table and returns the same
+        `GetCardResponse` envelope as the position-based path;
+        ambiguous matches return a structured refusal listing
+        candidates with positions; and the position-based
+        `--position` path remains unchanged.
+- [ ] 9.2.2. Add path-qualified disambiguation for `--symbol`
+      selectors. Requires 9.2.1.
+  - [ ] Acceptance criteria: selectors of the form `path:Symbol`
+        and `path:Parent.Symbol` filter the entity table by file
+        path pattern before name matching; and disambiguation
+        tests cover multi-file workspaces with identically named
+        symbols.
+- [ ] 9.2.3. Wire Sempai match output into symbol-first card
+      retrieval so `observe query` results can feed
+      `observe get-card` without manual position extraction.
+      Requires 9.1.5 and 9.2.1.
+  - [ ] Acceptance criteria: a Sempai match span resolves to a
+        card via both the `--position` and `--symbol` paths; an
+        end-to-end test demonstrates the query-to-card loop for
+        a single fixture using `--symbol`; and the test asserts
+        that the `GetCardResponse` envelope is identical
+        regardless of which selector path is used.
 
 ### 9.3. Deliver one-hop relation traversal
 
 *Outcome: Include exactly one navigable relation type in card output so that an
 agent can follow a returned `symbol_id` back into the same command path. This
-is the thinnest useful slice of JacquardWeave. See
-[`docs/jacquard-card-first-symbol-graph-design.md`](jacquard-card-first-symbol-graph-design.md)
- §12.1–§12.3.*
+is the thinnest useful slice of JacquardWeave.[^2]*
 
-- [ ] 9.3.1. Add a `relations` field to `SymbolCard` containing a small
-      ranked list of related `SymbolRef` values for one relation type
-      (references, containment, or callers/callees). Requires 7.1.2 and
-      3.1.4.
-  - [ ] Acceptance criteria: the chosen relation type is populated from the
-        existing LSP or Tree-sitter substrate; related items are stable
-        `SymbolRef` values that can be fed back into `observe get-card
-        --position`; the `relations` field is absent (not empty) when no
-        relations are found; and schema fixtures lock the new field shape.
-- [ ] 9.3.2. Implement the query-to-card-to-relation loop as a documented
-      agent workflow. Requires 9.2.3 and 9.3.1.
-  - [ ] Acceptance criteria: an end-to-end test demonstrates the full loop
-        (query → resolve → card → related symbol → second card) using CLI
-        commands; the workflow is documented in
-        [`docs/users-guide.md`](users-guide.md); and no interactive prompts
-        are required at any step.
+- [ ] 9.3.1. Add a `relations` field to `SymbolCard` containing a
+      small ranked list of related `SymbolRef` values for one
+      relation type (references, containment, or
+      callers/callees). Requires 7.1.2 and 3.1.4.
+  - [ ] Acceptance criteria: the chosen relation type is populated
+        from the existing LSP or Tree-sitter substrate; related
+        items are stable `SymbolRef` values that can be fed back
+        into `observe get-card --position`; the `relations` field
+        is absent (not empty) when no relations are found; and
+        schema fixtures lock the new field shape.
+- [ ] 9.3.2. Implement the query-to-card-to-relation loop as a
+      documented agent workflow. Requires 9.2.3 and 9.3.1.
+  - [ ] Acceptance criteria: an end-to-end test demonstrates the
+        full loop (query → resolve → card → related symbol →
+        second card) using CLI commands; the workflow is documented
+        in the user's guide[^4]; and no interactive prompts are
+        required at any step.
 
 ## 10. Leta parity for supported languages
 
@@ -1328,239 +1340,240 @@ every few minutes, bringing Weaver's public CLI surface to parity with
 TypeScript. This phase prioritizes the everyday agent navigation loop — find,
 show, trace, search, rename — over exotic analysis. Each operation must honour
 Weaver's existing JSONL envelope, exit-code contract, and human-readable
-rendering conventions. See [`docs/weaver-design.md`](weaver-design.md) §1.1 and
-§2.1, [`docs/ui-gap-analysis.md`](ui-gap-analysis.md), and
-[`docs/users-guide.md`](users-guide.md).*
+rendering conventions.[^3][^5][^4]*
 
 ### 10.1. Deliver `observe find-references` end-to-end
 
 *Outcome: Expose LSP `textDocument/references` as a stable, end-to-end CLI
 operation with human-readable and JSONL output. The underlying LSP substrate
-already supports references in `weaver-lsp-host`. See
-[`docs/users-guide.md`](users-guide.md) §observe find-references.*
+already supports references in `weaver-lsp-host`.[^4]*
 
-- [ ] 10.1.1. Wire `observe find-references` daemon dispatch to the existing
-      `LspHost::references()` method, returning structured location arrays.
-      Requires 2.1.8 and 2.1.9.
-  - [ ] Acceptance criteria: `weaver observe find-references --uri <URI>
-        --position <LINE:COL>` returns a JSONL response containing an array
-        of reference locations; empty results return an empty array (not an
-        error); unsupported languages return a structured diagnostic; and
-        human-readable output renders context blocks with line numbers.
+- [ ] 10.1.1. Wire `observe find-references` daemon dispatch to
+      the existing `LspHost::references()` method, returning
+      structured location arrays. Requires 2.1.8 and 2.1.9.
+  - [ ] Acceptance criteria: `weaver observe find-references
+        --uri <URI> --position <LINE:COL>` returns a JSONL
+        response containing an array of reference locations; empty
+        results return an empty array (not an error); unsupported
+        languages return a structured diagnostic; and
+        human-readable output renders context blocks with line
+        numbers.
 - [ ] 10.1.2. Add unit, behavioural, and end-to-end coverage for
       `observe find-references`. Requires 10.1.1.
-  - [ ] Acceptance criteria: tests cover success paths (single and multiple
-        references), empty-result paths, unsupported-language refusal, and
-        pre-initialization error paths for Rust, Python, and TypeScript
-        fixtures.
+  - [ ] Acceptance criteria: tests cover success paths (single
+        and multiple references), empty-result paths,
+        unsupported-language refusal, and pre-initialization error
+        paths for Rust, Python, and TypeScript fixtures.
 
 ### 10.2. Deliver symbol-first `observe show`
 
 *Outcome: Provide a `show` equivalent that accepts a symbol-ish selector and
 returns the full definition body, mirroring Leta's `show` command. This builds
 on the symbol-first card retrieval from 9.2 and the existing `observe get-card`
-infrastructure. See
-[`docs/jacquard-card-first-symbol-graph-design.md`](jacquard-card-first-symbol-graph-design.md)
- §9.1–§9.3.*
+infrastructure.[^2]*
 
-- [ ] 10.2.1. Add an `observe show` command that accepts `--symbol` (or
-      positional symbol name), resolves it via the entity table, and returns
-      the full symbol body with surrounding context. Requires 9.2.1.
-  - [ ] Acceptance criteria: `weaver observe show <SYMBOL> --uri <URI>`
-        returns the complete symbol definition including doc comments and
-        decorators; `--context <N>` adds surrounding lines; human-readable
-        output includes file path, line numbers, and syntax-highlighted
-        source; JSONL output includes `uri`, `range`, `source_text`, and
-        `symbol` identity fields; and ambiguous symbols return a structured
-        disambiguation response.
-- [ ] 10.2.2. Add qualified-name and path-filter support for `observe show`.
-      Requires 10.2.1 and 9.2.2.
-  - [ ] Acceptance criteria: selectors of the form `Parent.Symbol`,
-        `path:Symbol`, and `path:Parent.Symbol` resolve correctly; and tests
-        cover disambiguation across multiple files with identically named
-        symbols.
+- [ ] 10.2.1. Add an `observe show` command that accepts
+      `--symbol` (or positional symbol name), resolves it via the
+      entity table, and returns the full symbol body with
+      surrounding context. Requires 9.2.1.
+  - [ ] Acceptance criteria: `weaver observe show <SYMBOL>
+        --uri <URI>` returns the complete symbol definition
+        including doc comments and decorators; `--context <N>`
+        adds surrounding lines; human-readable output includes
+        file path, line numbers, and syntax-highlighted source;
+        JSONL output includes `uri`, `range`, `source_text`, and
+        `symbol` identity fields; and ambiguous symbols return a
+        structured disambiguation response.
+- [ ] 10.2.2. Add qualified-name and path-filter support for
+      `observe show`. Requires 10.2.1 and 9.2.2.
+  - [ ] Acceptance criteria: selectors of the form
+        `Parent.Symbol`, `path:Symbol`, and `path:Parent.Symbol`
+        resolve correctly; and tests cover disambiguation across
+        multiple files with identically named symbols.
 
 ### 10.3. Deliver `observe call-hierarchy` end-to-end
 
 *Outcome: Expose the existing `weaver-graph` call hierarchy provider as a
 stable CLI operation with configurable direction and depth. The internal
-`CallGraph` provider is complete. See [`docs/users-guide.md`](users-guide.md)
-§observe call-hierarchy and
-[`docs/jacquard-card-first-symbol-graph-design.md`](jacquard-card-first-symbol-graph-design.md)
- §12.*
+`CallGraph` provider is complete.[^4][^2]*
 
-- [ ] 10.3.1. Wire `observe call-hierarchy` daemon dispatch to the existing
-      `weaver-graph` call hierarchy provider with `--direction` and
-      `--max-depth` flags. Requires 2.1.8, 2.1.9, and 3.1.4.
-  - [ ] Acceptance criteria: `weaver observe call-hierarchy --uri <URI>
-        --position <LINE:COL>` returns a JSONL response containing `nodes`
-        and `edges` arrays; `--direction` supports `incoming`, `outgoing`,
-        and `both`; `--max-depth` limits traversal; provenance and call-site
-        positions are included on edges; and human-readable output renders
-        a tree view.
+- [ ] 10.3.1. Wire `observe call-hierarchy` daemon dispatch to
+      the existing `weaver-graph` call hierarchy provider with
+      `--direction` and `--max-depth` flags. Requires 2.1.8,
+      2.1.9, and 3.1.4.
+  - [ ] Acceptance criteria: `weaver observe call-hierarchy
+        --uri <URI> --position <LINE:COL>` returns a JSONL
+        response containing `nodes` and `edges` arrays;
+        `--direction` supports `incoming`, `outgoing`, and `both`;
+        `--max-depth` limits traversal; provenance and call-site
+        positions are included on edges; and human-readable output
+        renders a tree view.
 - [ ] 10.3.2. Add unit, behavioural, and end-to-end coverage for
       `observe call-hierarchy`. Requires 10.3.1.
-  - [ ] Acceptance criteria: tests cover outgoing calls, incoming calls,
-        bidirectional traversal, depth limiting, empty results, and
-        unsupported-language refusal for Rust, Python, and TypeScript
-        fixtures.
+  - [ ] Acceptance criteria: tests cover outgoing calls, incoming
+        calls, bidirectional traversal, depth limiting, empty
+        results, and unsupported-language refusal for Rust,
+        Python, and TypeScript fixtures.
 
 ### 10.4. Deliver `observe grep` end-to-end
 
 *Outcome: Expose the existing `weaver-syntax` structural search engine as a
 stable CLI operation for semantic symbol search with kind filtering. The
-underlying engine is complete. See [`docs/weaver-design.md`](weaver-design.md)
-§1.1.*
+underlying engine is complete.[^3]*
 
-- [ ] 10.4.1. Wire `observe grep` daemon dispatch to `weaver-syntax` with
-      `--pattern`, `--kind`, `--uri`, and `--lang` flags. Requires 2.1.8 and
-      3.1.1.
-  - [ ] Acceptance criteria: `weaver observe grep --pattern <PATTERN>
-        --lang <LANG>` returns a JSONL response containing match locations
-        with symbol kind, name, and span; `--kind` filters by symbol kind;
-        `--uri` scopes to a specific file; human-readable output renders
-        matches with file path, line number, kind, and name; and invalid
+- [ ] 10.4.1. Wire `observe grep` daemon dispatch to
+      `weaver-syntax` with `--pattern`, `--kind`, `--uri`, and
+      `--lang` flags. Requires 2.1.8 and 3.1.1.
+  - [ ] Acceptance criteria: `weaver observe grep --pattern
+        <PATTERN> --lang <LANG>` returns a JSONL response
+        containing match locations with symbol kind, name, and
+        span; `--kind` filters by symbol kind; `--uri` scopes to
+        a specific file; human-readable output renders matches
+        with file path, line number, kind, and name; and invalid
         patterns return structured parse diagnostics.
 - [ ] 10.4.2. Add unit, behavioural, and end-to-end coverage for
       `observe grep`. Requires 10.4.1.
-  - [ ] Acceptance criteria: tests cover pattern matching, kind filtering,
-        file scoping, invalid pattern diagnostics, and empty-result paths for
-        Rust, Python, and TypeScript fixtures.
+  - [ ] Acceptance criteria: tests cover pattern matching, kind
+        filtering, file scoping, invalid pattern diagnostics, and
+        empty-result paths for Rust, Python, and TypeScript
+        fixtures.
 
 ### 10.5. Deliver `act rename-symbol` end-to-end
 
 *Outcome: Expose the existing capability-routed `rename-symbol` plugins as a
 stable, end-to-end CLI operation with safety-harness integration. The
-capability contract and plugin implementations are in place (5.2.1–5.2.4). See
-[`docs/adr-001-plugin-capability-model-and-act-extricate.md`](adr-001-plugin-capability-model-and-act-extricate.md).
-*
+capability contract and plugin implementations are in place (5.2.1–5.2.4).[^6]*
 
-- [ ] 10.5.1. Wire `act rename-symbol` as a first-class CLI command with
-      `--uri`, `--position`, and `--new-name` flags, routing through
-      capability-based plugin selection. Requires 5.2.4.
+- [ ] 10.5.1. Wire `act rename-symbol` as a first-class CLI
+      command with `--uri`, `--position`, and `--new-name` flags,
+      routing through capability-based plugin selection.
+      Requires 5.2.4.
   - [ ] Acceptance criteria: `weaver act rename-symbol --uri <URI>
-        --position <LINE:COL> --new-name <NAME>` applies a workspace-wide
-        rename through the Double-Lock safety harness; JSONL output includes
-        the list of modified files and applied edits; human-readable output
-        shows a unified diff; refusal paths (unsupported language, symbol
-        not found) return structured diagnostics; and the filesystem is
-        unchanged on lock failure.
+        --position <LINE:COL> --new-name <NAME>` applies a
+        workspace-wide rename through the Double-Lock safety
+        harness; JSONL output includes the list of modified files
+        and applied edits; human-readable output shows a unified
+        diff; refusal paths (unsupported language, symbol not
+        found) return structured diagnostics; and the filesystem
+        is unchanged on lock failure.
 - [ ] 10.5.2. Add unit, behavioural, and end-to-end coverage for
       `act rename-symbol`. Requires 10.5.1 and 5.2.5.
-  - [ ] Acceptance criteria: tests cover successful rename for Python and
-        Rust, refusal paths, rollback guarantees, and safety-harness
-        integration.
+  - [ ] Acceptance criteria: tests cover successful rename for
+        Python and Rust, refusal paths, rollback guarantees, and
+        safety-harness integration.
 
-## 11. Weaver USP: composable agent-grade CLI primitives
+## 11. Weaver unique selling proposition (USP): composable agent-grade CLI primitives
 
 *Goal: Deliver the capabilities that make Weaver more than a Leta clone. Where
-Phase 10 reaches parity, this phase delivers Weaver's unique selling
-proposition: budgeted graph-slice traversal, card-driven exploration,
-deterministic CLI contracts for agent tool loops, and the safety harness that
-makes write operations trustworthy. These are the features that justify
-choosing Weaver over a thinner LSP wrapper. See
-[`docs/weaver-design.md`](weaver-design.md) §1.1–§1.2 (Table 1),
-[`docs/jacquard-card-first-symbol-graph-design.md`](jacquard-card-first-symbol-graph-design.md)
- §12, and [`docs/weaver-design.md`](weaver-design.md) §5.1 and §6.1.*
+Phase 10 reaches parity, this phase delivers Weaver's USP: budgeted graph-slice
+traversal, card-driven exploration, deterministic CLI contracts for agent tool
+loops, and the safety harness that makes write operations trustworthy. These
+are the features that justify choosing Weaver over a thinner LSP
+wrapper.[^3][^2][^7]*
 
 ### 11.1. Deliver `observe graph-slice` traversal
 
-*Outcome: Implement the budgeted, priority-queue-based graph traversal that
-returns a bounded subgraph rooted at an entry symbol, with typed edges and
-explicit budget constraints. This is the first Weaver-specific differentiator
-beyond Leta's `graph` command. Requires the schema work from 7.2.1. See
-[`docs/jacquard-card-first-symbol-graph-design.md`](jacquard-card-first-symbol-graph-design.md)
- §12.1–§12.3.*
+*Outcome: Wire the budgeted graph traversal from 7.2.5 into a stable CLI
+command with the full flag set from the design document. This is the first
+Weaver-specific differentiator beyond Leta's `graph` command. Requires the
+schema work from 7.2.1.[^2]*
 
-- [ ] 11.1.1. Implement budgeted traversal using a priority-queue expansion
-      strategy, consuming the schema from 7.2.1 and the call-edge provider
-      from 7.2.3. Requires 7.2.1, 7.2.3, and 7.2.5.
-  - [ ] Acceptance criteria: traversal never exceeds configured
-        `max_cards`, `max_edges`, and `max_estimated_tokens` caps; spillover
-        metadata is present when traversal is truncated; and behaviour-driven
-        development (BDD) tests cover fan-out explosion and budget
-        truncation.
-- [ ] 11.1.2. Wire `observe graph-slice` as a stable CLI command with the
-      full flag set from the design document. Requires 11.1.1.
-  - [ ] Acceptance criteria: `weaver observe graph-slice --uri <URI>
-        --position <LINE:COL>` returns a JSONL response containing `cards`,
-        `edges`, and `spillover` fields; all budget flags are exposed;
-        human-readable output renders a tree with depth markers; and
-        exit-code semantics distinguish success from truncation.
+- [ ] 11.1.1. Wire `observe graph-slice` as a stable CLI command
+      consuming the traversal engine from 7.2.5, the schema from
+      7.2.1, and the call-edge provider from 7.2.3.
+      Requires 7.2.1, 7.2.3, and 7.2.5.
+  - [ ] Acceptance criteria: `weaver observe graph-slice
+        --uri <URI> --position <LINE:COL>` returns a JSONL
+        response containing `cards`, `edges`, and `spillover`
+        fields; all budget flags (`--max-cards`, `--max-edges`,
+        `--max-estimated-tokens`, `--depth`, `--direction`,
+        `--edge-types`, `--min-confidence`, `--entry-detail`,
+        `--node-detail`) are exposed; human-readable output
+        renders a tree with depth markers; and exit-code semantics
+        distinguish success from truncation.
 
 ### 11.2. Deliver card-driven traversal workflow
 
 *Outcome: Enable agents to navigate from one symbol card to related symbols
-through structured relation data, completing the "postcard to loom" loop. See
-[`docs/jacquard-card-first-symbol-graph-design.md`](jacquard-card-first-symbol-graph-design.md)
- §12.*
+through structured relation data, completing the "postcard to loom" loop.[^2]*
 
-- [ ] 11.2.1. Extend the `relations` field from 9.3.1 to support multiple
-      relation types (references, containment, and callers/callees).
-      Requires 9.3.1.
-  - [ ] Acceptance criteria: cards include relations from all available
-        providers; each relation carries a `type` field and a ranked list of
-        `SymbolRef` values; relation types are explicitly enumerated in the
-        schema; and empty relation types are omitted rather than included as
-        empty arrays.
-- [ ] 11.2.2. Add dependency and dependent fan metrics to `full`-detail
-      cards. Requires 11.2.1 and 7.1.3.
-  - [ ] Acceptance criteria: `--detail full` cards include `fan_in` and
-        `fan_out` counts sourced from `weaver-graph`; provenance marks the
-        data source (`lsp`, `tree_sitter`, or `static_analysis`); and
-        metrics are absent (not zero) when the underlying provider is
+- [ ] 11.2.1. Extend the `relations` field from 9.3.1 to support
+      multiple relation types (references, containment, and
+      callers/callees). Requires 9.3.1.
+  - [ ] Acceptance criteria: cards include relations from all
+        available providers; each relation carries a `type` field
+        and a ranked list of `SymbolRef` values; relation types
+        are explicitly enumerated in the schema; and empty
+        relation types are omitted rather than included as empty
+        arrays.
+- [ ] 11.2.2. Add dependency and dependent fan metrics to
+      `full`-detail cards. Requires 11.2.1 and 7.1.3.
+  - [ ] Acceptance criteria: `--detail full` cards include
+        `fan_in` and `fan_out` counts sourced from
+        `weaver-graph`; provenance marks the data source (`lsp`,
+        `tree_sitter`, or `static_analysis`); and metrics are
+        absent (not zero) when the underlying provider is
         unavailable.
 
 ### 11.3. Deliver agent-grade CLI contract hardening
 
 *Outcome: Harden the CLI surface so that Weaver behaves as a reliable primitive
 for agent tool loops (Codex CLI, Claude Code, and similar). The contract must
-be deterministic, non-interactive, and machine-readable. See
-[`docs/weaver-design.md`](weaver-design.md) §2.1.*
+be deterministic, non-interactive, and machine-readable.[^3]*
 
-- [ ] 11.3.1. Enforce deterministic stdout/stderr separation across all
-      `observe` and `act` commands.
-  - [ ] Acceptance criteria: `stdout` contains only the result payload
-        (JSONL or human-readable); `stderr` carries logs, progress, and
-        diagnostics; no command writes diagnostic text to `stdout`; and
-        regression tests assert separation for every implemented command.
+- [ ] 11.3.1. Enforce deterministic stdout/stderr separation
+      across all `observe` and `act` commands.
+  - [ ] Acceptance criteria: `stdout` contains only the result
+        payload (JSONL or human-readable); `stderr` carries logs,
+        progress, and diagnostics; no command writes diagnostic
+        text to `stdout`; and regression tests assert separation
+        for every implemented command.
 - [ ] 11.3.2. Add explicit `schema_version` to all JSONL response
       envelopes.
-  - [ ] Acceptance criteria: every JSONL response includes a top-level
-        `schema_version` field; version values are stable across patch
-        releases; and snapshot tests lock the version for each response
-        type.
-- [ ] 11.3.3. Standardize exit codes across all commands to distinguish
-      `resolved`, `ambiguous`, `not_found`, and `backend_unavailable`.
-  - [ ] Acceptance criteria: exit-code semantics are documented in
-        [`docs/users-guide.md`](users-guide.md); every command uses the
-        shared exit-code enumeration; and BDD tests assert each exit code
-        for at least one command.
-- [ ] 11.3.4. Ensure compact output by default with opt-in expansion for
-      all `observe` commands.
-  - [ ] Acceptance criteria: default output stays within a configurable
-        token budget; `--detail` or `--expand` flags opt into richer output;
-        and agents can rely on bounded response sizes without explicit
-        truncation.
+  - [ ] Acceptance criteria: every JSONL response includes a
+        top-level `schema_version` field; version values are
+        stable across patch releases; and snapshot tests lock the
+        version for each response type.
+- [ ] 11.3.3. Standardize exit codes across all commands to
+      distinguish `resolved`, `ambiguous`, `not_found`, and
+      `backend_unavailable`.
+  - [ ] Acceptance criteria: exit-code semantics are documented
+        in the user's guide[^4]; every command uses the shared
+        exit-code enumeration; and BDD tests assert each exit
+        code for at least one command.
+- [ ] 11.3.4. Ensure compact output by default with opt-in
+      expansion for all `observe` commands.
+  - [ ] Acceptance criteria: default output stays within a
+        configurable token budget; `--detail` or `--expand` flags
+        opt into richer output; and agents can rely on bounded
+        response sizes without explicit truncation.
 
 ### 11.4. Deliver safety-harness integration as a visible differentiator
 
 *Outcome: Surface the Double-Lock safety harness as a visible, documented
 feature that agents and operators can rely on for trustworthy write operations.
-This is a key Weaver differentiator. See
-[`docs/weaver-design.md`](weaver-design.md) §5.1 and
-[`docs/formal-verification-methods-in-weaver.md`](formal-verification-methods-in-weaver.md).
-*
+This is a key Weaver differentiator.[^7][^8]*
 
-- [ ] 11.4.1. Add structured safety-harness result metadata to all `act`
-      command JSONL responses. Requires 2.1.13.
+- [ ] 11.4.1. Add structured safety-harness result metadata to
+      all `act` command JSONL responses. Requires 2.1.13.
   - [ ] Acceptance criteria: every `act` response includes a
-        `safety_harness` field reporting syntactic-lock and semantic-lock
-        outcomes; lock failures include diagnostic spans and reasons; and
-        the field is present even on success (reporting `passed`).
-- [ ] 11.4.2. Document the safety-harness contract for agent consumption
-      in [`docs/users-guide.md`](users-guide.md). Requires 11.4.1.
-  - [ ] Acceptance criteria: the user's guide includes a dedicated section
-        explaining the Double-Lock model, what agents can rely on, and how
-        to interpret lock-failure diagnostics; and the section references
-        the formal verification design document for deeper guarantees.
+        `safety_harness` field reporting syntactic-lock and
+        semantic-lock outcomes; lock failures include diagnostic
+        spans and reasons; and the field is present even on
+        success (reporting `passed`).
+- [ ] 11.4.2. Document the safety-harness contract for agent
+      consumption in the user's guide[^4]. Requires 11.4.1.
+  - [ ] Acceptance criteria: the user's guide includes a
+        dedicated section explaining the Double-Lock model, what
+        agents can rely on, and how to interpret lock-failure
+        diagnostics; and the section references the formal
+        verification design document for deeper guarantees.
+
+[^1]: [`sempai-query-language-design.md`](sempai-query-language-design.md)
+[^2]: [`jacquard-card-first-symbol-graph-design.md`](jacquard-card-first-symbol-graph-design.md)
+[^3]: [`weaver-design.md`](weaver-design.md)
+[^4]: [`users-guide.md`](users-guide.md)
+[^5]: [`ui-gap-analysis.md`](ui-gap-analysis.md)
+[^6]: [`adr-001-plugin-capability-model-and-act-extricate.md`](adr-001-plugin-capability-model-and-act-extricate.md)
+[^7]: [`weaver-design.md`](weaver-design.md) §5.1 and §6.1
+[^8]: [`formal-verification-methods-in-weaver.md`](formal-verification-methods-in-weaver.md)
