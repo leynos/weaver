@@ -350,3 +350,89 @@ helpers are:
 Each helper produces a `GraphSliceError::InvalidValue` with the originating
 flag name and a descriptive message on failure, so callers do not need to
 format error context themselves.
+
+## CLI help and preflight internals
+
+### 2.1 CLI help rendering architecture
+
+The runtime parser strips `--config-path`, `--daemon-socket`, `--log-filter`,
+`--log-format`, `--capability-overrides`, and `--locale` from `argv` before it
+hands control to clap. This keeps the runtime `Cli::command()` definition
+strict: the base clap command describes only runtime domains, operations, and
+structured subcommands, so configuration flags never appear in the parser that
+handles ordinary execution.
+
+`crates/weaver-cli/src/help.rs` provides the documentation-facing layer.
+`help::command()` starts from `Cli::command()`, adds the explicit
+`--config-path` argument, then iterates over
+`Config::get_doc_metadata().fields` to build the remaining shared configuration
+flags dynamically from `ortho_config` metadata. Each visible field becomes a
+`clap::Arg` with the correct long flag, value name, and constrained value set
+for the generated help surface.
+
+The augmented command is used in both places that need truthful help text:
+
+- runtime `--help` rendering, where the CLI prints help without invoking the
+  configuration loader or starting the daemon; and
+- `clap_mangen` man page generation in `crates/weaver-cli/build.rs`, so the
+  generated roff output stays aligned with the runtime help surface.
+
+### 2.2 Augmented command pattern
+
+The CLI deliberately uses two clap command shapes:
+
+- the *runtime* command, which is strict and excludes configuration flags; and
+- the *help* command, which is augmented with configuration metadata for
+  documentation only.
+
+This split preserves the current runtime contract that configuration flags take
+effect only when they appear before the command domain. It also avoids teaching
+clap to accept post-domain configuration flags that the loader would ignore.
+
+The augmented builder leaks clap argument IDs, long flag names, value names,
+and possible values as `&'static str` with `Box::leak`. Clap requires `'static`
+lifetimes for dynamically constructed arguments, so the builder intentionally
+promotes owned metadata into process-lifetime strings. This is safe here
+because the allocations are small, the help command is built for the current
+process only, and the leaked memory is intentionally never freed before process
+exit.
+
+### 2.3 Preflight boundary (`crates/weaver-cli/src/preflight.rs`)
+
+`handle_preflight` runs after `argv` splitting and before configuration
+loading. At that point the CLI has enough information to reject certain
+invocations locally, without consulting the daemon or trying to load the full
+configuration stack.
+
+The preflight contract is narrow: emit actionable guidance to `stderr` when the
+operator has not supplied a meaningful command shape, then return an `AppError`
+that stops execution before daemon startup.
+
+There are two preflight paths:
+
+- bare invocation: a call with no domain, no structured subcommand, and no
+  capability probe. This path emits the short domain guidance block and returns
+  `AppError::BareInvocation`.
+- domain guidance: a call with an unknown domain or a known domain that is
+  missing its operation. This path emits contextual guidance and returns
+  `AppError::PreflightGuidance`.
+
+This boundary exists specifically to keep operator guidance local, immediate,
+and side-effect free.
+
+### 2.4 `Locale` type (`crates/weaver-config/src/locale.rs`)
+
+`Locale` is a small newtype around `ortho_config::LanguageIdentifier`. It
+accepts only well-formed BCP 47 language tags, so invalid locale strings are
+rejected at the shared configuration boundary instead of leaking deeper into
+CLI or daemon startup.
+
+The built-in default is `en-US`. That value is part of the current shared
+configuration contract and is available from files, environment variables, and
+CLI configuration flags like any other config field.
+
+Full CLI localization bootstrap is intentionally deferred to roadmap item
+`3.3.1`. In particular, Weaver does not yet resolve the final locale and use it
+to construct the `Localizer` before clap parse errors are formatted. The
+current `Locale` type exists so the configuration contract is real now and the
+later localization bootstrap can reuse the validated domain value.

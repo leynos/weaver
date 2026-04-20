@@ -1,0 +1,11 @@
+---
+source: crates/weaver-cli/src/tests/unit/help_output.rs
+expression: rendered
+---
+Starts the daemon and waits for readiness
+
+Usage: start
+
+Options:
+  -h, --help
+          Print help

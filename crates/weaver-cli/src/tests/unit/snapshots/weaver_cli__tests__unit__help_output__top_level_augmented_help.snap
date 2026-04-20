@@ -1,0 +1,83 @@
+---
+source: crates/weaver-cli/src/tests/unit/help_output.rs
+expression: rendered
+---
+Semantic code intelligence tool for observing, acting on, and verifying code.
+
+Quick start:
+
+  weaver observe get-definition \
+    --uri file:///src/main.rs --position 10:5
+  weaver act apply-patch < changes.patch
+  weaver daemon status
+
+Configuration flags such as --config-path and --daemon-socket
+must appear before the command domain.
+
+Usage: weaver [OPTIONS] [DOMAIN] [OPERATION] [ARG]...
+       weaver [OPTIONS] [DOMAIN] [OPERATION] [ARG]... <COMMAND>
+
+Commands:
+  daemon  Runs daemon lifecycle commands
+
+Arguments:
+  [DOMAIN]
+          The command domain (for example `observe`)
+
+  [OPERATION]
+          The command operation (for example `get-definition`)
+
+  [ARG]...
+          Additional arguments passed to the daemon
+
+Options:
+      --capabilities
+          Prints the negotiated capability matrix and exits
+
+      --output <OUTPUT>
+          Controls how daemon output is rendered
+
+          Possible values:
+          - auto:  Selects `human` for terminal output and `json` for redirected output
+          - human: Always render human-readable output
+          - json:  Always emit raw JSON payloads from the daemon
+          
+          [default: auto]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+
+Options:
+      --config-path <PATH>
+          
+
+  -d, --daemon-socket <ENDPOINT>
+          
+
+  -l, --log-filter <FILTER>
+          
+
+  -L, --log-format <FORMAT>
+          
+
+  -c, --capability-overrides <DIRECTIVE>
+          
+
+  -o, --locale <LOCALE>
+          
+
+Domains and operations:
+
+  observe — Query code structure and relationships
+    get-definition    find-references    grep
+    diagnostics       call-hierarchy     get-card
+
+  act — Perform code modifications
+    rename-symbol     apply-edits        apply-patch
+    apply-rewrite     refactor
+
+  verify — Validate code correctness
+    diagnostics       syntax

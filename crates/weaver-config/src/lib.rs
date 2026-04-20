@@ -3,11 +3,12 @@
 //! This crate exposes the [`Config`] structure consumed by `weaver` and
 //! `weaverd`. Configuration values are layered using [`ortho_config`], merging
 //! configuration files, environment variables, and command-line arguments in
-//! increasing precedence. The schema focuses on three core concerns:
+//! increasing precedence. The schema focuses on four core concerns:
 //!
 //! - Transport sockets used by the daemon and client.
 //! - Structured logging defaults.
 //! - User-defined capability overrides.
+//! - Locale identifier for internationalisation surfaces.
 //!
 //! ```rust,no_run
 //! use weaver_config::Config;

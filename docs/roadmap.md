@@ -339,7 +339,7 @@ does* *not require source inspection or external runbooks.*
         discovery, and YAML 1.2 semantics; and `make markdownlint`,
         `make fmt`, `make nixie`, and documentation tests pass.
 - [ ] 3.2.6. Adopt `cargo orthohelp` for CI man page generation and retire the
-      `clap_mangen` path.
+      existing `clap_mangen` infrastructure.
       See
       [ortho-config user's guide: Generating IR with cargo-orthohelp](ortho-config-users-guide.md#generating-ir-with-cargo-orthohelp)
       and
