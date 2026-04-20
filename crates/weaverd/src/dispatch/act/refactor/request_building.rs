@@ -49,10 +49,6 @@ fn build_plugin_args(
     args: &arguments::RefactorArgs,
 ) -> Result<HashMap<String, serde_json::Value>, DispatchError> {
     let mut plugin_args = HashMap::new();
-    plugin_args.insert(
-        "refactoring".into(),
-        serde_json::Value::String(args.refactoring.clone()),
-    );
     for extra in &args.extra {
         let parts: Vec<&str> = extra.splitn(2, '=').collect();
         let key = parts
@@ -74,8 +70,8 @@ fn build_plugin_args(
             ));
         }
         if parts.len() == 2 {
-            plugin_args.insert(key.clone(), serde_json::Value::String(parts[1].to_owned()));
-        } else if parts.len() == 1 {
+            plugin_args.insert(key, serde_json::Value::String(parts[1].to_owned()));
+        } else {
             // Bare extra arguments are interpreted as boolean flags.
             plugin_args.insert(key, serde_json::Value::Bool(true));
         }
