@@ -9,8 +9,9 @@ use url::Url;
 use weaver_cards::{DEFAULT_CACHE_CAPACITY, DetailLevel};
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
-use super::handle;
+use super::{first_non_whitespace_column, handle};
 use crate::backends::FusionBackends;
+use crate::dispatch::errors::DispatchError;
 use crate::dispatch::request::CommandRequest;
 use crate::dispatch::response::ResponseWriter;
 use crate::semantic_provider::SemanticBackendProvider;
@@ -69,7 +70,7 @@ fn detail_value(detail: DetailLevel) -> &'static str {
         DetailLevel::Structure => "structure",
         DetailLevel::Semantic => "semantic",
         DetailLevel::Full => "full",
-        detail => unreachable!("unexpected detail level: {detail:?}"),
+        _ => "full",
     }
 }
 
@@ -190,10 +191,59 @@ fn unsupported_language_returns_structured_refusal(
 }
 
 #[rstest]
-#[case(&["--position", "10:5"])]
-#[case(&["--uri", "file:///src/main.rs", "--position", "bad"])]
+fn no_symbol_at_position_returns_structured_refusal(
+    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
+) {
+    let (mut backends, temp_dir) = backends;
+    let path = write_source(&temp_dir, "main.rs", "fn main() {}\n \n");
+    let uri = Url::from_file_path(&path).expect("file uri").to_string();
+    let request = make_request(&["--uri", &uri, "--position", "2:1"]);
+
+    let (status, payload) = dispatch_payload(&request, &mut backends);
+
+    assert_eq!(status, 1);
+    assert_eq!(payload["status"], "refusal");
+    assert_eq!(payload["refusal"]["reason"], "no_symbol_at_position");
+    assert_eq!(
+        payload["refusal"]["message"],
+        "observe graph-slice: no symbol found at 2:1"
+    );
+}
+
+#[rstest]
+fn position_out_of_range_returns_structured_refusal(
+    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
+) {
+    let (mut backends, temp_dir) = backends;
+    let path = write_source(&temp_dir, "main.rs", "fn main() {}\n");
+    let uri = Url::from_file_path(&path).expect("file uri").to_string();
+    let request = make_request(&["--uri", &uri, "--position", "10:1"]);
+
+    let (status, payload) = dispatch_payload(&request, &mut backends);
+
+    assert_eq!(status, 1);
+    assert_eq!(payload["status"], "refusal");
+    assert_eq!(payload["refusal"]["reason"], "position_out_of_range");
+    assert_eq!(
+        payload["refusal"]["message"],
+        "observe graph-slice: position 10:1 is outside the bounds of the file"
+    );
+}
+
+#[rstest]
+#[case(&["--position", "10:5"], "missing required argument: --uri")]
+#[case(
+    &["--uri", "file:///src/main.rs", "--position", "bad"],
+    "invalid argument value for --position"
+)]
+#[case(
+    &["--uri", "https://example.com/main.rs", "--position", "1:1"],
+    "expected a file URI"
+)]
+#[case(&["--uri", "file://%zz", "--position", "1:1"], "invalid URI")]
 fn invalid_arguments_return_dispatch_error(
     #[case] arguments: &[&str],
+    #[case] expected_substring: &str,
     backends: (FusionBackends<SemanticBackendProvider>, TempDir),
 ) {
     let (mut backends, _temp_dir) = backends;
@@ -201,5 +251,46 @@ fn invalid_arguments_return_dispatch_error(
     let mut buffer = Vec::new();
     let mut writer = ResponseWriter::new(&mut buffer);
     let result = handle(&request, &mut writer, &mut backends);
-    assert!(result.is_err());
+    match result {
+        Ok(_) => panic!("expected invalid arguments error, dispatch succeeded"),
+        Err(error) => match error {
+            DispatchError::InvalidArguments { message } => {
+                assert!(
+                    message.contains(expected_substring),
+                    "expected invalid-arguments message to contain {expected_substring:?}, got: {message}"
+                );
+            }
+            _ => panic!("expected invalid arguments error"),
+        },
+    }
+}
+
+#[rstest]
+fn missing_source_file_returns_invalid_arguments(
+    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
+) {
+    let (mut backends, temp_dir) = backends;
+    let path = temp_dir.path().join("missing.rs");
+    let uri = Url::from_file_path(&path).expect("file uri").to_string();
+    let request = make_request(&["--uri", &uri, "--position", "1:1"]);
+    let mut buffer = Vec::new();
+    let mut writer = ResponseWriter::new(&mut buffer);
+    match handle(&request, &mut writer, &mut backends) {
+        Ok(_) => panic!("expected invalid arguments error, dispatch succeeded"),
+        Err(error) => match error {
+            DispatchError::InvalidArguments { message } => {
+                assert!(message.contains("unable to read source file"));
+                assert!(message.contains("missing.rs"));
+            }
+            _ => panic!("expected invalid arguments error"),
+        },
+    }
+}
+
+#[test]
+fn first_non_whitespace_column_uses_character_offsets() {
+    assert_eq!(
+        first_non_whitespace_column("\u{2003}\u{2003}fn main() {}"),
+        Some(3)
+    );
 }
