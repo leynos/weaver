@@ -147,6 +147,14 @@ This plan covers roadmap item 7.2.1 in [docs/roadmap.md](../roadmap.md).
 - [x] (2026-04-12 21:57Z) Stage F: update design and user
       documentation, mark the roadmap
       entry done, and run all required gates.
+- [x] (2026-04-20 00:00Z) Post-review hardening: mapped local file-read
+      failures to invalid arguments, rejected `--max-cards 0`, bounded the
+      same-file discovery scan, added refusal and URI regression tests, and
+      revalidated the roadmap-complete 7.2.1 implementation against the review
+      findings.
+- [x] (2026-04-20 00:00Z) Follow-up fix: corrected same-file discovery
+      candidate columns to use character offsets instead of UTF-8 byte
+      offsets, and added a Unicode-whitespace regression test.
 
 ## Surprises & discoveries
 
@@ -187,6 +195,15 @@ This plan covers roadmap item 7.2.1 in [docs/roadmap.md](../roadmap.md).
   non-executable file. `make fmt` still completed successfully by using a
   temporary PATH shim and then relying on `make markdownlint`,
   `make nixie`, and `make check-fmt` to verify the resulting tree.
+- Review follow-up found one contract hole that the original milestone left
+  open: the parser accepted `--max-cards 0` even though the runtime always
+  returned at least the entry card. The fix now enforces `max_cards >= 1` at
+  parse time and also leaves a defensive zero-budget guard in the runtime
+  helper.
+- Review follow-up also found that same-file discovery was deriving columns
+  from UTF-8 byte offsets, which can misaddress symbols after multibyte
+  whitespace. The helper now counts characters so extracted candidate
+  positions stay aligned with the extractor API.
 
 ## Decision Log
 
@@ -229,6 +246,15 @@ This plan covers roadmap item 7.2.1 in [docs/roadmap.md](../roadmap.md).
   milestones land. Rationale: it stays within the existing public extractor
   surface, keeps the runtime deterministic, and avoids introducing a premature
   graph-engine API.
+- Decision: classify local `fs::read_to_string(...)` failures for
+  `observe graph-slice` as invalid arguments rather than generic dispatch IO
+  failures. Rationale: missing files, permission problems, and similar local
+  path issues are user-actionable request problems, and callers need to
+  distinguish them from daemon faults.
+- Decision: cap same-file discovery to the first 256 non-blank line starts
+  until roadmap item 7.2.2 lands the symbol-table-based traversal pipeline.
+  Rationale: the schema milestone still needs deterministic sibling discovery,
+  but unbounded one-position-per-line extraction scales poorly on large files.
 
 ## Outcomes & retrospective
 

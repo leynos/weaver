@@ -51,7 +51,7 @@ pub fn handle<W: Write>(
         DispatchError::invalid_arguments(format!("invalid URI '{}': {error}", slice_request.uri()))
     })?;
     let path = resolve_file_path(&parsed_uri)?;
-    let source = fs::read_to_string(&path)?;
+    let source = read_slice_source(&path)?;
     let response = build_response(&slice_request, &path, &source, backends)?;
 
     let status = exit_status(&response);
@@ -82,13 +82,12 @@ fn build_response(
     enrich_card_if_requested(&mut entry_card, request.entry_detail(), source, backends);
 
     let entry_symbol_id = entry_card.symbol.symbol_id.clone();
-    let sibling_cards = discover_same_file_cards(SameFileDiscovery {
+    let sibling_cards = discover_same_file_cards(
         request,
-        path,
-        source,
-        entry_symbol_id: &entry_symbol_id,
+        SliceDocument { path, source },
+        &entry_symbol_id,
         backends,
-    })?;
+    )?;
     let (cards, spillover) =
         apply_card_budget(entry_card, sibling_cards, request.budget().max_cards());
 
@@ -112,69 +111,35 @@ fn build_response(
     })
 }
 
-struct SameFileDiscovery<'a> {
-    request: &'a GraphSliceRequest,
+struct SliceDocument<'a> {
     path: &'a Path,
     source: &'a str,
-    entry_symbol_id: &'a str,
-    backends: &'a mut FusionBackends<SemanticBackendProvider>,
 }
-
 fn discover_same_file_cards(
-    discovery: SameFileDiscovery<'_>,
+    request: &GraphSliceRequest,
+    document: SliceDocument<'_>,
+    entry_symbol_id: &str,
+    backends: &mut FusionBackends<SemanticBackendProvider>,
 ) -> Result<Vec<SymbolCard>, DispatchError> {
-    let extractor = discovery.backends.provider().card_extractor().clone();
+    let extractor = backends.provider().card_extractor().clone();
     let mut cards = BTreeMap::new();
-    let mut visited_positions = BTreeSet::new();
 
-    for (line, column) in candidate_positions(discovery.source) {
-        if line == discovery.request.line() && column == discovery.request.column() {
-            continue;
-        }
-        if !visited_positions.insert((line, column)) {
+    for (line, column) in candidate_positions(document.source) {
+        if (line, column) == (request.line(), request.column()) {
             continue;
         }
 
-        let extraction = extractor.extract(CardExtractionInput {
-            path: discovery.path,
-            source: discovery.source,
-            line,
-            column,
-            detail: discovery.request.node_detail(),
-        });
-        let mut card = match extraction {
-            Ok(card) => card,
-            Err(CardExtractionError::NoSymbolAtPosition { .. }) => continue,
-            Err(CardExtractionError::UnsupportedLanguage { .. }) => continue,
-            Err(error @ CardExtractionError::PositionOutOfRange { .. }) => {
-                let message = format!(
-                    "computed position {line}:{column} should be valid during same-file slice discovery: {error}"
-                );
-                return Err(DispatchError::internal(message));
-            }
-            Err(CardExtractionError::InvalidPath { path }) => {
-                return Err(DispatchError::internal(format!(
-                    "Tree-sitter extractor requires an absolute path: {}",
-                    path.display()
-                )));
-            }
-            Err(CardExtractionError::Parse { language, message }) => {
-                return Err(DispatchError::internal(format!(
-                    "Tree-sitter parse failed for {language}: {message}"
-                )));
-            }
+        let Some(mut card) =
+            extract_same_file_card(&extractor, document, (line, column), request.node_detail())?
+        else {
+            continue;
         };
 
-        if card.symbol.symbol_id == discovery.entry_symbol_id {
+        if card.symbol.symbol_id == entry_symbol_id {
             continue;
         }
 
-        enrich_card_if_requested(
-            &mut card,
-            discovery.request.node_detail(),
-            discovery.source,
-            discovery.backends,
-        );
+        enrich_card_if_requested(&mut card, request.node_detail(), document.source, backends);
         cards.entry(card.symbol.symbol_id.clone()).or_insert(card);
     }
 
@@ -183,6 +148,38 @@ fn discover_same_file_cards(
     Ok(ordered_cards)
 }
 
+fn extract_same_file_card(
+    extractor: &TreeSitterCardExtractor,
+    document: SliceDocument<'_>,
+    position: (u32, u32),
+    detail: DetailLevel,
+) -> Result<Option<SymbolCard>, DispatchError> {
+    let (line, column) = position;
+
+    match extractor.extract(CardExtractionInput {
+        path: document.path,
+        source: document.source,
+        line,
+        column,
+        detail,
+    }) {
+        Ok(card) => Ok(Some(card)),
+        Err(CardExtractionError::NoSymbolAtPosition { .. })
+        | Err(CardExtractionError::UnsupportedLanguage { .. }) => Ok(None),
+        Err(error @ CardExtractionError::PositionOutOfRange { .. }) => {
+            Err(DispatchError::internal(format!(
+                "computed position {line}:{column} should be valid during same-file slice discovery: {error}"
+            )))
+        }
+        Err(CardExtractionError::InvalidPath { path }) => Err(DispatchError::internal(format!(
+            "Tree-sitter extractor requires an absolute path: {}",
+            path.display()
+        ))),
+        Err(CardExtractionError::Parse { language, message }) => Err(DispatchError::internal(
+            format!("Tree-sitter parse failed for {language}: {message}"),
+        )),
+    }
+}
 fn candidate_positions(source: &str) -> Vec<(u32, u32)> {
     source
         .lines()
@@ -190,12 +187,16 @@ fn candidate_positions(source: &str) -> Vec<(u32, u32)> {
         .filter_map(|(index, line)| {
             first_non_whitespace_column(line).map(|column| ((index as u32) + 1, column))
         })
+        // Bound extraction work for large files until symbol-table discovery
+        // lands in the later graph-slice milestones.
+        .take(MAX_SAME_FILE_DISCOVERY_POSITIONS)
         .collect()
 }
 
 fn first_non_whitespace_column(line: &str) -> Option<u32> {
-    line.char_indices()
-        .find_map(|(index, ch)| (!ch.is_whitespace()).then_some((index as u32) + 1))
+    line.chars()
+        .position(|ch| !ch.is_whitespace())
+        .map(|index| (index as u32) + 1)
 }
 
 fn stable_card_order(left: &SymbolCard, right: &SymbolCard) -> std::cmp::Ordering {
@@ -226,6 +227,25 @@ fn apply_card_budget(
     sibling_cards: Vec<SymbolCard>,
     max_cards: u32,
 ) -> (Vec<SymbolCard>, SliceSpillover) {
+    if max_cards == 0 {
+        let frontier = std::iter::once(SpilloverCandidate {
+            symbol_id: entry_card.symbol.symbol_id.clone(),
+            depth: 0,
+        })
+        .chain(sibling_cards.iter().map(|card| SpilloverCandidate {
+            symbol_id: card.symbol.symbol_id.clone(),
+            depth: 1,
+        }))
+        .collect();
+        return (
+            Vec::new(),
+            SliceSpillover {
+                truncated: true,
+                frontier,
+            },
+        );
+    }
+
     let remaining_capacity = max_cards.saturating_sub(1) as usize;
     let included_siblings = sibling_cards
         .iter()
@@ -268,20 +288,23 @@ fn enrich_card_if_requested(
     }
 
     if enrich::try_lsp_enrichment(card, source, backends) == EnrichmentOutcome::Enriched {
-        card.provenance
-            .sources
-            .retain(|source_name| source_name != "tree_sitter_degraded_semantic");
-        if !card
-            .provenance
-            .sources
-            .iter()
-            .any(|source_name| source_name == "lsp_hover")
-        {
-            card.provenance.sources.push(String::from("lsp_hover"));
-        }
+        normalize_lsp_provenance(card);
     }
 }
 
+fn normalize_lsp_provenance(card: &mut SymbolCard) {
+    card.provenance
+        .sources
+        .retain(|source_name| source_name != "tree_sitter_degraded_semantic");
+    if !card
+        .provenance
+        .sources
+        .iter()
+        .any(|source_name| source_name == "lsp_hover")
+    {
+        card.provenance.sources.push(String::from("lsp_hover"));
+    }
+}
 fn resolve_file_path(uri: &Url) -> Result<PathBuf, DispatchError> {
     if uri.scheme() != "file" {
         return Err(DispatchError::invalid_arguments(format!(
@@ -295,6 +318,14 @@ fn resolve_file_path(uri: &Url) -> Result<PathBuf, DispatchError> {
     })
 }
 
+fn read_slice_source(path: &Path) -> Result<String, DispatchError> {
+    fs::read_to_string(path).map_err(|error| {
+        DispatchError::invalid_arguments(format!(
+            "unable to read source file '{}': {error}",
+            path.display()
+        ))
+    })
+}
 fn map_extraction_error(error: CardExtractionError) -> Result<GraphSliceResponse, DispatchError> {
     match error {
         CardExtractionError::UnsupportedLanguage { path } => Ok(GraphSliceResponse::Refusal {
@@ -334,3 +365,5 @@ fn map_extraction_error(error: CardExtractionError) -> Result<GraphSliceResponse
     }
 }
 mod tests;
+
+const MAX_SAME_FILE_DISCOVERY_POSITIONS: usize = 256;
