@@ -122,6 +122,26 @@ Feature: Weaver CLI behaviour
     And stderr contains "verify"
     And stderr contains "weaver --help"
 
+  Scenario: Top-level help surfaces shared configuration flags
+    When the operator runs "--help"
+    Then stdout contains "--config-path <PATH>"
+    And stdout contains "--daemon-socket <ENDPOINT>"
+    And stdout contains "--log-filter <FILTER>"
+    And stdout contains "--log-format <FORMAT>"
+    And stdout contains "--capability-overrides <DIRECTIVE>"
+    And stdout contains "--locale <LOCALE>"
+    And no daemon command was sent
+
+  Scenario: Daemon start help surfaces shared configuration flags
+    When the operator runs "daemon start --help"
+    Then stdout contains "--config-path <PATH>"
+    And stdout contains "--daemon-socket <ENDPOINT>"
+    And stdout contains "--log-filter <FILTER>"
+    And stdout contains "--log-format <FORMAT>"
+    And stdout contains "--capability-overrides <DIRECTIVE>"
+    And stdout contains "--locale <LOCALE>"
+    And no daemon command was sent
+
   Scenario: Auto-start shows waiting message before spawn failure
     Given auto-start will be triggered
     When the operator runs "observe get-definition --symbol main"

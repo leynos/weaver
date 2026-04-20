@@ -3,11 +3,12 @@
 //! This crate exposes the [`Config`] structure consumed by `weaver` and
 //! `weaverd`. Configuration values are layered using [`ortho_config`], merging
 //! configuration files, environment variables, and command-line arguments in
-//! increasing precedence. The schema focuses on three core concerns:
+//! increasing precedence. The schema focuses on four core concerns:
 //!
 //! - Transport sockets used by the daemon and client.
 //! - Structured logging defaults.
 //! - User-defined capability overrides.
+//! - Locale identifier for internationalisation surfaces.
 //!
 //! ```rust,no_run
 //! use weaver_config::Config;
@@ -25,6 +26,7 @@
 
 mod capability;
 mod defaults;
+mod locale;
 mod logging;
 mod runtime;
 mod socket;
@@ -41,9 +43,14 @@ pub use defaults::{
     DEFAULT_LOG_FILTER, DEFAULT_TCP_PORT, default_log_filter, default_log_format,
     default_socket_endpoint,
 };
+pub use locale::{Locale, LocaleParseError};
 pub use logging::{LogFormat, LogFormatParseError};
 pub use runtime::{RuntimePaths, RuntimePathsError};
 pub use socket::{SocketEndpoint, SocketParseError, SocketPreparationError};
+
+fn default_locale() -> Locale {
+    Locale::en_us()
+}
 
 /// Complete configuration merged from defaults, files, environment, and CLI.
 #[derive(Debug, Clone, Deserialize, Serialize, OrthoConfig)]
@@ -62,23 +69,44 @@ pub use socket::{SocketEndpoint, SocketParseError, SocketPreparationError};
 pub struct Config {
     /// Transport endpoint used by the daemon and CLI.
     #[serde(default = "default_socket_endpoint")]
-    #[ortho_config(default = crate::default_socket_endpoint(), cli_long = "daemon-socket")]
+    #[ortho_config(
+        default = crate::default_socket_endpoint(),
+        cli_long = "daemon-socket",
+        cli(value_name = "ENDPOINT")
+    )]
     pub daemon_socket: SocketEndpoint,
     /// Tracing filter applied to structured logs.
     #[serde(default = "crate::defaults::default_log_filter_string")]
     #[ortho_config(
         default = String::from(crate::default_log_filter()),
-        cli_long = "log-filter"
+        cli_long = "log-filter",
+        cli(value_name = "FILTER")
     )]
     pub log_filter: String,
     /// Output format for structured logs.
     #[serde(default)]
-    #[ortho_config(default = crate::default_log_format(), cli_long = "log-format")]
+    #[ortho_config(
+        default = crate::default_log_format(),
+        cli_long = "log-format",
+        cli(value_name = "FORMAT")
+    )]
     pub log_format: LogFormat,
     /// Overrides for capability negotiation keyed by language and capability.
     #[serde(default)]
-    #[ortho_config(cli_long = "capability-overrides", merge_strategy = "append")]
+    #[ortho_config(
+        cli_long = "capability-overrides",
+        merge_strategy = "append",
+        cli(value_name = "DIRECTIVE")
+    )]
     pub capability_overrides: Vec<CapabilityDirective>,
+    /// Locale used for operator-facing help and diagnostics.
+    #[serde(default = "default_locale")]
+    #[ortho_config(
+        default = crate::default_locale(),
+        cli_long = "locale",
+        cli(value_name = "LOCALE")
+    )]
+    pub locale: Locale,
 }
 
 impl Config {
@@ -139,6 +167,12 @@ impl Config {
         CapabilityMatrix::from_directives(self.capability_overrides.iter())
     }
 
+    /// Accessor for the configured locale.
+    #[must_use]
+    pub fn locale(&self) -> &Locale {
+        &self.locale
+    }
+
     fn normalise_capability_overrides(&mut self) {
         deduplicate_directives(&mut self.capability_overrides);
     }
@@ -151,6 +185,7 @@ impl Default for Config {
             log_filter: crate::defaults::default_log_filter_string(),
             log_format: default_log_format(),
             capability_overrides: Vec::new(),
+            locale: default_locale(),
         };
         config.normalise_capability_overrides();
         config

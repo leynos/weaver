@@ -34,6 +34,13 @@ The CLI exposes the following configuration flags today:
   overrides. Duplicate entries are resolved by keeping the last directive for
   each language and capability pair, and lookups ignore case and surrounding
   whitespace.
+- `--locale <LOCALE>` — selects the operator-facing locale (defaults to
+  `en-US`). Locale values must be valid BCP 47 language identifiers.
+
+`weaver --help` and `weaver daemon start --help` both list these flags in their
+`Options:` section. The runtime behaviour remains strict, however: for a
+configuration flag to take effect, it must appear before the command domain or
+structured subcommand.
 
 ### Environment variables
 
@@ -44,6 +51,7 @@ The same options are available through environment variables. They follow the
 - `WEAVER_DAEMON_SOCKET`
 - `WEAVER_LOG_FILTER`
 - `WEAVER_LOG_FORMAT`
+- `WEAVER_LOCALE`
 
 Environment variables override files, but remain lower priority than CLI flags.
 
@@ -296,7 +304,9 @@ This output does not require a configuration file or a running daemon.
 Running `weaver --help` displays the full command reference to standard output
 and exits with code 0. The output includes a purpose statement, quick-start
 examples, global options, the `daemon` subcommand, and a catalogue of all
-domains and operations:
+domains and operations. It also includes the shared configuration flags
+`--config-path`, `--daemon-socket`, `--log-filter`, `--log-format`,
+`--capability-overrides`, and `--locale` in the `Options:` section:
 
 ```text
 Domains and operations:
@@ -315,6 +325,11 @@ Domains and operations:
 
 This catalogue is built into the binary and does not require a running daemon
 or configuration file.
+
+`weaver daemon start --help` exposes the same six configuration flags in its
+own `Options:` section. As with the top-level command, the help surface is
+truthful about the shared config contract, but the flags still need to appear
+before `daemon start` at runtime in order to change behaviour.
 
 ### Domain-only guidance
 
