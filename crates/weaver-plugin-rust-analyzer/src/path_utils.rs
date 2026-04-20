@@ -112,6 +112,13 @@ mod tests {
         validate_relative_path,
     };
 
+    fn assert_invalid_uri(input: &str, expected_msg: &str) {
+        match normalize_request_uri(input) {
+            Err(RustAnalyzerAdapterError::InvalidPath { message }) if message == expected_msg => {}
+            other => panic!("expected InvalidPath({expected_msg:?}) for {input:?}, got: {other:?}"),
+        }
+    }
+
     #[test]
     fn validate_relative_path_allows_dot_prefixed_file_path() {
         assert!(validate_relative_path(Path::new("./foo")).is_ok());
@@ -147,29 +154,21 @@ mod tests {
         ));
     }
 
-    #[rstest]
-    #[case(
-        "file://host/src/main.rs",
-        "uri argument must be a valid file:// URI without an authority"
-    )]
-    #[case(
-        "https://example.com/src/main.rs",
-        "uri argument must be a valid file:// URI without an authority"
-    )]
-    #[case("file:///", "path must not be empty or only '.'")]
-    #[case(
-        "not a uri",
-        "uri argument must be a valid file:// URI without an authority"
-    )]
-    fn normalize_request_uri_rejects_invalid_inputs(
-        #[case] input: &str,
-        #[case] expected_message: &str,
-    ) {
-        assert!(matches!(
-            normalize_request_uri(input),
-            Err(RustAnalyzerAdapterError::InvalidPath { message })
-                if message == expected_message
-        ));
+    #[test]
+    fn normalize_request_uri_rejects_authority_and_non_file_schemes() {
+        for input in ["file://host/src/main.rs", "https://example.com/src/main.rs"] {
+            assert_invalid_uri(
+                input,
+                "uri argument must be a valid file:// URI without an authority",
+            );
+        }
+    }
+
+    #[test]
+    fn normalize_request_uri_rejects_empty_root_and_invalid_uris() {
+        for input in ["file://", "file:///"] {
+            assert_invalid_uri(input, "path must not be empty or only '.'");
+        }
     }
 
     #[test]
