@@ -74,6 +74,7 @@ Domains and operations:
   observe — Query code structure and relationships
     get-definition    find-references    grep
     diagnostics       call-hierarchy     get-card
+    graph-slice
 
   act — Perform code modifications
     rename-symbol     apply-edits        apply-patch
