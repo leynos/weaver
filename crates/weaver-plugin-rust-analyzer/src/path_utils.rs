@@ -81,17 +81,40 @@ fn strip_file_uri_root(path: &Path) -> Result<PathBuf, RustAnalyzerAdapterError>
 }
 
 pub(crate) fn path_to_slash(path: &Path) -> Result<String, RustAnalyzerAdapterError> {
-    path.components()
-        .filter_map(|component| match component {
-            Component::Normal(part) => Some(part.to_str().map(str::to_owned).ok_or_else(|| {
+    let parts = path
+        .components()
+        .map(|component| match component {
+            Component::Normal(part) => part.to_str().map(str::to_owned).ok_or_else(|| {
                 RustAnalyzerAdapterError::InvalidPath {
                     message: format!("path contains non-UTF-8 component: {}", path.display()),
                 }
-            })),
-            _ => None,
+            }),
+            Component::CurDir => Ok(String::new()),
+            Component::ParentDir => Err(RustAnalyzerAdapterError::InvalidPath {
+                message: format!(
+                    "path traversal is not allowed; offending component: ParentDir; path: {}",
+                    path.display()
+                ),
+            }),
+            Component::RootDir => Err(RustAnalyzerAdapterError::InvalidPath {
+                message: format!(
+                    "absolute paths are not allowed; offending component: RootDir; path: {}",
+                    path.display()
+                ),
+            }),
+            Component::Prefix(_) => Err(RustAnalyzerAdapterError::InvalidPath {
+                message: format!(
+                    "windows path prefixes are not allowed; offending component: Prefix; path: {}",
+                    path.display()
+                ),
+            }),
         })
-        .collect::<Result<Vec<String>, RustAnalyzerAdapterError>>()
-        .map(|parts| parts.join("/"))
+        .collect::<Result<Vec<String>, RustAnalyzerAdapterError>>()?;
+    Ok(parts
+        .into_iter()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("/"))
 }
 
 #[cfg(test)]
@@ -185,6 +208,32 @@ mod tests {
         assert!(matches!(converted, Ok(ref path) if path == "src/lib.rs"));
     }
 
+    #[test]
+    fn path_to_slash_skips_curdir_components() {
+        let converted = path_to_slash(Path::new("./a/./b"));
+
+        assert!(matches!(converted, Ok(ref path) if path == "a/b"));
+    }
+
+    #[test]
+    fn path_to_slash_rejects_parentdir_components() {
+        assert!(matches!(
+            path_to_slash(Path::new("../foo")),
+            Err(RustAnalyzerAdapterError::InvalidPath { message })
+                if message.contains("ParentDir")
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn path_to_slash_rejects_rootdir_components() {
+        assert!(matches!(
+            path_to_slash(Path::new("/foo")),
+            Err(RustAnalyzerAdapterError::InvalidPath { message })
+                if message.contains("RootDir")
+        ));
+    }
+
     #[cfg(unix)]
     #[test]
     fn path_to_slash_rejects_non_utf8_components() {
@@ -194,6 +243,18 @@ mod tests {
             path_to_slash(&non_utf8),
             Err(RustAnalyzerAdapterError::InvalidPath { message })
                 if message.contains("path contains non-UTF-8 component")
+        ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn path_to_slash_rejects_windows_prefix_components() {
+        let path = PathBuf::from(r"C:\foo\bar");
+
+        assert!(matches!(
+            path_to_slash(&path),
+            Err(RustAnalyzerAdapterError::InvalidPath { message })
+                if message.contains("Prefix")
         ));
     }
 
