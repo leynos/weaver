@@ -20,9 +20,9 @@ chosen query model should either:
 - execute directly over Tree-sitter syntax trees, or
 - compile predictably into Tree-sitter-backed matching operations.
 
-The primary target languages are Rust, Python, Go, and TypeScript. Query
-support must be practical across these languages, including common constructs
-such as Rust attributes and Python decorators.
+The primary target languages are Rust, Python, Go, and TypeScript. Query support
+must be practical across these languages, including common constructs such as
+Rust attributes and Python decorators.
 
 The system also needs to support both short, one-off queries and longer,
 documented query files that can be reviewed and version-controlled.
@@ -56,8 +56,8 @@ documented query files that can be reviewed and version-controlled.
 ### Option A: Tree-sitter query language as primary surface
 
 Tree-sitter queries provide direct AST pattern matching with captures,
-quantifiers, and predicates. This option offers maximal implementation
-alignment with current infrastructure.
+quantifiers, and predicates. This option offers maximal implementation alignment
+with current infrastructure.
 
 Main trade-off: authoring ergonomics are weaker because authors must reason in
 terms of grammar node kinds and field names.
@@ -101,8 +101,8 @@ _Table 1: High-level trade-offs across candidate query approaches._
 Adopt a Semgrep-style query surface as Weaver's primary user-facing language,
 implemented natively against Weaver's Tree-sitter-backed matching pipeline.
 
-Retain direct Tree-sitter queries as an explicit advanced escape hatch for
-cases that need grammar-level precision beyond the Semgrep-style subset.
+Retain direct Tree-sitter queries as an explicit advanced escape hatch for cases
+that need grammar-level precision beyond the Semgrep-style subset.
 
 ## Goals and non-goals
 
@@ -121,10 +121,10 @@ cases that need grammar-level precision beyond the Semgrep-style subset.
 ## Migration plan
 
 1. Define the Semgrep-style subset grammar and AST in `weaver-syntax` docs.
-2. Implement parsing and normalization to Weaver internal query operators.
-3. Add execution over Tree-sitter-backed structures with capture support.
-4. Add conformance tests for mandatory language constructs.
-5. Provide explicit diagnostics for unsupported features with escape-hatch
+1. Implement parsing and normalization to Weaver internal query operators.
+1. Add execution over Tree-sitter-backed structures with capture support.
+1. Add conformance tests for mandatory language constructs.
+1. Provide explicit diagnostics for unsupported features with escape-hatch
    guidance to direct Tree-sitter queries.
 
 ## Known risks and limitations

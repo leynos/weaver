@@ -11,9 +11,9 @@ Configuration is layered using `ortho-config` with the following precedence
 order:
 
 1. built-in defaults,
-2. configuration files discovered via `--config-path` and the XDG search path,
-3. environment variables, and
-4. CLI flags.
+1. configuration files discovered via `--config-path` and the XDG search path,
+1. environment variables, and
+1. CLI flags.
 
 Each successive layer overrides earlier sources. This guarantees that a
 parameter passed through the CLI is honoured even when a configuration file or
@@ -24,8 +24,8 @@ environment variable also supplies the same field.
 The CLI exposes the following configuration flags today:
 
 - `--config-path <PATH>` — reads an explicit configuration file.
-- `--daemon-socket <ENDPOINT>` — overrides the daemon transport. Accepts
-  values such as `unix:///run/user/1000/weaver.sock` or `tcp://127.0.0.1:9779`.
+- `--daemon-socket <ENDPOINT>` — overrides the daemon transport. Accepts values
+  such as `unix:///run/user/1000/weaver.sock` or `tcp://127.0.0.1:9779`.
 - `--log-filter <FILTER>` — sets the tracing filter (defaults to `info`).
 - `--log-format <FORMAT>` — selects the log output format (`json` or `compact`
   only).
@@ -66,14 +66,13 @@ directive = "force"
 
 ### Validation and error reporting
 
-Invalid configuration files are treated as fatal. When `--config-path` points
-at a broken file, or when discovery finds a malformed
-`weaver.toml`/`.weaver.toml`, both the CLI and daemon abort with a
-`LoadConfiguration` error that lists every offending path. Remove or fix the
-reported files before retrying. If no configuration files exist at all, the
-loader still falls back to the built-in defaults described below. See the
-[developer's guide](developers-guide.md) for toolchain baseline and
-configuration framework internals.
+Invalid configuration files are treated as fatal. When `--config-path` points at
+a broken file, or when discovery finds a malformed `weaver.toml`/`.weaver.toml`,
+both the CLI and daemon abort with a `LoadConfiguration` error that lists every
+offending path. Remove or fix the reported files before retrying. If no
+configuration files exist at all, the loader still falls back to the built-in
+defaults described below. See the [developer's guide](developers-guide.md) for
+toolchain baseline and configuration framework internals.
 
 Operators will see aggregated errors enumerated in the order discovery
 encounters them. For example:
@@ -99,9 +98,8 @@ string "yes", expected a boolean
   languages.
 
 When `weaverd` starts, it ensures the parent directory for the configured Unix
-socket exists, returning a descriptive error if the directory cannot be
-created. This prevents silent failures later when the daemon attempts to bind
-the socket.
+socket exists, returning a descriptive error if the directory cannot be created.
+This prevents silent failures later when the daemon attempts to bind the socket.
 
 ## Daemon lifecycle
 
@@ -110,18 +108,18 @@ under the same directory as the Unix socket (for example
 `$XDG_RUNTIME_DIR/weaver`). Launching the daemon creates a lock file
 (`weaverd.lock`), a PID file (`weaverd.pid`), and a health snapshot
 (`weaverd.health`). PID and health files are written atomically, so observers
-never see a partially written payload. Attempts to start a second copy while
-one is running fail fast with an "already running" error that reports the
-existing PID. When the original launch is still initializing and has not yet
-published a PID, the second invocation now reports "launch already in progress"
-instead of removing the lock. If the daemon exited uncleanly, the new instance
-removes the stale files before continuing.
+never see a partially written payload. Attempts to start a second copy while one
+is running fail fast with an "already running" error that reports the existing
+PID. When the original launch is still initializing and has not yet published a
+PID, the second invocation now reports "launch already in progress" instead of
+removing the lock. If the daemon exited uncleanly, the new instance removes the
+stale files before continuing.
 
 The daemon now binds a socket listener as part of startup. It binds to the
 configured `--daemon-socket` endpoint and accepts multiple client connections
 concurrently. On Unix targets, stale socket files are removed only after
-confirming no listener responds, while actively used sockets cause the daemon
-to fail fast with a clear error. The listener removes the Unix socket file on
+confirming no listener responds, while actively used sockets cause the daemon to
+fail fast with a clear error. The listener removes the Unix socket file on
 shutdown to avoid lingering bind failures.
 
 The daemon implements a JSONL request dispatch loop that reads `CommandRequest`
@@ -136,15 +134,14 @@ implemented. `get-definition` accepts `--uri` and `--position`, infers the
 language from the file extension, initializes the appropriate language server,
 and returns definition locations as JSON. `get-card` accepts the same location
 arguments plus `--detail`, reads the target file locally, and returns a
-Tree-sitter-backed symbol card for supported Rust, Python, and TypeScript
-files. Missing or malformed arguments return structured error messages with
-exit status 1. Other operations within the `observe`, `act`, and `verify`
-domains still return "not yet implemented" responses while backend wiring is
-being completed.
+Tree-sitter-backed symbol card for supported Rust, Python, and TypeScript files.
+Missing or malformed arguments return structured error messages with exit status
+1\. Other operations within the `observe`, `act`, and `verify` domains still
+return "not yet implemented" responses while backend wiring is being completed.
 
-The health snapshot is a single-line JSON document describing the current
-state, enabling operators and automation to poll readiness without speaking the
-daemon protocol. Example:
+The health snapshot is a single-line JSON document describing the current state,
+enabling operators and automation to poll readiness without speaking the daemon
+protocol. Example:
 
 ```json
 {"status":"ready","pid":12345,"timestamp":1713356400}
@@ -178,15 +175,15 @@ therefore honour the configuration flags supplied to the CLI, including
 `--config-path` and `--daemon-socket`.
 
 - `weaver daemon start` verifies that the configured socket is free, spawns the
-  `weaverd` binary (the path can be overridden via `WEAVERD_BIN`), and waits
-  for the health snapshot to report `ready`. The command refuses to start when
-  the socket already accepts connections and prints the runtime directory that
-  now holds the lock, PID, and health files.
+  `weaverd` binary (the path can be overridden via `WEAVERD_BIN`), and waits for
+  the health snapshot to report `ready`. The command refuses to start when the
+  socket already accepts connections and prints the runtime directory that now
+  holds the lock, PID, and health files.
 - `weaver daemon stop` reads the PID file, sends `SIGTERM`, and waits for the
   runtime artefacts and socket to disappear. If the socket is reachable but the
-  PID file is missing, the command surfaces an error rather than blindly
-  killing a process. Successful stops report the PID that was terminated and
-  confirm the runtime directory was cleaned up.
+  PID file is missing, the command surfaces an error rather than blindly killing
+  a process. Successful stops report the PID that was terminated and confirm the
+  runtime directory was cleaned up.
 - `weaver daemon status` inspects the JSON health snapshot when present, falling
   back to the PID file and socket reachability. When no runtime artefacts exist
   the command prints a short reminder that `daemon start` can be used to launch
@@ -217,8 +214,8 @@ command executes. The automatic startup uses the same configuration flags
 (`--config-path`, `--daemon-socket`, etc.) passed to the command.
 
 Errors that prevent connection but are not related to the daemon being offline
-(such as permission denied or network timeouts) bypass automatic startup and
-are reported immediately.
+(such as permission denied or network timeouts) bypass automatic startup and are
+reported immediately.
 
 When the daemon binary cannot be found, the CLI provides actionable guidance:
 
@@ -313,8 +310,8 @@ Domains and operations:
     diagnostics       syntax
 ```
 
-This catalogue is built into the binary and does not require a running daemon
-or configuration file.
+This catalogue is built into the binary and does not require a running daemon or
+configuration file.
 
 ### Domain-only guidance
 
@@ -370,10 +367,9 @@ Next command:
 All error messages follow the unified three-part template: error statement,
 alternatives block, and concrete next command.
 
-Unknown operations are handled differently. The request still reaches the
-daemon because the daemon router owns the canonical operation list for each
-domain. Human-readable output now includes the full alternatives returned by
-the daemon:
+Unknown operations are handled differently. The request still reaches the daemon
+because the daemon router owns the canonical operation list for each domain.
+Human-readable output now includes the full alternatives returned by the daemon:
 
 ```text
 $ weaver --output human observe nonexistent
@@ -423,10 +419,9 @@ JSON document (machine-readable).
 
 The CLI accepts `--output` with `auto` (default), `human`, and `json` values.
 `auto` selects `human` when stdout is a TTY and `json` when output is
-redirected, so JSON pipelines remain stable. Place `--output` before the
-command domain and operation because arguments after the operation are passed
-directly to the daemon (for example,
-`weaver --output human observe get-definition ...`).
+redirected, so JSON pipelines remain stable. Place `--output` before the command
+domain and operation because arguments after the operation are passed directly
+to the daemon (for example, `weaver --output human observe get-definition ...`).
 
 When `--output human` is active, commands that return code locations or
 diagnostics render context blocks with file headers, line-numbered source
@@ -511,8 +506,8 @@ may route `textDocument/hover` requests for LSP enrichment.
 
 Syntactic operations provided by `weaver-syntax` use the same domain/operation
 shape (`observe grep` and `act apply-rewrite`) once they are wired into the
-daemon request loop. The examples below are illustrative; the daemon defines
-the exact payload schema.
+daemon request loop. The examples below are illustrative; the daemon defines the
+exact payload schema.
 
 #### observe get-definition
 
@@ -522,9 +517,9 @@ Syntax:
 weaver observe get-definition --uri <URI> --position <LINE:COL>
 ```
 
-Both `--uri` and `--position` are required. The position uses 1-indexed line
-and column numbers (matching editor conventions). The language is inferred from
-the file extension: `.rs` for Rust, `.py` for Python, and `.ts`/`.tsx` for
+Both `--uri` and `--position` are required. The position uses 1-indexed line and
+column numbers (matching editor conventions). The language is inferred from the
+file extension: `.rs` for Rust, `.py` for Python, and `.ts`/`.tsx` for
 TypeScript. Unsupported extensions return an error.
 
 Human output:
@@ -626,21 +621,20 @@ weaver observe get-card --uri <URI> --position <LINE:COL> [--detail <LEVEL>]
 Arguments:
 
 - `--uri` (required) — file URI of the source file containing the symbol.
-- `--position` (required) — 1-indexed `LINE:COL` position within the
-  symbol.
+- `--position` (required) — 1-indexed `LINE:COL` position within the symbol.
 - `--detail` (optional) — progressive detail level, controlling how much
   information the card contains. One of `minimal`, `signature`, `structure`
   (default), `semantic`, or `full`.
-- `--format` (optional) — output format. Currently, only `json` (the
-  default) is supported.
+- `--format` (optional) — output format. Currently, only `json` (the default) is
+  supported.
 
 Response:
 
 The response is a discriminated-union JSON envelope keyed on the `"status"`
 field. When `"status"` is `"refusal"`, the envelope carries a refusal payload
-indicating why a card could not be produced. When `"status"` is `"success"`,
-the envelope contains the card payload. The overall shape of the envelope
-therefore depends on the `"status"` value.
+indicating why a card could not be produced. When `"status"` is `"success"`, the
+envelope contains the card payload. The overall shape of the envelope therefore
+depends on the `"status"` value.
 
 `observe get-card` is Tree-sitter-first. Supported Rust, Python, and TypeScript
 files return a deterministic card. Requests for unsupported file types or
@@ -652,9 +646,9 @@ server is unavailable, the card degrades gracefully to a Tree-sitter-only
 extraction with provenance `"tree_sitter_degraded_semantic"`.
 
 `observe get-card` responses are cached per daemon process by
-`(path, content hash, language, detail level, line, column)`. Repeating the
-same request against an unchanged file revision reuses the cached card instead
-of reparsing the file. When the file contents change, Weaver invalidates stale
+`(path, content hash, language, detail level, line, column)`. Repeating the same
+request against an unchanged file revision reuses the cached card instead of
+reparsing the file. When the file contents change, Weaver invalidates stale
 cached revisions for that path and records a fresh `provenance.extracted_at`
 timestamp. Cache hits preserve the original extraction timestamp.
 
@@ -731,17 +725,17 @@ Card fields beyond identity are progressively included based on the detail
 level:
 
 - `minimal` — returns only the `symbol` and `provenance` fields.
-- `signature` — adds the `signature` block (for callable symbols)
-  exposing the callable display string, parameters, and return type.
-  Non-callable symbols (classes, variables, constants) may omit `signature` or
-  structure it differently.
-- `structure` (default) — further adds `doc`, `structure`, and basic
-  `metrics`. May include `attachments`.
-- `semantic` — attempts LSP enrichment via `textDocument/hover`. When
-  the language server is available and supports hover, the card's `lsp` field
-  is populated with hover documentation, type information, and deprecation
-  status, and provenance includes `"lsp_hover"`. When LSP is unavailable, the
-  card degrades to a Tree-sitter-only extraction with provenance
+- `signature` — adds the `signature` block (for callable symbols) exposing the
+  callable display string, parameters, and return type. Non-callable symbols
+  (classes, variables, constants) may omit `signature` or structure it
+  differently.
+- `structure` (default) — further adds `doc`, `structure`, and basic `metrics`.
+  May include `attachments`.
+- `semantic` — attempts LSP enrichment via `textDocument/hover`. When the
+  language server is available and supports hover, the card's `lsp` field is
+  populated with hover documentation, type information, and deprecation status,
+  and provenance includes `"lsp_hover"`. When LSP is unavailable, the card
+  degrades to a Tree-sitter-only extraction with provenance
   `"tree_sitter_degraded_semantic"`.
 - `full` — currently degrades to a Tree-sitter-only card with explicit
   provenance markers; dependency edges and fan-in/out metrics are not yet
@@ -757,35 +751,34 @@ weaver observe graph-slice --uri <URI> --position <LINE:COL> [OPTIONS]
 
 Arguments:
 
-- `--uri` (required) — file URI of the source file containing the
-  root symbol. Must start with `file://`.
-- `--position` (required) — 1-indexed `LINE:COL` position within the
-  root symbol.
+- `--uri` (required) — file URI of the source file containing the root symbol.
+  Must start with `file://`.
+- `--position` (required) — 1-indexed `LINE:COL` position within the root
+  symbol.
 - `--depth` (optional) — maximum traversal depth. Default: `2`.
-- `--direction` (optional) — traversal direction. One of `in`, `out`,
-  or `both` (default).
-- `--edge-types` (optional) — comma-separated list of edge types to
-  follow. Any combination of `call`, `import`, `config`. Default: all three.
-- `--min-confidence` (optional) — minimum edge confidence threshold
-  between `0.0` and `1.0`. Default: `0.5`.
-- `--max-cards` (optional) — maximum number of cards in the budget.
-  Default: `30`.
-- `--max-edges` (optional) — maximum number of edges in the budget.
-  Default: `200`.
-- `--max-estimated-tokens` (optional) — maximum estimated token count
-  in the budget. Default: `4000`.
-- `--entry-detail` (optional) — detail level for the entry card. One
-  of `minimal`, `signature`, `structure` (default), `semantic`, or `full`.
-- `--node-detail` (optional) — detail level for neighbouring node
-  cards. One of `minimal` (default), `signature`, `structure`, `semantic`, or
-  `full`.
+- `--direction` (optional) — traversal direction. One of `in`, `out`, or `both`
+  (default).
+- `--edge-types` (optional) — comma-separated list of edge types to follow. Any
+  combination of `call`, `import`, `config`. Default: all three.
+- `--min-confidence` (optional) — minimum edge confidence threshold between
+  `0.0` and `1.0`. Default: `0.5`.
+- `--max-cards` (optional) — maximum number of cards in the budget. Default:
+  `30`.
+- `--max-edges` (optional) — maximum number of edges in the budget. Default:
+  `200`.
+- `--max-estimated-tokens` (optional) — maximum estimated token count in the
+  budget. Default: `4000`.
+- `--entry-detail` (optional) — detail level for the entry card. One of
+  `minimal`, `signature`, `structure` (default), `semantic`, or `full`.
+- `--node-detail` (optional) — detail level for neighbouring node cards. One of
+  `minimal` (default), `signature`, `structure`, `semantic`, or `full`.
 
 Response:
 
 The response is a discriminated-union JSON envelope keyed on the `"status"`
-field. When `"status"` is `"refusal"`, the envelope carries a structured
-refusal explaining why a slice could not be produced. When `"status"` is
-`"success"`, the envelope contains the graph slice.
+field. When `"status"` is `"refusal"`, the envelope carries a structured refusal
+explaining why a slice could not be produced. When `"status"` is `"success"`,
+the envelope contains the graph slice.
 
 When the operation cannot produce a slice, the status is `"refusal"`:
 
@@ -953,12 +946,12 @@ JSON payload:
 {"status":"ok","files_written":1,"files_deleted":0}
 ```
 
-Failures return structured error envelopes on stderr and a non-zero exit
-status. Verification failures are rendered with the same human-readable output
-as other `act` commands when `--output human` is selected.
+Failures return structured error envelopes on stderr and a non-zero exit status.
+Verification failures are rendered with the same human-readable output as other
+`act` commands when `--output human` is selected.
 
-The daemon rejects JSONL request lines larger than 1 MiB, so large patch
-streams should be split into multiple `act apply-patch` invocations.
+The daemon rejects JSONL request lines larger than 1 MiB, so large patch streams
+should be split into multiple `act apply-patch` invocations.
 
 #### act apply-rewrite
 
@@ -1004,25 +997,25 @@ Table: act refactor command-line flags
 | `KEY=VALUE`     | Extra key-value arguments forwarded to the plugin.                                                                                                                              |
 
 The plugin receives the file content in-band as part of the JSONL request and
-does not need filesystem access. The daemon validates the resulting diff
-through both the syntactic (Tree-sitter) and semantic (LSP) locks before
-writing to disk. A plugin response that claims success but does not carry diff
-output is refused as a failure: Weaver exits with status `1`, prints
+does not need filesystem access. The daemon validates the resulting diff through
+both the syntactic (Tree-sitter) and semantic (LSP) locks before writing to
+disk. A plugin response that claims success but does not carry diff output is
+refused as a failure: Weaver exits with status `1`, prints
 `act refactor failed: plugin succeeded but did not return diff output`, and
 leaves the filesystem unchanged.
 
 For the built-in actuators, `rename` requires `offset=<BYTE_OFFSET>` and
-`new_name=<IDENTIFIER>` in the trailing `KEY=VALUE` arguments. When
-`--provider` is omitted, `weaverd` infers the language from `--file`, resolves
-the `rename-symbol` capability to the matching registered plugin for that
-language, and refuses deterministically when the language is unsupported or an
-explicit provider conflicts with the inferred language.
+`new_name=<IDENTIFIER>` in the trailing `KEY=VALUE` arguments. When `--provider`
+is omitted, `weaverd` infers the language from `--file`, resolves the
+`rename-symbol` capability to the matching registered plugin for that language,
+and refuses deterministically when the language is unsupported or an explicit
+provider conflicts with the inferred language.
 
 ### Parameter semantics and valid values
 
 The `act refactor` handler accepts `--refactoring` and `--file`, honours an
-optional `--provider` override, and forwards any additional `KEY=VALUE` pairs
-to the selected plugin.
+optional `--provider` override, and forwards any additional `KEY=VALUE` pairs to
+the selected plugin.
 
 Table: act refactor parameter semantics and validation
 
@@ -1043,24 +1036,24 @@ target symbol.
 Both examples follow the same execution pipeline:
 
 1. `weaverd` parses `--provider`, `--refactoring`, and `--file`.
-2. It maps `rename` to `rename-symbol`, infers the target language from the
+1. It maps `rename` to `rename-symbol`, infers the target language from the
    path, and resolves the provider automatically or validates the explicit
    override.
-3. It emits a structured `CapabilityResolution` record describing that
-   routing decision.
-4. The file content is read from the workspace and sent to the plugin in-band.
-5. The plugin executes `rename-symbol` using `position` and `new_name`.
-6. The plugin returns a unified diff for the modified file.
-7. Weaver validates the diff via the Double-Lock safety harness (syntax then
+1. It emits a structured `CapabilityResolution` record describing that routing
+   decision.
+1. The file content is read from the workspace and sent to the plugin in-band.
+1. The plugin executes `rename-symbol` using `position` and `new_name`.
+1. The plugin returns a unified diff for the modified file.
+1. Weaver validates the diff via the Double-Lock safety harness (syntax then
    semantic checks).
-8. If validation passes, Weaver writes the file atomically and returns:
+1. If validation passes, Weaver writes the file atomically and returns:
    `{"files_deleted":0,"files_written":1,"status":"ok"}`.
 
 When validation fails, parameters are invalid, or the plugin reports an error,
-the command exits non-zero and leaves the filesystem unchanged.
-A plugin response that reports success without a `Diff` payload is treated the
-same way: Weaver refuses the response, exits with status `1`, and does not
-touch the filesystem.
+the command exits non-zero and leaves the filesystem unchanged. A plugin
+response that reports success without a `Diff` payload is treated the same way:
+Weaver refuses the response, exits with status `1`, and does not touch the
+filesystem.
 
 Worked examples:
 
@@ -1160,10 +1153,9 @@ Worked examples:
 
 The daemon ships with default actuator registrations:
 
-- `rope` for Python
-  (`timeout_secs = 30`, `capabilities = ["rename-symbol"]`)
-- `rust-analyzer` for Rust
-  (`timeout_secs = 60`, `capabilities = ["rename-symbol"]`)
+- `rope` for Python (`timeout_secs = 30`, `capabilities = ["rename-symbol"]`)
+- `rust-analyzer` for Rust (`timeout_secs = 60`,
+  `capabilities = ["rename-symbol"]`)
 
 By default, it expects plugin executables at:
 
@@ -1230,12 +1222,12 @@ standard I/O:
 
 1. The broker writes one JSONL request line to the plugin's stdin and closes
    stdin.
-2. The plugin writes one JSONL response line to stdout and exits.
-3. Plugin stderr is captured for diagnostic logging but is not part of the
+1. The plugin writes one JSONL response line to stdout and exits.
+1. Plugin stderr is captured for diagnostic logging but is not part of the
    protocol.
 
-File content is passed in-band as part of the request body, so sandboxed
-plugins do not need filesystem access.
+File content is passed in-band as part of the request body, so sandboxed plugins
+do not need filesystem access.
 
 ### Plugin registry
 
@@ -1255,8 +1247,8 @@ For the current actuator rollout, `weaverd` registers:
   - kind: `actuator`
   - language: `rust`
   - capabilities: `["rename-symbol"]`
-  - executable: `/usr/bin/weaver-plugin-rust-analyzer`
-    (or `WEAVER_RUST_ANALYZER_PLUGIN_PATH`)
+  - executable: `/usr/bin/weaver-plugin-rust-analyzer` (or
+    `WEAVER_RUST_ANALYZER_PLUGIN_PATH`)
   - timeout: `60s`
 
 ### Plugin capabilities
@@ -1295,10 +1287,10 @@ Table: Required fields for `rename-symbol` requests.
 | `position` | string | Position of the symbol as a UTF-8 byte offset.   |
 | `new_name` | string | The new name for the symbol (must be non-empty). |
 
-Successful responses must contain a `Diff` output with a unified diff patch.
-If a plugin reports success with any other output shape, Weaver refuses the
-response, exits with status `1`, and makes no filesystem changes.
-Failed responses may include diagnostics with an optional `reason_code` field.
+Successful responses must contain a `Diff` output with a unified diff patch. If
+a plugin reports success with any other output shape, Weaver refuses the
+response, exits with status `1`, and makes no filesystem changes. Failed
+responses may include diagnostics with an optional `reason_code` field.
 
 #### Contract versioning
 
@@ -1353,11 +1345,11 @@ provider/language mismatches.
 
 ### Safety harness integration
 
-Actuator plugin output (unified diffs) flows through the same Double-Lock
-safety harness used by `act apply-patch`. Changes are validated by both the
-syntactic (Tree-sitter) and semantic (LSP) locks before any filesystem write is
-committed. If verification fails, the filesystem is left untouched and a
-structured error is returned to the caller.
+Actuator plugin output (unified diffs) flows through the same Double-Lock safety
+harness used by `act apply-patch`. Changes are validated by both the syntactic
+(Tree-sitter) and semantic (LSP) locks before any filesystem write is committed.
+If verification fails, the filesystem is left untouched and a structured error
+is returned to the caller.
 
 ## Language server capability detection
 
@@ -1367,11 +1359,10 @@ TypeScript and records which core requests each server advertises:
 hierarchy (`textDocument/prepareCallHierarchy` plus incoming/outgoing calls).
 These advertised capabilities are merged with any overrides provided via
 `capability_overrides` in `weaver-config`. `force` directives allow a request
-even when the server claims not to support it, while `deny` directives block
-the request regardless of the server report. When a request is rejected, the
-error explains whether the feature was disabled by configuration or simply
-absent from the server so operators and agents can adjust their plans without
-guesswork.
+even when the server claims not to support it, while `deny` directives block the
+request regardless of the server report. When a request is rejected, the error
+explains whether the feature was disabled by configuration or simply absent from
+the server so operators and agents can adjust their plans without guesswork.
 
 ### Process-based language server adapters
 
@@ -1418,7 +1409,7 @@ The harness validates proposed edits in two sequential phases:
    semicolons, or malformed declarations are caught at this stage. Files that
    fail parsing are rejected immediately, and the filesystem remains untouched.
 
-2. **Semantic Lock**: If the syntactic lock passes, the modified content is
+1. **Semantic Lock**: If the syntactic lock passes, the modified content is
    submitted to the configured language server. The daemon requests fresh
    diagnostics and compares them against the pre-edit baseline. Any new errors
    or high-severity warnings cause the semantic lock to fail. Only when both
@@ -1428,8 +1419,8 @@ The harness validates proposed edits in two sequential phases:
 
 Edits are first applied to in-memory copies of the affected files. The original
 content is preserved until both verification phases succeed. This allows the
-harness to reject problematic changes without leaving partially written files
-on disk.
+harness to reject problematic changes without leaving partially written files on
+disk.
 
 ### Document sync notifications
 
@@ -1468,8 +1459,8 @@ the lock parses the content and inspects the resulting syntax tree for ERROR
 nodes. Files containing structural errors—such as unbalanced braces, missing
 semicolons, or malformed declarations—are rejected before the semantic lock
 runs. Files with extensions not recognised by any configured parser are skipped
-(pass through) to avoid blocking edits to configuration files, documentation,
-or other non-code artefacts.
+(pass through) to avoid blocking edits to configuration files, documentation, or
+other non-code artefacts.
 
 The validation reports each failure with:
 
@@ -1498,8 +1489,8 @@ workspace crates:
 - **`sempai_core`** — canonical data model including language identifiers
   (`Language`), source spans (`Span`, `LineCol`), match results (`Match`),
   capture bindings (`CaptureValue`, `CapturedNode`), structured diagnostics
-  (`DiagnosticReport`, `Diagnostic`, `DiagnosticCode`), and engine
-  configuration (`EngineConfig`).
+  (`DiagnosticReport`, `Diagnostic`, `DiagnosticCode`), and engine configuration
+  (`EngineConfig`).
 - **`sempai_yaml`** — Semgrep-compatible YAML parser built on `saphyr` and
   `serde-saphyr`, exposing schema-aligned rule models for legacy and v2 search
   principals plus parser-time handling for extract, join, and taint rules.
@@ -1514,11 +1505,11 @@ The `Engine` struct exposes three methods for query compilation and execution:
 - `execute(plan, uri, source)` — executes a compiled plan against a source
   snapshot.
 
-`compile_yaml(yaml)` now performs real YAML parsing plus a mode-aware
-validation pass. Malformed YAML returns `E_SEMPAI_YAML_PARSE`, and schema-shape
-failures such as missing required rule keys return `E_SEMPAI_SCHEMA_INVALID`,
-both using the shared structured diagnostic payload with `primary_span`
-locations when available.
+`compile_yaml(yaml)` now performs real YAML parsing plus a mode-aware validation
+pass. Malformed YAML returns `E_SEMPAI_YAML_PARSE`, and schema-shape failures
+such as missing required rule keys return `E_SEMPAI_SCHEMA_INVALID`, both using
+the shared structured diagnostic payload with `primary_span` locations when
+available.
 
 After parsing succeeds, `compile_yaml(yaml)` now distinguishes parseable rules
 from executable ones:

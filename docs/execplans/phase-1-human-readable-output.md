@@ -20,15 +20,15 @@ blocks while keeping the JSONL protocol payloads intact for machine use.
 1. **CLI-side rendering**: Keep `weaverd` JSONL payloads unchanged and perform
    human-readable rendering in `weaver-cli`, preserving the canonical transport
    while allowing richer presentation.
-2. **Output format selection**: Add an `--output` flag with `auto`, `human`, and
+1. **Output format selection**: Add an `--output` flag with `auto`, `human`, and
    `json` values. `auto` defaults to `human` when stdout is a TTY and `json`
    when stdout is redirected, ensuring machine pipelines remain stable.
-3. **Miette-style renderer configuration**: Emit ASCII-only context blocks
+1. **Miette-style renderer configuration**: Emit ASCII-only context blocks
    modelled on `miette` output to match the design doc examples.
-4. **Lightweight response models**: Define CLI-side response structs mirroring
+1. **Lightweight response models**: Define CLI-side response structs mirroring
    `docs/users-guide.md` JSON shapes for definitions, references, diagnostics,
    and safety harness failures to avoid cross-crate coupling.
-5. **Source grouping and fallback**: Group results by file with one header per
+1. **Source grouping and fallback**: Group results by file with one header per
    file and a context block per location. When source content is unavailable,
    emit a fallback message that preserves the path and range with the reason.
 
@@ -69,8 +69,8 @@ crates/weaver-cli/src/
 
 - Convert URI + line/column (1-indexed) to byte offsets, handling multi-line
   spans and range end defaults for point locations.
-- Render ASCII context blocks with caret spans and group multiple spans per
-  file under a shared header.
+- Render ASCII context blocks with caret spans and group multiple spans per file
+  under a shared header.
 - Provide fallback rendering for unreadable or missing files, including the
   reason (e.g., "file missing" or "invalid URI").
 
@@ -86,8 +86,8 @@ crates/weaver-cli/src/
 ### Step 6: Add unit tests
 
 - Unit tests for span calculation, multi-line ranges, and file grouping.
-- Unit tests for fallback messaging when source content is missing or the URI
-  is invalid.
+- Unit tests for fallback messaging when source content is missing or the URI is
+  invalid.
 - Unit tests validating JSON parsing for each response model.
 
 ### Step 7: Add behavioural tests (rstest-bdd v0.4.0)
@@ -110,8 +110,8 @@ crates/weaver-cli/src/
 
 - Record the output-format decision and renderer behaviour in
   `docs/weaver-design.md` (section 2.1.4).
-- Update `docs/users-guide.md` output format section to describe `--output`,
-  the TTY-driven default, and the new context block format.
+- Update `docs/users-guide.md` output format section to describe `--output`, the
+  TTY-driven default, and the new context block format.
 
 ### Step 10: Mark roadmap entry done
 

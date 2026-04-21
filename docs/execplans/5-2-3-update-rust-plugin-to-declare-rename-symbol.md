@@ -1,9 +1,8 @@
 # Update weaver-plugin-rust-analyzer manifest and handshake for `rename-symbol`
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -18,9 +17,9 @@ Roadmap item 5.2.3 migrates the Rust actuator plugin from its legacy
 provider-specific rename request shape to the shared `rename-symbol` capability
 contract introduced in 5.2.1. After this change, the
 `weaver-plugin-rust-analyzer` manifest declares `CapabilityId::RenameSymbol`,
-the plugin accepts contract-conforming request payloads using `uri`,
-`position`, and `new_name`, and successful responses still return diff output
-that flows through the existing Double-Lock safety harness.
+the plugin accepts contract-conforming request payloads using `uri`, `position`,
+and `new_name`, and successful responses still return diff output that flows
+through the existing Double-Lock safety harness.
 
 The user-visible command-line interface (CLI) stays the same:
 
@@ -40,8 +39,8 @@ contract already used by the Python rope plugin.
 
 Observable success for this roadmap item:
 
-- `crates/weaverd/src/dispatch/act/refactor/mod.rs` registers the
-  rust-analyzer manifest with `CapabilityId::RenameSymbol`.
+- `crates/weaverd/src/dispatch/act/refactor/mod.rs` registers the rust-analyzer
+  manifest with `CapabilityId::RenameSymbol`.
 - `crates/weaver-plugin-rust-analyzer/src/lib.rs` accepts only the
   `rename-symbol` operation and validates the `uri`, `position`, and `new_name`
   request arguments defined by
@@ -51,38 +50,37 @@ Observable success for this roadmap item:
   class is known.
 - Unit tests and `rstest-bdd` v0.5.0 behaviour-driven development (BDD) tests
   cover happy paths, unhappy paths, and edge cases for the contract migration.
-- `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-  reflect the shipped behaviour.
+- `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md` reflect
+  the shipped behaviour.
 - `make fmt`, `make markdownlint`, `make check-fmt`, `make lint`, and
   `make test` all pass.
 
 ## Constraints
 
 1. The `rename-symbol` contract from 5.2.1 is already complete. Do not modify
-   `crates/weaver-plugins/` unless an implementation blocker proves the
-   contract is insufficient. That is an escalation event, not an autonomous
-   change.
-2. Keep the CLI surface stable. Users still invoke
+   `crates/weaver-plugins/` unless an implementation blocker proves the contract
+   is insufficient. That is an escalation event, not an autonomous change.
+1. Keep the CLI surface stable. Users still invoke
    `weaver act refactor --provider rust-analyzer --refactoring rename ...`. The
    daemon performs the internal mapping to `rename-symbol`.
-3. Keep all execution synchronous. Do not introduce async runtimes, async
+1. Keep all execution synchronous. Do not introduce async runtimes, async
    traits, or background tasks.
-4. Preserve the existing Double-Lock path. Successful Rust rename edits must
+1. Preserve the existing Double-Lock path. Successful Rust rename edits must
    still return unified diff output that is forwarded into `act apply-patch`.
-5. Respect the repository-wide 400-line file limit. Current hotspots:
+1. Respect the repository-wide 400-line file limit. Current hotspots:
    `crates/weaver-plugin-rust-analyzer/src/lib.rs` is 358 lines and
    `crates/weaverd/src/dispatch/act/refactor/mod.rs` is 399 lines.
-6. All touched Rust modules must retain module-level `//!` documentation, and
+1. All touched Rust modules must retain module-level `//!` documentation, and
    all public items must remain documented.
-7. Behaviour tests must use `rstest-bdd` v0.5.0 patterns already used in this
+1. Behaviour tests must use `rstest-bdd` v0.5.0 patterns already used in this
    repository, including a fixture parameter named exactly `world`.
-8. Lint suppressions are a last resort. If unavoidable, use tightly scoped
+1. Lint suppressions are a last resort. If unavoidable, use tightly scoped
    `#[expect(..., reason = "...")]`; do not add `#[allow(...)]`.
-9. Comments and documentation must use en-GB-oxendict spelling.
-10. Use existing workspace dependencies only. Adding a new crate dependency is
-    out of scope for this item.
-11. The plan must record any new design decisions in `docs/weaver-design.md`
-    as part of implementation, not just in this ExecPlan.
+1. Comments and documentation must use en-GB-oxendict spelling.
+1. Use existing workspace dependencies only. Adding a new crate dependency is
+   out of scope for this item.
+1. The plan must record any new design decisions in `docs/weaver-design.md` as
+   part of implementation, not just in this ExecPlan.
 
 ## Tolerances (exception triggers)
 
@@ -106,8 +104,8 @@ Observable success for this roadmap item:
 ## Risks
 
 - Risk: The rust-analyzer plugin currently accepts `"rename"` with `offset`
-  rather than `"rename-symbol"` with `position`. This migration can easily
-  leave unit and BDD fixtures half-updated. Severity: high Likelihood: high
+  rather than `"rename-symbol"` with `position`. This migration can easily leave
+  unit and BDD fixtures half-updated. Severity: high Likelihood: high
   Mitigation: update plugin request builders, unit tests, and feature steps in
   the same commit slice before changing dispatch assertions.
 
@@ -132,30 +130,30 @@ Observable success for this roadmap item:
 
 ## Progress
 
-- [x] (2026-03-06) Reviewed `AGENTS.md`, the roadmap entry, the execplans
-  skill, the prior 5.2.1 and 5.2.2 ExecPlans, and project memory notes.
-- [x] (2026-03-06) Inspected the current Rust plugin and daemon refactor
-  handler to identify the present contract mismatch and line-budget pressure.
+- [x] (2026-03-06) Reviewed `AGENTS.md`, the roadmap entry, the execplans skill,
+  the prior 5.2.1 and 5.2.2 ExecPlans, and project memory notes.
+- [x] (2026-03-06) Inspected the current Rust plugin and daemon refactor handler
+  to identify the present contract mismatch and line-budget pressure.
 - [x] (2026-03-06) Drafted this ExecPlan.
 - [x] (2026-03-07) Obtained approval for the ExecPlan.
 - [x] (2026-03-07) Added unit and behavioural tests that assert the
   `rename-symbol` request/response contract for the rust-analyzer plugin.
-- [x] (2026-03-07) Updated the rust-analyzer plugin runtime handshake and
-  error mapping.
+- [x] (2026-03-07) Updated the rust-analyzer plugin runtime handshake and error
+  mapping.
 - [x] (2026-03-07) Updated daemon manifest registration and request-capture
   tests proving Rust rename requests are capability-routed.
-- [x] (2026-03-07) Updated `docs/weaver-design.md`, `docs/users-guide.md`,
-  and `docs/roadmap.md`.
+- [x] (2026-03-07) Updated `docs/weaver-design.md`, `docs/users-guide.md`, and
+  `docs/roadmap.md`.
 - [x] (2026-03-07) Ran `make fmt`, `make markdownlint`, `make check-fmt`,
   `make lint`, and `make test`, each via `tee` with `set -o pipefail`.
 
 ## Surprises & Discoveries
 
-- Discovery: `crates/weaverd/src/dispatch/act/refactor/mod.rs` already maps
-  CLI `--refactoring rename` to internal operation `"rename-symbol"` and
-  renames `offset` to `position`. The remaining 5.2.3 gap is that the
-  rust-analyzer plugin itself still expects the old request shape and the
-  rust-analyzer manifest is not yet declared with `CapabilityId::RenameSymbol`.
+- Discovery: `crates/weaverd/src/dispatch/act/refactor/mod.rs` already maps CLI
+  `--refactoring rename` to internal operation `"rename-symbol"` and renames
+  `offset` to `position`. The remaining 5.2.3 gap is that the rust-analyzer
+  plugin itself still expects the old request shape and the rust-analyzer
+  manifest is not yet declared with `CapabilityId::RenameSymbol`.
 
 - Discovery: the rust-analyzer plugin crate currently has no manifest code of
   its own. In this repository, “manifest and runtime handshake” means the
@@ -164,9 +162,8 @@ Observable success for this roadmap item:
 
 - Discovery: extracting refactor-plugin manifest builders into a dedicated
   `manifests.rs` module dropped
-  `crates/weaverd/src/dispatch/act/refactor/mod.rs` from 399 lines to 381
-  lines, creating room for manifest-specific tests without breaking the
-  400-line cap.
+  `crates/weaverd/src/dispatch/act/refactor/mod.rs` from 399 lines to 381 lines,
+  creating room for manifest-specific tests without breaking the 400-line cap.
 
 - Discovery: the pre-existing workspace test hang in
   `tests::unit::auto_start::auto_start_succeeds_and_proceeds` was caused by a
@@ -183,14 +180,14 @@ Observable success for this roadmap item:
   already documented and exercised by tests. Date: 2026-03-06.
 
 - Decision: do not plan changes to `weaver --capabilities` for this item.
-  Rationale: the current top-level capability probe covers negotiated daemon
-  and LSP capability state, while roadmap 5.7.x is the explicit home for
+  Rationale: the current top-level capability probe covers negotiated daemon and
+  LSP capability state, while roadmap 5.7.x is the explicit home for
   plugin-capability discoverability. Date: 2026-03-06.
 
-- Decision: prefer small helper extraction over in-place expansion if
-  `weaverd` hits the 400-line limit. Rationale: `mod.rs` has only one line of
-  headroom, so even documenting the manifest registration logic may force a
-  split. Date: 2026-03-06.
+- Decision: prefer small helper extraction over in-place expansion if `weaverd`
+  hits the 400-line limit. Rationale: `mod.rs` has only one line of headroom, so
+  even documenting the manifest registration logic may force a split. Date:
+  2026-03-06.
 
 - Decision: make `PluginFailure` the rust-analyzer plugin's internal error
   transport and attach `ReasonCode::OperationNotSupported`,
@@ -261,8 +258,8 @@ The current implementation is split across two main areas.
 
 `crates/weaver-plugin-rust-analyzer/` is the one-shot actuator plugin. It reads
 one `PluginRequest` from stdin, executes a rename through the
-`RustAnalyzerAdapter` trait, and writes one `PluginResponse` to stdout. Today
-it still matches only `request.operation() == "rename"` and parses
+`RustAnalyzerAdapter` trait, and writes one `PluginResponse` to stdout. Today it
+still matches only `request.operation() == "rename"` and parses
 `offset`/`new_name` from the request arguments. That behaviour lives primarily
 in `crates/weaver-plugin-rust-analyzer/src/lib.rs`, with unit coverage in
 `crates/weaver-plugin-rust-analyzer/src/tests/mod.rs` and behavioural coverage
@@ -278,8 +275,8 @@ manifest. Tests for the request-building path live in
 `crates/weaverd/src/dispatch/act/refactor/tests.rs`.
 
 The shared contract defined by 5.2.1 lives in
-`crates/weaver-plugins/src/capability/rename_symbol.rs`. The important parts
-for this plan are:
+`crates/weaver-plugins/src/capability/rename_symbol.rs`. The important parts for
+this plan are:
 
 - operation name: `"rename-symbol"`
 - required arguments: `uri`, `position`, `new_name`
@@ -307,13 +304,13 @@ contract vocabulary.
 Update the behavioural tests in
 `crates/weaver-plugin-rust-analyzer/src/tests/behaviour.rs` and
 `crates/weaver-plugin-rust-analyzer/tests/features/rust_analyzer_plugin.feature`
- to describe the capability contract explicitly. The scenarios should prove:
+to describe the capability contract explicitly. The scenarios should prove:
 
 1. the plugin accepts a valid `rename-symbol` request and returns diff output;
-2. the plugin rejects missing required arguments with failure diagnostics;
-3. the plugin rejects unsupported operations with a stable failure shape;
-4. adapter failures are surfaced without crashing the dispatcher;
-5. unchanged content is treated as failure.
+1. the plugin rejects missing required arguments with failure diagnostics;
+1. the plugin rejects unsupported operations with a stable failure shape;
+1. adapter failures are surfaced without crashing the dispatcher;
+1. unchanged content is treated as failure.
 
 If line pressure grows in `src/tests/mod.rs`, extract request-building helpers
 into a small test-only support submodule rather than making the file sprawl.
@@ -324,9 +321,9 @@ Modify `crates/weaver-plugin-rust-analyzer/src/lib.rs` so `execute_request()`
 recognizes `"rename-symbol"` instead of `"rename"`. Update argument parsing to
 require `uri`, `position`, and `new_name`, with `position` parsed as the UTF-8
 byte offset used by the existing adapter. The in-band file payload remains
-authoritative for file content; `uri` is used to satisfy the contract and
-should be checked against the single file payload path so the request cannot
-silently describe one file while carrying another.
+authoritative for file content; `uri` is used to satisfy the contract and should
+be checked against the single file payload path so the request cannot silently
+describe one file while carrying another.
 
 Introduce a small failure carrier if needed, similar to the 5.2.2 rope
 migration, so deterministic failures can attach `ReasonCode` values without
@@ -340,9 +337,9 @@ Opaque adapter errors may continue to surface as human-readable messages if no
 stable reason code is justified. Keep the final success path as
 `PluginResponse::success(PluginOutput::Diff { ... })`.
 
-If `src/lib.rs` approaches 400 lines, extract the contract argument parsing
-into a dedicated `arguments.rs` helper module with its own `//!` comment and
-unit tests, mirroring the rope migration.
+If `src/lib.rs` approaches 400 lines, extract the contract argument parsing into
+a dedicated `arguments.rs` helper module with its own `//!` comment and unit
+tests, mirroring the rope migration.
 
 ### Stage 3: declare the capability in daemon registration and prove handshake coverage
 
@@ -354,16 +351,15 @@ manifest. Preserve the existing timeout and executable-path behaviour.
 Add or update tests in `crates/weaverd/src/dispatch/act/refactor/tests.rs` to
 prove the Rust path is capability-routed in the sense expected by 5.2.3:
 
-- a captured request for `--provider rust-analyzer --refactoring rename`
-  reaches the runtime as operation `"rename-symbol"`;
+- a captured request for `--provider rust-analyzer --refactoring rename` reaches
+  the runtime as operation `"rename-symbol"`;
 - the runtime request carries `uri`, `position`, and `new_name`;
-- the rust-analyzer manifest constructor includes
-  `CapabilityId::RenameSymbol`.
+- the rust-analyzer manifest constructor includes `CapabilityId::RenameSymbol`.
 
 Because `mod.rs` is already 399 lines, assume a helper extraction may be
 necessary here. The cleanest split is a small sibling module for manifest
-construction or request mapping, leaving `handle()` readable and within the
-line budget.
+construction or request mapping, leaving `handle()` readable and within the line
+budget.
 
 ### Stage 4: update design and user documentation
 
@@ -415,16 +411,16 @@ roadmap item complete until all five commands succeed.
 
 The minimal evidence expected from the implementation is:
 
-1. a unit test in the rust-analyzer plugin crate proving a valid
-   `rename-symbol` request succeeds with diff output;
-2. unit tests proving malformed `position`, missing `uri`, missing
-   `new_name`, unsupported operation, and unchanged output fail with the
-   expected diagnostic shape;
-3. `rstest-bdd` scenarios covering happy and unhappy contract paths using the
+1. a unit test in the rust-analyzer plugin crate proving a valid `rename-symbol`
+   request succeeds with diff output;
+1. unit tests proving malformed `position`, missing `uri`, missing `new_name`,
+   unsupported operation, and unchanged output fail with the expected diagnostic
+   shape;
+1. `rstest-bdd` scenarios covering happy and unhappy contract paths using the
    repository’s mutable-world pattern;
-4. a daemon-side test proving the Rust provider path sends the
-   `rename-symbol` operation and contract fields;
-5. passing `make fmt`, `make markdownlint`, `make check-fmt`, `make lint`, and
+1. a daemon-side test proving the Rust provider path sends the `rename-symbol`
+   operation and contract fields;
+1. passing `make fmt`, `make markdownlint`, `make check-fmt`, `make lint`, and
    `make test`.
 
 The feature is complete only when those checks pass and the roadmap entry is

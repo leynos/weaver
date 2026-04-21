@@ -48,13 +48,13 @@ ortho_config_macros = "0.6.0"
 
 1. Change every `ortho_config` dependency (workspace metadata, application
    crates, and supporting tools) to `"0.6.0"`. This keeps the runtime crate and
-   the derive macro in lockstep, ensuring generated code matches the new
-   library behaviour.
-2. Retain any optional features (such as `json5`, `yaml`, or `toml`) on the
-   main `ortho_config` dependency. The macro crate now inherits those flags,
-   removing the need for duplicate feature declarations on
+   the derive macro in lockstep, ensuring generated code matches the new library
+   behaviour.
+1. Retain any optional features (such as `json5`, `yaml`, or `toml`) on the main
+   `ortho_config` dependency. The macro crate now inherits those flags, removing
+   the need for duplicate feature declarations on
    `ortho_config_macros`.[^forwarded-features]
-3. Rebuild the project to confirm the upgraded macro compiles cleanly before
+1. Rebuild the project to confirm the upgraded macro compiles cleanly before
    proceeding with behavioural changes.
 
 The `hello_world` example continues to expose feature toggles via the parent
@@ -162,16 +162,16 @@ match config {
 ```
 
 Call sites that previously matched on `Ok(None)` to continue running with
-defaults should be audited. After upgrading, consider whether those branches
-now ought to abort with an error, so broken configuration files do not pass
+defaults should be audited. After upgrading, consider whether those branches now
+ought to abort with an error, so broken configuration files do not pass
 unnoticed.
 
 ## 5. Switch to the new stricter YAML provider
 
 The legacy `serde_yaml` integration has been replaced with a new `SaphyrYaml`
-provider backed by `serde-saphyr`. The parser enforces YAML 1.2 rules, so
-tokens like `yes` remain strings unless quoted and duplicate mapping keys
-produce structured errors.[^saphyr]
+provider backed by `serde-saphyr`. The parser enforces YAML 1.2 rules, so tokens
+like `yes` remain strings unless quoted and duplicate mapping keys produce
+structured errors.[^saphyr]
 
 If an application reads YAML, enable the `yaml` feature on `ortho_config` and
 switch to `SaphyrYaml::file` (or `::string` for inline fixtures) wherever the
@@ -230,45 +230,45 @@ The Weaver workspace now follows this migration guide:
   reproducible builds pick up the stricter discovery semantics.
 - `weaver-config::Config` relies on the `#[ortho_config(discovery(...))]`
   attribute, so no bespoke builders remain to audit for the new declarative API.
-- Both `weaver-cli` and `weaverd` bubble the aggregated `OrthoError` returned
-  by `Config::load`/`load_from_iter`, meaning broken configuration files now
-  stop launches immediately instead of falling back to defaults.
+- Both `weaver-cli` and `weaverd` bubble the aggregated `OrthoError` returned by
+  `Config::load`/`load_from_iter`, meaning broken configuration files now stop
+  launches immediately instead of falling back to defaults.
 - Operator-facing documentation (`docs/weaver-design.md` and
-  `docs/users-guide.md`) now calls out the fail-fast behaviour so users know
-  how to remedy invalid configuration files.
+  `docs/users-guide.md`) now calls out the fail-fast behaviour so users know how
+  to remedy invalid configuration files.
 
-[^forwarded-features]: Optional parser features on `ortho_config` automatically
-enable matching flags on the macro crate, keeping generated code in sync with
-runtime capabilities.【F:ortho_config/Cargo.toml†L41-L45】
-[^hello-world-cargo]: The `hello_world` crate forwards its parser feature flags
-to `ortho_config`, so enabling a format once covers both runtime and macro
-usage.【F:examples/hello_world/Cargo.toml†L23-L33】
-[^reexports]: `ortho_config` re-exports Figment, optional parser crates, and
-supporting utilities for consumers, eliminating redundant direct
-dependencies.【F:ortho_config/src/lib.rs†L11-L61】
-[^hello-world-figment]: The `hello_world` example pulls Figment providers from
-the `ortho_config` namespace when layering configuration data.
+\[^forwarded-features\]: Optional parser features on `ortho_config`
+automatically enable matching flags on the macro crate, keeping generated code
+in sync with runtime capabilities.【F:ortho_config/Cargo.toml†L41-L45】
+\[^hello-world-cargo\]: The `hello_world` crate forwards its parser feature
+flags to `ortho_config`, so enabling a format once covers both runtime and macro
+usage.【F:examples/hello_world/Cargo.toml†L23-L33】 \[^reexports\]: `ortho_config`
+re-exports Figment, optional parser crates, and supporting utilities for
+consumers, eliminating redundant direct
+dependencies.【F:ortho_config/src/lib.rs†L11-L61】 \[^hello-world-figment\]: The
+`hello_world` example pulls Figment providers from the `ortho_config` namespace
+when layering configuration data.
 【F:examples/hello_world/src/cli/config_loading.rs†L1-L60】 It reuses the same
 imports in tests to assert behaviour under YAML overrides.
 【F:examples/hello_world/src/cli/tests/overrides.rs†L125-L155】
-[^discovery-attr]: The derive macro accepts a `discovery(...)` attribute on
+\[^discovery-attr\]: The derive macro accepts a `discovery(...)` attribute on
 config structs, enabling declarative discovery
 policies.【F:examples/hello_world/src/cli/mod.rs†L174-L211】
-[^hello-world-discovery]: The CLI struct uses the discovery attribute to define
-file names, CLI flags, and environment overrides without manual builder
+\[^hello-world-discovery\]: The CLI struct uses the discovery attribute to
+define file names, CLI flags, and environment overrides without manual builder
 plumbing.【F:examples/hello_world/src/cli/mod.rs†L174-L211】
-[^discovery-errors]: `ConfigDiscovery::load_first` now aggregates discovery
+\[^discovery-errors\]: `ConfigDiscovery::load_first` now aggregates discovery
 errors, returning `Err` whenever every candidate fails but at least one error
 occurred.【F:ortho_config/src/discovery/mod.rs†L305-L318】
-[^hello-world-discover-config]: The shared discovery helper wraps
+\[^hello-world-discover-config\]: The shared discovery helper wraps
 `ConfigDiscovery::load_first` and maps aggregated errors into `HelloWorldError`
-for callers.【F:examples/hello_world/src/cli/discovery.rs†L1-L36】
-[^saphyr]: The `SaphyrYaml` provider reads files with strict YAML 1.2 semantics
-and backs the format-specific branch of `parse_config_by_format`.
+for callers.【F:examples/hello_world/src/cli/discovery.rs†L1-L36】 \[^saphyr\]:
+The `SaphyrYaml` provider reads files with strict YAML 1.2 semantics and backs
+the format-specific branch of `parse_config_by_format`.
 【F:ortho_config/src/file/mod.rs†L34-L86】
-【F:ortho_config/src/file/mod.rs†L253-L296】
-[^hello-world-yaml]: Behavioural tests in `hello_world` create YAML fixtures,
-load them through `ortho_config::load_config_file`, and assert strict parsing
+【F:ortho_config/src/file/mod.rs†L253-L296】 \[^hello-world-yaml\]: Behavioural
+tests in `hello_world` create YAML fixtures, load them through
+`ortho_config::load_config_file`, and assert strict parsing
 behaviour.【F:examples/hello_world/src/cli/tests/overrides.rs†L125-L155】
-[^changelog]: The Unreleased changelog summarises the v0.6.0 additions and
+\[^changelog\]: The Unreleased changelog summarises the v0.6.0 additions and
 behaviour changes discussed in this guide.【F:CHANGELOG.md†L6-L26】

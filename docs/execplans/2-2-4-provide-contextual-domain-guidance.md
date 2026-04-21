@@ -1,9 +1,8 @@
 # 2.2.4 Provide contextual guidance when a domain is supplied without an operation
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -56,8 +55,8 @@ with the operation list and hint adapted to the supplied domain.
   `crates/weaver-cli/src/tests/unit.rs` is 398 lines before this work starts.
 - `crates/weaver-cli/build.rs` includes `src/cli.rs` via
   `#[path = "src/cli.rs"]` for manpage generation. Do not add helper methods to
-  `cli.rs` that are only used at runtime unless they also compile cleanly in
-  the build-script context.
+  `cli.rs` that are only used at runtime unless they also compile cleanly in the
+  build-script context.
 - The current command model deliberately forwards operation arguments verbatim
   after `<domain> <operation>`. Do not restructure the CLI into nested clap
   subcommands as part of this task; operation-specific help belongs to roadmap
@@ -95,8 +94,8 @@ with the operation list and hint adapted to the supplied domain.
 
 - Risk: `lib.rs` has one line of headroom. A naive preflight branch for
   domain-only guidance will violate the repository-wide 400-line rule.
-  Mitigation: move new runtime guidance logic into a dedicated helper module
-  and keep the `lib.rs` call site minimal.
+  Mitigation: move new runtime guidance logic into a dedicated helper module and
+  keep the `lib.rs` call site minimal.
 
 - Risk: the acceptance criteria require a concrete
   `weaver <domain> <operation> --help` hint, but operation-specific help is not
@@ -114,41 +113,40 @@ with the operation list and hint adapted to the supplied domain.
 ## Progress
 
 - [x] (2026-03-10) Read the roadmap entry, UI gap analysis, design/testing
-      references, and the current `weaver-cli` implementation.
-- [x] (2026-03-10) Confirm the current call path:
-      `Cli::try_parse_from(...)` -> bare-invocation shortcut -> config load ->
-      `CommandInvocation::try_from(cli)`, which means missing-operation
-      guidance is not currently emitted before configuration loading.
+  references, and the current `weaver-cli` implementation.
+- [x] (2026-03-10) Confirm the current call path: `Cli::try_parse_from(...)` ->
+  bare-invocation shortcut -> config load -> `CommandInvocation::try_from(cli)`,
+  which means missing-operation guidance is not currently emitted before
+  configuration loading.
 - [x] (2026-03-10) Identify catalogue drift: CLI help omits `observe get-card`
-      while the daemon router advertises it.
+  while the daemon router advertises it.
 - [x] (2026-03-10) Write the initial ExecPlan to
-      `docs/execplans/2-2-4-provide-contextual-domain-guidance.md`.
+  `docs/execplans/2-2-4-provide-contextual-domain-guidance.md`.
 - [x] (2026-03-12) Stage A: established
-      `crates/weaver-cli/src/discoverability.rs` as the canonical client-side
-      domain-operation catalogue and reconciled `observe get-card`.
+  `crates/weaver-cli/src/discoverability.rs` as the canonical client-side
+  domain-operation catalogue and reconciled `observe get-card`.
 - [x] (2026-03-12) Stage B: added a preflight guidance branch in
-      `CliRunner::run_with_handler` that emits contextual guidance before
-      config loading, daemon connection, or auto-start.
+  `CliRunner::run_with_handler` that emits contextual guidance before config
+  loading, daemon connection, or auto-start.
 - [x] (2026-03-12) Stage C: added unit, behavioural, and integration coverage
-      for the new guidance and preserved the complete-command config-failure
-      path.
+  for the new guidance and preserved the complete-command config-failure path.
 - [x] (2026-03-12) Stage D: updated `docs/weaver-design.md`,
-      `docs/users-guide.md`, and marked roadmap item 2.2.4 complete.
+  `docs/users-guide.md`, and marked roadmap item 2.2.4 complete.
 - [x] (2026-03-12) Stage E: passed `make fmt`, `make markdownlint`,
-      `make nixie`, `make check-fmt`, `make lint`, and `make test`.
+  `make nixie`, `make check-fmt`, `make lint`, and `make test`.
 
 ## Surprises & Discoveries
 
 - The client-side help catalogue introduced for roadmap 2.2.2 is not currently
   authoritative. It already drifted from `weaverd` by missing
-  `observe get-card`. This task should not build new runtime behaviour on top
-  of stale data.
+  `observe get-card`. This task should not build new runtime behaviour on top of
+  stale data.
 
-- The current CLI architecture does not validate domain names when the
-  operation is missing. `weaver bogus` still collapses into the generic
-  missing-operation path because `CommandInvocation::try_from` only checks for
-  presence and non-blank values. Unknown-domain validation is intentionally a
-  later roadmap item (2.3.1), so this plan must preserve that boundary.
+- The current CLI architecture does not validate domain names when the operation
+  is missing. `weaver bogus` still collapses into the generic missing-operation
+  path because `CommandInvocation::try_from` only checks for presence and
+  non-blank values. Unknown-domain validation is intentionally a later roadmap
+  item (2.3.1), so this plan must preserve that boundary.
 
 - The hint command required by the roadmap is ahead of the current help model.
   `weaver observe get-definition --help` is still handled by clap's top-level
@@ -161,41 +159,41 @@ with the operation list and hint adapted to the supplied domain.
 
 ## Decision Log
 
-- Decision: add a dedicated client-side guidance module in `weaver-cli`
-  instead of extending `CommandInvocation::try_from`. Rationale:
-  `CommandInvocation` should remain a small data conversion layer. The new
-  behaviour is a preflight UX path that belongs near the runtime boundary, and
-  `lib.rs` does not have room for substantial new logic. Date: 2026-03-10.
+- Decision: add a dedicated client-side guidance module in `weaver-cli` instead
+  of extending `CommandInvocation::try_from`. Rationale: `CommandInvocation`
+  should remain a small data conversion layer. The new behaviour is a preflight
+  UX path that belongs near the runtime boundary, and `lib.rs` does not have
+  room for substantial new logic. Date: 2026-03-10.
 
 - Decision: use a single canonical client-side domain catalogue for both
   top-level help assertions and domain-only guidance, and reconcile it with the
   daemon router before anything else. Rationale: this task already uncovered
-  catalogue drift. Reusing stale or duplicated lists would compound the
-  problem. Date: 2026-03-10.
+  catalogue drift. Reusing stale or duplicated lists would compound the problem.
+  Date: 2026-03-10.
 
-- Decision: only known domains receive contextual guidance in this step.
-  Unknown domains continue to follow the generic missing-operation path until
-  roadmap 2.3.1 adds client-side unknown-domain validation. Rationale: this
-  keeps the scope aligned with the roadmap and avoids mixing two error-policy
-  changes in one feature. Date: 2026-03-10.
+- Decision: only known domains receive contextual guidance in this step. Unknown
+  domains continue to follow the generic missing-operation path until roadmap
+  2.3.1 adds client-side unknown-domain validation. Rationale: this keeps the
+  scope aligned with the roadmap and avoids mixing two error-policy changes in
+  one feature. Date: 2026-03-10.
 
 - Decision: choose the first operation in the canonical per-domain ordering as
   the concrete help hint. Rationale: the catalogue already defines a stable
   presentation order, and the acceptance criteria only requires one concrete
   hint, not heuristics. Date: 2026-03-10.
 
-- Decision: list operation names only in the new contextual guidance block.
-  Do not add per-operation summaries unless they emerge naturally from an
-  existing authoritative catalogue during implementation. Rationale: the
-  acceptance criteria require complete operation enumeration and one concrete
-  hint. Adding descriptive copy would broaden the catalogue surface and
-  increase drift risk without being required for acceptance. Date: 2026-03-10.
+- Decision: list operation names only in the new contextual guidance block. Do
+  not add per-operation summaries unless they emerge naturally from an existing
+  authoritative catalogue during implementation. Rationale: the acceptance
+  criteria require complete operation enumeration and one concrete hint. Adding
+  descriptive copy would broaden the catalogue surface and increase drift risk
+  without being required for acceptance. Date: 2026-03-10.
 
 - Decision: keep the top-level clap `after_help` text static in `cli.rs`, but
-  drive all assertions from the canonical discoverability catalogue and keep
-  the static text synchronized via tests. Rationale: `build.rs` includes
-  `cli.rs` directly for manpage generation, so wiring runtime-only helpers into
-  clap attributes would couple the build-script context unnecessarily. Date:
+  drive all assertions from the canonical discoverability catalogue and keep the
+  static text synchronized via tests. Rationale: `build.rs` includes `cli.rs`
+  directly for manpage generation, so wiring runtime-only helpers into clap
+  attributes would couple the build-script context unnecessarily. Date:
   2026-03-12.
 
 ## Outcomes & Retrospective
@@ -231,28 +229,26 @@ late, after configuration loading, even though no daemon request is needed.
 
 The relevant pieces today are:
 
-- `crates/weaver-cli/src/lib.rs`
-  Orchestrates argument parsing, early exits, config loading, daemon startup,
-  and error-to-exit-code mapping.
-- `crates/weaver-cli/src/command.rs`
-  Converts `Cli` into `CommandInvocation`. It currently returns the generic
-  `AppError::MissingOperation` whenever `operation` is absent or blank.
-- `crates/weaver-cli/src/errors.rs`
-  Owns the user-visible error strings and the sentinel `BareInvocation` path.
-- `crates/weaver-cli/src/discoverability.rs`
-  Holds the canonical client-side domain catalogue and renders the
-  missing-operation guidance block.
-- `crates/weaver-cli/src/tests/unit/bare_invocation.rs`
-  Shows the established pattern for asserting a local guidance path that skips
-  configuration loading by using a panicking loader.
+- `crates/weaver-cli/src/lib.rs` Orchestrates argument parsing, early exits,
+  config loading, daemon startup, and error-to-exit-code mapping.
+- `crates/weaver-cli/src/command.rs` Converts `Cli` into `CommandInvocation`. It
+  currently returns the generic `AppError::MissingOperation` whenever
+  `operation` is absent or blank.
+- `crates/weaver-cli/src/errors.rs` Owns the user-visible error strings and the
+  sentinel `BareInvocation` path.
+- `crates/weaver-cli/src/discoverability.rs` Holds the canonical client-side
+  domain catalogue and renders the missing-operation guidance block.
+- `crates/weaver-cli/src/tests/unit/bare_invocation.rs` Shows the established
+  pattern for asserting a local guidance path that skips configuration loading
+  by using a panicking loader.
 - `crates/weaver-cli/src/tests/behaviour.rs` and
-  `crates/weaver-cli/tests/features/weaver_cli.feature` provide the
-  `rstest-bdd` harness for user-visible CLI flows.
-- `crates/weaver-cli/tests/main_entry.rs`
-  Verifies binary-level behaviour with `assert_cmd`.
-- `crates/weaverd/src/dispatch/router.rs`
-  Contains the daemon-side `DomainRoutingContext::*::known_operations`
-  constants that the CLI catalogue must mirror.
+  `crates/weaver-cli/tests/features/weaver_cli.feature` provide the `rstest-bdd`
+  harness for user-visible CLI flows.
+- `crates/weaver-cli/tests/main_entry.rs` Verifies binary-level behaviour with
+  `assert_cmd`.
+- `crates/weaverd/src/dispatch/router.rs` Contains the daemon-side
+  `DomainRoutingContext::*::known_operations` constants that the CLI catalogue
+  must mirror.
 
 ## Plan of work
 
@@ -271,8 +267,8 @@ Before introducing new behaviour, reconcile the `observe` list with
 other domains for exact ordering and membership. Re-export the canonical
 catalogue from `lib.rs` if integration tests still need it.
 
-Keep the module data-driven. A novice should be able to inspect one file and
-see every domain and operation the CLI claims to support.
+Keep the module data-driven. A novice should be able to inspect one file and see
+every domain and operation the CLI claims to support.
 
 ### Stage B: add a preflight guidance path before config loading
 
@@ -282,14 +278,14 @@ after clap parsing and before `self.loader.load(...)`.
 The branch must:
 
 1. Preserve the existing bare-invocation behaviour.
-2. Detect the new case:
+1. Detect the new case:
    - no lifecycle subcommand;
    - no `--capabilities` probe;
    - `domain` is present and non-blank;
    - `operation` is absent or blank;
    - the supplied domain is recognized by the canonical client-side catalogue.
-3. Write the contextual guidance block to standard error.
-4. Exit with failure without loading configuration, attempting daemon
+1. Write the contextual guidance block to standard error.
+1. Exit with failure without loading configuration, attempting daemon
    connection, or triggering auto-start.
 
 Do not change the low-level `CommandInvocation::try_from` behaviour for unknown
@@ -324,8 +320,8 @@ Behavioural tests:
 
 - Extend `crates/weaver-cli/tests/features/weaver_cli.feature` with a
   `Scenario Outline` covering `observe`, `act`, and `verify`.
-- Reuse existing steps where possible:
-  `When the operator runs`, `Then the CLI fails`, `And stderr contains`, and
+- Reuse existing steps where possible: `When the operator runs`,
+  `Then the CLI fails`, `And stderr contains`, and
   `And no daemon command was sent`.
 - Include an unhappy-path scenario for `bogus` that confirms this task only
   changes known domains.
@@ -371,27 +367,28 @@ set -o pipefail; make test 2>&1 | tee /tmp/2-2-4-test.log
 Success means:
 
 1. The new unit tests pass.
-2. The new `rstest-bdd` scenarios pass.
-3. The updated integration test passes.
-4. No existing help, version, bare-invocation, or auto-start regression fails.
-5. The formatted docs and source files remain within repository policy.
+1. The new `rstest-bdd` scenarios pass.
+1. The updated integration test passes.
+1. No existing help, version, bare-invocation, or auto-start regression fails.
+1. The formatted docs and source files remain within repository policy.
 
 ## Acceptance checklist
 
 The implementation is complete only when all of the following are true:
 
 1. `weaver <known-domain>` without an operation exits non-zero.
-2. The output lists every operation registered for that domain.
-3. The output includes one concrete
-   `weaver <domain> <operation> --help` hint.
-4. The path does not load configuration, connect to the daemon, or trigger
+1. The output lists every operation registered for that domain.
+1. The output includes one concrete `weaver <domain> <operation> --help` hint.
+1. The path does not load configuration, connect to the daemon, or trigger
    auto-start.
-5. `weaver bogus` is unchanged by this task and remains reserved for roadmap
+1. `weaver bogus` is unchanged by this task and remains reserved for roadmap
    2.3.1.
-6. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md` are
+1. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md` are
    updated.
-7. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
-   `make lint`, and `make test` all succeed.
+1. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`,
+   and `make test` all succeed.
 
-[^1]: [Level 2 — domain without operation (`weaver observe`)](../ui-gap-analysis.md#level-2--domain-without-operation-weaver-observe)
-[^2]: [Level 10 — error messages and exit codes](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
+\[^1\]:
+[Level 2 — domain without operation (`weaver observe`)](../ui-gap-analysis.md#level-2--domain-without-operation-weaver-observe)
+\[^2\]:
+[Level 10 — error messages and exit codes](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes)

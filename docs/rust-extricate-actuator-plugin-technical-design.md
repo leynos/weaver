@@ -14,8 +14,8 @@ This document targets software engineers implementing the Rust
 `extricate-symbol` capability through the actuator plugin path.
 
 The design covers request contract changes, rust-analyzer Language Server
-Protocol (LSP) orchestration, edit-planning strategy, semantic verification,
-and test strategy. It aligns with
+Protocol (LSP) orchestration, edit-planning strategy, semantic verification, and
+test strategy. It aligns with
 [ADR 001](adr-001-plugin-capability-model-and-act-extricate.md).
 
 ## Relationship to ADR 001 provider model
@@ -38,8 +38,8 @@ symbol meaning stable, references correct, and code idiomatic on the first
 commit.
 
 The implementation must not rely on broad post-hoc repair loops, compatibility
-shims, or deferred clean-up. Final output must read as if it was authored in
-its final location.
+shims, or deferred clean-up. Final output must read as if it was authored in its
+final location.
 
 ## Design principles
 
@@ -54,9 +54,9 @@ its final location.
 
 ## System context
 
-The current Rust actuator plugin (`crates/weaver-plugin-rust-analyzer`)
-supports `rename` only and returns a unified diff through `PluginOutput::Diff`.
-The plugin protocol already supports multiple file payloads and structured
+The current Rust actuator plugin (`crates/weaver-plugin-rust-analyzer`) supports
+`rename` only and returns a unified diff through `PluginOutput::Diff`. The
+plugin protocol already supports multiple file payloads and structured
 arguments, which provides the substrate for multi-file extrication.
 
 Because plugin execution is sandboxed, the plugin cannot assume unrestricted
@@ -86,7 +86,7 @@ These behaviours directly affect payload and transaction handling:
 
 Authoritative runbook:
 [Migration guide: Weaver adoption of v0.8.0](ortho-config-v0-8-0-migration-guide.md),
- especially sections:
+especially sections:
 
 - [Required migration steps](ortho-config-v0-8-0-migration-guide.md#required-migration-steps)
 - [YAML semantics changed, even though Weaver runtime config is TOML-first](ortho-config-v0-8-0-migration-guide.md#4-yaml-semantics-changed-even-though-weaver-runtime-config-is-toml-first)
@@ -123,8 +123,8 @@ _Table 1: Arguments for Rust `extricate-symbol` plugin requests._
 
 ### File payload requirements
 
-`PluginRequest.files` must include a deterministic Rust package snapshot for
-all files that may be read or edited during the transaction:
+`PluginRequest.files` must include a deterministic Rust package snapshot for all
+files that may be read or edited during the transaction:
 
 - source file containing the target symbol,
 - destination module file and destination parent module files,
@@ -198,17 +198,17 @@ The following sequence is normative and is the single source of truth for
 ordering.
 
 1. Validate request arguments and payload completeness.
-2. Start RA session and open overlay documents.
-3. Resolve selected definition and collect pre-move references.
-4. Compute module paths and destination module graph updates.
-5. Build move-set closure for symbol and associated `impl` blocks.
-6. Apply planned move edits to overlay and publish `didChange`.
-7. Rewrite external references and affected `use` trees.
-8. Run import repair via diagnostics plus code actions.
-9. Resolve ambiguous fixes using definition-equivalence checks.
-10. Apply formatting for touched files when enabled.
-11. Run semantic invariants and diagnostics gate checks.
-12. Emit unified diff and return success, or refuse and rollback.
+1. Start RA session and open overlay documents.
+1. Resolve selected definition and collect pre-move references.
+1. Compute module paths and destination module graph updates.
+1. Build move-set closure for symbol and associated `impl` blocks.
+1. Apply planned move edits to overlay and publish `didChange`.
+1. Rewrite external references and affected `use` trees.
+1. Run import repair via diagnostics plus code actions.
+1. Resolve ambiguous fixes using definition-equivalence checks.
+1. Apply formatting for touched files when enabled.
+1. Run semantic invariants and diagnostics gate checks.
+1. Emit unified diff and return success, or refuse and rollback.
 
 ## LSP surface and behaviour
 
@@ -253,18 +253,18 @@ writing changes.
 Move-set planning defines exactly which syntax nodes move.
 
 1. Resolve selected top-level item from `documentSymbol` by position.
-2. Parse source syntax tree and collect candidate `impl` blocks.
-3. For each candidate `impl`, probe the self-type definition using
+1. Parse source syntax tree and collect candidate `impl` blocks.
+1. For each candidate `impl`, probe the self-type definition using
    `textDocument/definition`.
-4. Include only `impl` blocks resolving to the selected item definition.
-5. Preserve item attributes, docs, and comments verbatim in moved text.
+1. Include only `impl` blocks resolving to the selected item definition.
+1. Preserve item attributes, docs, and comments verbatim in moved text.
 
 This approach prevents accidental capture of similarly named types in scope.
 
 ## Module graph computation and destination plumbing
 
-Module path computation must use RA `experimental/parentModule` recursion
-rather than filesystem heuristics.
+Module path computation must use RA `experimental/parentModule` recursion rather
+than filesystem heuristics.
 
 Destination materialisation rules:
 
@@ -302,14 +302,14 @@ Destination files are expected to report unresolved symbols after initial move.
 Repair loop:
 
 1. Read destination diagnostics.
-2. Request code actions for missing-name diagnostics.
-3. If one action is available, apply it.
-4. If multiple actions exist, evaluate candidates one at a time:
+1. Request code actions for missing-name diagnostics.
+1. If one action is available, apply it.
+1. If multiple actions exist, evaluate candidates one at a time:
    - apply candidate in overlay,
    - probe definition at diagnostic site,
    - keep candidate only if definition matches pre-move anchor,
    - otherwise revert candidate.
-5. Continue until diagnostics converge or deterministic resolution fails.
+1. Continue until diagnostics converge or deterministic resolution fails.
 
 Deterministic failure to disambiguate imports is a hard error.
 
@@ -398,9 +398,14 @@ _Table 4: Primary implementation risks and mitigations._
 
 ## References
 
-[^1]: [Manually use rust-analyzer](https://users.rust-lang.org/t/manually-use-rust-analyzer/57156?utm_source=chatgpt.com)
-[^2]: [rust-analyzer LSP extensions](https://git.joshthomas.dev/language-servers/rust-analyzer/src/commit/c0107d2ea63a5527d2990f7f322f642340ceb3cd/docs/dev/lsp-extensions.md)
-[^3]: [LSP extensions mirror](https://android.googlesource.com/toolchain/rustc/%2B/HEAD/src/tools/rust-analyzer/docs/dev/lsp-extensions.md)
-[^4]: [RA diagnostic pull issue](https://github.com/rust-lang/rust-analyzer/issues/18709)
-[^5]: [Command-based RA code action handling](https://github.com/kakoune-lsp/kakoune-lsp/issues/314?utm_source=chatgpt.com)
-[^6]: [rust-analyzer book](https://rust-analyzer.github.io/book/)
+\[^1\]:
+[Manually use rust-analyzer](https://users.rust-lang.org/t/manually-use-rust-analyzer/57156?utm_source=chatgpt.com)
+\[^2\]:
+[rust-analyzer LSP extensions](https://git.joshthomas.dev/language-servers/rust-analyzer/src/commit/c0107d2ea63a5527d2990f7f322f642340ceb3cd/docs/dev/lsp-extensions.md)
+\[^3\]:
+[LSP extensions mirror](https://android.googlesource.com/toolchain/rustc/%2B/HEAD/src/tools/rust-analyzer/docs/dev/lsp-extensions.md)
+\[^4\]:
+[RA diagnostic pull issue](https://github.com/rust-lang/rust-analyzer/issues/18709)
+\[^5\]:
+[Command-based RA code action handling](https://github.com/kakoune-lsp/kakoune-lsp/issues/314?utm_source=chatgpt.com)
+\[^6\]: [rust-analyzer book](https://rust-analyzer.github.io/book/)

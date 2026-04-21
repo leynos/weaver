@@ -1,9 +1,8 @@
 # 4.1.4 Implement mode-aware Sempai validation and execution gating
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -23,14 +22,13 @@ Observable user-facing behaviour after implementation:
 - Valid `extract`, `taint`, `join`, and any other non-search modes fail
   deterministically with `E_SEMPAI_UNSUPPORTED_MODE` instead of falling through
   to the generic placeholder.
-- Invalid `search` rules fail deterministically with
-  `E_SEMPAI_SCHEMA_INVALID`, including the missing-principal combinations
-  defined in
+- Invalid `search` rules fail deterministically with `E_SEMPAI_SCHEMA_INVALID`,
+  including the missing-principal combinations defined in
   [docs/sempai-query-language-design.md](../sempai-query-language-design.md).
 
-This milestone is deliberately narrower than normalization or execution. It
-must deliver the semantic validation boundary promised in roadmap item 4.1.4
-without pulling 4.1.5 or 4.2.x work forward.
+This milestone is deliberately narrower than normalization or execution. It must
+deliver the semantic validation boundary promised in roadmap item 4.1.4 without
+pulling 4.1.5 or 4.2.x work forward.
 
 Observable completion evidence:
 
@@ -61,8 +59,8 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log
   - `sempai::Engine::compile_yaml` gates execution to supported modes.
   - Unsupported-mode handling must not be pushed down into the parser as a
     parse-time rejection.
-- Maintain the stable diagnostics contract from 4.1.2:
-  `code`, `message`, `primary_span`, and `notes` remain the only emitted fields.
+- Maintain the stable diagnostics contract from 4.1.2: `code`, `message`,
+  `primary_span`, and `notes` remain the only emitted fields.
 - Use `DiagnosticReport::validation_error(...)` for engine-side mode gating and
   keep `DiagnosticReport::parser_error(...)` for YAML shape and deserialization
   failures.
@@ -70,12 +68,11 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log
   the design, including the Semgrep compatibility key
   `r2c-internal-project-depends-on`, which must be parsed but may remain
   execution-no-op for now.
-- Keep this milestone out of 4.1.5 scope:
-  do not normalize legacy and v2 principals into canonical `Formula`, and do
-  not produce real `QueryPlan` values yet.
-- Keep this milestone out of 4.1.6 scope:
-  do not implement the one-liner domain-specific language (DSL) parser as part
-  of this work.
+- Keep this milestone out of 4.1.5 scope: do not normalize legacy and v2
+  principals into canonical `Formula`, and do not produce real `QueryPlan`
+  values yet.
+- Keep this milestone out of 4.1.6 scope: do not implement the one-liner
+  domain-specific language (DSL) parser as part of this work.
 - Add both unit tests and behaviour-driven development (BDD) tests using
   `rstest-bdd` v0.5.0. Cover happy paths, unhappy paths, and edge cases.
 - Keep files below 400 lines. Split validator code and test helpers into small,
@@ -93,11 +90,11 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log
 ## Tolerances
 
 - Scope: if implementation requires more than 14 net file touches outside
-  `crates/sempai/`, `crates/sempai-yaml/`, and the three required docs, stop
-  and escalate.
+  `crates/sempai/`, `crates/sempai-yaml/`, and the three required docs, stop and
+  escalate.
 - Interface: if satisfying deterministic `UnsupportedMode` diagnostics requires
-  a breaking change to the public signature of `sempai::Engine::compile_yaml`
-  or `sempai_yaml::parse_rule_file`, stop and escalate.
+  a breaking change to the public signature of `sempai::Engine::compile_yaml` or
+  `sempai_yaml::parse_rule_file`, stop and escalate.
 - Model shape: if engine-side diagnostics require source-span data that cannot
   be exposed additively from `sempai_yaml` models, stop and present the least
   disruptive API options before proceeding.
@@ -105,9 +102,9 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log
   materially about whether `r2c-internal-project-depends-on` satisfies search
   mode's required-principal contract, stop and escalate with the competing
   interpretations.
-- Behaviour: if mixed-mode YAML files force a partial-success design that
-  cannot fit the current `Result<Vec<QueryPlan>, DiagnosticReport>` surface,
-  stop and escalate rather than inventing ad hoc partial compilation.
+- Behaviour: if mixed-mode YAML files force a partial-success design that cannot
+  fit the current `Result<Vec<QueryPlan>, DiagnosticReport>` surface, stop and
+  escalate rather than inventing ad hoc partial compilation.
 - Iterations: if the same failing lint or test loop is attempted five times
   without a clear path forward, stop and escalate.
 
@@ -116,8 +113,8 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log
 - Risk: the current `sempai_yaml::Rule` model does not expose source spans, but
   engine-side `UnsupportedMode` diagnostics should point at a deterministic
   location. Severity: high. Likelihood: high. Mitigation: carry rule-level or
-  mode-field span information through the parsed model in an additive way so
-  the facade can emit anchored validation errors.
+  mode-field span information through the parsed model in an additive way so the
+  facade can emit anchored validation errors.
 
 - Risk: `sempai_yaml` already performs some mode-specific rejection, so the
   boundary between parser validation and engine validation is easy to blur.
@@ -130,8 +127,8 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log
   `r2c-internal-project-depends-on`, but the current parser does not model that
   key. Severity: medium. Likelihood: high. Mitigation: add parser support for
   that compatibility key now and document that it satisfies validation while
-  remaining ignored by execution and normalization until a later milestone
-  needs more semantics.
+  remaining ignored by execution and normalization until a later milestone needs
+  more semantics.
 
 - Risk: mixed documents containing both valid `search` rules and unsupported
   modes may tempt a partial compilation strategy. Severity: medium. Likelihood:
@@ -141,39 +138,37 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log
 
 - Risk: strict workspace lints will apply to behavioural test helpers and
   fixtures. Severity: low. Likelihood: medium. Mitigation: prefer small helper
-  structs and shared test helpers over large step-definition functions with
-  many parameters.
+  structs and shared test helpers over large step-definition functions with many
+  parameters.
 
 ## Progress
 
 - [x] (2026-03-28 UTC) Reviewed roadmap item 4.1.4, the Sempai design doc, the
-      current `sempai_yaml` parser/builder code, the `sempai` facade tests,
-      and adjacent ExecPlans.
+  current `sempai_yaml` parser/builder code, the `sempai` facade tests, and
+  adjacent ExecPlans.
 - [x] (2026-03-28 UTC) Drafted this ExecPlan.
-- [x] (2026-03-29 UTC) Stage A: Locked the intended behaviour with unit and
-      BDD tests for dependency search rules, unsupported execution modes, and
-      the preserved search-mode placeholder path.
-- [x] (2026-03-29 UTC) Stage B: Added additive parsed-rule metadata
-      (`mode_span` plus enclosing rule span) and model support for the
-      compatibility key `r2c-internal-project-depends-on`.
+- [x] (2026-03-29 UTC) Stage A: Locked the intended behaviour with unit and BDD
+  tests for dependency search rules, unsupported execution modes, and the
+  preserved search-mode placeholder path.
+- [x] (2026-03-29 UTC) Stage B: Added additive parsed-rule metadata (`mode_span`
+  plus enclosing rule span) and model support for the compatibility key
+  `r2c-internal-project-depends-on`.
 - [x] (2026-03-29 UTC) Stage C: Implemented engine-side whole-document mode
-      gating that reports the first unsupported rule in source order via
-      `E_SEMPAI_UNSUPPORTED_MODE`.
-- [x] (2026-03-29 UTC) Stage D: Updated the Sempai design doc, the user's
-      guide, and the roadmap to reflect mode-aware `compile_yaml(...)`
-      behaviour.
+  gating that reports the first unsupported rule in source order via
+  `E_SEMPAI_UNSUPPORTED_MODE`.
+- [x] (2026-03-29 UTC) Stage D: Updated the Sempai design doc, the user's guide,
+  and the roadmap to reflect mode-aware `compile_yaml(...)` behaviour.
 - [x] (2026-03-29 UTC) Stage E: Ran `make fmt`, `make markdownlint`,
-      `make nixie`, `make check-fmt`, `make lint`, `make test`,
-      `cargo test -p sempai_yaml`, and `cargo test -p sempai`.
+  `make nixie`, `make check-fmt`, `make lint`, `make test`,
+  `cargo test -p sempai_yaml`, and `cargo test -p sempai`.
 
 ## Surprises & Discoveries
 
-- Observation: `crates/sempai-yaml/src/parser/mod.rs` already rejects
-  cross-mode principal families, and
-  `crates/sempai-yaml/src/parser/builders.rs` already rejects `match` for
-  `extract` and `taint`. Impact: 4.1.4 is not starting from zero; it must
-  clarify the parser-vs-engine boundary instead of re-implementing existing
-  schema checks.
+- Observation: `crates/sempai-yaml/src/parser/mod.rs` already rejects cross-mode
+  principal families, and `crates/sempai-yaml/src/parser/builders.rs` already
+  rejects `match` for `extract` and `taint`. Impact: 4.1.4 is not starting from
+  zero; it must clarify the parser-vs-engine boundary instead of re-implementing
+  existing schema checks.
 
 - Observation: `crates/sempai/src/engine.rs` currently parses YAML and then
   unconditionally returns `DiagnosticReport::not_implemented(...)` for any
@@ -185,20 +180,19 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log
   engine-side `UnsupportedMode` diagnostics probably require additive model
   metadata before the facade can emit anchored validation errors.
 
-- Observation: the design doc explicitly names
-  `r2c-internal-project-depends-on` as satisfying search mode's required key
-  combinations, but the current parser does not model that field at all.
-  Impact: acceptance requires a small compatibility expansion in `sempai_yaml`,
-  not just a facade change.
+- Observation: the design doc explicitly names `r2c-internal-project-depends-on`
+  as satisfying search mode's required key combinations, but the current parser
+  does not model that field at all. Impact: acceptance requires a small
+  compatibility expansion in `sempai_yaml`, not just a facade change.
 
 - Observation: current BDD coverage only locks three YAML parser paths and the
   generic engine placeholder path. Impact: 4.1.4 must add behavioural coverage
   in both `sempai_yaml` and `sempai`, not just unit assertions.
 
-- Observation: the package name for focused parser tests is `sempai_yaml`
-  rather than `sempai-yaml`, so the crate-level verification commands needed to
-  use the underscore form. Impact: the completion evidence now records the
-  executable commands that actually passed in this workspace.
+- Observation: the package name for focused parser tests is `sempai_yaml` rather
+  than `sempai-yaml`, so the crate-level verification commands needed to use the
+  underscore form. Impact: the completion evidence now records the executable
+  commands that actually passed in this workspace.
 
 ## Decision Log
 
@@ -238,29 +232,29 @@ Target outcome at completion:
 1. `sempai_yaml` parses `search`, `extract`, `taint`, `join`, and
    forward-compatible mode strings while preserving enough metadata for a
    separate validation pass.
-2. Search mode validation enforces the required key combinations documented in
+1. Search mode validation enforces the required key combinations documented in
    the design, including the compatibility-only
    `r2c-internal-project-depends-on` key.
-3. `sempai::Engine::compile_yaml(...)` returns
-   `E_SEMPAI_UNSUPPORTED_MODE` for `extract`, `taint`, `join`, and other
-   non-search modes, with deterministic messaging and stable diagnostics.
-4. Valid `search` rules continue to the existing normalization placeholder and
+1. `sempai::Engine::compile_yaml(...)` returns `E_SEMPAI_UNSUPPORTED_MODE` for
+   `extract`, `taint`, `join`, and other non-search modes, with deterministic
+   messaging and stable diagnostics.
+1. Valid `search` rules continue to the existing normalization placeholder and
    still return `NOT_IMPLEMENTED` until 4.1.5 is complete.
-5. Unit tests and `rstest-bdd` v0.5.0 scenarios cover happy, unhappy, and edge
+1. Unit tests and `rstest-bdd` v0.5.0 scenarios cover happy, unhappy, and edge
    paths in both `sempai_yaml` and `sempai`.
-6. `docs/sempai-query-language-design.md` records the final boundary between
+1. `docs/sempai-query-language-design.md` records the final boundary between
    parser validation and engine validation.
-7. `docs/users-guide.md` explains the mode-specific `compile_yaml(...)`
+1. `docs/users-guide.md` explains the mode-specific `compile_yaml(...)`
    behaviour users now see.
-8. `docs/roadmap.md` marks 4.1.4 done.
-9. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
-   `make lint`, and `make test` all pass.
+1. `docs/roadmap.md` marks 4.1.4 done.
+1. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`,
+   and `make test` all pass.
 
 Retrospective notes:
 
-- Engine validation diagnostics now prefer the parsed `mode` field span and
-  fall back to the enclosing rule span. This keeps unsupported-mode reports
-  anchored to the most actionable location without changing public signatures.
+- Engine validation diagnostics now prefer the parsed `mode` field span and fall
+  back to the enclosing rule span. This keeps unsupported-mode reports anchored
+  to the most actionable location without changing public signatures.
 - `r2c-internal-project-depends-on` stayed opaque as
   `SearchQueryPrincipal::ProjectDependsOn(ProjectDependsOnPayload)`. That was
   enough to satisfy search-mode validation while deferring dependency semantics
@@ -326,14 +320,14 @@ In `crates/sempai-yaml`:
   - `r2c-internal-project-depends-on`
 - Add unhappy-path unit tests for search rules that declare the search header
   but none of the allowed principal keys.
-- Extend the behaviour-driven development (BDD) feature file with one happy
-  path proving the compatibility key is accepted and one unhappy path proving
+- Extend the behaviour-driven development (BDD) feature file with one happy path
+  proving the compatibility key is accepted and one unhappy path proving
   missing-principal search rules still fail with `E_SEMPAI_SCHEMA_INVALID`.
 
 In `crates/sempai`:
 
-- Add unit tests proving `compile_yaml(...)` returns
-  `E_SEMPAI_UNSUPPORTED_MODE` for valid `extract`, `join`, and `taint` rules.
+- Add unit tests proving `compile_yaml(...)` returns `E_SEMPAI_UNSUPPORTED_MODE`
+  for valid `extract`, `join`, and `taint` rules.
 - Add a unit test for a forward-compatible unknown mode string such as
   `mode: custom-mode`, verifying deterministic `UnsupportedMode` handling.
 - Add a unit test for a mixed-rule file, verifying that the first unsupported
@@ -345,8 +339,8 @@ In `crates/sempai`:
 
 Go/no-go:
 
-- Do not proceed until at least one new `sempai_yaml` test and one new
-  `sempai` test fail for the intended 4.1.4 behaviour.
+- Do not proceed until at least one new `sempai_yaml` test and one new `sempai`
+  test fail for the intended 4.1.4 behaviour.
 
 ### Stage B: Add the parser and model data the validator needs
 
@@ -359,8 +353,8 @@ Bridge the current data gap between parsed rules and engine-side validation.
   whether they satisfied validation through a recognized principal or through
   the compatibility key.
 - Add additive source-location data to the parsed rule model so the facade can
-  attach `primary_span` to engine-side validation diagnostics. A whole-rule
-  span is sufficient if a mode-field span is not cheaply available.
+  attach `primary_span` to engine-side validation diagnostics. A whole-rule span
+  is sufficient if a mode-field span is not cheaply available.
 - Keep parse-time schema validation in `sempai_yaml`; do not move existing
   malformed-YAML or structural checks into the facade.
 
@@ -387,9 +381,8 @@ placeholder.
   - use `DiagnosticCode::ESempaiUnsupportedMode`
   - include a deterministic message naming the unsupported mode
   - attach the span propagated from `sempai_yaml` when available
-- Keep the execution surface unchanged:
-  `Engine::execute(...)` still returns the existing placeholder until backend
-  work lands in 4.2.x.
+- Keep the execution surface unchanged: `Engine::execute(...)` still returns the
+  existing placeholder until backend work lands in 4.2.x.
 
 Go/no-go:
 
@@ -404,8 +397,7 @@ Once the implementation is stable, synchronize the living documentation.
   [docs/sempai-query-language-design.md](../sempai-query-language-design.md):
   - clarify the parser-vs-engine validation boundary
   - document how unsupported modes are surfaced
-  - record the compatibility treatment for
-    `r2c-internal-project-depends-on`
+  - record the compatibility treatment for `r2c-internal-project-depends-on`
 - Update [docs/users-guide.md](../users-guide.md):
   - explain that `compile_yaml(...)` now distinguishes supported search rules
     from parse-only unsupported modes

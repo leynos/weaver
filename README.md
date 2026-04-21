@@ -4,8 +4,8 @@ A semantics-aware command-line tool for AI coding agents.
 
 Weaver is your AI agent's best friend when it comes to understanding and
 modifying code. We believe the shell should speak the language of semantics—not
-just bytes and lines—so we've built a tool that brings deep code intelligence
-to your terminal.
+just bytes and lines—so we've built a tool that brings deep code intelligence to
+your terminal.
 
 ## What is Weaver?
 

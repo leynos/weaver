@@ -1,9 +1,8 @@
 # Normalize documentation style and navigation for parser and Semgrep docs
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -58,24 +57,24 @@ Success is observable by reading the updated documents and by running
   from current `crates/` and root tree, then mark planned components explicitly
   as planned.
 
-- Risk: Formatting and lint rules may fail after large prose edits.
-  Severity: low. Likelihood: medium. Mitigation: run `make markdownlint` and
-  `make fmt` before commit and apply targeted corrections.
+- Risk: Formatting and lint rules may fail after large prose edits. Severity:
+  low. Likelihood: medium. Mitigation: run `make markdownlint` and `make fmt`
+  before commit and apply targeted corrections.
 
 ## Implementation approach
 
 1. Inventory current docs and link references for the requested files and
    `docs/semgrep-language-reference/`.
-2. Normalize style for headings, list formatting, code-block info strings,
+1. Normalize style for headings, list formatting, code-block info strings,
    footnote ordering, and paragraph wrapping to align with
    `docs/documentation-style-guide.md`.
-3. Repair broken or inconsistent repository-local links.
-4. Add `docs/contents.md` modelled on `../zamburak/docs/contents.md` for Weaver.
-5. Add `docs/repository-layout.md` modelled on
+1. Repair broken or inconsistent repository-local links.
+1. Add `docs/contents.md` modelled on `../zamburak/docs/contents.md` for Weaver.
+1. Add `docs/repository-layout.md` modelled on
    `../zamburak/docs/repository-layout.md`, with separate sections for
    implemented and planned components.
-6. Run markdown quality gates and capture logs.
-7. Commit with a descriptive message.
+1. Run markdown quality gates and capture logs.
+1. Commit with a descriptive message.
 
 ## Validation plan
 
@@ -93,23 +92,21 @@ Then inspect each log tail for failures.
 ## Progress
 
 - [x] (2026-02-28 00:00 UTC) Confirmed branch context (`sempai-design`) and
-      loaded guidance (`AGENTS.md`, style guide, and template docs).
-- [x] (2026-02-28 00:00 UTC) Created this ExecPlan before applying
-      documentation updates.
+  loaded guidance (`AGENTS.md`, style guide, and template docs).
+- [x] (2026-02-28 00:00 UTC) Created this ExecPlan before applying documentation
+  updates.
 - [x] (2026-02-28 00:00 UTC) Inventoried requested docs and repaired
-      repository-local link consistency, including removal of non-portable
-      absolute local paths.
+  repository-local link consistency, including removal of non-portable absolute
+  local paths.
 - [x] (2026-02-28 00:00 UTC) Normalized requested docs to
-      `docs/documentation-style-guide.md`.
+  `docs/documentation-style-guide.md`.
 - [x] (2026-02-28 00:00 UTC) Created `docs/contents.md`.
 - [x] (2026-02-28 00:00 UTC) Created `docs/repository-layout.md` with
-      implemented and planned component separation.
+  implemented and planned component separation.
 - [x] (2026-02-28 00:00 UTC) Ran markdown gates and captured evidence logs:
-      `/tmp/markdownlint-weaver-sempai-design.out`,
-      `/tmp/fmt-weaver-sempai-design.out`,
-      `/tmp/nixie-weaver-sempai-design.out`.
-- [x] (2026-02-28 00:00 UTC) Committed documentation updates with gate
-      evidence.
+  `/tmp/markdownlint-weaver-sempai-design.out`,
+  `/tmp/fmt-weaver-sempai-design.out`, `/tmp/nixie-weaver-sempai-design.out`.
+- [x] (2026-02-28 00:00 UTC) Committed documentation updates with gate evidence.
 
 ## Surprises & Discoveries
 

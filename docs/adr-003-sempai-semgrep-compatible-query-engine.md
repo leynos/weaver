@@ -10,10 +10,10 @@ Proposed
 
 ## Context and problem statement
 
-ADR 002 proposes a Semgrep-style query surface for feature extraction in
-Weaver. The next decision is execution strategy: whether to implement matching
-fully in-house, adopt an existing Rust matcher as the primary engine, or use a
-hybrid approach.
+ADR 002 proposes a Semgrep-style query surface for feature extraction in Weaver.
+The next decision is execution strategy: whether to implement matching fully
+in-house, adopt an existing Rust matcher as the primary engine, or use a hybrid
+approach.
 
 This decision must preserve support for Rust, Python, Go, and TypeScript while
 maintaining predictable behaviour in daemon workflows.
@@ -105,9 +105,9 @@ Weaver keeps a Semgrep-compatible front-end and internal normalized formula
 representation. Execution is routed as follows:
 
 1. Use ast-grep-backed execution for rules that map cleanly.
-2. Use Weaver-native matching for supported Semgrep-style constructs that do
-   not map cleanly.
-3. Return explicit unsupported-feature diagnostics when neither path can execute
+1. Use Weaver-native matching for supported Semgrep-style constructs that do not
+   map cleanly.
+1. Return explicit unsupported-feature diagnostics when neither path can execute
    a rule safely.
 
 ## Goals and non-goals
@@ -127,10 +127,10 @@ representation. Execution is routed as follows:
 ## Migration plan
 
 1. Define a rule-capability matrix for routing eligibility.
-2. Implement routing with explicit reason codes.
-3. Add conformance tests for mapped and non-mapped operators.
-4. Add regression suites for capture boundaries and negation behaviour.
-5. Document compatibility boundaries in user-facing reference docs.
+1. Implement routing with explicit reason codes.
+1. Add conformance tests for mapped and non-mapped operators.
+1. Add regression suites for capture boundaries and negation behaviour.
+1. Document compatibility boundaries in user-facing reference docs.
 
 ## Known risks and limitations
 
@@ -147,5 +147,5 @@ representation. Execution is routed as follows:
 ## Architectural rationale
 
 The hybrid direction matches Weaver's broader architecture: composable layers,
-explicit fallbacks, and practical delivery without sacrificing long-term
-control of user-facing behaviour.
+explicit fallbacks, and practical delivery without sacrificing long-term control
+of user-facing behaviour.

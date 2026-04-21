@@ -11,17 +11,17 @@ parameters so that the tool is self-documenting.
 
 The analysis was conducted by:
 
-1. Reading every help surface the binary exposes today (`--help`, `-h`,
-   `help`, bare invocation, per-subcommand help).
-2. Tracing the clap definition in
+1. Reading every help surface the binary exposes today (`--help`, `-h`, `help`,
+   bare invocation, per-subcommand help).
+1. Tracing the clap definition in
    [`crates/weaver-cli/src/cli.rs`](../crates/weaver-cli/src/cli.rs) and the
    domain router in
    [`crates/weaverd/src/dispatch/router.rs`](../crates/weaverd/src/dispatch/router.rs).
-3. Exercising error paths for unknown domains, unknown operations,
-   missing arguments, and missing operations.
-4. Reviewing the plugin registry, the daemon dispatch table, and the
+1. Exercising error paths for unknown domains, unknown operations, missing
+   arguments, and missing operations.
+1. Reviewing the plugin registry, the daemon dispatch table, and the
    output-rendering pipeline.
-5. Cross-referencing against the user's guide
+1. Cross-referencing against the user's guide
    ([`docs/users-guide.md`](users-guide.md)) and the generated manual page.
 
 The sections below are ordered from the outermost user interaction (bare
@@ -45,11 +45,11 @@ documentation. The message does not explain what a "domain" is.
 
 **Recommended remedy.** When neither a domain nor a structured subcommand is
 supplied, emit the short help text (`-h` form) automatically instead of an
-unadorned error string. This is the behaviour users expect from every
-mainstream CLI tool.
+unadorned error string. This is the behaviour users expect from every mainstream
+CLI tool.
 
-*Alternative:* print a purpose-built "getting started" block that lists
-domains, the `daemon` subcommand, and the `--help` flag.
+*Alternative:* print a purpose-built "getting started" block that lists domains,
+the `daemon` subcommand, and the `--help` flag.
 
 ______________________________________________________________________
 
@@ -100,8 +100,8 @@ after-help block used for gap 1a.
 The five `ortho-config` flags (`--config-path`, `--daemon-socket`,
 `--log-filter`, `--log-format`, `--capability-overrides`) are stripped before
 clap parses and therefore never appear in help output. See
-[Level 6](#level-6--configuration-flags-invisible-in-help) for the full
-analysis and remedy.
+[Level 6](#level-6--configuration-flags-invisible-in-help) for the full analysis
+and remedy.
 
 ### Gap 1d — no `--version` flag
 
@@ -120,9 +120,9 @@ auto-generates `--version` / `-V`.
 
 ### Gap 1e — no long description or after-help text
 
-There is no `about`, `long_about`, or `after_help` on the top-level `Cli`
-struct that would describe Weaver's purpose, architecture, or give a
-quick-start example.
+There is no `about`, `long_about`, or `after_help` on the top-level `Cli` struct
+that would describe Weaver's purpose, architecture, or give a quick-start
+example.
 
 **Remedy.** Add `about` and `long_about` attributes describing Weaver's purpose
 and a one-line quick-start example.
@@ -136,14 +136,14 @@ Users accustomed to `<tool> help <topic>` patterns get a confusing error.
 **Recommended remedy.** Re-enable the `help` subcommand (remove
 `disable_help_subcommand = true`).
 
-*Alternative:* intercept the `help` domain token in the CLI and print
-contextual help.
+*Alternative:* intercept the `help` domain token in the CLI and print contextual
+help.
 
 ### Gap 1g — plugin listing absent
 
 There is no mechanism to list registered plugins (actuators, sensors), their
-supported languages, or their available refactoring operations. Users must
-guess provider names (e.g. `rope`, `rust-analyzer`) or read the source.
+supported languages, or their available refactoring operations. Users must guess
+provider names (e.g. `rope`, `rust-analyzer`) or read the source.
 
 **Remedy.** Add a `weaver list-plugins` (or `weaver plugins`) introspection
 subcommand. It should query the daemon (or a static registry) and print plugin
@@ -171,8 +171,8 @@ daemon's knowledge of valid operations is not surfaced.
 **Recommended remedy.** When a domain is provided without an operation, emit a
 contextual help block listing the valid operations for that domain. The
 recommended approach is a hard-coded table in the CLI mirroring the daemon's
-`DomainRoutingContext::known_operations`, since this avoids a daemon
-round-trip. The message should follow the pattern:
+`DomainRoutingContext::known_operations`, since this avoids a daemon round-trip.
+The message should follow the pattern:
 
 ```plaintext
 error: operation required for domain 'observe'
@@ -210,8 +210,8 @@ vs `obsrve`) produces an opaque rejection with no "did you mean?" hint.
 Additionally, the error is only available at the daemon layer — the CLI could
 validate the domain before attempting a daemon connection or auto-start.
 
-**Recommended remedy.** Validate the domain client-side before connecting to
-the daemon and include the list of valid domains in the error output:
+**Recommended remedy.** Validate the domain client-side before connecting to the
+daemon and include the list of valid domains in the error output:
 
 ```plaintext
 error: unknown domain 'obsrve'
@@ -234,9 +234,9 @@ When the daemon is running, it returns:
 unknown operation 'nonexistent' for domain 'observe'
 ```
 
-Exit code 1. The error does not list valid operations for the domain. The
-daemon has all the information needed (it holds the `known_operations` arrays)
-but does not include it in the error response.
+Exit code 1. The error does not list valid operations for the domain. The daemon
+has all the information needed (it holds the `known_operations` arrays) but does
+not include it in the error response.
 
 **Remedy.** Extend the `DispatchError::UnknownOperation` path to include the
 known operations list:
@@ -264,9 +264,9 @@ observe get-definition requires --uri and --position arguments
 
 Two sub-problems exist:
 
-- **No client-side pre-validation.** The CLI does not know what
-  arguments each operation needs, so it cannot catch missing parameters before
-  contacting the daemon.
+- **No client-side pre-validation.** The CLI does not know what arguments each
+  operation needs, so it cannot catch missing parameters before contacting the
+  daemon.
 - **No `--help` at operation level.** Running
   `weaver observe get-definition --help` prints the *top-level* help because
   `--help` is consumed by clap before the trailing arguments reach the daemon.
@@ -274,17 +274,17 @@ Two sub-problems exist:
 
 **Recommended remedy.** Model each domain as a clap subcommand containing its
 own subcommands (one per operation). This gives full clap-generated help at
-every level — including `weaver observe get-definition --help` — and is the
-most thorough approach, though it requires significant restructuring of
+every level — including `weaver observe get-definition --help` — and is the most
+thorough approach, though it requires significant restructuring of
 [`cli.rs`](../crates/weaver-cli/src/cli.rs).
 
 *Alternatives (lighter-weight):*
 
-- **Daemon-side `--help` interception.** When the daemon receives an
-  operation with `--help` in the arguments, respond with a help payload instead
-  of executing the operation.
-- **Introspection subcommand.** A `weaver help observe get-definition`
-  command that queries the daemon (or a static schema) and prints the expected
+- **Daemon-side `--help` interception.** When the daemon receives an operation
+  with `--help` in the arguments, respond with a help payload instead of
+  executing the operation.
+- **Introspection subcommand.** A `weaver help observe get-definition` command
+  that queries the daemon (or a static schema) and prints the expected
   arguments, types, and examples.
 
 ### Gap 5b — `act refactor` without arguments
@@ -323,9 +323,9 @@ The five configuration flags (`--config-path`, `--daemon-socket`,
 `split_config_arguments` before the remaining tokens reach clap. They work
 correctly at runtime, but are completely absent from all help output.
 
-An operator who runs `weaver --help` to discover how to connect to a
-non-default daemon socket finds no relevant flag listed. The flags are
-documented only in [`docs/users-guide.md`](users-guide.md) and the source code.
+An operator who runs `weaver --help` to discover how to connect to a non-default
+daemon socket finds no relevant flag listed. The flags are documented only in
+[`docs/users-guide.md`](users-guide.md) and the source code.
 
 **Recommended remedy.** Register the five flags as clap arguments on `Cli` so
 they appear in `--help`. They do not need to participate in clap's parsing
@@ -340,13 +340,12 @@ ______________________________________________________________________
 ## Level 7 — plugin discoverability
 
 There is no command to list plugins. The user must know the provider name
-(`rope`, `rust-analyzer`) from the documentation or source code. There is no
-way to discover which plugins are registered, which languages each plugin
-supports, which refactoring operations a plugin offers, or the version of each
-plugin.
+(`rope`, `rust-analyzer`) from the documentation or source code. There is no way
+to discover which plugins are registered, which languages each plugin supports,
+which refactoring operations a plugin offers, or the version of each plugin.
 
-The plugin registry (`PluginRegistry`) has the application programming
-interface (API) surface to answer all of these queries (`find_by_kind`,
+The plugin registry (`PluginRegistry`) has the application programming interface
+(API) surface to answer all of these queries (`find_by_kind`,
 `find_for_language`, `find_actuator_for_language`), but this information is not
 exposed through the CLI.
 
@@ -377,8 +376,8 @@ ______________________________________________________________________
 
 ## Level 8 — `daemon` subcommand help
 
-`weaver daemon --help` is adequate — it lists `start`, `stop`, and `status`
-with one-line descriptions.
+`weaver daemon --help` is adequate — it lists `start`, `stop`, and `status` with
+one-line descriptions.
 
 `weaver daemon start --help` shows only `Usage: weaver daemon start` and the
 `-h` / `--help` option. It does not mention the configuration flags that affect
@@ -386,10 +385,10 @@ startup (`--daemon-socket`, `--log-filter`, `--config-path`), nor does it
 describe the `WEAVERD_BIN` or `WEAVER_FOREGROUND` environment variable
 overrides.
 
-**Remedy.** Once configuration flags are surfaced in help (level 6 remedy),
-they will naturally appear in the `daemon start` help if marked as
-`global = true`. Additionally, mention `WEAVERD_BIN` and `WEAVER_FOREGROUND` in
-the `long_about` or `after_help` text for `daemon start`.
+**Remedy.** Once configuration flags are surfaced in help (level 6 remedy), they
+will naturally appear in the `daemon start` help if marked as `global = true`.
+Additionally, mention `WEAVERD_BIN` and `WEAVER_FOREGROUND` in the `long_about`
+or `after_help` text for `daemon start`.
 
 ______________________________________________________________________
 
@@ -446,8 +445,8 @@ A manual page is auto-generated via `clap_mangen` during the build. It reflects
 the same clap-derived content that `--help` shows.
 
 Because the manpage is generated from the same clap model that lacks domain
-enumeration, operation listing, configuration flags, and per-operation help,
-the manpage inherits all the same deficiencies.
+enumeration, operation listing, configuration flags, and per-operation help, the
+manpage inherits all the same deficiencies.
 
 **Remedy.** Fixing the clap model (levels 1–6 above) will automatically improve
 the manpage. No separate manpage-specific work is required beyond ensuring
@@ -464,8 +463,8 @@ ______________________________________________________________________
 the command operation must be provided
 ```
 
-The `help` subcommand is a universal CLI convention. Disabling it creates a
-trap for users who reflexively type `weaver help`.
+The `help` subcommand is a universal CLI convention. Disabling it creates a trap
+for users who reflexively type `weaver help`.
 
 **Recommended remedy.** Re-enable the help subcommand by removing
 `disable_help_subcommand = true`.
@@ -484,49 +483,49 @@ ______________________________________________________________________
 
 ## Summary of gaps and priority
 
-| Priority | Level | Gap summary                                  | Effort         |
-| -------- | ----- | -------------------------------------------- | -------------- |
-| P0       | 0     | Bare invocation gives no guidance            | Small          |
-| P0       | 1a    | Domains not listed in help                   | Small          |
-| P0       | 1b    | Operations not listed in help                | Small          |
-| P0       | 2     | Missing operation gives no alternatives      | Small          |
-| P0       | 1d    | No `--version` flag                          | Trivial        |
-| P1       | 1c    | Config flags invisible in help               | Medium         |
-| P1       | 3     | Unknown domain gives no suggestions          | Small          |
-| P1       | 4     | Unknown operation gives no suggestions       | Small          |
-| P1       | 5a    | No operation-level help                      | Medium–Large   |
-| P1       | 5b    | Refactor error lists only first missing flag | Small          |
-| P1       | 10    | Error messages lack actionable guidance      | Medium         |
-| P1       | 12    | `weaver help` broken                         | Small          |
-| P2       | 1e    | No long description or after-help            | Small          |
-| P2       | 1f    | `help` subcommand disabled                   | Small          |
-| P2       | 7     | No plugin listing command                    | Medium         |
-| P2       | 8     | Daemon start help lacks config/env detail    | Small          |
-| P3       | 9     | Capabilities probe shows overrides only      | Medium         |
+| Priority | Level | Gap summary                                  | Effort       |
+| -------- | ----- | -------------------------------------------- | ------------ |
+| P0       | 0     | Bare invocation gives no guidance            | Small        |
+| P0       | 1a    | Domains not listed in help                   | Small        |
+| P0       | 1b    | Operations not listed in help                | Small        |
+| P0       | 2     | Missing operation gives no alternatives      | Small        |
+| P0       | 1d    | No `--version` flag                          | Trivial      |
+| P1       | 1c    | Config flags invisible in help               | Medium       |
+| P1       | 3     | Unknown domain gives no suggestions          | Small        |
+| P1       | 4     | Unknown operation gives no suggestions       | Small        |
+| P1       | 5a    | No operation-level help                      | Medium–Large |
+| P1       | 5b    | Refactor error lists only first missing flag | Small        |
+| P1       | 10    | Error messages lack actionable guidance      | Medium       |
+| P1       | 12    | `weaver help` broken                         | Small        |
+| P2       | 1e    | No long description or after-help            | Small        |
+| P2       | 1f    | `help` subcommand disabled                   | Small        |
+| P2       | 7     | No plugin listing command                    | Medium       |
+| P2       | 8     | Daemon start help lacks config/env detail    | Small        |
+| P3       | 9     | Capabilities probe shows overrides only      | Medium       |
 
 ______________________________________________________________________
 
 ## Recommended implementation order
 
-1. **Quick wins (P0):** Add `version` to `Cli`. List domains and
-   operations in `after_help`. Improve bare-invocation and missing-operation
-   error messages. These changes touch only
-   [`cli.rs`](../crates/weaver-cli/src/cli.rs), [`command.rs`](../crates/weaver-cli/src/command.rs),
-    and [`errors.rs`](../crates/weaver-cli/src/errors.rs).
+1. **Quick wins (P0):** Add `version` to `Cli`. List domains and operations in
+   `after_help`. Improve bare-invocation and missing-operation error messages.
+   These changes touch only [`cli.rs`](../crates/weaver-cli/src/cli.rs),
+   [`command.rs`](../crates/weaver-cli/src/command.rs), and
+   [`errors.rs`](../crates/weaver-cli/src/errors.rs).
 
-2. **Error message enrichment (P1):** Add valid-alternative listings
-   to unknown-domain and unknown-operation errors in both the CLI and the
-   daemon router. Surface all required arguments in `act refactor` errors.
+1. **Error message enrichment (P1):** Add valid-alternative listings to
+   unknown-domain and unknown-operation errors in both the CLI and the daemon
+   router. Surface all required arguments in `act refactor` errors.
 
-3. **Configuration flag visibility (P1):** Register the five config
-   flags as clap arguments (even if parsing remains in `ortho-config`) so they
-   appear in help output.
+1. **Configuration flag visibility (P1):** Register the five config flags as
+   clap arguments (even if parsing remains in `ortho-config`) so they appear in
+   help output.
 
-4. **Help subcommand and operation-level help (P1–P2):** Re-enable
-   the help subcommand and implement topic-based help. Optionally restructure
-   the clap model to use nested subcommands for full per-operation `--help`.
+1. **Help subcommand and operation-level help (P1–P2):** Re-enable the help
+   subcommand and implement topic-based help. Optionally restructure the clap
+   model to use nested subcommands for full per-operation `--help`.
 
-5. **Plugin introspection (P2):** Add a `list-plugins` command.
+1. **Plugin introspection (P2):** Add a `list-plugins` command.
 
-6. **Capability matrix enrichment (P3):** Extend `--capabilities` to
-   merge runtime capabilities.
+1. **Capability matrix enrichment (P3):** Extend `--capabilities` to merge
+   runtime capabilities.

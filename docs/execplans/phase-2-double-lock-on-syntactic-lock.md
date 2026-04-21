@@ -15,7 +15,7 @@ The Double-Lock safety harness validates code modifications through two
 sequential phases:
 
 1. **Syntactic Lock**: Ensures modified files produce valid syntax trees
-2. **Semantic Lock**: Verifies no new errors are introduced via Language Server
+1. **Semantic Lock**: Verifies no new errors are introduced via Language Server
    Protocol (LSP) diagnostics
 
 Currently, the syntactic lock uses a placeholder implementation that always
@@ -113,8 +113,8 @@ single `VerificationFailure` containing the error message.
 
 **Decision**: Modify `SafetyHarnessWorld` to use a `SyntacticLockVariant` enum
 that can hold either `ConfigurableSyntacticLock` or
-`TreeSitterSyntacticLockAdapter`, enabling pluggable lock implementations in
-BDD tests.
+`TreeSitterSyntacticLockAdapter`, enabling pluggable lock implementations in BDD
+tests.
 
 **Rationale**:
 
@@ -155,19 +155,19 @@ BDD tests.
 ### Unit Tests
 
 1. Valid Rust code passes validation
-2. Invalid Rust code fails with location information
-3. Unknown file extensions pass through (not validated)
-4. Multiple files collect all failures
-5. Empty context passes validation
-6. Mixed valid/invalid files fail with complete failure list
+1. Invalid Rust code fails with location information
+1. Unknown file extensions pass through (not validated)
+1. Multiple files collect all failures
+1. Empty context passes validation
+1. Mixed valid/invalid files fail with complete failure list
 
 ### BDD Scenarios
 
 1. Valid Rust code passes syntactic validation with Tree-sitter
-2. Invalid Rust code fails syntactic validation with Tree-sitter
-3. Unknown file extensions pass through Tree-sitter validation
-4. Python code validated by Tree-sitter
-5. TypeScript code validated by Tree-sitter
+1. Invalid Rust code fails syntactic validation with Tree-sitter
+1. Unknown file extensions pass through Tree-sitter validation
+1. Python code validated by Tree-sitter
+1. TypeScript code validated by Tree-sitter
 
 ## Risks and Mitigations
 

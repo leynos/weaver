@@ -1,9 +1,8 @@
 # 2.3.3 Standardize actionable guidance in startup and routing errors
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: IMPLEMENTED
 
@@ -12,13 +11,13 @@ repository root.
 
 ## Purpose / big picture
 
-Roadmap item `2.3.3` is the unification step that sits on top of completed
-items `2.2.1`, `2.2.4`, `2.3.1`, and `2.3.2`. Today the Level 10 failure paths
-already exist, but they still read like separate features:
+Roadmap item `2.3.3` is the unification step that sits on top of completed items
+`2.2.1`, `2.2.4`, `2.3.1`, and `2.3.2`. Today the Level 10 failure paths already
+exist, but they still read like separate features:
 
 - bare invocation prints short help with no explicit error line;
-- unknown domains list valid domains but do not always tell the operator what
-  to run next;
+- unknown domains list valid domains but do not always tell the operator what to
+  run next;
 - unknown operations list alternatives but also stop short of an explicit next
   command;
 - daemon auto-start failures still dump raw `LifecycleError` text.
@@ -41,23 +40,23 @@ structure: error, alternatives, and one concrete next step.
 
 This work is successful when the following are all true:
 
-1. `weaver` with no arguments, `weaver <domain>`,
-   `weaver <unknown-domain> ...`, `weaver ... <unknown-operation>`, and daemon
-   start failures all print the same three-part layout.
-2. the `WEAVERD_BIN` failure path tells operators how to check installation and
+1. `weaver` with no arguments, `weaver <domain>`, `weaver <unknown-domain> ...`,
+   `weaver ... <unknown-operation>`, and daemon start failures all print the
+   same three-part layout.
+1. the `WEAVERD_BIN` failure path tells operators how to check installation and
    how to override the daemon binary path;
-3. stable non-zero exit behaviour does not change;
-4. unit tests and `rstest-bdd` scenarios cover the happy path, unhappy paths,
+1. stable non-zero exit behaviour does not change;
+1. unit tests and `rstest-bdd` scenarios cover the happy path, unhappy paths,
    and edge cases;
-5. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-   reflect the shipped behaviour.
+1. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md` reflect
+   the shipped behaviour.
 
 ## Constraints
 
 - Run `make check-fmt`, `make lint`, and `make test` before considering the
   feature complete.
-- Because this task also updates Markdown, run `make fmt`,
-  `make markdownlint`, and `make nixie` before finishing.
+- Because this task also updates Markdown, run `make fmt`, `make markdownlint`,
+  and `make nixie` before finishing.
 - Add both unit coverage and behavioural coverage using `rstest-bdd` v0.5.0.
   Reuse the existing feature harnesses where possible rather than creating a
   second bespoke end-to-end harness.
@@ -73,12 +72,12 @@ This work is successful when the following are all true:
   - startup failures still exit non-zero.
 - Do not widen the outer JSONL transport envelope. The `stream` and `exit`
   message contract must remain unchanged.
-- Prefer additive CLI-side formatting over changing `Display` implementations
-  on `AppError` or `LifecycleError`. The new operator contract is a rendering
+- Prefer additive CLI-side formatting over changing `Display` implementations on
+  `AppError` or `LifecycleError`. The new operator contract is a rendering
   concern, not a reason to blur internal error types.
 - Do not add a new dependency for formatting or edit-distance logic.
-- Keep files under 400 lines by extracting helpers or tests into focused
-  modules before crossing the limit.
+- Keep files under 400 lines by extracting helpers or tests into focused modules
+  before crossing the limit.
 - Update `docs/weaver-design.md` with the final error-template policy and any
   startup-guidance design decision.
 - Update `docs/users-guide.md` with the final operator-visible outputs.
@@ -86,16 +85,16 @@ This work is successful when the following are all true:
   all validation gates pass.
 - Comments and documentation must use en-GB-oxendict spelling.
 - Do not broaden this task into the locale-selection roadmap (`3.3.x`).
-  Preflight/localized text should continue to use the current localizer, but
-  the general human output renderer may remain English-only for now.
+  Preflight/localized text should continue to use the current localizer, but the
+  general human output renderer may remain English-only for now.
 
 ## Tolerances (exception triggers)
 
-- Scope: if implementation requires changes to more than 16 files or roughly
-  500 net lines, stop and re-evaluate before continuing.
-- Interfaces: if a public wire type in `crates/weaver-daemon-types/` must
-  change to satisfy the acceptance criteria, stop and escalate before changing
-  the JSON contract.
+- Scope: if implementation requires changes to more than 16 files or roughly 500
+  net lines, stop and re-evaluate before continuing.
+- Interfaces: if a public wire type in `crates/weaver-daemon-types/` must change
+  to satisfy the acceptance criteria, stop and escalate before changing the JSON
+  contract.
 - Dependencies: if the formatter or startup guidance appears to require a new
   external crate, stop and escalate.
 - Behaviour drift: if satisfying `2.3.3` would force a change to the completed
@@ -105,8 +104,8 @@ This work is successful when the following are all true:
   `crates/weaver-cli/src/discoverability.rs`, or
   `crates/weaver-cli/src/output/mod.rs` would exceed 400 lines, extract a new
   helper module before adding more logic.
-- Ambiguity: if there is no single defensible `Next command:` for a failure
-  case without product input, stop and present the options with trade-offs.
+- Ambiguity: if there is no single defensible `Next command:` for a failure case
+  without product input, stop and present the options with trade-offs.
 - Iterations: if the same failing validator needs more than five correction
   attempts, stop and report the blocker.
 
@@ -114,10 +113,10 @@ This work is successful when the following are all true:
 
 - Risk: bare invocation currently satisfies roadmap `2.2.1` by printing short
   help, but it does not have an explicit `error:` line. A careless refactor
-  could break the earlier `Usage:` and single-pointer requirements while
-  chasing the new template. Severity: medium. Likelihood: high. Mitigation:
-  drive the change with focused tests in `crates/weaver-cli/src/tests/unit/`
-  and keep the `Usage:` line plus exactly one help pointer in the final output.
+  could break the earlier `Usage:` and single-pointer requirements while chasing
+  the new template. Severity: medium. Likelihood: high. Mitigation: drive the
+  change with focused tests in `crates/weaver-cli/src/tests/unit/` and keep the
+  `Usage:` line plus exactly one help pointer in the final output.
 
 - Risk: unknown-operation guidance is intentionally daemon-routed, and the CLI
   must not rebuild the operation list from `DOMAIN_OPERATIONS`. Severity: high.
@@ -128,14 +127,14 @@ This work is successful when the following are all true:
 - Risk: lifecycle errors are surfaced through two different paths today:
   explicit `weaver daemon start` failures go through `AppError::Lifecycle`,
   while auto-start failures are printed directly in
-  `execute_daemon_command(...)`. Severity: medium. Likelihood: high.
-  Mitigation: add one CLI-side lifecycle-guidance renderer and route both print
-  sites through it.
+  `execute_daemon_command(...)`. Severity: medium. Likelihood: high. Mitigation:
+  add one CLI-side lifecycle-guidance renderer and route both print sites
+  through it.
 
 - Risk: the Fluent catalogue already contains some guidance strings, including
-  an unused unknown-domain hint entry. It is easy to add hard-coded English
-  text instead of reusing the existing localization seam. Severity: low.
-  Likelihood: high. Mitigation: keep preflight and bare-invocation copy inside
+  an unused unknown-domain hint entry. It is easy to add hard-coded English text
+  instead of reusing the existing localization seam. Severity: low. Likelihood:
+  high. Mitigation: keep preflight and bare-invocation copy inside
   `crates/weaver-cli/locales/en-US/messages.ftl` and continue using
   `strip_bidi_isolates(...)`.
 
@@ -160,8 +159,8 @@ This work is successful when the following are all true:
   `UnknownOperation` payloads and stable exit status `1`.
 - [x] (2026-04-07) Drafted this ExecPlan in
   `docs/execplans/2-3-3-standardize-actionable-guidance-in-startup-errors.md`.
-- [x] Stage A: add failing unit and behavioural tests for the unified
-  three-part template.
+- [x] Stage A: add failing unit and behavioural tests for the unified three-part
+  template.
 - [x] Stage B: introduce a small CLI-side actionable-guidance formatter and
   refactor bare invocation plus preflight domain guidance to use it.
 - [x] Stage C: route unknown-operation human rendering and startup/lifecycle
@@ -178,14 +177,14 @@ This work is successful when the following are all true:
   does not use it. That is a strong sign that the intended next-command surface
   was anticipated but not yet wired in.
 
-- The daemon-side unknown-operation contract is already in a good place for
-  this roadmap item. `crates/weaverd/src/dispatch/response.rs` serializes
+- The daemon-side unknown-operation contract is already in a good place for this
+  roadmap item. `crates/weaverd/src/dispatch/response.rs` serializes
   `known_operations` and the CLI already parses it in human mode. The missing
   piece is the next-command line, not a new daemon payload type.
 
-- `crates/weaver-cli/src/localizer.rs::write_bare_help(...)` is the outlier.
-  It writes a help block directly rather than building from the same guidance
-  shape as the other preflight paths.
+- `crates/weaver-cli/src/localizer.rs::write_bare_help(...)` is the outlier. It
+  writes a help block directly rather than building from the same guidance shape
+  as the other preflight paths.
 
 - Explicit lifecycle start failures and automatic daemon-start failures already
   share `LifecycleError`, but they do not share a rendering path. This is an
@@ -205,33 +204,33 @@ This work is successful when the following are all true:
   revision. Date: 2026-04-07.
 
 - Decision: treat startup guidance as a rendering layer over `LifecycleError`
-  rather than rewriting the error enum's `Display` strings. Rationale:
-  `Display` remains useful for logs and internal assertions, while the new
-  operator contract belongs in one dedicated formatter. Date: 2026-04-07.
+  rather than rewriting the error enum's `Display` strings. Rationale: `Display`
+  remains useful for logs and internal assertions, while the new operator
+  contract belongs in one dedicated formatter. Date: 2026-04-07.
 
-- Decision: apply the startup formatter to both auto-start failures and
-  explicit `weaver daemon start` failures. Rationale: both failure modes are
-  surfaced to operators and should not drift just because they reach stderr
-  through different call sites. Date: 2026-04-07.
+- Decision: apply the startup formatter to both auto-start failures and explicit
+  `weaver daemon start` failures. Rationale: both failure modes are surfaced to
+  operators and should not drift just because they reach stderr through
+  different call sites. Date: 2026-04-07.
 
 ## Outcomes & Retrospective
 
 Target outcome at completion:
 
-1. Level 10a through 10e all print the same three-part layout in
-   human-readable mode.
-2. The Level 10a missing-daemon-binary path names both recovery options:
+1. Level 10a through 10e all print the same three-part layout in human-readable
+   mode.
+1. The Level 10a missing-daemon-binary path names both recovery options:
    installation/PATH validation and `WEAVERD_BIN`.
-3. The CLI still avoids daemon startup for unknown domains and missing
+1. The CLI still avoids daemon startup for unknown domains and missing
    operations.
-4. Unknown operations still return the daemon's exit status `1` and preserve
-   the existing JSON payload in `--output json` mode.
-5. Bare invocation still prints a `Usage:` line, all three valid domains, and
+1. Unknown operations still return the daemon's exit status `1` and preserve the
+   existing JSON payload in `--output json` mode.
+1. Bare invocation still prints a `Usage:` line, all three valid domains, and
    exactly one help pointer.
-6. The feature is covered by unit tests and `rstest-bdd` scenarios, and the
+1. The feature is covered by unit tests and `rstest-bdd` scenarios, and the
    final repository state passes `make fmt`, `make markdownlint`, `make nixie`,
    `make check-fmt`, `make lint`, and `make test`.
-7. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
+1. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
    accurately describe the shipped behaviour.
 
 Retrospective notes will be added after implementation.
@@ -242,9 +241,9 @@ The current code is already close to the target behaviour, but the formatting
 logic is fragmented.
 
 `crates/weaver-cli/src/localizer.rs` owns `write_bare_help(...)`, which writes
-the current bare-invocation block directly. That block has the right
-information for roadmap `2.2.1`, but it does not expose the standard error /
-alternatives / next-command structure needed by `2.3.3`.
+the current bare-invocation block directly. That block has the right information
+for roadmap `2.2.1`, but it does not expose the standard error / alternatives /
+next-command structure needed by `2.3.3`.
 
 `crates/weaver-cli/src/discoverability.rs` owns
 `write_missing_operation_guidance(...)` and
@@ -253,10 +252,10 @@ alternatives, and they already use the localizer, but they are not built from a
 shared formatter. Unknown domains also stop after the alternatives block unless
 the code is extended to use the existing unknown-domain hint message.
 
-`crates/weaver-cli/src/output/mod.rs` owns `render_unknown_operation(...)`.
-This is the Level 10c path. It already prints the daemon-provided operations,
-so the source of truth is correct; it simply needs the final `Next command:`
-line and shared layout.
+`crates/weaver-cli/src/output/mod.rs` owns `render_unknown_operation(...)`. This
+is the Level 10c path. It already prints the daemon-provided operations, so the
+source of truth is correct; it simply needs the final `Next command:` line and
+shared layout.
 
 `crates/weaver-cli/src/lib.rs` owns the print sites. Bare invocation and
 preflight guidance are emitted in `handle_preflight(...)`. Auto-start failures
@@ -318,11 +317,11 @@ In `crates/weaver-cli/src/output/mod.rs` tests, extend the unknown-operation
 human rendering assertions so they require a `Next command:` line derived from
 the first `known_operations` entry in the daemon payload.
 
-In `crates/weaver-cli/src/tests/unit/auto_start.rs`, add explicit assertions
-for the missing-binary path so the stderr output mentions both installation
-checking and `WEAVERD_BIN`, and still exits with failure. Add a second focused
-unit test for `weaver daemon start` using the existing injected-daemon-binary
-test seam so the explicit lifecycle path renders the same startup guidance.
+In `crates/weaver-cli/src/tests/unit/auto_start.rs`, add explicit assertions for
+the missing-binary path so the stderr output mentions both installation checking
+and `WEAVERD_BIN`, and still exits with failure. Add a second focused unit test
+for `weaver daemon start` using the existing injected-daemon-binary test seam so
+the explicit lifecycle path renders the same startup guidance.
 
 In `crates/weaver-cli/tests/features/weaver_cli.feature` and
 `crates/weaver-cli/src/tests/behaviour.rs`, extend the existing behavioural
@@ -333,9 +332,9 @@ scenarios for:
 - unknown operation in human mode;
 - auto-start spawn failure.
 
-Keep the current happy-path scenarios (`streaming a request`, lifecycle
-success, capability probe, and valid daemon interaction) untouched so they
-continue to prove that successful behaviour is unchanged.
+Keep the current happy-path scenarios (`streaming a request`, lifecycle success,
+capability probe, and valid daemon interaction) untouched so they continue to
+prove that successful behaviour is unchanged.
 
 Only add daemon-side test changes if Stage C ends up requiring a payload
 revision. Otherwise, the existing `weaverd` unknown-operation tests are already
@@ -365,16 +364,16 @@ special cases. For example, bare invocation can include `Usage:` and domain
 rows, while unknown operations can include `Available operations:` and one
 operation per line.
 
-Refactor `crates/weaver-cli/src/localizer.rs::write_bare_help(...)` so it
-either delegates to the new helper or is replaced by a new
+Refactor `crates/weaver-cli/src/localizer.rs::write_bare_help(...)` so it either
+delegates to the new helper or is replaced by a new
 `write_missing_domain_guidance(...)` function that uses the same formatter and
 still pulls copy from the localizer.
 
 Refactor `crates/weaver-cli/src/discoverability.rs` so
-`write_missing_operation_guidance(...)` and
-`write_unknown_domain_guidance(...)` construct `ActionableGuidance` values
-instead of writing ad hoc blocks. Reuse the existing Fluent catalogue and add
-only the minimum new entries needed for `Next command:` or revised hint text.
+`write_missing_operation_guidance(...)` and `write_unknown_domain_guidance(...)`
+construct `ActionableGuidance` values instead of writing ad hoc blocks. Reuse
+the existing Fluent catalogue and add only the minimum new entries needed for
+`Next command:` or revised hint text.
 
 Do not move unknown-operation rendering into this module yet. First finish the
 preflight and bare-invocation paths, because they are the most sensitive to the
@@ -394,13 +393,13 @@ Next command:
 The operation hint must come from the daemon payload, not from
 `crates/weaver-cli/src/discoverability.rs`.
 
-Add a dedicated lifecycle-guidance rendering seam in `weaver-cli`, either in
-the new `actionable_guidance` module or as a focused helper beside the
-lifecycle module. The renderer should map at least these variants:
+Add a dedicated lifecycle-guidance rendering seam in `weaver-cli`, either in the
+new `actionable_guidance` module or as a focused helper beside the lifecycle
+module. The renderer should map at least these variants:
 
 - `LifecycleError::LaunchDaemon` with missing binary: mention installation/PATH
-  checking and `WEAVERD_BIN`, and derive the deterministic next command from
-  the configured daemon binary. If `WEAVERD_BIN` resolves to an explicit path
+  checking and `WEAVERD_BIN`, and derive the deterministic next command from the
+  configured daemon binary. If `WEAVERD_BIN` resolves to an explicit path
   (contains a slash), render `test -x <path>`; otherwise render
   `command -v <binary>`;
 - `LifecycleError::StartupFailed`, `LifecycleError::StartupTimeout`, and
@@ -412,7 +411,7 @@ Then route both print sites through this helper:
 
 1. the auto-start failure branch in
    `crates/weaver-cli/src/lib.rs::execute_daemon_command(...)`;
-2. the `AppError::Lifecycle` case in
+1. the `AppError::Lifecycle` case in
    `crates/weaver-cli/src/lib.rs::CliRunner::map_result_to_exit_code(...)`.
 
 Keep the exit codes unchanged. This stage is about rendering only.
@@ -441,8 +440,8 @@ and only when the validation gates are green.
 
 ### Stage E: run the full validation suite and capture evidence
 
-Run fast focused tests while iterating, then run the full gates sequentially.
-Do not run format, lint, and test commands in parallel in this repository.
+Run fast focused tests while iterating, then run the full gates sequentially. Do
+not run format, lint, and test commands in parallel in this repository.
 
 ## Concrete steps
 
@@ -613,5 +612,5 @@ The likely touched source files are:
 ## Revision note
 
 Implemented from roadmap item `2.3.3` with the shared actionable-guidance
-formatter, matching unit and behavioural tests, and the supporting
-documentation updates completed.
+formatter, matching unit and behavioural tests, and the supporting documentation
+updates completed.

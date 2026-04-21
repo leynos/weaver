@@ -22,8 +22,8 @@ writes.
 
 ## Constraints
 
-- Follow the `act apply-patch` semantics in `docs/weaver-design.md` section
-  4.3, including SEARCH/REPLACE behaviour, line-ending handling, and traversal
+- Follow the `act apply-patch` semantics in `docs/weaver-design.md` section 4.3,
+  including SEARCH/REPLACE behaviour, line-ending handling, and traversal
   checks.
 - The JSONL protocol must remain backward-compatible for existing commands.
 - All `act` edits must pass the Double-Lock harness with no on-disk writes on
@@ -41,10 +41,10 @@ writes.
 
 ## Tolerances (exception triggers)
 
-- Scope: if implementation requires touching more than 20 files or exceeds
-  ~1200 net lines, stop and escalate.
-- Interface: if the JSONL schema must break existing clients, stop and
-  escalate with options.
+- Scope: if implementation requires touching more than 20 files or exceeds ~1200
+  net lines, stop and escalate.
+- Interface: if the JSONL schema must break existing clients, stop and escalate
+  with options.
 - Dependencies: if a new external dependency is required, stop and escalate.
 - Iterations: if tests still fail after two focused fix attempts, stop and
   escalate with findings.
@@ -60,43 +60,42 @@ writes.
   (LSP) wiring beyond the placeholder lock. Severity: high. Likelihood: medium.
   Mitigation: implement a dedicated LSP-backed `SemanticLock` adapter and
   isolate it behind a trait for test doubles.
-- Risk: fuzzy match behaviour could misapply if not cursor-scoped.
-  Severity: high. Likelihood: medium. Mitigation: follow the cursor-based
-  algorithm from the design doc and test no-match failure paths.
-- Risk: CLI stdin handling could block non apply-patch commands.
-  Severity: medium. Likelihood: low. Mitigation: only read STDIN when
-  `domain=act` and `operation=apply-patch`.
+- Risk: fuzzy match behaviour could misapply if not cursor-scoped. Severity:
+  high. Likelihood: medium. Mitigation: follow the cursor-based algorithm from
+  the design doc and test no-match failure paths.
+- Risk: CLI stdin handling could block non apply-patch commands. Severity:
+  medium. Likelihood: low. Mitigation: only read STDIN when `domain=act` and
+  `operation=apply-patch`.
 
 ## Progress
 
 - [x] (2026-01-28 00:00Z) Drafted ExecPlan.
 - [x] (2026-02-02 00:00Z) Plan approved; implementation started.
 - [x] (2026-02-02 00:00Z) Add JSONL request/response types for apply-patch and
-      update CLI stdin handling.
+  update CLI stdin handling.
 - [x] (2026-02-02 00:00Z) Implement patch parsing, matching, and safety harness
-      integration in `weaverd`.
+  integration in `weaverd`.
 - [x] (2026-02-02 00:00Z) Add unit and BDD tests (rstest + rstest-bdd) for
-      happy/unhappy paths.
+  happy/unhappy paths.
 - [x] (2026-02-02 00:00Z) Update design doc, user guide, and roadmap; run
-      quality gates.
+  quality gates.
 
 ## Surprises & discoveries
 
-- Observation: Qdrant notes store was unreachable during planning.
-  Evidence: `qdrant-find` returned connection failures. Impact: no historical
-  project notes were available for this plan.
+- Observation: Qdrant notes store was unreachable during planning. Evidence:
+  `qdrant-find` returned connection failures. Impact: no historical project
+  notes were available for this plan.
 
 ## Decision log
 
-- Decision: Extend the existing JSONL `CommandRequest` with an optional
-  `patch` payload field (only populated for `act apply-patch`) to preserve
-  backward compatibility. Rationale: avoids a breaking protocol change while
-  still carrying raw patch content in a single JSONL line. Date/Author:
-  2026-01-28 / Codex
-- Decision: Keep request/response structs in `weaver-cli` and `weaverd` for
-  this step instead of introducing a new shared crate. Rationale: limits scope
-  creep; revisit if protocol drift becomes painful. Date/Author: 2026-01-28 /
+- Decision: Extend the existing JSONL `CommandRequest` with an optional `patch`
+  payload field (only populated for `act apply-patch`) to preserve backward
+  compatibility. Rationale: avoids a breaking protocol change while still
+  carrying raw patch content in a single JSONL line. Date/Author: 2026-01-28 /
   Codex
+- Decision: Keep request/response structs in `weaver-cli` and `weaverd` for this
+  step instead of introducing a new shared crate. Rationale: limits scope creep;
+  revisit if protocol drift becomes painful. Date/Author: 2026-01-28 / Codex
 - Decision: Raise the JSONL request size limit to 1 mebibyte (MiB) to
   accommodate apply-patch payloads while keeping memory usage bounded.
   Rationale: typical agent patches exceed 64 KiB; 1 MiB covers common usage
@@ -105,8 +104,8 @@ writes.
   error envelopes (`ApplyPatchError`, `VerificationError`, or backend
   input/output (I/O) errors) with status 1 for patch/lock failures and status 2
   for backend/I/O failures. Rationale: keeps CLI and agent consumers aligned
-  with existing harness conventions while providing clear outcomes.
-  Date/Author: 2026-02-02 / Codex.
+  with existing harness conventions while providing clear outcomes. Date/Author:
+  2026-02-02 / Codex.
 
 ## Outcomes & retrospective
 
@@ -125,10 +124,10 @@ Key references and existing code:
 
 - `docs/weaver-design.md` section 4.3 defines patch format, search/replace
   semantics, and lock interaction.
-- `crates/weaver-cli/src/command.rs` and `crates/weaver-cli/src/lib.rs`
-  define JSONL request construction and CLI execution flow.
-- `crates/weaverd/src/dispatch/request.rs` defines daemon JSONL request
-  parsing; `crates/weaverd/src/dispatch/handler.rs` enforces request size.
+- `crates/weaver-cli/src/command.rs` and `crates/weaver-cli/src/lib.rs` define
+  JSONL request construction and CLI execution flow.
+- `crates/weaverd/src/dispatch/request.rs` defines daemon JSONL request parsing;
+  `crates/weaverd/src/dispatch/handler.rs` enforces request size.
 - `crates/weaverd/src/safety_harness` provides edit transactions and lock
   interfaces; only placeholder semantic locks exist today.
 - BDD tests live in `crates/weaver-cli/tests/features/` and
@@ -140,22 +139,22 @@ Key references and existing code:
 
 ## Plan of work
 
-Stage A (confirm spec and constraints): re-read the `act apply-patch` section
-in `docs/weaver-design.md`, confirm the accepted patch grammar, and decide how
-to handle the request size limit. Capture any clarifications in the design
-doc's decision log for section 4.3.
+Stage A (confirm spec and constraints): re-read the `act apply-patch` section in
+`docs/weaver-design.md`, confirm the accepted patch grammar, and decide how to
+handle the request size limit. Capture any clarifications in the design doc's
+decision log for section 4.3.
 
 Stage B (CLI and JSONL protocol): extend `CommandRequest` in
-`crates/weaver-cli/src/command.rs` to carry an optional patch payload and
-update `execute_daemon_command` to read STDIN only for `act apply-patch`.
-Update the test harness to inject stdin (likely by adding a reader to
-`IoStreams` or passing a reader into `CliRunner`) so the BDD tests can assert
-the JSONL request contains the expected patch content. Add or update golden
-fixtures under `crates/weaver-cli/tests/golden/`.
+`crates/weaver-cli/src/command.rs` to carry an optional patch payload and update
+`execute_daemon_command` to read STDIN only for `act apply-patch`. Update the
+test harness to inject stdin (likely by adding a reader to `IoStreams` or
+passing a reader into `CliRunner`) so the BDD tests can assert the JSONL request
+contains the expected patch content. Add or update golden fixtures under
+`crates/weaver-cli/tests/golden/`.
 
 Stage C (daemon request parsing and handler wiring): extend
-`crates/weaverd/src/dispatch/request.rs` to deserialize the optional patch
-field and validate it for `act apply-patch` (non-empty, text-only). Add a new
+`crates/weaverd/src/dispatch/request.rs` to deserialize the optional patch field
+and validate it for `act apply-patch` (non-empty, text-only). Add a new
 `dispatch::act` module with an `apply_patch` handler, and route it from
 `DomainRouter::route_act`. Ensure the handler starts required backends and uses
 the safety harness.
@@ -167,12 +166,12 @@ matching, fuzzy whitespace/line-ending matching, and path traversal checks.
 Unit-test parsing and matching, including invalid headers, missing hunks, and
 binary or NUL bytes rejection.
 
-Stage E (Double-Lock integration): map parsed operations into a transaction
-that produces modified buffers for syntactic and semantic locks and performs
-atomic commits. Extend the safety harness if necessary to support delete
-operations and full-content replacements. Implement an LSP-backed semantic lock
-adapter that uses `did_open`, `did_change`, `did_close`, and `diagnostics` to
-compare baseline vs modified diagnostics, returning
+Stage E (Double-Lock integration): map parsed operations into a transaction that
+produces modified buffers for syntactic and semantic locks and performs atomic
+commits. Extend the safety harness if necessary to support delete operations and
+full-content replacements. Implement an LSP-backed semantic lock adapter that
+uses `did_open`, `did_change`, `did_close`, and `diagnostics` to compare
+baseline vs modified diagnostics, returning
 `SafetyHarnessError::SemanticBackendUnavailable` when the LSP backend cannot be
 started.
 
@@ -194,11 +193,11 @@ Stage H (quality gates): run `make check-fmt`, `make lint`, `make test`,
 
 1. Reconfirm requirements and decide on request size handling, then update
    `docs/weaver-design.md` with the decision before coding.
-2. Implement CLI JSONL request changes and tests, then run the CLI-focused
-   unit and BDD suites.
-3. Implement daemon apply-patch handler, parser, and safety harness changes,
+1. Implement CLI JSONL request changes and tests, then run the CLI-focused unit
+   and BDD suites.
+1. Implement daemon apply-patch handler, parser, and safety harness changes,
    then run unit and BDD suites for `weaverd`.
-4. Update documentation and roadmap, then run the full workspace gates.
+1. Update documentation and roadmap, then run the full workspace gates.
 
 Commands (run from repo root, using `tee` + `pipefail`):
 
@@ -217,8 +216,8 @@ The feature is complete when:
 
 - Running `weaver act apply-patch` with a patch on STDIN sends a JSONL request
   that includes the patch payload and exits with status 0 on success.
-- Daemon responses include structured JSON error payloads for parse failures
-  and verification failures, and the CLI surfaces them with non-zero status.
+- Daemon responses include structured JSON error payloads for parse failures and
+  verification failures, and the CLI surfaces them with non-zero status.
 - The patch parser enforces modify/create/delete semantics, rejects missing
   hunks and binary content, and normalizes line endings per the design doc.
 - Syntactic and semantic locks run on modified/new files; failures leave the
@@ -258,15 +257,15 @@ consistent and small, splitting modules as needed):
   - A helper like `CommandRequest::with_patch(...)` to build apply-patch
     requests.
 - In `crates/weaverd/src/dispatch/request.rs`:
-  - `CommandRequest` mirrors the optional `patch` field and includes a
-    `patch()` accessor that returns `Option<&str>`.
+  - `CommandRequest` mirrors the optional `patch` field and includes a `patch()`
+    accessor that returns `Option<&str>`.
 - In `crates/weaverd/src/dispatch/act/apply_patch/`:
   - `PatchParseError` and `PatchOperation` enums (Modify/Create/Delete).
   - `ParsedPatch` holding ordered operations.
-  - `PatchMatcher` functions that apply SEARCH/REPLACE blocks with cursor
-    logic and line-ending normalization.
-  - `ApplyPatchHandler::handle(request, writer, backends)` that starts
-    backends, applies the patch in-memory, and commits via the harness.
+  - `PatchMatcher` functions that apply SEARCH/REPLACE blocks with cursor logic
+    and line-ending normalization.
+  - `ApplyPatchHandler::handle(request, writer, backends)` that starts backends,
+    applies the patch in-memory, and commits via the harness.
 - In `crates/weaverd/src/safety_harness`:
   - Extend `EditTransaction` (or introduce a `FileChange` enum) to support
     deletes and full-content replacements without losing atomicity.

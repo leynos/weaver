@@ -19,16 +19,16 @@ Tree (CST).
 
 The key steps are:
 
-1. **Define the Expression AST**: Create Rust `enum`s and `struct`s to
-   represent the structure of all possible DDlog expressions.
+1. **Define the Expression AST**: Create Rust `enum`s and `struct`s to represent
+   the structure of all possible DDlog expressions.
 
-2. **Define Operator Precedence and Associativity**: Translate the operator
+1. **Define Operator Precedence and Associativity**: Translate the operator
    table from the Haskell parser analysis into a `chumsky` Pratt parser
    definition.
 
-3. **Implement the Parser**: Build the `chumsky` parser using `chumsky::pratt`.
+1. **Implement the Parser**: Build the `chumsky` parser using `chumsky::pratt`.
 
-4. **Integrate with the CST**: Ensure that when the expression parser is
+1. **Integrate with the CST**: Ensure that when the expression parser is
    invoked, the resulting AST is correctly represented within a `rowan`
    `GreenNode`.
 
@@ -327,8 +327,8 @@ guard for the duration of the condition parse. While active, it interprets
 `IDENT {` as a variable followed by the branch, preventing the condition from
 consuming the branch braces. The guard automatically suspends inside
 parentheses, brace groups, and closure bodies so expressions such as
-`if (Point { x: 1 }) { … }` or `if cond { Point { x: 1 } }` continue to parse
-as intended. This strategy eliminates spurious `expected T_COLON` diagnostics
+`if (Point { x: 1 }) { … }` or `if cond { Point { x: 1 } }` continue to parse as
+intended. This strategy eliminates spurious `expected T_COLON` diagnostics
 without restricting legitimate struct literal usage.
 
 ### Handling `match` expressions
@@ -347,12 +347,12 @@ braces, and brackets. The captured substring is trimmed so nested patterns such
 as `Point { field: Some(x) }` round-trip without losing formatting.
 
 If the parser encounters a comma or closing brace before a top-level `->`, it
-emits `expected '->' in match arm` and stops, preventing the following body
-from being misinterpreted as part of the pattern. Empty bodies (for example,
+emits `expected '->' in match arm` and stops, preventing the following body from
+being misinterpreted as part of the pattern. Empty bodies (for example,
 `match (x) { }`) raise `expected at least one match arm`, with the diagnostic
 anchored on the closing brace. Arm bodies execute under
-`with_struct_literals_suspended`, so users can build struct literals inside
-arms without triggering the guard.
+`with_struct_literals_suspended`, so users can build struct literals inside arms
+without triggering the guard.
 
 ### Handling `for` loop expressions
 
@@ -372,9 +372,8 @@ node. The header is handled in three parts:
 
 The loop body is parsed using the standard expression entry point. That parser
 handles both single atoms and grouped blocks. Treating loops as expressions
-means `rule_body_span` can continue validating rule bodies by invoking the
-Pratt parser; control-flow errors surface alongside other expression
-diagnostics.
+means `rule_body_span` can continue validating rule bodies by invoking the Pratt
+parser; control-flow errors surface alongside other expression diagnostics.
 
 ______________________________________________________________________
 
@@ -391,12 +390,12 @@ The strategy is as follows:
    expression is expected (e.g., in a rule body or a `return` statement), it
    will invoke `expression_parser()`.
 
-2. The `expression_parser()` will consume tokens from the stream.
+1. The `expression_parser()` will consume tokens from the stream.
 
-3. Crucially, the main parser will continue to feed every single token
+1. Crucially, the main parser will continue to feed every single token
    (including whitespace and comments) into the `rowan::GreenNodeBuilder`.
 
-4. The main parser will wrap the sequence of tokens that were successfully
+1. The main parser will wrap the sequence of tokens that were successfully
    parsed by `expression_parser()` in an `N_EXPR_NODE` `SyntaxKind`.
 
 This approach delivers the best of both worlds:
@@ -411,10 +410,10 @@ This approach delivers the best of both worlds:
 
 Integration and fixture code build Pratt parser expectations through the
 `parser::ast` façade. The module now re-exports `MatchArm` alongside `Expr`, so
-callers can construct match expressions without reaching into the private
-layout of `ast::expr`. Tests should continue using the helpers in `test_util`
-for common patterns, but direct use of `MatchArm` is available whenever bespoke
-arm construction is clearer than chaining builders.
+callers can construct match expressions without reaching into the private layout
+of `ast::expr`. Tests should continue using the helpers in `test_util` for
+common patterns, but direct use of `MatchArm` is available whenever bespoke arm
+construction is clearer than chaining builders.
 
 A typed AST wrapper describing this new node would look something like this:
 
@@ -457,8 +456,8 @@ ______________________________________________________________________
 
 ## 5. Implementation notes
 
-These notes describe one illustrative codebase layout and are included as
-worked examples. They are not normative requirements for Weaver components.
+These notes describe one illustrative codebase layout and are included as worked
+examples. They are not normative requirements for Weaver components.
 
 In the Weaver codebase, the parser implementation lives in
 `crates/weaver-syntax/src/parser.rs`. It wraps `tree_sitter::Parser`, sets the
@@ -468,19 +467,18 @@ returns a `ParseResult` for parsed source text.
 The workspace and crate manifests currently depend on Tree-sitter crates
 (`tree-sitter`, `tree-sitter-rust`, `tree-sitter-python`, and
 `tree-sitter-typescript`) and do not include a `chumsky` dependency. Unit tests
-in `crates/weaver-syntax/src/parser.rs` invoke this Tree-sitter-based parser
-via `Parser::new(...).parse(...)` to validate both successful parses and syntax
+in `crates/weaver-syntax/src/parser.rs` invoke this Tree-sitter-based parser via
+`Parser::new(...).parse(...)` to validate both successful parses and syntax
 error detection.
 
 Literal tokens are normalized via a dedicated helper, keeping prefix parsing
 readable. The parser maps `T_NUMBER`, `T_STRING`, `K_TRUE`, and `K_FALSE` to
-`ast::Literal` variants, ensuring numbers, strings, and booleans appear
-directly in the resulting AST. String handling now classifies standard, raw,
-and raw-interpolated forms (plus their interned variants) into a
-`StringLiteral` that records the surface form and whether interpolation is
-present. The same helper powers pattern collection, so interpolated strings in
-`match` arms or `for` bindings are rejected in line with the updated syntax
-specification.
+`ast::Literal` variants, ensuring numbers, strings, and booleans appear directly
+in the resulting AST. String handling now classifies standard, raw, and
+raw-interpolated forms (plus their interned variants) into a `StringLiteral`
+that records the surface form and whether interpolation is present. The same
+helper powers pattern collection, so interpolated strings in `match` arms or
+`for` bindings are rejected in line with the updated syntax specification.
 
 Operator precedence is centralized in `src/parser/ast/precedence.rs`. Both the
 Pratt parser and any future grammar extensions reference this table, ensuring
@@ -488,14 +486,14 @@ consistent binding power definitions across the codebase.
 
 Type and control operators follow this precedence, from highest to lowest: `:`,
 `as`, `=`, `=>`, `;`. Logical `and` and `or` outrank `=`, so `a and b = c`
-parses as `(a and b) = c`. Ascription and cast bind more tightly than
-assignment but looser than arithmetic operators.
+parses as `(a and b) = c`. Ascription and cast bind more tightly than assignment
+but looser than arithmetic operators.
 
 Variable references are parsed by interpreting identifier tokens as
 `Expr::Variable`. Postfix operators such as calls, field access, method
-invocations, bit slices, and tuple indexing are handled in a loop at the
-highest precedence. Function calls produce `Expr::Call { callee, args }`, while
-method calls, field access, bit slices, and tuple indices map to dedicated AST
+invocations, bit slices, and tuple indexing are handled in a loop at the highest
+precedence. Function calls produce `Expr::Call { callee, args }`, while method
+calls, field access, bit slices, and tuple indices map to dedicated AST
 variants. This design allows chaining like `foo.bar(x).0` without extra
 precedence rules.
 
@@ -507,16 +505,15 @@ accept trailing commas. Closure literals parse a pipe-delimited parameter list
 (allowing a trailing comma) followed by the body expression. Each feature is
 implemented with small helper routines to keep the main parser readable.
 
-Imperative control-flow tokens (`break`, `continue`, and `return`) now slot
-into the same prefix dispatch. `break` and `continue` build dedicated AST
-markers, so later passes can detect loop termination without re-reading the
-source text. The `return` parser accepts an optional expression: when the next
-token is a terminator such as `)`, `}`, `,`, `;`, or `->`, it emits a unit
-tuple to mirror the Haskell parser's default. Otherwise, it parses a full
-expression, while respecting the struct-literal suppression guard, surfacing a
-targeted diagnostic if the expression is missing. This keeps imperative
-statements usable inside expression contexts and aligns the behaviour with
-upstream DDlog semantics.
+Imperative control-flow tokens (`break`, `continue`, and `return`) now slot into
+the same prefix dispatch. `break` and `continue` build dedicated AST markers, so
+later passes can detect loop termination without re-reading the source text. The
+`return` parser accepts an optional expression: when the next token is a
+terminator such as `)`, `}`, `,`, `;`, or `->`, it emits a unit tuple to mirror
+the Haskell parser's default. Otherwise, it parses a full expression, while
+respecting the struct-literal suppression guard, surfacing a targeted diagnostic
+if the expression is missing. This keeps imperative statements usable inside
+expression contexts and aligns the behaviour with upstream DDlog semantics.
 
 ### 5.4 Rule body integration
 
@@ -532,13 +529,12 @@ expression diagnostics. When a literal uses an assignment form
 (`Pattern = Expr`), the span validator also parses and validates the left-hand
 pattern, ensuring FlatMap-style binds fail early with precise spans.
 
-The `Rule` AST wrapper exposes the resulting nodes via
-`body_expression_nodes()` and a convenience `body_expressions()` helper that
-re-parses the stored text into structured `Expr` values. Assignment literals
-are surfaced via `body_terms()` as `RuleBodyTerm::Assignment`, which stores a
-dedicated `Pattern` AST node rather than raw pattern text. Downstream analyses
-can therefore reason about rule bodies without rebuilding bespoke parsers or
-retokenising the source.
+The `Rule` AST wrapper exposes the resulting nodes via `body_expression_nodes()`
+and a convenience `body_expressions()` helper that re-parses the stored text
+into structured `Expr` values. Assignment literals are surfaced via
+`body_terms()` as `RuleBodyTerm::Assignment`, which stores a dedicated `Pattern`
+AST node rather than raw pattern text. Downstream analyses can therefore reason
+about rule bodies without rebuilding bespoke parsers or retokenising the source.
 
 ### 5.4.1 Atom adornments (`'` and `-<N>`)
 
@@ -549,8 +545,8 @@ are not ordinary infix operators:
   this as `Expr::AtomDiff { expr }` wrapped around the underlying atom
   expression.
 - **Delay:** `Atom -<N>` applies an unsigned delay to an atom. The Pratt parser
-  represents this as `Expr::AtomDelay { delay: u32, expr }` and reports an
-  error when `N` does not fit in `u32`.
+  represents this as `Expr::AtomDelay { delay: u32, expr }` and reports an error
+  when `N` does not fit in `u32`.
 
 Head locations (`@ expr`) are parsed by the rule head layer (`Rule::heads()`)
 rather than by the Pratt expression parser because `@` is only valid in rule
@@ -559,8 +555,8 @@ heads.
 ### 5.5 Operator table completion
 
 The precedence table now includes all operators from the updated syntax
-specification (`docs/differential-datalog-parser-syntax-spec-updated.md`
-section 4). The following operators are now included:
+specification (`docs/differential-datalog-parser-syntax-spec-updated.md` section
+4). The following operators are now included:
 
 **Binary operators:**
 
@@ -571,7 +567,7 @@ section 4). The following operators are now included:
 | `>>`     | `Shr`              | 55                   | left          |
 | `&`      | `BitAnd`           | 45                   | left          |
 | `^`      | `BitXor`           | 40                   | left          |
-| &#124;   | `BitOr`            | 35                   | left          |
+| \|       | `BitOr`            | 35                   | left          |
 | `==`     | `Eq`               | 30                   | left          |
 | `!=`     | `Neq`              | 30                   | left          |
 | `<`      | `Lt`               | 30                   | left          |
@@ -592,8 +588,8 @@ _Table 3: Unary prefix operators mapped to `UnaryOp` variants with binding
 powers._
 
 These binding powers mirror the constants in `src/parser/ast/precedence.rs`.
-When adjusting operator precedence in code, update this table in the same
-change so the documentation and implementation stay aligned.
+When adjusting operator precedence in code, update this table in the same change
+so the documentation and implementation stay aligned.
 
 The `T_CARET` token was added to the tokenizer to recognize the `^` operator.
 The `&` token serves dual purposes: as a prefix operator, it represents

@@ -4,18 +4,18 @@ This ExecPlan is a living document. The sections `Progress`,
 `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must
 be kept up to date as work proceeds.
 
-No `PLANS.md` file exists in the repository root, so this document stands on
-its own.
+No `PLANS.md` file exists in the repository root, so this document stands on its
+own.
 
 ## Purpose / Big Picture
 
 Implement the relational intelligence layer so Weaver can build a call graph
 from Language Server Protocol (LSP) `textDocument/callHierarchy` data. Success
-is visible when the weaver-graph crate can return a graph of nodes and edges
-for a symbol, and when the daemon-facing interface (or any public API) can
-surface that graph to callers with clear errors for unsupported or empty
-results. Behavioural tests must exercise both happy and unhappy paths using
-`rstest-bdd` v0.2.0.
+is visible when the weaver-graph crate can return a graph of nodes and edges for
+a symbol, and when the daemon-facing interface (or any public API) can surface
+that graph to callers with clear errors for unsupported or empty results.
+Behavioural tests must exercise both happy and unhappy paths using `rstest-bdd`
+v0.2.0.
 
 ## Progress
 
@@ -47,10 +47,10 @@ Not started yet.
 
 The Phase 2 roadmap item lives in `docs/roadmap.md` and calls for creating the
 `weaver-graph` crate with an LSP-backed provider. The design context for call
-graphs is documented in `docs/weaver-design.md` (see the call graph and
-provider strategy section). The call hierarchy capability is part of the LSP
-surface in `crates/weaver-lsp-host`, while user-facing behaviour is documented
-in `docs/users-guide.md` under `observe call-hierarchy`.
+graphs is documented in `docs/weaver-design.md` (see the call graph and provider
+strategy section). The call hierarchy capability is part of the LSP surface in
+`crates/weaver-lsp-host`, while user-facing behaviour is documented in
+`docs/users-guide.md` under `observe call-hierarchy`.
 
 Key files and modules to understand or edit:
 
@@ -86,27 +86,27 @@ human readable (for example, `path:line:column:name`). Keep the graph
 bidirectional to enable efficient `callers_of` and `callees_of` queries.
 Implement a provider trait that can build graphs from a start position and
 accept a depth limit. The LSP provider should: prepare call hierarchy items at
-the requested position, map items to nodes, traverse incoming and outgoing
-calls up to the requested depth, deduplicate nodes, and record edges with
-source metadata. Return semantic errors for missing symbols, missing capability
+the requested position, map items to nodes, traverse incoming and outgoing calls
+up to the requested depth, deduplicate nodes, and record edges with source
+metadata. Return semantic errors for missing symbols, missing capability
 support, and upstream LSP failures. Ensure each module has a `//!` comment and
 public APIs have rustdoc examples.
 
-Add unit tests that validate graph structure behaviour (node IDs, edge
-creation, deduplication, depth limits, callers/callees queries). For
-behavioural tests, add a new Gherkin feature file and use `rstest-bdd` to
-exercise the provider against a stub call hierarchy client. Include scenarios
-for a simple happy path (single caller and callee), a no-results path (symbol
-not found), and a provider error path (simulated LSP failure or unsupported
-capability). Use `rstest` fixtures for shared setup, keep tests deterministic,
-and prefer `mockall` or a small in-memory stub implementing the client trait.
+Add unit tests that validate graph structure behaviour (node IDs, edge creation,
+deduplication, depth limits, callers/callees queries). For behavioural tests,
+add a new Gherkin feature file and use `rstest-bdd` to exercise the provider
+against a stub call hierarchy client. Include scenarios for a simple happy path
+(single caller and callee), a no-results path (symbol not found), and a provider
+error path (simulated LSP failure or unsupported capability). Use `rstest`
+fixtures for shared setup, keep tests deterministic, and prefer `mockall` or a
+small in-memory stub implementing the client trait.
 
 Update documentation to reflect the implemented behaviour. In
 `docs/weaver-design.md`, document the concrete graph data model and the LSP
 provider strategy, including provenance on edges. In `docs/users-guide.md`,
-confirm the `observe call-hierarchy` output schema matches the implemented
-graph (nodes and edges, and any fields such as source or confidence). Finally,
-mark the Phase 2 roadmap item as done in `docs/roadmap.md`.
+confirm the `observe call-hierarchy` output schema matches the implemented graph
+(nodes and edges, and any fields such as source or confidence). Finally, mark
+the Phase 2 roadmap item as done in `docs/roadmap.md`.
 
 ## Concrete Steps
 
@@ -121,19 +121,19 @@ are safe to re-run.
    rg "call-hierarchy" -n docs
    ```
 
-2. If the crate does not exist, create it and add it to the workspace.
+1. If the crate does not exist, create it and add it to the workspace.
 
    cargo new crates/weaver-graph --lib
 
    Then update `Cargo.toml` (workspace members and shared dependencies).
 
-3. Implement or adjust the weaver-graph modules:
+1. Implement or adjust the weaver-graph modules:
 
    - `crates/weaver-graph/src/lib.rs`
    - `crates/weaver-graph/src/node.rs`, `edge.rs`, `graph.rs`, `error.rs`
    - `crates/weaver-graph/src/provider.rs` for the LSP provider
 
-4. Ensure `weaver-lsp-host` exposes call hierarchy operations and capabilities
+1. Ensure `weaver-lsp-host` exposes call hierarchy operations and capabilities
    if missing. Touch the following only if required by the inventory step:
 
    - `crates/weaver-lsp-host/src/host.rs`
@@ -141,7 +141,7 @@ are safe to re-run.
    - `crates/weaver-lsp-host/src/capability.rs`
    - `crates/weaver-lsp-host/src/errors.rs`
 
-5. Add tests:
+1. Add tests:
 
    - Unit tests in `crates/weaver-graph/src/tests.rs` or
      `crates/weaver-graph/src/tests/`.
@@ -150,13 +150,13 @@ are safe to re-run.
    - Add `rstest-bdd` and `rstest-bdd-macros` as dev-dependencies in
      `crates/weaver-graph/Cargo.toml` using workspace versions.
 
-6. Update documentation:
+1. Update documentation:
 
    - `docs/weaver-design.md`
    - `docs/users-guide.md`
    - `docs/roadmap.md`
 
-7. Format and validate documentation (required after doc changes):
+1. Format and validate documentation (required after doc changes):
 
    ```sh
    set -o pipefail
@@ -166,7 +166,7 @@ are safe to re-run.
 
    Run `make nixie` only if a Mermaid diagram was edited.
 
-8. Run the Rust quality gates:
+1. Run the Rust quality gates:
 
    ```sh
    set -o pipefail
@@ -191,11 +191,11 @@ Acceptance requires all of the following:
 
 ## Idempotence and Recovery
 
-All commands and tests above are safe to re-run. If a test fails midway, fix
-the underlying issue and re-run only the failing test or the full `make test`
-suite. If formatting or linting fails, apply fixes and re-run the same command
-until it passes. Keep documentation edits small so `make fmt` can be applied
-multiple times without drift.
+All commands and tests above are safe to re-run. If a test fails midway, fix the
+underlying issue and re-run only the failing test or the full `make test` suite.
+If formatting or linting fails, apply fixes and re-run the same command until it
+passes. Keep documentation edits small so `make fmt` can be applied multiple
+times without drift.
 
 ## Artifacts and Notes
 
@@ -211,8 +211,8 @@ Feature: Call graph via LSP call hierarchy
     And the graph includes an edge from "main" to "helper"
 ```
 
-Example JSON payload for `observe call-hierarchy` (update to match actual
-output schema):
+Example JSON payload for `observe call-hierarchy` (update to match actual output
+schema):
 
 ```json
 {"nodes":[{"id":"/src/lib.rs:10:0:main"}],"edges":[{"caller":"n1","callee":"n2"}]}
@@ -225,16 +225,17 @@ consume:
 
 - `weaver_graph::CallGraph` with `add_node`, `add_edge`, `callers_of`,
   `callees_of`, `find_by_name`, `node_count`, and `edge_count`.
+
 - `weaver_graph::CallNode` and `weaver_graph::CallEdge` with stable `NodeId`
   strings and optional call-site metadata.
+
 - `weaver_graph::CallGraphProvider` with:
 
-    fn build_graph(&mut self, position: &SourcePosition, depth: u32)
-        -> Result<CallGraph, GraphError>;
-    fn callers_graph(&mut self, position: &SourcePosition, depth: u32)
-        -> Result<CallGraph, GraphError>;
-    fn callees_graph(&mut self, position: &SourcePosition, depth: u32)
-        -> Result<CallGraph, GraphError>;
+  fn build_graph(&mut self, position: &SourcePosition, depth: u32) ->
+  Result\<CallGraph, GraphError>; fn callers_graph(&mut self, position:
+  &SourcePosition, depth: u32) -> Result\<CallGraph, GraphError>; fn
+  callees_graph(&mut self, position: &SourcePosition, depth: u32) ->
+  Result\<CallGraph, GraphError>;
 
 - `weaver_graph::CallHierarchyClient` trait implemented by an adapter over
   `weaver-lsp-host` so the LSP provider can run without owning the host.
@@ -245,5 +246,5 @@ Dependencies and versions:
 - `rstest-bdd` and `rstest-bdd-macros` v0.2.0 for behavioural tests.
 - `mockall` if mocking is required; otherwise use a small in-memory stub.
 
-Ensure each module starts with a `//!` comment and keep files under 400 lines
-by splitting modules if necessary.
+Ensure each module starts with a `//!` comment and keep files under 400 lines by
+splitting modules if necessary.

@@ -10,17 +10,17 @@ Proposed
 
 ## Outstanding Decisions
 
-- Which plugin categories, if any, need streaming behaviour instead of
-  one-shot JSON Lines (JSONL)?
+- Which plugin categories, if any, need streaming behaviour instead of one-shot
+  JSON Lines (JSONL)?
 - Which team owns the broker-side timeout and payload-size defaults?
 - Which plugin lifecycle guarantees must remain stable before acceptance?
 
 ## Context and Problem Statement
 
 Weaver needs a concrete execution strategy for plugins and other external
-helpers. The broker must keep ownership of command orchestration, but the
-plugin boundary still needs to be simple enough for testing, debugging, and
-sandbox control.
+helpers. The broker must keep ownership of command orchestration, but the plugin
+boundary still needs to be simple enough for testing, debugging, and sandbox
+control.
 
 The design also needs to explain why Weaver uses one-shot JSON Lines (JSONL)
 payloads rather than long-lived streaming sessions for plugin execution.
@@ -65,9 +65,9 @@ process.
 
 Adopt one-shot JSONL over stdio with broker ownership in `weaver-plugins`.
 
-The broker should own request validation, execution selection, and final
-handoff into the transaction path. Plugins remain implementation details and do
-not control commit behaviour directly.
+The broker should own request validation, execution selection, and final handoff
+into the transaction path. Plugins remain implementation details and do not
+control commit behaviour directly.
 
 ## Goals and Non-Goals
 
@@ -86,9 +86,9 @@ not control commit behaviour directly.
 ## Migration plan
 
 1. Keep plugin requests to one JSONL line in and one JSONL line out.
-2. Make broker validation and routing explicit.
-3. Preserve the safety-harness handoff for accepted edits.
-4. Add tests that exercise refusal, success, and rollback paths.
+1. Make broker validation and routing explicit.
+1. Preserve the safety-harness handoff for accepted edits.
+1. Add tests that exercise refusal, success, and rollback paths.
 
 ## Known Risks and Limitations
 

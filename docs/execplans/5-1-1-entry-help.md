@@ -1,9 +1,8 @@
 # 5.1.1 Show short help on bare invocation (Fluent-localized)
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -11,9 +10,9 @@ Status: COMPLETE
 
 When an operator runs `weaver` with no arguments today, the command-line
 interface (CLI) prints the terse message `the command domain must be provided`
-to stderr and exits 1. There is no hint about what domains exist, no usage
-line, and no pointer to `--help`. A newcomer who has just installed Weaver has
-no idea what to type next.
+to stderr and exits 1. There is no hint about what domains exist, no usage line,
+and no pointer to `--help`. A newcomer who has just installed Weaver has no idea
+what to type next.
 
 After this change, running `weaver` with no arguments will print a short,
 self-contained help block to stderr listing the three valid domains (`observe`,
@@ -38,9 +37,8 @@ Run 'weaver --help' for more information.
 
 This addresses the P0 gap identified in the
 [UI gap analysis Level 0](../ui-gap-analysis.md#level-0--bare-invocation-weaver)
- and
-[Level 10d](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes), and
-satisfies roadmap task 5.1.1 in `../roadmap.md`.
+and [Level 10d](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes),
+and satisfies roadmap task 5.1.1 in `../roadmap.md`.
 
 ## Constraints
 
@@ -49,8 +47,8 @@ satisfies roadmap task 5.1.1 in `../roadmap.md`.
 - The workspace Clippy configuration is extremely strict (pedantic, deny on
   `unwrap_used`, `expect_used`, `print_stdout`, `print_stderr`,
   `cognitive_complexity`, `missing_docs`, etc.). All new code must comply.
-- Comments and documentation must use en-GB-oxendict spelling
-  ("-ize" / "-yse" / "-our").
+- Comments and documentation must use en-GB-oxendict spelling ("-ize" / "-yse" /
+  "-our").
 - New functionality requires both unit tests and BDD (behaviour-driven
   development) behavioural tests.
 - Every module must begin with a `//!` module-level doc comment.
@@ -62,8 +60,8 @@ satisfies roadmap task 5.1.1 in `../roadmap.md`.
   `CommandInvocation::try_from`).
 - `rstest-bdd` v0.5.0 must be used for BDD tests (as specified in workspace
   `Cargo.toml`).
-- All new user-facing text must be sourced from Fluent `.ftl` resources via
-  the `ortho_config::Localizer` trait so future locales can override it.
+- All new user-facing text must be sourced from Fluent `.ftl` resources via the
+  `ortho_config::Localizer` trait so future locales can override it.
 
 ## Tolerances (exception triggers)
 
@@ -73,45 +71,43 @@ satisfies roadmap task 5.1.1 in `../roadmap.md`.
   escalate (all changes are `pub(crate)` or private).
 - Dependencies: upgrading ortho-config from v0.6.0 to v0.7.0 is pre-approved.
   Any other new external dependency requires escalation.
-- Iterations: if tests still fail after 5 attempts at fixing, stop and
-  escalate.
+- Iterations: if tests still fail after 5 attempts at fixing, stop and escalate.
 
 ## Risks
 
 - Risk: `unit.rs` is exactly 400 lines; adding a `mod bare_invocation;`
   declaration pushes it over the limit. Severity: low Likelihood: high
   Mitigation: Remove the redundant `///` doc comment on `mod auto_start;` (line
-  399) since the module already has its own `//!` doc comment inside
+  399\) since the module already has its own `//!` doc comment inside
   `auto_start.rs`. This frees one line for the new `mod` declaration.
 
-- Risk: The `BareInvocation` error variant with `#[error("")]` might trigger
-  a Clippy lint about empty Display strings. Severity: low Likelihood: medium
+- Risk: The `BareInvocation` error variant with `#[error("")]` might trigger a
+  Clippy lint about empty Display strings. Severity: low Likelihood: medium
   Mitigation: If Clippy complains, use a non-empty message like
-  `#[error("bare invocation")]` and ensure the match arm in
-  `run_with_handler()` suppresses printing for this variant.
+  `#[error("bare invocation")]` and ensure the match arm in `run_with_handler()`
+  suppresses printing for this variant.
 
 - Risk: The existing unit test `run_with_loader_reports_configuration_failures`
   invokes `weaver` with no args and asserts stderr contains "command domain".
   After the change, bare invocation is intercepted before config loading, so
   this test will fail. Severity: medium Likelihood: certain Mitigation: Update
-  the test to pass `["weaver", "observe"]` so the bare invocation check does
-  not fire, preserving the test's original intent (verifying that config loader
+  the test to pass `["weaver", "observe"]` so the bare invocation check does not
+  fire, preserving the test's original intent (verifying that config loader
   errors reach stderr).
 
 - Risk: Upgrading ortho-config from v0.6.0 to v0.7.0 may introduce subtle
   behavioural changes or new transitive dependencies (fluent-bundle,
   fluent-syntax, unic-langid). Severity: medium Likelihood: low (v0.7.0
   migration guide states "additive, no mandatory breaking changes") Mitigation:
-  Run the full test suite after upgrade, before making any other changes. If
-  any pre-existing tests break, fix the upgrade issues first as a separate
-  commit.
+  Run the full test suite after upgrade, before making any other changes. If any
+  pre-existing tests break, fix the upgrade issues first as a separate commit.
 
-- Risk: Fluent localizer construction could fail at runtime (e.g., if an
-  `.ftl` resource has a syntax error). Severity: low Likelihood: low (resources
-  are compiled-in via `include_str!` and validated by unit tests) Mitigation:
-  Use `NoOpLocalizer` as a graceful fallback, which causes
-  `Localizer::message()` to return the hardcoded English fallback string. Unit
-  tests validate that the `.ftl` resources parse successfully.
+- Risk: Fluent localizer construction could fail at runtime (e.g., if an `.ftl`
+  resource has a syntax error). Severity: low Likelihood: low (resources are
+  compiled-in via `include_str!` and validated by unit tests) Mitigation: Use
+  `NoOpLocalizer` as a graceful fallback, which causes `Localizer::message()` to
+  return the hardcoded English fallback string. Unit tests validate that the
+  `.ftl` resources parse successfully.
 
 ## Progress
 
@@ -125,11 +121,11 @@ satisfies roadmap task 5.1.1 in `../roadmap.md`.
 ## Surprises & discoveries
 
 - The build script (`build.rs`) includes `cli.rs` via `#[path = "src/cli.rs"]`
-  for manpage generation. The `is_bare_invocation()` method was initially
-  placed in `cli.rs` with `#[allow(dead_code)]` because `#[expect]` triggers
-  `unfulfilled_lint_expectations` in the library build where the method is
-  used. Resolved by moving the `impl Cli` block to `lib.rs`, which `build.rs`
-  never includes, eliminating the dual-compilation issue entirely.
+  for manpage generation. The `is_bare_invocation()` method was initially placed
+  in `cli.rs` with `#[allow(dead_code)]` because `#[expect]` triggers
+  `unfulfilled_lint_expectations` in the library build where the method is used.
+  Resolved by moving the `impl Cli` block to `lib.rs`, which `build.rs` never
+  includes, eliminating the dual-compilation issue entirely.
 - The `#[error("bare invocation")]` on `BareInvocation` provides a non-empty
   display string for safety in generic `Display` paths while the match arm in
   `run_with_handler()` suppresses printing for this variant.
@@ -151,8 +147,8 @@ satisfies roadmap task 5.1.1 in `../roadmap.md`.
   restructuring the `and_then` chain to use `Option<ExitCode>`. Rationale: The
   existing method returns `Result<ExitCode, AppError>` via an `and_then` chain.
   A sentinel error variant allows early return without restructuring the entire
-  method. The match arm in the error handler suppresses the empty print for
-  this specific variant. Date/Author: 2026-02-25
+  method. The match arm in the error handler suppresses the empty print for this
+  specific variant. Date/Author: 2026-02-25
 
 - Decision: Place the `is_bare_invocation()` method on the `Cli` struct rather
   than as a free function. Rationale: The method queries only `Cli` fields and
@@ -164,17 +160,17 @@ satisfies roadmap task 5.1.1 in `../roadmap.md`.
   wrong, the test panics rather than silently passing. This provides a stronger
   guarantee than a mock that returns a success. Date/Author: 2026-02-25
 
-- Decision: Upgrade ortho-config from v0.6.0 to v0.7.0 and use
-  `FluentLocalizer` with `NoOpLocalizer` fallback. Rationale: The user
-  requirement is that all user-facing text is translatable using Fluent.
-  ortho-config v0.7.0 provides the `Localizer` trait, `FluentLocalizer`,
-  `NoOpLocalizer`, and `localize_clap_error` helpers. The upgrade is additive
-  with no mandatory breaking changes per the migration guide. This establishes
-  the localization pipeline for all future CLI text. Date/Author: 2026-02-26
+- Decision: Upgrade ortho-config from v0.6.0 to v0.7.0 and use `FluentLocalizer`
+  with `NoOpLocalizer` fallback. Rationale: The user requirement is that all
+  user-facing text is translatable using Fluent. ortho-config v0.7.0 provides
+  the `Localizer` trait, `FluentLocalizer`, `NoOpLocalizer`, and
+  `localize_clap_error` helpers. The upgrade is additive with no mandatory
+  breaking changes per the migration guide. This establishes the localization
+  pipeline for all future CLI text. Date/Author: 2026-02-26
 
-- Decision: Create a new `crates/weaver-cli/src/localizer.rs` module rather
-  than inlining Fluent setup in `runtime_utils.rs`. Rationale: Localization is
-  a cross-cutting concern that will grow as more CLI text is localized. A
+- Decision: Create a new `crates/weaver-cli/src/localizer.rs` module rather than
+  inlining Fluent setup in `runtime_utils.rs`. Rationale: Localization is a
+  cross-cutting concern that will grow as more CLI text is localized. A
   dedicated module keeps it cohesive and testable. `runtime_utils.rs` remains
   for small stateless helpers. Date/Author: 2026-02-26
 
@@ -195,24 +191,23 @@ satisfies roadmap task 5.1.1 in `../roadmap.md`.
   `fluent_and_fallback_outputs_are_identical` test guards against drift between
   the two. Date/Author: 2026-02-26, updated 2026-02-28
 
-- Decision: Construct `FluentLocalizer` once at the start of
-  `CliRunner::run()`, falling back to `NoOpLocalizer` on error. Rationale: The
-  localizer must be available before config loading (since bare invocation
-  fires pre-config). Construction is cheap (one `include_str!` parse). Falling
-  back to `NoOpLocalizer` ensures the CLI never crashes due to a localization
-  issue — it simply serves the hardcoded English fallbacks. Date/Author:
-  2026-02-26
+- Decision: Construct `FluentLocalizer` once at the start of `CliRunner::run()`,
+  falling back to `NoOpLocalizer` on error. Rationale: The localizer must be
+  available before config loading (since bare invocation fires pre-config).
+  Construction is cheap (one `include_str!` parse). Falling back to
+  `NoOpLocalizer` ensures the CLI never crashes due to a localization issue — it
+  simply serves the hardcoded English fallbacks. Date/Author: 2026-02-26
 
 ## Outcomes & retrospective
 
 All acceptance criteria met:
 
 1. `weaver` with no arguments exits non-zero.
-2. Output includes `Usage: weaver <DOMAIN> <OPERATION> [ARG]...`.
-3. Lists three domains: `observe`, `act`, `verify`.
-4. Includes exactly one `weaver --help` pointer.
-5. Does not require configuration loading (proved by `PanickingLoader`).
-6. All text sourced through `ortho_config::Localizer` with Fluent `.ftl`
+1. Output includes `Usage: weaver <DOMAIN> <OPERATION> [ARG]...`.
+1. Lists three domains: `observe`, `act`, `verify`.
+1. Includes exactly one `weaver --help` pointer.
+1. Does not require configuration loading (proved by `PanickingLoader`).
+1. All text sourced through `ortho_config::Localizer` with Fluent `.ftl`
    resources.
 
 Quality gates passed: `make check-fmt`, `make lint`, `make test` all exit 0.
@@ -228,23 +223,22 @@ The entry point is `crates/weaver-cli/src/main.rs`, which delegates to
 creates a `CliRunner` and calls `CliRunner::run()`, which calls
 `run_with_handler()`. This method:
 
-1. Splits config arguments from command arguments
-   (`split_config_arguments()`).
-2. Parses CLI arguments via `Cli::try_parse_from()`.
-3. Loads configuration via `self.loader.load()`.
-4. Checks for `--capabilities` mode.
-5. Checks for `daemon` subcommand.
-6. Builds `CommandInvocation::try_from(cli)` — this is where
+1. Splits config arguments from command arguments (`split_config_arguments()`).
+1. Parses CLI arguments via `Cli::try_parse_from()`.
+1. Loads configuration via `self.loader.load()`.
+1. Checks for `--capabilities` mode.
+1. Checks for `daemon` subcommand.
+1. Builds `CommandInvocation::try_from(cli)` — this is where
    `AppError::MissingDomain` is returned when `domain` is `None`.
-7. Executes the daemon command.
+1. Executes the daemon command.
 
 The error is caught at the bottom of `run_with_handler()` (line 180-186 of
 `lib.rs`) and printed to stderr.
 
 ### ortho-config and Fluent localization
 
-The workspace used `ortho_config` v0.6.0 (workspace `Cargo.toml` line 33).
-There was no existing Fluent infrastructure: no `.ftl` files, no `locales/`
+The workspace used `ortho_config` v0.6.0 (workspace `Cargo.toml` line 33). There
+was no existing Fluent infrastructure: no `.ftl` files, no `locales/`
 directories, and no Fluent imports.
 
 `ortho_config` v0.7.0 (published 2026-01-02) adds:
@@ -257,8 +251,8 @@ directories, and no Fluent imports.
   `with_en_us_defaults(resources)`).
 - `NoOpLocalizer`: zero-sized type that always returns `None` from `lookup()`,
   causing `message()` to use the hardcoded English fallback.
-- `localize_clap_error()` / `localize_clap_error_with_command()`: rewrite
-  clap error messages through the Fluent pipeline.
+- `localize_clap_error()` / `localize_clap_error_with_command()`: rewrite clap
+  error messages through the Fluent pipeline.
 - `FluentLocalizerError`: `UnsupportedLocale`, `Parser`, `Registration`
   variants.
 
@@ -268,16 +262,15 @@ transitive dependencies: `fluent-bundle`, `fluent-syntax`, `unic-langid`.
 The hello_world example in ortho-config demonstrates the pattern:
 
 1. `.ftl` files under `locales/en-US/messages.ftl`.
-2. Embed via `include_str!("../locales/en-US/messages.ftl")`.
-3. Build: `FluentLocalizer::builder(langid!("en-US"))
-   .with_consumer_resources([APP_FTL]).try_build()?`.
-4. Fall back to `NoOpLocalizer` on error.
-5. Resolve strings via `localizer.message("msg-id", None, "fallback")`.
+1. Embed via `include_str!("../locales/en-US/messages.ftl")`.
+1. Build:
+   `FluentLocalizer::builder(langid!("en-US")) .with_consumer_resources([APP_FTL]).try_build()?`.
+1. Fall back to `NoOpLocalizer` on error.
+1. Resolve strings via `localizer.message("msg-id", None, "fallback")`.
 
-Fluent message IDs use hyphens (dots are normalized to hyphens by
-ortho-config's `normalize_identifier()`). The embedded en-US catalogue in
-ortho-config already provides `clap-error-*` messages for clap error
-localization.
+Fluent message IDs use hyphens (dots are normalized to hyphens by ortho-config's
+`normalize_identifier()`). The embedded en-US catalogue in ortho-config already
+provides `clap-error-*` messages for clap error localization.
 
 ### Key files involved in this change
 
@@ -304,8 +297,8 @@ _Table 1: Key files involved in this change and their purpose._
 
 ### Test infrastructure
 
-BDD tests use `rstest-bdd` v0.5.0 with `.feature` files in `tests/features/`
-and step definitions in `src/tests/behaviour.rs`. The `TestWorld` struct (in
+BDD tests use `rstest-bdd` v0.5.0 with `.feature` files in `tests/features/` and
+step definitions in `src/tests/behaviour.rs`. The `TestWorld` struct (in
 `src/tests/support/mod.rs`) provides a `run()` method that exercises the full
 CLI flow. The `#[when("the operator runs {command}")]` step accepts a quoted
 command string; an empty string `""` produces `["weaver"]` (bare invocation)
@@ -335,8 +328,8 @@ In workspace `Cargo.toml` line 33, change `ortho_config = "0.6.0"` to
 
 **A2. Verify the upgrade is clean.**
 
-Run `cargo check --workspace && make test`. If any pre-existing tests break,
-fix the upgrade issues before proceeding (separate commit).
+Run `cargo check --workspace && make test`. If any pre-existing tests break, fix
+the upgrade issues before proceeding (separate commit).
 
 ### Stage B: Scaffold Fluent resources and localizer module
 
@@ -359,9 +352,9 @@ weaver-bare-help-pointer = Run 'weaver --help' for more information.
 This module:
 
 1. Embeds the `.ftl` resource via `include_str!`.
-2. Exposes `build_localizer() -> Box<dyn Localizer>` which constructs a
+1. Exposes `build_localizer() -> Box<dyn Localizer>` which constructs a
    `FluentLocalizer` with `en-US` defaults, falling back to `NoOpLocalizer`.
-3. Exposes `write_bare_help(writer, &dyn Localizer) -> io::Result<()>` which
+1. Exposes `write_bare_help(writer, &dyn Localizer) -> io::Result<()>` which
    resolves each message via `Localizer::message()` with English fallbacks and
    writes the composed help block.
 
@@ -447,9 +440,9 @@ Below the `MissingOperation` variant:
 **B4. Add `is_bare_invocation()` method to `Cli` in `lib.rs`.**
 
 The method lives in `lib.rs` rather than `cli.rs` because `build.rs`
-`#[path]`-includes `cli.rs` for manpage generation, and an `#[expect]`
-attribute on the method would trigger `unfulfilled_lint_expectations` in the
-library build.
+`#[path]`-includes `cli.rs` for manpage generation, and an `#[expect]` attribute
+on the method would trigger `unfulfilled_lint_expectations` in the library
+build.
 
 ```rust
 impl Cli {
@@ -495,16 +488,16 @@ No new step definitions required.
 Tests that:
 
 1. Bare invocation exits with `FAILURE`.
-2. Bare invocation emits text containing the expected fragments to stderr.
-3. Bare invocation produces no stdout.
-4. Bare invocation does not attempt config loading (`PanickingLoader`).
-5. `write_bare_help()` with `NoOpLocalizer` produces the expected English
-   help block (tests the fallback path).
-6. `write_bare_help()` with the real `FluentLocalizer` produces the same
-   English help block (tests the Fluent resolution path).
-7. The help text contains all three domains.
-8. The help text contains a `Usage:` line.
-9. The help text contains exactly one `weaver --help` pointer.
+1. Bare invocation emits text containing the expected fragments to stderr.
+1. Bare invocation produces no stdout.
+1. Bare invocation does not attempt config loading (`PanickingLoader`).
+1. `write_bare_help()` with `NoOpLocalizer` produces the expected English help
+   block (tests the fallback path).
+1. `write_bare_help()` with the real `FluentLocalizer` produces the same English
+   help block (tests the Fluent resolution path).
+1. The help text contains all three domains.
+1. The help text contains a `Usage:` line.
+1. The help text contains exactly one `weaver --help` pointer.
 
 ```rust
 //! Tests for bare-invocation help output.
@@ -628,8 +621,8 @@ fn bare_help_contains_single_help_pointer() {
 
 **C3. Add `mod bare_invocation;` declaration to `unit.rs`.**
 
-Replace line 399 (`/// Tests for automatic...` doc comment on `auto_start`)
-with the module declarations:
+Replace line 399 (`/// Tests for automatic...` doc comment on `auto_start`) with
+the module declarations:
 
 ```rust
 mod auto_start;
@@ -707,8 +700,8 @@ match result {
 
 **D3. Update `run_with_daemon_binary` (test-only) to pass localizer.**
 
-The `#[cfg(test)]` function `run_with_daemon_binary()` creates a `CliRunner`
-and calls `run_with_handler`. It needs to accept and forward a localizer. Use
+The `#[cfg(test)]` function `run_with_daemon_binary()` creates a `CliRunner` and
+calls `run_with_handler`. It needs to accept and forward a localizer. Use
 `&NoOpLocalizer` as the default for existing test callers. Update the test
 support `TestWorld::run()` to pass `&NoOpLocalizer`.
 
@@ -730,9 +723,9 @@ Run `make check-fmt && make lint && make test`.
 Add a "Bare invocation" subsection within "Command reference", before "Output
 formats":
 
-Add a heading `### Bare invocation` describing the new behaviour.  Include a
+Add a heading `### Bare invocation` describing the new behaviour. Include a
 `text` code block showing the help output and a note that it does not require a
-configuration file or a running daemon.  See the actual `docs/users-guide.md`
+configuration file or a running daemon. See the actual `docs/users-guide.md`
 change for the rendered version.
 
 **E2. Mark roadmap task 5.1.1 as done in `docs/roadmap.md`.**
@@ -764,41 +757,41 @@ Work for full code listings; this section summarises the edits and commands.
 ### Stage A: Upgrade ortho-config
 
 1. Edit `Cargo.toml` line 33: `"0.6.0"` → `"0.7.0"`.
-2. Run `cargo check --workspace && make test` to verify no regressions.
+1. Run `cargo check --workspace && make test` to verify no regressions.
 
 ### Stage B: Scaffold Fluent resources and localizer
 
-1. Create `crates/weaver-cli/locales/en-US/messages.ftl` with bare-help
-   Fluent messages (see Plan of Work B1).
-2. Create `crates/weaver-cli/src/localizer.rs` with `build_localizer()` and
+1. Create `crates/weaver-cli/locales/en-US/messages.ftl` with bare-help Fluent
+   messages (see Plan of Work B1).
+1. Create `crates/weaver-cli/src/localizer.rs` with `build_localizer()` and
    `write_bare_help()` (see Plan of Work B2).
-3. Add `BareInvocation` to `AppError` in `errors.rs` (B3).
-4. Add `is_bare_invocation()` to `Cli` in `cli.rs` (B4).
-5. Register `mod localizer;` and update imports in `lib.rs` (B5).
+1. Add `BareInvocation` to `AppError` in `errors.rs` (B3).
+1. Add `is_bare_invocation()` to `Cli` in `cli.rs` (B4).
+1. Register `mod localizer;` and update imports in `lib.rs` (B5).
 
 ### Stage C: Scaffold tests
 
 1. Append BDD scenario to `weaver_cli.feature` (C1).
-2. Create `src/tests/unit/bare_invocation.rs` with unit tests (C2).
-3. Update `unit.rs` to declare `mod bare_invocation` (C3).
-4. Run `cargo check --workspace` then `make test` — new tests should fail
-   (red phase).
+1. Create `src/tests/unit/bare_invocation.rs` with unit tests (C2).
+1. Update `unit.rs` to declare `mod bare_invocation` (C3).
+1. Run `cargo check --workspace` then `make test` — new tests should fail (red
+   phase).
 
 ### Stage D: Wire implementation
 
 1. Construct localizer in `CliRunner::run()` and thread through
    `run_with_handler()` (D1).
-2. Add `BareInvocation` match arm in error handler (D2).
-3. Update `run_with_daemon_binary` and `TestWorld::run()` to pass
+1. Add `BareInvocation` match arm in error handler (D2).
+1. Update `run_with_daemon_binary` and `TestWorld::run()` to pass
    `&NoOpLocalizer` (D3).
-4. Fix `run_with_loader_reports_configuration_failures` test args (D4).
-5. Run `make check-fmt && make lint && make test` — all must pass (D5).
+1. Fix `run_with_loader_reports_configuration_failures` test args (D4).
+1. Run `make check-fmt && make lint && make test` — all must pass (D5).
 
 ### Stage E: Documentation
 
 1. Add "Bare invocation" subsection to `docs/users-guide.md`.
-2. Mark 5.1.1 as done in `docs/roadmap.md`.
-3. Run `make fmt && make markdownlint`.
+1. Mark 5.1.1 as done in `docs/roadmap.md`.
+1. Run `make fmt && make markdownlint`.
 
 ### Stage F: Final validation
 
@@ -816,17 +809,17 @@ make test 2>&1 | tee /tmp/test.log
 1. `weaver` with no arguments exits non-zero — verified by BDD scenario
    `Bare invocation shows short help` (`Then the CLI fails`) and unit test
    `bare_invocation_exits_with_failure`.
-2. Prints a `Usage:` line — verified by BDD `stderr contains "Usage: weaver"`
+1. Prints a `Usage:` line — verified by BDD `stderr contains "Usage: weaver"`
    and unit test `bare_help_contains_usage_line`.
-3. Lists the three valid domains — verified by BDD assertions for `observe`,
+1. Lists the three valid domains — verified by BDD assertions for `observe`,
    `act`, `verify` and unit tests
    `write_bare_help_with_noop_produces_english_fallback` /
    `write_bare_help_with_fluent_produces_english`.
-4. Includes exactly one pointer to `weaver --help` — verified by unit test
+1. Includes exactly one pointer to `weaver --help` — verified by unit test
    `bare_help_contains_single_help_pointer`.
-5. Does not require config loading — verified by `PanickingLoader` in unit
-   tests (loader panics if called).
-6. All user-facing text is sourced through `ortho_config::Localizer` — verified
+1. Does not require config loading — verified by `PanickingLoader` in unit tests
+   (loader panics if called).
+1. All user-facing text is sourced through `ortho_config::Localizer` — verified
    by unit tests exercising both `NoOpLocalizer` and `FluentLocalizer` paths.
 
 **Quality criteria:**
