@@ -27,6 +27,10 @@ jobs:
             **/*.md
             !**/target/**
             !**/dist/**
+      - name: Install Nixie
+        run: python3 -m pip install --user nixie-cli
+      - name: Mermaid lint
+        run: make nixie
       - name: Cache Whitaker installer
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
         with:
