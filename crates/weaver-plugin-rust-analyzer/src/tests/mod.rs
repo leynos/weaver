@@ -161,6 +161,7 @@ fn rename_rejects_empty_or_curdir_path(#[case] path: &str) {
     assert_eq!(error.reason_code(), Some(ReasonCode::IncompletePayload));
 }
 
+#[test]
 fn write_workspace_file_creates_nested_parent_directories() {
     let workspace = tempfile::tempdir().expect("temporary workspace should be created");
     let relative_path = PathBuf::from("src/nested/main.rs");

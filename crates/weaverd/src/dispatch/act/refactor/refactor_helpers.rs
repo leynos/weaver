@@ -6,14 +6,18 @@
 #![allow(dead_code)]
 
 pub(crate) mod builders {
+    //! Synthetic request and backend builders for refactor tests.
+
     use std::path::Path;
 
     use weaver_cards::DEFAULT_CACHE_CAPACITY;
     use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
-    use crate::backends::FusionBackends;
-    use crate::dispatch::request::{CommandDescriptor, CommandRequest};
-    use crate::semantic_provider::SemanticBackendProvider;
+    use crate::{
+        backends::FusionBackends,
+        dispatch::request::{CommandDescriptor, CommandRequest},
+        semantic_provider::SemanticBackendProvider,
+    };
 
     pub(crate) fn command_request(arguments: Vec<String>) -> CommandRequest {
         CommandRequest {
@@ -53,11 +57,18 @@ pub(crate) mod builders {
 }
 
 pub(crate) mod resolutions {
+    //! Shared resolution envelopes and routing helpers for refactor tests.
+
     use weaver_plugins::CapabilityId;
 
     use crate::dispatch::act::refactor::resolution::{
-        CandidateEvaluation, CandidateReason, CapabilityResolutionDetails,
-        CapabilityResolutionEnvelope, RefusalReason, ResolutionOutcome, SelectionMode,
+        CandidateEvaluation,
+        CandidateReason,
+        CapabilityResolutionDetails,
+        CapabilityResolutionEnvelope,
+        RefusalReason,
+        ResolutionOutcome,
+        SelectionMode,
     };
 
     pub(crate) struct RefusedResolution<'a> {
@@ -121,15 +132,49 @@ pub(crate) mod resolutions {
             reason,
         }
     }
+
+    pub(crate) struct AutoResolutionContext<'a> {
+        pub(crate) capability: CapabilityId,
+        pub(crate) requested_provider: Option<&'a str>,
+        pub(crate) selection_mode: SelectionMode,
+    }
+
+    pub(crate) fn resolve_auto_language(
+        context: AutoResolutionContext<'_>,
+        language_name: Option<&'static str>,
+        provider: &'static str,
+        candidates: Vec<CandidateEvaluation>,
+    ) -> CapabilityResolutionEnvelope {
+        if let Some(language) = language_name {
+            selected_resolution(SelectedResolution {
+                capability: context.capability,
+                language,
+                provider,
+                selection_mode: context.selection_mode,
+                requested_provider: context.requested_provider,
+            })
+        } else {
+            refused_resolution(RefusedResolution {
+                capability: context.capability,
+                language: None,
+                requested_provider: context.requested_provider,
+                selection_mode: context.selection_mode,
+                refusal_reason: RefusalReason::UnsupportedLanguage,
+                candidates,
+            })
+        }
+    }
 }
 
 pub(crate) mod rollback {
+    //! Runtime doubles that exercise rollback paths for refactor tests.
+
     use weaver_plugins::{PluginError, PluginRequest, PluginResponse};
 
     use super::resolutions::{SelectedResolution, selected_resolution};
-    use crate::dispatch::act::refactor::RefactorPluginRuntime;
-    use crate::dispatch::act::refactor::resolution::{
-        CapabilityResolutionEnvelope, ResolutionRequest,
+    use crate::dispatch::act::refactor::{
+        RefactorPluginRuntime,
+        resolution::{CapabilityResolutionEnvelope, ResolutionRequest},
     };
 
     pub(crate) struct RollbackRuntime {
@@ -186,6 +231,8 @@ pub(crate) mod rollback {
 }
 
 pub(crate) mod content {
+    //! Deterministic file contents and diff payloads for refactor tests.
+
     use std::path::Path;
 
     fn format_diff(path: &Path, git_header: &str) -> String {
@@ -268,8 +315,3 @@ pub(crate) mod content {
         routed_format_diff(path, |p| format!("diff --git a/{p}"))
     }
 }
-
-pub(crate) use builders::*;
-pub(crate) use content::*;
-pub(crate) use resolutions::*;
-pub(crate) use rollback::*;

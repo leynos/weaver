@@ -184,8 +184,8 @@ Agent flow:
 4. Run project validators.
 5. Report the outcome.
 
-______________________________________________________________________
-name: weaver description: Use this skill whenever the user wants semantic code
+______________________________________________________________________ name:
+weaver description: Use this skill whenever the user wants semantic code
 intelligence through the Weaver CLI, especially for fetching definitions,
 fetching symbol cards, checking capability support, inspecting daemon state, or
 performing language-aware renames. Trigger even when the user does not mention

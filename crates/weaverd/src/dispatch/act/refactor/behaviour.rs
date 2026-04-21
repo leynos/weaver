@@ -7,22 +7,38 @@ use rstest_bdd_macros::{given, scenario, then, when};
 use tempfile::TempDir;
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 use weaver_syntax::SupportedLanguage;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use super::refactor_helpers::*;
-use super::resolution::{
-    CandidateEvaluation, CandidateReason, CapabilityResolutionEnvelope, RefusalReason,
-    ResolutionRequest, SelectionMode,
-    ResolutionRequest,
-    RefusalReason,
-    SelectionMode,
-    CandidateReason,
-    CapabilityResolutionEnvelope,
-    resolution::{,
-    CandidateEvaluation,
+use super::{
+    refactor_helpers::{
+        builders::{build_backends, command_request, configure_request, standard_rename_args},
+        content::{
+            original_content_for,
+            routed_diff_for,
+            routed_malformed_diff_for,
+            routed_patch_path,
+            updated_content_for,
+        },
+        resolutions::{
+            AutoResolutionContext,
+            RefusedResolution,
+            refused_resolution,
+            rejected_candidate,
+            resolve_auto_language,
+        },
+    },
+    resolution::{
+        CandidateEvaluation,
+        CandidateReason,
+        CapabilityResolutionEnvelope,
+        RefusalReason,
+        ResolutionRequest,
+        SelectionMode,
+    },
+    *,
 };
 
 #[derive(Clone, Copy, Default)]
-use weaver_test_macros::allow_fixture_expansion_lints;
 enum RuntimeMode {
     #[default]
     DiffSuccess,
@@ -69,6 +85,7 @@ fn provider_for_auto(mode: RoutingMode) -> &'static str {
         _ => unreachable!("provider_for_auto is only for automatic modes"),
     }
 }
+
 impl RefactorPluginRuntime for StubRuntime {
     fn resolve(
         &self,
@@ -90,7 +107,12 @@ impl RefactorPluginRuntime for StubRuntime {
 
         Ok(match self.routing {
             mode @ (RoutingMode::AutomaticPython | RoutingMode::AutomaticRust) => {
-                resolve_auto_language(auto_context, language_name, provider_for_auto(mode))
+                resolve_auto_language(
+                    auto_context,
+                    language_name,
+                    provider_for_auto(mode),
+                    refused_candidates(requested_provider, CandidateReason::UnsupportedLanguage),
+                )
             }
             RoutingMode::UnsupportedLanguage => refused_resolution(RefusedResolution {
                 capability: request.capability(),
@@ -301,6 +323,8 @@ fn extract_status(world: &RefactorWorld) -> Result<i32, String> {
         .map(|status| *status)
         .map_err(|e| format!("status error: {e}"))
 }
+
+#[then("the refactor command succeeds")]
 fn then_refactor_succeeds(world: &mut RefactorWorld) -> Result<(), String> {
     assert_eq!(extract_status(world)?, 0);
     Ok(())
@@ -343,43 +367,7 @@ fn then_stderr_contains(world: &mut RefactorWorld, text: String) {
 }
 
 #[scenario(path = "tests/features/refactor.feature")]
-fn refactor_behaviour(#[from(world)] world: RefactorWorld) {
-    let _ = world;
-}
-
-struct AutoResolutionContext<'a> {
-    capability: weaver_plugins::CapabilityId,
-    requested_provider: Option<&'a str>,
-    selection_mode: SelectionMode,
-}
-
-fn resolve_auto_language(
-    context: AutoResolutionContext<'_>,
-    language_name: Option<&'static str>,
-    provider: &'static str,
-) -> CapabilityResolutionEnvelope {
-    if let Some(language) = language_name {
-        selected_resolution(SelectedResolution {
-            capability: context.capability,
-            language,
-            provider,
-            selection_mode: context.selection_mode,
-            requested_provider: context.requested_provider,
-        })
-    } else {
-        refused_resolution(RefusedResolution {
-            capability: context.capability,
-            language: None,
-            requested_provider: context.requested_provider,
-            selection_mode: context.selection_mode,
-            refusal_reason: RefusalReason::UnsupportedLanguage,
-            candidates: refused_candidates(
-                context.requested_provider,
-                CandidateReason::UnsupportedLanguage,
-            ),
-        })
-    }
-}
+fn refactor_behaviour(#[from(world)] world: RefactorWorld) { let _ = world; }
 
 fn read_routed_target(world: &RefactorWorld) -> Result<String, String> {
     let target_file = world.target_file()?;

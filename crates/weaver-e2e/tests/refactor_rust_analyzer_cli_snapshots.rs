@@ -16,9 +16,12 @@ use daemon_harness::{FakeDaemon, output_to_transcript, weaver_binary_path};
 use insta::assert_debug_snapshot;
 use rstest::rstest;
 
+#[expect(
+    clippy::expect_used,
+    reason = "test helper surfaces setup failures with the exact requested call structure"
+)]
 fn run_refactor_snapshot(snapshot_name: &str, display_command: &str, extra_args: &[&str]) {
-    let daemon = FakeDaemon::start(1, "renamed_name")
-        .unwrap_or_else(|error| panic!("fake daemon should start: {error}"));
+    let daemon = FakeDaemon::start(1, "renamed_name").expect("fake daemon should start");
     let endpoint = daemon.endpoint();
 
     let output = Command::new(weaver_binary_path())
@@ -28,7 +31,7 @@ fn run_refactor_snapshot(snapshot_name: &str, display_command: &str, extra_args:
         .arg("json")
         .args(extra_args)
         .output()
-        .unwrap_or_else(|error| panic!("command should execute: {error}"));
+        .expect("command should execute");
 
     let transcript = output_to_transcript(display_command.to_owned(), &output, daemon.requests());
     daemon.join();

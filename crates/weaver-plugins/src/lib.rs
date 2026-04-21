@@ -64,7 +64,9 @@ mod tests;
 /// this crate.
 #[cfg(feature = "test-support")]
 pub use self::capability::test_support::{
-    RenameSymbolRequestFixture, RenameSymbolResponseFixture, rename_symbol_request_fixtures,
+    RenameSymbolRequestFixture,
+    RenameSymbolResponseFixture,
+    rename_symbol_request_fixtures,
     rename_symbol_response_fixtures,
 };
 /// Shared fixture lookup and contract-validation helpers used by downstream
@@ -74,9 +76,12 @@ pub use self::capability::test_support::{
 /// this crate.
 #[cfg(feature = "test-support")]
 pub use self::capability::test_support::{
-    assert_rename_symbol_request_fixture_contract, assert_rename_symbol_response_fixture_contract,
-    rename_symbol_request_fixture_named, rename_symbol_response_fixture_named,
-    validate_rename_symbol_request_fixture, validate_rename_symbol_response_fixture,
+    assert_rename_symbol_request_fixture_contract,
+    assert_rename_symbol_response_fixture_contract,
+    rename_symbol_request_fixture_named,
+    rename_symbol_response_fixture_named,
+    validate_rename_symbol_request_fixture,
+    validate_rename_symbol_response_fixture,
 };
 pub use self::{
     capability::{

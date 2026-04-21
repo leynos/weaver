@@ -4,9 +4,10 @@ use tempfile::TempDir;
 use weaver_plugins::{PluginOutput, PluginResponse};
 
 use super::refactor_helpers::{
-    ExecuteResult, RefusedResolution, RollbackRuntime, SelectedResolution, build_backends,
-    command_request, original_content_for, refused_resolution, rollback_runtime, selected_runtime,
-    standard_rename_args,
+    builders::{build_backends, command_request, standard_rename_args},
+    content::original_content_for,
+    resolutions::{RefusedResolution, SelectedResolution, refused_resolution},
+    rollback::{ExecuteResult, RollbackRuntime, rollback_runtime, selected_runtime},
 };
 use crate::dispatch::act::refactor::{RefactorContext, ResponseWriter, handle};
 
@@ -43,14 +44,15 @@ fn rope_python_runtime(execute_result: ExecuteResult) -> RollbackRuntime {
     )
 }
 
-fn run_failure_case(runtime: RollbackRuntime) -> RollbackOutcome {
-    let workspace = TempDir::new().expect("workspace");
+fn run_failure_case(runtime: RollbackRuntime) -> Result<RollbackOutcome, String> {
+    let workspace = TempDir::new().map_err(|e| format!("workspace: {e}"))?;
     let file = "notes.py";
     let file_path = workspace.path().join(file);
-    std::fs::write(&file_path, original_content_for(file_path.as_path())).expect("write file");
+    std::fs::write(&file_path, original_content_for(file_path.as_path()))
+        .map_err(|e| format!("write file: {e}"))?;
 
     let request = command_request(standard_rename_args(file));
-    let socket_dir = TempDir::new().expect("socket dir");
+    let socket_dir = TempDir::new().map_err(|e| format!("socket dir: {e}"))?;
     let socket_path = socket_dir.path().join("socket.sock");
     let mut backends = build_backends(&socket_path);
     let mut output = Vec::new();
@@ -64,13 +66,13 @@ fn run_failure_case(runtime: RollbackRuntime) -> RollbackOutcome {
             runtime: &runtime,
         },
     )
-    .expect("dispatch should complete");
+    .map_err(|e| format!("dispatch should complete: {e}"))?;
 
-    RollbackOutcome {
+    Ok(RollbackOutcome {
         status: result.status,
-        stderr: String::from_utf8(output).expect("stderr utf8"),
-        content: std::fs::read_to_string(&file_path).expect("read file"),
-    }
+        stderr: String::from_utf8(output).map_err(|e| format!("stderr utf8: {e}"))?,
+        content: std::fs::read_to_string(&file_path).map_err(|e| format!("read file: {e}"))?,
+    })
 }
 
 fn assert_rollback_invariants(outcome: &RollbackOutcome, stderr_fragment: &str) {
@@ -83,23 +85,26 @@ fn assert_rollback_invariants(outcome: &RollbackOutcome, stderr_fragment: &str) 
 }
 
 #[test]
-fn refused_resolution_leaves_target_file_unchanged() {
-    let outcome = run_failure_case(refused_runtime());
+fn refused_resolution_leaves_target_file_unchanged() -> Result<(), String> {
+    let outcome = run_failure_case(refused_runtime())?;
     assert_rollback_invariants(&outcome, "unsupported_language");
+    Ok(())
 }
 
 #[test]
-fn plugin_runtime_error_leaves_target_file_unchanged() {
-    let outcome = run_failure_case(rope_python_runtime(ExecuteResult::MissingPlugin("rope")));
+fn plugin_runtime_error_leaves_target_file_unchanged() -> Result<(), String> {
+    let outcome = run_failure_case(rope_python_runtime(ExecuteResult::MissingPlugin("rope")))?;
     assert_rollback_invariants(&outcome, "act refactor failed");
+    Ok(())
 }
 
 #[test]
-fn successful_non_diff_response_leaves_target_file_unchanged() {
+fn successful_non_diff_response_leaves_target_file_unchanged() -> Result<(), String> {
     let outcome = run_failure_case(rope_python_runtime(ExecuteResult::Success(
         PluginResponse::success(PluginOutput::Analysis {
             data: serde_json::json!({ "unexpected": true }),
         }),
-    )));
+    )))?;
     assert_rollback_invariants(&outcome, "did not return diff output");
+    Ok(())
 }
