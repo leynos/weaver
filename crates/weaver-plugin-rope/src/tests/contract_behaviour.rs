@@ -3,10 +3,15 @@
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use weaver_plugins::{
-    PluginError, RenameSymbolRequestFixture, RenameSymbolResponseFixture,
-    rename_symbol_request_fixture_named, rename_symbol_response_fixture_named,
-    validate_rename_symbol_request_fixture, validate_rename_symbol_response_fixture,
+    PluginError,
+    RenameSymbolRequestFixture,
+    RenameSymbolResponseFixture,
+    rename_symbol_request_fixture_named,
+    rename_symbol_response_fixture_named,
+    validate_rename_symbol_request_fixture,
+    validate_rename_symbol_response_fixture,
 };
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 #[derive(Default)]
 struct World {
@@ -15,10 +20,9 @@ struct World {
     validation_result: Option<Result<(), PluginError>>,
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> World {
-    World::default()
-}
+fn world() -> World { World::default() }
 
 #[given("the shared valid rename-symbol request fixture")]
 fn given_valid_request_fixture(world: &mut World) {
@@ -74,6 +78,4 @@ fn then_fixture_fails_with_message(world: &mut World, text: String) {
 }
 
 #[scenario(path = "tests/features/rename_symbol_contract.feature")]
-fn rope_plugin_contract_behaviour(world: World) {
-    let _ = world;
-}
+fn rope_plugin_contract_behaviour(world: World) { let _ = world; }

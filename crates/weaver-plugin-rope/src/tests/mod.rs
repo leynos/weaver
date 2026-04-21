@@ -4,14 +4,15 @@ mod behaviour;
 mod contract_behaviour;
 mod contract_fixtures;
 
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use cap_std::{ambient_authority, fs::Dir};
 use mockall::mock;
 use rstest::{fixture, rstest};
-use weaver_plugins::capability::ReasonCode;
-use weaver_plugins::protocol::{FilePayload, PluginOutput, PluginRequest};
+use weaver_plugins::{
+    capability::ReasonCode,
+    protocol::{FilePayload, PluginOutput, PluginRequest},
+};
 
 use crate::{PluginFailure, RopeAdapter, RopeAdapterError, execute_request, run_with_adapter};
 

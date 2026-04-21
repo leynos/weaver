@@ -3,12 +3,13 @@
 //! This module is feature-gated so plugin crates can reuse one canonical suite
 //! of request and response examples without duplicating fixture data.
 
-use crate::capability::{CapabilityContract, ReasonCode, RenameSymbolContract};
-use crate::error::PluginError;
-use crate::protocol::{
-    DiagnosticSeverity, PluginDiagnostic, PluginOutput, PluginRequest, PluginResponse,
-};
 use serde_json::json;
+
+use crate::{
+    capability::{CapabilityContract, ReasonCode, RenameSymbolContract},
+    error::PluginError,
+    protocol::{DiagnosticSeverity, PluginDiagnostic, PluginOutput, PluginRequest, PluginResponse},
+};
 
 /// Shared fixture for `rename-symbol` contract validation payloads.
 #[derive(Debug, Clone)]
@@ -35,15 +36,11 @@ impl<T> RenameSymbolFixture<T> {
 
     /// Returns the human-readable fixture name.
     #[must_use]
-    pub const fn name(&self) -> &'static str {
-        self.name
-    }
+    pub const fn name(&self) -> &'static str { self.name }
 
     /// Returns the fixture payload.
     #[must_use]
-    pub const fn payload(&self) -> &T {
-        &self.payload
-    }
+    pub const fn payload(&self) -> &T { &self.payload }
 
     /// Returns the expected error fragment for invalid payloads.
     #[must_use]
@@ -199,10 +196,10 @@ fn fixture_named<T: Clone>(
     name: &str,
     fixture_kind: &str,
 ) -> RenameSymbolFixture<T> {
-    fixtures
-        .into_iter()
-        .find(|fixture| fixture.name() == name)
-        .unwrap_or_else(|| panic!("missing {fixture_kind} fixture '{name}'"))
+    let Some(fixture) = fixtures.into_iter().find(|fixture| fixture.name() == name) else {
+        panic!("missing {fixture_kind} fixture '{name}'");
+    };
+    fixture
 }
 
 fn assert_fixture_contract<T>(

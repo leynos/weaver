@@ -32,17 +32,17 @@ ______________________________________________________________________
    manages the `LspHost`. This avoids tight coupling between router and LSP.
 
 3. **Argument format**: Follow the [users guide](../users-guide.md)
-   convention:
-   `--uri file:///path.rs --position 10:5`. Position uses `LINE:COL` format
-   (1-indexed for user-facing, converted to 0-indexed for LSP).
+   convention: `--uri file:///path.rs --position 10:5`. Position uses
+   `LINE:COL` format (1-indexed for user-facing, converted to 0-indexed for
+   LSP).
 
 4. **Language inference**: Derive language from URI file extension:
    `.rs` → Rust, `.py` → Python, `.ts`/`.tsx` → TypeScript. Unknown extensions
    return a structured error.
 
 5. **Response format**: JSON payload per the [users
-   guide](../users-guide.md):
-   `{"uri":"<URI>","line":42,"column":17}` for each definition location.
+   guide](../users-guide.md): `{"uri":"<URI>","line":42,"column":17}` for each
+   definition location.
 
 6. **Error propagation**: New `DispatchError` variants for argument validation,
    backend startup failures, and LSP host errors. All return exit status 1.

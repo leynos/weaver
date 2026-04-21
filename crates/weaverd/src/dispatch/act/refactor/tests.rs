@@ -12,14 +12,25 @@ use weaver_test_macros::allow_fixture_expansion_lints;
 #[path = "refactor_helpers.rs"]
 mod refactor_helpers;
 
-use refactor_helpers::{build_backends, command_request};
-use crate::dispatch::act::refactor::resolution::{
-    CandidateEvaluation, CapabilityResolutionDetails, CapabilityResolutionEnvelope,
-    ResolutionOutcome, ResolutionRequest, SelectionMode,
-};
+use refactor_helpers::builders::{build_backends, command_request};
+
 use crate::dispatch::act::refactor::{
-    DispatchError, RefactorContext, RefactorPluginRuntime, ResponseWriter, default_runtime, handle,
-    resolve_rope_plugin_path, resolve_rust_analyzer_plugin_path,
+    DispatchError,
+    RefactorContext,
+    RefactorPluginRuntime,
+    ResponseWriter,
+    default_runtime,
+    handle,
+    resolution::{
+        CandidateEvaluation,
+        CapabilityResolutionDetails,
+        CapabilityResolutionEnvelope,
+        ResolutionOutcome,
+        ResolutionRequest,
+        SelectionMode,
+    },
+    resolve_rope_plugin_path,
+    resolve_rust_analyzer_plugin_path,
 };
 
 enum MockRuntimeResult {

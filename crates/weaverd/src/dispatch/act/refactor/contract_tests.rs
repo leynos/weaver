@@ -15,7 +15,8 @@ use weaver_test_macros::allow_fixture_expansion_lints;
 #[path = "refactor_helpers.rs"]
 mod refactor_helpers;
 
-use refactor_helpers::{build_backends, command_request};
+use refactor_helpers::builders::{build_backends, command_request};
+
 use crate::dispatch::act::refactor::{
     RefactorContext,
     RefactorPluginRuntime,

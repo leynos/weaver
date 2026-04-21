@@ -454,9 +454,9 @@ let payload = automatic_resolution_payload(std::path::Path::new(file));
 ### `refactor_helpers` (`weaverd/src/dispatch/act/refactor/refactor_helpers.rs`)
 
 `refactor_helpers` is a `#[cfg(test)]` support module for the daemon-side
-`act refactor` tests. It is split into small inline modules and then re-exported
-at the top level so sibling test modules can import a compact test API instead
-of reaching into several implementation details.
+`act refactor` tests. It is split into small inline modules and then
+re-exported at the top level so sibling test modules can import a compact test
+API instead of reaching into several implementation details.
 
 The inline modules are:
 
@@ -486,8 +486,8 @@ The `rollback_tests` module uses these abstractions to assert failure-path
 invariants for `act refactor`: the command exits with status `1`, the target
 file content remains unchanged, and stderr contains the expected refusal or
 runtime error text. That module is intentionally focused on rollback semantics,
-while `tests.rs`, `contract_tests.rs`, and `behaviour.rs` cover other aspects of
-the refactor handler.
+while `tests.rs`, `contract_tests.rs`, and `behaviour.rs` cover other aspects
+of the refactor handler.
 
 Typical usage pattern in daemon tests:
 
@@ -509,5 +509,5 @@ let mut backends = build_backends(&socket_path);
 
 That pattern lets a test build a request, inject a deterministic runtime, and
 then call `handle(...)` to assert on exit status, stderr, and any preserved
-workspace content. Tests that need fixture content or diff payloads layer in the
-`content` helpers instead of hand-writing patch strings.
+workspace content. Tests that need fixture content or diff payloads layer in
+the `content` helpers instead of hand-writing patch strings.
