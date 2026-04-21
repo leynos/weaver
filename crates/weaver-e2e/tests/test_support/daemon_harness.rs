@@ -220,7 +220,12 @@ fn respond_to_request(
         .get("command")
         .and_then(|command| command.get("operation"))
         .and_then(serde_json::Value::as_str)
-        .unwrap_or_default();
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "fake daemon request missing command.operation string field",
+            )
+        })?;
     let operation = Operation::from(operation_str);
     let arguments = request_arguments(&parsed_request)?;
 

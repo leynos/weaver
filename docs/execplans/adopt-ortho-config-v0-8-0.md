@@ -1,4 +1,4 @@
-# Adopt `ortho-config` v0.8.0 Across Weaver
+# Adopt `ortho-config` v0.8.0 across Weaver
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
