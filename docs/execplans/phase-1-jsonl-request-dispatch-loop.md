@@ -3,8 +3,8 @@
 ## Goal
 
 Implement the JSONL request dispatch loop in `weaverd` that reads
-`CommandRequest` messages from connected clients, routes them to the appropriate
-domain handler, and streams `CommandResponse` messages back.
+`CommandRequest` messages from connected clients, routes them to the
+appropriate domain handler, and streams `CommandResponse` messages back.
 
 ## Acceptance Criteria
 
@@ -18,21 +18,21 @@ domain handler, and streams `CommandResponse` messages back.
    separation of concerns (errors, request parsing, response writing, routing,
    and connection handling). Each file remains under 400 lines per AGENTS.md.
 
-1. **Minimum viable product (MVP) placeholder handlers**: The `get-definition`
+2. **Minimum viable product (MVP) placeholder handlers**: The `get-definition`
    operation in the `observe` domain is fully implemented with LSP integration.
    Other known operations (`find-references`, `grep`, `diagnostics`,
    `call-hierarchy` in `observe`; all operations in `act` and `verify`) return
    "not implemented" responses with exit status 1 while backend wiring is
    completed.
 
-1. **Structured error responses**: All errors (malformed JSONL, unknown domain,
+3. **Structured error responses**: All errors (malformed JSONL, unknown domain,
    unknown operation) are written to stderr as structured messages before the
    terminal exit message.
 
-1. **Case-insensitive domain matching**: Domain names (`observe`, `act`,
+4. **Case-insensitive domain matching**: Domain names (`observe`, `act`,
    `verify`) are matched case-insensitively for robustness.
 
-1. **Re-use existing transport infrastructure**: Build on the existing
+5. **Re-use existing transport infrastructure**: Build on the existing
    `ConnectionHandler` trait and `read_request_line` helper from the transport
    module.
 

@@ -32,8 +32,8 @@ slice the source first. This yields:
 ## 3 Dealing with left-recursion, infinite loops, and other things that ate Betelgeuse
 
 Left-recursive rules make top-down parsers seize up like Marvin’s shoulder
-joints. Rewrite them with repetition combinators (`many()`, `foldl()`), or use a
-precedence-climbing expression parser.
+joints. Rewrite them with repetition combinators (`many()`, `foldl()`), or use
+a precedence-climbing expression parser.
 
 Forward references? Wrap them in `recursive(|expr| { … })`, so Chumsky can see
 round corners.
@@ -47,15 +47,15 @@ Error recovery is what turns the parser from Vogon poetry into a Babel fish.
 
 1. **Anchors:** Tell Chumsky that `;`, `}`, `]`, and other setters of cosmic
    balance are “hard delimiters”. Use `recover_with(skip_until([]))`.
-1. **Labels:** Tag sub-parsers with `.labelled("expression")` so the diagnostics
+2. **Labels:** Tag sub-parsers with `.labelled("expression")` so the diagnostics
    mention something friendlier than “expected `Unknown(42)`”.
-1. **Tri-state nodes:** Return `Option<AstNode>`; missing bits propagate, but
+3. **Tri-state nodes:** Return `Option<AstNode>`; missing bits propagate, but
    the parser soldiers on.
 
 In practice, it is common to compose the built-ins via
-`recover_with(nested_delimiters())` and `recover_with(skip_until(…))`, threading
-in a couple of bespoke closures, and quickly look like the local authority on
-parser resilience.
+`recover_with(nested_delimiters())` and `recover_with(skip_until(…))`,
+threading in a couple of bespoke closures, and quickly look like the local
+authority on parser resilience.
 
 ## 5 Getting the Codex to behave (or: how to babysit a 2-metre tall neural net)
 
@@ -74,8 +74,8 @@ Codex is a marvellous companion so long as the operator:
 Treat the linter as the pre-solver phase of the differential logic engine:
 
 1. Build symbol tables and scope graphs.
-1. Run the cheap local checks (duplicates, arity, type holes).
-1. Emit a constraint set and immediately feed it to the solver; conflicts become
+2. Run the cheap local checks (duplicates, arity, type holes).
+3. Emit a constraint set and immediately feed it to the solver; conflicts become
    diagnostics.
 
 Because differential logic supports incremental rechecking, teams can deliver
@@ -94,9 +94,9 @@ ______________________________________________________________________
 
 ## Too long; didn’t read (because life is short and full of Thursdays)
 
-Write the grammar first, lex separately, tame left-recursion, anchor recovery on
-hard delimiters, keep Codex on a tight leash, and let the linter double as the
-logic engine’s warm-up act.
+Write the grammar first, lex separately, tame left-recursion, anchor recovery
+on hard delimiters, keep Codex on a tight leash, and let the linter double as
+the logic engine’s warm-up act.
 
 And always keep the towel handy. It’s the most massively useful thing an
 interstellar parser hacker can carry.

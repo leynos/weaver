@@ -1,7 +1,7 @@
 # Semgrep query operator precedence and Pratt binding powers
 
-This document records a parser-backed precedence normalization model for Semgrep
-query expressions.
+This document records a parser-backed precedence normalization model for
+Semgrep query expressions.
 
 Important scope note:
 
@@ -16,13 +16,13 @@ Important scope note:
 Highest to lowest in the normalization model:
 
 1. Atomics: `pattern`, `regex` (legacy: `pattern`, `pattern-regex`).
-1. Context wrappers: `inside`, `anywhere` (legacy: `pattern-inside`,
+2. Context wrappers: `inside`, `anywhere` (legacy: `pattern-inside`,
    `semgrep-internal-pattern-anywhere`).
-1. Negation: `not` (legacy: `pattern-not`; composite forms include
+3. Negation: `not` (legacy: `pattern-not`; composite forms include
    `pattern-not-regex` and `pattern-not-inside`).
-1. Conjunction: `all` (legacy: `patterns`).
-1. Disjunction: `any` (legacy: `pattern-either`).
-1. Decorator layer: `where`, `as`, `fix` (post-parse attachments).
+4. Conjunction: `all` (legacy: `patterns`).
+5. Disjunction: `any` (legacy: `pattern-either`).
+6. Decorator layer: `where`, `as`, `fix` (post-parse attachments).
 
 Parser-enforced semantic constraints:
 
@@ -74,6 +74,6 @@ See [Semgrep operator precedence DOT graph](semgrep-operator-precedence.dot).
 The following pointers reference upstream Semgrep parser and rule files:
 
 - `src/parsing/Parse_rule.ml` around line `648`.
-- `src/parsing/Parse_rule_formula.ml` around lines `367`, `399`, `483`, `739`,
-  and `969`.
+- `src/parsing/Parse_rule_formula.ml` around lines `367`, `399`, `483`,
+  `739`, and `969`.
 - `src/rule/Rule.ml` around lines `63` and `897`.

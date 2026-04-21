@@ -1,8 +1,9 @@
 # Implement the rust-analyzer actuator plugin
 
-This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
-`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
-and `Outcomes & Retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+proceeds.
 
 Status: COMPLETE (2026-02-17)
 
@@ -14,9 +15,9 @@ applies beyond `AGENTS.md` and this ExecPlan.
 
 ## Purpose / big picture
 
-Deliver the second specialist actuator plugin by integrating `rust-analyzer` for
-Rust refactoring. After this work, the following command executes a sandboxed
-rust-analyzer-backed plugin:
+Deliver the second specialist actuator plugin by integrating `rust-analyzer`
+for Rust refactoring. After this work, the following command executes a
+sandboxed rust-analyzer-backed plugin:
 
 ```sh
 weaver act refactor --provider rust-analyzer --refactoring rename --file src/main.rs offset=42 new_name=better_name
@@ -33,8 +34,8 @@ Observable success:
   failures return structured failures and leave files unchanged.
 - Unit, behavioural (`rstest-bdd` v0.5.0), and end-to-end tests cover happy,
   unhappy, and edge cases.
-- `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md` reflect
-  shipped behaviour.
+- `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
+  reflect shipped behaviour.
 - `make check-fmt`, `make lint`, and `make test` succeed.
 
 ## Constraints
@@ -56,8 +57,8 @@ Observable success:
 - Scope: if delivery requires touching more than 26 files or ~2400 net lines,
   stop and escalate.
 - Interface: if public protocol schema in
-  `crates/weaver-plugins/src/protocol/mod.rs` must break compatibility, stop and
-  escalate.
+  `crates/weaver-plugins/src/protocol/mod.rs` must break compatibility, stop
+  and escalate.
 - Dependencies: if adding new external crates beyond existing workspace
   dependencies becomes necessary, stop and escalate with justification.
 - Iterations: if the same failing test loop repeats 5 times without progress,
@@ -76,14 +77,14 @@ Observable success:
 
 ## Progress
 
-- [x] (2026-02-17 00:00Z) Added `crates/weaver-plugin-rust-analyzer/` crate with
-  request dispatch, adapter trait boundary, and binary entrypoint.
-- [x] (2026-02-17 00:20Z) Implemented production adapter using rust-analyzer LSP
-  JSON-RPC flow with workspace-edit application.
+- [x] (2026-02-17 00:00Z) Added `crates/weaver-plugin-rust-analyzer/` crate
+      with request dispatch, adapter trait boundary, and binary entrypoint.
+- [x] (2026-02-17 00:20Z) Implemented production adapter using rust-analyzer
+      LSP JSON-RPC flow with workspace-edit application.
 - [x] (2026-02-17 00:35Z) Wired runtime registration in `weaverd` for the
-  rust-analyzer provider and added path resolution tests.
+      rust-analyzer provider and added path resolution tests.
 - [x] (2026-02-17 00:45Z) Added unit and behavioural tests for plugin dispatch,
-  plus e2e CLI snapshots for rust-analyzer command ergonomics.
+      plus e2e CLI snapshots for rust-analyzer command ergonomics.
 - [x] (2026-02-17 01:00Z) Updated design docs, user guide, and roadmap status.
 - [x] (2026-02-17 01:15Z) Ran full quality gates successfully.
 
@@ -101,13 +102,13 @@ Observable success:
 - Decision: mirror `weaver-plugin-rope` crate shape for rust-analyzer.
   Rationale: consistent plugin ergonomics and lower maintenance overhead.
   Date/Author: 2026-02-17 / Codex
-- Decision: implement rust-analyzer integration through short-lived LSP JSON-RPC
-  2.0 stdio exchange rather than custom analysis logic. Rationale: semantic
-  correctness and alignment with existing LSP strategy. Date/Author: 2026-02-17
-  / Codex
-- Decision: keep all unit/BDD tests mock-based at adapter boundary. Rationale:
-  deterministic test suite without requiring rust-analyzer on host. Date/Author:
+- Decision: implement rust-analyzer integration through short-lived LSP
+  JSON-RPC 2.0 stdio exchange rather than custom analysis logic. Rationale:
+  semantic correctness and alignment with existing LSP strategy. Date/Author:
   2026-02-17 / Codex
+- Decision: keep all unit/BDD tests mock-based at adapter boundary.
+  Rationale: deterministic test suite without requiring rust-analyzer on host.
+  Date/Author: 2026-02-17 / Codex
 
 ## Outcomes & Retrospective
 
@@ -116,8 +117,8 @@ Observable success:
 - Registered rust-analyzer provider in `weaverd` with language `rust`, default
   executable `/usr/bin/weaver-plugin-rust-analyzer`, override via
   `WEAVER_RUST_ANALYZER_PLUGIN_PATH`, and timeout `60s`.
-- Added plugin unit tests, `rstest-bdd` behavioural tests, and e2e CLI snapshot
-  coverage for actuator isolation and observe→jq→act pipelines.
+- Added plugin unit tests, `rstest-bdd` behavioural tests, and e2e CLI
+  snapshot coverage for actuator isolation and observe→jq→act pipelines.
 - Updated `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
   to capture behaviour and design decisions.
 - Full quality gates passed before completion.

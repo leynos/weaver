@@ -3,23 +3,24 @@
 Name: `weaver`
 
 Use this skill whenever the user wants semantic code intelligence through the
-Weaver CLI, especially for fetching definitions, fetching symbol cards, checking
-capability support, inspecting daemon state, or performing language-aware
-renames. Trigger even when the user does not mention Weaver by name if they want
-IDE-like code navigation or semantic refactors from the terminal.
+Weaver CLI, especially for fetching definitions, fetching symbol cards,
+checking capability support, inspecting daemon state, or performing
+language-aware renames. Trigger even when the user does not mention Weaver by
+name if they want IDE-like code navigation or semantic refactors from the
+terminal.
 
 Weaver gives you semantic code operations through a CLI and daemon. Use it when
 plain text search is too lossy, when the user wants structured JSON about code
-relationships, or when a rename should go through language-aware tooling instead
-of raw text edits.
+relationships, or when a rename should go through language-aware tooling
+instead of raw text edits.
 
 ## Compatibility
 
 - Requires `weaver` in `PATH`.
 - Best support today is for Rust (`.rs`), Python (`.py`), and TypeScript
   (`.ts`/`.tsx`).
-- Domain commands auto-start the daemon when needed, so manual daemon control is
-  mainly for health checks and debugging.
+- Domain commands auto-start the daemon when needed, so manual daemon control
+  is mainly for health checks and debugging.
 - In this repository, the implemented semantic read operations are currently
   `observe get-definition` and `observe get-card`. Do not route reference
   lookup, call-graph, or diagnostics requests to Weaver here; use fallback
@@ -39,15 +40,15 @@ of raw text edits.
 
 1. Convert source paths to file URIs for `observe` commands, for example
    `file:///abs/path/to/file.rs`.
-1. Use 1-indexed `LINE:COL` values for `--position`.
-1. Choose the narrowest implemented command that matches the task:
+2. Use 1-indexed `LINE:COL` values for `--position`.
+3. Choose the narrowest implemented command that matches the task:
    - definition lookup → `observe get-definition`
    - rich symbol summary → `observe get-card`
    - semantic rename → `act refactor --refactoring rename`
-1. If the user asks for references, call graphs, or diagnostics, do not call the
-   unimplemented Weaver operations in this repo. Use the repository's normal
-   exploration or validation tools instead.
-1. If the user asks what Weaver supports in the current setup, run
+4. If the user asks for references, call graphs, or diagnostics, do not call
+   the unimplemented Weaver operations in this repo. Use the repository's
+   normal exploration or validation tools instead.
+5. If the user asks what Weaver supports in the current setup, run
    `weaver --capabilities`.
 
 ## Command playbook
@@ -128,8 +129,8 @@ If Weaver reports an unsupported language, missing capability, or another
 structured refusal:
 
 1. Quote the refusal reason briefly.
-1. Switch to the repository's normal exploration or editing tools.
-1. State why the fallback is necessary.
+2. Switch to the repository's normal exploration or editing tools.
+3. State why the fallback is necessary.
 
 ## Output handling
 
@@ -152,8 +153,8 @@ User: "Use Weaver to find the definition of the symbol at `src/lib.rs:42:17`."
 Agent flow:
 
 1. Build a file URI for `src/lib.rs`.
-1. Run `weaver --output json observe get-definition ...`.
-1. Return the resolved location or locations succinctly.
+2. Run `weaver --output json observe get-definition ...`.
+3. Return the resolved location or locations succinctly.
 
 ### Richer semantic context
 
@@ -162,8 +163,8 @@ User: "Give me a semantic summary of the function at `src/handler.py:18:5`."
 Agent flow:
 
 1. Start with `observe get-card --detail structure`.
-1. Escalate to `--detail semantic` only if hover or type data matters.
-1. Summarize the signature, docs, locals, branches, and provenance.
+2. Escalate to `--detail semantic` only if hover or type data matters.
+3. Summarize the signature, docs, locals, branches, and provenance.
 
 ### Safe rename
 
@@ -172,9 +173,9 @@ with Weaver."
 
 Agent flow:
 
-1. Run
-   `act refactor --refactoring rename --file src/main.py new_name=build_index offset=123`.
-1. Inspect the capability resolution.
-1. Review the diff.
-1. Run project validators.
-1. Report the outcome.
+1. Run `act refactor --refactoring rename --file src/main.py
+   new_name=build_index offset=123`.
+2. Inspect the capability resolution.
+3. Review the diff.
+4. Run project validators.
+5. Report the outcome.

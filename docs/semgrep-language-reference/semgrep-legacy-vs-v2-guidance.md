@@ -19,8 +19,8 @@ Current evidence indicates a mixed state:
   formula parsing,
 - extract mode still uses legacy formula parsing in some paths,
 - some schema constructs are still marked `EXPERIMENTAL`, and
-- some v2 or schema-level constructs are not represented uniformly across parser
-  branches.
+- some v2 or schema-level constructs are not represented uniformly across
+  parser branches.
 
 v2 is usable for core cases, but it is not complete across every path.
 
@@ -84,10 +84,10 @@ rule corpus must be ingested.
 Implement both syntaxes and normalize to a shared formula AST:
 
 1. Parse v2 `match`.
-1. Parse legacy `pattern*` forms.
-1. Lower both to shared constructors such as `P`, `Not`, `Inside`, `Anywhere`,
+2. Parse legacy `pattern*` forms.
+3. Lower both to shared constructors such as `P`, `Not`, `Inside`, `Anywhere`,
    `And`, and `Or`.
-1. Apply shared semantic checks such as `InvalidNotInOr` and
+4. Apply shared semantic checks such as `InvalidNotInOr` and
    `MissingPositiveTermInAnd`.
 
 Use this option when interoperability with existing Semgrep rules is required.
@@ -97,10 +97,10 @@ Use this option when interoperability with existing Semgrep rules is required.
 The following pointers reference upstream Semgrep implementation files and line
 ranges at the time this guide was compiled.[^1][^2][^3][^4]
 
-\[^1\]: `src/parsing/Parse_rule.ml` — lines `648`, `1011`, and `1026`. \[^2\]:
-`src/parsing/Parse_rule_formula.ml` — lines `315`, `739`, and `954`. \[^3\]:
-`src/rule/Rule.ml` — line `63`. \[^4\]:
-<https://raw.githubusercontent.com/semgrep/semgrep-interfaces/7e509db48c700cae49fe0372e2aa0410fa86d867/rule_schema_v1.yaml>
+[^1]: `src/parsing/Parse_rule.ml` — lines `648`, `1011`, and `1026`.
+[^2]: `src/parsing/Parse_rule_formula.ml` — lines `315`, `739`, and `954`.
+[^3]: `src/rule/Rule.ml` — line `63`.
+[^4]: <https://raw.githubusercontent.com/semgrep/semgrep-interfaces/7e509db48c700cae49fe0372e2aa0410fa86d867/rule_schema_v1.yaml>
 
 ## Related documents in this repository
 

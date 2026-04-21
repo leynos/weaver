@@ -1,17 +1,17 @@
 # Documentation style guide
 
-This guide outlines conventions for authoring documentation for software by df12
-Productions. Apply these rules to keep the documentation clear and consistent
-for developers.
+This guide outlines conventions for authoring documentation for software by
+df12 Productions. Apply these rules to keep the documentation clear and
+consistent for developers.
 
 ## Spelling
 
 - Use British English based on the
   [Oxford English Dictionary](https://public.oed.com/) (en-GB-oxendict):
-  - suffix -ize in words like _realize_ and _organization_ instead of -ise
-    endings,
-  - suffix ‑lyse in words not traced to the Greek ‑izo, ‑izein suffixes, such as
-    _analyse_, _paralyse_ and _catalyse_,
+  - suffix -ize in words like _realize_ and _organization_ instead of
+     -ise endings,
+  - suffix ‑lyse in words not traced to the Greek ‑izo, ‑izein suffixes,
+     such as _analyse_, _paralyse_ and _catalyse_,
   - suffix -our in words such as _colour_, _behaviour_ and _neighbour_,
   - suffix -re in words such as _calibre_, _centre_ and _fibre_,
   - double “l” in words such as _cancelled_, _counsellor_ and _cruellest_,
@@ -30,7 +30,8 @@ for developers.
   comprehension.
 - Company names are treated as collective nouns: “df12 Productions are
   expanding”.
-- Avoid first and second person personal pronouns outside the `README.md` file.
+- Avoid first and second person personal pronouns outside the `README.md`
+  file.
 
 ## Headings
 
@@ -40,7 +41,8 @@ for developers.
 
 ## Markdown rules
 
-- Follow [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2)
+- Follow
+  [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2)
   recommendations[^1].
 - Provide code blocks and lists using standard Markdown syntax.
 - Always provide a language identifier for fenced code blocks; use `plaintext`
@@ -75,8 +77,8 @@ fn add(a: i32, b: i32) -> i32 {
 
 ## API doc comments (Rust)
 
-Use doc comments to document public APIs. Keep them consistent with the contents
-of the manual.
+Use doc comments to document public APIs. Keep them consistent with the
+contents of the manual.
 
 - Begin each block with `///`.
 - Keep the summary line short, followed by further detail.
@@ -85,11 +87,11 @@ of the manual.
 - Document the return value with `# Returns`.
 - Document any panics or errors with `# Panics` or `# Errors` as appropriate.
 - Place examples under `# Examples` for public functions.
-- Use examples for private functions only where they assist in understanding the
-  purpose of the function, and mark these as `ignore`.
+- Use examples for private functions only where they assist in understanding
+  the purpose of the function, and mark these as `ignore`.
 - Put function attributes after the doc comment.
 
-````rust,no_run
+```rust,no_run
 /// Returns the sum of `a` and `b`.
 ///
 /// # Parameters
@@ -108,14 +110,14 @@ of the manual.
 pub fn add(a: i32, b: i32) -> i32 {
     a + b
 }
-````
+```
 
 ## Diagrams and images
 
-Where it adds clarity, include [Mermaid](https://mermaid.js.org/) diagrams. When
-embedding figures, use `![alt text](path/to/image)` and provide brief alt text
-describing the content. Add a short description before each Mermaid diagram, so
-screen readers can understand it.
+Where it adds clarity, include [Mermaid](https://mermaid.js.org/) diagrams.
+When embedding figures, use `![alt text](path/to/image)` and provide brief alt
+text describing the content. Add a short description before each Mermaid
+diagram, so screen readers can understand it.
 
 For screen readers: The following flowchart outlines the documentation workflow.
 
@@ -140,8 +142,8 @@ roadmap. Development effort should be roughly consistent from task to task.
 - Define outcomes, not intentions: Phrase tasks in terms of the capability
   delivered (e.g. “Implement role-based access control for API endpoints”), not
   aspirations like “Improve security”.
-- Quantify completion criteria: Attach measurable finish lines (e.g. “90% test
-  coverage for new modules”, “response times under 200ms”, “all endpoints
+- Quantify completion criteria: Attach measurable finish lines (e.g. “90%
+  test coverage for new modules”, “response times under 200ms”, “all endpoints
   migrated”).
 - Break into atomic increments: Ensure tasks can be completed in weeks, not
   quarters. Large goals should be decomposed into clear, deliverable units.
@@ -239,8 +241,8 @@ Include these sections as appropriate to the decision's complexity:
 - **Decision Outcome / Proposed Direction:** State the chosen approach and
   summarize the rationale. For `Proposed` ADRs, describe the recommended
   direction.
-- **Goals and Non-Goals:** Clarify what the decision aims to achieve and what is
-  explicitly out of scope.
+- **Goals and Non-Goals:** Clarify what the decision aims to achieve and what
+  is explicitly out of scope.
 - **Migration Plan:** For decisions requiring phased implementation, break the
   work into numbered phases with clear goals and deliverables.
 - **Known Risks and Limitations:** Document trade-offs, potential issues, and
@@ -254,8 +256,8 @@ Include these sections as appropriate to the decision's complexity:
 
 - Use second-level headings (`##`) for major sections.
 - Use third-level headings (`###`) for subsections (e.g. phases, option names).
-- Use tables to compare options when multiple dimensions are relevant. Include a
-  caption below the table (e.g. “_Table 1: Trade-offs between X and Y._”).
+- Use tables to compare options when multiple dimensions are relevant. Include
+  a caption below the table (e.g. “_Table 1: Trade-offs between X and Y._”).
 - Include code snippets with language identifiers when illustrating technical
   approaches. Use `no_run` for illustrative Rust code that should not be
   executed.
@@ -343,4 +345,4 @@ implementation is required.>
 
 ______________________________________________________________________
 
-\[^1\]: A linter that enforces consistent Markdown formatting.
+[^1]: A linter that enforces consistent Markdown formatting.

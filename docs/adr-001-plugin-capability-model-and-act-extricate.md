@@ -11,14 +11,14 @@ Proposed.
 ## Context and problem statement
 
 Weaver routes `act` operations through the daemon and currently implements
-`act apply-patch` and `act refactor`. Additional `act` operations are visible in
-routing but not implemented end-to-end. This creates a gap between command
+`act apply-patch` and `act refactor`. Additional `act` operations are visible
+in routing but not implemented end-to-end. This creates a gap between command
 surface and practical capability.
 
 The existing `act refactor` flow already demonstrates a useful pattern:
 providers generate edits, and Weaver applies those edits through the safety
-harness. The safety harness enforces transactional writes, syntactic checks, and
-semantic diagnostics checks before commit.
+harness. The safety harness enforces transactional writes, syntactic checks,
+and semantic diagnostics checks before commit.
 
 A new `act extricate` operation is needed to move a selected symbol into a new
 module or file while preserving behaviour. The operation must support at least
@@ -53,8 +53,9 @@ than required.
 
 ### Technical requirements
 
-- Define stable capability IDs: `rename-symbol`, `extricate-symbol`,
-  `extract-method`, `replace-body`, and `extract-predicate`.
+- Define stable capability IDs:
+  `rename-symbol`, `extricate-symbol`, `extract-method`, `replace-body`, and
+  `extract-predicate`.
 - Extend plugin manifests so providers can declare capabilities.
 - Add capability-aware provider resolution using language, capability support,
   and policy overrides.
@@ -73,8 +74,8 @@ Rust uses built-in orchestration with selective rust-analyzer assistance.
 
 ### Option B: rust-analyzer-only strategy for Rust extrication
 
-Attempt to implement Rust extrication solely as a chain of rust-analyzer assists
-and code actions.
+Attempt to implement Rust extrication solely as a chain of rust-analyzer
+assists and code actions.
 
 ### Option C: tree-sitter-only strategy for Rust extrication
 
@@ -108,10 +109,10 @@ Weaver will introduce a capability-first model where user intent is represented
 as a capability ID, and provider choice is resolved internally. The first
 increment adds `act extricate` for capability `extricate-symbol`.
 
-For Python, Weaver will use a Rope-backed actuator plugin. For Rust, Weaver will
-use a built-in orchestration flow that performs extraction planning, semantic
-checks, and module/edit repairs using a combination of Weaver infrastructure and
-rust-analyzer requests.
+For Python, Weaver will use a Rope-backed actuator plugin. For Rust, Weaver
+will use a built-in orchestration flow that performs extraction planning,
+semantic checks, and module/edit repairs using a combination of Weaver
+infrastructure and rust-analyzer requests.
 
 All final edits will continue to flow through the existing safety harness and
 transaction model.
@@ -152,16 +153,16 @@ This split keeps architecture and implementation aligned:
    - Extend plugin manifest schema with capability declarations.
    - Add resolver logic for language and capability selection.
    - Expose capability discovery output.
-1. Python provider rollout
+2. Python provider rollout
    - Extend Rope plugin with `extricate-symbol` handling.
    - Map `uri`, `position`, and `to` arguments to Rope move operations.
    - Emit unified diffs compatible with existing patch apply flow.
-1. Rust provider rollout
+3. Rust provider rollout
    - Add built-in extrication orchestration and overlay edit planning.
    - Integrate LSP requests for definition, references, and code actions.
    - Integrate rust-analyzer extension requests where available.
    - Add meaning-preservation verification before final commit.
-1. Hardening and expansion
+4. Hardening and expansion
    - Add behavioural and end-to-end tests for Python and Rust.
    - Add diagnostics and explanation output for capability resolution.
    - Expand additional capabilities incrementally behind the same model.

@@ -1,27 +1,28 @@
 # 2.2.2 List all domains and operations in top-level help output
 
-This ExecPlan (execution plan) is a living document. The sections `Constraints`,
-`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
-and `Outcomes & Retrospective` must be kept up to date as work proceeds.
+This ExecPlan (execution plan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+proceeds.
 
 Status: DONE
 
 ## Purpose / big picture
 
 When an operator runs `weaver --help` today, the help output lists one example
-domain (`observe`) and one example operation (`get-definition`) as parenthetical
-hints, but never enumerates the full set of available domains or operations. The
-operator must already know the domain and operation names or read external
-documentation to discover them. This is the P0 gap identified as
+domain (`observe`) and one example operation (`get-definition`) as
+parenthetical hints, but never enumerates the full set of available domains or
+operations. The operator must already know the domain and operation names or
+read external documentation to discover them. This is the P0 gap identified as
 [Gap 1a](../ui-gap-analysis.md#gap-1a--domains-not-enumerated) (domains not
 enumerated) and
 [Gap 1b](../ui-gap-analysis.md#gap-1b--operations-not-enumerated) (operations
 not enumerated) in the UI gap analysis.
 
 After this change, running `weaver --help` will display a catalogue section
-below the standard clap help output listing all three domains (`observe`, `act`,
-`verify`) with a one-line description each, and every CLI-supported operation
-per domain. The output requires no daemon startup or socket access.
+below the standard clap help output listing all three domains (`observe`,
+`act`, `verify`) with a one-line description each, and every CLI-supported
+operation per domain. The output requires no daemon startup or socket access.
 
 Observable outcome: run `weaver --help` and see, after the standard clap help:
 
@@ -47,23 +48,23 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
 
 - `make check-fmt`, `make lint`, and `make test` must pass after all changes.
 - No code file may exceed 400 lines.
-- The workspace Clippy configuration is strict (pedantic, deny on `unwrap_used`,
-  `expect_used`, `print_stdout`, `print_stderr`, `cognitive_complexity`,
-  `missing_docs`, etc.). All new code must comply. Note: `weaver-cli` does NOT
-  opt into workspace lints (no `[lints]` section in its `Cargo.toml`), so
-  `allow_attributes = "deny"` does not apply to it.
-- Comments and documentation must use en-GB-oxendict spelling ("-ize" / "-yse" /
-  "-our").
+- The workspace Clippy configuration is strict (pedantic, deny on
+  `unwrap_used`, `expect_used`, `print_stdout`, `print_stderr`,
+  `cognitive_complexity`, `missing_docs`, etc.). All new code must comply.
+  Note: `weaver-cli` does NOT opt into workspace lints (no `[lints]` section in
+  its `Cargo.toml`), so `allow_attributes = "deny"` does not apply to it.
+- Comments and documentation must use en-GB-oxendict spelling
+  ("-ize" / "-yse" / "-our").
 - New functionality requires both unit tests and BDD behavioural tests using
   `rstest-bdd` v0.5.0.
 - Every module must begin with a `//!` module-level doc comment.
 - The `after_help` catalogue must not require configuration loading or daemon
   connectivity. It must be entirely client-side.
 - The build script (`crates/weaver-cli/build.rs`) includes `cli.rs` via
-  `#[path = "src/cli.rs"]` for manpage generation. Any addition to `cli.rs` must
-  compile in both the build script and library contexts.
-- All new user-facing text must be sourced from Fluent `.ftl` resources via the
-  `ortho_config::Localizer` trait so future locales can override it.
+  `#[path = "src/cli.rs"]` for manpage generation. Any addition to `cli.rs`
+  must compile in both the build script and library contexts.
+- All new user-facing text must be sourced from Fluent `.ftl` resources via
+  the `ortho_config::Localizer` trait so future locales can override it.
 - The Fluent messages and the static English fallbacks must produce identical
   output; a unit test must guard against drift.
 
@@ -75,7 +76,8 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
   escalate. All changes are `pub(crate)` or private.
 - Dependencies: no new external dependencies are expected. If one is required,
   stop and escalate.
-- Iterations: if tests still fail after 5 attempts at fixing, stop and escalate.
+- Iterations: if tests still fail after 5 attempts at fixing, stop and
+  escalate.
 - Ambiguity: the operation list must exactly match the `DomainRoutingContext`
   constants in `crates/weaverd/src/dispatch/router.rs` lines 89–116. If these
   have changed since plan drafting, update the plan accordingly.
@@ -94,11 +96,11 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
   `mod after_help;`) Mitigation: We need to add `mod after_help;` (1 line). At
   397 lines this is within the limit.
 
-- Risk: The static `after_help` text in `cli.rs` is compiled into build.rs for
-  manpage generation. A very long `concat!` macro might cause formatting issues
-  in the generated manpage. Severity: low Likelihood: low Mitigation: Test both
-  `weaver --help` and the manpage rendering. The `after_help` text is plain
-  text, which renders cleanly in troff.
+- Risk: The static `after_help` text in `cli.rs` is compiled into build.rs
+  for manpage generation. A very long `concat!` macro might cause formatting
+  issues in the generated manpage. Severity: low Likelihood: low Mitigation:
+  Test both `weaver --help` and the manpage rendering. The `after_help` text is
+  plain text, which renders cleanly in troff.
 
 - Risk: The `after_help` text must be kept in sync with the daemon's
   `DomainRoutingContext` operation list. If operations are added or removed in
@@ -110,7 +112,7 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
 ## Progress
 
 - [x] Stage A: Add Fluent messages and localizer infrastructure for the
-  after-help catalogue.
+      after-help catalogue.
 - [x] Stage B: Add the static `after_help` attribute to `Cli` in `cli.rs`.
 - [x] Stage C: Add unit tests and integration tests.
 - [x] Stage D: Documentation and roadmap updates.
@@ -125,15 +127,15 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
   on exit code or output stream so the test remains valid regardless of how
   `--help` output is routed.
 
-- Surprise: Clippy's `items_after_test_module` lint fires when any item appears
-  after a `#[cfg(test)] mod`, even if the subsequent items are also
+- Surprise: Clippy's `items_after_test_module` lint fires when any item
+  appears after a `#[cfg(test)] mod`, even if the subsequent items are also
   `#[cfg(test)]`. The initial approach placed `mod after_help` and
   `fn render_after_help` as separate `#[cfg(test)]` items at the end of
   `localizer.rs`. The fix was to move `render_after_help` inside the
   `after_help` module, calling `super::msg()` for the localizer helper.
 
-- Surprise: The `after_help` module needed `pub(crate)` visibility (not just
-  private) because test code in `tests/unit/after_help.rs` imports
+- Surprise: The `after_help` module needed `pub(crate)` visibility (not
+  just private) because test code in `tests/unit/after_help.rs` imports
   `crate::localizer::after_help::render_after_help`.
 
 ## Decision log
@@ -144,8 +146,8 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
   `#[command(after_help = "...")]` clap attribute accepts a string literal (or
   `concat!`). This approach means both the runtime `--help` output and the
   manpage (generated by build.rs from `Cli::command()`) automatically include
-  the catalogue. Fluent messages are defined alongside the static strings, and a
-  unit test verifies they produce identical output. This exactly follows the
+  the catalogue. Fluent messages are defined alongside the static strings, and
+  a unit test verifies they produce identical output. This exactly follows the
   pattern established in task 5.1.1 for bare-help messages, where `bare_help`
   constants hold `(fluent_id, fallback)` tuples and a
   `fluent_and_fallback_outputs_are_identical` test guards against drift.
@@ -159,10 +161,10 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
   and fallback consistency, and to validate that the static `concat!` in
   `cli.rs` matches. Date/Author: 2026-03-03
 
-- Decision: Put new unit tests in `src/tests/unit/after_help.rs` as a sibling to
-  `bare_invocation.rs`. Rationale: Follows the existing test module structure.
-  The `unit.rs` parent has 4 lines of headroom; adding `mod after_help;` uses 1
-  line. Date/Author: 2026-03-03
+- Decision: Put new unit tests in `src/tests/unit/after_help.rs` as a
+  sibling to `bare_invocation.rs`. Rationale: Follows the existing test module
+  structure. The `unit.rs` parent has 4 lines of headroom; adding
+  `mod after_help;` uses 1 line. Date/Author: 2026-03-03
 
 - Decision: Verify `--help` output via `assert_cmd` integration tests in
   `tests/main_entry.rs`, not via the BDD `TestWorld` harness. Rationale:
@@ -174,33 +176,34 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
   which is the correct way to test `--help`. Date/Author: 2026-03-03
 
 - Decision: Declare `localizer::after_help` as `pub(crate)` (not
-  `#[cfg(test)]`). `after_help::DOMAIN_OPERATIONS` is `pub` and re-exported from
-  `lib.rs` (`pub use localizer::after_help:: DOMAIN_OPERATIONS`) so integration
-  tests (`tests/main_entry.rs`) can reference it directly. The remaining Fluent
-  `(id, fallback)` constants and `render_after_help()` are `#[cfg(test)]`-gated
-  inside a nested `after_help::fluent_entries` submodule. This eliminates
-  `dead_code` entirely without lint suppression: the constants and render
-  function are compiled only for the test target where they are used. No
-  `#[allow]` or `#[expect]` attribute is needed. `render_after_help()` lives
-  inside the `fluent_entries` submodule (rather than as a sibling item) to avoid
-  Clippy's `items_after_test_module` lint, and calls `crate::localizer::msg()`
-  to access the parent module's localizer helper. Date/Author: 2026-03-06
+  `#[cfg(test)]`). `after_help::DOMAIN_OPERATIONS` is `pub` and re-exported
+  from `lib.rs` (`pub use localizer::after_help:: DOMAIN_OPERATIONS`) so
+  integration tests (`tests/main_entry.rs`) can reference it directly. The
+  remaining Fluent `(id, fallback)` constants and `render_after_help()` are
+  `#[cfg(test)]`-gated inside a nested `after_help::fluent_entries` submodule.
+  This eliminates `dead_code` entirely without lint suppression: the constants
+  and render function are compiled only for the test target where they are
+  used. No `#[allow]` or `#[expect]` attribute is needed. `render_after_help()`
+  lives inside the `fluent_entries` submodule (rather than as a sibling item)
+  to avoid Clippy's `items_after_test_module` lint, and calls
+  `crate::localizer::msg()` to access the parent module's localizer helper.
+  Date/Author: 2026-03-06
 
 ## Outcomes & retrospective
 
 All acceptance criteria met:
 
 1. `weaver --help` lists all three domains (`observe`, `act`, `verify`).
-1. `weaver --help` lists every CLI-supported operation for each domain.
-1. `weaver --help` completes without daemon startup or socket access.
-1. Static clap text and Fluent resources are synchronized (guarded by
+2. `weaver --help` lists every CLI-supported operation for each domain.
+3. `weaver --help` completes without daemon startup or socket access.
+4. Static clap text and Fluent resources are synchronized (guarded by
    `clap_after_help_matches_fluent_render` test).
-1. Fluent and fallback paths produce identical output (guarded by
+5. Fluent and fallback paths produce identical output (guarded by
    `after_help_fluent_and_fallback_are_identical` test).
 
 Quality gates passed: `make check-fmt`, `make lint`, and `make test` (all tests
-pass; one pre-existing slow test `auto_start_succeeds_and_proceeds` hangs in the
-CI environment but is unrelated to this change).
+pass; one pre-existing slow test `auto_start_succeeds_and_proceeds` hangs in
+the CI environment but is unrelated to this change).
 
 Files modified: 9 (within 15-file tolerance).
 
@@ -239,10 +242,10 @@ _Table: Key files referenced in this plan._
 All user-facing text follows this pattern (established in task 5.1.1):
 
 1. Fluent messages in `crates/weaver-cli/locales/en-US/messages.ftl`.
-1. A constants module in `localizer.rs` holding `(fluent_id, fallback)` tuples.
-1. A `msg()` helper that resolves through the localizer with the fallback.
-1. A render function that composes the full text block.
-1. A `fluent_and_fallback_outputs_are_identical` unit test guarding drift.
+2. A constants module in `localizer.rs` holding `(fluent_id, fallback)` tuples.
+3. A `msg()` helper that resolves through the localizer with the fallback.
+4. A render function that composes the full text block.
+5. A `fluent_and_fallback_outputs_are_identical` unit test guarding drift.
 
 ### Authoritative operation list
 
@@ -308,12 +311,12 @@ Run `cargo run -p weaver-cli -- --help` and visually confirm.
 Tests that:
 
 1. `render_after_help()` with `NoOpLocalizer` contains all domains and ops.
-1. `render_after_help()` with `FluentLocalizer` contains all domains and ops.
-1. Fluent and fallback outputs are identical (drift guard).
-1. The static `after_help` text on `Cli::command()` matches the
+2. `render_after_help()` with `FluentLocalizer` contains all domains and ops.
+3. Fluent and fallback outputs are identical (drift guard).
+4. The static `after_help` text on `Cli::command()` matches the
    `render_after_help()` output (sync guard between `concat!` in `cli.rs` and
    the Fluent messages in `localizer.rs`).
-1. Every operation from the authoritative list appears in the rendered text.
+5. Every operation from the authoritative list appears in the rendered text.
 
 **C2. Add `mod after_help;` to `unit.rs`.**
 
@@ -364,28 +367,29 @@ All commands run from the workspace root `/home/user/project`.
 
 ### Stage A
 
-1. Edit `crates/weaver-cli/locales/en-US/messages.ftl` — append Fluent messages.
-1. Edit `crates/weaver-cli/src/localizer.rs` — add `mod after_help` with
+1. Edit `crates/weaver-cli/locales/en-US/messages.ftl` — append Fluent
+   messages.
+2. Edit `crates/weaver-cli/src/localizer.rs` — add `mod after_help` with
    constants and `pub(crate) fn render_after_help()`.
-1. Run `cargo check -p weaver-cli` to verify compilation.
+3. Run `cargo check -p weaver-cli` to verify compilation.
 
 ### Stage B
 
 1. Edit `crates/weaver-cli/src/cli.rs` — add `after_help = concat!(...)`.
-1. Run `cargo run -p weaver-cli -- --help` and visually confirm.
+2. Run `cargo run -p weaver-cli -- --help` and visually confirm.
 
 ### Stage C
 
 1. Create `crates/weaver-cli/src/tests/unit/after_help.rs` with unit tests.
-1. Edit `crates/weaver-cli/src/tests/unit.rs` — append `mod after_help;`.
-1. Edit `crates/weaver-cli/tests/main_entry.rs` — append integration test.
-1. Run `make test`.
+2. Edit `crates/weaver-cli/src/tests/unit.rs` — append `mod after_help;`.
+3. Edit `crates/weaver-cli/tests/main_entry.rs` — append integration test.
+4. Run `make test`.
 
 ### Stage D
 
 1. Edit `docs/users-guide.md` — add "Top-level help" subsection.
-1. Edit `docs/roadmap.md` — mark 2.2.2 as done.
-1. Run `make fmt`.
+2. Edit `docs/roadmap.md` — mark 2.2.2 as done.
+3. Run `make fmt`.
 
 ### Stage E
 
@@ -402,13 +406,13 @@ Acceptance criteria (from roadmap):
 
 1. `weaver --help` lists all three domains (`observe`, `act`, `verify`) —
    verified by integration test and unit tests.
-1. `weaver --help` lists every CLI-supported operation for each domain —
+2. `weaver --help` lists every CLI-supported operation for each domain —
    verified by tests checking for all 11 unique operations.
-1. `weaver --help` completes without daemon startup or socket access — verified
-   by integration test (runs binary with no daemon).
-1. Static clap text and Fluent resources remain synchronized — verified by unit
-   test `clap_after_help_matches_fluent_render`.
-1. Fluent and fallback paths produce identical output — verified by unit test
+3. `weaver --help` completes without daemon startup or socket access —
+   verified by integration test (runs binary with no daemon).
+4. Static clap text and Fluent resources remain synchronized — verified by
+   unit test `clap_after_help_matches_fluent_render`.
+5. Fluent and fallback paths produce identical output — verified by unit test
    `after_help_fluent_and_fallback_are_identical`.
 
 Quality criteria:

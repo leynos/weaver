@@ -1,8 +1,9 @@
 # Define the `rename-symbol` capability contract for actuator plugins
 
-This ExecPlan (execution plan) is a living document. The sections `Constraints`,
-`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
-and `Outcomes & Retrospective` must be kept up to date as work proceeds.
+This ExecPlan (execution plan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+proceeds.
 
 Status: COMPLETE
 
@@ -13,16 +14,17 @@ repository root.
 
 After this change, the `weaver-plugins` crate defines a strongly-typed,
 versioned capability contract for the `rename-symbol` actuator operation.
-Plugins that implement `rename-symbol` declare the capability in their manifest,
-and the broker validates request and response payloads against the contract
-schema before and after plugin execution. When a rename cannot proceed, the
-plugin returns a structured refusal diagnostic with a stable reason code that
-callers can match programmatically without parsing free-text messages.
+Plugins that implement `rename-symbol` declare the capability in their
+manifest, and the broker validates request and response payloads against the
+contract schema before and after plugin execution. When a rename cannot
+proceed, the plugin returns a structured refusal diagnostic with a stable
+reason code that callers can match programmatically without parsing free-text
+messages.
 
 Observable behaviour after this change:
 
-- Running `make check-fmt && make lint && make test && make markdownlint` passes
-  with no regressions.
+- Running `make check-fmt && make lint && make test && make markdownlint`
+  passes with no regressions.
 - New unit tests in `crates/weaver-plugins/src/capability/` exercise schema
   validation for happy and unhappy paths.
 - New behaviour-driven development (BDD) scenarios in
@@ -35,38 +37,39 @@ Observable behaviour after this change:
 
 ## Constraints
 
-1. **No async runtime.** The entire project uses synchronous blocking I/O. All
-   new code must remain synchronous.
-1. **Edition 2024, Rust 1.85+.** The workspace uses `edition = "2024"` and
+1. **No async runtime.** The entire project uses synchronous blocking I/O.
+   All new code must remain synchronous.
+2. **Edition 2024, Rust 1.85+.** The workspace uses `edition = "2024"` and
    `rust-version = "1.85"`.
-1. **Strict Clippy.** Over 60 denied lint categories including `unwrap_used`,
+3. **Strict Clippy.** Over 60 denied lint categories including `unwrap_used`,
    `expect_used`, `indexing_slicing`, `string_slice`, `missing_docs`,
    `cognitive_complexity`, `self_named_module_files`, and `allow_attributes`.
    The `weaver-plugins` crate opts into workspace lints via
    `[lints] workspace = true`. All code must pass
    `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
-1. **400-line file limit.** No single source file may exceed 400 lines.
-1. **Error handling.** Library crates use `thiserror`-derived error enums. No
-   `eyre` or `anyhow` in library code. Large errors use `Arc` to satisfy
+4. **400-line file limit.** No single source file may exceed 400 lines.
+5. **Error handling.** Library crates use `thiserror`-derived error enums.
+   No `eyre` or `anyhow` in library code. Large errors use `Arc` to satisfy
    `result_large_err`.
-1. **Documentation.** Every module begins with `//!` doc comments. All public
-   items have `///` rustdoc comments with examples where non-trivial.
-1. **en-GB-oxendict spelling.** Comments and documentation use British English
+6. **Documentation.** Every module begins with `//!` doc comments. All
+   public items have `///` rustdoc comments with examples where non-trivial.
+7. **en-GB-oxendict spelling.** Comments and documentation use British English
    with Oxford "-ize" / "-yse" / "-our" spelling.
-1. **rstest-bdd v0.5.0.** BDD tests use v0.5.0 with mutable world fixtures
+8. **rstest-bdd v0.5.0.** BDD tests use v0.5.0 with mutable world fixtures
    (`&mut`) instead of `RefCell`.
-1. **Caret version requirements.** New dependencies must use caret requirements
-   and be declared in `[workspace.dependencies]` when shared.
-1. **Lint suppressions must use `#[expect]` with reason**, not `#[allow]`.
-1. **Existing public API stability.** All existing public types in
-   `weaver-plugins` (`PluginRequest`, `PluginResponse`, `PluginOutput`,
-   `PluginManifest`, `PluginKind`, `PluginError`, etc.) must retain their
-   current public API signatures. New fields on serializable structs must use
-   `#[serde(default)]` for backwards compatibility.
-1. **Scope boundary.** This plan defines the contract types, validation
-   functions, and manifest extension only. It does not wire capability routing
-   into `weaverd` dispatch (that is roadmap item 5.2.4), nor does it modify the
-   rope or rust-analyzer plugin crates (those are 5.2.2 and 5.2.3).
+9. **Caret version requirements.** New dependencies must use caret
+   requirements and be declared in `[workspace.dependencies]` when shared.
+10. **Lint suppressions must use `#[expect]` with reason**, not `#[allow]`.
+11. **Existing public API stability.** All existing public types in
+    `weaver-plugins` (`PluginRequest`, `PluginResponse`, `PluginOutput`,
+    `PluginManifest`, `PluginKind`, `PluginError`, etc.) must retain their
+    current public API signatures. New fields on serializable structs must
+    use `#[serde(default)]` for backwards compatibility.
+12. **Scope boundary.** This plan defines the contract types, validation
+    functions, and manifest extension only. It does not wire capability
+    routing into `weaverd` dispatch (that is roadmap item 5.2.4), nor does
+    it modify the rope or rust-analyzer plugin crates (those are 5.2.2 and
+    5.2.3).
 
 ## Tolerances (exception triggers)
 
@@ -74,8 +77,8 @@ Observable behaviour after this change:
   (excluding test files), stop and escalate.
 - **Interface:** If any existing public API signature in `weaver-plugins` must
   change in a backwards-incompatible way, stop and escalate.
-- **Dependencies:** If a new external crate dependency is required beyond what
-  is already in the workspace, stop and escalate.
+- **Dependencies:** If a new external crate dependency is required beyond
+  what is already in the workspace, stop and escalate.
 - **Iterations:** If tests still fail after 3 attempts at a fix, stop and
   escalate.
 - **Line budget:** If any single file approaches 380 lines, split before
@@ -86,8 +89,8 @@ Observable behaviour after this change:
 
 ## Risks
 
-- Risk: Backwards-incompatible serde changes to `PluginManifest` when adding the
-  `capabilities` field. Severity: high Likelihood: low Mitigation: Use
+- Risk: Backwards-incompatible serde changes to `PluginManifest` when adding
+  the `capabilities` field. Severity: high Likelihood: low Mitigation: Use
   `#[serde(default)]` on the new field so existing manifest JSON without the
   field deserializes cleanly to an empty capabilities list.
 
@@ -121,7 +124,8 @@ Observable behaviour after this change:
 - [x] (2026-02-28) Create `capability/reason_code.rs` with `ReasonCode` enum.
 - [x] (2026-02-28) Create `capability/tests.rs` with unit tests.
 - [x] (2026-02-28) Extend `PluginManifest` with `capabilities` field.
-- [x] (2026-02-28) Extend `PluginDiagnostic` with optional `reason_code` field.
+- [x] (2026-02-28) Extend `PluginDiagnostic` with optional `reason_code`
+  field.
 - [x] (2026-02-28) Add `find_for_capability()` and
   `find_for_language_and_capability()` to `PluginRegistry`.
 - [x] (2026-02-28) Update `lib.rs` with re-exports.
@@ -147,37 +151,38 @@ Observable behaviour after this change:
 
 ## Decision log
 
-- Decision: Use an enum for `CapabilityId` rather than a string-backed newtype.
-  Rationale: Architecture Decision Record (ADR) 001 defines exactly five
-  first-party capability IDs (`rename-symbol`, `extricate-symbol`,
+- Decision: Use an enum for `CapabilityId` rather than a string-backed
+  newtype. Rationale: Architecture Decision Record (ADR) 001 defines exactly
+  five first-party capability IDs (`rename-symbol`, `extricate-symbol`,
   `extract-method`, `replace-body`, `extract-predicate`). An enum provides
   compile-time exhaustiveness checking, reliable `match` coverage, and prevents
-  typos. Third-party extensibility is a non-goal at this stage. The enum follows
-  the precedent set by `CapabilityKind` in
+  typos. Third-party extensibility is a non-goal at this stage. The enum
+  follows the precedent set by `CapabilityKind` in
   `crates/weaver-lsp-host/src/capability.rs`. Date: 2026-02-28.
 
-- Decision: Create a new `capability/` module directory rather than adding to
-  existing protocol or manifest modules. Rationale: The capability contract is a
-  cross-cutting concern that touches request validation, response validation,
-  manifest metadata, and diagnostic extensions. Placing it in its own module
-  keeps existing modules stable and under the 400-line limit. It also provides a
-  natural home for future capability contracts (`extricate-symbol`, etc.). Date:
-  2026-02-28.
+- Decision: Create a new `capability/` module directory rather than adding
+  to existing protocol or manifest modules. Rationale: The capability contract
+  is a cross-cutting concern that touches request validation, response
+  validation, manifest metadata, and diagnostic extensions. Placing it in its
+  own module keeps existing modules stable and under the 400-line limit. It
+  also provides a natural home for future capability contracts
+  (`extricate-symbol`, etc.). Date: 2026-02-28.
 
 - Decision: Use major.minor integer versioning for the contract rather than
-  SemVer strings. Rationale: Contract versions are internal to the broker-plugin
-  protocol, not published crate versions. A simple
+  SemVer strings. Rationale: Contract versions are internal to the
+  broker-plugin protocol, not published crate versions. A simple
   `ContractVersion { major: u16, minor: u16 }` is easier to compare and
   negotiate than parsing SemVer strings. Major bumps indicate breaking changes;
   minor bumps indicate additive changes. This is sufficient for the acceptance
   criterion "capability contract is versioned". Date: 2026-02-28.
 
-- Decision: Add an optional `reason_code` field to `PluginDiagnostic` rather
-  than creating a separate `RefusalDiagnostic` type. Rationale: The existing
-  `PluginResponse::failure(diagnostics)` pattern is already used by both plugin
-  crates. Adding a reason code field to the existing diagnostic type preserves
-  this pattern, avoids a parallel type hierarchy, and keeps the response schema
-  simple. The field is `Option` for backwards compatibility. Date: 2026-02-28.
+- Decision: Add an optional `reason_code` field to `PluginDiagnostic`
+  rather than creating a separate `RefusalDiagnostic` type. Rationale: The
+  existing `PluginResponse::failure(diagnostics)` pattern is already used by
+  both plugin crates. Adding a reason code field to the existing diagnostic
+  type preserves this pattern, avoids a parallel type hierarchy, and keeps the
+  response schema simple. The field is `Option` for backwards compatibility.
+  Date: 2026-02-28.
 
 - Decision: Implement validation as a `CapabilityContract` trait with a
   `RenameSymbolContract` implementation, rather than free functions. Rationale:
@@ -196,13 +201,13 @@ All acceptance criteria are met:
    current `rename-symbol` contract version. `is_compatible_with()` enforces
    same-major-version compatibility.
 
-1. **Broker validation enforces schema shape.** `RenameSymbolContract`
+2. **Broker validation enforces schema shape.** `RenameSymbolContract`
    implements `CapabilityContract` with `validate_request()` (checks `uri`,
    `position`, `new_name` fields) and `validate_response()` (checks successful
    responses contain `PluginOutput::Diff`). Unit and BDD tests cover happy and
    unhappy paths.
 
-1. **Refusal diagnostics use stable reason codes.** `ReasonCode` enum with 7
+3. **Refusal diagnostics use stable reason codes.** `ReasonCode` enum with 7
    variants is serialized as `snake_case` strings. The optional `reason_code`
    field on `PluginDiagnostic` is backwards-compatible via `serde(default)`.
 
@@ -213,8 +218,8 @@ workspace `check-fmt`, `lint`, and `test` gates pass.
 
 Lessons: Strict workspace Clippy lints (`string_slice`, `doc_markdown`) catch
 issues that would be acceptable in many projects. Test code is held to the same
-standard as production code, which requires more careful string handling even in
-test fixtures.
+standard as production code, which requires more careful string handling even
+in test fixtures.
 
 ## Context and orientation
 
@@ -261,16 +266,17 @@ optional `file`, optional `line`. The capability contract will add an optional
 `languages`, `executable`, `args`, `timeout_secs`. The capability contract will
 add a `capabilities` field.
 
-`PluginKind` (in `manifest/mod.rs`): enum with `Sensor` and `Actuator` variants.
-Only `Actuator` plugins can declare actuator capabilities like `rename-symbol`.
+`PluginKind` (in `manifest/mod.rs`): enum with `Sensor` and `Actuator`
+variants. Only `Actuator` plugins can declare actuator capabilities like
+`rename-symbol`.
 
 ### ADR 001 context
 
 `docs/adr-001-plugin-capability-model-and-act-extricate.md` defines the
-capability model that motivates this work. It establishes five stable capability
-IDs: `rename-symbol`, `extricate-symbol`, `extract-method`, `replace-body`,
-`extract-predicate`. It mandates capability-first routing where user intent maps
-to a capability ID, which maps to provider resolution.
+capability model that motivates this work. It establishes five stable
+capability IDs: `rename-symbol`, `extricate-symbol`, `extract-method`,
+`replace-body`, `extract-predicate`. It mandates capability-first routing where
+user intent maps to a capability ID, which maps to provider resolution.
 
 ### Downstream consumers
 
@@ -287,25 +293,25 @@ Create the `capability/` module directory with four files:
 
 1. `crates/weaver-plugins/src/capability/mod.rs` — Module-level doc comment
    explaining the capability contract system. `CapabilityId` enum with five
-   variants matching ADR 001, serialized as kebab-case. `ContractVersion` struct
-   with `major` and `minor` fields and `is_compatible_with()` method.
+   variants matching ADR 001, serialized as kebab-case. `ContractVersion`
+   struct with `major` and `minor` fields and `is_compatible_with()` method.
    `CapabilityContract` trait defining the validation interface. Re-exports for
    public API.
 
-1. `crates/weaver-plugins/src/capability/rename_symbol.rs` — Module-level doc
-   comment for the rename-symbol contract. `RenameSymbolRequest` struct defining
-   the typed request shape with `extract()` method that validates the untyped
-   arguments HashMap. `RenameSymbolContract` struct implementing
+2. `crates/weaver-plugins/src/capability/rename_symbol.rs` — Module-level
+   doc comment for the rename-symbol contract. `RenameSymbolRequest` struct
+   defining the typed request shape with `extract()` method that validates the
+   untyped arguments HashMap. `RenameSymbolContract` struct implementing
    `CapabilityContract`. `RENAME_SYMBOL_CONTRACT_VERSION` constant. Validation
    logic for request and response.
 
-1. `crates/weaver-plugins/src/capability/reason_code.rs` — Module-level doc
+3. `crates/weaver-plugins/src/capability/reason_code.rs` — Module-level doc
    comment for refusal reason codes. `ReasonCode` enum with seven stable codes
    serialized as snake_case strings.
 
-1. `crates/weaver-plugins/src/capability/tests.rs` — Unit tests covering serde
-   round-trips, validation happy/unhappy paths, version compatibility, and
-   reason code serialization.
+4. `crates/weaver-plugins/src/capability/tests.rs` — Unit tests covering
+   serde round-trips, validation happy/unhappy paths, version compatibility,
+   and reason code serialization.
 
 Add the `capability` module to `lib.rs` and wire in the `#[cfg(test)]` `tests`
 submodule.
@@ -376,17 +382,17 @@ make markdownlint 2>&1 | tee /tmp/markdownlint.log
 
 Acceptance criteria from the roadmap:
 
-1. **Capability contract is versioned:** The `RenameSymbolContract` implements
-   `CapabilityContract::version()` returning `ContractVersion::new(1, 0)`. Unit
-   test verifies the version value. `ContractVersion::is_compatible_with()`
-   enables negotiation.
+1. **Capability contract is versioned:** The `RenameSymbolContract`
+   implements `CapabilityContract::version()` returning
+   `ContractVersion::new(1, 0)`. Unit test verifies the version value.
+   `ContractVersion::is_compatible_with()` enables negotiation.
 
-1. **Broker validation enforces schema shape:** The `validate_request()` and
-   `validate_response()` methods on `RenameSymbolContract` check field presence,
-   types, and output variant. Unit and BDD tests exercise both happy and unhappy
-   paths.
+2. **Broker validation enforces schema shape:** The `validate_request()`
+   and `validate_response()` methods on `RenameSymbolContract` check field
+   presence, types, and output variant. Unit and BDD tests exercise both happy
+   and unhappy paths.
 
-1. **Refusal diagnostics use stable reason codes:** The `ReasonCode` enum
+3. **Refusal diagnostics use stable reason codes:** The `ReasonCode` enum
    provides seven stable codes serialized as snake_case strings. The
    `PluginDiagnostic::with_reason_code()` builder attaches a code to a
    diagnostic. BDD scenarios verify round-trip serialization.
@@ -501,10 +507,10 @@ pub fn find_for_language_and_capability(
 
 ### Downstream consumers (out of scope, for reference)
 
-- 5.2.2: `crates/weaver-plugin-rope/` will import `CapabilityId` and declare
-  `RenameSymbol` in its manifest.
-- 5.2.3: `crates/weaver-plugin-rust-analyzer/` will import `CapabilityId` and
+- 5.2.2: `crates/weaver-plugin-rope/` will import `CapabilityId` and
   declare `RenameSymbol` in its manifest.
+- 5.2.3: `crates/weaver-plugin-rust-analyzer/` will import `CapabilityId`
+  and declare `RenameSymbol` in its manifest.
 - 5.2.4: `crates/weaverd/src/dispatch/act/refactor/` will import
   `RenameSymbolContract` and call `validate_request()`/`validate_response()`
   around plugin execution.

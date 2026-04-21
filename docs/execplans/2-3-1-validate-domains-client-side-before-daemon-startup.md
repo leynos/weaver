@@ -1,8 +1,9 @@
 # 2.3.1 Validate domains client-side before daemon startup
 
-This ExecPlan (execution plan) is a living document. The sections `Constraints`,
-`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
-and `Outcomes & Retrospective` must be kept up to date as work proceeds.
+This ExecPlan (execution plan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+proceeds.
 
 Status: DONE
 
@@ -22,10 +23,10 @@ Today, `weaver` still treats unknown domains inconsistently.
 
 Roadmap item `2.3.1` requires a tighter contract.[^roadmap] After this change,
 any invocation whose first positional token is not one of the three valid
-domains must fail in the CLI before configuration loading, daemon connection, or
-daemon auto-start. The error body must always list the valid domains `observe`,
-`act`, and `verify`. When the invalid domain is within edit distance 2 of
-exactly one valid domain, the output must also include one deterministic
+domains must fail in the CLI before configuration loading, daemon connection,
+or daemon auto-start. The error body must always list the valid domains
+`observe`, `act`, and `verify`. When the invalid domain is within edit distance
+2 of exactly one valid domain, the output must also include one deterministic
 `did you mean` suggestion.[^level3] This closes Level 3 and the Level 10b
 error-guidance gap.[^level10]
 
@@ -56,8 +57,8 @@ Both commands exit non-zero and do not print `Waiting for daemon start...`.
   feature complete.
 - Because the implementation also updates Markdown, run `make fmt`,
   `make markdownlint`, and `make nixie` before finishing.
-- Add both unit coverage and behavioural coverage using `rstest-bdd` v0.5.0 for
-  happy paths, unhappy paths, and edge cases.
+- Add both unit coverage and behavioural coverage using `rstest-bdd` v0.5.0
+  for happy paths, unhappy paths, and edge cases.
 - Keep the CLI flat. Do not restructure the command surface into nested clap
   subcommands as part of this task.
 - Keep validation client-side. Unknown domains must fail before configuration
@@ -67,10 +68,10 @@ Both commands exit non-zero and do not print `Waiting for daemon start...`.
 - Replace the current unknown-domain guidance contract for domain-only
   invocations. The roadmap requires a valid-domain list, not a catalogue of
   domain-operation pairs.
-- The valid-domain list must contain all three canonical domains: `observe`,
-  `act`, and `verify`.
-- Emit at most one suggestion line, and only when the best edit distance is 2 or
-  less.
+- The valid-domain list must contain all three canonical domains:
+  `observe`, `act`, and `verify`.
+- Emit at most one suggestion line, and only when the best edit distance is 2
+  or less.
 - Do not add new third-party dependencies for edit-distance matching.
 - Keep files under 400 lines. Split helpers or tests into dedicated modules
   before violating the limit.
@@ -88,8 +89,8 @@ Both commands exit non-zero and do not print `Waiting for daemon start...`.
   lines, stop and escalate.
 - Interfaces: if meeting the acceptance criteria requires a public API change
   outside `weaver-cli`, stop and escalate.
-- Dependencies: if the suggestion logic seems to require an external crate, stop
-  and escalate rather than adding one.
+- Dependencies: if the suggestion logic seems to require an external crate,
+  stop and escalate rather than adding one.
 - Help model: if satisfying the acceptance criteria would require changing the
   `weaver <domain>` and `weaver <domain> <operation>` help contract beyond this
   roadmap item, stop and escalate.
@@ -132,33 +133,35 @@ Both commands exit non-zero and do not print `Waiting for daemon start...`.
 ## Progress
 
 - [x] (2026-03-22 00:00Z) Read `docs/roadmap.md`, `docs/ui-gap-analysis.md`,
-  `docs/weaver-design.md`, the relevant testing guides, and the prior `2.2.4`
-  ExecPlan.
+      `docs/weaver-design.md`, the relevant testing guides, and the prior
+      `2.2.4` ExecPlan.
 - [x] (2026-03-22 00:00Z) Confirmed the current runtime path in
-  `crates/weaver-cli/src/lib.rs`: `handle_preflight(...)` already runs before
-  config loading, but only emits unknown-domain guidance when the operator
-  provides no operation.
+      `crates/weaver-cli/src/lib.rs`: `handle_preflight(...)` already runs
+      before config loading, but only emits unknown-domain guidance when the
+      operator provides no operation.
 - [x] (2026-03-22 00:00Z) Confirmed the current implementation gap in
-  `crates/weaver-cli/src/discoverability.rs`:
-  `write_unknown_domain_guidance(...)` prints a full domain-operation catalogue
-  and offers no edit-distance suggestion.
+      `crates/weaver-cli/src/discoverability.rs`: `write_unknown_domain_guidance(...)`
+      prints a full domain-operation catalogue and offers no edit-distance
+      suggestion.
 - [x] (2026-03-22 00:00Z) Confirmed the current documentation drift in
-  `docs/users-guide.md`: unknown domains are still documented as printing the
-  built-in domain-operation catalogue.
+      `docs/users-guide.md`: unknown domains are still documented as printing
+      the built-in domain-operation catalogue.
 - [x] (2026-03-22 00:00Z) Drafted this ExecPlan in
-  `docs/execplans/2-3-1-validate-domains-client-side-before-daemon-startup.md`.
-- [x] (2026-03-22 14:00Z) Stage A: added unit, integration, and BDD coverage for
-  unknown domains with and without operations, plus typo suggestion and
-  no-suggestion cases.
+      `docs/execplans/2-3-1-validate-domains-client-side-before-daemon-startup.md`.
+- [x] (2026-03-22 14:00Z) Stage A: added unit, integration, and BDD coverage
+      for unknown domains with and without operations, plus typo suggestion and
+      no-suggestion cases.
 - [x] (2026-03-22 14:05Z) Stage B: broadened CLI preflight validation to all
-  unknown domains before config loading or daemon startup, replaced the
-  unknown-domain output contract with the valid-domain list, added bounded
-  edit-distance suggestions, and renamed the sentinel to `PreflightGuidance`.
+      unknown domains before config loading or daemon startup, replaced the
+      unknown-domain output contract with the valid-domain list, added bounded
+      edit-distance suggestions, and renamed the sentinel to
+      `PreflightGuidance`.
 - [x] (2026-03-22 14:10Z) Stage C: updated `docs/weaver-design.md`,
-  `docs/users-guide.md`, and `docs/roadmap.md` to reflect the shipped behaviour.
+      `docs/users-guide.md`, and `docs/roadmap.md` to reflect the shipped
+      behaviour.
 - [x] (2026-03-22 14:20Z) Stage D: ran `make fmt`, `make markdownlint`,
-  `make nixie`, `make check-fmt`, `make lint`, and `make test` with logged
-  output.
+      `make nixie`, `make check-fmt`, `make lint`, and `make test` with logged
+      output.
 
 ## Surprises & Discoveries
 
@@ -167,8 +170,8 @@ Both commands exit non-zero and do not print `Waiting for daemon start...`.
   contract correction and scope extension.
 
 - `handle_preflight(...)` in `crates/weaver-cli/src/lib.rs` only enters the
-  unknown-domain branch when `cli.operation` is missing or blank. That means the
-  roadmap's main Level 3 case, `weaver bogus something`, still reaches the
+  unknown-domain branch when `cli.operation` is missing or blank. That means
+  the roadmap's main Level 3 case, `weaver bogus something`, still reaches the
   daemon path today.
 
 - The current unknown-domain output is stronger than the old daemon error, but
@@ -177,11 +180,11 @@ Both commands exit non-zero and do not print `Waiting for daemon start...`.
   the required `Valid domains: observe, act, verify`.
 
 - `KnownDomain::try_parse(...)` already performs case-insensitive parsing, so
-  this task must preserve case-insensitive acceptance of the three valid domains
-  while only rejecting truly unknown values.
+  this task must preserve case-insensitive acceptance of the three valid
+  domains while only rejecting truly unknown values.
 
-- The workspace already pins `rstest-bdd` and `rstest-bdd-macros` at `0.5.0`, so
-  no dependency update is required.
+- The workspace already pins `rstest-bdd` and `rstest-bdd-macros` at `0.5.0`,
+  so no dependency update is required.
 
 ## Decision Log
 
@@ -203,11 +206,11 @@ Both commands exit non-zero and do not print `Waiting for daemon start...`.
 
 - Decision: when exactly one valid domain is within distance 2, emit one
   suggestion. When none qualify, emit no suggestion. When multiple domains tie
-  at the same best distance within the threshold, prefer catalogue order only if
-  that rule is explicitly documented in `docs/weaver-design.md`; otherwise stop
-  and escalate under the ambiguity tolerance. Rationale: the roadmap requires a
-  single suggestion, so any tie-break policy must be explicit and reviewable.
-  Date: 2026-03-22.
+  at the same best distance within the threshold, prefer catalogue order only
+  if that rule is explicitly documented in `docs/weaver-design.md`; otherwise
+  stop and escalate under the ambiguity tolerance. Rationale: the roadmap
+  requires a single suggestion, so any tie-break policy must be explicit and
+  reviewable. Date: 2026-03-22.
 
 - Decision: update the Fluent catalogue rather than hard-coding new English
   strings directly in Rust. Rationale: the CLI already routes discoverability
@@ -220,27 +223,27 @@ Target outcome at completion:
 
 1. `weaver <unknown-domain>` fails client-side with the canonical valid-domain
    list and no daemon interaction.
-1. `weaver <unknown-domain> <operation>` also fails client-side before config
+2. `weaver <unknown-domain> <operation>` also fails client-side before config
    load or daemon auto-start.
-1. A close typo such as `obsrve` emits exactly one `Did you mean 'observe'?`
+3. A close typo such as `obsrve` emits exactly one `Did you mean 'observe'?`
    line.
-1. A distant invalid domain emits no suggestion line.
-1. Known-domain missing-operation guidance still behaves as delivered in roadmap
-   `2.2.4`.
-1. Unit tests, integration tests, and `rstest-bdd` scenarios cover happy,
+4. A distant invalid domain emits no suggestion line.
+5. Known-domain missing-operation guidance still behaves as delivered in
+   roadmap `2.2.4`.
+6. Unit tests, integration tests, and `rstest-bdd` scenarios cover happy,
    unhappy, and edge cases.
-1. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md` reflect
-   the final behaviour.
-1. `make check-fmt`, `make lint`, and `make test` pass, along with the Markdown
-   gates required by `AGENTS.md`.
+7. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
+   reflect the final behaviour.
+8. `make check-fmt`, `make lint`, and `make test` pass, along with the
+   Markdown gates required by `AGENTS.md`.
 
 Retrospective notes:
 
-- Reusing the `2.2.4` preflight seam kept the change local to `weaver-cli` and
-  avoided any daemon or config-surface edits.
-- Renaming the sentinel from `MissingOperationGuidance` to `PreflightGuidance`
-  clarified the now-shared early-exit path and reduced future maintenance
-  ambiguity.
+- Reusing the `2.2.4` preflight seam kept the change local to `weaver-cli`
+  and avoided any daemon or config-surface edits.
+- Renaming the sentinel from `MissingOperationGuidance` to
+  `PreflightGuidance` clarified the now-shared early-exit path and reduced
+  future maintenance ambiguity.
 - A tiny bounded Levenshtein helper was sufficient for the fixed three-domain
   set; no external dependency or broader fuzzy-matching framework was needed.
 
@@ -248,28 +251,30 @@ Retrospective notes:
 
 The implementation surface is concentrated in `weaver-cli`.
 
-- `crates/weaver-cli/src/lib.rs` Owns `CliRunner::run_with_handler(...)` and
-  `handle_preflight(...)`. This is where the CLI currently decides whether to
-  exit before config loading.
-- `crates/weaver-cli/src/discoverability.rs` Owns `KnownDomain`,
-  `DOMAIN_OPERATIONS`, `write_missing_operation_guidance(...)`,
+- `crates/weaver-cli/src/lib.rs`
+  Owns `CliRunner::run_with_handler(...)` and `handle_preflight(...)`. This is
+  where the CLI currently decides whether to exit before config loading.
+- `crates/weaver-cli/src/discoverability.rs`
+  Owns `KnownDomain`, `DOMAIN_OPERATIONS`,
+  `write_missing_operation_guidance(...)`,
   `write_unknown_domain_guidance(...)`, and the current
   `should_emit_domain_guidance(...)` predicate.
-- `crates/weaver-cli/src/errors.rs` Owns the current sentinel
-  `AppError::MissingOperationGuidance`.
-- `crates/weaver-cli/locales/en-US/messages.ftl` Holds the localized message IDs
-  for the discoverability and guidance paths.
-- `crates/weaver-cli/src/tests/unit/missing_operation_guidance.rs` Already
-  verifies that preflight guidance avoids config loading by using a panicking
-  loader.
+- `crates/weaver-cli/src/errors.rs`
+  Owns the current sentinel `AppError::MissingOperationGuidance`.
+- `crates/weaver-cli/locales/en-US/messages.ftl`
+  Holds the localized message IDs for the discoverability and guidance paths.
+- `crates/weaver-cli/src/tests/unit/missing_operation_guidance.rs`
+  Already verifies that preflight guidance avoids config loading by using a
+  panicking loader.
 - `crates/weaver-cli/src/tests/behaviour.rs` and
-  `crates/weaver-cli/tests/features/weaver_cli.feature` Provide the `rstest-bdd`
-  coverage for operator-visible CLI flows.
-- `crates/weaver-cli/tests/main_entry.rs` Verifies binary-level behaviour with
-  `assert_cmd`.
-- `crates/weaverd/src/dispatch/router.rs` Remains the daemon-side backstop and
-  still owns the daemon's own domain set, but the roadmap item here is
-  explicitly about the CLI rejecting invalid domains before reaching that layer.
+  `crates/weaver-cli/tests/features/weaver_cli.feature` Provide the
+  `rstest-bdd` coverage for operator-visible CLI flows.
+- `crates/weaver-cli/tests/main_entry.rs`
+  Verifies binary-level behaviour with `assert_cmd`.
+- `crates/weaverd/src/dispatch/router.rs`
+  Remains the daemon-side backstop and still owns the daemon's own domain set,
+  but the roadmap item here is explicitly about the CLI rejecting invalid
+  domains before reaching that layer.
 
 Current behaviour to replace:
 
@@ -306,14 +311,14 @@ Unit coverage in
 - Unknown domain without operation emits `Valid domains: observe, act, verify`.
 - Unknown domain without operation does not emit `Available operations:` or any
   domain-operation pairs.
-- Unknown domain with an operation still fails before configuration loading. Use
-  the existing panicking-loader pattern so the red test proves there is no
+- Unknown domain with an operation still fails before configuration loading.
+  Use the existing panicking-loader pattern so the red test proves there is no
   config discovery.
 - Close typo cases produce exactly one suggestion line.
 - Non-close typo cases produce no suggestion line.
-- Edge cases for the pure distance/suggestion helper: trimming, case-insensitive
-  comparison, exact match, threshold `2`, and deterministic tie handling if a
-  tie-break rule is adopted.
+- Edge cases for the pure distance/suggestion helper:
+  trimming, case-insensitive comparison, exact match, threshold `2`, and
+  deterministic tie handling if a tie-break rule is adopted.
 
 Integration coverage in `crates/weaver-cli/tests/main_entry.rs` should assert
 the same operator-visible contract for the compiled binary, especially:
@@ -353,21 +358,21 @@ Implementation outline:
    - recognizes the three valid domains,
    - calculates the best edit-distance match within threshold 2, and
    - returns a structured result the writer can render.
-1. Broaden the preflight predicate so it covers both:
+2. Broaden the preflight predicate so it covers both:
    - known domain with missing operation, and
    - unknown domain with or without an operation.
-1. Keep `write_missing_operation_guidance(...)` for the known-domain path.
-1. Replace `write_unknown_domain_guidance(...)` output so it writes:
+3. Keep `write_missing_operation_guidance(...)` for the known-domain path.
+4. Replace `write_unknown_domain_guidance(...)` output so it writes:
    - the unknown-domain error line,
    - a blank line,
    - `Valid domains: observe, act, verify`,
    - an optional `Did you mean '<domain>'?` line, and
    - no operation catalogue.
-1. Update `handle_preflight(...)` so an unknown-domain result returns the
+5. Update `handle_preflight(...)` so an unknown-domain result returns the
    preflight sentinel before config loading or daemon startup.
-1. If the sentinel name is now misleading, rename it and update the narrow
+6. If the sentinel name is now misleading, rename it and update the narrow
    error-to-exit-code mapping in `CliRunner::map_result_to_exit_code(...)`.
-1. Update `crates/weaver-cli/locales/en-US/messages.ftl` with the new message
+7. Update `crates/weaver-cli/locales/en-US/messages.ftl` with the new message
    IDs and fallbacks for:
    - valid-domain list heading/body,
    - optional suggestion line,
@@ -390,15 +395,16 @@ Go/no-go:
 
 Update the design and operator docs once the code and tests are stable.
 
-- `docs/weaver-design.md` Document that unknown-domain validation now happens
-  client-side before config load and daemon startup, and record the suggestion
-  rule: distance threshold 2, single suggestion only, and the final tie
-  behaviour.
-- `docs/users-guide.md` Replace the current statement that unknown domains print
-  the built-in domain-operation catalogue. Include one concrete example showing
-  the new `Valid domains:` line and, if retained, the `Did you mean` hint.
-- `docs/roadmap.md` Mark item `2.3.1` complete only after the implementation and
-  all gates pass.
+- `docs/weaver-design.md`
+  Document that unknown-domain validation now happens client-side before config
+  load and daemon startup, and record the suggestion rule: distance threshold
+  2, single suggestion only, and the final tie behaviour.
+- `docs/users-guide.md`
+  Replace the current statement that unknown domains print the built-in
+  domain-operation catalogue. Include one concrete example showing the new
+  `Valid domains:` line and, if retained, the `Did you mean` hint.
+- `docs/roadmap.md`
+  Mark item `2.3.1` complete only after the implementation and all gates pass.
 
 Go/no-go:
 
@@ -421,16 +427,13 @@ set -o pipefail; make test 2>&1 | tee /tmp/2-3-1-make-test.log
 Expected evidence:
 
 - All six commands exit `0`.
-- `make test` output shows the new `weaver-cli` unit, integration, and BDD cases
-  passing.
+- `make test` output shows the new `weaver-cli` unit, integration, and BDD
+  cases passing.
 - No test output includes `Waiting for daemon start...` for the new
   unknown-domain scenarios.
 
 ## References
 
-\[^level3\]:
-[docs/ui-gap-analysis.md Level 3](../ui-gap-analysis.md#level-3--unknown-domain-weaver-bogus-something)
-\[^level10\]:
-[docs/ui-gap-analysis.md Level 10](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
-
-[^roadmap]: %5Bdocs/roadmap.md%5D(../roadmap.md)
+[^roadmap]: [docs/roadmap.md](../roadmap.md)
+[^level3]: [docs/ui-gap-analysis.md Level 3](../ui-gap-analysis.md#level-3--unknown-domain-weaver-bogus-something)
+[^level10]: [docs/ui-gap-analysis.md Level 10](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes)

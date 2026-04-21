@@ -38,7 +38,8 @@ invariants with assumptions about external components.
 
 - Identify the verified kernel explicitly.
 - Identify trusted external components explicitly.
-- Preserve the ability to add new proofs without reclassifying the whole system.
+- Preserve the ability to add new proofs without reclassifying the whole
+  system.
 
 ### Technical Requirements
 
@@ -69,8 +70,8 @@ Adopt Option A.
 
 Weaver will prove the orchestration kernel only: transaction ordering, path
 policy, capability routing, refusal semantics, and bounded counters. External
-tools remain trusted inputs, and the docs must state the assumptions those tools
-introduce.
+tools remain trusted inputs, and the docs must state the assumptions those
+tools introduce.
 
 ## Goals and Non-Goals
 
@@ -89,9 +90,9 @@ introduce.
 ## Migration plan
 
 1. Name the verified kernel in the design and roadmap docs.
-1. List trusted external tools and filesystem assumptions explicitly.
-1. Make proof harnesses refer to the modelled assumptions by name.
-1. Keep future-proof work inside the documented boundary.
+2. List trusted external tools and filesystem assumptions explicitly.
+3. Make proof harnesses refer to the modelled assumptions by name.
+4. Keep future-proof work inside the documented boundary.
 
 ## Known Risks and Limitations
 

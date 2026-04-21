@@ -1,8 +1,9 @@
 # 4.1.2 Define structured diagnostics with stable `E_SEMPAI_*` error codes and report schema
 
-This ExecPlan (execution plan) is a living document. The sections `Constraints`,
-`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
-and `Outcomes & Retrospective` must be kept up to date as work proceeds.
+This ExecPlan (execution plan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+proceeds.
 
 Status: COMPLETE
 
@@ -16,8 +17,8 @@ and snapshot-locked JSON output.
 
 This directly fulfills roadmap item 4.1.2 in [docs/roadmap.md](../roadmap.md):
 
-- Define structured diagnostics with stable `E_SEMPAI_*` error codes and report
-  schema.
+- Define structured diagnostics with stable `E_SEMPAI_*` error codes and
+  report schema.
 - Ensure JSON snapshots remain stable across parser and validator paths.
 
 Observable outcome after implementation:
@@ -44,8 +45,8 @@ make nixie        # exits 0
 - Preserve the `sempai` facade as the stable entrypoint. Any schema changes in
   `sempai_core` must remain consumable through `sempai` re-exports.
 - Follow workspace lint policy (`[lints] workspace = true`) and do not add
-  `#[allow(...)]`; use tightly scoped `#[expect(..., reason = "...")]` only when
-  unavoidable.
+  `#[allow(...)]`; use tightly scoped `#[expect(..., reason = "...")]` only
+  when unavoidable.
 - Keep files below 400 lines; split test or behaviour modules if needed.
 - Add both unit tests and behaviour tests using `rstest-bdd` v0.5.0 for happy
   and unhappy paths, plus relevant edge cases.
@@ -63,7 +64,8 @@ make nixie        # exits 0
 - Interface: if a breaking change to currently public Sempai API is required
   (for example, removing/renaming existing public methods without backward
   compatibility), stop and escalate.
-- Dependencies: if any new third-party dependency is needed, stop and escalate.
+- Dependencies: if any new third-party dependency is needed, stop and
+  escalate.
 - Iterations: if the same failing test/lint loop is attempted 5 times without
   progress, stop and escalate.
 - Ambiguity: if schema naming is ambiguous (`span` vs `primary_span`) and the
@@ -71,10 +73,10 @@ make nixie        # exits 0
 
 ## Risks
 
-- Risk: Existing diagnostics use `span`, while acceptance language uses "primary
-  span". Severity: medium. Likelihood: medium. Mitigation: Define a canonical
-  JSON field (`primary_span`) and, if needed, support backward compatibility via
-  serde aliasing and clear docs.
+- Risk: Existing diagnostics use `span`, while acceptance language uses
+  "primary span". Severity: medium. Likelihood: medium. Mitigation: Define a
+  canonical JSON field (`primary_span`) and, if needed, support backward
+  compatibility via serde aliasing and clear docs.
 
 - Risk: Parser and validator crates are not yet implemented, so "both paths"
   must be represented via contract constructors/tests now. Severity: medium.
@@ -101,10 +103,10 @@ make nixie        # exits 0
   but current contract wording and tests do not yet lock parser-vs-validator
   schema parity via snapshots. Evidence:
   [crates/sempai-core/src/diagnostic.rs](../../crates/sempai-core/src/diagnostic.rs)
-  and
+   and
   [crates/sempai-core/src/tests/diagnostic_tests.rs](../../crates/sempai-core/src/tests/diagnostic_tests.rs).
-  Impact: Work should focus on schema hardening and path parity, not inventing a
-  new code set.
+   Impact: Work should focus on schema hardening and path parity, not inventing
+  a new code set.
 
 - Observation: `rstest-bdd` v0.5.0 is already pinned at workspace level.
   Evidence: [Cargo.toml](../../Cargo.toml). Impact: No dependency update is
@@ -114,8 +116,8 @@ make nixie        # exits 0
   `insta` configuration, while `assert_snapshot!` is available and stable.
   Evidence:
   [crates/sempai-core/src/tests/diagnostic_snapshot_tests.rs](../../crates/sempai-core/src/tests/diagnostic_snapshot_tests.rs).
-  Impact: Snapshot tests should serialize deterministic pretty JSON strings and
-  use `assert_snapshot!`.
+   Impact: Snapshot tests should serialize deterministic pretty JSON strings
+  and use `assert_snapshot!`.
 
 ## Decision log
 
@@ -139,26 +141,26 @@ make nixie        # exits 0
 Target outcome at completion:
 
 1. Stable diagnostic payload contract exists and is documented.
-1. Parser-path and validator-path diagnostics serialize to the same schema.
-1. Unit, behavioural, and snapshot tests cover happy/unhappy/edge paths.
-1. `docs/users-guide.md` explains the updated diagnostic contract.
-1. `docs/sempai-query-language-design.md` records decisions made here.
-1. Roadmap item 4.1.2 is checked off.
-1. `make check-fmt`, `make lint`, and `make test` pass.
+2. Parser-path and validator-path diagnostics serialize to the same schema.
+3. Unit, behavioural, and snapshot tests cover happy/unhappy/edge paths.
+4. `docs/users-guide.md` explains the updated diagnostic contract.
+5. `docs/sempai-query-language-design.md` records decisions made here.
+6. Roadmap item 4.1.2 is checked off.
+7. `make check-fmt`, `make lint`, and `make test` pass.
 
 Retrospective notes:
 
-- Implemented canonical diagnostic JSON keys (`code`, `message`, `primary_span`,
-  `notes`) and maintained input compatibility for legacy `span` payloads through
-  serde aliasing.
+- Implemented canonical diagnostic JSON keys (`code`, `message`,
+  `primary_span`, `notes`) and maintained input compatibility for legacy `span`
+  payloads through serde aliasing.
 - Added parser/validator constructor helpers in `Diagnostic` and
   `DiagnosticReport` to encode path parity in the type surface.
-- Added unit tests for happy/unhappy/edge paths, plus BDD scenarios and snapshot
-  tests proving parser/validator schema consistency.
-- Verified complete gate sequence with logs: `/tmp/4-1-2-make-fmt.log`,
-  `/tmp/4-1-2-make-markdownlint.log`, `/tmp/4-1-2-make-nixie.log`,
-  `/tmp/4-1-2-make-check-fmt.log`, `/tmp/4-1-2-make-lint.log`,
-  `/tmp/4-1-2-make-test.log`.
+- Added unit tests for happy/unhappy/edge paths, plus BDD scenarios and
+  snapshot tests proving parser/validator schema consistency.
+- Verified complete gate sequence with logs:
+  `/tmp/4-1-2-make-fmt.log`, `/tmp/4-1-2-make-markdownlint.log`,
+  `/tmp/4-1-2-make-nixie.log`, `/tmp/4-1-2-make-check-fmt.log`,
+  `/tmp/4-1-2-make-lint.log`, `/tmp/4-1-2-make-test.log`.
 
 ## Context and orientation
 
@@ -170,8 +172,8 @@ Current Sempai state relevant to this milestone:
 - The existing `Diagnostic` struct currently uses a `span` field, and tests
   validate construction/serde/display, but they do not enforce parser/validator
   contract parity with schema snapshots.
-- `sempai` engine entrypoints remain stubs and currently emit `NOT_IMPLEMENTED`,
-  which is outside the final parser/validator code paths.
+- `sempai` engine entrypoints remain stubs and currently emit
+  `NOT_IMPLEMENTED`, which is outside the final parser/validator code paths.
 
 Primary files for this work:
 
@@ -193,8 +195,8 @@ diagnostic code:
 - Unit tests:
   - Assert the serialized diagnostic object contains exactly `code`, `message`,
     `primary_span`, and `notes`.
-  - Add parser-path and validator-path constructors/fixtures in tests and assert
-    they serialize to the same shape.
+  - Add parser-path and validator-path constructors/fixtures in tests and
+    assert they serialize to the same shape.
   - Add unhappy-path tests for unknown code deserialization and malformed span
     payloads.
 - Snapshot tests (`insta`):
@@ -215,8 +217,8 @@ Go/no-go:
 
 Update `sempai_core` diagnostics implementation to satisfy Stage A tests:
 
-- Make `Diagnostic` schema explicitly model primary span (`primary_span` in
-  JSON).
+- Make `Diagnostic` schema explicitly model primary span
+  (`primary_span` in JSON).
 - Keep accessors ergonomic and explicit (`primary_span()`), and preserve
   compatibility helpers only if required by existing callers.
 - Add explicit constructors or helper functions for parser-path and
@@ -310,10 +312,10 @@ Expected transcript endings:
 
 Acceptance is satisfied when all are true:
 
-- Diagnostics serialize with required fields: `code`, `message`, `primary_span`,
-  `notes`.
-- Parser-path and validator-path diagnostic JSON snapshots match the same schema
-  contract and remain stable.
+- Diagnostics serialize with required fields: `code`, `message`,
+  `primary_span`, `notes`.
+- Parser-path and validator-path diagnostic JSON snapshots match the same
+  schema contract and remain stable.
 - Unit tests cover:
   - Happy path serialization and accessor behaviour.
   - Unhappy path deserialization failures.

@@ -4,11 +4,11 @@
 
 This document presents the fourth-generation design and strategic roadmap for
 `Weaver`, a semantics-aware command-line tool engineered for AI coding agents.
-Moving beyond the initial proof-of-concept, this design solidifies `Weaver` as a
-high-performance, secure, and composable tool built entirely in Rust. Its core
-mission is to provide a robust, agent-friendly interface for understanding and
-modifying codebases by orchestrating semantic operations across a wide array of
-programming languages.
+Moving beyond the initial proof-of-concept, this design solidifies `Weaver` as
+a high-performance, secure, and composable tool built entirely in Rust. Its
+core mission is to provide a robust, agent-friendly interface for understanding
+and modifying codebases by orchestrating semantic operations across a wide
+array of programming languages.
 
 The architectural philosophy of `Weaver` represents a deliberate departure from
 monolithic, integrated solutions like the Serena Model Context Protocol Server.
@@ -16,8 +16,8 @@ Instead, `Weaver` is conceived as a suite of composable UNIX-style primitives.
 It leverages JSON Lines (JSONL) as its native protocol for input and output,
 ensuring seamless integration with the rich ecosystem of existing command-line
 utilities such as `jq`, `find`, and `xargs`. This approach treats semantic
-operations not as features within a closed application, but as fundamental verbs
-in the developer's shell.
+operations not as features within a closed application, but as fundamental
+verbs in the developer's shell.
 
 The system's intelligence is derived from a layered "Semantic Fusion Engine"
 that integrates data from three distinct sources: the Language Server Protocol
@@ -49,22 +49,23 @@ intelligence.
 
 ## 1. Vision and Strategic Positioning
 
-This section establishes the foundational principles of `Weaver`, positioning it
-not merely as a new tool, but as a proponent of a distinct architectural
+This section establishes the foundational principles of `Weaver`, positioning
+it not merely as a new tool, but as a proponent of a distinct architectural
 paradigm for AI-driven software development. It contrasts this philosophy with
 existing approaches to articulate its unique strategic value.
 
 ### 1.1. The Weaver Philosophy: Semantics as a Composable Primitive
 
 The core vision of `Weaver` is rooted in the enduring principles of the UNIX
-philosophy: build simple, single-purpose tools that interoperate effectively.^1^
-In an era of increasingly complex and integrated development environments,
+philosophy: build simple, single-purpose tools that interoperate
+effectively.^1^ In an era of increasingly complex and integrated development
+environments,
 
 `Weaver` champions a return to this model of composability. Its central thesis
-is that to effectively empower AI agents, semantic code operations should not be
-locked away within monolithic applications or proprietary protocols. Instead,
-they must be exposed as fundamental, composable primitives, accessible directly
-from the command line.
+is that to effectively empower AI agents, semantic code operations should not
+be locked away within monolithic applications or proprietary protocols.
+Instead, they must be exposed as fundamental, composable primitives, accessible
+directly from the command line.
 
 The choice of JSON Lines (JSONL) as the native communication protocol is the
 modern embodiment of this philosophy for structured data. Just as traditional
@@ -81,35 +82,36 @@ Within this paradigm, `Weaver` introduces a new vocabulary of semantic verbs to
 the developer's shell. Commands are grouped into intuitive categories:
 
 - **`observe`**: Commands for querying the state of the codebase (e.g.,
-  `observe get-definition`, `observe find-references`, `observe grep`).
+    `observe get-definition`, `observe find-references`, `observe grep`).
 
 - **`act`**: Commands for modifying the codebase (e.g., `act rename-symbol`,
-  `act apply-edits`, `act apply-patch`, `act refactor`).
+    `act apply-edits`, `act apply-patch`, `act refactor`).
 
 - **`verify`**: Commands for checking the integrity of the codebase (e.g.,
-  `verify diagnostics`).
+    `verify diagnostics`).
 
-These commands are designed to be chained together, allowing agents to construct
-sophisticated workflows. For example, an agent could find all implementations of
-an interface, refactor each one, and then verify that no new errors were
-introduced, all through a series of piped commands. This approach transforms
-code semantics from a feature into a fundamental, scriptable building block of
-the development environment.
+These commands are designed to be chained together, allowing agents to
+construct sophisticated workflows. For example, an agent could find all
+implementations of an interface, refactor each one, and then verify that no new
+errors were introduced, all through a series of piped commands. This approach
+transforms code semantics from a feature into a fundamental, scriptable
+building block of the development environment.
 
 ### 1.2. Architectural Counterpoint: A Comparative Analysis of Weaver and Serena
 
 To fully appreciate the strategic design of `Weaver`, it is instructive to
-compare it with its primary inspiration, the Serena Model Context Protocol (MCP)
-Server. While both tools aim to provide LLMs with semantic understanding of
-code, they do so through fundamentally different architectural and philosophical
-lenses. Serena represents a powerful, integrated, and agent-centric approach,
-while Weaver champions a decoupled, composable, and environment-centric model.
+compare it with its primary inspiration, the Serena Model Context Protocol
+(MCP) Server. While both tools aim to provide LLMs with semantic understanding
+of code, they do so through fundamentally different architectural and
+philosophical lenses. Serena represents a powerful, integrated, and
+agent-centric approach, while Weaver champions a decoupled, composable, and
+environment-centric model.
 
 Serena is architected as a sophisticated MCP server, designed to integrate
 tightly with MCP-compatible clients such as IDEs, local GUIs, and dedicated
 command-line interfaces.^5^ It functions as a stateful intermediary, managing
-project contexts, onboarding processes, and even a "memory" system to enhance an
-LLM's understanding over a session.^5^ The primary interaction model is
+project contexts, onboarding processes, and even a "memory" system to enhance
+an LLM's understanding over a session.^5^ The primary interaction model is
 conversational or tool-calling, mediated by the MCP specification and its
 corresponding SDKs.^6^ This makes Serena a first-class citizen within the
 burgeoning MCP ecosystem, offering a rich, out-of-the-box experience for
@@ -117,10 +119,10 @@ supported clients.^8^
 
 `Weaver`, in contrast, is architected as a suite of command-line tools that
 expose semantic operations directly to the shell environment. Its client-daemon
-architecture is a performance optimization, but its public interface remains the
-universal standard of STDIN and STDOUT, communicating via JSONL streams. This
-design choice fundamentally decouples the "semantic engine" from any specific
-LLM, agent framework, or client application.
+architecture is a performance optimization, but its public interface remains
+the universal standard of STDIN and STDOUT, communicating via JSONL streams.
+This design choice fundamentally decouples the "semantic engine" from any
+specific LLM, agent framework, or client application.
 
 This distinction is more than a technical preference; it dictates the nature of
 each tool's ecosystem and its capacity for future evolution. Serena's ecosystem
@@ -344,19 +346,19 @@ responsibilities are to:
 
 1. Parse command-line arguments and flags using the `clap` library.
 
-1. Serialize these arguments into a single JSONL object representing a command
-   request.
+2. Serialize these arguments into a single JSONL object representing a command
+    request.
 
-1. Write this JSONL object to the standard input of the `weaverd` process.
+3. Write this JSONL object to the standard input of the `weaverd` process.
 
-1. Pipe the standard output and standard error from `weaverd` directly to the
-   user's terminal.
+4. Pipe the standard output and standard error from `weaverd` directly to the
+    user's terminal.
 
 The `weaverd` daemon, managed by libraries like `daemonize-me`, continuously
-listens on its standard input for incoming JSONL request objects. Upon receiving
-a request, it executes the corresponding operation and writes one or more JSONL
-objects---representing either successful results or structured errors---to its
-standard output.
+listens on its standard input for incoming JSONL request objects. Upon
+receiving a request, it executes the corresponding operation and writes one or
+more JSONL objects---representing either successful results or structured
+errors---to its standard output.
 
 This design ensures that while a daemon is used for performance, the
 public-facing *interface* is indistinguishable from any other standard
@@ -386,8 +388,8 @@ following:
 ```
 
 The `act apply-patch` command extends the envelope with an optional `patch`
-field that carries the raw patch stream as a JSON string (newline characters are
-escaped in the serialized form). The CLI only sets this field for
+field that carries the raw patch stream as a JSON string (newline characters
+are escaped in the serialized form). The CLI only sets this field for
 `act apply-patch`, preserving backward compatibility for other commands.
 
 The daemon enforces a 1 MiB limit per JSONL request line to keep memory usage
@@ -399,23 +401,23 @@ The CLI uses `clap`'s trailing argument capture to ensure any flag-like values
 responses are consumed line by line, expecting each JSON object to specify the
 target stream (`stdout` or `stderr`). The client writes the data to the
 corresponding host stream and honours the terminal `exit` message to mirror the
-daemon's status code. A connection timeout of five seconds prevents the CLI from
-blocking indefinitely if the daemon is unreachable. Additionally, the reader
-abandons the session after ten consecutive blank lines and treats the absence of
-a terminating `exit` message as a failure. This ensures operators do not mistake
-a partial or stalled response for a successful execution.
+daemon's status code. A connection timeout of five seconds prevents the CLI
+from blocking indefinitely if the daemon is unreachable. Additionally, the
+reader abandons the session after ten consecutive blank lines and treats the
+absence of a terminating `exit` message as a failure. This ensures operators do
+not mistake a partial or stalled response for a successful execution.
 
 The capability probe specified in the roadmap is exposed as
-`weaver --capabilities`. The command loads the shared configuration, renders the
-negotiated capability matrix as pretty-printed JSON, and exits without
+`weaver --capabilities`. The command loads the shared configuration, renders
+the negotiated capability matrix as pretty-printed JSON, and exits without
 contacting the daemon. This keeps the probe side effect free and allows agents
 to cache the matrix easily.
 
-Known-domain invocations that omit the operation (for example, `weaver observe`)
-are also handled entirely on the client side. The CLI now consults a canonical
-built-in domain catalogue, prints the valid operations for the supplied domain,
-and exits non-zero before configuration discovery, daemon startup, or transport
-setup.
+Known-domain invocations that omit the operation (for example,
+`weaver observe`) are also handled entirely on the client side. The CLI now
+consults a canonical built-in domain catalogue, prints the valid operations for
+the supplied domain, and exits non-zero before configuration discovery, daemon
+startup, or transport setup.
 
 Unknown domains follow a separate client-side preflight rule. Any invocation
 whose first positional token is not one of the canonical domains `observe`,
@@ -497,18 +499,18 @@ actionable error when the socket is still bound but the PID file is missing.
 `daemon status` reports the structured state recorded in the health snapshot,
 falling back to the PID file and socket probe when health data is unavailable.
 Because lifecycle commands operate exclusively on shared filesystem artefacts
-they remain side-effect free with respect to the JSONL transport and can be used
-safely from automation tooling.
+they remain side-effect free with respect to the JSONL transport and can be
+used safely from automation tooling.
 
 #### 2.1.3. Automatic daemon startup
 
 When a domain command is invoked and the daemon is not running, the CLI
-automatically attempts to start the daemon rather than failing immediately. This
-removes friction for operators who expect commands to "just work" without
-explicit daemon management. The CLI prints "Waiting for daemon start…" to stderr
-while waiting, and uses a 30-second timeout to allow sufficient time for daemon
-initialisation. If the daemon fails to start, the CLI reports the failure and
-exits; if it starts successfully, the original command proceeds.
+automatically attempts to start the daemon rather than failing immediately.
+This removes friction for operators who expect commands to "just work" without
+explicit daemon management. The CLI prints "Waiting for daemon start…" to
+stderr while waiting, and uses a 30-second timeout to allow sufficient time for
+daemon initialisation. If the daemon fails to start, the CLI reports the
+failure and exits; if it starts successfully, the original command proceeds.
 
 The following sequence diagram illustrates the auto-start flow within
 `execute_daemon_command()`:
@@ -564,9 +566,9 @@ sequenceDiagram
 
 The error classification uses `is_daemon_not_running()` to distinguish
 recoverable connection failures (`ConnectionRefused`, `NotFound`,
-`AddrNotAvailable`) from other errors that should fail immediately. This ensures
-the CLI only attempts auto-start when the daemon genuinely isn't running, rather
-than masking configuration errors or network issues.
+`AddrNotAvailable`) from other errors that should fail immediately. This
+ensures the CLI only attempts auto-start when the daemon genuinely isn't
+running, rather than masking configuration errors or network issues.
 
 When auto-start fails, the CLI renders the failure using the unified three-part
 error template (roadmap 2.3.3). For a missing `weaverd` binary:
@@ -612,15 +614,15 @@ hierarchy edges, structural matches, rewrite results, and verification failures
 surfaced by the safety harness.
 
 The CLI exposes an `--output` flag with `auto`, `human`, and `json` values.
-`auto` selects `human` when stdout is a terminal (TTY) and `json` when output is
-redirected, ensuring pipelines remain stable while still providing rich context
-for interactive use. The human renderer follows `miette`-style ASCII output even
-when a direct `miette` dependency is not used.
+`auto` selects `human` when stdout is a terminal (TTY) and `json` when output
+is redirected, ensuring pipelines remain stable while still providing rich
+context for interactive use. The human renderer follows `miette`-style ASCII
+output even when a direct `miette` dependency is not used.
 
 Context blocks are required because line-and-column tuples alone are
 insufficient for fast triage. The renderer should show a labelled header with
-the path and coordinate, a small window of surrounding source (defaulting to two
-lines of context before and after), and a caret span highlighting the exact
+the path and coordinate, a small window of surrounding source (defaulting to
+two lines of context before and after), and a caret span highlighting the exact
 range. Multi-line ranges should render a distinct marker on each line. When
 multiple results point into the same file, the output should group them under a
 single file header to avoid repetition while still emitting a separate context
@@ -645,11 +647,11 @@ error: Undefined variable `new_function_name`
 #### 2.1.5. Localized help and reference surfaces
 
 Weaver's human-facing text should be localized without changing the JSONL
-protocol or daemon routing semantics. The daemon continues to emit stable reason
-codes and structured payloads; the CLI is responsible for rendering those codes
-into locale-specific prose. This keeps automation, plugin contracts, and test
-fixtures language-neutral while still allowing operators to work in their
-preferred language.
+protocol or daemon routing semantics. The daemon continues to emit stable
+reason codes and structured payloads; the CLI is responsible for rendering
+those codes into locale-specific prose. This keeps automation, plugin
+contracts, and test fixtures language-neutral while still allowing operators to
+work in their preferred language.
 
 Locale selection belongs to `weaver-config` rather than ad-hoc CLI parsing. The
 shared `Config` schema gains a `locale` field surfaced as `--locale`,
@@ -660,23 +662,24 @@ parse failures can be localized even when they occur before the full config has
 been merged. Weaver therefore performs a narrow pre-config pass that extracts
 `--locale` (including `--locale=<tag>`) before constructing any clap display
 surface. The bootstrap order should therefore be `--locale`, `WEAVER_LOCALE`,
-`LC_ALL`, `LC_MESSAGES`, `LANG`, then `en-US`; once `Config::load` succeeds, the
-CLI rebuilds the localizer if `Config::locale` resolves to a different value.
-This means early clap-only paths can honour the explicit CLI flag and the
-Weaver-scoped environment override immediately, while file-backed locale
+`LC_ALL`, `LC_MESSAGES`, `LANG`, then `en-US`; once `Config::load` succeeds,
+the CLI rebuilds the localizer if `Config::locale` resolves to a different
+value. This means early clap-only paths can honour the explicit CLI flag and
+the Weaver-scoped environment override immediately, while file-backed locale
 selection becomes authoritative only after the full config load completes.
 
 Bootstrap locale handling should distinguish explicit overrides from inherited
 process hints. Malformed `--locale` and `WEAVER_LOCALE` values are hard errors
 because they are explicit Weaver inputs and should behave like other invalid
-configuration values. Malformed `LC_ALL`, `LC_MESSAGES`, or `LANG` values should
-emit a warning and fall through to the next source so inherited shell state does
-not break `weaver --help`. Locale values read during config loading continue to
-be validated as BCP 47 language identifiers so malformed configuration files
-fail fast instead of silently falling back to the wrong language.
+configuration values. Malformed `LC_ALL`, `LC_MESSAGES`, or `LANG` values
+should emit a warning and fall through to the next source so inherited shell
+state does not break `weaver --help`. Locale values read during config loading
+continue to be validated as BCP 47 language identifiers so malformed
+configuration files fail fast instead of silently falling back to the wrong
+language.
 
-Runtime localization should use `ortho_config::FluentLocalizer` with an embedded
-mandatory `en-US` bundle and optional consumer bundles under
+Runtime localization should use `ortho_config::FluentLocalizer` with an
+embedded mandatory `en-US` bundle and optional consumer bundles under
 `crates/weaver-cli/locales/<locale>/messages.ftl`. Building the localizer via
 `FluentLocalizer::builder(...)` allows Weaver to layer the selected locale over
 `en-US`, attach an error reporter for Fluent formatting failures, and fall back
@@ -687,26 +690,26 @@ Clap integration should use `Cli::command().localize(&localizer)` for help text
 and `localize_clap_error_with_command` for parse and validation errors. Manual
 surfaces such as bare-invocation help, lifecycle guidance, and daemon-side
 human-readable rendering should resolve Fluent IDs through the same helper API
-and pass variable data through `LocalizationArgs`, rather than embedding English
-prose in code. This gives Weaver one message catalogue for static help, dynamic
-errors, and config-derived guidance.
+and pass variable data through `LocalizationArgs`, rather than embedding
+English prose in code. This gives Weaver one message catalogue for static help,
+dynamic errors, and config-derived guidance.
 
 Localization also requires a single structured command catalogue. The current
-hard-coded `after_help` strings are sufficient for English smoke tests, but they
-duplicate router knowledge and will drift as new operations are added. Weaver
-should define one catalogue describing domains, operations, examples, and
-message IDs. The router, contextual-help renderer, `weaver help` topics, and
-test fixtures should all read from that catalogue so adding an operation updates
-validation, localization, and help output in one place.
+hard-coded `after_help` strings are sufficient for English smoke tests, but
+they duplicate router knowledge and will drift as new operations are added.
+Weaver should define one catalogue describing domains, operations, examples,
+and message IDs. The router, contextual-help renderer, `weaver help` topics,
+and test fixtures should all read from that catalogue so adding an operation
+updates validation, localization, and help output in one place.
 
 To take advantage of `ortho_config` v0.8.0 beyond runtime help, `weaver-config`
 should annotate config-backed fields with stable documentation IDs and expose
 `OrthoConfigDocs` metadata. Once the schema-backed operation-help work in the
 roadmap lands, `cargo orthohelp` can render localized intermediate
-representation (IR) files and manpages from the same Fluent catalogues, removing
-the current drift risk between clap-generated roff output and runtime help text.
-The packaging contract should still guarantee an `en-US` manpage, while allowing
-distributors to ship additional locales as optional artefacts.
+representation (IR) files and manpages from the same Fluent catalogues,
+removing the current drift risk between clap-generated roff output and runtime
+help text. The packaging contract should still guarantee an `en-US` manpage,
+while allowing distributors to ship additional locales as optional artefacts.
 
 ### 2.2. Semantic, Syntactic, and Relational Fusion
 
@@ -722,26 +725,26 @@ provide more reliable results.
 The engine is built on three distinct layers of analysis:
 
 1. **The Semantic Foundation (LSP):** Managed by the `weaver-lsp-host` crate,
-   this layer provides the primary source of deep semantic understanding. It
-   leverages external Language Server Protocol servers to obtain information
-   about definitions, references, type hierarchies, diagnostics, and other
-   complex language constructs.^9^ This forms the bedrock of Weaver's
-   intelligence.
+    this layer provides the primary source of deep semantic understanding. It
+    leverages external Language Server Protocol servers to obtain information
+    about definitions, references, type hierarchies, diagnostics, and other
+    complex language constructs.^9^ This forms the bedrock of Weaver's
+    intelligence.
 
-1. **The Syntactic Scaffolding (Tree-sitter):** Managed by the `weaver-syntax`
-   crate, this layer provides a fast, fault-tolerant, and universally available
-   structural view of the code.^11^ Tree-sitter can build a concrete syntax tree
-   even in the presence of errors, making it exceptionally robust. Its key roles
-   are to provide syntactic guardrails for all edit operations, enable
-   high-precision structural search and manipulation that LSP often lacks, and
-   facilitate context-aware code slicing for prompt engineering.^13^
+2. **The Syntactic Scaffolding (Tree-sitter):** Managed by the `weaver-syntax`
+    crate, this layer provides a fast, fault-tolerant, and universally
+    available structural view of the code.^11^ Tree-sitter can build a concrete
+    syntax tree even in the presence of errors, making it exceptionally robust.
+    Its key roles are to provide syntactic guardrails for all edit operations,
+    enable high-precision structural search and manipulation that LSP often
+    lacks, and facilitate context-aware code slicing for prompt engineering.^13^
 
-1. **Relational Insight (Call-Graph Analysis):** Managed by the `weaver-graph`
-   crate, this layer builds a higher-level model of the program's control flow
-   and component relationships. It is not limited to a single data source;
-   instead, it fuses evidence from LSP's `callHierarchy` feature, dedicated
-   static analysis plugins, and potentially the output of dynamic profiling
-   tools to construct a more complete and accurate call graph.^15^
+3. **Relational Insight (Call-Graph Analysis):** Managed by the `weaver-graph`
+    crate, this layer builds a higher-level model of the program's control flow
+    and component relationships. It is not limited to a single data source;
+    instead, it fuses evidence from LSP's `callHierarchy` feature, dedicated
+    static analysis plugins, and potentially the output of dynamic profiling
+    tools to construct a more complete and accurate call graph.^15^
 
 > **Related design:** The call graph is intentionally treated as one relational
 > view. A richer, “cards-first” symbol context layer (symbol cards, typed edges,
@@ -972,8 +975,8 @@ sequenceDiagram
 *Figure: Typical `weaver-syntax` API flow across parsing, matching, rewriting,
 and syntactic validation.*
 
-The following sequence diagram focuses on the syntactic lock integration used by
-the safety harness to validate modified files:
+The following sequence diagram focuses on the syntactic lock integration used
+by the safety harness to validate modified files:
 
 ```mermaid
 sequenceDiagram
@@ -1097,27 +1100,27 @@ the struct, so every consumer shares the same generated loader without bespoke
 builders.
 
 The `ortho_config` v0.8.0 loader preserves the stricter discovery and parsing
-model adopted in earlier releases: if any discovered configuration file fails to
-parse, `ConfigDiscovery::load_first` returns an aggregated `OrthoError`. Both
-the CLI and daemon bubble that error to the user instead of quietly falling back
-to defaults, making misconfigurations immediately visible.
+model adopted in earlier releases: if any discovered configuration file fails
+to parse, `ConfigDiscovery::load_first` returns an aggregated `OrthoError`.
+Both the CLI and daemon bubble that error to the user instead of quietly
+falling back to defaults, making misconfigurations immediately visible.
 
-`ortho_config` v0.8.0 also resolves layered and overriding configuration sources
-through its dependency-graph model, so the effective merge order remains
-`defaults < files < environment < CLI` even when multiple discovered files and
-overrides participate in the same load. Later sources shadow earlier values
-without bespoke builder calls, because the generated loader derives the full
-precedence graph from the inline discovery contract. All configuration files are
-parsed according to TOML v1 rules, including explicit `true` and `false`
-booleans, TOML integer, float, and datetime formats, quoted and multiline string
-forms, table and dotted-key merging semantics, and the explicit typing rules for
-arrays and inline tables. TOML does not provide YAML anchors or aliases, and it
-does not perform implicit `yes` or `no` boolean conversion, so authored
-configuration must use TOML's explicit value syntax.
+`ortho_config` v0.8.0 also resolves layered and overriding configuration
+sources through its dependency-graph model, so the effective merge order
+remains `defaults < files < environment < CLI` even when multiple discovered
+files and overrides participate in the same load. Later sources shadow earlier
+values without bespoke builder calls, because the generated loader derives the
+full precedence graph from the inline discovery contract. All configuration
+files are parsed according to TOML v1 rules, including explicit `true` and
+`false` booleans, TOML integer, float, and datetime formats, quoted and
+multiline string forms, table and dotted-key merging semantics, and the
+explicit typing rules for arrays and inline tables. TOML does not provide YAML
+anchors or aliases, and it does not perform implicit `yes` or `no` boolean
+conversion, so authored configuration must use TOML's explicit value syntax.
 
 The daemon transport defaults to a Unix domain socket placed under
-`$XDG_RUNTIME_DIR/weaver/weaverd.sock`. When the runtime directory is absent, or
-otherwise unavailable, the path falls back to a per-user namespace under the
+`$XDG_RUNTIME_DIR/weaver/weaverd.sock`. When the runtime directory is absent,
+or otherwise unavailable, the path falls back to a per-user namespace under the
 system temporary directory—for example, `/tmp/weaver/uid-1000/weaverd.sock`.
 `weaverd` ensures the parent directory exists with restrictive permissions
 before binding, reporting a descriptive error when creation fails. Non-Unix
@@ -1132,8 +1135,8 @@ events suitable for ingestion by observability stacks while keeping console
 noise predictable.
 
 User-interface localization follows the same shared contract. `Config` gains a
-locale field surfaced as `--locale`, `WEAVER_LOCALE`, and a config-file key. The
-value controls help text, human-readable diagnostics, generated reference
+locale field surfaced as `--locale`, `WEAVER_LOCALE`, and a config-file key.
+The value controls help text, human-readable diagnostics, generated reference
 artefacts, and other operator-facing strings, but does not affect the JSONL
 protocol or plugin execution environment. Invalid locale identifiers are
 reported as configuration errors instead of silently falling back, preserving
@@ -1141,8 +1144,8 @@ the fail-fast behaviour expected from the rest of the config loader.
 
 The capability override matrix is expressed as a sequence of directives using
 the syntax `language:capability=directive`. The directive may be `allow`,
-`deny`, or `force`, letting the operator mask unreliable capabilities or force a
-feature on when a server under-reports its support. Inputs are normalized by
+`deny`, or `force`, letting the operator mask unreliable capabilities or force
+a feature on when a server under-reports its support. Inputs are normalized by
 lowercasing identifiers and trimming surrounding whitespace, while duplicate
 entries are resolved by honouring the last directive supplied for a given
 language and capability pair. These directives merge with the daemon's runtime
@@ -1181,23 +1184,24 @@ The snapshot records the lifecycle state (`starting`, `ready`, `stopping`), the
 PID, and a UNIX timestamp so external probes can consume the same readiness
 signal as the CLI.
 
-The daemon now binds a socket listener as part of startup. The listener binds to
-the configured `SocketEndpoint`, switches into a non-blocking accept loop, and
-spawns lightweight handler threads so multiple clients can connect concurrently
-without stalling the daemon. Connection and accept failures are logged and
-throttled with backoff rather than crashing the process. For Unix domain
-sockets, any stale socket file is removed only after confirming no listener
-responds, and the daemon cleans up the socket file on shutdown to avoid
-lingering bind errors. Until the request loop is fully implemented, the
+The daemon now binds a socket listener as part of startup. The listener binds
+to the configured `SocketEndpoint`, switches into a non-blocking accept loop,
+and spawns lightweight handler threads so multiple clients can connect
+concurrently without stalling the daemon. Connection and accept failures are
+logged and throttled with backoff rather than crashing the process. For Unix
+domain sockets, any stale socket file is removed only after confirming no
+listener responds, and the daemon cleans up the socket file on shutdown to
+avoid lingering bind errors. Until the request loop is fully implemented, the
 placeholder handler reads a single JSONL request line, replies with a minimal
 `exit` message, and closes the connection, so CLI clients do not hang while
 waiting for a response.
 
-A `SystemShutdownSignal` built on `signal-hook` listens for `SIGTERM`, `SIGINT`,
-`SIGQUIT`, and `SIGHUP`, logging the event and giving the runtime a ten-second
-budget to shut down gracefully. Developers can opt into a foreground mode for
-debugging by setting the `WEAVER_FOREGROUND` environment variable, which
-bypasses daemonisation while preserving the same PID/lock/health choreography.
+A `SystemShutdownSignal` built on `signal-hook` listens for `SIGTERM`,
+`SIGINT`, `SIGQUIT`, and `SIGHUP`, logging the event and giving the runtime a
+ten-second budget to shut down gracefully. Developers can opt into a foreground
+mode for debugging by setting the `WEAVER_FOREGROUND` environment variable,
+which bypasses daemonisation while preserving the same PID/lock/health
+choreography.
 
 ```mermaid
 erDiagram
@@ -1233,17 +1237,17 @@ erDiagram
 
 Semantic Fusion backends are modelled as a `FusionBackends` registry. Each
 backend starts lazily via `ensure_backend`, keeping the process lightweight
-until a command requires a specific capability. The supervisor records whether a
-backend has already started and surfaces errors using a dedicated
+until a command requires a specific capability. The supervisor records whether
+a backend has already started and surfaces errors using a dedicated
 `BackendStartupError`. Behavioural tests exercise both successful and failing
 paths, ensuring that lazy initialisation and error propagation behave as
 designed.
 
 ## 3. Core Components: A Technical Deep Dive
 
-This section provides a detailed examination of the core technologies that power
-the Weaver Intelligence Engine. It moves beyond a simple description of their
-features to analyze their limitations and detail the specific strategies
+This section provides a detailed examination of the core technologies that
+power the Weaver Intelligence Engine. It moves beyond a simple description of
+their features to analyze their limitations and detail the specific strategies
 `Weaver` will employ to harden its implementation and ensure robust, reliable
 operation.
 
@@ -1256,10 +1260,10 @@ leveraging LSP,
 `Weaver` gains access to rich semantic analysis for a vast number of languages
 without needing to implement a parser and type checker for each one. However, a
 successful implementation requires a pragmatic and defensive posture, as the
-protocol and its various server implementations are notoriously inconsistent and
-contain fundamental design limitations. `Weaver` must therefore treat LSP
-servers as powerful but untrusted and unreliable data sources, building a robust
-hardening layer around them.
+protocol and its various server implementations are notoriously inconsistent
+and contain fundamental design limitations. `Weaver` must therefore treat LSP
+servers as powerful but untrusted and unreliable data sources, building a
+robust hardening layer around them.
 
 The primary value of LSP is its standardized set of JSON-RPC methods for common
 developer tasks, such as `textDocument/definition` for "go to definition,"
@@ -1273,15 +1277,15 @@ However, the protocol's practical application is fraught with challenges. The
 specification is vast, and server implementations vary widely in quality and
 completeness.^19^ A server's self-reported
 
-`ServerCapabilities` during the `initialize` handshake cannot always be trusted.
-Some servers may claim to support a feature like `workspace/rename` but have a
-buggy or incomplete implementation. To mitigate this, the "Language Capability
-Matrix" defined in the `weaver-config` crate is an essential hardening
-mechanism. It allows users and the system itself to maintain an override file
-that can disable or modify the advertised capabilities for specific language
-servers (e.g., `"csharp-ls": {"renameProvider": false}`). This ensures that
-`Weaver` can work around known bugs and maintain stable behavior even when
-interacting with non-compliant servers.
+`ServerCapabilities` during the `initialize` handshake cannot always be
+trusted. Some servers may claim to support a feature like `workspace/rename`
+but have a buggy or incomplete implementation. To mitigate this, the "Language
+Capability Matrix" defined in the `weaver-config` crate is an essential
+hardening mechanism. It allows users and the system itself to maintain an
+override file that can disable or modify the advertised capabilities for
+specific language servers (e.g., `"csharp-ls": {"renameProvider": false}`).
+This ensures that `Weaver` can work around known bugs and maintain stable
+behavior even when interacting with non-compliant servers.
 
 More problematic are the fundamental design flaws in the protocol itself,
 particularly concerning causality and state synchronization.^19^ LSP operates
@@ -1289,34 +1293,35 @@ asynchronously. A client (like
 
 `Weaver`) can send a `textDocument/didChange` notification to inform the server
 of a file modification and immediately follow it with a
-`textDocument/references` request. There is no protocol-level guarantee that the
-server has fully processed the change before it responds to the reference
+`textDocument/references` request. There is no protocol-level guarantee that
+the server has fully processed the change before it responds to the reference
 request. This can lead to the server operating on a stale version of the file,
-returning incorrect or outdated information. For an automated agent performing a
-sequence of edits, this lack of causal consistency is a critical vulnerability
-that can lead to cascading failures.
+returning incorrect or outdated information. For an automated agent performing
+a sequence of edits, this lack of causal consistency is a critical
+vulnerability that can lead to cascading failures.
 
 This fundamental weakness in LSP is the primary driver for Weaver's two-pillar
 architecture, where the syntactic layer is not merely an enhancement but a
-co-equal partner required for correctness. `Weaver` cannot trust an LSP server's
-response to a refactoring request or assume that the diagnostics it provides
-immediately after an edit are valid. It must impose its own layer of causal
-consistency. This is the role of the "Double-Lock" Safety Harness (detailed in
-Section 4.2), which uses the fast and reliable Tree-sitter layer to validate the
-syntactic state of the code before and after an operation, and then explicitly
-requests a fresh set of diagnostics from the LSP server to verify the semantic
-state. This approach makes `Weaver` resilient to the inherent race conditions
-and state inconsistencies of the Language Server Protocol.
+co-equal partner required for correctness. `Weaver` cannot trust an LSP
+server's response to a refactoring request or assume that the diagnostics it
+provides immediately after an edit are valid. It must impose its own layer of
+causal consistency. This is the role of the "Double-Lock" Safety Harness
+(detailed in Section 4.2), which uses the fast and reliable Tree-sitter layer
+to validate the syntactic state of the code before and after an operation, and
+then explicitly requests a fresh set of diagnostics from the LSP server to
+verify the semantic state. This approach makes `Weaver` resilient to the
+inherent race conditions and state inconsistencies of the Language Server
+Protocol.
 
 ### 3.2. The Syntactic Scaffolding: Precision and Safety with Tree-sitter
 
-The `weaver-syntax` crate provides the second pillar of the intelligence engine,
-offering a fast, robust, and precise understanding of the code's structure. It
-is built upon Tree-sitter, a parser generator and incremental parsing library
-designed to be general enough for any language, fast enough for real-time use,
-and robust enough to handle syntax errors gracefully.^11^ These properties make
-it the ideal foundation for the syntactic layer, which serves several critical
-functions within the
+The `weaver-syntax` crate provides the second pillar of the intelligence
+engine, offering a fast, robust, and precise understanding of the code's
+structure. It is built upon Tree-sitter, a parser generator and incremental
+parsing library designed to be general enough for any language, fast enough for
+real-time use, and robust enough to handle syntax errors gracefully.^11^ These
+properties make it the ideal foundation for the syntactic layer, which serves
+several critical functions within the
 
 `Weaver` architecture.
 
@@ -1332,36 +1337,37 @@ nesting, and language grammar.
 
 Similarly, the `act apply-rewrite` command will draw inspiration from the
 rewriting capabilities of these tools. `srgn`, for example, demonstrates the
-power of combining Tree-sitter queries for precise scoping with a set of actions
-like `delete` or `replace`.^21^ Weaver will adopt this model, allowing an agent
-to perform large-scale, structurally-aware refactoring. For example, an agent
-could convert all instances of a legacy function call to a new format across an
-entire codebase with a single, precise command.
+power of combining Tree-sitter queries for precise scoping with a set of
+actions like `delete` or `replace`.^21^ Weaver will adopt this model, allowing
+an agent to perform large-scale, structurally-aware refactoring. For example,
+an agent could convert all instances of a legacy function call to a new format
+across an entire codebase with a single, precise command.
 
 The key responsibilities of the `weaver-syntax` crate are:
 
 1. **High-Precision Search and Analysis:** Powering the `observe grep` command
-   for structural queries and providing the raw data for advanced analysis, such
-   as identifying all function definitions or generating a preliminary call
-   graph based on call expressions.^12^
+    for structural queries and providing the raw data for advanced analysis,
+    such as identifying all function definitions or generating a preliminary
+    call graph based on call expressions.^12^
 
-1. **Syntactic Guardrails:** Serving as the "Syntactic Lock" in the Double-Lock
-   safety harness. Before any change is committed, this layer verifies that all
-   modified files can be successfully parsed into a valid syntax tree. This is a
-   fast, crucial first line of defense against corrupted code.
+2. **Syntactic Guardrails:** Serving as the "Syntactic Lock" in the
+    Double-Lock safety harness. Before any change is committed, this layer
+    verifies that all modified files can be successfully parsed into a valid
+    syntax tree. This is a fast, crucial first line of defense against
+    corrupted code.
 
-1. **Contextual Prompt Engineering:** Enabling agents to extract specific,
-   contextually relevant code snippets for inclusion in prompts for Large
-   Language Models. An agent can request "the body of the function named
-   `calculate_total`" or "the class definition for `UserManager`" without
-   needing to parse the file text itself.
+3. **Contextual Prompt Engineering:** Enabling agents to extract specific,
+    contextually relevant code snippets for inclusion in prompts for Large
+    Language Models. An agent can request "the body of the function named
+    `calculate_total`" or "the class definition for `UserManager`" without
+    needing to parse the file text itself.
 
-1. **LSP Fallback Mechanism:** When an LSP server does not support a specific
-   semantic operation (e.g., `rename`), the syntactic layer provides a robust
-   fallback. The agent can be instructed to use `observe grep` to find all
-   textual occurrences within the correct syntactic scope (e.g., not inside
-   comments or strings) and then use `act apply-edits` to perform a safe,
-   syntactic replacement.
+4. **LSP Fallback Mechanism:** When an LSP server does not support a specific
+    semantic operation (e.g., `rename`), the syntactic layer provides a robust
+    fallback. The agent can be instructed to use `observe grep` to find all
+    textual occurrences within the correct syntactic scope (e.g., not inside
+    comments or strings) and then use `act apply-edits` to perform a safe,
+    syntactic replacement.
 
 ### 3.3. Relational Insight: A Pragmatic Approach to Call Graph Generation
 
@@ -1394,8 +1400,8 @@ solution.
 | **2 (Specialist)**      | Static Analysis Plugin     | Language-specific static analysis tools (e.g., PyCG for Python ^25^) | Higher accuracy and recall, better handling of language-specific dynamic features, more comprehensive analysis. | Requires installing and configuring external plugin tools, slower than LSP, implementation is language-specific.      |
 | **3 (Execution-Aware)** | Dynamic Analysis Ingestion | Output from profilers (e.g., `gprof` ^27^, `callgrind` ^28^)         | Provides "ground truth" for a given execution, accurately captures dynamic dispatch and runtime behaviour.      | Incomplete coverage (only shows paths that were executed), requires the ability to run the code (e.g., a test suite). |
 
-The `weaver-graph` engine will be responsible for merging the graphs produced by
-these providers. When an agent requests a call graph, it can specify which
+The `weaver-graph` engine will be responsible for merging the graphs produced
+by these providers. When an agent requests a call graph, it can specify which
 providers to use. The resulting graph will have its edges annotated with their
 provenance (e.g., `{source: "lsp", confidence: 0.8}` or
 `{source: "dynamic", execution_id: "test-run-123"}`). This allows the agent to
@@ -1421,8 +1427,8 @@ the first provider, with the following concrete design choices:
 - The LSP provider uses `textDocument/prepareCallHierarchy` to seed the graph,
   then performs depth-limited traversal of incoming and outgoing calls while
   deduplicating nodes by their IDs.
-- The graph stores both incoming and outgoing indices so callers and callees can
-  be queried in O(1) time for a given node ID.
+- The graph stores both incoming and outgoing indices so callers and callees
+  can be queried in O(1) time for a given node ID.
 
 ## 4. The Actuation and Verification Layer
 
@@ -1447,31 +1453,31 @@ on the codebase). The Python tooling landscape provides an excellent case study
 for this model:
 
 - **`jedi` as a Sensor Plugin:** `jedi` is a powerful static analysis library
-  with a primary focus on autocompletion, goto definition, and finding
-  references.^29^ While there is some overlap with LSP functionality,
+    with a primary focus on autocompletion, goto definition, and finding
+    references.^29^ While there is some overlap with LSP functionality,
 
-  `jedi` can often provide supplementary or alternative analysis. It can be
-  integrated as a sensor plugin, offering another data stream to the Semantic
-  Fusion Engine, which can be particularly useful for cross-validation or when
-  an LSP server is unavailable.
+    `jedi` can often provide supplementary or alternative analysis. It can be
+    integrated as a sensor plugin, offering another data stream to the Semantic
+    Fusion Engine, which can be particularly useful for cross-validation or
+    when an LSP server is unavailable.
 
 - **`rope` as an Actuator Plugin:** `rope` is a dedicated and mature Python
-  refactoring library, recognized as being more powerful and comprehensive for
-  refactoring tasks than `jedi`.^31^ It supports a wide range of complex
-  operations, such as "Extract Method," "Change Signature," and "Move
-  Method".^33^
+    refactoring library, recognized as being more powerful and comprehensive
+    for refactoring tasks than `jedi`.^31^ It supports a wide range of complex
+    operations, such as "Extract Method," "Change Signature," and "Move
+    Method".^33^
 
-  `rope` will be integrated as a primary actuator plugin for Python, callable
-  via a command like
-  `weaver act refactor --provider rope --refactoring extract_method...`. This
-  allows an agent to perform sophisticated, language-aware refactorings through
-  the standard `Weaver` interface.
+    `rope` will be integrated as a primary actuator plugin for Python, callable
+    via a command like
+    `weaver act refactor --provider rope --refactoring extract_method...`. This
+    allows an agent to perform sophisticated, language-aware refactorings
+    through the standard `Weaver` interface.
 
 This model extends to other domains as well. Tools like `srgn` and `ast-grep`,
 which excel at high-speed, structural search and rewrite operations, can be
-integrated as "precision editing" actuators.^13^ This gives agents a spectrum of
-tools to choose from, ranging from fast, syntactic transformations to slower,
-fully semantic-aware refactorings, all orchestrated and secured by the
+integrated as "precision editing" actuators.^13^ This gives agents a spectrum
+of tools to choose from, ranging from fast, syntactic transformations to
+slower, fully semantic-aware refactorings, all orchestrated and secured by the
 
 `weaverd` daemon.
 
@@ -1497,8 +1503,8 @@ during the initial implementation:
 - **Plugin trait with process-based implementation.** A `PluginExecutor` trait
   defines the execution contract. `SandboxExecutor` provides the concrete
   implementation using `weaver-sandbox`. Test code implements the trait with
-  mock executors returning pre-configured responses, enabling unit and BDD tests
-  without spawning real processes.
+  mock executors returning pre-configured responses, enabling unit and BDD
+  tests without spawning real processes.
 
 - **Safety harness integration via `ContentTransaction`.** Actuator plugin diff
   output will be parsed into `ContentChange::Write` values and fed through the
@@ -1558,23 +1564,23 @@ following decisions govern this rollout:
   rust-analyzer actuator with a `60` second timeout and executable override via
   `WEAVER_RUST_ANALYZER_PLUGIN_PATH`.
 
-- **Shared `rename-symbol` capability contract.** The rust-analyzer actuator now
-  declares `rename-symbol` in its manifest, accepts `uri`, `position`, and
+- **Shared `rename-symbol` capability contract.** The rust-analyzer actuator
+  now declares `rename-symbol` in its manifest, accepts `uri`, `position`, and
   `new_name` in plugin requests, and returns protocol-conforming refusal
   diagnostics with stable reason codes for unsupported operations and malformed
   payloads. The user-facing CLI still spells the operation as
   `--refactoring rename`; `weaverd` performs the contract mapping internally.
 
-- **Daemon-side capability resolution with structured rationale.** `weaverd` now
-  resolves `rename-symbol` by capability plus inferred file language before
-  plugin execution. Python defaults to `rope`, Rust defaults to `rust-analyzer`,
-  and explicit `--provider` values remain supported only as compatibility
-  overrides that still must match the inferred language and the declared
-  capability. Every selection or refusal emits a structured
+- **Daemon-side capability resolution with structured rationale.** `weaverd`
+  now resolves `rename-symbol` by capability plus inferred file language before
+  plugin execution. Python defaults to `rope`, Rust defaults to
+  `rust-analyzer`, and explicit `--provider` values remain supported only as
+  compatibility overrides that still must match the inferred language and the
+  declared capability. Every selection or refusal emits a structured
   `CapabilityResolution` payload containing the capability, inferred language,
   selection mode, selected or requested provider, stable refusal code, and
-  candidate-by-candidate reasons so JSON consumers can inspect routing decisions
-  while human mode stays readable.
+  candidate-by-candidate reasons so JSON consumers can inspect routing
+  decisions while human mode stays readable.
 
 - **Shared Double-Lock commit path remains unchanged.** As with rope, successful
   `PluginOutput::Diff` output from rust-analyzer is forwarded to
@@ -1585,70 +1591,72 @@ following decisions govern this rollout:
 
 The "Double-Lock" safety harness is the single most critical feature for
 ensuring the safety and reliability of AI agent-driven code modifications. It
-addresses the fundamental problem that powerful external tools, while effective,
-can sometimes produce incorrect results or have unintended side effects. The
-harness wraps every action from an actuator plugin in a verifiable, atomic
-transaction, guaranteeing that no change is committed to the filesystem unless
-it is proven to be both syntactically and semantically sound.
+addresses the fundamental problem that powerful external tools, while
+effective, can sometimes produce incorrect results or have unintended side
+effects. The harness wraps every action from an actuator plugin in a
+verifiable, atomic transaction, guaranteeing that no change is committed to the
+filesystem unless it is proven to be both syntactically and semantically sound.
 
 The workflow for any modification command (e.g., `act refactor`) is as follows:
 
 1. **Agent Request:** An agent issues a command such as:
 
-   ```sh
-   weaver act refactor --provider rope --refactoring rename \
-     --path src/main.py --offset 123 --new-name new_function_name
-   ```
+    ```sh
+    weaver act refactor --provider rope --refactoring rename \
+      --path src/main.py --offset 123 --new-name new_function_name
+    ```
 
-1. **Sandboxed Execution:** The `weaverd` daemon invokes the specified plugin
-   (`rope`) within the secure, resource-limited sandbox (detailed in Section 5).
-   The plugin is provided with the necessary context (e.g., file contents,
-   arguments) via its standard input.
+2. **Sandboxed Execution:** The `weaverd` daemon invokes the specified plugin
+    (`rope`) within the secure, resource-limited sandbox (detailed in Section
+    5). The plugin is provided with the necessary context (e.g., file contents,
+    arguments) via its standard input.
 
-1. **Diff Capture:** The plugin executes the refactoring logic and, instead of
-   writing directly to the filesystem, it outputs a set of proposed changes
-   (e.g., a unified diff or a list of text edits) to its standard output.
+3. **Diff Capture:** The plugin executes the refactoring logic and, instead of
+    writing directly to the filesystem, it outputs a set of proposed changes
+    (e.g., a unified diff or a list of text edits) to its standard output.
 
-1. **Pre-flight Verification (The Double Lock):** `weaverd` captures the
-   proposed diff and applies it to an *in-memory* copy of the affected files. It
-   then subjects these virtual file contents to a rigorous two-phase validation:
+4. **Pre-flight Verification (The Double Lock):** `weaverd` captures the
+    proposed diff and applies it to an *in-memory* copy of the affected files.
+    It then subjects these virtual file contents to a rigorous two-phase
+    validation:
 
-   - **Syntactic Lock:** The modified content of each affected file is passed to
-     the `weaver-syntax` crate's Tree-sitter parser. If any file fails to parse
-     into a valid, error-free syntax tree, the entire operation is immediately
-     rejected. This is a fast, highly reliable check that catches syntax errors,
-     unbalanced parentheses, and other structural problems.
+    - **Syntactic Lock:** The modified content of each affected file is
+        passed to the `weaver-syntax` crate's Tree-sitter parser. If any file
+        fails to parse into a valid, error-free syntax tree, the entire
+        operation is immediately rejected. This is a fast, highly reliable
+        check that catches syntax errors, unbalanced parentheses, and other
+        structural problems.
 
-   - **Semantic Lock:** If the syntactic lock passes, `weaverd` sends the full
-     content of the modified files to the relevant LSP server (via a
-     `textDocument/didChange` notification on the in-memory buffer) and then
-     explicitly requests a full diagnostic report
-     (`textDocument/publishDiagnostics`). It waits for the response and checks
-     if any *new* errors or high-severity warnings have been introduced compared
-     to the pre-edit state. If the semantic state of the project has degraded,
-     the operation is rejected.
+    - **Semantic Lock:** If the syntactic lock passes, `weaverd` sends the
+        full content of the modified files to the relevant LSP server (via a
+        `textDocument/didChange` notification on the in-memory buffer) and then
+        explicitly requests a full diagnostic report
+        (`textDocument/publishDiagnostics`). It waits for the response and
+        checks if any *new* errors or high-severity warnings have been
+        introduced compared to the pre-edit state. If the semantic state of the
+        project has degraded, the operation is rejected.
 
-1. **Atomic Commit or Rollback:** Only if *both* the syntactic and semantic
-   locks pass is the captured diff applied to the actual files on the
-   filesystem. If either check fails, the filesystem is left untouched, and
-   `weaverd` returns a detailed, structured error to the agent. For example:
+5. **Atomic Commit or Rollback:** Only if *both* the syntactic and semantic
+    locks pass is the captured diff applied to the actual files on the
+    filesystem. If either check fails, the filesystem is left untouched, and
+    `weaverd` returns a detailed, structured error to the agent. For example:
 
-   ```json
-   {
-     "status": "error",
-     "type": "VerificationError",
-     "details": {
-       "phase": "SemanticLock",
-       "diagnostics": [
-         {
-           "file": "src/main.py",
-           "line": 42,
-           "message": "Undefined variable 'new_function_name'"
-         }
-       ]
-     }
-   }
-   ```
+    ```json
+    {
+      "status": "error",
+      "type": "VerificationError",
+      "details": {
+        "phase": "SemanticLock",
+        "diagnostics": [
+          {
+            "file": "src/main.py",
+            "line": 42,
+            "message": "Undefined variable 'new_function_name'"
+          }
+        ]
+      }
+    }
+    ```
 
 This model provides a powerful guarantee: it allows AI agents to confidently
 leverage the most advanced and specialized refactoring tools available, knowing
@@ -1664,18 +1672,19 @@ language servers or parsers during development.
 
 **Core types**:
 
-- `FileEdit` and `TextEdit` represent proposed changes using zero-based line and
-  column offsets following LSP conventions.
-- `VerificationContext` maintains in-memory copies of both original and modified
-  file content, isolating the verification process from the real filesystem.
+- `FileEdit` and `TextEdit` represent proposed changes using zero-based line
+  and column offsets following LSP conventions.
+- `VerificationContext` maintains in-memory copies of both original and
+  modified file content, isolating the verification process from the real
+  filesystem.
 - `EditTransaction` orchestrates the full workflow: reading original files,
   applying edits in-memory, validating through both locks, and committing
   atomically on success.
 
 **Lock traits**:
 
-- `SyntacticLock::validate(&self, context: &VerificationContext) -> SyntacticLockResult`
-  returns either `Passed` or `Failed { failures }`.
+- `SyntacticLock::validate(&self, context: &VerificationContext) ->
+  SyntacticLockResult` returns either `Passed` or `Failed { failures }`.
 - `SemanticLock::validate(...)` permits the semantic backend to surface
   unavailability errors separately from verification failures.
 
@@ -1689,19 +1698,19 @@ passes until the full LSP diagnostic comparison pipeline is wired through
 
 **Configurable test doubles**:
 
-`ConfigurableSyntacticLock` and `ConfigurableSemanticLock` accept pre-determined
-results, enabling BDD scenarios to exercise pass, fail, and backend-unavailable
-paths without external dependencies. These doubles power the
-`safety_harness.feature` behavioural tests.
+`ConfigurableSyntacticLock` and `ConfigurableSemanticLock` accept
+pre-determined results, enabling BDD scenarios to exercise pass, fail, and
+backend-unavailable paths without external dependencies. These doubles power
+the `safety_harness.feature` behavioural tests.
 
 **Atomic commit strategy**:
 
 Successful transactions use two-phase commit with rollback:
 
-1. **Prepare phase**: All modified content is written to temporary files in the
-   same directory as the target files.
-1. **Commit phase**: Temporary files are atomically renamed to their targets.
-1. **Rollback**: If any rename fails, all previously committed files are
+1. **Prepare phase**: All modified content is written to temporary files in
+   the same directory as the target files.
+2. **Commit phase**: Temporary files are atomically renamed to their targets.
+3. **Rollback**: If any rename fails, all previously committed files are
    restored to their original content from the `VerificationContext`.
 
 This ensures multi-file atomicity: either all files are updated or none are.
@@ -1721,14 +1730,14 @@ semantic lock must validate cross-file references. Rather than writing modified
 content to temporary files (which would break import resolution), the semantic
 lock will use LSP's document synchronization protocol:
 
-1. **`textDocument/didOpen`**: Open each affected file at its real URI, sending
-   the modified content as the document text.
-1. **Request diagnostics**: The LSP validates the in-memory content as if it
-   were at the actual file path, allowing imports and references to resolve
+1. **`textDocument/didOpen`**: Open each affected file at its real URI,
+   sending the modified content as the document text.
+2. **Request diagnostics**: The LSP validates the in-memory content as if
+   it were at the actual file path, allowing imports and references to resolve
    correctly.
-1. **Compare diagnostics**: Check for new errors compared to the pre-edit
+3. **Compare diagnostics**: Check for new errors compared to the pre-edit
    baseline.
-1. **`textDocument/didClose`**: Clean up the virtual document state.
+4. **`textDocument/didClose`**: Clean up the virtual document state.
 
 This approach leverages the standard LSP document lifecycle that editors use,
 where the LSP always validates in-memory content rather than disk content. The
@@ -1749,18 +1758,20 @@ routes the notifications to the appropriate server.
 ### 4.3. The `act apply-patch` command: safety-locked patch application
 
 `act apply-patch` provides a deterministic, command-line interface (CLI)-first
-way to apply structured patches while still benefiting from Weaver's Double-Lock
-safety harness. The command re-implements the `apply_patch` semantics used by AI
-agent tooling, favouring resilient search-and-replace blocks over line-numbered
-diffs. Every operation is validated through the Tree-sitter syntactic lock and
-the LSP semantic lock before any file is written to disk.
+way to apply structured patches while still benefiting from Weaver's
+Double-Lock safety harness. The command re-implements the `apply_patch`
+semantics used by AI agent tooling, favouring resilient search-and-replace
+blocks over line-numbered diffs. Every operation is validated through the
+Tree-sitter syntactic lock and the LSP semantic lock before any file is written
+to disk.
 
 #### 4.3.1. Patch format and operations
 
 `act apply-patch` reads a stream of Git-style file operations from standard
-input (STDIN). Each operation starts with a `diff --git a/... b/...` header; the
-tool targets the `b/` path relative to the workspace root and supports quoted
-filenames. The operation type is inferred from the metadata lines that follow:
+input (STDIN). Each operation starts with a `diff --git a/... b/...` header;
+the tool targets the `b/` path relative to the workspace root and supports
+quoted filenames. The operation type is inferred from the metadata lines that
+follow:
 
 - **Modify**: Uses one or more `SEARCH`/`REPLACE` blocks.
 - **Create**: Uses `new file mode <permissions>` and a standard diff hunk.
@@ -1806,16 +1817,17 @@ blocks within a single file:
 
 - The file is loaded into memory and a `cursor` starts at byte offset 0.
 - Each `SEARCH` block is matched against the remaining content from `cursor`.
-- Matching tries an exact match first, then a fuzzy match that trims leading and
-  trailing whitespace and normalizes line endings (`\r\n` vs `\n`).
-- If a block fails to match, the entire command fails and no files are modified.
-- When a match succeeds, the matched span is replaced with the `REPLACE` block
-  and the cursor advances to the end of the replacement.
+- Matching tries an exact match first, then a fuzzy match that trims leading
+  and trailing whitespace and normalizes line endings (`\r\n` vs `\n`).
+- If a block fails to match, the entire command fails and no files are
+  modified.
+- When a match succeeds, the matched span is replaced with the `REPLACE`
+  block and the cursor advances to the end of the replacement.
 
-This strategy avoids false positives while remaining resilient to unrelated line
-shifts and indentation changes. The replacement content preserves the existing
-file's dominant line ending style; new files follow the line endings present in
-the patch hunk, defaulting to `\n` when no style is implied.
+This strategy avoids false positives while remaining resilient to unrelated
+line shifts and indentation changes. The replacement content preserves the
+existing file's dominant line ending style; new files follow the line endings
+present in the patch hunk, defaulting to `\n` when no style is implied.
 
 #### 4.3.3. Apply-patch end-to-end flow
 
@@ -1995,8 +2007,8 @@ sequenceDiagram
 
 #### 4.3.5. Creation and deletion semantics
 
-For `new file mode` operations, the tool extracts the added (`+`) lines from the
-first diff hunk, creates any parent directories, and writes the new file
+For `new file mode` operations, the tool extracts the added (`+`) lines from
+the first diff hunk, creates any parent directories, and writes the new file
 content. For `deleted file mode` operations, the target file is removed; any
 additional body content is ignored.
 
@@ -2005,8 +2017,8 @@ additional body content is ignored.
 `act apply-patch` is governed by the same Double-Lock verification pipeline as
 other `act` commands. The parsed patch is applied to in-memory buffers, then:
 
-- **Syntactic Lock (Tree-sitter)**: All modified or created files are parsed to
-  ensure they remain syntactically valid. If the parser is unavailable or a
+- **Syntactic Lock (Tree-sitter)**: All modified or created files are parsed
+  to ensure they remain syntactically valid. If the parser is unavailable or a
   timeout elapses, the command fails fast with a structured backend-unavailable
   error.
 - **Semantic Lock (LSP)**: The modified content is synchronised to the LSP
@@ -2019,10 +2031,10 @@ when Tree-sitter or LSP validation is unavailable or exceeds the timeout.
 Instead, it returns a structured backend-unavailable error and exits with a
 non-zero status after leaving the filesystem untouched.
 
-Only if both locks pass does the daemon commit the changes atomically. Paths are
-normalized and rejected if they escape the workspace root (for example, `../..`
-traversal or absolute paths), preventing patch-based directory traversal
-attacks.
+Only if both locks pass does the daemon commit the changes atomically. Paths
+are normalized and rejected if they escape the workspace root (for example,
+`../..` traversal or absolute paths), preventing patch-based directory
+traversal attacks.
 
 #### 4.3.7. Apply-patch response payloads and limits
 
@@ -2047,10 +2059,10 @@ patch streams must split them into multiple apply-patch commands.
 
 Given that `Weaver` is designed to be programmatically controlled by AI agents
 and to execute a variety of third-party tools, security is not an optional
-feature but a foundational requirement. The system is architected on a principle
-of zero trust, where the `weaverd` daemon is the only trusted component, and all
-external processes it orchestrates are treated as potentially malicious or
-buggy.
+feature but a foundational requirement. The system is architected on a
+principle of zero trust, where the `weaverd` daemon is the only trusted
+component, and all external processes it orchestrates are treated as
+potentially malicious or buggy.
 
 ### 5.1. Principles and Threat Model for AI Agent Execution
 
@@ -2060,15 +2072,15 @@ static analyzers---could attempt to perform unauthorized actions. The primary
 threats are:
 
 - **Unauthorized Filesystem Access:** Reading sensitive files (e.g.,
-  `/etc/passwd`, SSH keys) or writing/deleting arbitrary files outside the
-  project directory.
+    `/etc/passwd`, SSH keys) or writing/deleting arbitrary files outside the
+    project directory.
 
 - **Unauthorized Network Access:** Making outbound network connections to
-  exfiltrate data or download further malicious payloads.
+    exfiltrate data or download further malicious payloads.
 
 - **Resource Exhaustion (Denial of Service):** Consuming excessive CPU or
-  memory, either accidentally (due to a bug) or maliciously, thereby degrading
-  or crashing the host system.
+    memory, either accidentally (due to a bug) or maliciously, thereby
+    degrading or crashing the host system.
 
 - **Process Spawning:** Launching additional, untrusted processes.
 
@@ -2104,15 +2116,16 @@ capabilities.
 | `birdcage` | Linux, macOS          | Namespaces, `sandbox_init`              | Focused on filesystem and network restrictions with native APIs.^35^ | Actively used in production by the Phylum CLI, offering a mature and focused scope.^35^ | **Recommended starting point.** Aligns with the primary filesystem and network threat model. |
 | `bastille` | Linux                 | Namespaces, `pivot_root`                | Targets compatibility with the `std::process::Command` API.^37^      | Work in progress and limited to Linux.                                                  | Monitor for future development, but currently unsuitable for cross-platform goals.           |
 
-While libraries like `birdcage` provide the necessary primitives, a truly secure
-architecture requires more than just process isolation. The documentation for
-`gaol` highlights a critical design pattern: the **broker process**.^36^ In this
-model, the sandboxed child process has almost no privileges itself. When it
-needs to perform a privileged operation (like reading a specific file), it does
-not do so directly. Instead, it sends an Inter-Process Communication (IPC)
-message to its trusted parent process (the broker), requesting the operation.
-The broker can then validate the request and perform the action on the child's
-behalf, for example, by opening the file and passing back a file descriptor.
+While libraries like `birdcage` provide the necessary primitives, a truly
+secure architecture requires more than just process isolation. The
+documentation for `gaol` highlights a critical design pattern: the **broker
+process**.^36^ In this model, the sandboxed child process has almost no
+privileges itself. When it needs to perform a privileged operation (like
+reading a specific file), it does not do so directly. Instead, it sends an
+Inter-Process Communication (IPC) message to its trusted parent process (the
+broker), requesting the operation. The broker can then validate the request and
+perform the action on the child's behalf, for example, by opening the file and
+passing back a file descriptor.
 
 This pattern is central to Weaver's security design. The `weaverd` daemon will
 act as the broker for all its plugins. A plugin will not be granted broad read
@@ -2128,8 +2141,8 @@ principle of the system's design.
 
 The first cut of the dedicated `weaver-sandbox` crate now wraps `birdcage`
 v0.8.1 with Weaver defaults. Executables must be supplied as absolute paths and
-whitelisted explicitly; the wrapper canonicalizes the whitelist before launch to
-prevent symlink escapes. Standard Linux library roots (`/lib`, `/lib64`,
+whitelisted explicitly; the wrapper canonicalizes the whitelist before launch
+to prevent symlink escapes. Standard Linux library roots (`/lib`, `/lib64`,
 `/usr/lib`, and their architecture-specific variants) are whitelisted for
 read-only access by default so dynamically linked binaries remain functional
 without exposing the wider filesystem. Network access remains disabled unless
@@ -2269,15 +2282,15 @@ agents with superior context.
 ### 6.1. Capability-Aware Orchestration and Graceful Degradation
 
 As established in Section 3.1, the LSP ecosystem is fragmented. A feature that
-works perfectly for one language may be buggy or entirely absent for another. An
-AI agent that assumes uniform capabilities will be brittle and ineffective.
+works perfectly for one language may be buggy or entirely absent for another.
+An AI agent that assumes uniform capabilities will be brittle and ineffective.
 `Weaver` addresses this head-on with its capability-aware orchestration layer.
 
 On startup, `weaverd` performs a capability-discovery process. It queries each
-configured LSP server for its `ServerCapabilities` and combines this information
-with the user-defined override matrix from `weaver-config`.^10^ This fused data
-is stored in a Capability Registry. Before planning a complex sequence of
-actions, an agent can query this registry via
+configured LSP server for its `ServerCapabilities` and combines this
+information with the user-defined override matrix from `weaver-config`.^10^
+This fused data is stored in a Capability Registry. Before planning a complex
+sequence of actions, an agent can query this registry via
 
 `weaver --capabilities` to get a definitive, JSONL-formatted list of supported
 features for the target language. This allows the agent to tailor its strategy
@@ -2288,15 +2301,17 @@ simply fail. It returns a structured `MissingCapability` error that is
 machine-readable and actionable. Critically, this error response can include a
 suggested fallback strategy. For example:
 
-- **Request:** `act rename-symbol` for Swift, where LSP rename support is known
-  to be limited.
+- **Request:** `act rename-symbol` for Swift, where LSP rename support is
+    known to be limited.
 
-- **Response:**
-  `{"status": "error", "type": "MissingCapability", "details":   {"language": "swift", "feature": "rename"}, "suggestion": "Use 'observe   grep' to find occurrences and 'act apply-edits' for syntactic   replacement."}`
+- **Response:** `{"status": "error", "type": "MissingCapability", "details":
+    {"language": "swift", "feature": "rename"}, "suggestion": "Use 'observe
+    grep' to find occurrences and 'act apply-edits' for syntactic
+    replacement."}`
 
 This mechanism for graceful degradation transforms failures from dead ends into
-decision points, enabling the agent to dynamically adapt its plan and still make
-progress on its task.
+decision points, enabling the agent to dynamically adapt its plan and still
+make progress on its task.
 
 ### 6.2. Project Onboarding via Retrieval-Augmented Generation (RAG)
 
@@ -2304,8 +2319,8 @@ For an AI agent to perform non-trivial tasks on a large codebase, it needs a
 high-level understanding of the project's architecture, key components, and
 conventions. Simply feeding it a list of all files is inefficient and exceeds
 the context limits of most models. The `onboard-project` command in `Weaver` is
-designed to solve this problem by applying the principles of Retrieval-Augmented
-Generation (RAG) to codebase analysis.
+designed to solve this problem by applying the principles of
+Retrieval-Augmented Generation (RAG) to codebase analysis.
 
 RAG is a technique that enhances the output of LLMs by grounding them in
 relevant, externally retrieved information, which reduces hallucinations and
@@ -2315,30 +2330,30 @@ documentation) is highly effective, whereas retrieving syntactically "similar"
 but contextually irrelevant code can actually degrade performance.^40^
 
 The `onboard-project` command implements a form of "Meta-RAG," a concept where
-the retrieval process focuses on metadata and summaries *about* the code, rather
-than the raw code itself.^41^ This creates a dense, token-efficient summary of
-the project that is ideal for an LLM's initial planning phase. The command will
-orchestrate a multi-step process to generate this summary, which will be saved
-as a
+the retrieval process focuses on metadata and summaries *about* the code,
+rather than the raw code itself.^41^ This creates a dense, token-efficient
+summary of the project that is ideal for an LLM's initial planning phase. The
+command will orchestrate a multi-step process to generate this summary, which
+will be saved as a
 
 `PROJECT.dna` file:
 
 1. **Relational Scaffolding:** It will invoke `weaver-graph` to build a
-   project-wide call graph and dependency graph, identifying key modules and
-   their interconnections.
+    project-wide call graph and dependency graph, identifying key modules and
+    their interconnections.
 
-1. **API Surface Extraction:** It will use `weaver-syntax` to traverse the AST
-   of all project files, extracting the public API surface: class definitions,
-   function signatures, and their associated docstrings.
+2. **API Surface Extraction:** It will use `weaver-syntax` to traverse the AST
+    of all project files, extracting the public API surface: class definitions,
+    function signatures, and their associated docstrings.
 
-1. **Dependency Analysis:** It will parse project configuration files (e.g.,
-   `pyproject.toml`, `package.json`, `Cargo.toml`) to identify and list all
-   external dependencies.
+3. **Dependency Analysis:** It will parse project configuration files (e.g.,
+    `pyproject.toml`, `package.json`, `Cargo.toml`) to identify and list all
+    external dependencies.
 
-1. **Synthesis:** It will synthesize these structured data points into a
-   comprehensive yet concise Markdown or JSONL document. This `PROJECT.dna` file
-   will contain sections on project structure, key modules, public APIs, and
-   dependencies.
+4. **Synthesis:** It will synthesize these structured data points into a
+    comprehensive yet concise Markdown or JSONL document. This `PROJECT.dna`
+    file will contain sections on project structure, key modules, public APIs,
+    and dependencies.
 
 When an agent begins a task, this `PROJECT.dna` file serves as the primary
 context document for its RAG system. This allows the agent to quickly gain a
@@ -2355,160 +2370,166 @@ a logical, incremental progression.
 
 ### Phase 0: Foundation & Tooling (Complete)
 
-- **Goal:** Set up the project workspace, CI/CD pipeline, and core dependencies.
+- **Goal:** Set up the project workspace, CI/CD pipeline, and core
+    dependencies.
 
 - **Status:** This foundational work is complete.
 
 ### Phase 1: Core MVP & Safety Harness Foundation
 
 - **Goal:** Establish the core client/daemon architecture, basic LSP
-  integration, and the foundational security and verification mechanisms. The
-  MVP must be safe for write operations from day one.
+    integration, and the foundational security and verification mechanisms. The
+    MVP must be safe for write operations from day one.
 
 - **Key Tasks:**
 
-  - Implement the `weaver-cli` and `weaverd` crates with robust daemonization
-    and process management.
+  - Implement the `weaver-cli` and `weaverd` crates with robust
+        daemonization and process management.
 
   - Build the `weaver-lsp-host` crate with support for initialization,
-    capability detection, and core LSP features (`definition`, `references`,
-    `diagnostics`) for Rust, Python, and TypeScript.
+        capability detection, and core LSP features (`definition`,
+        `references`, `diagnostics`) for Rust, Python, and TypeScript.
 
   - Implement the initial version of the `weaver-sandbox` crate, using
-    `birdcage` for its focused scope and production usage, prioritizing robust
-    Linux support via namespaces and seccomp-bpf.
+        `birdcage` for its focused scope and production usage, prioritizing
+        robust Linux support via namespaces and seccomp-bpf.
 
-  - **Implement the full "Double-Lock" safety harness logic in `weaverd`.** This
-    is a critical, non-negotiable feature for the MVP. All `act` commands must
-    pass through this verification layer before committing to the filesystem.
+  - **Implement the full "Double-Lock" safety harness logic in `weaverd`.**
+        This is a critical, non-negotiable feature for the MVP. All `act`
+        commands must pass through this verification layer before committing to
+        the filesystem.
 
-  - Implement atomic edits to ensure that multi-file changes either succeed or
-    fail as a single transaction.
+  - Implement atomic edits to ensure that multi-file changes either succeed
+        or fail as a single transaction.
 
 ### Phase 2: Syntactic & Relational Intelligence
 
 - **Goal:** Add the Tree-sitter and call graph layers to provide deeper
-  structural and relational understanding of code.
+    structural and relational understanding of code.
 
 - **Key Tasks:**
 
-  - Create the `weaver-syntax` crate and implement the structural search engine
-    for `observe grep` and `act apply-rewrite`, drawing inspiration from
-    `ast-grep`'s pattern language.
+  - Create the `weaver-syntax` crate and implement the structural search
+        engine for `observe grep` and `act apply-rewrite`, drawing inspiration
+        from `ast-grep`'s pattern language.
 
-  - Integrate the "Syntactic Lock" from `weaver-syntax` into the "Double-Lock"
-    harness.
+  - Integrate the "Syntactic Lock" from `weaver-syntax` into the
+        "Double-Lock" harness.
 
-  - Create the `weaver-graph` crate and implement the **LSP Provider** for call
-    graph generation, using the `textDocument/callHierarchy` request as the
-    initial data source.
+  - Create the `weaver-graph` crate and implement the **LSP Provider** for
+        call graph generation, using the `textDocument/callHierarchy` request
+        as the initial data source.
 
 ### Phase 3: Plugin Ecosystem & Specialist Tools
 
 - **Goal:** Build the plugin architecture to enable orchestration of
-  best-in-class, language-specific tools.
+    best-in-class, language-specific tools.
 
 - **Key Tasks:**
 
-  - Design and implement the `weaver-plugins` crate, including the secure IPC
-    protocol between the `weaverd` broker and sandboxed plugin processes.
+  - Design and implement the `weaver-plugins` crate, including the secure
+        IPC protocol between the `weaverd` broker and sandboxed plugin
+        processes.
 
   - Develop the first set of actuator plugins:
 
     - A plugin for `rope` to provide advanced Python refactoring.
 
-    - A plugin for `srgn` to provide high-performance, precision syntactic
-      editing.
+    - A plugin for `srgn` to provide high-performance, precision
+            syntactic editing.
 
   - Develop the first specialist sensor plugin:
 
-    - A plugin for `jedi` to provide supplementary static analysis for Python.
+    - A plugin for `jedi` to provide supplementary static analysis for
+            Python.
 
   - Refine the graceful degradation logic to suggest specific plugin-based
-    solutions when core LSP features are missing.
+        solutions when core LSP features are missing.
 
   - Implement the **Static Analysis Provider** for `weaver-graph` (e.g.,
-    wrapping `PyCG`) as the first major graph plugin.
+        wrapping `PyCG`) as the first major graph plugin.
 
 ### Phase 4: Advanced Agent Support & RAG
 
-- **Goal:** Introduce features specifically designed to support advanced agent
-  planning and human-in-the-loop workflows.
+- **Goal:** Introduce features specifically designed to support advanced
+    agent planning and human-in-the-loop workflows.
 
 - **Key Tasks:**
 
   - Implement the `onboard-project` command based on the "Meta-RAG" design,
-    orchestrating other Weaver components to generate the `PROJECT.dna` summary
-    file.
+        orchestrating other Weaver components to generate the `PROJECT.dna`
+        summary file.
 
-  - Implement a hybrid interactive mode (`--interactive`) that, in case of a
-    "Double-Lock" verification failure, presents the proposed diff and the
-    resulting errors to a human user for manual review, approval, or rejection.
+  - Implement a hybrid interactive mode (`--interactive`) that, in case of
+        a "Double-Lock" verification failure, presents the proposed diff and
+        the resulting errors to a human user for manual review, approval, or
+        rejection.
 
   - Begin research and development for the **Dynamic Analysis Ingestion**
-    provider for `weaver-graph`, allowing it to consume and merge profiling data
-    from tools like `gprof` and `callgrind`.
+        provider for `weaver-graph`, allowing it to consume and merge profiling
+        data from tools like `gprof` and `callgrind`.
 
 ## 8. Appendix
 
 ### A. Survey of Key Technologies and Prior Art
 
 - **Language Server Protocol (LSP):** An open, JSON-RPC-based protocol that
-  allows code editors and other tools to communicate with language-specific
-  servers that provide features like code completion, diagnostics, and
-  refactoring. While it has become the industry standard, its specification is
-  large, implementations are inconsistent, and it has known design flaws related
-  to state synchronization and causality, necessitating a defensive
-  implementation strategy.^9^
+    allows code editors and other tools to communicate with language-specific
+    servers that provide features like code completion, diagnostics, and
+    refactoring. While it has become the industry standard, its specification
+    is large, implementations are inconsistent, and it has known design flaws
+    related to state synchronization and causality, necessitating a defensive
+    implementation strategy.^9^
 
-- **Tree-sitter:** A parser generator tool and incremental parsing library. Its
-  key advantages are speed, robustness in the face of syntax errors, and
-  language agnosticism. It builds a concrete syntax tree, which is a more
-  detailed representation than an abstract syntax tree, making it ideal for
-  tools that perform structural search, analysis, and transformation. It is the
-  core technology behind tools like `ast-grep` and is used for syntax
-  highlighting in many modern editors.^11^
+- **Tree-sitter:** A parser generator tool and incremental parsing library.
+    Its key advantages are speed, robustness in the face of syntax errors, and
+    language agnosticism. It builds a concrete syntax tree, which is a more
+    detailed representation than an abstract syntax tree, making it ideal for
+    tools that perform structural search, analysis, and transformation. It is
+    the core technology behind tools like `ast-grep` and is used for syntax
+    highlighting in many modern editors.^11^
 
 - **Structural Search & Rewrite Tools:** Tools like `ast-grep` and `srgn`
-  represent the state-of-the-art in command-line code manipulation. They
-  leverage Tree-sitter to allow users to specify patterns and transformations
-  based on code structure rather than raw text. This provides a level of
-  precision and safety that is impossible to achieve with regular
-  expressions.^13^
+    represent the state-of-the-art in command-line code manipulation. They
+    leverage Tree-sitter to allow users to specify patterns and transformations
+    based on code structure rather than raw text. This provides a level of
+    precision and safety that is impossible to achieve with regular
+    expressions.^13^
 
-  `Weaver`'s syntactic layer is directly inspired by their design.
+    `Weaver`'s syntactic layer is directly inspired by their design.
 
-- **Process Sandboxing:** A security mechanism for restricting the environment
-  in which a program executes. On Linux, this is typically achieved using a
-  combination of kernel features: namespaces (to isolate resources like
-  filesystems, network, and process IDs) and seccomp-bpf (to whitelist allowed
-  system calls). The "broker process" is a common architectural pattern where a
-  sandboxed, low-privilege process communicates with a trusted, high-privilege
-  parent to request specific, controlled operations.^36^
+- **Process Sandboxing:** A security mechanism for restricting the
+    environment in which a program executes. On Linux, this is typically
+    achieved using a combination of kernel features: namespaces (to isolate
+    resources like filesystems, network, and process IDs) and seccomp-bpf (to
+    whitelist allowed system calls). The "broker process" is a common
+    architectural pattern where a sandboxed, low-privilege process communicates
+    with a trusted, high-privilege parent to request specific, controlled
+    operations.^36^
 
 - **Call Graph Generation:** The process of creating a directed graph
-  representing the calling relationships between subroutines in a program.
-  **Static** call graphs are generated by analyzing source code and represent
-  all possible calls, but may be imprecise for dynamic languages. **Dynamic**
-  call graphs are generated by observing a program's execution (e.g., with a
-  profiler) and are precise for that run but provide incomplete coverage.
-  Generating a perfectly accurate static call graph is an undecidable
-  problem.^15^
+    representing the calling relationships between subroutines in a program.
+    **Static** call graphs are generated by analyzing source code and represent
+    all possible calls, but may be imprecise for dynamic languages. **Dynamic**
+    call graphs are generated by observing a program's execution (e.g., with a
+    profiler) and are precise for that run but provide incomplete coverage.
+    Generating a perfectly accurate static call graph is an undecidable
+    problem.^15^
 
 - **Retrieval-Augmented Generation (RAG):** An AI technique that enhances the
-  output of a large language model by providing it with relevant information
-  retrieved from an external knowledge source. In the context of code, this
-  involves retrieving project-specific documentation, API definitions, or
-  related code snippets to ground the model's responses, improving accuracy and
-  contextual relevance.^38^
+    output of a large language model by providing it with relevant information
+    retrieved from an external knowledge source. In the context of code, this
+    involves retrieving project-specific documentation, API definitions, or
+    related code snippets to ground the model's responses, improving accuracy
+    and contextual relevance.^38^
 
 ### B. References
 
 - Lewis, P., et al. (2020). *Retrieval-Augmented Generation for
-  Knowledge-Intensive NLP Tasks*. arXiv:2005.11401.
+    Knowledge-Intensive NLP Tasks*. arXiv:2005.11401.
 
-- Salis, V., et al. (2021). *PyCG: Practical Call Graph Generation in Python*.
-  Proceedings of the 30th USENIX Security Symposium.
+- Salis, V., et al. (2021). *PyCG: Practical Call Graph Generation in
+    Python*. Proceedings of the 30th USENIX Security Symposium.
 
 - GitHub Engineering. (2021). *Semantic Code Search at Scale*. GitHub Blog.
 
@@ -2542,17 +2563,17 @@ same pin, so the entire stack aligns on stable releases.
 
 #### 2025-11-27: Introduce `weaver-lsp-host` with capability-aware routing
 
-The new `weaver-lsp-host` crate owns the lifecycle of language servers for Rust,
-Python, and TypeScript. Initialisation now records the capabilities the server
-advertises for `textDocument/definition`, `textDocument/references`, and
-diagnostics, and then folds in operator overrides from `weaver-config`. Explicit
-`force` directives enable missing features, while `deny` directives block
-requests even when the server reports support. Core observe/verify calls are
-routed through a small trait so higher layers can inject sandboxed or recording
-implementations without spawning real servers during tests. Requests fail fast
-with structured errors that surface both the language and the reason (server
-missing, override deny, or server error) to callers, keeping the capability
-matrix honest before the daemon adds sandboxing and transport.
+The new `weaver-lsp-host` crate owns the lifecycle of language servers for
+Rust, Python, and TypeScript. Initialisation now records the capabilities the
+server advertises for `textDocument/definition`, `textDocument/references`, and
+diagnostics, and then folds in operator overrides from `weaver-config`.
+Explicit `force` directives enable missing features, while `deny` directives
+block requests even when the server reports support. Core observe/verify calls
+are routed through a small trait so higher layers can inject sandboxed or
+recording implementations without spawning real servers during tests. Requests
+fail fast with structured errors that surface both the language and the reason
+(server missing, override deny, or server error) to callers, keeping the
+capability matrix honest before the daemon adds sandboxing and transport.
 
 #### 2025-12-03: Upgrade `rstest-bdd` from 0.1.0 to 0.2.0
 
@@ -2571,13 +2592,13 @@ behind a unified `Parser` abstraction that detects languages from file
 extensions. The `TreeSitterSyntacticLock` provides the syntactic lock required
 by the Double-Lock safety harness, validating files by parsing them and
 reporting any ERROR nodes as validation failures with line/column positions.
-Unknown file extensions are silently skipped to avoid blocking edits to non-code
-artefacts.
+Unknown file extensions are silently skipped to avoid blocking edits to
+non-code artefacts.
 
 The crate also delivers an ast-grep-inspired pattern matching engine. Patterns
 support metavariables (`$VAR` for single captures, `$$$VAR` for multiple) which
-Tree-sitter parses as native `metavariable` nodes. The `Pattern` type compiles a
-pattern string into a parsed tree and extracts metavariable definitions; the
+Tree-sitter parses as native `metavariable` nodes. The `Pattern` type compiles
+a pattern string into a parsed tree and extracts metavariable definitions; the
 `Matcher` walks the source tree and the pattern tree in parallel, yielding
 `MatchResult` instances with captured text ranges. A `Rewriter` applies
 `RewriteRule` instances to transform matched code, substituting captured values

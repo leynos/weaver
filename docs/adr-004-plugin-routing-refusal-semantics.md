@@ -13,8 +13,8 @@ Proposed
 - Which refusal reason codes are mandatory in the first acceptance set?
 - Which policy source owns the final routing decision when multiple providers
   are eligible?
-- Which team owns the regression tests that pin refusal diagnostics and rollback
-  guarantees?
+- Which team owns the regression tests that pin refusal diagnostics and
+  rollback guarantees?
 
 ## Context and problem statement
 
@@ -23,9 +23,10 @@ provider selection still needs a precise contract for what happens when no
 provider matches, when policy rejects a request, or when a plugin returns a
 partial result that must still pass through the safety harness.
 
-That gap matters because the user-facing behaviour has to stay deterministic. If
-routing and refusal semantics are implicit, tests cannot make stable assertions
-about the selected provider, refusal diagnostics, or rollback guarantees.
+That gap matters because the user-facing behaviour has to stay deterministic.
+If routing and refusal semantics are implicit, tests cannot make stable
+assertions about the selected provider, refusal diagnostics, or rollback
+guarantees.
 
 ## Decision drivers
 
@@ -69,8 +70,8 @@ Adopt deterministic routing with explicit refusal.
 
 Weaver should choose one provider that satisfies the request constraints and
 return a structured refusal when no provider qualifies. Accepted output still
-flows through the shared transaction and verification path so rollback behaviour
-stays consistent.
+flows through the shared transaction and verification path so rollback
+behaviour stays consistent.
 
 ## Goals and non-goals
 
@@ -89,17 +90,17 @@ stays consistent.
 ## Migration plan
 
 1. Add stable refusal codes and reason strings.
-1. Make provider resolution emit the selected provider and policy rationale.
-1. Add tests for no-match, policy-reject, and accepted-edit paths.
-1. Feed successful plugin output back through the existing verification path.
+2. Make provider resolution emit the selected provider and policy rationale.
+3. Add tests for no-match, policy-reject, and accepted-edit paths.
+4. Feed successful plugin output back through the existing verification path.
 
 ## Known risks and limitations
 
 - Providers can still fail after selection, so the commit path needs its own
   verification.
 - Overly broad fallback logic would weaken determinism.
-- Routing changes need careful regression coverage because callers may depend on
-  refusal codes.
+- Routing changes need careful regression coverage because callers may depend
+  on refusal codes.
 
 ## Architectural rationale
 

@@ -2,8 +2,8 @@
 
 Writing robust, reliable, and parallelisable tests requires an intentional
 approach to handling external dependencies such as environment variables, the
-filesystem, or the system clock. Functions that directly call `std::env::var` or
-`SystemTime::now()` are difficult to test because they depend on global,
+filesystem, or the system clock. Functions that directly call `std::env::var`
+or `SystemTime::now()` are difficult to test because they depend on global,
 non-deterministic state.
 
 This leads to several problems:
@@ -11,16 +11,16 @@ This leads to several problems:
 - **Flaky Tests:** A test might pass or fail depending on the environment it
   runs in.
 - **Parallel Execution Conflicts:** Tests that modify the same global
-  environment variable (`std::env::set_var`) will interfere with each other when
-  run with `cargo test`.
+  environment variable (`std::env::set_var`) will interfere with each other
+  when run with `cargo test`.
 - **State Corruption:** A test that panics can fail to clean up its changes to
   the environment, poisoning subsequent tests.
 
 The solution is a classic software design pattern: **Dependency Injection
-(DI)**. Instead of a function reaching out to the global state, its dependencies
-are provided as arguments. The `mockable` crate offers a convenient set of
-traits (`Env`, `Clock`, etc.) to implement this pattern for common system
-interactions in Rust.
+(DI)**. Instead of a function reaching out to the global state, its
+dependencies are provided as arguments. The `mockable` crate offers a
+convenient set of traits (`Env`, `Clock`, etc.) to implement this pattern for
+common system interactions in Rust.
 
 ______________________________________________________________________
 
@@ -105,8 +105,8 @@ due to external state.
 
 ### 5. Usage in Production Code
 
-In production code, inject the "real" implementation, `RealEnv`, which calls the
-actual `std::env` functions.
+In production code, inject the "real" implementation, `RealEnv`, which calls
+the actual `std::env` functions.
 
 ```rust
 use mockable::RealEnv;

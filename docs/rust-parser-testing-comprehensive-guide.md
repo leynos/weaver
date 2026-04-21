@@ -18,22 +18,22 @@ built with this modern Rust stack. It moves beyond rudimentary examples to
 establish a holistic testing philosophy tailored to the unique demands of
 language engineering. The methodologies detailed herein treat testing not as a
 post-development chore but as an integral part of the design and implementation
-process, essential for ensuring correctness, enabling confident refactoring, and
-delivering a high-quality experience for the language's users. The strategies
-are organized progressively, from foundational unit tests to advanced generative
-techniques, providing a complete roadmap for implementers. The intended audience
-is the experienced Rust developer, already conversant with the language's idioms
-and the `rstest` testing framework, who seeks to build a truly resilient and
-maintainable parsing pipeline.
+process, essential for ensuring correctness, enabling confident refactoring,
+and delivering a high-quality experience for the language's users. The
+strategies are organized progressively, from foundational unit tests to
+advanced generative techniques, providing a complete roadmap for implementers.
+The intended audience is the experienced Rust developer, already conversant
+with the language's idioms and the `rstest` testing framework, who seeks to
+build a truly resilient and maintainable parsing pipeline.
 
 ## Section 1: foundational testing paradigms for Rust parsers
 
 Before delving into the specifics of testing each component, it is crucial to
-establish a conceptual framework. A parser's testing strategy is not monolithic;
-it is a layered approach where different techniques are applied to validate
-different aspects of the system. This section outlines this framework, adapting
-classic testing models to the domain of language engineering and defining the
-roles of the key testing libraries used throughout this guide.
+establish a conceptual framework. A parser's testing strategy is not
+monolithic; it is a layered approach where different techniques are applied to
+validate different aspects of the system. This section outlines this framework,
+adapting classic testing models to the domain of language engineering and
+defining the roles of the key testing libraries used throughout this guide.
 
 ### 1.1 The testing pyramid in language engineering
 
@@ -47,15 +47,16 @@ in a token definition within the lexer can have cascading effects, altering the
 structure of the final syntax tree or the quality of error messages.[^1]
 
 This interconnectedness suggests that unit tests focusing on individual
-components remain valuable, yet the highest leverage often comes from tests that
-validate the integration of these components. A single, well-designed test that
-verifies the entire process from source text to final Abstract Syntax Tree (AST)
-can provide more assurance than hundreds of isolated unit tests. Consequently,
-the ideal testing structure for a parser often resembles a "diamond" or an
-"inverted pyramid" more than a classic one. The base is still composed of unit
-tests for specific edge cases, but the most significant investment is in the
-middle layer of integration and snapshot tests, and at the peak with powerful
-property-based tests that verify universal invariants of the system.
+components remain valuable, yet the highest leverage often comes from tests
+that validate the integration of these components. A single, well-designed test
+that verifies the entire process from source text to final Abstract Syntax Tree
+(AST) can provide more assurance than hundreds of isolated unit tests.
+Consequently, the ideal testing structure for a parser often resembles a
+"diamond" or an "inverted pyramid" more than a classic one. The base is still
+composed of unit tests for specific edge cases, but the most significant
+investment is in the middle layer of integration and snapshot tests, and at the
+peak with powerful property-based tests that verify universal invariants of the
+system.
 
 This approach challenges the conventional wisdom of "many unit tests, few
 integration tests." The parser's correctness is an emergent property of its
@@ -65,8 +66,8 @@ that parsing the output of a pretty-printer yields the original AST
 definition, every parser rule, and the structural integrity of the AST in a
 single, powerful check.[^2] Therefore, establishing the infrastructure for
 comprehensive snapshot and property-based testing early in the development
-lifecycle yields a disproportionately high return on investment for ensuring the
-parser's long-term correctness and maintainability.
+lifecycle yields a disproportionately high return on investment for ensuring
+the parser's long-term correctness and maintainability.
 
 ### 1.2 Structuring the test suite
 
@@ -76,14 +77,14 @@ testing conventions provide a solid foundation.[^3]
 - **Unit Tests:** Tests covering individual lexer tokens, or isolated parser
   rules, are best placed within a `mod tests` block, annotated with
   `#[cfg(test)]`, inside the source file where the code under test is defined.
-  This co-location makes it easy to find and update tests when the corresponding
-  implementation changes.
+  This co-location makes it easy to find and update tests when the
+  corresponding implementation changes.
 
 - **Integration and Corpus-Based Tests:** Larger tests, especially those that
   operate on entire source files, are typically placed in a top-level `tests/`
   directory. Each file in this directory is compiled as a separate crate, which
-  naturally enforces testing only the public API of the library.[^4] This is the
-  ideal location for snapshot tests that run against a corpus of valid and
+  naturally enforces testing only the public API of the library.[^4] This is
+  the ideal location for snapshot tests that run against a corpus of valid and
   invalid code samples, a common practice for validating parser correctness
   across a wide range of language features.[^5] For larger projects, it can be
   beneficial to move even unit tests to their own files (e.g.,
@@ -108,9 +109,9 @@ The main strategies, along with their supporting tools, are:
   robustness, AST round-trips, and invariant testing.
 
 This structured approach—combining conventional file organization, a clear
-understanding of each testing paradigm's purpose, plus targeted tooling—lays the
-groundwork for the robust and maintainable test suite detailed in the following
-sections.
+understanding of each testing paradigm's purpose, plus targeted tooling—lays
+the groundwork for the robust and maintainable test suite detailed in the
+following sections.
 
 ## Section 2: rigorous testing of the `logos` lexer
 
@@ -130,8 +131,8 @@ generated state machine across a wide range of inputs.
 The most fundamental lexer tests verify that simple, unambiguous inputs produce
 the correct tokens. The `rstest` crate is exceptionally well-suited for this
 task, allowing for the creation of concise, table-driven tests using the
-`#[case]` attribute.[^7] These tests form the bedrock of the lexer's test suite,
-covering the "happy path" for each token definition.
+`#[case]` attribute.[^7] These tests form the bedrock of the lexer's test
+suite, covering the "happy path" for each token definition.
 
 A typical test will verify that a given input string lexes to a specific
 sequence of expected tokens. For simple tokens like punctuation or keywords,
@@ -193,16 +194,16 @@ each token.[^8]
 `chumsky` uses spans to generate precise, user-friendly error messages that
 point to the exact location of a syntax error.[^9]
 
-`rowan` uses the token's text and length to construct a lossless Concrete Syntax
-Tree (CST) that can be perfectly pretty-printed back to the original
+`rowan` uses the token's text and length to construct a lossless Concrete
+Syntax Tree (CST) that can be perfectly pretty-printed back to the original
 source.[^10]
 
-Therefore, a bug in a token's span is not merely a lexer issue; it is a critical
-flaw that will manifest as misleading error diagnostics or a corrupted syntax
-tree. Testing spans, together with slices, must be treated as a first-class
-concern, on par with testing the token kind itself. The `logos::Lexer` provides
-the `span()` and `slice()` methods to access this information, and these should
-be asserted in every relevant test.[^11]
+Therefore, a bug in a token's span is not merely a lexer issue; it is a
+critical flaw that will manifest as misleading error diagnostics or a corrupted
+syntax tree. Testing spans, together with slices, must be treated as a
+first-class concern, on par with testing the token kind itself. The
+`logos::Lexer` provides the `span()` and `slice()` methods to access this
+information, and these should be asserted in every relevant test.[^11]
 
 ```rust,no_run
 // Continuing in #[cfg(test)] mod tests
@@ -298,12 +299,12 @@ state. This is essential for handling constructs like C-style block comments,
 strings with escape sequences, or nested delimiters.
 
 Testing callbacks involves verifying that the logic within the callback is
-correct. This includes testing successful transformations, error conditions, and
-special lexer actions like `logos::Skip`. The `logos` repository's own test
+correct. This includes testing successful transformations, error conditions,
+and special lexer actions like `logos::Skip`. The `logos` repository's own test
 suite provides excellent examples of these patterns.[^14]
 
-Consider a callback that parses hexadecimal integer literals; it can fail if the
-number is too large:
+Consider a callback that parses hexadecimal integer literals; it can fail if
+the number is too large:
 
 ```rust,no_run
 // In src/lexer.rs
@@ -436,8 +437,8 @@ mod tests {
 ```
 
 This harness provides a robust foundation for the lexer test suite, ensuring
-that every aspect of the token—its kind, its text, and its position—is validated
-with every test run.
+that every aspect of the token—its kind, its text, and its position—is
+validated with every test run.
 
 ## Section 3: comprehensive validation of `chumsky` parsers
 
@@ -458,11 +459,11 @@ small parser can be tested in isolation.
 
 To unit test a specific parser rule, one should feed it a pre-tokenized slice
 (`&[(Token<'a>, &'a str, std::ops::Range<usize>)]`) rather than a raw string.
-This isolates the parser logic from the lexer, ensuring that the test is focused
-solely on how the combinators operate. The parser's `parse` method returns a
-`ParseResult`, which contains either the output AST and a vector of non-fatal
-errors, or just a vector of fatal errors.[^18] Tests should assert against both
-the output and the error vector.
+This isolates the parser logic from the lexer, ensuring that the test is
+focused solely on how the combinators operate. The parser's `parse` method
+returns a `ParseResult`, which contains either the output AST and a vector of
+non-fatal errors, or just a vector of fatal errors.[^18] Tests should assert
+against both the output and the error vector.
 
 ```rust,no_run
 // Assuming an AST definition like this:
@@ -546,24 +547,25 @@ mod tests {
 
 ### 3.2 Snapshot testing: the key to taming ASTs and errors
 
-While `assert_eq!` is suitable for simple AST nodes, it quickly becomes unwieldy
-for complex, nested structures. Manually writing out expected ASTs in test code
-is tedious, error-prone, and makes refactoring the grammar a nightmare. This is
-where snapshot testing with the `insta` crate becomes indispensable.[^19]
+While `assert_eq!` is suitable for simple AST nodes, it quickly becomes
+unwieldy for complex, nested structures. Manually writing out expected ASTs in
+test code is tedious, error-prone, and makes refactoring the grammar a
+nightmare. This is where snapshot testing with the `insta` crate becomes
+indispensable.[^19]
 
 `insta` enables asserting that a complex value matches a “snapshot”—a reference
 representation stored in a separate file. On the first run, the snapshot is
 created. On subsequent runs, the test output is compared against the stored
 snapshot. If they differ, the test fails, and a rich diff is presented. The
-developer can then either fix the code or, if the change was intentional, update
-the snapshot with `cargo insta review`.[^20]
+developer can then either fix the code or, if the change was intentional,
+update the snapshot with `cargo insta review`.[^20]
 
-This workflow is transformative for parser development. When the language syntax
-evolves, the AST structure necessarily changes. Instead of manually updating
-dozens of `assert_eq!` calls, a developer can simply update the parser logic,
-run the tests, and then interactively review the new AST structures before
-accepting them as the new "golden" standard. This dramatically accelerates
-iteration and refactoring.[^21]
+This workflow is transformative for parser development. When the language
+syntax evolves, the AST structure necessarily changes. Instead of manually
+updating dozens of `assert_eq!` calls, a developer can simply update the parser
+logic, run the tests, and then interactively review the new AST structures
+before accepting them as the new "golden" standard. This dramatically
+accelerates iteration and refactoring.[^21]
 
 The best practice is to snapshot the entire `ParseResult`, which includes both
 the (potentially partial) AST and the list of errors. This provides a complete
@@ -597,8 +599,8 @@ fn snapshot_simple_function() {
 ```
 
 When this test is run for the first time, `insta` will create a file like
-`tests/snapshots/parser_snapshots__snapshot_simple_function.snap` containing the
-formatted AST and error output.
+`tests/snapshots/parser_snapshots__snapshot_simple_function.snap` containing
+the formatted AST and error output.
 
 ### 3.3 Mastering error recovery testing
 
@@ -613,7 +615,7 @@ inputs. For each invalid input, the test must verify two critical properties:
 1. **Correct Errors:** The parser produced the expected set of errors, with the
    correct error messages and spans.
 
-1. **Correct Recovery:** The parser successfully recovered and was able to
+2. **Correct Recovery:** The parser successfully recovered and was able to
    produce a useful partial AST for the valid parts of the code.
 
 Snapshot testing is the perfect tool for this. By snapshotting both the error
@@ -653,8 +655,8 @@ verifying that it respects the defined precedence and associativity rules.
 `rstest` is again an excellent choice for creating a table of expression inputs
 and their expected AST representations.
 
-To make assertions easier, it's common to represent the expected expression tree
-in a simple, readable format like S-expressions.
+To make assertions easier, it's common to represent the expected expression
+tree in a simple, readable format like S-expressions.
 
 ```rust,no_run
 // In ddlint, prefer: expr.to_sexpr().
@@ -698,10 +700,11 @@ engines.[^26]
 ### 4.1 The `rowan` philosophy: losslessness and its testing implications
 
 The core design of `rowan` separates the tree's structure (the "green tree,"
-which is immutable and untyped) from the view or cursor into it (the "red tree,"
-which provides a typed, parent-aware API).[^27] The library itself provides the
-generic tree data structures (`GreenNode`, `SyntaxNode`); the user's parser is
-responsible for correctly constructing the tree using a `GreenNodeBuilder`.[^28]
+which is immutable and untyped) from the view or cursor into it (the "red
+tree," which provides a typed, parent-aware API).[^27] The library itself
+provides the generic tree data structures (`GreenNode`, `SyntaxNode`); the
+user's parser is responsible for correctly constructing the tree using a
+`GreenNodeBuilder`.[^28]
 
 This architecture has a profound implication for testing: a bug found in a
 `rowan` CST is rarely a bug in the `rowan` library itself. Rather, it is a bug
@@ -722,10 +725,10 @@ simple:
 
 1. Parse a source string into a `rowan::SyntaxNode`.
 
-1. Traverse the `SyntaxNode`, concatenating the text of every `SyntaxToken`
+2. Traverse the `SyntaxNode`, concatenating the text of every `SyntaxToken`
    (including trivia like whitespace and comments).
 
-1. Assert that the resulting string is byte-for-byte identical to the original
+3. Assert that the resulting string is byte-for-byte identical to the original
    input string.
 
 If this property holds for a comprehensive corpus of source files, it provides
@@ -773,8 +776,8 @@ beautifully formatted, indented tree. It enumerates the kind and span for every
 node and includes the corresponding tokens.[^30] This debug representation is a
 perfect candidate for snapshot testing with `insta`.
 
-By snapshotting the CST, developers gain a human-readable "golden" record of the
-entire parse result for a given input. This is invaluable for debugging the
+By snapshotting the CST, developers gain a human-readable "golden" record of
+the entire parse result for a given input. This is invaluable for debugging the
 parser's logic and for reviewing the impact of grammar changes.
 
 Combining this with `rstest`'s `#[files]` attribute provides a powerful
@@ -814,16 +817,16 @@ fn test_cst_snapshots(input: &Path) {
 While the raw `SyntaxNode` API is powerful, it is untyped. For semantic
 analysis, it is conventional to build a typed AST layer on top of the CST. This
 involves creating structs that wrap `SyntaxNode` and provide typed accessor
-methods for navigating the tree, as demonstrated in `rowan`'s `s_expressions.rs`
-example.[^31]
+methods for navigating the tree, as demonstrated in `rowan`'s
+`s_expressions.rs` example.[^31]
 
 For example, a `FunctionDef` struct might wrap a `SyntaxNode` of kind `FN_DEF`
 and provide methods like `name() -> Option<SyntaxToken>` and
 `body() -> Option<BlockExpr>`. Tests targeting this layer should verify that
 these navigational methods work correctly. They should check that the accessors
 return the expected node types (`Some` for well-formed input, `None` for
-malformed input), and they should confirm that the returned nodes are themselves
-correct.
+malformed input), and they should confirm that the returned nodes are
+themselves correct.
 
 ```rust,no_run
 // Assuming a typed AST layer exists
@@ -855,19 +858,19 @@ fn test_typed_ast_navigation_on_malformed_input() {
 }
 ```
 
-These tests ensure that the "view" into the syntax tree is as robust as the tree
-itself, providing a safe and ergonomic API for later compiler stages.
+These tests ensure that the "view" into the syntax tree is as robust as the
+tree itself, providing a safe and ergonomic API for later compiler stages.
 
 ## Section 5: advanced strategies with property-based testing (`proptest`)
 
-The testing strategies discussed so far—example-based and snapshot—are excellent
-for verifying known scenarios and preventing regressions. However, they are
-limited by the developer's ability to imagine all possible edge cases.
+The testing strategies discussed so far—example-based and snapshot—are
+excellent for verifying known scenarios and preventing regressions. However,
+they are limited by the developer's ability to imagine all possible edge cases.
 Property-based testing, implemented in Rust by crates like `proptest`, offers a
 powerful solution to this problem. Instead of testing against specific inputs,
 it tests that certain *properties* or *invariants* of the code hold true for a
-vast range of automatically generated, random inputs.[^32] If a failing input is
-found,
+vast range of automatically generated, random inputs.[^32] If a failing input
+is found,
 
 `proptest` automatically "shrinks" it to the smallest possible test case that
 still reproduces the failure, making debugging far easier.[^33]
@@ -880,14 +883,14 @@ The core workflow of property-based testing is:
    asserts an invariant. For example, for any list `v`,
    `v.reverse().reverse() == v`.
 
-1. **Generate Inputs:** `proptest` uses "strategies" to generate random inputs
+2. **Generate Inputs:** `proptest` uses "strategies" to generate random inputs
    that conform to certain rules (e.g., integers within a range, strings
    matching a regex, or complex, custom data structures).
 
-1. **Test and Shrink:** The test runner executes the property function hundreds
-   or thousands of times with different generated inputs. If an assertion fails,
-   `proptest` begins a shrinking process, iteratively simplifying the failing
-   input to find a minimal counterexample.
+3. **Test and Shrink:** The test runner executes the property function hundreds
+   or thousands of times with different generated inputs. If an assertion
+   fails, `proptest` begins a shrinking process, iteratively simplifying the
+   failing input to find a minimal counterexample.
 
 For parsers, this approach is invaluable because it uncovers obscure bugs that
 would be nearly impossible to find with handwritten tests.
@@ -1063,8 +1066,8 @@ proptest! {
 }
 ```
 
-This test establishes a powerful feedback loop. A failure does not just indicate
-a bug; it points to a fundamental inconsistency between the parser's
+This test establishes a powerful feedback loop. A failure does not just
+indicate a bug; it points to a fundamental inconsistency between the parser's
 understanding of the grammar and the pretty-printer's representation of it. For
 example, if the pretty-printer fails to add necessary parentheses around a
 lower-precedence operation, the `parse` function will correctly interpret the
@@ -1072,14 +1075,14 @@ resulting string according to its precedence rules, leading to a different AST,
 which triggers a test failure. This forces the developer to ensure that the
 parser, and the pretty-printer, remain perfectly synchronized, significantly
 improving the overall quality and correctness of the language implementation.
-This symbiotic relationship elevates the pretty-printer from a simple utility to
-a critical component of the testing infrastructure.
+This symbiotic relationship elevates the pretty-printer from a simple utility
+to a critical component of the testing infrastructure.
 
 ## Section 6: conclusion: a holistic testing philosophy for language engineering
 
-The development of a robust parser is a complex endeavour that demands a testing
-strategy as sophisticated as the parser itself. This guide has detailed a
-multi-layered approach, leveraging the strengths of the modern Rust testing
+The development of a robust parser is a complex endeavour that demands a
+testing strategy as sophisticated as the parser itself. This guide has detailed
+a multi-layered approach, leveraging the strengths of the modern Rust testing
 ecosystem to build confidence in a parser constructed with `logos`, `chumsky`,
 and `rowan`. By moving from foundational unit tests to comprehensive snapshot
 and property-based tests, developers can create a formidable shield against
@@ -1094,14 +1097,14 @@ philosophy:
    and property-based tests with `proptest` for universal invariants provides
    comprehensive coverage.
 
-1. **Prioritize High-Leverage Tests:** In the context of parsing, the most
+2. **Prioritize High-Leverage Tests:** In the context of parsing, the most
    powerful tests are often those that verify the integration of the entire
    pipeline. The AST round-trip property test and the CST losslessness test are
    paramount. Investing in the infrastructure for these tests—namely,
    `Arbitrary` implementations and a pretty-printer—early in the development
    process yields the highest return.
 
-1. **Treat Spans and Errors as First-Class Citizens:** A parser is not merely a
+3. **Treat Spans and Errors as First-Class Citizens:** A parser is not merely a
    validator; it is a critical component of the developer experience. The
    quality of its error messages and the accuracy of its source location
    information are non-negotiable features. Every stage of testing, from the
@@ -1109,7 +1112,7 @@ philosophy:
    error structures, with snapshot testing being the ideal tool for this
    purpose.
 
-1. **Integrate Testing into the Development Workflow:** Tools like `insta` are
+4. **Integrate Testing into the Development Workflow:** Tools like `insta` are
    not just for preventing regressions; they are powerful aids for development
    and refactoring. The `cargo insta review` workflow allows for rapid,
    confident iteration on a language's syntax and its corresponding AST
@@ -1118,48 +1121,52 @@ philosophy:
 For integration into a Continuous Integration (CI) and Continuous Deployment
 (CD) pipeline, a tiered approach is recommended. The fast-running unit tests,
 and the snapshot tests, should be executed on every commit to provide rapid
-feedback. The more computationally expensive `proptest` suites, particularly the
-AST round-trip test, can be run nightly, or as a mandatory check before a
+feedback. The more computationally expensive `proptest` suites, particularly
+the AST round-trip test, can be run nightly, or as a mandatory check before a
 release, ensuring that deeper, more subtle bugs are caught without slowing down
 the primary development loop.
 
 Ultimately, building a language is an iterative process.[^38] The syntax,
 semantics, and tooling will evolve. A robust, multi-faceted test suite is the
 single most important asset for managing this evolution. It provides the
-confidence needed to refactor, experiment, and extend the language, ensuring the
-long-term health, correctness, and maintainability of the entire project.
+confidence needed to refactor, experiment, and extend the language, ensuring
+the long-term health, correctness, and maintainability of the entire project.
 
-\[^1\]: Original source citation number 1 from the source material. \[^2\]:
-Original source citation number 2 from the source material. \[^3\]: Original
-source citation number 4 from the source material. \[^4\]: Original source
-citation number 6 from the source material. \[^5\]: Original source citation
-number 7 from the source material. \[^6\]: Original source citation number 15
-from the source material. \[^7\]: Original source citation number 10 from the
-source material. \[^8\]: Original source citation number 19 from the source
-material. \[^9\]: Original source citation number 19 from the source material.
-\[^10\]: Original source citation number 21 from the source material. \[^11\]:
-Original source citation number 15 from the source material. \[^12\]: Original
-source citation number 1 from the source material. \[^13\]: Original source
-citation number 1 from the source material. \[^14\]: Original source citation
-number 22 from the source material. \[^15\]: Original source citation number 22
-from the source material. \[^16\]: Original source citation number 23 from the
-source material. \[^17\]: Original source citation number 23 from the source
-material. \[^18\]: Original source citation number 27 from the source material.
-\[^19\]: Original source citation number 11 from the source material. \[^20\]:
-Original source citation number 11 from the source material. \[^21\]: Original
-source citation number 12 from the source material. \[^22\]: Original source
-citation number 23 from the source material. \[^23\]: Original source citation
-number 23 from the source material. \[^24\]: Original source citation number 24
-from the source material. \[^25\]: Original source citation number 21 from the
-source material. \[^26\]: Original source citation number 29 from the source
-material. \[^27\]: Original source citation number 21 from the source material.
-\[^28\]: Original source citation number 31 from the source material. \[^29\]:
-Original source citation number 29 from the source material. \[^30\]: Original
-source citation number 31 from the source material. \[^31\]: Original source
-citation number 31 from the source material. \[^32\]: Original source citation
-number 13 from the source material. \[^33\]: Original source citation number 2
-from the source material. \[^34\]: Original source citation number 13 from the
-source material. \[^35\]: Original source citation number 13 from the source
-material. \[^36\]: Original source citation number 2 from the source material.
-\[^37\]: Original source citation number 35 from the source material. \[^38\]:
-Original source citation number 23 from the source material.
+[^1]: Original source citation number 1 from the source material.
+[^2]: Original source citation number 2 from the source material.
+[^3]: Original source citation number 4 from the source material.
+[^4]: Original source citation number 6 from the source material.
+[^5]: Original source citation number 7 from the source material.
+[^6]: Original source citation number 15 from the source material.
+[^7]: Original source citation number 10 from the source material.
+[^8]: Original source citation number 19 from the source material.
+[^9]: Original source citation number 19 from the source material.
+[^10]: Original source citation number 21 from the source material.
+[^11]: Original source citation number 15 from the source material.
+[^12]: Original source citation number 1 from the source material.
+[^13]: Original source citation number 1 from the source material.
+[^14]: Original source citation number 22 from the source material.
+[^15]: Original source citation number 22 from the source material.
+[^16]: Original source citation number 23 from the source material.
+[^17]: Original source citation number 23 from the source material.
+[^18]: Original source citation number 27 from the source material.
+[^19]: Original source citation number 11 from the source material.
+[^20]: Original source citation number 11 from the source material.
+[^21]: Original source citation number 12 from the source material.
+[^22]: Original source citation number 23 from the source material.
+[^23]: Original source citation number 23 from the source material.
+[^24]: Original source citation number 24 from the source material.
+[^25]: Original source citation number 21 from the source material.
+[^26]: Original source citation number 29 from the source material.
+[^27]: Original source citation number 21 from the source material.
+[^28]: Original source citation number 31 from the source material.
+[^29]: Original source citation number 29 from the source material.
+[^30]: Original source citation number 31 from the source material.
+[^31]: Original source citation number 31 from the source material.
+[^32]: Original source citation number 13 from the source material.
+[^33]: Original source citation number 2 from the source material.
+[^34]: Original source citation number 13 from the source material.
+[^35]: Original source citation number 13 from the source material.
+[^36]: Original source citation number 2 from the source material.
+[^37]: Original source citation number 35 from the source material.
+[^38]: Original source citation number 23 from the source material.

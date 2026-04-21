@@ -1,8 +1,9 @@
 # Add unit, behavioural, and end-to-end coverage for `rename-symbol`
 
-This ExecPlan (execution plan) is a living document. The sections `Constraints`,
-`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
-and `Outcomes & Retrospective` must be kept up to date as work proceeds.
+This ExecPlan (execution plan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+proceeds.
 
 Status: COMPLETE
 
@@ -30,8 +31,8 @@ After this change:
   paths, and edge cases across all three layers (plugin contract, plugin
   execution, daemon routing).
 - End-to-end tests in `weaver-e2e` validate that the command-line interface
-  (CLI)-to-daemon-to-plugin pipeline produces correct observable output for both
-  automatic and explicit provider routing, and that refusal scenarios emit
+  (CLI)-to-daemon-to-plugin pipeline produces correct observable output for
+  both automatic and explicit provider routing, and that refusal scenarios emit
   deterministic structured diagnostics.
 - Rollback guarantees are proven: every refusal path and every adapter-failure
   path leaves the filesystem unchanged, and this invariant is asserted
@@ -47,25 +48,27 @@ plugins.
 ## Constraints
 
 - The `rename-symbol` capability contract defined in
-  `crates/weaver-plugins/src/capability/` is stable. This plan must not redefine
-  the contract schema introduced by 5.2.1.
+  `crates/weaver-plugins/src/capability/` is stable. This plan must not
+  redefine the contract schema introduced by 5.2.1.
 - The daemon resolution layer in
   `crates/weaverd/src/dispatch/act/refactor/resolution.rs` is stable. This plan
   must not change resolution semantics; it adds coverage only.
 - The command-line interface (CLI) command shape is stable. Operator-facing
   inputs remain `--refactoring rename`, `offset`, `new_name`, and `--provider`.
   `--provider` is optional.
-- Preserve synchronous execution. Do not introduce async runtimes, async traits,
-  or background work queues.
-- The repository enforces a 400-line-per-file limit. New test files must respect
-  this budget. Existing files near the limit must be split before growing.
+- Preserve synchronous execution. Do not introduce async runtimes, async
+  traits, or background work queues.
+- The repository enforces a 400-line-per-file limit. New test files must
+  respect this budget. Existing files near the limit must be split before
+  growing.
 - Behavioural tests must use `rstest-bdd` v0.5.0 patterns already used in the
   workspace, including mutable fixtures named exactly `world`.
-- Comments and documentation must use en-GB-oxendict spelling ("-ize" / "-yse" /
-  "-our").
+- Comments and documentation must use en-GB-oxendict spelling ("-ize" /
+  "-yse" / "-our").
 - Lint suppressions remain a last resort. If unavoidable, use tightly scoped
   `#[expect(..., reason = "...")]` rather than `#[allow(...)]`.
-- No new external dependencies should be added. Reuse existing workspace crates.
+- No new external dependencies should be added. Reuse existing workspace
+  crates.
 - Any design decision taken during implementation must be recorded in this
   ExecPlan.
 - The final implementation must pass `make check-fmt`, `make lint`, and
@@ -84,8 +87,8 @@ plugins.
 
 - Scope: if implementation requires changes to more than 20 files or roughly
   1,200 net lines, stop and escalate.
-- Interface: if satisfying the acceptance criteria requires a breaking change to
-  the public `weaver-cli` command syntax or to the public `weaver-plugins`
+- Interface: if satisfying the acceptance criteria requires a breaking change
+  to the public `weaver-cli` command syntax or to the public `weaver-plugins`
   request/response contract, stop and escalate.
 - Dependencies: if a new crate dependency appears necessary, stop and escalate.
 - Iterations: if `make lint` or `make test` still fail after 5 repair loops,
@@ -104,13 +107,13 @@ plugins.
 
 - Risk: shared contract fixtures require both plugins to accept the same input
   shape. The rope plugin currently accepts a bare `uri` string while
-  rust-analyzer expects a `file:///` Uniform Resource Identifier (URI). Fixtures
-  must account for this difference. Severity: medium. Likelihood: high.
-  Mitigation: design the shared fixture data at the `weaver-plugins`
+  rust-analyzer expects a `file:///` Uniform Resource Identifier (URI).
+  Fixtures must account for this difference. Severity: medium. Likelihood:
+  high. Mitigation: design the shared fixture data at the `weaver-plugins`
   contract-validation level (which validates the abstract schema shape) rather
   than at the plugin-execution level (which handles URI normalization
-  internally). Each plugin's execution-level tests continue to use their own URI
-  conventions.
+  internally). Each plugin's execution-level tests continue to use their own
+  URI conventions.
 
 - Risk: end-to-end (e2e) tests in `weaver-e2e` use real `weaver` binary
   invocations with a `FakeDaemon`. Adding new e2e tests for capability-routed
@@ -121,16 +124,16 @@ plugins.
   CLI request shape without requiring a fully capable daemon response.
 
 - Risk: rollback-guarantee tests need to assert filesystem immutability on
-  failure. The existing BDD harness in `weaverd` uses in-memory response writers
-  rather than real files. Severity: low. Likelihood: medium. Mitigation: assert
-  rollback at the handler level (response status and no apply-patch invocation)
-  rather than at the filesystem level. End-to-end tests that use temporary
-  directories can assert filesystem immutability directly.
+  failure. The existing BDD harness in `weaverd` uses in-memory response
+  writers rather than real files. Severity: low. Likelihood: medium.
+  Mitigation: assert rollback at the handler level (response status and no
+  apply-patch invocation) rather than at the filesystem level. End-to-end tests
+  that use temporary directories can assert filesystem immutability directly.
 
 ## Progress
 
-- [x] Reviewed `AGENTS.md`, the roadmap entry, the preceding ExecPlans (5.2.1
-  through 5.2.4), and project memory notes.
+- [x] Reviewed `AGENTS.md`, the roadmap entry, the preceding ExecPlans
+  (5.2.1 through 5.2.4), and project memory notes.
 - [x] Inspected current test coverage across all relevant crates.
 - [x] Drafted this ExecPlan.
 - [x] Added feature-gated shared `rename-symbol` contract fixtures in
@@ -166,14 +169,14 @@ plugins.
   capability contract is defined in `weaver-plugins`, and the acceptance
   criteria require "shared contract fixtures". A `test-support` feature flag
   follows the established pattern used by `sempai-core`. Both plugin crates can
-  import shared fixtures via `weaver-plugins/test-support` dev-dependency. Date:
-  2026-03-24.
+  import shared fixtures via `weaver-plugins/test-support` dev-dependency.
+  Date: 2026-03-24.
 
 - Decision: structure the shared contract fixtures as parameterized `rstest`
   cases that exercise the `RenameSymbolContract::validate_request()` and
-  `RenameSymbolContract::validate_response()` methods with a fixed set of inputs
-  (valid request, missing fields, empty fields, wrong operation, valid diff
-  response, non-diff response, failure with reason code). Rationale: this
+  `RenameSymbolContract::validate_response()` methods with a fixed set of
+  inputs (valid request, missing fields, empty fields, wrong operation, valid
+  diff response, non-diff response, failure with reason code). Rationale: this
   validates that both plugins conform to the same abstract contract without
   coupling the fixtures to plugin-specific execution details like URI
   normalization or adapter mocking. Date: 2026-03-24.
@@ -182,7 +185,7 @@ plugins.
   existing daemon refactor feature coverage in place. The resulting files are
   `crates/weaver-plugin-rope/tests/features/rename_symbol_contract.feature`,
   `crates/weaver-plugin-rust-analyzer/tests/features/rename_symbol_contract.feature`,
-  and `crates/weaverd/tests/features/refactor.feature`. Rationale: keeps each
+   and `crates/weaverd/tests/features/refactor.feature`. Rationale: keeps each
   feature file focused and within budget while avoiding unnecessary daemon-side
   feature-file churn. Date: 2026-03-24.
 
@@ -206,15 +209,15 @@ plugins.
 - Extended daemon coverage to prove automatic and explicit routing decisions,
   non-diff success rejection, and rollback invariants on refusal and execution
   failure paths.
-- Extended end-to-end snapshot coverage so the CLI now records automatic routing
-  and structured mismatch refusals for both built-in rename flows.
+- Extended end-to-end snapshot coverage so the CLI now records automatic
+  routing and structured mismatch refusals for both built-in rename flows.
 - Updated `docs/users-guide.md` and `docs/roadmap.md` so the documented state
   matches the implemented coverage milestone.
 
 ## Context and orientation
 
-The rename-symbol capability spans four crates and one documentation layer. This
-section orients a newcomer to each area.
+The rename-symbol capability spans four crates and one documentation layer.
+This section orients a newcomer to each area.
 
 ### Capability contract (`crates/weaver-plugins/`)
 
@@ -222,12 +225,12 @@ The `weaver-plugins` crate defines the shared plugin infrastructure. The
 `src/capability/` module contains:
 
 - `mod.rs`: `CapabilityId` enum (5 variants including `RenameSymbol`),
-  `ContractVersion` struct, `CapabilityContract` trait with `validate_request()`
-  and `validate_response()` methods.
+  `ContractVersion` struct, `CapabilityContract` trait with
+  `validate_request()` and `validate_response()` methods.
 - `rename_symbol.rs`: `RenameSymbolContract` implementation and
   `RenameSymbolRequest` typed extraction struct.
-- `reason_code.rs`: `ReasonCode` enum (7 variants including `SymbolNotFound`,
-  `IncompletePayload`, `OperationNotSupported`).
+- `reason_code.rs`: `ReasonCode` enum (7 variants including
+  `SymbolNotFound`, `IncompletePayload`, `OperationNotSupported`).
 - `tests.rs`: 332-line unit test file for contract validation.
 
 BDD tests live in `tests/features/capability_contract.feature` (76 lines, 13
@@ -251,7 +254,8 @@ files:
 The rust-analyzer plugin declares `CapabilityId::RenameSymbol` in its manifest.
 Source files:
 
-- `src/lib.rs` (381 lines): `RustAnalyzerAdapter` trait, `execute_request()`.
+- `src/lib.rs` (381 lines): `RustAnalyzerAdapter` trait,
+  `execute_request()`.
 - `src/arguments.rs` (94 lines): `parse_rename_symbol_arguments()`.
 - `src/failure.rs` (52 lines): `PluginFailure` struct.
 - `src/tests/mod.rs` (151 lines): test coordination.
@@ -272,8 +276,10 @@ The `act refactor` handler lives in `src/dispatch/act/refactor/`. Key modules:
   `CapabilityResolutionEnvelope`, `ResolutionRequest`, `SelectionMode`,
   `ResolutionOutcome`, `RefusalReason`, `CandidateEvaluation`.
 - `arguments.rs` (136 lines): `RefactorArgs`, `parse_refactor_args()`.
-- `manifests.rs` (34 lines): `rope_manifest()`, `rust_analyzer_manifest()`.
-- `candidates.rs` (58 lines): `manifest_supports_language()`, `provider_rank()`.
+- `manifests.rs` (34 lines): `rope_manifest()`,
+  `rust_analyzer_manifest()`.
+- `candidates.rs` (58 lines): `manifest_supports_language()`,
+  `provider_rank()`.
 - `refusal.rs` (36 lines): `RoutingContext`, `refused()`.
 - `response_handling.rs` (65 lines): `handle_plugin_response()`.
 - `refactor_helpers.rs` (189 lines): shared test/routing helpers.
@@ -287,15 +293,15 @@ The `act refactor` handler lives in `src/dispatch/act/refactor/`. Key modules:
 
 The `weaver-e2e` crate contains CLI ergonomics snapshot tests:
 
-- `tests/refactor_rope_cli_snapshots.rs` (296 lines): rope CLI snapshots with
-  `FakeDaemon`.
-- `tests/refactor_rust_analyzer_cli_snapshots.rs` (296 lines): rust-analyzer CLI
-  snapshots with `FakeDaemon`.
+- `tests/refactor_rope_cli_snapshots.rs` (296 lines): rope CLI snapshots
+  with `FakeDaemon`.
+- `tests/refactor_rust_analyzer_cli_snapshots.rs` (296 lines):
+  rust-analyzer CLI snapshots with `FakeDaemon`.
 
 ### Documentation
 
-- `docs/users-guide.md`: documents `act refactor` syntax, parameter semantics,
-  routing rationale, and plugin inventory.
+- `docs/users-guide.md`: documents `act refactor` syntax, parameter
+  semantics, routing rationale, and plugin inventory.
 - `docs/roadmap.md`: section 5.2.5 is marked done.
 
 ## Plan of work
@@ -352,14 +358,15 @@ In each plugin crate's `Cargo.toml`, add
 `weaver-plugins = { path = "../weaver-plugins", features = ["test-support"] }`
 to `[dev-dependencies]`.
 
-Create a new test module in each plugin crate (`src/tests/contract_fixtures.rs`)
-that imports the shared fixtures from `weaver_plugins` and validates that each
-shared fixture still matches the canonical `RenameSymbolContract`.
+Create a new test module in each plugin crate
+(`src/tests/contract_fixtures.rs`) that imports the shared fixtures from
+`weaver_plugins` and validates that each shared fixture still matches the
+canonical `RenameSymbolContract`.
 
-The shipped tests exercise both request and response fixtures through the shared
-assertion helpers rather than through plugin execution. This keeps the fixture
-layer focused on contract parity while plugin-specific execution details remain
-covered by the existing unit and behaviour suites.
+The shipped tests exercise both request and response fixtures through the
+shared assertion helpers rather than through plugin execution. This keeps the
+fixture layer focused on contract parity while plugin-specific execution
+details remain covered by the existing unit and behaviour suites.
 
 #### 2b: Rollback-guarantee unit tests
 
@@ -384,14 +391,16 @@ Add new BDD feature files for each plugin:
 scenarios:
 
 - Rename-symbol request with missing `uri` fails with `incomplete_payload`.
-- Rename-symbol request with missing `new_name` fails with `incomplete_payload`.
-- Rename-symbol request with empty `new_name` fails with `incomplete_payload`.
+- Rename-symbol request with missing `new_name` fails with
+  `incomplete_payload`.
+- Rename-symbol request with empty `new_name` fails with
+  `incomplete_payload`.
 - Shared contract fixture cases pass validation identically.
 - Rollback: adapter failure produces no diff output.
 
 `crates/weaver-plugin-rust-analyzer/tests/features/rename_symbol_contract.feature`
-with scenarios mirroring the rope feature file above to demonstrate cross-plugin
-parity.
+ with scenarios mirroring the rope feature file above to demonstrate
+cross-plugin parity.
 
 Step definitions for the new feature files live in new behaviour modules
 (`src/tests/contract_behaviour.rs` or similar) to stay within the 400-line
@@ -425,10 +434,10 @@ Add unit tests in a new module
 Add unit tests that verify the handler's rollback invariant at the `weaverd`
 level:
 
-- When resolution refuses, the handler returns status 1 and does not invoke the
-  plugin runtime.
-- When the plugin returns a failure response, the handler returns status 1 and
-  does not invoke the apply-patch path.
+- When resolution refuses, the handler returns status 1 and does not invoke
+  the plugin runtime.
+- When the plugin returns a failure response, the handler returns status 1
+  and does not invoke the apply-patch path.
 - When the plugin returns a malformed diff, the handler returns status 1 and
   does not write to the filesystem.
 
@@ -468,8 +477,8 @@ Extend the existing snapshot files
 - Python automatic routing: CLI invocation without `--provider` for a `.py`
   file. Assert that the daemon request includes the correct command shape and
   that the response includes a `CapabilityResolution` envelope.
-- Rust automatic routing: CLI invocation without `--provider` for a `.rs` file.
-  Assert the same.
+- Rust automatic routing: CLI invocation without `--provider` for a `.rs`
+  file. Assert the same.
 
 These tests use the shared fake-daemon support in
 `crates/weaver-e2e/tests/test_support/daemon_harness.rs` and the routing helper
@@ -480,10 +489,10 @@ logic in `crates/weaver-e2e/tests/test_support/refactor_routing.rs` to emit a
 
 Add tests in the same file covering:
 
-- Unsupported language (e.g. `.java` file): CLI exits with status 1 and stderr
-  contains `unsupported_language`.
-- Explicit provider mismatch (e.g. `--provider rope` for `.rs` file): CLI exits
-  with status 1 and stderr contains `explicit_provider_mismatch`.
+- Unsupported language (e.g. `.java` file): CLI exits with status 1 and
+  stderr contains `unsupported_language`.
+- Explicit provider mismatch (e.g. `--provider rope` for `.rs` file): CLI
+  exits with status 1 and stderr contains `explicit_provider_mismatch`.
 
 These tests prove that refusal diagnostics survive the full CLI→daemon→CLI
 rendering pipeline.
@@ -503,8 +512,8 @@ Validation: `cargo test -p weaver-e2e` passes. Snapshot files are committed.
 
 Review the user's guide for any changes to observable behaviour surfaced during
 testing. If new refusal reasons or edge-case behaviours were discovered, add
-them to the relevant sections. If no behaviour changes are needed, record in the
-Decision Log that the user's guide was reviewed and found current.
+them to the relevant sections. If no behaviour changes are needed, record in
+the Decision Log that the user's guide was reviewed and found current.
 
 #### 5b: Mark roadmap 5.2.5 as done
 
@@ -530,27 +539,28 @@ All six commands must exit zero.
 
 Quality criteria (what "done" means):
 
-- Tests: `make test` passes with no regressions. The new shared contract fixture
-  cases pass identically for both plugins. New BDD scenarios pass. New
+- Tests: `make test` passes with no regressions. The new shared contract
+  fixture cases pass identically for both plugins. New BDD scenarios pass. New
   end-to-end (e2e) snapshot tests pass.
 - Lint/typecheck: `make check-fmt` and `make lint` both pass.
 - Documentation: `make markdownlint` and `make nixie` pass.
   `docs/users-guide.md` is reviewed and current. `docs/roadmap.md` marks 5.2.5
   as done.
-- Rollback guarantees: every refusal and failure path is asserted to produce no
-  filesystem-modifying output (no `PluginOutput::Diff` on failure, no
+- Rollback guarantees: every refusal and failure path is asserted to produce
+  no filesystem-modifying output (no `PluginOutput::Diff` on failure, no
   apply-patch invocation on refusal).
-- Cross-plugin parity: both plugins pass the same shared contract fixture cases
-  with identical pass/fail verdicts.
+- Cross-plugin parity: both plugins pass the same shared contract fixture
+  cases with identical pass/fail verdicts.
 
 Quality method (how this is checked):
 
 - Run `make check-fmt && make lint && make test` and verify exit code 0.
 - Run `make fmt && make markdownlint && make nixie` and verify exit code 0.
-- Inspect the test output for the shared contract fixture test names and confirm
-  they appear for both `weaver-plugin-rope` and `weaver-plugin-rust-analyzer`.
-- Inspect the e2e snapshot files to confirm they include `CapabilityResolution`
-  envelope data.
+- Inspect the test output for the shared contract fixture test names and
+  confirm they appear for both `weaver-plugin-rope` and
+  `weaver-plugin-rust-analyzer`.
+- Inspect the e2e snapshot files to confirm they include
+  `CapabilityResolution` envelope data.
 
 Expected targeted evidence while iterating:
 
@@ -597,8 +607,8 @@ Modified files:
 - `crates/weaver-plugin-rope/src/tests/mod.rs` (register new modules)
 - `crates/weaver-plugin-rust-analyzer/Cargo.toml` (add `test-support` dev-dep)
 - `crates/weaver-plugin-rust-analyzer/src/tests/mod.rs` (register new modules)
-- `crates/weaverd/src/dispatch/act/refactor/mod.rs` (register new test modules
-  and shared helpers)
+- `crates/weaverd/src/dispatch/act/refactor/mod.rs` (register new test
+  modules and shared helpers)
 - `crates/weaverd/tests/features/refactor.feature` (extend routing coverage)
 - `crates/weaver-e2e/tests/refactor_rope_cli_snapshots.rs`
 - `crates/weaver-e2e/tests/refactor_rust_analyzer_cli_snapshots.rs`

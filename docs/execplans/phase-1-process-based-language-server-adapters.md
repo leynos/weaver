@@ -20,22 +20,22 @@ with production-ready adapters.
 ## Constraints
 
 1. **Must implement `Send`**: Required by `LanguageServer` trait bound
-1. **Synchronous interface**: All trait methods block on process input/output
+2. **Synchronous interface**: All trait methods block on process input/output
    (I/O)
-1. **Single initialization**: `initialize()` called once per language, result
+3. **Single initialization**: `initialize()` called once per language, result
    cached by `LspHost`
-1. **Graceful degradation**: Missing binaries produce clear diagnostic errors,
+4. **Graceful degradation**: Missing binaries produce clear diagnostic errors,
    not crashes
-1. **Zero-trust sandbox**: Language servers execute in restricted sandbox
+5. **Zero-trust sandbox**: Language servers execute in restricted sandbox
    (future integration)
 
 ## Acceptance Criteria
 
 1. `SemanticBackendProvider::start_backend()` registers adapters for configured
    languages
-1. Adapters spawn server processes and communicate via stdio
-1. Server shutdown is handled gracefully on daemon stop
-1. Missing server binaries produce clear diagnostic errors
+2. Adapters spawn server processes and communicate via stdio
+3. Server shutdown is handled gracefully on daemon stop
+4. Missing server binaries produce clear diagnostic errors
 
 ## Implementation Tasks
 
@@ -181,9 +181,9 @@ All must pass before committing.
 
 **Decision:** Use blocking I/O for JSON-RPC communication rather than async.
 
-**Rationale:** The `LanguageServer` trait methods are synchronous (`&mut self`).
-Introducing async would require significant trait redesign. Blocking is
-acceptable because:
+**Rationale:** The `LanguageServer` trait methods are synchronous
+(`&mut self`). Introducing async would require significant trait redesign.
+Blocking is acceptable because:
 
 - Each language has one server instance
 - `LspHost` serializes access via session management

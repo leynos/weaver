@@ -1,8 +1,9 @@
 # Add top-level version output and long-form command-line interface (CLI) description
 
-This ExecPlan (execution plan) is a living document. The sections `Constraints`,
-`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
-and `Outcomes & Retrospective` must be kept up to date as work proceeds.
+This ExecPlan (execution plan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+proceeds.
 
 Status: COMPLETE
 
@@ -14,58 +15,60 @@ repository root.
 After this change, operators can run `weaver --version` or `weaver -V` to see
 the version string, exiting 0 and printing to standard output (stdout). Running
 `weaver --help` displays a purpose statement and runnable quick-start examples
-alongside the existing domain/operation catalogue. Both `--help` and `--version`
-now exit 0 and write to stdout, matching standard CLI conventions.
+alongside the existing domain/operation catalogue. Both `--help` and
+`--version` now exit 0 and write to stdout, matching standard CLI conventions.
 
 Observable behaviour after this change:
 
 - `weaver --version` prints `weaver 0.1.0` to stdout and exits 0.
 - `weaver -V` prints identical output to `weaver --version`.
-- `weaver --help` prints to stdout (not stderr), exits 0, and includes a "Quick
-  start:" block with at least one runnable command example
+- `weaver --help` prints to stdout (not stderr), exits 0, and includes a
+  "Quick start:" block with at least one runnable command example
   (`weaver observe get-definition`).
-- `weaver` (bare invocation) continues to exit 1 and print to standard error
-  (stderr) (unchanged).
-- Running `make check-fmt && make lint && make test` passes with no regressions.
+- `weaver` (bare invocation) continues to exit 1 and print to standard
+  error (stderr) (unchanged).
+- Running `make check-fmt && make lint && make test` passes with no
+  regressions.
 
 ## Constraints
 
-1. **400-line file limit.** No single source file may exceed 400 lines. `lib.rs`
-   starts at 399 lines (1 line of headroom), requiring a preparatory extraction
-   before adding the exit-code fix.
-1. **build.rs dual-compilation.** `cli.rs` is included by `build.rs` via
+1. **400-line file limit.** No single source file may exceed 400 lines.
+   `lib.rs` starts at 399 lines (1 line of headroom), requiring a preparatory
+   extraction before adding the exit-code fix.
+2. **build.rs dual-compilation.** `cli.rs` is included by `build.rs` via
    `#[path = "src/cli.rs"]` for manpage generation. Any code added to `cli.rs`
    must compile in the build script context. Clap derive attributes (`version`,
    `about`, `long_about`) are safe because they are processed by the derive
    macro, same as the existing `after_help`.
-1. **Strict Clippy.** Over 30 denied lint categories including `unwrap_used`,
+3. **Strict Clippy.** Over 30 denied lint categories including `unwrap_used`,
    `expect_used`, `indexing_slicing`, `string_slice`, `missing_docs`,
    `cognitive_complexity`, `allow_attributes`, and `str_to_string`. All code
    must pass
    `cargo clippy --workspace --all-targets --all-features -D warnings`.
-1. **en-GB-oxendict spelling.** Comments and documentation use British English
+4. **en-GB-oxendict spelling.** Comments and documentation use British English
    with Oxford "-ize" / "-yse" / "-our" spelling.
-1. **rstest-bdd v0.5.0.** Behaviour-driven development (BDD) tests use v0.5.0.
-   The fixture parameter must be named exactly `world`. Use `let _ = world;` to
-   suppress unused warnings.
-1. **`concat!()` for multi-line strings.** Per AGENTS.md, use `concat!()` to
+5. **rstest-bdd v0.5.0.** Behaviour-driven development (BDD) tests use
+   v0.5.0. The fixture parameter must be named exactly `world`. Use
+   `let _ = world;` to suppress unused warnings.
+6. **`concat!()` for multi-line strings.** Per AGENTS.md, use `concat!()` to
    combine long string literals rather than escaping newlines with backslash.
-1. **No new external dependencies.** The change uses only clap features already
+7. **No new external dependencies.** The change uses only clap features already
    available.
-1. **weaver-cli does not opt into workspace lints.** Its `Cargo.toml` has no
+8. **weaver-cli does not opt into workspace lints.** Its `Cargo.toml` has no
    `[lints]` section, so workspace-level `allow_attributes = "deny"` does not
    apply. This means `#[allow(dead_code)]` is acceptable if needed for the
    build.rs dual-compilation case.
-1. **`str_to_string` denied.** Use `String::from()` or `.into()`, not
+9. **`str_to_string` denied.** Use `String::from()` or `.into()`, not
    `.to_string()` on `&str`.
 
 ## Tolerances (exception triggers)
 
 - **Scope:** If implementation requires changes to more than 12 files or more
   than 200 net lines of code, stop and escalate.
-- **Interface:** If a public application programming interface (API) signature
-  must change beyond adding the clap attributes, stop and escalate.
-- **Dependencies:** If a new external dependency is required, stop and escalate.
+- **Interface:** If a public application programming interface (API)
+  signature must change beyond adding the clap attributes, stop and escalate.
+- **Dependencies:** If a new external dependency is required, stop and
+  escalate.
 - **Iterations:** If tests still fail after 3 attempts at fixing, stop and
   escalate.
 - **Line budget:** If any file cannot stay within 400 lines after the
@@ -73,19 +76,20 @@ Observable behaviour after this change:
 
 ## Risks
 
-- Risk: `lib.rs` line budget (399/400 lines). Adding the exit-code fix requires
-  net new lines. Severity: high. Likelihood: certain. Mitigation: Extract the
-  standalone `is_apply_patch()` function (7 lines) from `lib.rs` to `command.rs`
-  as a method on `CommandInvocation` before adding the exit-code fix. This
-  reclaims 7 lines, providing headroom for the +3 line exit-code change.
+- Risk: `lib.rs` line budget (399/400 lines). Adding the exit-code fix
+  requires net new lines. Severity: high. Likelihood: certain. Mitigation:
+  Extract the standalone `is_apply_patch()` function (7 lines) from `lib.rs` to
+  `command.rs` as a method on `CommandInvocation` before adding the exit-code
+  fix. This reclaims 7 lines, providing headroom for the +3 line exit-code
+  change.
 
 - Risk: Changing `--help` to stdout/exit-0 breaks existing integration test
   `help_output_lists_all_domains_and_operations` in `main_entry.rs`. Severity:
   medium. Likelihood: low. Mitigation: The existing test (lines 28-54)
   intentionally uses combined stdout+stderr output
   (`format!("{stdout}{stderr}")`) and does not assert on exit code. Its comment
-  states, "The test intentionally avoids asserting on the exit code so this test
-  remains valid if --help is later changed to exit 0." No change is needed.
+  states, "The test intentionally avoids asserting on the exit code so this
+  test remains valid if --help is later changed to exit 0." No change is needed.
 
 - Risk: BDD tests break because `--help`/`--version` now behaves differently.
   Severity: low. Likelihood: low. Mitigation: No existing BDD scenario tests
@@ -103,11 +107,15 @@ Observable behaviour after this change:
   `docs/execplans/2-2-3-top-level-version-output.md`.
 - [x] (2026-03-07) Stage A: Extract `is_apply_patch` from `lib.rs` to
   `command.rs`.
-- [x] (2026-03-07) Stage B: Add `version`, `about`, `long_about` to `cli.rs`.
-- [x] (2026-03-07) Stage C: Fix exit code for `--help`/`--version` in `lib.rs`.
-- [x] (2026-03-07) Stage D: Add unit tests in `tests/unit/version_output.rs`.
+- [x] (2026-03-07) Stage B: Add `version`, `about`, `long_about` to
+  `cli.rs`.
+- [x] (2026-03-07) Stage C: Fix exit code for `--help`/`--version` in
+  `lib.rs`.
+- [x] (2026-03-07) Stage D: Add unit tests in
+  `tests/unit/version_output.rs`.
 - [x] (2026-03-07) Stage E: Add BDD feature file and register scenario.
-- [x] (2026-03-07) Stage F: Add integration tests in `tests/main_entry.rs`.
+- [x] (2026-03-07) Stage F: Add integration tests in
+  `tests/main_entry.rs`.
 - [x] (2026-03-07) Stage G: Update `docs/users-guide.md` and run
   `make markdownlint` plus `make fmt`.
 - [x] (2026-03-07) Stage H: Mark roadmap 2.2.3 as done.
@@ -116,8 +124,8 @@ Observable behaviour after this change:
 
 ## Surprises & discoveries
 
-- Observation: `rustfmt` reformatted the `is_apply_patch` method body and some
-  assertion macros in `version_output.rs` to more compact forms. Evidence:
+- Observation: `rustfmt` reformatted the `is_apply_patch` method body and
+  some assertion macros in `version_output.rs` to more compact forms. Evidence:
   `make check-fmt` diff output. Impact: None — applied `cargo fmt --all` and
   re-verified.
 
@@ -130,10 +138,10 @@ Observable behaviour after this change:
   (saves lines in the already-tight `lib.rs`), and automatically handles any
   future clap informational error kinds. Date: 2026-03-07.
 
-- Decision: Extract `is_apply_patch` as a method on `CommandInvocation` rather
-  than moving to a separate module. Rationale: The function operates solely on
-  `CommandInvocation` fields and is a natural method. `command.rs` is at 91
-  lines and has ample headroom. Date: 2026-03-07.
+- Decision: Extract `is_apply_patch` as a method on `CommandInvocation`
+  rather than moving to a separate module. Rationale: The function operates
+  solely on `CommandInvocation` fields and is a natural method. `command.rs` is
+  at 91 lines and has ample headroom. Date: 2026-03-07.
 
 - Decision: Place unit tests in a new `version_output.rs` file rather than
   adding to `bare_invocation.rs`. Rationale: The tests cover a distinct feature
@@ -141,22 +149,22 @@ Observable behaviour after this change:
   bare-invocation help. Keeping them in a dedicated file aids discoverability
   and stays within the 400-line budget for both files. Date: 2026-03-07.
 
-- Decision: Use `about` + `long_about` rather than only `long_about`. Rationale:
-  `about` shows in short help (`-h`) and subcommand listings, giving users a
-  purpose statement even in abbreviated output. `long_about` extends this with
-  quick-start examples in `--help`. Both are standard clap attributes. Date:
-  2026-03-07.
+- Decision: Use `about` + `long_about` rather than only `long_about`.
+  Rationale: `about` shows in short help (`-h`) and subcommand listings, giving
+  users a purpose statement even in abbreviated output. `long_about` extends
+  this with quick-start examples in `--help`. Both are standard clap
+  attributes. Date: 2026-03-07.
 
 ## Outcomes & retrospective
 
 All acceptance criteria are met:
 
-1. `weaver --version` and `weaver -V` both exit 0 and emit the same version
-   string (`weaver 0.1.0`) to stdout.
-1. `weaver --help` exits 0, writes to stdout, and includes a "Quick start:"
+1. `weaver --version` and `weaver -V` both exit 0 and emit the same
+   version string (`weaver 0.1.0`) to stdout.
+2. `weaver --help` exits 0, writes to stdout, and includes a "Quick start:"
    block with runnable examples including `weaver observe get-definition`.
-1. `weaver` (bare invocation) continues to exit 1 and print to stderr.
-1. `make check-fmt`, `make lint`, and `make test` all pass clean.
+3. `weaver` (bare invocation) continues to exit 1 and print to stderr.
+4. `make check-fmt`, `make lint`, and `make test` all pass clean.
 
 Line budget management was the key constraint. Extracting `is_apply_patch` to
 `command.rs` as a preparatory refactoring reclaimed 7 lines in `lib.rs` (399 to
@@ -169,21 +177,21 @@ forward-compatible.
 
 ## Context and orientation
 
-The Weaver CLI is defined in `crates/weaver-cli/`. The main clap struct lives in
-`src/cli.rs` and is parsed by `src/lib.rs`. The build script at `build.rs`
+The Weaver CLI is defined in `crates/weaver-cli/`. The main clap struct lives
+in `src/cli.rs` and is parsed by `src/lib.rs`. The build script at `build.rs`
 includes `cli.rs` via `#[path = "src/cli.rs"]` for manpage generation. This
 dual-compilation means any code in `cli.rs` must compile in both contexts.
 
-The workspace version is `0.1.0` (set in the workspace `Cargo.toml` at line 22).
-Clap's derive macro reads `CARGO_PKG_VERSION` automatically when the bare
+The workspace version is `0.1.0` (set in the workspace `Cargo.toml` at line
+22). Clap's derive macro reads `CARGO_PKG_VERSION` automatically when the bare
 `version` attribute is present in `#[command()]`.
 
 Currently, `Cli::try_parse_from()` returns `Err(clap::Error)` for both `--help`
 and `--version`. This error is wrapped in `AppError::CliUsage` and handled in
-`run_with_handler`'s match block (lib.rs lines 202-209), which writes all errors
-to stderr and returns `ExitCode::FAILURE`. The fix adds a guard that checks
-`clap_err.use_stderr()` — when false (for help and version), it writes to stdout
-and returns `ExitCode::SUCCESS`.
+`run_with_handler`'s match block (lib.rs lines 202-209), which writes all
+errors to stderr and returns `ExitCode::FAILURE`. The fix adds a guard that
+checks `clap_err.use_stderr()` — when false (for help and version), it writes
+to stdout and returns `ExitCode::SUCCESS`.
 
 Key files and their current line counts:
 
@@ -200,8 +208,8 @@ Key files and their current line counts:
 
 ### Stage A: Preparatory extraction (separate refactoring commit)
 
-Move the standalone `is_apply_patch()` function from `lib.rs` to `command.rs` as
-a method on `CommandInvocation`. This reclaims 7 lines in `lib.rs`.
+Move the standalone `is_apply_patch()` function from `lib.rs` to `command.rs`
+as a method on `CommandInvocation`. This reclaims 7 lines in `lib.rs`.
 
 **`crates/weaver-cli/src/command.rs`** — Add an `impl CommandInvocation` block:
 
@@ -220,7 +228,7 @@ impl CommandInvocation {
 
 **`crates/weaver-cli/src/lib.rs`** — Remove the standalone function
 `is_apply_patch` (lines 343-349). Update the call site in `build_request` (line
-329\) from `is_apply_patch(&invocation)` to `invocation.is_apply_patch()`.
+329) from `is_apply_patch(&invocation)` to `invocation.is_apply_patch()`.
 
 Net effect on `lib.rs`: -7 lines (399 to 392).
 
@@ -303,16 +311,18 @@ prove that version and help output short-circuit before configuration loading:
 
 1. `version_long_flag_exits_with_success` — `--version` returns
    `ExitCode::SUCCESS`.
-1. `version_short_flag_exits_with_success` — `-V` returns `ExitCode::SUCCESS`.
-1. `version_output_goes_to_stdout` — stdout contains "weaver", stderr is empty.
-1. `version_output_contains_version_number` — stdout contains
+2. `version_short_flag_exits_with_success` — `-V` returns
+   `ExitCode::SUCCESS`.
+3. `version_output_goes_to_stdout` — stdout contains "weaver", stderr is
+   empty.
+4. `version_output_contains_version_number` — stdout contains
    `env!("CARGO_PKG_VERSION")`.
-1. `version_long_and_short_produce_identical_output` — `--version` and `-V`
+5. `version_long_and_short_produce_identical_output` — `--version` and `-V`
    yield the same stdout.
-1. `help_flag_exits_with_success` — `--help` returns `ExitCode::SUCCESS`.
-1. `help_output_goes_to_stdout` — stdout contains "Usage:", stderr is empty.
-1. `help_output_contains_quick_start_example` — stdout contains "Quick start:"
-   and "weaver observe get-definition".
+6. `help_flag_exits_with_success` — `--help` returns `ExitCode::SUCCESS`.
+7. `help_output_goes_to_stdout` — stdout contains "Usage:", stderr is empty.
+8. `help_output_contains_quick_start_example` — stdout contains
+   "Quick start:" and "weaver observe get-definition".
 
 **`crates/weaver-cli/src/tests/unit.rs`** — Add `mod version_output;` (line
 398).
@@ -445,13 +455,14 @@ cargo run -p weaver-cli -- --help
 After both commits, the following must hold:
 
 1. `weaver --version` prints `weaver 0.1.0` to stdout and exits 0.
-1. `weaver -V` prints identical output to `weaver --version`.
-1. `weaver --help` prints to stdout (not stderr), exits 0, and includes "Quick
-   start:" with at least one runnable example.
-1. `weaver` (bare invocation) still exits 1 and prints to stderr (unchanged).
-1. `make check-fmt` passes.
-1. `make lint` passes.
-1. `make test` passes (including new unit, BDD, and integration tests).
+2. `weaver -V` prints identical output to `weaver --version`.
+3. `weaver --help` prints to stdout (not stderr), exits 0, and includes
+   "Quick start:" with at least one runnable example.
+4. `weaver` (bare invocation) still exits 1 and prints to stderr
+   (unchanged).
+5. `make check-fmt` passes.
+6. `make lint` passes.
+7. `make test` passes (including new unit, BDD, and integration tests).
 
 Quality criteria:
 
@@ -484,10 +495,11 @@ Existing reusable code:
 - `PanickingLoader` pattern from
   `crates/weaver-cli/src/tests/unit/bare_invocation.rs` — reused for the new
   version output unit tests.
-- BDD step definitions in `crates/weaver-cli/src/tests/behaviour.rs` — all steps
-  needed by the new feature file already exist.
-- `run_with_loader()` from `crates/weaver-cli/src/lib.rs:353` — used by unit
-  tests to exercise the CLI without a real binary.
+- BDD step definitions in
+  `crates/weaver-cli/src/tests/behaviour.rs` — all steps needed by the new
+  feature file already exist.
+- `run_with_loader()` from `crates/weaver-cli/src/lib.rs:353` — used by
+  unit tests to exercise the CLI without a real binary.
 
 ## File change summary
 
@@ -509,15 +521,14 @@ to workspace root.
 
 ## Commit sequence
 
-1. **Refactoring commit:** "Extract is_apply_patch to CommandInvocation method"
-
+1. **Refactoring commit:** "Extract is_apply_patch to CommandInvocation
+   method"
    - Moves function from `lib.rs` to `command.rs`.
    - No behaviour change.
    - Must pass all quality gates.
 
-1. **Feature commit:** "Add --version/-V support and long_about quick-start
+2. **Feature commit:** "Add --version/-V support and long_about quick-start
    block"
-
    - `cli.rs`: `version`, `about`, `long_about` attributes.
    - `lib.rs`: exit-code fix for informational clap errors.
    - New unit tests, BDD tests, integration tests.

@@ -19,10 +19,10 @@ file, and `--config-path` flag are all defined next to the struct, so every
 consumer shares the same generated loader without bespoke builders.
 
 The `ortho_config` v0.8.0 loader preserves the stricter discovery and parsing
-model adopted in earlier releases: if any discovered configuration file fails to
-parse, `ConfigDiscovery::load_first` returns an aggregated `OrthoError`. Both
-the CLI and daemon bubble that error to the user instead of quietly falling back
-to defaults, making misconfigurations immediately visible.
+model adopted in earlier releases: if any discovered configuration file fails
+to parse, `ConfigDiscovery::load_first` returns an aggregated `OrthoError`.
+Both the CLI and daemon bubble that error to the user instead of quietly
+falling back to defaults, making misconfigurations immediately visible.
 
 Configuration is layered with `ortho_config`, producing the precedence order
 `defaults < files < environment < CLI`. File discovery honours `--config-path`
@@ -57,8 +57,8 @@ The `observe get-card` path is optimized around two shared resources in
   `SupportedLanguage`.
 
 `TreeSitterCardExtractor` composes both resources. In production the daemon
-constructs one extractor and reuses it across requests so cards and parsers stay
-warm across repeated lookups.
+constructs one extractor and reuses it across requests so cards and parsers
+stay warm across repeated lookups.
 
 ### `CardCache` design
 
@@ -249,14 +249,14 @@ pooling, and language-specific extraction together.
 The cache-aware `extract_shared(...)` flow is:
 
 1. Detect `SupportedLanguage` from the request path.
-1. Build a `CardCacheKey` from path, source, detail, and cursor position.
-1. Probe the cache with `peek_shared(...)`.
-1. On a hit, record a cache hit and return the shared card immediately.
-1. On a miss, acquire `lock_population(&cache_key)` so only one thread fills
+2. Build a `CardCacheKey` from path, source, detail, and cursor position.
+3. Probe the cache with `peek_shared(...)`.
+4. On a hit, record a cache hit and return the shared card immediately.
+5. On a miss, acquire `lock_population(&cache_key)` so only one thread fills
    that key.
-1. Re-check the cache with `get_shared(...)` in case another thread won the race
-   while the current thread was waiting.
-1. Parse through `ParserRegistry`, build the card, invalidate stale revisions,
+6. Re-check the cache with `get_shared(...)` in case another thread won the
+   race while the current thread was waiting.
+7. Parse through `ParserRegistry`, build the card, invalidate stale revisions,
    and insert the new shared card into `CardCache`.
 
 Example:
@@ -283,10 +283,10 @@ assert_eq!(card.symbol.name, "greet");
 # Ok::<(), weaver_cards::CardExtractionError>(())
 ```
 
-The plain `extract(...)` method remains available for callers that want an owned
-`SymbolCard`, but the daemon and other long-lived services should prefer shared
-resources and `extract_shared(...)` so cache hits do not pay for extra deep
-clones.
+The plain `extract(...)` method remains available for callers that want an
+owned `SymbolCard`, but the daemon and other long-lived services should prefer
+shared resources and `extract_shared(...)` so cache hits do not pay for extra
+deep clones.
 
 ## Graph-slice request parsing architecture
 
@@ -294,29 +294,30 @@ The `observe graph-slice` request parsing pipeline lives in
 `crates/weaver-cards/src/graph_slice/` and is split across three internal
 modules:
 
-- `request.rs` — public schema types (`GraphSliceRequest`, `SliceDirection`,
-  `SliceEdgeType`, `GraphSliceError`) and the
+- `request.rs` — public schema types (`GraphSliceRequest`,
+  `SliceDirection`, `SliceEdgeType`, `GraphSliceError`) and the
   `GraphSliceRequest::parse(&[String])` entry point.
-- `parse.rs` — the `RequestBuilder` accumulator and `Flag` enum that drives the
-  flag-dispatch loop.
-- `parse_helpers.rs` — value-level parsing functions that validate and convert
-  raw string arguments into typed values.
+- `parse.rs` — the `RequestBuilder` accumulator and `Flag` enum that
+  drives the flag-dispatch loop.
+- `parse_helpers.rs` — value-level parsing functions that validate and
+  convert raw string arguments into typed values.
 
 ### `RequestBuilder` accumulator pattern
 
-`RequestBuilder` is a private struct with `Option<T>` fields for every flag. The
-parse flow is:
+`RequestBuilder` is a private struct with `Option<T>` fields for every flag.
+The parse flow is:
 
-1. `GraphSliceRequest::parse(args)` creates an empty `RequestBuilder` and
-   iterates over `args` using a `Peekable` iterator.
-1. Each `--flag` token is dispatched through `try_apply_known_flag(flag, iter)`,
-   which delegates to `try_apply_traversal_flag`, `try_apply_budget_flag`, and
+1. `GraphSliceRequest::parse(args)` creates an empty `RequestBuilder`
+   and iterates over `args` using a `Peekable` iterator.
+2. Each `--flag` token is dispatched through
+   `try_apply_known_flag(flag, iter)`, which delegates to
+   `try_apply_traversal_flag`, `try_apply_budget_flag`, and
    `try_apply_detail_flag` in order.
-1. Each sub-dispatcher calls `require_arg_value(iter, Flag::*)` to consume the
-   next token, then passes the resulting `RawValue` to a typed parser (e.g.
-   `parse_uri`, `parse_position`, `parse_u32`).
-1. After all tokens are consumed, `build()` resolves defaults for missing fields
-   and constructs the final `GraphSliceRequest`.
+3. Each sub-dispatcher calls `require_arg_value(iter, Flag::*)` to
+   consume the next token, then passes the resulting `RawValue` to a typed
+   parser (e.g. `parse_uri`, `parse_position`, `parse_u32`).
+4. After all tokens are consumed, `build()` resolves defaults for
+   missing fields and constructs the final `GraphSliceRequest`.
 
 Unknown flags return `GraphSliceError::UnknownFlag`. Bare positional tokens
 return `GraphSliceError::UnknownArgument`.
@@ -331,8 +332,8 @@ produce the `--flag-name` string for error messages and `Into<String>` for
 ### `parse_helpers` module
 
 `parse_helpers.rs` contains pure parsing functions that accept a `RawValue` (a
-flag–value pair) and return a typed result or `GraphSliceError`. The key helpers
-are:
+flag–value pair) and return a typed result or `GraphSliceError`. The key
+helpers are:
 
 - `require_arg_value` — consumes the next iterator token, rejecting
   `--`-prefixed tokens as missing values.
@@ -340,14 +341,15 @@ are:
 - `parse_position` — splits `LINE:COL` and validates 1-indexed values.
 - `parse_u32` — parses a non-negative integer.
 - `parse_direction` — delegates to `SliceDirection::from_str`.
-- `parse_edge_types` — splits a comma-separated list and parses each token into
-  a `SliceEdgeType`.
-- `parse_confidence` — parses a float and validates the `[0.0, 1.0]` range.
+- `parse_edge_types` — splits a comma-separated list and parses each
+  token into a `SliceEdgeType`.
+- `parse_confidence` — parses a float and validates the `[0.0, 1.0]`
+  range.
 - `parse_detail` — delegates to `DetailLevel::from_str`.
 
-Each helper produces a `GraphSliceError::InvalidValue` with the originating flag
-name and a descriptive message on failure, so callers do not need to format
-error context themselves.
+Each helper produces a `GraphSliceError::InvalidValue` with the originating
+flag name and a descriptive message on failure, so callers do not need to
+format error context themselves.
 
 ## Test infrastructure for rename-symbol coverage
 
@@ -357,13 +359,13 @@ The `weaver-plugins` crate exposes shared contract fixtures behind the
 `test-support` Cargo feature. Activate it in a crate's `[dev-dependencies]` to
 access:
 
-- `RenameSymbolFixture<T>` — a generic fixture carrying a name, a typed payload
-  (`PluginRequest` or `PluginResponse`), and an optional expected error-message
-  fragment.
+- `RenameSymbolFixture<T>` — a generic fixture carrying a name, a typed
+  payload (`PluginRequest` or `PluginResponse`), and an optional expected
+  error-message fragment.
 - `RenameSymbolRequestFixture` / `RenameSymbolResponseFixture` — type aliases
   for the request and response sides of the contract.
-- `rename_symbol_request_fixtures()` / `rename_symbol_response_fixtures()` — the
-  canonical fixture collections consumed by plugin contract tests.
+- `rename_symbol_request_fixtures()` / `rename_symbol_response_fixtures()` —
+  the canonical fixture collections consumed by plugin contract tests.
 - `rename_symbol_request_fixture_named(name)` /
   `rename_symbol_response_fixture_named(name)` — look up a single named request
   or response fixture by key and panic when the requested fixture name is
@@ -411,8 +413,8 @@ daemon.join();
 ```
 
 Pass `endpoint()` to the `--daemon-socket` flag of the `weaver` binary under
-test. Call `join()` after the CLI exits to assert that the background thread did
-not panic.
+test. Call `join()` after the CLI exits to assert that the background thread
+did not panic.
 
 ### Request-routing helpers (`weaver-e2e/tests/test_support/refactor_routing.rs`)
 
@@ -425,9 +427,10 @@ produce capability-resolution payloads:
 - `argument_value(arguments, "--file")` — returns the value paired with a flag
   from that flat argument vector, normalizing access to values such as
   `Some("src/main.py")`.
-- `language_for_extension(&Path)` — maps `.py` → `"python"`, `.rs` → `"rust"`.
-- `automatic_resolution_payload(&Path)` — builds the `stderr` JSON for automatic
-  provider selection.
+- `language_for_extension(&Path)` — maps `.py` → `"python"`, `.rs` →
+  `"rust"`.
+- `automatic_resolution_payload(&Path)` — builds the `stderr` JSON for
+  automatic provider selection.
 - `provider_mismatch_payload(&Path, RequestedProvider)` — builds the `stderr`
   JSON for an explicit-provider mismatch refusal.
 - `write_refactor_response(writer, Operation, arguments, renamed_symbol)` —

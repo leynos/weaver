@@ -21,8 +21,8 @@ The repository layout is designed to:
 - support testability and deterministic quality gates, and
 - make planned work discoverable without obscuring implemented ownership.
 
-In this document, Language Server Protocol (LSP) and Continuous Integration (CI)
-are expanded here and then used by acronym in later sections.
+In this document, Language Server Protocol (LSP) and Continuous Integration
+(CI) are expanded here and then used by acronym in later sections.
 
 ## Top-level structure
 

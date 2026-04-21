@@ -2,9 +2,9 @@
 
 ## Summary
 
-Wire End-to-End (E2E) domain command execution from command-line interface (CLI)
-through daemon to backend, starting with `observe get-definition` as the first
-complete path.
+Wire End-to-End (E2E) domain command execution from command-line interface
+(CLI) through daemon to backend, starting with `observe get-definition` as the
+first complete path.
 
 **Acceptance Criteria:**
 
@@ -27,22 +27,22 @@ ______________________________________________________________________
    success responses. The CLI already handles both streams; daemon currently
    only uses stderr.
 
-1. **Backend wiring**: The `DispatchConnectionHandler` will receive a shared
+2. **Backend wiring**: The `DispatchConnectionHandler` will receive a shared
    reference to `FusionBackends` containing a `SemanticBackendProvider` that
    manages the `LspHost`. This avoids tight coupling between router and LSP.
 
-1. **Argument format**: Follow users-guide.md convention:
+3. **Argument format**: Follow users-guide.md convention:
    `--uri file:///path.rs --position 10:5`. Position uses `LINE:COL` format
    (1-indexed for user-facing, converted to 0-indexed for LSP).
 
-1. **Language inference**: Derive language from URI file extension: `.rs` →
-   Rust, `.py` → Python, `.ts`/`.tsx` → TypeScript. Unknown extensions return a
-   structured error.
+4. **Language inference**: Derive language from URI file extension:
+   `.rs` → Rust, `.py` → Python, `.ts`/`.tsx` → TypeScript. Unknown extensions
+   return a structured error.
 
-1. **Response format**: JSON payload per users-guide.md:
+5. **Response format**: JSON payload per users-guide.md:
    `{"uri":"<URI>","line":42,"column":17}` for each definition location.
 
-1. **Error propagation**: New `DispatchError` variants for argument validation,
+6. **Error propagation**: New `DispatchError` variants for argument validation,
    backend startup failures, and LSP host errors. All return exit status 1.
 
 ______________________________________________________________________

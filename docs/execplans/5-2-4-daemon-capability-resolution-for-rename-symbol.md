@@ -1,8 +1,9 @@
 # Implement daemon capability resolution for `rename-symbol`
 
-This ExecPlan (execution plan) is a living document. The sections `Constraints`,
-`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
-and `Outcomes & Retrospective` must be kept up to date as work proceeds.
+This ExecPlan (execution plan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+proceeds.
 
 Status: COMPLETE
 
@@ -24,42 +25,42 @@ The user-visible outcome is that `weaver act refactor --refactoring rename`
 selects the correct provider for supported languages even when `--provider` is
 omitted, while an explicit `--provider` remains available as a compatibility
 override for now. Routing outcomes become deterministic for success, fallback,
-and refusal cases, and every routing decision is emitted with a machine-readable
-rationale so tests and future tooling can inspect why a provider was selected or
-refused.
+and refusal cases, and every routing decision is emitted with a
+machine-readable rationale so tests and future tooling can inspect why a
+provider was selected or refused.
 
 Observable success for the eventual implementation:
 
-- Running the Python flow without `--provider` selects `rope` for a `*.py`
-  target and still applies the returned diff through the existing Double-Lock
-  path.
+- Running the Python flow without `--provider` selects `rope` for a
+  `*.py` target and still applies the returned diff through the existing
+  Double-Lock path.
 - Running the Rust flow without `--provider` selects `rust-analyzer` for a
   `*.rs` target and still applies the returned diff through the existing
   Double-Lock path.
 - Running the command against an unsupported language or an incompatible
   explicit provider exits non-zero with a deterministic structured refusal.
 - JavaScript Object Notation (JSON) mode exposes a machine-readable
-  capability-resolution payload that includes at least the requested capability,
-  inferred language, selected or refused provider, selection mode, and candidate
-  evaluation reasons.
+  capability-resolution payload that includes at least the requested
+  capability, inferred language, selected or refused provider, selection mode,
+  and candidate evaluation reasons.
 - Human-readable mode does not degrade into raw JSON noise; any new structured
-  routing payload is either rendered cleanly by the command-line interface (CLI)
-  or otherwise surfaced in a deliberate, documented form.
-- `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md` reflect
-  the shipped behaviour once implementation is complete.
+  routing payload is either rendered cleanly by the command-line interface
+  (CLI) or otherwise surfaced in a deliberate, documented form.
+- `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
+  reflect the shipped behaviour once implementation is complete.
 
 ## Constraints
 
 - The `rename-symbol` capability contract defined in
-  `crates/weaver-plugins/src/capability/` is already complete. This roadmap item
-  resolves providers in the daemon; it must not redefine the contract schema
-  introduced by 5.2.1.
+  `crates/weaver-plugins/src/capability/` is already complete. This roadmap
+  item resolves providers in the daemon; it must not redefine the contract
+  schema introduced by 5.2.1.
 - Keep the CLI command shape stable. `--refactoring rename`, `offset`, and
   `new_name` remain the operator-facing inputs. `--provider` may become
   optional, but it must not be removed in 5.2.4 because 5.2.6 is the roadmap
   item that deprecates legacy provider-specific paths.
-- Preserve synchronous execution. Do not introduce async runtimes, async traits,
-  or background work queues.
+- Preserve synchronous execution. Do not introduce async runtimes, async
+  traits, or background work queues.
 - Preserve the existing safety-critical commit path. Successful plugin output
   must continue to flow through `act apply-patch` and the Double-Lock safety
   harness.
@@ -85,8 +86,8 @@ Observable success for the eventual implementation:
 
 ## Tolerances (exception triggers)
 
-- Scope: if implementation requires changes to more than 14 files or roughly 800
-  net lines, stop and escalate.
+- Scope: if implementation requires changes to more than 14 files or roughly
+  800 net lines, stop and escalate.
 - Interface: if satisfying the acceptance criteria requires a breaking change to
   the public `weaver-cli` command syntax or to the public `weaver-plugins`
   request/response contract, stop and escalate.
@@ -106,8 +107,8 @@ Observable success for the eventual implementation:
 ## Risks
 
 - Risk: the current runtime abstraction takes a provider name directly, which
-  means capability resolution cannot be inserted cleanly without refactoring the
-  internal seam between the handler and the sandbox runner. Severity: high
+  means capability resolution cannot be inserted cleanly without refactoring
+  the internal seam between the handler and the sandbox runner. Severity: high
   Likelihood: high Mitigation: introduce a dedicated resolution type and split
   "resolve" from "execute" inside `crates/weaverd/src/dispatch/act/refactor/`.
 
@@ -121,10 +122,10 @@ Observable success for the eventual implementation:
   unsupported-language path explicit and deterministic rather than guessing;
   cover it with both unit and BDD tests.
 
-- Risk: `crates/weaverd/src/dispatch/act/refactor/tests.rs` already violates the
-  stated 400-line limit, so adding more routing assertions there would worsen
-  repository health. Severity: medium Likelihood: high Mitigation: split the
-  unit tests into focused modules before adding new routing coverage.
+- Risk: `crates/weaverd/src/dispatch/act/refactor/tests.rs` already violates
+  the stated 400-line limit, so adding more routing assertions there would
+  worsen repository health. Severity: medium Likelihood: high Mitigation: split
+  the unit tests into focused modules before adding new routing coverage.
 
 - Risk: there is currently no dedicated plugin-routing policy surface in
   `weaver-config`. Severity: medium Likelihood: medium Mitigation: start with a
@@ -134,21 +135,21 @@ Observable success for the eventual implementation:
 
 ## Progress
 
-- [x] (2026-03-11) Reviewed `AGENTS.md`, the roadmap entry, the execplans skill,
-  and project memory notes relevant to plugin routing and test gates.
+- [x] (2026-03-11) Reviewed `AGENTS.md`, the roadmap entry, the execplans
+  skill, and project memory notes relevant to plugin routing and test gates.
 - [x] (2026-03-11) Inspected the current `act refactor` handler, plugin
   manifests, plugin registry, CLI daemon-output protocol, and prior 5.2.1 to
   5.2.3 ExecPlans.
 - [x] (2026-03-11) Drafted this ExecPlan.
 - [x] (2026-03-13) Obtained approval for this ExecPlan.
-- [x] (2026-03-13) Extracted the refactor routing and tests into focused modules
-  that keep the handler within the repository line-budget rule.
+- [x] (2026-03-13) Extracted the refactor routing and tests into focused
+  modules that keep the handler within the repository line-budget rule.
 - [x] (2026-03-13) Implemented deterministic `rename-symbol` capability
   resolution in `weaverd`.
 - [x] (2026-03-13) Emitted machine-readable routing rationale and updated the
   CLI human renderer.
-- [x] (2026-03-13) Added unit and `rstest-bdd` behavioural coverage for success,
-  refusal, and override paths.
+- [x] (2026-03-13) Added unit and `rstest-bdd` behavioural coverage for
+  success, refusal, and override paths.
 - [x] (2026-03-13) Updated `docs/weaver-design.md` and `docs/users-guide.md`
   with the shipped behaviour and rationale format.
 - [x] (2026-03-13) Ran `make fmt`, `make markdownlint`, `make nixie`,
@@ -163,10 +164,10 @@ Observable success for the eventual implementation:
   resolution, not capability-contract translation.
 
 - Discovery: the daemon runtime seam is currently
-  `RefactorPluginRuntime::execute(&self, provider, request)`. Because it accepts
-  a provider string directly, the resolver must either run before the runtime
-  call or the runtime abstraction must be split into resolution and execution
-  phases.
+  `RefactorPluginRuntime::execute(&self, provider, request)`. Because it
+  accepts a provider string directly, the resolver must either run before the
+  runtime call or the runtime abstraction must be split into resolution and
+  execution phases.
 
 - Discovery: the daemon response envelope only has `stream` and `exit` message
   kinds today, and the CLI only understands those two. Machine-readable routing
@@ -174,13 +175,13 @@ Observable success for the eventual implementation:
   deliberate structured payload inside the existing stream channel.
 
 - Discovery: there is no existing config field in `weaver-config` for
-  refactor-plugin routing policy. The only current policy-like config surface is
-  the Language Server Protocol (LSP) capability matrix, which is unrelated to
-  plugin selection.
+  refactor-plugin routing policy. The only current policy-like config surface
+  is the Language Server Protocol (LSP) capability matrix, which is unrelated
+  to plugin selection.
 
-- Discovery: `crates/weaverd/src/dispatch/act/refactor/tests.rs` is already 419
-  lines long, so test growth must begin with a split rather than more in-place
-  additions.
+- Discovery: `crates/weaverd/src/dispatch/act/refactor/tests.rs` is already
+  419 lines long, so test growth must begin with a split rather than more
+  in-place additions.
 
 ## Decision Log
 
@@ -189,29 +190,29 @@ Observable success for the eventual implementation:
   rust-analyzer manifest/runtime handshake pieces; the remaining gap is that
   `weaverd` still trusts a raw `--provider` argument. Date: 2026-03-11.
 
-- Decision: preserve `--provider` as an explicit compatibility override in 5.2.4
-  while making daemon-driven selection the default when it is omitted.
+- Decision: preserve `--provider` as an explicit compatibility override in
+  5.2.4 while making daemon-driven selection the default when it is omitted.
   Rationale: this satisfies the roadmap's requirement for language-aware,
   policy-driven selection without pre-empting the later migration and
   deprecation work in 5.2.6. Date: 2026-03-11.
 
 - Decision: introduce a first-class resolution result type that captures both
-  the selected provider and the reasoning used to reach that outcome. Rationale:
-  deterministic routing and machine-readable rationale are easier to test and
-  document when they are represented as data rather than reconstructed from log
-  strings. Date: 2026-03-11.
+  the selected provider and the reasoning used to reach that outcome.
+  Rationale: deterministic routing and machine-readable rationale are easier to
+  test and document when they are represented as data rather than reconstructed
+  from log strings. Date: 2026-03-11.
 
 - Decision: prefer an additive daemon/CLI payload for routing rationale over
   prose-only stderr. Rationale: the acceptance criteria explicitly require
-  machine-readable rationale, and the CLI already has a rendering layer that can
-  be extended to keep human output usable. Date: 2026-03-11.
+  machine-readable rationale, and the CLI already has a rendering layer that
+  can be extended to keep human output usable. Date: 2026-03-11.
 
 ## Context and orientation
 
-The relevant code lives under `crates/weaverd/src/dispatch/act/refactor/`. Today
-the handler parses `--provider`, `--refactoring`, and `--file`, reads the target
-file, rewrites `rename` into `rename-symbol`, and then calls the runtime with
-the operator-supplied provider string. The runtime is backed by
+The relevant code lives under `crates/weaverd/src/dispatch/act/refactor/`.
+Today the handler parses `--provider`, `--refactoring`, and `--file`, reads the
+target file, rewrites `rename` into `rename-symbol`, and then calls the runtime
+with the operator-supplied provider string. The runtime is backed by
 `PluginRunner<SandboxExecutor>` and registers two actuator manifests through
 `manifests.rs`:
 
@@ -225,9 +226,8 @@ The plugin registry already supports the lookups needed for resolution:
 The current missing pieces are:
 
 - There is no language inference step for `act refactor`.
-- There is no policy object that turns
-  `(capability, language, explicit provider?)` into a deterministic provider
-  choice or refusal.
+- There is no policy object that turns `(capability, language, explicit
+  provider?)` into a deterministic provider choice or refusal.
 - There is no structured rationale payload for that decision.
 - The CLI does not yet know how to render such a payload cleanly.
 
@@ -238,8 +238,8 @@ The likely files touched by implementation are:
 - one or more new sibling modules such as
   `crates/weaverd/src/dispatch/act/refactor/resolution.rs` and
   `crates/weaverd/src/dispatch/act/refactor/rationale.rs`
-- `crates/weaverd/src/dispatch/act/refactor/tests.rs`, likely split into smaller
-  modules
+- `crates/weaverd/src/dispatch/act/refactor/tests.rs`, likely split into
+  smaller modules
 - `crates/weaverd/src/dispatch/act/refactor/behaviour.rs`
 - `crates/weaverd/tests/features/refactor.feature` or a new focused feature file
 - `crates/weaverd/src/dispatch/response.rs`
@@ -258,10 +258,10 @@ Start by making room for the work. `mod.rs` is already at 398 lines and the
 unit-test file is already over the repository's line budget. Extract the new
 routing logic into focused modules before adding behaviour:
 
-- Move capability-resolution types and helpers into a new sibling module such as
-  `resolution.rs`.
-- Split the refactor unit tests into smaller modules, for example one module for
-  request-shape tests and one for routing-policy tests.
+- Move capability-resolution types and helpers into a new sibling module such
+  as `resolution.rs`.
+- Split the refactor unit tests into smaller modules, for example one module
+  for request-shape tests and one for routing-policy tests.
 - Keep `manifests.rs` as the manifest-construction home; do not re-expand
   manifest code back into `mod.rs`.
 
@@ -271,8 +271,8 @@ execute the selected plugin, and forward diff output.
 
 ### Milestone 2: Implement deterministic `rename-symbol` resolution
 
-Introduce a data model that the handler and tests can reason about directly. The
-names may vary, but the plan expects three concepts:
+Introduce a data model that the handler and tests can reason about directly.
+The names may vary, but the plan expects three concepts:
 
 - A resolution input value, containing:
   - the effective capability (`rename-symbol`)
@@ -341,8 +341,8 @@ Two implementation rules matter here:
 - The payload must be emitted for both successful selection and deterministic
   refusal.
 - Human mode must remain readable. If the daemon adds a new message kind or a
-  new structured stream payload, update the CLI reader and human renderer in the
-  same change so users do not see unexplained JSON blobs.
+  new structured stream payload, update the CLI reader and human renderer in
+  the same change so users do not see unexplained JSON blobs.
 
 ### Milestone 4: Wire the selected provider into plugin execution
 
@@ -358,8 +358,8 @@ Once resolution exists, use it to drive plugin execution:
 
 If the current `RefactorPluginRuntime` trait cannot support this cleanly, split
 it into resolution and execution methods or introduce a new internal runtime
-input type. This is an internal seam, so refactoring it is acceptable as long as
-the operator-facing CLI and the plugin protocol remain stable.
+input type. This is an internal seam, so refactoring it is acceptable as long
+as the operator-facing CLI and the plugin protocol remain stable.
 
 ### Milestone 5: Add tests that prove selection, refusal, and rationale
 
@@ -393,13 +393,15 @@ readable. Do not keep growing one giant behaviour file.
 
 Once the implementation and tests are green, update the docs in the same change:
 
-- `docs/weaver-design.md` Record the final daemon-side routing policy, the
-  rationale payload shape, and any compatibility decision about `--provider`.
-- `docs/users-guide.md` Explain that `rename` routing is now language-aware,
-  describe whether `--provider` is optional or override-only, show at least one
-  provider-less example, and document the structured rationale visible in JSON
-  mode.
-- `docs/roadmap.md` Mark 5.2.4 as done only after all tests and gates pass.
+- `docs/weaver-design.md`
+  Record the final daemon-side routing policy, the rationale payload shape, and
+  any compatibility decision about `--provider`.
+- `docs/users-guide.md`
+  Explain that `rename` routing is now language-aware, describe whether
+  `--provider` is optional or override-only, show at least one provider-less
+  example, and document the structured rationale visible in JSON mode.
+- `docs/roadmap.md`
+  Mark 5.2.4 as done only after all tests and gates pass.
 
 ## Validation
 
@@ -416,8 +418,8 @@ set -o pipefail; make lint 2>&1 | tee /tmp/5-2-4-lint.log
 set -o pipefail; make test 2>&1 | tee /tmp/5-2-4-test.log
 ```
 
-In addition to the full gates, capture the most relevant targeted evidence while
-iterating:
+In addition to the full gates, capture the most relevant targeted evidence
+while iterating:
 
 ```sh
 cargo test -p weaverd dispatch::act::refactor -- --nocapture
@@ -444,11 +446,13 @@ Routing rationale now ships as a structured `CapabilityResolution` envelope on
 the existing daemon stream. The payload includes the requested capability,
 inferred language when known, optional requested provider, optional selected
 provider, selection mode, outcome, stable refusal code, and
-candidate-by-candidate reason codes. `weaver-cli` preserves that payload in JSON
-mode and renders the same information as concise routing text in human mode.
+candidate-by-candidate reason codes. `weaver-cli` preserves that payload in
+JSON mode and renders the same information as concise routing text in human
+mode.
 
 The implementation is proven by unit routing tests, request-contract tests, and
-behavioural scenarios covering automatic Python routing, automatic Rust routing,
-unsupported-language refusal, and explicit provider mismatch refusal. Follow-on
-work intentionally deferred to roadmap items 5.2.5 and 5.2.6: broader end-to-end
-coverage and migration/deprecation guidance for legacy provider-specific paths.
+behavioural scenarios covering automatic Python routing, automatic Rust
+routing, unsupported-language refusal, and explicit provider mismatch refusal.
+Follow-on work intentionally deferred to roadmap items 5.2.5 and 5.2.6: broader
+end-to-end coverage and migration/deprecation guidance for legacy
+provider-specific paths.

@@ -1,21 +1,22 @@
 # OrthoConfig user's guide
 
-`OrthoConfig` is a Rust library that unifies command‑line arguments, environment
-variables and configuration files into a single, strongly typed configuration
-struct. It is inspired by tools such as `esbuild` and is designed to minimize
-boiler‑plate. The library uses `serde` for deserialization and `clap` for
-argument parsing, while `figment` provides layered configuration management.
-This guide covers the functionality currently implemented in the repository.
+`OrthoConfig` is a Rust library that unifies command‑line arguments,
+environment variables and configuration files into a single, strongly typed
+configuration struct. It is inspired by tools such as `esbuild` and is designed
+to minimize boiler‑plate. The library uses `serde` for deserialization and
+`clap` for argument parsing, while `figment` provides layered configuration
+management. This guide covers the functionality currently implemented in the
+repository.
 
 ## Core concepts and motivation
 
 Rust projects often wire together `clap` for CLI parsing, `serde` for
 de/serialization, and ad‑hoc code for loading `*.toml` files or reading
 environment variables. Mapping between different naming conventions (kebab‑case
-flags, `UPPER_SNAKE_CASE` environment variables, and `snake_case` struct fields)
-can be tedious. `OrthoConfig` addresses these problems by letting developers
-describe their configuration once and then automatically loading values from
-multiple sources. The core features are:
+flags, `UPPER_SNAKE_CASE` environment variables, and `snake_case` struct
+fields) can be tedious. `OrthoConfig` addresses these problems by letting
+developers describe their configuration once and then automatically loading
+values from multiple sources. The core features are:
 
 - **Layered configuration** – Configuration values can come from application
   defaults, configuration files, environment variables and command‑line
@@ -35,21 +36,20 @@ multiple sources. The core features are:
   configuration struct and call a generated method to load the configuration.
 
 - **Customizable behaviour** – Attributes such as `default`, `cli_long`,
-  `cli_short`, and `merge_strategy` provide fine‑grained control over naming and
-  merging behaviour.
-
+  `cli_short`, and `merge_strategy` provide fine‑grained control over naming
+  and merging behaviour.
 - **Declarative merge tooling** – Every configuration struct exposes a
   `merge_from_layers` helper along with `MergeComposer`, making it simple to
-  compose defaults, files, environment captures, and CLI values in unit tests or
-  bespoke loaders without instantiating the CLI parser. Vector fields honour the
-  append strategy by default, so defaults flow through alongside environment and
-  CLI additions.
+  compose defaults, files, environment captures, and CLI values in unit tests
+  or bespoke loaders without instantiating the CLI parser. Vector fields honour
+  the append strategy by default, so defaults flow through alongside
+  environment and CLI additions.
 
 The workspace bundles an executable Hello World example under
-`examples/hello_world`. It layers defaults, environment variables, and CLI flags
-via the derive macro; see its
+`examples/hello_world`. It layers defaults, environment variables, and CLI
+flags via the derive macro; see its
 [README](https://github.com/leynos/ortho-config/blob/v0.8.0/examples/hello_world/README.md)
-for a step-by-step walkthrough and the `rstest-bdd` (Behaviour-Driven
+ for a step-by-step walkthrough and the `rstest-bdd` (Behaviour-Driven
 Development) scenarios that validate behaviour end-to-end.
 
 Run `make test` to execute the example’s coverage. The unit suite uses `rstest`
@@ -135,10 +135,11 @@ making it trivial to drive unit and behavioural tests with hand-crafted layers.
 `Vec<_>` fields accumulate values from each layer in order, so defaults can
 coexist with environment or CLI extensions. The Hello World example’s
 behavioural suite includes a dedicated scenario that parses JSON descriptors
-into `MergeLayer` values and asserts the merged configuration via these helpers.
-Unit tests can mirror this approach with `rstest` fixtures: define fixtures for
-default payloads, then enumerate cases for file, environment, and CLI layers.
-This validates every precedence permutation without copy-pasting setup.
+into `MergeLayer` values and asserts the merged configuration via these
+helpers. Unit tests can mirror this approach with `rstest` fixtures: define
+fixtures for default payloads, then enumerate cases for file, environment, and
+CLI layers. This validates every precedence permutation without copy-pasting
+setup.
 
 Every derived configuration also exposes `compose_layers()` and
 `compose_layers_from_iter(...)`. These helpers discover configuration files,
@@ -288,18 +289,18 @@ ortho_config = { version = "0.8.0", features = ["json5", "yaml"] }
 # Enabling these features expands file formats; precedence stays: defaults < file < env < CLI.
 ```
 
-Enabling the `json5` feature causes both `.json` and `.json5` files to be parsed
-using the JSON5 format. Without this feature, these files are ignored during
-discovery and do not cause errors if present. The `yaml` feature similarly
-enables `.yaml` and `.yml` files; without it, such files are skipped during
-discovery and do not cause errors if present.
+Enabling the `json5` feature causes both `.json` and `.json5` files to be
+parsed using the JSON5 format. Without this feature, these files are ignored
+during discovery and do not cause errors if present. The `yaml` feature
+similarly enables `.yaml` and `.yml` files; without it, such files are skipped
+during discovery and do not cause errors if present.
 
 `ortho_config` re-exports its parsing dependencies, so consumers do not need to
 declare them directly. Access `figment`, `uncased`, `xdg` (on Unix-like and
 Redox targets), and the optional parsers (`figment_json5`, `json5`,
 `serde_saphyr`, `toml`) via `ortho_config::` paths. The `serde_json` re-export
-is enabled by default because the crate relies on it internally; disable default
-features only when explicitly opting back into `serde_json`.
+is enabled by default because the crate relies on it internally; disable
+default features only when explicitly opting back into `serde_json`.
 
 ### Dependency architecture for derive macro users
 
@@ -343,22 +344,22 @@ clap = { version = "4", features = ["derive"] }
 - If derive output fails with unresolved `ortho_config::...` paths, ensure the
   dependency key is named `ortho_config` in `Cargo.toml` or use the
   `#[ortho_config(crate = "...")]` attribute to specify the alias.
-- **Dependency aliasing** is supported via the `crate` attribute. When renaming
-  the dependency in `Cargo.toml` (for example,
+- **Dependency aliasing** is supported via the `crate` attribute. When
+  renaming the dependency in `Cargo.toml` (for example,
   `my_cfg = { package = "ortho_config", ... }`), add
-  `#[ortho_config(crate = "my_cfg")]` to the struct so generated code references
-  the correct crate path.
+  `#[ortho_config(crate = "my_cfg")]` to the struct so generated code
+  references the correct crate path.
 - If dependency resolution reports conflicts, inspect duplicates with
-  `cargo tree -d` and prefer the versions selected through `ortho_config` unless
-  direct usage requires something else.
+  `cargo tree -d` and prefer the versions selected through `ortho_config`
+  unless direct usage requires something else.
 
 ### FAQ: should `figment`, `uncased`, or `xdg` be direct dependencies?
 
 No for derive-generated code. Yes, only when application code directly imports
 those crates without going through the `ortho_config::` re-exports.
 
-YAML parsing is handled by the pure-Rust `serde-saphyr` crate. It adheres to the
-YAML 1.2 specification, so unquoted scalars such as `yes`, `on`, and `off`
+YAML parsing is handled by the pure-Rust `serde-saphyr` crate. It adheres to
+the YAML 1.2 specification, so unquoted scalars such as `yes`, `on`, and `off`
 remain strings. The provider enables `Options::strict_booleans`, ensuring only
 `true` and `false` deserialize as booleans, while legacy YAML 1.1 literals are
 treated as plain strings. Duplicate mapping keys surface as parsing errors
@@ -414,9 +415,10 @@ A configuration is represented by a plain Rust struct. To take advantage of
 - `serde::Deserialize` and `serde::Serialize` – required for deserializing
   values and merging overrides.
 
-- The derive macro generates a hidden `clap::Parser` implementation, so manual
-  `clap` annotations are not required in typical use. CLI customization is
-  performed using `ortho_config` attributes such as `cli_short`, or `cli_long`.
+- The derive macro generates a hidden `clap::Parser` implementation, so
+  manual `clap` annotations are not required in typical use. CLI customization
+  is performed using `ortho_config` attributes such as `cli_short`, or
+  `cli_long`.
 
 - `OrthoConfig` – provided by the library. This derive macro generates the code
   to load and merge configuration from multiple sources.
@@ -442,8 +444,8 @@ Field attributes modify how a field is sourced or merged:
 | `cli_default_as_absent`     | Treats typed clap defaults as absent during merging; file and environment values still beat defaults, while explicit CLI overrides still win.                                        |
 
 Unrecognized keys are ignored by the derive macro for forwards compatibility.
-Unknown keys will therefore silently do nothing. Developers who require stricter
-validation may add manual `compile_error!` guards.
+Unknown keys will therefore silently do nothing. Developers who require
+stricter validation may add manual `compile_error!` guards.
 
 Vector append buffers operate on raw JSON values, so element types only need to
 implement `serde::Deserialize`. Deriving `serde::Serialize` remains useful when
@@ -470,13 +472,13 @@ parser, and reserved characters such as clap's `-h` and `-V`. A character is
 considered taken if it matches either set.
 
 The macro does not scan other characters in the field name when deriving the
-short flag. Short flags must be single ASCII alphanumeric characters and may not
-use clap's global `-h` or `-V` options. Long flags must contain only ASCII
+short flag. Short flags must be single ASCII alphanumeric characters and may
+not use clap's global `-h` or `-V` options. Long flags must contain only ASCII
 alphanumeric characters or hyphens, must not start with `-`, cannot be named
 `help` or `version`, and the macro rejects underscores.
 
-For example, when multiple fields begin with the same character, `cli_short` can
-disambiguate the final field:
+For example, when multiple fields begin with the same character, `cli_short`
+can disambiguate the final field:
 
 ```rust
 #[derive(OrthoConfig)]
@@ -540,8 +542,8 @@ fn main() -> Result<(), OrthoError> {
 `clap` attributes are not required in general; flags are derived from field
 names and `ortho_config` attributes. In this example, the `AppConfig` struct
 uses a prefix of `APP`. The `DatabaseConfig` struct declares a prefix `DB`,
-resulting in environment variables such as `APP_DB_URL`. The `features` field is
-a `Vec<String>` and accumulates values from multiple sources rather than
+resulting in environment variables such as `APP_DB_URL`. The `features` field
+is a `Vec<String>` and accumulates values from multiple sources rather than
 overwriting them.
 
 ### Customizing configuration discovery
@@ -578,39 +580,39 @@ following steps:
 1. Builds a `figment` configuration profile. A defaults provider constructed
    from the `#[ortho_config(default = …)]` attributes is added first.
 
-1. Attempts to load a configuration file. Candidate file paths are searched in
+2. Attempts to load a configuration file. Candidate file paths are searched in
    the following order:
 
-   1. If provided, a path supplied via the CLI flag generated by the
-      `discovery(...)` attribute (which defaults to a hidden `--config-path`) or
-      the `<PREFIX>CONFIG_PATH` environment variable (for example,
-      `APP_CONFIG_PATH` or `CONFIG_PATH`) takes precedence; see
-      [Config path override](#config-path-override).
+    1. If provided, a path supplied via the CLI flag generated by the
+       `discovery(...)` attribute (which defaults to a hidden `--config-path`)
+       or the `<PREFIX>CONFIG_PATH` environment variable (for example,
+       `APP_CONFIG_PATH` or `CONFIG_PATH`) takes precedence; see
+       [Config path override](#config-path-override).
 
-   1. A dotfile named `.<prefix>.toml` in the current working directory.
+    2. A dotfile named `.<prefix>.toml` in the current working directory.
 
-   1. A dotfile of the same name in the user's home directory.
+    3. A dotfile of the same name in the user's home directory.
 
-   1. On Unix‑like systems, the XDG configuration directory (e.g.
-      `~/.config/app/config.toml`) is searched using the `xdg` crate; on
-      Windows, the `%APPDATA%` and `%LOCALAPPDATA%` directories are checked.
+    4. On Unix‑like systems, the XDG configuration directory (e.g.
+       `~/.config/app/config.toml`) is searched using the `xdg` crate; on
+       Windows, the `%APPDATA%` and `%LOCALAPPDATA%` directories are checked.
 
-   1. If the `json5` or `yaml` features are enabled, files with `.json`,
-      `.json5`, `.yaml`, or `.yml` extensions are also considered in these
-      locations.
+    5. If the `json5` or `yaml` features are enabled, files with `.json`,
+       `.json5`, `.yaml`, or `.yml` extensions are also considered in these
+       locations.
 
-1. Adds an environment provider using the prefix specified on the struct. Keys
+3. Adds an environment provider using the prefix specified on the struct. Keys
    are upper‑cased and nested fields use double underscores (`__`) to separate
    components.
 
-1. Adds a provider containing the CLI values (captured as `Option<T>` fields) as
-   the final layer.
+4. Adds a provider containing the CLI values (captured as `Option<T>` fields)
+   as the final layer.
 
-1. Merges vector fields according to the `merge_strategy` (currently only
+5. Merges vector fields according to the `merge_strategy` (currently only
    `append`) so that lists of values from lower precedence sources are extended
    with values from higher precedence ones.
 
-1. Attempts to extract the merged configuration into the concrete struct. On
+6. Attempts to extract the merged configuration into the concrete struct. On
    success it returns the completed configuration; otherwise an `OrthoError` is
    returned.
 
@@ -621,8 +623,8 @@ associated environment variables even when no explicit field is declared. By
 default a hidden `--config-path` flag is accepted alongside
 `<PREFIX>CONFIG_PATH` and the unprefixed `CONFIG_PATH`. Applying the
 struct-level `discovery(...)` attribute customizes this behaviour, allowing the
-CLI flag to be renamed or exposed and the filenames searched during discovery to
-be adjusted:
+CLI flag to be renamed or exposed and the filenames searched during discovery
+to be adjusted:
 
 ```rust
 #[derive(Debug, Deserialize, ortho_config::OrthoConfig)]
@@ -661,20 +663,20 @@ earlier ones. The precedence, from lowest to highest, is:
 1. **Application‑defined defaults** – values provided via `default` attributes
    or `Option<T>` fields are considered defaults.
 
-1. **Configuration file** – values from a TOML (or JSON5/YAML) file loaded from
+2. **Configuration file** – values from a TOML (or JSON5/YAML) file loaded from
    one of the paths listed above.
 
-1. **Environment variables** – variables prefixed with the struct's `prefix`
+3. **Environment variables** – variables prefixed with the struct's `prefix`
    (e.g. `APP_PORT`, `APP_DATABASE__URL`) override file values.
 
-1. **Command‑line arguments** – values parsed by `clap` override all other
+4. **Command‑line arguments** – values parsed by `clap` override all other
    sources.
 
-Nested structs are flattened in the environment namespace by joining field names
-with double underscores. For example, if `AppConfig` has a nested `database`
-field and the prefix is `APP`, then `APP_DATABASE__URL` sets the `database.url`
-field. If a nested struct has its own prefix attribute, that prefix is used for
-its fields (e.g. `APP_DB_URL`).
+Nested structs are flattened in the environment namespace by joining field
+names with double underscores. For example, if `AppConfig` has a nested
+`database` field and the prefix is `APP`, then `APP_DATABASE__URL` sets the
+`database.url` field. If a nested struct has its own prefix attribute, that
+prefix is used for its fields (e.g. `APP_DB_URL`).
 
 When `clap`'s `flatten` attribute is employed to compose argument groups, the
 flattened struct is initialized even if no CLI flags within the group are
@@ -684,12 +686,12 @@ field is explicitly supplied on the command line.
 
 ### Using defaults and optional fields
 
-Fields of type `Option<T>` are treated as optional values. If no source provides
-a value for an `Option<T>` field then it remains `None`. To provide a default
-value for a non‑`Option` field or for an `Option<T>` field that should have an
-initial value, specify `#[ortho_config(default = expr)]`. This default acts as
-the lowest‑precedence source and is overridden by file, environment or CLI
-values.
+Fields of type `Option<T>` are treated as optional values. If no source
+provides a value for an `Option<T>` field then it remains `None`. To provide a
+default value for a non‑`Option` field or for an `Option<T>` field that should
+have an initial value, specify `#[ortho_config(default = expr)]`. This default
+acts as the lowest‑precedence source and is overridden by file, environment or
+CLI values.
 
 ### Environment variable naming
 
@@ -701,10 +703,10 @@ example above, valid environment variables include `APP_LOG_LEVEL`, `APP_PORT`,
 own prefix (`DB`), then the environment variable becomes `APP_DB_URL`.
 
 Comma-separated values such as `DDLINT_RULES=A,B,C` are parsed as lists. The
-loader converts these strings into arrays before merging, so array fields behave
-the same across environment variables, CLI arguments and configuration files.
-Values containing literal commas must be wrapped in quotes or brackets to
-disable list parsing.
+loader converts these strings into arrays before merging, so array fields
+behave the same across environment variables, CLI arguments and configuration
+files. Values containing literal commas must be wrapped in quotes or brackets
+to disable list parsing.
 
 ## Configuration inheritance
 
@@ -722,8 +724,8 @@ when inheritance is in use.
 
 Map fields such as `BTreeMap<String, RuleConfig>` allow configuration files to
 declare arbitrary rule keys. Any table nested under `rules.<name>` is
-deserialized into the map without prior knowledge of the key names. This enables
-use cases like:
+deserialized into the map without prior knowledge of the key names. This
+enables use cases like:
 
 ```toml
 [rules.consistent-casing]
@@ -756,12 +758,12 @@ flags via the `append` merge strategy.
 ## Subcommand configuration
 
 Many CLI applications use `clap` subcommands to perform different operations.
-`OrthoConfig` supports per‑subcommand defaults via a dedicated `cmds` namespace.
-The helper function `load_and_merge_subcommand_for` loads defaults for a
-specific subcommand and merges them beneath the CLI values. The merged struct is
-returned as a new instance; the original `cli` struct remains unchanged. CLI
-fields left unset (`None`) do not override environment or file defaults,
-avoiding accidental loss of configuration.
+`OrthoConfig` supports per‑subcommand defaults via a dedicated `cmds`
+namespace. The helper function `load_and_merge_subcommand_for` loads defaults
+for a specific subcommand and merges them beneath the CLI values. The merged
+struct is returned as a new instance; the original `cli` struct remains
+unchanged. CLI fields left unset (`None`) do not override environment or file
+defaults, avoiding accidental loss of configuration.
 
 ### How it works
 
@@ -776,9 +778,9 @@ variables beginning with `PREFIX_CMDS_<SUBCOMMAND>_` are considered.
 
 ### Example
 
-Suppose an application has a `pr` subcommand that accepts a `reference` argument
-and a `repo` global option. With `OrthoConfig` the argument structures might be
-defined as follows:
+Suppose an application has a `pr` subcommand that accepts a `reference`
+argument and a `repo` global option. With `OrthoConfig` the argument structures
+might be defined as follows:
 
 ```rust
 use clap::Parser;
@@ -826,11 +828,11 @@ VK_CMDS_ISSUE_REFERENCE=https://github.com/owner/repo/issues/101
 ```
 
 Within the `vk` example repository, the global `--repo` option is provided via
-the `GlobalArgs` struct. A developer can set this globally using the environment
-variable `VK_REPO` without passing `--repo` on every invocation. Subcommands
-`pr` and `issue` load their defaults from the `cmds` namespace and environment
-variables. If the `reference` field is missing in the defaults, the tool
-continues using the CLI value instead of exiting with an error.
+the `GlobalArgs` struct. A developer can set this globally using the
+environment variable `VK_REPO` without passing `--repo` on every invocation.
+Subcommands `pr` and `issue` load their defaults from the `cmds` namespace and
+environment variables. If the `reference` field is missing in the defaults, the
+tool continues using the CLI value instead of exiting with an error.
 
 ### Merging a selected subcommand enum
 
@@ -845,8 +847,8 @@ Variants that rely on `cli_default_as_absent` (because they use
 so the merge can consult `ArgMatches` and treat clap defaults as absent.
 
 To load the global configuration and merge the selected subcommand in one
-expression, use `load_globals_and_merge_selected_subcommand` and supply a global
-loader as a closure.
+expression, use `load_globals_and_merge_selected_subcommand` and supply a
+global loader as a closure.
 
 ```rust
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
@@ -889,19 +891,19 @@ Ok(())
 
 The `hello_world` example crate demonstrates these patterns in a compact
 setting. Global options such as `--recipient` or `--salutation` are resolved by
-`load_global_config`, which now reuses `HelloWorldCli::compose_layers_from_iter`
-to collect defaults, discovered files and environment variables before applying
-CLI overrides. When callers pass `-s/--salutation`, the helper clears earlier
-vector contributions, so CLI input replaces file or environment values. The
-`greet` subcommand adds optional behaviour like a preamble
-(`--preamble "Good morning"`) or custom punctuation while reusing the merged
-global configuration. The `take-leave` subcommand combines switches and optional
-arguments (`--wave`, `--gift`, `--channel email`, `--remind-in 15`) alongside
-greeting adjustments (`--preamble "Until next time"`, `--punctuation ?`) to
-describe how the farewell should unfold. Each subcommand struct derives
-`OrthoConfig` so defaults from `[cmds.greet]` or `[cmds.take-leave]` merge
-automatically when `load_and_merge_selected()` is invoked on the derived
-`Commands` enum.
+`load_global_config`, which now reuses
+`HelloWorldCli::compose_layers_from_iter` to collect defaults, discovered files
+and environment variables before applying CLI overrides. When callers pass
+`-s/--salutation`, the helper clears earlier vector contributions, so CLI input
+replaces file or environment values. The `greet` subcommand adds optional
+behaviour like a preamble (`--preamble "Good morning"`) or custom punctuation
+while reusing the merged global configuration. The `take-leave` subcommand
+combines switches and optional arguments (`--wave`, `--gift`,
+`--channel email`, `--remind-in 15`) alongside greeting adjustments
+(`--preamble "Until next time"`, `--punctuation ?`) to describe how the
+farewell should unfold. Each subcommand struct derives `OrthoConfig` so
+defaults from `[cmds.greet]` or `[cmds.take-leave]` merge automatically when
+`load_and_merge_selected()` is invoked on the derived `Commands` enum.
 
 Behavioural tests in `examples/hello_world/tests` exercise scenarios such as
 `hello_world greet --preamble "Good morning"` and running
@@ -911,9 +913,9 @@ arguments override configuration files and that validation errors surface
 cleanly when callers provide blank strings or conflicting switches.
 
 Sample configuration files live in `examples/hello_world/config`. The
-`baseline.toml` defaults underpin both the automated tests and the demo scripts,
-while `overrides.toml` extends the baseline to demonstrate inheritance by
-adjusting the recipient and salutation. The paired `scripts/demo.sh` and
+`baseline.toml` defaults underpin both the automated tests and the demo
+scripts, while `overrides.toml` extends the baseline to demonstrate inheritance
+by adjusting the recipient and salutation. The paired `scripts/demo.sh` and
 `scripts/demo.cmd` helpers copy these files into a temporary directory before
 running `cargo run -p hello_world`, illustrating how file defaults, environment
 variables, and CLI arguments override one another without mutating the working
@@ -924,12 +926,12 @@ tree.
 Non‑`Option` fields annotated with `#[arg(default_value_t = ...)]` normally
 override configuration files and environment variables because `clap` always
 populates them. The `cli_default_as_absent` attribute changes this behaviour:
-when the user does not explicitly provide a value on the command line, the field
-is excluded from the CLI layer so that file and environment values take
+when the user does not explicitly provide a value on the command line, the
+field is excluded from the CLI layer so that file and environment values take
 precedence.
 
-Add `cli_default_as_absent` and define the default in clap. The derive macro now
-infers the struct default from clap's default metadata, so the default only
+Add `cli_default_as_absent` and define the default in clap. The derive macro
+now infers the struct default from clap's default metadata, so the default only
 needs to be declared once:
 
 ```rust
@@ -954,13 +956,13 @@ remains available for generated defaults/documentation metadata.
 **Precedence with the attribute (lowest to highest):**
 
 1. Struct default (`#[ortho_config(default = ...)]` or inferred from clap)
-1. Configuration file
-1. Environment variable
-1. Explicit CLI override (e.g. `--punctuation "?"`)
+2. Configuration file
+3. Environment variable
+4. Explicit CLI override (e.g. `--punctuation "?"`)
 
-Without `cli_default_as_absent`, the clap default would always beat the file and
-environment layers. With the attribute, calling `greet` without `--punctuation`
-allows a `[cmds.greet] punctuation = "?"` file entry or
+Without `cli_default_as_absent`, the clap default would always beat the file
+and environment layers. With the attribute, calling `greet` without
+`--punctuation` allows a `[cmds.greet] punctuation = "?"` file entry or
 `APP_CMDS_GREET_PUNCTUATION=?` environment variable to win.
 
 When using this attribute, pass the `ArgMatches` so the crate can inspect
@@ -989,16 +991,17 @@ complete example.
 
 ## Error handling
 
-`load` and `load_and_merge_subcommand_for` return `OrthoResult<T>`, an alias for
-`Result<T, Arc<OrthoError>>`. `OrthoError` wraps errors from `clap`, file I/O
-and `figment`. Failures during the final merge of CLI values over configuration
-sources surface as the `Merge` variant, providing clearer diagnostics when the
-combined data is invalid. When multiple sources fail, the errors are collected
-into the `Aggregate` variant so callers can inspect each individual failure.
-Consumers should handle these errors appropriately, for example by printing them
-to stderr and exiting. If required fields are missing after merging, the crate
-returns `OrthoError::MissingRequiredValues` with a user‑friendly list of missing
-paths and hints on how to provide them. For example:
+`load` and `load_and_merge_subcommand_for` return `OrthoResult<T>`, an alias
+for `Result<T, Arc<OrthoError>>`. `OrthoError` wraps errors from `clap`, file
+I/O and `figment`. Failures during the final merge of CLI values over
+configuration sources surface as the `Merge` variant, providing clearer
+diagnostics when the combined data is invalid. When multiple sources fail, the
+errors are collected into the `Aggregate` variant so callers can inspect each
+individual failure. Consumers should handle these errors appropriately, for
+example by printing them to stderr and exiting. If required fields are missing
+after merging, the crate returns `OrthoError::MissingRequiredValues` with a
+user‑friendly list of missing paths and hints on how to provide them. For
+example:
 
 ```plaintext
 Missing required values:
@@ -1009,10 +1012,11 @@ Missing required values:
 
 When a user passes `--help` or `--version`, `clap` surfaces specialised
 `ErrorKind::DisplayHelp` / `DisplayVersion` errors so applications can print
-usage text and exit successfully. Deriving `OrthoConfig` often goes hand in hand
-with `Cli::try_parse()` so applications can map errors into their own types.
-Before performing that conversion, call `ortho_config::is_display_request` to
-detect these cases and delegate to `err.exit()`:
+usage text and exit successfully. Deriving `OrthoConfig` often goes hand in
+hand with `Cli::try_parse()` so applications can map errors into their own
+types. Before performing that conversion, call
+`ortho_config::is_display_request` to detect these cases and delegate to
+`err.exit()`:
 
 ```rust
 use clap::Parser;
@@ -1037,9 +1041,9 @@ are caught automatically.
 
 ### Aggregating multiple errors
 
-To return multiple errors in one go, use `OrthoError::aggregate`. It accepts any
-iterator of items that can be converted into `Arc<OrthoError>` so both owned and
-shared errors are supported. If the list might be empty,
+To return multiple errors in one go, use `OrthoError::aggregate`. It accepts
+any iterator of items that can be converted into `Arc<OrthoError>` so both
+owned and shared errors are supported. If the list might be empty,
 `OrthoError::try_aggregate` returns `Option<OrthoError>` instead of panicking:
 
 ```rust
@@ -1083,10 +1087,10 @@ specific source file (Gathering) or with the combined result of all layers
 To reduce boiler‑plate when converting between error types, the crate exposes
 small extension traits:
 
-- `OrthoResultExt::into_ortho()` converts `Result<T, E>` into `OrthoResult<T>`
-  when `E: Into<OrthoError>` (e.g., `serde_json::Error`).
-- `OrthoMergeExt::into_ortho_merge()` converts `Result<T, figment::Error>` into
-  `OrthoResult<T>` as `OrthoError::Merge`.
+- `OrthoResultExt::into_ortho()` converts `Result<T, E>` into
+  `OrthoResult<T>` when `E: Into<OrthoError>` (e.g., `serde_json::Error`).
+- `OrthoMergeExt::into_ortho_merge()` converts `Result<T, figment::Error>`
+  into `OrthoResult<T>` as `OrthoError::Merge`.
 - `OrthoJsonMergeExt::into_ortho_merge_json()` converts
   `Result<T, serde_json::Error>` into `OrthoResult<T>` as `OrthoError::Merge`,
   preserving location information from the JSON parser.
@@ -1164,8 +1168,8 @@ cargo orthohelp --out-dir target/orthohelp --locale en-US
 ```
 
 `--cache` reuses any previously generated IR cached under
-`target/orthohelp/<hash>/ir.json`, while `--no-build` skips the bridge build and
-fails if the cache is missing. The generated per-locale JSON lives under
+`target/orthohelp/<hash>/ir.json`, while `--no-build` skips the bridge build
+and fails if the cache is missing. The generated per-locale JSON lives under
 `<out>/ir/<locale>.json` and is ready for downstream generators.
 
 ### Generating man pages
@@ -1181,15 +1185,15 @@ cargo orthohelp --format man --out-dir target/man --locale en-US
 The generator produces standard man page sections in the canonical order:
 
 1. **NAME** – binary name and one-line description
-1. **SYNOPSIS** – usage pattern with flags
-1. **DESCRIPTION** – expanded about text
-1. **OPTIONS** – CLI flags with types, defaults, and possible values
-1. **ENVIRONMENT** – environment variables mapped to fields
-1. **FILES** – configuration file paths and discovery locations
-1. **PRECEDENCE** – source priority order (defaults → file → env → CLI)
-1. **EXAMPLES** – usage examples from the IR
-1. **SEE ALSO** – related commands and documentation links
-1. **EXIT STATUS** – standard exit codes
+2. **SYNOPSIS** – usage pattern with flags
+3. **DESCRIPTION** – expanded about text
+4. **OPTIONS** – CLI flags with types, defaults, and possible values
+5. **ENVIRONMENT** – environment variables mapped to fields
+6. **FILES** – configuration file paths and discovery locations
+7. **PRECEDENCE** – source priority order (defaults → file → env → CLI)
+8. **EXAMPLES** – usage examples from the IR
+9. **SEE ALSO** – related commands and documentation links
+10. **EXIT STATUS** – standard exit codes
 
 Additional options:
 
@@ -1205,8 +1209,8 @@ Enum fields list their possible values in the OPTIONS description.
 
 `cargo-orthohelp` can generate PowerShell external help in Microsoft Assistance
 Markup Language (MAML) alongside a wrapper module so `Get-Help {BinName} -Full`
-surfaces the same configuration metadata as the man page generator. Use the `ps`
-format to emit the module layout under `powershell/<ModuleName>`:
+surfaces the same configuration metadata as the man page generator. Use the
+`ps` format to emit the module layout under `powershell/<ModuleName>`:
 
 ```bash
 cargo orthohelp --format ps --out-dir target/orthohelp --locale en-US
@@ -1248,31 +1252,30 @@ help_info_uri = "https://example.com/help/MyModule"
   `append`, meaning that values from the configuration file appear first, then
   environment variables and finally CLI arguments. Use
   `merge_strategy = "append"` explicitly for clarity. When overrides should
-  discard earlier layers entirely (for example, to replace a default list with a
-  CLI-provided value) apply `merge_strategy = "replace"` instead.
-
+  discard earlier layers entirely (for example, to replace a default list with
+  a CLI-provided value) apply `merge_strategy = "replace"` instead.
 - **Map merging** – Map fields (such as `BTreeMap<String, _>`) default to keyed
   merges, where later layers update only the entries they define. Apply
   `merge_strategy = "replace"` when later layers must replace the entire map.
   The hello_world example exposes a `greeting_templates` map that uses this
-  strategy, so declarative configuration files can swap the full template set at
-  once.
+  strategy, so declarative configuration files can swap the full template set
+  at once.
 
-- **Option\<T> fields** – Fields of type `Option<T>` are not treated as
+- **Option&lt;T&gt; fields** – Fields of type `Option<T>` are not treated as
   required. They default to `None` and can be set via any source. Required CLI
   arguments can be represented as `Option<T>` to allow configuration defaults
-  while still requiring the CLI to provide a value when defaults are absent; see
-  the `vk` example above.
+  while still requiring the CLI to provide a value when defaults are absent;
+  see the `vk` example above.
 
-- **Changing naming conventions** – Runtime naming continues to use the default
-  snake/hyphenated (underscores → hyphens)/upper snake mappings. For
+- **Changing naming conventions** – Runtime naming continues to use the
+  default snake/hyphenated (underscores → hyphens)/upper snake mappings. For
   documentation output, use `env(name = "...")` and `file(key_path = "...")` to
   override IR metadata without altering runtime behaviour.
 
-- **Testing** – Because the CLI and environment variables are merged at runtime,
-  integration tests should set environment variables and construct CLI argument
-  vectors to exercise the merge logic. The `figment` crate makes it easy to
-  inject additional providers when writing unit tests.
+- **Testing** – Because the CLI and environment variables are merged at
+  runtime, integration tests should set environment variables and construct CLI
+  argument vectors to exercise the merge logic. The `figment` crate makes it
+  easy to inject additional providers when writing unit tests.
 
 - **Sanitized providers** – The `sanitized_provider` helper returns a `Figment`
   provider with `None` fields removed. It aids manual layering when bypassing
@@ -1297,5 +1300,5 @@ Subcommand support and integration with `clap‑dispatch` further reduce
 boiler‑plate in complex CLI tools. The example `vk` repository demonstrates how
 a real application can adopt `OrthoConfig` to handle global options and
 subcommand defaults. Contributions to the project are welcome, and the design
-documents outline planned improvements such as richer error messages and support
-for additional naming strategies.
+documents outline planned improvements such as richer error messages and
+support for additional naming strategies.
