@@ -7,13 +7,11 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use serde::Serialize;
-use serde_json::json;
-
 use super::refactor_routing::{
     Operation, request_arguments, response_payload_for_operation, write_refactor_response,
     write_stdout_exit,
 };
+use serde::Serialize;
 
 /// Captures the command string, exit status, stdout, stderr, and recorded
 /// daemon request payloads from a single end-to-end CLI invocation.
@@ -211,11 +209,7 @@ fn respond_to_request(
     reader.read_line(&mut request_line)?;
 
     let parsed_request: serde_json::Value = serde_json::from_str(request_line.trim())
-        .unwrap_or_else(|_| {
-            json!({
-                "invalid_request": request_line.trim(),
-            })
-        });
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
 
     requests
         .lock()

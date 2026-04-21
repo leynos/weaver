@@ -1,13 +1,13 @@
 # Deliver the weaver-graph call hierarchy provider
 
 This ExecPlan is a living document. The sections `Progress`,
-`Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must
+`Surprises & discoveries`, `Decision log`, and `Outcomes & retrospective` must
 be kept up to date as work proceeds.
 
 No `PLANS.md` file exists in the repository root, so this document stands on
 its own.
 
-## Purpose / Big Picture
+## Purpose / big picture
 
 Implement the relational intelligence layer so Weaver can build a call graph
 from Language Server Protocol (LSP) `textDocument/callHierarchy` data. Success
@@ -28,22 +28,22 @@ results. Behavioural tests must exercise both happy and unhappy paths using
 - [ ] Run `make check-fmt`, `make lint`, and `make test` successfully.
 - [ ] Mark the Phase 2 roadmap entry as done.
 
-## Surprises & Discoveries
+## Surprises & discoveries
 
 - None yet.
 
-## Decision Log
+## Decision log
 
 - Decision: Use Language Server Protocol (LSP) `textDocument/callHierarchy` as
   the minimum viable product (MVP) provider for the call graph. Rationale:
   Matches the Phase 2 roadmap requirement and reuses existing LSP
   infrastructure. Date/Author: 2026-01-02 / plan author.
 
-## Outcomes & Retrospective
+## Outcomes & retrospective
 
 Not started yet.
 
-## Context and Orientation
+## Context and orientation
 
 The Phase 2 roadmap item lives in `docs/roadmap.md` and calls for creating the
 `weaver-graph` crate with an LSP-backed provider. The design context for call
@@ -72,7 +72,7 @@ Definitions used in this plan:
 - Call graph: A graph of nodes (symbols) and edges (call relationships) with
   provenance describing which provider produced each edge.
 
-## Plan of Work
+## Plan of work
 
 First, confirm the current state of the workspace. If the `weaver-graph` crate
 or call hierarchy support is missing, create or add it; if it already exists,
@@ -108,7 +108,7 @@ confirm the `observe call-hierarchy` output schema matches the implemented
 graph (nodes and edges, and any fields such as source or confidence). Finally,
 mark the Phase 2 roadmap item as done in `docs/roadmap.md`.
 
-## Concrete Steps
+## Concrete steps
 
 Run these commands from the repository root (`/root/repo`). The `rg` commands
 are safe to re-run.
@@ -175,7 +175,7 @@ are safe to re-run.
    make test 2>&1 | tee /tmp/weaver-test.log
    ```
 
-## Validation and Acceptance
+## Validation and acceptance
 
 Acceptance requires all of the following:
 
@@ -189,7 +189,7 @@ Acceptance requires all of the following:
 - `docs/weaver-design.md` records the graph model and provider decisions.
 - The Phase 2 roadmap item is marked as done.
 
-## Idempotence and Recovery
+## Idempotence and recovery
 
 All commands and tests above are safe to re-run. If a test fails midway, fix
 the underlying issue and re-run only the failing test or the full `make test`
@@ -197,7 +197,7 @@ suite. If formatting or linting fails, apply fixes and re-run the same command
 until it passes. Keep documentation edits small so `make fmt` can be applied
 multiple times without drift.
 
-## Artifacts and Notes
+## Artifacts and notes
 
 Example Gherkin snippet for the behavioural test (stored in the feature file):
 
@@ -218,7 +218,7 @@ output schema):
 {"nodes":[{"id":"/src/lib.rs:10:0:main"}],"edges":[{"caller":"n1","callee":"n2"}]}
 ```
 
-## Interfaces and Dependencies
+## Interfaces and dependencies
 
 The weaver-graph crate must expose a minimal public API that other crates can
 consume:

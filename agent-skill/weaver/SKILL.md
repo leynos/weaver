@@ -173,8 +173,12 @@ with Weaver."
 
 Agent flow:
 
-<!-- markdownlint-disable-next-line MD013 -->
-1. Run `weaver --output json act refactor --refactoring rename --file src/main.py new_name=build_index offset=123`.
+1. Run:
+
+   ```sh
+   weaver --output json act refactor --refactoring rename --file src/main.py new_name=build_index offset=123
+   ```
+
 2. Inspect the capability resolution.
 3. Review the diff.
 4. Run project validators.
