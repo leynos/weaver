@@ -28,7 +28,7 @@ jobs:
             !**/target/**
             !**/dist/**
       - name: Install Nixie
-        run: python3 -m pip install --user nixie-cli
+        run: python3 -m pip install --user nixie-cli==1.0.0
       - name: Mermaid lint
         run: make nixie
       - name: Cache Whitaker installer
