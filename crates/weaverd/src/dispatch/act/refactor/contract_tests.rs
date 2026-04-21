@@ -248,6 +248,28 @@ fn handler_rename_contract_parametrised(
     Ok(())
 }
 
+#[rstest]
+fn handler_rejects_conflicting_offset_and_position(
+    socket_dir: Result<TempDir, String>,
+) -> Result<(), String> {
+    let socket_dir = socket_dir?;
+    let error = dispatch_inspecting_rename(RenameDispatch {
+        file: "notes.py",
+        provider: "rope",
+        language: "python",
+        extra_args: vec![
+            String::from("offset=4"),
+            String::from("position=5"),
+            String::from("new_name=woven"),
+        ],
+        socket_dir: &socket_dir,
+    })
+    .expect_err("rename request should reject conflicting offset and position");
+
+    assert!(error.contains("must not supply both 'offset' and 'position'"));
+    Ok(())
+}
+
 #[test]
 fn rust_analyzer_manifest_declares_rename_symbol_capability() {
     let manifest = rust_analyzer_manifest(std::path::PathBuf::from(

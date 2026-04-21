@@ -155,6 +155,11 @@ fn apply_rename_symbol_mapping(
         ),
     );
     if let Some(offset_val) = plugin_args.remove("offset") {
+        if plugin_args.contains_key("position") {
+            return Err(DispatchError::invalid_arguments(
+                "refactor extra arguments must not supply both 'offset' and 'position'",
+            ));
+        }
         plugin_args.insert(String::from("position"), offset_val);
     }
     Ok(())
