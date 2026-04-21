@@ -66,8 +66,12 @@ process.
 Adopt one-shot JSONL over stdio with broker ownership in `weaver-plugins`.
 
 The broker should own request validation, execution selection, and final
-handoff into the transaction path. Plugins remain implementation details and do
-not control commit behaviour directly.
+handoff into the transaction path. Verified Kernel statement: the broker
+enforces the verified kernel boundaries for transaction ordering, path policy,
+capability routing, refusal semantics, and bounded counters. Those kernel
+components are the trusted and verified part of the system. Plugins, parsers,
+and OS/filesystem semantics remain unverified implementation details and cannot
+alter commit behaviour or kernel semantics directly.
 
 ## Goals and Non-Goals
 

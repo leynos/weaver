@@ -34,6 +34,15 @@ Feature: Act refactor
     Then the refactor command fails with status 1
     And the target file is unchanged
 
+  Scenario: Refactor rejects successful plugin responses without diffs
+    Given a workspace file for refactoring
+    And a valid auto-routed act refactor request resolved to rope
+    And a non-diff success response from the refactor plugin
+    When the act refactor command executes
+    Then the refactor command fails with status 1
+    And the target file is unchanged
+    And the stderr stream contains "did not return diff output"
+
   Scenario: Refactor refuses unsupported languages deterministically
     Given a workspace file for refactoring
     And an unsupported-language act refactor request

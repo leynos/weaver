@@ -106,7 +106,8 @@ Observable success:
   JSON-RPC 2.0 stdio exchange rather than custom analysis logic. Rationale:
   semantic correctness and alignment with existing LSP strategy. Date/Author:
   2026-02-17 / Codex
-- Decision: keep all unit/BDD tests mock-based at adapter boundary.
+- Decision: keep all unit/Behaviour-Driven Development (BDD) tests mock-based
+  at adapter boundary.
   Rationale: deterministic test suite without requiring rust-analyzer on host.
   Date/Author: 2026-02-17 / Codex
 

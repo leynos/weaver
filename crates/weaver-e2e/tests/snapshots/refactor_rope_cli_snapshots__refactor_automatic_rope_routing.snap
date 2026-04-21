@@ -1,0 +1,26 @@
+---
+source: crates/weaver-e2e/tests/refactor_rope_cli_snapshots.rs
+expression: transcript
+---
+Transcript {
+    command: "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --refactoring rename --file src/main.py new_name=renamed_symbol offset=4",
+    status: 0,
+    stdout: "{\"files_deleted\":0,\"files_written\":1,\"status\":\"ok\"}",
+    stderr: "{\"details\":{\"candidates\":[{\"accepted\":true,\"provider\":\"rope\",\"reason\":\"matched_language_and_capability\"},{\"accepted\":false,\"provider\":\"rust-analyzer\",\"reason\":\"unsupported_language\"}],\"capability\":\"rename-symbol\",\"language\":\"python\",\"outcome\":\"selected\",\"selected_provider\":\"rope\",\"selection_mode\":\"automatic\"},\"status\":\"ok\",\"type\":\"CapabilityResolution\"}",
+    requests: [
+        Object {
+            "arguments": Array [
+                String("--refactoring"),
+                String("rename"),
+                String("--file"),
+                String("src/main.py"),
+                String("new_name=renamed_symbol"),
+                String("offset=4"),
+            ],
+            "command": Object {
+                "domain": String("act"),
+                "operation": String("refactor"),
+            },
+        },
+    ],
+}

@@ -40,6 +40,8 @@ mod arguments;
 mod candidates;
 mod manifests;
 mod plugin_paths;
+#[cfg(test)]
+pub(super) mod refactor_helpers;
 mod refusal;
 mod resolution;
 mod response_handling;
@@ -348,5 +350,7 @@ mod behaviour;
 mod contract_tests;
 #[cfg(test)]
 mod resolution_tests;
+#[cfg(test)]
+mod rollback_tests;
 #[cfg(test)]
 mod tests;

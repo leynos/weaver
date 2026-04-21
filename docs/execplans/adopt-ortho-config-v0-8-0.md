@@ -1,4 +1,4 @@
-# Adopt `ortho-config` v0.8.0 Across Weaver
+# Adopt `ortho-config` v0.8.0 across Weaver
 
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
@@ -54,7 +54,7 @@ Observable success after implementation:
    unless a source file genuinely needs them for non-generated code.
    Derive-adjacent imports and examples should prefer the `ortho_config::...`
    re-exports.
-5. Preserve the existing localisation behaviour in
+5. Preserve the existing localization behaviour in
    `crates/weaver-cli/src/localizer.rs`. The Fluent-backed localiser and
    English fallbacks must keep working after the dependency bump.
 6. Treat the `orthohelp` metadata flow as conditional. The current
@@ -102,7 +102,7 @@ Observable success after implementation:
   `crates/weaver-plugin-rust-analyzer/Cargo.toml`,
   `crates/weaver-plugins/Cargo.toml`, `crates/weaver-sandbox/Cargo.toml`, and
   `crates/weaverd/Cargo.toml`. Severity: medium. Likelihood: certain.
-  Mitigation: normalise every member manifest to
+  Mitigation: normalize every member manifest to
   `rust-version.workspace = true` as part of the migration.
 
 - Risk: The repository still documents `ortho-config` v0.6.0 in multiple
@@ -199,14 +199,14 @@ Observable success after implementation:
    instead of hand-editing the in-repo copy. Rationale: the user explicitly
   requested the upstream guide as the replacement artefact, and the fetched
   file already captures the v0.8.0 material around layer composition,
-  post-merge hooks, localisation, and dependency aliasing. Date: 2026-03-07.
+  post-merge hooks, localization, and dependency aliasing. Date: 2026-03-07.
 
 - Decision: Only implement the `orthohelp` metadata flow if a concrete
   repository consumer is found during implementation. Rationale: the current
   tree has no `orthohelp` wiring, and adding speculative metadata would create
   maintenance burden without an observable payoff. Date: 2026-03-07.
 
-- Decision: Normalise member manifests to
+- Decision: Normalize member manifests to
   `rust-version.workspace = true` while raising the workspace floor. Rationale:
   without that change, several crates would continue to omit an explicit Rust
   floor, undermining the requirement to ensure Rust 1.88 or newer. Date:
@@ -257,7 +257,7 @@ The upgrade is concentrated in a small set of files.
 - `crates/weaver-config/src/lib.rs` defines the shared
   `Config` struct and the derive-generated loading path used by both binaries.
 - `crates/weaver-cli/src/localizer.rs` exercises the
-  Fluent localisation APIs added in v0.7.0 and must continue to compile after
+  Fluent localization APIs added in v0.7.0 and must continue to compile after
   the v0.8.0 upgrade.
 - `crates/weaver-cli/src/config.rs` is a secondary audit
   point because it forwards CLI flags into `Config::load_from_iter`.

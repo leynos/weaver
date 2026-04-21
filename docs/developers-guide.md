@@ -350,3 +350,164 @@ helpers are:
 Each helper produces a `GraphSliceError::InvalidValue` with the originating
 flag name and a descriptive message on failure, so callers do not need to
 format error context themselves.
+
+## Test infrastructure for rename-symbol coverage
+
+### `test-support` feature (`weaver-plugins`)
+
+The `weaver-plugins` crate exposes shared contract fixtures behind the
+`test-support` Cargo feature. Activate it in a crate's `[dev-dependencies]` to
+access:
+
+- `RenameSymbolRequestFixture` / `RenameSymbolResponseFixture` — type aliases
+  for the request and response sides of the contract.
+- `rename_symbol_request_fixtures()` / `rename_symbol_response_fixtures()` —
+  the canonical fixture collections consumed by plugin contract tests.
+- `rename_symbol_request_fixture_named(name)` /
+  `rename_symbol_response_fixture_named(name)` — look up a single named request
+  or response fixture by key and panic when the requested fixture name is
+  unknown.
+- `validate_rename_symbol_request_fixture(fixture)` /
+  `validate_rename_symbol_response_fixture(fixture)` — run contract validation
+  without panicking and return `Result<(), PluginError>` so callers can inspect
+  the exact contract failure.
+- `assert_rename_symbol_request_fixture_contract` /
+  `assert_rename_symbol_response_fixture_contract` — assertion helpers that
+  validate a fixture against the `RenameSymbolContract` and panic with a
+  descriptive message on failure.
+
+```toml
+[dev-dependencies]
+weaver-plugins = { path = "../weaver-plugins", features = ["test-support"] }
+```
+
+Typical lookup and validation usage:
+
+```rust
+use weaver_plugins::{
+    rename_symbol_request_fixture_named, validate_rename_symbol_request_fixture,
+};
+
+let fixture = rename_symbol_request_fixture_named("valid_request");
+let result = validate_rename_symbol_request_fixture(&fixture);
+assert!(result.is_ok(), "fixture should satisfy the shared contract");
+```
+
+### `FakeDaemon` (`weaver-e2e/tests/test_support/daemon_harness.rs`)
+
+`FakeDaemon` is a lightweight in-process TCP server used by end-to-end snapshot
+tests. It binds an ephemeral port, records incoming JSON request payloads, and
+writes deterministic responses so that tests run without a real daemon process.
+
+Typical usage:
+
+```rust
+let daemon = FakeDaemon::start(1, "renamed_symbol").expect("fake daemon should start");
+let endpoint = daemon.endpoint(); // pass to --daemon-socket
+// … run CLI command …
+let requests = daemon.requests();
+daemon.join();
+```
+
+Pass `endpoint()` to the `--daemon-socket` flag of the `weaver` binary under
+test. Call `join()` after the CLI exits to assert that the background thread
+did not panic.
+
+### Request-routing helpers (`weaver-e2e/tests/test_support/refactor_routing.rs`)
+
+`refactor_routing` provides the routing logic used inside `FakeDaemon` to
+produce capability-resolution payloads:
+
+- `request_arguments(&serde_json::Value)` — extracts the daemon request's flat
+  CLI-style argument vector, for example a list containing `--refactoring`,
+  `rename`, `--file`, `src/main.py`, `new_name=renamed_symbol`, and `offset=4`.
+- `argument_value(arguments, "--file")` — returns the value paired with a flag
+  from that flat argument vector, normalizing access to values such as
+  `Some("src/main.py")`.
+- `language_for_extension(&Path)` — maps `.py` → `"python"`, `.rs` →
+  `"rust"`.
+- `automatic_resolution_payload(&Path)` — builds the `stderr` JSON for
+  automatic provider selection.
+- `provider_mismatch_payload(&Path, RequestedProvider)` — builds the `stderr`
+  JSON for an explicit-provider mismatch refusal.
+- `write_refactor_response(writer, Operation, arguments, renamed_symbol)` —
+  orchestrates the full response sequence (optional `stderr` stream, `stdout`
+  payload, exit record).
+- `write_stdout_exit(writer, payload, status)` — emits the `stdout` stream
+  record and the trailing exit envelope used by `FakeDaemon`, for example
+  `{"kind":"stream","stream":"stdout","data":"..."}` followed by
+  `{"kind":"exit","status":0}`.
+- `response_payload_for_operation(Operation, renamed_symbol)` — returns the
+  per-operation `stdout` JSON payload.
+
+The `RequestedProvider` and `Operation` enums replace stringly-typed parameters
+to reduce the risk of typos in test fixtures.
+
+Typical routing flow inside the fake daemon:
+
+```rust
+let arguments = request_arguments(&parsed_request);
+let file = argument_value(&arguments, "--file").expect("refactor requests need --file");
+let payload = automatic_resolution_payload(std::path::Path::new(file));
+```
+
+### `refactor_helpers` (`weaverd/src/dispatch/act/refactor/refactor_helpers.rs`)
+
+`refactor_helpers` is a `#[cfg(test)]` support module for the daemon-side
+`act refactor` tests. It is split into small inline modules and then re-exported
+at the top level so sibling test modules can import a compact test API instead
+of reaching into several implementation details.
+
+The inline modules are:
+
+- `builders` — request and backend constructors such as `command_request(...)`,
+  `build_backends(...)`, `standard_rename_args(...)`, and
+  `configure_request(...)`.
+- `resolutions` — pure constructors for capability-resolution envelopes,
+  including `selected_resolution(...)`, `refused_resolution(...)`, and
+  `rejected_candidate(...)`.
+- `rollback` — runtime test doubles used by rollback-oriented tests.
+- `content` — deterministic file-content and diff fixtures, including
+  `original_content_for(...)`, `updated_content_for(...)`, and routed patch
+  helpers such as `routed_diff_for(...)`.
+
+`RollbackRuntime` and `ExecuteResult` model the two daemon interactions that
+rollback tests need to control:
+
+- `RollbackRuntime` implements `RefactorPluginRuntime`, so tests can inject a
+  predetermined resolution result and a predetermined plugin execution result
+  without spawning a real plugin.
+- `ExecuteResult` distinguishes between a successful plugin response
+  (`ExecuteResult::Success(PluginResponse)`) and a missing-plugin failure
+  (`ExecuteResult::MissingPlugin(&'static str)`), which is enough to exercise
+  the rollback and error-reporting paths in `handle(...)`.
+
+The `rollback_tests` module uses these abstractions to assert failure-path
+invariants for `act refactor`: the command exits with status `1`, the target
+file content remains unchanged, and stderr contains the expected refusal or
+runtime error text. That module is intentionally focused on rollback semantics,
+while `tests.rs`, `contract_tests.rs`, and `behaviour.rs` cover other aspects of
+the refactor handler.
+
+Typical usage pattern in daemon tests:
+
+```rust
+let runtime = selected_runtime(
+    SelectedResolution {
+        capability: weaver_plugins::CapabilityId::RenameSymbol,
+        language: "python",
+        provider: "rope",
+        selection_mode: super::resolution::SelectionMode::Automatic,
+        requested_provider: None,
+    },
+    ExecuteResult::MissingPlugin("rope"),
+);
+
+let request = command_request(standard_rename_args("notes.py"));
+let mut backends = build_backends(&socket_path);
+```
+
+That pattern lets a test build a request, inject a deterministic runtime, and
+then call `handle(...)` to assert on exit status, stderr, and any preserved
+workspace content. Tests that need fixture content or diff payloads layer in the
+`content` helpers instead of hand-writing patch strings.

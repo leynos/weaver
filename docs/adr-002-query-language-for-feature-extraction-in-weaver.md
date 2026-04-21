@@ -121,7 +121,7 @@ cases that need grammar-level precision beyond the Semgrep-style subset.
 ## Migration plan
 
 1. Define the Semgrep-style subset grammar and AST in `weaver-syntax` docs.
-2. Implement parsing and normalization to Weaver internal query operators.
+2. Implement parsing and normalization to Weaver's internal query operators.
 3. Add execution over Tree-sitter-backed structures with capture support.
 4. Add conformance tests for mandatory language constructs.
 5. Provide explicit diagnostics for unsupported features with escape-hatch
