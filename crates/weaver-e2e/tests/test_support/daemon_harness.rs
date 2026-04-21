@@ -228,7 +228,7 @@ fn respond_to_request(
         .and_then(serde_json::Value::as_str)
         .unwrap_or_default();
     let operation = Operation::from(operation_str);
-    let arguments = request_arguments(&parsed_request);
+    let arguments = request_arguments(&parsed_request)?;
 
     let mut writer = stream;
     if matches!(&operation, Operation::Refactor) {

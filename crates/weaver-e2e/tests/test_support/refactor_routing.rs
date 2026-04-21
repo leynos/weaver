@@ -53,17 +53,22 @@ struct ValidatedRefactorRequest<'a> {
 
 /// Extracts the flat list of CLI argument strings from a parsed daemon
 /// request JSON value.
-pub fn request_arguments(parsed_request: &serde_json::Value) -> Vec<&str> {
+///
+/// Returns `io::ErrorKind::InvalidData` if the `arguments` array contains a
+/// non-string entry.
+pub fn request_arguments(parsed_request: &serde_json::Value) -> io::Result<Vec<&str>> {
     parsed_request
         .get("arguments")
         .and_then(serde_json::Value::as_array)
         .into_iter()
         .flatten()
         .map(|argument| {
-            argument.as_str().map_or_else(
-                || panic!("daemon request arguments must all be JSON strings"),
-                |value| value,
-            )
+            argument.as_str().ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "daemon request arguments must all be JSON strings",
+                )
+            })
         })
         .collect()
 }

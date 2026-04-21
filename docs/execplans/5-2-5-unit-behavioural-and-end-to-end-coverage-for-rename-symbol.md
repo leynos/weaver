@@ -619,23 +619,28 @@ Modified files:
 
 ### Shared test support module
 
-In `crates/weaver-plugins/src/capability/test_support.rs`, define and export:
+In `crates/weaver-plugins/src/capability/test_support.rs`, define the shared
+fixtures and root-re-export the downstream test API from `weaver_plugins`:
 
 ```rust
-//! Shared test fixtures for the `rename-symbol` capability contract.
-//!
-//! These fixtures are feature-gated behind `test-support` and
-//! intended for use by plugin crates that need to prove conformance
-//! to the shared contract.
-
-pub struct RenameSymbolFixture<T> { /* ... */ }
-
-pub type RenameSymbolRequestFixture = RenameSymbolFixture<PluginRequest>;
-pub type RenameSymbolResponseFixture = RenameSymbolFixture<PluginResponse>;
+pub type RenameSymbolRequestFixture = /* ... */;
+pub type RenameSymbolResponseFixture = /* ... */;
 
 pub fn rename_symbol_request_fixtures() -> Vec<RenameSymbolRequestFixture> { /* ... */ }
 
 pub fn rename_symbol_response_fixtures() -> Vec<RenameSymbolResponseFixture> { /* ... */ }
+
+pub fn rename_symbol_request_fixture_named(name: &str) -> RenameSymbolRequestFixture { /* ... */ }
+
+pub fn rename_symbol_response_fixture_named(name: &str) -> RenameSymbolResponseFixture { /* ... */ }
+
+pub fn validate_rename_symbol_request_fixture(
+    fixture: &RenameSymbolRequestFixture,
+) -> Result<(), PluginError> { /* ... */ }
+
+pub fn validate_rename_symbol_response_fixture(
+    fixture: &RenameSymbolResponseFixture,
+) -> Result<(), PluginError> { /* ... */ }
 
 pub fn assert_rename_symbol_request_fixture_contract(
     fixture: &RenameSymbolRequestFixture,
@@ -653,23 +658,40 @@ Each plugin crate's `src/tests/contract_fixtures.rs` follows this pattern:
 ```rust
 //! Shared contract fixture tests for the `rename-symbol` capability.
 
-use weaver_plugins::test_support::{
-    assert_rename_symbol_request_fixture_contract,
-    assert_rename_symbol_response_fixture_contract,
-    rename_symbol_request_fixtures,
-    rename_symbol_response_fixtures,
+use weaver_plugins::{
+    assert_rename_symbol_request_fixture_contract, assert_rename_symbol_response_fixture_contract,
+    rename_symbol_request_fixtures, rename_symbol_response_fixtures,
 };
 
-fn validate_request_fixtures() {
-    for fixture in rename_symbol_request_fixtures() {
-        assert_rename_symbol_request_fixture_contract(&fixture);
+fn validate_fixtures_against_contract<T>(
+    fixtures_name: &str,
+    fixtures: Vec<T>,
+    validate_fixture: impl Fn(&T),
+) {
+    assert!(
+        !fixtures.is_empty(),
+        "shared {fixtures_name} should not be empty; check plugin fixture wiring"
+    );
+
+    for fixture in fixtures {
+        validate_fixture(&fixture);
     }
 }
 
+fn validate_request_fixtures() {
+    validate_fixtures_against_contract(
+        "rename_symbol_request_fixtures",
+        rename_symbol_request_fixtures(),
+        assert_rename_symbol_request_fixture_contract,
+    );
+}
+
 fn validate_response_fixtures() {
-    for fixture in rename_symbol_response_fixtures() {
-        assert_rename_symbol_response_fixture_contract(&fixture);
-    }
+    validate_fixtures_against_contract(
+        "rename_symbol_response_fixtures",
+        rename_symbol_response_fixtures(),
+        assert_rename_symbol_response_fixture_contract,
+    );
 }
 ```
 

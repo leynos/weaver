@@ -15,7 +15,7 @@ first complete path.
 - E2E tests exercise the client/daemon pipeline
 - Behaviour-Driven Development (BDD) tests cover happy and unhappy paths using
   rstest-bdd v0.3.2
-- `docs/users-guide.md` updated with behaviour changes
+- [users guide](../users-guide.md) updated with behaviour changes
 - `make check-fmt`, `make lint`, `make test` all pass
 - Roadmap entry marked as done
 
@@ -31,7 +31,8 @@ ______________________________________________________________________
    reference to `FusionBackends` containing a `SemanticBackendProvider` that
    manages the `LspHost`. This avoids tight coupling between router and LSP.
 
-3. **Argument format**: Follow users-guide.md convention:
+3. **Argument format**: Follow the [users guide](../users-guide.md)
+   convention:
    `--uri file:///path.rs --position 10:5`. Position uses `LINE:COL` format
    (1-indexed for user-facing, converted to 0-indexed for LSP).
 
@@ -39,7 +40,8 @@ ______________________________________________________________________
    `.rs` → Rust, `.py` → Python, `.ts`/`.tsx` → TypeScript. Unknown extensions
    return a structured error.
 
-5. **Response format**: JSON payload per users-guide.md:
+5. **Response format**: JSON payload per the [users
+   guide](../users-guide.md):
    `{"uri":"<URI>","line":42,"column":17}` for each definition location.
 
 6. **Error propagation**: New `DispatchError` variants for argument validation,
@@ -62,7 +64,7 @@ ______________________________________________________________________
 | `crates/weaverd/src/semantic_provider.rs`               | LSP host backend provider    |
 | `crates/weaverd/tests/features/daemon_dispatch.feature` | BDD scenarios                |
 | `crates/weaverd/src/tests/dispatch_behaviour.rs`        | Step definitions             |
-| `docs/users-guide.md`                                   | Documentation updates        |
+| [users guide](../users-guide.md)                        | Documentation updates        |
 | `docs/roadmap.md`                                       | Mark task complete           |
 
 ______________________________________________________________________
@@ -565,7 +567,7 @@ ______________________________________________________________________
 
 ### Step 13: Update documentation
 
-**File:** `docs/users-guide.md`
+**File:** [users guide](../users-guide.md)
 
 Update the daemon lifecycle section to note that `observe get-definition` is
 fully implemented. Update the `observe get-definition` command reference with:

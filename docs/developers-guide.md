@@ -359,9 +359,6 @@ The `weaver-plugins` crate exposes shared contract fixtures behind the
 `test-support` Cargo feature. Activate it in a crate's `[dev-dependencies]` to
 access:
 
-- `RenameSymbolFixture<T>` — a generic fixture carrying a name, a typed
-  payload (`PluginRequest` or `PluginResponse`), and an optional expected
-  error-message fragment.
 - `RenameSymbolRequestFixture` / `RenameSymbolResponseFixture` — type aliases
   for the request and response sides of the contract.
 - `rename_symbol_request_fixtures()` / `rename_symbol_response_fixtures()` —

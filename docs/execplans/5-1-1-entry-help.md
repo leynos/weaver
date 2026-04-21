@@ -773,7 +773,8 @@ Work for full code listings; this section summarises the edits and commands.
 2. Create `crates/weaver-cli/src/localizer.rs` with `build_localizer()` and
    `write_bare_help()` (see Plan of Work B2).
 3. Add `BareInvocation` to `AppError` in `errors.rs` (B3).
-4. Add `is_bare_invocation()` to `Cli` in `cli.rs` (B4).
+4. Add `is_bare_invocation()` to the `CliRunner` implementation in `lib.rs`
+   (B4).
 5. Register `mod localizer;` and update imports in `lib.rs` (B5).
 
 ### Stage C: Scaffold tests
