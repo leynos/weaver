@@ -23,7 +23,7 @@ fn resolve_weaver_binary() -> Result<PathBuf, String> {
 
     let target_dir_candidate = target_dir_binary_path("weaver")?;
     if target_dir_candidate.is_file() {
-        return Ok(target_dir_candidate.clone());
+        return Ok(target_dir_candidate);
     }
 
     let fallback = target_debug_binary_path()?;

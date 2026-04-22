@@ -52,7 +52,8 @@ impl FakeDaemon {
         })
     }
 
-    pub fn port(&self) -> u16 { self.port }
+    /// Return the TCP port bound by the fake daemon.
+    pub const fn port(&self) -> u16 { self.port }
 
     /// Waits for the daemon thread to complete and returns all recorded requests.
     pub fn take_requests(&mut self) -> Result<Vec<String>> {

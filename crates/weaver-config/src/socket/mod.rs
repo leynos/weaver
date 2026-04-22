@@ -53,10 +53,20 @@ impl SocketEndpoint {
     }
 }
 
+fn decode_unix_path(path: &str) -> String {
+    path.replace("%3F", "?")
+        .replace("%23", "#")
+        .replace("%25", "%")
+}
+
 impl fmt::Display for SocketEndpoint {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Unix { path } => write!(formatter, "unix://{}", path),
+            Self::Unix { path } => {
+                let mut url = Url::parse("unix:///").map_err(|_| fmt::Error)?;
+                url.set_path(path.as_str());
+                write!(formatter, "{url}")
+            }
             Self::Tcp { host, port } => {
                 if host.contains(':') {
                     write!(formatter, "tcp://[{host}]:{port}")
@@ -74,26 +84,36 @@ impl FromStr for SocketEndpoint {
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         let url = Url::parse(input)?;
         match url.scheme() {
-            "unix" => {
-                let path = url.path();
-                if path.is_empty() {
-                    return Err(SocketParseError::MissingUnixPath(input.to_string()));
-                }
-                Ok(Self::unix(path))
-            }
-            "tcp" => {
-                let host = url
-                    .host_str()
-                    .ok_or_else(|| SocketParseError::MissingHost(input.to_string()))?;
-                let host = host.trim_matches(['[', ']']).to_string();
-                let port = url
-                    .port()
-                    .ok_or_else(|| SocketParseError::MissingPort(input.to_string()))?;
-                Ok(Self::tcp(host, port))
-            }
+            "unix" => parse_unix_endpoint(&url, input),
+            "tcp" => parse_tcp_endpoint(&url, input),
             other => Err(SocketParseError::UnsupportedScheme(other.to_string())),
         }
     }
+}
+
+fn parse_unix_endpoint(url: &Url, input: &str) -> Result<SocketEndpoint, SocketParseError> {
+    if url.host_str().is_some() {
+        return Err(SocketParseError::InvalidUnixAuthority(input.to_string()));
+    }
+    if url.query().is_some() || url.fragment().is_some() {
+        return Err(SocketParseError::InvalidUnixPathOptions(input.to_string()));
+    }
+    let path = url.path();
+    if path.is_empty() {
+        return Err(SocketParseError::MissingUnixPath(input.to_string()));
+    }
+    Ok(SocketEndpoint::unix(decode_unix_path(path)))
+}
+
+fn parse_tcp_endpoint(url: &Url, input: &str) -> Result<SocketEndpoint, SocketParseError> {
+    let host = url
+        .host_str()
+        .ok_or_else(|| SocketParseError::MissingHost(input.to_string()))?;
+    let host = host.trim_matches(['[', ']']).to_string();
+    let port = url
+        .port()
+        .ok_or_else(|| SocketParseError::MissingPort(input.to_string()))?;
+    Ok(SocketEndpoint::tcp(host, port))
 }
 
 /// Errors encountered while parsing a [`SocketEndpoint`] from text.
@@ -111,6 +131,12 @@ pub enum SocketParseError {
     /// Unix socket path was absent.
     #[error("missing Unix socket path in '{0}'")]
     MissingUnixPath(String),
+    /// Unix socket URLs must not include an authority.
+    #[error("unix socket URL must not include an authority in '{0}'")]
+    InvalidUnixAuthority(String),
+    /// Unix socket URLs must not include query strings or fragments.
+    #[error("unix socket URL must not include query strings or fragments in '{0}'")]
+    InvalidUnixPathOptions(String),
     /// URL failed to parse.
     #[error(transparent)]
     Url(#[from] url::ParseError),
@@ -126,6 +152,18 @@ mod tests {
     fn display_unix_socket() {
         let endpoint = SocketEndpoint::unix(Utf8PathBuf::from("/tmp/weaver.sock"));
         assert_eq!(endpoint.to_string(), "unix:///tmp/weaver.sock");
+    }
+
+    #[test]
+    fn unix_socket_round_trips_special_characters() {
+        let endpoint = SocketEndpoint::unix(Utf8PathBuf::from("/tmp/weaver?name#sock"));
+        let rendered = endpoint.to_string();
+
+        assert_eq!(rendered, "unix:///tmp/weaver%3Fname%23sock");
+        assert_eq!(
+            rendered.parse::<SocketEndpoint>().expect("roundtrip"),
+            endpoint
+        );
     }
 
     #[test]

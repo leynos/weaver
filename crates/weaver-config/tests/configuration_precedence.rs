@@ -184,4 +184,4 @@ fn then_defaults_applied(harness: &Harness) {
 }
 
 #[scenario(path = "tests/features/configuration_precedence.feature")]
-fn configuration_precedence(#[from(harness)] harness: Harness) { let _ = harness; }
+fn configuration_precedence(#[from(harness)] _harness: Harness) {}

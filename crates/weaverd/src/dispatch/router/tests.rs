@@ -17,7 +17,10 @@ fn make_request(domain: &str, operation: &str) -> CommandRequest {
         r#"{{"command":{{"domain":"{}","operation":"{}"}}}}"#,
         domain, operation
     );
-    CommandRequest::parse(json.as_bytes()).expect("test request")
+    match CommandRequest::parse(json.as_bytes()) {
+        Ok(request) => request,
+        Err(error) => panic!("test request: {error}"),
+    }
 }
 
 fn build_backends() -> FusionBackends<SemanticBackendProvider> {

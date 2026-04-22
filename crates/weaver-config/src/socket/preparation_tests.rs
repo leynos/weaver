@@ -15,14 +15,21 @@ where
     Setup: FnOnce(&Path) -> std::path::PathBuf,
     Predicate: Fn(&SocketPreparationError) -> bool,
 {
-    let tmp = tempdir().expect("temporary directory");
+    let tmp = match tempdir() {
+        Ok(tmp) => tmp,
+        Err(error) => panic!("temporary directory: {error}"),
+    };
     let socket_path = setup(tmp.path());
-    let socket_path = Utf8PathBuf::from_path_buf(socket_path).expect("socket path should be UTF-8");
+    let socket_path = match Utf8PathBuf::from_path_buf(socket_path) {
+        Ok(socket_path) => socket_path,
+        Err(_) => panic!("socket path should be UTF-8"),
+    };
     let endpoint = SocketEndpoint::unix(socket_path);
 
-    let error = endpoint
-        .prepare_filesystem()
-        .expect_err("filesystem preparation should fail");
+    let error = match endpoint.prepare_filesystem() {
+        Ok(()) => panic!("filesystem preparation should fail"),
+        Err(error) => error,
+    };
     assert!(predicate(&error), "unexpected error variant: {error}");
 }
 

@@ -11,7 +11,12 @@ use crate::{language::SupportedLanguage, parser::Parser};
 /// Fixture providing a Rust parser.
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn rust_parser() -> Parser { Parser::new(SupportedLanguage::Rust).expect("parser") }
+fn rust_parser() -> Parser {
+    match Parser::new(SupportedLanguage::Rust) {
+        Ok(parser) => parser,
+        Err(error) => panic!("parser: {error}"),
+    }
+}
 
 /// Helper to parse source and compile a pattern.
 fn parse_and_pattern(
@@ -19,8 +24,14 @@ fn parse_and_pattern(
     source: &str,
     pattern_str: &str,
 ) -> (crate::parser::ParseResult, Pattern) {
-    let parsed = parser.parse(source).expect("parse");
-    let pattern = Pattern::compile(pattern_str, SupportedLanguage::Rust).expect("pattern");
+    let parsed = match parser.parse(source) {
+        Ok(parsed) => parsed,
+        Err(error) => panic!("parse: {error}"),
+    };
+    let pattern = match Pattern::compile(pattern_str, SupportedLanguage::Rust) {
+        Ok(pattern) => pattern,
+        Err(error) => panic!("pattern: {error}"),
+    };
     (parsed, pattern)
 }
 
@@ -28,7 +39,10 @@ fn first_rust_match<'a>(
     pattern: &Pattern,
     source: &'a crate::parser::ParseResult,
 ) -> MatchResult<'a> {
-    pattern.find_first(source).expect("should find a match")
+    let Some(result) = pattern.find_first(source) else {
+        panic!("should find a match");
+    };
+    result
 }
 
 /// Helper to parse and return a multiple metavariable capture's text.
@@ -45,20 +59,17 @@ fn extract_multiple_capture_text(
 }
 
 /// Helper to extract a multiple metavariable capture from a match result.
-#[expect(
-    clippy::expect_fun_call,
-    reason = "Test helper needs string interpolation in expect message; will be addressed when \
-              whitaker permits unwrap_or_else panic in test interpolation contexts"
-)]
 fn extract_multiple_capture<'a>(
     match_result: &'a MatchResult<'a>,
     var_name: &str,
 ) -> &'a CapturedNodes<'a> {
-    match_result
-        .capture(var_name)
-        .expect(&format!("should capture {var_name}"))
-        .as_multiple()
-        .expect(&format!("{var_name} should be multiple"))
+    let Some(capture) = match_result.capture(var_name) else {
+        panic!("should capture {var_name}");
+    };
+    let Some(captured) = capture.as_multiple() else {
+        panic!("{var_name} should be multiple");
+    };
+    captured
 }
 
 #[rstest]

@@ -26,7 +26,9 @@ fn manifest() -> PluginManifest {
 #[fixture]
 fn registry_with_rope(manifest: PluginManifest) -> PluginRegistry {
     let mut r = PluginRegistry::new();
-    r.register(manifest).expect("register rope");
+    if let Err(error) = r.register(manifest) {
+        panic!("register rope: {error}");
+    }
     r
 }
 

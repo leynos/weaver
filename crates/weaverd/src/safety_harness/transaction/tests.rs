@@ -31,7 +31,10 @@ fn failure_scenario_builder() -> TransactionTestBuilder {
 
 /// Asserts that the file at the given path contains "hello world".
 fn assert_file_unchanged(path: &PathBuf) {
-    let content = fs::read_to_string(path).expect("read file");
+    let content = match fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(error) => panic!("read file: {error}"),
+    };
     assert_eq!(content, "hello world");
 }
 
@@ -49,7 +52,10 @@ where
     let (syntactic, semantic) = configure_locks(path.clone());
 
     let (result, _, _dir) = builder.execute_with_locks(&syntactic, &semantic);
-    let outcome = result.expect("should succeed");
+    let outcome = match result {
+        Ok(outcome) => outcome,
+        Err(error) => panic!("should succeed: {error}"),
+    };
 
     verify_outcome(&outcome);
     assert_file_unchanged(&path);
@@ -91,7 +97,10 @@ impl TransactionTestBuilder {
     /// Creates a new builder with a fresh temporary directory.
     fn new() -> Self {
         Self {
-            dir: TempDir::new().expect("create temp dir"),
+            dir: match TempDir::new() {
+                Ok(dir) => dir,
+                Err(error) => panic!("create temp dir: {error}"),
+            },
             files: Vec::new(),
             edits: Vec::new(),
         }
@@ -99,7 +108,10 @@ impl TransactionTestBuilder {
 
     /// Creates a file with the given content and adds it to the tracked files.
     fn with_file(mut self, name: &str, content: &str) -> Self {
-        let path = temp_file(&self.dir, name, content).expect("temp file");
+        let path = match temp_file(&self.dir, name, content) {
+            Ok(path) => path,
+            Err(error) => panic!("temp file: {error}"),
+        };
         self.files.push((path, content.to_string()));
         self
     }

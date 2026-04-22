@@ -185,10 +185,10 @@ mod tests {
 
     impl RecordingProvider {
         fn calls(&self) -> Vec<BackendKind> {
-            self.calls
-                .lock()
-                .expect("recording provider mutex poisoned")
-                .clone()
+            match self.calls.lock() {
+                Ok(calls) => calls.clone(),
+                Err(error) => panic!("recording provider mutex poisoned: {error}"),
+            }
         }
     }
 
@@ -198,10 +198,10 @@ mod tests {
             kind: BackendKind,
             _config: &Config,
         ) -> Result<(), BackendStartupError> {
-            let mut calls = self
-                .calls
-                .lock()
-                .expect("recording provider mutex poisoned");
+            let mut calls = match self.calls.lock() {
+                Ok(calls) => calls,
+                Err(error) => panic!("recording provider mutex poisoned: {error}"),
+            };
             calls.push(kind);
             Ok(())
         }
@@ -250,7 +250,12 @@ mod tests {
     }
 
     impl FailingProvider {
-        fn calls(&self) -> usize { *self.calls.lock().expect("failing provider mutex poisoned") }
+        fn calls(&self) -> usize {
+            match self.calls.lock() {
+                Ok(calls) => *calls,
+                Err(error) => panic!("failing provider mutex poisoned: {error}"),
+            }
+        }
     }
 
     impl BackendProvider for FailingProvider {
@@ -259,7 +264,10 @@ mod tests {
             kind: BackendKind,
             _config: &Config,
         ) -> Result<(), BackendStartupError> {
-            let mut calls = self.calls.lock().expect("failing provider mutex poisoned");
+            let mut calls = match self.calls.lock() {
+                Ok(calls) => calls,
+                Err(error) => panic!("failing provider mutex poisoned: {error}"),
+            };
             *calls += 1;
             Err(BackendStartupError::new(
                 kind,

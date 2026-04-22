@@ -127,7 +127,10 @@ mod tests {
     fn assert_edits_produce(original: &str, edits: Vec<TextEdit>, expected: &str) {
         let path = PathBuf::from("test.txt");
         let edit = FileEdit::with_edits(path, edits);
-        let result = apply_edits(original, &edit).expect("edit should succeed");
+        let result = match apply_edits(original, &edit) {
+            Ok(result) => result,
+            Err(error) => panic!("edit should succeed: {error}"),
+        };
         assert_eq!(result, expected);
     }
 

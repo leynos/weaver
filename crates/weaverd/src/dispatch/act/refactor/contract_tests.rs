@@ -221,6 +221,14 @@ fn assert_rename_request(
     new_name: Some("woven"),
 })]
 #[case(RenameContractCase {
+    file: "notes.py",
+    provider: "rope",
+    language: "python",
+    extra_args: vec![String::from("new_name=woven"), String::from("position=5")],
+    position: Some("5"),
+    new_name: Some("woven"),
+})]
+#[case(RenameContractCase {
     file: "notes.rs",
     provider: "rust-analyzer",
     language: "rust",

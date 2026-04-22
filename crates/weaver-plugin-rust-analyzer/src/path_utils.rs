@@ -177,21 +177,21 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn normalize_request_uri_rejects_authority_and_non_file_schemes() {
-        for input in ["file://host/src/main.rs", "https://example.com/src/main.rs"] {
-            assert_invalid_uri(
-                input,
-                "uri argument must be a valid file:// URI without an authority",
-            );
-        }
+    #[rstest]
+    #[case("file://host/src/main.rs")]
+    #[case("https://example.com/src/main.rs")]
+    fn normalize_request_uri_rejects_authority_and_non_file_schemes(#[case] input: &str) {
+        assert_invalid_uri(
+            input,
+            "uri argument must be a valid file:// URI without an authority",
+        );
     }
 
-    #[test]
-    fn normalize_request_uri_rejects_empty_root_and_invalid_uris() {
-        for input in ["file://", "file:///"] {
-            assert_invalid_uri(input, "path must not be empty or only '.'");
-        }
+    #[rstest]
+    #[case("file://")]
+    #[case("file:///")]
+    fn normalize_request_uri_rejects_empty_root_and_invalid_uris(#[case] input: &str) {
+        assert_invalid_uri(input, "path must not be empty or only '.'");
     }
 
     #[test]

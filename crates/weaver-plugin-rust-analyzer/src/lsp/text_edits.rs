@@ -2,7 +2,6 @@
 
 use std::path::Path;
 
-use camino::Utf8PathBuf;
 use cap_std::fs::Dir;
 use lsp_types::{
     AnnotatedTextEdit,
@@ -340,18 +339,10 @@ fn find_line_start_offset(
 
 /// Writes a minimal `Cargo.toml` so rust-analyzer can open the workspace.
 pub(super) fn write_stub_cargo_toml(workspace_root: &Path) -> Result<(), RustAnalyzerAdapterError> {
-    let utf8_path = Utf8PathBuf::from_path_buf(workspace_root.to_path_buf()).map_err(|_| {
-        RustAnalyzerAdapterError::InvalidPath {
-            message: String::from("workspace path contains invalid UTF-8"),
-        }
-    })?;
-
-    let workspace_dir =
-        Dir::open_ambient_dir(&utf8_path, cap_std::ambient_authority()).map_err(|source| {
-            RustAnalyzerAdapterError::WorkspaceWrite {
-                path: workspace_root.to_path_buf(),
-                source,
-            }
+    let workspace_dir = Dir::open_ambient_dir(workspace_root, cap_std::ambient_authority())
+        .map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
+            path: workspace_root.to_path_buf(),
+            source,
         })?;
 
     let content = concat!(

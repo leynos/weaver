@@ -3,8 +3,6 @@ target/
 .grepai/
 *:Zone.Identifier
 .agents/mcp/context_pack/packs/
-.*.swp
-.*.swo
-.*.swn
-.*~
+.*.sw?
+*~
 .*.un~

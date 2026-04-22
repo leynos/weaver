@@ -119,13 +119,14 @@ jobs:
       should-upload-workflow-artifacts: ${{ fromJSON(needs.metadata.outputs.should_upload_workflow_artifacts) }}
 
   release:
-    if: needs.metadata.outputs.should_publish == 'true'
+    if: ${{ always() && needs.metadata.outputs.should_publish == 'true' && needs.build-linux.result == 'success' && needs.build-macos.result == 'success' && (needs.build-freebsd.result == 'success' || needs.build-freebsd.result == 'skipped') }}
     permissions:
       contents: write
     needs:
       - metadata
       - build-linux
       - build-macos
+      - build-freebsd
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633

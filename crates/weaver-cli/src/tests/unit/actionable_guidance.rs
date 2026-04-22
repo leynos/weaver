@@ -64,10 +64,10 @@ fn assert_startup_guidance_template(error: &LifecycleError, expected: &StartupGu
         .map(ToOwned::to_owned)
         .unwrap_or_else(|| {
             if cfg!(unix) {
-                String::from(
-                    "  - Check whether the daemon is listening on \
-                     $XDG_RUNTIME_DIR/weaver/weaverd.sock",
-                )
+                String::from(concat!(
+                    "  - Check whether the daemon is listening on ",
+                    "$XDG_RUNTIME_DIR/weaver/weaverd.sock",
+                ))
             } else {
                 String::from("  - Check whether the daemon is listening on 127.0.0.1:9779")
             }

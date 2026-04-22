@@ -107,7 +107,7 @@ struct TestContext {
 }
 
 impl Drop for TestContext {
-    fn drop(&mut self) { drop(self.client.shutdown()); }
+    fn drop(&mut self) { self.client.shutdown().ok(); }
 }
 
 #[expect(
