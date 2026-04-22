@@ -6,7 +6,7 @@
 
 use std::{io::Write, process::ExitCode, time::SystemTime};
 
-use weaver_config::RuntimePaths;
+use weaver_config::{RuntimePaths, SocketEndpoint};
 
 use super::{
     error::LifecycleError,
@@ -23,6 +23,18 @@ use super::{
         write_startup_banner,
     },
 };
+
+#[derive(Clone, Copy, Debug)]
+struct RuntimeProbe {
+    reachable: bool,
+    pid: Option<u32>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct RuntimeStatusContext<'a> {
+    paths: &'a RuntimePaths,
+    endpoint: &'a SocketEndpoint,
+}
 
 /// Production lifecycle controller.
 #[derive(Debug, Default)]
@@ -127,15 +139,17 @@ impl SystemLifecycle {
     /// Reports status when socket is reachable but PID file is missing.
     fn report_socket_without_pid<W: Write, E: Write>(
         &self,
-        context: &LifecycleContext<'_>,
-        paths: &RuntimePaths,
+        runtime: RuntimeStatusContext<'_>,
         output: &mut LifecycleOutput<W, E>,
     ) -> Result<(), LifecycleError> {
         output.stdout_line(format_args!(
-            "daemon socket {} is listening but runtime files are missing; consider 'weaver daemon \
-             stop' or removing {}",
-            context.config.daemon_socket(),
-            paths.runtime_dir().display()
+            concat!(
+                "daemon socket {} is listening but runtime files are missing; consider 'weaver \
+                 daemon ",
+                "stop' or removing {}"
+            ),
+            runtime.endpoint,
+            runtime.paths.runtime_dir().display()
         ))
     }
 
@@ -152,20 +166,16 @@ impl SystemLifecycle {
     /// Reports daemon status when health snapshot is missing but runtime exists.
     fn report_degraded_status<W: Write, E: Write>(
         &self,
-        paths: &RuntimePaths,
-        context: &LifecycleContext<'_>,
+        probe: RuntimeProbe,
+        runtime: RuntimeStatusContext<'_>,
         output: &mut LifecycleOutput<W, E>,
     ) -> Result<(), LifecycleError> {
-        let reachable = socket_is_reachable(context.config.daemon_socket())?;
-        let dir = open_runtime_dir(paths)?;
-        let pid = read_pid(&dir, PID_FILENAME, paths.pid_path())?;
-
-        if let Some(pid) = pid {
-            return self.report_missing_health(pid, paths, output);
+        if let Some(pid) = probe.pid {
+            return self.report_missing_health(pid, runtime.paths, output);
         }
 
-        if reachable {
-            return self.report_socket_without_pid(context, paths, output);
+        if probe.reachable {
+            return self.report_socket_without_pid(runtime, output);
         }
 
         self.report_not_running(output)
@@ -194,13 +204,19 @@ impl SystemLifecycle {
 
         let dir = open_runtime_dir(&paths)?;
         let snapshot = read_health(&dir, HEALTH_FILENAME, paths.health_path())?;
+        let pid = read_pid(&dir, PID_FILENAME, paths.pid_path())?;
+        let reachable = socket_is_reachable(context.config.daemon_socket())?;
+        let runtime = RuntimeStatusContext {
+            paths: &paths,
+            endpoint: context.config.daemon_socket(),
+        };
 
         if let Some(snapshot) = snapshot {
             self.report_healthy_status(&snapshot, &context, output)?;
             return Ok(ExitCode::SUCCESS);
         }
 
-        self.report_degraded_status(&paths, &context, output)?;
+        self.report_degraded_status(RuntimeProbe { reachable, pid }, runtime, output)?;
         Ok(ExitCode::SUCCESS)
     }
 }

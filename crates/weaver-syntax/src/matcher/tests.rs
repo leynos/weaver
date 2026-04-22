@@ -11,10 +11,12 @@ use crate::{language::SupportedLanguage, parser::Parser};
 /// Fixture providing a Rust parser.
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn rust_parser() -> Parser {
-    match Parser::new(SupportedLanguage::Rust) {
-        Ok(parser) => parser,
-        Err(error) => panic!("parser: {error}"),
+fn rust_parser() -> Parser { result_or_panic(Parser::new(SupportedLanguage::Rust), "parser") }
+
+fn result_or_panic<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {
+    match result {
+        Ok(value) => value,
+        Err(error) => panic!("{context}: {error}"),
     }
 }
 
@@ -24,14 +26,11 @@ fn parse_and_pattern(
     source: &str,
     pattern_str: &str,
 ) -> (crate::parser::ParseResult, Pattern) {
-    let parsed = match parser.parse(source) {
-        Ok(parsed) => parsed,
-        Err(error) => panic!("parse: {error}"),
-    };
-    let pattern = match Pattern::compile(pattern_str, SupportedLanguage::Rust) {
-        Ok(pattern) => pattern,
-        Err(error) => panic!("pattern: {error}"),
-    };
+    let parsed = result_or_panic(parser.parse(source), "parse");
+    let pattern = result_or_panic(
+        Pattern::compile(pattern_str, SupportedLanguage::Rust),
+        "pattern",
+    );
     (parsed, pattern)
 }
 

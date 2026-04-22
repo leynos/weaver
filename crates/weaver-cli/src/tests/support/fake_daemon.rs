@@ -90,11 +90,7 @@ impl FakeDaemon {
                     return Self::stream_responses(stream, &lines);
                 }
                 AcceptOutcome::Retry => {}
-                AcceptOutcome::TimedOut => {
-                    // No connection arrived; exit cleanly so tests do not hang when the CLI
-                    // aborts before connecting (e.g. capabilities mode exiting early).
-                    return Ok(());
-                }
+                AcceptOutcome::TimedOut => return Err(anyhow!("accept deadline expired")),
             }
         }
     }

@@ -6,6 +6,7 @@
 use std::{fmt, str::FromStr};
 
 use camino::{Utf8Path, Utf8PathBuf};
+use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::Url;
@@ -53,10 +54,10 @@ impl SocketEndpoint {
     }
 }
 
-fn decode_unix_path(path: &str) -> String {
-    path.replace("%3F", "?")
-        .replace("%23", "#")
-        .replace("%25", "%")
+fn decode_unix_path(path: &str) -> Result<String, std::str::Utf8Error> {
+    percent_decode_str(path)
+        .decode_utf8()
+        .map(|decoded| decoded.into_owned())
 }
 
 impl fmt::Display for SocketEndpoint {
@@ -102,7 +103,9 @@ fn parse_unix_endpoint(url: &Url, input: &str) -> Result<SocketEndpoint, SocketP
     if path.is_empty() {
         return Err(SocketParseError::MissingUnixPath(input.to_string()));
     }
-    Ok(SocketEndpoint::unix(decode_unix_path(path)))
+    let decoded_path =
+        decode_unix_path(path).map_err(|_| SocketParseError::InvalidUnixPath(input.to_string()))?;
+    Ok(SocketEndpoint::unix(decoded_path))
 }
 
 fn parse_tcp_endpoint(url: &Url, input: &str) -> Result<SocketEndpoint, SocketParseError> {
@@ -137,6 +140,9 @@ pub enum SocketParseError {
     /// Unix socket URLs must not include query strings or fragments.
     #[error("unix socket URL must not include query strings or fragments in '{0}'")]
     InvalidUnixPathOptions(String),
+    /// Unix socket path contained invalid percent-encoding or invalid UTF-8.
+    #[error("invalid Unix socket path in '{0}'")]
+    InvalidUnixPath(String),
     /// URL failed to parse.
     #[error(transparent)]
     Url(#[from] url::ParseError),
@@ -163,6 +169,28 @@ mod tests {
         assert_eq!(
             rendered.parse::<SocketEndpoint>().expect("roundtrip"),
             endpoint
+        );
+    }
+
+    #[test]
+    fn unix_socket_round_trips_space_in_path() {
+        let endpoint = SocketEndpoint::unix(Utf8PathBuf::from("/tmp/weaver socket.sock"));
+        let rendered = endpoint.to_string();
+
+        assert_eq!(rendered, "unix:///tmp/weaver%20socket.sock");
+        assert_eq!(
+            rendered.parse::<SocketEndpoint>().expect("roundtrip"),
+            endpoint
+        );
+    }
+
+    #[test]
+    fn parse_unix_socket_decodes_percent_encoded_bytes() {
+        let parsed: SocketEndpoint = "unix:///tmp/weaver%20draft+%25sock".parse().expect("parse");
+
+        assert_eq!(
+            parsed,
+            SocketEndpoint::unix(Utf8PathBuf::from("/tmp/weaver draft+%sock"))
         );
     }
 
