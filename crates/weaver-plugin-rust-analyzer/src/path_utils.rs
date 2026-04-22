@@ -6,6 +6,10 @@ use url::Url;
 
 use crate::RustAnalyzerAdapterError;
 
+/// Validate that `path` is a safe workspace-relative path.
+///
+/// The path must be non-empty, relative, free of root and Windows-prefix
+/// components, and must not contain `..` traversal segments.
 pub(crate) fn validate_relative_path(path: &Path) -> Result<(), RustAnalyzerAdapterError> {
     if path.is_absolute() {
         return Err(RustAnalyzerAdapterError::InvalidPath {
@@ -21,6 +25,15 @@ pub(crate) fn validate_relative_path(path: &Path) -> Result<(), RustAnalyzerAdap
     {
         return Err(RustAnalyzerAdapterError::InvalidPath {
             message: String::from("path must not be empty or only '.'"),
+        });
+    }
+
+    let has_root_dir = components
+        .iter()
+        .any(|component| matches!(component, Component::RootDir));
+    if has_root_dir {
+        return Err(RustAnalyzerAdapterError::InvalidPath {
+            message: String::from("absolute paths are not allowed"),
         });
     }
 
@@ -45,6 +58,10 @@ pub(crate) fn validate_relative_path(path: &Path) -> Result<(), RustAnalyzerAdap
     Ok(())
 }
 
+/// Normalise a `file://` request URI into a slash-separated workspace path.
+///
+/// The URI must use the `file` scheme without an authority. The resulting path
+/// is validated as workspace-relative and returned with `/` separators.
 pub(crate) fn normalize_request_uri(uri: &str) -> Result<String, RustAnalyzerAdapterError> {
     let parsed = Url::parse(uri).map_err(|_| invalid_file_uri_error())?;
     if parsed.scheme() != "file" || parsed.has_host() {
@@ -80,6 +97,10 @@ fn strip_file_uri_root(path: &Path) -> Result<PathBuf, RustAnalyzerAdapterError>
     Ok(stripped)
 }
 
+/// Convert a validated relative path into slash-separated form.
+///
+/// Normal path components are preserved, `.` components are ignored, and any
+/// root, prefix, traversal, or non-UTF-8 component yields `InvalidPath`.
 pub(crate) fn path_to_slash(path: &Path) -> Result<String, RustAnalyzerAdapterError> {
     let parts = path
         .components()

@@ -3009,6 +3009,7 @@ dependencies = [
  "libc",
  "once_cell",
  "ortho_config",
+ "percent-encoding",
  "rstest",
  "rstest-bdd",
  "rstest-bdd-macros",

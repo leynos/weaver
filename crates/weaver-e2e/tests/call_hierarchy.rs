@@ -119,10 +119,6 @@ mod fixtures_impl {
 
     use super::*;
 
-    #[expect(
-        clippy::expect_used,
-        reason = "test fixture setup should panic with an explicit message"
-    )]
     fn create_test_context(fixture_content: &str) -> Result<Option<TestContext>, TestError> {
         if !pyrefly_available() {
             return Ok(None);

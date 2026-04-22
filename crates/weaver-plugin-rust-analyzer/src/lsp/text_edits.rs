@@ -2,7 +2,6 @@
 
 use std::path::Path;
 
-use cap_std::fs::Dir;
 use lsp_types::{
     AnnotatedTextEdit,
     DocumentChangeOperation,
@@ -14,7 +13,7 @@ use lsp_types::{
     WorkspaceEdit,
 };
 
-use crate::{ByteOffset, RustAnalyzerAdapterError};
+use crate::{ByteOffset, RustAnalyzerAdapterError, write_workspace_file};
 
 /// LSP position encoding used for character offsets.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -339,12 +338,6 @@ fn find_line_start_offset(
 
 /// Writes a minimal `Cargo.toml` so rust-analyzer can open the workspace.
 pub(super) fn write_stub_cargo_toml(workspace_root: &Path) -> Result<(), RustAnalyzerAdapterError> {
-    let workspace_dir = Dir::open_ambient_dir(workspace_root, cap_std::ambient_authority())
-        .map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
-            path: workspace_root.to_path_buf(),
-            source,
-        })?;
-
     let content = concat!(
         "[package]\n",
         "name = \"weaver-rust-analyzer-workspace\"\n",
@@ -352,12 +345,7 @@ pub(super) fn write_stub_cargo_toml(workspace_root: &Path) -> Result<(), RustAna
         "edition = \"2024\"\n",
     );
 
-    workspace_dir
-        .write("Cargo.toml", content.as_bytes())
-        .map_err(|source| RustAnalyzerAdapterError::WorkspaceWrite {
-            path: workspace_root.join("Cargo.toml"),
-            source,
-        })
+    write_workspace_file(workspace_root, Path::new("Cargo.toml"), content).map(|_| ())
 }
 
 /// Converts an absolute path to an `lsp_types::Uri` using `file://` encoding.

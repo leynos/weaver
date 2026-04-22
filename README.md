@@ -136,9 +136,9 @@ Cargo may report unstable `-Z` option errors, missing
 When that happens, verify the pinned Nightly toolchain, the Cranelift
 component, and the system linker packages first.
 
-Triage: [type:docstyle] If local builds fail, verify the pinned Nightly
-override first, then confirm the Cranelift component and linker packages are
-installed before investigating the workspace itself.
+If local builds fail, verify the pinned Nightly override first, then confirm
+the Cranelift component and linker packages are installed before investigating
+the workspace itself.
 
 ## Documentation
 
