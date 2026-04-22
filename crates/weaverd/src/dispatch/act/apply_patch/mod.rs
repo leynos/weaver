@@ -135,8 +135,9 @@ impl<'a> ApplyPatchExecutor<'a> {
                     .count();
                 debug_assert!(
                     files_modified >= files_deleted,
-                    "files_modified ({files_modified}) smaller than files_deleted \
-                     ({files_deleted})",
+                    concat!("files_modified ({}) smaller than files_deleted ", "({})"),
+                    files_modified,
+                    files_deleted,
                 );
                 Ok(ApplyPatchSummary {
                     status: "ok",

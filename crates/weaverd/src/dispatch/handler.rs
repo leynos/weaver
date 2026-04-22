@@ -214,13 +214,21 @@ mod tests {
     impl HandlerTestHarness {
         /// Sends request bytes and retrieves all response lines.
         fn send_and_collect(&mut self, request: &[u8]) -> Vec<String> {
-            self.client.write_all(request).expect("write request");
-            self.client.flush().expect("flush");
+            if let Err(error) = self.client.write_all(request) {
+                panic!("write request: {error}");
+            }
+            if let Err(error) = self.client.flush() {
+                panic!("flush: {error}");
+            }
 
             let mut reader = BufReader::new(&mut self.client);
             let mut lines = Vec::new();
             let mut line = String::new();
-            while reader.read_line(&mut line).expect("read") > 0 {
+            while match reader.read_line(&mut line) {
+                Ok(bytes_read) => bytes_read,
+                Err(error) => panic!("read: {error}"),
+            } > 0
+            {
                 lines.push(line.clone());
                 line.clear();
             }
@@ -228,13 +236,23 @@ mod tests {
         }
 
         /// Waits for the server thread to complete.
-        fn join(self) { self.server_handle.join().expect("server join"); }
+        fn join(self) {
+            if let Err(error) = self.server_handle.join() {
+                panic!("server join: {error:?}");
+            }
+        }
     }
 
     /// Creates a TCP listener and returns the listener and its address.
     fn create_listener() -> (TcpListener, SocketAddr) {
-        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
-        let addr = listener.local_addr().expect("addr");
+        let listener = match TcpListener::bind(("127.0.0.1", 0)) {
+            Ok(listener) => listener,
+            Err(error) => panic!("bind: {error}"),
+        };
+        let addr = match listener.local_addr() {
+            Ok(addr) => addr,
+            Err(error) => panic!("addr: {error}"),
+        };
         (listener, addr)
     }
 
@@ -244,12 +262,18 @@ mod tests {
         let workspace_root = PathBuf::from("/tmp/weaver-test-workspace");
 
         let server_handle = thread::spawn(move || {
-            let (stream, _) = listener.accept().expect("accept");
+            let (stream, _) = match listener.accept() {
+                Ok(stream) => stream,
+                Err(error) => panic!("accept: {error}"),
+            };
             DispatchConnectionHandler::new(backend_manager, workspace_root)
                 .handle(ConnectionStream::Tcp(stream));
         });
 
-        let client = TcpStream::connect(addr).expect("connect");
+        let client = match TcpStream::connect(addr) {
+            Ok(client) => client,
+            Err(error) => panic!("connect: {error}"),
+        };
         HandlerTestHarness {
             client,
             server_handle,

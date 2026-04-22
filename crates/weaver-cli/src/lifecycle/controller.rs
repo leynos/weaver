@@ -182,17 +182,13 @@ impl SystemLifecycle {
         let paths = match self.check_daemon_paths(context.config) {
             Some(paths) => paths,
             None => {
-                output.stdout_line(format_args!(
-                    "daemon is not running; use 'weaver daemon start' to launch it."
-                ))?;
+                self.report_not_running(output)?;
                 return Ok(ExitCode::SUCCESS);
             }
         };
 
         if !paths.runtime_dir().exists() {
-            output.stdout_line(format_args!(
-                "daemon is not running; use 'weaver daemon start' to launch it."
-            ))?;
+            self.report_not_running(output)?;
             return Ok(ExitCode::SUCCESS);
         }
 

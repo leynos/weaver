@@ -74,7 +74,12 @@ mod tests {
 
     #[allow_fixture_expansion_lints]
     #[fixture]
-    fn sample_uri() -> Uri { "file:///src/main.rs".parse().expect("valid uri") }
+    fn sample_uri() -> Uri {
+        match "file:///src/main.rs".parse() {
+            Ok(uri) => uri,
+            Err(error) => panic!("valid uri: {error}"),
+        }
+    }
 
     fn make_location(uri: &Uri, line: u32, character: u32) -> Location {
         Location {

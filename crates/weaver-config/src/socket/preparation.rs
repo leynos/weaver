@@ -23,7 +23,6 @@ pub enum SocketPreparationError {
         source: std::io::Error,
     },
     /// Failed to read metadata while securing socket directories.
-    #[cfg(unix)]
     #[error("failed to inspect socket directory '{path}': {source}")]
     ReadMetadata {
         path: Utf8PathBuf,
@@ -31,7 +30,6 @@ pub enum SocketPreparationError {
         source: std::io::Error,
     },
     /// Failed to canonicalize a socket directory while validating safety.
-    #[cfg(unix)]
     #[error("failed to canonicalize socket directory '{path}': {source}")]
     Canonicalize {
         path: Utf8PathBuf,
@@ -39,15 +37,12 @@ pub enum SocketPreparationError {
         source: std::io::Error,
     },
     /// Encountered a symbolic link in the socket directory path.
-    #[cfg(unix)]
     #[error("socket directory '{path}' resolves through a symlink")]
     SymlinkDetected { path: Utf8PathBuf },
     /// Socket directory canonicalization produced a non-UTF-8 path.
-    #[cfg(unix)]
     #[error("socket directory canonicalizes to a non-UTF-8 path: {path:?}")]
     NonUtf8CanonicalPath { path: std::path::PathBuf },
     /// Socket directory escapes the configured base path.
-    #[cfg(unix)]
     #[error("socket directory '{path}' escapes to '{canonical}' when canonicalized")]
     PathTraversal {
         path: Utf8PathBuf,

@@ -3,8 +3,6 @@
 //! This file is intentionally loaded multiple times by different test modules
 //! using `#[path = "refactor_helpers.rs"]` to provide shared test utilities.
 
-#![allow(dead_code)]
-
 pub(crate) mod builders {
     //! Synthetic request and backend builders for refactor tests.
 
@@ -53,6 +51,14 @@ pub(crate) mod builders {
 
     pub(crate) fn configure_request(request: &mut CommandRequest, args: Vec<String>) {
         *request = command_request(args);
+    }
+
+    #[test]
+    fn builder_helpers_are_referenced() {
+        let mut request = command_request(Vec::new());
+        let _ = build_backends;
+        let args = standard_rename_args("notes.py");
+        configure_request(&mut request, args);
     }
 }
 
@@ -164,12 +170,40 @@ pub(crate) mod resolutions {
             })
         }
     }
+
+    #[test]
+    fn resolution_helpers_are_referenced() {
+        let refused = RefusedResolution {
+            capability: CapabilityId::RenameSymbol,
+            language: None,
+            requested_provider: None,
+            selection_mode: SelectionMode::Automatic,
+            refusal_reason: RefusalReason::UnsupportedLanguage,
+            candidates: Vec::new(),
+        };
+        let selected = SelectedResolution {
+            capability: CapabilityId::RenameSymbol,
+            language: "python",
+            provider: "rope",
+            selection_mode: SelectionMode::Automatic,
+            requested_provider: None,
+        };
+        let _ = selected_resolution(selected);
+        let _ = refused_resolution(refused);
+        let _ = rejected_candidate("rope", CandidateReason::UnsupportedLanguage);
+        let context = AutoResolutionContext {
+            capability: CapabilityId::RenameSymbol,
+            requested_provider: None,
+            selection_mode: SelectionMode::Automatic,
+        };
+        let _ = resolve_auto_language(context, Some("python"), "rope", Vec::new());
+    }
 }
 
 pub(crate) mod rollback {
     //! Runtime doubles that exercise rollback paths for refactor tests.
 
-    use weaver_plugins::{PluginError, PluginRequest, PluginResponse};
+    use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 
     use super::resolutions::{SelectedResolution, selected_resolution};
     use crate::dispatch::act::refactor::{
@@ -227,6 +261,25 @@ pub(crate) mod rollback {
             resolution,
             execute_result,
         }
+    }
+
+    #[test]
+    fn rollback_helpers_are_referenced() {
+        let runtime = selected_runtime(
+            SelectedResolution {
+                capability: weaver_plugins::CapabilityId::RenameSymbol,
+                language: "python",
+                provider: "rope",
+                selection_mode:
+                    crate::dispatch::act::refactor::resolution::SelectionMode::Automatic,
+                requested_provider: None,
+            },
+            ExecuteResult::MissingPlugin("rope"),
+        );
+        let _ = rollback_runtime(
+            runtime.resolution.clone(),
+            ExecuteResult::Success(PluginResponse::success(PluginOutput::Empty)),
+        );
     }
 }
 
@@ -313,5 +366,20 @@ pub(crate) mod content {
 
     pub(crate) fn routed_malformed_diff_for(path: &Path) -> String {
         routed_format_diff(path, |p| format!("diff --git a/{p}"))
+    }
+
+    #[test]
+    fn content_helpers_are_referenced() {
+        let path = Path::new("notes.py");
+        let _ = format_diff(path, "diff --git a/notes.py b/notes.py\n");
+        let _ = FileKind::Python;
+        let _ = classify_file(path);
+        let _ = content_table(FileKind::Python);
+        let _ = original_content_for(path);
+        let _ = updated_content_for(path);
+        let _ = routed_patch_path(path);
+        let _ = routed_format_diff(path, |value| value.to_owned());
+        let _ = routed_diff_for(path);
+        let _ = routed_malformed_diff_for(path);
     }
 }

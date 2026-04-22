@@ -190,4 +190,4 @@ fn then_graph_build_fails(world: &RefCell<TestWorld>, error_kind: String) {
 }
 
 #[scenario(path = "tests/features/weaver_graph.feature")]
-fn call_graph_behaviour(world: RefCell<TestWorld>) { let _ = world; }
+fn call_graph_behaviour(world: RefCell<TestWorld>) { std::mem::drop(world); }

@@ -68,21 +68,16 @@ fn when_execute(world: &mut TestWorld) {
 // ---------------------------------------------------------------------------
 
 /// Asserts that a diagnostic result contains a specific error code.
-#[expect(
-    clippy::expect_fun_call,
-    reason = "Test helper needs string interpolation in expect message; will be addressed when \
-              whitaker permits unwrap_or_else panic in test interpolation contexts"
-)]
 fn assert_diagnostic_code(
     result: Option<&Result<(), DiagnosticReport>>,
     expected_code: &str,
     result_name: &str,
     failure_kind: &str,
 ) {
-    let inner = result.expect(&format!("{result_name} should be set"));
-    let report = inner
-        .as_ref()
-        .expect_err(&format!("expected {failure_kind}"));
+    let missing_result_message = format!("{result_name} should be set");
+    let expected_failure_message = format!("expected {failure_kind}");
+    let inner = result.expect(&missing_result_message);
+    let report = inner.as_ref().expect_err(&expected_failure_message);
     let first = report
         .diagnostics()
         .first()

@@ -26,6 +26,15 @@ fn create_dir_all_cap(base: &Dir, path: &Utf8Path) -> io::Result<()> {
     Ok(())
 }
 
+/// Write `content` to a workspace-relative file, creating parent directories.
+///
+/// Paths are interpreted relative to `workspace_root`, and the destination is
+/// created or overwritten using capability-scoped filesystem operations.
+///
+/// # Errors
+///
+/// Returns [`RustAnalyzerAdapterError`] if the path is invalid, lacks a file
+/// name, or any capability-based filesystem operation fails.
 pub(crate) fn write_workspace_file(
     workspace_root: &Path,
     relative_path: &Path,

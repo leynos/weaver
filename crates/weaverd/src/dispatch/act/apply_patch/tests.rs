@@ -12,7 +12,12 @@ use crate::{
 
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn temp_dir() -> TempDir { TempDir::new().expect("temp dir") }
+fn temp_dir() -> TempDir {
+    match TempDir::new() {
+        Ok(temp_dir) => temp_dir,
+        Err(error) => panic!("temp dir: {error}"),
+    }
+}
 
 #[rstest]
 fn resolve_path_rejects_parent_dir(temp_dir: TempDir) {

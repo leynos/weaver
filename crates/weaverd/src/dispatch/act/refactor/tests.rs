@@ -80,7 +80,12 @@ impl RefactorPluginRuntime for MockRuntime {
 
 #[allow_fixture_expansion_lints]
 #[fixture]
-fn socket_dir() -> TempDir { TempDir::new().expect("socket dir") }
+fn socket_dir() -> TempDir {
+    match TempDir::new() {
+        Ok(temp_dir) => temp_dir,
+        Err(error) => panic!("socket dir: {error}"),
+    }
+}
 
 fn run_rename_handle(
     socket_dir: &TempDir,
@@ -88,8 +93,13 @@ fn run_rename_handle(
     resolution: MockResolution,
     result: MockRuntimeResult,
 ) -> (i32, String) {
-    let workspace = TempDir::new().expect("workspace");
-    std::fs::write(workspace.path().join(file), "hello\n").expect("write");
+    let workspace = match TempDir::new() {
+        Ok(workspace) => workspace,
+        Err(error) => panic!("workspace: {error}"),
+    };
+    if let Err(error) = std::fs::write(workspace.path().join(file), "hello\n") {
+        panic!("write: {error}");
+    }
 
     let request = command_request(vec![
         String::from("--refactoring"),
@@ -103,7 +113,7 @@ fn run_rename_handle(
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
 
-    let dispatch_result = handle(
+    let dispatch_result = match handle(
         &request,
         &mut writer,
         RefactorContext {
@@ -111,10 +121,15 @@ fn run_rename_handle(
             workspace_root: workspace.path(),
             runtime: &runtime,
         },
-    )
-    .expect("dispatch result");
+    ) {
+        Ok(dispatch_result) => dispatch_result,
+        Err(error) => panic!("dispatch result: {error}"),
+    };
 
-    let stderr = String::from_utf8(output).expect("stderr utf8");
+    let stderr = match String::from_utf8(output) {
+        Ok(stderr) => stderr,
+        Err(error) => panic!("stderr utf8: {error}"),
+    };
     (dispatch_result.status, stderr)
 }
 
