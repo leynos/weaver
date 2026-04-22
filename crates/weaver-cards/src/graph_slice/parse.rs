@@ -170,6 +170,12 @@ impl RequestBuilder {
             "--max-cards" => {
                 let raw = require_arg_value(iter, Flag::MaxCards)?;
                 let n = parse_u32(raw)?;
+                if n == 0 {
+                    return Err(GraphSliceError::InvalidValue {
+                        flag: Flag::MaxCards.into(),
+                        message: String::from("max_cards must be >= 1"),
+                    });
+                }
                 self.budget = self.budget.with_max_cards(n);
                 Ok(true)
             }
