@@ -36,11 +36,22 @@ impl RefactorArgsBuilder {
         let Some(file) = self.file else {
             return Err(missing_requirements_error());
         };
-        if let Some(unexpected_flag) = self.extra.iter().find(|extra| extra.starts_with("--")) {
+        let invalid_extra_arguments: Vec<&str> = self
+            .extra
+            .iter()
+            .map(String::as_str)
+            .filter(|extra| !is_valid_extra_argument(extra))
+            .collect();
+        if !invalid_extra_arguments.is_empty() {
+            let offending_tokens = invalid_extra_arguments
+                .iter()
+                .map(|token| format!("'{token}'"))
+                .collect::<Vec<_>>()
+                .join(", ");
             return Err(DispatchError::invalid_arguments(format!(
-                "act refactor does not support top-level flag '{unexpected_flag}'; use only \
-                 --provider <plugin>, --refactoring <operation>, --file <path>, and trailing \
-                 KEY=VALUE arguments"
+                "act refactor only accepts trailing KEY=VALUE arguments; invalid trailing \
+                 arguments: {offending_tokens}. Use only --provider <plugin>, --refactoring \
+                 <operation>, --file <path>, and trailing KEY=VALUE arguments"
             )));
         }
 
@@ -101,8 +112,24 @@ fn parse_flag_value<'a>(
     Ok(value.clone())
 }
 
+fn is_valid_extra_argument(argument: &str) -> bool {
+    if argument.starts_with("--") {
+        return false;
+    }
+
+    let Some((key, _value)) = argument.split_once('=') else {
+        return false;
+    };
+    !key.is_empty()
+}
+
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
+    use super::parse_refactor_args;
+    use crate::dispatch::errors::DispatchError;
+
     #[test]
     fn flag_as_value_is_rejected() {
         let args = vec![
@@ -145,6 +172,26 @@ mod tests {
         assert_eq!(parsed.file, "src/main.py");
     }
 
+    #[rstest]
+    #[case::no_arguments(Vec::new())]
+    #[case::missing_provider(vec![
+        String::from("--refactoring"),
+        String::from("rename"),
+        String::from("--file"),
+        String::from("src/main.py"),
+    ])]
+    #[case::missing_refactoring(vec![
+        String::from("--provider"),
+        String::from("rope"),
+        String::from("--file"),
+        String::from("src/main.py"),
+    ])]
+    #[case::missing_file(vec![
+        String::from("--provider"),
+        String::from("rope"),
+        String::from("--refactoring"),
+        String::from("rename"),
+    ])]
     fn missing_required_flags_report_full_contract(#[case] args: Vec<String>) {
         let message =
             invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
@@ -229,6 +276,27 @@ mod tests {
 
         let message =
             invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
-        assert!(message.contains("does not support top-level flag '--bogus'"));
+        assert!(message.contains("invalid trailing arguments: '--bogus'"));
+        assert!(message.contains("trailing KEY=VALUE arguments"));
+    }
+
+    #[test]
+    fn malformed_trailing_arguments_are_rejected() {
+        let args = vec![
+            String::from("--provider"),
+            String::from("rope"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("src/main.py"),
+            String::from("offset"),
+            String::from("=woven"),
+            String::from("new_name"),
+        ];
+
+        let message =
+            invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
+        assert!(message.contains("invalid trailing arguments: 'offset', '=woven', 'new_name'"));
+        assert!(message.contains("trailing KEY=VALUE arguments"));
     }
 }

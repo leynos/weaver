@@ -305,10 +305,6 @@ fn given_unsupported_language_request(world: &mut RefactorWorld) {
     );
     world.routing_mode = RoutingMode::UnsupportedLanguage;
 }
-
-fn given_missing_required_arguments_request(world: &mut RefactorWorld) {
-    configure_request(&mut world.request, Vec::new());
-}
 fn given_explicit_provider_mismatch_request(world: &mut RefactorWorld) -> Result<(), String> {
     configure_request(
         &mut world.request,
