@@ -45,6 +45,12 @@ pub(crate) mod builders {
         ]
     }
 
+    pub(crate) fn standard_rename_args_for_provider(file: &str, provider: &str) -> Vec<String> {
+        let mut args = vec![String::from("--provider"), String::from(provider)];
+        args.extend(standard_rename_args(file));
+        args
+    }
+
     pub(crate) fn configure_request(request: &mut CommandRequest, args: Vec<String>) {
         *request = command_request(args);
     }
@@ -66,23 +72,6 @@ pub(crate) mod resolutions {
         pub(crate) refusal_reason: RefusalReason,
         pub(crate) candidates: Vec<CandidateEvaluation>,
     }
-
-pub(super) fn standard_rename_args(file: &str) -> Vec<String> {
-    vec![
-        String::from("--refactoring"),
-        String::from("rename"),
-        String::from("--file"),
-        String::from(file),
-        String::from("offset=1"),
-        String::from("new_name=woven"),
-    ]
-}
-
-pub(super) fn standard_rename_args_for_provider(file: &str, provider: &str) -> Vec<String> {
-    let mut args = vec![String::from("--provider"), String::from(provider)];
-    args.extend(standard_rename_args(file));
-    args
-}
 
     pub(crate) struct SelectedResolution<'a> {
         pub(crate) capability: CapabilityId,
