@@ -186,7 +186,7 @@ mod tests {
 
     #[cfg(windows)]
     #[rstest]
-    #[case(r"C:\foo", "windows path prefixes are not allowed")]
+    #[case(r"C:foo", "windows path prefixes are not allowed")]
     fn validate_relative_path_rejects_windows_prefixes(
         #[case] input: &str,
         #[case] expected_message: &str,

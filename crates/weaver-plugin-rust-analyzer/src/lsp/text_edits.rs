@@ -124,7 +124,7 @@ pub(super) fn apply_workspace_edit(
         })
         .collect::<Result<Vec<(usize, usize, String)>, RustAnalyzerAdapterError>>()?;
 
-    ranges.sort_by_key(|right| std::cmp::Reverse(right.0));
+    ranges.sort_by_key(|range| std::cmp::Reverse(range.0));
 
     let mut updated = String::from(original);
     for (start, end, replacement) in ranges {
@@ -208,8 +208,11 @@ fn collect_operation(
         DocumentChangeOperation::Op(resource_operation) => {
             Err(RustAnalyzerAdapterError::InvalidOutput {
                 message: format!(
-                    "workspace edit includes unsupported resource operation: \
-                     {resource_operation:?}"
+                    concat!(
+                        "workspace edit includes unsupported resource operation: ",
+                        "{:?}"
+                    ),
+                    resource_operation
                 ),
             })
         }
@@ -248,7 +251,7 @@ fn lsp_position_to_byte_offset(
 
     match encoding {
         PositionEncoding::Utf8 => {
-            utf8_position_to_byte_offset(content, line_content, position, (line_start, line_end))
+            utf8_position_to_byte_offset(content, position, line_start, line_end)
         }
         PositionEncoding::Utf16 => {
             utf16_position_to_byte_offset(line_content, position, line_start, line_end)
@@ -258,11 +261,10 @@ fn lsp_position_to_byte_offset(
 
 fn utf8_position_to_byte_offset(
     content: &str,
-    line_content: &str,
     position: Position,
-    line_bounds: (usize, usize),
+    line_start: usize,
+    line_end: usize,
 ) -> Result<usize, RustAnalyzerAdapterError> {
-    let (line_start, line_end) = line_bounds;
     let character_offset = usize::try_from(position.character).map_err(|source| {
         RustAnalyzerAdapterError::InvalidOutput {
             message: format!("UTF-8 character offset conversion failed: {source}"),
@@ -273,7 +275,7 @@ fn utf8_position_to_byte_offset(
         return Err(RustAnalyzerAdapterError::InvalidOutput {
             message: format!(
                 "position {position:?} exceeds line UTF-8 width {}",
-                line_content.len()
+                line_end - line_start
             ),
         });
     }
