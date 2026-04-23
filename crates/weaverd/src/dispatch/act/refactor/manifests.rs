@@ -72,6 +72,11 @@ pub(crate) fn rust_analyzer_manifest(executable: PathBuf) -> PluginManifest {
     manifest_from_spec(provider_spec(RUST_ANALYZER_PLUGIN_NAME), executable)
 }
 
+/// Returns the names of all built-in refactoring providers.
+///
+/// The slice is derived from the compile-time built-in provider catalogue and
+/// is used as the canonical source of valid provider names for `act refactor`
+/// argument validation.
 pub(crate) fn built_in_provider_names() -> &'static [&'static str] {
     BUILT_IN_PROVIDER_NAMES
 }
