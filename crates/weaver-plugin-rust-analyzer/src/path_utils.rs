@@ -58,7 +58,7 @@ pub(crate) fn validate_relative_path(path: &Path) -> Result<(), RustAnalyzerAdap
     Ok(())
 }
 
-/// Normalise a `file://` request URI into a slash-separated workspace path.
+/// Normalize a `file://` request URI into a slash-separated workspace path.
 ///
 /// The URI must use the `file` scheme without an authority. The resulting path
 /// is validated as workspace-relative and returned with `/` separators.
