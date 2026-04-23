@@ -39,9 +39,13 @@ pub(crate) mod builders {
     }
 
     pub(crate) fn standard_rename_args(file: &str) -> Vec<String> {
+        standard_rename_args_for_provider(file, provider_for_file(file))
+    }
+
+    pub(crate) fn standard_rename_args_for_provider(file: &str, provider: &str) -> Vec<String> {
         vec![
             String::from("--provider"),
-            String::from(provider_for_file(file)),
+            String::from(provider),
             String::from("--refactoring"),
             String::from("rename"),
             String::from("--file"),
@@ -64,6 +68,7 @@ pub(crate) mod builders {
 
     const _: fn(&Path) -> FusionBackends<SemanticBackendProvider> = build_backends;
     const _: fn(&str) -> Vec<String> = standard_rename_args;
+    const _: fn(&str, &str) -> Vec<String> = standard_rename_args_for_provider;
     const _: fn(&str) -> &'static str = provider_for_file;
     const _: fn(&mut CommandRequest, Vec<String>) = configure_request;
 }

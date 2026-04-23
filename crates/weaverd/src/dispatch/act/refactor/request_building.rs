@@ -8,7 +8,13 @@ use std::{
 use url::Url;
 use weaver_plugins::{PluginRequest, capability::CapabilityId, protocol::FilePayload};
 
-use super::arguments;
+use super::{
+    arguments,
+    requirements::{
+        capability_for_operation,
+        effective_operation as supported_effective_operation,
+    },
+};
 use crate::dispatch::errors::DispatchError;
 
 struct ResolvedFile {
@@ -30,12 +36,12 @@ pub(super) fn prepare_plugin_request(
     })?;
     let resolved_file = resolve_file(&canonical_workspace, &args.file)?;
     let mut plugin_args = build_plugin_args(args)?;
-    let effective_operation = effective_operation(&mut plugin_args, args, &resolved_file.path)?;
+    let effective_operation = map_effective_operation(&mut plugin_args, args, &resolved_file.path)?;
     plugin_args.insert(
         String::from("refactoring"),
         serde_json::Value::String(effective_operation.clone()),
     );
-    let capability = capability_from_operation(&effective_operation)?;
+    let capability = capability_for_operation(&effective_operation)?;
     let file_content = load_file_contents(&resolved_file.path)?;
     let plugin_request = PluginRequest::with_arguments(
         &effective_operation,
@@ -79,18 +85,16 @@ fn build_plugin_args(
     Ok(plugin_args)
 }
 
-fn effective_operation(
+fn map_effective_operation(
     plugin_args: &mut HashMap<String, serde_json::Value>,
     args: &arguments::RefactorArgs,
     file_path: &Path,
 ) -> Result<String, DispatchError> {
-    match args.refactoring.as_str() {
-        "rename" => {
-            apply_rename_symbol_mapping(plugin_args, file_path)?;
-            Ok(String::from("rename-symbol"))
-        }
-        _ => Ok(args.refactoring.clone()),
+    let operation = supported_effective_operation(&args.refactoring)?;
+    if operation == "rename-symbol" {
+        apply_rename_symbol_mapping(plugin_args, file_path)?;
     }
+    Ok(String::from(operation))
 }
 
 fn contains_parent_traversal(path: &Path) -> bool {
@@ -163,16 +167,4 @@ fn apply_rename_symbol_mapping(
         plugin_args.insert(String::from("position"), offset_val);
     }
     Ok(())
-}
-
-fn capability_from_operation(operation: &str) -> Result<CapabilityId, DispatchError> {
-    // TODO: Extend this mapping when additional refactoring operations are added
-    // (e.g., extract-method, inline-variable, move-function).
-    match operation {
-        "rename-symbol" => Ok(CapabilityId::RenameSymbol),
-        other => Err(DispatchError::invalid_arguments(format!(
-            "act refactor does not support capability resolution for '{other}' (only \
-             'rename-symbol' is currently implemented)"
-        ))),
-    }
 }

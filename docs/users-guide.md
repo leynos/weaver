@@ -1328,10 +1328,10 @@ constraint during registration and rejects manifests that violate it.
 The daemon uses capability declarations to select plugins. For example, when
 routing a `rename-symbol` request for Python, the daemon queries the registry
 for actuator plugins that declare `rename-symbol` and support the `python`
-language. The current built-in routing policy selects `rope` for Python and
-`rust-analyzer` for Rust when `--provider` is omitted, and refuses
-deterministically for unsupported languages, unknown providers, and explicit
-provider/language mismatches.
+language. For `act refactor`, operators must still pass `--provider`
+explicitly, using `rope` for Python rename flows or `rust-analyzer` for Rust
+rename flows. The daemon refuses deterministically for unsupported languages,
+unknown providers, and explicit provider/language mismatches.
 
 ### Safety harness integration
 

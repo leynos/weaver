@@ -11,7 +11,13 @@ use weaver_test_macros::allow_fixture_expansion_lints;
 
 use super::{
     refactor_helpers::{
-        builders::{build_backends, command_request, configure_request, standard_rename_args},
+        builders::{
+            build_backends,
+            command_request,
+            configure_request,
+            standard_rename_args,
+            standard_rename_args_for_provider,
+        },
         content::{
             original_content_for,
             routed_diff_for,
@@ -273,21 +279,30 @@ fn given_workspace_file(
 
 #[given("a valid act refactor request for rope")]
 fn given_valid_rope_request(world: &mut RefactorWorld) -> Result<(), String> {
-    configure_request(&mut world.request, standard_rename_args("notes.py"));
+    configure_request(
+        &mut world.request,
+        standard_rename_args_for_provider("notes.py", "rope"),
+    );
     world.routing_mode = RoutingMode::AutomaticPython;
     world.prepare_routed_fixture("notes.py")
 }
 
 #[given("a valid act refactor request for rust-analyzer")]
 fn given_valid_rust_request(world: &mut RefactorWorld) -> Result<(), String> {
-    configure_request(&mut world.request, standard_rename_args("notes.rs"));
+    configure_request(
+        &mut world.request,
+        standard_rename_args_for_provider("notes.rs", "rust-analyzer"),
+    );
     world.routing_mode = RoutingMode::AutomaticRust;
     world.prepare_routed_fixture("notes.rs")
 }
 
 #[given("an unsupported-language act refactor request")]
 fn given_unsupported_language_request(world: &mut RefactorWorld) {
-    configure_request(&mut world.request, standard_rename_args("notes.txt"));
+    configure_request(
+        &mut world.request,
+        standard_rename_args_for_provider("notes.txt", "rope"),
+    );
     world.routing_mode = RoutingMode::UnsupportedLanguage;
 }
 
@@ -295,9 +310,10 @@ fn given_missing_required_arguments_request(world: &mut RefactorWorld) {
     configure_request(&mut world.request, Vec::new());
 }
 fn given_explicit_provider_mismatch_request(world: &mut RefactorWorld) -> Result<(), String> {
-    let mut args = vec![String::from("--provider"), String::from("rust-analyzer")];
-    args.extend(standard_rename_args("notes.py"));
-    configure_request(&mut world.request, args);
+    configure_request(
+        &mut world.request,
+        standard_rename_args_for_provider("notes.py", "rust-analyzer"),
+    );
     world.routing_mode = RoutingMode::ExplicitProviderMismatch;
     world.prepare_routed_fixture("notes.py")
 }

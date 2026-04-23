@@ -3,10 +3,11 @@
 //! This module keeps the required flags, supported provider names, supported
 //! refactorings, and actionable error text aligned from one source of truth.
 
+use weaver_plugins::CapabilityId;
+
+use super::manifests::built_in_provider_names;
 use crate::dispatch::errors::DispatchError;
 
-const SUPPORTED_PROVIDERS: &[&str] = &["rope", "rust-analyzer"];
-const SUPPORTED_REFACTORINGS: &[&str] = &["rename"];
 const REQUIRED_FLAGS: &[&str] = &[
     "--provider <plugin>",
     "--refactoring <operation>",
@@ -17,9 +18,25 @@ const NEXT_COMMAND: &str = concat!(
     "--file path/to/file.py offset=1 new_name=renamed_symbol"
 );
 
-pub(crate) fn supported_provider_names() -> &'static [&'static str] { SUPPORTED_PROVIDERS }
+struct SupportedRefactoring {
+    user_facing: &'static str,
+    capability_operation: &'static str,
+    capability: CapabilityId,
+}
 
-pub(crate) fn supported_refactoring_names() -> &'static [&'static str] { SUPPORTED_REFACTORINGS }
+const SUPPORTED_REFACTORINGS: &[SupportedRefactoring] = &[SupportedRefactoring {
+    user_facing: "rename",
+    capability_operation: "rename-symbol",
+    capability: CapabilityId::RenameSymbol,
+}];
+
+const SUPPORTED_REFACTORING_NAMES: &[&str] = &["rename"];
+
+pub(crate) fn supported_provider_names() -> &'static [&'static str] { built_in_provider_names() }
+
+pub(crate) fn supported_refactoring_names() -> &'static [&'static str] {
+    SUPPORTED_REFACTORING_NAMES
+}
 
 pub(crate) fn validate_provider(provider: &str) -> Result<(), DispatchError> {
     validate_value("provider", supported_provider_names(), provider)
@@ -29,16 +46,35 @@ pub(crate) fn validate_refactoring(refactoring: &str) -> Result<(), DispatchErro
     validate_value("refactoring", supported_refactoring_names(), refactoring)
 }
 
+pub(crate) fn effective_operation(refactoring: &str) -> Result<&'static str, DispatchError> {
+    SUPPORTED_REFACTORINGS
+        .iter()
+        .find(|supported| supported.user_facing == refactoring)
+        .map(|supported| supported.capability_operation)
+        .ok_or_else(|| invalid_supported_value("refactoring", refactoring))
+}
+
+pub(crate) fn capability_for_operation(operation: &str) -> Result<CapabilityId, DispatchError> {
+    SUPPORTED_REFACTORINGS
+        .iter()
+        .find(|supported| supported.capability_operation == operation)
+        .map(|supported| supported.capability)
+        .ok_or_else(|| {
+            DispatchError::invalid_arguments(format!(
+                "act refactor does not support capability resolution for '{operation}' (only \
+                 'rename-symbol' is currently implemented)"
+            ))
+        })
+}
+
 fn validate_value(kind: &str, supported: &[&str], value: &str) -> Result<(), DispatchError> {
     if supported.contains(&value) {
         Ok(())
     } else {
-        Err(DispatchError::invalid_arguments(format!(
-            "act refactor does not support {kind} '{value}'\n\n{}",
-            guidance_lines()
-        )))
+        Err(invalid_supported_value(kind, value))
     }
 }
+
 pub(crate) fn missing_requirements_error() -> DispatchError {
     DispatchError::invalid_arguments(format!(
         "act refactor requires {}\n\n{}",
@@ -48,12 +84,21 @@ pub(crate) fn missing_requirements_error() -> DispatchError {
 }
 
 fn guidance_lines() -> String {
+    let providers = supported_provider_names();
+    let refactorings = supported_refactoring_names();
     format!(
         "Valid alternatives:\n  - Providers: {}\n  - Refactorings: {}\n\nNext command:\n  {}",
-        supported_provider_names().join(", "),
-        supported_refactoring_names().join(", "),
+        providers.join(", "),
+        refactorings.join(", "),
         NEXT_COMMAND
     )
+}
+
+fn invalid_supported_value(kind: &str, value: &str) -> DispatchError {
+    DispatchError::invalid_arguments(format!(
+        "act refactor does not support {kind} '{value}'\n\n{}",
+        guidance_lines()
+    ))
 }
 
 fn format_required_flags() -> String {
@@ -65,7 +110,11 @@ fn format_required_flags() -> String {
 
 #[cfg(test)]
 mod tests {
+    use weaver_plugins::CapabilityId;
+
     use super::{
+        capability_for_operation,
+        effective_operation,
         missing_requirements_error,
         supported_provider_names,
         supported_refactoring_names,
@@ -122,5 +171,17 @@ mod tests {
     fn supported_lists_stay_canonical() {
         assert_eq!(supported_provider_names(), ["rope", "rust-analyzer"]);
         assert_eq!(supported_refactoring_names(), ["rename"]);
+    }
+
+    #[test]
+    fn refactoring_table_drives_operation_mapping() {
+        assert_eq!(
+            effective_operation("rename").expect("supported"),
+            "rename-symbol"
+        );
+        assert_eq!(
+            capability_for_operation("rename-symbol").expect("supported"),
+            CapabilityId::RenameSymbol
+        );
     }
 }

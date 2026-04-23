@@ -1469,9 +1469,12 @@ for this model:
 
     `rope` will be integrated as a primary actuator plugin for Python, callable
     via a command like
-    `weaver act refactor --provider rope --refactoring extract_method...`. This
-    allows an agent to perform sophisticated, language-aware refactorings
-    through the standard `Weaver` interface.
+    `weaver act refactor --provider rope --refactoring rename --file src/main.py
+    offset=123 new_name=new_function_name`. More advanced rope operations
+    remain future work, but the shipped `act refactor` contract uses the
+    canonical `--provider`, `--refactoring`, and `--file` flags plus trailing
+    `KEY=VALUE` arguments. This allows an agent to perform sophisticated,
+    language-aware refactorings through the standard `Weaver` interface.
 
 This model extends to other domains as well. Tools like `srgn` and `ast-grep`,
 which excel at high-speed, structural search and rewrite operations, can be
@@ -1607,7 +1610,9 @@ The workflow for any modification command (e.g., `act refactor`) is as follows:
 
     ```sh
     weaver act refactor --provider rope --refactoring rename \
-      --path src/main.py --offset 123 --new-name new_function_name
+      --file src/main.py \
+      offset=123 \
+      new_name=new_function_name
     ```
 
 2. **Sandboxed Execution:** The `weaverd` daemon invokes the specified plugin
