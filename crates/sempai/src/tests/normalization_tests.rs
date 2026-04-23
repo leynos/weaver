@@ -10,9 +10,7 @@ use crate::normalize::normalize_search_principal;
 /// Helper to normalize a legacy formula and extract the node.
 fn normalize_legacy(formula: LegacyFormula) -> Formula {
     let principal = SearchQueryPrincipal::Legacy(formula);
-    normalize_search_principal(&principal, None)
-        .expect("should normalize")
-        .node
+    normalize_search_principal(&principal, None).node
 }
 
 /// Helper to normalize a legacy formula and keep the full decorated wrapper.
@@ -21,21 +19,19 @@ fn normalize_legacy(formula: LegacyFormula) -> Formula {
 /// attached to the normalized formula.
 fn normalize_legacy_decorated(formula: LegacyFormula) -> Decorated<Formula> {
     let principal = SearchQueryPrincipal::Legacy(formula);
-    normalize_search_principal(&principal, None).expect("should normalize")
+    normalize_search_principal(&principal, None)
 }
 
 /// Helper to normalize a v2 match formula and extract the node.
 fn normalize_v2(formula: MatchFormula) -> Formula {
     let principal = SearchQueryPrincipal::Match(formula);
-    normalize_search_principal(&principal, None)
-        .expect("should normalize")
-        .node
+    normalize_search_principal(&principal, None).node
 }
 
 /// Helper to normalize a v2 match formula and keep the full decorated wrapper.
 fn normalize_v2_decorated(formula: MatchFormula) -> Decorated<Formula> {
     let principal = SearchQueryPrincipal::Match(formula);
-    normalize_search_principal(&principal, None).expect("should normalize")
+    normalize_search_principal(&principal, None)
 }
 
 #[test]
@@ -265,7 +261,7 @@ fn v2_decorated_preserves_where_as_and_fix_metadata() {
 fn span_propagates_from_search_principal_to_decorated() {
     let span = SourceSpan::new(5, 42, Some(String::from("file:///rule.yaml")));
     let principal = SearchQueryPrincipal::Match(MatchFormula::Pattern(String::from("foo($X)")));
-    let normalized = normalize_search_principal(&principal, Some(&span)).expect("should normalize");
+    let normalized = normalize_search_principal(&principal, Some(&span));
 
     assert_eq!(normalized.span, Some(span));
 }

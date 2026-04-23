@@ -155,7 +155,7 @@ impl Engine {
                 }
             })
             .try_fold(Vec::new(), |mut plans, (rule, principal)| {
-                let formula = normalize_search_principal(principal, rule.rule_span())?;
+                let formula = normalize_search_principal(principal, rule.rule_span());
                 validate_formula(&formula)?;
                 let rule_plans = compile_rule_plans(rule, &formula)?;
                 plans.extend(rule_plans);
