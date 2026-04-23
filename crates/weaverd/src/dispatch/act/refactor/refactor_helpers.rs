@@ -28,6 +28,11 @@ pub(crate) mod builders {
         }
     }
 
+    #[allow(
+        unfulfilled_lint_expectations,
+        reason = "Used in some #[path] includes"
+    )]
+    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn build_backends(socket_path: &Path) -> FusionBackends<SemanticBackendProvider> {
         let config = Config {
             daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().as_ref()),
@@ -38,6 +43,11 @@ pub(crate) mod builders {
         FusionBackends::new(config, provider)
     }
 
+    #[allow(
+        unfulfilled_lint_expectations,
+        reason = "Used in some #[path] includes"
+    )]
+    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn standard_rename_args(file: &str) -> Vec<String> {
         vec![
             String::from("--refactoring"),
@@ -49,16 +59,13 @@ pub(crate) mod builders {
         ]
     }
 
+    #[allow(
+        unfulfilled_lint_expectations,
+        reason = "Used in some #[path] includes"
+    )]
+    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn configure_request(request: &mut CommandRequest, args: Vec<String>) {
         *request = command_request(args);
-    }
-
-    #[test]
-    fn builder_helpers_are_referenced() {
-        let mut request = command_request(Vec::new());
-        let _ = build_backends;
-        let args = standard_rename_args("notes.py");
-        configure_request(&mut request, args);
     }
 }
 
@@ -94,6 +101,11 @@ pub(crate) mod resolutions {
         pub(crate) requested_provider: Option<&'a str>,
     }
 
+    #[allow(
+        unfulfilled_lint_expectations,
+        reason = "Used in some #[path] includes"
+    )]
+    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn selected_resolution(
         config: SelectedResolution<'_>,
     ) -> CapabilityResolutionEnvelope {
@@ -113,6 +125,11 @@ pub(crate) mod resolutions {
         })
     }
 
+    #[allow(
+        unfulfilled_lint_expectations,
+        reason = "Used in some #[path] includes"
+    )]
+    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn refused_resolution(
         config: RefusedResolution<'_>,
     ) -> CapabilityResolutionEnvelope {
@@ -128,6 +145,11 @@ pub(crate) mod resolutions {
         })
     }
 
+    #[allow(
+        unfulfilled_lint_expectations,
+        reason = "Used in some #[path] includes"
+    )]
+    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn rejected_candidate(
         provider: &str,
         reason: CandidateReason,
@@ -145,6 +167,11 @@ pub(crate) mod resolutions {
         pub(crate) selection_mode: SelectionMode,
     }
 
+    #[allow(
+        unfulfilled_lint_expectations,
+        reason = "Used in some #[path] includes"
+    )]
+    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn resolve_auto_language(
         context: AutoResolutionContext<'_>,
         language_name: Option<&'static str>,
@@ -170,40 +197,12 @@ pub(crate) mod resolutions {
             })
         }
     }
-
-    #[test]
-    fn resolution_helpers_are_referenced() {
-        let refused = RefusedResolution {
-            capability: CapabilityId::RenameSymbol,
-            language: None,
-            requested_provider: None,
-            selection_mode: SelectionMode::Automatic,
-            refusal_reason: RefusalReason::UnsupportedLanguage,
-            candidates: Vec::new(),
-        };
-        let selected = SelectedResolution {
-            capability: CapabilityId::RenameSymbol,
-            language: "python",
-            provider: "rope",
-            selection_mode: SelectionMode::Automatic,
-            requested_provider: None,
-        };
-        let _ = selected_resolution(selected);
-        let _ = refused_resolution(refused);
-        let _ = rejected_candidate("rope", CandidateReason::UnsupportedLanguage);
-        let context = AutoResolutionContext {
-            capability: CapabilityId::RenameSymbol,
-            requested_provider: None,
-            selection_mode: SelectionMode::Automatic,
-        };
-        let _ = resolve_auto_language(context, Some("python"), "rope", Vec::new());
-    }
 }
 
 pub(crate) mod rollback {
     //! Runtime doubles that exercise rollback paths for refactor tests.
 
-    use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
+    use weaver_plugins::{PluginError, PluginRequest, PluginResponse};
 
     use super::resolutions::{SelectedResolution, selected_resolution};
     use crate::dispatch::act::refactor::{
@@ -216,6 +215,7 @@ pub(crate) mod rollback {
         pub(crate) execute_result: ExecuteResult,
     }
 
+    #[allow(dead_code, reason = "Used in some #[path] includes")]
     pub(crate) enum ExecuteResult {
         Success(PluginResponse),
         MissingPlugin(&'static str),
@@ -243,6 +243,11 @@ pub(crate) mod rollback {
         }
     }
 
+    #[allow(
+        unfulfilled_lint_expectations,
+        reason = "Used in some #[path] includes"
+    )]
+    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn selected_runtime(
         config: SelectedResolution<'_>,
         execute_result: ExecuteResult,
@@ -253,6 +258,11 @@ pub(crate) mod rollback {
         }
     }
 
+    #[allow(
+        unfulfilled_lint_expectations,
+        reason = "Used in some #[path] includes"
+    )]
+    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn rollback_runtime(
         resolution: CapabilityResolutionEnvelope,
         execute_result: ExecuteResult,
@@ -261,25 +271,6 @@ pub(crate) mod rollback {
             resolution,
             execute_result,
         }
-    }
-
-    #[test]
-    fn rollback_helpers_are_referenced() {
-        let runtime = selected_runtime(
-            SelectedResolution {
-                capability: weaver_plugins::CapabilityId::RenameSymbol,
-                language: "python",
-                provider: "rope",
-                selection_mode:
-                    crate::dispatch::act::refactor::resolution::SelectionMode::Automatic,
-                requested_provider: None,
-            },
-            ExecuteResult::MissingPlugin("rope"),
-        );
-        let _ = rollback_runtime(
-            runtime.resolution.clone(),
-            ExecuteResult::Success(PluginResponse::success(PluginOutput::Empty)),
-        );
     }
 }
 
@@ -300,6 +291,11 @@ pub(crate) mod content {
         Other,
     }
 
+    #[allow(
+        unfulfilled_lint_expectations,
+        reason = "Used in some #[path] includes"
+    )]
+    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn classify_file(path: &Path) -> FileKind {
         match path.extension().and_then(|ext| ext.to_str()) {
             Some("py") => FileKind::Python,
@@ -340,14 +336,29 @@ pub(crate) mod content {
         }
     }
 
+    #[allow(
+        unfulfilled_lint_expectations,
+        reason = "Used in some #[path] includes"
+    )]
+    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn original_content_for(path: &Path) -> &'static str {
         content_table(classify_file(path)).original
     }
 
+    #[allow(
+        unfulfilled_lint_expectations,
+        reason = "Used in some #[path] includes"
+    )]
+    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn updated_content_for(path: &Path) -> &'static str {
         content_table(classify_file(path)).updated
     }
 
+    #[allow(
+        unfulfilled_lint_expectations,
+        reason = "Used in some #[path] includes"
+    )]
+    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn routed_patch_path(path: &Path) -> &Path {
         match classify_file(path) {
             FileKind::Python | FileKind::Rust => Path::new("notes.txt"),
@@ -360,26 +371,24 @@ pub(crate) mod content {
         format_diff(path, &make_header(&patch_path.to_string_lossy()))
     }
 
+    #[allow(
+        unfulfilled_lint_expectations,
+        reason = "Used in some #[path] includes"
+    )]
+    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn routed_diff_for(path: &Path) -> String {
         routed_format_diff(path, |p| format!("diff --git a/{p} b/{p}"))
     }
 
+    #[allow(
+        unfulfilled_lint_expectations,
+        reason = "This helper is used in some #[path] includes"
+    )]
+    #[expect(
+        dead_code,
+        reason = "Used via sibling #[path] test includes in some units"
+    )]
     pub(crate) fn routed_malformed_diff_for(path: &Path) -> String {
         routed_format_diff(path, |p| format!("diff --git a/{p}"))
-    }
-
-    #[test]
-    fn content_helpers_are_referenced() {
-        let path = Path::new("notes.py");
-        let _ = format_diff(path, "diff --git a/notes.py b/notes.py\n");
-        let _ = FileKind::Python;
-        let _ = classify_file(path);
-        let _ = content_table(FileKind::Python);
-        let _ = original_content_for(path);
-        let _ = updated_content_for(path);
-        let _ = routed_patch_path(path);
-        let _ = routed_format_diff(path, |value| value.to_owned());
-        let _ = routed_diff_for(path);
-        let _ = routed_malformed_diff_for(path);
     }
 }
