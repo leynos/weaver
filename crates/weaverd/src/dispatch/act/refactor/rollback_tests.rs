@@ -22,8 +22,8 @@ fn refused_runtime() -> RollbackRuntime {
         refused_resolution(RefusedResolution {
             capability: weaver_plugins::CapabilityId::RenameSymbol,
             language: Some("python"),
-            requested_provider: None,
-            selection_mode: super::resolution::SelectionMode::Automatic,
+            requested_provider: Some("rope"),
+            selection_mode: super::resolution::SelectionMode::ExplicitProvider,
             refusal_reason: super::resolution::RefusalReason::UnsupportedLanguage,
             candidates: Vec::new(),
         }),
@@ -37,8 +37,8 @@ fn rope_python_runtime(execute_result: ExecuteResult) -> RollbackRuntime {
             capability: weaver_plugins::CapabilityId::RenameSymbol,
             language: "python",
             provider: "rope",
-            selection_mode: super::resolution::SelectionMode::Automatic,
-            requested_provider: None,
+            selection_mode: super::resolution::SelectionMode::ExplicitProvider,
+            requested_provider: Some("rope"),
         },
         execute_result,
     )
