@@ -35,6 +35,12 @@ fn build_backends() -> FusionBackends<SemanticBackendProvider> {
 
 fn build_router() -> DomainRouter { DomainRouter::new(PathBuf::from("/tmp/weaver-test-workspace")) }
 
+#[test]
+#[should_panic(expected = "DomainRouter requires an absolute workspace_root")]
+fn build_router_rejects_relative_workspace_root() {
+    let _ = DomainRouter::new(PathBuf::from("relative/workspace"));
+}
+
 #[allow_fixture_expansion_lints]
 #[fixture]
 fn backends() -> FusionBackends<SemanticBackendProvider> { build_backends() }

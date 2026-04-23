@@ -132,7 +132,14 @@ impl std::fmt::Debug for DomainRouter {
 
 impl DomainRouter {
     /// Creates a new domain router with the workspace root.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `workspace_root` is not an absolute path. Dispatch handlers
+    /// resolve workspace-relative files against this root and rely on the
+    /// resulting paths to construct canonical file URIs.
     pub fn new(workspace_root: PathBuf) -> Self {
+        assert_absolute_workspace_root(workspace_root.as_path());
         Self {
             workspace_root,
             refactor_runtime: act::refactor::default_runtime(),
@@ -140,6 +147,10 @@ impl DomainRouter {
     }
 
     /// Creates a domain router with a custom refactor runtime.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `workspace_root` is not an absolute path.
     #[cfg(test)]
     #[expect(
         dead_code,
@@ -149,6 +160,7 @@ impl DomainRouter {
         workspace_root: PathBuf,
         runtime: Arc<dyn act::refactor::RefactorPluginRuntime + Send + Sync>,
     ) -> Self {
+        assert_absolute_workspace_root(workspace_root.as_path());
         Self {
             workspace_root,
             refactor_runtime: runtime,
@@ -259,5 +271,11 @@ impl DomainRouter {
     }
 }
 
-#[cfg(test)]
+fn assert_absolute_workspace_root(workspace_root: &Path) {
+    assert!(
+        workspace_root.is_absolute(),
+        "DomainRouter requires an absolute workspace_root, got '{}'",
+        workspace_root.display()
+    );
+}
 mod tests;
