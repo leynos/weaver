@@ -259,21 +259,30 @@ fn given_workspace_file(
 
 #[given("a valid act refactor request for rope")]
 fn given_valid_rope_request(world: &mut RefactorWorld) {
-    configure_request(&mut world.request, standard_rename_args("notes.py"));
+    configure_request(
+        &mut world.request,
+        standard_rename_args_for_provider("notes.py", "rope"),
+    );
     world.routing_mode = RoutingMode::AutomaticPython;
     world.prepare_routed_fixture("notes.py");
 }
 
 #[given("a valid act refactor request for rust-analyzer")]
 fn given_valid_rust_request(world: &mut RefactorWorld) {
-    configure_request(&mut world.request, standard_rename_args("notes.rs"));
+    configure_request(
+        &mut world.request,
+        standard_rename_args_for_provider("notes.rs", "rust-analyzer"),
+    );
     world.routing_mode = RoutingMode::AutomaticRust;
     world.prepare_routed_fixture("notes.rs");
 }
 
 #[given("an unsupported-language act refactor request")]
 fn given_unsupported_language_request(world: &mut RefactorWorld) {
-    configure_request(&mut world.request, standard_rename_args("notes.txt"));
+    configure_request(
+        &mut world.request,
+        standard_rename_args_for_provider("notes.txt", "rope"),
+    );
     world.routing_mode = RoutingMode::UnsupportedLanguage;
 }
 
@@ -284,9 +293,19 @@ fn given_missing_required_arguments_request(world: &mut RefactorWorld) {
 
 #[given("a Python act refactor request with an incompatible provider override")]
 fn given_explicit_provider_mismatch_request(world: &mut RefactorWorld) {
-    let mut args = vec![String::from("--provider"), String::from("rust-analyzer")];
-    args.extend(standard_rename_args("notes.py"));
-    configure_request(&mut world.request, args);
+    configure_request(
+        &mut world.request,
+        vec![
+            String::from("--provider"),
+            String::from("rust-analyzer"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("notes.py"),
+            String::from("offset=1"),
+            String::from("new_name=woven"),
+        ],
+    );
     world.routing_mode = RoutingMode::ExplicitProviderMismatch;
     world.prepare_routed_fixture("notes.py");
 }

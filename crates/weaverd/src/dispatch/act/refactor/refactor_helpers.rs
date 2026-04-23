@@ -69,8 +69,6 @@ pub(crate) mod resolutions {
 
 pub(super) fn standard_rename_args(file: &str) -> Vec<String> {
     vec![
-        String::from("--provider"),
-        String::from(provider_for_file(file)),
         String::from("--refactoring"),
         String::from("rename"),
         String::from("--file"),
@@ -80,12 +78,10 @@ pub(super) fn standard_rename_args(file: &str) -> Vec<String> {
     ]
 }
 
-fn provider_for_file(file: &str) -> &'static str {
-    match Path::new(file).extension().and_then(|ext| ext.to_str()) {
-        Some("py") => "rope",
-        Some("rs") => "rust-analyzer",
-        _ => "rope",
-    }
+pub(super) fn standard_rename_args_for_provider(file: &str, provider: &str) -> Vec<String> {
+    let mut args = vec![String::from("--provider"), String::from(provider)];
+    args.extend(standard_rename_args(file));
+    args
 }
 
     pub(crate) struct SelectedResolution<'a> {

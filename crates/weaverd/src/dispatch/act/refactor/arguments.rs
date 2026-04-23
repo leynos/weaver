@@ -37,6 +37,11 @@ impl RefactorArgsBuilder {
         let Some(file) = self.file else {
             return Err(missing_requirements_error());
         };
+        if let Some(unexpected_flag) = self.extra.iter().find(|extra| extra.starts_with("--")) {
+            return Err(DispatchError::invalid_arguments(format!(
+                "act refactor does not support top-level flag '{unexpected_flag}'; use only --provider <plugin>, --refactoring <operation>, --file <path>, and trailing KEY=VALUE arguments"
+            )));
+        }
 
         validate_provider(&provider)?;
         validate_refactoring(&refactoring)?;
@@ -232,5 +237,22 @@ mod tests {
             invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
         assert!(message.contains("does not support refactoring 'extract-method'"));
         assert!(message.contains("Refactorings: rename"));
+    }
+
+    #[test]
+    fn unexpected_top_level_flag_is_rejected() {
+        let args = vec![
+            String::from("--provider"),
+            String::from("rope"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("src/main.py"),
+            String::from("--bogus"),
+        ];
+
+        let message =
+            invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
+        assert!(message.contains("does not support top-level flag '--bogus'"));
     }
 }

@@ -12,10 +12,11 @@ repository root.
 
 ## Purpose / big picture
 
-Roadmap item `2.3.4` closes UI gap `5b` by making `weaver act refactor` surface
-the full operator contract when required arguments are missing. Today the
-daemon stops at the first missing field and returns only one message, for
-example `act refactor requires --refactoring <operation>` or
+Roadmap item `2.3.4` closes user interface (UI) gap `5b` by making
+`weaver act refactor` surface the full operator contract when required
+arguments are missing. Today the daemon stops at the first missing field and
+returns only one message, for example
+`act refactor requires --refactoring <operation>` or
 `act refactor requires --file <path>`. That leaves operators guessing which
 other flags are mandatory, which provider names are valid, and which
 refactoring names the MVP actually supports.
@@ -54,9 +55,9 @@ This work is successful when the following are all true:
 - Add both unit coverage and behavioural coverage using `rstest-bdd` v0.5.0.
   Reuse the existing `act refactor` feature harness in `crates/weaverd/` rather
   than creating a second bespoke BDD harness.
-- Keep the JSONL transport envelope unchanged. This task may improve the
-  `InvalidArguments` message body, but it must not add a new top-level response
-  type or widen the `stream` / `exit` protocol contract.
+- Keep the JSON Lines (JSONL) transport envelope unchanged. This task may
+  improve the `InvalidArguments` message body, but it must not add a new
+  top-level response type or widen the `stream` / `exit` protocol contract.
 - Treat the roadmap acceptance criteria as authoritative for this item. The
   current implementation and current documentation describe `--provider` as
   optional, but this plan assumes `--provider` becomes a required operator
@@ -171,8 +172,8 @@ This work is successful when the following are all true:
 
 - The current missing-argument logic lives in the parser builder, not in the
   handler. That is the right seam for this work because it lets the daemon
-  reject incomplete requests before plugin resolution, file I/O, or backend
-  startup.
+  reject incomplete requests before plugin resolution, file input/output (I/O),
+  or backend startup.
 
 - The currently implemented user-facing refactoring surface is narrower than
   the design document's aspirational examples. In practice the MVP advertises
@@ -267,9 +268,9 @@ contract.
 
 `crates/weaver-e2e/tests/refactor_rope_cli_snapshots.rs` and
 `crates/weaver-e2e/tests/refactor_rust_analyzer_cli_snapshots.rs` exercise the
-operator-facing CLI workflows. A small end-to-end assertion or snapshot should
-be added here if needed to prove that the human-visible `weaver act refactor`
-output matches the acceptance criteria.
+operator-facing command-line interface (CLI) workflows. A small end-to-end
+assertion or snapshot should be added here if needed to prove that the
+human-visible `weaver act refactor` output matches the acceptance criteria.
 
 ## Implementation plan
 

@@ -17,7 +17,7 @@ use arguments::parse_refactor_args;
 use tracing::debug;
 use url::Url;
 
-use weaver_plugins::capability::CapabilityId;
+use weaver_plugins::CapabilityId;
 use weaver_plugins::process::SandboxExecutor;
 use weaver_plugins::protocol::FilePayload;
 use weaver_plugins::runner::PluginRunner;
@@ -34,6 +34,7 @@ use plugin_paths::{
     ROPE_PLUGIN_PATH_ENV, RUST_ANALYZER_PLUGIN_PATH_ENV, resolve_rope_plugin_path,
     resolve_rust_analyzer_plugin_path,
 };
+use requirements::{capability_for_operation, effective_operation};
 use resolution::{CapabilityResolutionEnvelope, ResolutionRequest, resolve_provider};
 
 mod arguments;
@@ -181,21 +182,18 @@ fn prepare_plugin_request(
         }
     }
 
-    let effective_operation = match args.refactoring.as_str() {
-        "rename" => {
-            apply_rename_symbol_mapping(&mut plugin_args, &args.file)?;
-            String::from("rename-symbol")
-        }
-        _ => args.refactoring.clone(),
-    };
+    let effective_operation = effective_operation(&args.refactoring)?;
+    if effective_operation == "rename-symbol" {
+        apply_rename_symbol_mapping(&mut plugin_args, &args.file)?;
+    }
 
     let plugin_request = PluginRequest::with_arguments(
-        &effective_operation,
+        effective_operation,
         vec![FilePayload::new(PathBuf::from(&args.file), file_content)],
         plugin_args,
     );
 
-    let capability = capability_from_operation(&effective_operation)?;
+    let capability = capability_for_operation(effective_operation)?;
     Ok((plugin_request, capability, file_path))
 }
 
@@ -320,17 +318,6 @@ fn to_file_uri(path: &str) -> Result<String, url::ParseError> {
         segments.extend(path.split('/'));
     }
     Ok(url.to_string())
-}
-
-fn capability_from_operation(operation: &str) -> Result<CapabilityId, DispatchError> {
-    // TODO: Extend this mapping when additional refactoring operations are added
-    // (e.g., extract-method, inline-variable, move-function).
-    match operation {
-        "rename-symbol" => Ok(CapabilityId::RenameSymbol),
-        other => Err(DispatchError::invalid_arguments(format!(
-            "act refactor does not support capability resolution for '{other}' (only 'rename-symbol' is currently implemented)"
-        ))),
-    }
 }
 
 fn write_capability_resolution<W: Write>(
