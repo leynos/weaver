@@ -162,10 +162,11 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-5-make-nixie.log
 
 The Sempai query pipeline currently stops at a `NOT_IMPLEMENTED` placeholder
 after successfully parsing and mode-validating a YAML rule file.  The parser
-produces `LegacyFormula` and `MatchFormula` ASTs in `sempai_yaml`, which are
-structurally distinct but semantically equivalent for the subset they share.
+produces `LegacyFormula` and `MatchFormula` abstract syntax trees (ASTs) in
+`sempai_yaml`, which are structurally distinct but semantically equivalent for
+the subset they share.
 
-The normalisation step must lower both representations into the design
+The normalization step must lower both representations into the design
 document's canonical `Formula` enum, then run semantic constraint checks before
 constructing a `QueryPlan`.
 

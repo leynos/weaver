@@ -18,6 +18,13 @@ fn make_pattern(text: &str) -> Decorated<Formula> {
 }
 
 #[test]
+fn single_positive_atom_passes_validation() {
+    let formula = make_pattern("foo");
+    let result = validate_formula(&formula);
+    assert!(result.is_ok());
+}
+
+#[test]
 fn valid_or_with_positive_branches_passes() {
     let formula = Decorated {
         node: Formula::Or(vec![make_pattern("foo"), make_pattern("bar")]),

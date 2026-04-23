@@ -78,6 +78,40 @@ fn compile_yaml_normalizes_and_returns_query_plans() {
 }
 
 #[test]
+fn compile_yaml_returns_semantic_error_for_invalid_not_in_or() {
+    let engine = default_engine();
+    let result = engine.compile_yaml(concat!(
+        "rules:\n",
+        "  - id: demo.invalid.not.in.or\n",
+        "    message: invalid not in or\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    pattern-either:\n",
+        "      - pattern: foo($X)\n",
+        "      - pattern-not: bar($Y)\n",
+    ));
+    let (code, _diag) = first_diagnostic_of_err(result);
+    assert_eq!(code, DiagnosticCode::ESempaiInvalidNotInOr);
+}
+
+#[test]
+fn compile_yaml_returns_semantic_error_for_missing_positive_term_in_and() {
+    let engine = default_engine();
+    let result = engine.compile_yaml(concat!(
+        "rules:\n",
+        "  - id: demo.missing.positive.term.in.and\n",
+        "    message: missing positive term in and\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    patterns:\n",
+        "      - pattern-not: foo($X)\n",
+        "      - pattern-inside: bar($Y)\n",
+    ));
+    let (code, _diag) = first_diagnostic_of_err(result);
+    assert_eq!(code, DiagnosticCode::ESempaiMissingPositiveTermInAnd);
+}
+
+#[test]
 fn compile_yaml_normalizes_project_depends_on_search_rule() {
     let engine = default_engine();
     let result = engine.compile_yaml(concat!(

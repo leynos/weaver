@@ -88,12 +88,18 @@ fn check_positive_term_in_and(
         Formula::And(branches) => {
             let has_positive = branches.iter().any(|branch| is_positive_term(&branch.node));
             if !has_positive {
+                // Prefer the first branch's span for a more precise anchor; fall
+                // back to the enclosing And's span if no branch has one.
+                let error_span = branches
+                    .iter()
+                    .find_map(|branch| branch.span.clone())
+                    .or_else(|| span.cloned());
                 return Err(DiagnosticReport::validation_error(
                     DiagnosticCode::ESempaiMissingPositiveTermInAnd,
                     String::from(
                         "conjunction (And/patterns) must contain at least one positive match term",
                     ),
-                    span.cloned(),
+                    error_span,
                     vec![],
                 ));
             }
