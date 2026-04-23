@@ -109,6 +109,9 @@ fn parse_unix_endpoint(url: &Url, input: &str) -> Result<SocketEndpoint, SocketP
 }
 
 fn parse_tcp_endpoint(url: &Url, input: &str) -> Result<SocketEndpoint, SocketParseError> {
+    if tcp_url_has_invalid_components(url) {
+        return Err(SocketParseError::InvalidTcpUrl(input.to_string()));
+    }
     let host = url
         .host_str()
         .ok_or_else(|| SocketParseError::MissingHost(input.to_string()))?;
@@ -117,6 +120,14 @@ fn parse_tcp_endpoint(url: &Url, input: &str) -> Result<SocketEndpoint, SocketPa
         .port()
         .ok_or_else(|| SocketParseError::MissingPort(input.to_string()))?;
     Ok(SocketEndpoint::tcp(host, port))
+}
+
+fn tcp_url_has_invalid_components(url: &Url) -> bool {
+    !url.username().is_empty()
+        || url.password().is_some()
+        || !matches!(url.path(), "" | "/")
+        || url.query().is_some()
+        || url.fragment().is_some()
 }
 
 /// Errors encountered while parsing a [`SocketEndpoint`] from text.
@@ -131,6 +142,9 @@ pub enum SocketParseError {
     /// TCP port was missing from the address.
     #[error("missing TCP port in '{0}'")]
     MissingPort(String),
+    /// TCP socket URLs must not include credentials, paths, queries, or fragments.
+    #[error("invalid TCP socket URL '{0}'")]
+    InvalidTcpUrl(String),
     /// Unix socket path was absent.
     #[error("missing Unix socket path in '{0}'")]
     MissingUnixPath(String),
@@ -200,6 +214,30 @@ mod tests {
             .parse()
             .expect("valid IPv4 TCP socket URL");
         assert!(matches!(endpoint, SocketEndpoint::Tcp { port: 9000, .. }));
+    }
+
+    #[test]
+    fn parse_tcp_socket_rejects_userinfo() {
+        let result = "tcp://user@127.0.0.1:9000".parse::<SocketEndpoint>();
+        assert!(matches!(result, Err(SocketParseError::InvalidTcpUrl(_))));
+    }
+
+    #[test]
+    fn parse_tcp_socket_rejects_non_root_path() {
+        let result = "tcp://127.0.0.1:9000/socket".parse::<SocketEndpoint>();
+        assert!(matches!(result, Err(SocketParseError::InvalidTcpUrl(_))));
+    }
+
+    #[test]
+    fn parse_tcp_socket_rejects_query() {
+        let result = "tcp://127.0.0.1:9000?probe=1".parse::<SocketEndpoint>();
+        assert!(matches!(result, Err(SocketParseError::InvalidTcpUrl(_))));
+    }
+
+    #[test]
+    fn parse_tcp_socket_rejects_fragment() {
+        let result = "tcp://127.0.0.1:9000#socket".parse::<SocketEndpoint>();
+        assert!(matches!(result, Err(SocketParseError::InvalidTcpUrl(_))));
     }
 
     #[test]

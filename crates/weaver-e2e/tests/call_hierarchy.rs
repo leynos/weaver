@@ -125,8 +125,7 @@ mod fixtures_impl {
         }
 
         let temp_dir = TempDir::new()?;
-        let file_path =
-            write_fixture_path(&temp_dir, "test.py", fixture_content).expect("write fixture path");
+        let file_path = write_fixture_path(&temp_dir, "test.py", fixture_content)?;
 
         let root_uri = file_uri(temp_dir.path())?;
         let file_uri_val = file_uri(&file_path)?;

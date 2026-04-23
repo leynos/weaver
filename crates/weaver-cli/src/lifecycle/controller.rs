@@ -204,8 +204,6 @@ impl SystemLifecycle {
 
         let dir = open_runtime_dir(&paths)?;
         let snapshot = read_health(&dir, HEALTH_FILENAME, paths.health_path())?;
-        let pid = read_pid(&dir, PID_FILENAME, paths.pid_path())?;
-        let reachable = socket_is_reachable(context.config.daemon_socket())?;
         let runtime = RuntimeStatusContext {
             paths: &paths,
             endpoint: context.config.daemon_socket(),
@@ -216,6 +214,8 @@ impl SystemLifecycle {
             return Ok(ExitCode::SUCCESS);
         }
 
+        let pid = read_pid(&dir, PID_FILENAME, paths.pid_path())?;
+        let reachable = socket_is_reachable(context.config.daemon_socket())?;
         self.report_degraded_status(RuntimeProbe { reachable, pid }, runtime, output)?;
         Ok(ExitCode::SUCCESS)
     }
