@@ -1023,13 +1023,13 @@ The `act refactor` handler requires `--provider`, `--refactoring`, and
 
 Table: act refactor parameter semantics and validation
 
-| Parameter       | Meaning                                                                                                                                                | Valid values                                                                             | Failure conditions                                                                          |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `--provider`    | Provider to use for the refactoring request.                                                                                                           | Registered actuator name such as `rope` or `rust-analyzer`.                              | Missing flag, missing value, or unknown provider name causes failure.                       |
-| `--refactoring` | Refactoring operation requested from the plugin. The handler maps `rename` to the `rename-symbol` capability contract before forwarding to the plugin. | Currently only `rename` is implemented by built-in `rope` and `rust-analyzer` plugins.   | Missing value, or unsupported operation name (for example `extract_method`) causes failure. |
-| `--file`        | Target file to load and refactor.                                                                                                                      | Workspace-relative path to an existing readable file (for example `src/main.py`).        | Absolute paths, parent traversal (`..`), or unreadable/missing files cause failure.         |
-| `new_name`      | New symbol name used by `rename`.                                                                                                                      | Non-empty string value.                                                                  | Missing key, non-string value, or empty/whitespace-only value causes failure.               |
-| `offset`        | UTF-8 byte offset of the symbol occurrence used as rename anchor. The handler maps `offset` to the contract `position` field internally.               | Non-negative integer, provided as a number or numeric string (for example `4` or `"4"`). | Missing key, non-numeric value, or negative value causes failure.                           |
+| Parameter       | Meaning                                                                                                                                                | Valid values                                                                             | Failure conditions                                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `--provider`    | Provider to use for the refactoring request.                                                                                                           | Registered actuator name such as `rope` or `rust-analyzer`.                              | Missing flag, missing value, or unknown provider name causes failure.                                            |
+| `--refactoring` | Refactoring operation requested from the plugin. The handler maps `rename` to the `rename-symbol` capability contract before forwarding to the plugin. | Currently only `rename` is implemented by built-in `rope` and `rust-analyzer` plugins.   | Missing flag, missing value, or unsupported operation name (for example `extract_method`) causes failure.        |
+| `--file`        | Target file to load and refactor.                                                                                                                      | Workspace-relative path to an existing readable file (for example `src/main.py`).        | Missing flag, missing value, absolute paths, parent traversal (`..`), or unreadable/missing files cause failure. |
+| `new_name`      | New symbol name used by `rename`.                                                                                                                      | Non-empty string value.                                                                  | Missing key, non-string value, or empty/whitespace-only value causes failure.                                    |
+| `offset`        | UTF-8 byte offset of the symbol occurrence used as rename anchor. The handler maps `offset` to the contract `position` field internally.               | Non-negative integer, provided as a number or numeric string (for example `4` or `"4"`). | Missing key, non-numeric value, or negative value causes failure.                                                |
 
 For `offset`, count bytes from the start of the file (`0`-based), not line and
 column pairs. This matters when multibyte UTF-8 characters appear before the
@@ -1069,10 +1069,10 @@ Next command:
 ```
 
 When validation fails, parameters are invalid, or the plugin reports an error,
-the command exits non-zero and leaves the filesystem unchanged.
-A plugin response that reports success without a `Diff` payload is treated the
-same way: Weaver refuses the response, exits with status `1`, and does not
-touch the filesystem.
+the command exits non-zero and leaves the filesystem unchanged. A plugin
+response that reports success without a `Diff` payload is treated the same way:
+Weaver refuses the response, exits with status `1`, and does not touch the
+filesystem.
 
 Worked examples:
 
@@ -1277,10 +1277,10 @@ Table: Required fields for `rename-symbol` requests.
 | `position` | string | Position of the symbol as a UTF-8 byte offset.   |
 | `new_name` | string | The new name for the symbol (must be non-empty). |
 
-Successful responses must contain a `Diff` output with a unified diff patch.
-If a plugin reports success with any other output shape, Weaver refuses the
-response, exits with status `1`, and makes no filesystem changes.
-Failed responses may include diagnostics with an optional `reason_code` field.
+Successful responses must contain a `Diff` output with a unified diff patch. If
+a plugin reports success with any other output shape, Weaver refuses the
+response, exits with status `1`, and makes no filesystem changes. Failed
+responses may include diagnostics with an optional `reason_code` field.
 
 #### Contract versioning
 

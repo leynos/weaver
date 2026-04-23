@@ -102,13 +102,13 @@ fn run_rename_handle(
     (dispatch_result.status, stderr)
 }
 
-fn automatic_selection(provider: &str, language: &str) -> CapabilityResolutionEnvelope {
+fn explicit_selection(provider: &str, language: &str) -> CapabilityResolutionEnvelope {
     CapabilityResolutionEnvelope::from_details(CapabilityResolutionDetails {
         capability: weaver_plugins::CapabilityId::RenameSymbol,
         language: Some(String::from(language)),
-        requested_provider: None,
+        requested_provider: Some(String::from(provider)),
         selected_provider: Some(String::from(provider)),
-        selection_mode: SelectionMode::Automatic,
+        selection_mode: SelectionMode::ExplicitProvider,
         outcome: ResolutionOutcome::Selected,
         refusal_reason: None,
         candidates: vec![CandidateEvaluation {
@@ -124,7 +124,7 @@ fn handle_runtime_error_returns_status_one(socket_dir: TempDir) {
     let (status, stderr) = run_rename_handle(
         &socket_dir,
         "notes.py",
-        MockResolution::Success(automatic_selection("rope", "python")),
+        MockResolution::Success(explicit_selection("rope", "python")),
         MockRuntimeResult::NotFound(String::from("rope")),
     );
 
@@ -152,7 +152,7 @@ fn handle_non_diff_output_returns_status_one(
         String::from("notes.py"),
     ]);
     let runtime = MockRuntime {
-        resolution: MockResolution::Success(automatic_selection("rope", "python")),
+        resolution: MockResolution::Success(explicit_selection("rope", "python")),
         result: MockRuntimeResult::Success(PluginResponse::success(output_variant)),
     };
     let socket_path = socket_dir.path().join("socket.sock");
@@ -192,7 +192,7 @@ fn handle_diff_output_applies_patch_through_apply_patch_pipeline(socket_dir: Tem
         ">>>>>>> REPLACE\n",
     );
     let runtime = MockRuntime {
-        resolution: MockResolution::Success(automatic_selection("rope", "python")),
+        resolution: MockResolution::Success(explicit_selection("rope", "python")),
         result: MockRuntimeResult::Success(PluginResponse::success(PluginOutput::Diff {
             content: String::from(diff),
         })),
@@ -267,7 +267,7 @@ fn handle_returns_error_for_unsupported_refactoring(socket_dir: TempDir) {
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
     let runtime = MockRuntime {
-        resolution: MockResolution::Success(automatic_selection("rope", "python")),
+        resolution: MockResolution::Success(explicit_selection("rope", "python")),
         result: MockRuntimeResult::Panic,
     };
 

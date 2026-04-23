@@ -55,22 +55,38 @@ supported_refactoring_catalogue!({
     capability: CapabilityId::RenameSymbol
 });
 
+/// Returns the canonical built-in provider names accepted by `act refactor`.
 pub(crate) fn supported_provider_names() -> &'static [&'static str] {
     built_in_provider_names()
 }
 
+/// Returns the supported user-facing refactoring names accepted by
+/// `act refactor`.
 pub(crate) fn supported_refactoring_names() -> &'static [&'static str] {
     SUPPORTED_REFACTORING_NAMES
 }
 
+/// Validates an operator-supplied provider name.
+///
+/// Returns [`DispatchError::InvalidArguments`] when `provider` is not one of
+/// [`supported_provider_names`].
 pub(crate) fn validate_provider(provider: &str) -> Result<(), DispatchError> {
     validate_value("provider", supported_provider_names(), provider)
 }
 
+/// Validates an operator-supplied refactoring name.
+///
+/// Returns [`DispatchError::InvalidArguments`] when `refactoring` is not one of
+/// [`supported_refactoring_names`].
 pub(crate) fn validate_refactoring(refactoring: &str) -> Result<(), DispatchError> {
     validate_value("refactoring", supported_refactoring_names(), refactoring)
 }
 
+/// Maps a user-facing refactoring name to the plugin capability operation.
+///
+/// For example, `rename` maps to `rename-symbol`. Returns
+/// [`DispatchError::InvalidArguments`] when the supplied `refactoring` is not
+/// supported.
 pub(crate) fn effective_operation(refactoring: &str) -> Result<&'static str, DispatchError> {
     SUPPORTED_REFACTORINGS
         .iter()
@@ -79,14 +95,23 @@ pub(crate) fn effective_operation(refactoring: &str) -> Result<&'static str, Dis
         .ok_or_else(|| invalid_supported_value("refactoring", refactoring))
 }
 
+/// Maps a plugin capability operation to its corresponding [`CapabilityId`].
+///
+/// Returns [`DispatchError::InvalidArguments`] when `operation` is not present
+/// in the canonical refactoring table.
 pub(crate) fn capability_for_operation(operation: &str) -> Result<CapabilityId, DispatchError> {
+    let supported_operations = SUPPORTED_REFACTORINGS
+        .iter()
+        .map(|supported| supported.capability_operation)
+        .collect::<Vec<_>>()
+        .join(", ");
     SUPPORTED_REFACTORINGS
         .iter()
         .find(|supported| supported.capability_operation == operation)
         .map(|supported| supported.capability)
         .ok_or_else(|| {
             DispatchError::invalid_arguments(format!(
-                "act refactor does not support capability resolution for '{operation}' (only 'rename-symbol' is currently implemented)"
+                "act refactor does not support capability resolution for '{operation}' (supported capability operations: {supported_operations})"
             ))
         })
 }
@@ -99,6 +124,11 @@ fn validate_value(kind: &str, supported: &[&str], value: &str) -> Result<(), Dis
     }
 }
 
+/// Builds the deterministic missing-arguments error for `act refactor`.
+///
+/// The returned [`DispatchError::InvalidArguments`] lists every required
+/// top-level flag, the supported provider and refactoring values, and a next
+/// command example. This is used when one or more required flags are absent.
 pub(crate) fn missing_requirements_error() -> DispatchError {
     DispatchError::invalid_arguments(format!(
         "act refactor requires {}\n\n{}",

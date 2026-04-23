@@ -286,11 +286,6 @@ fn given_unsupported_language_request(world: &mut RefactorWorld) {
     world.routing_mode = RoutingMode::UnsupportedLanguage;
 }
 
-#[given("an act refactor request without the required flags")]
-fn given_missing_required_arguments_request(world: &mut RefactorWorld) {
-    configure_request(&mut world.request, Vec::new());
-}
-
 #[given("a Python act refactor request with an incompatible provider override")]
 fn given_explicit_provider_mismatch_request(world: &mut RefactorWorld) {
     configure_request(

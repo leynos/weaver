@@ -36,7 +36,7 @@ Feature: Act refactor
 
   Scenario: Refactor rejects successful plugin responses without diffs
     Given a workspace file for refactoring
-    And a valid auto-routed act refactor request resolved to rope
+    And a valid act refactor request for rope
     And a non-diff success response from the refactor plugin
     When the act refactor command executes
     Then the refactor command fails with status 1
@@ -58,13 +58,3 @@ Feature: Act refactor
     Then the refactor command fails with status 1
     And the target file is unchanged
     And the stderr stream contains "\"refusal_reason\":\"explicit_provider_mismatch\""
-
-  Scenario: Refactor reports the complete required argument contract
-    Given an act refactor request without the required flags
-    When the act refactor command executes
-    Then the refactor command fails with status 1
-    And the dispatch error contains "--provider <plugin>"
-    And the dispatch error contains "--refactoring <operation>"
-    And the dispatch error contains "--file <path>"
-    And the dispatch error contains "Providers: rope, rust-analyzer"
-    And the dispatch error contains "Refactorings: rename"

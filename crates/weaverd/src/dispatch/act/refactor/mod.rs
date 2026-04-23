@@ -184,7 +184,7 @@ fn prepare_plugin_request(
 
     let effective_operation = effective_operation(&args.refactoring)?;
     if effective_operation == "rename-symbol" {
-        apply_rename_symbol_mapping(&mut plugin_args, &args.file)?;
+        apply_rename_symbol_mapping(&mut plugin_args, file_path.as_path())?;
     }
 
     let plugin_request = PluginRequest::with_arguments(
@@ -293,15 +293,11 @@ fn resolve_file(workspace_root: &Path, file: &str) -> Result<std::path::PathBuf,
 /// injects `uri` from `file` and renames `offset` to `position`.
 fn apply_rename_symbol_mapping(
     plugin_args: &mut std::collections::HashMap<String, serde_json::Value>,
-    file: &str,
+    file: &Path,
 ) -> Result<(), DispatchError> {
     plugin_args.insert(
         String::from("uri"),
-        serde_json::Value::String(to_file_uri(file).map_err(|error| {
-            DispatchError::invalid_arguments(format!(
-                "cannot construct file URI for '{file}': {error}"
-            ))
-        })?),
+        serde_json::Value::String(to_file_uri(file)?),
     );
     if let Some(offset_val) = plugin_args.remove("offset") {
         plugin_args.insert(String::from("position"), offset_val);
@@ -309,15 +305,15 @@ fn apply_rename_symbol_mapping(
     Ok(())
 }
 
-fn to_file_uri(path: &str) -> Result<String, url::ParseError> {
-    let mut url = Url::parse("file:///")?;
-    {
-        let mut segments = url
-            .path_segments_mut()
-            .map_err(|()| url::ParseError::RelativeUrlWithoutBase)?;
-        segments.extend(path.split('/'));
-    }
-    Ok(url.to_string())
+fn to_file_uri(path: &Path) -> Result<String, DispatchError> {
+    Url::from_file_path(path)
+        .map(|url| url.to_string())
+        .map_err(|()| {
+            DispatchError::invalid_arguments(format!(
+                "cannot construct file URI for '{}'",
+                path.display()
+            ))
+        })
 }
 
 fn write_capability_resolution<W: Write>(
