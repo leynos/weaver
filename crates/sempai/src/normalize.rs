@@ -29,10 +29,10 @@
 //! - `inside: ...` → `Formula::Inside(Box<...>)`
 //! - `anywhere: ...` → `Formula::Anywhere(Box<...>)`
 
+use sempai_core::SourceSpan;
 use sempai_core::formula::{
     Atom, Decorated, Formula, PatternAtom, RegexAtom, TreeSitterQueryAtom, WhereClause,
 };
-use sempai_core::{DiagnosticReport, SourceSpan};
 use sempai_yaml::{
     LegacyClause, LegacyFormula, LegacyValue, MatchFormula, ProjectDependsOnPayload,
     SearchQueryPrincipal,
@@ -40,23 +40,19 @@ use sempai_yaml::{
 
 /// Normalizes a parsed search principal into the canonical formula model.
 ///
-/// # Errors
-///
-/// Returns a diagnostic report if the principal cannot be normalized
-/// (e.g., unsupported formula structure or missing required data).
-#[expect(
-    clippy::unnecessary_wraps,
-    reason = "future normalization steps may return errors"
-)]
+/// Normalization is currently infallible: every supported principal shape has
+/// a well-defined canonical mapping. If a future mapping needs to signal a
+/// structural error, switch this function's return type to
+/// `Result<Decorated<Formula>, DiagnosticReport>` at that point.
 pub(crate) fn normalize_search_principal(
     principal: &SearchQueryPrincipal,
     rule_span: Option<&SourceSpan>,
-) -> Result<Decorated<Formula>, DiagnosticReport> {
+) -> Decorated<Formula> {
     match principal {
-        SearchQueryPrincipal::Legacy(formula) => Ok(normalize_legacy(formula, rule_span.cloned())),
-        SearchQueryPrincipal::Match(formula) => Ok(normalize_match(formula, rule_span.cloned())),
+        SearchQueryPrincipal::Legacy(formula) => normalize_legacy(formula, rule_span.cloned()),
+        SearchQueryPrincipal::Match(formula) => normalize_match(formula, rule_span.cloned()),
         SearchQueryPrincipal::ProjectDependsOn(payload) => {
-            Ok(normalize_dependency_principal(payload, rule_span.cloned()))
+            normalize_dependency_principal(payload, rule_span.cloned())
         }
     }
 }
