@@ -155,6 +155,95 @@ mod tests {
         }
     }
 
+    #[track_caller]
+    fn assert_invalid_args_contains(args: Vec<String>, expected_substrings: &[&str]) {
+        let message =
+            invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
+        for expected in expected_substrings {
+            assert!(
+                message.contains(expected),
+                "missing {expected:?} from: {message}"
+            );
+        }
+    }
+
+    #[rstest]
+    #[case::missing_flag_value(
+        vec![
+            String::from("--provider"),
+            String::from("rope"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+        ],
+        vec!["requires a value"],
+    )]
+    #[case::flag_as_value(
+        vec![
+            String::from("--provider"),
+            String::from("rope"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("--provider"),
+        ],
+        vec!["requires a value"],
+    )]
+    #[case::unsupported_provider(
+        vec![
+            String::from("--provider"),
+            String::from("missing-provider"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("src/main.py"),
+        ],
+        vec!["does not support provider 'missing-provider'", "Providers: rope, rust-analyzer"],
+    )]
+    #[case::unsupported_refactoring(
+        vec![
+            String::from("--provider"),
+            String::from("rope"),
+            String::from("--refactoring"),
+            String::from("extract-method"),
+            String::from("--file"),
+            String::from("src/main.py"),
+        ],
+        vec!["does not support refactoring 'extract-method'", "Refactorings: rename"],
+    )]
+    #[case::unexpected_top_level_flag(
+        vec![
+            String::from("--provider"),
+            String::from("rope"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("src/main.py"),
+            String::from("--bogus"),
+        ],
+        vec!["invalid trailing arguments: '--bogus'", "trailing KEY=VALUE arguments"],
+    )]
+    #[case::malformed_trailing_arguments(
+        vec![
+            String::from("--provider"),
+            String::from("rope"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("src/main.py"),
+            String::from("offset"),
+            String::from("=woven"),
+            String::from("new_name"),
+        ],
+        vec!["invalid trailing arguments: 'offset', '=woven', 'new_name'", "trailing KEY=VALUE arguments"],
+    )]
+    fn invalid_arguments_are_rejected(
+        #[case] args: Vec<String>,
+        #[case] expected_substrings: Vec<&str>,
+    ) {
+        assert_invalid_args_contains(args, &expected_substrings);
+    }
+
     #[test]
     fn parses_complete_argument_set() {
         let args = vec![

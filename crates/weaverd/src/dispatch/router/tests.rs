@@ -33,12 +33,19 @@ fn build_backends() -> FusionBackends<SemanticBackendProvider> {
     FusionBackends::new(config, provider)
 }
 
-fn build_router() -> DomainRouter { DomainRouter::new(PathBuf::from("/tmp/weaver-test-workspace")) }
+fn build_router() -> DomainRouter {
+    DomainRouter::new(PathBuf::from("/tmp/weaver-test-workspace"))
+        .unwrap_or_else(|error| panic!("absolute workspace root: {error}"))
+}
 
 #[test]
-#[should_panic(expected = "DomainRouter requires an absolute workspace_root")]
 fn build_router_rejects_relative_workspace_root() {
-    let _ = DomainRouter::new(PathBuf::from("relative/workspace"));
+    let error = match DomainRouter::new(PathBuf::from("relative/workspace")) {
+        Ok(_) => panic!("relative workspace roots should be rejected"),
+        Err(error) => error,
+    };
+
+    assert!(matches!(error, DispatchError::InvalidArguments { .. }));
 }
 
 #[allow_fixture_expansion_lints]

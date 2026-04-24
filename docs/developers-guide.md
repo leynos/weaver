@@ -455,7 +455,7 @@ let payload = automatic_resolution_payload(std::path::Path::new(file));
 
 `refactor_helpers` is a `#[cfg(test)]` support module for the daemon-side
 `act refactor` tests. It is split into small inline modules and then
-re-exported at the top level so sibling test modules can import a compact test
+re-exported at the top-level so sibling test modules can import a compact test
 API instead of reaching into several implementation details.
 
 The inline modules are:

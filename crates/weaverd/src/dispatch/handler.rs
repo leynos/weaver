@@ -38,11 +38,11 @@ pub struct DispatchConnectionHandler {
 
 impl DispatchConnectionHandler {
     /// Creates a new dispatch handler with a backend manager and workspace root.
-    pub fn new(backends: BackendManager, workspace_root: PathBuf) -> Self {
-        Self {
-            router: DomainRouter::new(workspace_root),
+    pub fn new(backends: BackendManager, workspace_root: PathBuf) -> Result<Self, DispatchError> {
+        Ok(Self {
+            router: DomainRouter::new(workspace_root)?,
             backends,
-        }
+        })
     }
 
     /// Handles a connection by reading the request and dispatching.
@@ -267,6 +267,7 @@ mod tests {
                 Err(error) => panic!("accept: {error}"),
             };
             DispatchConnectionHandler::new(backend_manager, workspace_root)
+                .unwrap_or_else(|error| panic!("absolute workspace root: {error}"))
                 .handle(ConnectionStream::Tcp(stream));
         });
 
