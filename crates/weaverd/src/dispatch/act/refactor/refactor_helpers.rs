@@ -28,11 +28,6 @@ pub(crate) mod builders {
         }
     }
 
-    #[allow(
-        unfulfilled_lint_expectations,
-        reason = "Used in some #[path] includes"
-    )]
-    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn build_backends(socket_path: &Path) -> FusionBackends<SemanticBackendProvider> {
         let config = Config {
             daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().as_ref()),
@@ -43,11 +38,6 @@ pub(crate) mod builders {
         FusionBackends::new(config, provider)
     }
 
-    #[allow(
-        unfulfilled_lint_expectations,
-        reason = "Used in some #[path] includes"
-    )]
-    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn standard_rename_args(file: &str) -> Vec<String> {
         vec![
             String::from("--refactoring"),
@@ -59,14 +49,13 @@ pub(crate) mod builders {
         ]
     }
 
-    #[allow(
-        unfulfilled_lint_expectations,
-        reason = "Used in some #[path] includes"
-    )]
-    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn configure_request(request: &mut CommandRequest, args: Vec<String>) {
         *request = command_request(args);
     }
+
+    const _: fn(&Path) -> FusionBackends<SemanticBackendProvider> = build_backends;
+    const _: fn(&str) -> Vec<String> = standard_rename_args;
+    const _: fn(&mut CommandRequest, Vec<String>) = configure_request;
 }
 
 pub(crate) mod resolutions {
@@ -101,11 +90,6 @@ pub(crate) mod resolutions {
         pub(crate) requested_provider: Option<&'a str>,
     }
 
-    #[allow(
-        unfulfilled_lint_expectations,
-        reason = "Used in some #[path] includes"
-    )]
-    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn selected_resolution(
         config: SelectedResolution<'_>,
     ) -> CapabilityResolutionEnvelope {
@@ -125,11 +109,6 @@ pub(crate) mod resolutions {
         })
     }
 
-    #[allow(
-        unfulfilled_lint_expectations,
-        reason = "Used in some #[path] includes"
-    )]
-    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn refused_resolution(
         config: RefusedResolution<'_>,
     ) -> CapabilityResolutionEnvelope {
@@ -145,11 +124,6 @@ pub(crate) mod resolutions {
         })
     }
 
-    #[allow(
-        unfulfilled_lint_expectations,
-        reason = "Used in some #[path] includes"
-    )]
-    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn rejected_candidate(
         provider: &str,
         reason: CandidateReason,
@@ -167,11 +141,6 @@ pub(crate) mod resolutions {
         pub(crate) selection_mode: SelectionMode,
     }
 
-    #[allow(
-        unfulfilled_lint_expectations,
-        reason = "Used in some #[path] includes"
-    )]
-    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn resolve_auto_language(
         context: AutoResolutionContext<'_>,
         language_name: Option<&'static str>,
@@ -197,6 +166,17 @@ pub(crate) mod resolutions {
             })
         }
     }
+
+    const _: for<'a> fn(SelectedResolution<'a>) -> CapabilityResolutionEnvelope =
+        selected_resolution;
+    const _: for<'a> fn(RefusedResolution<'a>) -> CapabilityResolutionEnvelope = refused_resolution;
+    const _: fn(&str, CandidateReason) -> CandidateEvaluation = rejected_candidate;
+    const _: for<'a> fn(
+        AutoResolutionContext<'a>,
+        Option<&'static str>,
+        &'static str,
+        Vec<CandidateEvaluation>,
+    ) -> CapabilityResolutionEnvelope = resolve_auto_language;
 }
 
 pub(crate) mod rollback {
@@ -215,7 +195,6 @@ pub(crate) mod rollback {
         pub(crate) execute_result: ExecuteResult,
     }
 
-    #[allow(dead_code, reason = "Used in some #[path] includes")]
     pub(crate) enum ExecuteResult {
         Success(PluginResponse),
         MissingPlugin(&'static str),
@@ -243,11 +222,6 @@ pub(crate) mod rollback {
         }
     }
 
-    #[allow(
-        unfulfilled_lint_expectations,
-        reason = "Used in some #[path] includes"
-    )]
-    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn selected_runtime(
         config: SelectedResolution<'_>,
         execute_result: ExecuteResult,
@@ -258,11 +232,6 @@ pub(crate) mod rollback {
         }
     }
 
-    #[allow(
-        unfulfilled_lint_expectations,
-        reason = "Used in some #[path] includes"
-    )]
-    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn rollback_runtime(
         resolution: CapabilityResolutionEnvelope,
         execute_result: ExecuteResult,
@@ -272,6 +241,12 @@ pub(crate) mod rollback {
             execute_result,
         }
     }
+
+    const _: fn(PluginResponse) -> ExecuteResult = ExecuteResult::Success;
+    const _: fn(&'static str) -> ExecuteResult = ExecuteResult::MissingPlugin;
+    const _: for<'a> fn(SelectedResolution<'a>, ExecuteResult) -> RollbackRuntime =
+        selected_runtime;
+    const _: fn(CapabilityResolutionEnvelope, ExecuteResult) -> RollbackRuntime = rollback_runtime;
 }
 
 pub(crate) mod content {
@@ -291,11 +266,6 @@ pub(crate) mod content {
         Other,
     }
 
-    #[allow(
-        unfulfilled_lint_expectations,
-        reason = "Used in some #[path] includes"
-    )]
-    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn classify_file(path: &Path) -> FileKind {
         match path.extension().and_then(|ext| ext.to_str()) {
             Some("py") => FileKind::Python,
@@ -336,29 +306,14 @@ pub(crate) mod content {
         }
     }
 
-    #[allow(
-        unfulfilled_lint_expectations,
-        reason = "Used in some #[path] includes"
-    )]
-    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn original_content_for(path: &Path) -> &'static str {
         content_table(classify_file(path)).original
     }
 
-    #[allow(
-        unfulfilled_lint_expectations,
-        reason = "Used in some #[path] includes"
-    )]
-    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn updated_content_for(path: &Path) -> &'static str {
         content_table(classify_file(path)).updated
     }
 
-    #[allow(
-        unfulfilled_lint_expectations,
-        reason = "Used in some #[path] includes"
-    )]
-    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn routed_patch_path(path: &Path) -> &Path {
         match classify_file(path) {
             FileKind::Python | FileKind::Rust => Path::new("notes.txt"),
@@ -371,24 +326,18 @@ pub(crate) mod content {
         format_diff(path, &make_header(&patch_path.to_string_lossy()))
     }
 
-    #[allow(
-        unfulfilled_lint_expectations,
-        reason = "Used in some #[path] includes"
-    )]
-    #[expect(dead_code, reason = "Unused in some #[path] includes")]
     pub(crate) fn routed_diff_for(path: &Path) -> String {
         routed_format_diff(path, |p| format!("diff --git a/{p} b/{p}"))
     }
 
-    #[allow(
-        unfulfilled_lint_expectations,
-        reason = "This helper is used in some #[path] includes"
-    )]
-    #[expect(
-        dead_code,
-        reason = "Used via sibling #[path] test includes in some units"
-    )]
     pub(crate) fn routed_malformed_diff_for(path: &Path) -> String {
         routed_format_diff(path, |p| format!("diff --git a/{p}"))
     }
+
+    const _: fn(&Path) -> FileKind = classify_file;
+    const _: fn(&Path) -> &'static str = original_content_for;
+    const _: fn(&Path) -> &'static str = updated_content_for;
+    const _: fn(&Path) -> &Path = routed_patch_path;
+    const _: fn(&Path) -> String = routed_diff_for;
+    const _: fn(&Path) -> String = routed_malformed_diff_for;
 }

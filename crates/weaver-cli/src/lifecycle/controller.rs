@@ -6,7 +6,7 @@
 
 use std::{io::Write, process::ExitCode, time::SystemTime};
 
-use weaver_config::{RuntimePaths, SocketEndpoint};
+use weaver_config::{RuntimePaths, RuntimePathsError, SocketEndpoint};
 
 use super::{
     error::LifecycleError,
@@ -104,8 +104,15 @@ impl SystemLifecycle {
     }
 
     /// Checks if the daemon is running by attempting to read runtime paths.
-    fn check_daemon_paths(&self, config: &weaver_config::Config) -> Option<RuntimePaths> {
-        RuntimePaths::from_config_readonly(config).ok()
+    fn check_daemon_paths(
+        &self,
+        config: &weaver_config::Config,
+    ) -> Result<Option<RuntimePaths>, LifecycleError> {
+        match RuntimePaths::from_config_readonly(config) {
+            Ok(paths) => Ok(Some(paths)),
+            Err(RuntimePathsError::MissingSocketParent { .. }) => Ok(None),
+            Err(error) => Err(error.into()),
+        }
     }
 
     /// Reports daemon status when a valid health snapshot is available.
@@ -189,7 +196,7 @@ impl SystemLifecycle {
     ) -> Result<ExitCode, LifecycleError> {
         ensure_no_extra_arguments(invocation)?;
 
-        let paths = match self.check_daemon_paths(context.config) {
+        let paths = match self.check_daemon_paths(context.config)? {
             Some(paths) => paths,
             None => {
                 self.report_not_running(output)?;
