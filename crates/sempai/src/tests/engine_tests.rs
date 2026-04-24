@@ -102,36 +102,36 @@ fn compile_yaml_normalizes_and_returns_query_plans(
 
 #[test]
 fn compile_yaml_returns_semantic_error_for_invalid_not_in_or() {
-    let engine = default_engine();
-    let result = engine.compile_yaml(concat!(
-        "rules:\n",
-        "  - id: demo.invalid.not.in.or\n",
-        "    message: invalid not in or\n",
-        "    languages: [rust]\n",
-        "    severity: ERROR\n",
-        "    pattern-either:\n",
-        "      - pattern: foo($X)\n",
-        "      - pattern-not: bar($Y)\n",
-    ));
-    let (code, _diag) = first_diagnostic_of_err(result);
-    assert_eq!(code, DiagnosticCode::ESempaiInvalidNotInOr);
+    assert_compile_yaml_semantic_error(
+        concat!(
+            "rules:\n",
+            "  - id: demo.invalid.not.in.or\n",
+            "    message: invalid not in or\n",
+            "    languages: [rust]\n",
+            "    severity: ERROR\n",
+            "    pattern-either:\n",
+            "      - pattern: foo($X)\n",
+            "      - pattern-not: bar($Y)\n",
+        ),
+        DiagnosticCode::ESempaiInvalidNotInOr,
+    );
 }
 
 #[test]
 fn compile_yaml_returns_semantic_error_for_missing_positive_term_in_and() {
-    let engine = default_engine();
-    let result = engine.compile_yaml(concat!(
-        "rules:\n",
-        "  - id: demo.missing.positive.term.in.and\n",
-        "    message: missing positive term in and\n",
-        "    languages: [rust]\n",
-        "    severity: ERROR\n",
-        "    patterns:\n",
-        "      - pattern-not: foo($X)\n",
-        "      - pattern-inside: bar($Y)\n",
-    ));
-    let (code, _diag) = first_diagnostic_of_err(result);
-    assert_eq!(code, DiagnosticCode::ESempaiMissingPositiveTermInAnd);
+    assert_compile_yaml_semantic_error(
+        concat!(
+            "rules:\n",
+            "  - id: demo.missing.positive.term.in.and\n",
+            "    message: missing positive term in and\n",
+            "    languages: [rust]\n",
+            "    severity: ERROR\n",
+            "    patterns:\n",
+            "      - pattern-not: foo($X)\n",
+            "      - pattern-inside: bar($Y)\n",
+        ),
+        DiagnosticCode::ESempaiMissingPositiveTermInAnd,
+    );
 }
 
 fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str) {
@@ -146,6 +146,13 @@ fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str
         diag.message(),
     );
     assert!(diag.primary_span().is_some());
+}
+
+fn assert_compile_yaml_semantic_error(yaml: &str, expected_code: DiagnosticCode) {
+    let engine = default_engine();
+    let result = engine.compile_yaml(yaml);
+    let (code, _diag) = first_diagnostic_of_err(result);
+    assert_eq!(code, expected_code);
 }
 
 #[test]
