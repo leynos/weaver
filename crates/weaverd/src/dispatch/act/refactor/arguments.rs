@@ -280,5 +280,4 @@ mod tests {
         assert!(message.contains("Refactorings: rename"));
         assert!(message.contains("Next command:"));
     }
-
 }
