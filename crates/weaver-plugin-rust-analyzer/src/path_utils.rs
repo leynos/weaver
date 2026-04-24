@@ -156,10 +156,14 @@ mod tests {
         validate_relative_path,
     };
 
-    fn assert_invalid_uri(input: &str, expected_msg: &str) {
+    fn assert_invalid_uri(input: &str, expected_msg: &str) -> Result<(), String> {
         match normalize_request_uri(input) {
-            Err(RustAnalyzerAdapterError::InvalidPath { message }) if message == expected_msg => {}
-            other => panic!("expected InvalidPath({expected_msg:?}) for {input:?}, got: {other:?}"),
+            Err(RustAnalyzerAdapterError::InvalidPath { message }) if message == expected_msg => {
+                Ok(())
+            }
+            other => Err(format!(
+                "expected InvalidPath({expected_msg:?}) for {input:?}, got: {other:?}"
+            )),
         }
     }
 
@@ -201,18 +205,22 @@ mod tests {
     #[rstest]
     #[case("file://host/src/main.rs")]
     #[case("https://example.com/src/main.rs")]
-    fn normalize_request_uri_rejects_authority_and_non_file_schemes(#[case] input: &str) {
+    fn normalize_request_uri_rejects_authority_and_non_file_schemes(
+        #[case] input: &str,
+    ) -> Result<(), String> {
         assert_invalid_uri(
             input,
             "uri argument must be a valid file:// URI without an authority",
-        );
+        )
     }
 
     #[rstest]
     #[case("file://")]
     #[case("file:///")]
-    fn normalize_request_uri_rejects_empty_root_and_invalid_uris(#[case] input: &str) {
-        assert_invalid_uri(input, "path must not be empty or only '.'");
+    fn normalize_request_uri_rejects_empty_root_and_invalid_uris(
+        #[case] input: &str,
+    ) -> Result<(), String> {
+        assert_invalid_uri(input, "path must not be empty or only '.'")
     }
 
     #[test]
