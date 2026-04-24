@@ -503,7 +503,7 @@ let runtime = selected_runtime(
     ExecuteResult::MissingPlugin("rope"),
 );
 
-let request = command_request(standard_rename_args("notes.py"));
+let request = command_request(standard_rename_args_for_provider("notes.py", "rope"));
 let mut backends = build_backends(&socket_path);
 ```
 
