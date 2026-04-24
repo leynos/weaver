@@ -124,8 +124,20 @@ fn check_positive_term_in_and(
 
 /// Returns true if the formula is a positive match-producing term.
 ///
-/// Positive terms: `Atom`, `And`, `Or`
-/// Constraint-only terms: `Not`, `Inside`, `Anywhere`
-const fn is_positive_term(formula: &Formula) -> bool {
-    matches!(formula, Formula::Atom(_) | Formula::And(_) | Formula::Or(_))
+/// A term is positive when it ultimately produces a match location.  An `Atom`
+/// is always positive; `Not`, `Inside`, and `Anywhere` are purely
+/// constraint-style and never positive on their own.  An `And` or `Or` is
+/// positive only when at least one of its descendants is itself positive —
+/// otherwise the combinator bottoms out in constraint-only terms and cannot
+/// anchor matches.  This prevents shapes like `And[Or[Inside[Atom]]]` from
+/// sneaking past `MissingPositiveTermInAnd` on the basis of the outer shape
+/// alone.
+fn is_positive_term(formula: &Formula) -> bool {
+    match formula {
+        Formula::Atom(_) => true,
+        Formula::And(branches) | Formula::Or(branches) => {
+            branches.iter().any(|b| is_positive_term(&b.node))
+        }
+        Formula::Not(_) | Formula::Inside(_) | Formula::Anywhere(_) => false,
+    }
 }

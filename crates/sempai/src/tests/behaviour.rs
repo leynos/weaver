@@ -15,7 +15,7 @@ use crate::{DiagnosticReport, Engine, EngineConfig, Language, engine::QueryPlan}
 #[derive(Default)]
 struct TestWorld {
     engine: Option<Engine>,
-    compile_result: Option<Result<(), DiagnosticReport>>,
+    compile_result: Option<Result<Vec<QueryPlan>, DiagnosticReport>>,
     execute_result: Option<Result<(), DiagnosticReport>>,
 }
 
@@ -39,7 +39,7 @@ fn given_default_engine(world: &mut TestWorld) {
 #[when("YAML {yaml} is compiled")]
 fn when_compile_yaml(world: &mut TestWorld, yaml: QuotedString) {
     let engine = world.engine.as_ref().expect("engine should be set");
-    world.compile_result = Some(engine.compile_yaml(yaml.as_str()).map(|_| ()));
+    world.compile_result = Some(engine.compile_yaml(yaml.as_str()));
 }
 
 #[when("DSL {dsl} is compiled for language {lang}")]
@@ -49,7 +49,7 @@ fn when_compile_dsl(world: &mut TestWorld, dsl: QuotedString, lang: QuotedString
     world.compile_result = Some(
         engine
             .compile_dsl("interactive", language, dsl.as_str())
-            .map(|_| ()),
+            .map(|plan| vec![plan]),
     );
 }
 
@@ -78,8 +78,8 @@ fn when_execute(world: &mut TestWorld) {
 // ---------------------------------------------------------------------------
 
 /// Asserts that a diagnostic result contains a specific error code.
-fn assert_diagnostic_code(
-    result: Option<&Result<(), DiagnosticReport>>,
+fn assert_diagnostic_code<T: std::fmt::Debug>(
+    result: Option<&Result<T, DiagnosticReport>>,
     expected_code: &str,
     result_name: &str,
     failure_kind: &str,
@@ -134,7 +134,31 @@ fn then_first_diagnostic_message_contains(world: &mut TestWorld, snippet: Quoted
     assert!(first.message().contains(snippet.as_str()));
 }
 
-#[then("execution fails with code {code}")]
+fn then_compilation_succeeds_with_plans(world: &mut TestWorld, count: usize) {
+    let plans = world
+        .compile_result
+        .as_ref()
+        .expect("compile result should be set")
+        .as_ref()
+        .expect("expected successful compilation");
+    assert_eq!(
+        plans.len(),
+        count,
+        "expected {count} query plan(s), got {}",
+        plans.len()
+    );
+}
+
+fn then_first_plan_rule_id(world: &mut TestWorld, id: QuotedString) {
+    let plans = world
+        .compile_result
+        .as_ref()
+        .expect("compile result should be set")
+        .as_ref()
+        .expect("expected successful compilation");
+    let first = plans.first().expect("expected at least one query plan");
+    assert_eq!(first.rule_id(), id.as_str());
+}
 fn then_execution_fails(world: &mut TestWorld, code: QuotedString) {
     assert_diagnostic_code(
         world.execute_result.as_ref(),

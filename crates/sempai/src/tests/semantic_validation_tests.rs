@@ -115,6 +115,40 @@ fn and_with_only_constraints_fails() {
 }
 
 #[test]
+fn and_with_or_containing_only_constraints_fails() {
+    // `And[Or[Inside[Atom]]]` must not pass: the Or's only branch is a
+    // constraint-only term, so the whole combinator lacks a positive term.
+    let inside_only = Decorated {
+        node: Formula::Inside(Box::new(make_pattern("ctx"))),
+        where_clauses: vec![],
+        as_name: None,
+        fix: None,
+        span: None,
+    };
+    let or_of_constraints = Decorated {
+        node: Formula::Or(vec![inside_only]),
+        where_clauses: vec![],
+        as_name: None,
+        fix: None,
+        span: None,
+    };
+    let formula = Decorated {
+        node: Formula::And(vec![or_of_constraints]),
+        where_clauses: vec![],
+        as_name: None,
+        fix: None,
+        span: None,
+    };
+    let result = validate_formula(&formula);
+    let err = result.expect_err("should fail validation");
+    let first = err.diagnostics().first().expect("should have diagnostic");
+    assert_eq!(
+        first.code(),
+        DiagnosticCode::ESempaiMissingPositiveTermInAnd
+    );
+}
+
+#[test]
 fn nested_or_in_and_with_not_fails() {
     let nested_or = Decorated {
         node: Formula::Or(vec![

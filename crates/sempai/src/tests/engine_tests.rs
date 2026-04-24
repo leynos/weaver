@@ -70,6 +70,8 @@ fn dummy_formula() -> Decorated<Formula> {
         span: None,
     }
 }
+
+#[test]
 fn engine_new_with_default_config() {
     let engine = Engine::new(EngineConfig::default());
     assert_eq!(engine.config().max_matches_per_rule(), 10_000);
@@ -83,18 +85,42 @@ fn engine_new_with_custom_config() {
     assert!(engine.config().enable_hcl());
 }
 
-fn compile_yaml_normalizes_and_returns_query_plans() {
+#[rstest]
+#[case::legacy_pattern(
+    "rules:\n  - id: demo.rule\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n",
+    "demo.rule",
+    Language::Rust
+)]
+#[case::project_depends_on(
+    concat!(
+        "rules:\n",
+        "  - id: demo.depends\n",
+        "    message: detect vulnerable dependency\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    r2c-internal-project-depends-on:\n",
+        "      namespace: pypi\n",
+        "      package: requests\n",
+    ),
+    "demo.depends",
+    Language::Python,
+)]
+fn compile_yaml_normalizes_and_returns_query_plans(
+    #[case] yaml: &str,
+    #[case] expected_rule_id: &str,
+    #[case] expected_language: Language,
+) {
     let engine = default_engine();
-    let result = engine.compile_yaml(
-        "rules:\n  - id: demo.rule\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n",
-    );
-    let plans = result.expect("should successfully compile");
+    let plans = engine
+        .compile_yaml(yaml)
+        .expect("should successfully compile");
     assert_eq!(plans.len(), 1);
     let plan = plans.first().expect("should have first plan");
-    assert_eq!(plan.rule_id(), "demo.rule");
-    assert_eq!(plan.language(), Language::Rust);
+    assert_eq!(plan.rule_id(), expected_rule_id);
+    assert_eq!(plan.language(), expected_language);
 }
 
+#[test]
 fn compile_yaml_returns_semantic_error_for_invalid_not_in_or() {
     let engine = default_engine();
     let result = engine.compile_yaml(concat!(
@@ -111,6 +137,7 @@ fn compile_yaml_returns_semantic_error_for_invalid_not_in_or() {
     assert_eq!(code, DiagnosticCode::ESempaiInvalidNotInOr);
 }
 
+#[test]
 fn compile_yaml_returns_semantic_error_for_missing_positive_term_in_and() {
     let engine = default_engine();
     let result = engine.compile_yaml(concat!(
@@ -125,24 +152,6 @@ fn compile_yaml_returns_semantic_error_for_missing_positive_term_in_and() {
     ));
     let (code, _diag) = first_diagnostic_of_err(result);
     assert_eq!(code, DiagnosticCode::ESempaiMissingPositiveTermInAnd);
-}
-fn compile_yaml_normalizes_project_depends_on_search_rule() {
-    let engine = default_engine();
-    let result = engine.compile_yaml(concat!(
-        "rules:\n",
-        "  - id: demo.depends\n",
-        "    message: detect vulnerable dependency\n",
-        "    languages: [python]\n",
-        "    severity: WARNING\n",
-        "    r2c-internal-project-depends-on:\n",
-        "      namespace: pypi\n",
-        "      package: requests\n",
-    ));
-    let plans = result.expect("should successfully compile");
-    assert_eq!(plans.len(), 1);
-    let plan = plans.first().expect("should have first plan");
-    assert_eq!(plan.rule_id(), "demo.depends");
-    assert_eq!(plan.language(), Language::Python);
 }
 
 #[rstest]
@@ -162,15 +171,6 @@ fn compile_yaml_normalizes_project_depends_on_search_rule() {
         expected_code: DiagnosticCode::ESempaiSchemaInvalid,
         check_primary_span: false,
         check_message: None,
-    }
-)]
-#[case(
-    SingleRuleDiagnosticCase {
-        rule_id: Some("demo.rule"),
-        yaml_body: "pattern: foo($X)",
-        expected_code: DiagnosticCode::NotImplemented,
-        check_primary_span: false,
-        check_message: Some("normalization"),
     }
 )]
 fn compile_yaml_returns_expected_diagnostic_for_single_rule_cases(
