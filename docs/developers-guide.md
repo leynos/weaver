@@ -454,9 +454,9 @@ let payload = automatic_resolution_payload(std::path::Path::new(file));
 ### `refactor_helpers` (`weaverd/src/dispatch/act/refactor/refactor_helpers.rs`)
 
 `refactor_helpers` is a `#[cfg(test)]` support module for the daemon-side
-`act refactor` tests. It is split into small inline modules and then re-exported
-at the top level so sibling test modules can import a compact test API instead
-of reaching into several implementation details.
+`act refactor` tests. It is split into small inline modules and then
+re-exported at the top-level so sibling test modules can import a compact test
+API instead of reaching into several implementation details.
 
 The inline modules are:
 
@@ -486,8 +486,8 @@ The `rollback_tests` module uses these abstractions to assert failure-path
 invariants for `act refactor`: the command exits with status `1`, the target
 file content remains unchanged, and stderr contains the expected refusal or
 runtime error text. That module is intentionally focused on rollback semantics,
-while `tests.rs`, `contract_tests.rs`, and `behaviour.rs` cover other aspects of
-the refactor handler.
+while `tests.rs`, `contract_tests.rs`, and `behaviour.rs` cover other aspects
+of the refactor handler.
 
 Typical usage pattern in daemon tests:
 
@@ -497,17 +497,51 @@ let runtime = selected_runtime(
         capability: weaver_plugins::CapabilityId::RenameSymbol,
         language: "python",
         provider: "rope",
-        selection_mode: super::resolution::SelectionMode::Automatic,
-        requested_provider: None,
+        selection_mode: super::resolution::SelectionMode::ExplicitProvider,
+        requested_provider: Some("rope"),
     },
     ExecuteResult::MissingPlugin("rope"),
 );
 
-let request = command_request(standard_rename_args("notes.py"));
+let request = command_request(standard_rename_args_for_provider("notes.py", "rope"));
 let mut backends = build_backends(&socket_path);
 ```
 
 That pattern lets a test build a request, inject a deterministic runtime, and
 then call `handle(...)` to assert on exit status, stderr, and any preserved
-workspace content. Tests that need fixture content or diff payloads layer in the
-`content` helpers instead of hand-writing patch strings.
+workspace content. Tests that need fixture content or diff payloads layer in
+the `content` helpers instead of hand-writing patch strings.
+
+### `requirements` (`weaverd/src/dispatch/act/refactor/requirements.rs`)
+
+`requirements` is the single source of truth for the operator-facing contract of
+`act refactor`. It is a non-test module consumed by both the argument-parsing
+layer and the test suite to keep validation, guidance text, and supported-value
+lists in one place.
+
+The module exposes seven `pub(crate)` functions:
+
+- `supported_provider_names() -> &'static [&'static str]` — returns the
+  canonical slice of accepted provider names (e.g. `rope`, `rust-analyzer`),
+  sourced from the built-in provider manifest catalogue.
+- `supported_refactoring_names() -> &'static [&'static str]` — returns the
+  canonical slice of accepted user-facing refactoring names (e.g. `rename`).
+- `validate_provider(provider: &str) -> Result<(), DispatchError>` — returns
+  `DispatchError::InvalidArguments` when `provider` is not in
+  `supported_provider_names`.
+- `validate_refactoring(refactoring: &str) -> Result<(), DispatchError>` —
+  returns `DispatchError::InvalidArguments` when `refactoring` is not in
+  `supported_refactoring_names`.
+- `effective_operation(refactoring: &str) ->
+  Result<&'static str, DispatchError>` —
+  maps a user-facing refactoring name to the underlying plugin capability
+  operation string (e.g. `rename` → `rename-symbol`).
+- `capability_for_operation(operation: &str) ->
+  Result<CapabilityId, DispatchError>` —
+  maps a capability operation string to its `CapabilityId` variant, returning
+  `DispatchError::InvalidArguments` for unknown operations.
+- `missing_requirements_error() -> DispatchError` — builds the deterministic
+  `DispatchError::InvalidArguments` that lists every required flag
+  (`--provider`, `--refactoring`, `--file`), valid provider and refactoring
+  values, and a next-command example. Called by the argument-builder when one
+  or more required flags are absent.

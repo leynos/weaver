@@ -6,7 +6,7 @@
 //! with structured errors.
 
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use tracing::debug;
@@ -138,14 +138,27 @@ impl std::fmt::Debug for DomainRouter {
 
 impl DomainRouter {
     /// Creates a new domain router with the workspace root.
-    pub fn new(workspace_root: PathBuf) -> Self {
-        Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DispatchError::InvalidArguments`] if `workspace_root` is not
+    /// an absolute path. Dispatch handlers resolve workspace-relative files
+    /// against this root and rely on the resulting paths to construct
+    /// canonical file URIs.
+    pub fn new(workspace_root: PathBuf) -> Result<Self, DispatchError> {
+        validate_absolute_workspace_root(workspace_root.as_path())?;
+        Ok(Self {
             workspace_root,
             refactor_runtime: act::refactor::default_runtime(),
-        }
+        })
     }
 
     /// Creates a domain router with a custom refactor runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DispatchError::InvalidArguments`] if `workspace_root` is not
+    /// an absolute path.
     #[cfg(test)]
     #[expect(
         dead_code,
@@ -154,11 +167,12 @@ impl DomainRouter {
     pub fn with_runtime(
         workspace_root: PathBuf,
         runtime: Arc<dyn act::refactor::RefactorPluginRuntime + Send + Sync>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, DispatchError> {
+        validate_absolute_workspace_root(workspace_root.as_path())?;
+        Ok(Self {
             workspace_root,
             refactor_runtime: runtime,
-        }
+        })
     }
 
     /// Routes a command request to the appropriate domain handler.
@@ -262,6 +276,17 @@ impl DomainRouter {
             "{domain} {operation}: operation not yet implemented\n"
         ))?;
         Ok(DispatchResult::with_status(1))
+    }
+}
+
+fn validate_absolute_workspace_root(workspace_root: &Path) -> Result<(), DispatchError> {
+    if workspace_root.is_absolute() {
+        Ok(())
+    } else {
+        Err(DispatchError::invalid_arguments(format!(
+            "workspace_root must be an absolute path, got '{}'",
+            workspace_root.display()
+        )))
     }
 }
 

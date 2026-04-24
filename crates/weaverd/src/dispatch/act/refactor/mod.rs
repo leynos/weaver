@@ -17,7 +17,7 @@ use arguments::parse_refactor_args;
 use tracing::debug;
 use url::Url;
 
-use weaver_plugins::capability::CapabilityId;
+use weaver_plugins::CapabilityId;
 use weaver_plugins::process::SandboxExecutor;
 use weaver_plugins::protocol::FilePayload;
 use weaver_plugins::runner::PluginRunner;
@@ -34,6 +34,7 @@ use plugin_paths::{
     ROPE_PLUGIN_PATH_ENV, RUST_ANALYZER_PLUGIN_PATH_ENV, resolve_rope_plugin_path,
     resolve_rust_analyzer_plugin_path,
 };
+use requirements::{capability_for_operation, effective_operation};
 use resolution::{CapabilityResolutionEnvelope, ResolutionRequest, resolve_provider};
 
 mod arguments;
@@ -43,6 +44,7 @@ mod plugin_paths;
 #[cfg(test)]
 pub(super) mod refactor_helpers;
 mod refusal;
+mod requirements;
 mod resolution;
 mod response_handling;
 
@@ -180,29 +182,25 @@ fn prepare_plugin_request(
         }
     }
 
-    let effective_operation = match args.refactoring.as_str() {
-        "rename" => {
-            apply_rename_symbol_mapping(&mut plugin_args, &args.file)?;
-            String::from("rename-symbol")
-        }
-        _ => args.refactoring.clone(),
-    };
+    let effective_operation = effective_operation(&args.refactoring)?;
+    if effective_operation == "rename-symbol" {
+        apply_rename_symbol_mapping(&mut plugin_args, file_path.as_path())?;
+    }
 
     let plugin_request = PluginRequest::with_arguments(
-        &effective_operation,
+        effective_operation,
         vec![FilePayload::new(PathBuf::from(&args.file), file_content)],
         plugin_args,
     );
 
-    let capability = capability_from_operation(&effective_operation)?;
+    let capability = capability_for_operation(effective_operation)?;
     Ok((plugin_request, capability, file_path))
 }
 
 /// Handles `act refactor` requests.
 ///
-/// Expects `--refactoring <operation>` and `--file <path>` in the request
-/// arguments. `--provider <plugin>` is optional and acts as an explicit
-/// compatibility override when supplied.
+/// Expects `--provider <plugin>`, `--refactoring <operation>`, and
+/// `--file <path>` in the request arguments.
 ///
 /// The handler reads the file content, executes the plugin, and forwards
 /// successful diff output through `act apply-patch` for Double-Lock
@@ -216,7 +214,7 @@ pub fn handle<W: Write>(
 
     debug!(
         target: DISPATCH_TARGET,
-        provider = args.provider.as_deref().unwrap_or("<auto>"),
+        provider = args.provider,
         refactoring = args.refactoring,
         file = args.file,
         "handling act refactor"
@@ -227,15 +225,13 @@ pub fn handle<W: Write>(
     let resolution = match context.runtime.resolve(ResolutionRequest::new(
         capability,
         file_path.as_path(),
-        args.provider.as_deref(),
+        Some(&args.provider),
     )) {
         Ok(resolution) => resolution,
         Err(error) => {
             writer.write_stderr(format!(
                 "act refactor failed: {error} (provider={}, refactoring={}, file={})\n",
-                args.provider.as_deref().unwrap_or("<auto>"),
-                args.refactoring,
-                args.file
+                args.provider, args.refactoring, args.file
             ))?;
             return Ok(DispatchResult::with_status(1));
         }
@@ -297,15 +293,11 @@ fn resolve_file(workspace_root: &Path, file: &str) -> Result<std::path::PathBuf,
 /// injects `uri` from `file` and renames `offset` to `position`.
 fn apply_rename_symbol_mapping(
     plugin_args: &mut std::collections::HashMap<String, serde_json::Value>,
-    file: &str,
+    file: &Path,
 ) -> Result<(), DispatchError> {
     plugin_args.insert(
         String::from("uri"),
-        serde_json::Value::String(to_file_uri(file).map_err(|error| {
-            DispatchError::invalid_arguments(format!(
-                "cannot construct file URI for '{file}': {error}"
-            ))
-        })?),
+        serde_json::Value::String(to_file_uri(file)?),
     );
     if let Some(offset_val) = plugin_args.remove("offset") {
         plugin_args.insert(String::from("position"), offset_val);
@@ -313,26 +305,15 @@ fn apply_rename_symbol_mapping(
     Ok(())
 }
 
-fn to_file_uri(path: &str) -> Result<String, url::ParseError> {
-    let mut url = Url::parse("file:///")?;
-    {
-        let mut segments = url
-            .path_segments_mut()
-            .map_err(|()| url::ParseError::RelativeUrlWithoutBase)?;
-        segments.extend(path.split('/'));
-    }
-    Ok(url.to_string())
-}
-
-fn capability_from_operation(operation: &str) -> Result<CapabilityId, DispatchError> {
-    // TODO: Extend this mapping when additional refactoring operations are added
-    // (e.g., extract-method, inline-variable, move-function).
-    match operation {
-        "rename-symbol" => Ok(CapabilityId::RenameSymbol),
-        other => Err(DispatchError::invalid_arguments(format!(
-            "act refactor does not support capability resolution for '{other}' (only 'rename-symbol' is currently implemented)"
-        ))),
-    }
+fn to_file_uri(path: &Path) -> Result<String, DispatchError> {
+    Url::from_file_path(path)
+        .map(|url| url.to_string())
+        .map_err(|()| {
+            DispatchError::invalid_arguments(format!(
+                "cannot construct file URI for '{}'",
+                path.display()
+            ))
+        })
 }
 
 fn write_capability_resolution<W: Write>(

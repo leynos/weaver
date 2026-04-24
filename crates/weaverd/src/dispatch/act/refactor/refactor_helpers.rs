@@ -45,6 +45,17 @@ pub(crate) mod builders {
         ]
     }
 
+    /// Builds a rename command argument vector with an explicit provider selection.
+    ///
+    /// Prepends `--provider <provider>` to the output of [`standard_rename_args`],
+    /// producing a complete argument list suitable for tests that exercise the
+    /// explicit-provider code path.
+    pub(crate) fn standard_rename_args_for_provider(file: &str, provider: &str) -> Vec<String> {
+        let mut args = vec![String::from("--provider"), String::from(provider)];
+        args.extend(standard_rename_args(file));
+        args
+    }
+
     pub(crate) fn configure_request(request: &mut CommandRequest, args: Vec<String>) {
         *request = command_request(args);
     }
