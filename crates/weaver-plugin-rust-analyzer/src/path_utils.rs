@@ -102,6 +102,15 @@ fn strip_file_uri_root(path: &Path) -> Result<PathBuf, RustAnalyzerAdapterError>
 /// Normal path components are preserved, `.` components are ignored, and any
 /// root, prefix, traversal, or non-UTF-8 component yields `InvalidPath`.
 pub(crate) fn path_to_slash(path: &Path) -> Result<String, RustAnalyzerAdapterError> {
+    if path.as_os_str().is_empty() || path == Path::new(".") {
+        return Err(RustAnalyzerAdapterError::InvalidPath {
+            message: format!(
+                "empty or dot-only paths are not allowed; path: {}",
+                path.display()
+            ),
+        });
+    }
+
     let parts = path
         .components()
         .map(|component| match component {
@@ -242,6 +251,17 @@ mod tests {
         let converted = path_to_slash(Path::new("./a/./b"));
 
         assert!(matches!(converted, Ok(ref path) if path == "a/b"));
+    }
+
+    #[rstest]
+    #[case("")]
+    #[case(".")]
+    fn path_to_slash_rejects_empty_and_dot_only_paths(#[case] input: &str) {
+        assert!(matches!(
+            path_to_slash(Path::new(input)),
+            Err(RustAnalyzerAdapterError::InvalidPath { message })
+                if message.contains("empty or dot-only paths are not allowed")
+        ));
     }
 
     #[test]

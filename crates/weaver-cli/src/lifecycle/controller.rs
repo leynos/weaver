@@ -204,7 +204,11 @@ impl SystemLifecycle {
             }
         };
 
-        if !paths.runtime_dir().exists() {
+        if !paths
+            .runtime_dir()
+            .try_exists()
+            .map_err(LifecycleError::Io)?
+        {
             self.report_not_running(output)?;
             return Ok(ExitCode::SUCCESS);
         }
