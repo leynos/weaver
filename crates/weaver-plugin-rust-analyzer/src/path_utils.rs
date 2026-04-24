@@ -140,11 +140,19 @@ pub(crate) fn path_to_slash(path: &Path) -> Result<String, RustAnalyzerAdapterEr
             }),
         })
         .collect::<Result<Vec<String>, RustAnalyzerAdapterError>>()?;
-    Ok(parts
+    let normalized_parts = parts
         .into_iter()
         .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>()
-        .join("/"))
+        .collect::<Vec<_>>();
+    if normalized_parts.is_empty() {
+        return Err(RustAnalyzerAdapterError::InvalidPath {
+            message: format!(
+                "empty or dot-only paths are not allowed; path: {}",
+                path.display()
+            ),
+        });
+    }
+    Ok(normalized_parts.join("/"))
 }
 
 #[cfg(test)]
@@ -256,6 +264,8 @@ mod tests {
     #[rstest]
     #[case("")]
     #[case(".")]
+    #[case("./")]
+    #[case("././")]
     fn path_to_slash_rejects_empty_and_dot_only_paths(#[case] input: &str) {
         assert!(matches!(
             path_to_slash(Path::new(input)),

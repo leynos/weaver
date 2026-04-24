@@ -6,7 +6,7 @@
 
 use std::{io::Write, process::ExitCode, time::SystemTime};
 
-use weaver_config::{RuntimePaths, RuntimePathsError, SocketEndpoint};
+use weaver_config::{RuntimePaths, SocketEndpoint};
 
 use super::{
     error::LifecycleError,
@@ -110,7 +110,6 @@ impl SystemLifecycle {
     ) -> Result<Option<RuntimePaths>, LifecycleError> {
         match RuntimePaths::from_config_readonly(config) {
             Ok(paths) => Ok(Some(paths)),
-            Err(RuntimePathsError::MissingSocketParent { .. }) => Ok(None),
             Err(error) => Err(error.into()),
         }
     }
