@@ -60,10 +60,13 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-5-make-nixie.log
   `as`, and `fix` metadata.
 - Preserve the crate boundary split:
   - `sempai_core` owns the `Formula`, `Atom`, `Decorated`, and `WhereClause`
-    types plus semantic validation logic.
+    types. `Decorated<T>` carries the fields `node: T`, `where_clauses:
+    Vec<WhereClause>`, `as_name: Option<String>`, `fix: Option<String>`, and
+    `span: Option<SourceSpan>`.
   - `sempai_yaml` owns the parsed `LegacyFormula` and `MatchFormula` types.
   - `sempai` (facade) wires parsing → normalization → validation → plan
-    construction.
+    construction. Normalization lives in `crates/sempai/src/normalize.rs` and
+    semantic validation in `crates/sempai/src/semantic_check.rs`.
 - Maintain the stable diagnostics contract from 4.1.2:
   `code`, `message`, `primary_span`, and `notes` remain the only emitted fields.
 - Use `DiagnosticReport::validation_error(...)` for semantic constraint
@@ -212,10 +215,10 @@ pub enum Atom {
 
 pub struct Decorated<T> {
     pub node: T,
-    pub where_: Vec<WhereClause>,
-    pub as_: Option<String>,
+    pub where_clauses: Vec<WhereClause>,
+    pub as_name: Option<String>,
     pub fix: Option<String>,
-    pub span: SourceSpan,
+    pub span: Option<SourceSpan>,
 }
 ```
 
@@ -245,7 +248,11 @@ v2-to-canonical mapping:
 | `not: ...`                           | `Formula::Not(Box<...>)`            |
 | `inside: ...`                        | `Formula::Inside(Box<...>)`         |
 | `anywhere: ...`                      | `Formula::Anywhere(Box<...>)`       |
-| `Decorated { where_, as_, fix, .. }` | `Decorated<Formula>` wrapper        |
+| `Decorated { where, as, fix, .. }`   | `Decorated<Formula>` wrapper[^d]    |
+
+[^d]: The canonical `Decorated<Formula>` exposes the fields `where_clauses`,
+    `as_name`, `fix`, and `span: Option<SourceSpan>` in addition to the inner
+    `node`.
 
 ## Plan of work
 
@@ -267,8 +274,9 @@ Add a new module `crates/sempai-core/src/formula.rs` (< 200 lines) containing:
 - `PatternAtom` — wraps a pattern string (the raw host-language snippet).
 - `RegexAtom` — wraps a regex string.
 - `TreeSitterQueryAtom` — stub wrapping a query string (for escape hatch).
-- `Decorated<T>` — generic wrapper with `node: T`, `where_: Vec<WhereClause>`,
-  `as_: Option<String>`, `fix: Option<String>`, `span: SourceSpan`.
+- `Decorated<T>` — generic wrapper with `node: T`, `where_clauses:
+  Vec<WhereClause>`, `as_name: Option<String>`, `fix: Option<String>`, `span:
+  Option<SourceSpan>`.
 - `WhereClause` — initially wraps `serde_json::Value` for opaque constraint
   storage; later milestones interpret specific clause types.
 

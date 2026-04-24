@@ -249,12 +249,14 @@ fn normalize_dependency_principal(
     _payload: &ProjectDependsOnPayload,
     fallback_span: Option<SourceSpan>,
 ) -> Decorated<Formula> {
-    // For now, represent as a degenerate pattern that will never match
-    // real code. This allows the rule to parse and normalize successfully
-    // without inventing execution semantics prematurely.
+    // For now, represent as a degenerate pattern that will never match real
+    // code. Use a node type that cannot exist in any Tree-sitter grammar
+    // (`__NONEXISTENT_NODE__`) so the query is guaranteed to be non-matchable;
+    // the earlier `(ERROR)` placeholder would have matched real parse-error
+    // nodes produced by Tree-sitter on malformed source.
     bare(
         Formula::Atom(Atom::TreeSitterQuery(TreeSitterQueryAtom {
-            query: String::from("(ERROR) @_dependency_check"),
+            query: String::from("(__NONEXISTENT_NODE__) @_dependency_check"),
         })),
         fallback_span,
     )
