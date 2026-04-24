@@ -424,7 +424,7 @@ phase* *with explicit parser, backend, and Weaver-integration milestones.*
   - Acceptance criteria: unsupported execution modes return deterministic
     `UnsupportedMode` diagnostics, and search mode validation enforces required
     key combinations.
-- [ ] 4.1.5. Implement legacy and v2 normalization into one canonical
+- [x] 4.1.5. Implement legacy and v2 normalization into one canonical
       `Formula` model with semantic constraint checks. Requires 4.1.3.
   - Acceptance criteria: paired legacy and v2 fixtures normalize to equivalent
     formulas, and semantic invalid states emit deterministic rule diagnostics.

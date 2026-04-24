@@ -1520,19 +1520,26 @@ failures such as missing required rule keys return `E_SEMPAI_SCHEMA_INVALID`,
 both using the shared structured diagnostic payload with `primary_span`
 locations when available.
 
-After parsing succeeds, `compile_yaml(yaml)` now distinguishes parseable rules
-from executable ones:
+After parsing succeeds, `compile_yaml(yaml)` normalizes search rules into
+canonical query plans:
 
-- Valid `search` rules, including compatibility-only
-  `r2c-internal-project-depends-on` rules, continue to the existing
-  `NOT_IMPLEMENTED` normalization placeholder.
-- Valid `extract`, `taint`, `join`, and unknown future mode strings now fail
-  deterministically with `E_SEMPAI_UNSUPPORTED_MODE` instead of falling through
-  to the generic placeholder.
+- Valid `search` rules are normalized into the canonical `Formula` model
+  defined in `sempai_core::formula`. Both legacy (`pattern*`) and v2 (`match`)
+  syntaxes are lowered into a shared representation.
+- Normalized formulas are validated for semantic correctness:
+  `E_SEMPAI_INVALID_NOT_IN_OR` is emitted when negated terms appear in
+  disjunction branches, and `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND` is emitted
+  when conjunctions contain only constraint formulas.
+- For each valid search rule and declared language, a `QueryPlan` is returned
+  containing the normalized formula and metadata.
+- Valid `extract`, `taint`, `join`, and unknown future mode strings fail
+  deterministically with `E_SEMPAI_UNSUPPORTED_MODE`.
+- Compatibility-only `r2c-internal-project-depends-on` rules normalize to a
+  degenerate formula that will never match real code.
 
 Unsupported-mode diagnostics point at the rule's `mode` field when that span is
-available, which makes whole-document failures deterministic even though the
-execution backend is still pending.
+available. Semantic validation errors include accurate `primary_span` locations
+when available from the parser.
 
 `compile_dsl(...)` and `execute(...)` still return "not implemented"
 diagnostics. They will be wired to the DSL parser and Tree-sitter backend as

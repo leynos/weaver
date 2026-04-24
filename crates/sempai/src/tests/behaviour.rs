@@ -2,6 +2,7 @@
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
+use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom};
 use sempai_core::test_support::QuotedString;
 
 use crate::engine::QueryPlan;
@@ -14,7 +15,7 @@ use crate::{DiagnosticReport, Engine, EngineConfig, Language};
 #[derive(Default)]
 struct TestWorld {
     engine: Option<Engine>,
-    compile_result: Option<Result<(), DiagnosticReport>>,
+    compile_result: Option<Result<Vec<QueryPlan>, DiagnosticReport>>,
     execute_result: Option<Result<(), DiagnosticReport>>,
 }
 
@@ -39,7 +40,7 @@ fn given_default_engine(world: &mut TestWorld) {
 #[when("YAML {yaml} is compiled")]
 fn when_compile_yaml(world: &mut TestWorld, yaml: QuotedString) {
     let engine = world.engine.as_ref().expect("engine should be set");
-    world.compile_result = Some(engine.compile_yaml(yaml.as_str()).map(|_| ()));
+    world.compile_result = Some(engine.compile_yaml(yaml.as_str()));
 }
 
 #[when("DSL {dsl} is compiled for language {lang}")]
@@ -49,14 +50,23 @@ fn when_compile_dsl(world: &mut TestWorld, dsl: QuotedString, lang: QuotedString
     world.compile_result = Some(
         engine
             .compile_dsl("interactive", language, dsl.as_str())
-            .map(|_| ()),
+            .map(|plan| vec![plan]),
     );
 }
 
 #[when("a query plan is executed")]
 fn when_execute(world: &mut TestWorld) {
     let engine = world.engine.as_ref().expect("engine should be set");
-    let plan = QueryPlan::new(String::from("test-rule"), Language::Rust);
+    let dummy_formula = Decorated {
+        node: Formula::Atom(Atom::Pattern(PatternAtom {
+            text: String::from("dummy"),
+        })),
+        where_clauses: vec![],
+        as_name: None,
+        fix: None,
+        span: None,
+    };
+    let plan = QueryPlan::new(String::from("test-rule"), Language::Rust, dummy_formula);
     world.execute_result = Some(
         engine
             .execute(&plan, "file:///t.rs", "fn main() {}")
@@ -69,8 +79,8 @@ fn when_execute(world: &mut TestWorld) {
 // ---------------------------------------------------------------------------
 
 /// Asserts that a diagnostic result contains a specific error code.
-fn assert_diagnostic_code(
-    result: Option<&Result<(), DiagnosticReport>>,
+fn assert_diagnostic_code<T: std::fmt::Debug>(
+    result: Option<&Result<T, DiagnosticReport>>,
     expected_code: &str,
     result_name: &str,
     failure_kind: &str,
@@ -123,6 +133,34 @@ fn then_first_diagnostic_message_contains(world: &mut TestWorld, snippet: Quoted
         .first()
         .expect("at least one diagnostic");
     assert!(first.message().contains(snippet.as_str()));
+}
+
+#[then("compilation succeeds with {count} query plan")]
+fn then_compilation_succeeds_with_plans(world: &mut TestWorld, count: usize) {
+    let plans = world
+        .compile_result
+        .as_ref()
+        .expect("compile result should be set")
+        .as_ref()
+        .expect("expected successful compilation");
+    assert_eq!(
+        plans.len(),
+        count,
+        "expected {count} query plan(s), got {}",
+        plans.len()
+    );
+}
+
+#[then("the first query plan has rule id {id}")]
+fn then_first_plan_rule_id(world: &mut TestWorld, id: QuotedString) {
+    let plans = world
+        .compile_result
+        .as_ref()
+        .expect("compile result should be set")
+        .as_ref()
+        .expect("expected successful compilation");
+    let first = plans.first().expect("expected at least one query plan");
+    assert_eq!(first.rule_id(), id.as_str());
 }
 
 #[then("execution fails with code {code}")]
