@@ -10,20 +10,30 @@ mod utils;
 
 use std::path::{Path, PathBuf};
 
-use thiserror::Error;
-use weaver_syntax::SupportedLanguage;
-
-use crate::Provenance;
-use crate::timestamp::extraction_timestamp_now;
-use crate::{
-    AttachmentsInfo, DetailLevel, DocInfo, ImportInterstitialInfo, InterstitialInfo, MetricsInfo,
-    NormalizedAttachments, SignatureInfo, StructureInfo, SymbolCard, SymbolIdentity, SymbolRef,
-};
 pub(super) use candidates::{EntityCandidate, InterstitialCandidate};
 use candidates::{build_module_candidate, select_candidate};
 use positions::{position_to_byte, usize_to_u32};
 pub use state::TreeSitterCardExtractor;
+use thiserror::Error;
 use utils::{file_uri, provenance_sources, to_card_language};
+use weaver_syntax::SupportedLanguage;
+
+use crate::{
+    AttachmentsInfo,
+    DetailLevel,
+    DocInfo,
+    ImportInterstitialInfo,
+    InterstitialInfo,
+    MetricsInfo,
+    NormalizedAttachments,
+    Provenance,
+    SignatureInfo,
+    StructureInfo,
+    SymbolCard,
+    SymbolIdentity,
+    SymbolRef,
+    timestamp::extraction_timestamp_now,
+};
 
 /// Input required to extract a Tree-sitter-backed symbol card.
 #[derive(Debug, Clone, Copy)]
@@ -138,9 +148,7 @@ struct LeadingAttachments {
 }
 
 impl LeadingAttachments {
-    const fn is_empty(&self) -> bool {
-        self.doc_comments.is_empty() && self.decorators.is_empty()
-    }
+    const fn is_empty(&self) -> bool { self.doc_comments.is_empty() && self.decorators.is_empty() }
 }
 
 #[derive(Debug, Clone)]

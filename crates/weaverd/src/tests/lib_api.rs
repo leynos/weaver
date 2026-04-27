@@ -4,11 +4,13 @@ use std::sync::Arc;
 
 use rstest::rstest;
 
-use crate::{BackendKind, bootstrap_with};
-
 use super::support::{
-    HealthEvent, RecordingBackendProvider, RecordingHealthReporter, TestConfigLoader,
+    HealthEvent,
+    RecordingBackendProvider,
+    RecordingHealthReporter,
+    TestConfigLoader,
 };
+use crate::{BackendKind, bootstrap_with};
 
 /// Verifies that the public `bootstrap_with` re-export correctly initialises
 /// the daemon without eagerly starting backends.

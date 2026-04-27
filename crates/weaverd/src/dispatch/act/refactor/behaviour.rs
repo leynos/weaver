@@ -7,13 +7,36 @@ use rstest_bdd_macros::{given, scenario, then, when};
 use tempfile::TempDir;
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 use weaver_syntax::SupportedLanguage;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use super::refactor_helpers::*;
-use super::resolution::{
-    CandidateEvaluation, CandidateReason, CapabilityResolutionEnvelope, RefusalReason,
-    ResolutionRequest, SelectionMode,
+use super::{
+    refactor_helpers::{
+        builders::{build_backends, command_request, configure_request, standard_rename_args},
+        content::{
+            original_content_for,
+            routed_diff_for,
+            routed_malformed_diff_for,
+            routed_patch_path,
+            updated_content_for,
+        },
+        resolutions::{
+            AutoResolutionContext,
+            RefusedResolution,
+            refused_resolution,
+            rejected_candidate,
+            resolve_auto_language,
+        },
+    },
+    resolution::{
+        CandidateEvaluation,
+        CandidateReason,
+        CapabilityResolutionEnvelope,
+        RefusalReason,
+        ResolutionRequest,
+        SelectionMode,
+    },
+    *,
 };
-use super::*;
 
 #[derive(Clone, Copy, Default)]
 enum RuntimeMode {
@@ -55,6 +78,14 @@ fn refused_candidates(
         .collect()
 }
 
+fn provider_for_auto(mode: RoutingMode) -> &'static str {
+    match mode {
+        RoutingMode::AutomaticPython => "rope",
+        RoutingMode::AutomaticRust => "rust-analyzer",
+        _ => unreachable!("provider_for_auto is only for automatic modes"),
+    }
+}
+
 impl RefactorPluginRuntime for StubRuntime {
     fn resolve(
         &self,
@@ -68,41 +99,21 @@ impl RefactorPluginRuntime for StubRuntime {
         } else {
             SelectionMode::Automatic
         };
-
-        // Automatic routing modes require a valid language
-        let requires_language = matches!(
-            self.routing,
-            RoutingMode::AutomaticPython | RoutingMode::AutomaticRust
-        );
-        if requires_language && language_name.is_none() {
-            return Ok(refused_resolution(RefusedResolution {
-                capability: request.capability(),
-                language: None,
-                requested_provider,
-                selection_mode,
-                refusal_reason: RefusalReason::UnsupportedLanguage,
-                candidates: refused_candidates(
-                    requested_provider,
-                    CandidateReason::UnsupportedLanguage,
-                ),
-            }));
-        }
+        let auto_context = AutoResolutionContext {
+            capability: request.capability(),
+            requested_provider,
+            selection_mode,
+        };
 
         Ok(match self.routing {
-            RoutingMode::AutomaticPython => selected_resolution(SelectedResolution {
-                capability: request.capability(),
-                language: language_name.expect("language validated above"),
-                provider: "rope",
-                selection_mode,
-                requested_provider,
-            }),
-            RoutingMode::AutomaticRust => selected_resolution(SelectedResolution {
-                capability: request.capability(),
-                language: language_name.expect("language validated above"),
-                provider: "rust-analyzer",
-                selection_mode,
-                requested_provider,
-            }),
+            mode @ (RoutingMode::AutomaticPython | RoutingMode::AutomaticRust) => {
+                resolve_auto_language(
+                    auto_context,
+                    language_name,
+                    provider_for_auto(mode),
+                    refused_candidates(requested_provider, CandidateReason::UnsupportedLanguage),
+                )
+            }
             RoutingMode::UnsupportedLanguage => refused_resolution(RefusedResolution {
                 capability: request.capability(),
                 language: language_name,
@@ -130,23 +141,22 @@ impl RefactorPluginRuntime for StubRuntime {
         _provider: &str,
         request: &PluginRequest,
     ) -> Result<PluginResponse, PluginError> {
-        let relative_path = request
+        let file_payload = request
             .files()
             .first()
-            .expect("file payload")
-            .path()
-            .to_string_lossy()
-            .into_owned();
+            .ok_or_else(|| PluginError::NotFound {
+                name: String::from("file payload"),
+            })?;
 
         match self.execution {
             RuntimeMode::DiffSuccess => Ok(PluginResponse::success(PluginOutput::Diff {
-                content: routed_diff_for(Path::new(&relative_path)),
+                content: routed_diff_for(file_payload.path()),
             })),
             RuntimeMode::RuntimeError => Err(PluginError::NotFound {
                 name: String::from("rope"),
             }),
             RuntimeMode::MalformedDiff => Ok(PluginResponse::success(PluginOutput::Diff {
-                content: routed_malformed_diff_for(Path::new(&relative_path)),
+                content: routed_malformed_diff_for(file_payload.path()),
             })),
             RuntimeMode::EmptySuccess => Ok(PluginResponse::success(PluginOutput::Empty)),
         }
@@ -164,10 +174,10 @@ struct RefactorWorld {
 }
 
 impl RefactorWorld {
-    fn new() -> Self {
-        Self {
-            workspace: TempDir::new().expect("workspace"),
-            socket_dir: TempDir::new().expect("socket dir"),
+    fn new() -> Result<Self, String> {
+        Ok(Self {
+            workspace: TempDir::new().map_err(|e| format!("workspace: {e}"))?,
+            socket_dir: TempDir::new().map_err(|e| format!("socket dir: {e}"))?,
             request: command_request(vec![
                 String::from("--refactoring"),
                 String::from("rename"),
@@ -178,42 +188,39 @@ impl RefactorWorld {
             routing_mode: RoutingMode::AutomaticPython,
             dispatch_result: None,
             response_stream: String::new(),
-        }
+        })
     }
 
-    fn path(&self, relative: &str) -> PathBuf {
-        self.workspace.path().join(relative)
-    }
+    fn path(&self, relative: &str) -> PathBuf { self.workspace.path().join(relative) }
 
-    fn target_file(&self) -> String {
+    fn target_file(&self) -> Result<String, String> {
         self.request
             .arguments
             .windows(2)
             .find_map(|pair| (pair[0] == "--file").then(|| pair[1].clone()))
-            .expect("target file argument")
+            .ok_or_else(|| "target file argument missing".to_string())
     }
 
-    fn write_file(&self, relative: &str, content: &str) {
-        std::fs::write(self.path(relative), content).expect("write file");
+    fn write_file(&self, relative: &str, content: &str) -> Result<(), String> {
+        std::fs::write(self.path(relative), content).map_err(|e| format!("write file: {e}"))
     }
 
-    fn prepare_routed_fixture(&self, target_file: &str) {
+    fn prepare_routed_fixture(&self, target_file: &str) -> Result<(), String> {
         let target_path = Path::new(target_file);
-        self.write_file(target_file, original_content_for(target_path));
+        self.write_file(target_file, original_content_for(target_path))?;
         let patch_path = routed_patch_path(target_path);
         if patch_path != target_path {
-            self.write_file(
-                patch_path.to_str().expect("valid UTF-8 path"),
-                original_content_for(target_path),
-            );
+            let path_str = patch_path.to_str().ok_or("invalid UTF-8 path")?;
+            self.write_file(path_str, original_content_for(target_path))?;
         }
+        Ok(())
     }
 
-    fn read_file(&self, relative: &str) -> String {
-        std::fs::read_to_string(self.path(relative)).expect("read file")
+    fn read_file(&self, relative: &str) -> Result<String, String> {
+        std::fs::read_to_string(self.path(relative)).map_err(|e| format!("read file: {e}"))
     }
 
-    fn execute(&mut self) {
+    fn execute(&mut self) -> Result<(), String> {
         let runtime = StubRuntime {
             routing: self.routing_mode,
             execution: self.runtime_mode,
@@ -234,20 +241,27 @@ impl RefactorWorld {
         .map(|dispatch| dispatch.status);
 
         self.dispatch_result = Some(result);
-        self.response_stream = String::from_utf8(output).expect("response utf8");
+        self.response_stream =
+            String::from_utf8(output).map_err(|e| format!("response utf8: {e}"))?;
+        Ok(())
     }
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
 fn world() -> RefactorWorld {
-    RefactorWorld::new()
+    match RefactorWorld::new() {
+        Ok(world) => world,
+        Err(e) => panic!("failed to create refactor world: {}", e),
+    }
 }
 
 #[given("a workspace file for refactoring")]
 fn given_workspace_file(
     #[expect(
         unused_variables,
-        reason = "BDD step exists for readability; file creation happens in prepare_routed_fixture()"
+        reason = "BDD step exists for readability; file creation happens in \
+                  prepare_routed_fixture()"
     )]
     world: &mut RefactorWorld,
 ) {
@@ -256,17 +270,17 @@ fn given_workspace_file(
 }
 
 #[given("a valid auto-routed act refactor request resolved to rope")]
-fn given_valid_rope_request(world: &mut RefactorWorld) {
+fn given_valid_rope_request(world: &mut RefactorWorld) -> Result<(), String> {
     configure_request(&mut world.request, standard_rename_args("notes.py"));
     world.routing_mode = RoutingMode::AutomaticPython;
-    world.prepare_routed_fixture("notes.py");
+    world.prepare_routed_fixture("notes.py")
 }
 
 #[given("a valid auto-routed act refactor request resolved to rust-analyzer")]
-fn given_valid_rust_request(world: &mut RefactorWorld) {
+fn given_valid_rust_request(world: &mut RefactorWorld) -> Result<(), String> {
     configure_request(&mut world.request, standard_rename_args("notes.rs"));
     world.routing_mode = RoutingMode::AutomaticRust;
-    world.prepare_routed_fixture("notes.rs");
+    world.prepare_routed_fixture("notes.rs")
 }
 
 #[given("an unsupported-language act refactor request")]
@@ -276,12 +290,12 @@ fn given_unsupported_language_request(world: &mut RefactorWorld) {
 }
 
 #[given("a Python act refactor request with an incompatible provider override")]
-fn given_explicit_provider_mismatch_request(world: &mut RefactorWorld) {
+fn given_explicit_provider_mismatch_request(world: &mut RefactorWorld) -> Result<(), String> {
     let mut args = vec![String::from("--provider"), String::from("rust-analyzer")];
     args.extend(standard_rename_args("notes.py"));
     configure_request(&mut world.request, args);
     world.routing_mode = RoutingMode::ExplicitProviderMismatch;
-    world.prepare_routed_fixture("notes.py");
+    world.prepare_routed_fixture("notes.py")
 }
 
 #[given("a runtime error from the refactor plugin")]
@@ -300,40 +314,46 @@ fn given_non_diff_success(world: &mut RefactorWorld) {
 }
 
 #[when("the act refactor command executes")]
-fn when_refactor_executes(world: &mut RefactorWorld) {
-    world.execute();
+fn when_refactor_executes(world: &mut RefactorWorld) -> Result<(), String> { world.execute() }
+
+fn extract_status(world: &RefactorWorld) -> Result<i32, String> {
+    let result = world.dispatch_result.as_ref().ok_or("result missing")?;
+    result
+        .as_ref()
+        .map(|status| *status)
+        .map_err(|e| format!("status error: {e}"))
 }
 
 #[then("the refactor command succeeds")]
-fn then_refactor_succeeds(world: &mut RefactorWorld) {
-    let result = world.dispatch_result.as_ref().expect("result missing");
-    let status = result.as_ref().expect("status should be present");
-    assert_eq!(*status, 0);
+fn then_refactor_succeeds(world: &mut RefactorWorld) -> Result<(), String> {
+    assert_eq!(extract_status(world)?, 0);
+    Ok(())
 }
 
 #[then("the refactor command fails with status 1")]
-fn then_refactor_fails_status_one(world: &mut RefactorWorld) {
-    let result = world.dispatch_result.as_ref().expect("result missing");
-    let status = result.as_ref().expect("status should be present");
-    assert_eq!(*status, 1);
+fn then_refactor_fails_status_one(world: &mut RefactorWorld) -> Result<(), String> {
+    assert_eq!(extract_status(world)?, 1);
+    Ok(())
 }
 
 #[then("the target file is updated")]
-fn then_target_file_updated(world: &mut RefactorWorld) {
-    let target_file = world.target_file();
-    let target_path = Path::new(&target_file);
-    let patch_target = routed_patch_path(target_path);
-    let updated = world.read_file(patch_target.to_str().expect("valid UTF-8 path"));
-    assert_eq!(updated, updated_content_for(target_path));
+fn then_target_file_updated(world: &mut RefactorWorld) -> Result<(), String> {
+    let target_file = world.target_file()?;
+    assert_eq!(
+        read_routed_target(world)?,
+        updated_content_for(Path::new(&target_file))
+    );
+    Ok(())
 }
 
 #[then("the target file is unchanged")]
-fn then_target_file_unchanged(world: &mut RefactorWorld) {
-    let target_file = world.target_file();
-    let target_path = Path::new(&target_file);
-    let patch_target = routed_patch_path(target_path);
-    let updated = world.read_file(patch_target.to_str().expect("valid UTF-8 path"));
-    assert_eq!(updated, original_content_for(target_path));
+fn then_target_file_unchanged(world: &mut RefactorWorld) -> Result<(), String> {
+    let target_file = world.target_file()?;
+    assert_eq!(
+        read_routed_target(world)?,
+        original_content_for(Path::new(&target_file))
+    );
+    Ok(())
 }
 
 #[then("the stderr stream contains {text}")]
@@ -347,6 +367,11 @@ fn then_stderr_contains(world: &mut RefactorWorld, text: String) {
 }
 
 #[scenario(path = "tests/features/refactor.feature")]
-fn refactor_behaviour(#[from(world)] world: RefactorWorld) {
-    let _ = world;
+fn refactor_behaviour(#[from(world)] world: RefactorWorld) { let _ = world; }
+
+fn read_routed_target(world: &RefactorWorld) -> Result<String, String> {
+    let target_file = world.target_file()?;
+    let patch_target = routed_patch_path(Path::new(&target_file));
+    let path_str = patch_target.to_str().ok_or("invalid UTF-8 path")?;
+    world.read_file(path_str)
 }

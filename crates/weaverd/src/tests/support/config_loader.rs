@@ -1,8 +1,9 @@
 //! Test configuration loaders for scenarios covering success and failure paths.
-//!
-use std::ffi::OsString;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::{
+    ffi::OsString,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use ortho_config::OrthoError;
 use tempfile::TempDir;

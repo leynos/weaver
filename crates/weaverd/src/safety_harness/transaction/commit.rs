@@ -1,12 +1,14 @@
 //! Commit helpers for applying verified changes.
 
-use std::fs;
-use std::io::Write as IoWrite;
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    io::Write as IoWrite,
+    path::{Path, PathBuf},
+};
 
-use super::super::error::SafetyHarnessError;
-use super::super::verification::VerificationContext;
 use tracing::warn;
+
+use super::super::{error::SafetyHarnessError, verification::VerificationContext};
 
 /// Planned file deletion with rollback context.
 ///

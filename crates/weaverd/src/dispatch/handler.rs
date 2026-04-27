@@ -5,18 +5,21 @@
 //! parses them into typed commands, routes them to domain handlers, and streams
 //! responses back to the client.
 
-use std::io::{self, Read};
-use std::path::PathBuf;
+use std::{
+    io::{self, Read},
+    path::PathBuf,
+};
 
 use tracing::{debug, warn};
 
+use super::{
+    backend_manager::BackendManager,
+    errors::DispatchError,
+    request::CommandRequest,
+    response::ResponseWriter,
+    router::{DISPATCH_TARGET, DomainRouter},
+};
 use crate::transport::{ConnectionHandler, ConnectionStream};
-
-use super::backend_manager::BackendManager;
-use super::errors::DispatchError;
-use super::request::CommandRequest;
-use super::response::ResponseWriter;
-use super::router::{DISPATCH_TARGET, DomainRouter};
 
 /// Maximum size of a single request line in bytes.
 /// Increased to 1 MiB to accommodate apply-patch payloads.
@@ -111,9 +114,7 @@ impl DispatchConnectionHandler {
 }
 
 impl ConnectionHandler for DispatchConnectionHandler {
-    fn handle(&self, stream: ConnectionStream) {
-        self.dispatch(stream);
-    }
+    fn handle(&self, stream: ConnectionStream) { self.dispatch(stream); }
 }
 
 /// Reads a bounded JSONL request line from the stream.
@@ -128,26 +129,18 @@ fn read_request_line(stream: &mut ConnectionStream) -> Result<Option<Vec<u8>>, D
 
     loop {
         let bytes_read = read_with_retry(stream, &mut chunk)?;
-
         if bytes_read == 0 {
-            return Ok(if buffer.is_empty() {
-                None
-            } else {
-                Some(buffer)
-            });
+            return Ok(finish_request_line(buffer));
         }
-
-        if let Some(newline_pos) = chunk[..bytes_read].iter().position(|b| *b == b'\n') {
-            buffer.extend_from_slice(&chunk[..=newline_pos]);
-            enforce_limit(buffer.len())?;
+        if append_request_chunk(&mut buffer, &chunk[..bytes_read])? {
             return Ok(Some(buffer));
         }
-
-        buffer.extend_from_slice(&chunk[..bytes_read]);
-        enforce_limit(buffer.len())?;
     }
 }
 
+fn finish_request_line(buffer: Vec<u8>) -> Option<Vec<u8>> {
+    (!buffer.is_empty()).then_some(buffer)
+}
 /// Reads from the stream, retrying on interrupts.
 fn read_with_retry(stream: &mut ConnectionStream, buf: &mut [u8]) -> io::Result<usize> {
     loop {
@@ -167,22 +160,38 @@ fn enforce_limit(size: usize) -> Result<(), DispatchError> {
     Ok(())
 }
 
+fn append_request_chunk(buffer: &mut Vec<u8>, chunk: &[u8]) -> Result<bool, DispatchError> {
+    let Some(newline_pos) = chunk.iter().position(|byte| *byte == b'\n') else {
+        buffer.extend_from_slice(chunk);
+        enforce_limit(buffer.len())?;
+        return Ok(false);
+    };
+    buffer.extend_from_slice(&chunk[..=newline_pos]);
+    enforce_limit(buffer.len())?;
+    Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
-    use std::io::{BufRead, BufReader, Write};
-    use std::net::{SocketAddr, TcpListener, TcpStream};
-    use std::sync::{Arc, Mutex};
-    use std::thread::{self, JoinHandle};
+    //! Unit tests for command dispatch and request handling.
+
+    use std::{
+        io::{BufRead, BufReader, Write},
+        net::{SocketAddr, TcpListener, TcpStream},
+        sync::{Arc, Mutex},
+        thread::{self, JoinHandle},
+    };
 
     use rstest::{fixture, rstest};
     use weaver_cards::DEFAULT_CACHE_CAPACITY;
     use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
-    use crate::backends::FusionBackends;
-    use crate::dispatch::{UNKNOWN_OPERATION_TYPE, parse_stderr_json_payload};
-    use crate::semantic_provider::SemanticBackendProvider;
-
     use super::*;
+    use crate::{
+        backends::FusionBackends,
+        dispatch::{UNKNOWN_OPERATION_TYPE, parse_stderr_json_payload},
+        semantic_provider::SemanticBackendProvider,
+    };
 
     #[fixture]
     fn backend_manager() -> BackendManager {
@@ -205,13 +214,21 @@ mod tests {
     impl HandlerTestHarness {
         /// Sends request bytes and retrieves all response lines.
         fn send_and_collect(&mut self, request: &[u8]) -> Vec<String> {
-            self.client.write_all(request).expect("write request");
-            self.client.flush().expect("flush");
+            if let Err(error) = self.client.write_all(request) {
+                panic!("write request: {error}");
+            }
+            if let Err(error) = self.client.flush() {
+                panic!("flush: {error}");
+            }
 
             let mut reader = BufReader::new(&mut self.client);
             let mut lines = Vec::new();
             let mut line = String::new();
-            while reader.read_line(&mut line).expect("read") > 0 {
+            while match reader.read_line(&mut line) {
+                Ok(bytes_read) => bytes_read,
+                Err(error) => panic!("read: {error}"),
+            } > 0
+            {
                 lines.push(line.clone());
                 line.clear();
             }
@@ -220,14 +237,22 @@ mod tests {
 
         /// Waits for the server thread to complete.
         fn join(self) {
-            self.server_handle.join().expect("server join");
+            if let Err(error) = self.server_handle.join() {
+                panic!("server join: {error:?}");
+            }
         }
     }
 
     /// Creates a TCP listener and returns the listener and its address.
     fn create_listener() -> (TcpListener, SocketAddr) {
-        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
-        let addr = listener.local_addr().expect("addr");
+        let listener = match TcpListener::bind(("127.0.0.1", 0)) {
+            Ok(listener) => listener,
+            Err(error) => panic!("bind: {error}"),
+        };
+        let addr = match listener.local_addr() {
+            Ok(addr) => addr,
+            Err(error) => panic!("addr: {error}"),
+        };
         (listener, addr)
     }
 
@@ -237,12 +262,18 @@ mod tests {
         let workspace_root = PathBuf::from("/tmp/weaver-test-workspace");
 
         let server_handle = thread::spawn(move || {
-            let (stream, _) = listener.accept().expect("accept");
+            let (stream, _) = match listener.accept() {
+                Ok(stream) => stream,
+                Err(error) => panic!("accept: {error}"),
+            };
             DispatchConnectionHandler::new(backend_manager, workspace_root)
                 .handle(ConnectionStream::Tcp(stream));
         });
 
-        let client = TcpStream::connect(addr).expect("connect");
+        let client = match TcpStream::connect(addr) {
+            Ok(client) => client,
+            Err(error) => panic!("connect: {error}"),
+        };
         HandlerTestHarness {
             client,
             server_handle,

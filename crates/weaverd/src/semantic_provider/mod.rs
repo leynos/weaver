@@ -5,14 +5,12 @@
 //! finding. The provider lazily initializes the LSP host when the semantic
 //! backend is first requested.
 
-use std::fmt;
-use std::sync::Mutex;
+use std::{fmt, sync::Mutex};
 
 use tracing::debug;
 use weaver_cards::TreeSitterCardExtractor;
 use weaver_config::{CapabilityMatrix, Config};
-use weaver_lsp_host::adapter::ProcessLanguageServer;
-use weaver_lsp_host::{Language, LspHost};
+use weaver_lsp_host::{Language, LspHost, adapter::ProcessLanguageServer};
 
 use crate::backends::{BackendKind, BackendProvider, BackendStartupError};
 
@@ -82,22 +80,17 @@ impl SemanticBackendProvider {
         capability_matrix: CapabilityMatrix,
         lsp_host: LspHost,
         card_cache_capacity: usize,
-    ) -> Self {
+    ) -> Result<Self, LspHostPoisonedError> {
         let provider = Self::new(capability_matrix, card_cache_capacity);
-        let mut guard = provider
-            .lsp_host
-            .lock()
-            .expect("fresh mutex cannot be poisoned");
+        let mut guard = provider.lsp_host.lock().map_err(|_| LspHostPoisonedError)?;
         *guard = Some(lsp_host);
         drop(guard);
-        provider
+        Ok(provider)
     }
 
     /// Returns the shared Tree-sitter card extractor.
     #[must_use]
-    pub fn card_extractor(&self) -> &TreeSitterCardExtractor {
-        &self.card_extractor
-    }
+    pub fn card_extractor(&self) -> &TreeSitterCardExtractor { &self.card_extractor }
 
     /// Executes a closure with a reference to the initialized LSP host.
     ///
@@ -214,6 +207,8 @@ impl BackendProvider for SemanticBackendProvider {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for semantic provider configuration and backend provider.
+
     use rstest::{fixture, rstest};
     use weaver_config::SocketEndpoint;
 

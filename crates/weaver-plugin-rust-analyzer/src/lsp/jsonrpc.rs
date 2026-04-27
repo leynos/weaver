@@ -73,33 +73,14 @@ fn read_response_for_id(
     while attempts < MAX_RESPONSE_ATTEMPTS {
         attempts += 1;
         let message = read_lsp_message(reader)?;
-        let rpc: JsonRpcMessage = serde_json::from_str(&message).map_err(|source| {
-            RustAnalyzerAdapterError::InvalidOutput {
-                message: format!("failed to deserialize JSON-RPC message: {source}"),
-            }
-        })?;
-
-        if let Some(method) = rpc.method {
-            if let Some(server_request_id) = rpc.id {
-                acknowledge_server_request(writer, server_request_id, &method)?;
-            }
+        let rpc = parse_jsonrpc_message(&message)?;
+        if acknowledge_server_request_if_needed(writer, &rpc)? {
             continue;
         }
-
         if rpc.id != Some(expected_id) {
             continue;
         }
-
-        if let Some(error) = rpc.error {
-            return Err(RustAnalyzerAdapterError::EngineFailed {
-                message: format!(
-                    "JSON-RPC request failed with code {}: {}",
-                    error.code, error.message
-                ),
-            });
-        }
-
-        return Ok(rpc.result.unwrap_or(serde_json::Value::Null));
+        return response_result(rpc);
     }
 
     Err(RustAnalyzerAdapterError::ResponseTimeout {
@@ -108,6 +89,37 @@ fn read_response_for_id(
              {MAX_RESPONSE_ATTEMPTS} attempts"
         ),
     })
+}
+
+fn parse_jsonrpc_message(message: &str) -> Result<JsonRpcMessage, RustAnalyzerAdapterError> {
+    serde_json::from_str(message).map_err(|source| RustAnalyzerAdapterError::InvalidOutput {
+        message: format!("failed to deserialize JSON-RPC message: {source}"),
+    })
+}
+
+fn acknowledge_server_request_if_needed(
+    writer: &mut impl Write,
+    rpc: &JsonRpcMessage,
+) -> Result<bool, RustAnalyzerAdapterError> {
+    let Some(method) = rpc.method.as_deref() else {
+        return Ok(false);
+    };
+    if let Some(server_request_id) = rpc.id {
+        acknowledge_server_request(writer, server_request_id, method)?;
+    }
+    Ok(true)
+}
+
+fn response_result(rpc: JsonRpcMessage) -> Result<serde_json::Value, RustAnalyzerAdapterError> {
+    if let Some(error) = rpc.error {
+        return Err(RustAnalyzerAdapterError::EngineFailed {
+            message: format!(
+                "JSON-RPC request failed with code {}: {}",
+                error.code, error.message
+            ),
+        });
+    }
+    Ok(rpc.result.unwrap_or(serde_json::Value::Null))
 }
 
 fn acknowledge_server_request(
@@ -183,39 +195,47 @@ fn read_content_length(reader: &mut impl BufRead) -> Result<usize, RustAnalyzerA
     let mut content_length: Option<usize> = None;
 
     loop {
-        let mut line = String::new();
-        let bytes_read = reader.read_line(&mut line).map_err(|source| {
-            RustAnalyzerAdapterError::EngineFailed {
-                message: format!("failed reading LSP header line: {source}"),
-            }
-        })?;
-
-        if bytes_read == 0 {
-            return Err(RustAnalyzerAdapterError::EngineFailed {
-                message: String::from("unexpected EOF while reading LSP headers"),
-            });
-        }
-
+        let line = read_header_line(reader)?;
         let trimmed = line.trim();
         if trimmed.is_empty() {
             break;
         }
-
-        if let Some(value) = trimmed.strip_prefix("Content-Length: ") {
-            content_length =
-                Some(
-                    value
-                        .parse()
-                        .map_err(|source| RustAnalyzerAdapterError::InvalidOutput {
-                            message: format!("invalid Content-Length header '{value}': {source}"),
-                        })?,
-                );
+        if let Some(length) = parse_content_length_header(trimmed)? {
+            content_length = Some(length);
         }
     }
 
     content_length.ok_or_else(|| RustAnalyzerAdapterError::InvalidOutput {
         message: String::from("LSP message missing Content-Length header"),
     })
+}
+
+fn read_header_line(reader: &mut impl BufRead) -> Result<String, RustAnalyzerAdapterError> {
+    let mut line = String::new();
+    let bytes_read =
+        reader
+            .read_line(&mut line)
+            .map_err(|source| RustAnalyzerAdapterError::EngineFailed {
+                message: format!("failed reading LSP header line: {source}"),
+            })?;
+    if bytes_read == 0 {
+        return Err(RustAnalyzerAdapterError::EngineFailed {
+            message: String::from("unexpected EOF while reading LSP headers"),
+        });
+    }
+    Ok(line)
+}
+
+fn parse_content_length_header(line: &str) -> Result<Option<usize>, RustAnalyzerAdapterError> {
+    let Some(value) = line.strip_prefix("Content-Length: ") else {
+        return Ok(None);
+    };
+    value
+        .parse()
+        .map(Some)
+        .map_err(|source| RustAnalyzerAdapterError::InvalidOutput {
+            message: format!("invalid Content-Length header '{value}': {source}"),
+        })
 }
 
 #[derive(Debug, Serialize)]

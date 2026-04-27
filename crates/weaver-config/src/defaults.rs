@@ -7,14 +7,13 @@
 //! is unavailable, falls back to a user-namespaced directory under the system
 //! temporary directory to keep concurrent operators isolated.
 
-use camino::Utf8PathBuf;
 use std::env;
 
-#[cfg(unix)]
-use libc::geteuid;
-
+use camino::Utf8PathBuf;
 #[cfg(unix)]
 use dirs::runtime_dir;
+#[cfg(unix)]
+use libc::geteuid;
 
 use crate::socket::SocketEndpoint;
 
@@ -25,24 +24,16 @@ pub const DEFAULT_TCP_PORT: u16 = 9779;
 pub const DEFAULT_LOG_FILTER: &str = "info";
 
 /// Default log filter expression used by the binaries.
-pub fn default_log_filter() -> &'static str {
-    DEFAULT_LOG_FILTER
-}
+pub fn default_log_filter() -> &'static str { DEFAULT_LOG_FILTER }
 
 /// Owned log filter value used where allocation is required (e.g. serde).
-pub fn default_log_filter_string() -> String {
-    DEFAULT_LOG_FILTER.to_string()
-}
+pub fn default_log_filter_string() -> String { DEFAULT_LOG_FILTER.to_string() }
 
 /// Default logging format for the binaries.
-pub fn default_log_format() -> crate::logging::LogFormat {
-    crate::logging::LogFormat::Json
-}
+pub fn default_log_format() -> crate::logging::LogFormat { crate::logging::LogFormat::Json }
 
 /// Computes the default socket endpoint for the daemon.
-pub fn default_socket_endpoint() -> SocketEndpoint {
-    default_socket_endpoint_inner()
-}
+pub fn default_socket_endpoint() -> SocketEndpoint { default_socket_endpoint_inner() }
 
 #[cfg(unix)]
 fn default_socket_endpoint_inner() -> SocketEndpoint {

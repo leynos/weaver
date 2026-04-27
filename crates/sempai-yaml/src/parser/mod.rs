@@ -5,9 +5,11 @@ mod builders;
 use sempai_core::{DiagnosticCode, DiagnosticReport, SourceSpan};
 
 use self::builders::{build_extract_rule, build_join_rule, build_search_rule, build_taint_rule};
-use crate::model::{Rule, RuleFile, RuleMode};
-use crate::raw::{RawRule, RawRuleFile, parse_mode, parse_severity, schema_error};
-use crate::source_map::SourceMap;
+use crate::{
+    model::{Rule, RuleFile, RuleMode},
+    raw::{RawRule, RawRuleFile, parse_mode, parse_severity, schema_error},
+    source_map::SourceMap,
+};
 
 /// Parses a Semgrep-compatible YAML rule file.
 ///
@@ -44,9 +46,7 @@ const fn has_extract_fields(raw: &RawRule) -> bool {
 }
 
 /// Checks if the raw rule contains join fields.
-const fn has_join_fields(raw: &RawRule) -> bool {
-    raw.join.is_some()
-}
+const fn has_join_fields(raw: &RawRule) -> bool { raw.join.is_some() }
 
 /// Checks if the raw rule contains taint fields (new or legacy).
 const fn has_taint_fields(raw: &RawRule) -> bool {
@@ -56,8 +56,8 @@ const fn has_taint_fields(raw: &RawRule) -> bool {
         || raw.pattern_sinks.is_some()
 }
 
-/// Checks if the raw rule contains legacy search fields (pattern, pattern-regex, patterns, pattern-either).
-/// Does not include the `match` field, which is the modern search syntax.
+/// Checks if the raw rule contains legacy search fields (pattern, pattern-regex, patterns,
+/// pattern-either). Does not include the `match` field, which is the modern search syntax.
 const fn has_legacy_search_fields(raw: &RawRule) -> bool {
     raw.pattern.is_some()
         || raw.pattern_regex.is_some()

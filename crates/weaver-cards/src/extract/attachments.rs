@@ -74,9 +74,7 @@ impl Decorator {
 }
 
 impl From<&String> for Decorator {
-    fn from(value: &String) -> Self {
-        Self(value.clone())
-    }
+    fn from(value: &String) -> Self { Self(value.clone()) }
 }
 
 /// Collects the leading comment block and decorator metadata for a symbol.
@@ -171,6 +169,8 @@ fn trim_comment_body(rest: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    //! Tests for comment extraction from Rust and TypeScript source files.
+
     use super::{rust_comment, ts_comment};
 
     #[test]

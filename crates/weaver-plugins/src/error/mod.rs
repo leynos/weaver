@@ -4,8 +4,7 @@
 //! can inspect the failure programmatically. I/O errors are wrapped in `Arc`
 //! to satisfy the `result_large_err` Clippy lint.
 
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use thiserror::Error;
 
@@ -32,12 +31,14 @@ pub enum PluginError {
     },
 
     /// The plugin did not complete within the configured timeout.
-    #[error("plugin '{name}' timed out after {timeout_secs}s")]
+    #[error("plugin '{name}' timed out after {timeout_secs}s: {message}")]
     Timeout {
         /// Plugin name.
         name: String,
         /// Configured timeout in seconds.
         timeout_secs: u64,
+        /// Process-control outcome recorded while timing out the child.
+        message: String,
     },
 
     /// The plugin exited with a non-zero status code.

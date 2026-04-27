@@ -7,15 +7,18 @@
 use std::path::Path;
 
 use serde::Serialize;
-use weaver_plugins::PluginRegistry;
-use weaver_plugins::capability::CapabilityId;
-use weaver_plugins::manifest::PluginManifest;
+use weaver_plugins::{PluginRegistry, capability::CapabilityId, manifest::PluginManifest};
 use weaver_syntax::SupportedLanguage;
 
-use super::candidates::{
-    accepted_candidate, manifest_supports_language, provider_rank, rejected_candidate,
+use super::{
+    candidates::{
+        accepted_candidate,
+        manifest_supports_language,
+        provider_rank,
+        rejected_candidate,
+    },
+    refusal::{RoutingContext, refused},
 };
-use super::refusal::{RoutingContext, refused};
 
 /// Stable envelope type written to the daemon output stream.
 pub(crate) const CAPABILITY_RESOLUTION_TYPE: &str = "CapabilityResolution";
@@ -47,9 +50,7 @@ impl CapabilityResolutionEnvelope {
 
     /// Returns the inner details payload.
     #[must_use]
-    pub(crate) const fn details(&self) -> &CapabilityResolutionDetails {
-        &self.details
-    }
+    pub(crate) const fn details(&self) -> &CapabilityResolutionDetails { &self.details }
 }
 
 /// Detailed routing decision captured as data.
@@ -72,9 +73,7 @@ pub(crate) struct CapabilityResolutionDetails {
 impl CapabilityResolutionDetails {
     /// Returns the selected provider, if routing succeeded.
     #[must_use]
-    pub(crate) fn selected_provider(&self) -> Option<&str> {
-        self.selected_provider.as_deref()
-    }
+    pub(crate) fn selected_provider(&self) -> Option<&str> { self.selected_provider.as_deref() }
 }
 
 /// Resolution mode used for the request.
@@ -163,23 +162,17 @@ impl<'a> ResolutionRequest<'a> {
     /// Returns the requested capability.
     #[cfg(test)]
     #[must_use]
-    pub(crate) const fn capability(self) -> CapabilityId {
-        self.capability
-    }
+    pub(crate) const fn capability(self) -> CapabilityId { self.capability }
 
     /// Returns the target file path used for language inference.
     #[cfg(test)]
     #[must_use]
-    pub(crate) const fn target_file(self) -> &'a Path {
-        self.target_file
-    }
+    pub(crate) const fn target_file(self) -> &'a Path { self.target_file }
 
     /// Returns the explicit provider override supplied by the operator.
     #[cfg(test)]
     #[must_use]
-    pub(crate) const fn explicit_provider(self) -> Option<&'a str> {
-        self.explicit_provider
-    }
+    pub(crate) const fn explicit_provider(self) -> Option<&'a str> { self.explicit_provider }
 }
 
 /// Resolves a provider from the registry using the built-in rename policy.

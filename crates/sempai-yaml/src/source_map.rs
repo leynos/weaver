@@ -1,9 +1,8 @@
 //! Source-location helpers for YAML parsing diagnostics.
 
 use saphyr::{LoadableYamlNode, MarkedYamlOwned, YamlDataOwned};
-use serde_saphyr::Location;
-
 use sempai_core::SourceSpan;
+use serde_saphyr::Location;
 
 /// Retains coarse source locations from the raw YAML document.
 #[derive(Debug, Clone, Default)]
@@ -62,21 +61,15 @@ impl SourceMap {
 
     /// Returns the whole-document span when known.
     #[must_use]
-    pub const fn root_span(&self) -> Option<&SourceSpan> {
-        self.root_span.as_ref()
-    }
+    pub const fn root_span(&self) -> Option<&SourceSpan> { self.root_span.as_ref() }
 
     /// Returns the top-level `rules` span when known.
     #[must_use]
-    pub const fn rules_span(&self) -> Option<&SourceSpan> {
-        self.rules_span.as_ref()
-    }
+    pub const fn rules_span(&self) -> Option<&SourceSpan> { self.rules_span.as_ref() }
 
     /// Returns the span of the indexed rule object when known.
     #[must_use]
-    pub fn rule_span(&self, index: usize) -> Option<&SourceSpan> {
-        self.rule_spans.get(index)
-    }
+    pub fn rule_span(&self, index: usize) -> Option<&SourceSpan> { self.rule_spans.get(index) }
 
     /// Converts a `serde-saphyr` location into a diagnostic span.
     #[must_use]

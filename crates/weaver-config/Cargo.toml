@@ -18,6 +18,7 @@ clap.workspace = true
 ortho_config.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+percent-encoding = "2.3.2"
 strum = { version = "0.26.3", features = ["derive"] }
 url = { version = "2.5", features = ["serde"] }
 
@@ -31,3 +32,5 @@ rstest-bdd.workspace = true
 rstest-bdd-macros.workspace = true
 tempfile.workspace = true
 once_cell.workspace = true
+weaver-test-macros = { path = "../weaver-test-macros" }
+cap-std = { workspace = true }

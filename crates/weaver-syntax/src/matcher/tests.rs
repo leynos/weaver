@@ -2,17 +2,22 @@
 //!
 //! Exercises pattern matching, capture extraction, and match positioning.
 
-use super::*;
-
 use rstest::*;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use crate::language::SupportedLanguage;
-use crate::parser::Parser;
+use super::*;
+use crate::{language::SupportedLanguage, parser::Parser};
 
 /// Fixture providing a Rust parser.
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn rust_parser() -> Parser {
-    Parser::new(SupportedLanguage::Rust).expect("parser")
+fn rust_parser() -> Parser { result_or_panic(Parser::new(SupportedLanguage::Rust), "parser") }
+
+fn result_or_panic<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {
+    match result {
+        Ok(value) => value,
+        Err(error) => panic!("{context}: {error}"),
+    }
 }
 
 /// Helper to parse source and compile a pattern.
@@ -21,8 +26,11 @@ fn parse_and_pattern(
     source: &str,
     pattern_str: &str,
 ) -> (crate::parser::ParseResult, Pattern) {
-    let parsed = parser.parse(source).expect("parse");
-    let pattern = Pattern::compile(pattern_str, SupportedLanguage::Rust).expect("pattern");
+    let parsed = result_or_panic(parser.parse(source), "parse");
+    let pattern = result_or_panic(
+        Pattern::compile(pattern_str, SupportedLanguage::Rust),
+        "pattern",
+    );
     (parsed, pattern)
 }
 
@@ -30,7 +38,10 @@ fn first_rust_match<'a>(
     pattern: &Pattern,
     source: &'a crate::parser::ParseResult,
 ) -> MatchResult<'a> {
-    pattern.find_first(source).expect("should find a match")
+    let Some(result) = pattern.find_first(source) else {
+        panic!("should find a match");
+    };
+    result
 }
 
 /// Helper to parse and return a multiple metavariable capture's text.
@@ -51,11 +62,13 @@ fn extract_multiple_capture<'a>(
     match_result: &'a MatchResult<'a>,
     var_name: &str,
 ) -> &'a CapturedNodes<'a> {
-    match_result
-        .capture(var_name)
-        .unwrap_or_else(|| panic!("should capture {var_name}"))
-        .as_multiple()
-        .unwrap_or_else(|| panic!("{var_name} should be multiple"))
+    let Some(capture) = match_result.capture(var_name) else {
+        panic!("should capture {var_name}");
+    };
+    let Some(captured) = capture.as_multiple() else {
+        panic!("{var_name} should be multiple");
+    };
+    captured
 }
 
 #[rstest]

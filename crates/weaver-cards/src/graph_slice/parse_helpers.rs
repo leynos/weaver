@@ -5,10 +5,11 @@
 
 use std::fmt;
 
+use super::{
+    parse::Flag,
+    request::{GraphSliceError, SliceDirection, SliceEdgeType, SliceParseError},
+};
 use crate::DetailLevel;
-
-use super::parse::Flag;
-use super::request::{GraphSliceError, SliceDirection, SliceEdgeType, SliceParseError};
 
 /// A raw flag-value pair from the command line.
 ///
@@ -21,9 +22,7 @@ pub(super) struct RawValue<'a> {
 }
 
 impl<'a> RawValue<'a> {
-    pub(super) const fn new(flag: Flag, value: &'a str) -> Self {
-        Self { flag, value }
-    }
+    pub(super) const fn new(flag: Flag, value: &'a str) -> Self { Self { flag, value } }
 }
 
 /// Extracts the next argument value from the iterator.

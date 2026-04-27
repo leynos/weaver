@@ -7,8 +7,7 @@
 //! See `docs/jacquard-card-first-symbol-graph-design.md` §7 for the full
 //! detail-level taxonomy and latency expectations.
 
-use std::fmt;
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
@@ -60,7 +59,10 @@ impl fmt::Display for DetailLevelParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "unknown detail level: {}; expected one of: minimal, signature, structure, semantic, full",
+            concat!(
+                "unknown detail level: {}; expected one of: minimal, signature, structure, ",
+                "semantic, full"
+            ),
             self.name
         )
     }

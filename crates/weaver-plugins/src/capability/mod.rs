@@ -20,12 +20,13 @@ pub mod test_support;
 #[cfg(test)]
 mod tests;
 
-use crate::error::PluginError;
-use crate::protocol::{PluginRequest, PluginResponse};
-
-pub use self::reason_code::ReasonCode;
-pub use self::rename_symbol::{
-    RENAME_SYMBOL_CONTRACT_VERSION, RenameSymbolContract, RenameSymbolRequest,
+pub use self::{
+    reason_code::ReasonCode,
+    rename_symbol::{RENAME_SYMBOL_CONTRACT_VERSION, RenameSymbolContract, RenameSymbolRequest},
+};
+use crate::{
+    error::PluginError,
+    protocol::{PluginRequest, PluginResponse},
 };
 
 // ---------------------------------------------------------------------------
@@ -111,27 +112,19 @@ pub struct ContractVersion {
 impl ContractVersion {
     /// Creates a new contract version.
     #[must_use]
-    pub const fn new(major: u16, minor: u16) -> Self {
-        Self { major, minor }
-    }
+    pub const fn new(major: u16, minor: u16) -> Self { Self { major, minor } }
 
     /// Returns the major version number.
     #[must_use]
-    pub const fn major(self) -> u16 {
-        self.major
-    }
+    pub const fn major(self) -> u16 { self.major }
 
     /// Returns the minor version number.
     #[must_use]
-    pub const fn minor(self) -> u16 {
-        self.minor
-    }
+    pub const fn minor(self) -> u16 { self.minor }
 
     /// Returns `true` if `other` is compatible (same major version).
     #[must_use]
-    pub const fn is_compatible_with(self, other: &Self) -> bool {
-        self.major == other.major
-    }
+    pub const fn is_compatible_with(self, other: &Self) -> bool { self.major == other.major }
 }
 
 impl std::fmt::Display for ContractVersion {

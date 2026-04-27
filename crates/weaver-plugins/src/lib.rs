@@ -21,11 +21,16 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use weaver_plugins::{
-//!     PluginManifest, PluginMetadata, PluginKind, PluginRegistry, PluginRunner,
-//! };
-//! use weaver_plugins::process::SandboxExecutor;
 //! use std::path::PathBuf;
+//!
+//! use weaver_plugins::{
+//!     PluginKind,
+//!     PluginManifest,
+//!     PluginMetadata,
+//!     PluginRegistry,
+//!     PluginRunner,
+//!     process::SandboxExecutor,
+//! };
 //!
 //! let meta = PluginMetadata::new("rope", "1.0.0", PluginKind::Actuator);
 //! let manifest = PluginManifest::new(
@@ -59,7 +64,9 @@ mod tests;
 /// this crate.
 #[cfg(feature = "test-support")]
 pub use self::capability::test_support::{
-    RenameSymbolRequestFixture, RenameSymbolResponseFixture, rename_symbol_request_fixtures,
+    RenameSymbolRequestFixture,
+    RenameSymbolResponseFixture,
+    rename_symbol_request_fixtures,
     rename_symbol_response_fixtures,
 };
 /// Shared fixture lookup and contract-validation helpers used by downstream
@@ -69,18 +76,32 @@ pub use self::capability::test_support::{
 /// this crate.
 #[cfg(feature = "test-support")]
 pub use self::capability::test_support::{
-    assert_rename_symbol_request_fixture_contract, assert_rename_symbol_response_fixture_contract,
-    rename_symbol_request_fixture_named, rename_symbol_response_fixture_named,
-    validate_rename_symbol_request_fixture, validate_rename_symbol_response_fixture,
+    assert_rename_symbol_request_fixture_contract,
+    assert_rename_symbol_response_fixture_contract,
+    rename_symbol_request_fixture_named,
+    rename_symbol_response_fixture_named,
+    validate_rename_symbol_request_fixture,
+    validate_rename_symbol_response_fixture,
 };
-pub use self::capability::{
-    CapabilityContract, CapabilityId, ContractVersion, ReasonCode, RenameSymbolContract,
-    RenameSymbolRequest,
+pub use self::{
+    capability::{
+        CapabilityContract,
+        CapabilityId,
+        ContractVersion,
+        ReasonCode,
+        RenameSymbolContract,
+        RenameSymbolRequest,
+    },
+    error::PluginError,
+    manifest::{PluginKind, PluginManifest, PluginMetadata},
+    protocol::{
+        DiagnosticSeverity,
+        FilePayload,
+        PluginDiagnostic,
+        PluginOutput,
+        PluginRequest,
+        PluginResponse,
+    },
+    registry::PluginRegistry,
+    runner::{PluginExecutor, PluginRunner},
 };
-pub use self::error::PluginError;
-pub use self::manifest::{PluginKind, PluginManifest, PluginMetadata};
-pub use self::protocol::{
-    DiagnosticSeverity, FilePayload, PluginDiagnostic, PluginOutput, PluginRequest, PluginResponse,
-};
-pub use self::registry::PluginRegistry;
-pub use self::runner::{PluginExecutor, PluginRunner};

@@ -1,14 +1,19 @@
 //! LSP-backed semantic lock adapter for apply-patch.
 
-use std::collections::HashSet;
-use std::path::Path;
-use std::str::FromStr;
+use std::{collections::HashSet, path::Path, str::FromStr};
 
-use crate::safety_harness::{
-    SafetyHarnessError, SemanticLock, SemanticLockResult, VerificationContext, VerificationFailure,
-};
-use crate::semantic_provider::SemanticBackendProvider;
 use weaver_lsp_host::{Language, LspHost};
+
+use crate::{
+    safety_harness::{
+        SafetyHarnessError,
+        SemanticLock,
+        SemanticLockResult,
+        VerificationContext,
+        VerificationFailure,
+    },
+    semantic_provider::SemanticBackendProvider,
+};
 
 /// Semantic lock adapter that uses the LSP host.
 pub(crate) struct LspSemanticLockAdapter<'a> {

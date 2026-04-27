@@ -5,17 +5,28 @@
 
 use std::fmt;
 
+use super::{
+    budget::SliceBudget,
+    parse_helpers::{
+        parse_confidence,
+        parse_detail,
+        parse_direction,
+        parse_edge_types,
+        parse_position,
+        parse_u32,
+        parse_uri,
+        require_arg_value,
+    },
+    request::{
+        DEFAULT_DEPTH,
+        DEFAULT_MIN_CONFIDENCE,
+        GraphSliceError,
+        GraphSliceRequest,
+        SliceDirection,
+        SliceEdgeType,
+    },
+};
 use crate::DetailLevel;
-
-use super::budget::SliceBudget;
-use super::parse_helpers::{
-    parse_confidence, parse_detail, parse_direction, parse_edge_types, parse_position, parse_u32,
-    parse_uri, require_arg_value,
-};
-use super::request::{
-    DEFAULT_DEPTH, DEFAULT_MIN_CONFIDENCE, GraphSliceError, GraphSliceRequest, SliceDirection,
-    SliceEdgeType,
-};
 
 /// Identifies a recognized CLI flag for error-reporting purposes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,9 +63,7 @@ impl fmt::Display for Flag {
 }
 
 impl From<Flag> for String {
-    fn from(flag: Flag) -> Self {
-        flag.to_string()
-    }
+    fn from(flag: Flag) -> Self { flag.to_string() }
 }
 
 /// Accumulates parsed flag values before constructing a
@@ -124,36 +133,12 @@ impl RequestBuilder {
         I: Iterator<Item = &'a String>,
     {
         match flag {
-            "--uri" => {
-                let raw = require_arg_value(iter, Flag::Uri)?;
-                self.uri = Some(parse_uri(raw)?);
-                Ok(true)
-            }
-            "--position" => {
-                let raw = require_arg_value(iter, Flag::Position)?;
-                self.position = Some(parse_position(raw)?);
-                Ok(true)
-            }
-            "--depth" => {
-                let raw = require_arg_value(iter, Flag::Depth)?;
-                self.depth = Some(parse_u32(raw)?);
-                Ok(true)
-            }
-            "--direction" => {
-                let raw = require_arg_value(iter, Flag::Direction)?;
-                self.direction = Some(parse_direction(raw)?);
-                Ok(true)
-            }
-            "--edge-types" => {
-                let raw = require_arg_value(iter, Flag::EdgeTypes)?;
-                self.edge_types = Some(parse_edge_types(raw)?);
-                Ok(true)
-            }
-            "--min-confidence" => {
-                let raw = require_arg_value(iter, Flag::MinConfidence)?;
-                self.min_confidence = Some(parse_confidence(raw)?);
-                Ok(true)
-            }
+            "--uri" => self.apply_uri_flag(iter).map(|()| true),
+            "--position" => self.apply_position_flag(iter).map(|()| true),
+            "--depth" => self.apply_depth_flag(iter).map(|()| true),
+            "--direction" => self.apply_direction_flag(iter).map(|()| true),
+            "--edge-types" => self.apply_edge_types_flag(iter).map(|()| true),
+            "--min-confidence" => self.apply_min_confidence_flag(iter).map(|()| true),
             _ => Ok(false),
         }
     }
@@ -167,24 +152,9 @@ impl RequestBuilder {
         I: Iterator<Item = &'a String>,
     {
         match flag {
-            "--max-cards" => {
-                let raw = require_arg_value(iter, Flag::MaxCards)?;
-                let n = parse_u32(raw)?;
-                self.budget = self.budget.with_max_cards(n);
-                Ok(true)
-            }
-            "--max-edges" => {
-                let raw = require_arg_value(iter, Flag::MaxEdges)?;
-                let n = parse_u32(raw)?;
-                self.budget = self.budget.with_max_edges(n);
-                Ok(true)
-            }
-            "--max-estimated-tokens" => {
-                let raw = require_arg_value(iter, Flag::MaxEstimatedTokens)?;
-                let n = parse_u32(raw)?;
-                self.budget = self.budget.with_max_estimated_tokens(n);
-                Ok(true)
-            }
+            "--max-cards" => self.apply_max_cards_flag(iter).map(|()| true),
+            "--max-edges" => self.apply_max_edges_flag(iter).map(|()| true),
+            "--max-estimated-tokens" => self.apply_max_estimated_tokens_flag(iter).map(|()| true),
             _ => Ok(false),
         }
     }
@@ -198,18 +168,125 @@ impl RequestBuilder {
         I: Iterator<Item = &'a String>,
     {
         match flag {
-            "--entry-detail" => {
-                let raw = require_arg_value(iter, Flag::EntryDetail)?;
-                self.entry_detail = Some(parse_detail(raw)?);
-                Ok(true)
-            }
-            "--node-detail" => {
-                let raw = require_arg_value(iter, Flag::NodeDetail)?;
-                self.node_detail = Some(parse_detail(raw)?);
-                Ok(true)
-            }
+            "--entry-detail" => self.apply_entry_detail_flag(iter).map(|()| true),
+            "--node-detail" => self.apply_node_detail_flag(iter).map(|()| true),
             _ => Ok(false),
         }
+    }
+
+    fn apply_uri_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        let raw = require_arg_value(iter, Flag::Uri)?;
+        self.uri = Some(parse_uri(raw)?);
+        Ok(())
+    }
+
+    fn apply_position_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        let raw = require_arg_value(iter, Flag::Position)?;
+        self.position = Some(parse_position(raw)?);
+        Ok(())
+    }
+
+    fn apply_depth_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        let raw = require_arg_value(iter, Flag::Depth)?;
+        self.depth = Some(parse_u32(raw)?);
+        Ok(())
+    }
+
+    fn apply_direction_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        let raw = require_arg_value(iter, Flag::Direction)?;
+        self.direction = Some(parse_direction(raw)?);
+        Ok(())
+    }
+
+    fn apply_edge_types_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        let raw = require_arg_value(iter, Flag::EdgeTypes)?;
+        self.edge_types = Some(parse_edge_types(raw)?);
+        Ok(())
+    }
+
+    fn apply_min_confidence_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        let raw = require_arg_value(iter, Flag::MinConfidence)?;
+        self.min_confidence = Some(parse_confidence(raw)?);
+        Ok(())
+    }
+
+    fn apply_u32_budget_flag<'a, I>(
+        &mut self,
+        iter: &mut I,
+        flag: Flag,
+        apply: fn(SliceBudget, u32) -> SliceBudget,
+    ) -> Result<(), GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        let raw = require_arg_value(iter, flag)?;
+        let value = parse_u32(raw)?;
+        self.budget = apply(self.budget, value);
+        Ok(())
+    }
+
+    fn apply_max_cards_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        self.apply_u32_budget_flag(iter, Flag::MaxCards, SliceBudget::with_max_cards)
+    }
+
+    fn apply_max_edges_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        self.apply_u32_budget_flag(iter, Flag::MaxEdges, SliceBudget::with_max_edges)
+    }
+
+    fn apply_max_estimated_tokens_flag<'a, I>(
+        &mut self,
+        iter: &mut I,
+    ) -> Result<(), GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        self.apply_u32_budget_flag(
+            iter,
+            Flag::MaxEstimatedTokens,
+            SliceBudget::with_max_estimated_tokens,
+        )
+    }
+
+    fn apply_entry_detail_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        let raw = require_arg_value(iter, Flag::EntryDetail)?;
+        self.entry_detail = Some(parse_detail(raw)?);
+        Ok(())
+    }
+
+    fn apply_node_detail_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>
+    where
+        I: Iterator<Item = &'a String>,
+    {
+        let raw = require_arg_value(iter, Flag::NodeDetail)?;
+        self.node_detail = Some(parse_detail(raw)?);
+        Ok(())
     }
 
     /// Validates required fields and constructs the request.

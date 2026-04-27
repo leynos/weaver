@@ -230,8 +230,14 @@ pub struct Provenance {
 ///
 /// ```
 /// use weaver_cards::{
-///     CardLanguage, CardSymbolKind, Provenance, SourcePosition,
-///     SourceRange, SymbolCard, SymbolIdentity, SymbolRef,
+///     CardLanguage,
+///     CardSymbolKind,
+///     Provenance,
+///     SourcePosition,
+///     SourceRange,
+///     SymbolCard,
+///     SymbolIdentity,
+///     SymbolRef,
 /// };
 ///
 /// let card = SymbolCard {
@@ -242,7 +248,10 @@ pub struct Provenance {
 ///             uri: String::from("file:///src/main.rs"),
 ///             range: SourceRange {
 ///                 start: SourcePosition { line: 0, column: 0 },
-///                 end: SourcePosition { line: 10, column: 0 },
+///                 end: SourcePosition {
+///                     line: 10,
+///                     column: 0,
+///                 },
 ///             },
 ///             language: CardLanguage::Rust,
 ///             kind: CardSymbolKind::Function,

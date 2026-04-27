@@ -4,8 +4,10 @@
 //! and user-facing error handling when required arguments are missing.
 
 use assert_cmd::cargo::cargo_bin_cmd;
-use predicates::prelude::PredicateBooleanExt;
-use predicates::str::{contains, is_empty};
+use predicates::{
+    prelude::PredicateBooleanExt,
+    str::{contains, is_empty},
+};
 use weaver_cli::DOMAIN_OPERATIONS;
 
 #[test]

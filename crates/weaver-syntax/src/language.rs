@@ -3,9 +3,7 @@
 //! This module provides the [`SupportedLanguage`] enum for identifying
 //! programming languages and mapping them to their Tree-sitter grammars.
 
-use std::fmt;
-use std::path::Path;
-use std::str::FromStr;
+use std::{fmt, path::Path, str::FromStr};
 
 use thiserror::Error;
 
@@ -60,16 +58,14 @@ impl SupportedLanguage {
     ///
     /// ```
     /// use std::path::Path;
+    ///
     /// use weaver_syntax::SupportedLanguage;
     ///
     /// assert_eq!(
     ///     SupportedLanguage::from_path(Path::new("src/main.rs")),
     ///     Some(SupportedLanguage::Rust)
     /// );
-    /// assert_eq!(
-    ///     SupportedLanguage::from_path(Path::new("README.md")),
-    ///     None
-    /// );
+    /// assert_eq!(SupportedLanguage::from_path(Path::new("README.md")), None);
     /// ```
     #[must_use]
     pub fn from_path(path: &Path) -> Option<Self> {
@@ -103,15 +99,11 @@ impl SupportedLanguage {
 
     /// Returns all supported languages.
     #[must_use]
-    pub const fn all() -> &'static [Self] {
-        &[Self::Rust, Self::Python, Self::TypeScript]
-    }
+    pub const fn all() -> &'static [Self] { &[Self::Rust, Self::Python, Self::TypeScript] }
 }
 
 impl fmt::Display for SupportedLanguage {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(self.as_str()) }
 }
 
 /// Error raised when parsing a language identifier fails.
@@ -122,9 +114,7 @@ pub struct LanguageParseError(String);
 impl LanguageParseError {
     /// Returns the input that failed to parse.
     #[must_use]
-    pub fn input(&self) -> &str {
-        &self.0
-    }
+    pub fn input(&self) -> &str { &self.0 }
 }
 
 impl FromStr for SupportedLanguage {
@@ -143,8 +133,11 @@ impl FromStr for SupportedLanguage {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    //! Unit tests for language detection and supported language mappings.
+
     use rstest::rstest;
+
+    use super::*;
 
     #[rstest]
     #[case("rs", SupportedLanguage::Rust)]

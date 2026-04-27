@@ -5,8 +5,7 @@
 //! writes one [`PluginResponse`] line to stdout and exits. Plugin stderr is
 //! captured for diagnostic logging but is not part of the protocol.
 
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -19,8 +18,9 @@ use crate::capability::ReasonCode;
 /// # Example
 ///
 /// ```
-/// use weaver_plugins::protocol::{PluginRequest, FilePayload};
 /// use std::path::PathBuf;
+///
+/// use weaver_plugins::protocol::{FilePayload, PluginRequest};
 ///
 /// let request = PluginRequest::new(
 ///     "rename",
@@ -67,21 +67,15 @@ impl PluginRequest {
 
     /// Returns the operation name.
     #[must_use]
-    pub const fn operation(&self) -> &str {
-        self.operation.as_str()
-    }
+    pub const fn operation(&self) -> &str { self.operation.as_str() }
 
     /// Returns the file payloads.
     #[must_use]
-    pub fn files(&self) -> &[FilePayload] {
-        &self.files
-    }
+    pub fn files(&self) -> &[FilePayload] { &self.files }
 
     /// Returns the arguments map.
     #[must_use]
-    pub const fn arguments(&self) -> &HashMap<String, serde_json::Value> {
-        &self.arguments
-    }
+    pub const fn arguments(&self) -> &HashMap<String, serde_json::Value> { &self.arguments }
 }
 
 /// File content passed to the plugin in the request body.
@@ -106,15 +100,11 @@ impl FilePayload {
 
     /// Returns the file path.
     #[must_use]
-    pub fn path(&self) -> &std::path::Path {
-        &self.path
-    }
+    pub fn path(&self) -> &std::path::Path { &self.path }
 
     /// Returns the file content.
     #[must_use]
-    pub const fn content(&self) -> &str {
-        self.content.as_str()
-    }
+    pub const fn content(&self) -> &str { self.content.as_str() }
 }
 
 /// Response sent from a plugin to the `weaverd` broker on stdout.
@@ -151,21 +141,15 @@ impl PluginResponse {
 
     /// Returns whether the plugin completed successfully.
     #[must_use]
-    pub const fn is_success(&self) -> bool {
-        self.success
-    }
+    pub const fn is_success(&self) -> bool { self.success }
 
     /// Returns the plugin output.
     #[must_use]
-    pub const fn output(&self) -> &PluginOutput {
-        &self.output
-    }
+    pub const fn output(&self) -> &PluginOutput { &self.output }
 
     /// Returns the diagnostic messages.
     #[must_use]
-    pub fn diagnostics(&self) -> &[PluginDiagnostic] {
-        &self.diagnostics
-    }
+    pub fn diagnostics(&self) -> &[PluginDiagnostic] { &self.diagnostics }
 }
 
 /// Output payload from a plugin.
@@ -232,15 +216,11 @@ impl PluginDiagnostic {
 
     /// Returns the severity level.
     #[must_use]
-    pub const fn severity(&self) -> DiagnosticSeverity {
-        self.severity
-    }
+    pub const fn severity(&self) -> DiagnosticSeverity { self.severity }
 
     /// Returns the message text.
     #[must_use]
-    pub const fn message(&self) -> &str {
-        self.message.as_str()
-    }
+    pub const fn message(&self) -> &str { self.message.as_str() }
 
     /// Attaches a stable reason code to the diagnostic.
     #[must_use]
@@ -251,9 +231,7 @@ impl PluginDiagnostic {
 
     /// Returns the stable reason code, if present.
     #[must_use]
-    pub const fn reason_code(&self) -> Option<ReasonCode> {
-        self.reason_code
-    }
+    pub const fn reason_code(&self) -> Option<ReasonCode> { self.reason_code }
 }
 
 /// Severity level for plugin diagnostics.

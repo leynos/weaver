@@ -1,7 +1,6 @@
 //! Domain errors raised by the sandbox wrapper.
 
-use std::io;
-use std::path::PathBuf;
+use std::{io, path::PathBuf};
 
 use birdcage::error::Error as BirdcageError;
 use thiserror::Error;

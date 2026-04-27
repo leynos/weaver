@@ -1,8 +1,10 @@
 //! Shared request parsing and routing payload helpers for refactor snapshots.
 
-use std::io::{self, Write};
-use std::net::TcpStream;
-use std::path::Path;
+use std::{
+    io::{self, Write},
+    net::TcpStream,
+    path::Path,
+};
 
 use serde_json::json;
 
@@ -215,38 +217,43 @@ pub fn write_refactor_response(
         panic_unsupported_extension(request.file);
     }
 
-    if let Some(provider) = request.requested_provider
-        && let Some(payload) = provider_mismatch_payload(request.file, provider)
-    {
-        write_json_line(
-            writer,
-            &json!({
-                "kind": "stream",
-                "stream": "stderr",
-                "data": payload,
-            }),
-        )?;
+    if write_provider_mismatch_response(writer, &request)? {
         return write_json_line(writer, &json!({ "kind": "exit", "status": 1 }));
     }
 
-    if request.requested_provider.is_none()
-        && let Some(payload) = automatic_resolution_payload(request.file)
-    {
-        write_json_line(
-            writer,
-            &json!({
-                "kind": "stream",
-                "stream": "stderr",
-                "data": payload,
-            }),
-        )?;
-    }
+    write_automatic_resolution_stream(writer, &request)?;
 
     write_stdout_exit(
         writer,
         &response_payload_for_operation(operation, renamed_symbol),
         0,
     )
+}
+
+fn write_provider_mismatch_response(
+    writer: &mut TcpStream,
+    request: &ValidatedRefactorRequest<'_>,
+) -> Result<bool, io::Error> {
+    let Some(provider) = request.requested_provider else {
+        return Ok(false);
+    };
+    let Some(payload) = provider_mismatch_payload(request.file, provider) else {
+        return Ok(false);
+    };
+    write_optional_stderr_stream(writer, Some(payload))
+}
+
+fn write_automatic_resolution_stream(
+    writer: &mut TcpStream,
+    request: &ValidatedRefactorRequest<'_>,
+) -> Result<(), io::Error> {
+    if request.requested_provider.is_some() {
+        return Ok(());
+    }
+    let Some(payload) = automatic_resolution_payload(request.file) else {
+        return Ok(());
+    };
+    write_stderr_stream(writer, &payload)
 }
 
 /// Writes a `stdout` stream record containing `payload` followed by an exit
@@ -299,8 +306,8 @@ fn requested_provider(arguments: &[&str]) -> Option<RequestedProvider> {
 
 fn panic_unsupported_extension(file: &Path) -> ! {
     panic!(
-        "fake daemon received a refactor request for unsupported file extension: {}; \
-         add a routing rule to language_for_extension",
+        "fake daemon received a refactor request for unsupported file extension: {}; add a \
+         routing rule to language_for_extension",
         file.display()
     );
 }
@@ -341,6 +348,24 @@ fn validate_refactor_request<'a>(arguments: &'a [&'a str]) -> ValidatedRefactorR
         file: Path::new(file),
         requested_provider: requested_provider(arguments),
     }
+}
+
+fn write_stderr_stream(writer: &mut TcpStream, payload: &str) -> io::Result<()> {
+    write_json_line(
+        writer,
+        &json!({ "kind": "stream", "stream": "stderr", "data": payload }),
+    )
+}
+
+fn write_optional_stderr_stream(
+    writer: &mut TcpStream,
+    payload: Option<String>,
+) -> io::Result<bool> {
+    if let Some(stream_payload) = payload {
+        write_stderr_stream(writer, &stream_payload)?;
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 fn write_json_line(writer: &mut impl Write, payload: &serde_json::Value) -> Result<(), io::Error> {

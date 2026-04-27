@@ -1,14 +1,16 @@
-//! BDD test world: encapsulates loader, reporter, provider, and daemon/bootstrap state for step functions.
-//!
-use std::cell::RefCell;
-use std::sync::Arc;
+//! BDD test world: encapsulates loader, reporter, provider, and daemon/bootstrap state for step
+//! functions.
+use std::{cell::RefCell, sync::Arc};
 
-use crate::backends::{BackendKind, BackendStartupError};
-use crate::bootstrap::{BootstrapError, ConfigLoader, Daemon, bootstrap_with};
-
-use super::backend_provider::RecordingBackendProvider;
-use super::config_loader::{FailingConfigLoader, TestConfigLoader};
-use super::reporter::RecordingHealthReporter;
+use super::{
+    backend_provider::RecordingBackendProvider,
+    config_loader::{FailingConfigLoader, TestConfigLoader},
+    reporter::RecordingHealthReporter,
+};
+use crate::{
+    backends::{BackendKind, BackendStartupError},
+    bootstrap::{BootstrapError, ConfigLoader, Daemon, bootstrap_with},
+};
 
 /// Scenario world shared across BDD steps.
 pub struct TestWorld {
@@ -65,15 +67,11 @@ impl TestWorld {
 
     /// Returns whether bootstrap produced an error.
     #[must_use]
-    pub fn bootstrap_error(&self) -> Option<&BootstrapError> {
-        self.bootstrap_error.as_ref()
-    }
+    pub fn bootstrap_error(&self) -> Option<&BootstrapError> { self.bootstrap_error.as_ref() }
 
     /// Returns true when the daemon handle is available.
     #[must_use]
-    pub fn daemon_started(&self) -> bool {
-        self.daemon.is_some()
-    }
+    pub fn daemon_started(&self) -> bool { self.daemon.is_some() }
 
     /// Requests the specified backend via the daemon handle.
     pub fn request_backend(&mut self, kind: BackendKind) {
@@ -86,9 +84,7 @@ impl TestWorld {
 
     /// Returns a snapshot of recorded backend starts.
     #[must_use]
-    pub fn backend_starts(&self) -> Vec<BackendKind> {
-        self.provider.recorded_starts()
-    }
+    pub fn backend_starts(&self) -> Vec<BackendKind> { self.provider.recorded_starts() }
 
     /// Returns the last backend result, if any.
     #[must_use]
@@ -104,13 +100,9 @@ impl TestWorld {
 }
 
 impl Default for TestWorld {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 /// Default test world fixture.
 #[must_use]
-pub fn world() -> RefCell<TestWorld> {
-    RefCell::new(TestWorld::new())
-}
+pub fn world() -> RefCell<TestWorld> { RefCell::new(TestWorld::new()) }

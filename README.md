@@ -81,17 +81,64 @@ configuration layering, and the complete command reference.
 
 ## Building from source
 
-Weaver requires **Rust 1.88+** (edition 2024). To build:
+Weaver requires the pinned **Nightly Rust toolchain `nightly-2026-03-26`** for
+local builds. The workspace `.cargo/config.toml` uses options that require the
+Nightly toolchain, so stable Rust is not sufficient for local Cargo builds in
+this checkout. To build:
 
 ```sh
-cargo build --release
+cargo +nightly-2026-03-26 build --release
 ```
 
 To run the test suite:
 
 ```sh
-cargo test --workspace
+cargo +nightly-2026-03-26 test --workspace
 ```
+
+### Toolchain prerequisites
+
+The workspace `.cargo/config.toml` enables Nightly-only build settings for the
+Cranelift codegen backend and configures `clang` with the `mold` linker for the
+Linux `x86_64` and `aarch64` targets. Install the pinned toolchain and
+component with:
+
+```sh
+rustup toolchain install nightly-2026-03-26
+rustup component add rustc-codegen-cranelift --toolchain nightly-2026-03-26
+```
+
+Set a local override so Cargo uses that pinned Nightly automatically in this
+checkout:
+
+```sh
+rustup override set nightly-2026-03-26
+```
+
+You also need `clang` and `mold` available on your system because the target
+configuration passes `-C link-arg=-fuse-ld=mold`.
+
+Debian/Ubuntu:
+
+```sh
+sudo apt-get install clang mold
+```
+
+Fedora:
+
+```sh
+sudo dnf install clang mold
+```
+
+If any of these prerequisites are missing, the failure mode is often opaque:
+Cargo may report unstable `-Z` option errors, missing
+`rustc-codegen-cranelift`, linker failures from `clang`, or `mold` not found.
+When that happens, verify the pinned Nightly toolchain, the Cranelift
+component, and the system linker packages first.
+
+If local builds fail, verify the pinned Nightly override first, then confirm
+the Cranelift component and linker packages are installed before investigating
+the workspace itself.
 
 ## Documentation
 

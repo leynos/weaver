@@ -1,25 +1,27 @@
 //! Unit tests for card extraction cache behaviour.
 
-use std::path::Path;
-use std::sync::{Arc, Barrier};
-use std::thread;
+use std::{
+    path::Path,
+    sync::{Arc, Barrier},
+    thread,
+};
 
 use rstest::rstest;
 use weaver_syntax::SupportedLanguage;
 
-use crate::cache::{CardCache, CardCacheAddress, CardCacheKey};
-use crate::tests::fixtures;
 use crate::{
-    CardExtractionInput, DetailLevel, ParserRegistry, TreeSitterCardExtractor, content_hash,
+    CardExtractionInput,
+    DetailLevel,
+    ParserRegistry,
+    TreeSitterCardExtractor,
+    cache::{CardCache, CardCacheAddress, CardCacheKey},
+    content_hash,
+    tests::fixtures,
 };
 
-fn rust_path() -> &'static Path {
-    Path::new("/tmp/weaver-cards-tests/cache.rs")
-}
+fn rust_path() -> &'static Path { Path::new("/tmp/weaver-cards-tests/cache.rs") }
 
-fn rust_source(name: &str) -> String {
-    format!("fn {name}() -> usize {{\n    1\n}}\n")
-}
+fn rust_source(name: &str) -> String { format!("fn {name}() -> usize {{\n    1\n}}\n") }
 
 fn extract_card(extractor: &TreeSitterCardExtractor, source: &str) -> crate::SymbolCard {
     extractor
@@ -74,9 +76,7 @@ fn cache_miss_returns_none() {
 
 #[rstest]
 #[should_panic(expected = "card cache capacity must be greater than zero")]
-fn zero_capacity_cache_panics() {
-    drop(CardCache::new(0));
-}
+fn zero_capacity_cache_panics() { drop(CardCache::new(0)); }
 
 #[rstest]
 fn content_change_invalidates_cache() {

@@ -142,6 +142,8 @@ fn resolve_uri(uri: &str) -> Result<PathBuf, String> {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for source location extraction and URI handling.
+
     use super::*;
 
     #[test]

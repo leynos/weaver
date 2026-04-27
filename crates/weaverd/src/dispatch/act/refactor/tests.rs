@@ -3,15 +3,34 @@
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use super::refactor_helpers::{build_backends, command_request};
-use crate::dispatch::act::refactor::resolution::{
-    CandidateEvaluation, CapabilityResolutionDetails, CapabilityResolutionEnvelope,
-    ResolutionOutcome, ResolutionRequest, SelectionMode,
-};
+#[expect(
+    clippy::duplicate_mod,
+    reason = "Shared test helpers loaded by multiple test modules"
+)]
+#[path = "refactor_helpers.rs"]
+mod refactor_helpers;
+
+use refactor_helpers::builders::{build_backends, command_request};
+
 use crate::dispatch::act::refactor::{
-    DispatchError, RefactorContext, RefactorPluginRuntime, ResponseWriter, default_runtime, handle,
-    resolve_rope_plugin_path, resolve_rust_analyzer_plugin_path,
+    DispatchError,
+    RefactorContext,
+    RefactorPluginRuntime,
+    ResponseWriter,
+    default_runtime,
+    handle,
+    resolution::{
+        CandidateEvaluation,
+        CapabilityResolutionDetails,
+        CapabilityResolutionEnvelope,
+        ResolutionOutcome,
+        ResolutionRequest,
+        SelectionMode,
+    },
+    resolve_rope_plugin_path,
+    resolve_rust_analyzer_plugin_path,
 };
 
 enum MockRuntimeResult {
@@ -59,9 +78,13 @@ impl RefactorPluginRuntime for MockRuntime {
     }
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
 fn socket_dir() -> TempDir {
-    TempDir::new().expect("socket dir")
+    match TempDir::new() {
+        Ok(temp_dir) => temp_dir,
+        Err(error) => panic!("socket dir: {error}"),
+    }
 }
 
 fn run_rename_handle(
@@ -70,8 +93,13 @@ fn run_rename_handle(
     resolution: MockResolution,
     result: MockRuntimeResult,
 ) -> (i32, String) {
-    let workspace = TempDir::new().expect("workspace");
-    std::fs::write(workspace.path().join(file), "hello\n").expect("write");
+    let workspace = match TempDir::new() {
+        Ok(workspace) => workspace,
+        Err(error) => panic!("workspace: {error}"),
+    };
+    if let Err(error) = std::fs::write(workspace.path().join(file), "hello\n") {
+        panic!("write: {error}");
+    }
 
     let request = command_request(vec![
         String::from("--refactoring"),
@@ -85,7 +113,7 @@ fn run_rename_handle(
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
 
-    let dispatch_result = handle(
+    let dispatch_result = match handle(
         &request,
         &mut writer,
         RefactorContext {
@@ -93,10 +121,15 @@ fn run_rename_handle(
             workspace_root: workspace.path(),
             runtime: &runtime,
         },
-    )
-    .expect("dispatch result");
+    ) {
+        Ok(dispatch_result) => dispatch_result,
+        Err(error) => panic!("dispatch result: {error}"),
+    };
 
-    let stderr = String::from_utf8(output).expect("stderr utf8");
+    let stderr = match String::from_utf8(output) {
+        Ok(stderr) => stderr,
+        Err(error) => panic!("stderr utf8: {error}"),
+    };
     (dispatch_result.status, stderr)
 }
 

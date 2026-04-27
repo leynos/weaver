@@ -1,15 +1,22 @@
 //! Unit tests for the LSP call graph provider.
 
-use crate::provider::{
-    CallGraphProvider, CallHierarchyClient, LspCallGraphProvider, SourcePosition,
-};
-use crate::tests::support::{Response, incoming_call, item, outgoing_call};
-use crate::{CallGraph, GraphError};
-use lsp_types::{
-    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
-    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-};
 use std::sync::{Arc, Mutex};
+
+use lsp_types::{
+    CallHierarchyIncomingCall,
+    CallHierarchyIncomingCallsParams,
+    CallHierarchyItem,
+    CallHierarchyOutgoingCall,
+    CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams,
+};
+
+use crate::{
+    CallGraph,
+    GraphError,
+    provider::{CallGraphProvider, CallHierarchyClient, LspCallGraphProvider, SourcePosition},
+    tests::support::{Response, incoming_call, item, outgoing_call},
+};
 
 #[derive(Debug, Default)]
 struct CallCounts {

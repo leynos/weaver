@@ -1,17 +1,23 @@
 //! Shared fake-daemon and transcript helpers for refactor CLI snapshots.
 
-use std::io::{self, BufRead, BufReader};
-use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::process::Output;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::{
+    io::{self, BufRead, BufReader},
+    net::{SocketAddr, TcpListener, TcpStream},
+    process::Output,
+    sync::{Arc, Mutex},
+    thread,
+    time::{Duration, Instant},
+};
+
+use serde::Serialize;
 
 use super::refactor_routing::{
-    Operation, request_arguments, response_payload_for_operation, write_refactor_response,
+    Operation,
+    request_arguments,
+    response_payload_for_operation,
+    write_refactor_response,
     write_stdout_exit,
 };
-use serde::Serialize;
 
 /// Captures the command string, exit status, stdout, stderr, and recorded
 /// daemon request payloads from a single end-to-end CLI invocation.
@@ -43,17 +49,9 @@ const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 /// Returns the path to the compiled `weaver` binary for use in end-to-end
 /// tests.
 ///
-/// # Deprecation
-/// Use `assert_cmd::cargo::cargo_bin("weaver")` directly. This wrapper is
-/// retained for backwards compatibility with test modules that already
+/// This wrapper keeps the test support API stable for modules that already
 /// import it.
-#[expect(
-    deprecated,
-    reason = "assert_cmd::cargo::cargo_bin resolves workspace binaries for e2e tests"
-)]
-pub fn weaver_binary_path() -> std::path::PathBuf {
-    assert_cmd::cargo::cargo_bin("weaver")
-}
+pub fn weaver_binary_path() -> std::path::PathBuf { assert_cmd::cargo::cargo_bin("weaver") }
 
 impl FakeDaemon {
     /// Binds an ephemeral localhost TCP port and spawns a background thread that
@@ -90,9 +88,7 @@ impl FakeDaemon {
 
     /// Returns the `tcp://<addr>` connection string that the CLI under test
     /// should pass to `--daemon-socket`.
-    pub fn endpoint(&self) -> String {
-        format!("tcp://{}", self.address)
-    }
+    pub fn endpoint(&self) -> String { format!("tcp://{}", self.address) }
 
     /// Returns a snapshot of all JSON request payloads received so far.
     #[expect(

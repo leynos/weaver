@@ -1,12 +1,13 @@
 //! Provides atomic write helpers for daemon runtime artefacts.
 
-use std::io::{self, Write};
-use std::path::Path;
-
-use tempfile::Builder;
-
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+use std::{
+    io::{self, Write},
+    path::Path,
+};
+
+use tempfile::Builder;
 
 /// Writes the provided bytes to the path using an atomic persist step.
 ///

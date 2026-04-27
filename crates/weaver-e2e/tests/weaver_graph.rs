@@ -3,21 +3,32 @@
 //! These tests exercise the weaver-graph LSP provider with a real language
 //! server. Tests are skipped gracefully if Pyrefly is not available.
 
+#[path = "support/fixture_io.rs"]
+mod fixture_io;
+
 use std::path::Path;
 
 use camino::Utf8PathBuf;
+use fixture_io::write_fixture_path;
 use lsp_types::{
-    CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
+    CallHierarchyIncomingCallsParams,
+    CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams,
     Uri,
 };
 use tempfile::TempDir;
 use url::Url;
-
-use weaver_e2e::fixtures;
-use weaver_e2e::lsp_client::{LspClient, LspClientError};
-use weaver_e2e::pyrefly_available;
+use weaver_e2e::{
+    fixtures,
+    lsp_client::{LspClient, LspClientError},
+    pyrefly_available,
+};
 use weaver_graph::{
-    CallGraphProvider, CallHierarchyClient, GraphError, LspCallGraphProvider, SourcePosition,
+    CallGraphProvider,
+    CallHierarchyClient,
+    GraphError,
+    LspCallGraphProvider,
+    SourcePosition,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -124,8 +135,7 @@ struct GraphTestContext {
 impl GraphTestContext {
     fn new(fixture: &str) -> Result<Self, TestError> {
         let temp_dir = TempDir::new()?;
-        let file_path = temp_dir.path().join("test.py");
-        std::fs::write(&file_path, fixture)?;
+        let file_path = write_fixture_path(&temp_dir, "test.py", fixture)?;
 
         let root_uri = file_uri(temp_dir.path())?;
         let file_uri_val = file_uri(&file_path)?;

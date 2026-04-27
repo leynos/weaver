@@ -1,29 +1,26 @@
-//! Raw serde-deserialisable types mirroring the YAML schema.
+//! Raw serde-deserializable types mirroring the YAML schema.
 //!
-//! These types directly match the YAML structure as consumed by serde and are
-//! converted into the typed `model` types via `TryFrom` implementations.
-//! Conversion can fail with a `DiagnosticReport` when the deserialized shape
-//! does not satisfy semantic constraints (e.g., missing required fields,
-//! multiple conflicting operators, etc.).
-
+//! These types mirror the serde input and convert into the typed `model` layer
+//! via `TryFrom`, returning `DiagnosticReport` when semantic constraints fail.
+use sempai_core::{DiagnosticCode, DiagnosticReport, SourceSpan};
 use serde::Deserialize;
 use serde_json::Value;
 use serde_saphyr::Spanned;
 
-use sempai_core::{DiagnosticCode, DiagnosticReport, SourceSpan};
-
 use crate::model::{
-    LegacyClause, LegacyFormula, LegacyValue, MatchFormula, RuleMode, RuleSeverity,
+    LegacyClause,
+    LegacyFormula,
+    LegacyValue,
+    MatchFormula,
+    RuleMode,
+    RuleSeverity,
 };
-
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawRuleFile {
     pub(crate) rules: Vec<RawRule>,
 }
-
 // Allow unknown fields for forward compatibility with future Semgrep rule extensions.
-// The official Semgrep schema sets `additionalProperties: true` on the rule object.
 #[derive(Debug, Deserialize)]
 pub(crate) struct RawRule {
     pub(crate) id: Option<Spanned<String>>,
@@ -80,7 +77,7 @@ pub(crate) struct RawLegacyFormulaObject {
     pub(crate) pattern_regex: Option<String>,
     pub(crate) patterns: Option<Vec<RawLegacyClause>>,
     #[serde(rename = "pattern-either")]
-    pub(crate) pattern_either: Option<Vec<RawLegacyFormulaObject>>,
+    pub(crate) pattern_either: Option<Vec<Self>>,
     #[serde(rename = "pattern-not")]
     pub(crate) pattern_not: Option<RawLegacyValue>,
     #[serde(rename = "pattern-inside")]
@@ -130,13 +127,11 @@ pub(crate) fn schema_error(
     )
 }
 
-pub(crate) fn singleton_formula<F>(
+/// Returns the sole parsed legacy formula or the diagnostic from `make_error`.
+pub(crate) fn singleton_formula(
     mut formulas: Vec<LegacyFormula>,
-    make_error: F,
-) -> Result<LegacyFormula, DiagnosticReport>
-where
-    F: FnOnce(usize) -> DiagnosticReport,
-{
+    make_error: impl FnOnce(usize) -> DiagnosticReport,
+) -> Result<LegacyFormula, DiagnosticReport> {
     match formulas.len() {
         1 => Ok(formulas.remove(0)),
         len => Err(make_error(len)),
@@ -170,8 +165,7 @@ impl TryFrom<RawLegacyFormulaObject> for LegacyFormula {
     }
 }
 
-/// Converts a `RawLegacyFormulaObject` to a `LegacyFormula`, using the provided
-/// span for error reporting when validation fails.
+/// Converts a `RawLegacyFormulaObject` to a `LegacyFormula`.
 pub(crate) fn convert_legacy_formula_object(
     value: RawLegacyFormulaObject,
     span: Option<SourceSpan>,
@@ -183,22 +177,12 @@ pub(crate) fn convert_legacy_formula_object(
         value.pattern_regex,
         LegacyFormula::PatternRegex,
     );
-    if let Some(patterns) = value.patterns {
-        formulas.push(LegacyFormula::Patterns(
-            patterns
-                .into_iter()
-                .map(TryInto::try_into)
-                .collect::<Result<Vec<_>, _>>()?,
-        ));
-    }
-    if let Some(pattern_either) = value.pattern_either {
-        formulas.push(LegacyFormula::PatternEither(
-            pattern_either
-                .into_iter()
-                .map(TryInto::try_into)
-                .collect::<Result<Vec<_>, _>>()?,
-        ));
-    }
+    push_optional_legacy_sequence_formula(&mut formulas, value.patterns, LegacyFormula::Patterns)?;
+    push_optional_legacy_sequence_formula(
+        &mut formulas,
+        value.pattern_either,
+        LegacyFormula::PatternEither,
+    )?;
     push_optional_legacy_value_formula(
         &mut formulas,
         value.pattern_not,
@@ -235,7 +219,8 @@ pub(crate) fn convert_legacy_formula_object(
     })
 }
 
-fn push_optional_legacy_formula(
+/// Appends an optional string-backed legacy operator to `formulas`.
+pub(crate) fn push_optional_legacy_formula(
     formulas: &mut Vec<LegacyFormula>,
     value: Option<String>,
     constructor: fn(String) -> LegacyFormula,
@@ -243,6 +228,26 @@ fn push_optional_legacy_formula(
     if let Some(text) = value {
         formulas.push(constructor(text));
     }
+}
+
+/// Appends an optional sequence-backed legacy operator to `formulas`.
+pub(crate) fn push_optional_legacy_sequence_formula<T, U>(
+    formulas: &mut Vec<LegacyFormula>,
+    value: Option<Vec<T>>,
+    constructor: fn(Vec<U>) -> LegacyFormula,
+) -> Result<(), DiagnosticReport>
+where
+    T: TryInto<U, Error = DiagnosticReport>,
+{
+    if let Some(items) = value {
+        formulas.push(constructor(
+            items
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<_>, _>>()?,
+        ));
+    }
+    Ok(())
 }
 
 fn push_optional_legacy_value_formula(
@@ -332,8 +337,7 @@ impl TryFrom<RawMatchFormulaObject> for MatchFormula {
     }
 }
 
-/// Converts a `RawMatchFormulaObject` to a `MatchFormula`, using the provided
-/// span for error reporting when validation fails.
+/// Converts a raw `match` formula object into a validated `MatchFormula`.
 pub(crate) fn convert_match_formula_object(
     value: RawMatchFormulaObject,
     span: Option<SourceSpan>,
@@ -383,11 +387,14 @@ pub(crate) fn parse_severity(
         schema_error(
             format!("unsupported severity `{}`", value.value),
             fallback_span.cloned(),
-            "use one of ERROR, WARNING, INFO, INVENTORY, EXPERIMENT, CRITICAL, HIGH, MEDIUM, or LOW",
+            concat!(
+                "use one of ERROR, WARNING, INFO, ",
+                "INVENTORY, EXPERIMENT, CRITICAL, ",
+                "HIGH, MEDIUM, or LOW"
+            ),
         )
     })
 }
 
-pub(crate) fn parse_mode(value: Option<&str>) -> RuleMode {
-    RuleMode::from_optional(value)
-}
+/// Parses an optional raw rule mode string into the corresponding [`RuleMode`].
+pub(crate) fn parse_mode(value: Option<&str>) -> RuleMode { RuleMode::from_optional(value) }

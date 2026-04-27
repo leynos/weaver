@@ -8,8 +8,7 @@
 use weaver_syntax::TreeSitterSyntacticLock;
 
 use super::{SyntacticLock, VerificationContext};
-use crate::safety_harness::error::VerificationFailure;
-use crate::safety_harness::locks::SyntacticLockResult;
+use crate::safety_harness::{error::VerificationFailure, locks::SyntacticLockResult};
 
 /// Adapter wrapping [`weaver_syntax::TreeSitterSyntacticLock`] for the harness.
 ///
@@ -24,10 +23,13 @@ use crate::safety_harness::locks::SyntacticLockResult;
 /// # Example
 ///
 /// ```
-/// use weaverd::safety_harness::{
-///     TreeSitterSyntacticLockAdapter, SyntacticLock, VerificationContext,
-/// };
 /// use std::path::PathBuf;
+///
+/// use weaverd::safety_harness::{
+///     SyntacticLock,
+///     TreeSitterSyntacticLockAdapter,
+///     VerificationContext,
+/// };
 ///
 /// let lock = TreeSitterSyntacticLockAdapter::new();
 /// let mut ctx = VerificationContext::new();
@@ -54,9 +56,7 @@ impl TreeSitterSyntacticLockAdapter {
 }
 
 impl Default for TreeSitterSyntacticLockAdapter {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 impl SyntacticLock for TreeSitterSyntacticLockAdapter {
@@ -102,23 +102,24 @@ fn convert_failure(f: weaver_syntax::ValidationFailure) -> VerificationFailure {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for Tree-sitter syntactic lock verification.
+
     use std::path::PathBuf;
 
     use rstest::{fixture, rstest};
+    use weaver_test_macros::allow_fixture_expansion_lints;
 
     use super::*;
 
     /// Shared fixture providing a configured adapter instance.
+    #[allow_fixture_expansion_lints]
     #[fixture]
-    fn lock() -> TreeSitterSyntacticLockAdapter {
-        TreeSitterSyntacticLockAdapter::new()
-    }
+    fn lock() -> TreeSitterSyntacticLockAdapter { TreeSitterSyntacticLockAdapter::new() }
 
     /// Shared fixture providing an empty verification context.
+    #[allow_fixture_expansion_lints]
     #[fixture]
-    fn ctx() -> VerificationContext {
-        VerificationContext::new()
-    }
+    fn ctx() -> VerificationContext { VerificationContext::new() }
 
     // ---- Valid code tests (parameterised) ----
 

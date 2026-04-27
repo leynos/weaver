@@ -19,13 +19,11 @@
 //! committing changes to the filesystem. The harness validates proposed edits
 //! in two phases:
 //!
-//! 1. **Syntactic Lock**: Modified files are parsed to ensure they produce
-//!    valid syntax trees. This catches structural errors before they reach the
-//!    semantic analysis phase.
+//! 1. **Syntactic Lock**: Modified files are parsed to ensure they produce valid syntax trees. This
+//!    catches structural errors before they reach the semantic analysis phase.
 //!
-//! 2. **Semantic Lock**: Changes are sent to the configured language server,
-//!    which verifies that no new errors or high-severity warnings are
-//!    introduced compared to the pre-edit state.
+//! 2. **Semantic Lock**: Changes are sent to the configured language server, which verifies that no
+//!    new errors or high-severity warnings are introduced compared to the pre-edit state.
 //!
 //! Changes that fail either lock are rejected, leaving the filesystem
 //! untouched. See the [`safety_harness`] module for details.
@@ -41,10 +39,19 @@ mod telemetry;
 mod transport;
 
 pub use backends::{
-    BackendKind, BackendKindParseError, BackendProvider, BackendStartupError, FusionBackends,
+    BackendKind,
+    BackendKindParseError,
+    BackendProvider,
+    BackendStartupError,
+    FusionBackends,
 };
 pub use bootstrap::{
-    BootstrapError, ConfigLoader, Daemon, StaticConfigLoader, SystemConfigLoader, bootstrap_with,
+    BootstrapError,
+    ConfigLoader,
+    Daemon,
+    StaticConfigLoader,
+    SystemConfigLoader,
+    bootstrap_with,
 };
 // Workspace integration tests can opt into these internal wiring exports via
 // the `test-support` cargo feature.

@@ -7,7 +7,7 @@ pub(in crate::discoverability) const HEADER: (&str, &str) =
 fn domain_heading_entry(domain: super::KnownDomain) -> (String, String) {
     let description = super::DOMAIN_OPERATIONS
         .iter()
-        .find(|(candidate, _, _)| *candidate == domain.as_str())
+        .find(|(candidate, ..)| *candidate == domain.as_str())
         .map(|(_, description, _)| *description)
         .unwrap_or_default();
 

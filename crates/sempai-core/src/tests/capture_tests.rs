@@ -1,13 +1,13 @@
 //! Tests for [`CapturedNode`] and [`CaptureValue`].
 
 use rstest::{fixture, rstest};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 use crate::{CaptureValue, CapturedNode, LineCol, Span};
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn sample_span() -> Span {
-    Span::new(0, 5, LineCol::new(0, 0), LineCol::new(0, 5))
-}
+fn sample_span() -> Span { Span::new(0, 5, LineCol::new(0, 0), LineCol::new(0, 5)) }
 
 #[rstest]
 fn captured_node_construction_and_accessors(sample_span: Span) {

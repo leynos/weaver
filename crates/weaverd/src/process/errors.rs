@@ -1,22 +1,14 @@
 //! Defines the unified error surface for daemon launch and supervision.
 
-use std::io;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::SystemTimeError;
+use std::{io, path::PathBuf, sync::Arc, time::SystemTimeError};
 
 use nix::errno::Errno;
-use thiserror::Error;
-
 use ortho_config::OrthoError;
-
+use thiserror::Error;
 use weaver_config::{RuntimePathsError, SocketPreparationError};
 
-use crate::bootstrap::BootstrapError;
-use crate::transport::ListenerError;
-
-use super::daemonizer::DaemonizeError;
-use super::shutdown::ShutdownError;
+use super::{daemonizer::DaemonizeError, shutdown::ShutdownError};
+use crate::{bootstrap::BootstrapError, transport::ListenerError};
 
 /// Errors surfaced while launching or supervising the daemon process.
 #[derive(Debug, Error)]
@@ -163,15 +155,11 @@ pub enum LaunchError {
 }
 
 impl From<Arc<OrthoError>> for LaunchError {
-    fn from(source: Arc<OrthoError>) -> Self {
-        Self::Config { source }
-    }
+    fn from(source: Arc<OrthoError>) -> Self { Self::Config { source } }
 }
 
 impl From<SocketPreparationError> for LaunchError {
-    fn from(source: SocketPreparationError) -> Self {
-        Self::Socket { source }
-    }
+    fn from(source: SocketPreparationError) -> Self { Self::Socket { source } }
 }
 
 impl From<RuntimePathsError> for LaunchError {
@@ -186,25 +174,17 @@ impl From<RuntimePathsError> for LaunchError {
 }
 
 impl From<DaemonizeError> for LaunchError {
-    fn from(source: DaemonizeError) -> Self {
-        Self::Daemonize { source }
-    }
+    fn from(source: DaemonizeError) -> Self { Self::Daemonize { source } }
 }
 
 impl From<ShutdownError> for LaunchError {
-    fn from(source: ShutdownError) -> Self {
-        Self::Shutdown { source }
-    }
+    fn from(source: ShutdownError) -> Self { Self::Shutdown { source } }
 }
 
 impl From<BootstrapError> for LaunchError {
-    fn from(source: BootstrapError) -> Self {
-        Self::Bootstrap { source }
-    }
+    fn from(source: BootstrapError) -> Self { Self::Bootstrap { source } }
 }
 
 impl From<ListenerError> for LaunchError {
-    fn from(source: ListenerError) -> Self {
-        Self::Listener { source }
-    }
+    fn from(source: ListenerError) -> Self { Self::Listener { source } }
 }

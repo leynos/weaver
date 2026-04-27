@@ -1,17 +1,25 @@
 //! Tests for edit and content transaction management.
 
-use std::fs;
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 use rstest::rstest;
 use tempfile::TempDir;
 
-use super::test_support::{LockFailureKind, temp_file};
-use super::{EditTransaction, SafetyHarnessError, TransactionOutcome};
-use crate::safety_harness::edit::{FileEdit, Position, TextEdit};
-use crate::safety_harness::error::VerificationFailure;
-use crate::safety_harness::verification::{
-    ConfigurableSemanticLock, ConfigurableSyntacticLock, SemanticLock, SyntacticLock,
+use super::{
+    EditTransaction,
+    SafetyHarnessError,
+    TransactionOutcome,
+    test_support::{LockFailureKind, temp_file},
+};
+use crate::safety_harness::{
+    edit::{FileEdit, Position, TextEdit},
+    error::VerificationFailure,
+    verification::{
+        ConfigurableSemanticLock,
+        ConfigurableSyntacticLock,
+        SemanticLock,
+        SyntacticLock,
+    },
 };
 
 /// Creates a standard failure scenario builder with a test file and replacement edit.
@@ -23,7 +31,10 @@ fn failure_scenario_builder() -> TransactionTestBuilder {
 
 /// Asserts that the file at the given path contains "hello world".
 fn assert_file_unchanged(path: &PathBuf) {
-    let content = fs::read_to_string(path).expect("read file");
+    let content = match fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(error) => panic!("read file: {error}"),
+    };
     assert_eq!(content, "hello world");
 }
 
@@ -41,7 +52,10 @@ where
     let (syntactic, semantic) = configure_locks(path.clone());
 
     let (result, _, _dir) = builder.execute_with_locks(&syntactic, &semantic);
-    let outcome = result.expect("should succeed");
+    let outcome = match result {
+        Ok(outcome) => outcome,
+        Err(error) => panic!("should succeed: {error}"),
+    };
 
     verify_outcome(&outcome);
     assert_file_unchanged(&path);
@@ -69,9 +83,7 @@ impl LineReplacement {
     }
 
     /// Creates a replacement starting from column 0.
-    fn from_start(end_col: u32, text: impl Into<String>) -> Self {
-        Self::new(0, end_col, text)
-    }
+    fn from_start(end_col: u32, text: impl Into<String>) -> Self { Self::new(0, end_col, text) }
 }
 
 /// Builder for constructing test transactions with reduced boilerplate.
@@ -85,7 +97,10 @@ impl TransactionTestBuilder {
     /// Creates a new builder with a fresh temporary directory.
     fn new() -> Self {
         Self {
-            dir: TempDir::new().expect("create temp dir"),
+            dir: match TempDir::new() {
+                Ok(dir) => dir,
+                Err(error) => panic!("create temp dir: {error}"),
+            },
             files: Vec::new(),
             edits: Vec::new(),
         }
@@ -93,7 +108,10 @@ impl TransactionTestBuilder {
 
     /// Creates a file with the given content and adds it to the tracked files.
     fn with_file(mut self, name: &str, content: &str) -> Self {
-        let path = temp_file(&self.dir, name, content);
+        let path = match temp_file(&self.dir, name, content) {
+            Ok(path) => path,
+            Err(error) => panic!("temp file: {error}"),
+        };
         self.files.push((path, content.to_string()));
         self
     }
@@ -129,9 +147,7 @@ impl TransactionTestBuilder {
     }
 
     /// Returns a reference to a file path by index.
-    fn file_path(&self, idx: usize) -> &PathBuf {
-        &self.files[idx].0
-    }
+    fn file_path(&self, idx: usize) -> &PathBuf { &self.files[idx].0 }
 
     /// Executes the transaction with the given locks and returns the outcome.
     ///
@@ -261,8 +277,8 @@ fn handles_new_file_creation() {
 #[test]
 fn handles_multiple_files() {
     let dir = TempDir::new().expect("create temp dir");
-    let path1 = temp_file(&dir, "file1.txt", "aaa");
-    let path2 = temp_file(&dir, "file2.txt", "bbb");
+    let path1 = temp_file(&dir, "file1.txt", "aaa").expect("temp file");
+    let path2 = temp_file(&dir, "file2.txt", "bbb").expect("temp file");
 
     let edit1 = FileEdit::with_edits(
         path1.clone(),

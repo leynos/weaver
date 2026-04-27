@@ -9,15 +9,17 @@ use std::io::Write;
 
 use tracing::debug;
 
-use crate::backends::{BackendKind, FusionBackends};
-use crate::dispatch::errors::DispatchError;
-use crate::dispatch::request::CommandRequest;
-use crate::dispatch::response::ResponseWriter;
-use crate::dispatch::router::{DISPATCH_TARGET, DispatchResult};
-use crate::semantic_provider::SemanticBackendProvider;
-
-use super::arguments::GetDefinitionArgs;
-use super::responses::extract_locations;
+use super::{arguments::GetDefinitionArgs, responses::extract_locations};
+use crate::{
+    backends::{BackendKind, FusionBackends},
+    dispatch::{
+        errors::DispatchError,
+        request::CommandRequest,
+        response::ResponseWriter,
+        router::{DISPATCH_TARGET, DispatchResult},
+    },
+    semantic_provider::SemanticBackendProvider,
+};
 
 /// Handles the `observe get-definition` command.
 ///
@@ -86,9 +88,13 @@ pub fn handle<W: Write>(
     Ok(DispatchResult::success())
 }
 
+// Tests for get-definition handler.
+//
+// Integration tests are in the BDD test suite.
+// Unit tests for argument parsing are in the arguments module.
+// Unit tests for response serialization are in the responses module.
+
 #[cfg(test)]
 mod tests {
-    // Integration tests for the handler are in the BDD test suite.
-    // Unit tests for argument parsing are in the arguments module.
-    // Unit tests for response serialization are in the responses module.
+    //! Unit tests for get_definition dispatch handler.
 }

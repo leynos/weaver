@@ -3,21 +3,38 @@
 use std::sync::{Arc, Mutex};
 
 use lsp_types::{
-    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
-    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, Location, MarkupContent,
-    MarkupKind, ReferenceParams, Uri,
+    CallHierarchyIncomingCall,
+    CallHierarchyIncomingCallsParams,
+    CallHierarchyItem,
+    CallHierarchyOutgoingCall,
+    CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams,
+    Diagnostic,
+    DidChangeTextDocumentParams,
+    DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams,
+    GotoDefinitionParams,
+    GotoDefinitionResponse,
+    Hover,
+    HoverParams,
+    Location,
+    MarkupContent,
+    MarkupKind,
+    ReferenceParams,
+    Uri,
 };
 use tempfile::TempDir;
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_lsp_host::{
-    Language, LanguageServer, LanguageServerError, LspHost, ServerCapabilitySet,
+    Language,
+    LanguageServer,
+    LanguageServerError,
+    LspHost,
+    ServerCapabilitySet,
 };
 
-use crate::backends::FusionBackends;
-use crate::semantic_provider::SemanticBackendProvider;
+use crate::{backends::FusionBackends, semantic_provider::SemanticBackendProvider};
 
 pub(crate) struct StubLanguageServer {
     capabilities: ServerCapabilitySet,
@@ -139,7 +156,12 @@ impl LanguageServer for StubLanguageServer {
     }
 
     fn hover(&mut self, params: HoverParams) -> Result<Option<Hover>, LanguageServerError> {
-        *self.last_hover_params.lock().unwrap() = Some(params);
+        let mut guard = self
+            .last_hover_params
+            .lock()
+            .map_err(|_| LanguageServerError::new("failed to lock last_hover_params"))?;
+        *guard = Some(params);
+        drop(guard);
         match &self.hover_error {
             Some(message) => Err(LanguageServerError::new(message.clone())),
             None => Ok(self.hover.clone()),
@@ -160,24 +182,25 @@ pub(crate) fn markdown_hover(value: &str) -> Hover {
 pub(crate) fn semantic_backends_with_server(
     language: Language,
     server: impl LanguageServer + 'static,
-) -> (FusionBackends<SemanticBackendProvider>, TempDir) {
+) -> Result<(FusionBackends<SemanticBackendProvider>, TempDir), String> {
     let capability_matrix = CapabilityMatrix::default();
     let mut lsp_host = LspHost::new(capability_matrix.clone());
     lsp_host
         .register_language(language, Box::new(server))
-        .expect("register test language server");
+        .map_err(|e| format!("register test language server: {e}"))?;
 
     let provider = SemanticBackendProvider::with_lsp_host_for_tests(
         capability_matrix.clone(),
         lsp_host,
         DEFAULT_CACHE_CAPACITY,
-    );
-    let (config, dir) = test_config();
-    (FusionBackends::new(config, provider), dir)
+    )
+    .map_err(|e| format!("failed to create semantic backend provider: {e}"))?;
+    let (config, dir) = test_config()?;
+    Ok((FusionBackends::new(config, provider), dir))
 }
 
-fn test_config() -> (Config, TempDir) {
-    let dir = TempDir::new().expect("create temp dir");
+fn test_config() -> Result<(Config, TempDir), String> {
+    let dir = TempDir::new().map_err(|e| format!("create temp dir: {e}"))?;
     let socket_path = dir
         .path()
         .join("socket.sock")
@@ -187,5 +210,5 @@ fn test_config() -> (Config, TempDir) {
         daemon_socket: SocketEndpoint::unix(socket_path),
         ..Config::default()
     };
-    (config, dir)
+    Ok((config, dir))
 }

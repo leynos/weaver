@@ -41,21 +41,15 @@ impl EngineLimits {
 
     /// Returns the maximum matches per rule.
     #[must_use]
-    pub const fn max_matches_per_rule(&self) -> usize {
-        self.matches_per_rule
-    }
+    pub const fn max_matches_per_rule(&self) -> usize { self.matches_per_rule }
 
     /// Returns the maximum capture text bytes.
     #[must_use]
-    pub const fn max_capture_text_bytes(&self) -> usize {
-        self.capture_text_bytes
-    }
+    pub const fn max_capture_text_bytes(&self) -> usize { self.capture_text_bytes }
 
     /// Returns the maximum deep search nodes.
     #[must_use]
-    pub const fn max_deep_search_nodes(&self) -> usize {
-        self.deep_search_nodes
-    }
+    pub const fn max_deep_search_nodes(&self) -> usize { self.deep_search_nodes }
 }
 
 impl Default for EngineLimits {
@@ -101,37 +95,25 @@ pub struct EngineConfig {
 impl EngineConfig {
     /// Creates a new engine configuration with explicit values.
     #[must_use]
-    pub const fn new(limits: EngineLimits, enable_hcl: bool) -> Self {
-        Self { limits, enable_hcl }
-    }
+    pub const fn new(limits: EngineLimits, enable_hcl: bool) -> Self { Self { limits, enable_hcl } }
 
     /// Returns the numeric engine limits.
     #[must_use]
-    pub const fn limits(&self) -> &EngineLimits {
-        &self.limits
-    }
+    pub const fn limits(&self) -> &EngineLimits { &self.limits }
 
     /// Returns the maximum matches per rule.
     #[must_use]
-    pub const fn max_matches_per_rule(&self) -> usize {
-        self.limits.matches_per_rule
-    }
+    pub const fn max_matches_per_rule(&self) -> usize { self.limits.matches_per_rule }
 
     /// Returns the maximum capture text bytes.
     #[must_use]
-    pub const fn max_capture_text_bytes(&self) -> usize {
-        self.limits.capture_text_bytes
-    }
+    pub const fn max_capture_text_bytes(&self) -> usize { self.limits.capture_text_bytes }
 
     /// Returns the maximum deep search nodes.
     #[must_use]
-    pub const fn max_deep_search_nodes(&self) -> usize {
-        self.limits.deep_search_nodes
-    }
+    pub const fn max_deep_search_nodes(&self) -> usize { self.limits.deep_search_nodes }
 
     /// Returns whether HCL support is enabled.
     #[must_use]
-    pub const fn enable_hcl(&self) -> bool {
-        self.enable_hcl
-    }
+    pub const fn enable_hcl(&self) -> bool { self.enable_hcl }
 }

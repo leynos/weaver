@@ -1057,10 +1057,10 @@ Both examples follow the same execution pipeline:
    `{"files_deleted":0,"files_written":1,"status":"ok"}`.
 
 When validation fails, parameters are invalid, or the plugin reports an error,
-the command exits non-zero and leaves the filesystem unchanged.
-A plugin response that reports success without a `Diff` payload is treated the
-same way: Weaver refuses the response, exits with status `1`, and does not
-touch the filesystem.
+the command exits non-zero and leaves the filesystem unchanged. A plugin
+response that reports success without a `Diff` payload is treated the same way:
+Weaver refuses the response, exits with status `1`, and does not touch the
+filesystem.
 
 Worked examples:
 
@@ -1295,10 +1295,10 @@ Table: Required fields for `rename-symbol` requests.
 | `position` | string | Position of the symbol as a UTF-8 byte offset.   |
 | `new_name` | string | The new name for the symbol (must be non-empty). |
 
-Successful responses must contain a `Diff` output with a unified diff patch.
-If a plugin reports success with any other output shape, Weaver refuses the
-response, exits with status `1`, and makes no filesystem changes.
-Failed responses may include diagnostics with an optional `reason_code` field.
+Successful responses must contain a `Diff` output with a unified diff patch. If
+a plugin reports success with any other output shape, Weaver refuses the
+response, exits with status `1`, and makes no filesystem changes. Failed
+responses may include diagnostics with an optional `reason_code` field.
 
 #### Contract versioning
 

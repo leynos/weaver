@@ -13,10 +13,11 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
+      WHITAKER_INSTALLER_VERSION: 0.2.1
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@98246364002def859ab550fe01ab3bca55dcfd61
+        uses: leynos/shared-actions/.github/actions/setup-rust@6b13b519f99c5b461be8cc21ecf19c2ec5907b9c
       - name: Format
         run: make check-fmt
       - name: Markdown lint
@@ -26,10 +27,44 @@ jobs:
             **/*.md
             !**/target/**
             !**/dist/**
+      - name: Install Nixie
+        run: python3 -m pip install --user nixie-cli==1.0.0
+      - name: Mermaid lint
+        run: make nixie
+      - name: Cache Whitaker installer
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
+        with:
+          path: |
+            ~/.cargo/bin/whitaker-installer
+            ~/.cache/cargo-binstall
+          key: whitaker-installer-${{ runner.os }}-${{ runner.arch }}-${{ env.WHITAKER_INSTALLER_VERSION }}
+      - name: Install Whitaker
+        run: |
+          installed_version=""
+          if command -v whitaker-installer >/dev/null 2>&1; then
+            installed_version=$(whitaker-installer --version 2>/dev/null | grep -Eo '[0-9]+(\.[0-9]+){2,}' | head -n1 || true)
+          fi
+
+          if [ "${installed_version}" = "${WHITAKER_INSTALLER_VERSION}" ]; then
+            echo "whitaker-installer ${installed_version} already present; skipping cargo binstall"
+          else
+            cargo binstall --no-confirm whitaker-installer@${{ env.WHITAKER_INSTALLER_VERSION }}
+          fi
+          whitaker-installer
+      # Stopgap until Whitaker can provision cranelift support directly.
+      # Tracking issue: https://github.com/leynos/whitaker/issues/207
+      - name: Install rustc-codegen-cranelift
+        run: |
+          toolchain=$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)
+          if [ -z "$toolchain" ]; then
+            echo "error: failed to extract Rust toolchain from rust-toolchain.toml" >&2
+            exit 1
+          fi
+          rustup component add rustc-codegen-cranelift --toolchain "$toolchain"
       - name: Lint
         run: make lint
       - name: Test and Measure Coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@98246364002def859ab550fe01ab3bca55dcfd61
+        uses: leynos/shared-actions/.github/actions/generate-coverage@6b13b519f99c5b461be8cc21ecf19c2ec5907b9c
         with:
           output-path: lcov.info
           format: lcov
@@ -37,7 +72,7 @@ jobs:
         env:
           CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
         if: ${{ env.CS_ACCESS_TOKEN }}
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@98246364002def859ab550fe01ab3bca55dcfd61
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@6b13b519f99c5b461be8cc21ecf19c2ec5907b9c
         with:
           format: lcov
           access-token: ${{ env.CS_ACCESS_TOKEN }}
