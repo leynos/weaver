@@ -56,7 +56,7 @@ fn config_path_arg() -> Arg {
         .action(ArgAction::Set)
 }
 
-/// Maps a [`FieldMetadata`] entry to bounded static metadata, returning `None`
+/// Maps a [`FieldMetadata`] entry to an optional `clap::Arg`, returning `None`
 /// for fields marked `hide_in_help` or lacking a long flag name.
 fn config_field_arg(field: &FieldMetadata) -> Option<Arg> {
     let cli = field.cli.as_ref()?;
@@ -78,9 +78,9 @@ fn config_field_arg(field: &FieldMetadata) -> Option<Arg> {
 }
 
 fn promote_static(value: String) -> &'static str {
-    // SAFETY: clap requires process-lifetime metadata for dynamically built
-    // arguments. `AUGMENTED_COMMAND` calls this during one-time cache
-    // construction only, keeping the promotion bounded for the process.
+    // SAFETY: clap requires `'static` lifetimes for dynamically constructed
+    // argument metadata. The augmented help command is built once per process
+    // and the leaked allocation lives for the process lifetime.
     Box::leak(value.into_boxed_str())
 }
 
@@ -96,8 +96,8 @@ fn config_arg_from_metadata(field: &ConfigFieldArgMetadata) -> Arg {
     arg
 }
 
-/// Configures value or flag behaviour, optional short alias, and `value_name`
-/// on an [`Arg`] from shared configuration metadata.
+/// Configures value or flag behaviour, optional short alias, `value_name`, and
+/// intentionally defers allowed-value validation to runtime config parsing.
 fn apply_arg_shape(arg: Arg, field: &ConfigFieldArgMetadata) -> Arg {
     let mut shaped = arg;
 

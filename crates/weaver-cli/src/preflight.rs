@@ -21,8 +21,8 @@ enum DomainGuidanceToEmit {
 }
 
 /// Handles preflight exits after argv splitting and before configuration
-/// loading, returning `Ok(())` when execution should continue or an
-/// [`AppError`] that exits before daemon startup.
+/// loading, returning `Ok(())` when no early exit is needed or an [`AppError`]
+/// that exits before daemon startup.
 pub(crate) fn handle_preflight<ErrWriter: Write>(
     cli: &Cli,
     split: &ConfigArgumentSplit,
@@ -44,7 +44,7 @@ pub(crate) fn handle_preflight<ErrWriter: Write>(
     Ok(())
 }
 
-/// Emits domain-specific guidance to stderr for unknown domains or missing
+/// Dispatches domain-specific guidance to stderr for unknown domains or missing
 /// operations.
 fn emit_domain_guidance<ErrWriter: Write>(
     cli: &Cli,

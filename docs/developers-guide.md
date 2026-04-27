@@ -390,11 +390,13 @@ This split preserves the current runtime contract that configuration flags take
 effect only when they appear before the command domain. It also avoids teaching
 clap to accept post-domain configuration flags that the loader would ignore.
 
-The augmented builder caches clap argument IDs, long flag names, and value names
-as `&'static str` in a `OnceLock`. Clap requires `'static` lifetimes for
-dynamically constructed arguments, so the builder intentionally promotes owned
-metadata into process-lifetime strings once, then reuses that bounded metadata
-for each help command construction.
+The augmented builder promotes clap argument IDs, long flag names, value names,
+and any future possible-value metadata to `&'static str` values. Clap requires
+`'static` lifetimes for dynamically constructed arguments, so the builder
+intentionally leaks those bounded allocations with `Box::leak`. The leaked
+strings live for the process lifetime and are intentionally never freed; the
+augmented command is cached once per process, so repeated help rendering does
+not allocate another set of argument metadata.
 
 ### 2.3 Preflight boundary (`crates/weaver-cli/src/preflight.rs`)
 
@@ -430,12 +432,11 @@ The built-in default is `en-US`. That value is part of the current shared
 configuration contract and is available from files, environment variables, and
 CLI configuration flags like any other config field.
 
-Full CLI localization bootstrap is intentionally deferred to roadmap item
+Full CLI localisation bootstrap is intentionally deferred to roadmap item
 `3.3.1`. In particular, Weaver does not yet resolve the final locale and use it
 to construct the `Localizer` before clap parse errors are formatted. The
 current `Locale` type exists so the configuration contract is real now and the
-later localization bootstrap can reuse the validated domain value.
-
+later localisation bootstrap can reuse the validated domain value.
 ## Test infrastructure for rename-symbol coverage
 
 ### `test-support` feature (`weaver-plugins`)
