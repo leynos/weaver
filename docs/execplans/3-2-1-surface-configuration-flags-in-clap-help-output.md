@@ -264,10 +264,11 @@ Retrospective notes:
   generation, while leaving the runtime parser strict about where configuration
   flags are honoured.
 - Follow-on roadmap note: item `3.2.6` now tracks adoption of
-  `cargo orthohelp` in CI to replace the current `clap_mangen` infrastructure
-  in `crates/weaver-cli/build.rs` once the help metadata and locale surfaces
-  are stable, while keeping `crates/weaver-cli/src/help.rs` shared by the
-  runtime help path and leaving the runtime parser strict.
+  `cargo orthohelp` in Continuous Integration (CI) to replace the current
+  `clap_mangen` infrastructure in `crates/weaver-cli/build.rs` once the help
+  metadata and locale surfaces are stable, while keeping
+  `crates/weaver-cli/src/help.rs` shared by the runtime help path and leaving
+  the runtime parser strict.
 - `locale` shipped as a validated `weaver-config::Locale` newtype because the
   direct `unic_langid::LanguageIdentifier` type was not serde-enabled through
   the current workspace dependency surface. This preserved validation without
