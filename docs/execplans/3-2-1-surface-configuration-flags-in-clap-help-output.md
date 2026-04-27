@@ -76,8 +76,9 @@ fiction.
   take effect only when they appear before the command domain or structured
   subcommand. Do not silently make post-domain placement work as a side effect
   of the help change.
-- Keep the JSONL transport, daemon routing, and auto-start behaviour unchanged.
-  `--help` must still complete without daemon startup or socket access.
+- Keep the JSON Lines (JSONL) transport, daemon routing, and auto-start
+  behaviour unchanged. `--help` must still complete without daemon startup or
+  socket access.
 - Keep `weaver-config` as the authoritative source of the shared configuration
   contract. The CLI may add help-rendering metadata, but it must not invent
   config flags that the loader cannot actually accept.

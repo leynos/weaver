@@ -11,6 +11,7 @@ use serde_json::json;
 use super::support::*;
 use crate::{
     EMPTY_LINE_LIMIT,
+    SHARED_CONFIG_HELP_FLAGS,
     lifecycle::{LifecycleCommand, LifecycleError},
     output::UNKNOWN_OPERATION_TYPE,
 };
@@ -320,6 +321,15 @@ fn then_stderr_contains(world: &RefCell<TestWorld>, snippet: String) {
 #[then("stdout contains {snippet}")]
 fn then_stdout_contains(world: &RefCell<TestWorld>, snippet: String) {
     assert_output_contains(world, |world| world.stdout_text(), snippet, "stdout");
+}
+
+#[then("stdout contains the shared configuration flags")]
+fn then_stdout_contains_shared_config_flags(world: &RefCell<TestWorld>) {
+    let world = world.borrow();
+    let text = world.stdout_text().expect("stdout text missing");
+    for flag in SHARED_CONFIG_HELP_FLAGS {
+        assert!(text.contains(flag), "stdout missing config flag {flag:?}");
+    }
 }
 
 #[then("stdout does not contain {snippet}")]

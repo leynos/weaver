@@ -29,6 +29,16 @@ mod preflight;
 mod runtime_utils;
 mod transport;
 
+/// Shared configuration flag renderings expected in clap help output.
+pub const SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
+    "--config-path <PATH>",
+    "--daemon-socket <ENDPOINT>",
+    "--log-filter <FILTER>",
+    "--log-format <FORMAT>",
+    "--capability-overrides <DIRECTIVE>",
+    "--locale <LOCALE>",
+];
+
 pub use cli::OutputFormat;
 pub(crate) use cli::{Cli, CliCommand, DaemonAction};
 #[cfg(test)]
@@ -44,13 +54,9 @@ use lifecycle::{
     LifecycleInvocation,
     LifecycleOutput,
     SystemLifecycle,
-    try_auto_start_daemon,
 };
-use localizer::build_localizer;
 pub use output::{OutputContext, ResolvedOutputFormat, render_human_output};
-use preflight::handle_preflight;
 pub(crate) use runtime_utils::exit_code_from_status;
-use runtime_utils::handle_capabilities_mode;
 use transport::{Connection, connect, connect_with_retry};
 
 /// CLI flags recognised by the configuration loader.

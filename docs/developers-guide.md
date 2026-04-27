@@ -389,13 +389,11 @@ This split preserves the current runtime contract that configuration flags take
 effect only when they appear before the command domain. It also avoids teaching
 clap to accept post-domain configuration flags that the loader would ignore.
 
-The augmented builder leaks clap argument IDs, long flag names, value names,
-and possible values as `&'static str` with `Box::leak`. Clap requires `'static`
+The augmented builder caches clap argument IDs, long flag names, value names,
+and possible values as `&'static str` in a `OnceLock`. Clap requires `'static`
 lifetimes for dynamically constructed arguments, so the builder intentionally
-promotes owned metadata into process-lifetime strings. This is safe here
-because the allocations are small, the help command is built for the current
-process only, and the leaked memory is intentionally never freed before process
-exit.
+promotes owned metadata into process-lifetime strings once, then reuses that
+bounded metadata for each help command construction.
 
 ### 2.3 Preflight boundary (`crates/weaver-cli/src/preflight.rs`)
 

@@ -12,6 +12,11 @@ use crate::discoverability::{
 };
 use crate::{AppError, Cli};
 
+enum DomainGuidanceToEmit {
+    MissingOperation(KnownDomain),
+    UnknownDomain,
+}
+
 /// Handles preflight exits after argv splitting and before configuration
 /// loading, returning `Ok(())` when execution should continue or an
 /// [`AppError`] that exits before daemon startup.
@@ -41,21 +46,36 @@ fn emit_domain_guidance<ErrWriter: Write>(
     localizer: &dyn Localizer,
     raw_domain: &str,
 ) -> Result<(), AppError> {
+    let Some(guidance) = domain_guidance(cli, raw_domain) else {
+        return Ok(());
+    };
+
+    let written = match guidance {
+        DomainGuidanceToEmit::MissingOperation(domain) => {
+            write_missing_operation_guidance(stderr, localizer, domain)
+        }
+        DomainGuidanceToEmit::UnknownDomain => {
+            write_unknown_domain_guidance(stderr, localizer, raw_domain)
+        }
+    }
+    .map_err(AppError::EmitGuidance)?;
+    preflight_result(written)
+}
+
+fn domain_guidance(cli: &Cli, raw_domain: &str) -> Option<DomainGuidanceToEmit> {
     let operation_is_missing = cli
         .operation
         .as_deref()
         .is_none_or(|op| op.trim().is_empty());
 
-    match KnownDomain::try_parse(raw_domain) {
-        Some(domain) if operation_is_missing => preflight_result(
-            write_missing_operation_guidance(stderr, localizer, domain)
-                .map_err(AppError::EmitGuidance)?,
-        ),
-        Some(_) => Ok(()),
-        None => preflight_result(
-            write_unknown_domain_guidance(stderr, localizer, raw_domain)
-                .map_err(AppError::EmitGuidance)?,
-        ),
+    let Some(domain) = KnownDomain::try_parse(raw_domain) else {
+        return Some(DomainGuidanceToEmit::UnknownDomain);
+    };
+
+    if operation_is_missing {
+        Some(DomainGuidanceToEmit::MissingOperation(domain))
+    } else {
+        None
     }
 }
 

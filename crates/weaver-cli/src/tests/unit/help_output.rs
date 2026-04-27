@@ -5,7 +5,7 @@ use std::io::Cursor;
 use std::process::ExitCode;
 
 use crate::help;
-use crate::{AppError, ConfigLoader, IoStreams, run_with_loader};
+use crate::{AppError, ConfigLoader, IoStreams, SHARED_CONFIG_HELP_FLAGS, run_with_loader};
 use weaver_config::Config;
 
 struct PanickingLoader;
@@ -34,14 +34,7 @@ fn run_with_args(args: &[&str]) -> (ExitCode, String, String) {
 }
 
 fn assert_config_flags_present(text: &str) {
-    for flag in [
-        "--config-path <PATH>",
-        "--daemon-socket <ENDPOINT>",
-        "--log-filter <FILTER>",
-        "--log-format <FORMAT>",
-        "--capability-overrides <DIRECTIVE>",
-        "--locale <LOCALE>",
-    ] {
+    for flag in SHARED_CONFIG_HELP_FLAGS {
         assert!(text.contains(flag), "help output missing {flag:?}");
     }
 }
@@ -57,6 +50,15 @@ fn top_level_help_lists_shared_config_flags() {
 #[test]
 fn daemon_start_help_lists_shared_config_flags() {
     let (exit, stdout, stderr) = run_with_args(&["weaver", "daemon", "start", "--help"]);
+    assert_eq!(exit, ExitCode::SUCCESS);
+    assert!(stderr.is_empty(), "help output must not write to stderr");
+    assert_config_flags_present(&stdout);
+}
+
+#[test]
+fn top_level_help_with_config_flag_uses_help_command() {
+    let (exit, stdout, stderr) =
+        run_with_args(&["weaver", "--config-path", "dummy.toml", "--help"]);
     assert_eq!(exit, ExitCode::SUCCESS);
     assert!(stderr.is_empty(), "help output must not write to stderr");
     assert_config_flags_present(&stdout);

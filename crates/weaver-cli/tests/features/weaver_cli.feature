@@ -124,22 +124,12 @@ Feature: Weaver CLI behaviour
 
   Scenario: Top-level help surfaces shared configuration flags
     When the operator runs "--help"
-    Then stdout contains "--config-path <PATH>"
-    And stdout contains "--daemon-socket <ENDPOINT>"
-    And stdout contains "--log-filter <FILTER>"
-    And stdout contains "--log-format <FORMAT>"
-    And stdout contains "--capability-overrides <DIRECTIVE>"
-    And stdout contains "--locale <LOCALE>"
+    Then stdout contains the shared configuration flags
     And no daemon command was sent
 
   Scenario: Daemon start help surfaces shared configuration flags
     When the operator runs "daemon start --help"
-    Then stdout contains "--config-path <PATH>"
-    And stdout contains "--daemon-socket <ENDPOINT>"
-    And stdout contains "--log-filter <FILTER>"
-    And stdout contains "--log-format <FORMAT>"
-    And stdout contains "--capability-overrides <DIRECTIVE>"
-    And stdout contains "--locale <LOCALE>"
+    Then stdout contains the shared configuration flags
     And no daemon command was sent
 
   Scenario: Auto-start shows waiting message before spawn failure
