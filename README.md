@@ -99,9 +99,8 @@ cargo +nightly-2026-03-26 test --workspace
 ### Toolchain prerequisites
 
 The workspace `.cargo/config.toml` enables Nightly-only build settings for the
-Cranelift codegen backend and configures `clang` with the `mold` linker for the
-Linux `x86_64` and `aarch64` targets. Install the pinned toolchain and
-component with:
+Cranelift codegen backend in development builds. Install the pinned toolchain
+and component with:
 
 ```sh
 rustup toolchain install nightly-2026-03-26
@@ -115,30 +114,13 @@ checkout:
 rustup override set nightly-2026-03-26
 ```
 
-You also need `clang` and `mold` available on your system because the target
-configuration passes `-C link-arg=-fuse-ld=mold`.
-
-Debian/Ubuntu:
-
-```sh
-sudo apt-get install clang mold
-```
-
-Fedora:
-
-```sh
-sudo dnf install clang mold
-```
-
 If any of these prerequisites are missing, the failure mode is often opaque:
-Cargo may report unstable `-Z` option errors, missing
-`rustc-codegen-cranelift`, linker failures from `clang`, or `mold` not found.
-When that happens, verify the pinned Nightly toolchain, the Cranelift
-component, and the system linker packages first.
+Cargo may report unstable `-Z` option errors or missing
+`rustc-codegen-cranelift`. When that happens, verify the pinned Nightly
+toolchain and the Cranelift component first.
 
 If local builds fail, verify the pinned Nightly override first, then confirm
-the Cranelift component and linker packages are installed before investigating
-the workspace itself.
+the Cranelift component is installed before investigating the workspace itself.
 
 ## Documentation
 
