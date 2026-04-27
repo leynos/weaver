@@ -24,6 +24,7 @@ struct ConfigFieldArgMetadata {
     name: &'static str,
     long: &'static str,
     short: Option<char>,
+    help: &'static str,
     takes_value: bool,
     multiple: bool,
     value_name: Option<&'static str>,
@@ -78,6 +79,7 @@ fn config_path_arg() -> Arg {
     Arg::new(CONFIG_PATH_ARG_ID)
         .long(CONFIG_PATH_ARG_ID)
         .value_name("PATH")
+        .help("Path to the configuration file supplied by --config-path")
         .help_heading(CONFIG_HELP_HEADING)
         .global(true)
         .action(ArgAction::Set)
@@ -96,6 +98,7 @@ fn config_field_arg(field: &FieldMetadata) -> Option<Arg> {
         name: promote_static(field.name.clone()),
         long: promote_static(long.to_string()),
         short: cli.short,
+        help: config_field_help(field),
         takes_value: cli.takes_value,
         multiple: cli.multiple,
         value_name: cli.value_name.clone().map(promote_static),
@@ -118,12 +121,24 @@ fn promote_static(value: String) -> &'static str {
 fn config_arg_from_metadata(field: &ConfigFieldArgMetadata) -> Arg {
     let mut arg = Arg::new(field.name)
         .long(field.long)
+        .help(field.help)
         .help_heading(CONFIG_HELP_HEADING)
         .global(true);
 
     arg = apply_arg_shape(arg, field);
 
     arg
+}
+
+fn config_field_help(field: &FieldMetadata) -> &'static str {
+    match field.name.as_str() {
+        "daemon_socket" => "Overrides the daemon transport endpoint",
+        "log_filter" => "Sets the tracing filter",
+        "log_format" => "Selects the structured log output format",
+        "capability_overrides" => "Appends a language capability override directive",
+        "locale" => "Selects the operator-facing locale",
+        _ => "Overrides a shared configuration value",
+    }
 }
 
 fn attach_ordering_caveat(command: Command) -> Command {
@@ -276,6 +291,7 @@ mod tests {
             name: "append_field",
             long: "append-field",
             short: None,
+            help: "Appends example values",
             takes_value: true,
             multiple: true,
             value_name: Some("VALUE"),
@@ -295,6 +311,7 @@ mod tests {
             name: "switch_field",
             long: "switch-field",
             short: None,
+            help: "Enables the example switch",
             takes_value: false,
             multiple: false,
             value_name: None,

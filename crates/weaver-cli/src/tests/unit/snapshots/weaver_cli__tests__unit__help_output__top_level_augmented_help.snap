@@ -1,6 +1,6 @@
 ---
 source: crates/weaver-cli/src/tests/unit/help_output.rs
-assertion_line: 78
+assertion_line: 58
 expression: rendered
 ---
 Semantic code intelligence tool for observing, acting on, and verifying code.
@@ -53,22 +53,22 @@ Options:
 
 Options:
       --config-path <PATH>
-          
+          Path to the configuration file supplied by --config-path
 
   -d, --daemon-socket <ENDPOINT>
-          
+          Overrides the daemon transport endpoint
 
   -l, --log-filter <FILTER>
-          
+          Sets the tracing filter
 
   -L, --log-format <FORMAT>
-          
+          Selects the structured log output format
 
   -c, --capability-overrides <DIRECTIVE>
-          
+          Appends a language capability override directive
 
   -o, --locale <LOCALE>
-          
+          Selects the operator-facing locale
 
 Domains and operations:
 

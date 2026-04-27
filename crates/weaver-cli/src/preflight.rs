@@ -1,4 +1,5 @@
-//! Pre-clap guidance paths that should exit before configuration loading.
+//! Post-parse (pre-configuration) guidance paths that operate on an already
+//! parsed `Cli` and should exit before configuration loading.
 
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -129,6 +130,27 @@ mod tests {
         expected_stderr_substring: Option<&'static str>,
     }
 
+    enum WriteFailureScenario {
+        BareInvocation,
+        DomainGuidance,
+    }
+
+    impl WriteFailureScenario {
+        fn domain(&self) -> Option<&str> {
+            match self {
+                WriteFailureScenario::BareInvocation => None,
+                WriteFailureScenario::DomainGuidance => Some("unknown-domain"),
+            }
+        }
+
+        fn operation(&self) -> Option<&str> {
+            match self {
+                WriteFailureScenario::BareInvocation => None,
+                WriteFailureScenario::DomainGuidance => Some("status"),
+            }
+        }
+    }
+
     struct PreflightContext {
         localizer: Box<dyn Localizer>,
         stderr: Vec<u8>,
@@ -255,73 +277,38 @@ mod tests {
         }
     }
 
-    fn assert_preflight_guidance(
-        domain: Option<&str>,
-        operation: Option<&str>,
-        expected_stderr: &str,
+    #[fixture]
+    fn failing_writer() -> FailingWriter {
+        FailingWriter
+    }
+
+    #[rstest]
+    #[case(WriteFailureScenario::BareInvocation)]
+    #[case(WriteFailureScenario::DomainGuidance)]
+    fn preflight_guidance_propagates_write_failure(
+        #[case] scenario: WriteFailureScenario,
+        mut failing_writer: FailingWriter,
     ) {
         let localizer = test_localizer();
-        let mut stderr = Vec::new();
 
         let result = handle_preflight(
-            &cli(domain, operation),
+            &cli(scenario.domain(), scenario.operation()),
             &split(false),
-            &mut stderr,
+            &mut failing_writer,
             &localizer,
         );
 
-        assert!(matches!(result, Err(AppError::PreflightGuidance)));
-        let output = String::from_utf8(stderr).expect("guidance must be valid UTF-8");
-        assert!(
-            output.contains(expected_stderr),
-            "expected stderr to contain {expected_stderr:?}, got: {output:?}",
-        );
-    }
-
-    #[test]
-    fn unknown_domain_returns_preflight_guidance() {
-        assert_preflight_guidance(
-            Some("unknown-domain"),
-            Some("status"),
-            "unknown domain 'unknown-domain'",
-        );
-    }
-
-    #[test]
-    fn known_domain_without_operation_returns_preflight_guidance() {
-        assert_preflight_guidance(
-            Some("observe"),
-            None,
-            "operation required for domain 'observe'",
-        );
-    }
-
-    #[test]
-    fn bare_invocation_propagates_guidance_write_failure() {
-        let localizer = test_localizer();
-        let mut stderr = FailingWriter;
-
-        let result = handle_preflight(&cli(None, None), &split(false), &mut stderr, &localizer);
-
-        assert!(
-            matches!(result, Err(AppError::EmitBareHelp(error)) if error.kind() == io::ErrorKind::BrokenPipe)
-        );
-    }
-
-    #[test]
-    fn domain_guidance_propagates_write_failure() {
-        let localizer = test_localizer();
-        let mut stderr = FailingWriter;
-
-        let result = handle_preflight(
-            &cli(Some("unknown-domain"), Some("status")),
-            &split(false),
-            &mut stderr,
-            &localizer,
-        );
-
-        assert!(
-            matches!(result, Err(AppError::EmitGuidance(error)) if error.kind() == io::ErrorKind::BrokenPipe)
-        );
+        match scenario {
+            WriteFailureScenario::BareInvocation => {
+                assert!(
+                    matches!(result, Err(AppError::EmitBareHelp(error)) if error.kind() == io::ErrorKind::BrokenPipe)
+                );
+            }
+            WriteFailureScenario::DomainGuidance => {
+                assert!(
+                    matches!(result, Err(AppError::EmitGuidance(error)) if error.kind() == io::ErrorKind::BrokenPipe)
+                );
+            }
+        }
     }
 }

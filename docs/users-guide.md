@@ -44,7 +44,7 @@ structured subcommand.
 
 ### Environment variables
 
-The same options are available through environment variables. They follow the
+Most options are available through environment variables. They follow the
 `WEAVER_*` naming convention:
 
 - `WEAVER_CONFIG_PATH`
