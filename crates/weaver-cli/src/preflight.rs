@@ -110,9 +110,29 @@ mod tests {
     use crate::localizer::WEAVER_EN_US;
     use crate::{AppError, Cli, OutputFormat};
     use ortho_config::{FluentLocalizer, Localizer};
+    use rstest::{fixture, rstest};
     use std::ffi::OsString;
     use std::io;
     use std::io::Write;
+
+    enum ExpectedPreflightResult {
+        Continue,
+        BareInvocation,
+        PreflightGuidance,
+    }
+
+    struct PreflightScenario {
+        domain: Option<&'static str>,
+        operation: Option<&'static str>,
+        has_config_flags: bool,
+        expected_result: ExpectedPreflightResult,
+        expected_stderr_substring: Option<&'static str>,
+    }
+
+    struct PreflightContext {
+        localizer: Box<dyn Localizer>,
+        stderr: Vec<u8>,
+    }
 
     struct FailingWriter;
 
@@ -129,6 +149,14 @@ mod tests {
     fn test_localizer() -> impl Localizer {
         FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])
             .expect("embedded Fluent catalogue must parse")
+    }
+
+    #[fixture]
+    fn preflight_context() -> PreflightContext {
+        PreflightContext {
+            localizer: Box::new(test_localizer()),
+            stderr: Vec::new(),
+        }
     }
 
     fn cli(domain: Option<&str>, operation: Option<&str>) -> Cli {
@@ -154,82 +182,77 @@ mod tests {
         }
     }
 
-    #[test]
-    fn bare_invocation_without_config_flags_returns_bare_invocation() {
-        let localizer = test_localizer();
-        let mut stderr = Vec::new();
-
-        let result = handle_preflight(&cli(None, None), &split(false), &mut stderr, &localizer);
-
-        assert!(matches!(result, Err(AppError::BareInvocation)));
-        assert!(!stderr.is_empty(), "bare invocation should emit guidance");
-    }
-
-    #[test]
-    fn bare_invocation_with_config_flags_continues() {
-        let localizer = test_localizer();
-        let mut stderr = Vec::new();
-
-        let result = handle_preflight(&cli(None, None), &split(true), &mut stderr, &localizer);
-
-        assert!(matches!(result, Ok(())));
-        assert!(
-            stderr.is_empty(),
-            "config-backed bare invocation should not emit guidance"
-        );
-    }
-
-    #[test]
-    fn unknown_domain_returns_preflight_guidance() {
-        let localizer = test_localizer();
-        let mut stderr = Vec::new();
-
-        let result = handle_preflight(
-            &cli(Some("unknown-domain"), Some("status")),
-            &split(false),
-            &mut stderr,
-            &localizer,
-        );
-
-        assert!(matches!(result, Err(AppError::PreflightGuidance)));
-        let stderr = String::from_utf8(stderr).expect("guidance must be valid UTF-8");
-        assert!(stderr.contains("unknown domain 'unknown-domain'"));
-    }
-
-    #[test]
-    fn known_domain_without_operation_returns_preflight_guidance() {
-        let localizer = test_localizer();
-        let mut stderr = Vec::new();
+    #[rstest]
+    #[case(PreflightScenario {
+        domain: None,
+        operation: None,
+        has_config_flags: false,
+        expected_result: ExpectedPreflightResult::BareInvocation,
+        expected_stderr_substring: Some("Usage: weaver"),
+    })]
+    #[case(PreflightScenario {
+        domain: None,
+        operation: None,
+        has_config_flags: true,
+        expected_result: ExpectedPreflightResult::Continue,
+        expected_stderr_substring: None,
+    })]
+    #[case(PreflightScenario {
+        domain: Some("unknown-domain"),
+        operation: Some("status"),
+        has_config_flags: false,
+        expected_result: ExpectedPreflightResult::PreflightGuidance,
+        expected_stderr_substring: Some("unknown domain 'unknown-domain'"),
+    })]
+    #[case(PreflightScenario {
+        domain: Some("observe"),
+        operation: None,
+        has_config_flags: false,
+        expected_result: ExpectedPreflightResult::PreflightGuidance,
+        expected_stderr_substring: Some("operation required for domain 'observe'"),
+    })]
+    #[case(PreflightScenario {
+        domain: Some("observe"),
+        operation: Some("get-definition"),
+        has_config_flags: false,
+        expected_result: ExpectedPreflightResult::Continue,
+        expected_stderr_substring: None,
+    })]
+    fn preflight_guidance_paths_match_expected_contract(
+        #[case] scenario: PreflightScenario,
+        preflight_context: PreflightContext,
+    ) {
+        let PreflightContext {
+            localizer,
+            mut stderr,
+        } = preflight_context;
 
         let result = handle_preflight(
-            &cli(Some("observe"), None),
-            &split(false),
+            &cli(scenario.domain, scenario.operation),
+            &split(scenario.has_config_flags),
             &mut stderr,
-            &localizer,
+            localizer.as_ref(),
         );
 
-        assert!(matches!(result, Err(AppError::PreflightGuidance)));
-        let stderr = String::from_utf8(stderr).expect("guidance must be valid UTF-8");
-        assert!(stderr.contains("operation required for domain 'observe'"));
-    }
+        match scenario.expected_result {
+            ExpectedPreflightResult::Continue => assert!(matches!(result, Ok(()))),
+            ExpectedPreflightResult::BareInvocation => {
+                assert!(matches!(result, Err(AppError::BareInvocation)));
+            }
+            ExpectedPreflightResult::PreflightGuidance => {
+                assert!(matches!(result, Err(AppError::PreflightGuidance)));
+            }
+        }
 
-    #[test]
-    fn known_domain_with_operation_continues() {
-        let localizer = test_localizer();
-        let mut stderr = Vec::new();
-
-        let result = handle_preflight(
-            &cli(Some("observe"), Some("get-definition")),
-            &split(false),
-            &mut stderr,
-            &localizer,
-        );
-
-        assert!(matches!(result, Ok(())));
-        assert!(
-            stderr.is_empty(),
-            "complete invocation should not emit guidance"
-        );
+        if let Some(needle) = scenario.expected_stderr_substring {
+            let stderr = String::from_utf8(stderr).expect("guidance must be valid UTF-8");
+            assert!(stderr.contains(needle), "stderr should contain {needle:?}");
+        } else {
+            assert!(
+                stderr.is_empty(),
+                "invocation without guidance should not emit stderr"
+            );
+        }
     }
 
     #[test]

@@ -1,5 +1,6 @@
 ---
 source: crates/weaver-cli/src/tests/unit/help_output.rs
+assertion_line: 78
 expression: rendered
 ---
 Semantic code intelligence tool for observing, acting on, and verifying code.
@@ -82,3 +83,5 @@ Domains and operations:
 
   verify — Validate code correctness
     diagnostics       syntax
+
+CLI flags must appear before the command domain or structured subcommand to take effect.

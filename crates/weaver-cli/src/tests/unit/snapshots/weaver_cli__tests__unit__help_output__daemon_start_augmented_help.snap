@@ -1,5 +1,6 @@
 ---
 source: crates/weaver-cli/src/tests/unit/help_output.rs
+assertion_line: 92
 expression: rendered
 ---
 Starts the daemon and waits for readiness
@@ -9,3 +10,5 @@ Usage: start
 Options:
   -h, --help
           Print help
+
+CLI flags must appear before the command domain or structured subcommand to take effect.

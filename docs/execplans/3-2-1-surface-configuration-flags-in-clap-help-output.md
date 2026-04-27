@@ -264,9 +264,9 @@ Retrospective notes:
   flags are honoured.
 - Follow-on roadmap note: item `3.2.6` now tracks adoption of
   `cargo orthohelp` in CI to replace the current `clap_mangen` infrastructure
-  once the help metadata and locale surfaces are stable.
-  `crates/weaver-cli/src/help.rs`, shared by the runtime help path and
-  `crates/weaver-cli/build.rs`, while leaving the runtime parser strict.
+  in `crates/weaver-cli/build.rs` once the help metadata and locale surfaces
+  are stable, while keeping `crates/weaver-cli/src/help.rs` shared by the
+  runtime help path and leaving the runtime parser strict.
 - `locale` shipped as a validated `weaver-config::Locale` newtype because the
   direct `unic_langid::LanguageIdentifier` type was not serde-enabled through
   the current workspace dependency surface. This preserved validation without
@@ -334,7 +334,7 @@ help/version tests stays low. These tests should assert that:
 - `weaver daemon start --help` contains the same six flags;
 - `--capability-overrides` is shown with the correct repeatable/directive
   shape;
-- `split_config_arguments(...)` recognises `--locale` in both separate-value
+- `split_config_arguments(...)` recognizes `--locale` in both separate-value
   and inline-value forms; and
 - configuration flags placed after the domain or structured subcommand are not
   accidentally reclassified as working runtime overrides.
@@ -372,7 +372,7 @@ The field should:
 - stop short of wiring the localizer bootstrap or translated help selection in
   this roadmap item.
 
-Update any loader-facing constants or metadata so the runtime recognises
+Update any loader-facing constants or metadata so the runtime recognizes
 `--locale` during config-argument splitting. This includes removing the
 hard-coded five-flag assumption from `crates/weaver-cli/src/lib.rs`.
 

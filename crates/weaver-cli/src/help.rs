@@ -14,6 +14,8 @@ use crate::cli::Cli;
 
 const CONFIG_PATH_ARG_ID: &str = "config-path";
 const CONFIG_HELP_HEADING: &str = "Options";
+const ORDERING_CAVEAT: &str =
+    "CLI flags must appear before the command domain or structured subcommand to take effect.";
 
 static AUGMENTED_COMMAND: OnceLock<Command> = OnceLock::new();
 
@@ -43,7 +45,7 @@ fn build_command() -> Command {
         }
     }
 
-    command
+    attach_ordering_caveat(command)
 }
 
 /// Returns the `--config-path` clap argument.
@@ -94,6 +96,15 @@ fn config_arg_from_metadata(field: &ConfigFieldArgMetadata) -> Arg {
     arg = apply_arg_shape(arg, field);
 
     arg
+}
+
+fn attach_ordering_caveat(command: Command) -> Command {
+    let command = command.mut_subcommands(attach_ordering_caveat);
+    let after_help = command.get_after_help().map_or_else(
+        || ORDERING_CAVEAT.to_string(),
+        |existing| format!("{existing}\n\n{ORDERING_CAVEAT}"),
+    );
+    command.after_help(after_help)
 }
 
 /// Configures value or flag behaviour, optional short alias, `value_name`, and
@@ -165,6 +176,25 @@ mod tests {
         assert_eq!(first, second);
         assert!(first.contains("--config-path <PATH>"));
         assert!(first.contains("--locale <LOCALE>"));
+        assert!(first.contains(ORDERING_CAVEAT));
+    }
+
+    #[test]
+    fn command_attaches_ordering_caveat_to_nested_help() {
+        let mut command = command();
+        let daemon = command
+            .find_subcommand_mut("daemon")
+            .expect("daemon subcommand should exist");
+        let start = daemon
+            .find_subcommand_mut("start")
+            .expect("daemon start subcommand should exist");
+
+        assert!(
+            start
+                .render_long_help()
+                .to_string()
+                .contains(ORDERING_CAVEAT)
+        );
     }
 
     #[test]
