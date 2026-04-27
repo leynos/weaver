@@ -5,7 +5,7 @@ CARGO ?= cargo
 BUILD_JOBS ?=
 CLIPPY_FLAGS ?= --workspace --all-targets --all-features -- -D warnings
 RUSTDOC_FLAGS ?= --cfg docsrs -D warnings
-MDLINT ?= markdownlint-cli2
+MDLINT ?= PATH="$(HOME)/.bun/bin:$(PATH)" markdownlint-cli2
 NIXIE ?= nixie
 
 build: target/debug/$(APP) ## Build debug binary
