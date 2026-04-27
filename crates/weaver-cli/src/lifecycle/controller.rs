@@ -148,8 +148,7 @@ impl SystemLifecycle {
         output.stdout_line(format_args!(
             concat!(
                 "daemon socket {} is listening but runtime files are missing; consider ",
-                "'weaver daemon ",
-                "stop' or removing {}"
+                "'weaver daemon stop' or removing {}"
             ),
             runtime.endpoint,
             runtime.paths.runtime_dir().display()
