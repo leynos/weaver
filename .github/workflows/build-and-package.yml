@@ -56,7 +56,7 @@ jobs:
 
       # Build weaver-cli
       - name: Build weaver-cli release binary
-        uses: leynos/shared-actions/.github/actions/rust-build-release@6b13b519f99c5b461be8cc21ecf19c2ec5907b9c
+        uses: leynos/shared-actions/.github/actions/rust-build-release@413dd72e8528ad793fc7fca34c93f5f73d5623fc
         with:
           target: ${{ inputs.target }}
           bin-name: weaver
@@ -64,7 +64,7 @@ jobs:
 
       # Build weaverd
       - name: Build weaverd release binary
-        uses: leynos/shared-actions/.github/actions/rust-build-release@6b13b519f99c5b461be8cc21ecf19c2ec5907b9c
+        uses: leynos/shared-actions/.github/actions/rust-build-release@413dd72e8528ad793fc7fca34c93f5f73d5623fc
         with:
           target: ${{ inputs.target }}
           bin-name: weaverd
