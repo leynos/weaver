@@ -437,6 +437,7 @@ Full CLI localisation bootstrap is intentionally deferred to roadmap item
 to construct the `Localizer` before clap parse errors are formatted. The
 current `Locale` type exists so the configuration contract is real now and the
 later localisation bootstrap can reuse the validated domain value.
+
 ## Test infrastructure for rename-symbol coverage
 
 ### `test-support` feature (`weaver-plugins`)
