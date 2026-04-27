@@ -136,6 +136,34 @@ where
         self
     }
 
+    /// Parses CLI arguments, rendering help to stdout and returning `Ok(None)`
+    /// if a `DisplayHelp` error is produced. Returns `Ok(Some(cli))` on
+    /// success or `Err` on a genuine parse error or help-write failure.
+    fn parse_or_render_help(
+        &mut self,
+        args: &[OsString],
+        split: &config::ConfigArgumentSplit,
+    ) -> Result<Option<Cli>, AppError> {
+        let cli_arguments = prepare_cli_arguments(args, split);
+        match Cli::try_parse_from(cli_arguments) {
+            Ok(cli) => Ok(Some(cli)),
+            Err(error) if error.kind() == clap::error::ErrorKind::DisplayHelp => {
+                tracing::debug!("rendering clap help");
+                help::write_help_for_args(args, &mut *self.io.stdout)
+                    .map(|()| None)
+                    .map_err(|io_error| {
+                        tracing::warn!(
+                            error_kind = ?io_error.kind(),
+                            error = %io_error,
+                            "failed to write clap help"
+                        );
+                        AppError::EmitHelp(io_error)
+                    })
+            }
+            Err(error) => Err(AppError::CliUsage(error)),
+        }
+    }
+
     fn run<I>(&mut self, args: I) -> ExitCode
     where
         I: IntoIterator<Item = OsString>,
@@ -163,23 +191,11 @@ where
     {
         let args: Vec<OsString> = args.into_iter().collect();
         let split = split_config_arguments(&args);
-        let cli_arguments = prepare_cli_arguments(&args, &split);
 
-        let parsed_cli = match Cli::try_parse_from(cli_arguments) {
-            Ok(cli) => Ok(cli),
-            Err(error) if error.kind() == clap::error::ErrorKind::DisplayHelp => {
-                tracing::debug!("rendering clap help");
-                if let Err(io_error) = help::write_help_for_args(&args, &mut *self.io.stdout) {
-                    tracing::warn!(
-                        error_kind = ?io_error.kind(),
-                        error = %io_error,
-                        "failed to write clap help"
-                    );
-                    return self.map_result_to_exit_code(Err(AppError::EmitHelp(io_error)));
-                }
-                return ExitCode::SUCCESS;
-            }
-            Err(error) => Err(AppError::CliUsage(error)),
+        let parsed_cli = match self.parse_or_render_help(&args, &split) {
+            Ok(Some(cli)) => Ok(cli),
+            Ok(None) => return ExitCode::SUCCESS,
+            Err(e) => return self.map_result_to_exit_code(Err(e)),
         };
 
         let result = parsed_cli
