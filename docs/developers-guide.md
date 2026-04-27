@@ -353,7 +353,6 @@ format error context themselves.
 
 ## CLI help and preflight internals
 
-
 ### 2.1 CLI help rendering architecture
 
 The runtime parser strips `--config-path`, `--daemon-socket`, `--log-filter`,
@@ -378,7 +377,6 @@ The augmented command is used in both places that need truthful help text:
 - `clap_mangen` man page generation in `crates/weaver-cli/build.rs`, so the
   generated roff output stays aligned with the runtime help surface.
 
-
 ### 2.2 Augmented command pattern
 
 The CLI deliberately uses two clap command shapes:
@@ -398,7 +396,6 @@ promotes owned metadata into process-lifetime strings. This is safe here
 because the allocations are small, the help command is built for the current
 process only, and the leaked memory is intentionally never freed before process
 exit.
-
 
 ### 2.3 Preflight boundary (`crates/weaver-cli/src/preflight.rs`)
 
@@ -423,7 +420,6 @@ There are two preflight paths:
 This boundary exists specifically to keep operator guidance local, immediate,
 and side-effect free.
 
-
 ### 2.4 `Locale` type (`crates/weaver-config/src/locale.rs`)
 
 `Locale` is a small newtype around `ortho_config::LanguageIdentifier`. It
@@ -440,6 +436,7 @@ Full CLI localization bootstrap is intentionally deferred to roadmap item
 to construct the `Localizer` before clap parse errors are formatted. The
 current `Locale` type exists so the configuration contract is real now and the
 later localization bootstrap can reuse the validated domain value.
+
 ## Test infrastructure for rename-symbol coverage
 
 ### `test-support` feature (`weaver-plugins`)
