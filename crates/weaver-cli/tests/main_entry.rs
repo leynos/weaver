@@ -8,7 +8,16 @@ use predicates::{
     prelude::PredicateBooleanExt,
     str::{contains, is_empty},
 };
-use weaver_cli::{DOMAIN_OPERATIONS, SHARED_CONFIG_HELP_FLAGS};
+use weaver_cli::DOMAIN_OPERATIONS;
+
+const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
+    "--config-path <PATH>",
+    "--daemon-socket <ENDPOINT>",
+    "--log-filter <FILTER>",
+    "--log-format <FORMAT>",
+    "--capability-overrides <DIRECTIVE>",
+    "--locale <LOCALE>",
+];
 
 #[test]
 fn capabilities_probe_succeeds() {
@@ -100,7 +109,7 @@ fn help_output_lists_all_domains_and_operations() {
         }
     }
 
-    for flag in SHARED_CONFIG_HELP_FLAGS {
+    for flag in EXPECTED_SHARED_CONFIG_HELP_FLAGS {
         assert!(
             combined.contains(flag),
             "weaver --help output missing config flag {flag:?}"
@@ -142,7 +151,7 @@ fn daemon_start_help_lists_all_config_flags() {
     let mut command = cargo_bin_cmd!("weaver");
     command.args(["daemon", "start", "--help"]);
     let mut assert = command.assert().success();
-    for flag in SHARED_CONFIG_HELP_FLAGS {
+    for flag in EXPECTED_SHARED_CONFIG_HELP_FLAGS {
         assert = assert.stdout(contains(*flag));
     }
     assert

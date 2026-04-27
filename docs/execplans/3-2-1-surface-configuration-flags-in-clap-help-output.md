@@ -10,7 +10,7 @@ Status: COMPLETE
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
 
-This plan must be approved before implementation begins.
+Approval was obtained before implementation began.
 
 ## Purpose / big picture
 
@@ -472,7 +472,6 @@ set -o pipefail; make test 2>&1 | tee /tmp/3-2-1-make-test.log
 
 ## Approval
 
-Do not begin implementation when this document is first written. Present the
-plan, call out the assumption that `locale` enters the shared config contract
-in this roadmap item, and wait for explicit user approval before editing Rust
-code or updating the roadmap entry.
+Approval was obtained before implementation began. The approved scope included
+the assumption that `locale` enters the shared config contract in this roadmap
+item.

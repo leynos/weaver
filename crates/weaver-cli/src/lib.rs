@@ -30,6 +30,10 @@ mod runner_glue;
 mod runtime_utils;
 mod transport;
 /// Shared configuration flag renderings expected in clap help output.
+///
+/// MAINTENANCE: This list must be kept in sync with the `cli_long` attributes
+/// defined on `weaver_config::Config`. When adding new configuration options,
+/// update this array and `CONFIG_CLI_FLAGS` accordingly.
 pub const SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
     "--config-path <PATH>",
     "--daemon-socket <ENDPOINT>",
