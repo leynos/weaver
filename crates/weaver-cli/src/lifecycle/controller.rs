@@ -108,10 +108,7 @@ impl SystemLifecycle {
         &self,
         config: &weaver_config::Config,
     ) -> Result<RuntimePaths, LifecycleError> {
-        match RuntimePaths::from_config_readonly(config) {
-            Ok(paths) => Ok(paths),
-            Err(error) => Err(error.into()),
-        }
+        RuntimePaths::from_config_readonly(config).map_err(Into::into)
     }
 
     /// Reports daemon status when a valid health snapshot is available.
@@ -150,8 +147,8 @@ impl SystemLifecycle {
     ) -> Result<(), LifecycleError> {
         output.stdout_line(format_args!(
             concat!(
-                "daemon socket {} is listening but runtime files are missing; consider 'weaver ",
-                "daemon ",
+                "daemon socket {} is listening but runtime files are missing; consider ",
+                "'weaver daemon ",
                 "stop' or removing {}"
             ),
             runtime.endpoint,
