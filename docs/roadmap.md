@@ -1329,7 +1329,7 @@ is the thinnest useful slice of JacquardWeave.[^2]*
   - [ ] Acceptance criteria: an end-to-end test demonstrates the
         full loop (query → resolve → card → related symbol →
         second card) using CLI commands; the workflow is documented
-        in the user's guide[^4]; and no interactive prompts are
+        in the user's guide[^5]; and no interactive prompts are
         required at any step.
 
 ## 10. Leta parity for supported languages
@@ -1340,13 +1340,13 @@ every few minutes, bringing Weaver's public CLI surface to parity with
 TypeScript. This phase prioritizes the everyday agent navigation loop — find,
 show, trace, search, rename — over exotic analysis. Each operation must honour
 Weaver's existing JSONL envelope, exit-code contract, and human-readable
-rendering conventions.[^3][^5][^4]*
+rendering conventions.[^3][^4][^5]*
 
 ### 10.1. Deliver `observe find-references` end-to-end
 
 *Outcome: Expose LSP `textDocument/references` as a stable, end-to-end CLI
 operation with human-readable and JSONL output. The underlying LSP substrate
-already supports references in `weaver-lsp-host`.[^4]*
+already supports references in `weaver-lsp-host`.[^5]*
 
 - [ ] 10.1.1. Wire `observe find-references` daemon dispatch to
       the existing `LspHost::references()` method, returning
@@ -1395,7 +1395,7 @@ infrastructure.[^2]*
 
 *Outcome: Expose the existing `weaver-graph` call hierarchy provider as a
 stable CLI operation with configurable direction and depth. The internal
-`CallGraph` provider is complete.[^4][^2]*
+`CallGraph` provider is complete.[^5][^2]*
 
 - [ ] 10.3.1. Wire `observe call-hierarchy` daemon dispatch to
       the existing `weaver-graph` call hierarchy provider with
@@ -1538,7 +1538,7 @@ be deterministic, non-interactive, and machine-readable.[^3]*
       distinguish `resolved`, `ambiguous`, `not_found`, and
       `backend_unavailable`.
   - [ ] Acceptance criteria: exit-code semantics are documented
-        in the user's guide[^4]; every command uses the shared
+        in the user's guide[^5]; every command uses the shared
         exit-code enumeration; and BDD tests assert each exit
         code for at least one command.
 - [ ] 11.3.4. Ensure compact output by default with opt-in
@@ -1562,7 +1562,7 @@ This is a key Weaver differentiator.[^7][^8]*
         spans and reasons; and the field is present even on
         success (reporting `passed`).
 - [ ] 11.4.2. Document the safety-harness contract for agent
-      consumption in the user's guide[^4]. Requires 11.4.1.
+      consumption in the user's guide[^5]. Requires 11.4.1.
   - [ ] Acceptance criteria: the user's guide includes a
         dedicated section explaining the Double-Lock model, what
         agents can rely on, and how to interpret lock-failure
@@ -1572,8 +1572,8 @@ This is a key Weaver differentiator.[^7][^8]*
 [^1]: [`sempai-query-language-design.md`](sempai-query-language-design.md)
 [^2]: [`jacquard-card-first-symbol-graph-design.md`](jacquard-card-first-symbol-graph-design.md)
 [^3]: [`weaver-design.md`](weaver-design.md)
-[^4]: [`users-guide.md`](users-guide.md)
-[^5]: [`ui-gap-analysis.md`](ui-gap-analysis.md)
+[^4]: [`ui-gap-analysis.md`](ui-gap-analysis.md)
+[^5]: [`users-guide.md`](users-guide.md)
 [^6]: [`adr-001-plugin-capability-model-and-act-extricate.md`](adr-001-plugin-capability-model-and-act-extricate.md)
 [^7]: [`weaver-design.md`](weaver-design.md) §5.1 and §6.1
 [^8]: [`formal-verification-methods-in-weaver.md`](formal-verification-methods-in-weaver.md)
