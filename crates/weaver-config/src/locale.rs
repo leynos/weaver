@@ -1,7 +1,7 @@
 //! Locale identifier validation for the shared Weaver configuration contract.
 //!
 //! The roadmap requires `--locale` to be a real configuration field now, but
-//! the wider CLI localisation bootstrap remains future work. This wrapper keeps
+//! the wider CLI localization bootstrap remains future work. This wrapper keeps
 //! the current task small by validating BCP 47 tags at the config boundary
 //! while exposing a serializable, clap-friendly domain type.
 
