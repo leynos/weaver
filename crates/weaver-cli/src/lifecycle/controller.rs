@@ -103,13 +103,13 @@ impl SystemLifecycle {
         Ok(ExitCode::SUCCESS)
     }
 
-    /// Checks if the daemon is running by attempting to read runtime paths.
+    /// Returns the daemon runtime paths from the current configuration.
     fn check_daemon_paths(
         &self,
         config: &weaver_config::Config,
-    ) -> Result<Option<RuntimePaths>, LifecycleError> {
+    ) -> Result<RuntimePaths, LifecycleError> {
         match RuntimePaths::from_config_readonly(config) {
-            Ok(paths) => Ok(Some(paths)),
+            Ok(paths) => Ok(paths),
             Err(error) => Err(error.into()),
         }
     }
@@ -195,13 +195,7 @@ impl SystemLifecycle {
     ) -> Result<ExitCode, LifecycleError> {
         ensure_no_extra_arguments(invocation)?;
 
-        let paths = match self.check_daemon_paths(context.config)? {
-            Some(paths) => paths,
-            None => {
-                self.report_not_running(output)?;
-                return Ok(ExitCode::SUCCESS);
-            }
-        };
+        let paths = self.check_daemon_paths(context.config)?;
 
         if !paths
             .runtime_dir()
