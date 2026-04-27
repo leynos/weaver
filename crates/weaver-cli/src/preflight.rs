@@ -255,6 +255,47 @@ mod tests {
         }
     }
 
+    fn assert_preflight_guidance(
+        domain: Option<&str>,
+        operation: Option<&str>,
+        expected_stderr: &str,
+    ) {
+        let localizer = test_localizer();
+        let mut stderr = Vec::new();
+
+        let result = handle_preflight(
+            &cli(domain, operation),
+            &split(false),
+            &mut stderr,
+            &localizer,
+        );
+
+        assert!(matches!(result, Err(AppError::PreflightGuidance)));
+        let output = String::from_utf8(stderr).expect("guidance must be valid UTF-8");
+        assert!(
+            output.contains(expected_stderr),
+            "expected stderr to contain {expected_stderr:?}, got: {output:?}",
+        );
+    }
+
+    #[test]
+    fn unknown_domain_returns_preflight_guidance() {
+        assert_preflight_guidance(
+            Some("unknown-domain"),
+            Some("status"),
+            "unknown domain 'unknown-domain'",
+        );
+    }
+
+    #[test]
+    fn known_domain_without_operation_returns_preflight_guidance() {
+        assert_preflight_guidance(
+            Some("observe"),
+            None,
+            "operation required for domain 'observe'",
+        );
+    }
+
     #[test]
     fn bare_invocation_propagates_guidance_write_failure() {
         let localizer = test_localizer();
