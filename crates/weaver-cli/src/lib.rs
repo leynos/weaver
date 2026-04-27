@@ -43,7 +43,8 @@ pub(crate) use cli::{Cli, CliCommand, DaemonAction};
 #[cfg(test)]
 pub(crate) use command::CommandDescriptor;
 pub(crate) use command::{CommandInvocation, CommandRequest};
-pub(crate) use config::{ConfigLoader, OrthoConfigLoader};
+use config::prepare_cli_arguments;
+pub(crate) use config::{ConfigLoader, OrthoConfigLoader, split_config_arguments};
 pub(crate) use daemon_output::{OutputSettings, read_daemon_messages};
 pub use discoverability::DOMAIN_OPERATIONS;
 pub(crate) use errors::{AppError, is_daemon_not_running};
@@ -53,9 +54,12 @@ use lifecycle::{
     LifecycleInvocation,
     LifecycleOutput,
     SystemLifecycle,
+    try_auto_start_daemon,
 };
+use localizer::build_localizer;
 pub use output::{OutputContext, ResolvedOutputFormat, render_human_output};
-pub(crate) use runtime_utils::exit_code_from_status;
+pub(crate) use preflight::handle_preflight;
+pub(crate) use runtime_utils::{exit_code_from_status, handle_capabilities_mode};
 use transport::{Connection, connect, connect_with_retry};
 
 /// CLI flags recognised by the configuration loader.

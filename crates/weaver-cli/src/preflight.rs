@@ -1,18 +1,25 @@
 //! Post-parse (pre-configuration) guidance paths that operate on an already
 //! parsed `Cli` and should exit before configuration loading.
 
-use std::io::Write;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::{
+    io::Write,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use ortho_config::Localizer;
 
-use crate::actionable_guidance;
-use crate::config::ConfigArgumentSplit;
-use crate::discoverability::{
-    KnownDomain, should_emit_domain_guidance, write_missing_operation_guidance,
-    write_unknown_domain_guidance,
+use crate::{
+    AppError,
+    Cli,
+    actionable_guidance,
+    config::ConfigArgumentSplit,
+    discoverability::{
+        KnownDomain,
+        should_emit_domain_guidance,
+        write_missing_operation_guidance,
+        write_unknown_domain_guidance,
+    },
 };
-use crate::{AppError, Cli};
 
 static PREFLIGHT_GUIDANCE_EMISSIONS: AtomicU64 = AtomicU64::new(0);
 
@@ -106,15 +113,21 @@ fn preflight_result(written: bool) -> Result<(), AppError> {
 
 #[cfg(test)]
 mod tests {
-    use super::handle_preflight;
-    use crate::config::ConfigArgumentSplit;
-    use crate::localizer::WEAVER_EN_US;
-    use crate::{AppError, Cli, OutputFormat};
+    //! Tests for preflight guidance decisions and write-error propagation.
+
+    use std::{ffi::OsString, io, io::Write};
+
     use ortho_config::{FluentLocalizer, Localizer};
     use rstest::{fixture, rstest};
-    use std::ffi::OsString;
-    use std::io;
-    use std::io::Write;
+
+    use super::handle_preflight;
+    use crate::{
+        AppError,
+        Cli,
+        OutputFormat,
+        config::ConfigArgumentSplit,
+        localizer::WEAVER_EN_US,
+    };
 
     enum ExpectedPreflightResult {
         Continue,
@@ -163,14 +176,14 @@ mod tests {
             Err(io::Error::new(io::ErrorKind::BrokenPipe, "write failed"))
         }
 
-        fn flush(&mut self) -> io::Result<()> {
-            Ok(())
-        }
+        fn flush(&mut self) -> io::Result<()> { Ok(()) }
     }
 
     fn test_localizer() -> impl Localizer {
-        FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])
-            .expect("embedded Fluent catalogue must parse")
+        match FluentLocalizer::with_en_us_defaults([WEAVER_EN_US]) {
+            Ok(localizer) => localizer,
+            Err(error) => panic!("embedded Fluent catalogue must parse: {error}"),
+        }
     }
 
     #[fixture]
@@ -277,19 +290,12 @@ mod tests {
         }
     }
 
-    #[fixture]
-    fn failing_writer() -> FailingWriter {
-        FailingWriter
-    }
-
     #[rstest]
     #[case(WriteFailureScenario::BareInvocation)]
     #[case(WriteFailureScenario::DomainGuidance)]
-    fn preflight_guidance_propagates_write_failure(
-        #[case] scenario: WriteFailureScenario,
-        mut failing_writer: FailingWriter,
-    ) {
+    fn preflight_guidance_propagates_write_failure(#[case] scenario: WriteFailureScenario) {
         let localizer = test_localizer();
+        let mut failing_writer = FailingWriter;
 
         let result = handle_preflight(
             &cli(scenario.domain(), scenario.operation()),

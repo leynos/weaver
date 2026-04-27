@@ -5,8 +5,7 @@
 //! the current task small by validating BCP 47 tags at the config boundary
 //! while exposing a serializable, clap-friendly domain type.
 
-use std::fmt;
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 use ortho_config::{LanguageIdentifier, langid};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -26,21 +25,15 @@ pub struct LocaleParseError {
 impl Locale {
     /// Returns the built-in fallback locale.
     #[must_use]
-    pub fn en_us() -> Self {
-        Self(langid!("en-US"))
-    }
+    pub fn en_us() -> Self { Self(langid!("en-US")) }
 }
 
 impl Default for Locale {
-    fn default() -> Self {
-        Self::en_us()
-    }
+    fn default() -> Self { Self::en_us() }
 }
 
 impl fmt::Display for Locale {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.0) }
 }
 
 impl FromStr for Locale {
@@ -77,8 +70,11 @@ impl<'de> Deserialize<'de> for Locale {
 
 #[cfg(test)]
 mod tests {
-    use super::{Locale, LocaleParseError};
+    //! Tests for locale parsing, formatting, and rejection of invalid tags.
+
     use proptest::prelude::*;
+
+    use super::{Locale, LocaleParseError};
 
     #[test]
     fn parses_valid_locale() {

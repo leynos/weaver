@@ -5,18 +5,20 @@
 //! help-only clap command with those flags so help and generated manpages stay
 //! truthful without weakening runtime parsing semantics.
 
+use std::{ffi::OsString, io::Write, sync::OnceLock};
+
 use clap::{Arg, ArgAction, Command, CommandFactory};
 use ortho_config::docs::{FieldMetadata, OrthoConfigDocs};
-use std::ffi::OsString;
-use std::io::Write;
-use std::sync::OnceLock;
 use weaver_config::Config;
 
 use crate::cli::Cli;
 
 const CONFIG_PATH_ARG_ID: &str = "config-path";
 const CONFIG_HELP_HEADING: &str = "Options";
-const ORDERING_CAVEAT: &str = "Config flags must appear before the command domain or structured subcommand to take effect; for example, `weaver daemon start --log-filter debug` is ignored because `--log-filter` appears after `start`.";
+const ORDERING_CAVEAT: &str = "Config flags must appear before the command domain or structured \
+                               subcommand to take effect; for example, `weaver daemon start \
+                               --log-filter debug` is ignored because `--log-filter` appears \
+                               after `start`.";
 
 static AUGMENTED_COMMAND: OnceLock<Command> = OnceLock::new();
 
@@ -33,9 +35,7 @@ struct ConfigFieldArgMetadata {
 /// Returns an augmented `clap::Command` that adds shared configuration flags
 /// for help rendering and manpage generation without affecting the runtime
 /// parser.
-pub(crate) fn command() -> Command {
-    AUGMENTED_COMMAND.get_or_init(build_command).clone()
-}
+pub(crate) fn command() -> Command { AUGMENTED_COMMAND.get_or_init(build_command).clone() }
 
 /// Writes help for the provided arguments using the augmented help command.
 pub fn write_help_for_args<W: Write>(args: &[OsString], writer: &mut W) -> std::io::Result<()> {
@@ -177,9 +177,12 @@ fn apply_arg_shape(arg: Arg, field: &ConfigFieldArgMetadata) -> Arg {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    //! Tests for augmented help command construction and argument shaping.
+
     use clap::error::ErrorKind;
     use ortho_config::docs::CliMetadata;
+
+    use super::*;
 
     fn field_metadata(cli: Option<CliMetadata>) -> FieldMetadata {
         FieldMetadata {

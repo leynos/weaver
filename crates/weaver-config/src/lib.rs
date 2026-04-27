@@ -53,9 +53,7 @@ pub use runtime::{RuntimePaths, RuntimePathsError};
 use serde::{Deserialize, Serialize};
 pub use socket::{SocketEndpoint, SocketParseError, SocketPreparationError};
 
-fn default_locale() -> Locale {
-    Locale::en_us()
-}
+fn default_locale() -> Locale { Locale::en_us() }
 
 /// Complete configuration merged from defaults, files, environment, and CLI.
 #[derive(Debug, Clone, Deserialize, Serialize, OrthoConfig)]
@@ -168,9 +166,7 @@ impl Config {
 
     /// Accessor for the configured locale.
     #[must_use]
-    pub fn locale(&self) -> &Locale {
-        &self.locale
-    }
+    pub fn locale(&self) -> &Locale { &self.locale }
 
     fn normalise_capability_overrides(&mut self) {
         deduplicate_directives(&mut self.capability_overrides);

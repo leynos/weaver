@@ -1,6 +1,9 @@
 #![cfg(feature = "cli")]
 
-use std::ffi::OsString;
+use std::{
+    ffi::OsString,
+    sync::{Mutex, MutexGuard, OnceLock},
+};
 
 use cap_std::fs::Dir;
 use rstest::fixture;
@@ -154,22 +157,29 @@ fn given_environment_override(harness: &Harness, socket: String) {
     harness.set_env("WEAVER_DAEMON_SOCKET", &socket);
 }
 
+#[given("a configuration file setting the locale to \"{locale}\"")]
 fn given_configuration_file_locale(harness: &Harness, locale: String) {
     harness.write_locale_config(&locale);
 }
 
+#[given("the environment overrides the locale to \"{locale}\"")]
 fn given_environment_locale_override(harness: &Harness, locale: String) {
     harness.set_env("WEAVER_LOCALE", &locale);
 }
+
+#[when("the CLI sets the daemon socket to \"{socket}\"")]
 fn when_cli_override(harness: &Harness, socket: String) {
     harness.push_cli_arg("--daemon-socket");
     harness.push_cli_arg(OsString::from(&socket));
 }
 
+#[when("the CLI sets the locale to \"{locale}\"")]
 fn when_cli_locale_override(harness: &Harness, locale: String) {
     harness.push_cli_arg("--locale");
     harness.push_cli_arg(OsString::from(&locale));
 }
+
+#[when("the configuration loads without overrides")]
 fn when_load_without_overrides(harness: &Harness) { harness.load(); }
 
 #[then("loading the configuration resolves the daemon socket to \"{socket}\"")]
@@ -220,6 +230,7 @@ fn then_defaults_applied(harness: &Harness) {
     );
 }
 
+#[then("loading the configuration resolves the locale to \"{locale}\"")]
 fn then_resolved_locale(harness: &Harness, locale: String) {
     harness.load();
 
@@ -235,4 +246,6 @@ fn then_resolved_locale(harness: &Harness, locale: String) {
 
     assert_eq!(config.locale().to_string(), locale);
 }
+
+#[scenario(path = "tests/features/configuration_precedence.feature")]
 fn configuration_precedence(#[from(harness)] _harness: Harness) {}

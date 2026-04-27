@@ -9,7 +9,9 @@ use weaver_build_util::{manual_date_from_env, out_dir_for_target_profile, write_
 
 #[path = "src/cli.rs"]
 mod cli;
+#[path = "src/help.rs"]
 mod help;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _runtime_help_writer = help::write_help_for_args::<Vec<u8>>;
 

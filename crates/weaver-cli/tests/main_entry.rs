@@ -8,6 +8,7 @@ use predicates::{
     prelude::PredicateBooleanExt,
     str::{contains, is_empty},
 };
+use weaver_cli::{DOMAIN_OPERATIONS, SHARED_CONFIG_HELP_FLAGS};
 
 #[test]
 fn capabilities_probe_succeeds() {
@@ -136,6 +137,7 @@ fn help_flag_exits_successfully_with_quick_start() {
         .stdout(contains("weaver observe get-definition"));
 }
 
+#[test]
 fn daemon_start_help_lists_all_config_flags() {
     let mut command = cargo_bin_cmd!("weaver");
     command.args(["daemon", "start", "--help"]);
