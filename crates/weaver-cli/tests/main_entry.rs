@@ -143,5 +143,14 @@ fn daemon_start_help_lists_all_config_flags() {
     for flag in SHARED_CONFIG_HELP_FLAGS {
         assert = assert.stdout(contains(*flag));
     }
-    assert.stderr(is_empty());
+    assert
+        .stdout(contains("Starting").not())
+        .stdout(contains("started").not())
+        .stdout(contains("launch").not())
+        .stdout(contains("daemon socket opened").not())
+        .stderr(is_empty())
+        .stderr(contains("Starting").not())
+        .stderr(contains("started").not())
+        .stderr(contains("launch").not())
+        .stderr(contains("daemon socket opened").not());
 }

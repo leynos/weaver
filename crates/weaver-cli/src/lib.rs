@@ -9,7 +9,6 @@ use std::{
     ffi::{OsStr, OsString},
     io::{Read, Write},
     process::ExitCode,
-    sync::atomic::{AtomicU64, Ordering},
 };
 
 use clap::Parser;
@@ -29,8 +28,6 @@ pub mod output;
 mod preflight;
 mod runtime_utils;
 mod transport;
-static HELP_RENDER_ATTEMPTS: AtomicU64 = AtomicU64::new(0);
-
 /// Shared configuration flag renderings expected in clap help output.
 pub const SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
     "--config-path <PATH>",
@@ -75,7 +72,6 @@ const CONFIG_CLI_FLAGS: &[&str] = &[
     "--locale",
 ];
 pub(crate) const EMPTY_LINE_LIMIT: usize = 10;
-
 /// Bundles the IO streams provided to the CLI runtime.
 ///
 /// `IoStreams` owns the long-lived writers used while parsing CLI arguments.
@@ -88,7 +84,6 @@ pub struct IoStreams<'a, R: Read, W: Write, E: Write> {
     pub(crate) stderr: &'a mut E,
     stdout_is_terminal: bool,
 }
-
 impl<'a, R: Read, W: Write, E: Write> IoStreams<'a, R, W, E> {
     pub fn new(
         stdin: &'a mut R,
@@ -106,7 +101,6 @@ impl<'a, R: Read, W: Write, E: Write> IoStreams<'a, R, W, E> {
 
     pub(crate) const fn stdout_is_terminal(&self) -> bool { self.stdout_is_terminal }
 }
-
 impl Cli {
     /// Returns true when no domain, subcommand, or probe flag was supplied,
     /// indicating the operator needs short help guidance.
@@ -175,7 +169,7 @@ where
             Ok(cli) => Ok(cli),
             Err(error) if error.kind() == clap::error::ErrorKind::DisplayHelp => {
                 tracing::debug!("rendering clap help");
-                if let Err(io_error) = write_help_for_args(&args, &mut *self.io.stdout) {
+                if let Err(io_error) = help::write_help_for_args(&args, &mut *self.io.stdout) {
                     tracing::warn!(
                         error_kind = ?io_error.kind(),
                         error = %io_error,
@@ -265,26 +259,6 @@ where
     E: Write,
 {
     run_with_loader(args, io, &OrthoConfigLoader)
-}
-
-fn write_help_for_args<W: Write>(args: &[OsString], writer: &mut W) -> std::io::Result<()> {
-    HELP_RENDER_ATTEMPTS.fetch_add(1, Ordering::Relaxed);
-    match help::command().try_get_matches_from(args.iter().cloned()) {
-        Err(error)
-            if matches!(
-                error.kind(),
-                clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion
-            ) =>
-        {
-            write!(writer, "{error}")
-        }
-        Err(error) => write!(writer, "{error}"),
-        Ok(_) => {
-            let mut fallback = help::command();
-            fallback.write_long_help(writer)?;
-            writeln!(writer)
-        }
-    }
 }
 fn execute_daemon_command<R, W, E>(
     invocation: CommandInvocation,

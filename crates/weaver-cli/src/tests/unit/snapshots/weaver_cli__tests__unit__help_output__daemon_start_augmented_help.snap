@@ -11,4 +11,4 @@ Options:
   -h, --help
           Print help
 
-CLI flags must appear before the command domain or structured subcommand to take effect.
+Config flags must appear before the command domain or structured subcommand to take effect; for example, `weaver daemon start --log-filter debug` is ignored because `--log-filter` appears after `start`.

@@ -18,11 +18,26 @@ use weaver_test_macros::allow_fixture_expansion_lints;
 struct Harness {
     temp_dir: TempDir,
     cli_args: std::cell::RefCell<Vec<OsString>>,
+    env_guard: std::cell::RefCell<Option<EnvGuard>>,
     env_overrides: std::cell::RefCell<Vec<(String, Option<OsString>)>>,
     loaded: std::cell::RefCell<Option<Config>>,
     error: std::cell::RefCell<Option<String>>,
 }
 
+struct EnvGuard {
+    _lock: MutexGuard<'static, ()>,
+}
+
+impl EnvGuard {
+    fn acquire() -> Self {
+        static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        let lock = ENV_LOCK.get_or_init(|| Mutex::new(()));
+        let guard = lock
+            .lock()
+            .expect("environment mutation lock should not be poisoned");
+        Self { _lock: guard }
+    }
+}
 impl Harness {
     fn new() -> Self {
         let temp_dir = match TempDir::new() {
@@ -32,6 +47,7 @@ impl Harness {
         Self {
             temp_dir,
             cli_args: std::cell::RefCell::new(vec![OsString::from("weaver")]),
+            env_guard: std::cell::RefCell::new(None),
             env_overrides: std::cell::RefCell::new(Vec::new()),
             loaded: std::cell::RefCell::new(None),
             error: std::cell::RefCell::new(None),
@@ -54,6 +70,11 @@ impl Harness {
     }
 
     fn set_env(&self, key: &str, value: &str) {
+        let mut guard = self.env_guard.borrow_mut();
+        if guard.is_none() {
+            *guard = Some(EnvGuard::acquire());
+        }
+
         let previous = std::env::var_os(key);
         // The nightly toolchain marks environment mutation as `unsafe` while the
         // API stabilises. The harness restores overrides in `Drop` to keep the

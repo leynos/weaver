@@ -8,7 +8,7 @@
 //! - Transport sockets used by the daemon and client.
 //! - Structured logging defaults.
 //! - User-defined capability overrides.
-//! - Locale identifier for internationalisation surfaces.
+//! - Locale identifier for internationalization surfaces.
 //!
 //! ```rust,no_run
 //! use weaver_config::Config;

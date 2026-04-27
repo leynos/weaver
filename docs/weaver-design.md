@@ -694,7 +694,7 @@ and pass variable data through `LocalizationArgs`, rather than embedding
 English prose in code. This gives Weaver one message catalogue for static help,
 dynamic errors, and config-derived guidance.
 
-Roadmap item `3.2.1` deliberately stops short of full clap localisation. The
+Roadmap item `3.2.1` deliberately stops short of full clap localization. The
 shipped implementation uses a shared augmented clap `Command` for help and
 manpage generation so the `weaver-config` contract is visible in
 `weaver --help` and `weaver daemon start --help`, while the runtime parser

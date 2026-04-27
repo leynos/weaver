@@ -11,6 +11,8 @@ use weaver_build_util::{manual_date_from_env, out_dir_for_target_profile, write_
 mod cli;
 mod help;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let _runtime_help_writer = help::write_help_for_args::<Vec<u8>>;
+
     // Regenerate the manual page when the CLI or metadata changes.
     println!("cargo:rerun-if-changed=src/cli.rs");
     println!("cargo:rerun-if-env-changed=CARGO_PKG_VERSION");
