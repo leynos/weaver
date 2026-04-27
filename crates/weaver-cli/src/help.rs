@@ -105,9 +105,12 @@ fn config_field_arg(field: &FieldMetadata) -> Option<Arg> {
 }
 
 fn promote_static(value: String) -> &'static str {
-    // SAFETY: clap requires `'static` lifetimes for dynamically constructed
-    // argument metadata. The augmented help command is built once per process
-    // and the leaked allocation lives for the process lifetime.
+    // SAFETY: This intentionally promotes the given `String` to a `'static`
+    // `str` because clap requires process-lifetime metadata for dynamically
+    // built arguments. The leak is effectively process-lifetime and bounded by
+    // the `OnceLock` command cache, which performs this promotion once per
+    // field. This tradeoff satisfies clap's `'static` argument metadata
+    // requirement while avoiding unbounded leaks.
     Box::leak(value.into_boxed_str())
 }
 

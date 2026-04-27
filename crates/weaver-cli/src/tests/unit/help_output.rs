@@ -6,6 +6,7 @@ use std::process::ExitCode;
 
 use crate::help;
 use crate::{AppError, ConfigLoader, IoStreams, SHARED_CONFIG_HELP_FLAGS, run_with_loader};
+use rstest::rstest;
 use weaver_config::Config;
 
 struct PanickingLoader;
@@ -39,34 +40,13 @@ fn assert_config_flags_present(text: &str) {
     }
 }
 
-#[test]
-fn top_level_help_lists_shared_config_flags() {
-    let (exit, stdout, stderr) = run_with_args(&["weaver", "--help"]);
-    assert_eq!(exit, ExitCode::SUCCESS);
-    assert!(stderr.is_empty(), "help output must not write to stderr");
-    assert_config_flags_present(&stdout);
-}
-
-#[test]
-fn daemon_start_help_lists_shared_config_flags() {
-    let (exit, stdout, stderr) = run_with_args(&["weaver", "daemon", "start", "--help"]);
-    assert_eq!(exit, ExitCode::SUCCESS);
-    assert!(stderr.is_empty(), "help output must not write to stderr");
-    assert_config_flags_present(&stdout);
-}
-
-#[test]
-fn top_level_help_with_config_flag_uses_help_command() {
-    let (exit, stdout, stderr) =
-        run_with_args(&["weaver", "--config-path", "dummy.toml", "--help"]);
-    assert_eq!(exit, ExitCode::SUCCESS);
-    assert!(stderr.is_empty(), "help output must not write to stderr");
-    assert_config_flags_present(&stdout);
-}
-
-#[test]
-fn top_level_help_with_uppercase_config_value_does_not_validate_config() {
-    let (exit, stdout, stderr) = run_with_args(&["weaver", "--log-format", "JSON", "--help"]);
+#[rstest]
+#[case(&["weaver", "--help"])]
+#[case(&["weaver", "daemon", "start", "--help"])]
+#[case(&["weaver", "--config-path", "dummy.toml", "--help"])]
+#[case(&["weaver", "--log-format", "JSON", "--help"])]
+fn help_lists_shared_config_flags_without_loading_config(#[case] argv: &[&str]) {
+    let (exit, stdout, stderr) = run_with_args(argv);
     assert_eq!(exit, ExitCode::SUCCESS);
     assert!(stderr.is_empty(), "help output must not write to stderr");
     assert_config_flags_present(&stdout);
