@@ -33,11 +33,11 @@ enum DomainGuidanceToEmit {
 /// that exits before daemon startup.
 pub(crate) fn handle_preflight<ErrWriter: Write>(
     cli: &Cli,
-    split: &ConfigArgumentSplit,
+    _split: &ConfigArgumentSplit,
     stderr: &mut ErrWriter,
     localizer: &dyn Localizer,
 ) -> Result<(), AppError> {
-    if cli.is_bare_invocation() && !split.has_config_flags() {
+    if cli.is_bare_invocation() {
         tracing::debug!("emitting bare invocation guidance");
         actionable_guidance::write_bare_invocation_guidance(stderr, localizer)
             .map_err(AppError::EmitBareHelp)?;
@@ -229,8 +229,8 @@ mod tests {
         domain: None,
         operation: None,
         has_config_flags: true,
-        expected_result: ExpectedPreflightResult::Continue,
-        expected_stderr_substring: None,
+        expected_result: ExpectedPreflightResult::BareInvocation,
+        expected_stderr_substring: Some("Usage: weaver"),
     })]
     #[case(PreflightScenario {
         domain: Some("unknown-domain"),

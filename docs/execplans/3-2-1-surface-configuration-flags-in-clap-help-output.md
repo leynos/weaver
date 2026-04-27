@@ -164,8 +164,9 @@ fiction.
       `daemon_socket`, `log_filter`, `log_format`, and
       `capability_overrides`, but no `locale` field yet.
 - [x] (2026-04-10 00:20Z) Confirmed the build coupling:
-      `crates/weaver-cli/build.rs` uses `Cli::command()` for manpage
-      generation, so the final help solution must be shared there as well.
+      `crates/weaver-cli/build.rs` uses `help::command()` for manpage
+      generation, so runtime help and packaged reference output share the same
+      augmented command.
 - [x] (2026-04-10 00:35Z) Drafted this ExecPlan in
       `docs/execplans/3-2-1-surface-configuration-flags-in-clap-help-output.md`.
 - [x] (2026-04-11 00:20Z) Stage A: added unit coverage in
@@ -195,13 +196,13 @@ fiction.
   It does not automatically affect `weaver-cli`'s clap help because the CLI and
   config loader are parsed separately.
 
-- The current `CONFIG_CLI_FLAGS` list in `crates/weaver-cli/src/lib.rs`
-  contains only five flags and omits `--locale`, so the roadmap and runtime
-  have already diverged.
+- At plan start, the `CONFIG_CLI_FLAGS` list in `crates/weaver-cli/src/lib.rs`
+  contained only five flags and omitted `--locale`, so the roadmap and runtime
+  had diverged.
 
-- `crates/weaver-cli/src/lib.rs` is already over the repository's 400-line
-  limit, so even a small feature here should begin with extraction rather than
-  direct growth.
+- At plan start, `crates/weaver-cli/src/lib.rs` was already over the
+  repository's 400-line limit, so even a small feature here needed extraction
+  rather than direct growth.
 
 - The safest way to keep help honest may be to render help from an augmented
   clap `Command` while leaving the runtime parser strict. That is a more
@@ -292,14 +293,15 @@ The implementation surface is concentrated in `weaver-cli` and `weaver-config`.
 
 - `crates/weaver-cli/src/lib.rs`
 
-  Owns `CONFIG_CLI_FLAGS`, `CliRunner::run_with_handler(...)`, and
-  `handle_preflight(...)`. This is the runtime entry point and the current
-  pressure point for any help interception or config-flag extraction.
+  Owns the `CONFIG_CLI_FLAGS` table and `CliRunner::run_with_handler(...)`.
+  Runtime execution enters through `run(...)` and `run_with_loader(...)`, then
+  splits configuration arguments before calling
+  `help::write_help_for_args(...)` only for clap display requests.
 
 - `crates/weaver-cli/build.rs`
 
-  Generates the manpage from `Cli::command()`. Any help-surface solution that
-  is not reused here will create drift immediately.
+  Generates the manpage from `crates/weaver-cli/src/help.rs::command()`. Any
+  help-surface solution that is not reused here will create drift immediately.
 
 - `crates/weaver-config/src/lib.rs`
 
@@ -392,11 +394,11 @@ Use that catalogue in two places:
 The recommended implementation is:
 
 - keep `Cli::try_parse_from(...)` strict for normal execution;
-- add a helper such as `cli::build_help_command()` that starts from
-  `Cli::command()` and appends the six config flags as visible global args; and
-- add a narrow early branch in `CliRunner::run_with_handler(...)` that detects
-  help requests on the raw `argv` and renders help from that augmented command
-  instead of the stripped runtime parser.
+- use `crates/weaver-cli/src/help.rs::command()` to start from `Cli::command()`
+  and append the shared config flags as visible global args; and
+- route clap display requests through `help::write_help_for_args(...)` from
+  `CliRunner::parse_or_render_help(...)`, preserving the stripped runtime
+  parser for normal execution.
 
 This preserves the current rule that configuration flags must appear before the
 command token to take effect, while still making clap help and manpage output

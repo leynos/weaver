@@ -26,6 +26,7 @@ mod lifecycle;
 mod localizer;
 pub mod output;
 mod preflight;
+mod runner_glue;
 mod runtime_utils;
 mod transport;
 /// Shared configuration flag renderings expected in clap help output.
@@ -45,6 +46,7 @@ pub(crate) use command::CommandDescriptor;
 pub(crate) use command::{CommandInvocation, CommandRequest};
 use config::prepare_cli_arguments;
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader, split_config_arguments};
+#[cfg(test)]
 pub(crate) use daemon_output::{OutputSettings, read_daemon_messages};
 pub use discoverability::DOMAIN_OPERATIONS;
 pub(crate) use errors::{AppError, is_daemon_not_running};
@@ -54,13 +56,16 @@ use lifecycle::{
     LifecycleInvocation,
     LifecycleOutput,
     SystemLifecycle,
-    try_auto_start_daemon,
 };
 use localizer::build_localizer;
 pub use output::{OutputContext, ResolvedOutputFormat, render_human_output};
 pub(crate) use preflight::handle_preflight;
+#[cfg(test)]
+pub(crate) use runner_glue::build_request;
+pub(crate) use runner_glue::execute_daemon_command;
 pub(crate) use runtime_utils::{exit_code_from_status, handle_capabilities_mode};
-use transport::{Connection, connect, connect_with_retry};
+#[cfg(test)]
+pub(crate) use transport::connect;
 
 /// CLI flags recognised by the configuration loader.
 ///
@@ -280,76 +285,6 @@ where
 {
     run_with_loader(args, io, &OrthoConfigLoader)
 }
-fn execute_daemon_command<R, W, E>(
-    invocation: CommandInvocation,
-    context: LifecycleContext<'_>,
-    io: &mut IoStreams<'_, R, W, E>,
-    output_format: ResolvedOutputFormat,
-) -> ExitCode
-where
-    R: Read,
-    W: Write,
-    E: Write,
-{
-    let output_context = OutputContext::new(
-        invocation.domain.clone(),
-        invocation.operation.clone(),
-        invocation.arguments.clone(),
-    );
-    let request = match build_request(invocation, &mut *io.stdin) {
-        Ok(request) => request,
-        Err(error) => return write_error_and_fail(&mut *io.stderr, error),
-    };
-    let mut connection = match connect_or_start_daemon(context, &mut *io.stderr) {
-        Ok(connection) => connection,
-        Err(exit_code) => return exit_code,
-    };
-
-    if let Err(error) = request.write_jsonl(&mut connection) {
-        return write_error_and_fail(&mut *io.stderr, error);
-    }
-
-    match read_daemon_messages(
-        &mut connection,
-        io,
-        OutputSettings {
-            format: output_format,
-            context: &output_context,
-        },
-    ) {
-        Ok(status) => exit_code_from_status(status),
-        Err(error) => write_error_and_fail(&mut *io.stderr, error),
-    }
-}
-
-fn connect_or_start_daemon<E: Write>(
-    context: LifecycleContext<'_>,
-    stderr: &mut E,
-) -> Result<Connection, ExitCode> {
-    match connect(context.config.daemon_socket()) {
-        Ok(connection) => Ok(connection),
-        Err(error) if is_daemon_not_running(&error) => start_and_retry_daemon(context, stderr),
-        Err(error) => Err(write_error_and_fail(stderr, error)),
-    }
-}
-fn build_request<R: Read>(
-    invocation: CommandInvocation,
-    stdin: &mut R,
-) -> Result<CommandRequest, AppError> {
-    if invocation.is_apply_patch() {
-        let mut patch = String::new();
-        stdin
-            .read_to_string(&mut patch)
-            .map_err(AppError::ReadPatch)?;
-        if patch.trim().is_empty() {
-            return Err(AppError::MissingPatchInput);
-        }
-        Ok(CommandRequest::with_patch(invocation, patch))
-    } else {
-        Ok(CommandRequest::from(invocation))
-    }
-}
-
 /// Runs the CLI with a custom configuration loader.
 #[must_use]
 pub(crate) fn run_with_loader<'a, I, R, W, E, L>(
@@ -399,25 +334,3 @@ where
 
 #[cfg(test)]
 mod tests;
-
-fn write_error_and_fail<W: Write>(stderr: &mut W, error: impl std::fmt::Display) -> ExitCode {
-    writeln!(stderr, "{error}").ok();
-    ExitCode::FAILURE
-}
-
-fn start_and_retry_daemon<E: Write>(
-    context: LifecycleContext<'_>,
-    stderr: &mut E,
-) -> Result<Connection, ExitCode> {
-    if let Err(error) = try_auto_start_daemon(context, stderr) {
-        actionable_guidance::write_startup_guidance(stderr, &error).ok();
-        return Err(ExitCode::FAILURE);
-    }
-
-    // Retry briefly after daemon startup to tolerate socket-bind lag.
-    connect_with_retry(
-        context.config.daemon_socket(),
-        transport::CONNECTION_TIMEOUT,
-    )
-    .map_err(|error| write_error_and_fail(stderr, error))
-}

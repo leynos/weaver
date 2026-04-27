@@ -283,6 +283,8 @@ does* *not require source inspection or external runbooks.*
 *CLI without requiring external documentation lookup.*
 
 - [x] 3.2.1. Surface configuration flags in clap help output.
+      Shipped: `locale` is now part of the shared configuration contract and is
+      visible as `--locale`, `WEAVER_LOCALE`, and the `locale` config-file key.
       See
       [Gap 1c](ui-gap-analysis.md#gap-1c--configuration-flags-invisible)
       and
@@ -365,21 +367,19 @@ does* *not require source inspection or external runbooks.*
 *Outcome: Let operators choose a locale once and receive consistent Fluent-*
 *backed help, error text, and generated reference artefacts across Weaver.*
 
-- [ ] 3.3.1. Introduce locale selection in the shared configuration contract.
+- [ ] 3.3.1. Apply resolved locale during CLI bootstrap.
       See
       [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces)
       and
       [weaver design §2.3.1](weaver-design.md#231-configuration-contract).
-  - [ ] Add a `locale` field to `weaver-config`, surfaced as `--locale`,
-        `WEAVER_LOCALE`, and a config-file key.
   - [ ] Add a pre-config bootstrap pass that honours `--locale` and
         `WEAVER_LOCALE` before consulting `LC_ALL`, `LC_MESSAGES`, and `LANG`,
         then rebuild the localizer if the resolved config locale differs.
   - [ ] Acceptance criteria: `weaver --help` and other pre-config clap display
         paths honour `--locale` and `WEAVER_LOCALE` immediately; malformed
         `--locale` and `WEAVER_LOCALE` values fail fast; malformed ambient
-        `LC_*` or `LANG` values warn and fall back; file-backed locale
-        settings apply after full config loading; and `en-US` remains the
+        `LC_*` or `LANG` values warn and fall back; file-backed locale settings
+        continue to apply after full config loading; and `en-US` remains the
         guaranteed fallback.
 - [ ] 3.3.2. Localize clap help and parse errors through `ortho_config`.
       Requires 3.3.1. See

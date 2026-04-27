@@ -17,6 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Regenerate the manual page when the CLI or metadata changes.
     println!("cargo:rerun-if-changed=src/cli.rs");
+    println!("cargo:rerun-if-changed=src/help.rs");
     println!("cargo:rerun-if-env-changed=CARGO_PKG_VERSION");
     println!("cargo:rerun-if-env-changed=CARGO_PKG_NAME");
     println!("cargo:rerun-if-env-changed=CARGO_BIN_NAME");

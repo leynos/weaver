@@ -150,9 +150,11 @@ fn daemon_start_help_lists_all_config_flags() {
         .stdout(contains("started").not())
         .stdout(contains("launch").not())
         .stdout(contains("daemon socket opened").not())
+        .stdout(contains("Waiting for daemon start...").not())
         .stderr(is_empty())
         .stderr(contains("Starting").not())
         .stderr(contains("started").not())
         .stderr(contains("launch").not())
-        .stderr(contains("daemon socket opened").not());
+        .stderr(contains("daemon socket opened").not())
+        .stderr(contains("Waiting for daemon start...").not());
 }
