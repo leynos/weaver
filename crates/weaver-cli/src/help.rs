@@ -24,7 +24,6 @@ struct ConfigFieldArgMetadata {
     takes_value: bool,
     multiple: bool,
     value_name: Option<&'static str>,
-    possible_values: Vec<&'static str>,
 }
 
 /// Returns an augmented `clap::Command` that adds shared configuration flags
@@ -77,12 +76,6 @@ fn config_field_arg_metadata(field: &FieldMetadata) -> Option<ConfigFieldArgMeta
         takes_value: cli.takes_value,
         multiple: cli.multiple,
         value_name: cli.value_name.clone().map(promote_static),
-        possible_values: cli
-            .possible_values
-            .iter()
-            .cloned()
-            .map(promote_static)
-            .collect(),
     })
 }
 
@@ -105,8 +98,8 @@ fn config_field_arg(field: &ConfigFieldArgMetadata) -> Arg {
     arg
 }
 
-/// Configures value or flag behaviour, optional short alias, `value_name`, and
-/// allowed values on an [`Arg`] from shared configuration metadata.
+/// Configures value or flag behaviour, optional short alias, and `value_name`
+/// on an [`Arg`] from shared configuration metadata.
 fn apply_arg_shape(arg: Arg, field: &ConfigFieldArgMetadata) -> Arg {
     let mut shaped = arg;
 
@@ -122,9 +115,6 @@ fn apply_arg_shape(arg: Arg, field: &ConfigFieldArgMetadata) -> Arg {
         });
         if let Some(value_name) = field.value_name {
             shaped = shaped.value_name(value_name);
-        }
-        if !field.possible_values.is_empty() {
-            shaped = shaped.value_parser(field.possible_values.clone());
         }
     } else {
         shaped = shaped.action(ArgAction::SetTrue);

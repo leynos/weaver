@@ -65,6 +65,14 @@ fn top_level_help_with_config_flag_uses_help_command() {
 }
 
 #[test]
+fn top_level_help_with_uppercase_config_value_does_not_validate_config() {
+    let (exit, stdout, stderr) = run_with_args(&["weaver", "--log-format", "JSON", "--help"]);
+    assert_eq!(exit, ExitCode::SUCCESS);
+    assert!(stderr.is_empty(), "help output must not write to stderr");
+    assert_config_flags_present(&stdout);
+}
+
+#[test]
 fn top_level_help_snapshot_matches_augmented_command() {
     let rendered = help::command().render_long_help().to_string();
     insta::assert_snapshot!("top_level_augmented_help", rendered);

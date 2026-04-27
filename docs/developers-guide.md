@@ -367,8 +367,9 @@ handles ordinary execution.
 `--config-path` argument, then iterates over
 `Config::get_doc_metadata().fields` to build the remaining shared configuration
 flags dynamically from `ortho_config` metadata. Each visible field becomes a
-`clap::Arg` with the correct long flag, value name, and constrained value set
-for the generated help surface.
+`clap::Arg` with the correct long flag and value name for the generated help
+surface. The help-only parser deliberately does not attach config value
+validators, because runtime config parsing owns case handling and validation.
 
 The augmented command is used in both places that need truthful help text:
 
@@ -389,11 +390,11 @@ This split preserves the current runtime contract that configuration flags take
 effect only when they appear before the command domain. It also avoids teaching
 clap to accept post-domain configuration flags that the loader would ignore.
 
-The augmented builder caches clap argument IDs, long flag names, value names,
-and possible values as `&'static str` in a `OnceLock`. Clap requires `'static`
-lifetimes for dynamically constructed arguments, so the builder intentionally
-promotes owned metadata into process-lifetime strings once, then reuses that
-bounded metadata for each help command construction.
+The augmented builder caches clap argument IDs, long flag names, and value names
+as `&'static str` in a `OnceLock`. Clap requires `'static` lifetimes for
+dynamically constructed arguments, so the builder intentionally promotes owned
+metadata into process-lifetime strings once, then reuses that bounded metadata
+for each help command construction.
 
 ### 2.3 Preflight boundary (`crates/weaver-cli/src/preflight.rs`)
 
