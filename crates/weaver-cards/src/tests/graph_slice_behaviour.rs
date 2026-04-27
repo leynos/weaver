@@ -2,11 +2,15 @@
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use super::graph_slice_fixtures;
-use super::test_utils::QuotedString;
-use crate::graph_slice::{ResolutionScope, SliceRefusalReason};
-use crate::{GraphSliceRequest, GraphSliceResponse, SliceEdgeType};
+use super::{graph_slice_fixtures, test_utils::QuotedString};
+use crate::{
+    GraphSliceRequest,
+    GraphSliceResponse,
+    SliceEdgeType,
+    graph_slice::{ResolutionScope, SliceRefusalReason},
+};
 
 // ---------------------------------------------------------------------------
 // Test world
@@ -20,10 +24,9 @@ struct TestWorld {
     json_output: Option<String>,
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> TestWorld {
-    TestWorld::default()
-}
+fn world() -> TestWorld { TestWorld::default() }
 
 // ---------------------------------------------------------------------------
 // Given steps
@@ -115,9 +118,7 @@ fn parse_json(world: &TestWorld) -> serde_json::Value {
     serde_json::from_str(json).expect("valid JSON")
 }
 
-fn json_pointer(field: &str) -> String {
-    format!("/{}", field.replace('.', "/"))
-}
+fn json_pointer(field: &str) -> String { format!("/{}", field.replace('.', "/")) }
 
 #[then("the slice JSON contains a {field} field")]
 fn then_json_contains(world: &mut TestWorld, field: QuotedString) {
@@ -134,9 +135,9 @@ fn then_json_contains(world: &mut TestWorld, field: QuotedString) {
 fn then_json_field_value(world: &mut TestWorld, key: QuotedString, value: QuotedString) {
     let parsed = parse_json(world);
     let pointer = json_pointer(key.as_str());
-    let actual = parsed
-        .pointer(&pointer)
-        .unwrap_or_else(|| panic!("expected JSON to contain key '{}'", key.as_str()));
+    let Some(actual) = parsed.pointer(&pointer) else {
+        panic!("expected JSON to contain key '{}'", key.as_str());
+    };
     let expected: serde_json::Value = serde_json::from_str(value.as_str())
         .unwrap_or_else(|_| serde_json::Value::String(String::from(value.as_str())));
     assert_eq!(
@@ -153,9 +154,9 @@ fn then_json_field_value(world: &mut TestWorld, key: QuotedString, value: Quoted
 fn then_json_field_is_empty(world: &mut TestWorld, key: QuotedString) {
     let parsed = parse_json(world);
     let pointer = json_pointer(key.as_str());
-    let actual = parsed
-        .pointer(&pointer)
-        .unwrap_or_else(|| panic!("expected JSON to contain key '{}'", key.as_str()));
+    let Some(actual) = parsed.pointer(&pointer) else {
+        panic!("expected JSON to contain key '{}'", key.as_str());
+    };
     match actual {
         serde_json::Value::Array(arr) if arr.is_empty() => {}
         serde_json::Value::Object(obj) if obj.is_empty() => {}
@@ -243,6 +244,4 @@ fn then_response_contains_resolution_scope(world: &mut TestWorld, scope: QuotedS
 // ---------------------------------------------------------------------------
 
 #[scenario(path = "tests/features/graph_slice_schema.feature")]
-fn graph_slice_schema_behaviour(world: TestWorld) {
-    drop(world);
-}
+fn graph_slice_schema_behaviour(world: TestWorld) { drop(world); }

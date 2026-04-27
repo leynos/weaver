@@ -1,27 +1,33 @@
 //! Shared harness utilities for end-to-end integration tests.
 
-use std::io;
-use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::path::{Path, PathBuf};
-use std::process::Output;
-use std::sync::OnceLock;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::{
+    io,
+    net::{SocketAddr, TcpListener, TcpStream},
+    path::Path,
+    process::Output,
+    sync::{Arc, Mutex},
+    thread,
+    time::{Duration, Instant},
+};
 
-use assert_cmd::{Command, cargo};
+use assert_cmd::Command;
 use insta::assert_snapshot;
 use serde::Serialize;
 use tempfile::TempDir;
 use url::Url;
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
+use weaver_e2e::card_fixtures::CardFixtureCase;
 use weaverd::{
-    BackendManager, ConnectionHandler, ConnectionStream, DispatchConnectionHandler, FusionBackends,
+    BackendManager,
+    ConnectionHandler,
+    ConnectionStream,
+    DispatchConnectionHandler,
+    FusionBackends,
     SemanticBackendProvider,
 };
 
-use weaver_e2e::card_fixtures::CardFixtureCase;
+use crate::{fixture_io::write_fixture_path, weaver_binary::weaver_binary_path};
 
 const ACCEPT_TIMEOUT: Duration = Duration::from_secs(10);
 const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
@@ -57,21 +63,6 @@ pub(crate) struct TestDaemon {
     join_handle: thread::JoinHandle<()>,
 }
 
-fn weaver_binary_path() -> &'static Path {
-    static WEAVER_BINARY: OnceLock<PathBuf> = OnceLock::new();
-    WEAVER_BINARY.get_or_init(resolve_weaver_binary)
-}
-
-#[expect(
-    deprecated,
-    reason = "workspace integration tests need the runtime lookup"
-)]
-fn resolve_weaver_binary() -> PathBuf {
-    // `cargo::cargo_bin!` only resolves binaries for the current integration
-    // test crate. These tests execute the workspace `weaver` binary instead.
-    cargo::cargo_bin("weaver")
-}
-
 impl TestDaemon {
     pub(crate) fn start(expected_requests: usize) -> Self {
         let _ = weaver_binary_path();
@@ -102,9 +93,7 @@ impl TestDaemon {
         }
     }
 
-    fn endpoint(&self) -> String {
-        format!("tcp://{}", self.address)
-    }
+    fn endpoint(&self) -> String { format!("tcp://{}", self.address) }
 
     pub(crate) fn cache_stats(&self) -> weaver_cards::CacheStats {
         let stats = self
@@ -123,15 +112,18 @@ impl TestDaemon {
 }
 
 pub(crate) fn fixture_uri(temp_dir: &TempDir, case: CardFixtureCase) -> String {
-    let path = temp_dir.path().join(case.file_name);
-    required_result(std::fs::write(&path, case.source), "write fixture");
+    let path = required_result(
+        write_fixture_path(temp_dir, case.file_name, case.source),
+        "write fixture path",
+    );
     let uri = Url::from_file_path(&path).map_err(|()| "fixture path to URI".to_owned());
     required_result(uri, "fixture path to URI").to_string()
 }
 
 pub(crate) fn run_get_card(daemon: &TestDaemon, request: GetCardRequest<'_>) -> Transcript {
     let command = format!(
-        "weaver --daemon-socket tcp://<daemon-endpoint> --output json observe get-card --uri <uri> --position {}:{} --detail {}",
+        "weaver --daemon-socket tcp://<daemon-endpoint> --output json observe get-card --uri \
+         <uri> --position {}:{} --detail {}",
         request.line, request.column, request.detail
     );
     let command_output = Command::new(weaver_binary_path())
@@ -205,7 +197,8 @@ fn accept_before_deadline(listener: &TcpListener) -> TcpStream {
                     .local_addr()
                     .map_or_else(|_| String::from("<unknown>"), |address| address.to_string());
                 panic!(
-                    "test daemon listener {listener_address} failed before {ACCEPT_TIMEOUT:?}: {error}"
+                    "test daemon listener {listener_address} failed before {ACCEPT_TIMEOUT:?}: \
+                     {error}"
                 );
             }
         }
@@ -258,20 +251,23 @@ fn normalize_snapshot_value(value: &mut serde_json::Value) {
                 normalize_snapshot_value(item);
             }
         }
-        serde_json::Value::String(text) => {
-            if text.starts_with("file://") {
-                *text = String::from("<uri>");
-            }
+        serde_json::Value::String(text) if text.starts_with("file://") => {
+            *text = String::from("<uri>");
         }
         _ => {}
     }
 }
 
 fn normalize_message_value(value: &mut serde_json::Value) {
-    if let serde_json::Value::String(message) = value
-        && let Some((prefix, _)) = message.split_once("/tmp/")
-    {
-        *message = format!("{prefix}<path>");
+    if let serde_json::Value::String(message) = value {
+        if let Some((prefix, _)) = message.split_once(" for path ") {
+            *message = format!("{prefix} for path <path>");
+            return;
+        }
+
+        if let Some((prefix, _)) = message.split_once("/tmp/") {
+            *message = format!("{prefix}<path>");
+        }
     }
 }
 

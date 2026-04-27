@@ -8,14 +8,11 @@ mod capture;
 mod context;
 mod matching;
 
-use std::collections::HashMap;
-use std::ops::Range;
-
-use crate::parser::ParseResult;
-use crate::pattern::Pattern;
-use crate::position::point_to_one_based;
+use std::{collections::HashMap, ops::Range};
 
 pub use capture::{CapturedNode, CapturedNodes, CapturedValue};
+
+use crate::{parser::ParseResult, pattern::Pattern, position::point_to_one_based};
 
 /// Result of a successful pattern match.
 #[derive(Debug)]
@@ -28,49 +25,35 @@ pub struct MatchResult<'a> {
 impl<'a> MatchResult<'a> {
     /// Returns the matched AST node.
     #[must_use]
-    pub const fn node(&self) -> tree_sitter::Node<'a> {
-        self.node
-    }
+    pub const fn node(&self) -> tree_sitter::Node<'a> { self.node }
 
     /// Returns the byte range of the match in the source.
     #[must_use]
-    pub fn byte_range(&self) -> Range<usize> {
-        self.node.byte_range()
-    }
+    pub fn byte_range(&self) -> Range<usize> { self.node.byte_range() }
 
     /// Returns the text of the matched region.
     #[must_use]
-    pub fn text(&self) -> &'a str {
-        self.source.get(self.byte_range()).unwrap_or_default()
-    }
+    pub fn text(&self) -> &'a str { self.source.get(self.byte_range()).unwrap_or_default() }
 
     /// Returns the start position (line, column) of the match.
     ///
     /// Both line and column are one-based for display purposes.
     #[must_use]
-    pub fn start_position(&self) -> (u32, u32) {
-        point_to_one_based(self.node.start_position())
-    }
+    pub fn start_position(&self) -> (u32, u32) { point_to_one_based(self.node.start_position()) }
 
     /// Returns the end position (line, column) of the match.
     ///
     /// Both line and column are one-based for display purposes.
     #[must_use]
-    pub fn end_position(&self) -> (u32, u32) {
-        point_to_one_based(self.node.end_position())
-    }
+    pub fn end_position(&self) -> (u32, u32) { point_to_one_based(self.node.end_position()) }
 
     /// Gets a captured metavariable by name.
     #[must_use]
-    pub fn capture(&self, name: &str) -> Option<&CapturedValue<'a>> {
-        self.captures.get(name)
-    }
+    pub fn capture(&self, name: &str) -> Option<&CapturedValue<'a>> { self.captures.get(name) }
 
     /// Returns all captured metavariables.
     #[must_use]
-    pub const fn captures(&self) -> &HashMap<String, CapturedValue<'a>> {
-        &self.captures
-    }
+    pub const fn captures(&self) -> &HashMap<String, CapturedValue<'a>> { &self.captures }
 }
 
 /// Pattern matcher that finds occurrences in parsed code.
@@ -81,9 +64,7 @@ pub struct Matcher<'p> {
 impl<'p> Matcher<'p> {
     /// Creates a new matcher for the given pattern.
     #[must_use]
-    pub const fn new(pattern: &'p Pattern) -> Self {
-        Self { pattern }
-    }
+    pub const fn new(pattern: &'p Pattern) -> Self { Self { pattern } }
 
     /// Finds all matches of the pattern in the parsed source.
     #[must_use]

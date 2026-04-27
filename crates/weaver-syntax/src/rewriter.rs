@@ -4,13 +4,16 @@
 //! replacing matched code structures with new code, with support for
 //! metavariable substitution in the replacement.
 
-use crate::error::SyntaxError;
-use crate::language::SupportedLanguage;
-use crate::matcher::MatchResult;
-use crate::metavariables::extract_metavar_name;
-use crate::parser::Parser;
-use crate::pattern::Pattern;
 use std::collections::HashSet;
+
+use crate::{
+    error::SyntaxError,
+    language::SupportedLanguage,
+    matcher::MatchResult,
+    metavariables::extract_metavar_name,
+    parser::Parser,
+    pattern::Pattern,
+};
 
 /// A structural rewrite rule.
 ///
@@ -61,15 +64,11 @@ impl RewriteRule {
 
     /// Returns the pattern for this rule.
     #[must_use]
-    pub const fn pattern(&self) -> &Pattern {
-        &self.pattern
-    }
+    pub const fn pattern(&self) -> &Pattern { &self.pattern }
 
     /// Returns the replacement template.
     #[must_use]
-    pub fn replacement(&self) -> &str {
-        &self.replacement
-    }
+    pub fn replacement(&self) -> &str { &self.replacement }
 }
 
 /// Engine for applying structural rewrites.
@@ -80,15 +79,11 @@ pub struct Rewriter {
 impl Rewriter {
     /// Creates a new rewriter for the given language.
     #[must_use]
-    pub const fn new(language: SupportedLanguage) -> Self {
-        Self { language }
-    }
+    pub const fn new(language: SupportedLanguage) -> Self { Self { language } }
 
     /// Returns the language this rewriter is configured for.
     #[must_use]
-    pub const fn language(&self) -> SupportedLanguage {
-        self.language
-    }
+    pub const fn language(&self) -> SupportedLanguage { self.language }
 
     /// Applies a rewrite rule to source code.
     ///
@@ -154,7 +149,7 @@ impl Rewriter {
         // Sort matches by byte offset (descending) to replace from end to start
         // This preserves earlier offsets when replacing
         let mut sorted_matches: Vec<_> = matches.iter().collect();
-        sorted_matches.sort_by(|a, b| b.byte_range().start.cmp(&a.byte_range().start));
+        sorted_matches.sort_by_key(|b| std::cmp::Reverse(b.byte_range().start));
 
         let mut result = source.to_owned();
 
@@ -191,21 +186,15 @@ pub struct RewriteResult {
 impl RewriteResult {
     /// Returns the transformed source code.
     #[must_use]
-    pub fn output(&self) -> &str {
-        &self.output
-    }
+    pub fn output(&self) -> &str { &self.output }
 
     /// Returns the number of replacements made.
     #[must_use]
-    pub const fn num_replacements(&self) -> usize {
-        self.num_replacements
-    }
+    pub const fn num_replacements(&self) -> usize { self.num_replacements }
 
     /// Returns whether any replacements were made.
     #[must_use]
-    pub const fn has_changes(&self) -> bool {
-        self.num_replacements > 0
-    }
+    pub const fn has_changes(&self) -> bool { self.num_replacements > 0 }
 }
 
 /// Counts consecutive dollar signs starting from the current position.
@@ -257,6 +246,22 @@ fn try_substitute_metavar(
     }
 }
 
+/// Processes a metavariable reference and adds it to vars if valid.
+fn process_metavar_ref(
+    chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>,
+    vars: &mut Vec<String>,
+) {
+    let dollars = count_dollars(chars);
+    let name = extract_metavar_name(chars);
+    if name.is_empty() || dollars == 2 {
+        return;
+    }
+
+    if dollars == 1 || dollars == 3 {
+        vars.push(name);
+    }
+}
+
 /// Extracts metavariable references from a replacement template.
 fn extract_replacement_vars(replacement: &str) -> Vec<String> {
     let mut vars = Vec::new();
@@ -264,15 +269,7 @@ fn extract_replacement_vars(replacement: &str) -> Vec<String> {
 
     while let Some((_, ch)) = chars.next() {
         if ch == '$' {
-            let dollars = count_dollars(&mut chars);
-            let name = extract_metavar_name(&mut chars);
-            if name.is_empty() || dollars == 2 {
-                continue;
-            }
-
-            if dollars == 1 || dollars == 3 {
-                vars.push(name);
-            }
+            process_metavar_ref(&mut chars, &mut vars);
         }
     }
 
@@ -300,6 +297,8 @@ fn substitute_metavariables(template: &str, match_result: &MatchResult<'_>) -> S
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for pattern-based source code rewriting.
+
     use super::*;
 
     #[test]

@@ -4,22 +4,20 @@
 //! wrap the resulting streams in a uniform [`Connection`] type so that the rest
 //! of the CLI logic can remain transport agnostic.
 
-use std::io::{self, Read, Write};
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
-use std::thread;
-use std::time::Duration;
-use std::time::Instant;
-
-use weaver_config::SocketEndpoint;
-
-#[cfg(unix)]
-use std::os::unix::net::UnixStream;
-
 #[cfg(unix)]
 use std::os::fd::{FromRawFd, IntoRawFd, OwnedFd};
+#[cfg(unix)]
+use std::os::unix::net::UnixStream;
+use std::{
+    io::{self, Read, Write},
+    net::{SocketAddr, TcpStream, ToSocketAddrs},
+    thread,
+    time::{Duration, Instant},
+};
 
 #[cfg(unix)]
 use socket2::{Domain, SockAddr, Socket, Type};
+use weaver_config::SocketEndpoint;
 
 use super::{AppError, is_daemon_not_running};
 

@@ -1,21 +1,33 @@
 //! Process supervision test world shared across BDD scenarios.
 
-use std::cell::RefCell;
-use std::fs;
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::{
+    cell::RefCell,
+    fs,
+    path::PathBuf,
+    sync::{
+        Arc,
+        Condvar,
+        Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
+    thread,
+    time::{Duration, Instant},
+};
 
 use serde_json::Value;
-
-use crate::process::daemonizer::{DaemonizeError, Daemonizer};
-use crate::process::launch::{LaunchPlan, ProcessControl, ServiceDeps, run_daemon_with};
-use crate::process::shutdown::{ShutdownError, ShutdownSignal};
-use crate::process::{LaunchError, LaunchMode, test_support};
-use crate::tests::support::{FailingConfigLoader, RecordingHealthReporter, TestConfigLoader};
 use weaver_config::RuntimePaths;
+
+use crate::{
+    process::{
+        LaunchError,
+        LaunchMode,
+        daemonizer::{DaemonizeError, Daemonizer},
+        launch::{LaunchPlan, ProcessControl, ServiceDeps, run_daemon_with},
+        shutdown::{ShutdownError, ShutdownSignal},
+        test_support,
+    },
+    tests::support::{FailingConfigLoader, RecordingHealthReporter, TestConfigLoader},
+};
 
 pub const WAIT_TIMEOUT: Duration = Duration::from_secs(2);
 pub const POLL_INTERVAL: Duration = Duration::from_millis(25);
@@ -34,9 +46,7 @@ pub struct ProcessTestWorld {
 }
 
 impl Default for ProcessTestWorld {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 impl ProcessTestWorld {
@@ -52,7 +62,8 @@ impl ProcessTestWorld {
             wait_error: None,
             health_history: RefCell::new(Vec::new()),
         };
-        test_support::clear_health_events(world.health_path().as_path());
+        test_support::clear_health_events(world.health_path().as_path())
+            .expect("clear_health_events should succeed");
         world
     }
 
@@ -144,36 +155,26 @@ impl ProcessTestWorld {
         }
     }
 
-    pub fn trigger_shutdown(&self) {
-        self.shutdown.trigger();
-    }
+    pub fn trigger_shutdown(&self) { self.shutdown.trigger(); }
 
     pub fn reset_observations(&mut self) {
         self.wait_error = None;
         self.health_history.borrow_mut().clear();
         self.shutdown = TestShutdownSignal::new();
-        test_support::clear_health_events(self.health_path().as_path());
+        let _ = test_support::clear_health_events(self.health_path().as_path());
     }
 
     pub fn record_wait_for_status(&mut self, expected: &str) {
         self.wait_error = self.wait_for_status(expected).err();
     }
 
-    pub fn take_wait_error(&mut self) -> Option<String> {
-        self.wait_error.take()
-    }
+    pub fn take_wait_error(&mut self) -> Option<String> { self.wait_error.take() }
 
-    pub fn lock_path(&self) -> PathBuf {
-        self.loader.runtime_dir().join("weaverd.lock")
-    }
+    pub fn lock_path(&self) -> PathBuf { self.loader.runtime_dir().join("weaverd.lock") }
 
-    pub fn pid_path(&self) -> PathBuf {
-        self.loader.runtime_dir().join("weaverd.pid")
-    }
+    pub fn pid_path(&self) -> PathBuf { self.loader.runtime_dir().join("weaverd.pid") }
 
-    pub fn health_path(&self) -> PathBuf {
-        self.loader.runtime_dir().join("weaverd.health")
-    }
+    pub fn health_path(&self) -> PathBuf { self.loader.runtime_dir().join("weaverd.health") }
 
     pub fn read_health(&self) -> Result<Value, String> {
         let content = fs::read_to_string(self.health_path()).map_err(|error| error.to_string())?;
@@ -222,21 +223,13 @@ impl ProcessTestWorld {
                 .any(|status| status == expected)
     }
 
-    pub fn lock_exists(&self) -> bool {
-        self.lock_path().exists()
-    }
+    pub fn lock_exists(&self) -> bool { self.lock_path().exists() }
 
-    pub fn daemonizer_calls(&self) -> usize {
-        self.daemonizer.calls()
-    }
+    pub fn daemonizer_calls(&self) -> usize { self.daemonizer.calls() }
 
-    pub fn last_result(&self) -> Option<&Result<(), LaunchError>> {
-        self.result.as_ref()
-    }
+    pub fn last_result(&self) -> Option<&Result<(), LaunchError>> { self.result.as_ref() }
 
-    pub fn last_error(&self) -> Option<&LaunchError> {
-        self.result.as_ref()?.as_ref().err()
-    }
+    pub fn last_error(&self) -> Option<&LaunchError> { self.result.as_ref()?.as_ref().err() }
 
     pub fn wait_for_status(&self, expected: &str) -> StepResult {
         let deadline = Instant::now() + WAIT_TIMEOUT;
@@ -288,9 +281,7 @@ pub struct TestDaemonizer {
 }
 
 impl TestDaemonizer {
-    pub fn calls(&self) -> usize {
-        self.calls.load(Ordering::SeqCst)
-    }
+    pub fn calls(&self) -> usize { self.calls.load(Ordering::SeqCst) }
 }
 
 impl Daemonizer for TestDaemonizer {

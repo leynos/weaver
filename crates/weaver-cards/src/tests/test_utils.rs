@@ -23,7 +23,5 @@ impl FromStr for QuotedString {
 }
 
 impl QuotedString {
-    pub(crate) fn as_str(&self) -> &str {
-        &self.0
-    }
+    pub(crate) fn as_str(&self) -> &str { &self.0 }
 }

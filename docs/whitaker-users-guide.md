@@ -1,0 +1,457 @@
+# Whitaker User's Guide
+
+Whitaker is a collection of opinionated Dylint lints for Rust. This guide
+explains how to integrate the lints into a project and configure them.
+
+For contributors who want to develop new lints or work on Whitaker itself, see
+the [Developer's Guide](developers-guide.md).
+
+## Quick Setup
+
+### Prerequisites
+
+Install `cargo-dylint` and `dylint-link`:
+
+```sh
+cargo install cargo-dylint dylint-link
+```
+
+### Standalone installation (recommended)
+
+The simplest way to use Whitaker is via the standalone installer, which handles
+setup automatically:
+
+```sh
+cargo install whitaker-installer
+whitaker-installer
+whitaker --all
+```
+
+This:
+
+1. Installs `cargo-dylint` and `dylint-link` if not present
+   The installer first tries Whitaker's repository-hosted dependency archives
+   for supported targets, then falls back to `cargo binstall`, and finally to
+   `cargo install` when needed.
+2. Clones the Whitaker repository to a platform-specific data directory
+3. Builds the lint libraries
+4. Creates `whitaker` and `whitaker-ls` wrapper scripts. `whitaker` invokes
+   `cargo dylint` with the correct `DYLINT_LIBRARY_PATH`, and `whitaker-ls`
+   lists installed Whitaker suite libraries
+5. Ensures the pinned Rust toolchain and components are installed via rustup
+
+After installation, run `whitaker --all` in any Rust project to lint it. Use
+`whitaker-ls` to list the installed Whitaker suite libraries.
+
+**Options:**
+
+- `--skip-deps` — Skip `cargo-dylint`/`dylint-link` installation check
+- `--skip-wrapper` — Skip wrapper script generation (prints
+  `DYLINT_LIBRARY_PATH` instructions instead)
+- `--no-update` — Don't update existing repository clone
+
+### Adding Whitaker to a project
+
+Add the following to the workspace `Cargo.toml`:
+
+```toml
+[workspace.metadata.dylint]
+libraries = [
+  { git = "https://github.com/leynos/whitaker", pattern = "whitaker_suite" }
+]
+```
+
+Then run the lints:
+
+```sh
+cargo dylint --all
+```
+
+### Version pinning
+
+For reproducible builds, pin to a specific release tag or commit:
+
+```toml
+[workspace.metadata.dylint]
+libraries = [
+  { git = "https://github.com/leynos/whitaker", pattern = "whitaker_suite", tag = "v0.1.0" }
+]
+```
+
+Or pin to a specific commit:
+
+```toml
+[workspace.metadata.dylint]
+libraries = [
+  { git = "https://github.com/leynos/whitaker", pattern = "whitaker_suite", rev = "abc123def456" }
+]
+```
+
+### Selecting individual lints
+
+To load specific lints instead of the full suite, specify each lint explicitly:
+
+```toml
+[workspace.metadata.dylint]
+libraries = [
+  { git = "https://github.com/leynos/whitaker", pattern = "crates/module_max_lines" },
+  { git = "https://github.com/leynos/whitaker", pattern = "crates/no_expect_outside_tests" }
+]
+```
+
+### Standard vs Experimental Lints
+
+Whitaker lints are divided into two categories:
+
+- **Standard lints** are stable, well-tested, and included in the default suite.
+  They are recommended for general use and have predictable behaviour.
+- **Experimental lints** are newer or more aggressive checks that may produce
+  false positives or undergo breaking changes between releases. They must be
+  explicitly enabled.
+
+The default `whitaker_suite` pattern includes only standard lints. At present,
+all shipped Whitaker lints are standard and there are no experimental lints in
+the release.
+
+### Enabling experimental lints
+
+#### Via standalone installer
+
+```sh
+whitaker-installer --experimental
+```
+
+This flag is retained for forward compatibility and currently has no effect.
+
+## Lint Configuration
+
+Configure lint behaviour in `dylint.toml` at the workspace root:
+
+```toml
+# Diagnostic language (default: en-GB)
+locale = "cy"
+
+# Module size threshold (default: 400)
+[module_max_lines]
+max_lines = 500
+
+# Conditional branch limit (default: 2)
+[conditional_max_n_branches]
+max_branches = 3
+
+# Custom test attributes
+[no_expect_outside_tests]
+additional_test_attributes = ["my_framework::test", "wasm_bindgen_test"]
+
+# Additional test markers for `test_must_not_have_example`
+[test_must_not_have_example]
+additional_test_attributes = ["actix_rt::test", "my_framework::test"]
+
+# Allow panics in main
+[no_unwrap_or_else_panic]
+allow_in_main = true
+```
+
+## Localized Diagnostics
+
+Whitaker supports multiple languages for diagnostic messages. Set the locale
+via the `DYLINT_LOCALE` environment variable or in `dylint.toml`:
+
+```toml
+locale = "cy"
+```
+
+Available locales:
+
+- `en-GB` (default) - English
+- `cy` - Welsh (Cymraeg)
+- `gd` - Scottish Gaelic (Gàidhlig)
+
+______________________________________________________________________
+
+## Available Lints
+
+### `bumpy_road_function`
+
+#### Purpose <!-- bumpy_road_function -->
+
+Detects functions with multiple distinct clusters of nested conditional
+complexity.
+
+#### Scope and behaviour <!-- bumpy_road_function -->
+
+Flags a function when peak detection finds two or more separated complexity
+regions above the configured threshold. Detection smooths the local complexity
+signal with the configured `window` and only considers peaks spanning at least
+`min_bump_lines`.
+
+#### Configuration <!-- bumpy_road_function -->
+
+```toml
+[bumpy_road_function]
+threshold = 3.0
+window = 3
+min_bump_lines = 2
+```
+
+#### What is allowed <!-- bumpy_road_function -->
+
+- A single complexity peak in a function.
+- Simple predicates that remain below the configured threshold.
+
+#### What is denied <!-- bumpy_road_function -->
+
+- Two or more separated complexity peaks above the configured threshold.
+
+#### How to fix <!-- bumpy_road_function -->
+
+Split complex regions into helper functions and simplify branch-heavy
+predicates.
+
+______________________________________________________________________
+
+### `conditional_max_n_branches`
+
+Limits the complexity of conditional predicates by enforcing a maximum number
+of boolean branches.
+
+**Configuration:**
+
+```toml
+[conditional_max_n_branches]
+max_branches = 2
+```
+
+The default threshold is 2 branches. A predicate like `a && b && c` has three
+branches and would trigger the lint.
+
+**How to fix:** Extract complex conditions into helper functions:
+
+```rust
+// Before: Too many branches
+if condition_a && condition_b && condition_c {
+    // action
+}
+
+// After: Extract to helper function
+fn should_proceed() -> bool {
+    condition_a && condition_b && condition_c
+}
+
+if should_proceed() {
+    // action
+}
+```
+
+______________________________________________________________________
+
+### `function_attrs_follow_docs`
+
+Ensures doc comments appear before all other outer attributes on functions.
+
+**How to fix:** Move doc comments to appear before other attributes:
+
+```rust
+// Wrong
+#[inline]
+/// This function does something.
+fn example() {}
+
+// Correct
+/// This function does something.
+#[inline]
+fn example() {}
+```
+
+______________________________________________________________________
+
+### `module_max_lines`
+
+Warns when modules exceed a configurable line count threshold.
+
+**Configuration:**
+
+```toml
+[module_max_lines]
+max_lines = 400
+```
+
+**How to fix:** Split large modules into smaller, focused submodules.
+
+______________________________________________________________________
+
+### `module_must_have_inner_docs`
+
+Enforces that every module begins with an inner documentation comment (`//!`).
+
+**How to fix:**
+
+```rust
+mod my_module {
+    //! Explain the module's purpose here.
+    pub fn value() {}
+}
+```
+
+______________________________________________________________________
+
+### `no_expect_outside_tests`
+
+#### Purpose
+
+Detect test attributes correctly so `no_expect_outside_tests` can allow
+`.expect()` in recognized test-only code while still flagging production use.
+
+#### Scope and behaviour
+
+Whitaker recognizes `#[test]`, prelude-qualified `#[test]` forms,
+`#[tokio::test]`, `#[async_std::test]`, `#[gpui::test]`, `#[rstest]`,
+`#[rstest::rstest]`, `#[case]`, and `#[rstest::case]` by default. The
+`additional_test_attributes` setting extends that matching list with
+project-specific markers, so the lint treats those annotated functions as tests
+too.
+
+#### Configuration
+
+```toml
+[no_expect_outside_tests]
+additional_test_attributes = ["my_framework::test", "wasm_bindgen_test"]
+```
+
+Set `additional_test_attributes` to an array of attribute paths written as
+strings. Each entry should match the path Whitaker sees on the test function,
+for example `my_framework::test` or `wasm_bindgen_test`.
+
+#### What is allowed
+
+- Default markers such as `#[test]`, `#[::test]`,
+  `#[::std::prelude::v1::test]`, `#[tokio::test]`, `#[async_std::test]`,
+  `#[gpui::test]`, `#[rstest]`, `#[rstest::rstest]`, `#[case]`, and
+  `#[rstest::case]`
+- Project-specific markers listed in `additional_test_attributes`, such as
+  `#[wasm_bindgen_test]`
+
+#### What is denied
+
+Functions using `.expect()` will still be flagged when their test attribute is
+not in Whitaker's default list and is not listed in
+`additional_test_attributes`.
+
+#### How to fix
+
+- Add the missing test marker to `additional_test_attributes` if the function is
+  genuinely part of a supported test framework
+- Change the attribute usage to a recognized form such as `#[test]`,
+  `#[::test]`, `#[::std::prelude::v1::test]`, `#[tokio::test]`,
+  `#[async_std::test]`, `#[gpui::test]`, `#[rstest]`, `#[rstest::rstest]`,
+  `#[case]`, or `#[rstest::case]` where appropriate
+- If the function is not test-only code, replace `.expect()` with explicit error
+  handling such as `?` or `map_err`
+
+______________________________________________________________________
+
+### `test_must_not_have_example`
+
+Warns when test function documentation includes example headings (for example
+`# Examples`) or fenced code blocks.
+
+**Configuration:**
+
+```toml
+[test_must_not_have_example]
+additional_test_attributes = ["actix_rt::test", "my_framework::test"]
+```
+
+Use `additional_test_attributes` for frameworks not covered by default test
+markers such as `#[test]`, `#[tokio::test]`, `#[async_std::test]`,
+`#[gpui::test]`, and `#[rstest]`.
+
+**How to fix:** Keep test docs focused on intent and assertions, and move
+example/tutorial snippets into user-facing documentation.
+
+```rust
+// Before
+#[test]
+/// # Examples
+/// ```rust
+/// assert_eq!(sum(2, 2), 4);
+/// ```
+fn sums_values() { /* ... */ }
+
+// After
+#[test]
+/// Verifies summation handles two positive integers.
+fn sums_values() { /* ... */ }
+```
+
+______________________________________________________________________
+
+### `no_std_fs_operations`
+
+Enforces capability-based filesystem access by forbidding direct use of
+`std::fs` operations.
+
+**Configuration:**
+
+```toml
+[no_std_fs_operations]
+excluded_crates = ["my_cli_entrypoint", "my_test_utilities"]
+```
+
+The `excluded_crates` option allows specified crates to use `std::fs`
+operations without triggering diagnostics. This is useful for:
+
+- CLI entry points where ambient filesystem access is the intended boundary
+- Test support utilities that manage fixtures with ambient access
+- Build scripts or code generators that require direct filesystem operations
+
+> **Note:** Use Rust crate names (underscores), not Cargo package names
+> (hyphens). For example, use `my_cli_app` rather than `my-cli-app`.
+
+**How to fix:** Replace `std::fs` with `cap_std`:
+
+```rust
+// Before
+use std::fs;
+fn read_config() -> std::io::Result<String> {
+    fs::read_to_string("config.toml")
+}
+
+// After
+use cap_std::fs::Dir;
+use camino::Utf8Path;
+fn read_config(config_dir: &Dir, path: &Utf8Path) -> std::io::Result<String> {
+    config_dir.read_to_string(path)
+}
+```
+
+______________________________________________________________________
+
+### `no_unwrap_or_else_panic`
+
+Denies panicking `unwrap_or_else` fallbacks on `Option`/`Result`, including
+tests. Doctest runs remain exempt.
+
+**Configuration:**
+
+```toml
+[no_unwrap_or_else_panic]
+allow_in_main = true
+```
+
+**What is allowed:**
+
+- Panicking `unwrap_or_else` fallbacks inside doctests
+- Panicking `unwrap_or_else` fallbacks inside `main` when
+  `allow_in_main = true`
+- Non-panicking `unwrap_or_else` fallbacks
+
+**What is denied:**
+
+- `unwrap_or_else(|| panic!(..))`
+- `unwrap_or_else(|| value.unwrap())`
+
+**How to fix:** Propagate errors with `?` or use `.expect()` with a clear
+message if a panic is truly intended. In tests, replace
+`unwrap_or_else(|| panic!("msg"))` with `.expect("msg")` for clarity and
+brevity.

@@ -1,4 +1,6 @@
 //! Unit tests for the weaver-graph crate.
+//!
+//! Tests for graph operations including nodes, edges, and traversals.
 
 // Tests use caller/callee terminology which triggers similar_names lint
 #![expect(
@@ -12,9 +14,13 @@
 )]
 
 mod graph_tests {
-    use crate::edge::{CallEdge, EdgeSource};
-    use crate::graph::CallGraph;
-    use crate::node::{CallNode, Position, SymbolKind};
+    //! Tests for graph operations and structure.
+
+    use crate::{
+        edge::{CallEdge, EdgeSource},
+        graph::CallGraph,
+        node::{CallNode, Position, SymbolKind},
+    };
 
     #[test]
     fn empty_graph_has_no_nodes() {
@@ -114,8 +120,11 @@ mod graph_tests {
 }
 
 mod node_tests {
-    use crate::node::{CallNode, NodeId, Position, SymbolKind};
+    //! Tests for node creation and accessor methods.
+
     use camino::Utf8PathBuf;
+
+    use crate::node::{CallNode, NodeId, Position, SymbolKind};
 
     #[test]
     fn node_id_format_is_correct() {
@@ -144,9 +153,14 @@ mod node_tests {
 }
 
 mod edge_tests {
-    use crate::edge::{CallEdge, EdgeSource};
-    use crate::node::{NodeId, Position};
+    //! Tests for edge creation and relationship tracking.
+
     use camino::Utf8PathBuf;
+
+    use crate::{
+        edge::{CallEdge, EdgeSource},
+        node::{NodeId, Position},
+    };
 
     #[test]
     fn edge_accessors_return_correct_values() {

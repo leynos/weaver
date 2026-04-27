@@ -81,17 +81,46 @@ configuration layering, and the complete command reference.
 
 ## Building from source
 
-Weaver requires **Rust 1.88+** (edition 2024). To build:
+Weaver requires the pinned **Nightly Rust toolchain `nightly-2026-03-26`** for
+local builds. The workspace `.cargo/config.toml` uses options that require the
+Nightly toolchain, so stable Rust is not sufficient for local Cargo builds in
+this checkout. To build:
 
 ```sh
-cargo build --release
+cargo +nightly-2026-03-26 build --release
 ```
 
 To run the test suite:
 
 ```sh
-cargo test --workspace
+cargo +nightly-2026-03-26 test --workspace
 ```
+
+### Toolchain prerequisites
+
+The workspace `.cargo/config.toml` enables Nightly-only build settings for the
+Cranelift codegen backend in development builds. Install the pinned toolchain
+and component with:
+
+```sh
+rustup toolchain install nightly-2026-03-26
+rustup component add rustc-codegen-cranelift --toolchain nightly-2026-03-26
+```
+
+Set a local override so Cargo uses that pinned Nightly automatically in this
+checkout:
+
+```sh
+rustup override set nightly-2026-03-26
+```
+
+If any of these prerequisites are missing, the failure mode is often opaque:
+Cargo may report unstable `-Z` option errors or missing
+`rustc-codegen-cranelift`. When that happens, verify the pinned Nightly
+toolchain and the Cranelift component first.
+
+If local builds fail, verify the pinned Nightly override first, then confirm
+the Cranelift component is installed before investigating the workspace itself.
 
 ## Documentation
 

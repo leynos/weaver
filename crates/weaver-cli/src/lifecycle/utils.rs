@@ -3,17 +3,21 @@
 //! Provides high-level helpers for preparing runtime directories, validating
 //! invocations, and auto-starting the daemon.
 
-use std::io::Write;
-use std::time::{Duration, SystemTime};
+use std::{
+    io::Write,
+    time::{Duration, SystemTime},
+};
 
 use cap_std::fs::Dir;
 use weaver_config::RuntimePaths;
 
-use super::LifecycleOutput;
-use super::error::LifecycleError;
-use super::monitoring::{HealthSnapshot, wait_for_ready};
-use super::spawning::spawn_daemon;
-use super::types::{LifecycleContext, LifecycleInvocation};
+use super::{
+    LifecycleOutput,
+    error::LifecycleError,
+    monitoring::{HealthSnapshot, wait_for_ready},
+    spawning::spawn_daemon,
+    types::{LifecycleContext, LifecycleInvocation},
+};
 
 pub(super) const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
 pub(super) const AUTO_START_TIMEOUT: Duration = Duration::from_secs(30);
@@ -94,12 +98,16 @@ pub(super) fn write_startup_banner<W: Write, E: Write>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::tests::support::{temp_paths, write_health_json};
-    use rstest::rstest;
+    //! Unit tests for lifecycle utility functions and health snapshot parsing.
+
     use std::time::UNIX_EPOCH;
+
+    use rstest::rstest;
     use tempfile::TempDir;
     use weaver_config::RuntimePaths;
+
+    use super::*;
+    use crate::tests::support::{temp_paths, write_health_json};
 
     /// Creates a context configured to fail daemon spawn (nonexistent binary).
     fn make_failing_context(config: &weaver_config::Config) -> LifecycleContext<'_> {
@@ -175,7 +183,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("system time")
             .as_secs();
-        write_health_json(&health_path, "ready", 12345, timestamp);
+        write_health_json(&health_path, "ready", 12345, timestamp).expect("write health snapshot");
 
         let context = LifecycleContext {
             config: &config,

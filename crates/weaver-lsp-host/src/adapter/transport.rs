@@ -7,8 +7,10 @@
 //! <payload>
 //! ```
 
-use std::io::{BufRead, BufReader, BufWriter, Read, Write};
-use std::process::{ChildStdin, ChildStdout};
+use std::{
+    io::{BufRead, BufReader, BufWriter, Read, Write},
+    process::{ChildStdin, ChildStdout},
+};
 
 use super::error::TransportError;
 
@@ -92,6 +94,8 @@ impl StdioTransport {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for LSP transport layer and message framing.
+
     use std::io::Cursor;
 
     use rstest::rstest;
@@ -130,9 +134,7 @@ mod tests {
             Ok(content)
         }
 
-        fn written_bytes(&self) -> &[u8] {
-            &self.write_buffer
-        }
+        fn written_bytes(&self) -> &[u8] { &self.write_buffer }
     }
 
     #[rstest]

@@ -61,27 +61,19 @@ impl CallEdge {
 
     /// Returns the caller node ID.
     #[must_use]
-    pub const fn caller(&self) -> &NodeId {
-        &self.caller
-    }
+    pub const fn caller(&self) -> &NodeId { &self.caller }
 
     /// Returns the callee node ID.
     #[must_use]
-    pub const fn callee(&self) -> &NodeId {
-        &self.callee
-    }
+    pub const fn callee(&self) -> &NodeId { &self.callee }
 
     /// Returns how this edge was discovered.
     #[must_use]
-    pub const fn source(&self) -> EdgeSource {
-        self.source
-    }
+    pub const fn source(&self) -> EdgeSource { self.source }
 
     /// Returns the call site position if known.
     #[must_use]
-    pub const fn call_site(&self) -> Option<Position> {
-        self.call_site
-    }
+    pub const fn call_site(&self) -> Option<Position> { self.call_site }
 
     /// Returns the call site line if known.
     #[must_use]

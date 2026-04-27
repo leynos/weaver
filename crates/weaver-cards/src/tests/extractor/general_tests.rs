@@ -4,9 +4,8 @@ use std::path::Path;
 
 use rstest::{fixture, rstest};
 
-use crate::{DetailLevel, GetCardResponse};
-
 use super::common::{ExtractRequest, extract};
+use crate::{DetailLevel, GetCardResponse};
 
 #[fixture]
 fn rust_extract_request() -> ExtractRequest<'static> {

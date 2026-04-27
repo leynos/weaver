@@ -4,8 +4,12 @@ use weaver_plugins::capability::CapabilityId;
 use weaver_syntax::SupportedLanguage;
 
 use super::resolution::{
-    CandidateEvaluation, CapabilityResolutionDetails, CapabilityResolutionEnvelope, RefusalReason,
-    ResolutionOutcome, SelectionMode,
+    CandidateEvaluation,
+    CapabilityResolutionDetails,
+    CapabilityResolutionEnvelope,
+    RefusalReason,
+    ResolutionOutcome,
+    SelectionMode,
 };
 
 /// Groups routing metadata for refusal construction.

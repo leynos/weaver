@@ -5,9 +5,7 @@ use std::path::PathBuf;
 use rstest::rstest;
 
 use super::*;
-use crate::capability::CapabilityId;
-use crate::error::PluginError;
-use crate::manifest::PluginMetadata;
+use crate::{capability::CapabilityId, error::PluginError, manifest::PluginMetadata};
 
 // ---------------------------------------------------------------------------
 // PluginKind
@@ -55,7 +53,10 @@ fn assert_manifest_from_json<F>(json: &str, assertion: F)
 where
     F: FnOnce(&PluginManifest),
 {
-    let m: PluginManifest = serde_json::from_str(json).expect("deserialise");
+    let m: PluginManifest = match serde_json::from_str(json) {
+        Ok(manifest) => manifest,
+        Err(error) => panic!("deserialise: {error}"),
+    };
     assertion(&m);
 }
 

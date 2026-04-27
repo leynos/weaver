@@ -5,23 +5,34 @@
 //! executes a refactoring operation, and writes one JSONL response to stdout.
 
 mod arguments;
+mod workspace_fs;
 
 #[cfg(test)]
 mod tests;
 
-use std::fmt;
-use std::io::{BufRead, Write};
-use std::path::{Component, Path, PathBuf};
-use std::process::Command;
+use std::{
+    fmt,
+    io::{BufRead, Write},
+    path::{Component, Path, PathBuf},
+    process::Command,
+};
 
 use tempfile::TempDir;
 use thiserror::Error;
-use weaver_plugins::capability::ReasonCode;
-use weaver_plugins::protocol::{
-    DiagnosticSeverity, FilePayload, PluginDiagnostic, PluginOutput, PluginRequest, PluginResponse,
+use weaver_plugins::{
+    capability::ReasonCode,
+    protocol::{
+        DiagnosticSeverity,
+        FilePayload,
+        PluginDiagnostic,
+        PluginOutput,
+        PluginRequest,
+        PluginResponse,
+    },
 };
 
 use crate::arguments::parse_rename_symbol_arguments;
+pub(crate) use crate::workspace_fs::write_workspace_file;
 
 const PYTHON_BINARY: &str = "python3";
 const PYTHON_RENAME_SCRIPT: &str = concat!(
@@ -195,9 +206,7 @@ impl PluginFailure {
 }
 
 impl fmt::Display for PluginFailure {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.message)
-    }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(&self.message) }
 }
 
 /// Executes one plugin request from `stdin` and writes one response to `stdout`.
@@ -310,28 +319,6 @@ fn execute_rename<R: RopeAdapter>(
     Ok(PluginResponse::success(PluginOutput::Diff {
         content: patch,
     }))
-}
-
-fn write_workspace_file(
-    workspace_root: &Path,
-    relative_path: &Path,
-    content: &str,
-) -> Result<PathBuf, RopeAdapterError> {
-    let absolute_path = workspace_root.join(relative_path);
-
-    if let Some(parent) = absolute_path.parent() {
-        std::fs::create_dir_all(parent).map_err(|source| RopeAdapterError::WorkspaceWrite {
-            path: parent.to_path_buf(),
-            source,
-        })?;
-    }
-
-    std::fs::write(&absolute_path, content).map_err(|source| RopeAdapterError::WorkspaceWrite {
-        path: absolute_path.clone(),
-        source,
-    })?;
-
-    Ok(absolute_path)
 }
 
 fn validate_relative_path(path: &Path) -> Result<(), RopeAdapterError> {

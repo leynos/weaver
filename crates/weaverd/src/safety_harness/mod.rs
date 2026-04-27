@@ -4,13 +4,11 @@
 //! All proposed changes are validated against a two-phase verification process
 //! before being committed to the filesystem:
 //!
-//! 1. **Syntactic Lock**: Modified files are parsed to ensure they produce valid
-//!    syntax trees. This catches structural errors such as unbalanced braces or
-//!    broken statements.
+//! 1. **Syntactic Lock**: Modified files are parsed to ensure they produce valid syntax trees. This
+//!    catches structural errors such as unbalanced braces or broken statements.
 //!
-//! 2. **Semantic Lock**: Changes are submitted to the configured LSP server,
-//!    which verifies that no new errors or high-severity warnings are introduced
-//!    compared to the pre-edit state.
+//! 2. **Semantic Lock**: Changes are submitted to the configured LSP server, which verifies that no
+//!    new errors or high-severity warnings are introduced compared to the pre-edit state.
 //!
 //! Changes that fail either lock are rejected, leaving the filesystem untouched
 //! and returning a structured error describing the failure.
@@ -37,7 +35,12 @@ pub use error::{SafetyHarnessError, VerificationFailure};
 pub use locks::{SemanticLockResult, SyntacticLockResult};
 pub use transaction::{ContentChange, ContentTransaction, EditTransaction, TransactionOutcome};
 pub use verification::{
-    ConfigurableSemanticLock, ConfigurableSyntacticLock, PlaceholderSemanticLock,
-    PlaceholderSyntacticLock, SemanticLock, SyntacticLock, TreeSitterSyntacticLockAdapter,
+    ConfigurableSemanticLock,
+    ConfigurableSyntacticLock,
+    PlaceholderSemanticLock,
+    PlaceholderSyntacticLock,
+    SemanticLock,
+    SyntacticLock,
+    TreeSitterSyntacticLockAdapter,
     VerificationContext,
 };

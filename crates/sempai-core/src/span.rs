@@ -26,21 +26,15 @@ pub struct LineCol {
 impl LineCol {
     /// Creates a new line/column position.
     #[must_use]
-    pub const fn new(line: u32, column: u32) -> Self {
-        Self { line, column }
-    }
+    pub const fn new(line: u32, column: u32) -> Self { Self { line, column } }
 
     /// Returns the zero-indexed line number.
     #[must_use]
-    pub const fn line(&self) -> u32 {
-        self.line
-    }
+    pub const fn line(&self) -> u32 { self.line }
 
     /// Returns the zero-indexed column number.
     #[must_use]
-    pub const fn column(&self) -> u32 {
-        self.column
-    }
+    pub const fn column(&self) -> u32 { self.column }
 }
 
 /// A byte and line/column span in a UTF-8 source.
@@ -84,25 +78,17 @@ impl Span {
 
     /// Returns the inclusive start byte offset.
     #[must_use]
-    pub const fn start_byte(&self) -> u32 {
-        self.start_byte
-    }
+    pub const fn start_byte(&self) -> u32 { self.start_byte }
 
     /// Returns the exclusive end byte offset.
     #[must_use]
-    pub const fn end_byte(&self) -> u32 {
-        self.end_byte
-    }
+    pub const fn end_byte(&self) -> u32 { self.end_byte }
 
     /// Returns the start line/column position.
     #[must_use]
-    pub const fn start(&self) -> &LineCol {
-        &self.start
-    }
+    pub const fn start(&self) -> &LineCol { &self.start }
 
     /// Returns the end line/column position.
     #[must_use]
-    pub const fn end(&self) -> &LineCol {
-        &self.end
-    }
+    pub const fn end(&self) -> &LineCol { &self.end }
 }

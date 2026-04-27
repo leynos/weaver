@@ -4,12 +4,12 @@
 //! code structure through call graph analysis. It implements a provider-based
 //! architecture that can fuse data from multiple sources:
 //!
-//! - **LSP Provider**: Uses `textDocument/callHierarchy` requests for semantic
-//!   call graph information
-//! - **Static Analysis Provider** (planned): Wraps language-specific tools like
-//!   `PyCG` for deeper analysis
-//! - **Dynamic Analysis Provider** (planned): Ingests profiling data from tools
-//!   like gprof and callgrind
+//! - **LSP Provider**: Uses `textDocument/callHierarchy` requests for semantic call graph
+//!   information
+//! - **Static Analysis Provider** (planned): Wraps language-specific tools like `PyCG` for deeper
+//!   analysis
+//! - **Dynamic Analysis Provider** (planned): Ingests profiling data from tools like gprof and
+//!   callgrind
 //!
 //! # Core Types
 //!

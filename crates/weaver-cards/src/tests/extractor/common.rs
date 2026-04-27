@@ -3,7 +3,11 @@
 use std::path::Path;
 
 use crate::{
-    CardExtractionError, CardExtractionInput, CardSymbolKind, DetailLevel, TreeSitterCardExtractor,
+    CardExtractionError,
+    CardExtractionInput,
+    CardSymbolKind,
+    DetailLevel,
+    TreeSitterCardExtractor,
 };
 
 #[derive(Clone, Copy)]

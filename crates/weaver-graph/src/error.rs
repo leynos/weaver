@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use camino::Utf8PathBuf;
 use thiserror::Error;
-
 use weaver_lsp_host::LspHostError;
 
 /// Errors returned by call graph operations.
@@ -81,13 +80,9 @@ impl GraphError {
 
     /// Creates a new `NodeNotFound` error.
     #[must_use]
-    pub fn node_not_found(node_id: impl Into<String>) -> Self {
-        Self::NodeNotFound(node_id.into())
-    }
+    pub fn node_not_found(node_id: impl Into<String>) -> Self { Self::NodeNotFound(node_id.into()) }
 
     /// Creates a new `Validation` error.
     #[must_use]
-    pub fn validation(message: impl Into<String>) -> Self {
-        Self::Validation(message.into())
-    }
+    pub fn validation(message: impl Into<String>) -> Self { Self::Validation(message.into()) }
 }

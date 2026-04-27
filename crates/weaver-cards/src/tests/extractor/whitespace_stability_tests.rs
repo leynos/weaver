@@ -2,22 +2,33 @@
 
 use std::path::Path;
 
-use crate::DetailLevel;
-
 use super::common::{ExtractRequest, extract};
+use crate::DetailLevel;
 
 #[test]
 fn rust_comment_bundling_is_stable_under_whitespace_edits() {
     let baseline = extract(ExtractRequest {
         path: Path::new("fixture.rs"),
-        source: "/// Greets callers.\n/// Returns a count.\nfn greet(name: &str) -> usize {\n    name.len()\n}\n",
+        source: concat!(
+            "/// Greets callers.\n",
+            "/// Returns a count.\n",
+            "fn greet(name: &str) -> usize {\n",
+            "    name.len()\n",
+            "}\n",
+        ),
         line: 3,
         column: 4,
         detail: DetailLevel::Structure,
     });
     let edited = extract(ExtractRequest {
         path: Path::new("fixture.rs"),
-        source: "/// Greets callers.   \n/// Returns a count.\nfn greet(name: &str) -> usize {\n    name.len()\n}\n",
+        source: concat!(
+            "/// Greets callers.   \n",
+            "/// Returns a count.\n",
+            "fn greet(name: &str) -> usize {\n",
+            "    name.len()\n",
+            "}\n",
+        ),
         line: 3,
         column: 4,
         detail: DetailLevel::Structure,

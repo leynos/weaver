@@ -2,10 +2,8 @@
 
 use rstest::rstest;
 
-use crate::dispatch::request::CommandRequest;
-use crate::dispatch::response::ResponseWriter;
-
 use super::handle;
+use crate::dispatch::{request::CommandRequest, response::ResponseWriter};
 
 fn make_request(arguments: &[&str]) -> CommandRequest {
     let args_json: Vec<String> = arguments
@@ -20,15 +18,24 @@ fn make_request(arguments: &[&str]) -> CommandRequest {
         ),
         args_json.join(",")
     );
-    CommandRequest::parse(json.as_bytes()).expect("request")
+    match CommandRequest::parse(json.as_bytes()) {
+        Ok(request) => request,
+        Err(error) => panic!("request: {error}"),
+    }
 }
 
 fn dispatch_graph_slice(arguments: &[&str]) -> (i32, String) {
     let request = make_request(arguments);
     let mut buffer = Vec::new();
     let mut writer = ResponseWriter::new(&mut buffer);
-    let result = handle(&request, &mut writer).expect("dispatch succeeds");
-    let output = String::from_utf8(buffer).expect("valid UTF-8");
+    let result = match handle(&request, &mut writer) {
+        Ok(result) => result,
+        Err(error) => panic!("dispatch succeeds: {error}"),
+    };
+    let output = match String::from_utf8(buffer) {
+        Ok(output) => output,
+        Err(error) => panic!("valid UTF-8: {error}"),
+    };
     (result.status, output)
 }
 

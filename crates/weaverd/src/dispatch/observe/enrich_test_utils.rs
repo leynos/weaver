@@ -2,19 +2,25 @@
 
 use tempfile::TempDir;
 use weaver_cards::{
-    CardLanguage, LspInfo, Provenance, SourcePosition, SourceRange, SymbolCard, SymbolIdentity,
+    CardLanguage,
+    LspInfo,
+    Provenance,
+    SourcePosition,
+    SourceRange,
+    SymbolCard,
+    SymbolIdentity,
     SymbolRef,
 };
 use weaver_lsp_host::{Language, ServerCapabilitySet};
 
-use crate::backends::FusionBackends;
-use crate::dispatch::observe::enrich::{
-    EnrichmentOutcome, parse_hover_response, try_lsp_enrichment,
+use crate::{
+    backends::FusionBackends,
+    dispatch::observe::{
+        enrich::{EnrichmentOutcome, parse_hover_response, try_lsp_enrichment},
+        test_support::{StubLanguageServer, markdown_hover, semantic_backends_with_server},
+    },
+    semantic_provider::SemanticBackendProvider,
 };
-use crate::dispatch::observe::test_support::{
-    StubLanguageServer, markdown_hover, semantic_backends_with_server,
-};
-use crate::semantic_provider::SemanticBackendProvider;
 
 /// Expected values for LSP info assertions.
 pub(crate) struct ExpectedLspInfo<'a> {
@@ -38,14 +44,20 @@ pub(crate) fn assert_lsp_info(info: &LspInfo, expected: &ExpectedLspInfo<'_>) {
 }
 
 /// Checks that byte-to-UTF-16 conversion produces expected result.
-pub(crate) fn check_utf16_offset(line: &str, byte_col: usize, expected: Option<u32>) {
+pub(crate) fn check_utf16_offset(
+    line: &str,
+    byte_col: usize,
+    expected: Option<u32>,
+) -> Result<(), String> {
     use crate::dispatch::observe::enrich::byte_col_to_utf16;
-    let byte_col_u32 = u32::try_from(byte_col).expect("byte_col must fit in u32");
+    let byte_col_u32 =
+        u32::try_from(byte_col).map_err(|error| format!("byte_col must fit in u32: {error}"))?;
     assert_eq!(
         byte_col_to_utf16(line, byte_col_u32),
         expected,
         "byte_col_to_utf16({line:?}, {byte_col}) expected {expected:?}"
     );
+    Ok(())
 }
 
 /// Asserts that hover text is correctly parsed for deprecation status.
@@ -62,24 +74,27 @@ pub(crate) fn assert_deprecation(text: &str, expected: bool) {
 pub(crate) fn run_enrichment_with_server(
     server: StubLanguageServer,
     source: &str,
-) -> (
-    EnrichmentOutcome,
-    FusionBackends<SemanticBackendProvider>,
-    SymbolCard,
-    TempDir,
-) {
-    let (mut backends, dir) = semantic_backends_with_server(Language::Rust, server);
+) -> Result<
+    (
+        EnrichmentOutcome,
+        FusionBackends<SemanticBackendProvider>,
+        SymbolCard,
+        TempDir,
+    ),
+    String,
+> {
+    let (mut backends, dir) = semantic_backends_with_server(Language::Rust, server)?;
     let mut card = rust_card();
     let outcome = try_lsp_enrichment(&mut card, source, &mut backends);
-    (outcome, backends, card, dir)
+    Ok((outcome, backends, card, dir))
 }
 
 /// Asserts that enrichment degrades with the given server configuration.
 pub(crate) fn assert_enrichment_degrades(
     server: StubLanguageServer,
-) -> (FusionBackends<SemanticBackendProvider>, TempDir) {
+) -> Result<(FusionBackends<SemanticBackendProvider>, TempDir), String> {
     let source = "// comment\nfn greet(name: &str) -> usize { 0 }";
-    let (outcome, backends, card, dir) = run_enrichment_with_server(server, source);
+    let (outcome, backends, card, dir) = run_enrichment_with_server(server, source)?;
     assert_eq!(outcome, EnrichmentOutcome::Degraded);
     assert!(card.lsp.is_none());
     // Verify that degradation leaves provenance unchanged
@@ -88,7 +103,7 @@ pub(crate) fn assert_enrichment_degrades(
         vec![String::from("tree_sitter")],
         "degradation should not modify provenance"
     );
-    (backends, dir)
+    Ok((backends, dir))
 }
 
 /// Creates a sample Rust symbol card for testing.
@@ -140,11 +155,11 @@ pub(crate) fn test_symbol_card_with_pos(start: SourcePosition, end: SourcePositi
 /// Runs non-ASCII enrichment test with the given capabilities.
 /// Returns the character offset sent to the LSP server.
 /// Asserts that enrichment succeeds.
-pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> u32 {
+pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> Result<u32, String> {
     let source = "// café fn foo() {}";
     let hover = markdown_hover("```rust\nfn foo()\n```");
     let (server, hover_params_ref) = StubLanguageServer::with_hover(capabilities, hover);
-    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server);
+    let (mut backends, _dir) = semantic_backends_with_server(Language::Rust, server)?;
 
     let mut card = test_symbol_card_with_pos(
         SourcePosition {
@@ -166,11 +181,11 @@ pub(crate) fn run_non_ascii_enrichment(capabilities: ServerCapabilitySet) -> u32
 
     let hover_params = hover_params_ref
         .lock()
-        .expect("failed to lock hover_params_ref");
+        .map_err(|error| format!("failed to lock hover_params_ref: {error}"))?;
     let params = hover_params
         .as_ref()
-        .expect("hover should have been called");
+        .ok_or("hover should have been called")?;
     assert_eq!(params.text_document_position_params.position.line, 0);
 
-    params.text_document_position_params.position.character
+    Ok(params.text_document_position_params.position.character)
 }

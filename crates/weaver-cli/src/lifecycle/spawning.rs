@@ -3,9 +3,11 @@
 //! Provides helpers for resolving the daemon binary path and spawning the
 //! daemon process with appropriate configuration arguments.
 
-use std::env;
-use std::ffi::{OsStr, OsString};
-use std::process::{Child, Command, Stdio};
+use std::{
+    env,
+    ffi::{OsStr, OsString},
+    process::{Child, Command, Stdio},
+};
 
 use super::error::LifecycleError;
 
@@ -41,6 +43,8 @@ fn resolve_daemon_binary(binary_override: Option<&OsStr>) -> OsString {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for daemon spawning and binary resolution.
+
     use super::*;
 
     #[test]

@@ -3,16 +3,29 @@
 use std::collections::HashMap;
 
 use lsp_types::{
-    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
-    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, ReferenceParams, Uri,
+    CallHierarchyIncomingCall,
+    CallHierarchyIncomingCallsParams,
+    CallHierarchyItem,
+    CallHierarchyOutgoingCall,
+    CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams,
+    DidChangeTextDocumentParams,
+    DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams,
+    GotoDefinitionParams,
+    GotoDefinitionResponse,
+    Hover,
+    HoverParams,
+    ReferenceParams,
+    Uri,
 };
 
-use crate::capability::{CapabilityKind, CapabilitySummary, resolve_capabilities};
-use crate::errors::{HostOperation, LspHostError};
-use crate::language::Language;
-use crate::server::{LanguageServer, LanguageServerError};
+use crate::{
+    capability::{CapabilityKind, CapabilitySummary, resolve_capabilities},
+    errors::{HostOperation, LspHostError},
+    language::Language,
+    server::{LanguageServer, LanguageServerError},
+};
 
 struct Session {
     server: Box<dyn LanguageServer>,

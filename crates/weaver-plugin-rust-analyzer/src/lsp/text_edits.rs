@@ -3,11 +3,17 @@
 use std::path::Path;
 
 use lsp_types::{
-    AnnotatedTextEdit, DocumentChangeOperation, DocumentChanges, OneOf, Position, TextEdit, Uri,
+    AnnotatedTextEdit,
+    DocumentChangeOperation,
+    DocumentChanges,
+    OneOf,
+    Position,
+    TextEdit,
+    Uri,
     WorkspaceEdit,
 };
 
-use crate::{ByteOffset, RustAnalyzerAdapterError};
+use crate::{ByteOffset, RustAnalyzerAdapterError, write_workspace_file};
 
 /// LSP position encoding used for character offsets.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -38,13 +44,12 @@ pub(super) fn ensure_response_is_object(
     response: &serde_json::Value,
     method: &str,
 ) -> Result<(), RustAnalyzerAdapterError> {
-    if response.is_object() {
-        return Ok(());
-    }
-
-    Err(RustAnalyzerAdapterError::InvalidOutput {
-        message: format!("{method} response payload was not a JSON object"),
-    })
+    response
+        .is_object()
+        .then_some(())
+        .ok_or_else(|| RustAnalyzerAdapterError::InvalidOutput {
+            message: format!("{method} response payload was not a JSON object"),
+        })
 }
 
 /// Converts a byte offset into an LSP UTF-16 position.
@@ -119,7 +124,7 @@ pub(super) fn apply_workspace_edit(
         })
         .collect::<Result<Vec<(usize, usize, String)>, RustAnalyzerAdapterError>>()?;
 
-    ranges.sort_by(|left, right| right.0.cmp(&left.0));
+    ranges.sort_by_key(|range| std::cmp::Reverse(range.0));
 
     let mut updated = String::from(original);
     for (start, end, replacement) in ranges {
@@ -203,7 +208,11 @@ fn collect_operation(
         DocumentChangeOperation::Op(resource_operation) => {
             Err(RustAnalyzerAdapterError::InvalidOutput {
                 message: format!(
-                    "workspace edit includes unsupported resource operation: {resource_operation:?}"
+                    concat!(
+                        "workspace edit includes unsupported resource operation: ",
+                        "{:?}"
+                    ),
+                    resource_operation
                 ),
             })
         }
@@ -242,59 +251,70 @@ fn lsp_position_to_byte_offset(
 
     match encoding {
         PositionEncoding::Utf8 => {
-            let character_offset = usize::try_from(position.character).map_err(|source| {
-                RustAnalyzerAdapterError::InvalidOutput {
-                    message: format!("UTF-8 character offset conversion failed: {source}"),
-                }
-            })?;
-            let byte_offset = line_start + character_offset;
-            if byte_offset > line_end {
-                return Err(RustAnalyzerAdapterError::InvalidOutput {
-                    message: format!(
-                        "position {position:?} exceeds line UTF-8 width {}",
-                        line_content.len()
-                    ),
-                });
-            }
-            if !content.is_char_boundary(byte_offset) {
-                return Err(RustAnalyzerAdapterError::InvalidOutput {
-                    message: format!("position {position:?} splits a UTF-8 code point"),
-                });
-            }
-            Ok(byte_offset)
+            utf8_position_to_byte_offset(content, position, line_start, line_end)
         }
         PositionEncoding::Utf16 => {
-            let mut utf16_units = 0_u32;
-            for (index, character) in line_content.char_indices() {
-                if utf16_units == position.character {
-                    return Ok(line_start + index);
-                }
-
-                let char_width = u32::try_from(character.len_utf16()).map_err(|source| {
-                    RustAnalyzerAdapterError::InvalidOutput {
-                        message: format!("character width conversion failed: {source}"),
-                    }
-                })?;
-                utf16_units += char_width;
-
-                if utf16_units > position.character {
-                    return Err(RustAnalyzerAdapterError::InvalidOutput {
-                        message: format!(
-                            "position {position:?} splits a UTF-16 code unit sequence"
-                        ),
-                    });
-                }
-            }
-
-            if utf16_units == position.character {
-                return Ok(line_end);
-            }
-
-            Err(RustAnalyzerAdapterError::InvalidOutput {
-                message: format!("position {position:?} exceeds line UTF-16 width {utf16_units}"),
-            })
+            utf16_position_to_byte_offset(line_content, position, line_start, line_end)
         }
     }
+}
+
+fn utf8_position_to_byte_offset(
+    content: &str,
+    position: Position,
+    line_start: usize,
+    line_end: usize,
+) -> Result<usize, RustAnalyzerAdapterError> {
+    let character_offset = usize::try_from(position.character).map_err(|source| {
+        RustAnalyzerAdapterError::InvalidOutput {
+            message: format!("UTF-8 character offset conversion failed: {source}"),
+        }
+    })?;
+    let byte_offset = line_start + character_offset;
+    if byte_offset > line_end {
+        return Err(RustAnalyzerAdapterError::InvalidOutput {
+            message: format!(
+                "position {position:?} exceeds line UTF-8 width {}",
+                line_end - line_start
+            ),
+        });
+    }
+    if !content.is_char_boundary(byte_offset) {
+        return Err(RustAnalyzerAdapterError::InvalidOutput {
+            message: format!("position {position:?} splits a UTF-8 code point"),
+        });
+    }
+    Ok(byte_offset)
+}
+
+fn utf16_position_to_byte_offset(
+    line_content: &str,
+    position: Position,
+    line_start: usize,
+    line_end: usize,
+) -> Result<usize, RustAnalyzerAdapterError> {
+    let mut utf16_units = 0_u32;
+    for (index, character) in line_content.char_indices() {
+        if utf16_units == position.character {
+            return Ok(line_start + index);
+        }
+        utf16_units += u32::try_from(character.len_utf16()).map_err(|source| {
+            RustAnalyzerAdapterError::InvalidOutput {
+                message: format!("character width conversion failed: {source}"),
+            }
+        })?;
+        if utf16_units > position.character {
+            return Err(RustAnalyzerAdapterError::InvalidOutput {
+                message: format!("position {position:?} splits a UTF-16 code unit sequence"),
+            });
+        }
+    }
+    if utf16_units == position.character {
+        return Ok(line_end);
+    }
+    Err(RustAnalyzerAdapterError::InvalidOutput {
+        message: format!("position {position:?} exceeds line UTF-16 width {utf16_units}"),
+    })
 }
 
 fn find_line_start_offset(
@@ -304,7 +324,6 @@ fn find_line_start_offset(
     if target_line == 0 {
         return Ok(0);
     }
-
     let mut current_line = 0_u32;
     for (index, character) in content.char_indices() {
         if character == '\n' {
@@ -314,7 +333,6 @@ fn find_line_start_offset(
             }
         }
     }
-
     Err(RustAnalyzerAdapterError::InvalidOutput {
         message: format!("line {target_line} is beyond the end of the document"),
     })
@@ -322,7 +340,6 @@ fn find_line_start_offset(
 
 /// Writes a minimal `Cargo.toml` so rust-analyzer can open the workspace.
 pub(super) fn write_stub_cargo_toml(workspace_root: &Path) -> Result<(), RustAnalyzerAdapterError> {
-    let cargo_toml = workspace_root.join("Cargo.toml");
     let content = concat!(
         "[package]\n",
         "name = \"weaver-rust-analyzer-workspace\"\n",
@@ -330,12 +347,7 @@ pub(super) fn write_stub_cargo_toml(workspace_root: &Path) -> Result<(), RustAna
         "edition = \"2024\"\n",
     );
 
-    std::fs::write(&cargo_toml, content).map_err(|source| {
-        RustAnalyzerAdapterError::WorkspaceWrite {
-            path: cargo_toml,
-            source,
-        }
-    })
+    write_workspace_file(workspace_root, Path::new("Cargo.toml"), content).map(|_| ())
 }
 
 /// Converts an absolute path to an `lsp_types::Uri` using `file://` encoding.
@@ -344,7 +356,6 @@ pub(super) fn path_to_file_uri(path: &Path) -> Result<Uri, RustAnalyzerAdapterEr
         url::Url::from_file_path(path).map_err(|()| RustAnalyzerAdapterError::InvalidPath {
             message: format!("failed to convert '{}' to file:// URI", path.display()),
         })?;
-
     file_url
         .as_str()
         .parse()

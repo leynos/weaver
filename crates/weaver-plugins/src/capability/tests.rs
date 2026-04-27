@@ -4,14 +4,20 @@ use std::collections::HashMap;
 
 use rstest::{fixture, rstest};
 
-use crate::capability::reason_code::ReasonCode;
-use crate::capability::rename_symbol::{
-    RENAME_SYMBOL_CONTRACT_VERSION, RenameSymbolContract, RenameSymbolRequest,
-};
-use crate::capability::{CapabilityContract, CapabilityId, ContractVersion};
-use crate::error::PluginError;
-use crate::protocol::{
-    DiagnosticSeverity, PluginDiagnostic, PluginOutput, PluginRequest, PluginResponse,
+use crate::{
+    capability::{
+        CapabilityContract,
+        CapabilityId,
+        ContractVersion,
+        reason_code::ReasonCode,
+        rename_symbol::{
+            RENAME_SYMBOL_CONTRACT_VERSION,
+            RenameSymbolContract,
+            RenameSymbolRequest,
+        },
+    },
+    error::PluginError,
+    protocol::{DiagnosticSeverity, PluginDiagnostic, PluginOutput, PluginRequest, PluginResponse},
 };
 
 // ---------------------------------------------------------------------------
@@ -197,10 +203,11 @@ fn rename_symbol_request_accessors() {
 // RenameSymbolContract
 // ---------------------------------------------------------------------------
 
+use weaver_test_macros::allow_fixture_expansion_lints;
+
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn contract() -> RenameSymbolContract {
-    RenameSymbolContract
-}
+fn contract() -> RenameSymbolContract { RenameSymbolContract }
 
 #[fixture]
 fn valid_rename_request() -> PluginRequest {

@@ -9,13 +9,12 @@ mod params;
 #[path = "structure.rs"]
 mod structure;
 
-use tree_sitter::Node;
-
-use crate::{CardSymbolKind, SourcePosition, SourceRange};
-
-use super::super::EntityCandidate;
 use params::parse_parameters;
 use structure::collect_structure;
+use tree_sitter::Node;
+
+use super::super::EntityCandidate;
+use crate::{CardSymbolKind, SourcePosition, SourceRange};
 
 /// Internal metadata collected alongside callable entities.
 #[derive(Debug, Clone)]
@@ -36,8 +35,7 @@ impl CallableMetadata {
     ///
     /// Parameters:
     /// - `container`: optional container name such as a class or impl target.
-    /// - `decorators`: raw decorator or annotation texts collected from the
-    ///   syntax tree.
+    /// - `decorators`: raw decorator or annotation texts collected from the syntax tree.
     /// - `docstring`: extracted language-native docstring content, if present.
     pub(super) const fn new(
         container: Option<String>,
@@ -193,9 +191,7 @@ pub(super) fn python_docstring(node: Node<'_>, source: &str) -> Option<String> {
 }
 
 /// Placeholder Rust docstring extractor until native docstring support lands.
-pub(super) const fn extract_rust_docstring(_node: Node<'_>) -> Option<String> {
-    None
-}
+pub(super) const fn extract_rust_docstring(_node: Node<'_>) -> Option<String> { None }
 
 /// Normalises whitespace while preserving string and template literal content.
 pub(super) fn normalise_whitespace(raw: &str) -> String {
@@ -220,9 +216,7 @@ pub(super) fn to_range(node: Node<'_>) -> SourceRange {
 
 /// Converts a `usize` to `u32`, saturating at [`u32::MAX`] for files larger
 /// than 4 GiB, an edge case that is unreachable in normal operation.
-fn to_u32(value: usize) -> u32 {
-    u32::try_from(value).unwrap_or(u32::MAX)
-}
+fn to_u32(value: usize) -> u32 { u32::try_from(value).unwrap_or(u32::MAX) }
 
 /// Returns `opening_index` when the prefix before the first quote character
 /// is either absent or a valid string-literal prefix (e.g. `r`, `b`, `rb`).

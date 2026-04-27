@@ -3,16 +3,30 @@
 //! This module provides a simple LSP client that can spawn a language server
 //! process and communicate with it via JSON-RPC over stdin/stdout.
 
-use std::io::{BufRead, BufReader, BufWriter, Read, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::{
+    io::{BufRead, BufReader, BufWriter, Read, Write},
+    process::{Child, ChildStdin, ChildStdout, Command, Stdio},
+    sync::atomic::{AtomicI64, Ordering},
+};
 
 use lsp_types::{
-    CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
-    CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    ClientCapabilities, DidOpenTextDocumentParams, GotoDefinitionParams, GotoDefinitionResponse,
-    InitializeParams, InitializeResult, TextDocumentIdentifier, TextDocumentItem,
-    TextDocumentPositionParams, Uri, WorkspaceFolder,
+    CallHierarchyIncomingCall,
+    CallHierarchyIncomingCallsParams,
+    CallHierarchyItem,
+    CallHierarchyOutgoingCall,
+    CallHierarchyOutgoingCallsParams,
+    CallHierarchyPrepareParams,
+    ClientCapabilities,
+    DidOpenTextDocumentParams,
+    GotoDefinitionParams,
+    GotoDefinitionResponse,
+    InitializeParams,
+    InitializeResult,
+    TextDocumentIdentifier,
+    TextDocumentItem,
+    TextDocumentPositionParams,
+    Uri,
+    WorkspaceFolder,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};

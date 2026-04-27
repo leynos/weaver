@@ -44,9 +44,7 @@ pub(crate) enum ApplyPatchError {
 }
 
 impl ApplyPatchError {
-    pub(crate) const fn exit_status(&self) -> i32 {
-        1
-    }
+    pub(crate) const fn exit_status(&self) -> i32 { 1 }
 
     pub(crate) fn to_json(&self) -> Result<String, serde_json::Error> {
         let details = ApplyPatchErrorDetails {

@@ -10,27 +10,41 @@ mod payloads;
 mod semantic_lock;
 mod types;
 
-use std::io::Write;
-use std::path::{Path, PathBuf};
-
-use crate::backends::{BackendKind, FusionBackends};
-use crate::dispatch::errors::DispatchError;
-use crate::dispatch::request::CommandRequest;
-use crate::dispatch::response::ResponseWriter;
-use crate::dispatch::router::{DISPATCH_TARGET, DispatchResult};
-use crate::safety_harness::{
-    ContentChange, ContentTransaction, SafetyHarnessError, SemanticLock, SyntacticLock,
-    TransactionOutcome, TreeSitterSyntacticLockAdapter, VerificationFailure,
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
 };
-use crate::semantic_provider::SemanticBackendProvider;
+
 use tracing::debug;
 
 pub(crate) use self::errors::ApplyPatchError;
-use self::matcher::apply_search_replace;
-use self::parser::parse_patch;
-use self::payloads::{ApplyPatchSummary, GenericErrorEnvelope, VerificationErrorEnvelope};
-use self::semantic_lock::LspSemanticLockAdapter;
-use self::types::{FileContent, FilePath, PatchOperation, PatchText, SearchReplaceBlock};
+use self::{
+    matcher::apply_search_replace,
+    parser::parse_patch,
+    payloads::{ApplyPatchSummary, GenericErrorEnvelope, VerificationErrorEnvelope},
+    semantic_lock::LspSemanticLockAdapter,
+    types::{FileContent, FilePath, PatchOperation, PatchText, SearchReplaceBlock},
+};
+use crate::{
+    backends::{BackendKind, FusionBackends},
+    dispatch::{
+        errors::DispatchError,
+        request::CommandRequest,
+        response::ResponseWriter,
+        router::{DISPATCH_TARGET, DispatchResult},
+    },
+    safety_harness::{
+        ContentChange,
+        ContentTransaction,
+        SafetyHarnessError,
+        SemanticLock,
+        SyntacticLock,
+        TransactionOutcome,
+        TreeSitterSyntacticLockAdapter,
+        VerificationFailure,
+    },
+    semantic_provider::SemanticBackendProvider,
+};
 
 /// Handles `act apply-patch` requests.
 pub fn handle<W: Write>(
@@ -121,7 +135,9 @@ impl<'a> ApplyPatchExecutor<'a> {
                     .count();
                 debug_assert!(
                     files_modified >= files_deleted,
-                    "files_modified ({files_modified}) smaller than files_deleted ({files_deleted})",
+                    concat!("files_modified ({}) smaller than files_deleted ", "({})"),
+                    files_modified,
+                    files_deleted,
                 );
                 Ok(ApplyPatchSummary {
                     status: "ok",

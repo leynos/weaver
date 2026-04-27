@@ -7,8 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::DetailLevel;
-use crate::error::GetCardError;
+use crate::{DetailLevel, error::GetCardError};
 
 /// Parsed request for the `observe get-card` operation.
 ///
@@ -18,8 +17,10 @@ use crate::error::GetCardError;
 /// use weaver_cards::{DetailLevel, GetCardRequest};
 ///
 /// let args = vec![
-///     String::from("--uri"), String::from("file:///src/main.rs"),
-///     String::from("--position"), String::from("10:5"),
+///     String::from("--uri"),
+///     String::from("file:///src/main.rs"),
+///     String::from("--position"),
+///     String::from("10:5"),
 /// ];
 /// let request = GetCardRequest::parse(&args).expect("valid request");
 /// assert_eq!(request.detail, DetailLevel::Structure);
@@ -37,6 +38,97 @@ pub struct GetCardRequest {
     pub detail: DetailLevel,
 }
 
+/// Intermediate state while parsing CLI arguments.
+#[derive(Default)]
+struct ParseState {
+    uri: Option<String>,
+    position: Option<(u32, u32)>,
+    detail: DetailLevel,
+}
+
+impl ParseState {
+    /// Applies a single argument to the parse state.
+    fn apply_arg(
+        &mut self,
+        arg: &str,
+        iter: &mut std::iter::Peekable<std::slice::Iter<'_, String>>,
+    ) -> Result<(), GetCardError> {
+        match arg {
+            "--uri" => self.parse_uri(iter),
+            "--position" => self.parse_position(iter),
+            "--detail" => self.parse_detail(iter),
+            "--format" => Self::parse_format(iter),
+            other if other.starts_with("--") => {
+                skip_unknown_flag_value(iter);
+                Ok(())
+            }
+            other => Err(GetCardError::UnknownArgument {
+                argument: String::from(other),
+            }),
+        }
+    }
+
+    /// Parses the `--uri` argument.
+    fn parse_uri(
+        &mut self,
+        iter: &mut std::iter::Peekable<std::slice::Iter<'_, String>>,
+    ) -> Result<(), GetCardError> {
+        let value = require_arg_value(iter, "--uri")?;
+        self.uri = Some(String::from(value));
+        Ok(())
+    }
+
+    /// Parses the `--position` argument.
+    fn parse_position(
+        &mut self,
+        iter: &mut std::iter::Peekable<std::slice::Iter<'_, String>>,
+    ) -> Result<(), GetCardError> {
+        let value = require_arg_value(iter, "--position")?;
+        self.position = Some(parse_position(value)?);
+        Ok(())
+    }
+
+    /// Parses the `--detail` argument.
+    fn parse_detail(
+        &mut self,
+        iter: &mut std::iter::Peekable<std::slice::Iter<'_, String>>,
+    ) -> Result<(), GetCardError> {
+        let value = require_arg_value(iter, "--detail")?;
+        self.detail = parse_detail(value)?;
+        Ok(())
+    }
+
+    /// Parses the `--format` argument.
+    fn parse_format(
+        iter: &mut std::iter::Peekable<std::slice::Iter<'_, String>>,
+    ) -> Result<(), GetCardError> {
+        let value = require_arg_value(iter, "--format")?;
+        validate_format(value)
+    }
+}
+
+impl TryFrom<ParseState> for GetCardRequest {
+    type Error = GetCardError;
+
+    fn try_from(state: ParseState) -> Result<Self, Self::Error> {
+        let uri = state.uri.ok_or_else(|| GetCardError::MissingArgument {
+            flag: String::from("--uri"),
+        })?;
+        let (line, column) = state
+            .position
+            .ok_or_else(|| GetCardError::MissingArgument {
+                flag: String::from("--position"),
+            })?;
+
+        Ok(Self {
+            uri,
+            line,
+            column,
+            detail: state.detail,
+        })
+    }
+}
+
 impl GetCardRequest {
     /// Parses a `get-card` request from a CLI argument list.
     ///
@@ -50,55 +142,14 @@ impl GetCardRequest {
     /// malformed, or a non-flag positional token is encountered. Unknown
     /// `--` prefixed flags are silently skipped for forward compatibility.
     pub fn parse(arguments: &[String]) -> Result<Self, GetCardError> {
-        let mut uri: Option<String> = None;
-        let mut position: Option<(u32, u32)> = None;
-        let mut detail = DetailLevel::default();
-
+        let mut state = ParseState::default();
         let mut iter = arguments.iter().peekable();
+
         while let Some(arg) = iter.next() {
-            match arg.as_str() {
-                "--uri" => {
-                    let value = require_arg_value(&mut iter, "--uri")?;
-                    uri = Some(String::from(value));
-                }
-                "--position" => {
-                    let value = require_arg_value(&mut iter, "--position")?;
-                    position = Some(parse_position(value)?);
-                }
-                "--detail" => {
-                    let value = require_arg_value(&mut iter, "--detail")?;
-                    detail = parse_detail(value)?;
-                }
-                "--format" => {
-                    let value = require_arg_value(&mut iter, "--format")?;
-                    validate_format(value)?;
-                }
-                other if other.starts_with("--") => {
-                    // Skip unrecognised flags and consume their value
-                    // argument (if present) for forward compatibility.
-                    skip_unknown_flag_value(&mut iter);
-                }
-                other => {
-                    return Err(GetCardError::UnknownArgument {
-                        argument: String::from(other),
-                    });
-                }
-            }
+            state.apply_arg(arg, &mut iter)?;
         }
 
-        let resolved_uri = uri.ok_or_else(|| GetCardError::MissingArgument {
-            flag: String::from("--uri"),
-        })?;
-        let (line, column) = position.ok_or_else(|| GetCardError::MissingArgument {
-            flag: String::from("--position"),
-        })?;
-
-        Ok(Self {
-            uri: resolved_uri,
-            line,
-            column,
-            detail,
-        })
+        state.try_into()
     }
 }
 
@@ -194,13 +245,13 @@ fn parse_position(value: &str) -> Result<(u32, u32), GetCardError> {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for [`GetCardRequest`] parsing and validation.
+
     use rstest::rstest;
 
     use super::*;
 
-    fn args(items: &[&str]) -> Vec<String> {
-        items.iter().map(|s| String::from(*s)).collect()
-    }
+    fn args(items: &[&str]) -> Vec<String> { items.iter().map(|s| String::from(*s)).collect() }
 
     #[test]
     fn parses_valid_minimal_arguments() {

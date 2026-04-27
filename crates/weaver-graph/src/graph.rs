@@ -2,9 +2,11 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::edge::CallEdge;
-use crate::error::GraphError;
-use crate::node::{CallNode, NodeId};
+use crate::{
+    edge::CallEdge,
+    error::GraphError,
+    node::{CallNode, NodeId},
+};
 
 /// A call graph with bidirectional indexing for efficient traversal.
 ///
@@ -25,9 +27,7 @@ pub struct CallGraph {
 impl CallGraph {
     /// Creates a new empty call graph.
     #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
+    pub fn new() -> Self { Self::default() }
 
     /// Adds a node to the graph.
     ///
@@ -63,31 +63,21 @@ impl CallGraph {
 
     /// Returns the node with the given ID.
     #[must_use]
-    pub fn node(&self, id: &NodeId) -> Option<&CallNode> {
-        self.nodes.get(id)
-    }
+    pub fn node(&self, id: &NodeId) -> Option<&CallNode> { self.nodes.get(id) }
 
     /// Returns an iterator over all nodes in the graph.
-    pub fn nodes(&self) -> impl Iterator<Item = &CallNode> {
-        self.nodes.values()
-    }
+    pub fn nodes(&self) -> impl Iterator<Item = &CallNode> { self.nodes.values() }
 
     /// Returns the number of nodes in the graph.
     #[must_use]
-    pub fn node_count(&self) -> usize {
-        self.nodes.len()
-    }
+    pub fn node_count(&self) -> usize { self.nodes.len() }
 
     /// Returns an iterator over all edges in the graph.
-    pub fn edges(&self) -> impl Iterator<Item = &CallEdge> {
-        self.edges.iter()
-    }
+    pub fn edges(&self) -> impl Iterator<Item = &CallEdge> { self.edges.iter() }
 
     /// Returns the number of edges in the graph.
     #[must_use]
-    pub const fn edge_count(&self) -> usize {
-        self.edges.len()
-    }
+    pub const fn edge_count(&self) -> usize { self.edges.len() }
 
     /// Returns the edges representing calls *to* the given node.
     ///
@@ -125,15 +115,11 @@ impl CallGraph {
 
     /// Returns whether the graph contains a node with the given ID.
     #[must_use]
-    pub fn contains_node(&self, id: &NodeId) -> bool {
-        self.nodes.contains_key(id)
-    }
+    pub fn contains_node(&self, id: &NodeId) -> bool { self.nodes.contains_key(id) }
 
     /// Returns whether the graph is empty.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.nodes.is_empty()
-    }
+    pub fn is_empty(&self) -> bool { self.nodes.is_empty() }
 
     /// Merges another graph into this one.
     ///

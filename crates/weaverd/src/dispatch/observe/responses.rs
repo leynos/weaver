@@ -64,14 +64,21 @@ pub fn extract_locations(response: GotoDefinitionResponse) -> Vec<DefinitionLoca
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for LSP response conversion and extraction.
+
     use lsp_types::{Position, Range, Uri};
     use rstest::{fixture, rstest};
+    use weaver_test_macros::allow_fixture_expansion_lints;
 
     use super::*;
 
+    #[allow_fixture_expansion_lints]
     #[fixture]
     fn sample_uri() -> Uri {
-        "file:///src/main.rs".parse().expect("valid uri")
+        match "file:///src/main.rs".parse() {
+            Ok(uri) => uri,
+            Err(error) => panic!("valid uri: {error}"),
+        }
     }
 
     fn make_location(uri: &Uri, line: u32, character: u32) -> Location {

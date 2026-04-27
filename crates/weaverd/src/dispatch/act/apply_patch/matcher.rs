@@ -1,8 +1,8 @@
 //! Search/replace matching helpers for apply-patch modifications.
 
-use crate::dispatch::act::apply_patch::errors::ApplyPatchError;
-use crate::dispatch::act::apply_patch::types::{
-    FileContent, FilePath, LineEnding, SearchPattern, SearchReplaceBlock,
+use crate::dispatch::act::apply_patch::{
+    errors::ApplyPatchError,
+    types::{FileContent, FilePath, LineEnding, SearchPattern, SearchReplaceBlock},
 };
 
 /// Applies SEARCH/REPLACE blocks to the provided file content in order.
@@ -84,9 +84,7 @@ fn find_fuzzy(
     Some((start_orig, end_orig))
 }
 
-fn trim_fuzzy_whitespace(value: &str) -> &str {
-    value.trim_matches(|ch| ch == ' ' || ch == '\t')
-}
+fn trim_fuzzy_whitespace(value: &str) -> &str { value.trim_matches(|ch| ch == ' ' || ch == '\t') }
 
 fn dominant_line_ending(content: &str) -> LineEnding {
     let mut crlf = 0;
@@ -217,13 +215,9 @@ impl NormalizedContent {
         }
     }
 
-    fn norm_to_orig(&self, index: usize) -> Option<usize> {
-        self.norm_to_orig.get(index).copied()
-    }
+    fn norm_to_orig(&self, index: usize) -> Option<usize> { self.norm_to_orig.get(index).copied() }
 
-    fn orig_to_norm(&self, index: usize) -> Option<usize> {
-        self.orig_to_norm.get(index).copied()
-    }
+    fn orig_to_norm(&self, index: usize) -> Option<usize> { self.orig_to_norm.get(index).copied() }
 }
 
 fn map_crlf_indices(orig_to_norm: &mut [usize], next_idx: usize, norm_index: usize) {
@@ -237,18 +231,21 @@ fn map_crlf_indices(orig_to_norm: &mut [usize], next_idx: usize, norm_index: usi
 mod tests {
     //! Tests for apply-patch matcher helpers.
 
-    use rstest::fixture;
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
+    use weaver_test_macros::allow_fixture_expansion_lints;
 
     use super::*;
     use crate::dispatch::act::apply_patch::types::{
-        FileContent, FilePath, ReplacementText, SearchPattern, SearchReplaceBlock,
+        FileContent,
+        FilePath,
+        ReplacementText,
+        SearchPattern,
+        SearchReplaceBlock,
     };
 
+    #[allow_fixture_expansion_lints]
     #[fixture]
-    fn path() -> FilePath {
-        FilePath::new("file.txt")
-    }
+    fn path() -> FilePath { FilePath::new("file.txt") }
 
     #[rstest]
     #[case::exact_match(

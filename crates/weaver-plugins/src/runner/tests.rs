@@ -5,11 +5,13 @@ use std::path::PathBuf;
 use rstest::{fixture, rstest};
 
 use super::*;
-use crate::error::PluginError;
-use crate::manifest::{PluginKind, PluginManifest, PluginMetadata};
-use crate::protocol::PluginRequest;
-use crate::registry::PluginRegistry;
-use crate::tests::{diff_executor, non_zero_exit_executor};
+use crate::{
+    error::PluginError,
+    manifest::{PluginKind, PluginManifest, PluginMetadata},
+    protocol::PluginRequest,
+    registry::PluginRegistry,
+    tests::{diff_executor, non_zero_exit_executor},
+};
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -24,7 +26,9 @@ fn manifest() -> PluginManifest {
 #[fixture]
 fn registry_with_rope(manifest: PluginManifest) -> PluginRegistry {
     let mut r = PluginRegistry::new();
-    r.register(manifest).expect("register rope");
+    if let Err(error) = r.register(manifest) {
+        panic!("register rope: {error}");
+    }
     r
 }
 

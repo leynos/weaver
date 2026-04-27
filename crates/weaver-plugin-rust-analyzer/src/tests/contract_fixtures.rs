@@ -2,8 +2,10 @@
 
 use rstest::rstest;
 use weaver_plugins::{
-    assert_rename_symbol_request_fixture_contract, assert_rename_symbol_response_fixture_contract,
-    rename_symbol_request_fixtures, rename_symbol_response_fixtures,
+    assert_rename_symbol_request_fixture_contract,
+    assert_rename_symbol_response_fixture_contract,
+    rename_symbol_request_fixtures,
+    rename_symbol_response_fixtures,
 };
 
 fn validate_fixtures_against_contract<T>(
@@ -40,6 +42,4 @@ fn validate_response_fixtures() {
 #[rstest]
 #[case(validate_request_fixtures as fn())]
 #[case(validate_response_fixtures as fn())]
-fn shared_fixtures_match_rename_symbol_contract(#[case] validate: fn()) {
-    validate();
-}
+fn shared_fixtures_match_rename_symbol_contract(#[case] validate: fn()) { validate(); }

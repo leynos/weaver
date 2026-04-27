@@ -1,15 +1,16 @@
 //! Behavioural tests for the process-based language server adapter.
 
-use std::cell::RefCell;
-use std::error::Error;
-use std::path::PathBuf;
+use std::{cell::RefCell, error::Error, path::PathBuf};
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use crate::Language;
-use crate::adapter::{AdapterError, LspServerConfig, ProcessLanguageServer};
-use crate::server::{LanguageServer, LanguageServerError};
+use crate::{
+    Language,
+    adapter::{AdapterError, LspServerConfig, ProcessLanguageServer},
+    server::{LanguageServer, LanguageServerError},
+};
 
 /// Test world for adapter BDD scenarios.
 struct AdapterTestWorld {
@@ -31,10 +32,9 @@ impl AdapterTestWorld {
     }
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> RefCell<AdapterTestWorld> {
-    RefCell::new(AdapterTestWorld::new())
-}
+fn world() -> RefCell<AdapterTestWorld> { RefCell::new(AdapterTestWorld::new()) }
 
 // --- Given steps ---
 

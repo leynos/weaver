@@ -29,8 +29,8 @@ fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
         .unwrap_or_default();
     let command_string = format!(
         "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
-         {provider_fragment}--refactoring rename --file src/main.py \
-         new_name=renamed_symbol offset=4"
+         {provider_fragment}--refactoring rename --file src/main.py new_name=renamed_symbol \
+         offset=4"
     );
 
     let mut args: Vec<String> = vec![

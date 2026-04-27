@@ -3,18 +3,27 @@
 use std::collections::HashMap;
 
 use lsp_types::{
-    Diagnostic, DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    GotoDefinitionResponse, Location, Uri,
+    Diagnostic,
+    DidChangeTextDocumentParams,
+    DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams,
+    GotoDefinitionResponse,
+    Location,
+    Uri,
 };
 
-use crate::LspHost;
-use crate::capability::CapabilitySummary;
-use crate::errors::LspHostError;
-use crate::language::Language;
-use crate::server::ServerCapabilitySet;
-
 use super::recording_server::{
-    CallKind, RecordingLanguageServer, RecordingServerHandle, ResponseSet,
+    CallKind,
+    RecordingLanguageServer,
+    RecordingServerHandle,
+    ResponseSet,
+};
+use crate::{
+    LspHost,
+    capability::CapabilitySummary,
+    errors::LspHostError,
+    language::Language,
+    server::ServerCapabilitySet,
 };
 
 /// Configuration used to seed a stub server for a language.

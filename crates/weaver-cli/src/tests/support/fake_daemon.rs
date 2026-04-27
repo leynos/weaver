@@ -3,14 +3,15 @@
 //! Provides a mock TCP server that simulates daemon responses, allowing CLI
 //! integration tests to verify request/response behaviour without a real daemon.
 
-use std::io::{self, BufRead, BufReader, Read, Write};
-use std::net::{TcpListener, TcpStream};
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::{Duration, Instant};
-
 #[cfg(unix)]
 use std::os::unix::net::UnixStream;
+use std::{
+    io::{self, BufRead, BufReader, Read, Write},
+    net::{TcpListener, TcpStream},
+    sync::{Arc, Mutex},
+    thread,
+    time::{Duration, Instant},
+};
 
 use anyhow::{Context, Result, anyhow};
 
@@ -51,9 +52,8 @@ impl FakeDaemon {
         })
     }
 
-    pub fn port(&self) -> u16 {
-        self.port
-    }
+    /// Return the TCP port bound by the fake daemon.
+    pub const fn port(&self) -> u16 { self.port }
 
     /// Waits for the daemon thread to complete and returns all recorded requests.
     pub fn take_requests(&mut self) -> Result<Vec<String>> {
@@ -84,23 +84,30 @@ impl FakeDaemon {
     ) -> Result<()> {
         let deadline = Instant::now() + Duration::from_secs(2);
         loop {
-            match listener.accept() {
-                Ok((stream, _)) => {
+            match Self::accept_client(&listener, deadline)? {
+                AcceptOutcome::Accepted(stream) => {
                     Self::record_request(&stream, &requests)?;
                     return Self::stream_responses(stream, &lines);
                 }
-                Err(ref error)
-                    if error.kind() == io::ErrorKind::WouldBlock && Instant::now() < deadline =>
-                {
-                    thread::sleep(Duration::from_millis(10));
-                }
-                Err(ref error) if error.kind() == io::ErrorKind::WouldBlock => {
-                    // No connection arrived; exit cleanly so tests do not hang when the CLI
-                    // aborts before connecting (e.g. capabilities mode exiting early).
-                    return Ok(());
-                }
-                Err(error) => return Err(error).context("accept connection"),
+                AcceptOutcome::Retry => {}
+                AcceptOutcome::TimedOut => return Err(anyhow!("accept deadline expired")),
             }
+        }
+    }
+
+    fn accept_client(listener: &TcpListener, deadline: Instant) -> Result<AcceptOutcome> {
+        match listener.accept() {
+            Ok((stream, _)) => Ok(AcceptOutcome::Accepted(stream)),
+            Err(ref error)
+                if error.kind() == io::ErrorKind::WouldBlock && Instant::now() < deadline =>
+            {
+                thread::sleep(Duration::from_millis(10));
+                Ok(AcceptOutcome::Retry)
+            }
+            Err(ref error) if error.kind() == io::ErrorKind::WouldBlock => {
+                Ok(AcceptOutcome::TimedOut)
+            }
+            Err(error) => Err(error).context("accept connection"),
         }
     }
 
@@ -135,6 +142,12 @@ impl Drop for FakeDaemon {
     }
 }
 
+enum AcceptOutcome {
+    Accepted(TcpStream),
+    Retry,
+    TimedOut,
+}
+
 // ── Stream utilities ───────────────────────────────────────────────────────────
 
 /// Trait for streams that can be cloned for concurrent read/write.
@@ -147,18 +160,14 @@ pub(in crate::tests) trait TryCloneStream: Write {
 impl TryCloneStream for TcpStream {
     type Owned = TcpStream;
 
-    fn try_clone(&self) -> io::Result<Self::Owned> {
-        TcpStream::try_clone(self)
-    }
+    fn try_clone(&self) -> io::Result<Self::Owned> { TcpStream::try_clone(self) }
 }
 
 #[cfg(unix)]
 impl TryCloneStream for UnixStream {
     type Owned = UnixStream;
 
-    fn try_clone(&self) -> io::Result<Self::Owned> {
-        UnixStream::try_clone(self)
-    }
+    fn try_clone(&self) -> io::Result<Self::Owned> { UnixStream::try_clone(self) }
 }
 
 /// Reads a request line from a stream and writes response lines.

@@ -1,34 +1,28 @@
 //! Daemon health monitoring utilities.
-//!
-//! Provides helpers for reading and evaluating health snapshots, waiting for
-//! the daemon to become ready, and reading PID files.
 
-use std::io;
-use std::path::Path;
-use std::process::Child;
-use std::thread;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::{
+    io,
+    path::Path,
+    process::Child,
+    thread,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
 
 use cap_std::fs::Dir;
 use weaver_config::RuntimePaths;
 
-use super::error::LifecycleError;
-use super::utils::open_runtime_dir;
+use super::{error::LifecycleError, utils::open_runtime_dir};
 
 /// Filename for the daemon's PID file within the runtime directory.
 pub(super) const PID_FILENAME: &str = "weaverd.pid";
 /// Filename for the daemon's health snapshot within the runtime directory.
 pub(super) const HEALTH_FILENAME: &str = "weaverd.health";
-
 /// Interval between health snapshot checks during daemon startup polling.
-///
-/// A 200ms interval balances responsiveness (detecting ready state quickly)
-/// against CPU usage and filesystem pressure. This is used by [`wait_for_ready`]
-/// to periodically check the daemon's health file.
+/// A 200ms interval balances responsiveness against CPU and filesystem pressure.
+/// [`wait_for_ready`] uses it to poll the daemon's health file.
 const POLL_INTERVAL: Duration = Duration::from_millis(200);
 
 /// Current operational state of the daemon.
-///
 /// The daemon reports its state through the health snapshot file, transitioning
 /// through these states during its lifecycle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
@@ -53,7 +47,6 @@ impl std::fmt::Display for DaemonStatus {
 }
 
 /// Health snapshot data read from the daemon's health file.
-///
 /// The daemon writes this JSON structure to `weaverd.health` to communicate its
 /// current state. The CLI reads this file to determine readiness during startup
 /// and to report status.
@@ -62,8 +55,8 @@ impl std::fmt::Display for DaemonStatus {
 ///
 /// * `status` - Current daemon state as a [`DaemonStatus`] enum variant.
 /// * `pid` - Process ID of the running daemon.
-/// * `timestamp` - Unix timestamp (seconds since epoch) when the snapshot was
-///   written. Used to distinguish fresh snapshots from stale ones.
+/// * `timestamp` - Unix timestamp (seconds since epoch) when the snapshot was written. Used to
+///   distinguish fresh snapshots from stale ones.
 #[derive(Debug, serde::Deserialize, PartialEq, Eq)]
 pub(crate) struct HealthSnapshot {
     /// Current daemon state.
@@ -181,8 +174,8 @@ macro_rules! define_reader {
 ///
 /// * `paths` - Runtime paths containing the location of health and PID files.
 /// * `child` - Handle to the spawned daemon process.
-/// * `started_at` - Timestamp when the daemon was started, used to validate
-///   that health snapshots are fresh (not stale from a previous run).
+/// * `started_at` - Timestamp when the daemon was started, used to validate that health snapshots
+///   are fresh (not stale from a previous run).
 /// * `timeout` - Maximum duration to wait for the daemon to become ready.
 ///
 /// # Returns
@@ -215,46 +208,63 @@ pub(super) fn wait_for_ready(
     // PID check and rely solely on the timestamp to identify fresh snapshots.
     let mut daemonized = false;
     while deadline.is_none_or(|d| Instant::now() < d) {
-        // Check child status FIRST so we detect daemonization before checking
-        // the health snapshot. Otherwise the PID mismatch causes a continue
-        // before we can update the daemonized flag. Skip this check once
-        // daemonized is true since the child has already been reaped.
-        if !daemonized
-            && let Some(status) = child
-                .try_wait()
-                .map_err(|source| LifecycleError::MonitorChild { source })?
-        {
-            if !status.success() {
-                return Err(LifecycleError::StartupFailed {
-                    exit_status: status.code(),
-                });
-            }
-            // Spawned process exited cleanly; daemon has forked to a new PID.
-            daemonized = true;
-        }
+        poll_spawned_child(child, &mut daemonized)?;
         let monitor = ProcessMonitorContext {
             started_at,
             expected_pid,
             daemonized,
         };
-        match check_health_snapshot(&dir, paths, monitor)? {
-            HealthCheckOutcome::Ready(snapshot) => return Ok(snapshot),
-            HealthCheckOutcome::Aborted { path } => {
-                return Err(LifecycleError::StartupAborted { path });
-            }
-            HealthCheckOutcome::Continue => {}
+        if let Some(snapshot) =
+            resolve_health_outcome(check_health_snapshot(&dir, paths, monitor)?)?
+        {
+            return Ok(snapshot);
         }
-        // Cap sleep to remaining time to avoid exceeding the timeout by up to
-        // POLL_INTERVAL. When deadline is None (overflow), always use full interval.
-        let sleep_duration = deadline
-            .and_then(|d| d.checked_duration_since(Instant::now()))
-            .map_or(POLL_INTERVAL, |remaining| remaining.min(POLL_INTERVAL));
-        thread::sleep(sleep_duration);
+        thread::sleep(next_poll_interval(deadline));
     }
     Err(LifecycleError::StartupTimeout {
         health_path: paths.health_path().to_path_buf(),
         timeout,
     })
+}
+
+fn poll_spawned_child(child: &mut Child, daemonized: &mut bool) -> Result<(), LifecycleError> {
+    if *daemonized {
+        return Ok(());
+    }
+    // Check child status before the health snapshot so PID validation uses the
+    // latest daemonization state.
+    let Some(status) = child
+        .try_wait()
+        .map_err(|source| LifecycleError::MonitorChild { source })?
+    else {
+        return Ok(());
+    };
+    if !status.success() {
+        return Err(LifecycleError::StartupFailed {
+            exit_status: status.code(),
+        });
+    }
+    *daemonized = true;
+    Ok(())
+}
+
+fn resolve_health_outcome(
+    outcome: HealthCheckOutcome,
+) -> Result<Option<HealthSnapshot>, LifecycleError> {
+    match outcome {
+        HealthCheckOutcome::Ready(snapshot) => Ok(Some(snapshot)),
+        HealthCheckOutcome::Aborted { path } => Err(LifecycleError::StartupAborted { path }),
+        HealthCheckOutcome::Continue => Ok(None),
+    }
+}
+
+fn next_poll_interval(deadline: Option<Instant>) -> Duration {
+    match deadline {
+        None => POLL_INTERVAL,
+        Some(limit) => limit
+            .checked_duration_since(Instant::now())
+            .map_or(Duration::ZERO, |remaining| remaining.min(POLL_INTERVAL)),
+    }
 }
 
 define_reader! {
@@ -329,8 +339,8 @@ pub(crate) struct ProcessMonitorContext {
 ///
 /// * [`HealthCheckOutcome::Ready`] - Snapshot is valid and daemon reports ready.
 /// * [`HealthCheckOutcome::Aborted`] - Snapshot is valid but daemon is stopping.
-/// * [`HealthCheckOutcome::Continue`] - No valid snapshot yet (missing, stale,
-///   PID mismatch, or daemon still starting); polling should continue.
+/// * [`HealthCheckOutcome::Continue`] - No valid snapshot yet (missing, stale, PID mismatch, or
+///   daemon still starting); polling should continue.
 ///
 /// # Errors
 ///

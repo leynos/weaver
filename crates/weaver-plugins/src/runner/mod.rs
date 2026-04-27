@@ -8,10 +8,12 @@
 //! The executor abstraction enables test doubles that return pre-configured
 //! responses without spawning real processes.
 
-use crate::error::PluginError;
-use crate::manifest::PluginManifest;
-use crate::protocol::{PluginRequest, PluginResponse};
-use crate::registry::PluginRegistry;
+use crate::{
+    error::PluginError,
+    manifest::PluginManifest,
+    protocol::{PluginRequest, PluginResponse},
+    registry::PluginRegistry,
+};
 
 /// Trait abstracting plugin process execution for testability.
 ///
@@ -23,8 +25,14 @@ use crate::registry::PluginRegistry;
 /// # Example
 ///
 /// ```
-/// use weaver_plugins::runner::PluginExecutor;
-/// use weaver_plugins::{PluginManifest, PluginRequest, PluginResponse, PluginOutput, PluginError};
+/// use weaver_plugins::{
+///     PluginError,
+///     PluginManifest,
+///     PluginOutput,
+///     PluginRequest,
+///     PluginResponse,
+///     runner::PluginExecutor,
+/// };
 ///
 /// struct MockExecutor;
 ///
@@ -59,12 +67,20 @@ pub trait PluginExecutor {
 /// # Example
 ///
 /// ```
-/// use weaver_plugins::{
-///     PluginRunner, PluginRegistry, PluginManifest, PluginMetadata, PluginKind,
-///     PluginRequest, PluginResponse, PluginOutput, PluginError,
-/// };
-/// use weaver_plugins::runner::PluginExecutor;
 /// use std::path::PathBuf;
+///
+/// use weaver_plugins::{
+///     PluginError,
+///     PluginKind,
+///     PluginManifest,
+///     PluginMetadata,
+///     PluginOutput,
+///     PluginRegistry,
+///     PluginRequest,
+///     PluginResponse,
+///     PluginRunner,
+///     runner::PluginExecutor,
+/// };
 ///
 /// struct MockExecutor;
 /// impl PluginExecutor for MockExecutor {
@@ -81,11 +97,13 @@ pub trait PluginExecutor {
 ///
 /// let mut registry = PluginRegistry::new();
 /// let meta = PluginMetadata::new("rope", "1.0", PluginKind::Actuator);
-/// registry.register(PluginManifest::new(
-///     meta,
-///     vec!["python".into()],
-///     PathBuf::from("/usr/bin/rope"),
-/// )).unwrap();
+/// registry
+///     .register(PluginManifest::new(
+///         meta,
+///         vec!["python".into()],
+///         PathBuf::from("/usr/bin/rope"),
+///     ))
+///     .unwrap();
 ///
 /// let runner = PluginRunner::new(registry, MockExecutor);
 /// let request = PluginRequest::new("rename", vec![]);
@@ -101,21 +119,15 @@ pub struct PluginRunner<E> {
 impl<E> PluginRunner<E> {
     /// Creates a runner with the given registry and executor.
     #[must_use]
-    pub const fn new(registry: PluginRegistry, executor: E) -> Self {
-        Self { registry, executor }
-    }
+    pub const fn new(registry: PluginRegistry, executor: E) -> Self { Self { registry, executor } }
 
     /// Returns a reference to the plugin registry.
     #[must_use]
-    pub const fn registry(&self) -> &PluginRegistry {
-        &self.registry
-    }
+    pub const fn registry(&self) -> &PluginRegistry { &self.registry }
 
     /// Returns a mutable reference to the plugin registry.
     #[must_use]
-    pub const fn registry_mut(&mut self) -> &mut PluginRegistry {
-        &mut self.registry
-    }
+    pub const fn registry_mut(&mut self) -> &mut PluginRegistry { &mut self.registry }
 }
 
 impl<E: PluginExecutor> PluginRunner<E> {

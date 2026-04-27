@@ -1,18 +1,19 @@
 //! Behaviour-driven tests for plugin execution.
 
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr};
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
-
-use crate::error::PluginError;
-use crate::manifest::{PluginKind, PluginManifest, PluginMetadata};
-use crate::protocol::{PluginOutput, PluginRequest, PluginResponse};
-use crate::registry::PluginRegistry;
-use crate::runner::PluginRunner;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 use super::{diff_executor, empty_executor, non_zero_exit_executor};
+use crate::{
+    error::PluginError,
+    manifest::{PluginKind, PluginManifest, PluginMetadata},
+    protocol::{PluginOutput, PluginRequest, PluginResponse},
+    registry::PluginRegistry,
+    runner::PluginRunner,
+};
 
 // ---------------------------------------------------------------------------
 // Typed wrappers for Gherkin step parameters
@@ -26,15 +27,11 @@ struct QuotedString(String);
 impl FromStr for QuotedString {
     type Err = std::convert::Infallible;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(s.trim_matches('"').to_owned()))
-    }
+    fn from_str(s: &str) -> Result<Self, Self::Err> { Ok(Self(s.trim_matches('"').to_owned())) }
 }
 
 impl QuotedString {
-    fn as_str(&self) -> &str {
-        &self.0
-    }
+    fn as_str(&self) -> &str { &self.0 }
 }
 
 /// Error kind discriminator for BDD assertions.
@@ -54,8 +51,7 @@ impl FromStr for ErrorKind {
             "non_zero_exit" => Ok(Self::NonZeroExit),
             "timeout" => Ok(Self::Timeout),
             other => Err(format!(
-                "unsupported error kind: '{other}' \
-                 (supported: not_found, non_zero_exit, timeout)"
+                "unsupported error kind: '{other}' (supported: not_found, non_zero_exit, timeout)"
             )),
         }
     }
@@ -81,10 +77,9 @@ enum ExecutorKind {
     NonZeroExit,
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> TestWorld {
-    TestWorld::default()
-}
+fn world() -> TestWorld { TestWorld::default() }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -135,19 +130,13 @@ fn given_sensor(world: &mut TestWorld, name: QuotedString, language: QuotedStrin
 }
 
 #[given("a mock executor that returns a diff")]
-fn given_diff_executor(world: &mut TestWorld) {
-    world.executor_kind = ExecutorKind::Diff;
-}
+fn given_diff_executor(world: &mut TestWorld) { world.executor_kind = ExecutorKind::Diff; }
 
 #[given("a mock executor that returns a non-zero exit error")]
-fn given_error_executor(world: &mut TestWorld) {
-    world.executor_kind = ExecutorKind::NonZeroExit;
-}
+fn given_error_executor(world: &mut TestWorld) { world.executor_kind = ExecutorKind::NonZeroExit; }
 
 #[given("a mock executor that returns empty output")]
-fn given_empty_executor(world: &mut TestWorld) {
-    world.executor_kind = ExecutorKind::Empty;
-}
+fn given_empty_executor(world: &mut TestWorld) { world.executor_kind = ExecutorKind::Empty; }
 
 // ---------------------------------------------------------------------------
 // When steps
@@ -259,6 +248,4 @@ fn then_plugin_named(world: &mut TestWorld, name: QuotedString) {
 // ---------------------------------------------------------------------------
 
 #[scenario(path = "tests/features/plugin_execution.feature")]
-fn plugin_execution_behaviour(world: TestWorld) {
-    let _ = world;
-}
+fn plugin_execution_behaviour(world: TestWorld) { let _ = world; }

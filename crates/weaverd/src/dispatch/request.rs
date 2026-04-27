@@ -71,19 +71,13 @@ impl CommandRequest {
     }
 
     /// Returns the normalised domain (trimmed).
-    pub fn domain(&self) -> &str {
-        self.command.domain.trim()
-    }
+    pub fn domain(&self) -> &str { self.command.domain.trim() }
 
     /// Returns the normalised operation (trimmed).
-    pub fn operation(&self) -> &str {
-        self.command.operation.trim()
-    }
+    pub fn operation(&self) -> &str { self.command.operation.trim() }
 
     /// Returns the patch payload, if provided.
-    pub fn patch(&self) -> Option<&str> {
-        self.patch.as_deref()
-    }
+    pub fn patch(&self) -> Option<&str> { self.patch.as_deref() }
 }
 
 /// Trims trailing ASCII whitespace from a byte slice.
@@ -98,6 +92,8 @@ fn trim_trailing_whitespace(bytes: &[u8]) -> &[u8] {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for command request parsing and validation.
+
     use rstest::rstest;
 
     use super::*;

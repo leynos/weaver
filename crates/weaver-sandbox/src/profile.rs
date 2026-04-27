@@ -1,7 +1,6 @@
 //! Sandbox policy definition and builder helpers.
 
-use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::{collections::BTreeSet, path::PathBuf};
 
 use once_cell::sync::OnceCell;
 
@@ -139,15 +138,11 @@ impl SandboxProfile {
     }
 
     /// Returns the configured environment policy.
-    pub(crate) fn environment_policy(&self) -> &EnvironmentPolicy {
-        &self.environment
-    }
+    pub(crate) fn environment_policy(&self) -> &EnvironmentPolicy { &self.environment }
 
     /// Returns the network policy.
     #[must_use]
-    pub fn network_policy(&self) -> NetworkPolicy {
-        self.network
-    }
+    pub fn network_policy(&self) -> NetworkPolicy { self.network }
 }
 
 impl SandboxProfile {
@@ -161,17 +156,13 @@ impl SandboxProfile {
 }
 
 impl Default for SandboxProfile {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 impl NetworkPolicy {
     /// Returns true when networking is denied.
     #[must_use]
-    pub fn is_denied(self) -> bool {
-        matches!(self, Self::Deny)
-    }
+    pub fn is_denied(self) -> bool { matches!(self, Self::Deny) }
 }
 
 impl EnvironmentPolicy {

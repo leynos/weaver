@@ -5,8 +5,10 @@ use std::path::PathBuf;
 use rstest::{fixture, rstest};
 
 use super::*;
-use crate::error::PluginError;
-use crate::manifest::{PluginKind, PluginManifest, PluginMetadata};
+use crate::{
+    error::PluginError,
+    manifest::{PluginKind, PluginManifest, PluginMetadata},
+};
 
 fn make_actuator(name: &str, lang: &str) -> PluginManifest {
     let meta = PluginMetadata::new(name, "1.0", PluginKind::Actuator);
@@ -29,12 +31,15 @@ fn make_sensor(name: &str, lang: &str) -> PluginManifest {
 #[fixture]
 fn populated_registry() -> PluginRegistry {
     let mut r = PluginRegistry::new();
-    r.register(make_actuator("rope", "python"))
-        .expect("register rope");
-    r.register(make_sensor("jedi", "python"))
-        .expect("register jedi");
-    r.register(make_actuator("srgn", "rust"))
-        .expect("register srgn");
+    if let Err(error) = r.register(make_actuator("rope", "python")) {
+        panic!("register rope: {error}");
+    }
+    if let Err(error) = r.register(make_sensor("jedi", "python")) {
+        panic!("register jedi: {error}");
+    }
+    if let Err(error) = r.register(make_actuator("srgn", "rust")) {
+        panic!("register srgn: {error}");
+    }
     r
 }
 
@@ -157,20 +162,23 @@ fn make_actuator_with_capabilities(
 #[fixture]
 fn capability_registry() -> PluginRegistry {
     let mut r = PluginRegistry::new();
-    r.register(make_actuator_with_capabilities(
+    if let Err(error) = r.register(make_actuator_with_capabilities(
         "rope",
         "python",
         vec![CapabilityId::RenameSymbol],
-    ))
-    .expect("register rope");
-    r.register(make_actuator_with_capabilities(
+    )) {
+        panic!("register rope: {error}");
+    }
+    if let Err(error) = r.register(make_actuator_with_capabilities(
         "ra",
         "rust",
         vec![CapabilityId::RenameSymbol, CapabilityId::ExtricateSymbol],
-    ))
-    .expect("register ra");
-    r.register(make_sensor("jedi", "python"))
-        .expect("register jedi");
+    )) {
+        panic!("register ra: {error}");
+    }
+    if let Err(error) = r.register(make_sensor("jedi", "python")) {
+        panic!("register jedi: {error}");
+    }
     r
 }
 

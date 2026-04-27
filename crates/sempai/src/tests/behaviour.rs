@@ -3,9 +3,9 @@
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use sempai_core::test_support::QuotedString;
+use weaver_test_macros::allow_fixture_expansion_lints;
 
-use crate::engine::QueryPlan;
-use crate::{DiagnosticReport, Engine, EngineConfig, Language};
+use crate::{DiagnosticReport, Engine, EngineConfig, Language, engine::QueryPlan};
 
 // ---------------------------------------------------------------------------
 // Test world
@@ -18,10 +18,9 @@ struct TestWorld {
     execute_result: Option<Result<(), DiagnosticReport>>,
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> TestWorld {
-    TestWorld::default()
-}
+fn world() -> TestWorld { TestWorld::default() }
 
 // ---------------------------------------------------------------------------
 // Given steps
@@ -75,10 +74,10 @@ fn assert_diagnostic_code(
     result_name: &str,
     failure_kind: &str,
 ) {
-    let inner = result.unwrap_or_else(|| panic!("{result_name} should be set"));
-    let report = inner
-        .as_ref()
-        .expect_err(&format!("expected {failure_kind}"));
+    let missing_result_message = format!("{result_name} should be set");
+    let expected_failure_message = format!("expected {failure_kind}");
+    let inner = result.expect(&missing_result_message);
+    let report = inner.as_ref().expect_err(&expected_failure_message);
     let first = report
         .diagnostics()
         .first()
@@ -140,6 +139,4 @@ fn then_execution_fails(world: &mut TestWorld, code: QuotedString) {
 // ---------------------------------------------------------------------------
 
 #[scenario(path = "tests/features/sempai_engine.feature")]
-fn sempai_engine_behaviour(world: TestWorld) {
-    let _ = world;
-}
+fn sempai_engine_behaviour(world: TestWorld) { let _ = world; }

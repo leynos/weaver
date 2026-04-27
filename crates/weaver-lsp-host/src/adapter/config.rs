@@ -28,25 +28,19 @@ impl LspServerConfig {
     ///
     /// Expects `rust-analyzer` to be available in PATH.
     #[must_use]
-    pub fn rust_default() -> Self {
-        Self::default_config("rust-analyzer", Vec::new())
-    }
+    pub fn rust_default() -> Self { Self::default_config("rust-analyzer", Vec::new()) }
 
     /// Default configuration for Python (`pyrefly lsp`).
     ///
     /// Expects `pyrefly` to be available in PATH.
     #[must_use]
-    pub fn python_default() -> Self {
-        Self::default_config("pyrefly", vec!["lsp".to_string()])
-    }
+    pub fn python_default() -> Self { Self::default_config("pyrefly", vec!["lsp".to_string()]) }
 
     /// Default configuration for TypeScript (`tsgo --lsp`).
     ///
     /// Expects `tsgo` to be available in PATH.
     #[must_use]
-    pub fn typescript_default() -> Self {
-        Self::default_config("tsgo", vec!["--lsp".to_string()])
-    }
+    pub fn typescript_default() -> Self { Self::default_config("tsgo", vec!["--lsp".to_string()]) }
 
     /// Returns the default configuration for a given language.
     #[must_use]
@@ -68,6 +62,8 @@ impl LspServerConfig {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for language server configuration defaults.
+
     use rstest::rstest;
 
     use super::*;

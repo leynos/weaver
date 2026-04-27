@@ -9,8 +9,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::capability::CapabilityId;
-use crate::error::PluginError;
+use crate::{capability::CapabilityId, error::PluginError};
 
 /// Default timeout in seconds for plugin execution.
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
@@ -60,7 +59,7 @@ impl std::fmt::Display for PluginKind {
 /// # Example
 ///
 /// ```
-/// use weaver_plugins::{PluginMetadata, PluginKind};
+/// use weaver_plugins::{PluginKind, PluginMetadata};
 ///
 /// let meta = PluginMetadata::new("rope", "1.0.0", PluginKind::Actuator);
 /// assert_eq!(meta.name(), "rope");
@@ -85,21 +84,15 @@ impl PluginMetadata {
 
     /// Returns the plugin name.
     #[must_use]
-    pub const fn name(&self) -> &str {
-        self.name.as_str()
-    }
+    pub const fn name(&self) -> &str { self.name.as_str() }
 
     /// Returns the plugin version.
     #[must_use]
-    pub const fn version(&self) -> &str {
-        self.version.as_str()
-    }
+    pub const fn version(&self) -> &str { self.version.as_str() }
 
     /// Returns the plugin category.
     #[must_use]
-    pub const fn kind(&self) -> PluginKind {
-        self.kind
-    }
+    pub const fn kind(&self) -> PluginKind { self.kind }
 }
 
 /// Declarative description of a plugin's identity and capabilities.
@@ -111,8 +104,9 @@ impl PluginMetadata {
 /// # Example
 ///
 /// ```
-/// use weaver_plugins::{PluginManifest, PluginMetadata, PluginKind};
 /// use std::path::PathBuf;
+///
+/// use weaver_plugins::{PluginKind, PluginManifest, PluginMetadata};
 ///
 /// let meta = PluginMetadata::new("rope", "1.0.0", PluginKind::Actuator);
 /// let manifest = PluginManifest::new(
@@ -140,9 +134,7 @@ pub struct PluginManifest {
     capabilities: Vec<CapabilityId>,
 }
 
-const fn default_timeout_secs() -> u64 {
-    DEFAULT_TIMEOUT_SECS
-}
+const fn default_timeout_secs() -> u64 { DEFAULT_TIMEOUT_SECS }
 
 impl PluginManifest {
     /// Creates a new manifest with default timeout and no extra arguments.
@@ -211,51 +203,35 @@ impl PluginManifest {
 
     /// Returns the plugin name.
     #[must_use]
-    pub const fn name(&self) -> &str {
-        self.name.as_str()
-    }
+    pub const fn name(&self) -> &str { self.name.as_str() }
 
     /// Returns the plugin version.
     #[must_use]
-    pub const fn version(&self) -> &str {
-        self.version.as_str()
-    }
+    pub const fn version(&self) -> &str { self.version.as_str() }
 
     /// Returns the plugin category.
     #[must_use]
-    pub const fn kind(&self) -> PluginKind {
-        self.kind
-    }
+    pub const fn kind(&self) -> PluginKind { self.kind }
 
     /// Returns the supported languages.
     #[must_use]
-    pub fn languages(&self) -> &[String] {
-        &self.languages
-    }
+    pub fn languages(&self) -> &[String] { &self.languages }
 
     /// Returns the absolute path to the plugin executable.
     #[must_use]
-    pub fn executable(&self) -> &Path {
-        &self.executable
-    }
+    pub fn executable(&self) -> &Path { &self.executable }
 
     /// Returns the default arguments.
     #[must_use]
-    pub fn args(&self) -> &[String] {
-        &self.args
-    }
+    pub fn args(&self) -> &[String] { &self.args }
 
     /// Returns the timeout in seconds.
     #[must_use]
-    pub const fn timeout_secs(&self) -> u64 {
-        self.timeout_secs
-    }
+    pub const fn timeout_secs(&self) -> u64 { self.timeout_secs }
 
     /// Returns the declared capabilities.
     #[must_use]
-    pub fn capabilities(&self) -> &[CapabilityId] {
-        &self.capabilities
-    }
+    pub fn capabilities(&self) -> &[CapabilityId] { &self.capabilities }
 
     /// Converts all language entries to ASCII lowercase for
     /// allocation-free lookups.

@@ -1,7 +1,6 @@
 //! Unit tests for the IPC protocol types.
 
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use rstest::rstest;
 

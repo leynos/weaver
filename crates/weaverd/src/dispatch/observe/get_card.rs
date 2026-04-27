@@ -4,24 +4,30 @@
 //! backed card extraction to `weaver-cards`, and optionally enriches the card
 //! with LSP hover data when `--detail semantic` or higher is requested.
 
-use std::fs;
-use std::io::Write;
-use std::path::PathBuf;
+use std::{fs, io::Write, path::PathBuf};
 
 use url::Url;
 use weaver_cards::{
-    CardExtractionError, CardExtractionInput, CardRefusal, DetailLevel, GetCardRequest,
-    GetCardResponse, RefusalReason,
+    CardExtractionError,
+    CardExtractionInput,
+    CardRefusal,
+    DetailLevel,
+    GetCardRequest,
+    GetCardResponse,
+    RefusalReason,
 };
 
-use crate::backends::FusionBackends;
-use crate::dispatch::errors::DispatchError;
-use crate::dispatch::request::CommandRequest;
-use crate::dispatch::response::ResponseWriter;
-use crate::dispatch::router::DispatchResult;
-use crate::semantic_provider::SemanticBackendProvider;
-
 use super::enrich::{self, EnrichmentOutcome};
+use crate::{
+    backends::FusionBackends,
+    dispatch::{
+        errors::DispatchError,
+        request::CommandRequest,
+        response::ResponseWriter,
+        router::DispatchResult,
+    },
+    semantic_provider::SemanticBackendProvider,
+};
 
 /// Handles the `observe get-card` command.
 ///

@@ -8,9 +8,7 @@ use weaver_plugins::capability::ReasonCode;
 use super::support::{adapter_returning, adapter_unused, rename_arguments, request_with_args};
 use crate::execute_request;
 
-fn remove_uri(arguments: &mut HashMap<String, serde_json::Value>) {
-    arguments.remove("uri");
-}
+fn remove_uri(arguments: &mut HashMap<String, serde_json::Value>) { arguments.remove("uri"); }
 
 fn set_empty_uri(arguments: &mut HashMap<String, serde_json::Value>) {
     arguments.insert(

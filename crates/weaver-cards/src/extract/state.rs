@@ -116,20 +116,14 @@ impl TreeSitterCardExtractor {
 
     /// Returns cache hit/miss counters for this extractor instance.
     #[must_use]
-    pub fn cache_stats(&self) -> crate::CacheStats {
-        self.cache.stats()
-    }
+    pub fn cache_stats(&self) -> crate::CacheStats { self.cache.stats() }
 
     /// Returns the number of cached entries held by this extractor.
     #[must_use]
-    pub fn cache_len(&self) -> usize {
-        self.cache.len()
-    }
+    pub fn cache_len(&self) -> usize { self.cache.len() }
 
     #[cfg(test)]
-    pub(crate) fn invalidate_path(&self, path: &std::path::Path) {
-        self.cache.invalidate(path);
-    }
+    pub(crate) fn invalidate_path(&self, path: &std::path::Path) { self.cache.invalidate(path); }
 
     #[cfg(test)]
     pub(crate) fn parser_identity(
@@ -152,7 +146,5 @@ impl TreeSitterCardExtractor {
 }
 
 impl Default for TreeSitterCardExtractor {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }

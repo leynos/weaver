@@ -43,27 +43,19 @@ impl CapturedNode {
         clippy::missing_const_for_fn,
         reason = "heap types cannot be used in const contexts"
     )]
-    pub fn new(span: Span, kind: String, text: Option<String>) -> Self {
-        Self { span, kind, text }
-    }
+    pub fn new(span: Span, kind: String, text: Option<String>) -> Self { Self { span, kind, text } }
 
     /// Returns a reference to the captured span.
     #[must_use]
-    pub const fn span(&self) -> &Span {
-        &self.span
-    }
+    pub const fn span(&self) -> &Span { &self.span }
 
     /// Returns the Tree-sitter node kind.
     #[must_use]
-    pub fn kind(&self) -> &str {
-        &self.kind
-    }
+    pub fn kind(&self) -> &str { &self.kind }
 
     /// Returns the source text, if captured.
     #[must_use]
-    pub fn text(&self) -> Option<&str> {
-        self.text.as_deref()
-    }
+    pub fn text(&self) -> Option<&str> { self.text.as_deref() }
 }
 
 /// A capture binding produced by query execution.

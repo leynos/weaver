@@ -66,9 +66,7 @@ impl ConfigArgumentSplit {
     /// Returns true when the operator supplied at least one configuration
     /// flag (e.g. `--config-path`).  The binary name at index 0 is always
     /// present and does not count.
-    pub(crate) fn has_config_flags(&self) -> bool {
-        self.config_arguments.len() > 1
-    }
+    pub(crate) fn has_config_flags(&self) -> bool { self.config_arguments.len() > 1 }
 }
 
 pub(crate) fn split_config_arguments(args: &[OsString]) -> ConfigArgumentSplit {
@@ -133,8 +131,11 @@ pub(crate) fn prepare_cli_arguments(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    //! Unit tests for configuration loading and CLI argument processing.
+
     use std::ffi::OsStr;
+
+    use super::*;
 
     #[test]
     fn inline_value_flags_do_not_need_follow_up_value() {

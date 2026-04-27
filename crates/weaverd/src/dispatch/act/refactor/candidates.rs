@@ -28,7 +28,8 @@ pub(super) fn preferred_provider(language: SupportedLanguage) -> &'static str {
     match language {
         SupportedLanguage::Python => "rope",
         SupportedLanguage::Rust => "rust-analyzer",
-        // TODO: Implement TypeScript provider support - this placeholder will cause routing to fail for TypeScript files
+        // TODO: Implement TypeScript provider support - this placeholder will cause routing to fail
+        // for TypeScript files
         SupportedLanguage::TypeScript => "typescript-unimplemented",
     }
 }

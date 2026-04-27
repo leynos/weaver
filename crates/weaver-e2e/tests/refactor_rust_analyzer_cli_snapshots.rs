@@ -16,9 +16,12 @@ use daemon_harness::{FakeDaemon, output_to_transcript, weaver_binary_path};
 use insta::assert_debug_snapshot;
 use rstest::rstest;
 
+#[expect(
+    clippy::expect_used,
+    reason = "test helper surfaces setup failures with the exact requested call structure"
+)]
 fn run_refactor_snapshot(snapshot_name: &str, display_command: &str, extra_args: &[&str]) {
-    let daemon = FakeDaemon::start(1, "renamed_name")
-        .unwrap_or_else(|error| panic!("fake daemon should start: {error}"));
+    let daemon = FakeDaemon::start(1, "renamed_name").expect("fake daemon should start");
     let endpoint = daemon.endpoint();
 
     let output = Command::new(weaver_binary_path())
@@ -28,7 +31,7 @@ fn run_refactor_snapshot(snapshot_name: &str, display_command: &str, extra_args:
         .arg("json")
         .args(extra_args)
         .output()
-        .unwrap_or_else(|error| panic!("command should execute: {error}"));
+        .expect("command should execute");
 
     let transcript = output_to_transcript(display_command.to_owned(), &output, daemon.requests());
     daemon.join();
@@ -106,7 +109,8 @@ fn refactor_rust_analyzer_pipeline_with_observe_and_jq_snapshot() {
         "observe get-definition --symbol old_name ",
         "| jq -r '.[0].symbol' ",
         "| xargs -I{} \"$WEAVER_BIN\" --daemon-socket \"$WEAVER_ENDPOINT\" --output json ",
-        "act refactor --provider rust-analyzer --refactoring rename --file src/main.rs new_name={} offset=3"
+        "act refactor --provider rust-analyzer --refactoring rename --file src/main.rs \
+         new_name={} offset=3"
     );
 
     let output = Command::new("bash")

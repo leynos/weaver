@@ -22,6 +22,7 @@ rstest = "0.26.1"
 rstest-bdd = { workspace = true }
 rstest-bdd-macros = { workspace = true }
 tempfile = { workspace = true }
+weaver-test-macros = { path = "../weaver-test-macros" }
 
 [lints]
 workspace = true

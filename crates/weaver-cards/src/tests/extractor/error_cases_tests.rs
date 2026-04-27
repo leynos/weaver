@@ -4,9 +4,8 @@ use std::path::Path;
 
 use rstest::rstest;
 
-use crate::{CardExtractionError, CardExtractionInput, DetailLevel, TreeSitterCardExtractor};
-
 use super::common::{ExpectedError, ExtractRequest, error_matches, extract_error};
+use crate::{CardExtractionError, CardExtractionInput, DetailLevel, TreeSitterCardExtractor};
 
 #[rstest]
 #[case(

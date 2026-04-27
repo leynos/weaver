@@ -5,12 +5,9 @@
 //! This minimises boot latency and avoids paying the cost of services that are
 //! not required for a given command sequence.
 
-use std::collections::HashSet;
-use std::fmt;
-use std::str::FromStr;
+use std::{collections::HashSet, fmt, str::FromStr};
 
 use thiserror::Error;
-
 use weaver_config::Config;
 
 /// Semantic Fusion backends managed by the daemon.
@@ -43,15 +40,11 @@ pub struct BackendKindParseError(String);
 impl BackendKindParseError {
     /// Creates a parse error describing the unsupported value.
     #[must_use]
-    pub fn new(value: impl Into<String>) -> Self {
-        Self(value.into())
-    }
+    pub fn new(value: impl Into<String>) -> Self { Self(value.into()) }
 
     /// Returns the offending value that could not be parsed.
     #[must_use]
-    pub fn value(&self) -> &str {
-        self.0.as_str()
-    }
+    pub fn value(&self) -> &str { self.0.as_str() }
 }
 
 impl FromStr for BackendKind {
@@ -106,9 +99,7 @@ impl BackendStartupError {
 
     /// Human-readable message describing the failure.
     #[must_use]
-    pub fn message(&self) -> &str {
-        self.message.as_str()
-    }
+    pub fn message(&self) -> &str { self.message.as_str() }
 }
 
 /// Trait implemented by types capable of starting a backend.
@@ -138,21 +129,15 @@ impl<P> FusionBackends<P> {
 
     /// Returns a reference to the resolved configuration.
     #[must_use]
-    pub fn config(&self) -> &Config {
-        &self.config
-    }
+    pub fn config(&self) -> &Config { &self.config }
 
     /// Returns a reference to the backend provider.
     #[must_use]
-    pub fn provider(&self) -> &P {
-        &self.provider
-    }
+    pub fn provider(&self) -> &P { &self.provider }
 
     /// Returns a mutable reference to the backend provider.
     #[must_use]
-    pub fn provider_mut(&mut self) -> &mut P {
-        &mut self.provider
-    }
+    pub fn provider_mut(&mut self) -> &mut P { &mut self.provider }
 
     /// Ensures the specified backend has been started.
     ///
@@ -178,17 +163,20 @@ impl<P> FusionBackends<P> {
 
     /// Returns `true` when the backend has already been started.
     #[must_use]
-    pub fn is_started(&self, kind: BackendKind) -> bool {
-        self.started.contains(&kind)
-    }
+    pub fn is_started(&self, kind: BackendKind) -> bool { self.started.contains(&kind) }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use rstest::{fixture, rstest};
+    //! Unit tests for backend orchestration and lifecycle management.
+
     use std::sync::{Arc, Mutex};
+
+    use rstest::{fixture, rstest};
     use weaver_config::SocketEndpoint;
+    use weaver_test_macros::allow_fixture_expansion_lints;
+
+    use super::*;
 
     #[derive(Clone, Debug, Default)]
     struct RecordingProvider {
@@ -197,10 +185,10 @@ mod tests {
 
     impl RecordingProvider {
         fn calls(&self) -> Vec<BackendKind> {
-            self.calls
-                .lock()
-                .expect("recording provider mutex poisoned")
-                .clone()
+            match self.calls.lock() {
+                Ok(calls) => calls.clone(),
+                Err(error) => panic!("recording provider mutex poisoned: {error}"),
+            }
         }
     }
 
@@ -210,15 +198,16 @@ mod tests {
             kind: BackendKind,
             _config: &Config,
         ) -> Result<(), BackendStartupError> {
-            let mut calls = self
-                .calls
-                .lock()
-                .expect("recording provider mutex poisoned");
+            let mut calls = match self.calls.lock() {
+                Ok(calls) => calls,
+                Err(error) => panic!("recording provider mutex poisoned: {error}"),
+            };
             calls.push(kind);
             Ok(())
         }
     }
 
+    #[allow_fixture_expansion_lints]
     #[fixture]
     fn config() -> Config {
         Config {
@@ -227,10 +216,9 @@ mod tests {
         }
     }
 
+    #[allow_fixture_expansion_lints]
     #[fixture]
-    fn provider() -> RecordingProvider {
-        RecordingProvider::default()
-    }
+    fn provider() -> RecordingProvider { RecordingProvider::default() }
 
     #[fixture]
     fn fusion_backends(
@@ -263,7 +251,10 @@ mod tests {
 
     impl FailingProvider {
         fn calls(&self) -> usize {
-            *self.calls.lock().expect("failing provider mutex poisoned")
+            match self.calls.lock() {
+                Ok(calls) => *calls,
+                Err(error) => panic!("failing provider mutex poisoned: {error}"),
+            }
         }
     }
 
@@ -273,7 +264,10 @@ mod tests {
             kind: BackendKind,
             _config: &Config,
         ) -> Result<(), BackendStartupError> {
-            let mut calls = self.calls.lock().expect("failing provider mutex poisoned");
+            let mut calls = match self.calls.lock() {
+                Ok(calls) => calls,
+                Err(error) => panic!("failing provider mutex poisoned: {error}"),
+            };
             *calls += 1;
             Err(BackendStartupError::new(
                 kind,

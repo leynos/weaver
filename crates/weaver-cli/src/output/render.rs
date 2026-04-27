@@ -1,12 +1,16 @@
 //! Human-readable rendering of source locations.
 
-use std::collections::HashMap;
-use std::collections::hash_map::Entry;
-use std::fmt::Write as _;
-use std::fs;
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    fmt,
+    fmt::Write as _,
+    path::Path,
+};
+
+use cap_std::fs::Dir;
+use unicode_width::UnicodeWidthChar;
 
 use super::source::SourceLocation;
-use unicode_width::UnicodeWidthChar;
 
 const CONTEXT_LINES: u32 = 2;
 
@@ -59,11 +63,11 @@ fn render_group(output: &mut String, key: &str, group: &[&SourceLocation]) {
     }
 
     let source = &group[0].source;
-    writeln!(output, "{key}").expect("write header");
+    write_render_line(output, format_args!("{key}\n"));
 
     let content_result = source
         .as_path()
-        .map(|path| fs::read_to_string(path).map_err(|err| err.to_string()));
+        .map(|path| read_source_content(path).map_err(|err| err.to_string()));
 
     for (index, location) in group.iter().enumerate() {
         if index > 0 {
@@ -114,16 +118,16 @@ fn render_unresolved(output: &mut String, location: &SourceLocation, reason: imp
     let reason = reason.into();
     match (location.position.line, location.position.column) {
         (Some(line), Some(column)) => {
-            writeln!(output, "  --> {line}:{column}").expect("write location");
+            write_render_line(output, format_args!("  --> {line}:{column}\n"));
         }
         (Some(line), None) => {
-            writeln!(output, "  --> {line}").expect("write location");
+            write_render_line(output, format_args!("  --> {line}\n"));
         }
         _ => {
-            writeln!(output, "  --> (location unavailable)").expect("write location");
+            write_render_line(output, format_args!("  --> (location unavailable)\n"));
         }
     }
-    writeln!(output, "  note: {reason}").expect("write reason");
+    write_render_line(output, format_args!("  note: {reason}\n"));
 }
 
 fn render_context(
@@ -148,12 +152,15 @@ fn render_context(
     let end_line = (point.line + CONTEXT_LINES).min(total_lines);
     let line_width = num_digits(end_line);
 
-    writeln!(output, "  --> {}:{}", point.line, point.column).expect("write location");
-    writeln!(output, "   |").expect("write gutter");
+    write_render_line(
+        output,
+        format_args!("  --> {}:{}\n", point.line, point.column),
+    );
+    write_render_line(output, format_args!("   |\n"));
 
     for current in start_line..=end_line {
         let text = lines[(current - 1) as usize];
-        writeln!(output, "{current:>line_width$} | {text}").expect("write line");
+        write_render_line(output, format_args!("{current:>line_width$} | {text}\n"));
 
         if current == point.line {
             render_caret_line(
@@ -180,14 +187,29 @@ fn render_caret_line(output: &mut String, context: CaretContext<'_>) {
         caret_line.push(' ');
         caret_line.push_str(context.label);
     }
-    writeln!(
+    write_render_line(
         output,
-        "{0:>line_width$} | {caret_line}",
-        "",
-        line_width = context.line_width
-    )
-    .expect("write caret");
+        format_args!(
+            "{0:>line_width$} | {caret_line}\n",
+            "",
+            line_width = context.line_width
+        ),
+    );
 }
+
+fn read_source_content(path: &Path) -> std::io::Result<String> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let file_name = path.file_name().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing file name")
+    })?;
+    let directory = Dir::open_ambient_dir(parent, cap_std::ambient_authority())?;
+    directory.read_to_string(file_name)
+}
+
+fn write_render_line(output: &mut String, args: fmt::Arguments<'_>) { output.write_fmt(args).ok(); }
 
 fn caret_display_offset(text: &str, target_units: u32) -> usize {
     let mut units_consumed = 0u32;
@@ -205,9 +227,7 @@ fn caret_display_offset(text: &str, target_units: u32) -> usize {
     width
 }
 
-fn num_digits(value: u32) -> usize {
-    value.to_string().len()
-}
+fn num_digits(value: u32) -> usize { value.to_string().len() }
 
 struct LineColumn {
     line: u32,
@@ -223,6 +243,8 @@ struct CaretContext<'a> {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for output rendering and formatting.
+
     use super::*;
     use crate::output::source::{SourceLocation, SourcePosition, SourceReference};
 

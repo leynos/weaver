@@ -1,14 +1,15 @@
 //! JSON-RPC messaging functionality for language server communication.
 
-use serde::Serialize;
-use serde::de::DeserializeOwned;
+use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use tracing::{debug, warn};
 
-use super::error::AdapterError;
-use super::jsonrpc::{JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
-use super::lifecycle::ADAPTER_TARGET;
-use super::transport::StdioTransport;
+use super::{
+    error::AdapterError,
+    jsonrpc::{JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse},
+    lifecycle::ADAPTER_TARGET,
+    transport::StdioTransport,
+};
 
 /// Maximum number of iterations to wait for a matching JSON-RPC response.
 const MAX_RESPONSE_ITERATIONS: usize = 100;
@@ -136,7 +137,8 @@ pub(super) fn receive_response_for_request(
     }
 }
 
-/// Process a received JSON-RPC message, returning the response if it matches the expected request ID.
+/// Process a received JSON-RPC message, returning the response if it matches the expected request
+/// ID.
 fn process_received_message(
     message: JsonRpcMessage,
     expected_request_id: i64,

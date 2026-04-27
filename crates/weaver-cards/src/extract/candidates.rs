@@ -2,9 +2,8 @@
 
 use std::path::Path;
 
-use crate::{CardSymbolKind, SourcePosition, SourceRange};
-
 use super::positions::usize_to_u32;
+use crate::{CardSymbolKind, SourcePosition, SourceRange};
 
 #[derive(Debug, Clone)]
 pub(crate) struct EntityCandidate {

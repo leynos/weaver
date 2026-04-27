@@ -1,7 +1,6 @@
 //! Shared test helpers for rust-analyzer plugin unit tests.
 
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use mockall::mock;
 use url::Url;
@@ -48,9 +47,7 @@ pub(crate) fn adapter_returning_with_path(
 }
 
 /// Builds a `MockAdapter` where rename is never expected.
-pub(crate) fn adapter_unused() -> MockAdapter {
-    MockAdapter::new()
-}
+pub(crate) fn adapter_unused() -> MockAdapter { MockAdapter::new() }
 
 /// Returns a valid `rename-symbol` argument map.
 pub(crate) fn rename_arguments() -> HashMap<String, serde_json::Value> {

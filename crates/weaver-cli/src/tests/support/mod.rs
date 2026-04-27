@@ -7,26 +7,28 @@
 mod fake_daemon;
 mod lifecycle;
 
-use std::cell::RefCell;
-use std::ffi::OsString;
-use std::fs;
-use std::path::{Component, PathBuf};
-use std::process::ExitCode;
+use std::{
+    cell::RefCell,
+    ffi::OsString,
+    io,
+    path::{Component, PathBuf},
+    process::ExitCode,
+};
 
 use anyhow::{Context, Result, ensure};
-use rstest::fixture;
-use tempfile::TempDir;
-use url::Url;
-use weaver_config::{CapabilityDirective, CapabilityOverride, Config, SocketEndpoint};
-
-use crate::lifecycle::LifecycleError;
-use crate::{AppError, ConfigLoader, IoStreams, run_with_daemon_binary};
-
+use cap_std::fs::Dir;
 #[cfg(unix)]
 pub(super) use fake_daemon::accept_unix_connection;
 pub(super) use fake_daemon::{FakeDaemon, accept_tcp_connection, respond_to_request};
 pub(super) use lifecycle::{LifecycleCall, TestLifecycle};
 pub(crate) use lifecycle::{temp_paths, write_health_json, write_health_snapshot};
+use rstest::fixture;
+use tempfile::TempDir;
+use url::Url;
+use weaver_config::{CapabilityDirective, CapabilityOverride, Config, SocketEndpoint};
+use weaver_test_macros::allow_fixture_expansion_lints;
+
+use crate::{AppError, ConfigLoader, IoStreams, lifecycle::LifecycleError, run_with_daemon_binary};
 
 /// A config loader that returns a fixed configuration for tests.
 pub(super) struct StaticConfigLoader {
@@ -34,15 +36,11 @@ pub(super) struct StaticConfigLoader {
 }
 
 impl StaticConfigLoader {
-    pub(super) fn new(config: Config) -> Self {
-        Self { config }
-    }
+    pub(super) fn new(config: Config) -> Self { Self { config } }
 }
 
 impl ConfigLoader for StaticConfigLoader {
-    fn load(&self, _args: &[OsString]) -> Result<Config, AppError> {
-        Ok(self.config.clone())
-    }
+    fn load(&self, _args: &[OsString]) -> Result<Config, AppError> { Ok(self.config.clone()) }
 }
 
 /// Test world holding CLI state, daemon instance, and captured output.
@@ -106,7 +104,7 @@ impl TestWorld {
     /// Creates a source file fixture and stores its location metadata.
     pub fn create_source_file(&mut self, filename: &str, content: &str) -> Result<()> {
         let (temp_dir, path, uri) = Self::prepare_source_location(filename)?;
-        fs::write(&path, content)?;
+        write_test_file(&path, content.as_bytes())?;
         self.store_source_location(temp_dir, path, uri);
         Ok(())
     }
@@ -131,9 +129,9 @@ impl TestWorld {
             "source filename must not traverse outside the temp dir: {filename}"
         );
         let temp_dir = tempfile::tempdir()?;
-        let path = temp_dir.path().join(candidate);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+        let path = temp_dir.path().join(&candidate);
+        if let Some(parent) = candidate.parent() {
+            ensure_relative_dirs(temp_dir.path(), parent)?;
         }
         let uri = Url::from_file_path(&path)
             .map_err(|_| anyhow::anyhow!("failed to convert path to URI"))?
@@ -185,9 +183,7 @@ impl TestWorld {
         Ok(())
     }
 
-    pub fn set_stdin(&mut self, data: &str) {
-        self.stdin = data.as_bytes().to_vec();
-    }
+    pub fn set_stdin(&mut self, data: &str) { self.stdin = data.as_bytes().to_vec(); }
 
     fn build_args(command: &str) -> Vec<OsString> {
         let mut args = vec![OsString::from("weaver")];
@@ -202,13 +198,9 @@ impl TestWorld {
         args
     }
 
-    pub fn stdout_text(&self) -> Result<String> {
-        decode_utf8(self.stdout.clone(), "stdout")
-    }
+    pub fn stdout_text(&self) -> Result<String> { decode_utf8(self.stdout.clone(), "stdout") }
 
-    pub fn stderr_text(&self) -> Result<String> {
-        decode_utf8(self.stderr.clone(), "stderr")
-    }
+    pub fn stderr_text(&self) -> Result<String> { decode_utf8(self.stderr.clone(), "stderr") }
 
     pub fn assert_exit_code(&self, expected: u8) -> Result<()> {
         let exit = self.exit_code.context("exit code recorded")?;
@@ -255,13 +247,9 @@ impl TestWorld {
         Ok(())
     }
 
-    pub fn lifecycle_calls(&self) -> Vec<LifecycleCall> {
-        self.lifecycle.record()
-    }
+    pub fn lifecycle_calls(&self) -> Vec<LifecycleCall> { self.lifecycle.record() }
 
-    pub fn lifecycle_enqueue_success(&self) {
-        self.lifecycle.enqueue(Ok(ExitCode::SUCCESS));
-    }
+    pub fn lifecycle_enqueue_success(&self) { self.lifecycle.enqueue(Ok(ExitCode::SUCCESS)); }
 
     pub fn lifecycle_enqueue_error(&self, error: LifecycleError) {
         self.lifecycle.enqueue(Err(error));
@@ -279,13 +267,59 @@ impl TestWorld {
 
 // ── Helper functions ───────────────────────────────────────────────────────────
 
+fn open_parent_dir(path: &std::path::Path) -> io::Result<(Dir, PathBuf)> {
+    let parent = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+    let file_name = path.file_name().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("path has no file name: {}", path.display()),
+        )
+    })?;
+    let dir = Dir::open_ambient_dir(parent, cap_std::ambient_authority())?;
+    Ok((dir, PathBuf::from(file_name)))
+}
+
+fn ensure_relative_dirs(root: &std::path::Path, relative: &std::path::Path) -> io::Result<()> {
+    let mut dir = Dir::open_ambient_dir(root, cap_std::ambient_authority())?;
+    for component in relative.components() {
+        match component {
+            Component::CurDir => {}
+            Component::Normal(name) => {
+                match dir.create_dir(name) {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+                    Err(error) => return Err(error),
+                }
+                dir = dir.open_dir(name)?;
+            }
+            other => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("unexpected relative path component: {other:?}"),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn write_test_file(path: &std::path::Path, content: &[u8]) -> io::Result<()> {
+    let (dir, file_name) = open_parent_dir(path)?;
+    dir.write(file_name, content)
+}
+
+pub(crate) fn read_test_file_to_string(path: &std::path::Path) -> io::Result<String> {
+    let (dir, file_name) = open_parent_dir(path)?;
+    dir.read_to_string(file_name)
+}
+
 pub(super) fn read_fixture(name: &str) -> Result<String> {
     let normalized = name.trim().trim_matches('"');
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("tests");
     path.push("golden");
     path.push(normalized);
-    fs::read_to_string(&path).with_context(|| format!("read fixture at {}", path.display()))
+    read_test_file_to_string(&path).with_context(|| format!("read fixture at {}", path.display()))
 }
 
 pub(super) fn decode_utf8(buffer: Vec<u8>, label: &str) -> Result<String> {
@@ -335,7 +369,6 @@ pub(super) fn daemon_lines_for_stderr(payload: &str, status: i32) -> Vec<String>
 
 // ── Fixtures ───────────────────────────────────────────────────────────────────
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-pub(super) fn world() -> RefCell<TestWorld> {
-    RefCell::new(TestWorld::default())
-}
+pub(super) fn world() -> RefCell<TestWorld> { RefCell::new(TestWorld::default()) }

@@ -6,21 +6,28 @@ mod world;
 use std::str::FromStr;
 
 use lsp_types::{
-    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    GotoDefinitionParams, ReferenceContext, ReferenceParams, TextDocumentContentChangeEvent,
-    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri,
+    DidChangeTextDocumentParams,
+    DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams,
+    GotoDefinitionParams,
+    ReferenceContext,
+    ReferenceParams,
+    TextDocumentContentChangeEvent,
+    TextDocumentIdentifier,
+    TextDocumentItem,
+    TextDocumentPositionParams,
+    Uri,
     VersionedTextDocumentIdentifier,
 };
-use rstest::fixture;
-
 pub use recording_server::{CallKind, DocumentSyncErrors, RecordingLanguageServer, ResponseSet};
+use rstest::fixture;
+use weaver_test_macros::allow_fixture_expansion_lints;
 pub use world::{TestServerConfig, TestWorld};
 
 /// Common URI used by host tests.
+#[allow_fixture_expansion_lints]
 #[fixture]
-pub fn sample_uri() -> Uri {
-    Uri::from_str("file:///workspace/main.rs").expect("invalid test URI")
-}
+pub fn sample_uri() -> Uri { Uri::from_str("file:///workspace/main.rs").expect("invalid test URI") }
 
 /// Builds a definition request for the sample URI.
 #[must_use]

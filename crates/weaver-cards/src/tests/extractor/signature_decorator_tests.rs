@@ -2,9 +2,8 @@
 
 use std::path::Path;
 
-use crate::DetailLevel;
-
 use super::common::{ExtractRequest, extract};
+use crate::DetailLevel;
 
 #[test]
 fn rust_tuple_type_parameters_are_extracted_from_ast() {

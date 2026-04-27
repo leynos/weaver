@@ -8,15 +8,19 @@ mod apply;
 mod syntactic;
 mod test_doubles;
 
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 pub use apply::apply_edits;
 pub use syntactic::TreeSitterSyntacticLockAdapter;
 pub use test_doubles::{ConfigurableSemanticLock, ConfigurableSyntacticLock};
 
-use super::error::SafetyHarnessError;
-use super::locks::{SemanticLockResult, SyntacticLockResult};
+use super::{
+    error::SafetyHarnessError,
+    locks::{SemanticLockResult, SyntacticLockResult},
+};
 
 /// Context for verification operations.
 ///
@@ -52,15 +56,11 @@ impl VerificationContext {
 
     /// Returns the original content for a path.
     #[must_use]
-    pub fn original(&self, path: &Path) -> Option<&String> {
-        self.original_content.get(path)
-    }
+    pub fn original(&self, path: &Path) -> Option<&String> { self.original_content.get(path) }
 
     /// Returns the modified content for a path.
     #[must_use]
-    pub fn modified(&self, path: &Path) -> Option<&String> {
-        self.modified_content.get(path)
-    }
+    pub fn modified(&self, path: &Path) -> Option<&String> { self.modified_content.get(path) }
 
     /// Returns all paths with modified content.
     pub fn modified_paths(&self) -> impl Iterator<Item = &Path> {
@@ -74,21 +74,15 @@ impl VerificationContext {
 
     /// Returns the number of files in the modified set.
     #[must_use]
-    pub fn modified_count(&self) -> usize {
-        self.modified_content.len()
-    }
+    pub fn modified_count(&self) -> usize { self.modified_content.len() }
 
     /// Returns true when no files are in the modified set.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.modified_content.is_empty()
-    }
+    pub fn is_empty(&self) -> bool { self.modified_content.is_empty() }
 }
 
 impl Default for VerificationContext {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 /// Trait for syntactic validation implementations.
@@ -147,6 +141,8 @@ impl SemanticLock for PlaceholderSemanticLock {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for verification context and file tracking.
+
     use super::*;
 
     #[test]

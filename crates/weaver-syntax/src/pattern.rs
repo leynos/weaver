@@ -13,10 +13,12 @@
 //! Metavariable names must start with an uppercase letter or underscore,
 //! followed by uppercase letters, digits, or underscores.
 
-use crate::error::SyntaxError;
-use crate::language::SupportedLanguage;
-use crate::metavariables::{extract_metavar_name, placeholder_for_metavar};
-use crate::parser::{ParseResult, Parser};
+use crate::{
+    error::SyntaxError,
+    language::SupportedLanguage,
+    metavariables::{extract_metavar_name, placeholder_for_metavar},
+    parser::{ParseResult, Parser},
+};
 
 /// A compiled structural pattern for matching code.
 ///
@@ -78,18 +80,16 @@ impl Pattern {
     /// # Ok::<(), weaver_syntax::SyntaxError>(())
     /// ```
     pub fn compile(source: &str, language: SupportedLanguage) -> Result<Self, SyntaxError> {
-        // Extract metavariables from the source
-        let metavariables = extract_metavariables(source)?;
+        let raw = RawSource(source);
+        let metavariables = extract_metavariables(raw)?;
+        let normalized = normalize_metavariables(raw)?;
 
-        let normalised_source = normalise_metavariables(source)?;
-
-        // Parse the pattern as code
         let mut parser = Parser::new(language)?;
         let mut wrapped_in_function = false;
-        let mut parsed = parser.parse(&normalised_source)?;
+        let mut parsed = parser.parse(normalized.as_str())?;
         if parsed.has_errors() {
-            let wrapped_source = wrap_pattern_for_parse(language, &normalised_source);
-            parsed = parser.parse(&wrapped_source)?;
+            let wrapped = wrap_pattern_for_parse(language, &normalized);
+            parsed = parser.parse(&wrapped)?;
             wrapped_in_function = true;
         }
 
@@ -111,83 +111,87 @@ impl Pattern {
 
     /// Returns the original pattern source.
     #[must_use]
-    pub fn source(&self) -> &str {
-        &self.source
-    }
+    pub fn source(&self) -> &str { &self.source }
 
     /// Returns the language this pattern is compiled for.
     #[must_use]
-    pub const fn language(&self) -> SupportedLanguage {
-        self.language
-    }
+    pub const fn language(&self) -> SupportedLanguage { self.language }
 
-    pub(crate) const fn wrapped_in_function(&self) -> bool {
-        self.wrapped_in_function
-    }
+    pub(crate) const fn wrapped_in_function(&self) -> bool { self.wrapped_in_function }
 
     /// Returns the metavariables defined in this pattern.
     #[must_use]
-    pub fn metavariables(&self) -> &[MetaVariable] {
-        &self.metavariables
-    }
+    pub fn metavariables(&self) -> &[MetaVariable] { &self.metavariables }
 
     /// Returns the parsed syntax tree of the pattern.
     #[must_use]
-    pub const fn parsed(&self) -> &ParseResult {
-        &self.parsed
-    }
+    pub const fn parsed(&self) -> &ParseResult { &self.parsed }
 
     /// Returns whether this pattern has any metavariables.
     #[must_use]
-    pub const fn has_metavariables(&self) -> bool {
-        !self.metavariables.is_empty()
-    }
+    pub const fn has_metavariables(&self) -> bool { !self.metavariables.is_empty() }
 }
 
-fn wrap_pattern_for_parse(language: SupportedLanguage, pattern: &str) -> String {
+/// Un-normalised pattern source, before metavariable substitution.
+#[derive(Clone, Copy)]
+struct RawSource<'a>(&'a str);
+
+/// Pattern source after metavariable placeholders have been substituted.
+#[derive(Debug)]
+struct NormalizedSource(String);
+
+impl NormalizedSource {
+    fn as_str(&self) -> &str { &self.0 }
+}
+
+fn wrap_pattern_for_parse(language: SupportedLanguage, pattern: &NormalizedSource) -> String {
+    let s = pattern.as_str();
     match language {
         SupportedLanguage::Rust => {
-            let trimmed = pattern.trim_end();
-            let needs_semicolon =
-                !trimmed.is_empty() && !trimmed.ends_with(';') && !trimmed.ends_with('}');
-            let statement = if needs_semicolon {
-                format!("{trimmed};")
-            } else {
-                trimmed.to_owned()
-            };
-
-            format!("fn __weaver_pattern_wrapper__() {{ {statement} }}")
+            format!(
+                "fn __weaver_pattern_wrapper__() {{ {} }}",
+                rust_pattern_wrapper_statement(pattern)
+            )
         }
-        SupportedLanguage::Python => {
-            let mut out = String::from("def __weaver_pattern_wrapper__():\n");
-            if pattern.trim().is_empty() {
-                out.push_str("    pass\n");
-                return out;
-            }
-
-            for line in pattern.lines() {
-                out.push_str("    ");
-                out.push_str(line);
-                out.push('\n');
-            }
-
-            out
-        }
+        SupportedLanguage::Python => python_pattern_wrapper(pattern),
         SupportedLanguage::TypeScript => {
-            format!("function __weaver_pattern_wrapper__() {{ {pattern} }}")
+            format!("function __weaver_pattern_wrapper__() {{ {s} }}")
         }
     }
 }
 
-fn normalise_metavariables(source: &str) -> Result<String, SyntaxError> {
-    let mut out = String::with_capacity(source.len());
+fn rust_pattern_wrapper_statement(pattern: &NormalizedSource) -> String {
+    let trimmed = pattern.as_str().trim_end();
+    match trimmed.chars().last() {
+        None | Some(';' | '}') => trimmed.to_owned(),
+        Some(_) => format!("{trimmed};"),
+    }
+}
+
+fn python_pattern_wrapper(pattern: &NormalizedSource) -> String {
+    let s = pattern.as_str();
+    let mut out = String::from("def __weaver_pattern_wrapper__():\n");
+    if s.trim().is_empty() {
+        out.push_str("    pass\n");
+    } else {
+        for line in s.lines() {
+            out.push_str("    ");
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    out
+}
+
+fn normalize_metavariables(source: RawSource<'_>) -> Result<NormalizedSource, SyntaxError> {
+    let mut out = String::with_capacity(source.0.len());
 
     visit_metavariables(source, |event| match event {
         MetavarEvent::Literal(ch) => out.push(ch),
         MetavarEvent::Metavar(metavar) => out.push_str(&placeholder_for_metavar(&metavar.name)),
     })?;
 
-    Ok(out)
+    Ok(NormalizedSource(out))
 }
 
 #[derive(Debug)]
@@ -203,11 +207,11 @@ enum MetavarEvent {
     Metavar(MetavarReference),
 }
 
-fn visit_metavariables<F>(source: &str, mut handler: F) -> Result<(), SyntaxError>
+fn visit_metavariables<F>(source: RawSource<'_>, mut handler: F) -> Result<(), SyntaxError>
 where
     F: FnMut(MetavarEvent),
 {
-    let mut chars = source.char_indices().peekable();
+    let mut chars = source.0.char_indices().peekable();
     while let Some((offset, ch)) = chars.next() {
         if ch != '$' {
             handler(MetavarEvent::Literal(ch));
@@ -247,7 +251,7 @@ where
 ///
 /// Scans the source for `$VAR` and `$$$VAR` patterns and returns
 /// information about each metavariable found.
-fn extract_metavariables(source: &str) -> Result<Vec<MetaVariable>, SyntaxError> {
+fn extract_metavariables(source: RawSource<'_>) -> Result<Vec<MetaVariable>, SyntaxError> {
     let mut metavariables = Vec::new();
     visit_metavariables(source, |event| {
         let MetavarEvent::Metavar(metavar) = event else {
@@ -272,11 +276,13 @@ fn extract_metavariables(source: &str) -> Result<Vec<MetaVariable>, SyntaxError>
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for pattern metavariable extraction and validation.
+
     use super::*;
 
     #[test]
     fn extract_single_metavariable() {
-        let metavars = extract_metavariables("$VAR").expect("extract");
+        let metavars = extract_metavariables(RawSource("$VAR")).expect("extract");
         assert_eq!(metavars.len(), 1);
         assert_eq!(metavars.first().map(|m| m.name.as_str()), Some("VAR"));
         assert_eq!(metavars.first().map(|m| m.kind), Some(MetaVarKind::Single));
@@ -284,7 +290,7 @@ mod tests {
 
     #[test]
     fn extract_multiple_metavariable() {
-        let metavars = extract_metavariables("$$$ARGS").expect("extract");
+        let metavars = extract_metavariables(RawSource("$$$ARGS")).expect("extract");
         assert_eq!(metavars.len(), 1);
         assert_eq!(metavars.first().map(|m| m.name.as_str()), Some("ARGS"));
         assert_eq!(
@@ -295,7 +301,7 @@ mod tests {
 
     #[test]
     fn extract_multiple_metavariables() {
-        let metavars = extract_metavariables("$FUNC($ARG1, $ARG2)").expect("extract");
+        let metavars = extract_metavariables(RawSource("$FUNC($ARG1, $ARG2)")).expect("extract");
         assert_eq!(metavars.len(), 3);
 
         let names: Vec<_> = metavars.iter().map(|m| m.name.as_str()).collect();
@@ -304,7 +310,7 @@ mod tests {
 
     #[test]
     fn extract_wildcard() {
-        let metavars = extract_metavariables("$_").expect("extract");
+        let metavars = extract_metavariables(RawSource("$_")).expect("extract");
         assert_eq!(metavars.len(), 1);
         assert_eq!(metavars.first().map(|m| m.name.as_str()), Some("_"));
     }
@@ -340,5 +346,19 @@ mod tests {
     fn compile_rejects_patterns_with_syntax_errors() {
         let result = Pattern::compile("fn (", SupportedLanguage::Rust);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn wrap_rust_pattern_adds_statement_semicolon() {
+        let src = NormalizedSource("dbg!($EXPR)".to_owned());
+        let wrapped = wrap_pattern_for_parse(SupportedLanguage::Rust, &src);
+        assert_eq!(wrapped, "fn __weaver_pattern_wrapper__() { dbg!($EXPR); }");
+    }
+
+    #[test]
+    fn wrap_python_empty_pattern_uses_pass() {
+        let src = NormalizedSource(" \n".to_owned());
+        let wrapped = wrap_pattern_for_parse(SupportedLanguage::Python, &src);
+        assert_eq!(wrapped, "def __weaver_pattern_wrapper__():\n    pass\n");
     }
 }

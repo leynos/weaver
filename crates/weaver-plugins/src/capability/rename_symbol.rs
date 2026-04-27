@@ -8,9 +8,11 @@
 
 use std::collections::HashMap;
 
-use crate::capability::{CapabilityContract, CapabilityId, ContractVersion};
-use crate::error::PluginError;
-use crate::protocol::{PluginOutput, PluginRequest, PluginResponse};
+use crate::{
+    capability::{CapabilityContract, CapabilityId, ContractVersion},
+    error::PluginError,
+    protocol::{PluginOutput, PluginRequest, PluginResponse},
+};
 
 /// Contract version for `rename-symbol` v1.0.
 pub const RENAME_SYMBOL_CONTRACT_VERSION: ContractVersion = ContractVersion::new(1, 0);
@@ -26,11 +28,8 @@ pub const RENAME_SYMBOL_CONTRACT_VERSION: ContractVersion = ContractVersion::new
 /// ```
 /// use weaver_plugins::capability::RenameSymbolRequest;
 ///
-/// let request = RenameSymbolRequest::new(
-///     "file:///project/src/main.py",
-///     "10:5",
-///     "new_function_name",
-/// );
+/// let request =
+///     RenameSymbolRequest::new("file:///project/src/main.py", "10:5", "new_function_name");
 /// assert_eq!(request.uri(), "file:///project/src/main.py");
 /// assert_eq!(request.new_name(), "new_function_name");
 /// ```
@@ -58,21 +57,15 @@ impl RenameSymbolRequest {
 
     /// Returns the file URI.
     #[must_use]
-    pub fn uri(&self) -> &str {
-        &self.uri
-    }
+    pub fn uri(&self) -> &str { &self.uri }
 
     /// Returns the position string (e.g., "10:5" or byte offset).
     #[must_use]
-    pub fn position(&self) -> &str {
-        &self.position
-    }
+    pub fn position(&self) -> &str { &self.position }
 
     /// Returns the new symbol name.
     #[must_use]
-    pub fn new_name(&self) -> &str {
-        &self.new_name
-    }
+    pub fn new_name(&self) -> &str { &self.new_name }
 
     /// Extracts and validates a [`RenameSymbolRequest`] from generic
     /// plugin request arguments.
@@ -134,8 +127,8 @@ fn validate_success_output(response: &PluginResponse) -> Result<(), PluginError>
         other => Err(PluginError::InvalidOutput {
             name: String::from("rename-symbol"),
             message: format!(
-                "rename-symbol contract requires successful responses to \
-                 contain diff output, got {other:?}",
+                "rename-symbol contract requires successful responses to contain diff output, got \
+                 {other:?}",
             ),
         }),
     }
@@ -146,9 +139,7 @@ fn validate_success_output(response: &PluginResponse) -> Result<(), PluginError>
 /// # Example
 ///
 /// ```
-/// use weaver_plugins::capability::{
-///     CapabilityContract, CapabilityId, RenameSymbolContract,
-/// };
+/// use weaver_plugins::capability::{CapabilityContract, CapabilityId, RenameSymbolContract};
 ///
 /// let contract = RenameSymbolContract;
 /// assert_eq!(contract.capability_id(), CapabilityId::RenameSymbol);
@@ -157,13 +148,9 @@ fn validate_success_output(response: &PluginResponse) -> Result<(), PluginError>
 pub struct RenameSymbolContract;
 
 impl CapabilityContract for RenameSymbolContract {
-    fn capability_id(&self) -> CapabilityId {
-        CapabilityId::RenameSymbol
-    }
+    fn capability_id(&self) -> CapabilityId { CapabilityId::RenameSymbol }
 
-    fn version(&self) -> ContractVersion {
-        RENAME_SYMBOL_CONTRACT_VERSION
-    }
+    fn version(&self) -> ContractVersion { RENAME_SYMBOL_CONTRACT_VERSION }
 
     fn validate_request(&self, request: &PluginRequest) -> Result<(), PluginError> {
         let expected = CapabilityId::RenameSymbol.as_str();
@@ -171,8 +158,7 @@ impl CapabilityContract for RenameSymbolContract {
             return Err(PluginError::InvalidOutput {
                 name: String::from("rename-symbol"),
                 message: format!(
-                    "rename-symbol contract expects operation '{expected}', \
-                     got '{}'",
+                    "rename-symbol contract expects operation '{expected}', got '{}'",
                     request.operation(),
                 ),
             });

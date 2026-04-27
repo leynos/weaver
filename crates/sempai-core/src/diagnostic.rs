@@ -109,27 +109,19 @@ impl SourceSpan {
         clippy::missing_const_for_fn,
         reason = "heap types cannot be used in const contexts"
     )]
-    pub fn new(start: u32, end: u32, uri: Option<String>) -> Self {
-        Self { start, end, uri }
-    }
+    pub fn new(start: u32, end: u32, uri: Option<String>) -> Self { Self { start, end, uri } }
 
     /// Returns the inclusive start byte offset.
     #[must_use]
-    pub const fn start(&self) -> u32 {
-        self.start
-    }
+    pub const fn start(&self) -> u32 { self.start }
 
     /// Returns the exclusive end byte offset.
     #[must_use]
-    pub const fn end(&self) -> u32 {
-        self.end
-    }
+    pub const fn end(&self) -> u32 { self.end }
 
     /// Returns the source file URI, if available.
     #[must_use]
-    pub fn uri(&self) -> Option<&str> {
-        self.uri.as_deref()
-    }
+    pub fn uri(&self) -> Option<&str> { self.uri.as_deref() }
 }
 
 /// A single diagnostic entry within a report.
@@ -184,21 +176,15 @@ impl Diagnostic {
 
     /// Returns the diagnostic code.
     #[must_use]
-    pub const fn code(&self) -> DiagnosticCode {
-        self.code
-    }
+    pub const fn code(&self) -> DiagnosticCode { self.code }
 
     /// Returns the diagnostic message.
     #[must_use]
-    pub fn message(&self) -> &str {
-        &self.message
-    }
+    pub fn message(&self) -> &str { &self.message }
 
     /// Returns the source span, if available.
     #[must_use]
-    pub const fn primary_span(&self) -> Option<&SourceSpan> {
-        self.primary_span.as_ref()
-    }
+    pub const fn primary_span(&self) -> Option<&SourceSpan> { self.primary_span.as_ref() }
 
     /// Returns the primary source span, if available.
     ///
@@ -206,15 +192,11 @@ impl Diagnostic {
     /// migrated to [`primary_span`](Self::primary_span).
     #[must_use]
     #[deprecated(since = "0.1.0", note = "use `primary_span()` instead")]
-    pub const fn span(&self) -> Option<&SourceSpan> {
-        self.primary_span()
-    }
+    pub const fn span(&self) -> Option<&SourceSpan> { self.primary_span() }
 
     /// Returns the supplementary notes.
     #[must_use]
-    pub fn notes(&self) -> &[String] {
-        &self.notes
-    }
+    pub fn notes(&self) -> &[String] { &self.notes }
 }
 
 /// Summarises the first diagnostic in a report for the `Display` impl.
@@ -252,9 +234,7 @@ impl DiagnosticReport {
         clippy::missing_const_for_fn,
         reason = "heap types cannot be used in const contexts"
     )]
-    pub fn new(diagnostics: Vec<Diagnostic>) -> Self {
-        Self { diagnostics }
-    }
+    pub fn new(diagnostics: Vec<Diagnostic>) -> Self { Self { diagnostics } }
 
     /// Creates a report containing a single diagnostic.
     ///
@@ -328,19 +308,13 @@ impl DiagnosticReport {
 
     /// Returns the diagnostics in this report.
     #[must_use]
-    pub fn diagnostics(&self) -> &[Diagnostic] {
-        &self.diagnostics
-    }
+    pub fn diagnostics(&self) -> &[Diagnostic] { &self.diagnostics }
 
     /// Returns `true` if the report contains no diagnostics.
     #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        self.diagnostics.is_empty()
-    }
+    pub const fn is_empty(&self) -> bool { self.diagnostics.is_empty() }
 
     /// Returns the number of diagnostics in the report.
     #[must_use]
-    pub const fn len(&self) -> usize {
-        self.diagnostics.len()
-    }
+    pub const fn len(&self) -> usize { self.diagnostics.len() }
 }

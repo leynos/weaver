@@ -20,9 +20,7 @@ pub struct Position {
 impl Position {
     /// Creates a new position.
     #[must_use]
-    pub const fn new(line: u32, column: u32) -> Self {
-        Self { line, column }
-    }
+    pub const fn new(line: u32, column: u32) -> Self { Self { line, column } }
 }
 
 /// A range within a text file, defined by start and end positions.
@@ -37,9 +35,7 @@ pub struct TextRange {
 impl TextRange {
     /// Creates a new range from start to end.
     #[must_use]
-    pub const fn new(start: Position, end: Position) -> Self {
-        Self { start, end }
-    }
+    pub const fn new(start: Position, end: Position) -> Self { Self { start, end } }
 
     /// Creates a zero-length range at the given position.
     #[must_use]
@@ -102,33 +98,23 @@ impl TextEdit {
 
     /// Starting line (zero-based).
     #[must_use]
-    pub const fn start_line(&self) -> u32 {
-        self.range.start.line
-    }
+    pub const fn start_line(&self) -> u32 { self.range.start.line }
 
     /// Starting column (zero-based, UTF-8 bytes).
     #[must_use]
-    pub const fn start_column(&self) -> u32 {
-        self.range.start.column
-    }
+    pub const fn start_column(&self) -> u32 { self.range.start.column }
 
     /// Ending line (zero-based).
     #[must_use]
-    pub const fn end_line(&self) -> u32 {
-        self.range.end.line
-    }
+    pub const fn end_line(&self) -> u32 { self.range.end.line }
 
     /// Ending column (zero-based, UTF-8 bytes).
     #[must_use]
-    pub const fn end_column(&self) -> u32 {
-        self.range.end.column
-    }
+    pub const fn end_column(&self) -> u32 { self.range.end.column }
 
     /// Replacement text.
     #[must_use]
-    pub fn new_text(&self) -> &str {
-        &self.new_text
-    }
+    pub fn new_text(&self) -> &str { &self.new_text }
 }
 
 /// A collection of edits for a single file.
@@ -151,37 +137,29 @@ impl FileEdit {
     }
 
     /// Adds a text edit to this file.
-    pub fn add_edit(&mut self, edit: TextEdit) {
-        self.edits.push(edit);
-    }
+    pub fn add_edit(&mut self, edit: TextEdit) { self.edits.push(edit); }
 
     /// Builds a file edit from an existing collection of edits.
     #[must_use]
-    pub fn with_edits(path: PathBuf, edits: Vec<TextEdit>) -> Self {
-        Self { path, edits }
-    }
+    pub fn with_edits(path: PathBuf, edits: Vec<TextEdit>) -> Self { Self { path, edits } }
 
     /// Path to the file being edited.
     #[must_use]
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
+    pub fn path(&self) -> &Path { &self.path }
 
     /// Edits to apply.
     #[must_use]
-    pub fn edits(&self) -> &[TextEdit] {
-        &self.edits
-    }
+    pub fn edits(&self) -> &[TextEdit] { &self.edits }
 
     /// Returns true when no edits are present.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.edits.is_empty()
-    }
+    pub fn is_empty(&self) -> bool { self.edits.is_empty() }
 }
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for text edit operations and positioning.
+
     use super::*;
 
     #[test]

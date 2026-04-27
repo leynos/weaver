@@ -16,6 +16,7 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 assert_cmd = { workspace = true }
+cap-std = { workspace = true }
 rstest = { workspace = true }
 insta = { workspace = true }
 tempfile = { workspace = true }
@@ -24,6 +25,7 @@ weaver-cli = { path = "../weaver-cli" }
 weaver-cards = { path = "../weaver-cards" }
 weaver-config = { path = "../weaver-config" }
 weaverd = { path = "../weaverd", features = ["test-support"] }
+weaver-test-macros = { path = "../weaver-test-macros" }
 
 [lints]
 workspace = true

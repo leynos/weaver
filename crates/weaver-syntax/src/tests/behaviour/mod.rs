@@ -3,16 +3,23 @@
 //! These tests execute the Gherkin feature file via `rstest-bdd` and exercise
 //! the crate's public APIs end-to-end.
 
-use std::cell::RefCell;
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::{cell::RefCell, path::PathBuf, str::FromStr};
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, then, when};
+use weaver_test_macros::allow_fixture_expansion_lints;
 
 use crate::{
-    MatchResult, ParseResult, Parser, Pattern, RewriteResult, RewriteRule, Rewriter,
-    SupportedLanguage, TreeSitterSyntacticLock, ValidationFailure,
+    MatchResult,
+    ParseResult,
+    Parser,
+    Pattern,
+    RewriteResult,
+    RewriteRule,
+    Rewriter,
+    SupportedLanguage,
+    TreeSitterSyntacticLock,
+    ValidationFailure,
 };
 
 mod scenarios;
@@ -60,19 +67,16 @@ impl<'a> From<&MatchResult<'a>> for MatchResultSnapshot {
     }
 }
 
+#[allow_fixture_expansion_lints]
 #[fixture]
-fn world() -> RefCell<TestWorld> {
-    RefCell::new(TestWorld::default())
-}
+fn world() -> RefCell<TestWorld> { RefCell::new(TestWorld::default()) }
 
 // =============================================================================
 // Given Steps
 // =============================================================================
 
 /// Strips surrounding double quotes from a string if present.
-fn strip_quotes(s: &str) -> &str {
-    s.trim_matches('"')
-}
+fn strip_quotes(s: &str) -> &str { s.trim_matches('"') }
 
 #[given("language {language}")]
 fn given_language(world: &RefCell<TestWorld>, language: String) {

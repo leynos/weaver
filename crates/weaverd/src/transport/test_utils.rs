@@ -22,7 +22,5 @@ impl CountingHandler {
 }
 
 impl ConnectionHandler for CountingHandler {
-    fn handle(&self, _stream: ConnectionStream) {
-        self.count.fetch_add(1, Ordering::SeqCst);
-    }
+    fn handle(&self, _stream: ConnectionStream) { self.count.fetch_add(1, Ordering::SeqCst); }
 }

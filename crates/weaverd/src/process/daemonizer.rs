@@ -1,12 +1,13 @@
 //! Implements the daemonisation backend for the `weaverd` process.
 
-use daemonize_me::Daemon;
 use std::ffi::OsStr;
+
+use daemonize_me::Daemon;
 use thiserror::Error;
 use tracing::info;
+use weaver_config::RuntimePaths;
 
 use super::PROCESS_TARGET;
-use weaver_config::RuntimePaths;
 
 /// Abstraction over daemonisation strategies.
 pub trait Daemonizer: Send + Sync {
@@ -28,9 +29,7 @@ pub struct SystemDaemonizer;
 
 impl SystemDaemonizer {
     /// Builds a new system daemoniser.
-    pub fn new() -> Self {
-        Self
-    }
+    pub fn new() -> Self { Self }
 }
 
 impl Daemonizer for SystemDaemonizer {

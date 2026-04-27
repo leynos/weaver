@@ -1,9 +1,11 @@
 //! Error types for daemon lifecycle operations.
 
-use std::ffi::OsString;
-use std::io;
-use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use std::{
+    ffi::OsString,
+    io,
+    path::PathBuf,
+    time::{Duration, SystemTime},
+};
 
 use thiserror::Error;
 use weaver_config::{RuntimePathsError, SocketPreparationError};
@@ -17,7 +19,14 @@ pub enum LifecycleError {
         argument: String,
     },
     #[error(
-        "daemon socket {endpoint} is already in use; stop the existing daemon or change --daemon-socket"
+        "{}",
+        format_args!(
+            concat!(
+                "daemon socket {endpoint} is already in use; stop the existing daemon or change ",
+                "--daemon-socket"
+            ),
+            endpoint = endpoint
+        )
     )]
     SocketInUse { endpoint: String },
     #[error("failed to probe daemon socket {endpoint}: {source}")]
@@ -71,7 +80,15 @@ pub enum LifecycleError {
         source: std::num::ParseIntError,
     },
     #[error(
-        "daemon socket {endpoint} is reachable but pid file {path:?} is missing; inspect the runtime directory before retrying"
+        "{}",
+        format_args!(
+            concat!(
+                "daemon socket {endpoint} is reachable but pid file {path:?} is missing; inspect the ",
+                "runtime directory before retrying"
+            ),
+            endpoint = endpoint,
+            path = path
+        )
     )]
     MissingPidWithSocket { path: PathBuf, endpoint: String },
     #[error("failed to write lifecycle output: {0}")]
@@ -106,7 +123,14 @@ pub enum LifecycleError {
         source: io::Error,
     },
     #[error(
-        "system clock error: time {time:?} is before UNIX epoch; daemon readiness cannot be validated"
+        "{}",
+        format_args!(
+            concat!(
+                "system clock error: time {time:?} is before UNIX epoch; daemon readiness cannot be ",
+                "validated"
+            ),
+            time = time
+        )
     )]
     InvalidSystemClock { time: SystemTime },
 }

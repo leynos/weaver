@@ -4,12 +4,13 @@ use std::sync::Arc;
 
 use ortho_config::OrthoError;
 use thiserror::Error;
-
 use weaver_config::{Config, SocketPreparationError};
 
-use crate::backends::{BackendKind, BackendProvider, BackendStartupError, FusionBackends};
-use crate::health::HealthReporter;
-use crate::telemetry::{self, TelemetryError, TelemetryHandle};
+use crate::{
+    backends::{BackendKind, BackendProvider, BackendStartupError, FusionBackends},
+    health::HealthReporter,
+    telemetry::{self, TelemetryError, TelemetryHandle},
+};
 
 macro_rules! try_bootstrap {
     ($reporter:expr, $expr:expr => $variant:ident) => {{
@@ -35,9 +36,7 @@ pub trait ConfigLoader: Send + Sync {
 pub struct SystemConfigLoader;
 
 impl ConfigLoader for SystemConfigLoader {
-    fn load(&self) -> Result<Config, Arc<OrthoError>> {
-        Config::load()
-    }
+    fn load(&self) -> Result<Config, Arc<OrthoError>> { Config::load() }
 }
 
 /// Loader that always returns the supplied configuration clone.
@@ -48,15 +47,11 @@ pub struct StaticConfigLoader {
 
 impl StaticConfigLoader {
     /// Builds a loader that always returns the provided configuration.
-    pub fn new(config: Config) -> Self {
-        Self { config }
-    }
+    pub fn new(config: Config) -> Self { Self { config } }
 }
 
 impl ConfigLoader for StaticConfigLoader {
-    fn load(&self) -> Result<Config, Arc<OrthoError>> {
-        Ok(self.config.clone())
-    }
+    fn load(&self) -> Result<Config, Arc<OrthoError>> { Ok(self.config.clone()) }
 }
 
 /// Errors surfaced during bootstrap.
@@ -110,21 +105,15 @@ impl<P> Daemon<P> {
     }
 
     /// Consumes the daemon and returns the backends for shared use.
-    pub fn into_backends(self) -> FusionBackends<P> {
-        self.backends
-    }
+    pub fn into_backends(self) -> FusionBackends<P> { self.backends }
 
     /// Accessor for the resolved configuration.
     #[must_use]
-    pub fn config(&self) -> &Config {
-        &self.config
-    }
+    pub fn config(&self) -> &Config { &self.config }
 
     /// Accessor for the telemetry handle, primarily useful for testing.
     #[must_use]
-    pub fn telemetry(&self) -> TelemetryHandle {
-        self.telemetry
-    }
+    pub fn telemetry(&self) -> TelemetryHandle { self.telemetry }
 }
 
 impl<P> Daemon<P>

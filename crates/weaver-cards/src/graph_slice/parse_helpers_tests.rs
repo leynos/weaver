@@ -2,14 +2,22 @@
 
 use rstest::rstest;
 
-use crate::DetailLevel;
-
-use super::parse::Flag;
-use super::parse_helpers::{
-    RawValue, parse_confidence, parse_detail, parse_direction, parse_edge_types, parse_position,
-    parse_u32, parse_uri, require_arg_value,
+use super::{
+    parse::Flag,
+    parse_helpers::{
+        RawValue,
+        parse_confidence,
+        parse_detail,
+        parse_direction,
+        parse_edge_types,
+        parse_position,
+        parse_u32,
+        parse_uri,
+        require_arg_value,
+    },
+    request::{GraphSliceError, SliceDirection, SliceEdgeType},
 };
-use super::request::{GraphSliceError, SliceDirection, SliceEdgeType};
+use crate::DetailLevel;
 
 fn assert_err_contains(result: Result<impl std::fmt::Debug, GraphSliceError>, substring: &str) {
     let error = result.expect_err("expected error");
