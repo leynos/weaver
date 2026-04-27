@@ -119,7 +119,22 @@ mod tests {
         }
     }
 
+    prop_compose! {
+        fn language_region_tag()(
+            language in "[a-z]{2,3}",
+            region in "[A-Z]{2}",
+        ) -> String {
+            format!("{language}-{region}")
+        }
+    }
+
     proptest! {
+        #[test]
+        fn language_region_tags_parse_and_display_canonically(input in language_region_tag()) {
+            let locale = input.parse::<Locale>().expect("generated locale should parse");
+            prop_assert_eq!(locale.to_string(), input);
+        }
+
         #[test]
         fn locale_display_round_trips_ascii_inputs_when_parsing_succeeds(input in ascii_string()) {
             if let Ok(locale) = input.parse::<Locale>() {

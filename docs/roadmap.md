@@ -282,7 +282,7 @@ does* *not require source inspection or external runbooks.*
 *Outcome: Make configuration and operation help directly discoverable from the*
 *CLI without requiring external documentation lookup.*
 
-- [ ] 3.2.1. Surface configuration flags in clap help output.
+- [x] 3.2.1. Surface configuration flags in clap help output.
       See
       [Gap 1c](ui-gap-analysis.md#gap-1c--configuration-flags-invisible)
       and

@@ -15,7 +15,7 @@ use crate::cli::Cli;
 const CONFIG_PATH_ARG_ID: &str = "config-path";
 const CONFIG_HELP_HEADING: &str = "Options";
 
-static CONFIG_FIELD_ARGS: OnceLock<Vec<ConfigFieldArgMetadata>> = OnceLock::new();
+static AUGMENTED_COMMAND: OnceLock<Command> = OnceLock::new();
 
 struct ConfigFieldArgMetadata {
     name: &'static str,
@@ -30,11 +30,17 @@ struct ConfigFieldArgMetadata {
 /// for help rendering and manpage generation without affecting the runtime
 /// parser.
 pub(crate) fn command() -> Command {
+    AUGMENTED_COMMAND.get_or_init(build_command).clone()
+}
+
+fn build_command() -> Command {
     let mut command = Cli::command();
     command = command.arg(config_path_arg());
 
-    for field in config_field_args() {
-        command = command.arg(config_field_arg(field));
+    for field in Config::get_doc_metadata().fields {
+        if let Some(arg) = config_field_arg(&field) {
+            command = command.arg(arg);
+        }
     }
 
     command
@@ -50,44 +56,36 @@ fn config_path_arg() -> Arg {
         .action(ArgAction::Set)
 }
 
-fn config_field_args() -> &'static [ConfigFieldArgMetadata] {
-    CONFIG_FIELD_ARGS.get_or_init(|| {
-        Config::get_doc_metadata()
-            .fields
-            .iter()
-            .filter_map(config_field_arg_metadata)
-            .collect()
-    })
-}
-
 /// Maps a [`FieldMetadata`] entry to bounded static metadata, returning `None`
 /// for fields marked `hide_in_help` or lacking a long flag name.
-fn config_field_arg_metadata(field: &FieldMetadata) -> Option<ConfigFieldArgMetadata> {
+fn config_field_arg(field: &FieldMetadata) -> Option<Arg> {
     let cli = field.cli.as_ref()?;
     let long = cli.long.as_deref()?;
     if cli.hide_in_help {
         return None;
     }
 
-    Some(ConfigFieldArgMetadata {
+    let metadata = ConfigFieldArgMetadata {
         name: promote_static(field.name.clone()),
         long: promote_static(long.to_string()),
         short: cli.short,
         takes_value: cli.takes_value,
         multiple: cli.multiple,
         value_name: cli.value_name.clone().map(promote_static),
-    })
+    };
+
+    Some(config_arg_from_metadata(&metadata))
 }
 
 fn promote_static(value: String) -> &'static str {
-    // Clap requires process-lifetime metadata for dynamically built arguments.
-    // Cache construction calls this once per field, keeping the promotion
-    // bounded even when callers build the help command repeatedly.
+    // SAFETY: clap requires process-lifetime metadata for dynamically built
+    // arguments. `AUGMENTED_COMMAND` calls this during one-time cache
+    // construction only, keeping the promotion bounded for the process.
     Box::leak(value.into_boxed_str())
 }
 
 /// Maps shared configuration metadata to a `clap::Arg`.
-fn config_field_arg(field: &ConfigFieldArgMetadata) -> Arg {
+fn config_arg_from_metadata(field: &ConfigFieldArgMetadata) -> Arg {
     let mut arg = Arg::new(field.name)
         .long(field.long)
         .help_heading(CONFIG_HELP_HEADING)
@@ -121,4 +119,138 @@ fn apply_arg_shape(arg: Arg, field: &ConfigFieldArgMetadata) -> Arg {
     }
 
     shaped
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::error::ErrorKind;
+    use ortho_config::docs::CliMetadata;
+
+    fn field_metadata(cli: Option<CliMetadata>) -> FieldMetadata {
+        FieldMetadata {
+            name: "example_field".to_string(),
+            help_id: "example-help".to_string(),
+            long_help_id: None,
+            value: None,
+            default: None,
+            required: false,
+            deprecated: None,
+            cli,
+            env: None,
+            file: None,
+            examples: Vec::new(),
+            links: Vec::new(),
+            notes: Vec::new(),
+        }
+    }
+
+    fn cli_metadata(takes_value: bool) -> CliMetadata {
+        CliMetadata {
+            long: Some("example-field".to_string()),
+            short: Some('e'),
+            value_name: Some("VALUE".to_string()),
+            multiple: false,
+            takes_value,
+            possible_values: Vec::new(),
+            hide_in_help: false,
+        }
+    }
+
+    #[test]
+    fn command_returns_reusable_augmented_command() {
+        let first = command().render_long_help().to_string();
+        let second = command().render_long_help().to_string();
+
+        assert_eq!(first, second);
+        assert!(first.contains("--config-path <PATH>"));
+        assert!(first.contains("--locale <LOCALE>"));
+    }
+
+    #[test]
+    fn config_path_arg_accepts_path_value() {
+        let matches = Command::new("test")
+            .arg(config_path_arg())
+            .try_get_matches_from(["test", "--config-path", "weaver.toml"])
+            .expect("config path should parse");
+
+        assert_eq!(
+            matches
+                .get_one::<String>(CONFIG_PATH_ARG_ID)
+                .map(String::as_str),
+            Some("weaver.toml")
+        );
+    }
+
+    #[test]
+    fn config_field_arg_omits_hidden_or_unflagged_fields() {
+        let mut hidden = cli_metadata(true);
+        hidden.hide_in_help = true;
+        let mut unflagged = cli_metadata(true);
+        unflagged.long = None;
+
+        assert!(config_field_arg(&field_metadata(Some(hidden))).is_none());
+        assert!(config_field_arg(&field_metadata(Some(unflagged))).is_none());
+        assert!(config_field_arg(&field_metadata(None)).is_none());
+    }
+
+    #[test]
+    fn config_field_arg_uses_value_shape_without_enum_validation() {
+        let mut cli = cli_metadata(true);
+        cli.possible_values = vec!["json".to_string(), "compact".to_string()];
+        let arg = config_field_arg(&field_metadata(Some(cli))).expect("arg should be visible");
+        let matches = Command::new("test")
+            .arg(arg)
+            .try_get_matches_from(["test", "--example-field", "JSON"])
+            .expect("help parser should not validate config values");
+
+        assert_eq!(
+            matches
+                .get_one::<String>("example_field")
+                .map(String::as_str),
+            Some("JSON")
+        );
+    }
+
+    #[test]
+    fn apply_arg_shape_supports_append_and_boolean_flags() {
+        let append = ConfigFieldArgMetadata {
+            name: "append_field",
+            long: "append-field",
+            short: None,
+            takes_value: true,
+            multiple: true,
+            value_name: Some("VALUE"),
+        };
+        let matches = Command::new("test")
+            .arg(config_arg_from_metadata(&append))
+            .try_get_matches_from(["test", "--append-field", "one", "--append-field", "two"])
+            .expect("append flag should parse");
+        let values = matches
+            .get_many::<String>("append_field")
+            .expect("append values should be present")
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        assert_eq!(values, ["one", "two"]);
+
+        let switch = ConfigFieldArgMetadata {
+            name: "switch_field",
+            long: "switch-field",
+            short: None,
+            takes_value: false,
+            multiple: false,
+            value_name: None,
+        };
+        let matches = Command::new("test")
+            .arg(config_arg_from_metadata(&switch))
+            .try_get_matches_from(["test", "--switch-field"])
+            .expect("switch flag should parse");
+        assert_eq!(matches.get_one::<bool>("switch_field").copied(), Some(true));
+
+        let error = Command::new("test")
+            .arg(config_arg_from_metadata(&switch))
+            .try_get_matches_from(["test", "--switch-field", "value"])
+            .expect_err("switch flag should reject a value");
+        assert_eq!(error.kind(), ErrorKind::UnknownArgument);
+    }
 }

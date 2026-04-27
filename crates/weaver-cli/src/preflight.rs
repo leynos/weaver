@@ -1,6 +1,7 @@
 //! Pre-clap guidance paths that should exit before configuration loading.
 
 use std::io::Write;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use ortho_config::Localizer;
 
@@ -11,6 +12,8 @@ use crate::discoverability::{
     write_unknown_domain_guidance,
 };
 use crate::{AppError, Cli};
+
+static PREFLIGHT_GUIDANCE_EMISSIONS: AtomicU64 = AtomicU64::new(0);
 
 enum DomainGuidanceToEmit {
     MissingOperation(KnownDomain),
@@ -27,12 +30,15 @@ pub(crate) fn handle_preflight<ErrWriter: Write>(
     localizer: &dyn Localizer,
 ) -> Result<(), AppError> {
     if cli.is_bare_invocation() && !split.has_config_flags() {
+        tracing::debug!("emitting bare invocation guidance");
         actionable_guidance::write_bare_invocation_guidance(stderr, localizer)
             .map_err(AppError::EmitBareHelp)?;
+        PREFLIGHT_GUIDANCE_EMISSIONS.fetch_add(1, Ordering::Relaxed);
         return Err(AppError::BareInvocation);
     }
     if should_emit_domain_guidance(cli) {
         let raw_domain = cli.domain.as_deref().map(str::trim).unwrap_or_default();
+        tracing::debug!(domain = raw_domain, "evaluating preflight domain guidance");
         emit_domain_guidance(cli, stderr, localizer, raw_domain)?;
     }
     Ok(())
@@ -52,13 +58,21 @@ fn emit_domain_guidance<ErrWriter: Write>(
 
     let written = match guidance {
         DomainGuidanceToEmit::MissingOperation(domain) => {
+            tracing::debug!(?domain, "emitting missing operation guidance");
             write_missing_operation_guidance(stderr, localizer, domain)
         }
         DomainGuidanceToEmit::UnknownDomain => {
+            tracing::debug!(domain = raw_domain, "emitting unknown domain guidance");
             write_unknown_domain_guidance(stderr, localizer, raw_domain)
         }
     }
-    .map_err(AppError::EmitGuidance)?;
+    .map_err(|error| {
+        tracing::warn!(domain = raw_domain, error = %error, "failed to emit preflight guidance");
+        AppError::EmitGuidance(error)
+    })?;
+    if written {
+        PREFLIGHT_GUIDANCE_EMISSIONS.fetch_add(1, Ordering::Relaxed);
+    }
     preflight_result(written)
 }
 
@@ -97,6 +111,20 @@ mod tests {
     use crate::{AppError, Cli, OutputFormat};
     use ortho_config::{FluentLocalizer, Localizer};
     use std::ffi::OsString;
+    use std::io;
+    use std::io::Write;
+
+    struct FailingWriter;
+
+    impl Write for FailingWriter {
+        fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "write failed"))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
 
     fn test_localizer() -> impl Localizer {
         FluentLocalizer::with_en_us_defaults([WEAVER_EN_US])
@@ -201,6 +229,35 @@ mod tests {
         assert!(
             stderr.is_empty(),
             "complete invocation should not emit guidance"
+        );
+    }
+
+    #[test]
+    fn bare_invocation_propagates_guidance_write_failure() {
+        let localizer = test_localizer();
+        let mut stderr = FailingWriter;
+
+        let result = handle_preflight(&cli(None, None), &split(false), &mut stderr, &localizer);
+
+        assert!(
+            matches!(result, Err(AppError::EmitBareHelp(error)) if error.kind() == io::ErrorKind::BrokenPipe)
+        );
+    }
+
+    #[test]
+    fn domain_guidance_propagates_write_failure() {
+        let localizer = test_localizer();
+        let mut stderr = FailingWriter;
+
+        let result = handle_preflight(
+            &cli(Some("unknown-domain"), Some("status")),
+            &split(false),
+            &mut stderr,
+            &localizer,
+        );
+
+        assert!(
+            matches!(result, Err(AppError::EmitGuidance(error)) if error.kind() == io::ErrorKind::BrokenPipe)
         );
     }
 }

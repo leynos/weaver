@@ -50,6 +50,7 @@ saphyr = "0.0.6"
 tempfile = "3.10"
 thiserror = "2.0"
 time = { version = "0.3", features = ["formatting"] }
+tracing = "0.1"
 tree-sitter = "0.25.10"
 tree-sitter-python = "0.25.0"
 tree-sitter-rust = "0.24.0"

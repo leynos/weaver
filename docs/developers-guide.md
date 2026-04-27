@@ -399,7 +399,7 @@ for each help command construction.
 ### 2.3 Preflight boundary (`crates/weaver-cli/src/preflight.rs`)
 
 `handle_preflight` runs after `argv` splitting and before configuration
-loading. At that point the CLI has enough information to reject certain
+loading. At that point, the CLI has enough information to reject certain
 invocations locally, without consulting the daemon or trying to load the full
 configuration stack.
 

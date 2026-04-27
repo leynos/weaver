@@ -9,6 +9,7 @@ use std::{
     ffi::{OsStr, OsString},
     io::{Read, Write},
     process::ExitCode,
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 use clap::Parser;
@@ -28,6 +29,7 @@ pub mod output;
 mod preflight;
 mod runtime_utils;
 mod transport;
+static HELP_RENDER_ATTEMPTS: AtomicU64 = AtomicU64::new(0);
 
 /// Shared configuration flag renderings expected in clap help output.
 pub const SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
@@ -172,7 +174,13 @@ where
         let parsed_cli = match Cli::try_parse_from(cli_arguments) {
             Ok(cli) => Ok(cli),
             Err(error) if error.kind() == clap::error::ErrorKind::DisplayHelp => {
+                tracing::debug!("rendering clap help");
                 if let Err(io_error) = write_help_for_args(&args, &mut *self.io.stdout) {
+                    tracing::warn!(
+                        error_kind = ?io_error.kind(),
+                        error = %io_error,
+                        "failed to write clap help"
+                    );
                     return self.map_result_to_exit_code(Err(AppError::EmitHelp(io_error)));
                 }
                 return ExitCode::SUCCESS;
@@ -260,6 +268,7 @@ where
 }
 
 fn write_help_for_args<W: Write>(args: &[OsString], writer: &mut W) -> std::io::Result<()> {
+    HELP_RENDER_ATTEMPTS.fetch_add(1, Ordering::Relaxed);
     match help::command().try_get_matches_from(args.iter().cloned()) {
         Err(error)
             if matches!(

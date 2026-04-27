@@ -65,6 +65,7 @@ hierarchy capability for Python:
 daemon_socket = { transport = "tcp", host = "127.0.0.1", port = 9779 }
 log_filter = "info"
 log_format = "compact"
+locale = "en-GB"
 
 [[capability_overrides]]
 language = "python"
