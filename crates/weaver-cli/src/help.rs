@@ -39,10 +39,6 @@ pub(crate) fn command() -> Command { AUGMENTED_COMMAND.get_or_init(build_command
 
 /// Writes help for the provided arguments using the augmented help command.
 pub fn write_help_for_args<W: Write>(args: &[OsString], writer: &mut W) -> std::io::Result<()> {
-    use std::sync::atomic::{AtomicU64, Ordering};
-
-    static HELP_RENDER_ATTEMPTS: AtomicU64 = AtomicU64::new(0);
-    HELP_RENDER_ATTEMPTS.fetch_add(1, Ordering::Relaxed);
     match command().try_get_matches_from(args.iter().cloned()) {
         Err(error)
             if matches!(

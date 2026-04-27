@@ -11,10 +11,21 @@ use serde_json::json;
 use super::support::*;
 use crate::{
     EMPTY_LINE_LIMIT,
-    SHARED_CONFIG_HELP_FLAGS,
     lifecycle::{LifecycleCommand, LifecycleError},
     output::UNKNOWN_OPERATION_TYPE,
 };
+
+/// Test-local mirror of the shared configuration help flags.
+/// Must be kept in sync with `SHARED_CONFIG_HELP_FLAGS` in `lib.rs`.
+/// If this constant drifts, tests will fail, surfacing the discrepancy.
+const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
+    "--config-path <PATH>",
+    "--daemon-socket <ENDPOINT>",
+    "--log-filter <FILTER>",
+    "--log-format <FORMAT>",
+    "--capability-overrides <DIRECTIVE>",
+    "--locale <LOCALE>",
+];
 
 const SAMPLE_RUST_SOURCE: &str = "fn main() {\n    let value = 1;\n    value\n}\n";
 const SAMPLE_PATCH: &str = concat!(
@@ -327,7 +338,7 @@ fn then_stdout_contains(world: &RefCell<TestWorld>, snippet: String) {
 fn then_stdout_contains_shared_config_flags(world: &RefCell<TestWorld>) {
     let world = world.borrow();
     let text = world.stdout_text().expect("stdout text missing");
-    for flag in SHARED_CONFIG_HELP_FLAGS {
+    for flag in EXPECTED_SHARED_CONFIG_HELP_FLAGS {
         assert!(text.contains(flag), "stdout missing config flag {flag:?}");
     }
 }

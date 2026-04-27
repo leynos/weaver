@@ -43,3 +43,4 @@ predicates = "3.0"
 tempfile = { workspace = true }
 weaver-test-macros = { path = "../weaver-test-macros" }
 insta = { workspace = true }
+proptest = { workspace = true }

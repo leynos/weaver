@@ -5,9 +5,21 @@ use std::io::Cursor;
 use std::process::ExitCode;
 
 use crate::help;
-use crate::{AppError, ConfigLoader, IoStreams, SHARED_CONFIG_HELP_FLAGS, run_with_loader};
+use crate::{AppError, ConfigLoader, IoStreams, run_with_loader};
 use rstest::rstest;
 use weaver_config::Config;
+
+/// Test-local mirror of the shared configuration help flags.
+/// Must be kept in sync with `SHARED_CONFIG_HELP_FLAGS` in `lib.rs`.
+/// If this constant drifts, tests will fail, surfacing the discrepancy.
+const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
+    "--config-path <PATH>",
+    "--daemon-socket <ENDPOINT>",
+    "--log-filter <FILTER>",
+    "--log-format <FORMAT>",
+    "--capability-overrides <DIRECTIVE>",
+    "--locale <LOCALE>",
+];
 
 struct PanickingLoader;
 
@@ -35,7 +47,7 @@ fn run_with_args(args: &[&str]) -> (ExitCode, String, String) {
 }
 
 fn assert_config_flags_present(text: &str) {
-    for flag in SHARED_CONFIG_HELP_FLAGS {
+    for flag in EXPECTED_SHARED_CONFIG_HELP_FLAGS {
         assert!(text.contains(flag), "help output missing {flag:?}");
     }
 }
@@ -70,4 +82,25 @@ fn daemon_start_help_snapshot_matches_augmented_command() {
         .render_long_help()
         .to_string();
     insta::assert_snapshot!("daemon_start_augmented_help", rendered);
+}
+
+#[test]
+fn write_help_for_args_surfaces_io_error_on_broken_writer() {
+    struct BrokenWriter;
+
+    impl std::io::Write for BrokenWriter {
+        fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
+    }
+
+    let args: Vec<OsString> = vec![OsString::from("weaver"), OsString::from("--help")];
+    let result = crate::help::write_help_for_args(&args, &mut BrokenWriter);
+    assert!(result.is_err());
+    assert_eq!(
+        result.expect_err("broken writer should fail").kind(),
+        std::io::ErrorKind::BrokenPipe
+    );
 }

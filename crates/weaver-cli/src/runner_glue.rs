@@ -24,6 +24,15 @@ use crate::{
     transport::{self, Connection, connect, connect_with_retry},
 };
 
+/// Executes a daemon-backed command end-to-end.
+///
+/// Builds a [`CommandRequest`] from `invocation`, connects to the daemon socket
+/// (auto-starting the daemon if it is not running), writes the request as JSON
+/// Lines over the connection, and consumes daemon response messages,
+/// translating the final status into an [`ExitCode`].
+///
+/// Writes a human-readable error message to `io.stderr` and returns
+/// [`ExitCode::FAILURE`] on any transport or IO error.
 pub(crate) fn execute_daemon_command<R, W, E>(
     invocation: CommandInvocation,
     context: LifecycleContext<'_>,
@@ -35,6 +44,11 @@ where
     W: Write,
     E: Write,
 {
+    tracing::debug!(
+        domain = %invocation.domain,
+        operation = %invocation.operation,
+        "executing daemon command"
+    );
     let output_context = OutputContext::new(
         invocation.domain.clone(),
         invocation.operation.clone(),
@@ -48,6 +62,7 @@ where
         Ok(connection) => connection,
         Err(exit_code) => return exit_code,
     };
+    tracing::debug!("connected to daemon socket");
 
     if let Err(error) = request.write_jsonl(&mut connection) {
         return write_error_and_fail(&mut *io.stderr, error);
@@ -72,11 +87,20 @@ fn connect_or_start_daemon<E: Write>(
 ) -> Result<Connection, ExitCode> {
     match connect(context.config.daemon_socket()) {
         Ok(connection) => Ok(connection),
-        Err(error) if is_daemon_not_running(&error) => start_and_retry_daemon(context, stderr),
+        Err(error) if is_daemon_not_running(&error) => {
+            tracing::debug!("daemon not running; attempting auto-start");
+            start_and_retry_daemon(context, stderr)
+        }
         Err(error) => Err(write_error_and_fail(stderr, error)),
     }
 }
 
+/// Builds a [`CommandRequest`] from `invocation`.
+///
+/// For `apply-patch` operations, reads patch content from `stdin` and returns
+/// [`AppError::MissingPatchInput`] if the content is empty after trimming. For
+/// all other operations, constructs the request directly from the invocation
+/// without reading stdin.
 pub(crate) fn build_request<R: Read>(
     invocation: CommandInvocation,
     stdin: &mut R,
@@ -110,9 +134,61 @@ fn start_and_retry_daemon<E: Write>(
     }
 
     // Retry briefly after daemon startup to tolerate socket-bind lag.
+    tracing::debug!("retrying socket connection after daemon startup");
     connect_with_retry(
         context.config.daemon_socket(),
         transport::CONNECTION_TIMEOUT,
     )
-    .map_err(|error| write_error_and_fail(stderr, error))
+    .map_err(|error| {
+        tracing::warn!(error = %error, "failed to connect after daemon startup");
+        write_error_and_fail(stderr, error)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    //! Tests for daemon request construction helpers.
+
+    use std::io::Cursor;
+
+    use super::build_request;
+    use crate::{AppError, CommandInvocation};
+
+    fn observe_status_invocation() -> CommandInvocation {
+        CommandInvocation {
+            domain: "observe".to_owned(),
+            operation: "status".to_owned(),
+            arguments: Vec::new(),
+        }
+    }
+
+    fn apply_patch_invocation() -> CommandInvocation {
+        CommandInvocation {
+            domain: "act".to_owned(),
+            operation: "apply-patch".to_owned(),
+            arguments: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn non_patch_invocation_does_not_read_stdin() {
+        let mut stdin = Cursor::new(b"should not be read".to_vec());
+        let result = build_request(observe_status_invocation(), &mut stdin);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn apply_patch_reads_patch_from_stdin() {
+        let patch = "--- a/foo\n+++ b/foo\n@@ -1 +1 @@\n-old\n+new\n";
+        let mut stdin = Cursor::new(patch.as_bytes().to_vec());
+        let result = build_request(apply_patch_invocation(), &mut stdin);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn apply_patch_returns_error_for_empty_stdin() {
+        let mut stdin = Cursor::new(b"   \n".to_vec());
+        let result = build_request(apply_patch_invocation(), &mut stdin);
+        assert!(matches!(result, Err(AppError::MissingPatchInput)));
+    }
 }

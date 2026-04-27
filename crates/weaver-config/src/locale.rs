@@ -90,6 +90,21 @@ mod tests {
         assert_eq!(error.to_string(), "invalid locale `not a locale`");
     }
 
+    #[test]
+    fn locale_serialises_and_deserialises_as_json_string() {
+        let original = "fr-FR".parse::<Locale>().expect("valid locale");
+        let json = serde_json::to_string(&original).expect("serialise");
+        assert_eq!(json, "\"fr-FR\"");
+        let roundtripped: Locale = serde_json::from_str(&json).expect("deserialise");
+        assert_eq!(roundtripped.to_string(), "fr-FR");
+    }
+
+    #[test]
+    fn locale_deserialises_error_for_invalid_json_string() {
+        let result: Result<Locale, _> = serde_json::from_str("\"not a locale\"");
+        assert!(result.is_err());
+    }
+
     prop_compose! {
         fn ascii_string()(bytes in proptest::collection::vec(0u8..=0x7f, 0..24)) -> String {
             bytes.into_iter().map(char::from).collect()

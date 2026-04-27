@@ -1,10 +1,7 @@
 //! Post-parse (pre-configuration) guidance paths that operate on an already
 //! parsed `Cli` and should exit before configuration loading.
 
-use std::{
-    io::Write,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::io::Write;
 
 use ortho_config::Localizer;
 
@@ -20,8 +17,6 @@ use crate::{
         write_unknown_domain_guidance,
     },
 };
-
-static PREFLIGHT_GUIDANCE_EMISSIONS: AtomicU64 = AtomicU64::new(0);
 
 enum DomainGuidanceToEmit {
     MissingOperation(KnownDomain),
@@ -41,7 +36,6 @@ pub(crate) fn handle_preflight<ErrWriter: Write>(
         tracing::debug!("emitting bare invocation guidance");
         actionable_guidance::write_bare_invocation_guidance(stderr, localizer)
             .map_err(AppError::EmitBareHelp)?;
-        PREFLIGHT_GUIDANCE_EMISSIONS.fetch_add(1, Ordering::Relaxed);
         return Err(AppError::BareInvocation);
     }
     if should_emit_domain_guidance(cli) {
@@ -78,9 +72,6 @@ fn emit_domain_guidance<ErrWriter: Write>(
         tracing::warn!(domain = raw_domain, error = %error, "failed to emit preflight guidance");
         AppError::EmitGuidance(error)
     })?;
-    if written {
-        PREFLIGHT_GUIDANCE_EMISSIONS.fetch_add(1, Ordering::Relaxed);
-    }
     preflight_result(written)
 }
 
