@@ -1,13 +1,11 @@
 //! Tests for clap help output augmented with shared configuration flags.
 
-use std::ffi::OsString;
-use std::io::Cursor;
-use std::process::ExitCode;
+use std::{ffi::OsString, io::Cursor, process::ExitCode};
 
-use crate::help;
-use crate::{AppError, ConfigLoader, IoStreams, run_with_loader};
 use rstest::rstest;
 use weaver_config::Config;
+
+use crate::{AppError, ConfigLoader, IoStreams, help, run_with_loader};
 
 /// Test-local mirror of the shared configuration help flags.
 /// Must be kept in sync with `SHARED_CONFIG_HELP_FLAGS` in `lib.rs`.

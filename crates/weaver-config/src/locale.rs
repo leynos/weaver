@@ -7,17 +7,18 @@
 
 use std::{fmt, str::FromStr};
 
+use icu_locale_core::Locale as IcuLocale;
 use ortho_config::{LanguageIdentifier, langid};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
 
 /// Validated locale identifier stored in Weaver configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Locale(LanguageIdentifier);
+pub struct Locale(LanguageIdentifier, String);
 
 /// Error returned when a locale string is not a valid BCP 47 identifier.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
-#[error("invalid locale `{input}`")]
+#[error("invalid locale {input:?}")]
 pub struct LocaleParseError {
     input: String,
 }
@@ -25,7 +26,10 @@ pub struct LocaleParseError {
 impl Locale {
     /// Returns the built-in fallback locale.
     #[must_use]
-    pub fn en_us() -> Self { Self(langid!("en-US")) }
+    pub fn en_us() -> Self {
+        let language_identifier = langid!("en-US");
+        Self(language_identifier, "en-US".to_string())
+    }
 }
 
 impl Default for Locale {
@@ -33,19 +37,25 @@ impl Default for Locale {
 }
 
 impl fmt::Display for Locale {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{}", self.0) }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(&self.1) }
 }
 
 impl FromStr for Locale {
     type Err = LocaleParseError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        value
+        let locale = value.parse::<IcuLocale>().map_err(|_| Self::Err {
+            input: value.to_string(),
+        })?;
+        let canonical = locale.to_string();
+        let language_identifier = locale
+            .id
+            .to_string()
             .parse::<LanguageIdentifier>()
-            .map(Self)
             .map_err(|_| Self::Err {
                 input: value.to_string(),
-            })
+            })?;
+        Ok(Self(language_identifier, canonical))
     }
 }
 
@@ -72,6 +82,7 @@ impl<'de> Deserialize<'de> for Locale {
 mod tests {
     //! Tests for locale parsing, formatting, and rejection of invalid tags.
 
+    use ortho_config::LanguageIdentifier;
     use proptest::prelude::*;
 
     use super::{Locale, LocaleParseError};
@@ -87,7 +98,7 @@ mod tests {
         let error = "not a locale"
             .parse::<Locale>()
             .expect_err("invalid locale should fail");
-        assert_eq!(error.to_string(), "invalid locale `not a locale`");
+        assert_eq!(error.to_string(), "invalid locale \"not a locale\"");
     }
 
     #[test]
@@ -103,6 +114,34 @@ mod tests {
     fn locale_deserialises_error_for_invalid_json_string() {
         let result: Result<Locale, _> = serde_json::from_str("\"not a locale\"");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn parses_locale_with_unicode_extension() {
+        let expected: LanguageIdentifier = "en-US"
+            .parse()
+            .expect("language identifier from locale base");
+        let locale = "en-US-u-ca-gregory"
+            .parse::<Locale>()
+            .expect("valid locale with Unicode extension");
+
+        assert_eq!(locale.0, expected);
+        assert_eq!(locale.to_string(), "en-US-u-ca-gregory");
+    }
+
+    #[test]
+    fn locale_with_unicode_extension_serialises_round_trips() {
+        let expected: LanguageIdentifier = "en-US"
+            .parse()
+            .expect("language identifier from locale base");
+        let original = "en-US-u-ca-gregory"
+            .parse::<Locale>()
+            .expect("valid locale with Unicode extension");
+        let json = serde_json::to_string(&original).expect("serialise");
+        let roundtripped: Locale = serde_json::from_str(&json).expect("deserialise");
+
+        assert_eq!(roundtripped, original);
+        assert_eq!(roundtripped.0, expected);
     }
 
     prop_compose! {

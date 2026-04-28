@@ -22,6 +22,27 @@ const ORDERING_CAVEAT: &str = "Config flags must appear before the command domai
 
 static AUGMENTED_COMMAND: OnceLock<Command> = OnceLock::new();
 
+const CONFIG_FIELD_HELP: &[(&str, &str)] = &[
+    (
+        "weaver.fields.daemon_socket.help",
+        "Overrides the daemon transport endpoint",
+    ),
+    ("weaver.fields.log_filter.help", "Sets the tracing filter"),
+    (
+        "weaver.fields.log_format.help",
+        "Selects the structured log output format",
+    ),
+    (
+        "weaver.fields.capability_overrides.help",
+        "Appends a language capability override directive",
+    ),
+    (
+        "weaver.fields.locale.help",
+        "Selects the operator-facing locale",
+    ),
+];
+const DEFAULT_CONFIG_FIELD_HELP: &str = "Overrides a shared configuration value";
+
 struct ConfigFieldArgMetadata {
     name: &'static str,
     long: &'static str,
@@ -94,7 +115,7 @@ fn config_field_arg(field: &FieldMetadata) -> Option<Arg> {
         name: promote_static(field.name.clone()),
         long: promote_static(long.to_string()),
         short: cli.short,
-        help: config_field_help(field),
+        help: config_field_help_from_metadata(&field.help_id),
         takes_value: cli.takes_value,
         multiple: cli.multiple,
         value_name: cli.value_name.clone().map(promote_static),
@@ -126,15 +147,11 @@ fn config_arg_from_metadata(field: &ConfigFieldArgMetadata) -> Arg {
     arg
 }
 
-fn config_field_help(field: &FieldMetadata) -> &'static str {
-    match field.name.as_str() {
-        "daemon_socket" => "Overrides the daemon transport endpoint",
-        "log_filter" => "Sets the tracing filter",
-        "log_format" => "Selects the structured log output format",
-        "capability_overrides" => "Appends a language capability override directive",
-        "locale" => "Selects the operator-facing locale",
-        _ => "Overrides a shared configuration value",
-    }
+fn config_field_help_from_metadata(help_id: &str) -> &'static str {
+    CONFIG_FIELD_HELP
+        .iter()
+        .find_map(|(candidate, help)| (*candidate == help_id).then_some(*help))
+        .unwrap_or(DEFAULT_CONFIG_FIELD_HELP)
 }
 
 fn attach_ordering_caveat(command: Command) -> Command {
@@ -281,6 +298,21 @@ mod tests {
                 .get_one::<String>("example_field")
                 .map(String::as_str),
             Some("JSON")
+        );
+    }
+
+    #[test]
+    fn config_field_arg_uses_help_id_metadata_for_help_text() {
+        let mut field = field_metadata(Some(cli_metadata(true)));
+        field.help_id = "weaver.fields.locale.help".to_string();
+        let arg = config_field_arg(&field).expect("arg should be visible");
+        let mut command = Command::new("test").arg(arg);
+
+        assert!(
+            command
+                .render_long_help()
+                .to_string()
+                .contains("Selects the operator-facing locale")
         );
     }
 

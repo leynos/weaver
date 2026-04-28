@@ -15,6 +15,7 @@ cli = []
 [dependencies]
 camino.workspace = true
 clap.workspace = true
+icu_locale_core.workspace = true
 ortho_config.workspace = true
 serde.workspace = true
 thiserror.workspace = true

@@ -1017,6 +1017,7 @@ checksum = "92219b62b3e2b4d88ac5119f8904c10f8f61bf7e95b640d25ba3075e6cac2c29"
 dependencies = [
  "displaydoc",
  "litemap",
+ "serde",
  "tinystr",
  "writeable",
  "zerovec",
@@ -3120,6 +3121,7 @@ dependencies = [
  "cap-std 4.0.2",
  "clap",
  "dirs 6.0.0",
+ "icu_locale_core",
  "libc",
  "once_cell",
  "ortho_config",

@@ -22,7 +22,6 @@ use crate::{
     handle_preflight,
     localizer::{WEAVER_EN_US, write_bare_help},
     run_with_loader,
-    split_config_arguments,
 };
 
 /// A config loader that panics if called, proving that bare invocation
@@ -230,12 +229,9 @@ fn bare_invocation_propagates_bare_help_write_failures() {
         operation: None,
         arguments: Vec::new(),
     };
-    let args = vec![OsString::from("weaver")];
-    let split = split_config_arguments(&args);
     let mut stderr = FailingWriter;
 
-    let error =
-        handle_preflight(&cli, &split, &mut stderr, &NoOpLocalizer).expect_err("write failure");
+    let error = handle_preflight(&cli, &mut stderr, &NoOpLocalizer).expect_err("write failure");
 
     assert!(matches!(error, AppError::EmitBareHelp(_)));
 }

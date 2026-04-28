@@ -64,6 +64,25 @@ The existing precedence tests must keep passing, and the new `locale` flag must
 be an honest part of the shared configuration contract rather than a help-only
 fiction.
 
+## Fail-fast discovery
+
+Configuration loading must fail immediately when any discovered configuration
+file is invalid. Tests must prove Weaver exits before applying partial
+configuration from an invalid discovered file.
+
+## YAML 1.2 semantics
+
+YAML configuration examples and loader behaviour referenced by this plan must
+follow YAML 1.2 scalar semantics. Any observable difference from older YAML
+behaviour must be documented and covered by tests before it ships.
+
+## ortho-config v0.8.0 dependency graph
+
+The implementation must rely on the documented `ortho-config` v0.8.0 model and
+dependency graph for layered configuration discovery and precedence. Tests must
+prove defaults, files, environment variables, and CLI flags resolve in the
+intended order without adding another configuration parser.
+
 ## Constraints
 
 - Run `make check-fmt`, `make lint`, and `make test` before considering the
@@ -150,23 +169,23 @@ fiction.
 
 ## Progress
 
-- [x] (2026-04-10 00:00Z) Read `docs/roadmap.md`,
-      `docs/ui-gap-analysis.md`, `docs/weaver-design.md`,
-      `docs/users-guide.md`, and the referenced testing guides.
+- [x] (2026-04-10 00:00Z) Read `docs/roadmap.md`[^1],
+      `docs/ui-gap-analysis.md`[^2], `docs/weaver-design.md`[^3],
+      `docs/users-guide.md`[^4], and the referenced testing guides.
 - [x] (2026-04-10 00:10Z) Confirmed the live implementation seam:
-      `crates/weaver-cli/src/config.rs::split_config_arguments(...)` strips
-      only leading config flags before clap parses the rest of the CLI.
+      `crates/weaver-cli/src/config.rs::split_config_arguments(...)`[^5]
+      strips only leading config flags before clap parses the rest of the CLI.
 - [x] (2026-04-10 00:12Z) Confirmed the help gap:
-      `crates/weaver-cli/src/cli.rs::Cli` declares no config flags, so
+      `crates/weaver-cli/src/cli.rs::Cli`[^6] declares no config flags, so
       clap-generated help cannot display them.
 - [x] (2026-04-10 00:15Z) Confirmed the contract mismatch:
-      `crates/weaver-config/src/lib.rs::Config` exposes
+      `crates/weaver-config/src/lib.rs::Config`[^7] exposes
       `daemon_socket`, `log_filter`, `log_format`, and
       `capability_overrides`, but no `locale` field yet.
 - [x] (2026-04-10 00:20Z) Confirmed the build coupling:
-      `crates/weaver-cli/build.rs` uses `help::command()` for manpage
-      generation, so runtime help and packaged reference output share the same
-      augmented command.
+      `crates/weaver-cli/build.rs::help::command()`[^8] drives manpage
+      generation, so runtime help and packaged reference output share the
+      same augmented command.
 - [x] (2026-04-10 00:35Z) Drafted this ExecPlan in
       `docs/execplans/3-2-1-surface-configuration-flags-in-clap-help-output.md`.
 - [x] (2026-04-11 00:20Z) Stage A: added unit coverage in
@@ -252,8 +271,8 @@ Target outcome at completion:
    domain or structured subcommand to take effect.
 5. Unit tests, integration tests, and `rstest-bdd` scenarios cover happy
    paths, unhappy paths, and the relevant ordering and precedence edge cases.
-6. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-   reflect the shipped behaviour.
+6. `docs/weaver-design.md`[^3], `docs/users-guide.md`[^4], and
+   `docs/roadmap.md`[^1] reflect the shipped behaviour.
 7. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
@@ -281,13 +300,13 @@ Retrospective notes:
 
 The implementation surface is concentrated in `weaver-cli` and `weaver-config`.
 
-- `crates/weaver-cli/src/config.rs`
+- `crates/weaver-cli/src/config.rs`[^5]
 
   Owns `split_config_arguments(...)` and `prepare_cli_arguments(...)`. This is
   where leading configuration flags are separated from the clap-parsed command
   surface today.
 
-- `crates/weaver-cli/src/cli.rs`
+- `crates/weaver-cli/src/cli.rs`[^6]
 
   Owns `Cli`, `CliCommand`, and `DaemonAction`. This is the clap definition
   whose help text currently omits configuration flags.
@@ -299,12 +318,12 @@ The implementation surface is concentrated in `weaver-cli` and `weaver-config`.
   splits configuration arguments before calling
   `help::write_help_for_args(...)` only for clap display requests.
 
-- `crates/weaver-cli/build.rs`
+- `crates/weaver-cli/build.rs`[^8]
 
   Generates the manpage from `crates/weaver-cli/src/help.rs::command()`. Any
   help-surface solution that is not reused here will create drift immediately.
 
-- `crates/weaver-config/src/lib.rs`
+- `crates/weaver-config/src/lib.rs`[^7]
 
   Owns `Config` and the `ortho-config` derive annotations that define the
   shared config contract.
@@ -417,22 +436,22 @@ module that both `lib.rs` and `build.rs` can include safely.
 
 ### Stage E: Document the shipped contract
 
-Update `docs/weaver-design.md` in the sections covering localized help surfaces
-and the configuration contract. Record two decisions explicitly:
+Update `docs/weaver-design.md`[^3] in the sections covering localized help
+surfaces and the configuration contract. Record two decisions explicitly:
 
 - configuration flags are surfaced in help through a shared augmented command,
   while runtime parsing remains strict about flag ordering; and
 - `locale` enters the shared config contract in this task, but the bootstrap
   locale-selection behaviour remains the responsibility of roadmap `3.3.1`.
 
-Update `docs/users-guide.md` so the configuration section and help/discovery
-section both reflect the new operator experience. The guide should say that the
-flags are visible in `--help`, should list `--locale`, and should restate that
-the flags must appear before the command domain or structured subcommand to
-take effect.
+Update `docs/users-guide.md`[^4] so the configuration section and
+help/discovery section both reflect the new operator experience. The guide
+should say that the flags are visible in `--help`, should list `--locale`, and
+should restate that the flags must appear before the command domain or
+structured subcommand to take effect.
 
 Only after the implementation, tests, and docs are complete should
-`docs/roadmap.md` mark `3.2.1` as done.
+`docs/roadmap.md`[^1] mark `3.2.1` as done.
 
 ## Validation
 
@@ -441,7 +460,8 @@ Use focused commands first so failures are easier to interpret:
 ```plaintext
 set -o pipefail; cargo test -p weaver-cli help_output 2>&1 | tee /tmp/3-2-1-weaver-cli-help.log
 set -o pipefail; cargo test -p weaver-cli daemon_start_help 2>&1 | tee /tmp/3-2-1-weaver-cli-daemon-help.log
-set -o pipefail; cargo test -p weaver-config configuration_precedence -- --nocapture 2>&1 | tee /tmp/3-2-1-weaver-config-precedence.log
+set -o pipefail; cargo test -p weaver-config configuration_precedence -- \
+  --nocapture 2>&1 | tee /tmp/3-2-1-weaver-config-precedence.log
 ```
 
 Then verify the observable help surfaces manually:
@@ -470,6 +490,23 @@ set -o pipefail; make check-fmt 2>&1 | tee /tmp/3-2-1-make-check-fmt.log
 set -o pipefail; make lint 2>&1 | tee /tmp/3-2-1-make-lint.log
 set -o pipefail; make test 2>&1 | tee /tmp/3-2-1-make-test.log
 ```
+
+[^1]: `docs/roadmap.md` records roadmap item `3.2.1`, its shipped status, and
+    the later locale-bootstrap scope.
+[^2]: `docs/ui-gap-analysis.md` records the discovery gap that made
+    configuration flags hard to find from the CLI help surface.
+[^3]: `docs/weaver-design.md` records the configuration contract and localized
+    help architecture decisions.
+[^4]: `docs/users-guide.md` records the operator-facing help and configuration
+    usage contract.
+[^5]: `crates/weaver-cli/src/config.rs::split_config_arguments(...)` owns the
+    pre-domain configuration flag split before clap parsing.
+[^6]: `crates/weaver-cli/src/cli.rs::Cli` owns the runtime clap command
+    definition.
+[^7]: `crates/weaver-config/src/lib.rs::Config` owns the shared layered
+    configuration schema.
+[^8]: `crates/weaver-cli/build.rs::help::command()` owns manpage generation
+    through the same augmented help command used at runtime.
 
 ## Approval
 

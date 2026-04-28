@@ -213,7 +213,7 @@ where
 
         let result = parsed_cli
             .and_then(|cli| {
-                handle_preflight(&cli, &split, &mut *self.io.stderr, localizer)?;
+                handle_preflight(&cli, &mut *self.io.stderr, localizer)?;
                 self.loader
                     .load(&split.config_arguments)
                     .map(|config| (cli, config))

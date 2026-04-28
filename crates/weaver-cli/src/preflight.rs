@@ -9,7 +9,6 @@ use crate::{
     AppError,
     Cli,
     actionable_guidance,
-    config::ConfigArgumentSplit,
     discoverability::{
         KnownDomain,
         should_emit_domain_guidance,
@@ -28,7 +27,6 @@ enum DomainGuidanceToEmit {
 /// that exits before daemon startup.
 pub(crate) fn handle_preflight<ErrWriter: Write>(
     cli: &Cli,
-    _split: &ConfigArgumentSplit,
     stderr: &mut ErrWriter,
     localizer: &dyn Localizer,
 ) -> Result<(), AppError> {
@@ -106,19 +104,13 @@ fn preflight_result(written: bool) -> Result<(), AppError> {
 mod tests {
     //! Tests for preflight guidance decisions and write-error propagation.
 
-    use std::{ffi::OsString, io, io::Write};
+    use std::{io, io::Write};
 
     use ortho_config::{FluentLocalizer, Localizer};
     use rstest::{fixture, rstest};
 
     use super::handle_preflight;
-    use crate::{
-        AppError,
-        Cli,
-        OutputFormat,
-        config::ConfigArgumentSplit,
-        localizer::WEAVER_EN_US,
-    };
+    use crate::{AppError, Cli, OutputFormat, localizer::WEAVER_EN_US};
 
     enum ExpectedPreflightResult {
         Continue,
@@ -129,7 +121,6 @@ mod tests {
     struct PreflightScenario {
         domain: Option<&'static str>,
         operation: Option<&'static str>,
-        has_config_flags: bool,
         expected_result: ExpectedPreflightResult,
         expected_stderr_substring: Option<&'static str>,
     }
@@ -196,51 +187,28 @@ mod tests {
         }
     }
 
-    fn split(has_config_flags: bool) -> ConfigArgumentSplit {
-        let mut config_arguments = vec![OsString::from("weaver")];
-        if has_config_flags {
-            config_arguments.push(OsString::from("--config-path"));
-            config_arguments.push(OsString::from("weaver.toml"));
-        }
-        ConfigArgumentSplit {
-            config_arguments,
-            command_start: 1,
-        }
-    }
-
     #[rstest]
     #[case(PreflightScenario {
         domain: None,
         operation: None,
-        has_config_flags: false,
-        expected_result: ExpectedPreflightResult::BareInvocation,
-        expected_stderr_substring: Some("Usage: weaver"),
-    })]
-    #[case(PreflightScenario {
-        domain: None,
-        operation: None,
-        has_config_flags: true,
         expected_result: ExpectedPreflightResult::BareInvocation,
         expected_stderr_substring: Some("Usage: weaver"),
     })]
     #[case(PreflightScenario {
         domain: Some("unknown-domain"),
         operation: Some("status"),
-        has_config_flags: false,
         expected_result: ExpectedPreflightResult::PreflightGuidance,
         expected_stderr_substring: Some("unknown domain 'unknown-domain'"),
     })]
     #[case(PreflightScenario {
         domain: Some("observe"),
         operation: None,
-        has_config_flags: false,
         expected_result: ExpectedPreflightResult::PreflightGuidance,
         expected_stderr_substring: Some("operation required for domain 'observe'"),
     })]
     #[case(PreflightScenario {
         domain: Some("observe"),
         operation: Some("get-definition"),
-        has_config_flags: false,
         expected_result: ExpectedPreflightResult::Continue,
         expected_stderr_substring: None,
     })]
@@ -255,7 +223,6 @@ mod tests {
 
         let result = handle_preflight(
             &cli(scenario.domain, scenario.operation),
-            &split(scenario.has_config_flags),
             &mut stderr,
             localizer.as_ref(),
         );
@@ -290,7 +257,6 @@ mod tests {
 
         let result = handle_preflight(
             &cli(scenario.domain(), scenario.operation()),
-            &split(false),
             &mut failing_writer,
             &localizer,
         );
