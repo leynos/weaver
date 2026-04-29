@@ -9,7 +9,7 @@ use std::{ffi::OsString, io::Write, sync::OnceLock};
 
 use clap::{Arg, ArgAction, Command, CommandFactory};
 use ortho_config::docs::{FieldMetadata, OrthoConfigDocs};
-use weaver_config::Config;
+use weaver_config::{Config, config_field_help};
 
 use crate::cli::Cli;
 
@@ -21,27 +21,6 @@ const ORDERING_CAVEAT: &str = "Config flags must appear before the command domai
                                after `start`.";
 
 static AUGMENTED_COMMAND: OnceLock<Command> = OnceLock::new();
-
-const CONFIG_FIELD_HELP: &[(&str, &str)] = &[
-    (
-        "weaver.fields.daemon_socket.help",
-        "Overrides the daemon transport endpoint",
-    ),
-    ("weaver.fields.log_filter.help", "Sets the tracing filter"),
-    (
-        "weaver.fields.log_format.help",
-        "Selects the structured log output format",
-    ),
-    (
-        "weaver.fields.capability_overrides.help",
-        "Appends a language capability override directive",
-    ),
-    (
-        "weaver.fields.locale.help",
-        "Selects the operator-facing locale",
-    ),
-];
-const DEFAULT_CONFIG_FIELD_HELP: &str = "Overrides a shared configuration value";
 
 struct ConfigFieldArgMetadata {
     name: &'static str,
@@ -115,7 +94,7 @@ fn config_field_arg(field: &FieldMetadata) -> Option<Arg> {
         name: promote_static(field.name.clone()),
         long: promote_static(long.to_string()),
         short: cli.short,
-        help: config_field_help_from_metadata(&field.help_id),
+        help: config_field_help(&field.help_id),
         takes_value: cli.takes_value,
         multiple: cli.multiple,
         value_name: cli.value_name.clone().map(promote_static),
@@ -145,13 +124,6 @@ fn config_arg_from_metadata(field: &ConfigFieldArgMetadata) -> Arg {
     arg = apply_arg_shape(arg, field);
 
     arg
-}
-
-fn config_field_help_from_metadata(help_id: &str) -> &'static str {
-    CONFIG_FIELD_HELP
-        .iter()
-        .find_map(|(candidate, help)| (*candidate == help_id).then_some(*help))
-        .unwrap_or(DEFAULT_CONFIG_FIELD_HELP)
 }
 
 fn attach_ordering_caveat(command: Command) -> Command {

@@ -55,6 +55,48 @@ pub use socket::{SocketEndpoint, SocketParseError, SocketPreparationError};
 
 fn default_locale() -> Locale { Locale::en_us() }
 
+const CONFIG_FIELD_HELP: &[(&str, &str)] = &[
+    (
+        "weaver.fields.daemon_socket.help",
+        "Overrides the daemon transport endpoint",
+    ),
+    ("weaver.fields.log_filter.help", "Sets the tracing filter"),
+    (
+        "weaver.fields.log_format.help",
+        "Selects the structured log output format",
+    ),
+    (
+        "weaver.fields.capability_overrides.help",
+        "Appends a language capability override directive",
+    ),
+    (
+        "weaver.fields.locale.help",
+        "Selects the operator-facing locale",
+    ),
+];
+const DEFAULT_CONFIG_FIELD_HELP: &str = "Overrides a shared configuration value";
+
+/// Returns the canonical short help text for a configuration field help ID.
+///
+/// Use this helper when rendering `Config::get_doc_metadata()` into
+/// user-facing help surfaces.
+///
+/// # Examples
+///
+/// ```rust
+/// assert_eq!(
+///     weaver_config::config_field_help("weaver.fields.locale.help"),
+///     "Selects the operator-facing locale"
+/// );
+/// ```
+#[must_use]
+pub fn config_field_help(help_id: &str) -> &'static str {
+    CONFIG_FIELD_HELP
+        .iter()
+        .find_map(|(candidate, help)| (*candidate == help_id).then_some(*help))
+        .unwrap_or(DEFAULT_CONFIG_FIELD_HELP)
+}
+
 /// Complete configuration merged from defaults, files, environment, and CLI.
 #[derive(Debug, Clone, Deserialize, Serialize, OrthoConfig)]
 #[serde(default)]

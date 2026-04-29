@@ -227,7 +227,7 @@ intended order without adding another configuration parser.
   clap `Command` while leaving the runtime parser strict. That is a more
   deliberate design than simply adding shadow fields to `Cli`.
 
-- `unic_langid::LanguageIdentifier` is not serde-enabled through the current
+- `ortho_config::LanguageIdentifier` is not serde-enabled through the current
   workspace dependency surface, so a direct `Config::locale` field would not
   compile. A small validated `Locale` newtype in `weaver-config` keeps the
   config contract honest without adding new dependency churn.
@@ -252,7 +252,7 @@ intended order without adding another configuration parser.
   architecture and avoids inventing a second config contract. Date: 2026-04-10.
 
 - Decision: ship `locale` in `3.2.1` as a validated newtype inside
-  `weaver-config` instead of storing `unic_langid::LanguageIdentifier`
+  `weaver-config` instead of storing `ortho_config::LanguageIdentifier`
   directly. Rationale: the direct type is not serde-enabled in the current
   workspace dependency graph, while the newtype preserves validation and keeps
   dependency churn below the tolerance threshold. Date: 2026-04-11.
@@ -289,7 +289,7 @@ Retrospective notes:
   `crates/weaver-cli/src/help.rs` shared by the runtime help path and leaving
   the runtime parser strict.
 - `locale` shipped as a validated `weaver-config::Locale` newtype because the
-  direct `unic_langid::LanguageIdentifier` type was not serde-enabled through
+  direct `ortho_config::LanguageIdentifier` type was not serde-enabled through
   the current workspace dependency surface. This preserved validation without
   dragging roadmap `3.3.1` into the current task.
 - Shared builder verification caught the main drift risk up front: top-level
@@ -390,7 +390,7 @@ The field should:
 
 - participate in the same layered precedence as the existing config fields;
 - be surfaced as `--locale` and `WEAVER_LOCALE`;
-- have a documented default, likely `en-US`; and
+- have a documented default of `en-US`; and
 - stop short of wiring the localizer bootstrap or translated help selection in
   this roadmap item.
 
