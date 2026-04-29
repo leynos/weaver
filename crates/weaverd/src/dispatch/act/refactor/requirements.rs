@@ -24,13 +24,35 @@ struct SupportedRefactoring {
     capability: CapabilityId,
 }
 
-const SUPPORTED_REFACTORINGS: &[SupportedRefactoring] = &[SupportedRefactoring {
+macro_rules! supported_refactorings {
+    (
+        $(
+            {
+                user_facing: $user_facing:expr,
+                capability_operation: $capability_operation:expr,
+                capability: $capability:expr
+            }
+        ),+ $(,)?
+    ) => {
+        const SUPPORTED_REFACTORINGS: &[SupportedRefactoring] = &[
+            $(
+                SupportedRefactoring {
+                    user_facing: $user_facing,
+                    capability_operation: $capability_operation,
+                    capability: $capability,
+                },
+            )+
+        ];
+
+        const SUPPORTED_REFACTORING_NAMES: &[&str] = &[$($user_facing),+];
+    };
+}
+
+supported_refactorings!({
     user_facing: "rename",
     capability_operation: "rename-symbol",
-    capability: CapabilityId::RenameSymbol,
-}];
-
-const SUPPORTED_REFACTORING_NAMES: &[&str] = &["rename"];
+    capability: CapabilityId::RenameSymbol
+});
 
 /// Returns the canonical built-in provider names accepted by `act refactor`.
 pub(crate) fn supported_provider_names() -> &'static [&'static str] { built_in_provider_names() }

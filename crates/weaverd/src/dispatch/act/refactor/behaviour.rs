@@ -373,14 +373,16 @@ fn then_stderr_contains(world: &mut RefactorWorld, text: String) {
 fn then_dispatch_error_contains(world: &mut RefactorWorld, text: String) -> Result<(), String> {
     let needle = text.trim_matches('"');
     let result = world.dispatch_result.as_ref().ok_or("result missing")?;
-    let Err(error) = result else {
-        panic!("expected dispatch error, got status: {result:?}");
+    let error = match result {
+        Err(error) => error,
+        Ok(status) => return Err(format!("expected dispatch error, got status: {status:?}")),
     };
     let rendered = error.to_string();
-    assert!(
-        rendered.contains(needle),
-        "expected dispatch error to contain '{needle}', got: {rendered}"
-    );
+    if !rendered.contains(needle) {
+        return Err(format!(
+            "expected dispatch error to contain '{needle}', got: {rendered}"
+        ));
+    }
     Ok(())
 }
 

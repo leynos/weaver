@@ -4,7 +4,7 @@ use tempfile::TempDir;
 use weaver_plugins::{PluginOutput, PluginResponse};
 
 use super::refactor_helpers::{
-    builders::{build_backends, command_request, standard_rename_args},
+    builders::{build_backends, command_request, standard_rename_args_for_provider},
     content::original_content_for,
     resolutions::{RefusedResolution, SelectedResolution, refused_resolution},
     rollback::{ExecuteResult, RollbackRuntime, rollback_runtime, selected_runtime},
@@ -51,7 +51,7 @@ fn run_failure_case(runtime: RollbackRuntime) -> Result<RollbackOutcome, String>
     std::fs::write(&file_path, original_content_for(file_path.as_path()))
         .map_err(|e| format!("write file: {e}"))?;
 
-    let request = command_request(standard_rename_args(file));
+    let request = command_request(standard_rename_args_for_provider(file, "rope"));
     let socket_dir = TempDir::new().map_err(|e| format!("socket dir: {e}"))?;
     let socket_path = socket_dir.path().join("socket.sock");
     let mut backends = build_backends(&socket_path);

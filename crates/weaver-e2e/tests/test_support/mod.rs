@@ -77,12 +77,10 @@ impl TestDaemon {
         let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
         let backend_manager = BackendManager::new(Arc::clone(&backends));
         let workspace_root = required_result(std::env::current_dir(), "workspace root");
-        let handler = Arc::new(
-            match DispatchConnectionHandler::new(backend_manager.clone(), workspace_root) {
-                Ok(handler) => handler,
-                Err(error) => panic!("absolute workspace root: {error}"),
-            },
-        );
+        let handler = Arc::new(required_result(
+            DispatchConnectionHandler::new(backend_manager.clone(), workspace_root),
+            "absolute workspace root",
+        ));
 
         let join_handle = thread::spawn(move || {
             serve_requests(&listener, expected_requests, &handler);

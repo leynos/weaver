@@ -36,15 +36,16 @@ pub(super) fn prepare_plugin_request(
     })?;
     let resolved_file = resolve_file(&canonical_workspace, &args.file)?;
     let mut plugin_args = build_plugin_args(args)?;
-    let effective_operation = map_effective_operation(&mut plugin_args, args, &resolved_file.path)?;
+    let effective_operation = supported_effective_operation(&args.refactoring)?;
+    let capability = capability_for_operation(effective_operation)?;
+    apply_capability_argument_mapping(&mut plugin_args, capability, &resolved_file.path)?;
     plugin_args.insert(
         String::from("refactoring"),
-        serde_json::Value::String(effective_operation.clone()),
+        serde_json::Value::String(String::from(effective_operation)),
     );
-    let capability = capability_for_operation(&effective_operation)?;
     let file_content = load_file_contents(&resolved_file.path)?;
     let plugin_request = PluginRequest::with_arguments(
-        &effective_operation,
+        effective_operation,
         vec![FilePayload::new(resolved_file.relative_path, file_content)],
         plugin_args,
     );
@@ -85,16 +86,15 @@ fn build_plugin_args(
     Ok(plugin_args)
 }
 
-fn map_effective_operation(
+fn apply_capability_argument_mapping(
     plugin_args: &mut HashMap<String, serde_json::Value>,
-    args: &arguments::RefactorArgs,
+    capability: CapabilityId,
     file_path: &Path,
-) -> Result<String, DispatchError> {
-    let operation = supported_effective_operation(&args.refactoring)?;
-    if operation == "rename-symbol" {
-        apply_rename_symbol_mapping(plugin_args, file_path)?;
+) -> Result<(), DispatchError> {
+    if capability == CapabilityId::RenameSymbol {
+        return apply_rename_symbol_mapping(plugin_args, file_path);
     }
-    Ok(String::from(operation))
+    Ok(())
 }
 
 fn contains_parent_traversal(path: &Path) -> bool {
