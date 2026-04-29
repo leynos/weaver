@@ -92,6 +92,12 @@ fn apply_flag<'a>(
     builder: &mut RefactorArgsBuilder,
 ) -> Result<(), DispatchError> {
     match arg {
+        "--provider" | "--refactoring" | "--file" if !builder.extra.is_empty() => {
+            return Err(DispatchError::invalid_arguments(format!(
+                "act refactor only accepts trailing KEY=VALUE arguments after all flags; \
+                 interleaved KEY=VALUE arguments cannot appear before flag '{arg}'"
+            )));
+        }
         "--provider" => builder.provider = Some(parse_flag_value(arg, iter)?),
         "--refactoring" => builder.refactoring = Some(parse_flag_value(arg, iter)?),
         "--file" => builder.file = Some(parse_flag_value(arg, iter)?),
@@ -131,24 +137,6 @@ mod tests {
 
     use super::parse_refactor_args;
     use crate::dispatch::errors::DispatchError;
-
-    #[test]
-    fn flag_as_value_is_rejected() {
-        let args = vec![
-            String::from("--provider"),
-            String::from("rope"),
-            String::from("--refactoring"),
-            String::from("rename"),
-            String::from("--file"),
-            String::from("--provider"),
-        ];
-
-        let error = parse_refactor_args(&args).expect_err("parse should fail");
-        assert!(matches!(
-            error,
-            crate::dispatch::errors::DispatchError::InvalidArguments { .. }
-        ));
-    }
 
     fn invalid_arguments_message(error: DispatchError) -> String {
         match error {
@@ -239,6 +227,18 @@ mod tests {
         ],
         vec!["invalid trailing arguments: 'offset', '=woven', 'new_name'", "trailing KEY=VALUE arguments"],
     )]
+    #[case::interleaved_trailing_arguments(
+        vec![
+            String::from("--provider"),
+            String::from("rope"),
+            String::from("new_name=woven"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("src/main.py"),
+        ],
+        vec!["interleaved KEY=VALUE arguments", "before flag '--refactoring'"],
+    )]
     fn invalid_arguments_are_rejected(
         #[case] args: Vec<String>,
         #[case] expected_substrings: Vec<&str>,
@@ -300,94 +300,5 @@ mod tests {
         assert!(message.contains("Providers: rope, rust-analyzer"));
         assert!(message.contains("Refactorings: rename"));
         assert!(message.contains("Next command:"));
-    }
-
-    #[test]
-    fn missing_flag_value_is_rejected() {
-        let args = vec![
-            String::from("--provider"),
-            String::from("rope"),
-            String::from("--refactoring"),
-            String::from("rename"),
-            String::from("--file"),
-        ];
-
-        let error = parse_refactor_args(&args).expect_err("parse should fail");
-        assert!(matches!(
-            error,
-            crate::dispatch::errors::DispatchError::InvalidArguments { .. }
-        ));
-    }
-
-    #[test]
-    fn unsupported_provider_is_rejected_before_runtime_resolution() {
-        let args = vec![
-            String::from("--provider"),
-            String::from("missing-provider"),
-            String::from("--refactoring"),
-            String::from("rename"),
-            String::from("--file"),
-            String::from("src/main.py"),
-        ];
-
-        let message =
-            invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
-        assert!(message.contains("does not support provider 'missing-provider'"));
-        assert!(message.contains("Providers: rope, rust-analyzer"));
-    }
-
-    #[test]
-    fn unsupported_refactoring_is_rejected_with_supported_values() {
-        let args = vec![
-            String::from("--provider"),
-            String::from("rope"),
-            String::from("--refactoring"),
-            String::from("extract-method"),
-            String::from("--file"),
-            String::from("src/main.py"),
-        ];
-
-        let message =
-            invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
-        assert!(message.contains("does not support refactoring 'extract-method'"));
-        assert!(message.contains("Refactorings: rename"));
-    }
-
-    #[test]
-    fn unexpected_top_level_flag_is_rejected() {
-        let args = vec![
-            String::from("--provider"),
-            String::from("rope"),
-            String::from("--refactoring"),
-            String::from("rename"),
-            String::from("--file"),
-            String::from("src/main.py"),
-            String::from("--bogus"),
-        ];
-
-        let message =
-            invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
-        assert!(message.contains("invalid trailing arguments: '--bogus'"));
-        assert!(message.contains("trailing KEY=VALUE arguments"));
-    }
-
-    #[test]
-    fn malformed_trailing_arguments_are_rejected() {
-        let args = vec![
-            String::from("--provider"),
-            String::from("rope"),
-            String::from("--refactoring"),
-            String::from("rename"),
-            String::from("--file"),
-            String::from("src/main.py"),
-            String::from("offset"),
-            String::from("=woven"),
-            String::from("new_name"),
-        ];
-
-        let message =
-            invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
-        assert!(message.contains("invalid trailing arguments: 'offset', '=woven', 'new_name'"));
-        assert!(message.contains("trailing KEY=VALUE arguments"));
     }
 }
