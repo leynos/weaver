@@ -26,55 +26,30 @@ struct BuiltInProviderSpec {
     timeout_secs: Option<u64>,
 }
 
-macro_rules! built_in_provider_catalogue {
-    (
-        $(
-            {
-                name: $name:expr,
-                version: $version:expr,
-                languages: [$($language:expr),* $(,)?],
-                timeout_secs: $timeout_secs:expr
-            }
-        ),+ $(,)?
-    ) => {
-        const BUILT_IN_PROVIDER_SPECS: &[BuiltInProviderSpec] = &[
-            $(
-                BuiltInProviderSpec {
-                    name: $name,
-                    version: $version,
-                    languages: &[$($language),*],
-                    timeout_secs: $timeout_secs,
-                },
-            )+
-        ];
+const ROPE_PROVIDER_SPEC: BuiltInProviderSpec = BuiltInProviderSpec {
+    name: ROPE_PLUGIN_NAME,
+    version: ROPE_PLUGIN_VERSION,
+    languages: &["python"],
+    timeout_secs: None,
+};
 
-        pub(crate) const BUILT_IN_PROVIDER_NAMES: &[&str] = &[$($name),+];
-    };
-}
+const RUST_ANALYZER_PROVIDER_SPEC: BuiltInProviderSpec = BuiltInProviderSpec {
+    name: RUST_ANALYZER_PLUGIN_NAME,
+    version: RUST_ANALYZER_PLUGIN_VERSION,
+    languages: &["rust"],
+    timeout_secs: Some(RUST_ANALYZER_PLUGIN_TIMEOUT_SECS),
+};
 
-built_in_provider_catalogue!(
-    {
-        name: ROPE_PLUGIN_NAME,
-        version: ROPE_PLUGIN_VERSION,
-        languages: ["python"],
-        timeout_secs: None
-    },
-    {
-        name: RUST_ANALYZER_PLUGIN_NAME,
-        version: RUST_ANALYZER_PLUGIN_VERSION,
-        languages: ["rust"],
-        timeout_secs: Some(RUST_ANALYZER_PLUGIN_TIMEOUT_SECS)
-    },
-);
+pub(crate) const BUILT_IN_PROVIDER_NAMES: &[&str] = &[ROPE_PLUGIN_NAME, RUST_ANALYZER_PLUGIN_NAME];
 
 /// Builds the default rope plugin manifest.
 pub(crate) fn rope_manifest(executable: PathBuf) -> PluginManifest {
-    manifest_from_spec(provider_spec(ROPE_PLUGIN_NAME), executable)
+    manifest_from_spec(&ROPE_PROVIDER_SPEC, executable)
 }
 
 /// Builds the default rust-analyzer plugin manifest.
 pub(crate) fn rust_analyzer_manifest(executable: PathBuf) -> PluginManifest {
-    manifest_from_spec(provider_spec(RUST_ANALYZER_PLUGIN_NAME), executable)
+    manifest_from_spec(&RUST_ANALYZER_PROVIDER_SPEC, executable)
 }
 
 /// Returns the names of all built-in refactoring providers.
@@ -101,11 +76,4 @@ fn manifest_from_spec(spec: &BuiltInProviderSpec, executable: PathBuf) -> Plugin
     } else {
         manifest
     }
-}
-
-fn provider_spec(name: &str) -> &'static BuiltInProviderSpec {
-    BUILT_IN_PROVIDER_SPECS
-        .iter()
-        .find(|spec| spec.name == name)
-        .unwrap_or_else(|| panic!("missing built-in provider spec for '{name}'"))
 }

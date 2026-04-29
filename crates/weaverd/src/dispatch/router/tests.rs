@@ -34,8 +34,10 @@ fn build_backends() -> FusionBackends<SemanticBackendProvider> {
 }
 
 fn build_router() -> DomainRouter {
-    DomainRouter::new(PathBuf::from("/tmp/weaver-test-workspace"))
-        .unwrap_or_else(|error| panic!("absolute workspace root: {error}"))
+    match DomainRouter::new(PathBuf::from("/tmp/weaver-test-workspace")) {
+        Ok(router) => router,
+        Err(error) => panic!("absolute workspace root: {error}"),
+    }
 }
 
 #[test]

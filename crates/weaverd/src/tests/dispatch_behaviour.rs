@@ -40,7 +40,7 @@ fn test_handler() -> Arc<DispatchConnectionHandler> {
     let workspace_root = std::env::current_dir().expect("workspace root");
     Arc::new(
         DispatchConnectionHandler::new(backend_manager, workspace_root)
-            .unwrap_or_else(|error| panic!("absolute workspace root: {error}")),
+            .expect("absolute workspace root"),
     )
 }
 

@@ -140,6 +140,8 @@ fn format_required_flags() -> String {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for canonical act refactor requirements.
+
     use weaver_plugins::CapabilityId;
 
     use super::{

@@ -15,7 +15,6 @@ use super::{
             build_backends,
             command_request,
             configure_request,
-            standard_rename_args,
             standard_rename_args_for_provider,
         },
         content::{
@@ -33,14 +32,7 @@ use super::{
             resolve_auto_language,
         },
     },
-    resolution::{
-        CandidateEvaluation,
-        CandidateReason,
-        CapabilityResolutionEnvelope,
-        RefusalReason,
-        ResolutionRequest,
-        SelectionMode,
-    },
+    resolution::*,
     *,
 };
 
@@ -265,17 +257,7 @@ fn world() -> RefactorWorld {
 }
 
 #[given("a workspace file for refactoring")]
-fn given_workspace_file(
-    #[expect(
-        unused_variables,
-        reason = "BDD step exists for readability; file creation happens in \
-                  prepare_routed_fixture()"
-    )]
-    world: &mut RefactorWorld,
-) {
-    // File creation is handled by prepare_routed_fixture() in subsequent steps
-    // This step exists for BDD readability but performs no action
-}
+fn given_workspace_file(world: &mut RefactorWorld) { let _ = world; }
 
 #[given("a valid act refactor request for rope")]
 fn given_valid_rope_request(world: &mut RefactorWorld) -> Result<(), String> {
@@ -305,6 +287,7 @@ fn given_unsupported_language_request(world: &mut RefactorWorld) {
     );
     world.routing_mode = RoutingMode::UnsupportedLanguage;
 }
+#[given("a Python act refactor request with an incompatible provider override")]
 fn given_explicit_provider_mismatch_request(world: &mut RefactorWorld) -> Result<(), String> {
     configure_request(
         &mut world.request,
@@ -387,9 +370,9 @@ fn then_stderr_contains(world: &mut RefactorWorld, text: String) {
 }
 
 #[then("the dispatch error contains {text}")]
-fn then_dispatch_error_contains(world: &mut RefactorWorld, text: String) {
+fn then_dispatch_error_contains(world: &mut RefactorWorld, text: String) -> Result<(), String> {
     let needle = text.trim_matches('"');
-    let result = world.dispatch_result.as_ref().expect("result missing");
+    let result = world.dispatch_result.as_ref().ok_or("result missing")?;
     let Err(error) = result else {
         panic!("expected dispatch error, got status: {result:?}");
     };
@@ -398,6 +381,7 @@ fn then_dispatch_error_contains(world: &mut RefactorWorld, text: String) {
         rendered.contains(needle),
         "expected dispatch error to contain '{needle}', got: {rendered}"
     );
+    Ok(())
 }
 
 #[scenario(path = "tests/features/refactor.feature")]

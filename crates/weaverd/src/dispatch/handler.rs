@@ -266,9 +266,11 @@ mod tests {
                 Ok(stream) => stream,
                 Err(error) => panic!("accept: {error}"),
             };
-            DispatchConnectionHandler::new(backend_manager, workspace_root)
-                .unwrap_or_else(|error| panic!("absolute workspace root: {error}"))
-                .handle(ConnectionStream::Tcp(stream));
+            match DispatchConnectionHandler::new(backend_manager, workspace_root) {
+                Ok(handler) => handler,
+                Err(error) => panic!("absolute workspace root: {error}"),
+            }
+            .handle(ConnectionStream::Tcp(stream));
         });
 
         let client = match TcpStream::connect(addr) {

@@ -125,6 +125,8 @@ fn is_valid_extra_argument(argument: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for act refactor argument parsing.
+
     use rstest::rstest;
 
     use super::parse_refactor_args;

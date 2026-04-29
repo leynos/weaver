@@ -5,7 +5,11 @@
 //! own set of supported operations. Unknown domains or operations are rejected
 //! with structured errors.
 
-use std::{io::Write, path::PathBuf, sync::Arc};
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use tracing::debug;
 
@@ -283,4 +287,5 @@ fn validate_absolute_workspace_root(workspace_root: &Path) -> Result<(), Dispatc
         )))
     }
 }
+#[cfg(test)]
 mod tests;
