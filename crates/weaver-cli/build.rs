@@ -3,7 +3,6 @@
 
 use std::env;
 
-use camino::Utf8PathBuf;
 use clap_mangen::Man;
 use weaver_build_util::{manual_date_from_env, out_dir_for_target_profile, write_man_page};
 
@@ -57,17 +56,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Man page generation is pure file output, so it works during cross-compilation.
     let target = env::var("TARGET").unwrap_or_else(|_| "unknown-target".into());
     let profile = env::var("PROFILE").unwrap_or_else(|_| "unknown-profile".into());
-    let out_dir_env: Option<Utf8PathBuf> =
-        env::var_os("OUT_DIR").and_then(|p| p.to_str().map(Utf8PathBuf::from));
-    let out_dir = out_dir_for_target_profile(&target, &profile, out_dir_env.as_deref());
+    let out_dir = out_dir_for_target_profile(&target, &profile, None);
     write_man_page(&buf, &out_dir, &page_name)?;
-
-    // Also write to OUT_DIR if available for build script consumers.
-    if let Some(extra_dir) = out_dir_env
-        && let Err(err) = write_man_page(&buf, &extra_dir, &page_name)
-    {
-        println!("cargo:warning=Failed to stage manual page in OUT_DIR ({extra_dir}): {err}");
-    }
 
     Ok(())
 }
