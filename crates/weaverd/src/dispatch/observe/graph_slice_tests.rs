@@ -8,7 +8,7 @@ use url::Url;
 use weaver_cards::{DEFAULT_CACHE_CAPACITY, DetailLevel};
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
-use super::{first_non_whitespace_column, handle};
+use super::{MAX_SAME_FILE_DISCOVERY_POSITIONS, first_non_whitespace_column, handle};
 use crate::{
     backends::FusionBackends,
     dispatch::{errors::DispatchError, request::CommandRequest, response::ResponseWriter},
@@ -196,6 +196,43 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
             .as_array()
             .expect("frontier array")
             .is_empty()
+    );
+}
+
+#[rstest]
+fn discovery_cap_marks_spillover_truncated_when_card_budget_remains(
+    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
+) {
+    let (mut backends, temp_dir) = backends;
+    let source = (0..=MAX_SAME_FILE_DISCOVERY_POSITIONS)
+        .map(|index| format!("fn item_{index}() {{}}\n"))
+        .collect::<String>();
+    let path = write_source(&temp_dir, "large.rs", &source);
+    let uri = Url::from_file_path(&path).expect("file uri").to_string();
+    let request = make_request(&[
+        "--uri",
+        &uri,
+        "--position",
+        "1:4",
+        "--max-cards",
+        "300",
+        "--entry-detail",
+        detail_value(DetailLevel::Structure),
+        "--node-detail",
+        detail_value(DetailLevel::Structure),
+    ]);
+
+    let (status, payload) = dispatch_payload(&request, &mut backends);
+
+    assert_eq!(status, 0);
+    assert_eq!(payload["status"], "success");
+    assert_eq!(payload["spillover"]["truncated"], true);
+    assert_eq!(
+        payload["spillover"]["frontier"]
+            .as_array()
+            .expect("frontier array")
+            .len(),
+        0
     );
 }
 

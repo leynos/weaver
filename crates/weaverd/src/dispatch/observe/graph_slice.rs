@@ -1,10 +1,8 @@
-//! Handler for the `observe graph-slice` operation.
+//! Handler for `observe graph-slice` stable schema responses.
 //!
-//! This module parses graph-slice requests through the stable schema
-//! types in `weaver-cards` and produces schema-valid JSON responses.
-//! The full graph traversal engine is deferred to roadmap items 7.2.2
-//! through 7.2.5. For the schema milestone, the handler returns a
-//! deterministic same-file slice bounded by `max_cards`.
+//! Full graph traversal is deferred to later roadmap items. For the schema
+//! milestone, this handler returns a deterministic same-file slice bounded by
+//! `max_cards`.
 
 use std::{
     collections::BTreeMap,
@@ -46,23 +44,13 @@ use crate::{
 
 const MAX_SAME_FILE_DISCOVERY_POSITIONS: usize = 256;
 
-/// Maps a graph-slice response to its exit status code.
-///
-/// Returns `0` for success, `1` for refusals.
 fn exit_status(response: &GraphSliceResponse) -> i32 {
-    match response {
-        GraphSliceResponse::Success { .. } => 0,
-        GraphSliceResponse::Refusal { .. } => 1,
-        _ => 1,
-    }
+    i32::from(!matches!(response, GraphSliceResponse::Success { .. }))
 }
 
 /// Handles the `observe graph-slice` command.
 ///
-/// Parses the request through [`GraphSliceRequest`] and serializes a
-/// typed response. The schema milestone returns a deterministic
-/// same-file slice while later roadmap items add true graph traversal
-/// and edge extraction.
+/// Parses the request and serializes a deterministic same-file response.
 ///
 /// # Errors
 ///
@@ -110,14 +98,18 @@ fn build_response(
     enrich_card_if_requested(&mut entry_card, request.entry_detail(), source, backends);
 
     let entry_symbol_id = entry_card.symbol.symbol_id.clone();
-    let sibling_cards = discover_same_file_cards(
+    let (sibling_cards, discovery_capped) = discover_same_file_cards(
         request,
         SliceDocument { path, source },
         &entry_symbol_id,
         backends,
     )?;
-    let (cards, spillover) =
-        apply_card_budget(entry_card, sibling_cards, request.budget().max_cards());
+    let (cards, spillover) = apply_card_budget(
+        entry_card,
+        sibling_cards,
+        request.budget().max_cards(),
+        discovery_capped,
+    );
 
     Ok(GraphSliceResponse::Success {
         slice_version: 1,
@@ -149,11 +141,12 @@ fn discover_same_file_cards(
     document: SliceDocument<'_>,
     entry_symbol_id: &str,
     backends: &mut FusionBackends<SemanticBackendProvider>,
-) -> Result<Vec<SymbolCard>, DispatchError> {
+) -> Result<(Vec<SymbolCard>, bool), DispatchError> {
     let extractor = backends.provider().card_extractor().clone();
     let mut cards = BTreeMap::new();
+    let (candidate_positions, discovery_capped) = candidate_positions(document.source);
 
-    for (line, column) in candidate_positions(document.source) {
+    for (line, column) in candidate_positions {
         if (line, column) == (request.line(), request.column()) {
             continue;
         }
@@ -174,7 +167,7 @@ fn discover_same_file_cards(
 
     let mut ordered_cards = cards.into_values().collect::<Vec<_>>();
     ordered_cards.sort_by(stable_card_order);
-    Ok(ordered_cards)
+    Ok((ordered_cards, discovery_capped))
 }
 
 fn extract_same_file_card(
@@ -210,17 +203,19 @@ fn extract_same_file_card(
         )),
     }
 }
-fn candidate_positions(source: &str) -> Vec<(u32, u32)> {
-    source
+fn candidate_positions(source: &str) -> (Vec<(u32, u32)>, bool) {
+    let mut positions = source
         .lines()
         .enumerate()
         .filter_map(|(index, line)| {
             first_non_whitespace_column(line).map(|column| ((index as u32) + 1, column))
         })
-        // Bound extraction work for large files until symbol-table discovery
-        // lands in the later graph-slice milestones.
-        .take(MAX_SAME_FILE_DISCOVERY_POSITIONS)
-        .collect()
+        // Bound extraction work until later symbol-table discovery milestones.
+        .take(MAX_SAME_FILE_DISCOVERY_POSITIONS + 1)
+        .collect::<Vec<_>>();
+    let discovery_capped = positions.len() > MAX_SAME_FILE_DISCOVERY_POSITIONS;
+    positions.truncate(MAX_SAME_FILE_DISCOVERY_POSITIONS);
+    (positions, discovery_capped)
 }
 
 fn first_non_whitespace_column(line: &str) -> Option<u32> {
@@ -256,6 +251,7 @@ fn apply_card_budget(
     entry_card: SymbolCard,
     sibling_cards: Vec<SymbolCard>,
     max_cards: u32,
+    discovery_capped: bool,
 ) -> (Vec<SymbolCard>, SliceSpillover) {
     if max_cards == 0 {
         let frontier = std::iter::once(SpilloverCandidate {
@@ -296,7 +292,10 @@ fn apply_card_budget(
     cards.extend(included_siblings);
 
     let spillover = if frontier.is_empty() {
-        SliceSpillover::empty()
+        SliceSpillover {
+            truncated: discovery_capped,
+            frontier,
+        }
     } else {
         SliceSpillover {
             truncated: true,

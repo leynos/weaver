@@ -141,10 +141,10 @@ This plan covers roadmap item 7.2.1 in [docs/roadmap.md](../roadmap.md).
 - [x] (2026-04-12 00:20Z) Re-audited the implementation against this plan
       and confirmed the remaining gaps were the hard-coded daemon refusal, the
       absent `weaver-e2e` graph-slice battery, and outdated user/design docs.
-- [x] (2026-04-12 21:20Z) Stage E: add `assert_cmd` plus `insta`
+- [x] (2026-04-12 21:20Z) Stage E COMPLETE: add `assert_cmd` plus `insta`
       end-to-end coverage using the
       dedicated 20 Rust and 20 Python graph-slice fixture batteries.
-- [x] (2026-04-12 21:57Z) Stage F: update design and user
+- [x] (2026-04-12 21:57Z) Stage F COMPLETE: update design and user
       documentation, mark the roadmap
       entry done, and run all required gates.
 - [x] (2026-04-20 00:00Z) Post-review hardening: mapped local file-read
@@ -274,7 +274,7 @@ Successful completion will mean:
    graph-slice scenarios at semantic detail.
 6. The design doc, user guide, and roadmap all match the shipped contract.
 
-Completed on 2026-04-12:
+Completed on 2026-04-12, including Stage E and Stage F:
 
 1. `observe graph-slice` now returns a deterministic same-file success
    response instead of a hard-coded refusal, while still deferring real edge
@@ -558,8 +558,7 @@ Review the tail of each log before concluding that the milestone is done.
 
 ## Approval gate
 
-This ExecPlan was approved and implementation has begun. Stages A through D
+This ExecPlan was approved and implementation is complete. Stages A through F
 have been completed, establishing the stable JSON schema contract, daemon
-routing, CLI parsing, and BDD coverage for the `observe graph-slice` operation.
-Stages E and F (end-to-end fixture coverage and documentation updates) remain
-in progress.
+routing, CLI parsing, BDD coverage, end-to-end fixture coverage, and
+documentation updates for the `observe graph-slice` operation.
