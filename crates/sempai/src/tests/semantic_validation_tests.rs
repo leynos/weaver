@@ -19,6 +19,13 @@ fn make_pattern(text: &str) -> Decorated<Formula> {
     }
 }
 
+fn assert_invalid_not_in_or(formula: &Decorated<Formula>) {
+    let result = validate_formula(formula);
+    let err = result.expect_err("should fail validation");
+    let first = err.diagnostics().first().expect("should have diagnostic");
+    assert_eq!(first.code(), DiagnosticCode::ESempaiInvalidNotInOr);
+}
+
 #[test]
 fn single_positive_atom_passes_validation() {
     let formula = make_pattern("foo");
@@ -55,10 +62,7 @@ fn or_with_not_branch_fails() {
         fix: None,
         span: None,
     };
-    let result = validate_formula(&formula);
-    let err = result.expect_err("should fail validation");
-    let first = err.diagnostics().first().expect("should have diagnostic");
-    assert_eq!(first.code(), DiagnosticCode::ESempaiInvalidNotInOr);
+    assert_invalid_not_in_or(&formula);
 }
 
 #[test]
@@ -86,10 +90,7 @@ fn or_with_nested_not_branch_fails() {
         fix: None,
         span: None,
     };
-    let result = validate_formula(&formula);
-    let err = result.expect_err("should fail validation");
-    let first = err.diagnostics().first().expect("should have diagnostic");
-    assert_eq!(first.code(), DiagnosticCode::ESempaiInvalidNotInOr);
+    assert_invalid_not_in_or(&formula);
 }
 
 #[test]
