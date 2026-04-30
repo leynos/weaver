@@ -39,7 +39,8 @@ pub(crate) fn command() -> Command { AUGMENTED_COMMAND.get_or_init(build_command
 
 /// Writes help for the provided arguments using the augmented help command.
 pub fn write_help_for_args<W: Write>(args: &[OsString], writer: &mut W) -> std::io::Result<()> {
-    match command().try_get_matches_from(args.iter().cloned()) {
+    let mut cmd = command();
+    match cmd.try_get_matches_from_mut(args.iter().cloned()) {
         Err(error)
             if matches!(
                 error.kind(),
@@ -50,19 +51,22 @@ pub fn write_help_for_args<W: Write>(args: &[OsString], writer: &mut W) -> std::
         }
         Err(error) => write!(writer, "{error}"),
         Ok(_) => {
-            let mut fallback = command();
-            fallback.write_long_help(writer)?;
+            cmd.write_long_help(writer).inspect_err(|e| {
+                tracing::warn!(error = %e, "failed to write long help to writer");
+            })?;
             writeln!(writer)
         }
     }
 }
 
 fn build_command() -> Command {
+    tracing::debug!("building augmented help command");
     let mut command = Cli::command();
     command = command.arg(config_path_arg());
 
     for field in Config::get_doc_metadata().fields {
         if let Some(arg) = config_field_arg(&field) {
+            tracing::trace!(field = %field.name, "attached config arg to help command");
             command = command.arg(arg);
         }
     }

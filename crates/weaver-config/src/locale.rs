@@ -140,6 +140,33 @@ mod tests {
                 }
             }
         }
+
+        #[test]
+        fn locale_serialises_to_json_string() {
+            let locale = "fr-FR".parse::<Locale>().expect("valid locale");
+            let json = serde_json::to_string(&locale).expect("serialise");
+            assert_eq!(json, "\"fr-FR\"");
+        }
+
+        #[test]
+        fn locale_deserialises_from_json_string() {
+            let locale: Locale = serde_json::from_str("\"de-DE\"").expect("deserialise");
+            assert_eq!(locale.to_string(), "de-DE");
+        }
+
+        #[test]
+        fn locale_json_round_trip_preserves_canonical_form() {
+            let original = "en-US".parse::<Locale>().expect("valid locale");
+            let json = serde_json::to_string(&original).expect("serialise");
+            let roundtripped: Locale = serde_json::from_str(&json).expect("deserialise");
+            assert_eq!(original.to_string(), roundtripped.to_string());
+        }
+
+        #[test]
+        fn locale_deserialise_rejects_invalid_json_string() {
+            let result: Result<Locale, _> = serde_json::from_str("\"not a locale!!!\"");
+            assert!(result.is_err(), "invalid locale must not deserialise");
+        }
     }
 
     #[test]

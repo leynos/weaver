@@ -438,6 +438,29 @@ to construct the `Localizer` before clap parse errors are formatted. The
 current `Locale` type exists so the configuration contract is real now and the
 later localisation bootstrap can reuse the validated domain value.
 
+### 2.5 Daemon command execution glue (`crates/weaver-cli/src/runner_glue.rs`)
+
+`runner_glue` extracts the daemon transport path from `lib.rs` so the
+top-level runtime stays small enough to scan. Its two `pub(crate)` entry points
+are:
+
+- **`execute_daemon_command`** — builds a `CommandRequest`, connects to the
+  daemon socket (auto-starting the daemon if it is not running), writes the
+  request as JSON Lines, and processes daemon response messages, returning an
+  `ExitCode`. On transport or IO failure it writes a human-readable error to
+  `stderr` and returns `ExitCode::FAILURE`.
+
+- **`build_request`** — constructs a `CommandRequest` from a
+  `CommandInvocation`. For `apply-patch` operations it drains `stdin` into the
+  request patch field and returns `AppError::MissingPatchInput` when the
+  content is empty after trimming. For all other operations it constructs the
+  request without reading `stdin`.
+
+The module keeps connection retry logic in `start_and_retry_daemon`, which
+tolerates socket-bind lag after daemon startup, and `write_error_and_fail`, a
+small helper that writes a display message to `stderr` and returns
+`ExitCode::FAILURE`.
+
 ## Test infrastructure for rename-symbol coverage
 
 ### `test-support` feature (`weaver-plugins`)

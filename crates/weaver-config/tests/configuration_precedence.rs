@@ -2,7 +2,7 @@
 
 use std::{
     ffi::OsString,
-    sync::{Mutex, MutexGuard, OnceLock},
+    sync::{LockResult, Mutex, MutexGuard, OnceLock},
 };
 
 use cap_std::fs::Dir;
@@ -18,6 +18,13 @@ use weaver_config::{
 };
 use weaver_test_macros::allow_fixture_expansion_lints;
 
+/// Serialises environment mutations across test threads.
+///
+/// `std::env` is a global mutable resource. `ENV_LOCK` coordinates every
+/// `set_env` and `remove_var` call so concurrent test threads cannot observe
+/// each other's temporary environment changes.
+static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
 struct Harness {
     temp_dir: TempDir,
     cli_args: std::cell::RefCell<Vec<OsString>>,
@@ -27,19 +34,35 @@ struct Harness {
     error: std::cell::RefCell<Option<String>>,
 }
 
+/// Serialises environment mutations across test threads.
+///
+/// `std::env` is a global mutable resource. `EnvGuard` acquires a process-wide
+/// `Mutex` before any `set_env` / `remove_var` call and releases it when
+/// dropped, ensuring that concurrent test threads cannot observe each other's
+/// temporary environment changes.
+///
+/// The inner `MutexGuard` is retained for the lifetime of `EnvGuard` so the
+/// lock is held until the harness `Drop` impl has restored all overrides.
 struct EnvGuard {
     _lock: MutexGuard<'static, ()>,
 }
 
 impl EnvGuard {
     fn acquire() -> Self {
-        static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
         let lock = ENV_LOCK.get_or_init(|| Mutex::new(()));
-        let guard = lock
-            .lock()
-            .expect("environment mutation lock should not be poisoned");
+        // Recover from a poisoned mutex: if a previous test panicked while
+        // holding the environment lock, the mutex is poisoned but the
+        // underlying data (the unit value) is still valid. Recovering here
+        // prevents a cascade failure where all subsequent env-mutating tests
+        // fail with an unrelated "poisoned" error rather than the original
+        // assertion failure.
+        let guard = recover_env_lock(lock.lock());
         Self { _lock: guard }
     }
+}
+
+fn recover_env_lock(result: LockResult<MutexGuard<'static, ()>>) -> MutexGuard<'static, ()> {
+    result.unwrap_or_else(|e| e.into_inner())
 }
 impl Harness {
     fn new() -> Self {
@@ -245,6 +268,17 @@ fn then_resolved_locale(harness: &Harness, locale: String) {
     };
 
     assert_eq!(config.locale().to_string(), locale);
+}
+
+#[test]
+fn env_guard_recovers_from_poisoned_lock() {
+    use std::sync::PoisonError;
+
+    let lock: &'static Mutex<()> = Box::leak(Box::new(Mutex::new(())));
+    let guard = lock.lock().expect("fresh mutex should lock");
+    let poisoned = Err(PoisonError::new(guard));
+
+    let _guard = recover_env_lock(poisoned);
 }
 
 #[scenario(path = "tests/features/configuration_precedence.feature")]

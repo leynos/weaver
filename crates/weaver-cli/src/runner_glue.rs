@@ -5,7 +5,7 @@
 //! the top-level runtime stays small enough to scan.
 
 use std::{
-    io::{Read, Write},
+    io::{Error, ErrorKind, Read, Write},
     process::ExitCode,
 };
 
@@ -23,6 +23,12 @@ use crate::{
     lifecycle::{LifecycleContext, try_auto_start_daemon},
     transport::{self, Connection, connect, connect_with_retry},
 };
+
+/// Maximum patch size accepted from stdin (4 MiB).
+///
+/// Prevents resource exhaustion from accidentally piping large files. Patches
+/// that exceed this limit return an IO error with `ErrorKind::UnexpectedEof`.
+const MAX_PATCH_BYTES: u64 = 4 * 1024 * 1024;
 
 /// Executes a daemon-backed command end-to-end.
 ///
@@ -108,8 +114,15 @@ pub(crate) fn build_request<R: Read>(
     if invocation.is_apply_patch() {
         let mut patch = String::new();
         stdin
+            .take(MAX_PATCH_BYTES + 1)
             .read_to_string(&mut patch)
             .map_err(AppError::ReadPatch)?;
+        if patch.len() as u64 > MAX_PATCH_BYTES {
+            return Err(AppError::ReadPatch(Error::new(
+                ErrorKind::UnexpectedEof,
+                "patch input exceeds maximum size",
+            )));
+        }
         if patch.trim().is_empty() {
             return Err(AppError::MissingPatchInput);
         }
@@ -151,7 +164,7 @@ mod tests {
 
     use std::io::Cursor;
 
-    use super::build_request;
+    use super::{MAX_PATCH_BYTES, build_request};
     use crate::{AppError, CommandInvocation};
 
     fn observe_status_invocation() -> CommandInvocation {
@@ -190,5 +203,18 @@ mod tests {
         let mut stdin = Cursor::new(b"   \n".to_vec());
         let result = build_request(apply_patch_invocation(), &mut stdin);
         assert!(matches!(result, Err(AppError::MissingPatchInput)));
+    }
+
+    #[test]
+    fn apply_patch_returns_error_for_oversized_stdin() {
+        let mut input = vec![b'a'; MAX_PATCH_BYTES as usize + 1];
+        input.push(b'\n');
+        let mut stdin = Cursor::new(input);
+        let result = build_request(apply_patch_invocation(), &mut stdin);
+
+        assert!(matches!(
+            result,
+            Err(AppError::ReadPatch(error)) if error.kind() == std::io::ErrorKind::UnexpectedEof
+        ));
     }
 }
