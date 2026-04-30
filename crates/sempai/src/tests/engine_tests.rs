@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use rstest::rstest;
-use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom};
+use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom, TreeSitterQueryAtom};
 
 use crate::{
     Diagnostic,
@@ -90,7 +90,10 @@ fn engine_new_with_custom_config() {
 #[case::legacy_pattern(
     "rules:\n  - id: demo.rule\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n",
     "demo.rule",
-    Language::Rust
+    Language::Rust,
+    Formula::Atom(Atom::Pattern(PatternAtom {
+        text: String::from("foo($X)"),
+    })),
 )]
 #[case::project_depends_on(
     concat!(
@@ -105,11 +108,15 @@ fn engine_new_with_custom_config() {
     ),
     "demo.depends",
     Language::Python,
+    Formula::Atom(Atom::TreeSitterQuery(TreeSitterQueryAtom {
+        query: String::from("(__NONEXISTENT_NODE__) @_dependency_check"),
+    })),
 )]
 fn compile_yaml_normalizes_and_returns_query_plans(
     #[case] yaml: &str,
     #[case] expected_rule_id: &str,
     #[case] expected_language: Language,
+    #[case] expected_formula: Formula,
 ) {
     let engine = default_engine();
     let plans = engine
@@ -119,6 +126,7 @@ fn compile_yaml_normalizes_and_returns_query_plans(
     let plan = plans.first().expect("should have first plan");
     assert_eq!(plan.rule_id(), expected_rule_id);
     assert_eq!(plan.language(), expected_language);
+    assert_eq!(&plan.formula().node, &expected_formula);
 }
 
 #[rstest]

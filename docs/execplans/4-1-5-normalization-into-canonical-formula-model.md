@@ -128,10 +128,11 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-5-make-nixie.log
   individual formula nodes.
 
 - Risk: `r2c-internal-project-depends-on` rules have no formula body and cannot
-  meaningfully normalize. Severity: low Likelihood: certain Mitigation:
-  Represent as a dedicated `Formula::Atom(Atom::DependencyCheck)` variant or
-  skip normalization for these rules and emit a degenerate plan. Decision to be
-  taken in Stage B.
+  normalize into the existing `Atom` variants (`Pattern`, `Regex`,
+  `TreeSitterQuery`) as a real code-matching query. Severity: low Likelihood:
+  certain Mitigation: model them as a distinct handling path in the ExecPlan by
+  emitting a degenerate, non-matchable `TreeSitterQuery` placeholder for now,
+  while preserving the dependency payload for later execution work.
 
 ## Progress
 
@@ -305,9 +306,10 @@ The normalization must handle:
    enclosing `And`'s `Decorated` wrapper.
 5. `MatchFormula::Decorated` → `Decorated<Formula>` with `where_clauses`,
    `as_name`, and `fix` mapped through.
-6. `SearchQueryPrincipal::ProjectDependsOn` → produce a placeholder
-   `Formula::Atom(Atom::Pattern(...))` or a new `Atom::DependencyCheck` variant
-   (decision to be taken here and recorded in the decision log).
+6. `SearchQueryPrincipal::ProjectDependsOn` → produce a degenerate
+   `Formula::Atom(Atom::TreeSitterQuery(...))` placeholder that cannot match
+   real code, preserving dependency-rule compilation without inventing a
+   speculative `Atom` variant.
 
 Go/no-go: unit tests show that paired legacy and v2 YAML fixtures produce
 structurally equivalent `Formula` values.
