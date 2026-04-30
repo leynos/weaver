@@ -338,7 +338,7 @@ fn normalize_lsp_provenance(card: &mut SymbolCard) {
 fn resolve_file_path(uri: &Url) -> Result<PathBuf, DispatchError> {
     if uri.scheme() != "file" {
         return Err(DispatchError::invalid_arguments(format!(
-            "unsupported URI scheme '{}': expected file",
+            "unsupported URI scheme '{}': expected a file URI",
             uri.scheme()
         )));
     }
