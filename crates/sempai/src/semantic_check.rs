@@ -42,8 +42,6 @@ pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), Diagn
 }
 
 /// Checks that no `Or` branch contains a `Not` formula.
-///
-/// Recursively validates all sub-formulas.
 fn check_no_not_in_or(
     formula: &Formula,
     span: Option<&sempai_core::SourceSpan>,
@@ -51,7 +49,7 @@ fn check_no_not_in_or(
     match formula {
         Formula::Or(branches) => {
             for branch in branches {
-                if matches!(branch.node, Formula::Not(_)) {
+                if branch_contains_not(&branch.node) {
                     return Err(DiagnosticReport::validation_error(
                         DiagnosticCode::ESempaiInvalidNotInOr,
                         String::from(
@@ -76,6 +74,18 @@ fn check_no_not_in_or(
             check_no_not_in_or(&inner.node, inner.span.as_ref().or(span))
         }
         Formula::Atom(_) => Ok(()),
+    }
+}
+
+/// Returns true when a formula subtree contains a negation.
+fn branch_contains_not(formula: &Formula) -> bool {
+    match formula {
+        Formula::Not(_) => true,
+        Formula::And(branches) | Formula::Or(branches) => branches
+            .iter()
+            .any(|branch| branch_contains_not(&branch.node)),
+        Formula::Inside(inner) | Formula::Anywhere(inner) => branch_contains_not(&inner.node),
+        Formula::Atom(_) => false,
     }
 }
 

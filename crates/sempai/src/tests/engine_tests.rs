@@ -1,5 +1,7 @@
 //! Tests for the `Engine` and `QueryPlan` types.
 
+use std::sync::Arc;
+
 use rstest::rstest;
 use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom};
 
@@ -252,7 +254,11 @@ fn compile_dsl_returns_not_implemented() {
 #[test]
 fn execute_returns_not_implemented() {
     let engine = default_engine();
-    let plan = QueryPlan::new(String::from("test-rule"), Language::Rust, dummy_formula());
+    let plan = QueryPlan::new(
+        String::from("test-rule"),
+        Language::Rust,
+        Arc::new(dummy_formula()),
+    );
     let result = engine.execute(&plan, "file:///test.rs", "fn main() {}");
     let (code, diag) = first_diagnostic_of_err(result);
     assert_eq!(code, DiagnosticCode::NotImplemented);

@@ -62,6 +62,37 @@ fn or_with_not_branch_fails() {
 }
 
 #[test]
+fn or_with_nested_not_branch_fails() {
+    let nested_and = Decorated {
+        node: Formula::And(vec![
+            make_pattern("foo"),
+            Decorated {
+                node: Formula::Not(Box::new(make_pattern("bar"))),
+                where_clauses: vec![],
+                as_name: None,
+                fix: None,
+                span: None,
+            },
+        ]),
+        where_clauses: vec![],
+        as_name: None,
+        fix: None,
+        span: None,
+    };
+    let formula = Decorated {
+        node: Formula::Or(vec![nested_and]),
+        where_clauses: vec![],
+        as_name: None,
+        fix: None,
+        span: None,
+    };
+    let result = validate_formula(&formula);
+    let err = result.expect_err("should fail validation");
+    let first = err.diagnostics().first().expect("should have diagnostic");
+    assert_eq!(first.code(), DiagnosticCode::ESempaiInvalidNotInOr);
+}
+
+#[test]
 fn valid_and_with_positive_term_passes() {
     let formula = Decorated {
         node: Formula::And(vec![

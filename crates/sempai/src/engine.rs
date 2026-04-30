@@ -5,6 +5,8 @@
 //! Compilation and execution are separate phases, allowing a compiled
 //! [`QueryPlan`] to be reused across multiple source files.
 
+use std::sync::Arc;
+
 use sempai_core::{
     DiagnosticCode,
     DiagnosticReport,
@@ -27,14 +29,14 @@ pub struct QueryPlan {
     rule_id: String,
     language: Language,
     /// The normalized canonical formula.
-    formula: Decorated<Formula>,
+    formula: Arc<Decorated<Formula>>,
 }
 
 impl QueryPlan {
     pub(crate) const fn new(
         rule_id: String,
         language: Language,
-        formula: Decorated<Formula>,
+        formula: Arc<Decorated<Formula>>,
     ) -> Self {
         Self {
             rule_id,
@@ -53,7 +55,7 @@ impl QueryPlan {
 
     /// Returns the normalized canonical formula.
     #[must_use]
-    pub const fn formula(&self) -> &Decorated<Formula> { &self.formula }
+    pub fn formula(&self) -> &Decorated<Formula> { self.formula.as_ref() }
 }
 
 /// Compiles and executes Semgrep-compatible queries on Tree-sitter syntax
@@ -116,7 +118,7 @@ impl Engine {
             .try_fold(Vec::new(), |mut plans, (rule, principal)| {
                 let formula = normalize_search_principal(principal, rule.rule_span());
                 validate_formula(&formula)?;
-                let rule_plans = compile_rule_plans(rule, &formula)?;
+                let rule_plans = compile_rule_plans(rule, formula)?;
                 plans.extend(rule_plans);
                 Ok(plans)
             })
@@ -156,8 +158,9 @@ impl Engine {
 /// Compiles query plans for a single rule's languages.
 fn compile_rule_plans(
     rule: &Rule,
-    formula: &Decorated<Formula>,
+    formula: Decorated<Formula>,
 ) -> Result<Vec<QueryPlan>, DiagnosticReport> {
+    let shared_formula = Arc::new(formula);
     rule.languages()
         .iter()
         .map(|lang_str| {
@@ -172,7 +175,7 @@ fn compile_rule_plans(
             Ok(QueryPlan::new(
                 rule.id().to_owned(),
                 language,
-                formula.clone(),
+                Arc::clone(&shared_formula),
             ))
         })
         .collect()

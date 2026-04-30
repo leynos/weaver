@@ -1,10 +1,18 @@
 //! Tests for formula normalization.
 
+use rstest::rstest;
 use sempai_core::{
     SourceSpan,
-    formula::{Atom, Decorated, Formula, PatternAtom, RegexAtom},
+    formula::{Atom, Decorated, Formula, PatternAtom, RegexAtom, TreeSitterQueryAtom},
 };
-use sempai_yaml::{LegacyClause, LegacyFormula, LegacyValue, MatchFormula, SearchQueryPrincipal};
+use sempai_yaml::{
+    LegacyClause,
+    LegacyFormula,
+    LegacyValue,
+    MatchFormula,
+    ProjectDependsOnPayload,
+    SearchQueryPrincipal,
+};
 use serde_json::json;
 
 use crate::normalize::normalize_search_principal;
@@ -36,26 +44,25 @@ fn normalize_v2_decorated(formula: MatchFormula) -> Decorated<Formula> {
     normalize_search_principal(&principal, None)
 }
 
-#[test]
-fn legacy_pattern_normalizes_to_atom() {
-    let result = normalize_legacy(LegacyFormula::Pattern(String::from("foo($X)")));
-    assert_eq!(
-        result,
-        Formula::Atom(Atom::Pattern(PatternAtom {
-            text: String::from("foo($X)")
-        }))
-    );
-}
-
-#[test]
-fn legacy_pattern_regex_normalizes_to_regex_atom() {
-    let result = normalize_legacy(LegacyFormula::PatternRegex(String::from(r"foo_\d+")));
-    assert_eq!(
-        result,
-        Formula::Atom(Atom::Regex(RegexAtom {
-            pattern: String::from(r"foo_\d+")
-        }))
-    );
+#[rstest]
+#[case::pattern(
+    LegacyFormula::Pattern(String::from("foo($X)")),
+    Formula::Atom(Atom::Pattern(PatternAtom {
+        text: String::from("foo($X)")
+    }))
+)]
+#[case::pattern_regex(
+    LegacyFormula::PatternRegex(String::from(r"foo_\d+")),
+    Formula::Atom(Atom::Regex(RegexAtom {
+        pattern: String::from(r"foo_\d+")
+    }))
+)]
+fn legacy_formula_normalizes_to_expected_formula(
+    #[case] formula: LegacyFormula,
+    #[case] expected: Formula,
+) {
+    let result = normalize_legacy(formula);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -91,68 +98,60 @@ fn legacy_pattern_not_inside_normalizes_to_not_inside() {
     }
 }
 
-#[test]
-fn v2_pattern_shorthand_normalizes_to_atom() {
-    let result = normalize_v2(MatchFormula::Pattern(String::from("bar($Y)")));
-    assert_eq!(
-        result,
-        Formula::Atom(Atom::Pattern(PatternAtom {
-            text: String::from("bar($Y)")
-        }))
-    );
+#[rstest]
+#[case::pattern_shorthand(
+    MatchFormula::Pattern(String::from("bar($Y)")),
+    Formula::Atom(Atom::Pattern(PatternAtom {
+        text: String::from("bar($Y)")
+    }))
+)]
+#[case::regex(
+    MatchFormula::Regex(String::from(r"baz_\w+")),
+    Formula::Atom(Atom::Regex(RegexAtom {
+        pattern: String::from(r"baz_\w+")
+    }))
+)]
+fn v2_atom_formula_normalizes_to_expected_formula(
+    #[case] formula: MatchFormula,
+    #[case] expected: Formula,
+) {
+    let result = normalize_v2(formula);
+    assert_eq!(result, expected);
 }
 
-#[test]
-fn v2_regex_normalizes_to_regex_atom() {
-    let result = normalize_v2(MatchFormula::Regex(String::from(r"baz_\w+")));
-    assert_eq!(
-        result,
-        Formula::Atom(Atom::Regex(RegexAtom {
-            pattern: String::from(r"baz_\w+")
-        }))
-    );
-}
-
-#[test]
-fn v2_all_normalizes_to_and() {
-    let result = normalize_v2(MatchFormula::All(vec![
+#[rstest]
+#[case::all(
+    MatchFormula::All(vec![
         MatchFormula::Pattern(String::from("foo")),
         MatchFormula::Pattern(String::from("bar")),
-    ]));
-    assert!(matches!(result, Formula::And(ref branches) if branches.len() == 2));
-}
-
-#[test]
-fn v2_any_normalizes_to_or() {
-    let result = normalize_v2(MatchFormula::Any(vec![
+    ]),
+    |normalised| matches!(normalised, Formula::And(branches) if branches.len() == 2)
+)]
+#[case::any(
+    MatchFormula::Any(vec![
         MatchFormula::Pattern(String::from("foo")),
         MatchFormula::Pattern(String::from("bar")),
-    ]));
-    assert!(matches!(result, Formula::Or(ref branches) if branches.len() == 2));
-}
-
-#[test]
-fn v2_not_normalizes_to_not() {
-    let result = normalize_v2(MatchFormula::Not(Box::new(MatchFormula::Pattern(
-        String::from("baz"),
-    ))));
-    assert!(matches!(result, Formula::Not(_)));
-}
-
-#[test]
-fn v2_inside_normalizes_to_inside() {
-    let result = normalize_v2(MatchFormula::Inside(Box::new(MatchFormula::Pattern(
-        String::from("class X:"),
-    ))));
-    assert!(matches!(result, Formula::Inside(_)));
-}
-
-#[test]
-fn v2_anywhere_normalizes_to_anywhere() {
-    let result = normalize_v2(MatchFormula::Anywhere(Box::new(MatchFormula::Pattern(
-        String::from("unsafe"),
-    ))));
-    assert!(matches!(result, Formula::Anywhere(_)));
+    ]),
+    |normalised| matches!(normalised, Formula::Or(branches) if branches.len() == 2)
+)]
+#[case::not(
+    MatchFormula::Not(Box::new(MatchFormula::Pattern(String::from("baz")))),
+    |normalised| matches!(normalised, Formula::Not(_))
+)]
+#[case::inside(
+    MatchFormula::Inside(Box::new(MatchFormula::Pattern(String::from("class X:")))),
+    |normalised| matches!(normalised, Formula::Inside(_))
+)]
+#[case::anywhere(
+    MatchFormula::Anywhere(Box::new(MatchFormula::Pattern(String::from("unsafe")))),
+    |normalised| matches!(normalised, Formula::Anywhere(_))
+)]
+fn v2_structural_formula_normalizes_to_expected_shape(
+    #[case] formula: MatchFormula,
+    #[case] expected_shape: fn(Formula) -> bool,
+) {
+    let result = normalize_v2(formula);
+    assert!(expected_shape(result));
 }
 
 #[test]
@@ -266,4 +265,24 @@ fn span_propagates_from_search_principal_to_decorated() {
     let normalized = normalize_search_principal(&principal, Some(&span));
 
     assert_eq!(normalized.span, Some(span));
+}
+
+#[test]
+fn project_depends_on_propagates_span_to_placeholder_formula() {
+    let span = SourceSpan::new(7, 64, Some(String::from("file:///rule.yaml")));
+    let payload = ProjectDependsOnPayload::try_from(json!({
+        "namespace": "pypi",
+        "package": "requests",
+    }))
+    .expect("valid project dependency payload");
+    let principal = SearchQueryPrincipal::ProjectDependsOn(payload);
+    let normalized = normalize_search_principal(&principal, Some(&span));
+
+    assert_eq!(normalized.span, Some(span));
+    assert_eq!(
+        normalized.node,
+        Formula::Atom(Atom::TreeSitterQuery(TreeSitterQueryAtom {
+            query: String::from("(__NONEXISTENT_NODE__) @_dependency_check"),
+        }))
+    );
 }

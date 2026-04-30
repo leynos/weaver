@@ -1,5 +1,7 @@
 //! Behaviour-driven tests for the `sempai` engine facade.
 
+use std::sync::Arc;
+
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
 use sempai_core::{
@@ -67,7 +69,11 @@ fn when_execute(world: &mut TestWorld) {
         fix: None,
         span: None,
     };
-    let plan = QueryPlan::new(String::from("test-rule"), Language::Rust, dummy_formula);
+    let plan = QueryPlan::new(
+        String::from("test-rule"),
+        Language::Rust,
+        Arc::new(dummy_formula),
+    );
     world.execute_result = Some(
         engine
             .execute(&plan, "file:///t.rs", "fn main() {}")
