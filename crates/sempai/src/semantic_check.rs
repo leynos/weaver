@@ -91,8 +91,9 @@ fn branch_contains_not(formula: &Formula) -> bool {
 
 /// Checks that every `And` formula has at least one positive term.
 ///
-/// A positive term is a match-producing formula: `Atom`, `And`, or `Or`.
-/// Constraint-only formulas (`Not`, `Inside`, `Anywhere`) are not positive.
+/// A positive term is a match-producing formula: `Atom`, or `And`/`Or` when
+/// they contain a positive descendant. Constraint-only formulas (`Not`,
+/// `Inside`, `Anywhere`) are not positive.
 fn check_positive_term_in_and(
     formula: &Formula,
     span: Option<&sempai_core::SourceSpan>,
@@ -157,8 +158,8 @@ fn check_positive_term_in_and_with_spans(
 ///
 /// A term is positive when it ultimately produces a match location.  An `Atom`
 /// is always positive; `Not`, `Inside`, and `Anywhere` are purely
-/// constraint-style and never positive on their own.  An `And` or `Or` is
-/// positive only when at least one of its descendants is itself positive —
+/// constraint-style and never positive on their own. And/Or are positive only
+/// when at least one of their descendants is itself positive —
 /// otherwise the combinator bottoms out in constraint-only terms and cannot
 /// anchor matches.  This prevents shapes like `And[Or[Inside[Atom]]]` from
 /// sneaking past `MissingPositiveTermInAnd` on the basis of the outer shape
