@@ -109,6 +109,45 @@ fn dispatch_payload(
     (result.status, response_payload(output))
 }
 
+fn assert_success_response(status: i32, payload: &serde_json::Value) {
+    assert_eq!(status, 0);
+    assert_eq!(payload["status"], "success");
+}
+
+fn assert_default_graph_slice_shape(payload: &serde_json::Value) {
+    assert_eq!(payload["constraints"]["direction"], "both");
+    assert_eq!(
+        payload["constraints"]["budget"]["max_cards"],
+        serde_json::json!(30)
+    );
+    assert_eq!(payload["edges"], serde_json::json!([]));
+}
+
+fn assert_spillover_truncated_with_frontier(payload: &serde_json::Value) {
+    assert_eq!(payload["spillover"]["truncated"], true);
+    let frontier = match payload["spillover"]["frontier"].as_array() {
+        Some(frontier) => frontier,
+        None => panic!("frontier array"),
+    };
+    assert!(!frontier.is_empty(), "expected non-empty frontier");
+}
+
+fn assert_refusal(status: i32, payload: &serde_json::Value, reason: &str) {
+    assert_eq!(status, 1);
+    assert_eq!(payload["status"], "refusal");
+    assert_eq!(payload["refusal"]["reason"], reason);
+}
+
+fn assert_refusal_with_message(
+    status: i32,
+    payload: &serde_json::Value,
+    reason: &str,
+    message: &str,
+) {
+    assert_refusal(status, payload, reason);
+    assert_eq!(payload["refusal"]["message"], message);
+}
+
 #[rstest]
 fn valid_request_returns_success_and_echoed_constraints(
     backends: (FusionBackends<SemanticBackendProvider>, TempDir),
@@ -140,14 +179,8 @@ fn valid_request_returns_success_and_echoed_constraints(
 
     let (status, payload) = dispatch_payload(&request, &mut backends);
 
-    assert_eq!(status, 0);
-    assert_eq!(payload["status"], "success");
-    assert_eq!(payload["constraints"]["direction"], "both");
-    assert_eq!(
-        payload["constraints"]["budget"]["max_cards"],
-        serde_json::json!(30)
-    );
-    assert_eq!(payload["edges"], serde_json::json!([]));
+    assert_success_response(status, &payload);
+    assert_default_graph_slice_shape(&payload);
     assert_eq!(payload["spillover"]["truncated"], false);
     assert_eq!(payload["cards"][0]["symbol"]["ref"]["name"], "increment");
     assert!(payload["cards"].as_array().expect("cards array").len() >= 2);
@@ -187,16 +220,9 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
 
     let (status, payload) = dispatch_payload(&request, &mut backends);
 
-    assert_eq!(status, 0);
-    assert_eq!(payload["status"], "success");
+    assert_success_response(status, &payload);
     assert_eq!(payload["cards"].as_array().expect("cards array").len(), 1);
-    assert_eq!(payload["spillover"]["truncated"], true);
-    assert!(
-        !payload["spillover"]["frontier"]
-            .as_array()
-            .expect("frontier array")
-            .is_empty()
-    );
+    assert_spillover_truncated_with_frontier(&payload);
 }
 
 #[rstest]
@@ -224,8 +250,7 @@ fn discovery_cap_marks_spillover_truncated_when_card_budget_remains(
 
     let (status, payload) = dispatch_payload(&request, &mut backends);
 
-    assert_eq!(status, 0);
-    assert_eq!(payload["status"], "success");
+    assert_success_response(status, &payload);
     assert_eq!(payload["spillover"]["truncated"], true);
     assert_eq!(
         payload["spillover"]["frontier"]
@@ -236,59 +261,68 @@ fn discovery_cap_marks_spillover_truncated_when_card_budget_remains(
     );
 }
 
-#[rstest]
-fn unsupported_language_returns_structured_refusal(
-    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
+#[expect(
+    clippy::too_many_arguments,
+    reason = "review requested this exact helper signature for the refusal table"
+)]
+fn assert_structured_refusal(
+    backends: &mut FusionBackends<SemanticBackendProvider>,
+    temp_dir: &TempDir,
+    filename: &str,
+    content: &str,
+    position: &str,
+    expected_reason: &str,
+    expected_message: Option<&str>,
 ) {
-    let (mut backends, temp_dir) = backends;
-    let path = write_source(&temp_dir, "notes.txt", "plain text\n");
-    let uri = Url::from_file_path(&path).expect("file uri").to_string();
-    let request = make_request(&["--uri", &uri, "--position", "1:1"]);
+    let path = write_source(temp_dir, filename, content);
+    let uri = match Url::from_file_path(&path) {
+        Ok(uri) => uri.to_string(),
+        Err(()) => panic!("file uri"),
+    };
+    let request = make_request(&["--uri", &uri, "--position", position]);
 
-    let (status, payload) = dispatch_payload(&request, &mut backends);
+    let (status, payload) = dispatch_payload(&request, backends);
 
-    assert_eq!(status, 1);
-    assert_eq!(payload["status"], "refusal");
-    assert_eq!(payload["refusal"]["reason"], "unsupported_language");
+    match expected_message {
+        Some(message) => assert_refusal_with_message(status, &payload, expected_reason, message),
+        None => assert_refusal(status, &payload, expected_reason),
+    }
 }
 
 #[rstest]
-fn no_symbol_at_position_returns_structured_refusal(
+#[case(("notes.txt", "plain text\n", "1:1", "unsupported_language", None))]
+#[case(
+    (
+        "main.rs",
+        "fn main() {}\n \n",
+        "2:1",
+        "no_symbol_at_position",
+        Some("observe graph-slice: no symbol found at 2:1"),
+    )
+)]
+#[case(
+    (
+        "main.rs",
+        "fn main() {}\n",
+        "10:1",
+        "position_out_of_range",
+        Some("observe graph-slice: position 10:1 is outside the bounds of the file"),
+    )
+)]
+fn structured_refusal_cases(
+    #[case] case: (&str, &str, &str, &str, Option<&str>),
     backends: (FusionBackends<SemanticBackendProvider>, TempDir),
 ) {
     let (mut backends, temp_dir) = backends;
-    let path = write_source(&temp_dir, "main.rs", "fn main() {}\n \n");
-    let uri = Url::from_file_path(&path).expect("file uri").to_string();
-    let request = make_request(&["--uri", &uri, "--position", "2:1"]);
-
-    let (status, payload) = dispatch_payload(&request, &mut backends);
-
-    assert_eq!(status, 1);
-    assert_eq!(payload["status"], "refusal");
-    assert_eq!(payload["refusal"]["reason"], "no_symbol_at_position");
-    assert_eq!(
-        payload["refusal"]["message"],
-        "observe graph-slice: no symbol found at 2:1"
-    );
-}
-
-#[rstest]
-fn position_out_of_range_returns_structured_refusal(
-    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
-) {
-    let (mut backends, temp_dir) = backends;
-    let path = write_source(&temp_dir, "main.rs", "fn main() {}\n");
-    let uri = Url::from_file_path(&path).expect("file uri").to_string();
-    let request = make_request(&["--uri", &uri, "--position", "10:1"]);
-
-    let (status, payload) = dispatch_payload(&request, &mut backends);
-
-    assert_eq!(status, 1);
-    assert_eq!(payload["status"], "refusal");
-    assert_eq!(payload["refusal"]["reason"], "position_out_of_range");
-    assert_eq!(
-        payload["refusal"]["message"],
-        "observe graph-slice: position 10:1 is outside the bounds of the file"
+    let (filename, content, position, expected_reason, expected_message) = case;
+    assert_structured_refusal(
+        &mut backends,
+        &temp_dir,
+        filename,
+        content,
+        position,
+        expected_reason,
+        expected_message,
     );
 }
 
