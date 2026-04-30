@@ -106,47 +106,40 @@ mod tests {
 
         use super::Locale;
 
-        #[test]
-        fn locale_serialises_to_json_string() {
-            let locale = "fr-FR".parse::<Locale>().expect("valid locale");
-            let json = serde_json::to_string(&locale).expect("serialise");
-            assert_eq!(json, "\"fr-FR\"");
+        #[derive(Clone, Copy)]
+        enum JsonLocaleExpectation {
+            Valid(&'static str),
+            Invalid,
         }
 
-        #[test]
-        fn locale_deserialises_from_json_string() {
-            let locale: Locale = serde_json::from_str("\"de-DE\"").expect("deserialise");
-            assert_eq!(locale.to_string(), "de-DE");
+        #[rstest::rstest]
+        #[case::serialises_to_json_string("\"fr-FR\"", JsonLocaleExpectation::Valid("fr-FR"))]
+        #[case::deserialises_from_json_string("\"de-DE\"", JsonLocaleExpectation::Valid("de-DE"))]
+        #[case::round_trip_preserves_canonical_form(
+            "\"en-US\"",
+            JsonLocaleExpectation::Valid("en-US")
+        )]
+        #[case::rejects_invalid_json_string("\"not a locale!!!\"", JsonLocaleExpectation::Invalid)]
+        #[case::rejects_invalid_locale_json("\"not a locale\"", JsonLocaleExpectation::Invalid)]
+        fn locale_json_string_cases(
+            #[case] input_json: &str,
+            #[case] expected: JsonLocaleExpectation,
+        ) {
+            match expected {
+                JsonLocaleExpectation::Valid(expected_locale) => {
+                    let locale: Locale = serde_json::from_str(input_json).expect("deserialise");
+                    assert_eq!(locale.to_string(), expected_locale);
+                    let json = serde_json::to_string(&locale).expect("serialise");
+                    assert_eq!(json, input_json);
+                    let roundtripped: Locale = serde_json::from_str(&json).expect("deserialise");
+                    assert_eq!(roundtripped.to_string(), expected_locale);
+                }
+                JsonLocaleExpectation::Invalid => {
+                    let result: Result<Locale, _> = serde_json::from_str(input_json);
+                    assert!(result.is_err(), "invalid locale must not deserialise");
+                }
+            }
         }
-
-        #[test]
-        fn locale_json_round_trip_preserves_canonical_form() {
-            let original = "en-US".parse::<Locale>().expect("valid locale");
-            let json = serde_json::to_string(&original).expect("serialise");
-            let roundtripped: Locale = serde_json::from_str(&json).expect("deserialise");
-            assert_eq!(original.to_string(), roundtripped.to_string());
-        }
-
-        #[test]
-        fn locale_deserialises_error_for_invalid_json_string() {
-            let result: Result<Locale, _> = serde_json::from_str("\"not a locale!!!\"");
-            assert!(result.is_err(), "invalid locale must not deserialise");
-        }
-    }
-
-    #[test]
-    fn locale_serialises_and_deserialises_as_json_string() {
-        let original = "fr-FR".parse::<Locale>().expect("valid locale");
-        let json = serde_json::to_string(&original).expect("serialise");
-        assert_eq!(json, "\"fr-FR\"");
-        let roundtripped: Locale = serde_json::from_str(&json).expect("deserialise");
-        assert_eq!(roundtripped.to_string(), "fr-FR");
-    }
-
-    #[test]
-    fn locale_deserialises_error_for_invalid_json_string() {
-        let result: Result<Locale, _> = serde_json::from_str("\"not a locale\"");
-        assert!(result.is_err());
     }
 
     #[test]
