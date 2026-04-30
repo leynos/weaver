@@ -96,8 +96,11 @@ fn dispatch_payload(
 }
 
 fn assert_success_response(status: i32, payload: &serde_json::Value) {
-    assert_eq!(status, 0);
-    assert_eq!(payload["status"], "success");
+    assert_eq!(status, 0, "expected success exit status");
+    assert_eq!(
+        payload["status"], "success",
+        "expected success payload status"
+    );
 }
 
 fn assert_default_graph_slice_shape(payload: &serde_json::Value) {
@@ -110,7 +113,10 @@ fn assert_default_graph_slice_shape(payload: &serde_json::Value) {
 }
 
 fn assert_spillover_truncated_with_frontier(payload: &serde_json::Value) {
-    assert_eq!(payload["spillover"]["truncated"], true);
+    assert_eq!(
+        payload["spillover"]["truncated"], true,
+        "expected truncated"
+    );
     let frontier = match payload["spillover"]["frontier"].as_array() {
         Some(frontier) => frontier,
         None => panic!("frontier array"),
@@ -130,7 +136,9 @@ fn assert_refusal_with_message(
     reason: &str,
     message: &str,
 ) {
-    assert_refusal(status, payload, reason);
+    assert_eq!(status, 1, "expected error exit status");
+    assert_eq!(payload["status"], "refusal");
+    assert_eq!(payload["refusal"]["reason"], reason);
     assert_eq!(payload["refusal"]["message"], message);
 }
 
