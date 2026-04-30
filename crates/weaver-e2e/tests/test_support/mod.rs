@@ -1,4 +1,8 @@
 //! Shared harness utilities for end-to-end integration tests.
+#![expect(
+    dead_code,
+    reason = "shared integration helpers are used selectively across test binaries"
+)]
 
 use std::{
     io,
@@ -56,6 +60,7 @@ pub(crate) struct GetCardRequest<'a> {
     pub(crate) detail: &'a str,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct GraphSliceRequest<'a> {
     pub(crate) uri: &'a str,
     pub(crate) line: u32,

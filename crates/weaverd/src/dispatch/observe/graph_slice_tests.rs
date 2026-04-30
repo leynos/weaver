@@ -1,7 +1,6 @@
 //! Unit tests for the `observe graph-slice` dispatch handler.
 
-use std::fs;
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
@@ -10,15 +9,18 @@ use weaver_cards::{DEFAULT_CACHE_CAPACITY, DetailLevel};
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
 use super::{first_non_whitespace_column, handle};
-use crate::backends::FusionBackends;
-use crate::dispatch::errors::DispatchError;
-use crate::dispatch::request::CommandRequest;
-use crate::dispatch::response::ResponseWriter;
-use crate::semantic_provider::SemanticBackendProvider;
+use crate::{
+    backends::FusionBackends,
+    dispatch::{errors::DispatchError, request::CommandRequest, response::ResponseWriter},
+    semantic_provider::SemanticBackendProvider,
+};
 
 #[fixture]
 fn backends() -> (FusionBackends<SemanticBackendProvider>, TempDir) {
-    let dir = TempDir::new().expect("create temp dir");
+    let dir = match TempDir::new() {
+        Ok(dir) => dir,
+        Err(error) => panic!("create temp dir: {error}"),
+    };
     let socket_path = dir
         .path()
         .join("socket.sock")
@@ -35,7 +37,9 @@ fn backends() -> (FusionBackends<SemanticBackendProvider>, TempDir) {
 
 fn write_source(temp_dir: &TempDir, name: &str, content: &str) -> PathBuf {
     let path = temp_dir.path().join(name);
-    fs::write(&path, content).expect("write source");
+    if let Err(error) = fs::write(&path, content) {
+        panic!("write source: {error}");
+    }
     path
 }
 
@@ -52,15 +56,33 @@ fn make_request(arguments: &[&str]) -> CommandRequest {
         ),
         args_json.join(",")
     );
-    CommandRequest::parse(json.as_bytes()).expect("request")
+    match CommandRequest::parse(json.as_bytes()) {
+        Ok(request) => request,
+        Err(error) => panic!("request: {error}"),
+    }
 }
 
 fn response_payload(output: Vec<u8>) -> serde_json::Value {
-    let response = String::from_utf8(output).expect("utf8");
-    let stream_line = response.lines().next().expect("stream line");
-    let envelope: serde_json::Value = serde_json::from_str(stream_line).expect("envelope");
-    let data = envelope["data"].as_str().expect("stdout data");
-    serde_json::from_str(data).expect("payload")
+    let response = match String::from_utf8(output) {
+        Ok(response) => response,
+        Err(error) => panic!("utf8: {error}"),
+    };
+    let stream_line = match response.lines().next() {
+        Some(line) => line,
+        None => panic!("stream line"),
+    };
+    let envelope: serde_json::Value = match serde_json::from_str(stream_line) {
+        Ok(envelope) => envelope,
+        Err(error) => panic!("envelope: {error}"),
+    };
+    let data = match envelope["data"].as_str() {
+        Some(data) => data,
+        None => panic!("stdout data"),
+    };
+    match serde_json::from_str(data) {
+        Ok(payload) => payload,
+        Err(error) => panic!("payload: {error}"),
+    }
 }
 
 fn detail_value(detail: DetailLevel) -> &'static str {
@@ -80,7 +102,10 @@ fn dispatch_payload(
 ) -> (i32, serde_json::Value) {
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
-    let result = handle(request, &mut writer, backends).expect("dispatch succeeds");
+    let result = match handle(request, &mut writer, backends) {
+        Ok(result) => result,
+        Err(error) => panic!("dispatch succeeds: {error}"),
+    };
     (result.status, response_payload(output))
 }
 
@@ -257,7 +282,8 @@ fn invalid_arguments_return_dispatch_error(
             DispatchError::InvalidArguments { message } => {
                 assert!(
                     message.contains(expected_substring),
-                    "expected invalid-arguments message to contain {expected_substring:?}, got: {message}"
+                    "expected invalid-arguments message to contain {expected_substring:?}, got: \
+                     {message}"
                 );
             }
             _ => panic!("expected invalid arguments error"),

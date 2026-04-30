@@ -2,21 +2,49 @@
 //!
 //! This module parses graph-slice requests through the stable schema
 //! types in `weaver-cards` and produces schema-valid JSON responses.
-//! The full traversal engine is deferred to roadmap item 7.2.2; this
-//! handler currently returns a structured `NotYetImplemented` refusal.
+//! The full graph traversal engine is deferred to roadmap items 7.2.2
+//! through 7.2.5. For the schema milestone, the handler returns a
+//! deterministic same-file slice bounded by `max_cards`.
 
-use std::io::Write;
-
-
-use crate::dispatch::{
-    errors::DispatchError,
-    request::CommandRequest,
-    response::ResponseWriter,
-    router::DispatchResult,
+use std::{
+    collections::BTreeMap,
+    fs,
+    io::Write,
+    path::{Path, PathBuf},
 };
 
 use url::Url;
+use weaver_cards::{
+    CardExtractionError,
+    CardExtractionInput,
+    DetailLevel,
+    GraphSliceRequest,
+    GraphSliceResponse,
+    SliceSpillover,
+    SymbolCard,
+    TreeSitterCardExtractor,
+    graph_slice::{
+        SliceConstraints,
+        SliceEntry,
+        SliceRefusal,
+        SliceRefusalReason,
+        SpilloverCandidate,
+    },
+};
+
 use super::enrich::{self, EnrichmentOutcome};
+use crate::{
+    backends::FusionBackends,
+    dispatch::{
+        errors::DispatchError,
+        request::CommandRequest,
+        response::ResponseWriter,
+        router::DispatchResult,
+    },
+    semantic_provider::SemanticBackendProvider,
+};
+
+const MAX_SAME_FILE_DISCOVERY_POSITIONS: usize = 256;
 
 /// Maps a graph-slice response to its exit status code.
 ///
@@ -111,6 +139,7 @@ fn build_response(
     })
 }
 
+#[derive(Clone, Copy)]
 struct SliceDocument<'a> {
     path: &'a Path,
     source: &'a str,
@@ -168,7 +197,8 @@ fn extract_same_file_card(
         | Err(CardExtractionError::UnsupportedLanguage { .. }) => Ok(None),
         Err(error @ CardExtractionError::PositionOutOfRange { .. }) => {
             Err(DispatchError::internal(format!(
-                "computed position {line}:{column} should be valid during same-file slice discovery: {error}"
+                "computed position {line}:{column} should be valid during same-file slice \
+                 discovery: {error}"
             )))
         }
         Err(CardExtractionError::InvalidPath { path }) => Err(DispatchError::internal(format!(
@@ -354,7 +384,8 @@ fn map_extraction_error(error: CardExtractionError) -> Result<GraphSliceResponse
                 refusal: SliceRefusal {
                     reason: SliceRefusalReason::PositionOutOfRange,
                     message: format!(
-                        "observe graph-slice: position {line}:{column} is outside the bounds of the file"
+                        "observe graph-slice: position {line}:{column} is outside the bounds of \
+                         the file"
                     ),
                 },
             })
@@ -364,6 +395,6 @@ fn map_extraction_error(error: CardExtractionError) -> Result<GraphSliceResponse
         ))),
     }
 }
+#[cfg(test)]
+#[path = "graph_slice_tests.rs"]
 mod tests;
-
-const MAX_SAME_FILE_DISCOVERY_POSITIONS: usize = 256;

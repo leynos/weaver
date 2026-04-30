@@ -8,12 +8,17 @@ mod weaver_binary;
 
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
-use url::Url;
-
 use test_support::{
-    GraphSliceRequest, TestDaemon, assert_named_snapshot, fixture_uri, run_graph_slice,
+    GraphSliceRequest,
+    TestDaemon,
+    assert_named_snapshot,
+    fixture_uri,
+    run_graph_slice,
 };
+use url::Url;
 use weaver_e2e::graph_slice_fixtures::{GraphSliceFixtureCase, PYTHON_CASES, RUST_CASES};
+
+use crate::fixture_io::write_fixture_path;
 
 struct WorkspaceUri {
     _temp_dir: TempDir,
@@ -45,8 +50,8 @@ impl SnapshotHarness {
     )]
     fn unsupported_workspace() -> WorkspaceUri {
         let temp_dir = TempDir::new().expect("creating temp dir");
-        let path = temp_dir.path().join("notes.txt");
-        std::fs::write(&path, "plain text\n").expect("write unsupported fixture");
+        let path = write_fixture_path(&temp_dir, "notes.txt", "plain text\n")
+            .expect("write unsupported fixture");
         let uri = Url::from_file_path(&path).expect("unsupported path to URI");
         WorkspaceUri {
             _temp_dir: temp_dir,

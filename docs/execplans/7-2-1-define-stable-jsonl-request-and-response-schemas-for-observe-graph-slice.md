@@ -193,8 +193,8 @@ This plan covers roadmap item 7.2.1 in [docs/roadmap.md](../roadmap.md).
 - The local Markdown formatter toolchain in this runner is partially broken:
   `fd` is unavailable and `/root/.local/bin/mdtablefix` is an empty,
   non-executable file. `make fmt` still completed successfully by using a
-  temporary PATH shim and then relying on `make markdownlint`,
-  `make nixie`, and `make check-fmt` to verify the resulting tree.
+  temporary PATH shim and then relying on `make markdownlint`, `make nixie`,
+  and `make check-fmt` to verify the resulting tree.
 - Review follow-up found one contract hole that the original milestone left
   open: the parser accepted `--max-cards 0` even though the runtime always
   returned at least the entry card. The fix now enforces `max_cards >= 1` at
@@ -202,8 +202,8 @@ This plan covers roadmap item 7.2.1 in [docs/roadmap.md](../roadmap.md).
   helper.
 - Review follow-up also found that same-file discovery was deriving columns
   from UTF-8 byte offsets, which can misaddress symbols after multibyte
-  whitespace. The helper now counts characters so extracted candidate
-  positions stay aligned with the extractor API.
+  whitespace. The helper now counts characters so extracted candidate positions
+  stay aligned with the extractor API.
 
 ## Decision Log
 
@@ -280,8 +280,8 @@ Completed on 2026-04-12:
    response instead of a hard-coded refusal, while still deferring real edge
    extraction and graph traversal to 7.2.2 through 7.2.5.
 2. `weaver-e2e` now ships a dedicated `graph_slice_fixtures` module, a
-   `graph_slice_snapshots.rs` harness, 40 semantic-detail success snapshots,
-   2 truncation snapshots, and 1 refusal snapshot through the real `weaver`
+   `graph_slice_snapshots.rs` harness, 40 semantic-detail success snapshots, 2
+   truncation snapshots, and 1 refusal snapshot through the real `weaver`
    binary.
 3. The design doc and user guide now describe the nested `budget` object, the
    stable `resolution_scope` edge field, always-present `spillover`, and the
