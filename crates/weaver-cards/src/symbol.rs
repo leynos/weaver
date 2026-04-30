@@ -67,7 +67,7 @@ pub struct SourceRange {
 ///
 /// These kinds align with the symbol taxonomy defined in
 /// `docs/jacquard-card-first-symbol-graph-design.md` §5.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum CardSymbolKind {

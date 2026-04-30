@@ -235,7 +235,7 @@ fn stable_card_order(left: &SymbolCard, right: &SymbolCard) -> std::cmp::Orderin
     (
         left_ref.container.as_deref().unwrap_or_default(),
         left_ref.name.as_str(),
-        format!("{:?}", left_ref.kind),
+        left_ref.kind,
         left_ref.range.start.line,
         left_ref.range.start.column,
         left_ref.range.end.line,
@@ -244,7 +244,7 @@ fn stable_card_order(left: &SymbolCard, right: &SymbolCard) -> std::cmp::Orderin
         .cmp(&(
             right_ref.container.as_deref().unwrap_or_default(),
             right_ref.name.as_str(),
-            format!("{:?}", right_ref.kind),
+            right_ref.kind,
             right_ref.range.start.line,
             right_ref.range.start.column,
             right_ref.range.end.line,

@@ -43,7 +43,7 @@ impl Position {
 /// Kind of symbol represented by a call graph node.
 ///
 /// This mirrors LSP's `SymbolKind` but only includes callable symbols.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SymbolKind {
     /// A function definition.
     Function,
