@@ -2,7 +2,7 @@
 
 use std::{fs, path::PathBuf};
 
-use rstest::{fixture, rstest};
+use rstest::rstest;
 use tempfile::TempDir;
 use url::Url;
 use weaver_cards::{DEFAULT_CACHE_CAPACITY, DetailLevel};
@@ -15,12 +15,8 @@ use crate::{
     semantic_provider::SemanticBackendProvider,
 };
 
-#[fixture]
-fn backends() -> (FusionBackends<SemanticBackendProvider>, TempDir) {
-    let dir = match TempDir::new() {
-        Ok(dir) => dir,
-        Err(error) => panic!("create temp dir: {error}"),
-    };
+fn make_backends() -> Result<(FusionBackends<SemanticBackendProvider>, TempDir), String> {
+    let dir = TempDir::new().map_err(|error| format!("create temp dir: {error}"))?;
     let socket_path = dir
         .path()
         .join("socket.sock")
@@ -32,15 +28,13 @@ fn backends() -> (FusionBackends<SemanticBackendProvider>, TempDir) {
     };
     let provider =
         SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
-    (FusionBackends::new(config, provider), dir)
+    Ok((FusionBackends::new(config, provider), dir))
 }
 
-fn write_source(temp_dir: &TempDir, name: &str, content: &str) -> PathBuf {
+fn write_source(temp_dir: &TempDir, name: &str, content: &str) -> Result<PathBuf, std::io::Error> {
     let path = temp_dir.path().join(name);
-    if let Err(error) = fs::write(&path, content) {
-        panic!("write source: {error}");
-    }
-    path
+    fs::write(&path, content)?;
+    Ok(path)
 }
 
 fn make_request(arguments: &[&str]) -> CommandRequest {
@@ -67,17 +61,15 @@ fn response_payload(output: Vec<u8>) -> serde_json::Value {
         Ok(response) => response,
         Err(error) => panic!("utf8: {error}"),
     };
-    let stream_line = match response.lines().next() {
-        Some(line) => line,
-        None => panic!("stream line"),
+    let Some(stream_line) = response.lines().next() else {
+        panic!("stream line");
     };
     let envelope: serde_json::Value = match serde_json::from_str(stream_line) {
         Ok(envelope) => envelope,
         Err(error) => panic!("envelope: {error}"),
     };
-    let data = match envelope["data"].as_str() {
-        Some(data) => data,
-        None => panic!("stdout data"),
+    let Some(data) = envelope.get("data").and_then(|value| value.as_str()) else {
+        panic!("stdout data");
     };
     match serde_json::from_str(data) {
         Ok(payload) => payload,
@@ -99,14 +91,14 @@ fn detail_value(detail: DetailLevel) -> &'static str {
 fn dispatch_payload(
     request: &CommandRequest,
     backends: &mut FusionBackends<SemanticBackendProvider>,
-) -> (i32, serde_json::Value) {
+) -> Result<(i32, serde_json::Value), String> {
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
     let result = match handle(request, &mut writer, backends) {
         Ok(result) => result,
-        Err(error) => panic!("dispatch succeeds: {error}"),
+        Err(error) => return Err(format!("dispatch fails: {error}")),
     };
-    (result.status, response_payload(output))
+    response_payload(output).map(|payload| (result.status, payload))
 }
 
 fn assert_success_response(status: i32, payload: &serde_json::Value) {
@@ -149,10 +141,8 @@ fn assert_refusal_with_message(
 }
 
 #[rstest]
-fn valid_request_returns_success_and_echoed_constraints(
-    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
-) {
-    let (mut backends, temp_dir) = backends;
+fn valid_request_returns_success_and_echoed_constraints() {
+    let (mut backends, temp_dir) = make_backends();
     let path = write_source(
         &temp_dir,
         "slice.rs",
@@ -187,10 +177,8 @@ fn valid_request_returns_success_and_echoed_constraints(
 }
 
 #[rstest]
-fn max_cards_budget_truncates_same_file_symbol_inventory(
-    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
-) {
-    let (mut backends, temp_dir) = backends;
+fn max_cards_budget_truncates_same_file_symbol_inventory() {
+    let (mut backends, temp_dir) = make_backends();
     let path = write_source(
         &temp_dir,
         "slice.py",
@@ -226,10 +214,8 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
 }
 
 #[rstest]
-fn discovery_cap_marks_spillover_truncated_when_card_budget_remains(
-    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
-) {
-    let (mut backends, temp_dir) = backends;
+fn discovery_cap_marks_spillover_truncated_when_card_budget_remains() {
+    let (mut backends, temp_dir) = make_backends();
     let source = (0..=MAX_SAME_FILE_DISCOVERY_POSITIONS)
         .map(|index| format!("fn item_{index}() {{}}\n"))
         .collect::<String>();
@@ -309,11 +295,8 @@ fn assert_structured_refusal(
         Some("observe graph-slice: position 10:1 is outside the bounds of the file"),
     )
 )]
-fn structured_refusal_cases(
-    #[case] case: (&str, &str, &str, &str, Option<&str>),
-    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
-) {
-    let (mut backends, temp_dir) = backends;
+fn structured_refusal_cases(#[case] case: (&str, &str, &str, &str, Option<&str>)) {
+    let (mut backends, temp_dir) = make_backends();
     let (filename, content, position, expected_reason, expected_message) = case;
     assert_structured_refusal(
         &mut backends,
@@ -340,9 +323,8 @@ fn structured_refusal_cases(
 fn invalid_arguments_return_dispatch_error(
     #[case] arguments: &[&str],
     #[case] expected_substring: &str,
-    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
 ) {
-    let (mut backends, _temp_dir) = backends;
+    let (mut backends, _temp_dir) = make_backends();
     let request = make_request(arguments);
     let mut buffer = Vec::new();
     let mut writer = ResponseWriter::new(&mut buffer);
@@ -363,10 +345,8 @@ fn invalid_arguments_return_dispatch_error(
 }
 
 #[rstest]
-fn missing_source_file_returns_invalid_arguments(
-    backends: (FusionBackends<SemanticBackendProvider>, TempDir),
-) {
-    let (mut backends, temp_dir) = backends;
+fn missing_source_file_returns_invalid_arguments() {
+    let (mut backends, temp_dir) = make_backends();
     let path = temp_dir.path().join("missing.rs");
     let uri = Url::from_file_path(&path).expect("file uri").to_string();
     let request = make_request(&["--uri", &uri, "--position", "1:1"]);

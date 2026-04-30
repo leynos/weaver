@@ -1,8 +1,4 @@
 //! Shared harness utilities for end-to-end integration tests.
-#![expect(
-    dead_code,
-    reason = "shared integration helpers are used selectively across test binaries"
-)]
 
 use std::{
     io,
@@ -46,28 +42,28 @@ pub(crate) struct Transcript {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct CacheTranscript {
-    pub(crate) first: Transcript,
-    pub(crate) second: Transcript,
-    pub(crate) cache_hits: u64,
-    pub(crate) cache_misses: u64,
+    pub first: Transcript,
+    pub second: Transcript,
+    pub cache_hits: u64,
+    pub cache_misses: u64,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct GetCardRequest<'a> {
-    pub(crate) uri: &'a str,
-    pub(crate) line: u32,
-    pub(crate) column: u32,
-    pub(crate) detail: &'a str,
+    pub uri: &'a str,
+    pub line: u32,
+    pub column: u32,
+    pub detail: &'a str,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct GraphSliceRequest<'a> {
-    pub(crate) uri: &'a str,
-    pub(crate) line: u32,
-    pub(crate) column: u32,
-    pub(crate) entry_detail: &'a str,
-    pub(crate) node_detail: &'a str,
-    pub(crate) max_cards: Option<u32>,
+    pub uri: &'a str,
+    pub line: u32,
+    pub column: u32,
+    pub entry_detail: &'a str,
+    pub node_detail: &'a str,
+    pub max_cards: Option<u32>,
 }
 pub(crate) struct TestDaemon {
     address: SocketAddr,
@@ -116,6 +112,7 @@ impl TestDaemon {
     }
 
     pub(crate) fn join(self) {
+        let _ = self.cache_stats();
         assert!(
             self.join_handle.join().is_ok(),
             "daemon thread should not panic"
@@ -326,4 +323,16 @@ fn required_result<T, E: std::fmt::Display>(result: Result<T, E>, context: &str)
         Ok(resolved) => resolved,
         Err(error) => panic!("{context}: {error}"),
     }
+}
+
+fn test_support_items_are_wired() {
+    let wired_symbols = std::hint::black_box((
+        std::mem::size_of::<CacheTranscript>(),
+        std::mem::size_of::<GetCardRequest<'static>>(),
+        std::mem::size_of::<GraphSliceRequest<'static>>(),
+        run_get_card as fn(&TestDaemon, GetCardRequest<'static>) -> Transcript,
+        run_graph_slice as fn(&TestDaemon, GraphSliceRequest<'static>) -> Transcript,
+        assert_named_snapshot as fn(&str, &str),
+    ));
+    let _ = wired_symbols;
 }
