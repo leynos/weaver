@@ -1,7 +1,9 @@
 //! Tests for formula normalization.
 
-use sempai_core::SourceSpan;
-use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom, RegexAtom};
+use sempai_core::{
+    SourceSpan,
+    formula::{Atom, Decorated, Formula, PatternAtom, RegexAtom},
+};
 use sempai_yaml::{LegacyClause, LegacyFormula, LegacyValue, MatchFormula, SearchQueryPrincipal};
 use serde_json::json;
 

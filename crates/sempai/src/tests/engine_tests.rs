@@ -1,6 +1,7 @@
 //! Tests for the `Engine` and `QueryPlan` types.
 
 use rstest::rstest;
+use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom};
 
 use crate::{
     Diagnostic,
@@ -12,8 +13,6 @@ use crate::{
     Language,
     engine::QueryPlan,
 };
-
-use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom};
 
 fn default_engine() -> Engine { Engine::new(EngineConfig::default()) }
 
@@ -186,7 +185,6 @@ fn compile_yaml_returns_expected_diagnostic_for_single_rule_cases(
     }
 }
 
-#[test]
 fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str) {
     let engine = default_engine();
     let result = engine.compile_yaml(yaml);
@@ -207,6 +205,8 @@ fn assert_compile_yaml_semantic_error(yaml: &str, expected_code: DiagnosticCode)
     let (code, _diag) = first_diagnostic_of_err(result);
     assert_eq!(code, expected_code);
 }
+
+#[test]
 fn compile_yaml_returns_unsupported_mode_for_extract_rules() {
     assert_compile_yaml_unsupported_mode(
         concat!(

@@ -2,8 +2,10 @@
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
-use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom};
-use sempai_core::test_support::QuotedString;
+use sempai_core::{
+    formula::{Atom, Decorated, Formula, PatternAtom},
+    test_support::QuotedString,
+};
 use weaver_test_macros::allow_fixture_expansion_lints;
 
 use crate::{DiagnosticReport, Engine, EngineConfig, Language, engine::QueryPlan};
@@ -134,6 +136,7 @@ fn then_first_diagnostic_message_contains(world: &mut TestWorld, snippet: Quoted
     assert!(first.message().contains(snippet.as_str()));
 }
 
+#[then("compilation succeeds with {count} query plan")]
 fn then_compilation_succeeds_with_plans(world: &mut TestWorld, count: usize) {
     let plans = world
         .compile_result
@@ -149,6 +152,7 @@ fn then_compilation_succeeds_with_plans(world: &mut TestWorld, count: usize) {
     );
 }
 
+#[then("the first query plan has rule id {id}")]
 fn then_first_plan_rule_id(world: &mut TestWorld, id: QuotedString) {
     let plans = world
         .compile_result
@@ -159,6 +163,8 @@ fn then_first_plan_rule_id(world: &mut TestWorld, id: QuotedString) {
     let first = plans.first().expect("expected at least one query plan");
     assert_eq!(first.rule_id(), id.as_str());
 }
+
+#[then("execution fails with code {code}")]
 fn then_execution_fails(world: &mut TestWorld, code: QuotedString) {
     assert_diagnostic_code(
         world.execute_result.as_ref(),

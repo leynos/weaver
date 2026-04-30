@@ -14,10 +14,12 @@
 //! # Example
 //!
 //! ```
-//! use sempai_core::formula::{Formula, Atom, PatternAtom, Decorated};
+//! use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom};
 //!
 //! // A simple pattern atom
-//! let pattern = PatternAtom { text: String::from("foo($X)") };
+//! let pattern = PatternAtom {
+//!     text: String::from("foo($X)"),
+//! };
 //! let formula = Formula::Atom(Atom::Pattern(pattern));
 //!
 //! // Wrap in a decorator with no metadata
@@ -30,8 +32,9 @@
 //! };
 //! ```
 
-use crate::SourceSpan;
 use serde_json::Value;
+
+use crate::SourceSpan;
 
 /// Canonical normalized query formula.
 ///
@@ -42,15 +45,15 @@ pub enum Formula {
     /// A leaf pattern or regex atom.
     Atom(Atom),
     /// Negation: the inner formula must not match.
-    Not(Box<Decorated<Formula>>),
+    Not(Box<Decorated<Self>>),
     /// Context constraint: the anchor must be inside a match of the inner.
-    Inside(Box<Decorated<Formula>>),
+    Inside(Box<Decorated<Self>>),
     /// Context constraint: the inner must match somewhere in scope.
-    Anywhere(Box<Decorated<Formula>>),
+    Anywhere(Box<Decorated<Self>>),
     /// Conjunction: all branches must match.
-    And(Vec<Decorated<Formula>>),
+    And(Vec<Decorated<Self>>),
     /// Disjunction: at least one branch must match.
-    Or(Vec<Decorated<Formula>>),
+    Or(Vec<Decorated<Self>>),
 }
 
 /// A leaf atom in the formula tree.
@@ -126,9 +129,11 @@ pub struct TreeSitterQueryAtom {
 /// # Example
 ///
 /// ```
-/// use sempai_core::formula::{Decorated, Formula, Atom, PatternAtom};
+/// use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom};
 ///
-/// let pattern = PatternAtom { text: String::from("foo($X)") };
+/// let pattern = PatternAtom {
+///     text: String::from("foo($X)"),
+/// };
 /// let decorated = Decorated {
 ///     node: Formula::Atom(Atom::Pattern(pattern)),
 ///     where_clauses: vec![],

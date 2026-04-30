@@ -1,7 +1,9 @@
 //! Tests for semantic formula validation.
 
-use sempai_core::DiagnosticCode;
-use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom};
+use sempai_core::{
+    DiagnosticCode,
+    formula::{Atom, Decorated, Formula, PatternAtom},
+};
 
 use crate::semantic_check::validate_formula;
 

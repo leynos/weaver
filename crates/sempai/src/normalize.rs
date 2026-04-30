@@ -29,12 +29,16 @@
 //! - `inside: ...` → `Formula::Inside(Box<...>)`
 //! - `anywhere: ...` → `Formula::Anywhere(Box<...>)`
 
-use sempai_core::SourceSpan;
-use sempai_core::formula::{
-    Atom, Decorated, Formula, PatternAtom, RegexAtom, TreeSitterQueryAtom, WhereClause,
+use sempai_core::{
+    SourceSpan,
+    formula::{Atom, Decorated, Formula, PatternAtom, RegexAtom, TreeSitterQueryAtom, WhereClause},
 };
 use sempai_yaml::{
-    LegacyClause, LegacyFormula, LegacyValue, MatchFormula, ProjectDependsOnPayload,
+    LegacyClause,
+    LegacyFormula,
+    LegacyValue,
+    MatchFormula,
+    ProjectDependsOnPayload,
     SearchQueryPrincipal,
 };
 

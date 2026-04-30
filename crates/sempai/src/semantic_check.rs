@@ -6,10 +6,10 @@
 //!
 //! # Semantic constraints
 //!
-//! - **`InvalidNotInOr`**: `Or` branches must not contain `Not` formulas.
-//!   Negated terms in disjunction contexts are structurally invalid.
-//! - **`MissingPositiveTermInAnd`**: `And` branches must contain at least one
-//!   positive match-producing term (not `Not`, `Inside`, or `Anywhere`).
+//! - **`InvalidNotInOr`**: `Or` branches must not contain `Not` formulas. Negated terms in
+//!   disjunction contexts are structurally invalid.
+//! - **`MissingPositiveTermInAnd`**: `And` branches must contain at least one positive
+//!   match-producing term (not `Not`, `Inside`, or `Anywhere`).
 //!
 //! # Example
 //!
@@ -21,8 +21,11 @@
 //! validate_formula(&formula)?;
 //! ```
 
-use sempai_core::formula::{Decorated, Formula};
-use sempai_core::{DiagnosticCode, DiagnosticReport};
+use sempai_core::{
+    DiagnosticCode,
+    DiagnosticReport,
+    formula::{Decorated, Formula},
+};
 
 /// Validates semantic constraints on a normalized formula.
 ///

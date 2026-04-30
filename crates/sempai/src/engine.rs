@@ -5,14 +5,24 @@
 //! Compilation and execution are separate phases, allowing a compiled
 //! [`QueryPlan`] to be reused across multiple source files.
 
-use sempai_core::formula::{Decorated, Formula};
-use sempai_core::{DiagnosticCode, DiagnosticReport, EngineConfig, Language, Match};
+use sempai_core::{
+    DiagnosticCode,
+    DiagnosticReport,
+    EngineConfig,
+    Language,
+    Match,
+    formula::{Decorated, Formula},
+};
 use sempai_yaml::{Rule, RulePrincipal, parse_rule_file};
 
-use crate::mode_validation::validate_supported_modes;
-use crate::normalize::normalize_search_principal;
-use crate::semantic_check::validate_formula;
+use crate::{
+    mode_validation::validate_supported_modes,
+    normalize::normalize_search_principal,
+    semantic_check::validate_formula,
+};
 
+/// A compiled query plan for one rule and target language.
+#[derive(Debug)]
 pub struct QueryPlan {
     rule_id: String,
     language: Language,
@@ -21,7 +31,11 @@ pub struct QueryPlan {
 }
 
 impl QueryPlan {
-    pub(crate) fn new(rule_id: String, language: Language, formula: Decorated<Formula>) -> Self {
+    pub(crate) const fn new(
+        rule_id: String,
+        language: Language,
+        formula: Decorated<Formula>,
+    ) -> Self {
         Self {
             rule_id,
             language,
@@ -39,9 +53,7 @@ impl QueryPlan {
 
     /// Returns the normalized canonical formula.
     #[must_use]
-    pub const fn formula(&self) -> &Decorated<Formula> {
-        &self.formula
-    }
+    pub const fn formula(&self) -> &Decorated<Formula> { &self.formula }
 }
 
 /// Compiles and executes Semgrep-compatible queries on Tree-sitter syntax
@@ -59,7 +71,10 @@ impl QueryPlan {
 ///
 /// let engine = Engine::new(EngineConfig::default());
 /// // Valid YAML with rules compiles successfully
-/// let result = engine.compile_yaml("rules:\n  - id: test\n    message: test\n    languages: [rust]\n    severity: ERROR\n    pattern: foo\n");
+/// let result = engine.compile_yaml(
+///     "rules:\n  - id: test\n    message: test\n    languages: [rust]\n    severity: ERROR\n    \
+///      pattern: foo\n",
+/// );
 /// assert!(result.is_ok());
 ///
 /// // Malformed YAML returns a parser diagnostic
