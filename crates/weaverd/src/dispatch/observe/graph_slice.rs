@@ -1,8 +1,7 @@
 //! Handler for `observe graph-slice` stable schema responses.
 //!
-//! Full graph traversal is deferred to later roadmap items. For the schema
-//! milestone, this handler returns a deterministic same-file slice bounded by
-//! `max_cards`.
+//! Full graph traversal is deferred to later roadmap items. For the schema milestone,
+//! this handler returns a deterministic same-file slice bounded by `max_cards`.
 
 use std::{
     collections::BTreeMap,
@@ -104,12 +103,15 @@ fn build_response(
         &entry_symbol_id,
         backends,
     )?;
-    let (cards, spillover) = apply_card_budget(
+    let (mut cards, spillover) = apply_card_budget(
         entry_card,
         sibling_cards,
         request.budget().max_cards(),
         discovery_capped,
     );
+    for card in cards.iter_mut().skip(1) {
+        enrich_card_if_requested(card, request.node_detail(), source, backends);
+    }
 
     Ok(GraphSliceResponse::Success {
         slice_version: 1,
@@ -140,7 +142,7 @@ fn discover_same_file_cards(
     request: &GraphSliceRequest,
     document: SliceDocument<'_>,
     entry_symbol_id: &str,
-    backends: &mut FusionBackends<SemanticBackendProvider>,
+    backends: &FusionBackends<SemanticBackendProvider>,
 ) -> Result<(Vec<SymbolCard>, bool), DispatchError> {
     let extractor = backends.provider().card_extractor().clone();
     let mut cards = BTreeMap::new();
@@ -151,7 +153,7 @@ fn discover_same_file_cards(
             continue;
         }
 
-        let Some(mut card) =
+        let Some(card) =
             extract_same_file_card(&extractor, document, (line, column), request.node_detail())?
         else {
             continue;
@@ -161,7 +163,6 @@ fn discover_same_file_cards(
             continue;
         }
 
-        enrich_card_if_requested(&mut card, request.node_detail(), document.source, backends);
         cards.entry(card.symbol.symbol_id.clone()).or_insert(card);
     }
 

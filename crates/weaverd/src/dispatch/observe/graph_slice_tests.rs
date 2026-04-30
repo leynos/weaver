@@ -15,11 +15,8 @@ use crate::{
     semantic_provider::SemanticBackendProvider,
 };
 
-fn make_backends() -> (FusionBackends<SemanticBackendProvider>, TempDir) {
-    let dir = match TempDir::new() {
-        Ok(dir) => dir,
-        Err(error) => panic!("create temp dir: {error}"),
-    };
+fn make_backends() -> Result<(FusionBackends<SemanticBackendProvider>, TempDir), String> {
+    let dir = TempDir::new().map_err(|error| format!("create temp dir: {error}"))?;
     let socket_path = dir
         .path()
         .join("socket.sock")
@@ -31,15 +28,13 @@ fn make_backends() -> (FusionBackends<SemanticBackendProvider>, TempDir) {
     };
     let provider =
         SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
-    (FusionBackends::new(config, provider), dir)
+    Ok((FusionBackends::new(config, provider), dir))
 }
 
-fn write_source(temp_dir: &TempDir, name: &str, content: &str) -> PathBuf {
+fn write_source(temp_dir: &TempDir, name: &str, content: &str) -> Result<PathBuf, std::io::Error> {
     let path = temp_dir.path().join(name);
-    if let Err(error) = fs::write(&path, content) {
-        panic!("write source: {error}");
-    }
-    path
+    fs::write(&path, content)?;
+    Ok(path)
 }
 
 fn make_request(arguments: &[&str]) -> CommandRequest {
@@ -61,25 +56,19 @@ fn make_request(arguments: &[&str]) -> CommandRequest {
     }
 }
 
-fn response_payload(output: Vec<u8>) -> serde_json::Value {
-    let response = match String::from_utf8(output) {
-        Ok(response) => response,
-        Err(error) => panic!("utf8: {error}"),
-    };
-    let Some(stream_line) = response.lines().next() else {
-        panic!("stream line");
-    };
-    let envelope: serde_json::Value = match serde_json::from_str(stream_line) {
-        Ok(envelope) => envelope,
-        Err(error) => panic!("envelope: {error}"),
-    };
-    let Some(data) = envelope.get("data").and_then(|value| value.as_str()) else {
-        panic!("stdout data");
-    };
-    match serde_json::from_str(data) {
-        Ok(payload) => payload,
-        Err(error) => panic!("payload: {error}"),
-    }
+fn response_payload(output: Vec<u8>) -> Result<serde_json::Value, String> {
+    let response = String::from_utf8(output).map_err(|error| format!("utf8: {error}"))?;
+    let stream_line = response
+        .lines()
+        .next()
+        .ok_or_else(|| "stream line".to_string())?;
+    let envelope: serde_json::Value =
+        serde_json::from_str(stream_line).map_err(|error| format!("envelope: {error}"))?;
+    let data = envelope
+        .get("data")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| "stdout data".to_string())?;
+    serde_json::from_str(data).map_err(|error| format!("payload: {error}"))
 }
 
 fn detail_value(detail: DetailLevel) -> &'static str {
@@ -96,14 +85,14 @@ fn detail_value(detail: DetailLevel) -> &'static str {
 fn dispatch_payload(
     request: &CommandRequest,
     backends: &mut FusionBackends<SemanticBackendProvider>,
-) -> (i32, serde_json::Value) {
+) -> Result<(i32, serde_json::Value), String> {
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
     let result = match handle(request, &mut writer, backends) {
         Ok(result) => result,
-        Err(error) => panic!("dispatch fails: {error}"),
+        Err(error) => return Err(format!("dispatch fails: {error}")),
     };
-    (result.status, response_payload(output))
+    response_payload(output).map(|payload| (result.status, payload))
 }
 
 fn assert_success_response(status: i32, payload: &serde_json::Value) {
@@ -146,8 +135,8 @@ fn assert_refusal_with_message(
 }
 
 #[rstest]
-fn valid_request_returns_success_and_echoed_constraints() {
-    let (mut backends, temp_dir) = make_backends();
+fn valid_request_returns_success_and_echoed_constraints() -> Result<(), String> {
+    let (mut backends, temp_dir) = make_backends()?;
     let path = write_source(
         &temp_dir,
         "slice.rs",
@@ -159,7 +148,8 @@ fn valid_request_returns_success_and_echoed_constraints() {
             "    }\n",
             "}\n"
         ),
-    );
+    )
+    .map_err(|error| error.to_string())?;
     let uri = Url::from_file_path(&path).expect("file uri").to_string();
     let request = make_request(&[
         "--uri",
@@ -172,18 +162,19 @@ fn valid_request_returns_success_and_echoed_constraints() {
         detail_value(DetailLevel::Semantic),
     ]);
 
-    let (status, payload) = dispatch_payload(&request, &mut backends);
+    let (status, payload) = dispatch_payload(&request, &mut backends)?;
 
     assert_success_response(status, &payload);
     assert_default_graph_slice_shape(&payload);
     assert_eq!(payload["spillover"]["truncated"], false);
     assert_eq!(payload["cards"][0]["symbol"]["ref"]["name"], "increment");
     assert!(payload["cards"].as_array().expect("cards array").len() >= 2);
+    Ok(())
 }
 
 #[rstest]
-fn max_cards_budget_truncates_same_file_symbol_inventory() {
-    let (mut backends, temp_dir) = make_backends();
+fn max_cards_budget_truncates_same_file_symbol_inventory() -> Result<(), String> {
+    let (mut backends, temp_dir) = make_backends()?;
     let path = write_source(
         &temp_dir,
         "slice.py",
@@ -196,7 +187,8 @@ fn max_cards_budget_truncates_same_file_symbol_inventory() {
             "    def version() -> str:\n",
             "        return \"1.0\"\n"
         ),
-    );
+    )
+    .map_err(|error| error.to_string())?;
     let uri = Url::from_file_path(&path).expect("file uri").to_string();
     let request = make_request(&[
         "--uri",
@@ -211,20 +203,21 @@ fn max_cards_budget_truncates_same_file_symbol_inventory() {
         detail_value(DetailLevel::Semantic),
     ]);
 
-    let (status, payload) = dispatch_payload(&request, &mut backends);
+    let (status, payload) = dispatch_payload(&request, &mut backends)?;
 
     assert_success_response(status, &payload);
     assert_eq!(payload["cards"].as_array().expect("cards array").len(), 1);
     assert_spillover_truncated_with_frontier(&payload);
+    Ok(())
 }
 
 #[rstest]
-fn discovery_cap_marks_spillover_truncated_when_card_budget_remains() {
-    let (mut backends, temp_dir) = make_backends();
+fn discovery_cap_marks_spillover_truncated_when_card_budget_remains() -> Result<(), String> {
+    let (mut backends, temp_dir) = make_backends()?;
     let source = (0..=MAX_SAME_FILE_DISCOVERY_POSITIONS)
         .map(|index| format!("fn item_{index}() {{}}\n"))
         .collect::<String>();
-    let path = write_source(&temp_dir, "large.rs", &source);
+    let path = write_source(&temp_dir, "large.rs", &source).map_err(|error| error.to_string())?;
     let uri = Url::from_file_path(&path).expect("file uri").to_string();
     let request = make_request(&[
         "--uri",
@@ -239,7 +232,7 @@ fn discovery_cap_marks_spillover_truncated_when_card_budget_remains() {
         detail_value(DetailLevel::Structure),
     ]);
 
-    let (status, payload) = dispatch_payload(&request, &mut backends);
+    let (status, payload) = dispatch_payload(&request, &mut backends)?;
 
     assert_success_response(status, &payload);
     assert_eq!(payload["spillover"]["truncated"], true);
@@ -250,6 +243,7 @@ fn discovery_cap_marks_spillover_truncated_when_card_budget_remains() {
             .len(),
         0
     );
+    Ok(())
 }
 
 #[expect(
@@ -264,20 +258,20 @@ fn assert_structured_refusal(
     position: &str,
     expected_reason: &str,
     expected_message: Option<&str>,
-) {
-    let path = write_source(temp_dir, filename, content);
-    let uri = match Url::from_file_path(&path) {
-        Ok(uri) => uri.to_string(),
-        Err(()) => panic!("file uri"),
-    };
+) -> Result<(), String> {
+    let path = write_source(temp_dir, filename, content).map_err(|error| error.to_string())?;
+    let uri = Url::from_file_path(&path)
+        .map_err(|()| "file uri".to_string())?
+        .to_string();
     let request = make_request(&["--uri", &uri, "--position", position]);
 
-    let (status, payload) = dispatch_payload(&request, backends);
+    let (status, payload) = dispatch_payload(&request, backends)?;
 
     match expected_message {
         Some(message) => assert_refusal_with_message(status, &payload, expected_reason, message),
         None => assert_refusal(status, &payload, expected_reason),
     }
+    Ok(())
 }
 
 #[rstest]
@@ -300,8 +294,10 @@ fn assert_structured_refusal(
         Some("observe graph-slice: position 10:1 is outside the bounds of the file"),
     )
 )]
-fn structured_refusal_cases(#[case] case: (&str, &str, &str, &str, Option<&str>)) {
-    let (mut backends, temp_dir) = make_backends();
+fn structured_refusal_cases(
+    #[case] case: (&str, &str, &str, &str, Option<&str>),
+) -> Result<(), String> {
+    let (mut backends, temp_dir) = make_backends()?;
     let (filename, content, position, expected_reason, expected_message) = case;
     assert_structured_refusal(
         &mut backends,
@@ -311,7 +307,7 @@ fn structured_refusal_cases(#[case] case: (&str, &str, &str, &str, Option<&str>)
         position,
         expected_reason,
         expected_message,
-    );
+    )
 }
 
 #[rstest]
@@ -328,8 +324,8 @@ fn structured_refusal_cases(#[case] case: (&str, &str, &str, &str, Option<&str>)
 fn invalid_arguments_return_dispatch_error(
     #[case] arguments: &[&str],
     #[case] expected_substring: &str,
-) {
-    let (mut backends, _temp_dir) = make_backends();
+) -> Result<(), String> {
+    let (mut backends, _temp_dir) = make_backends()?;
     let request = make_request(arguments);
     let mut buffer = Vec::new();
     let mut writer = ResponseWriter::new(&mut buffer);
@@ -347,11 +343,12 @@ fn invalid_arguments_return_dispatch_error(
             _ => panic!("expected invalid arguments error"),
         },
     }
+    Ok(())
 }
 
 #[rstest]
-fn missing_source_file_returns_invalid_arguments() {
-    let (mut backends, temp_dir) = make_backends();
+fn missing_source_file_returns_invalid_arguments() -> Result<(), String> {
+    let (mut backends, temp_dir) = make_backends()?;
     let path = temp_dir.path().join("missing.rs");
     let uri = Url::from_file_path(&path).expect("file uri").to_string();
     let request = make_request(&["--uri", &uri, "--position", "1:1"]);
@@ -367,6 +364,7 @@ fn missing_source_file_returns_invalid_arguments() {
             _ => panic!("expected invalid arguments error"),
         },
     }
+    Ok(())
 }
 
 #[test]

@@ -347,7 +347,7 @@ Tree-sitter-derived graphs use a default two-pass pipeline:
 When `snapshots_on_demand` loads only a subset of files, the symbol table is
 partial by design. Edge records must carry `resolution_scope` alongside
 `confidence` to distinguish `full_symbol_table`, `partial_symbol_table`, and
-`lsp` resolution so clients can treat missing edges as uncertainty rather than
+`lsp` resolution, so clients can treat missing edges as uncertainty rather than
 silence.
 
 ## Tree-sitter extraction

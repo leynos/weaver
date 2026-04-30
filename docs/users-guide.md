@@ -140,16 +140,18 @@ structure and rejects malformed input with structured error messages. Domain
 routing supports `observe`, `act`, and `verify` commands. Unknown domains or
 operations return structured errors with exit status 1.
 
-The `observe get-definition` and `observe get-card` operations are fully
-implemented. `get-definition` accepts `--uri` and `--position`, infers the
-language from the file extension, initializes the appropriate language server,
-and returns definition locations as JSON. `get-card` accepts the same location
-arguments plus `--detail`, reads the target file locally, and returns a
-Tree-sitter-backed symbol card for supported Rust, Python, and TypeScript
-files. Missing or malformed arguments return structured error messages with
-exit status 1. Other operations within the `observe`, `act`, and `verify`
-domains still return "not yet implemented" responses while backend wiring is
-being completed.
+The `observe get-definition`, `observe get-card`, and `observe graph-slice`
+operations are fully implemented. `get-definition` accepts `--uri` and
+`--position`, infers the language from the file extension, initializes the
+appropriate language server, and returns definition locations as JSON.
+`get-card` accepts the same location arguments plus `--detail`, reads the
+target file locally, and returns a Tree-sitter-backed symbol card for supported
+Rust, Python, and TypeScript files. `graph-slice` accepts the same location
+arguments plus traversal, detail, and budget options, and returns a stable
+same-file graph-slice envelope. Missing or malformed arguments return
+structured error messages with exit status 1. Other operations within the
+`observe`, `act`, and `verify` domains still return "not yet implemented"
+responses while backend wiring is being completed.
 
 The health snapshot is a single-line JSON document describing the current
 state, enabling operators and automation to poll readiness without speaking the
@@ -315,6 +317,7 @@ Domains and operations:
   observe — Query code structure and relationships
     get-definition    find-references    grep
     diagnostics       call-hierarchy    get-card
+    graph-slice
 
   act — Perform code modifications
     rename-symbol     apply-edits        apply-patch
@@ -326,6 +329,12 @@ Domains and operations:
 
 This catalogue is built into the binary and does not require a running daemon
 or configuration file.
+
+The graph-slice operation uses this syntax:
+
+```sh
+weaver observe graph-slice --uri <URI> --position <LINE:COL> [OPTIONS]
+```
 
 `weaver daemon start --help` exposes the same six configuration flags in its
 own `Options:` section. As with the top-level command, the help surface is
@@ -350,9 +359,16 @@ Available operations:
   diagnostics
   call-hierarchy
   get-card
+  graph-slice
 
 Next command:
   weaver observe get-definition --help
+```
+
+The listed `graph-slice` operation accepts:
+
+```sh
+weaver observe graph-slice --uri <URI> --position <LINE:COL> [OPTIONS]
 ```
 
 Unknown domains list the canonical domains instead of printing the operation
@@ -402,9 +418,16 @@ Available operations:
   diagnostics
   call-hierarchy
   get-card
+  graph-slice
 
 Next command:
   weaver observe get-definition --help
+```
+
+The `graph-slice` alternative in this list maps to:
+
+```sh
+weaver observe graph-slice --uri <URI> --position <LINE:COL> [OPTIONS]
 ```
 
 JSON output forwards the daemon payload unchanged:
@@ -422,7 +445,8 @@ JSON output forwards the daemon payload unchanged:
       "grep",
       "diagnostics",
       "call-hierarchy",
-      "get-card"
+      "get-card",
+      "graph-slice"
     ]
   }
 }
@@ -518,6 +542,7 @@ operations:
 
 - `observe.get-definition`
 - `observe.get-card-hover`
+- `observe.graph-slice`
 - `observe.find-references`
 - `observe.call-hierarchy`
 - `verify.diagnostics`
