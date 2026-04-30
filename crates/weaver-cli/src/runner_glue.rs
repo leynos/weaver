@@ -167,6 +167,12 @@ mod tests {
     use super::{MAX_PATCH_BYTES, build_request};
     use crate::{AppError, CommandInvocation};
 
+    enum ExpectedPatchRequest {
+        Ok,
+        MissingPatchInput,
+        Oversized,
+    }
+
     fn observe_status_invocation() -> CommandInvocation {
         CommandInvocation {
             domain: "observe".to_owned(),
@@ -190,31 +196,47 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    #[test]
-    fn apply_patch_reads_patch_from_stdin() {
-        let patch = "--- a/foo\n+++ b/foo\n@@ -1 +1 @@\n-old\n+new\n";
-        let mut stdin = Cursor::new(patch.as_bytes().to_vec());
-        let result = build_request(apply_patch_invocation(), &mut stdin);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn apply_patch_returns_error_for_empty_stdin() {
-        let mut stdin = Cursor::new(b"   \n".to_vec());
-        let result = build_request(apply_patch_invocation(), &mut stdin);
-        assert!(matches!(result, Err(AppError::MissingPatchInput)));
-    }
-
-    #[test]
-    fn apply_patch_returns_error_for_oversized_stdin() {
-        let mut input = vec![b'a'; MAX_PATCH_BYTES as usize + 1];
-        input.push(b'\n');
+    #[rstest::rstest]
+    #[case::reads_patch_from_stdin(
+        b"--- a/foo\n+++ b/foo\n@@ -1 +1 @@\n-old\n+new\n".to_vec(),
+        ExpectedPatchRequest::Ok
+    )]
+    #[case::returns_error_for_empty_stdin(
+        b"   \n".to_vec(),
+        ExpectedPatchRequest::MissingPatchInput
+    )]
+    #[case::accepts_input_at_max_size_limit(
+        {
+            let mut input = vec![b'a'; MAX_PATCH_BYTES as usize - 1];
+            input.push(b'\n');
+            input
+        },
+        ExpectedPatchRequest::Ok
+    )]
+    #[case::returns_error_for_oversized_stdin(
+        {
+            let mut input = vec![b'a'; MAX_PATCH_BYTES as usize + 1];
+            input.push(b'\n');
+            input
+        },
+        ExpectedPatchRequest::Oversized
+    )]
+    fn apply_patch_stdin_cases(#[case] input: Vec<u8>, #[case] expected: ExpectedPatchRequest) {
         let mut stdin = Cursor::new(input);
         let result = build_request(apply_patch_invocation(), &mut stdin);
 
-        assert!(matches!(
-            result,
-            Err(AppError::ReadPatch(error)) if error.kind() == std::io::ErrorKind::UnexpectedEof
-        ));
+        match expected {
+            ExpectedPatchRequest::Ok => assert!(result.is_ok()),
+            ExpectedPatchRequest::MissingPatchInput => {
+                assert!(matches!(result, Err(AppError::MissingPatchInput)));
+            }
+            ExpectedPatchRequest::Oversized => {
+                assert!(matches!(
+                    result,
+                    Err(AppError::ReadPatch(error))
+                        if error.kind() == std::io::ErrorKind::UnexpectedEof
+                ));
+            }
+        }
     }
 }

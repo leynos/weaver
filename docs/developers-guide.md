@@ -369,12 +369,12 @@ handles ordinary execution.
 flags dynamically from `ortho_config` metadata. Each visible field becomes a
 `clap::Arg` with the correct long flag and value name for the generated help
 surface. The help-only parser deliberately does not attach config value
-validators, because runtime config parsing owns case handling and validation.
+validators because runtime config parsing owns case handling and validation.
 
 The augmented command is used in both places that need truthful help text:
 
 - runtime `--help` rendering, where the CLI prints help without invoking the
-  configuration loader or starting the daemon; and
+  configuration loader or starting the daemon;
 - `clap_mangen` man page generation in `crates/weaver-cli/build.rs`, so the
   generated roff output stays aligned with the runtime help surface.
 
@@ -382,7 +382,7 @@ The augmented command is used in both places that need truthful help text:
 
 The CLI deliberately uses two clap command shapes:
 
-- the *runtime* command, which is strict and excludes configuration flags; and
+- the *runtime* command, which is strict and excludes configuration flags;
 - the *help* command, which is augmented with configuration metadata for
   documentation only.
 
@@ -432,11 +432,11 @@ The built-in default is `en-US`. That value is part of the current shared
 configuration contract and is available from files, environment variables, and
 CLI configuration flags like any other config field.
 
-Full CLI localisation bootstrap is intentionally deferred to roadmap item
+Full CLI localization bootstrap is intentionally deferred to roadmap item
 `3.3.1`. In particular, Weaver does not yet resolve the final locale and use it
 to construct the `Localizer` before clap parse errors are formatted. The
 current `Locale` type exists so the configuration contract is real now and the
-later localisation bootstrap can reuse the validated domain value.
+later localization bootstrap can reuse the validated domain value.
 
 ### 2.5 Daemon command execution glue (`crates/weaver-cli/src/runner_glue.rs`)
 
