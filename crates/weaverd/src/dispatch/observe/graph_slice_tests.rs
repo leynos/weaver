@@ -15,8 +15,11 @@ use crate::{
     semantic_provider::SemanticBackendProvider,
 };
 
-fn make_backends() -> Result<(FusionBackends<SemanticBackendProvider>, TempDir), String> {
-    let dir = TempDir::new().map_err(|error| format!("create temp dir: {error}"))?;
+fn make_backends() -> (FusionBackends<SemanticBackendProvider>, TempDir) {
+    let dir = match TempDir::new() {
+        Ok(dir) => dir,
+        Err(error) => panic!("create temp dir: {error}"),
+    };
     let socket_path = dir
         .path()
         .join("socket.sock")
@@ -28,13 +31,15 @@ fn make_backends() -> Result<(FusionBackends<SemanticBackendProvider>, TempDir),
     };
     let provider =
         SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
-    Ok((FusionBackends::new(config, provider), dir))
+    (FusionBackends::new(config, provider), dir)
 }
 
-fn write_source(temp_dir: &TempDir, name: &str, content: &str) -> Result<PathBuf, std::io::Error> {
+fn write_source(temp_dir: &TempDir, name: &str, content: &str) -> PathBuf {
     let path = temp_dir.path().join(name);
-    fs::write(&path, content)?;
-    Ok(path)
+    if let Err(error) = fs::write(&path, content) {
+        panic!("write source: {error}");
+    }
+    path
 }
 
 fn make_request(arguments: &[&str]) -> CommandRequest {
@@ -91,14 +96,14 @@ fn detail_value(detail: DetailLevel) -> &'static str {
 fn dispatch_payload(
     request: &CommandRequest,
     backends: &mut FusionBackends<SemanticBackendProvider>,
-) -> Result<(i32, serde_json::Value), String> {
+) -> (i32, serde_json::Value) {
     let mut output = Vec::new();
     let mut writer = ResponseWriter::new(&mut output);
     let result = match handle(request, &mut writer, backends) {
         Ok(result) => result,
-        Err(error) => return Err(format!("dispatch fails: {error}")),
+        Err(error) => panic!("dispatch fails: {error}"),
     };
-    response_payload(output).map(|payload| (result.status, payload))
+    (result.status, response_payload(output))
 }
 
 fn assert_success_response(status: i32, payload: &serde_json::Value) {
