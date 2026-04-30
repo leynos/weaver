@@ -121,38 +121,35 @@ fn compile_yaml_normalizes_and_returns_query_plans(
     assert_eq!(plan.language(), expected_language);
 }
 
-#[test]
-fn compile_yaml_returns_semantic_error_for_invalid_not_in_or() {
-    assert_compile_yaml_semantic_error(
-        concat!(
-            "rules:\n",
-            "  - id: demo.invalid.not.in.or\n",
-            "    message: invalid not in or\n",
-            "    languages: [rust]\n",
-            "    severity: ERROR\n",
-            "    pattern-either:\n",
-            "      - pattern: foo($X)\n",
-            "      - pattern-not: bar($Y)\n",
-        ),
-        DiagnosticCode::ESempaiInvalidNotInOr,
-    );
-}
-
-#[test]
-fn compile_yaml_returns_semantic_error_for_missing_positive_term_in_and() {
-    assert_compile_yaml_semantic_error(
-        concat!(
-            "rules:\n",
-            "  - id: demo.missing.positive.term.in.and\n",
-            "    message: missing positive term in and\n",
-            "    languages: [rust]\n",
-            "    severity: ERROR\n",
-            "    patterns:\n",
-            "      - pattern-not: foo($X)\n",
-            "      - pattern-inside: bar($Y)\n",
-        ),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd,
-    );
+#[rstest]
+#[case::invalid_not_in_or(
+    concat!(
+        "rules:\n",
+        "  - id: demo.invalid.not.in.or\n",
+        "    message: invalid not in or\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    pattern-either:\n",
+        "      - pattern: foo($X)\n",
+        "      - pattern-not: bar($Y)\n",
+    ),
+    DiagnosticCode::ESempaiInvalidNotInOr,
+)]
+#[case::missing_positive_term_in_and(
+    concat!(
+        "rules:\n",
+        "  - id: demo.missing.positive.term.in.and\n",
+        "    message: missing positive term in and\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    patterns:\n",
+        "      - pattern-not: foo($X)\n",
+        "      - pattern-inside: bar($Y)\n",
+    ),
+    DiagnosticCode::ESempaiMissingPositiveTermInAnd,
+)]
+fn compile_yaml_returns_semantic_error(#[case] yaml: &str, #[case] expected_code: DiagnosticCode) {
+    assert_compile_yaml_semantic_error(yaml, expected_code);
 }
 
 #[rstest]
