@@ -40,7 +40,7 @@ use crate::SourceSpan;
 ///
 /// All legacy and v2 syntaxes are lowered into this shared representation
 /// before semantic validation and plan compilation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Formula {
     /// A leaf pattern or regex atom.
     Atom(Atom),
@@ -142,7 +142,7 @@ pub struct TreeSitterQueryAtom {
 ///     span: None,
 /// };
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Decorated<T> {
     /// The core formula or atom.
     pub node: T,
@@ -171,7 +171,7 @@ pub struct Decorated<T> {
 ///     raw: json!({"metavariable-regex": {"metavariable": "$X", "regex": "foo.*"}}),
 /// };
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct WhereClause {
     /// The raw JSON value of the constraint.
     pub raw: Value,

@@ -54,7 +54,7 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-5-make-nixie.log
 ## Constraints
 
 - Align with the canonical formula model specified in
-  `docs/sempai-query-language-design.md` §"Normalised formula model":
+  `docs/sempai-query-language-design.md` §"Normalized formula model":
   `Formula::Atom`, `Formula::Not`, `Formula::Inside`, `Formula::Anywhere`,
   `Formula::And`, `Formula::Or`, with `Decorated<T>` wrapper carrying `where`,
   `as`, and `fix` metadata.

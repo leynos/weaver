@@ -97,16 +97,22 @@ fn check_positive_term_in_and(
     formula: &Formula,
     span: Option<&sempai_core::SourceSpan>,
 ) -> Result<(), DiagnosticReport> {
+    check_positive_term_in_and_with_spans(formula, span, span)
+}
+
+fn check_positive_term_in_and_with_spans(
+    formula: &Formula,
+    node_span: Option<&sempai_core::SourceSpan>,
+    fallback_span: Option<&sempai_core::SourceSpan>,
+) -> Result<(), DiagnosticReport> {
     match formula {
         Formula::And(branches) => {
             let has_positive = branches.iter().any(|branch| is_positive_term(&branch.node));
             if !has_positive {
-                // Prefer the first branch's span for a more precise anchor; fall
-                // back to the enclosing And's span if no branch has one.
-                let error_span = branches
-                    .iter()
-                    .find_map(|branch| branch.span.clone())
-                    .or_else(|| span.cloned());
+                let error_span = node_span
+                    .cloned()
+                    .or_else(|| branches.first().and_then(|branch| branch.span.clone()))
+                    .or_else(|| fallback_span.cloned());
                 return Err(DiagnosticReport::validation_error(
                     DiagnosticCode::ESempaiMissingPositiveTermInAnd,
                     String::from(
@@ -118,18 +124,30 @@ fn check_positive_term_in_and(
             }
             // Recursively check nested formulas
             for branch in branches {
-                check_positive_term_in_and(&branch.node, branch.span.as_ref().or(span))?;
+                check_positive_term_in_and_with_spans(
+                    &branch.node,
+                    branch.span.as_ref(),
+                    node_span.or(fallback_span),
+                )?;
             }
             Ok(())
         }
         Formula::Or(branches) => {
             for branch in branches {
-                check_positive_term_in_and(&branch.node, branch.span.as_ref().or(span))?;
+                check_positive_term_in_and_with_spans(
+                    &branch.node,
+                    branch.span.as_ref(),
+                    node_span.or(fallback_span),
+                )?;
             }
             Ok(())
         }
         Formula::Not(inner) | Formula::Inside(inner) | Formula::Anywhere(inner) => {
-            check_positive_term_in_and(&inner.node, inner.span.as_ref().or(span))
+            check_positive_term_in_and_with_spans(
+                &inner.node,
+                inner.span.as_ref(),
+                node_span.or(fallback_span),
+            )
         }
         Formula::Atom(_) => Ok(()),
     }
