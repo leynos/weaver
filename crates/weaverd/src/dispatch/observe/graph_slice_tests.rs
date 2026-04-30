@@ -254,30 +254,33 @@ fn discovery_cap_marks_spillover_truncated_when_card_budget_remains() -> Result<
     Ok(())
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "review requested this exact helper signature for the refusal table"
-)]
+struct RefusalCase<'a> {
+    filename: &'a str,
+    content: &'a str,
+    position: &'a str,
+    expected_reason: &'a str,
+    expected_message: Option<&'a str>,
+}
+
 fn assert_structured_refusal(
     backends: &mut FusionBackends<SemanticBackendProvider>,
     temp_dir: &TempDir,
-    filename: &str,
-    content: &str,
-    position: &str,
-    expected_reason: &str,
-    expected_message: Option<&str>,
+    case: &RefusalCase<'_>,
 ) -> Result<(), String> {
-    let path = write_source(temp_dir, filename, content).map_err(|error| error.to_string())?;
+    let path =
+        write_source(temp_dir, case.filename, case.content).map_err(|error| error.to_string())?;
     let uri = Url::from_file_path(&path)
         .map_err(|()| "file uri".to_string())?
         .to_string();
-    let request = make_request(&["--uri", &uri, "--position", position]);
+    let request = make_request(&["--uri", &uri, "--position", case.position]);
 
     let (status, payload) = dispatch_payload(&request, backends)?;
 
-    match expected_message {
-        Some(message) => assert_refusal_with_message(status, &payload, expected_reason, message),
-        None => assert_refusal(status, &payload, expected_reason),
+    match case.expected_message {
+        Some(message) => {
+            assert_refusal_with_message(status, &payload, case.expected_reason, message);
+        }
+        None => assert_refusal(status, &payload, case.expected_reason),
     }
     Ok(())
 }
@@ -310,11 +313,13 @@ fn structured_refusal_cases(
     assert_structured_refusal(
         &mut backends,
         &temp_dir,
-        filename,
-        content,
-        position,
-        expected_reason,
-        expected_message,
+        &RefusalCase {
+            filename,
+            content,
+            position,
+            expected_reason,
+            expected_message,
+        },
     )
 }
 
