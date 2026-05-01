@@ -36,7 +36,7 @@ const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 pub(crate) struct Transcript {
     command: String,
     status: i32,
-    stdout: String,
+    pub(crate) stdout: String,
     stderr: String,
 }
 
@@ -48,6 +48,7 @@ pub(crate) struct CacheTranscript {
     pub cache_misses: u64,
 }
 
+/// Input parameters for a single `observe get-card` CLI invocation in tests.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct GetCardRequest<'a> {
     pub uri: &'a str,
@@ -56,6 +57,7 @@ pub(crate) struct GetCardRequest<'a> {
     pub detail: &'a str,
 }
 
+/// Input parameters for a single `observe graph-slice` CLI invocation in tests.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct GraphSliceRequest<'a> {
     pub uri: &'a str,
@@ -120,6 +122,7 @@ impl TestDaemon {
     }
 }
 
+/// Writes a card fixture file into `temp_dir` and returns its `file://` URI string.
 pub(crate) fn fixture_uri(temp_dir: &TempDir, case: CardFixtureCase) -> String {
     let path = required_result(
         write_fixture_path(temp_dir, case.file_name, case.source),
@@ -129,6 +132,7 @@ pub(crate) fn fixture_uri(temp_dir: &TempDir, case: CardFixtureCase) -> String {
     required_result(uri, "fixture path to URI").to_string()
 }
 
+/// Executes `weaver observe get-card` via the test daemon and returns a `Transcript`.
 pub(crate) fn run_get_card(daemon: &TestDaemon, request: GetCardRequest<'_>) -> Transcript {
     let command = format!(
         "weaver --daemon-socket tcp://<daemon-endpoint> --output json observe get-card --uri \
@@ -155,6 +159,7 @@ pub(crate) fn run_get_card(daemon: &TestDaemon, request: GetCardRequest<'_>) -> 
     output_to_transcript(command, &output)
 }
 
+/// Executes `weaver observe graph-slice` via the test daemon and returns a `Transcript`.
 pub(crate) fn run_graph_slice(daemon: &TestDaemon, request: GraphSliceRequest<'_>) -> Transcript {
     let mut command = format!(
         concat!(
@@ -193,6 +198,7 @@ pub(crate) fn run_graph_slice(daemon: &TestDaemon, request: GraphSliceRequest<'_
     );
     output_to_transcript(command, &output)
 }
+/// Asserts an insta snapshot stored under `tests/snapshots/<name>.snap`.
 pub(crate) fn assert_named_snapshot(name: &str, content: &str) {
     let mut settings = insta::Settings::clone_current();
     settings.set_snapshot_path(Path::new(concat!(
