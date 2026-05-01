@@ -97,16 +97,16 @@ pub(crate) fn effective_operation(refactoring: &str) -> Result<&'static str, Dis
 /// Returns [`DispatchError::InvalidArguments`] when `operation` is not present
 /// in the canonical refactoring table.
 pub(crate) fn capability_for_operation(operation: &str) -> Result<CapabilityId, DispatchError> {
-    let supported_operations = SUPPORTED_REFACTORINGS
-        .iter()
-        .map(|supported| supported.capability_operation)
-        .collect::<Vec<_>>()
-        .join(", ");
     SUPPORTED_REFACTORINGS
         .iter()
         .find(|supported| supported.capability_operation == operation)
         .map(|supported| supported.capability)
         .ok_or_else(|| {
+            let supported_operations = SUPPORTED_REFACTORINGS
+                .iter()
+                .map(|supported| supported.capability_operation)
+                .collect::<Vec<_>>()
+                .join(", ");
             DispatchError::invalid_arguments(format!(
                 "act refactor does not support capability resolution for '{operation}' (supported \
                  capability operations: {supported_operations})"
