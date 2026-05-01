@@ -11,7 +11,12 @@ use weaver_test_macros::allow_fixture_expansion_lints;
 
 use super::{
     refactor_helpers::{
-        builders::{build_backends, command_request, configure_request, standard_rename_args},
+        builders::{
+            build_backends,
+            command_request,
+            configure_request,
+            standard_rename_args_for_provider,
+        },
         content::{
             original_content_for,
             routed_diff_for,
@@ -27,14 +32,7 @@ use super::{
             resolve_auto_language,
         },
     },
-    resolution::{
-        CandidateEvaluation,
-        CandidateReason,
-        CapabilityResolutionEnvelope,
-        RefusalReason,
-        ResolutionRequest,
-        SelectionMode,
-    },
+    resolution::*,
     *,
 };
 
@@ -179,6 +177,8 @@ impl RefactorWorld {
             workspace: TempDir::new().map_err(|e| format!("workspace: {e}"))?,
             socket_dir: TempDir::new().map_err(|e| format!("socket dir: {e}"))?,
             request: command_request(vec![
+                String::from("--provider"),
+                String::from("rope"),
                 String::from("--refactoring"),
                 String::from("rename"),
                 String::from("--file"),
@@ -257,43 +257,42 @@ fn world() -> RefactorWorld {
 }
 
 #[given("a workspace file for refactoring")]
-fn given_workspace_file(
-    #[expect(
-        unused_variables,
-        reason = "BDD step exists for readability; file creation happens in \
-                  prepare_routed_fixture()"
-    )]
-    world: &mut RefactorWorld,
-) {
-    // File creation is handled by prepare_routed_fixture() in subsequent steps
-    // This step exists for BDD readability but performs no action
-}
+fn given_workspace_file(world: &mut RefactorWorld) { let _ = world; }
 
-#[given("a valid auto-routed act refactor request resolved to rope")]
+#[given("a valid act refactor request for rope")]
 fn given_valid_rope_request(world: &mut RefactorWorld) -> Result<(), String> {
-    configure_request(&mut world.request, standard_rename_args("notes.py"));
+    configure_request(
+        &mut world.request,
+        standard_rename_args_for_provider("notes.py", "rope"),
+    );
     world.routing_mode = RoutingMode::AutomaticPython;
     world.prepare_routed_fixture("notes.py")
 }
 
-#[given("a valid auto-routed act refactor request resolved to rust-analyzer")]
+#[given("a valid act refactor request for rust-analyzer")]
 fn given_valid_rust_request(world: &mut RefactorWorld) -> Result<(), String> {
-    configure_request(&mut world.request, standard_rename_args("notes.rs"));
+    configure_request(
+        &mut world.request,
+        standard_rename_args_for_provider("notes.rs", "rust-analyzer"),
+    );
     world.routing_mode = RoutingMode::AutomaticRust;
     world.prepare_routed_fixture("notes.rs")
 }
 
 #[given("an unsupported-language act refactor request")]
 fn given_unsupported_language_request(world: &mut RefactorWorld) {
-    configure_request(&mut world.request, standard_rename_args("notes.txt"));
+    configure_request(
+        &mut world.request,
+        standard_rename_args_for_provider("notes.txt", "rope"),
+    );
     world.routing_mode = RoutingMode::UnsupportedLanguage;
 }
-
 #[given("a Python act refactor request with an incompatible provider override")]
 fn given_explicit_provider_mismatch_request(world: &mut RefactorWorld) -> Result<(), String> {
-    let mut args = vec![String::from("--provider"), String::from("rust-analyzer")];
-    args.extend(standard_rename_args("notes.py"));
-    configure_request(&mut world.request, args);
+    configure_request(
+        &mut world.request,
+        standard_rename_args_for_provider("notes.py", "rust-analyzer"),
+    );
     world.routing_mode = RoutingMode::ExplicitProviderMismatch;
     world.prepare_routed_fixture("notes.py")
 }
@@ -332,7 +331,11 @@ fn then_refactor_succeeds(world: &mut RefactorWorld) -> Result<(), String> {
 
 #[then("the refactor command fails with status 1")]
 fn then_refactor_fails_status_one(world: &mut RefactorWorld) -> Result<(), String> {
-    assert_eq!(extract_status(world)?, 1);
+    let result = world.dispatch_result.as_ref().ok_or("result missing")?;
+    match result {
+        Ok(status) => assert_eq!(*status, 1),
+        Err(error) => assert_eq!(error.exit_status(), 1),
+    }
     Ok(())
 }
 
@@ -364,6 +367,23 @@ fn then_stderr_contains(world: &mut RefactorWorld, text: String) {
         "expected response stream to contain '{needle}', got: {}",
         world.response_stream
     );
+}
+
+#[then("the dispatch error contains {text}")]
+fn then_dispatch_error_contains(world: &mut RefactorWorld, text: String) -> Result<(), String> {
+    let needle = text.trim_matches('"');
+    let result = world.dispatch_result.as_ref().ok_or("result missing")?;
+    let error = match result {
+        Err(error) => error,
+        Ok(status) => return Err(format!("expected dispatch error, got status: {status:?}")),
+    };
+    let rendered = error.to_string();
+    if !rendered.contains(needle) {
+        return Err(format!(
+            "expected dispatch error to contain '{needle}', got: {rendered}"
+        ));
+    }
+    Ok(())
 }
 
 #[scenario(path = "tests/features/refactor.feature")]

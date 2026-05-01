@@ -2,6 +2,7 @@
 
 use std::{
     env,
+    io,
     sync::{Arc, Mutex},
 };
 
@@ -128,10 +129,13 @@ where
     // Create backend manager using the same backends from the daemon
     let backends = Arc::new(Mutex::new(daemon.into_backends()));
     let backend_manager = BackendManager::new(backends);
-    let handler = Arc::new(DispatchConnectionHandler::new(
-        backend_manager,
-        workspace_root,
-    ));
+    let handler = Arc::new(
+        DispatchConnectionHandler::new(backend_manager, workspace_root).map_err(|error| {
+            LaunchError::WorkspaceRoot {
+                source: io::Error::new(io::ErrorKind::InvalidInput, error.to_string()),
+            }
+        })?,
+    );
 
     let listener_handle = listener.start(handler)?;
     guard.write_health(HealthState::Ready)?;

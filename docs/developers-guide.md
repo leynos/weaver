@@ -455,13 +455,13 @@ let payload = automatic_resolution_payload(std::path::Path::new(file));
 
 `refactor_helpers` is a `#[cfg(test)]` support module for the daemon-side
 `act refactor` tests. It is split into small inline modules and then
-re-exported at the top level so sibling test modules can import a compact test
+re-exported at the top-level so sibling test modules can import a compact test
 API instead of reaching into several implementation details.
 
 The inline modules are:
 
 - `builders` — request and backend constructors such as `command_request(...)`,
-  `build_backends(...)`, `standard_rename_args(...)`, and
+  `build_backends(...)`, `standard_rename_args_for_provider(...)`, and
   `configure_request(...)`.
 - `resolutions` — pure constructors for capability-resolution envelopes,
   including `selected_resolution(...)`, `refused_resolution(...)`, and
@@ -497,13 +497,13 @@ let runtime = selected_runtime(
         capability: weaver_plugins::CapabilityId::RenameSymbol,
         language: "python",
         provider: "rope",
-        selection_mode: super::resolution::SelectionMode::Automatic,
-        requested_provider: None,
+        selection_mode: super::resolution::SelectionMode::ExplicitProvider,
+        requested_provider: Some("rope"),
     },
     ExecuteResult::MissingPlugin("rope"),
 );
 
-let request = command_request(standard_rename_args("notes.py"));
+let request = command_request(standard_rename_args_for_provider("notes.py", "rope"));
 let mut backends = build_backends(&socket_path);
 ```
 
@@ -511,3 +511,48 @@ That pattern lets a test build a request, inject a deterministic runtime, and
 then call `handle(...)` to assert on exit status, stderr, and any preserved
 workspace content. Tests that need fixture content or diff payloads layer in
 the `content` helpers instead of hand-writing patch strings.
+
+### `requirements` (`weaverd/src/dispatch/act/refactor/requirements.rs`)
+
+`requirements` is the single source of truth for the operator-facing contract
+of `act refactor`. It is a non-test module consumed by both the
+argument-parsing layer and the test suite to keep validation, guidance text,
+and supported-value lists in one place.
+
+The module exposes seven `pub(crate)` functions:
+
+- `supported_provider_names() -> &'static [&'static str]` — returns the
+  canonical slice of accepted provider names (e.g. `rope`, `rust-analyzer`),
+  sourced from the built-in provider manifest catalogue.
+- `supported_refactoring_names() -> &'static [&'static str]` — returns the
+  canonical slice of accepted user-facing refactoring names (e.g. `rename`).
+- `validate_provider(provider: &str) -> Result<(), DispatchError>` — delegates
+  to `validate_value("provider", supported_provider_names(), provider)` and
+  returns `DispatchError::InvalidArguments` with
+  `act refactor does not support provider '<value>'` plus the shared guidance
+  block when `provider` is not in `supported_provider_names()`.
+- `validate_refactoring(refactoring: &str) -> Result<(), DispatchError>` —
+  delegates to
+  `validate_value("refactoring", supported_refactoring_names(), refactoring)`
+  and returns `DispatchError::InvalidArguments` with
+  `act refactor does not support refactoring '<value>'` plus the shared
+  guidance block when `refactoring` is not in `supported_refactoring_names()`.
+- `effective_operation(refactoring: &str) -> Result<&'static str,
+  DispatchError>` — maps a user-facing refactoring name to the underlying
+  plugin capability operation string (`"rename"` → `"rename-symbol"`),
+  returning the same unsupported-refactoring
+  `DispatchError::InvalidArguments` as `validate_refactoring(...)` for unknown
+  user-facing names.
+- `capability_for_operation(operation: &str) -> Result<CapabilityId,
+  DispatchError>` — maps a capability operation string to its `CapabilityId`
+  variant (`"rename-symbol"` → `CapabilityId::RenameSymbol`), returning
+  `DispatchError::InvalidArguments` with
+  `act refactor does not support capability resolution for '<operation>'` and
+  the supported capability-operation tokens for unknown operations.
+- `missing_requirements_error() -> DispatchError` — builds the deterministic
+  `DispatchError::InvalidArguments` with `act refactor requires ...`, every
+  required flag (`--provider <plugin>`, `--refactoring <operation>`,
+  `--file <path>`), valid provider and refactoring values, and a next-command
+  example derived from the first supported provider/refactoring or the
+  `<plugin>` / `<operation>` placeholders. Called by the argument-builder when
+  one or more required flags are absent.

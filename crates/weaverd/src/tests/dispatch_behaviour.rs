@@ -38,10 +38,10 @@ fn test_handler() -> Arc<DispatchConnectionHandler> {
     let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
     let backend_manager = BackendManager::new(backends);
     let workspace_root = std::env::current_dir().expect("workspace root");
-    Arc::new(DispatchConnectionHandler::new(
-        backend_manager,
-        workspace_root,
-    ))
+    Arc::new(
+        DispatchConnectionHandler::new(backend_manager, workspace_root)
+            .expect("absolute workspace root"),
+    )
 }
 
 struct DispatchWorld {

@@ -33,7 +33,22 @@ fn build_backends() -> FusionBackends<SemanticBackendProvider> {
     FusionBackends::new(config, provider)
 }
 
-fn build_router() -> DomainRouter { DomainRouter::new(PathBuf::from("/tmp/weaver-test-workspace")) }
+fn build_router() -> DomainRouter {
+    match DomainRouter::new(PathBuf::from("/tmp/weaver-test-workspace")) {
+        Ok(router) => router,
+        Err(error) => panic!("absolute workspace root: {error}"),
+    }
+}
+
+#[test]
+fn build_router_rejects_relative_workspace_root() {
+    let error = match DomainRouter::new(PathBuf::from("relative/workspace")) {
+        Ok(_) => panic!("relative workspace roots should be rejected"),
+        Err(error) => error,
+    };
+
+    assert!(matches!(error, DispatchError::InvalidArguments { .. }));
+}
 
 #[allow_fixture_expansion_lints]
 #[fixture]
@@ -54,7 +69,7 @@ fn invalid_arguments_message(domain: &str, operation: &str) -> Option<&'static s
             Some("act apply-patch should fail with InvalidArguments (missing patch)")
         }
         ("act", "refactor") => {
-            Some("act refactor should fail with InvalidArguments (missing --provider)")
+            Some("act refactor should fail with InvalidArguments (missing required flags)")
         }
         _ => None,
     }
