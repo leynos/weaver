@@ -167,3 +167,40 @@ fn daemon_start_help_lists_all_config_flags() {
         .stderr(contains("daemon socket opened").not())
         .stderr(contains("Waiting for daemon start...").not());
 }
+
+#[test]
+fn generated_man_page_contains_all_shared_config_flags() {
+    use cap_std::{ambient_authority, fs::Dir};
+
+    let workspace_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("crates parent")
+        .parent()
+        .expect("workspace root")
+        .to_path_buf();
+    let workspace =
+        Dir::open_ambient_dir(&workspace_root, ambient_authority()).expect("open workspace root");
+    let target = format!("{}-unknown-linux-gnu", std::env::consts::ARCH);
+    let man_pages = ["debug", "release"]
+        .map(|profile| format!("target/generated-man/{target}/{profile}/weaver.1"));
+
+    let content = man_pages.iter().find_map(|path| {
+        workspace
+            .read_to_string(path)
+            .ok()
+            .map(|content| (path, content))
+    });
+    let Some((man_page_path, content)) = content else {
+        eprintln!("skipping manpage test: no weaver.1 found for target {target}");
+        return;
+    };
+
+    for flag in EXPECTED_SHARED_CONFIG_HELP_FLAGS {
+        let flag_name = flag.split_whitespace().next().expect("flag has name");
+        let roff_flag_name = flag_name.replace('-', "\\-");
+        assert!(
+            content.contains(flag_name) || content.contains(&roff_flag_name),
+            "man page {man_page_path} missing flag {flag_name:?}",
+        );
+    }
+}

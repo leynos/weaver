@@ -83,6 +83,78 @@ fn daemon_start_help_snapshot_matches_augmented_command() {
 }
 
 #[test]
+fn augmented_command_has_expected_arg_structure() {
+    use clap::ArgAction;
+
+    let expected: &[(&str, Option<&str>, ArgAction)] = &[
+        ("config-path", Some("PATH"), ArgAction::Set),
+        ("daemon-socket", Some("ENDPOINT"), ArgAction::Set),
+        ("log-filter", Some("FILTER"), ArgAction::Set),
+        ("log-format", Some("FORMAT"), ArgAction::Set),
+        ("capability-overrides", Some("DIRECTIVE"), ArgAction::Append),
+        ("locale", Some("LOCALE"), ArgAction::Set),
+    ];
+
+    let cmd = help::command();
+    for (long, expected_value_name, expected_action) in expected {
+        let arg = cmd
+            .get_arguments()
+            .find(|a| a.get_long() == Some(*long))
+            .unwrap_or_else(|| panic!("augmented command missing --{long}"));
+
+        assert!(arg.is_global_set(), "arg --{long} must be global");
+        assert_eq!(
+            arg.get_value_names()
+                .and_then(|names| names.first().map(|value| value.as_str())),
+            *expected_value_name,
+            "arg --{long} value_name mismatch"
+        );
+        assert_eq!(
+            format!("{:?}", arg.get_action()),
+            format!("{expected_action:?}"),
+            "arg --{long} action mismatch"
+        );
+    }
+}
+
+#[test]
+fn config_flag_after_domain_is_not_extracted_as_config_argument() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+
+    let load_called = Arc::new(AtomicBool::new(false));
+    let load_called_clone = Arc::clone(&load_called);
+
+    struct TrackingLoader(Arc<AtomicBool>);
+
+    impl ConfigLoader for TrackingLoader {
+        fn load(&self, args: &[OsString]) -> Result<Config, AppError> {
+            self.0.store(true, Ordering::SeqCst);
+            let contains_locale = args.iter().any(|arg| arg == "--locale");
+            assert!(
+                !contains_locale,
+                "post-domain --locale must not reach the config loader"
+            );
+            Err(AppError::MissingDomain)
+        }
+    }
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut stdin = Cursor::new(Vec::new());
+    let mut io = IoStreams::new(&mut stdin, &mut stdout, &mut stderr, false);
+    let argv: Vec<OsString> = ["weaver", "observe", "status", "--locale", "de-DE"]
+        .iter()
+        .map(OsString::from)
+        .collect();
+    let _exit = run_with_loader(argv, &mut io, &TrackingLoader(load_called_clone));
+
+    let _ = load_called.load(Ordering::SeqCst);
+}
+
+#[test]
 fn write_help_for_args_surfaces_io_error_on_broken_writer() {
     struct BrokenWriter;
 

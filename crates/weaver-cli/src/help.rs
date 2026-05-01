@@ -336,3 +336,24 @@ mod tests {
         assert_eq!(error.kind(), ErrorKind::UnknownArgument);
     }
 }
+
+#[cfg(test)]
+mod prop_tests {
+    //! Property tests for augmented help command construction.
+
+    use proptest::prelude::*;
+
+    use super::command;
+
+    proptest! {
+        #[test]
+        fn command_always_includes_config_path(_seed in 0u64..) {
+            let cmd = command();
+
+            prop_assert!(
+                cmd.get_arguments().any(|a| a.get_id().as_str() == "config-path"),
+                "--config-path must always be present in the augmented command"
+            );
+        }
+    }
+}

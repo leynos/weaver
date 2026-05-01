@@ -153,6 +153,13 @@ fn enforce_request_line_limit(request: &CommandRequest) -> Result<(), AppError> 
     Ok(())
 }
 
+/// Writes `error` to `stderr` as a human-readable line and returns
+/// [`ExitCode::FAILURE`].
+///
+/// Write failures are deliberately ignored via `.ok()`: by the time this
+/// function is called the process has already encountered a fatal error.
+/// Surfacing a secondary write failure would obscure the original error
+/// context, and there is no meaningful recovery path available.
 fn write_error_and_fail<W: Write>(stderr: &mut W, error: impl std::fmt::Display) -> ExitCode {
     writeln!(stderr, "{error}").ok();
     ExitCode::FAILURE
@@ -184,6 +191,8 @@ mod tests {
     //! Tests for daemon request construction helpers.
 
     use std::io::Cursor;
+
+    use proptest::prelude::*;
 
     use super::{MAX_PATCH_BYTES, build_request};
     use crate::{AppError, CommandInvocation, CommandRequest};
@@ -312,6 +321,40 @@ mod tests {
             ExpectedPatchRequest::Oversized => {
                 assert!(matches!(result, Err(AppError::RequestTooLarge { .. })));
             }
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn patch_at_or_below_limit_returns_only_expected_outcomes(
+            size in 1usize..=(MAX_PATCH_BYTES as usize)
+        ) {
+            let small_patch = "x";
+            let mut stdin = Cursor::new(small_patch.as_bytes().to_vec());
+            let result = build_request(apply_patch_invocation(), &mut stdin);
+
+            prop_assert!(
+                result.is_ok() || matches!(result, Err(AppError::RequestTooLarge { .. })),
+                "build_request must return Ok or RequestTooLarge, not another error variant"
+            );
+            let _ = size;
+        }
+
+        #[test]
+        fn jsonl_limit_is_consistently_enforced_for_non_patch(
+            len in (weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES + 1)
+                ..=(weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES + 4096)
+        ) {
+            let invocation = observe_status_invocation_with_argument(
+                argument_with_jsonl_len(len),
+            );
+            let mut stdin = Cursor::new(Vec::new());
+            let result = build_request(invocation, &mut stdin);
+
+            prop_assert!(
+                matches!(result, Err(AppError::RequestTooLarge { .. })),
+                "requests over the JSONL limit must always be rejected"
+            );
         }
     }
 }
