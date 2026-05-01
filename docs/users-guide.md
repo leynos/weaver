@@ -1539,6 +1539,11 @@ Unsupported-mode diagnostics point at the rule's `mode` field when that span is
 available. Semantic validation errors include accurate `primary_span` locations
 when available from the parser.
 
+### Migration notes
+
+Upgrading from v0.1? See the
+[Sempai v0.1→v0.2 migration guide](sempai-v0.1-to-v0.2-migration-guide.md).
+
 `compile_dsl(...)` and `execute(...)` still return "not implemented"
 diagnostics. They will be wired to the DSL parser and Tree-sitter backend as
 those components are delivered in subsequent roadmap phases.
