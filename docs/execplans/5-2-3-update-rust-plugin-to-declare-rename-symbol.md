@@ -33,7 +33,7 @@ weaver act refactor \
   --provider rust-analyzer \
   --refactoring rename \
   --file src/main.rs \
-  offset=3 \
+  --position 1:4 \
   new_name=renamed_name
 ```
 
@@ -109,7 +109,7 @@ Observable success for this roadmap item:
 
 ## Risks
 
-- Risk: The rust-analyzer plugin currently accepts `"rename"` with `offset`
+- Risk: The rust-analyzer plugin currently accepts `"rename"` with `position`
   rather than `"rename-symbol"` with `position`. This migration can easily
   leave unit and BDD fixtures half-updated. Severity: high Likelihood: high
   Mitigation: update plugin request builders, unit tests, and feature steps in
@@ -156,10 +156,11 @@ Observable success for this roadmap item:
 ## Surprises & Discoveries
 
 - Discovery: `crates/weaverd/src/dispatch/act/refactor/mod.rs` already maps
-  CLI `--refactoring rename` to internal operation `"rename-symbol"` and
-  renames `offset` to `position`. The remaining 5.2.3 gap is that the
-  rust-analyzer plugin itself still expects the old request shape and the
-  rust-analyzer manifest is not yet declared with `CapabilityId::RenameSymbol`.
+  CLI `--refactoring rename` to internal operation `"rename-symbol"` and maps
+  CLI `--position` to internal plugin `position`. The remaining 5.2.3 gap is
+  that the rust-analyzer plugin itself still expects the old request shape and
+  the rust-analyzer manifest is not yet declared with
+  `CapabilityId::RenameSymbol`.
 
 - Discovery: the rust-analyzer plugin crate currently has no manifest code of
   its own. In this repository, “manifest and runtime handshake” means the
@@ -267,18 +268,19 @@ The current implementation is split across two main areas.
 one `PluginRequest` from stdin, executes a rename through the
 `RustAnalyzerAdapter` trait, and writes one `PluginResponse` to stdout. Today
 it still matches only `request.operation() == "rename"` and parses
-`offset`/`new_name` from the request arguments. That behaviour lives primarily
-in `crates/weaver-plugin-rust-analyzer/src/lib.rs`, with unit coverage in
-`crates/weaver-plugin-rust-analyzer/src/tests/mod.rs` and behavioural coverage
-in `crates/weaver-plugin-rust-analyzer/src/tests/behaviour.rs` plus
+`position`/`new_name` from the request arguments. That behaviour lives
+primarily in `crates/weaver-plugin-rust-analyzer/src/lib.rs`, with unit
+coverage in `crates/weaver-plugin-rust-analyzer/src/tests/mod.rs` and
+behavioural coverage in
+`crates/weaver-plugin-rust-analyzer/src/tests/behaviour.rs` plus
 `crates/weaver-plugin-rust-analyzer/tests/features/rust_analyzer_plugin.feature`.
 
 `crates/weaverd/src/dispatch/act/refactor/mod.rs` is the daemon-side
 registration and request-building layer. It already maps CLI
 `--refactoring rename` to the internal operation `"rename-symbol"`, injects
-`uri` from `--file`, and maps `offset` to `position`. It already declares
-`CapabilityId::RenameSymbol` for the rope plugin, but not for the rust-analyzer
-manifest. Tests for the request-building path live in
+`uri` from `--file`, and maps CLI `--position` to plugin `position`. It already
+declares `CapabilityId::RenameSymbol` for the rope plugin, but not for the
+rust-analyzer manifest. Tests for the request-building path live in
 `crates/weaverd/src/dispatch/act/refactor/tests.rs`.
 
 The shared contract defined by 5.2.1 lives in
@@ -326,11 +328,11 @@ into a small test-only support submodule rather than making the file sprawl.
 
 Modify `crates/weaver-plugin-rust-analyzer/src/lib.rs` so `execute_request()`
 recognizes `"rename-symbol"` instead of `"rename"`. Update argument parsing to
-require `uri`, `position`, and `new_name`, with `position` parsed as the UTF-8
-byte offset used by the existing adapter. The in-band file payload remains
-authoritative for file content; `uri` is used to satisfy the contract and
-should be checked against the single file payload path so the request cannot
-silently describe one file while carrying another.
+require `uri`, `position`, and `new_name`, with `position` parsed as the
+provider-specific value used by the existing adapter. The in-band file payload
+remains authoritative for file content; `uri` is used to satisfy the contract
+and should be checked against the single file payload path so the request
+cannot silently describe one file while carrying another.
 
 Introduce a small failure carrier if needed, similar to the 5.2.2 rope
 migration, so deterministic failures can attach `ReasonCode` values without

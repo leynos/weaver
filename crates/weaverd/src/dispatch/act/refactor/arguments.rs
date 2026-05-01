@@ -3,7 +3,10 @@
 //! This module keeps CLI-token parsing separate from routing and plugin
 //! execution so the handler can stay within the repository's file-size limit.
 
-use super::requirements::{missing_requirements_error, validate_provider, validate_refactoring};
+use super::{
+    positions::parse_line_col,
+    requirements::{missing_requirements_error, validate_provider, validate_refactoring},
+};
 use crate::dispatch::errors::DispatchError;
 
 /// Parsed `act refactor` arguments.
@@ -12,6 +15,7 @@ pub(crate) struct RefactorArgs {
     pub(crate) provider: String,
     pub(crate) refactoring: String,
     pub(crate) file: String,
+    pub(crate) position: Option<String>,
     pub(crate) extra: Vec<String>,
 }
 
@@ -21,6 +25,7 @@ struct RefactorArgsBuilder {
     provider: Option<String>,
     refactoring: Option<String>,
     file: Option<String>,
+    position: Option<String>,
     extra: Vec<String>,
 }
 
@@ -62,6 +67,7 @@ impl RefactorArgsBuilder {
             provider,
             refactoring,
             file,
+            position: self.position,
             extra: self.extra,
         })
     }
@@ -92,7 +98,7 @@ fn apply_flag<'a>(
     builder: &mut RefactorArgsBuilder,
 ) -> Result<(), DispatchError> {
     match arg {
-        "--provider" | "--refactoring" | "--file" if !builder.extra.is_empty() => {
+        "--provider" | "--refactoring" | "--file" | "--position" if !builder.extra.is_empty() => {
             return Err(DispatchError::invalid_arguments(format!(
                 "act refactor only accepts trailing KEY=VALUE arguments after all flags; \
                  interleaved KEY=VALUE arguments cannot appear before flag '{arg}'"
@@ -101,9 +107,19 @@ fn apply_flag<'a>(
         "--provider" => builder.provider = Some(parse_flag_value(arg, iter)?),
         "--refactoring" => builder.refactoring = Some(parse_flag_value(arg, iter)?),
         "--file" => builder.file = Some(parse_flag_value(arg, iter)?),
+        "--position" => builder.position = Some(parse_position_flag(arg, iter)?),
         other => builder.extra.push(other.to_owned()),
     }
     Ok(())
+}
+
+fn parse_position_flag<'a>(
+    flag: &str,
+    iter: &mut impl Iterator<Item = &'a String>,
+) -> Result<String, DispatchError> {
+    let value = parse_flag_value(flag, iter)?;
+    parse_line_col(&value)?;
+    Ok(value)
 }
 
 fn parse_flag_value<'a>(
@@ -239,6 +255,44 @@ mod tests {
         ],
         vec!["interleaved KEY=VALUE arguments", "before flag '--refactoring'"],
     )]
+    #[case::missing_position_value(
+        vec![
+            String::from("--provider"),
+            String::from("rope"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("src/main.py"),
+            String::from("--position"),
+        ],
+        vec!["--position requires a value"],
+    )]
+    #[case::invalid_position_format(
+        vec![
+            String::from("--provider"),
+            String::from("rope"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("src/main.py"),
+            String::from("--position"),
+            String::from("1"),
+        ],
+        vec!["position must be LINE:COL"],
+    )]
+    #[case::zero_position_column(
+        vec![
+            String::from("--provider"),
+            String::from("rope"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("src/main.py"),
+            String::from("--position"),
+            String::from("1:0"),
+        ],
+        vec!["column number must be >= 1"],
+    )]
     fn invalid_arguments_are_rejected(
         #[case] args: Vec<String>,
         #[case] expected_substrings: Vec<&str>,
@@ -255,12 +309,15 @@ mod tests {
             String::from("rename"),
             String::from("--file"),
             String::from("src/main.py"),
+            String::from("--position"),
+            String::from("1:5"),
         ];
 
         let parsed = parse_refactor_args(&args).expect("parse succeeds");
         assert_eq!(parsed.provider, "rope");
         assert_eq!(parsed.refactoring, "rename");
         assert_eq!(parsed.file, "src/main.py");
+        assert_eq!(parsed.position.as_deref(), Some("1:5"));
     }
 
     #[rstest]

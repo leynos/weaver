@@ -41,8 +41,8 @@ Observable behaviour after this change:
   `IncompletePayload` for missing arguments, `SymbolNotFound` for adapter
   failures).
 - The `weaverd` handler maps the user-facing `--refactoring rename` to the
-  contract operation `"rename-symbol"` and translates `offset` to `position`
-  internally, preserving command-line interface (CLI) backward compatibility.
+  contract operation `"rename-symbol"` and translates CLI `--position` to the
+  provider-specific internal position value.
 - Behaviour-driven development (BDD) scenarios cover happy path,
   missing arguments, unsupported operation, adapter failure, unchanged output,
   and reason code verification.
@@ -71,8 +71,9 @@ Observable behaviour after this change:
 9. **Lint suppressions must use `#[expect]` with reason**, not `#[allow]`.
 10. **Do not modify `crates/weaver-plugins/`.** The capability contract types
     from roadmap item 5.2.1 are complete and must not be changed.
-11. **CLI backward compatibility.** Users still pass `--refactoring rename`,
-    `offset=N`, and `new_name=X`. The handler does the translation internally.
+11. **CLI position contract.** Users pass `--refactoring rename`,
+    `--position LINE:COL`, and `new_name=X`. The handler does any provider
+    offset translation internally.
 12. **`str_to_string` denied.** Use `String::from()` or `.into()`, not
     `.to_string()` on `&str`.
 
@@ -111,7 +112,7 @@ Observable behaviour after this change:
   arriving at ~387 lines, within budget.
 
 - Risk: BDD step definitions reference the old operation name `"rename"` and
-  argument keys (`offset`, `new_name`). Updating them could introduce
+  argument keys (`position`, `new_name`). Updating them could introduce
   regressions. Severity: medium Likelihood: low Mitigation: Update all step
   definitions and feature files atomically. Run `make test` after every change.
 
@@ -166,11 +167,10 @@ Observable behaviour after this change:
   `PluginFailure` type. This follows the project pattern of small, focused
   modules. Date: 2026-03-05.
 
-- Decision: Map `position` as a byte offset string.
-  Rationale: The rope adapter needs a `usize` byte offset. The contract's
-  `position` field is a string. The handler passes the user's `offset=N` value
-  as the `position` string. The plugin parses it back to `usize`. This is the
-  simplest conforming implementation. Date: 2026-03-05.
+- Decision: Keep provider byte offsets behind the daemon/plugin boundary.
+  Rationale: The rope adapter needs a `usize` byte offset, but the canonical
+  CLI accepts `--position LINE:COL`. The handler converts that value before
+  dispatching to the plugin. Date: 2026-03-05; updated 2026-05-01.
 
 - Decision: Introduce `PluginFailure` struct to carry
   `(message, Option<ReasonCode>)`. Rationale: `execute_request()` currently
@@ -197,7 +197,7 @@ its manifest, accepts contract-conforming requests with `uri`/`position`/
 `new_name` arguments, and returns structured failure diagnostics with stable
 `ReasonCode` values. The weaverd handler maps the user-facing
 `--refactoring rename` to the internal `rename-symbol` operation and translates
-`offset` to `position`, maintaining CLI backward compatibility.
+CLI `--position` to the provider-specific internal position value.
 
 Files created: `crates/weaver-plugin-rope/src/arguments.rs` (98 lines).
 Implementation artefacts: `crates/weaver-plugin-rope/src/lib.rs` (400 lines,
@@ -241,7 +241,7 @@ code analysis and modification. The key crates for this task are:
 The rope plugin currently:
 
 1. Accepts operation `"rename"` (not `"rename-symbol"`).
-2. Expects arguments: `offset` (string or number, parsed to `usize`) and
+2. Expects arguments: `position` (string or number, parsed to `usize`) and
    `new_name` (string).
 3. Returns `PluginOutput::Diff` on success.
 4. Returns failure via `PluginResponse::failure` with a single
@@ -326,7 +326,7 @@ In `crates/weaverd/src/dispatch/act/refactor/mod.rs`:
    - If the refactoring is `"rename"`, set the effective operation to
      `"rename-symbol"`.
    - Inject `uri` from `args.file` if not already present.
-   - Map `offset` to `position` if `offset` is present and `position` is not.
+   - Map CLI `--position` to plugin `position`.
 4. Use the effective operation name when constructing the `PluginRequest`.
 
 Validation: `cargo check -p weaverd` compiles.
@@ -348,7 +348,7 @@ Update `crates/weaver-plugin-rope/src/tests/mod.rs`:
 Update `crates/weaver-plugin-rope/src/tests/behaviour.rs`:
 
 1. Update `build_request()`: operation `"rename-symbol"`, add `uri` argument,
-   rename `offset` to `position`.
+   pass the internal `position`.
 2. Update `should_invoke_rename()`: check `"rename-symbol"`, `"position"`,
    `"uri"`.
 3. Update `#[given]` step annotations to match new feature file text.
@@ -375,9 +375,9 @@ Validation: `cargo test -p weaverd` passes.
 
 1. Update `docs/users-guide.md` in the "act refactor" section to note that
    the handler maps `--refactoring rename` to the capability contract operation
-   `"rename-symbol"` internally. Update the parameter table to note that
-   `offset` is mapped to `position` in the plugin protocol. Add a note that the
-   rope plugin now declares the `rename-symbol` capability.
+   `"rename-symbol"` internally. Update the parameter table to note that CLI
+   `--position` is mapped to the plugin protocol. Add a note that the rope
+   plugin now declares the `rename-symbol` capability.
 2. Mark `docs/archive/prototype-roadmap.md` entry 5.2.2 as done (`[x]`).
 3. Run `make fmt` to format all changed files.
 4. Run `make markdownlint` to validate Markdown.

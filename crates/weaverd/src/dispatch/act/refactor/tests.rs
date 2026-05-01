@@ -5,6 +5,15 @@ use tempfile::TempDir;
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 use weaver_test_macros::allow_fixture_expansion_lints;
 
+#[expect(
+    clippy::duplicate_mod,
+    reason = "Shared test helpers loaded by multiple test modules"
+)]
+#[path = "refactor_helpers.rs"]
+mod refactor_helpers;
+
+use refactor_helpers::builders::{build_backends, command_request};
+
 use crate::dispatch::act::refactor::{
     DispatchError,
     RefactorContext,
@@ -12,7 +21,6 @@ use crate::dispatch::act::refactor::{
     ResponseWriter,
     default_runtime,
     handle,
-    refactor_helpers::builders::{build_backends, command_request},
     resolution::{
         CandidateEvaluation,
         CapabilityResolutionDetails,
@@ -100,6 +108,8 @@ fn run_rename_handle(
         String::from("rename"),
         String::from("--file"),
         String::from(file),
+        String::from("--position"),
+        String::from("1:1"),
     ]);
     let runtime = MockRuntime { resolution, result };
     let socket_path = socket_dir.path().join("socket.sock");
@@ -175,6 +185,8 @@ fn handle_non_diff_output_returns_status_one(
         String::from("rename"),
         String::from("--file"),
         String::from("notes.py"),
+        String::from("--position"),
+        String::from("1:1"),
     ]);
     let runtime = MockRuntime {
         resolution: MockResolution::Success(automatic_selection("rope", "python")),
@@ -229,6 +241,8 @@ fn handle_diff_output_applies_patch_through_apply_patch_pipeline(socket_dir: Tem
         String::from("rename"),
         String::from("--file"),
         relative_file.clone(),
+        String::from("--position"),
+        String::from("1:1"),
     ]);
     let socket_path = socket_dir.path().join("socket.sock");
     let mut backends = build_backends(&socket_path);

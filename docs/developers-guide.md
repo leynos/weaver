@@ -54,6 +54,7 @@ Sempai is Weaver's Semgrep-compatible query engine facade. It parses rule YAML,
 normalizes supported search syntax into a canonical formula model, and prepares
 per-language query plans for later execution.
 
+
 ## Sempai query pipeline (prototype archive milestone 4.1.5)
 
 - Canonical model (`sempai_core::formula`):
@@ -926,11 +927,11 @@ readable after automated wrapping:
 - `missing_requirements_error() -> DispatchError` — builds the deterministic
   `DispatchError::InvalidArguments` with `act refactor requires ...`, every
   required flag (`--provider <plugin>`, `--refactoring <operation>`,
-  `--file <path>`), valid provider and refactoring values, and a next-command
+  `--file <path>`, `--position <line:col>`), valid provider and refactoring
+  values, and a next-command
   example derived from the first supported provider/refactoring or the
   `<plugin>` / `<operation>` placeholders. Called by the argument-builder when
   one or more required flags are absent.
-
 ## Dispatch lifecycle observability internals
 
 This section documents the dispatch and startup-observability helpers added for
