@@ -299,3 +299,35 @@ fn graph_slice_refusal_snapshots(snapshot_harness: SnapshotHarness) {
         &render_snapshot(&transcript),
     );
 }
+
+#[rstest]
+fn graph_slice_refusal_position_out_of_range(snapshot_harness: SnapshotHarness) {
+    let workspace = SnapshotHarness::workspace_for_case(RUST_CASES[0]);
+    let daemon = snapshot_harness.daemon(None);
+    let transcript = run_graph_slice(
+        &daemon,
+        SnapshotHarness::request(&workspace.uri, 10_000, 1, None),
+    );
+    {
+        let raw = &transcript.stdout;
+        if !raw.is_empty() {
+            let value: serde_json::Value =
+                serde_json::from_str(raw).expect("transcript stdout should be valid JSON");
+            assert_eq!(
+                value.get("status"),
+                Some(&serde_json::json!("refusal")),
+                "out-of-range position should produce a refusal"
+            );
+            assert_eq!(
+                value.pointer("/refusal/reason"),
+                Some(&serde_json::json!("position_out_of_range")),
+                "refusal reason should be position_out_of_range"
+            );
+        }
+    }
+    daemon.join();
+    assert_named_snapshot(
+        "graph_slice_refusal_position_out_of_range",
+        &render_snapshot(&transcript),
+    );
+}

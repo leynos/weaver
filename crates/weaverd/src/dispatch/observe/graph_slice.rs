@@ -42,6 +42,12 @@ use crate::{
 
 const MAX_SAME_FILE_DISCOVERY_POSITIONS: usize = 256;
 
+fn display_filename(path: &Path) -> &str {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("<unknown>")
+}
+
 fn exit_status(response: &GraphSliceResponse) -> i32 {
     i32::from(!matches!(response, GraphSliceResponse::Success { .. }))
 }
@@ -64,9 +70,7 @@ pub fn handle<W: Write>(
     let path = fs::canonicalize(&path).map_err(|error| {
         DispatchError::invalid_arguments(format!(
             "unable to read source file '{}': {error}",
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or("<unknown>")
+            display_filename(&path)
         ))
     })?;
     let source = read_slice_source(&path)?;
@@ -193,7 +197,7 @@ fn extract_same_file_card(
         }
         Err(CardExtractionError::InvalidPath { path }) => Err(DispatchError::internal(format!(
             "Tree-sitter extractor requires an absolute path: {}",
-            path.display()
+            display_filename(&path)
         ))),
         Err(CardExtractionError::Parse { language, message }) => Err(DispatchError::internal(
             format!("Tree-sitter parse failed for {language}: {message}"),
@@ -346,9 +350,7 @@ fn read_slice_source(path: &Path) -> Result<String, DispatchError> {
     fs::read_to_string(path).map_err(|error| {
         DispatchError::invalid_arguments(format!(
             "unable to read source file '{}': {error}",
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or("<unknown>")
+            display_filename(path)
         ))
     })
 }
@@ -361,15 +363,13 @@ fn map_extraction_error(error: CardExtractionError) -> Result<GraphSliceResponse
                 reason: SliceRefusalReason::UnsupportedLanguage,
                 message: format!(
                     "observe graph-slice: unsupported language for '{}'",
-                    path.file_name()
-                        .and_then(|name| name.to_str())
-                        .unwrap_or("<unknown>")
+                    display_filename(&path)
                 ),
             },
         }),
         CardExtractionError::InvalidPath { path } => Err(DispatchError::internal(format!(
             "Tree-sitter extractor requires an absolute path: {}",
-            path.display()
+            display_filename(&path)
         ))),
         CardExtractionError::NoSymbolAtPosition { line, column } => {
             Ok(GraphSliceResponse::Refusal {

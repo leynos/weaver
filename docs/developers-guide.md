@@ -367,7 +367,7 @@ router. It delegates to `build_response` which owns all domain logic.
 
 ### Same-file discovery
 
-`discover_same_file_cards(document, entry_symbol_id, request, backends)` drives
+`discover_same_file_cards(request, document, entry_symbol_id, backends)` drives
 sibling discovery:
 
 1. `candidate_positions(source)` yields `(line, column)` pairs for the first
@@ -378,7 +378,6 @@ sibling discovery:
    `UnsupportedLanguage`) and `Err` for unexpected failures.
 3. Candidates matching the entry symbol ID are filtered out; remaining cards
    are deduplicated by `symbol_id` using a `BTreeMap`.
-
 
 ### Budget and spillover
 
