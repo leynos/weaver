@@ -2113,6 +2113,7 @@ checksum = "b12e76d157a900eb52e81bc6e9f3069344290341720e9178cde2407113ac8d89"
 name = "sempai"
 version = "0.1.0"
 dependencies = [
+ "proptest",
  "rstest",
  "rstest-bdd",
  "rstest-bdd-macros",
