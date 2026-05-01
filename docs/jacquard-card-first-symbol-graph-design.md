@@ -831,6 +831,7 @@ Response:
 
 ```json
 {
+  "status": "success",
   "schema_version": "graph_slice.v1",
   "slice_version": 1,
   "entry": { "symbol_id": "sym_…" },

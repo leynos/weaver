@@ -74,7 +74,7 @@ pub(crate) struct GraphSliceRequest<'a> {
 pub(crate) struct TestDaemon {
     address: SocketAddr,
     backend_manager: BackendManager,
-    join_handle: thread::JoinHandle<()>,
+    join_handle: Option<thread::JoinHandle<()>>,
 }
 
 impl TestDaemon {
@@ -105,7 +105,7 @@ impl TestDaemon {
         Self {
             address,
             backend_manager,
-            join_handle,
+            join_handle: Some(join_handle),
         }
     }
 
@@ -121,12 +121,13 @@ impl TestDaemon {
     }
 
     /// Waits for the daemon thread to finish and asserts all expected requests were served.
-    pub(crate) fn join(self) {
-        let _ = self.cache_stats();
-        assert!(
-            self.join_handle.join().is_ok(),
-            "daemon thread should not panic"
+    pub(crate) fn join(mut self) {
+        let join_handle = required_result(
+            self.join_handle.take().ok_or("daemon join handle missing"),
+            "daemon join handle",
         );
+        assert!(join_handle.join().is_ok(), "daemon thread should not panic");
+        let _ = self.cache_stats();
     }
 }
 
