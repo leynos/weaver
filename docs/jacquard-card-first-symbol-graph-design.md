@@ -831,6 +831,7 @@ Response:
 
 ```json
 {
+  "schema_version": "graph_slice.v1",
   "slice_version": 1,
   "entry": { "symbol_id": "sym_…" },
   "constraints": {

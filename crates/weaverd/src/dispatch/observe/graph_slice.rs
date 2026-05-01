@@ -9,6 +9,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[path = "graph_slice/status.rs"]
+mod status;
+
 use url::Url;
 use weaver_cards::{
     CardExtractionError,
@@ -19,15 +22,10 @@ use weaver_cards::{
     SliceSpillover,
     SymbolCard,
     TreeSitterCardExtractor,
-    graph_slice::{
-        SliceConstraints,
-        SliceEntry,
-        SliceRefusal,
-        SliceRefusalReason,
-        SpilloverCandidate,
-    },
+    graph_slice::{SliceConstraints, SliceEntry, SliceRefusalReason, SpilloverCandidate},
 };
 
+use self::status::{GRAPH_SLICE_SCHEMA_VERSION, exit_status, refusal};
 use super::enrich::{self, EnrichmentOutcome};
 use crate::{
     backends::FusionBackends,
@@ -48,9 +46,6 @@ fn display_filename(path: &Path) -> &str {
         .unwrap_or("<unknown>")
 }
 
-fn exit_status(response: &GraphSliceResponse) -> i32 {
-    i32::from(!matches!(response, GraphSliceResponse::Success { .. }))
-}
 /// Handles the `observe graph-slice` command and serializes a deterministic same-file response.
 ///
 /// # Errors
@@ -63,9 +58,8 @@ pub fn handle<W: Write>(
 ) -> Result<DispatchResult, DispatchError> {
     let slice_request = GraphSliceRequest::parse(&request.arguments)
         .map_err(|error| DispatchError::invalid_arguments(error.to_string()))?;
-    let parsed_uri = Url::parse(slice_request.uri()).map_err(|error| {
-        DispatchError::invalid_arguments(format!("invalid URI '{}': {error}", slice_request.uri()))
-    })?;
+    let parsed_uri = Url::parse(slice_request.uri())
+        .map_err(|error| DispatchError::invalid_arguments(format!("invalid URI: {error}")))?;
     let path = resolve_file_path(&parsed_uri)?;
     let path = fs::canonicalize(&path).map_err(|error| {
         DispatchError::invalid_arguments(format!(
@@ -118,6 +112,7 @@ fn build_response(
     }
 
     Ok(GraphSliceResponse::Success {
+        schema_version: String::from(GRAPH_SLICE_SCHEMA_VERSION),
         slice_version: 1,
         entry: SliceEntry {
             symbol_id: entry_symbol_id,
@@ -341,9 +336,8 @@ fn resolve_file_path(uri: &Url) -> Result<PathBuf, DispatchError> {
             uri.scheme()
         )));
     }
-    uri.to_file_path().map_err(|_| {
-        DispatchError::invalid_arguments(format!("URI is not a valid file path: {uri}"))
-    })
+    uri.to_file_path()
+        .map_err(|_| DispatchError::invalid_arguments("URI is not a valid file path"))
 }
 /// Reads the source file at `path`, mapping IO failures to invalid-arguments errors.
 fn read_slice_source(path: &Path) -> Result<String, DispatchError> {
@@ -358,38 +352,27 @@ fn read_slice_source(path: &Path) -> Result<String, DispatchError> {
 /// `DispatchError`.
 fn map_extraction_error(error: CardExtractionError) -> Result<GraphSliceResponse, DispatchError> {
     match error {
-        CardExtractionError::UnsupportedLanguage { path } => Ok(GraphSliceResponse::Refusal {
-            refusal: SliceRefusal {
-                reason: SliceRefusalReason::UnsupportedLanguage,
-                message: format!(
-                    "observe graph-slice: unsupported language for '{}'",
-                    display_filename(&path)
-                ),
-            },
-        }),
+        CardExtractionError::UnsupportedLanguage { path } => Ok(refusal(
+            SliceRefusalReason::UnsupportedLanguage,
+            format!(
+                "observe graph-slice: unsupported language for '{}'",
+                display_filename(&path)
+            ),
+        )),
         CardExtractionError::InvalidPath { path } => Err(DispatchError::internal(format!(
             "Tree-sitter extractor requires an absolute path: {}",
             display_filename(&path)
         ))),
-        CardExtractionError::NoSymbolAtPosition { line, column } => {
-            Ok(GraphSliceResponse::Refusal {
-                refusal: SliceRefusal {
-                    reason: SliceRefusalReason::NoSymbolAtPosition,
-                    message: format!("observe graph-slice: no symbol found at {line}:{column}"),
-                },
-            })
-        }
-        CardExtractionError::PositionOutOfRange { line, column } => {
-            Ok(GraphSliceResponse::Refusal {
-                refusal: SliceRefusal {
-                    reason: SliceRefusalReason::PositionOutOfRange,
-                    message: format!(
-                        "observe graph-slice: position {line}:{column} is outside the bounds of \
-                         the file"
-                    ),
-                },
-            })
-        }
+        CardExtractionError::NoSymbolAtPosition { line, column } => Ok(refusal(
+            SliceRefusalReason::NoSymbolAtPosition,
+            format!("observe graph-slice: no symbol found at {line}:{column}"),
+        )),
+        CardExtractionError::PositionOutOfRange { line, column } => Ok(refusal(
+            SliceRefusalReason::PositionOutOfRange,
+            format!(
+                "observe graph-slice: position {line}:{column} is outside the bounds of the file"
+            ),
+        )),
         CardExtractionError::Parse { language, message } => Err(DispatchError::internal(format!(
             "Tree-sitter parse failed for {language}: {message}"
         ))),

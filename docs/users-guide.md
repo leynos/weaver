@@ -833,9 +833,10 @@ When the operation cannot produce a slice, the status is `"refusal"`:
 ```json
 {
   "status": "refusal",
+  "schema_version": "graph_slice.v1",
   "refusal": {
     "reason": "unsupported_language",
-    "message": "observe graph-slice: unsupported language for path /workspace/notes.txt"
+    "message": "observe graph-slice: unsupported language for '/workspace/notes.txt'"
   }
 }
 ```
@@ -846,6 +847,7 @@ spillover metadata:
 ```json
 {
   "status": "success",
+  "schema_version": "graph_slice.v1",
   "slice_version": 1,
   "entry": { "symbol_id": "sym_abc123" },
   "constraints": {
@@ -900,10 +902,14 @@ the entry card plus additional same-file symbol cards that fit within
 responses, while the stable schema already reserves the typed edge shape for
 later milestones.
 
-When the traversal exceeds the budget, `spillover.truncated` is `true` and
+When traversal exceeds the budget, `spillover.truncated` is `true` and
 `spillover.frontier` lists candidate same-file symbols that were discovered but
-excluded. This gives callers a stable way to detect truncation before the
-multi-file traversal engine lands.
+excluded. `spillover.truncated` may also be `true` while `spillover.frontier`
+is empty when the discovery cap, rather than excluded cards, caused truncation.
+The `discovery_cap_marks_spillover_truncated_when_card_budget_remains` test is
+the canonical behaviour: `spillover.frontier` is populated only for discovered
+candidate symbols excluded from the response, not for symbols that discovery
+limits prevented Weaver from enumerating.
 
 The stable edge schema is already locked even though runtime edges are deferred
 to later milestones. When present, every edge will carry a `resolution_scope`

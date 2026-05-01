@@ -252,7 +252,7 @@ impl RequestBuilder {
         if value == 0 {
             return Err(GraphSliceError::InvalidValue {
                 flag: Flag::MaxCards.into(),
-                message: String::from("max_cards must be >= 1"),
+                message: String::from("--max-cards must be >= 1"),
             });
         }
         self.budget = self.budget.with_max_cards(value);

@@ -1,5 +1,4 @@
 //! Unit tests for the `observe graph-slice` dispatch handler.
-
 use std::{fs, path::PathBuf};
 
 use rstest::{fixture, rstest};
@@ -15,11 +14,8 @@ use crate::{
     semantic_provider::SemanticBackendProvider,
 };
 #[fixture]
-fn backends_fixture() -> (FusionBackends<SemanticBackendProvider>, TempDir) {
-    let dir = match TempDir::new() {
-        Ok(dir) => dir,
-        Err(error) => panic!("create temp dir: {error}"),
-    };
+fn backends_fixture() -> Result<(FusionBackends<SemanticBackendProvider>, TempDir), String> {
+    let dir = TempDir::new().map_err(|error| format!("create temp dir: {error}"))?;
     let socket_path = dir
         .path()
         .join("socket.sock")
@@ -31,14 +27,13 @@ fn backends_fixture() -> (FusionBackends<SemanticBackendProvider>, TempDir) {
     };
     let provider =
         SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
-    (FusionBackends::new(config, provider), dir)
+    Ok((FusionBackends::new(config, provider), dir))
 }
 fn write_source(temp_dir: &TempDir, name: &str, content: &str) -> Result<PathBuf, std::io::Error> {
     let path = temp_dir.path().join(name);
     fs::write(&path, content)?;
     Ok(path)
 }
-
 fn make_request(arguments: &[&str]) -> CommandRequest {
     let args_json: Vec<String> = arguments
         .iter()
@@ -82,7 +77,6 @@ fn detail_value(detail: DetailLevel) -> &'static str {
         _ => "full",
     }
 }
-
 fn dispatch_payload(
     request: &CommandRequest,
     backends: &mut FusionBackends<SemanticBackendProvider>,
@@ -95,13 +89,13 @@ fn dispatch_payload(
     };
     response_payload(output).map(|payload| (result.status, payload))
 }
-
 fn assert_success_response(status: i32, payload: &serde_json::Value) {
     assert_eq!(status, 0, "expected success exit status");
     assert_eq!(
         payload["status"], "success",
         "expected success payload status"
     );
+    assert_eq!(payload["schema_version"], "graph_slice.v1");
 }
 
 fn assert_default_graph_slice_shape(payload: &serde_json::Value) {
@@ -112,7 +106,6 @@ fn assert_default_graph_slice_shape(payload: &serde_json::Value) {
     );
     assert_eq!(payload["edges"], serde_json::json!([]));
 }
-
 fn assert_spillover_truncated_with_frontier(payload: &serde_json::Value) {
     assert_eq!(
         payload["spillover"]["truncated"], true,
@@ -126,8 +119,17 @@ fn assert_spillover_truncated_with_frontier(payload: &serde_json::Value) {
 }
 
 fn assert_refusal(status: i32, payload: &serde_json::Value, reason: &str) {
-    assert_eq!(status, 1);
+    let expected_status = match reason {
+        "unsupported_language" => 10,
+        "no_symbol_at_position" => 11,
+        "position_out_of_range" => 12,
+        "not_yet_implemented" => 13,
+        "backend_unavailable" => 14,
+        other => panic!("unknown refusal reason {other}"),
+    };
+    assert_eq!(status, expected_status);
     assert_eq!(payload["status"], "refusal");
+    assert_eq!(payload["schema_version"], "graph_slice.v1");
     assert_eq!(payload["refusal"]["reason"], reason);
 }
 
@@ -143,9 +145,9 @@ fn assert_refusal_with_message(
 
 #[rstest]
 fn valid_request_returns_success_and_echoed_constraints(
-    backends_fixture: (FusionBackends<SemanticBackendProvider>, TempDir),
+    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
 ) -> Result<(), String> {
-    let (mut backends, temp_dir) = backends_fixture;
+    let (mut backends, temp_dir) = backends_fixture?;
     let path = write_source(
         &temp_dir,
         "slice.rs",
@@ -183,9 +185,9 @@ fn valid_request_returns_success_and_echoed_constraints(
 
 #[rstest]
 fn max_cards_budget_truncates_same_file_symbol_inventory(
-    backends_fixture: (FusionBackends<SemanticBackendProvider>, TempDir),
+    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
 ) -> Result<(), String> {
-    let (mut backends, temp_dir) = backends_fixture;
+    let (mut backends, temp_dir) = backends_fixture?;
     let path = write_source(
         &temp_dir,
         "slice.py",
@@ -224,9 +226,9 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
 
 #[rstest]
 fn discovery_cap_marks_spillover_truncated_when_card_budget_remains(
-    backends_fixture: (FusionBackends<SemanticBackendProvider>, TempDir),
+    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
 ) -> Result<(), String> {
-    let (mut backends, temp_dir) = backends_fixture;
+    let (mut backends, temp_dir) = backends_fixture?;
     let source = (0..=MAX_SAME_FILE_DISCOVERY_POSITIONS)
         .map(|index| format!("fn item_{index}() {{}}\n"))
         .collect::<String>();
@@ -311,10 +313,10 @@ fn assert_structured_refusal(
     )
 )]
 fn structured_refusal_cases(
-    backends_fixture: (FusionBackends<SemanticBackendProvider>, TempDir),
+    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
     #[case] case: (&str, &str, &str, &str, Option<&str>),
 ) -> Result<(), String> {
-    let (mut backends, temp_dir) = backends_fixture;
+    let (mut backends, temp_dir) = backends_fixture?;
     let (filename, content, position, expected_reason, expected_message) = case;
     assert_structured_refusal(
         &mut backends,
@@ -341,11 +343,11 @@ fn structured_refusal_cases(
 )]
 #[case(&["--uri", "file://%zz", "--position", "1:1"], "invalid URI")]
 fn invalid_arguments_return_dispatch_error(
-    backends_fixture: (FusionBackends<SemanticBackendProvider>, TempDir),
+    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
     #[case] arguments: &[&str],
     #[case] expected_substring: &str,
 ) -> Result<(), String> {
-    let (mut backends, _temp_dir) = backends_fixture;
+    let (mut backends, _temp_dir) = backends_fixture?;
     let request = make_request(arguments);
     let mut buffer = Vec::new();
     let mut writer = ResponseWriter::new(&mut buffer);
@@ -368,9 +370,9 @@ fn invalid_arguments_return_dispatch_error(
 
 #[rstest]
 fn missing_source_file_returns_invalid_arguments(
-    backends_fixture: (FusionBackends<SemanticBackendProvider>, TempDir),
+    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
 ) -> Result<(), String> {
-    let (mut backends, temp_dir) = backends_fixture;
+    let (mut backends, temp_dir) = backends_fixture?;
     let path = temp_dir.path().join("missing.rs");
     let uri = Url::from_file_path(&path).expect("file uri").to_string();
     let request = make_request(&["--uri", &uri, "--position", "1:1"]);

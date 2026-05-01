@@ -4,6 +4,7 @@ expression: json
 ---
 {
   "status": "refusal",
+  "schema_version": "graph_slice.v1",
   "refusal": {
     "reason": "not_yet_implemented",
     "message": "observe graph-slice: graph-slice traversal is not yet implemented"

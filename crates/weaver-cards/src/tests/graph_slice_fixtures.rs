@@ -34,6 +34,7 @@ pub fn sample_success_response() -> GraphSliceResponse {
     let edge = sample_resolved_call_edge();
 
     GraphSliceResponse::Success {
+        schema_version: String::from("graph_slice.v1"),
         slice_version: 1,
         entry: SliceEntry {
             symbol_id: String::from("sym_abc123"),
@@ -51,6 +52,7 @@ pub fn sample_truncated_response() -> GraphSliceResponse {
     let edge = sample_resolved_call_edge();
 
     GraphSliceResponse::Success {
+        schema_version: String::from("graph_slice.v1"),
         slice_version: 1,
         entry: SliceEntry {
             symbol_id: String::from("sym_abc123"),
@@ -138,6 +140,7 @@ pub fn sample_multi_resolution_response() -> GraphSliceResponse {
     };
 
     GraphSliceResponse::Success {
+        schema_version: String::from("graph_slice.v1"),
         slice_version: 1,
         entry: SliceEntry {
             symbol_id: String::from("sym_abc123"),
@@ -169,6 +172,7 @@ pub fn sample_refusal(reason: SliceRefusalReason) -> GraphSliceResponse {
         }
     };
     GraphSliceResponse::Refusal {
+        schema_version: String::from("graph_slice.v1"),
         refusal: SliceRefusal { reason, message },
     }
 }

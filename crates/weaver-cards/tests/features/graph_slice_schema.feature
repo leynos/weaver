@@ -4,6 +4,7 @@ Feature: Graph-slice schema contracts
     Given a graph-slice success response with default budget
     When the slice response is serialized to JSON
     Then the slice JSON field "status" has value "success"
+    And the slice JSON field "schema_version" has value "graph_slice.v1"
     And the slice JSON contains a "slice_version" field
     And the slice JSON contains a "entry" field
     And the slice JSON contains a "constraints" field
@@ -27,6 +28,7 @@ Feature: Graph-slice schema contracts
     Given a graph-slice refusal with reason "not_yet_implemented"
     When the slice response is serialized to JSON
     Then the slice JSON field "status" has value "refusal"
+    And the slice JSON field "schema_version" has value "graph_slice.v1"
     And the slice JSON contains a "refusal" field
     And the slice JSON field "refusal.reason" has value "not_yet_implemented"
 

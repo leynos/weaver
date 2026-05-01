@@ -98,6 +98,15 @@ fn render_snapshot<T: serde::Serialize>(transcript: &T) -> String {
     serde_json::to_string_pretty(transcript).expect("serialize transcript")
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "snapshot assertions should panic with explicit context"
+)]
+fn assert_and_parse_stdout(stdout: &str) -> serde_json::Value {
+    assert!(!stdout.is_empty(), "transcript stdout should not be empty");
+    serde_json::from_str(stdout).expect("transcript stdout should be valid JSON")
+}
+
 #[rstest]
 #[case::python_01(PYTHON_CASES[0])]
 #[case::python_02(PYTHON_CASES[1])]
@@ -151,55 +160,51 @@ fn graph_slice_semantic_snapshots_cover_python_and_rust_fixture_battery(
     );
     // Parse and assert structural shape so regressions surface even if snapshots are not reviewed.
     {
-        let raw = &transcript.stdout;
-        if !raw.is_empty() {
-            let value: serde_json::Value =
-                serde_json::from_str(raw).expect("transcript stdout should be valid JSON");
-            if value.get("status") == Some(&serde_json::json!("success")) {
-                assert!(
-                    value
-                        .pointer("/constraints/budget/max_cards")
-                        .and_then(serde_json::Value::as_u64)
-                        .unwrap_or(0)
-                        > 0,
-                    "graph_slice_{} budget.max_cards should be positive",
-                    case.name
-                );
-                assert_eq!(
-                    value.get("edges"),
-                    Some(&serde_json::json!([])),
-                    "graph_slice_{} edges should be empty",
-                    case.name
-                );
-                assert!(
-                    value
-                        .get("spillover")
-                        .is_some_and(serde_json::Value::is_object),
-                    "graph_slice_{} spillover should be present",
-                    case.name
-                );
-                assert!(
-                    value
-                        .get("cards")
-                        .and_then(serde_json::Value::as_array)
-                        .is_some_and(|cards| !cards.is_empty()),
-                    "graph_slice_{} cards should be non-empty",
-                    case.name
-                );
-            } else {
-                assert_eq!(
-                    value.get("status"),
-                    Some(&serde_json::json!("refusal")),
-                    "graph_slice_{} should return success or refusal",
-                    case.name
-                );
-                assert_eq!(
-                    value.pointer("/refusal/reason"),
-                    Some(&serde_json::json!("no_symbol_at_position")),
-                    "graph_slice_{} refusal reason should match the snapshot contract",
-                    case.name
-                );
-            }
+        let value = assert_and_parse_stdout(&transcript.stdout);
+        if value.get("status") == Some(&serde_json::json!("success")) {
+            assert!(
+                value
+                    .pointer("/constraints/budget/max_cards")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(0)
+                    > 0,
+                "graph_slice_{} budget.max_cards should be positive",
+                case.name
+            );
+            assert_eq!(
+                value.get("edges"),
+                Some(&serde_json::json!([])),
+                "graph_slice_{} edges should be empty",
+                case.name
+            );
+            assert!(
+                value
+                    .get("spillover")
+                    .is_some_and(serde_json::Value::is_object),
+                "graph_slice_{} spillover should be present",
+                case.name
+            );
+            assert!(
+                value
+                    .get("cards")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|cards| !cards.is_empty()),
+                "graph_slice_{} cards should be non-empty",
+                case.name
+            );
+        } else {
+            assert_eq!(
+                value.get("status"),
+                Some(&serde_json::json!("refusal")),
+                "graph_slice_{} should return success or refusal",
+                case.name
+            );
+            assert_eq!(
+                value.pointer("/refusal/reason"),
+                Some(&serde_json::json!("no_symbol_at_position")),
+                "graph_slice_{} refusal reason should match the snapshot contract",
+                case.name
+            );
         }
     }
     daemon.join();
@@ -223,42 +228,38 @@ fn graph_slice_truncation_snapshots(
         SnapshotHarness::request(&workspace.uri, case.line, case.column, Some(1)),
     );
     {
-        let raw = &transcript.stdout;
-        if !raw.is_empty() {
-            let value: serde_json::Value =
-                serde_json::from_str(raw).expect("transcript stdout should be valid JSON");
-            if value.get("status") == Some(&serde_json::json!("success")) {
-                assert_eq!(
-                    value
-                        .get("cards")
-                        .and_then(serde_json::Value::as_array)
-                        .map_or(0, Vec::len),
-                    1,
-                    "graph_slice_truncated_{} should contain exactly 1 card (max_cards=1)",
-                    case.name
-                );
-                assert_eq!(
-                    value
-                        .pointer("/spillover/truncated")
-                        .and_then(serde_json::Value::as_bool),
-                    Some(true),
-                    "graph_slice_truncated_{} spillover should be truncated",
-                    case.name
-                );
-            } else {
-                assert_eq!(
-                    value.get("status"),
-                    Some(&serde_json::json!("refusal")),
-                    "graph_slice_truncated_{} should return success or refusal",
-                    case.name
-                );
-                assert_eq!(
-                    value.pointer("/refusal/reason"),
-                    Some(&serde_json::json!("no_symbol_at_position")),
-                    "graph_slice_truncated_{} refusal reason should match the snapshot contract",
-                    case.name
-                );
-            }
+        let value = assert_and_parse_stdout(&transcript.stdout);
+        if value.get("status") == Some(&serde_json::json!("success")) {
+            assert_eq!(
+                value
+                    .get("cards")
+                    .and_then(serde_json::Value::as_array)
+                    .map_or(0, Vec::len),
+                1,
+                "graph_slice_truncated_{} should contain exactly 1 card (max_cards=1)",
+                case.name
+            );
+            assert_eq!(
+                value
+                    .pointer("/spillover/truncated")
+                    .and_then(serde_json::Value::as_bool),
+                Some(true),
+                "graph_slice_truncated_{} spillover should be truncated",
+                case.name
+            );
+        } else {
+            assert_eq!(
+                value.get("status"),
+                Some(&serde_json::json!("refusal")),
+                "graph_slice_truncated_{} should return success or refusal",
+                case.name
+            );
+            assert_eq!(
+                value.pointer("/refusal/reason"),
+                Some(&serde_json::json!("no_symbol_at_position")),
+                "graph_slice_truncated_{} refusal reason should match the snapshot contract",
+                case.name
+            );
         }
     }
     daemon.join();
@@ -277,10 +278,6 @@ struct RefusalSnapshotCase<'a> {
     snapshot_name: &'a str,
 }
 
-#[expect(
-    clippy::expect_used,
-    reason = "test helper failures should panic with explicit context"
-)]
 fn run_refusal_snapshot(harness: SnapshotHarness, case: RefusalSnapshotCase<'_>) {
     let RefusalSnapshotCase {
         workspace,
@@ -296,21 +293,17 @@ fn run_refusal_snapshot(harness: SnapshotHarness, case: RefusalSnapshotCase<'_>)
         SnapshotHarness::request(&workspace.uri, line, column, None),
     );
     {
-        let raw = &transcript.stdout;
-        if !raw.is_empty() {
-            let value: serde_json::Value =
-                serde_json::from_str(raw).expect("transcript stdout should be valid JSON");
-            assert_eq!(
-                value.get("status"),
-                Some(&serde_json::json!("refusal")),
-                "{status_assertion_message}"
-            );
-            assert_eq!(
-                value.pointer("/refusal/reason"),
-                Some(&serde_json::json!(expected_reason)),
-                "refusal reason should be {expected_reason}"
-            );
-        }
+        let value = assert_and_parse_stdout(&transcript.stdout);
+        assert_eq!(
+            value.get("status"),
+            Some(&serde_json::json!("refusal")),
+            "{status_assertion_message}"
+        );
+        assert_eq!(
+            value.pointer("/refusal/reason"),
+            Some(&serde_json::json!(expected_reason)),
+            "refusal reason should be {expected_reason}"
+        );
     }
     daemon.join();
     assert_named_snapshot(snapshot_name, &render_snapshot(&transcript));
@@ -327,6 +320,21 @@ fn graph_slice_refusal_snapshots(snapshot_harness: SnapshotHarness) {
             expected_reason: "unsupported_language",
             status_assertion_message: "unsupported language should produce a refusal",
             snapshot_name: "graph_slice_refusal_unsupported_language",
+        },
+    );
+}
+
+#[rstest]
+fn graph_slice_refusal_no_symbol_at_position(snapshot_harness: SnapshotHarness) {
+    run_refusal_snapshot(
+        snapshot_harness,
+        RefusalSnapshotCase {
+            workspace: SnapshotHarness::workspace_for_case(RUST_CASES[19]),
+            line: 2,
+            column: 1,
+            expected_reason: "no_symbol_at_position",
+            status_assertion_message: "blank-indented position should produce a refusal",
+            snapshot_name: "graph_slice_refusal_no_symbol_at_position",
         },
     );
 }

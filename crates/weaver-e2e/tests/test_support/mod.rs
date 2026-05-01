@@ -69,6 +69,7 @@ pub(crate) struct GraphSliceRequest<'a> {
     pub node_detail: &'a str,
     pub max_cards: Option<u32>,
 }
+
 /// In-process test daemon accepting a bounded number of requests over a loopback socket.
 pub(crate) struct TestDaemon {
     address: SocketAddr,
