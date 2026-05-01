@@ -19,6 +19,7 @@ thiserror = { workspace = true }
 cap-std = { workspace = true }
 url = { workspace = true }
 unicode-width = { workspace = true }
+tracing = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 socket2 = { version = "0.5" }
@@ -28,7 +29,10 @@ libc = "0.2"
 camino = { workspace = true }
 clap = { workspace = true }
 clap_mangen = "0.2"
+ortho_config = { workspace = true }
+tracing = { workspace = true }
 weaver-build-util = { path = "../weaver-build-util" }
+weaver-config = { path = "../weaver-config", features = ["cli"] }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -39,3 +43,5 @@ assert_cmd = "2.0"
 predicates = "3.0"
 tempfile = { workspace = true }
 weaver-test-macros = { path = "../weaver-test-macros" }
+insta = { workspace = true }
+proptest = { workspace = true }

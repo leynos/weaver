@@ -1,0 +1,87 @@
+---
+source: crates/weaver-cli/src/tests/unit/help_output.rs
+assertion_line: 58
+expression: rendered
+---
+Semantic code intelligence tool for observing, acting on, and verifying code.
+
+Quick start:
+
+  weaver observe get-definition \
+    --uri file:///src/main.rs --position 10:5
+  weaver act apply-patch < changes.patch
+  weaver daemon status
+
+Configuration flags such as --config-path and --daemon-socket
+must appear before the command domain.
+
+Usage: weaver [OPTIONS] [DOMAIN] [OPERATION] [ARG]...
+       weaver [OPTIONS] [DOMAIN] [OPERATION] [ARG]... <COMMAND>
+
+Commands:
+  daemon  Runs daemon lifecycle commands
+
+Arguments:
+  [DOMAIN]
+          The command domain (for example `observe`)
+
+  [OPERATION]
+          The command operation (for example `get-definition`)
+
+  [ARG]...
+          Additional arguments passed to the daemon
+
+Options:
+      --capabilities
+          Prints the negotiated capability matrix and exits
+
+      --output <OUTPUT>
+          Controls how daemon output is rendered
+
+          Possible values:
+          - auto:  Selects `human` for terminal output and `json` for redirected output
+          - human: Always render human-readable output
+          - json:  Always emit raw JSON payloads from the daemon
+          
+          [default: auto]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+
+Options:
+      --config-path <PATH>
+          Path to the configuration file supplied by --config-path
+
+  -d, --daemon-socket <ENDPOINT>
+          Overrides the daemon transport endpoint
+
+  -l, --log-filter <FILTER>
+          Sets the tracing filter
+
+  -L, --log-format <FORMAT>
+          Selects the structured log output format
+
+  -c, --capability-overrides <DIRECTIVE>
+          Appends a language capability override directive
+
+  -o, --locale <LOCALE>
+          Selects the operator-facing locale
+
+Domains and operations:
+
+  observe — Query code structure and relationships
+    get-definition    find-references    grep
+    diagnostics       call-hierarchy     get-card
+    graph-slice
+
+  act — Perform code modifications
+    rename-symbol     apply-edits        apply-patch
+    apply-rewrite     refactor
+
+  verify — Validate code correctness
+    diagnostics       syntax
+
+Config flags must appear before the command domain or structured subcommand to take effect; for example, `weaver daemon start --log-filter debug` is ignored because `--log-filter` appears after `start`.

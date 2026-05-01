@@ -11,6 +11,7 @@ use std::{
 };
 
 use tracing::{debug, warn};
+use weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES;
 
 use super::{
     backend_manager::BackendManager,
@@ -20,10 +21,6 @@ use super::{
     router::{DISPATCH_TARGET, DomainRouter},
 };
 use crate::transport::{ConnectionHandler, ConnectionStream};
-
-/// Maximum size of a single request line in bytes.
-/// Increased to 1 MiB to accommodate apply-patch payloads.
-pub(crate) const MAX_REQUEST_BYTES: usize = 1024 * 1024;
 
 /// Connection handler that parses and dispatches JSONL commands.
 ///
@@ -57,7 +54,7 @@ impl DispatchConnectionHandler {
             Err(error) => {
                 warn!(target: DISPATCH_TARGET, %error, "failed to read request");
                 let mut writer = ResponseWriter::new(&mut stream);
-                let _ = writer.write_error(&error);
+                writer.write_error(&error).ok();
                 return;
             }
         };
@@ -69,7 +66,7 @@ impl DispatchConnectionHandler {
             Ok(req) => req,
             Err(error) => {
                 warn!(target: DISPATCH_TARGET, %error, "malformed request");
-                let _ = writer.write_error(&error);
+                writer.write_error(&error).ok();
                 return;
             }
         };
@@ -77,7 +74,7 @@ impl DispatchConnectionHandler {
         // Validate the request
         if let Err(error) = request.validate() {
             warn!(target: DISPATCH_TARGET, %error, "invalid request");
-            let _ = writer.write_error(&error);
+            writer.write_error(&error).ok();
             return;
         }
 
@@ -101,13 +98,13 @@ impl DispatchConnectionHandler {
             }
             Ok(Err(error)) => {
                 warn!(target: DISPATCH_TARGET, %error, "dispatch failed");
-                let _ = writer.write_error(&error);
+                writer.write_error(&error).ok();
             }
             Err(error) => {
                 // Backend manager error (e.g., lock poisoned)
                 warn!(target: DISPATCH_TARGET, %error, "backend manager error");
-                let _ = writer.write_error(&error);
-                let _ = writer.write_exit(error.exit_status());
+                writer.write_error(&error).ok();
+                writer.write_exit(error.exit_status()).ok();
             }
         }
     }
@@ -154,8 +151,11 @@ fn read_with_retry(stream: &mut ConnectionStream, buf: &mut [u8]) -> io::Result<
 
 /// Enforces the maximum request size limit.
 fn enforce_limit(size: usize) -> Result<(), DispatchError> {
-    if size > MAX_REQUEST_BYTES {
-        return Err(DispatchError::request_too_large(size, MAX_REQUEST_BYTES));
+    if size > JSONL_REQUEST_MAX_LINE_BYTES {
+        return Err(DispatchError::request_too_large(
+            size,
+            JSONL_REQUEST_MAX_LINE_BYTES,
+        ));
     }
     Ok(())
 }

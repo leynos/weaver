@@ -22,7 +22,6 @@ use crate::{
     handle_preflight,
     localizer::{WEAVER_EN_US, write_bare_help},
     run_with_loader,
-    split_config_arguments,
 };
 
 /// A config loader that panics if called, proving that bare invocation
@@ -158,11 +157,11 @@ fn write_bare_help_produces_english(#[case] use_fluent: bool) {
 }
 
 #[test]
-fn config_only_invocation_reports_config_error_not_help() {
-    struct FailingLoader;
-    impl ConfigLoader for FailingLoader {
+fn config_only_invocation_emits_bare_help() {
+    struct PanickingConfigOnlyLoader;
+    impl ConfigLoader for PanickingConfigOnlyLoader {
         fn load(&self, _args: &[OsString]) -> Result<Config, AppError> {
-            Err(AppError::MissingDomain)
+            panic!("config-only bare invocation must not attempt configuration loading");
         }
     }
     let mut stdout = Vec::new();
@@ -174,12 +173,12 @@ fn config_only_invocation_reports_config_error_not_help() {
         OsString::from("--config-path"),
         OsString::from("nonexistent.toml"),
     ];
-    let exit = run_with_loader(args, &mut io, &FailingLoader);
+    let exit = run_with_loader(args, &mut io, &PanickingConfigOnlyLoader);
     let stderr_text = String::from_utf8(stderr).expect("stderr utf8");
     assert_eq!(exit, ExitCode::FAILURE);
     assert!(
-        !stderr_text.contains("Usage: weaver"),
-        "config-only invocation must not show bare help"
+        stderr_text.contains("Usage: weaver"),
+        "config-only invocation must show bare help"
     );
 }
 
@@ -230,12 +229,9 @@ fn bare_invocation_propagates_bare_help_write_failures() {
         operation: None,
         arguments: Vec::new(),
     };
-    let args = vec![OsString::from("weaver")];
-    let split = split_config_arguments(&args);
     let mut stderr = FailingWriter;
 
-    let error =
-        handle_preflight(&cli, &split, &mut stderr, &NoOpLocalizer).expect_err("write failure");
+    let error = handle_preflight(&cli, &mut stderr, &NoOpLocalizer).expect_err("write failure");
 
     assert!(matches!(error, AppError::EmitBareHelp(_)));
 }

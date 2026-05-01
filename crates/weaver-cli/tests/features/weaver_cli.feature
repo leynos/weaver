@@ -122,6 +122,16 @@ Feature: Weaver CLI behaviour
     And stderr contains "verify"
     And stderr contains "weaver --help"
 
+  Scenario: Top-level help surfaces shared configuration flags
+    When the operator runs "--help"
+    Then stdout contains the shared configuration flags
+    And no daemon command was sent
+
+  Scenario: Daemon start help surfaces shared configuration flags
+    When the operator runs "daemon start --help"
+    Then stdout contains the shared configuration flags
+    And no daemon command was sent
+
   Scenario: Auto-start shows waiting message before spawn failure
     Given auto-start will be triggered
     When the operator runs "observe get-definition --symbol main"

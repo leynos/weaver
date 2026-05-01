@@ -282,7 +282,9 @@ does* *not require source inspection or external runbooks.*
 *Outcome: Make configuration and operation help directly discoverable from the*
 *CLI without requiring external documentation lookup.*
 
-- [ ] 3.2.1. Surface configuration flags in clap help output.
+- [x] 3.2.1. Surface configuration flags in clap help output.
+      Shipped: `locale` is now part of the shared configuration contract and is
+      visible as `--locale`, `WEAVER_LOCALE`, and the `locale` config-file key.
       See
       [Gap 1c](ui-gap-analysis.md#gap-1c--configuration-flags-invisible)
       and
@@ -291,10 +293,10 @@ does* *not require source inspection or external runbooks.*
       [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces)
       and
       [weaver design §2.3.1](weaver-design.md#231-configuration-contract).
-  - [ ] Register `--config-path`, `--daemon-socket`, `--log-filter`,
+  - [x] Register `--config-path`, `--daemon-socket`, `--log-filter`,
         `--log-format`, `--capability-overrides`, and `--locale` as visible
         global flags.
-  - [ ] Acceptance criteria: all six flags appear in both `weaver --help` and
+  - [x] Acceptance criteria: all six flags appear in both `weaver --help` and
         `weaver daemon start --help`, and existing precedence tests
         (file < env < CLI) continue to pass.
 - [ ] 3.2.2. Extend `daemon start` help with config and environment guidance.
@@ -338,27 +340,46 @@ does* *not require source inspection or external runbooks.*
         updated with explicit sections for dependency graph, fail-fast
         discovery, and YAML 1.2 semantics; and `make markdownlint`,
         `make fmt`, `make nixie`, and documentation tests pass.
+- [ ] 3.2.6. Adopt `cargo orthohelp` for CI man page generation and retire the
+      existing `clap_mangen` infrastructure.
+      See
+      [ortho-config user's guide: Generating IR with cargo-orthohelp](ortho-config-users-guide.md#generating-ir-with-cargo-orthohelp)
+      and
+      [ortho-config user's guide: Generating man pages](ortho-config-users-guide.md#generating-man-pages).
+      See
+      [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces).
+  - [ ] Add `[package.metadata.ortho_config]` wiring for the Weaver CLI root
+        type and supported locales so `cargo orthohelp` can resolve schema and
+        Fluent metadata without a bespoke bridge.
+  - [ ] Replace the existing `clap_mangen`-based build/CI manpage generation
+        path with `cargo orthohelp --format man --locale en-US`, preserving the
+        current `en-US` packaging contract while leaving multi-locale emission
+        to roadmap item `5.7.3`.
+  - [ ] Validate that CI artefacts still land in the expected output paths and
+        that no manual post-processing is required after the switch.
+  - [ ] Acceptance criteria: CI generates the shipped `en-US` manpage via
+        `cargo orthohelp`, the `clap_mangen` infrastructure is removed, and the
+        resulting roff output still includes the full shared configuration
+        contract introduced in `3.2.1`.
 
 ### 3.3. Deliver localized CLI and reference outputs
 
 *Outcome: Let operators choose a locale once and receive consistent Fluent-*
 *backed help, error text, and generated reference artefacts across Weaver.*
 
-- [ ] 3.3.1. Introduce locale selection in the shared configuration contract.
+- [ ] 3.3.1. Apply resolved locale during CLI bootstrap.
       See
       [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces)
       and
       [weaver design §2.3.1](weaver-design.md#231-configuration-contract).
-  - [ ] Add a `locale` field to `weaver-config`, surfaced as `--locale`,
-        `WEAVER_LOCALE`, and a config-file key.
   - [ ] Add a pre-config bootstrap pass that honours `--locale` and
         `WEAVER_LOCALE` before consulting `LC_ALL`, `LC_MESSAGES`, and `LANG`,
         then rebuild the localizer if the resolved config locale differs.
   - [ ] Acceptance criteria: `weaver --help` and other pre-config clap display
         paths honour `--locale` and `WEAVER_LOCALE` immediately; malformed
         `--locale` and `WEAVER_LOCALE` values fail fast; malformed ambient
-        `LC_*` or `LANG` values warn and fall back; file-backed locale
-        settings apply after full config loading; and `en-US` remains the
+        `LC_*` or `LANG` values warn and fall back; file-backed locale settings
+        continue to apply after full config loading; and `en-US` remains the
         guaranteed fallback.
 - [ ] 3.3.2. Localize clap help and parse errors through `ortho_config`.
       Requires 3.3.1. See

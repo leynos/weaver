@@ -2,6 +2,7 @@
 
 TARGET ?= weaver
 USER_CARGO := $(HOME)/.cargo/bin/cargo
+USER_MDFORMAT := $(HOME)/.local/bin/mdformat-all
 USER_MDLINT := $(HOME)/.bun/bin/markdownlint-cli2
 USER_WHITAKER := $(HOME)/.local/bin/whitaker
 USER_BIN_PATH := $(HOME)/.cargo/bin:$(HOME)/.local/bin:$(HOME)/.bun/bin
@@ -15,6 +16,7 @@ CARGO_FLAGS ?= --workspace --all-targets --all-features
 CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 TEST_FLAGS ?= $(CARGO_FLAGS)
 TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
+MDFORMAT ?= $(or $(shell command -v mdformat-all 2>/dev/null),$(wildcard $(USER_MDFORMAT)),mdformat-all)
 MDLINT ?= $(or $(shell command -v markdownlint-cli2 2>/dev/null),$(wildcard $(USER_MDLINT)),markdownlint-cli2)
 NIXIE ?= nixie
 NIXIE_FLAGS ?= --no-sandbox
@@ -45,7 +47,7 @@ typecheck: ## Type-check without building
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all
-	mdformat-all
+	PATH="$(USER_BIN_PATH):$(PATH)" $(MDFORMAT)
 
 check-fmt: ## Verify formatting
 	$(CARGO) fmt --all -- --check

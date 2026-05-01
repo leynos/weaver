@@ -10,6 +10,15 @@ use predicates::{
 };
 use weaver_cli::DOMAIN_OPERATIONS;
 
+const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
+    "--config-path <PATH>",
+    "--daemon-socket <ENDPOINT>",
+    "--log-filter <FILTER>",
+    "--log-format <FORMAT>",
+    "--capability-overrides <DIRECTIVE>",
+    "--locale <LOCALE>",
+];
+
 #[test]
 fn capabilities_probe_succeeds() {
     let mut command = cargo_bin_cmd!("weaver");
@@ -99,6 +108,13 @@ fn help_output_lists_all_domains_and_operations() {
             );
         }
     }
+
+    for flag in EXPECTED_SHARED_CONFIG_HELP_FLAGS {
+        assert!(
+            combined.contains(flag),
+            "weaver --help output missing config flag {flag:?}"
+        );
+    }
 }
 
 #[test]
@@ -128,4 +144,62 @@ fn help_flag_exits_successfully_with_quick_start() {
         .success()
         .stdout(contains("Quick start:"))
         .stdout(contains("weaver observe get-definition"));
+}
+
+#[test]
+fn daemon_start_help_lists_all_config_flags() {
+    let mut command = cargo_bin_cmd!("weaver");
+    command.args(["daemon", "start", "--help"]);
+    let mut assert = command.assert().success();
+    for flag in EXPECTED_SHARED_CONFIG_HELP_FLAGS {
+        assert = assert.stdout(contains(*flag));
+    }
+    assert
+        .stdout(contains("Starting").not())
+        .stdout(contains("started").not())
+        .stdout(contains("launch").not())
+        .stdout(contains("daemon socket opened").not())
+        .stdout(contains("Waiting for daemon start...").not())
+        .stderr(is_empty())
+        .stderr(contains("Starting").not())
+        .stderr(contains("started").not())
+        .stderr(contains("launch").not())
+        .stderr(contains("daemon socket opened").not())
+        .stderr(contains("Waiting for daemon start...").not());
+}
+
+#[test]
+fn generated_man_page_contains_all_shared_config_flags() {
+    use cap_std::{ambient_authority, fs::Dir};
+
+    let workspace_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("crates parent")
+        .parent()
+        .expect("workspace root")
+        .to_path_buf();
+    let workspace =
+        Dir::open_ambient_dir(&workspace_root, ambient_authority()).expect("open workspace root");
+    let target = format!("{}-unknown-linux-gnu", std::env::consts::ARCH);
+    let man_pages = ["debug", "release"]
+        .map(|profile| format!("target/generated-man/{target}/{profile}/weaver.1"));
+
+    let content = man_pages.iter().find_map(|path| {
+        workspace
+            .read_to_string(path)
+            .ok()
+            .map(|content| (path, content))
+    });
+    let Some((man_page_path, content)) = content else {
+        panic!("generated man page weaver.1 not found for target {target}");
+    };
+
+    for flag in EXPECTED_SHARED_CONFIG_HELP_FLAGS {
+        let flag_name = flag.split_whitespace().next().expect("flag has name");
+        let roff_flag_name = flag_name.replace('-', "\\-");
+        assert!(
+            content.contains(flag_name) || content.contains(&roff_flag_name),
+            "man page {man_page_path} missing flag {flag_name:?}",
+        );
+    }
 }

@@ -62,13 +62,6 @@ pub(crate) struct ConfigArgumentSplit {
     pub(crate) command_start: usize,
 }
 
-impl ConfigArgumentSplit {
-    /// Returns true when the operator supplied at least one configuration
-    /// flag (e.g. `--config-path`).  The binary name at index 0 is always
-    /// present and does not count.
-    pub(crate) fn has_config_flags(&self) -> bool { self.config_arguments.len() > 1 }
-}
-
 pub(crate) fn split_config_arguments(args: &[OsString]) -> ConfigArgumentSplit {
     if args.is_empty() {
         return ConfigArgumentSplit {
@@ -165,5 +158,79 @@ mod tests {
     fn unknown_flags_are_skipped() {
         let result = OrthoConfigLoader::process_config_flag(OsStr::new("--unknown"));
         assert!(matches!(result, FlagAction::Skip), "should skip");
+    }
+}
+
+#[cfg(test)]
+mod ordering_invariant {
+    //! Property tests for the configuration flag ordering contract.
+
+    use std::ffi::OsString;
+
+    use proptest::prelude::*;
+
+    use crate::config::split_config_arguments;
+
+    const CONFIG_FLAGS: &[&str] = &[
+        "--config-path",
+        "--daemon-socket",
+        "--log-filter",
+        "--log-format",
+        "--capability-overrides",
+        "--locale",
+    ];
+
+    proptest! {
+        #[test]
+        fn pre_domain_config_flags_end_up_in_config_arguments(
+            flag_idx in 0usize..CONFIG_FLAGS.len(),
+            value in "[a-zA-Z0-9/._-]{1,20}",
+            domain in prop_oneof![Just("observe"), Just("act"), Just("daemon")],
+            operation in "[a-z-]{1,12}",
+        ) {
+            let flag = CONFIG_FLAGS[flag_idx];
+            let args: Vec<OsString> = vec![
+                OsString::from("weaver"),
+                OsString::from(flag),
+                OsString::from(&value),
+                OsString::from(domain),
+                OsString::from(&operation),
+            ];
+            let split = split_config_arguments(&args);
+            let config_str: Vec<String> = split.config_arguments
+                .iter()
+                .map(|s| s.to_string_lossy().into_owned())
+                .collect();
+            prop_assert!(
+                config_str.iter().any(|value| value == flag),
+                "pre-domain flag {flag:?} not in config_arguments: {config_str:?}"
+            );
+        }
+
+        #[test]
+        fn post_domain_config_flags_do_not_end_up_in_config_arguments(
+            flag_idx in 0usize..CONFIG_FLAGS.len(),
+            value in "[a-zA-Z0-9/._-]{1,20}",
+            domain in prop_oneof![Just("observe"), Just("act"), Just("daemon")],
+            operation in "[a-z-]{1,12}",
+        ) {
+            let flag = CONFIG_FLAGS[flag_idx];
+            let args: Vec<OsString> = vec![
+                OsString::from("weaver"),
+                OsString::from(domain),
+                OsString::from(&operation),
+                OsString::from(flag),
+                OsString::from(&value),
+            ];
+            let split = split_config_arguments(&args);
+            let config_str: Vec<String> = split.config_arguments
+                .iter()
+                .map(|s| s.to_string_lossy().into_owned())
+                .collect();
+            prop_assert!(
+                !config_str.iter().any(|value| value == flag),
+                "post-domain flag {flag:?} must NOT be in config_arguments: {config_str:?}"
+            );
+        }
     }
 }

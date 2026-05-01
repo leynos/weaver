@@ -15,6 +15,18 @@ use crate::{
     output::UNKNOWN_OPERATION_TYPE,
 };
 
+/// Test-local mirror of the shared configuration help flags.
+/// Must be kept in sync with `SHARED_CONFIG_HELP_FLAGS` in `lib.rs`.
+/// If this constant drifts, tests will fail, surfacing the discrepancy.
+const EXPECTED_SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
+    "--config-path <PATH>",
+    "--daemon-socket <ENDPOINT>",
+    "--log-filter <FILTER>",
+    "--log-format <FORMAT>",
+    "--capability-overrides <DIRECTIVE>",
+    "--locale <LOCALE>",
+];
+
 const SAMPLE_RUST_SOURCE: &str = "fn main() {\n    let value = 1;\n    value\n}\n";
 const SAMPLE_PATCH: &str = concat!(
     "diff --git a/src/main.rs b/src/main.rs\n",
@@ -320,6 +332,15 @@ fn then_stderr_contains(world: &RefCell<TestWorld>, snippet: String) {
 #[then("stdout contains {snippet}")]
 fn then_stdout_contains(world: &RefCell<TestWorld>, snippet: String) {
     assert_output_contains(world, |world| world.stdout_text(), snippet, "stdout");
+}
+
+#[then("stdout contains the shared configuration flags")]
+fn then_stdout_contains_shared_config_flags(world: &RefCell<TestWorld>) {
+    let world = world.borrow();
+    let text = world.stdout_text().expect("stdout text missing");
+    for flag in EXPECTED_SHARED_CONFIG_HELP_FLAGS {
+        assert!(text.contains(flag), "stdout missing config flag {flag:?}");
+    }
 }
 
 #[then("stdout does not contain {snippet}")]

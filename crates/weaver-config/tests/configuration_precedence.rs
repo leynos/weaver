@@ -1,6 +1,9 @@
 #![cfg(feature = "cli")]
 
-use std::ffi::OsString;
+use std::{
+    ffi::OsString,
+    sync::{LockResult, Mutex, MutexGuard, OnceLock},
+};
 
 use cap_std::fs::Dir;
 use rstest::fixture;
@@ -15,14 +18,52 @@ use weaver_config::{
 };
 use weaver_test_macros::allow_fixture_expansion_lints;
 
+/// Serialises environment mutations across test threads.
+///
+/// `std::env` is a global mutable resource. `ENV_LOCK` coordinates every
+/// `set_env` and `remove_var` call so concurrent test threads cannot observe
+/// each other's temporary environment changes.
+static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
 struct Harness {
     temp_dir: TempDir,
     cli_args: std::cell::RefCell<Vec<OsString>>,
+    env_guard: std::cell::RefCell<Option<EnvGuard>>,
     env_overrides: std::cell::RefCell<Vec<(String, Option<OsString>)>>,
     loaded: std::cell::RefCell<Option<Config>>,
     error: std::cell::RefCell<Option<String>>,
 }
 
+/// Serialises environment mutations across test threads.
+///
+/// `std::env` is a global mutable resource. `EnvGuard` acquires a process-wide
+/// `Mutex` before any `set_env` / `remove_var` call and releases it when
+/// dropped, ensuring that concurrent test threads cannot observe each other's
+/// temporary environment changes.
+///
+/// The inner `MutexGuard` is retained for the lifetime of `EnvGuard` so the
+/// lock is held until the harness `Drop` impl has restored all overrides.
+struct EnvGuard {
+    _lock: MutexGuard<'static, ()>,
+}
+
+impl EnvGuard {
+    fn acquire() -> Self {
+        let lock = ENV_LOCK.get_or_init(|| Mutex::new(()));
+        // Recover from a poisoned mutex: if a previous test panicked while
+        // holding the environment lock, the mutex is poisoned but the
+        // underlying data (the unit value) is still valid. Recovering here
+        // prevents a cascade failure where all subsequent env-mutating tests
+        // fail with an unrelated "poisoned" error rather than the original
+        // assertion failure.
+        let guard = recover_env_lock(lock.lock());
+        Self { _lock: guard }
+    }
+}
+
+fn recover_env_lock(result: LockResult<MutexGuard<'static, ()>>) -> MutexGuard<'static, ()> {
+    result.unwrap_or_else(|e| e.into_inner())
+}
 impl Harness {
     fn new() -> Self {
         let temp_dir = match TempDir::new() {
@@ -32,6 +73,7 @@ impl Harness {
         Self {
             temp_dir,
             cli_args: std::cell::RefCell::new(vec![OsString::from("weaver")]),
+            env_guard: std::cell::RefCell::new(None),
             env_overrides: std::cell::RefCell::new(Vec::new()),
             loaded: std::cell::RefCell::new(None),
             error: std::cell::RefCell::new(None),
@@ -39,8 +81,7 @@ impl Harness {
     }
 
     fn write_config(&self, socket: &SocketEndpoint) {
-        let path = self.temp_dir.path().join("weaver.toml");
-        let toml = match socket {
+        self.write_config_contents(match socket {
             SocketEndpoint::Unix { path } => {
                 format!(
                     "daemon_socket = {{ transport = \"unix\", path = \"{}\" }}\n",
@@ -51,20 +92,15 @@ impl Harness {
                 "daemon_socket = {{ transport = \"tcp\", host = \"{}\", port = {} }}\n",
                 host, port
             ),
-        };
-
-        let dir = Dir::open_ambient_dir(self.temp_dir.path(), cap_std::ambient_authority())
-            .expect("open temp dir");
-        if let Err(error) = dir.write("weaver.toml", toml) {
-            panic!("failed to write configuration: {error}");
-        }
-
-        let mut args = self.cli_args.borrow_mut();
-        args.push(OsString::from("--config-path"));
-        args.push(path.into_os_string());
+        });
     }
 
     fn set_env(&self, key: &str, value: &str) {
+        let mut guard = self.env_guard.borrow_mut();
+        if guard.is_none() {
+            *guard = Some(EnvGuard::acquire());
+        }
+
         let previous = std::env::var_os(key);
         // The nightly toolchain marks environment mutation as `unsafe` while the
         // API stabilises. The harness restores overrides in `Drop` to keep the
@@ -93,6 +129,23 @@ impl Harness {
                 *self.error.borrow_mut() = Some(error.to_string());
             }
         }
+    }
+
+    fn write_locale_config(&self, locale: &str) {
+        self.write_config_contents(format!("locale = \"{locale}\"\n"));
+    }
+
+    fn write_config_contents(&self, contents: String) {
+        let path = self.temp_dir.path().join("weaver.toml");
+        let dir = Dir::open_ambient_dir(self.temp_dir.path(), cap_std::ambient_authority())
+            .expect("open temp dir");
+        if let Err(error) = dir.write("weaver.toml", contents) {
+            panic!("failed to write configuration: {error}");
+        }
+
+        let mut args = self.cli_args.borrow_mut();
+        args.push(OsString::from("--config-path"));
+        args.push(path.into_os_string());
     }
 }
 
@@ -127,10 +180,26 @@ fn given_environment_override(harness: &Harness, socket: String) {
     harness.set_env("WEAVER_DAEMON_SOCKET", &socket);
 }
 
+#[given("a configuration file setting the locale to \"{locale}\"")]
+fn given_configuration_file_locale(harness: &Harness, locale: String) {
+    harness.write_locale_config(&locale);
+}
+
+#[given("the environment overrides the locale to \"{locale}\"")]
+fn given_environment_locale_override(harness: &Harness, locale: String) {
+    harness.set_env("WEAVER_LOCALE", &locale);
+}
+
 #[when("the CLI sets the daemon socket to \"{socket}\"")]
 fn when_cli_override(harness: &Harness, socket: String) {
     harness.push_cli_arg("--daemon-socket");
     harness.push_cli_arg(OsString::from(&socket));
+}
+
+#[when("the CLI sets the locale to \"{locale}\"")]
+fn when_cli_locale_override(harness: &Harness, locale: String) {
+    harness.push_cli_arg("--locale");
+    harness.push_cli_arg(OsString::from(&locale));
 }
 
 #[when("the configuration loads without overrides")]
@@ -175,12 +244,41 @@ fn then_defaults_applied(harness: &Harness) {
     assert_eq!(config.daemon_socket(), &default_socket_endpoint());
     assert_eq!(config.log_filter(), default_log_filter());
     assert_eq!(config.log_format(), default_log_format());
+    assert_eq!(config.locale().to_string(), "en-US");
 
     let matrix = config.capability_matrix();
     assert!(
         matrix.languages.is_empty(),
         "expected no capability overrides"
     );
+}
+
+#[then("loading the configuration resolves the locale to \"{locale}\"")]
+fn then_resolved_locale(harness: &Harness, locale: String) {
+    harness.load();
+
+    if let Some(error) = harness.error.borrow().as_ref() {
+        panic!("configuration failed to load: {error}");
+    }
+
+    let loaded = harness.loaded.borrow();
+    let config = match loaded.as_ref() {
+        Some(config) => config,
+        None => panic!("configuration was not loaded"),
+    };
+
+    assert_eq!(config.locale().to_string(), locale);
+}
+
+#[test]
+fn env_guard_recovers_from_poisoned_lock() {
+    use std::sync::PoisonError;
+
+    let lock: &'static Mutex<()> = Box::leak(Box::new(Mutex::new(())));
+    let guard = lock.lock().expect("fresh mutex should lock");
+    let poisoned = Err(PoisonError::new(guard));
+
+    let _guard = recover_env_lock(poisoned);
 }
 
 #[scenario(path = "tests/features/configuration_precedence.feature")]

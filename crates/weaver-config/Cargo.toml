@@ -15,6 +15,7 @@ cli = []
 [dependencies]
 camino.workspace = true
 clap.workspace = true
+icu_locale_core.workspace = true
 ortho_config.workspace = true
 serde.workspace = true
 thiserror.workspace = true
@@ -34,3 +35,5 @@ tempfile.workspace = true
 once_cell.workspace = true
 weaver-test-macros = { path = "../weaver-test-macros" }
 cap-std = { workspace = true }
+proptest = { workspace = true }
+serde_json = { workspace = true }

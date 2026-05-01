@@ -12,6 +12,12 @@
 
 use serde::Deserialize;
 
+/// Maximum size of a single JSON Lines request line in bytes.
+///
+/// Keeps client request construction and daemon request parsing aligned to the
+/// same transport budget.
+pub const JSONL_REQUEST_MAX_LINE_BYTES: usize = 1024 * 1024;
+
 /// Wire-protocol discriminator for unknown-operation error payloads.
 ///
 /// This constant is part of the JSONL protocol contract between the daemon

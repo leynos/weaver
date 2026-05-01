@@ -18,6 +18,8 @@ pub(crate) enum AppError {
     MissingOperation,
     #[error("failed to emit bare help: {0}")]
     EmitBareHelp(io::Error),
+    #[error("failed to emit clap help: {0}")]
+    EmitHelp(io::Error),
     /// Sentinel for bare invocation — help has already been written.
     #[error("bare invocation")]
     BareInvocation,
@@ -46,6 +48,8 @@ pub(crate) enum AppError {
     ReadPatch(io::Error),
     #[error("apply-patch requires patch content on stdin")]
     MissingPatchInput,
+    #[error("command request is {size} bytes, exceeding the {limit} byte JSONL request limit")]
+    RequestTooLarge { size: usize, limit: usize },
     #[error("daemon closed the stream without sending an exit status")]
     MissingExit,
     #[error("failed to serialise capability matrix: {0}")]
