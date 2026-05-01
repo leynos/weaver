@@ -351,19 +351,16 @@ Each helper produces a `GraphSliceError::InvalidValue` with the originating
 flag name and a descriptive message on failure, so callers do not need to
 format error context themselves.
 
-
 ## Graph-slice handler architecture
 
 The `observe graph-slice` command handler lives in
 `crates/weaverd/src/dispatch/observe/graph_slice.rs`. It is the sole
 implementation of the stable same-file slice contract.
 
-
 ### Entry point
 
 `handle(request, writer, backends)` is the public entry point wired by the
 router. It delegates to `build_response` which owns all domain logic.
-
 
 ### Same-file discovery
 
@@ -395,7 +392,6 @@ cards included in the response pay the enrichment cost. The entry card is
 enriched before discovery; included sibling cards are enriched immediately
 after `apply_card_budget` returns.
 
-
 ### Error mapping
 
 `map_extraction_error` converts `CardExtractionError` variants into structured
@@ -403,12 +399,10 @@ after `apply_card_budget` returns.
 mapped to `DispatchError::invalid_arguments` because the caller is responsible
 for supplying a valid URI pointing to a readable file.
 
-
 ### Stable card ordering
 
 `stable_card_order` imposes a deterministic total order over `SymbolCard`
 values so that slice responses are reproducible regardless of extraction order.
-
 
 ## E2E test support for graph-slice
 
@@ -416,20 +410,17 @@ The end-to-end graph-slice test harness lives in
 `crates/weaver-e2e/tests/graph_slice_snapshots.rs` and is backed by helpers in
 `crates/weaver-e2e/tests/test_support/mod.rs`.
 
-
 ### `GraphSliceRequest`
 
 `GraphSliceRequest<'a>` carries the parameters for one
 `weaver observe graph-slice` CLI invocation: `uri`, `line`, `column`,
 `entry_detail`, `node_detail`, and an optional `max_cards` budget.
 
-
 ### `run_graph_slice`
 
 `run_graph_slice(daemon, request)` invokes the CLI via the test daemon socket
 and returns a `Transcript` containing `stdout` (the JSONL response envelope)
 and `stderr`.
-
 
 ### `fixture_uri`
 
@@ -443,13 +434,11 @@ real filesystem path.
 explicit snapshot name, storing results under
 `crates/weaver-e2e/tests/snapshots/<name>.snap`.
 
-
 ### Fixture batteries
 
 `crates/weaver-e2e/src/graph_slice_fixtures/` re-exports `PYTHON_CASES` (20
 entries) and `RUST_CASES` (20 entries) from the shared `card_fixtures`
 catalogue. `GraphSliceFixtureCase` is a type alias for `CardFixtureCase`.
-
 
 ### Snapshot test structure
 
