@@ -200,7 +200,7 @@ pub fn provider_mismatch_payload(file: &Path, provider: RequestedProvider) -> Op
 ///
 /// # Panics
 /// Panics if the `--file` argument is missing, the refactoring is not
-/// `rename`, `new_name` or `offset` is absent, the file extension is not
+/// `rename`, `new_name` or `--position` is absent, the file extension is not
 /// recognised, or the `--provider` value is not `rope` or `rust-analyzer`.
 ///
 /// # Errors
@@ -333,15 +333,15 @@ fn validate_refactor_request<'a>(arguments: &'a [&'a str]) -> ValidatedRefactorR
         !new_name.is_empty(),
         "refactor snapshot requests must include non-empty new_name=<value>"
     );
-    let Some(offset) = arguments
-        .iter()
-        .find_map(|argument| argument.strip_prefix("offset="))
-    else {
-        panic!("refactor snapshot requests must include offset=<value>");
+    let Some(position) = argument_value(arguments, "--position") else {
+        panic!("refactor snapshot requests must include --position <LINE:COL>");
+    };
+    let Some((line, column)) = position.split_once(':') else {
+        panic!("refactor snapshot requests must include --position <LINE:COL>");
     };
     assert!(
-        offset.parse::<usize>().is_ok(),
-        "refactor snapshot requests must include numeric offset=<value>"
+        line.parse::<u32>().is_ok() && column.parse::<u32>().is_ok(),
+        "refactor snapshot requests must include numeric --position <LINE:COL>"
     );
 
     ValidatedRefactorRequest {

@@ -10,6 +10,7 @@ use weaver_plugins::{PluginRequest, capability::CapabilityId, protocol::FilePayl
 
 use super::{
     arguments,
+    positions::{line_col_to_byte_offset, parse_line_col},
     requirements::{
         capability_for_operation,
         effective_operation as supported_effective_operation,
@@ -20,6 +21,13 @@ use crate::dispatch::errors::DispatchError;
 struct ResolvedFile {
     path: PathBuf,
     relative_path: PathBuf,
+}
+
+struct CapabilityMappingContext<'a> {
+    capability: CapabilityId,
+    file_path: &'a Path,
+    file_content: &'a str,
+    position: Option<&'a str>,
 }
 
 /// Resolves the target file, reads its content, builds the [`PluginRequest`],
@@ -38,12 +46,20 @@ pub(super) fn prepare_plugin_request(
     let mut plugin_args = build_plugin_args(args)?;
     let effective_operation = supported_effective_operation(&args.refactoring)?;
     let capability = capability_for_operation(effective_operation)?;
-    apply_capability_argument_mapping(&mut plugin_args, capability, &resolved_file.path)?;
+    let file_content = load_file_contents(&resolved_file.path)?;
+    apply_capability_argument_mapping(
+        &mut plugin_args,
+        CapabilityMappingContext {
+            capability,
+            file_path: &resolved_file.path,
+            file_content: &file_content,
+            position: args.position.as_deref(),
+        },
+    )?;
     plugin_args.insert(
         String::from("refactoring"),
         serde_json::Value::String(String::from(effective_operation)),
     );
-    let file_content = load_file_contents(&resolved_file.path)?;
     let plugin_request = PluginRequest::with_arguments(
         effective_operation,
         vec![FilePayload::new(resolved_file.relative_path, file_content)],
@@ -88,11 +104,15 @@ fn build_plugin_args(
 
 fn apply_capability_argument_mapping(
     plugin_args: &mut HashMap<String, serde_json::Value>,
-    capability: CapabilityId,
-    file_path: &Path,
+    context: CapabilityMappingContext<'_>,
 ) -> Result<(), DispatchError> {
-    if capability == CapabilityId::RenameSymbol {
-        return apply_rename_symbol_mapping(plugin_args, file_path);
+    if context.capability == CapabilityId::RenameSymbol {
+        return apply_rename_symbol_mapping(
+            plugin_args,
+            context.file_path,
+            context.file_content,
+            context.position,
+        );
     }
     Ok(())
 }
@@ -144,6 +164,8 @@ fn load_file_contents(path: &Path) -> Result<String, DispatchError> {
 fn apply_rename_symbol_mapping(
     plugin_args: &mut HashMap<String, serde_json::Value>,
     file: &Path,
+    file_content: &str,
+    position: Option<&str>,
 ) -> Result<(), DispatchError> {
     plugin_args.insert(
         String::from("uri"),
@@ -158,13 +180,31 @@ fn apply_rename_symbol_mapping(
                 .to_string(),
         ),
     );
-    if let Some(offset_val) = plugin_args.remove("offset") {
-        if plugin_args.contains_key("position") {
-            return Err(DispatchError::invalid_arguments(
-                "refactor extra arguments must not supply both 'offset' and 'position'",
-            ));
-        }
-        plugin_args.insert(String::from("position"), offset_val);
+    if position.is_some() && plugin_args.contains_key("offset") {
+        return Err(DispatchError::invalid_arguments(
+            "refactor rename must not supply both '--position' and deprecated 'offset='",
+        ));
     }
-    Ok(())
+    if plugin_args.contains_key("position") {
+        return Err(DispatchError::invalid_arguments(
+            "refactor rename must use '--position LINE:COL'; trailing 'position=' is reserved for \
+             the internal plugin contract",
+        ));
+    }
+    if let Some(position) = position {
+        let (line, column) = parse_line_col(position)?;
+        let offset = line_col_to_byte_offset(file_content, line, column)?;
+        plugin_args.insert(
+            String::from("position"),
+            serde_json::Value::String(offset.to_string()),
+        );
+        return Ok(());
+    }
+    if let Some(offset_val) = plugin_args.remove("offset") {
+        plugin_args.insert(String::from("position"), offset_val);
+        return Ok(());
+    }
+    Err(DispatchError::invalid_arguments(
+        "refactor rename requires --position LINE:COL",
+    ))
 }

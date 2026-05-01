@@ -108,6 +108,8 @@ fn run_rename_handle(
         String::from("rename"),
         String::from("--file"),
         String::from(file),
+        String::from("--position"),
+        String::from("1:1"),
     ]);
     let runtime = MockRuntime { resolution, result };
     let socket_path = socket_dir.path().join("socket.sock");
@@ -183,6 +185,8 @@ fn handle_non_diff_output_returns_status_one(
         String::from("rename"),
         String::from("--file"),
         String::from("notes.py"),
+        String::from("--position"),
+        String::from("1:1"),
     ]);
     let runtime = MockRuntime {
         resolution: MockResolution::Success(automatic_selection("rope", "python")),
@@ -237,6 +241,8 @@ fn handle_diff_output_applies_patch_through_apply_patch_pipeline(socket_dir: Tem
         String::from("rename"),
         String::from("--file"),
         relative_file.clone(),
+        String::from("--position"),
+        String::from("1:1"),
     ]);
     let socket_path = socket_dir.path().join("socket.sock");
     let mut backends = build_backends(&socket_path);

@@ -54,6 +54,30 @@ Sempai is Weaver's Semgrep-compatible query engine facade. It parses rule YAML,
 normalizes supported search syntax into a canonical formula model, and prepares
 per-language query plans for later execution.
 
+
+## Sempai query pipeline (prototype archive milestone 4.1.5)
+
+- Canonical model (`sempai_core::formula`):
+  - `Formula` enum: `Atom`, `Not`, `Inside`, `Anywhere`, `And`, `Or`
+  - `Atom` enum: `Pattern`, `Regex`, `TreeSitterQuery`
+  - `Decorated<T>` wrapper: `where_clauses`, `as_name`, `fix`, `span`
+- Normalization (`crates/sempai/src/normalize.rs`):
+  - Legacy syntax: `pattern*`, `patterns`, `pattern-either`,
+    `pattern-not`, `pattern-not-inside`, `pattern-not-regex`, and
+    `semgrep-internal-pattern-anywhere`
+  - v2 `match` syntax: `pattern`, `regex`, `all`, `any`, `not`, `inside`,
+    `anywhere`, and decorated metadata propagation
+  - Special handling: `r2c-internal-project-depends-on` lowers to
+    `(__NONEXISTENT_NODE__) @_dependency_check`
+- Semantic validation (`crates/sempai/src/semantic_check.rs`):
+  - `InvalidNotInOr`
+  - `MissingPositiveTermInAnd`
+  - Span precedence rules: node span -> first child -> fallback
+- Engine wiring (`crates/sempai/src/engine.rs`):
+  - Parse -> validate modes -> normalize -> validate semantics -> compile
+    per-language `QueryPlan`
+  - `QueryPlan::formula()` exposure for tests and integration
+
 ## Sempai query pipeline (prototype archive milestone 4.1.5)
 
 - Canonical model (`sempai_core::formula`):
@@ -526,6 +550,8 @@ catalogue. `GraphSliceFixtureCase` is a type alias for `CardFixtureCase`.
 
 ## Public API additions in prototype archive milestone 7.2.1
 
+## Public API additions in prototype archive milestone 7.2.1
+
 ### `handle` signature — `FusionBackends` parameter
 
 `handle(request, writer, backends)` now accepts
@@ -900,7 +926,8 @@ readable after automated wrapping:
 - `missing_requirements_error() -> DispatchError` — builds the deterministic
   `DispatchError::InvalidArguments` with `act refactor requires ...`, every
   required flag (`--provider <plugin>`, `--refactoring <operation>`,
-  `--file <path>`), valid provider and refactoring values, and a next-command
+  `--file <path>`, `--position <line:col>`), valid provider and refactoring
+  values, and a next-command
   example derived from the first supported provider/refactoring or the
   `<plugin>` / `<operation>` placeholders. Called by the argument-builder when
   one or more required flags are absent.

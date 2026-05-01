@@ -52,6 +52,7 @@ pub(super) mod refactor_helpers;
 mod refusal;
 mod requirements;
 
+mod positions;
 mod request_building;
 mod resolution;
 mod response_handling;
@@ -238,6 +239,7 @@ pub fn handle<W: Write>(
 
     let (plugin_request, capability, file_path) =
         prepare_plugin_request(context.workspace_root, &args)?;
+    write_deprecated_offset_warning(&args, writer)?;
     let resolution_params = ResolutionParams {
         runtime: context.runtime,
         capability,
@@ -269,6 +271,18 @@ fn write_capability_resolution<W: Write>(
 ) -> Result<(), DispatchError> {
     let json = serde_json::to_string(resolution)?;
     writer.write_stderr(format!("{json}\n"))
+}
+
+fn write_deprecated_offset_warning<W: Write>(
+    args: &arguments::RefactorArgs,
+    writer: &mut ResponseWriter<W>,
+) -> Result<(), DispatchError> {
+    if args.position.is_none() && args.extra.iter().any(|arg| arg.starts_with("offset=")) {
+        writer.write_stderr(
+            "Warning: 'offset=' is deprecated; use '--position LINE:COL' instead.\n",
+        )?;
+    }
+    Ok(())
 }
 
 use response_handling::handle_plugin_response;

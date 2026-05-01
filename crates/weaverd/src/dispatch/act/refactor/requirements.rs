@@ -13,7 +13,7 @@ const REQUIRED_FLAGS: &[&str] = &[
     "--refactoring <operation>",
     "--file <path>",
 ];
-const NEXT_COMMAND_SUFFIX: &str = "--file path/to/file.py offset=1 new_name=renamed_symbol";
+const NEXT_COMMAND_SUFFIX: &str = "--file path/to/file.py --position 1:1 new_name=renamed_symbol";
 
 struct SupportedRefactoring {
     user_facing: &'static str,

@@ -55,7 +55,8 @@ pub(crate) mod builders {
             String::from("rename"),
             String::from("--file"),
             String::from(file),
-            String::from("offset=1"),
+            String::from("--position"),
+            String::from("1:1"),
             String::from("new_name=woven"),
         ]
     }
