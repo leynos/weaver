@@ -338,14 +338,9 @@ fn required_result<T, E: std::fmt::Display>(result: Result<T, E>, context: &str)
     }
 }
 
-fn test_support_items_are_wired() {
-    let wired_symbols = std::hint::black_box((
-        std::mem::size_of::<CacheTranscript>(),
-        std::mem::size_of::<GetCardRequest<'static>>(),
-        std::mem::size_of::<GraphSliceRequest<'static>>(),
-        run_get_card as fn(&TestDaemon, GetCardRequest<'static>) -> Transcript,
-        run_graph_slice as fn(&TestDaemon, GraphSliceRequest<'static>) -> Transcript,
-        assert_named_snapshot as fn(&str, &str),
-    ));
-    let _ = wired_symbols;
-}
+const _: usize = std::mem::size_of::<CacheTranscript>();
+const _: usize = std::mem::size_of::<GetCardRequest<'static>>();
+const _: usize = std::mem::size_of::<GraphSliceRequest<'static>>();
+const _: fn(&TestDaemon, GetCardRequest<'static>) -> Transcript = run_get_card;
+const _: fn(&TestDaemon, GraphSliceRequest<'static>) -> Transcript = run_graph_slice;
+const _: fn(&str, &str) = assert_named_snapshot;
