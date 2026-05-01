@@ -2,7 +2,7 @@
 
 use std::{fs, path::PathBuf};
 
-use rstest::rstest;
+use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use url::Url;
 use weaver_cards::{DEFAULT_CACHE_CAPACITY, DetailLevel};
@@ -14,9 +14,12 @@ use crate::{
     dispatch::{errors::DispatchError, request::CommandRequest, response::ResponseWriter},
     semantic_provider::SemanticBackendProvider,
 };
-
-fn make_backends() -> Result<(FusionBackends<SemanticBackendProvider>, TempDir), String> {
-    let dir = TempDir::new().map_err(|error| format!("create temp dir: {error}"))?;
+#[fixture]
+fn backends_fixture() -> (FusionBackends<SemanticBackendProvider>, TempDir) {
+    let dir = match TempDir::new() {
+        Ok(dir) => dir,
+        Err(error) => panic!("create temp dir: {error}"),
+    };
     let socket_path = dir
         .path()
         .join("socket.sock")
@@ -28,9 +31,8 @@ fn make_backends() -> Result<(FusionBackends<SemanticBackendProvider>, TempDir),
     };
     let provider =
         SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
-    Ok((FusionBackends::new(config, provider), dir))
+    (FusionBackends::new(config, provider), dir)
 }
-
 fn write_source(temp_dir: &TempDir, name: &str, content: &str) -> Result<PathBuf, std::io::Error> {
     let path = temp_dir.path().join(name);
     fs::write(&path, content)?;
@@ -70,7 +72,6 @@ fn response_payload(output: Vec<u8>) -> Result<serde_json::Value, String> {
         .ok_or_else(|| "stdout data".to_string())?;
     serde_json::from_str(data).map_err(|error| format!("payload: {error}"))
 }
-
 fn detail_value(detail: DetailLevel) -> &'static str {
     match detail {
         DetailLevel::Minimal => "minimal",
@@ -143,8 +144,10 @@ fn assert_refusal_with_message(
 }
 
 #[rstest]
-fn valid_request_returns_success_and_echoed_constraints() -> Result<(), String> {
-    let (mut backends, temp_dir) = make_backends()?;
+fn valid_request_returns_success_and_echoed_constraints(
+    backends_fixture: (FusionBackends<SemanticBackendProvider>, TempDir),
+) -> Result<(), String> {
+    let (mut backends, temp_dir) = backends_fixture;
     let path = write_source(
         &temp_dir,
         "slice.rs",
@@ -181,8 +184,10 @@ fn valid_request_returns_success_and_echoed_constraints() -> Result<(), String> 
 }
 
 #[rstest]
-fn max_cards_budget_truncates_same_file_symbol_inventory() -> Result<(), String> {
-    let (mut backends, temp_dir) = make_backends()?;
+fn max_cards_budget_truncates_same_file_symbol_inventory(
+    backends_fixture: (FusionBackends<SemanticBackendProvider>, TempDir),
+) -> Result<(), String> {
+    let (mut backends, temp_dir) = backends_fixture;
     let path = write_source(
         &temp_dir,
         "slice.py",
@@ -220,8 +225,10 @@ fn max_cards_budget_truncates_same_file_symbol_inventory() -> Result<(), String>
 }
 
 #[rstest]
-fn discovery_cap_marks_spillover_truncated_when_card_budget_remains() -> Result<(), String> {
-    let (mut backends, temp_dir) = make_backends()?;
+fn discovery_cap_marks_spillover_truncated_when_card_budget_remains(
+    backends_fixture: (FusionBackends<SemanticBackendProvider>, TempDir),
+) -> Result<(), String> {
+    let (mut backends, temp_dir) = backends_fixture;
     let source = (0..=MAX_SAME_FILE_DISCOVERY_POSITIONS)
         .map(|index| format!("fn item_{index}() {{}}\n"))
         .collect::<String>();
@@ -306,9 +313,10 @@ fn assert_structured_refusal(
     )
 )]
 fn structured_refusal_cases(
+    backends_fixture: (FusionBackends<SemanticBackendProvider>, TempDir),
     #[case] case: (&str, &str, &str, &str, Option<&str>),
 ) -> Result<(), String> {
-    let (mut backends, temp_dir) = make_backends()?;
+    let (mut backends, temp_dir) = backends_fixture;
     let (filename, content, position, expected_reason, expected_message) = case;
     assert_structured_refusal(
         &mut backends,
@@ -335,10 +343,11 @@ fn structured_refusal_cases(
 )]
 #[case(&["--uri", "file://%zz", "--position", "1:1"], "invalid URI")]
 fn invalid_arguments_return_dispatch_error(
+    backends_fixture: (FusionBackends<SemanticBackendProvider>, TempDir),
     #[case] arguments: &[&str],
     #[case] expected_substring: &str,
 ) -> Result<(), String> {
-    let (mut backends, _temp_dir) = make_backends()?;
+    let (mut backends, _temp_dir) = backends_fixture;
     let request = make_request(arguments);
     let mut buffer = Vec::new();
     let mut writer = ResponseWriter::new(&mut buffer);
@@ -360,8 +369,10 @@ fn invalid_arguments_return_dispatch_error(
 }
 
 #[rstest]
-fn missing_source_file_returns_invalid_arguments() -> Result<(), String> {
-    let (mut backends, temp_dir) = make_backends()?;
+fn missing_source_file_returns_invalid_arguments(
+    backends_fixture: (FusionBackends<SemanticBackendProvider>, TempDir),
+) -> Result<(), String> {
+    let (mut backends, temp_dir) = backends_fixture;
     let path = temp_dir.path().join("missing.rs");
     let uri = Url::from_file_path(&path).expect("file uri").to_string();
     let request = make_request(&["--uri", &uri, "--position", "1:1"]);
