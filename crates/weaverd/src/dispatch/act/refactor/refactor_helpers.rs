@@ -63,10 +63,6 @@ pub(crate) mod builders {
     pub(crate) fn configure_request(request: &mut CommandRequest, args: Vec<String>) {
         *request = command_request(args);
     }
-
-    const _: fn(&std::path::Path) -> FusionBackends<SemanticBackendProvider> = build_backends;
-    const _: fn(&str, &str) -> Vec<String> = standard_rename_args_for_provider;
-    const _: fn(&mut CommandRequest, Vec<String>) = configure_request;
 }
 
 pub(crate) mod resolutions {
@@ -177,17 +173,6 @@ pub(crate) mod resolutions {
             })
         }
     }
-
-    const _: for<'a> fn(SelectedResolution<'a>) -> CapabilityResolutionEnvelope =
-        selected_resolution;
-    const _: for<'a> fn(RefusedResolution<'a>) -> CapabilityResolutionEnvelope = refused_resolution;
-    const _: fn(&str, CandidateReason) -> CandidateEvaluation = rejected_candidate;
-    const _: for<'a> fn(
-        AutoResolutionContext<'a>,
-        Option<&'static str>,
-        &'static str,
-        Vec<CandidateEvaluation>,
-    ) -> CapabilityResolutionEnvelope = resolve_auto_language;
 }
 
 pub(crate) mod rollback {
@@ -252,12 +237,6 @@ pub(crate) mod rollback {
             execute_result,
         }
     }
-
-    const _: fn(PluginResponse) -> ExecuteResult = ExecuteResult::Success;
-    const _: fn(&'static str) -> ExecuteResult = ExecuteResult::MissingPlugin;
-    const _: for<'a> fn(SelectedResolution<'a>, ExecuteResult) -> RollbackRuntime =
-        selected_runtime;
-    const _: fn(CapabilityResolutionEnvelope, ExecuteResult) -> RollbackRuntime = rollback_runtime;
 }
 
 pub(crate) mod content {
@@ -344,11 +323,4 @@ pub(crate) mod content {
     pub(crate) fn routed_malformed_diff_for(path: &Path) -> String {
         routed_format_diff(path, |p| format!("diff --git a/{p}"))
     }
-
-    const _: fn(&Path) -> FileKind = classify_file;
-    const _: fn(&Path) -> &'static str = original_content_for;
-    const _: fn(&Path) -> &'static str = updated_content_for;
-    const _: fn(&Path) -> &Path = routed_patch_path;
-    const _: fn(&Path) -> String = routed_diff_for;
-    const _: fn(&Path) -> String = routed_malformed_diff_for;
 }
