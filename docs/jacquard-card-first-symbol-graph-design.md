@@ -855,10 +855,11 @@ Response:
 For roadmap item 7.2.1, the shipped runtime uses this stable response shape to
 return a deterministic same-file slice: the entry card plus any same-file
 symbol cards that fit within `budget.max_cards`, with `spillover` populated
-when additional local symbols are excluded. Edge extraction remains deferred to
-7.2.2 through 7.2.4, so the stable schema already exposes typed edges and
-`resolution_scope`, but the runtime may legitimately emit an empty `edges`
-array until those milestones land.
+when additional local symbols are excluded. The stable edge schema is already
+locked, even though runtime edges are deferred to later milestones. Every edge
+will carry a `resolution_scope` set to one of `full_symbol_table`,
+`partial_symbol_table`, or `lsp`, but the runtime may legitimately emit an
+empty `edges` array until those milestones land.
 
 ### `observe graph-history`
 

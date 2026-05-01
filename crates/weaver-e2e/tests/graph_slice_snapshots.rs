@@ -107,6 +107,40 @@ fn assert_and_parse_stdout(stdout: &str) -> serde_json::Value {
     serde_json::from_str(stdout).expect("transcript stdout should be valid JSON")
 }
 
+fn assert_schema_version(value: &serde_json::Value, context: &str) {
+    assert_eq!(
+        value.pointer("/schema_version"),
+        Some(&serde_json::json!("graph_slice.v1")),
+        "{context} schema_version should be graph_slice.v1"
+    );
+}
+
+fn expected_exit_status(value: &serde_json::Value) -> i32 {
+    match value.get("status").and_then(serde_json::Value::as_str) {
+        Some("success") => 0,
+        Some("refusal") => match value
+            .pointer("/refusal/reason")
+            .and_then(serde_json::Value::as_str)
+        {
+            Some("unsupported_language") => 10,
+            Some("no_symbol_at_position") => 11,
+            Some("position_out_of_range") => 12,
+            Some("not_yet_implemented") => 13,
+            Some("backend_unavailable") => 14,
+            Some(_) | None => 15,
+        },
+        Some(_) | None => 15,
+    }
+}
+
+fn assert_exit_status(actual: i32, value: &serde_json::Value, context: &str) {
+    assert_eq!(
+        actual,
+        expected_exit_status(value),
+        "{context} exit status should match payload"
+    );
+}
+
 #[rstest]
 #[case::python_01(PYTHON_CASES[0])]
 #[case::python_02(PYTHON_CASES[1])]
@@ -161,6 +195,8 @@ fn graph_slice_semantic_snapshots_cover_python_and_rust_fixture_battery(
     // Parse and assert structural shape so regressions surface even if snapshots are not reviewed.
     {
         let value = assert_and_parse_stdout(&transcript.stdout);
+        assert_schema_version(&value, case.name);
+        assert_exit_status(transcript.status, &value, case.name);
         if value.get("status") == Some(&serde_json::json!("success")) {
             assert!(
                 value
@@ -229,6 +265,8 @@ fn graph_slice_truncation_snapshots(
     );
     {
         let value = assert_and_parse_stdout(&transcript.stdout);
+        assert_schema_version(&value, case.name);
+        assert_exit_status(transcript.status, &value, case.name);
         if value.get("status") == Some(&serde_json::json!("success")) {
             assert_eq!(
                 value
@@ -294,6 +332,8 @@ fn run_refusal_snapshot(harness: SnapshotHarness, case: RefusalSnapshotCase<'_>)
     );
     {
         let value = assert_and_parse_stdout(&transcript.stdout);
+        assert_schema_version(&value, snapshot_name);
+        assert_exit_status(transcript.status, &value, snapshot_name);
         assert_eq!(
             value.get("status"),
             Some(&serde_json::json!("refusal")),

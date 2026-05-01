@@ -36,7 +36,7 @@ const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 #[derive(Debug, Serialize)]
 pub(crate) struct Transcript {
     command: String,
-    status: i32,
+    pub(crate) status: i32,
     pub(crate) stdout: String,
     stderr: String,
 }
