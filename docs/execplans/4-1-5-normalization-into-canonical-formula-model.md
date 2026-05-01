@@ -179,15 +179,17 @@ with stable `E_SEMPAI_*` diagnostics before plan construction.
 
 ## Context and orientation
 
-The Sempai query pipeline currently stops at a `NOT_IMPLEMENTED` placeholder
-after successfully parsing and mode-validating a YAML rule file.  The parser
+The Sempai query pipeline now parses and mode-validates a YAML rule file, then
+normalizes search principals before constructing query plans. The parser
 produces `LegacyFormula` and `MatchFormula` abstract syntax trees (ASTs) in
 `sempai_yaml`, which are structurally distinct but semantically equivalent for
 the subset they share.
 
-The normalization step must lower both representations into the design
-document's canonical `Formula` enum, then run semantic constraint checks before
-constructing a `QueryPlan`.
+`Engine::compile_yaml` lowers both representations into the design document's
+canonical `Formula` enum, runs semantic constraint checks, and constructs a
+`QueryPlan` carrying the normalized formula. Historically, the pipeline stopped
+at a `NOT_IMPLEMENTED` placeholder after parsing and mode validation; that
+placeholder has been replaced for valid search-mode rules.
 
 ### Key files and modules
 
@@ -197,8 +199,8 @@ constructing a `QueryPlan`.
 - `crates/sempai-yaml/src/model.rs` — `LegacyFormula`, `MatchFormula`,
   `LegacyClause`, `LegacyValue`, `SearchQueryPrincipal`, `Rule`.
 - `crates/sempai-yaml/src/lib.rs` — public re-exports and `parse_rule_file`.
-- `crates/sempai/src/engine.rs` — `Engine::compile_yaml` with the
-  `NOT_IMPLEMENTED` placeholder.
+- `crates/sempai/src/engine.rs` — `Engine::compile_yaml` parsing,
+  normalization, semantic validation, and `QueryPlan` construction.
 - `crates/sempai/src/mode_validation.rs` — mode-gating pass.
 - `crates/sempai/src/tests/behaviour.rs` — existing BDD test world.
 - `crates/sempai/tests/features/sempai_engine.feature` — existing BDD
@@ -358,8 +360,9 @@ and valid fixtures pass without error.
 Modify `crates/sempai/src/engine.rs`:
 
 1. After `validate_supported_modes(&file)?`, iterate search rules.
-2. For each rule, call `normalize_search_principal(rule.principal())`.
-3. Call `validate_formula(...)` on the normalized result.
+2. For each rule, call
+   `normalize_search_principal(rule.principal(), rule.rule_span())`.
+3. Pass the normalized result to `validate_formula(...)`.
 4. Construct a `QueryPlan` containing the normalized formula and rule metadata.
 5. Return `Ok(plans)` instead of `Err(DiagnosticReport::not_implemented(...))`.
 
