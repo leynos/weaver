@@ -126,7 +126,9 @@ impl TestDaemon {
             self.join_handle.take().ok_or("daemon join handle missing"),
             "daemon join handle",
         );
-        assert!(join_handle.join().is_ok(), "daemon thread should not panic");
+        if let Err(panic_payload) = join_handle.join() {
+            std::panic::resume_unwind(panic_payload);
+        }
         let _ = self.cache_stats();
     }
 }
