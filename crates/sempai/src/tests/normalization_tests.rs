@@ -44,6 +44,40 @@ fn normalize_v2_decorated(formula: MatchFormula) -> Decorated<Formula> {
     normalize_search_principal(&principal, None)
 }
 
+/// Asserts that a `Decorated<Formula>` wraps a `Pattern` atom with the given text.
+///
+/// Intended for use in unary-wrapper tests (`Not`, `Inside`, `Anywhere`).
+fn assert_wraps_pattern_atom(inner: &Decorated<Formula>, expected_text: &str) {
+    assert!(
+        matches!(&inner.node, Formula::Atom(Atom::Pattern(p)) if p.text == expected_text),
+        "expected Pattern(\"{expected_text}\"), got {:?}",
+        inner.node
+    );
+}
+
+/// Asserts that a branch slice contains exactly two `Pattern` atoms with the given texts.
+///
+/// Intended for use in branch-list tests (`And`, `Or`).
+fn assert_two_pattern_branches(
+    branches: &[Decorated<Formula>],
+    first_text: &str,
+    second_text: &str,
+) {
+    assert_eq!(branches.len(), 2);
+    let first = branches.first().expect("expected first branch");
+    let second = branches.get(1).expect("expected second branch");
+    assert!(
+        matches!(&first.node, Formula::Atom(Atom::Pattern(p)) if p.text == first_text),
+        "expected first branch Pattern(\"{first_text}\"), got {:?}",
+        first.node
+    );
+    assert!(
+        matches!(&second.node, Formula::Atom(Atom::Pattern(p)) if p.text == second_text),
+        "expected second branch Pattern(\"{second_text}\"), got {:?}",
+        second.node
+    );
+}
+
 #[rstest]
 #[case::pattern(
     LegacyFormula::Pattern(String::from("foo($X)")),
@@ -126,21 +160,7 @@ fn v2_all_normalizes_to_and_with_correct_branches() {
         MatchFormula::Pattern(String::from("bar")),
     ]));
     match result {
-        Formula::And(branches) => {
-            assert_eq!(branches.len(), 2);
-            let first = branches.first().expect("expected first branch");
-            let second = branches.get(1).expect("expected second branch");
-            assert!(
-                matches!(&first.node, Formula::Atom(Atom::Pattern(p)) if p.text == "foo"),
-                "expected first branch Pattern(\"foo\"), got {:?}",
-                first.node
-            );
-            assert!(
-                matches!(&second.node, Formula::Atom(Atom::Pattern(p)) if p.text == "bar"),
-                "expected second branch Pattern(\"bar\"), got {:?}",
-                second.node
-            );
-        }
+        Formula::And(branches) => assert_two_pattern_branches(&branches, "foo", "bar"),
         other => panic!("expected And formula, got {other:?}"),
     }
 }
@@ -152,21 +172,7 @@ fn v2_any_normalizes_to_or_with_correct_branches() {
         MatchFormula::Pattern(String::from("bar")),
     ]));
     match result {
-        Formula::Or(branches) => {
-            assert_eq!(branches.len(), 2);
-            let first = branches.first().expect("expected first branch");
-            let second = branches.get(1).expect("expected second branch");
-            assert!(
-                matches!(&first.node, Formula::Atom(Atom::Pattern(p)) if p.text == "foo"),
-                "expected first branch Pattern(\"foo\"), got {:?}",
-                first.node
-            );
-            assert!(
-                matches!(&second.node, Formula::Atom(Atom::Pattern(p)) if p.text == "bar"),
-                "expected second branch Pattern(\"bar\"), got {:?}",
-                second.node
-            );
-        }
+        Formula::Or(branches) => assert_two_pattern_branches(&branches, "foo", "bar"),
         other => panic!("expected Or formula, got {other:?}"),
     }
 }
@@ -177,11 +183,7 @@ fn v2_not_normalizes_to_not_with_inner_pattern() {
         String::from("baz"),
     ))));
     match result {
-        Formula::Not(inner) => assert!(
-            matches!(&inner.node, Formula::Atom(Atom::Pattern(p)) if p.text == "baz"),
-            "expected inner Pattern(\"baz\"), got {:?}",
-            inner.node
-        ),
+        Formula::Not(inner) => assert_wraps_pattern_atom(&inner, "baz"),
         other => panic!("expected Not formula, got {other:?}"),
     }
 }
@@ -192,11 +194,7 @@ fn v2_inside_normalizes_to_inside_with_inner_pattern() {
         String::from("class X:"),
     ))));
     match result {
-        Formula::Inside(inner) => assert!(
-            matches!(&inner.node, Formula::Atom(Atom::Pattern(p)) if p.text == "class X:"),
-            "expected inner Pattern(\"class X:\"), got {:?}",
-            inner.node
-        ),
+        Formula::Inside(inner) => assert_wraps_pattern_atom(&inner, "class X:"),
         other => panic!("expected Inside formula, got {other:?}"),
     }
 }
@@ -207,11 +205,7 @@ fn v2_anywhere_normalizes_to_anywhere_with_inner_pattern() {
         String::from("unsafe"),
     ))));
     match result {
-        Formula::Anywhere(inner) => assert!(
-            matches!(&inner.node, Formula::Atom(Atom::Pattern(p)) if p.text == "unsafe"),
-            "expected inner Pattern(\"unsafe\"), got {:?}",
-            inner.node
-        ),
+        Formula::Anywhere(inner) => assert_wraps_pattern_atom(&inner, "unsafe"),
         other => panic!("expected Anywhere formula, got {other:?}"),
     }
 }
