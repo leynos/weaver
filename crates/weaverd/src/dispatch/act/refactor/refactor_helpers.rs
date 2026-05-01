@@ -38,6 +38,15 @@ pub(crate) mod builders {
         FusionBackends::new(config, provider)
     }
 
+    /// Builds a rename command argument vector with an explicit provider selection.
+    ///
+    /// Prepends `--provider <provider>` to the standard rename arguments, producing
+    /// a complete argument list for tests and callers that exercise the
+    /// explicit-provider code path.
+    ///
+    /// # Parameters
+    /// - `file`: workspace-relative path to the file under rename.
+    /// - `provider`: the provider name to pass as `--provider` (e.g. `"rope"`, `"rust-analyzer"`).
     pub(crate) fn standard_rename_args_for_provider(file: &str, provider: &str) -> Vec<String> {
         vec![
             String::from("--provider"),

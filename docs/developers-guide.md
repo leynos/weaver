@@ -461,7 +461,8 @@ API instead of reaching into several implementation details.
 The inline modules are:
 
 - `builders` — request and backend constructors such as `command_request(...)`,
-  `build_backends(...)`, `standard_rename_args(...)`, and
+  `build_backends(...)`, `standard_rename_args(...)`,
+  `standard_rename_args_for_provider(...)`, and
   `configure_request(...)`.
 - `resolutions` — pure constructors for capability-resolution envelopes,
   including `selected_resolution(...)`, `refused_resolution(...)`, and
