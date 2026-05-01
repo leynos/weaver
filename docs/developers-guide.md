@@ -453,8 +453,10 @@ are:
 - **`build_request`** — constructs a `CommandRequest` from a
   `CommandInvocation`. For `apply-patch` operations it drains `stdin` into the
   request patch field and returns `AppError::MissingPatchInput` when the
-  content is empty after trimming. For all other operations it constructs the
-  request without reading `stdin`.
+  content is empty after trimming. It also enforces the JSON Lines request
+  size cap configured in `crates/weaver-cli/src/runner_glue.rs`; oversized
+  stdin is rejected with an early request error before patch processing starts.
+  For all other operations it constructs the request without reading `stdin`.
 
 The module keeps connection retry logic in `start_and_retry_daemon`, which
 tolerates socket-bind lag after daemon startup, and `write_error_and_fail`, a

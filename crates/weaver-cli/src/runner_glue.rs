@@ -9,6 +9,8 @@ use std::{
     process::ExitCode,
 };
 
+use weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES;
+
 use crate::{
     AppError,
     CommandInvocation,
@@ -24,11 +26,12 @@ use crate::{
     transport::{self, Connection, connect, connect_with_retry},
 };
 
-/// Maximum patch size accepted from stdin (4 MiB).
+/// Maximum patch size accepted from stdin.
 ///
-/// Prevents resource exhaustion from accidentally piping large files. Patches
-/// that exceed this limit return an IO error with `ErrorKind::UnexpectedEof`.
-const MAX_PATCH_BYTES: u64 = 4 * 1024 * 1024;
+/// Mirrors the JSON Lines request line-size budget so apply-patch requests do
+/// not exceed the daemon transport limit. Patches that exceed this limit return
+/// an IO error with `ErrorKind::UnexpectedEof`.
+const MAX_PATCH_BYTES: u64 = JSONL_REQUEST_MAX_LINE_BYTES as u64;
 
 /// Executes a daemon-backed command end-to-end.
 ///

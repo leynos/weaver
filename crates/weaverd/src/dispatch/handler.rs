@@ -11,6 +11,7 @@ use std::{
 };
 
 use tracing::{debug, warn};
+use weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES;
 
 use super::{
     backend_manager::BackendManager,
@@ -20,10 +21,6 @@ use super::{
     router::{DISPATCH_TARGET, DomainRouter},
 };
 use crate::transport::{ConnectionHandler, ConnectionStream};
-
-/// Maximum size of a single request line in bytes.
-/// Increased to 1 MiB to accommodate apply-patch payloads.
-pub(crate) const MAX_REQUEST_BYTES: usize = 1024 * 1024;
 
 /// Connection handler that parses and dispatches JSONL commands.
 ///
@@ -154,8 +151,11 @@ fn read_with_retry(stream: &mut ConnectionStream, buf: &mut [u8]) -> io::Result<
 
 /// Enforces the maximum request size limit.
 fn enforce_limit(size: usize) -> Result<(), DispatchError> {
-    if size > MAX_REQUEST_BYTES {
-        return Err(DispatchError::request_too_large(size, MAX_REQUEST_BYTES));
+    if size > JSONL_REQUEST_MAX_LINE_BYTES {
+        return Err(DispatchError::request_too_large(
+            size,
+            JSONL_REQUEST_MAX_LINE_BYTES,
+        ));
     }
     Ok(())
 }
