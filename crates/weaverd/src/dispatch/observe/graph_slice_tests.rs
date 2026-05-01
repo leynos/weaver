@@ -137,9 +137,7 @@ fn assert_refusal_with_message(
     reason: &str,
     message: &str,
 ) {
-    assert_eq!(status, 1, "expected error exit status");
-    assert_eq!(payload["status"], "refusal");
-    assert_eq!(payload["refusal"]["reason"], reason);
+    assert_refusal(status, payload, reason);
     assert_eq!(payload["refusal"]["message"], message);
 }
 

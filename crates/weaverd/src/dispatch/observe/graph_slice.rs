@@ -101,6 +101,7 @@ fn build_response(
         request.budget().max_cards(),
         discovery_capped,
     );
+    // Enrich only the cards that survive budget truncation (entry card is already enriched).
     for card in cards.iter_mut().skip(1) {
         enrich_card_if_requested(card, request.node_detail(), source, backends);
     }
