@@ -290,8 +290,10 @@ Go/no-go: `cargo doc -p sempai_core` builds, and `make lint` passes.
 Add a new module `crates/sempai/src/normalize.rs` (or split into
 `normalize/legacy.rs` and `normalize/match_v2.rs` if size requires) with:
 
-- `pub(crate) fn normalize_search_principal(principal: &SearchQueryPrincipal)
-  -> Result<Decorated<Formula>, DiagnosticReport>`
+- `pub(crate) fn normalize_search_principal(
+    principal: &SearchQueryPrincipal,
+    rule_span: Option<&SourceSpan>,
+  ) -> Decorated<Formula>`
 - Internal helpers:
   - `fn normalize_legacy(formula: &LegacyFormula) -> Decorated<Formula>`
   - `fn normalize_legacy_clause(clause: &LegacyClause) -> ...`
@@ -544,7 +546,7 @@ Formula::And([
 ///
 /// All legacy and v2 syntaxes are lowered into this shared representation
 /// before semantic validation and plan compilation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Formula {
     /// A leaf pattern or regex atom.
     Atom(Atom),
@@ -590,7 +592,7 @@ pub struct TreeSitterQueryAtom {
 }
 
 /// Wraps a formula node with optional decorator metadata.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Decorated<T> {
     /// The core formula or atom.
     pub node: T,
@@ -605,7 +607,7 @@ pub struct Decorated<T> {
 }
 
 /// An opaque `where` constraint clause preserved for later interpretation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct WhereClause {
     /// The raw JSON value of the constraint.
     pub raw: serde_json::Value,
@@ -619,7 +621,7 @@ pub struct WhereClause {
 pub(crate) fn normalize_search_principal(
     principal: &SearchQueryPrincipal,
     rule_span: Option<&SourceSpan>,
-) -> Result<Decorated<Formula>, DiagnosticReport>;
+) -> Decorated<Formula>;
 ```
 
 ### New functions in `crates/sempai/src/semantic_check.rs`
