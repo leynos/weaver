@@ -20,11 +20,13 @@ use weaver_e2e::graph_slice_fixtures::{GraphSliceFixtureCase, PYTHON_CASES, RUST
 
 use crate::fixture_io::write_fixture_path;
 
+/// Owns the temporary directory and its corresponding `file://` URI for one snapshot test run.
 struct WorkspaceUri {
     _temp_dir: TempDir,
     uri: String,
 }
 
+/// Shared configuration for graph-slice snapshot tests.
 #[derive(Clone, Copy)]
 struct SnapshotHarness {
     default_expected_requests: usize,
@@ -87,6 +89,7 @@ const fn snapshot_harness() -> SnapshotHarness {
     }
 }
 
+/// Serialises a transcript to pretty-printed JSON for snapshot comparison.
 #[expect(
     clippy::expect_used,
     reason = "snapshot helper failures should panic with explicit context"

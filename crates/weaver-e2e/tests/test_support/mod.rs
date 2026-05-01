@@ -32,6 +32,7 @@ use crate::{fixture_io::write_fixture_path, weaver_binary::weaver_binary_path};
 const ACCEPT_TIMEOUT: Duration = Duration::from_secs(10);
 const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
+/// Captured stdout and stderr from a single CLI invocation.
 #[derive(Debug, Serialize)]
 pub(crate) struct Transcript {
     command: String,
@@ -40,6 +41,7 @@ pub(crate) struct Transcript {
     stderr: String,
 }
 
+/// Paired transcripts from a two-request caching sequence.
 #[derive(Debug, Serialize)]
 pub(crate) struct CacheTranscript {
     pub first: Transcript,
@@ -67,6 +69,7 @@ pub(crate) struct GraphSliceRequest<'a> {
     pub node_detail: &'a str,
     pub max_cards: Option<u32>,
 }
+/// In-process test daemon accepting a bounded number of requests over a loopback socket.
 pub(crate) struct TestDaemon {
     address: SocketAddr,
     backend_manager: BackendManager,
@@ -74,6 +77,8 @@ pub(crate) struct TestDaemon {
 }
 
 impl TestDaemon {
+    /// Starts the daemon, binding to an ephemeral loopback port and awaiting `expected_requests`
+    /// connections.
     pub(crate) fn start(expected_requests: usize) -> Self {
         let _ = weaver_binary_path();
         let listener = required_result(TcpListener::bind(("127.0.0.1", 0)), "bind test listener");
@@ -105,6 +110,7 @@ impl TestDaemon {
 
     fn endpoint(&self) -> String { format!("tcp://{}", self.address) }
 
+    /// Returns the daemon's current card-cache statistics.
     pub(crate) fn cache_stats(&self) -> weaver_cards::CacheStats {
         let stats = self
             .backend_manager
@@ -113,6 +119,7 @@ impl TestDaemon {
         required_result(stats, "cache stats should be available")
     }
 
+    /// Waits for the daemon thread to finish and asserts all expected requests were served.
     pub(crate) fn join(self) {
         let _ = self.cache_stats();
         assert!(

@@ -341,7 +341,9 @@ fn read_slice_source(path: &Path) -> Result<String, DispatchError> {
     fs::read_to_string(path).map_err(|error| {
         DispatchError::invalid_arguments(format!(
             "unable to read source file '{}': {error}",
-            path.display()
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("<unknown>")
         ))
     })
 }
@@ -353,8 +355,10 @@ fn map_extraction_error(error: CardExtractionError) -> Result<GraphSliceResponse
             refusal: SliceRefusal {
                 reason: SliceRefusalReason::UnsupportedLanguage,
                 message: format!(
-                    "observe graph-slice: unsupported language for path {}",
-                    path.display()
+                    "observe graph-slice: unsupported language for '{}'",
+                    path.file_name()
+                        .and_then(|name| name.to_str())
+                        .unwrap_or("<unknown>")
                 ),
             },
         }),
