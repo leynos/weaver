@@ -5,7 +5,7 @@
 //! the top-level runtime stays small enough to scan.
 
 use std::{
-    io::{Error, ErrorKind, Read, Write},
+    io::{Read, Write},
     process::ExitCode,
 };
 
@@ -63,15 +63,15 @@ where
         invocation.operation.clone(),
         invocation.arguments.clone(),
     );
-    let request = match build_request(invocation, &mut *io.stdin) {
-        Ok(request) => request,
-        Err(error) => return write_error_and_fail(&mut *io.stderr, error),
-    };
     let mut connection = match connect_or_start_daemon(context, &mut *io.stderr) {
         Ok(connection) => connection,
         Err(exit_code) => return exit_code,
     };
     tracing::debug!("connected to daemon socket");
+    let request = match build_request(invocation, &mut *io.stdin) {
+        Ok(request) => request,
+        Err(error) => return write_error_and_fail(&mut *io.stderr, error),
+    };
 
     if let Err(error) = request.write_jsonl(&mut connection) {
         return write_error_and_fail(&mut *io.stderr, error);
@@ -121,10 +121,10 @@ pub(crate) fn build_request<R: Read>(
             .read_to_string(&mut patch)
             .map_err(AppError::ReadPatch)?;
         if patch.len() as u64 > MAX_PATCH_BYTES {
-            return Err(AppError::ReadPatch(Error::new(
-                ErrorKind::UnexpectedEof,
-                "patch input exceeds maximum size",
-            )));
+            return Err(AppError::RequestTooLarge {
+                size: patch.len(),
+                limit: JSONL_REQUEST_MAX_LINE_BYTES,
+            });
         }
         if patch.trim().is_empty() {
             return Err(AppError::MissingPatchInput);
@@ -143,11 +143,12 @@ fn enforce_request_line_limit(request: &CommandRequest) -> Result<(), AppError> 
     let json_len = serde_json::to_vec(request)
         .map_err(AppError::SerialiseRequest)?
         .len();
-    if json_len + 1 > JSONL_REQUEST_MAX_LINE_BYTES {
-        return Err(AppError::ReadPatch(Error::new(
-            ErrorKind::UnexpectedEof,
-            "command request exceeds maximum JSONL request size",
-        )));
+    let request_line_len = json_len + 1;
+    if request_line_len > JSONL_REQUEST_MAX_LINE_BYTES {
+        return Err(AppError::RequestTooLarge {
+            size: request_line_len,
+            limit: JSONL_REQUEST_MAX_LINE_BYTES,
+        });
     }
     Ok(())
 }
@@ -251,6 +252,11 @@ mod tests {
         let mut stdin = Cursor::new(b"should not be read".to_vec());
         let result = build_request(observe_status_invocation(), &mut stdin);
         assert!(result.is_ok());
+        assert_eq!(
+            stdin.position(),
+            0,
+            "non-patch requests must not read stdin"
+        );
     }
 
     #[test]
@@ -261,11 +267,7 @@ mod tests {
         let mut stdin = Cursor::new(b"should not be read".to_vec());
         let result = build_request(invocation, &mut stdin);
 
-        assert!(matches!(
-            result,
-            Err(AppError::ReadPatch(error))
-                if error.kind() == std::io::ErrorKind::UnexpectedEof
-        ));
+        assert!(matches!(result, Err(AppError::RequestTooLarge { .. })));
     }
 
     #[rstest::rstest]
@@ -300,11 +302,7 @@ mod tests {
                 assert!(matches!(result, Err(AppError::MissingPatchInput)));
             }
             ExpectedPatchRequest::Oversized => {
-                assert!(matches!(
-                    result,
-                    Err(AppError::ReadPatch(error))
-                        if error.kind() == std::io::ErrorKind::UnexpectedEof
-                ));
+                assert!(matches!(result, Err(AppError::RequestTooLarge { .. })));
             }
         }
     }
