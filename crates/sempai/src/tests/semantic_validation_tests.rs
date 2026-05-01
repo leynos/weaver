@@ -26,6 +26,16 @@ fn assert_invalid_not_in_or(formula: &Decorated<Formula>) {
     assert_eq!(first.code(), DiagnosticCode::ESempaiInvalidNotInOr);
 }
 
+fn assert_missing_positive_term_in_and(formula: &Decorated<Formula>) {
+    let result = validate_formula(formula);
+    let err = result.expect_err("should fail validation");
+    let first = err.diagnostics().first().expect("should have diagnostic");
+    assert_eq!(
+        first.code(),
+        DiagnosticCode::ESempaiMissingPositiveTermInAnd
+    );
+}
+
 fn make_not(inner: Decorated<Formula>) -> Decorated<Formula> {
     Decorated {
         node: Formula::Not(Box::new(inner)),
@@ -102,25 +112,13 @@ fn and_with_only_constraints_fails() {
         make_not(make_pattern("foo")),
         make_inside(make_pattern("bar")),
     ]);
-    let result = validate_formula(&formula);
-    let err = result.expect_err("should fail validation");
-    let first = err.diagnostics().first().expect("should have diagnostic");
-    assert_eq!(
-        first.code(),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd
-    );
+    assert_missing_positive_term_in_and(&formula);
 }
 
 #[test]
 fn and_with_or_containing_only_constraints_fails() {
     let formula = make_and(vec![make_or(vec![make_inside(make_pattern("ctx"))])]);
-    let result = validate_formula(&formula);
-    let err = result.expect_err("should fail validation");
-    let first = err.diagnostics().first().expect("should have diagnostic");
-    assert_eq!(
-        first.code(),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd
-    );
+    assert_missing_positive_term_in_and(&formula);
 }
 
 #[test]
