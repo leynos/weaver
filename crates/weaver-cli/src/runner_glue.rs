@@ -222,11 +222,15 @@ mod tests {
         ExpectedPatchRequest::Oversized
     )]
     fn apply_patch_stdin_cases(#[case] input: Vec<u8>, #[case] expected: ExpectedPatchRequest) {
+        let expected_patch = String::from_utf8(input.clone()).expect("patch input is UTF-8");
         let mut stdin = Cursor::new(input);
         let result = build_request(apply_patch_invocation(), &mut stdin);
 
         match expected {
-            ExpectedPatchRequest::Ok => assert!(result.is_ok()),
+            ExpectedPatchRequest::Ok => {
+                let request = result.expect("patch input should build a request");
+                assert_eq!(request.patch.as_deref(), Some(expected_patch.as_str()));
+            }
             ExpectedPatchRequest::MissingPatchInput => {
                 assert!(matches!(result, Err(AppError::MissingPatchInput)));
             }

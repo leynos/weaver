@@ -419,7 +419,7 @@ There are two preflight paths:
   `AppError::PreflightGuidance`.
 
 This boundary exists specifically to keep operator guidance local, immediate,
-and side-effect free.
+and side effect free.
 
 ### 2.4 `Locale` type (`crates/weaver-config/src/locale.rs`)
 
