@@ -45,8 +45,7 @@ const MAX_SAME_FILE_DISCOVERY_POSITIONS: usize = 256;
 fn exit_status(response: &GraphSliceResponse) -> i32 {
     i32::from(!matches!(response, GraphSliceResponse::Success { .. }))
 }
-/// Handles the `observe graph-slice` command.
-/// Parses the request and serializes a deterministic same-file response.
+/// Handles the `observe graph-slice` command and serializes a deterministic same-file response.
 ///
 /// # Errors
 /// Returns a [`DispatchError`] if the request arguments are malformed
@@ -62,6 +61,14 @@ pub fn handle<W: Write>(
         DispatchError::invalid_arguments(format!("invalid URI '{}': {error}", slice_request.uri()))
     })?;
     let path = resolve_file_path(&parsed_uri)?;
+    let path = fs::canonicalize(&path).map_err(|error| {
+        DispatchError::invalid_arguments(format!(
+            "unable to read source file '{}': {error}",
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("<unknown>")
+        ))
+    })?;
     let source = read_slice_source(&path)?;
     let response = build_response(&slice_request, &path, &source, backends)?;
 
@@ -160,8 +167,7 @@ fn discover_same_file_cards(
     Ok((ordered_cards, discovery_capped))
 }
 
-/// Attempts to extract one `SymbolCard` at `position`, returning `None` for benign extraction
-/// misses.
+/// Attempts to extract one `SymbolCard` at `position`, returning `None` for benign misses.
 fn extract_same_file_card(
     extractor: &TreeSitterCardExtractor,
     document: SliceDocument<'_>,
@@ -194,8 +200,7 @@ fn extract_same_file_card(
         )),
     }
 }
-/// Yields `(line, column)` pairs for each non-blank line, capped at
-/// `MAX_SAME_FILE_DISCOVERY_POSITIONS`.
+/// Yields `(line, column)` pairs for each non-blank line, capped at discovery limit.
 fn candidate_positions(source: &str) -> (Vec<(u32, u32)>, bool) {
     let mut positions = source
         .lines()

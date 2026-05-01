@@ -384,9 +384,10 @@ sibling discovery:
 
 `apply_card_budget(entry_card, sibling_cards, max_cards)` partitions the sorted
 sibling list into an included set (up to `max_cards − 1` siblings plus the
-entry card) and a `SliceSpillover` frontier. When `max_cards == 0` the entry
-card itself is placed in the frontier and an empty card list is returned.
-
+entry card) and a `SliceSpillover` frontier. The `apply_card_budget` branch for
+`max_cards == 0` is only a defensive internal check; the public request parser
+rejects `--max-cards 0` before dispatch, so callers cannot reach the
+zero-budget `SliceSpillover` path through the CLI.
 
 ### Enrichment ordering
 
