@@ -217,27 +217,35 @@ mod tests {
         }
     }
 
-    fn patch_with_jsonl_len(len: usize) -> Vec<u8> {
-        let envelope_len = request_jsonl_len(&CommandRequest::with_patch(
-            apply_patch_invocation(),
-            String::new(),
-        ));
+    /// Returns the number of payload bytes needed to reach a serialised JSON Lines
+    /// line length of exactly `len` bytes, using `template` to measure the fixed
+    /// envelope overhead.
+    ///
+    /// Panics if `len` does not exceed the envelope length, which would make the
+    /// requested line length impossible to achieve.
+    fn payload_size_for_jsonl_len(len: usize, template: &CommandRequest) -> usize {
+        let envelope_len = request_jsonl_len(template);
         assert!(
             len > envelope_len,
-            "requested JSONL line length must fit patch bytes"
+            "requested JSONL line length {len} must exceed envelope length {envelope_len}"
         );
-        vec![b'a'; len - envelope_len]
+        len - envelope_len
+    }
+
+    fn patch_with_jsonl_len(len: usize) -> Vec<u8> {
+        let n = payload_size_for_jsonl_len(
+            len,
+            &CommandRequest::with_patch(apply_patch_invocation(), String::new()),
+        );
+        vec![b'a'; n]
     }
 
     fn argument_with_jsonl_len(len: usize) -> String {
-        let envelope_len = request_jsonl_len(&CommandRequest::from(
-            observe_status_invocation_with_argument(String::new()),
-        ));
-        assert!(
-            len > envelope_len,
-            "requested JSONL line length must fit argument bytes"
+        let n = payload_size_for_jsonl_len(
+            len,
+            &CommandRequest::from(observe_status_invocation_with_argument(String::new())),
         );
-        "a".repeat(len - envelope_len)
+        "a".repeat(n)
     }
 
     fn request_jsonl_len(request: &CommandRequest) -> usize {
