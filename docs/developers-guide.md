@@ -461,8 +461,7 @@ API instead of reaching into several implementation details.
 The inline modules are:
 
 - `builders` — request and backend constructors such as `command_request(...)`,
-  `build_backends(...)`, `standard_rename_args(...)`,
-  `standard_rename_args_for_provider(...)`, and
+  `build_backends(...)`, `standard_rename_args_for_provider(...)`, and
   `configure_request(...)`.
 - `resolutions` — pure constructors for capability-resolution envelopes,
   including `selected_resolution(...)`, `refused_resolution(...)`, and
@@ -515,10 +514,10 @@ the `content` helpers instead of hand-writing patch strings.
 
 ### `requirements` (`weaverd/src/dispatch/act/refactor/requirements.rs`)
 
-`requirements` is the single source of truth for the operator-facing contract of
-`act refactor`. It is a non-test module consumed by both the argument-parsing
-layer and the test suite to keep validation, guidance text, and supported-value
-lists in one place.
+`requirements` is the single source of truth for the operator-facing contract
+of `act refactor`. It is a non-test module consumed by both the
+argument-parsing layer and the test suite to keep validation, guidance text,
+and supported-value lists in one place.
 
 The module exposes seven `pub(crate)` functions:
 
@@ -527,22 +526,33 @@ The module exposes seven `pub(crate)` functions:
   sourced from the built-in provider manifest catalogue.
 - `supported_refactoring_names() -> &'static [&'static str]` — returns the
   canonical slice of accepted user-facing refactoring names (e.g. `rename`).
-- `validate_provider(provider: &str) -> Result<(), DispatchError>` — returns
-  `DispatchError::InvalidArguments` when `provider` is not in
-  `supported_provider_names`.
+- `validate_provider(provider: &str) -> Result<(), DispatchError>` — delegates
+  to `validate_value("provider", supported_provider_names(), provider)` and
+  returns `DispatchError::InvalidArguments` with
+  `act refactor does not support provider '<value>'` plus the shared guidance
+  block when `provider` is not in `supported_provider_names()`.
 - `validate_refactoring(refactoring: &str) -> Result<(), DispatchError>` —
-  returns `DispatchError::InvalidArguments` when `refactoring` is not in
-  `supported_refactoring_names`.
-- `effective_operation(refactoring: &str) ->
-  Result<&'static str, DispatchError>` —
-  maps a user-facing refactoring name to the underlying plugin capability
-  operation string (e.g. `rename` → `rename-symbol`).
-- `capability_for_operation(operation: &str) ->
-  Result<CapabilityId, DispatchError>` —
-  maps a capability operation string to its `CapabilityId` variant, returning
-  `DispatchError::InvalidArguments` for unknown operations.
+  delegates to
+  `validate_value("refactoring", supported_refactoring_names(), refactoring)`
+  and returns `DispatchError::InvalidArguments` with
+  `act refactor does not support refactoring '<value>'` plus the shared
+  guidance block when `refactoring` is not in `supported_refactoring_names()`.
+- `effective_operation(refactoring: &str) -> Result<&'static str,
+  DispatchError>` — maps a user-facing refactoring name to the underlying
+  plugin capability operation string (`"rename"` → `"rename-symbol"`),
+  returning the same unsupported-refactoring
+  `DispatchError::InvalidArguments` as `validate_refactoring(...)` for unknown
+  user-facing names.
+- `capability_for_operation(operation: &str) -> Result<CapabilityId,
+  DispatchError>` — maps a capability operation string to its `CapabilityId`
+  variant (`"rename-symbol"` → `CapabilityId::RenameSymbol`), returning
+  `DispatchError::InvalidArguments` with
+  `act refactor does not support capability resolution for '<operation>'` and
+  the supported capability-operation tokens for unknown operations.
 - `missing_requirements_error() -> DispatchError` — builds the deterministic
-  `DispatchError::InvalidArguments` that lists every required flag
-  (`--provider`, `--refactoring`, `--file`), valid provider and refactoring
-  values, and a next-command example. Called by the argument-builder when one
-  or more required flags are absent.
+  `DispatchError::InvalidArguments` with `act refactor requires ...`, every
+  required flag (`--provider <plugin>`, `--refactoring <operation>`,
+  `--file <path>`), valid provider and refactoring values, and a next-command
+  example derived from the first supported provider/refactoring or the
+  `<plugin>` / `<operation>` placeholders. Called by the argument-builder when
+  one or more required flags are absent.
