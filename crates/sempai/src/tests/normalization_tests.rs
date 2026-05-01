@@ -119,39 +119,101 @@ fn v2_atom_formula_normalizes_to_expected_formula(
     assert_eq!(result, expected);
 }
 
-#[rstest]
-#[case::all(
-    MatchFormula::All(vec![
+#[test]
+fn v2_all_normalizes_to_and_with_correct_branches() {
+    let result = normalize_v2(MatchFormula::All(vec![
         MatchFormula::Pattern(String::from("foo")),
         MatchFormula::Pattern(String::from("bar")),
-    ]),
-    |normalised| matches!(normalised, Formula::And(branches) if branches.len() == 2)
-)]
-#[case::any(
-    MatchFormula::Any(vec![
+    ]));
+    match result {
+        Formula::And(branches) => {
+            assert_eq!(branches.len(), 2);
+            let first = branches.first().expect("expected first branch");
+            let second = branches.get(1).expect("expected second branch");
+            assert!(
+                matches!(&first.node, Formula::Atom(Atom::Pattern(p)) if p.text == "foo"),
+                "expected first branch Pattern(\"foo\"), got {:?}",
+                first.node
+            );
+            assert!(
+                matches!(&second.node, Formula::Atom(Atom::Pattern(p)) if p.text == "bar"),
+                "expected second branch Pattern(\"bar\"), got {:?}",
+                second.node
+            );
+        }
+        other => panic!("expected And formula, got {other:?}"),
+    }
+}
+
+#[test]
+fn v2_any_normalizes_to_or_with_correct_branches() {
+    let result = normalize_v2(MatchFormula::Any(vec![
         MatchFormula::Pattern(String::from("foo")),
         MatchFormula::Pattern(String::from("bar")),
-    ]),
-    |normalised| matches!(normalised, Formula::Or(branches) if branches.len() == 2)
-)]
-#[case::not(
-    MatchFormula::Not(Box::new(MatchFormula::Pattern(String::from("baz")))),
-    |normalised| matches!(normalised, Formula::Not(_))
-)]
-#[case::inside(
-    MatchFormula::Inside(Box::new(MatchFormula::Pattern(String::from("class X:")))),
-    |normalised| matches!(normalised, Formula::Inside(_))
-)]
-#[case::anywhere(
-    MatchFormula::Anywhere(Box::new(MatchFormula::Pattern(String::from("unsafe")))),
-    |normalised| matches!(normalised, Formula::Anywhere(_))
-)]
-fn v2_structural_formula_normalizes_to_expected_shape(
-    #[case] formula: MatchFormula,
-    #[case] expected_shape: fn(Formula) -> bool,
-) {
-    let result = normalize_v2(formula);
-    assert!(expected_shape(result));
+    ]));
+    match result {
+        Formula::Or(branches) => {
+            assert_eq!(branches.len(), 2);
+            let first = branches.first().expect("expected first branch");
+            let second = branches.get(1).expect("expected second branch");
+            assert!(
+                matches!(&first.node, Formula::Atom(Atom::Pattern(p)) if p.text == "foo"),
+                "expected first branch Pattern(\"foo\"), got {:?}",
+                first.node
+            );
+            assert!(
+                matches!(&second.node, Formula::Atom(Atom::Pattern(p)) if p.text == "bar"),
+                "expected second branch Pattern(\"bar\"), got {:?}",
+                second.node
+            );
+        }
+        other => panic!("expected Or formula, got {other:?}"),
+    }
+}
+
+#[test]
+fn v2_not_normalizes_to_not_with_inner_pattern() {
+    let result = normalize_v2(MatchFormula::Not(Box::new(MatchFormula::Pattern(
+        String::from("baz"),
+    ))));
+    match result {
+        Formula::Not(inner) => assert!(
+            matches!(&inner.node, Formula::Atom(Atom::Pattern(p)) if p.text == "baz"),
+            "expected inner Pattern(\"baz\"), got {:?}",
+            inner.node
+        ),
+        other => panic!("expected Not formula, got {other:?}"),
+    }
+}
+
+#[test]
+fn v2_inside_normalizes_to_inside_with_inner_pattern() {
+    let result = normalize_v2(MatchFormula::Inside(Box::new(MatchFormula::Pattern(
+        String::from("class X:"),
+    ))));
+    match result {
+        Formula::Inside(inner) => assert!(
+            matches!(&inner.node, Formula::Atom(Atom::Pattern(p)) if p.text == "class X:"),
+            "expected inner Pattern(\"class X:\"), got {:?}",
+            inner.node
+        ),
+        other => panic!("expected Inside formula, got {other:?}"),
+    }
+}
+
+#[test]
+fn v2_anywhere_normalizes_to_anywhere_with_inner_pattern() {
+    let result = normalize_v2(MatchFormula::Anywhere(Box::new(MatchFormula::Pattern(
+        String::from("unsafe"),
+    ))));
+    match result {
+        Formula::Anywhere(inner) => assert!(
+            matches!(&inner.node, Formula::Atom(Atom::Pattern(p)) if p.text == "unsafe"),
+            "expected inner Pattern(\"unsafe\"), got {:?}",
+            inner.node
+        ),
+        other => panic!("expected Anywhere formula, got {other:?}"),
+    }
 }
 
 #[test]

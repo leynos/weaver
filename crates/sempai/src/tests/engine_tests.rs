@@ -129,6 +129,30 @@ fn compile_yaml_normalizes_and_returns_query_plans(
     assert_eq!(&plan.formula().node, &expected_formula);
 }
 
+#[test]
+fn compile_yaml_plan_formula_matches_normalization() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.formula.check\n",
+        "    message: check formula\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    pattern: foo($X)\n",
+    );
+    let engine = default_engine();
+    let plans = engine.compile_yaml(yaml).expect("should compile");
+    let plan = plans.first().expect("should have one plan");
+    let formula = plan.formula();
+    assert!(
+        matches!(
+            &formula.node,
+            Formula::Atom(Atom::Pattern(p)) if p.text == "foo($X)"
+        ),
+        "expected Pattern atom with text \"foo($X)\", got {:?}",
+        formula.node
+    );
+}
+
 #[rstest]
 #[case::invalid_not_in_or(
     concat!(

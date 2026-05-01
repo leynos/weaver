@@ -207,8 +207,5 @@ fn nested_or_in_and_with_not_fails() {
         fix: None,
         span: None,
     };
-    let result = validate_formula(&formula);
-    let err = result.expect_err("should fail validation");
-    let first = err.diagnostics().first().expect("should have diagnostic");
-    assert_eq!(first.code(), DiagnosticCode::ESempaiInvalidNotInOr);
+    assert_invalid_not_in_or(&formula);
 }
