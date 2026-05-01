@@ -54,7 +54,7 @@ impl DispatchConnectionHandler {
             Err(error) => {
                 warn!(target: DISPATCH_TARGET, %error, "failed to read request");
                 let mut writer = ResponseWriter::new(&mut stream);
-                let _ = writer.write_error(&error);
+                writer.write_error(&error).ok();
                 return;
             }
         };
@@ -66,7 +66,7 @@ impl DispatchConnectionHandler {
             Ok(req) => req,
             Err(error) => {
                 warn!(target: DISPATCH_TARGET, %error, "malformed request");
-                let _ = writer.write_error(&error);
+                writer.write_error(&error).ok();
                 return;
             }
         };
@@ -74,7 +74,7 @@ impl DispatchConnectionHandler {
         // Validate the request
         if let Err(error) = request.validate() {
             warn!(target: DISPATCH_TARGET, %error, "invalid request");
-            let _ = writer.write_error(&error);
+            writer.write_error(&error).ok();
             return;
         }
 
@@ -98,13 +98,13 @@ impl DispatchConnectionHandler {
             }
             Ok(Err(error)) => {
                 warn!(target: DISPATCH_TARGET, %error, "dispatch failed");
-                let _ = writer.write_error(&error);
+                writer.write_error(&error).ok();
             }
             Err(error) => {
                 // Backend manager error (e.g., lock poisoned)
                 warn!(target: DISPATCH_TARGET, %error, "backend manager error");
-                let _ = writer.write_error(&error);
-                let _ = writer.write_exit(error.exit_status());
+                writer.write_error(&error).ok();
+                writer.write_exit(error.exit_status()).ok();
             }
         }
     }

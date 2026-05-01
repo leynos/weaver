@@ -129,10 +129,25 @@ pub(crate) fn build_request<R: Read>(
         if patch.trim().is_empty() {
             return Err(AppError::MissingPatchInput);
         }
-        Ok(CommandRequest::with_patch(invocation, patch))
+        let request = CommandRequest::with_patch(invocation, patch);
+        enforce_request_line_limit(&request)?;
+        Ok(request)
     } else {
         Ok(CommandRequest::from(invocation))
     }
+}
+
+fn enforce_request_line_limit(request: &CommandRequest) -> Result<(), AppError> {
+    let json_len = serde_json::to_vec(request)
+        .map_err(AppError::SerialiseRequest)?
+        .len();
+    if json_len + 1 > JSONL_REQUEST_MAX_LINE_BYTES {
+        return Err(AppError::ReadPatch(Error::new(
+            ErrorKind::UnexpectedEof,
+            "patch request exceeds maximum JSONL request size",
+        )));
+    }
+    Ok(())
 }
 
 fn write_error_and_fail<W: Write>(stderr: &mut W, error: impl std::fmt::Display) -> ExitCode {
@@ -168,7 +183,7 @@ mod tests {
     use std::io::Cursor;
 
     use super::{MAX_PATCH_BYTES, build_request};
-    use crate::{AppError, CommandInvocation};
+    use crate::{AppError, CommandInvocation, CommandRequest};
 
     enum ExpectedPatchRequest {
         Ok,
@@ -192,6 +207,25 @@ mod tests {
         }
     }
 
+    fn patch_with_jsonl_len(len: usize) -> Vec<u8> {
+        let envelope_len = request_jsonl_len(&CommandRequest::with_patch(
+            apply_patch_invocation(),
+            String::new(),
+        ));
+        assert!(
+            len > envelope_len,
+            "requested JSONL line length must fit patch bytes"
+        );
+        vec![b'a'; len - envelope_len]
+    }
+
+    fn request_jsonl_len(request: &CommandRequest) -> usize {
+        match serde_json::to_vec(request) {
+            Ok(bytes) => bytes.len() + 1,
+            Err(error) => panic!("request must serialise: {error}"),
+        }
+    }
+
     #[test]
     fn non_patch_invocation_does_not_read_stdin() {
         let mut stdin = Cursor::new(b"should not be read".to_vec());
@@ -208,20 +242,12 @@ mod tests {
         b"   \n".to_vec(),
         ExpectedPatchRequest::MissingPatchInput
     )]
-    #[case::accepts_input_at_max_size_limit(
-        {
-            let mut input = vec![b'a'; MAX_PATCH_BYTES as usize - 1];
-            input.push(b'\n');
-            input
-        },
+    #[case::accepts_request_at_jsonl_size_limit(
+        patch_with_jsonl_len(MAX_PATCH_BYTES as usize),
         ExpectedPatchRequest::Ok
     )]
-    #[case::returns_error_for_oversized_stdin(
-        {
-            let mut input = vec![b'a'; MAX_PATCH_BYTES as usize + 1];
-            input.push(b'\n');
-            input
-        },
+    #[case::returns_error_for_oversized_jsonl_request(
+        patch_with_jsonl_len(MAX_PATCH_BYTES as usize + 1),
         ExpectedPatchRequest::Oversized
     )]
     fn apply_patch_stdin_cases(#[case] input: Vec<u8>, #[case] expected: ExpectedPatchRequest) {
@@ -233,6 +259,7 @@ mod tests {
             ExpectedPatchRequest::Ok => {
                 let request = result.expect("patch input should build a request");
                 assert_eq!(request.patch.as_deref(), Some(expected_patch.as_str()));
+                assert!(request_jsonl_len(&request) <= MAX_PATCH_BYTES as usize);
             }
             ExpectedPatchRequest::MissingPatchInput => {
                 assert!(matches!(result, Err(AppError::MissingPatchInput)));

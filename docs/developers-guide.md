@@ -454,7 +454,7 @@ are:
   `CommandInvocation`. For `apply-patch` operations it drains `stdin` into the
   request patch field and returns `AppError::MissingPatchInput` when the
   content is empty after trimming. It also enforces the JSON Lines request
-  size cap configured in `crates/weaver-cli/src/runner_glue.rs`; oversized
+  size cap from `weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES`; oversized
   stdin is rejected with an early request error before patch processing starts.
   For all other operations it constructs the request without reading `stdin`.
 
