@@ -316,9 +316,18 @@ Add a new module `crates/sempai/src/normalize.rs` (or split into
     rule_span: Option<&SourceSpan>,
   ) -> Decorated<Formula>`
 - Internal helpers:
-  - `fn normalize_legacy(formula: &LegacyFormula) -> Decorated<Formula>`
-  - `fn normalize_legacy_clause(clause: &LegacyClause) -> ...`
-  - `fn normalize_match(formula: &MatchFormula) -> Decorated<Formula>`
+  - `fn normalize_legacy(
+      formula: &LegacyFormula,
+      fallback_span: Option<SourceSpan>,
+    ) -> Decorated<Formula>`
+  - `fn normalize_legacy_value(
+      value: &LegacyValue,
+      fallback_span: Option<SourceSpan>,
+    ) -> Decorated<Formula>`
+  - `fn normalize_match(
+      formula: &MatchFormula,
+      fallback_span: Option<SourceSpan>,
+    ) -> Decorated<Formula>`
 
 The normalization must handle:
 
