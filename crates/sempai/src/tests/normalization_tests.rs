@@ -78,6 +78,20 @@ fn assert_two_pattern_branches(
     );
 }
 
+fn extract_and_branches(f: Formula) -> Vec<Decorated<Formula>> {
+    match f {
+        Formula::And(b) => b,
+        other => panic!("expected And formula, got {other:?}"),
+    }
+}
+
+fn extract_or_branches(f: Formula) -> Vec<Decorated<Formula>> {
+    match f {
+        Formula::Or(b) => b,
+        other => panic!("expected Or formula, got {other:?}"),
+    }
+}
+
 #[rstest]
 #[case::pattern(
     LegacyFormula::Pattern(String::from("foo($X)")),
@@ -153,28 +167,28 @@ fn v2_atom_formula_normalizes_to_expected_formula(
     assert_eq!(result, expected);
 }
 
-#[test]
-fn v2_all_normalizes_to_and_with_correct_branches() {
-    let result = normalize_v2(MatchFormula::All(vec![
+#[rstest]
+#[case::all(
+    MatchFormula::All(vec![
         MatchFormula::Pattern(String::from("foo")),
         MatchFormula::Pattern(String::from("bar")),
-    ]));
-    match result {
-        Formula::And(branches) => assert_two_pattern_branches(&branches, "foo", "bar"),
-        other => panic!("expected And formula, got {other:?}"),
-    }
-}
-
-#[test]
-fn v2_any_normalizes_to_or_with_correct_branches() {
-    let result = normalize_v2(MatchFormula::Any(vec![
+    ]),
+    extract_and_branches as fn(Formula) -> Vec<Decorated<Formula>>,
+)]
+#[case::any(
+    MatchFormula::Any(vec![
         MatchFormula::Pattern(String::from("foo")),
         MatchFormula::Pattern(String::from("bar")),
-    ]));
-    match result {
-        Formula::Or(branches) => assert_two_pattern_branches(&branches, "foo", "bar"),
-        other => panic!("expected Or formula, got {other:?}"),
-    }
+    ]),
+    extract_or_branches as fn(Formula) -> Vec<Decorated<Formula>>,
+)]
+fn v2_branch_formula_normalizes_with_correct_branches(
+    #[case] input: MatchFormula,
+    #[case] extract: fn(Formula) -> Vec<Decorated<Formula>>,
+) {
+    let result = normalize_v2(input);
+    let branches = extract(result);
+    assert_two_pattern_branches(&branches, "foo", "bar");
 }
 
 #[test]
