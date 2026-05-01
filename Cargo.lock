@@ -2119,6 +2119,7 @@ dependencies = [
  "sempai_core",
  "sempai_yaml",
  "serde_json",
+ "tracing",
  "weaver-test-macros",
 ]
 

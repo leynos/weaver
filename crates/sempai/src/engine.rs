@@ -102,8 +102,10 @@ impl Engine {
     /// # Errors
     ///
     /// Returns a diagnostic report if parsing, normalization, or validation fails.
+    #[tracing::instrument(level = "info", skip_all, fields(rules = tracing::field::Empty))]
     pub fn compile_yaml(&self, yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
         let file = parse_rule_file(yaml, None)?;
+        tracing::Span::current().record("rules", file.rules().len());
         validate_supported_modes(&file)?;
 
         file.rules()
@@ -116,8 +118,17 @@ impl Engine {
                 }
             })
             .try_fold(Vec::new(), |mut plans, (rule, principal)| {
+                tracing::debug!(rule_id = rule.id(), "normalizing principal");
                 let formula = normalize_search_principal(principal, rule.rule_span());
+
+                tracing::debug!(rule_id = rule.id(), "validating normalized formula");
                 validate_formula(&formula)?;
+
+                tracing::debug!(
+                    rule_id = rule.id(),
+                    languages = ?rule.languages(),
+                    "compiling rule plans"
+                );
                 let rule_plans = compile_rule_plans(rule, formula)?;
                 plans.extend(rule_plans);
                 Ok(plans)
@@ -164,6 +175,12 @@ fn compile_rule_plans(
     rule.languages()
         .iter()
         .map(|lang_str| {
+            let _span = tracing::debug_span!(
+                "compile_rule_plan",
+                rule_id = rule.id(),
+                language = lang_str.as_str()
+            )
+            .entered();
             let language = lang_str.parse::<Language>().map_err(|e| {
                 DiagnosticReport::validation_error(
                     DiagnosticCode::ESempaiSchemaInvalid,
