@@ -133,7 +133,9 @@ pub(crate) fn build_request<R: Read>(
         enforce_request_line_limit(&request)?;
         Ok(request)
     } else {
-        Ok(CommandRequest::from(invocation))
+        let request = CommandRequest::from(invocation);
+        enforce_request_line_limit(&request)?;
+        Ok(request)
     }
 }
 
@@ -144,7 +146,7 @@ fn enforce_request_line_limit(request: &CommandRequest) -> Result<(), AppError> 
     if json_len + 1 > JSONL_REQUEST_MAX_LINE_BYTES {
         return Err(AppError::ReadPatch(Error::new(
             ErrorKind::UnexpectedEof,
-            "patch request exceeds maximum JSONL request size",
+            "command request exceeds maximum JSONL request size",
         )));
     }
     Ok(())
@@ -199,6 +201,13 @@ mod tests {
         }
     }
 
+    fn observe_status_invocation_with_argument(argument: String) -> CommandInvocation {
+        CommandInvocation {
+            arguments: vec![argument],
+            ..observe_status_invocation()
+        }
+    }
+
     fn apply_patch_invocation() -> CommandInvocation {
         CommandInvocation {
             domain: "act".to_owned(),
@@ -219,6 +228,17 @@ mod tests {
         vec![b'a'; len - envelope_len]
     }
 
+    fn argument_with_jsonl_len(len: usize) -> String {
+        let envelope_len = request_jsonl_len(&CommandRequest::from(
+            observe_status_invocation_with_argument(String::new()),
+        ));
+        assert!(
+            len > envelope_len,
+            "requested JSONL line length must fit argument bytes"
+        );
+        "a".repeat(len - envelope_len)
+    }
+
     fn request_jsonl_len(request: &CommandRequest) -> usize {
         match serde_json::to_vec(request) {
             Ok(bytes) => bytes.len() + 1,
@@ -231,6 +251,21 @@ mod tests {
         let mut stdin = Cursor::new(b"should not be read".to_vec());
         let result = build_request(observe_status_invocation(), &mut stdin);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn non_patch_invocation_rejects_oversized_jsonl_request() {
+        let invocation = observe_status_invocation_with_argument(argument_with_jsonl_len(
+            MAX_PATCH_BYTES as usize + 1,
+        ));
+        let mut stdin = Cursor::new(b"should not be read".to_vec());
+        let result = build_request(invocation, &mut stdin);
+
+        assert!(matches!(
+            result,
+            Err(AppError::ReadPatch(error))
+                if error.kind() == std::io::ErrorKind::UnexpectedEof
+        ));
     }
 
     #[rstest::rstest]
