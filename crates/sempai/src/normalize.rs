@@ -22,7 +22,7 @@
 //!
 //! - `"..."` (string shorthand) → `Formula::Atom(Atom::Pattern(...))`
 //! - `pattern: "..."` → `Formula::Atom(Atom::Pattern(...))`
-//! - `regex: "...` → `Formula::Atom(Atom::Regex(...))`
+//! - `regex: "..."` → `Formula::Atom(Atom::Regex(...))`
 //! - `all: [...]` → `Formula::And([...])`
 //! - `any: [...]` → `Formula::Or([...])`
 //! - `not: ...` → `Formula::Not(Box<...>)`
