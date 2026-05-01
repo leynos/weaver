@@ -329,15 +329,13 @@ mod tests {
         fn patch_at_or_below_limit_returns_only_expected_outcomes(
             size in 1usize..=(MAX_PATCH_BYTES as usize)
         ) {
-            let small_patch = "x";
-            let mut stdin = Cursor::new(small_patch.as_bytes().to_vec());
+            let mut stdin = Cursor::new(vec![b'x'; size]);
             let result = build_request(apply_patch_invocation(), &mut stdin);
 
             prop_assert!(
                 result.is_ok() || matches!(result, Err(AppError::RequestTooLarge { .. })),
                 "build_request must return Ok or RequestTooLarge, not another error variant"
             );
-            let _ = size;
         }
 
         #[test]

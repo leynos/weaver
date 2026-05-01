@@ -191,8 +191,7 @@ fn generated_man_page_contains_all_shared_config_flags() {
             .map(|content| (path, content))
     });
     let Some((man_page_path, content)) = content else {
-        eprintln!("skipping manpage test: no weaver.1 found for target {target}");
-        return;
+        panic!("generated man page weaver.1 not found for target {target}");
     };
 
     for flag in EXPECTED_SHARED_CONFIG_HELP_FLAGS {

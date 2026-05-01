@@ -149,9 +149,13 @@ fn config_flag_after_domain_is_not_extracted_as_config_argument() {
         .iter()
         .map(OsString::from)
         .collect();
-    let _exit = run_with_loader(argv, &mut io, &TrackingLoader(load_called_clone));
+    let exit = run_with_loader(argv, &mut io, &TrackingLoader(load_called_clone));
 
-    let _ = load_called.load(Ordering::SeqCst);
+    assert!(
+        load_called.load(Ordering::SeqCst),
+        "config loader must be called for domain command routing"
+    );
+    assert_eq!(exit, ExitCode::FAILURE);
 }
 
 #[test]
