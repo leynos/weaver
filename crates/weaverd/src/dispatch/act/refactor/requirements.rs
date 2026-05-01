@@ -13,10 +13,7 @@ const REQUIRED_FLAGS: &[&str] = &[
     "--refactoring <operation>",
     "--file <path>",
 ];
-const NEXT_COMMAND: &str = concat!(
-    "weaver act refactor --provider rope --refactoring rename ",
-    "--file path/to/file.py offset=1 new_name=renamed_symbol"
-);
+const NEXT_COMMAND_SUFFIX: &str = "--file path/to/file.py offset=1 new_name=renamed_symbol";
 
 struct SupportedRefactoring {
     user_facing: &'static str,
@@ -142,7 +139,20 @@ fn guidance_lines() -> String {
         "Valid alternatives:\n  - Providers: {}\n  - Refactorings: {}\n\nNext command:\n  {}",
         providers.join(", "),
         refactorings.join(", "),
-        NEXT_COMMAND
+        next_command_example(providers, refactorings)
+    )
+}
+
+fn next_command_example(providers: &[&str], refactorings: &[&str]) -> String {
+    let provider = providers.first().copied().unwrap_or("<plugin>");
+    let refactoring = refactorings.first().copied().unwrap_or("<operation>");
+    format!(
+        concat!(
+            "weaver act refactor --provider {} ",
+            "--refactoring {} ",
+            "{}"
+        ),
+        provider, refactoring, NEXT_COMMAND_SUFFIX
     )
 }
 
@@ -154,10 +164,12 @@ fn invalid_supported_value(kind: &str, value: &str) -> DispatchError {
 }
 
 fn format_required_flags() -> String {
-    let [first, second, third] = REQUIRED_FLAGS else {
-        unreachable!("required act refactor flag list must stay in sync");
-    };
-    format!("{first}, {second}, and {third}")
+    match REQUIRED_FLAGS {
+        [] => String::new(),
+        [only] => (*only).to_owned(),
+        [first, second] => format!("{first} and {second}"),
+        [rest @ .., last] => format!("{}, and {last}", rest.join(", ")),
+    }
 }
 
 #[cfg(test)]
