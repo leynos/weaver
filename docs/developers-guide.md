@@ -433,10 +433,9 @@ and `stderr`.
 
 ### `fixture_uri`
 
-`fixture_uri(temp_dir, case)` materialises a `CardFixtureCase` source file into
+`fixture_uri(temp_dir, case)` materializes a `CardFixtureCase` source file into
 `temp_dir` and returns its `file://` URI so that snapshot tests operate on a
 real filesystem path.
-
 
 ### `assert_named_snapshot`
 
@@ -454,7 +453,7 @@ catalogue. `GraphSliceFixtureCase` is a type alias for `CardFixtureCase`.
 
 ### Snapshot test structure
 
-`graph_slice_snapshots.rs` contains three `#[rstest]` tests:
+`graph_slice_snapshots.rs` contains four `#[rstest]` tests:
 
 - `graph_slice_semantic_snapshots_cover_python_and_rust_fixture_battery` —
   runs all 40 fixture cases and asserts both explicit structural fields and a
@@ -464,6 +463,9 @@ catalogue. `GraphSliceFixtureCase` is a type alias for `CardFixtureCase`.
   spillover.
 - `graph_slice_refusal_snapshots` — exercises the unsupported-language refusal
   path and asserts `refusal.reason == "unsupported_language"`.
+- `graph_slice_refusal_position_out_of_range` — exercises the refusal path for
+  an out-of-range position and asserts
+  `refusal.reason == "position_out_of_range"`.
 
 ## CLI help and preflight internals
 
