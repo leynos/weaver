@@ -268,13 +268,32 @@ fn graph_slice_truncation_snapshots(
     );
 }
 
-#[rstest]
-fn graph_slice_refusal_snapshots(snapshot_harness: SnapshotHarness) {
-    let workspace = SnapshotHarness::unsupported_workspace();
-    let daemon = snapshot_harness.daemon(None);
+struct RefusalSnapshotCase<'a> {
+    workspace: WorkspaceUri,
+    line: u32,
+    column: u32,
+    expected_reason: &'a str,
+    status_assertion_message: &'a str,
+    snapshot_name: &'a str,
+}
+
+#[expect(
+    clippy::expect_used,
+    reason = "test helper failures should panic with explicit context"
+)]
+fn run_refusal_snapshot(harness: SnapshotHarness, case: RefusalSnapshotCase<'_>) {
+    let RefusalSnapshotCase {
+        workspace,
+        line,
+        column,
+        expected_reason,
+        status_assertion_message,
+        snapshot_name,
+    } = case;
+    let daemon = harness.daemon(None);
     let transcript = run_graph_slice(
         &daemon,
-        SnapshotHarness::request(&workspace.uri, 1, 1, None),
+        SnapshotHarness::request(&workspace.uri, line, column, None),
     );
     {
         let raw = &transcript.stdout;
@@ -284,50 +303,45 @@ fn graph_slice_refusal_snapshots(snapshot_harness: SnapshotHarness) {
             assert_eq!(
                 value.get("status"),
                 Some(&serde_json::json!("refusal")),
-                "unsupported language should produce a refusal"
+                "{status_assertion_message}"
             );
             assert_eq!(
                 value.pointer("/refusal/reason"),
-                Some(&serde_json::json!("unsupported_language")),
-                "refusal reason should be unsupported_language"
+                Some(&serde_json::json!(expected_reason)),
+                "refusal reason should be {expected_reason}"
             );
         }
     }
     daemon.join();
-    assert_named_snapshot(
-        "graph_slice_refusal_unsupported_language",
-        &render_snapshot(&transcript),
+    assert_named_snapshot(snapshot_name, &render_snapshot(&transcript));
+}
+
+#[rstest]
+fn graph_slice_refusal_snapshots(snapshot_harness: SnapshotHarness) {
+    run_refusal_snapshot(
+        snapshot_harness,
+        RefusalSnapshotCase {
+            workspace: SnapshotHarness::unsupported_workspace(),
+            line: 1,
+            column: 1,
+            expected_reason: "unsupported_language",
+            status_assertion_message: "unsupported language should produce a refusal",
+            snapshot_name: "graph_slice_refusal_unsupported_language",
+        },
     );
 }
 
 #[rstest]
 fn graph_slice_refusal_position_out_of_range(snapshot_harness: SnapshotHarness) {
-    let workspace = SnapshotHarness::workspace_for_case(RUST_CASES[0]);
-    let daemon = snapshot_harness.daemon(None);
-    let transcript = run_graph_slice(
-        &daemon,
-        SnapshotHarness::request(&workspace.uri, 10_000, 1, None),
-    );
-    {
-        let raw = &transcript.stdout;
-        if !raw.is_empty() {
-            let value: serde_json::Value =
-                serde_json::from_str(raw).expect("transcript stdout should be valid JSON");
-            assert_eq!(
-                value.get("status"),
-                Some(&serde_json::json!("refusal")),
-                "out-of-range position should produce a refusal"
-            );
-            assert_eq!(
-                value.pointer("/refusal/reason"),
-                Some(&serde_json::json!("position_out_of_range")),
-                "refusal reason should be position_out_of_range"
-            );
-        }
-    }
-    daemon.join();
-    assert_named_snapshot(
-        "graph_slice_refusal_position_out_of_range",
-        &render_snapshot(&transcript),
+    run_refusal_snapshot(
+        snapshot_harness,
+        RefusalSnapshotCase {
+            workspace: SnapshotHarness::workspace_for_case(RUST_CASES[0]),
+            line: 10_000,
+            column: 1,
+            expected_reason: "position_out_of_range",
+            status_assertion_message: "out-of-range position should produce a refusal",
+            snapshot_name: "graph_slice_refusal_position_out_of_range",
+        },
     );
 }
