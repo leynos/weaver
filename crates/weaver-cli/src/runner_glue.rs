@@ -29,8 +29,8 @@ use crate::{
 /// Maximum patch size accepted from stdin.
 ///
 /// Mirrors the JSON Lines request line-size budget so apply-patch requests do
-/// not exceed the daemon transport limit. Patches that exceed this limit return
-/// an IO error with `ErrorKind::UnexpectedEof`.
+/// not exceed the daemon transport limit. Patches or serialised requests that
+/// exceed this limit return [`AppError::RequestTooLarge`].
 const MAX_PATCH_BYTES: u64 = JSONL_REQUEST_MAX_LINE_BYTES as u64;
 
 /// Executes a daemon-backed command end-to-end.
