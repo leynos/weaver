@@ -28,9 +28,10 @@ Observable user-facing behaviour after implementation:
   conjunctions without positive terms in `patterns`/`all`) emit deterministic
   `E_SEMPAI_INVALID_NOT_IN_OR` or `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND`
   diagnostics with accurate `primary_span` locations.
-- `r2c-internal-project-depends-on` rules continue to parse successfully
-  without normalization failure (they produce a degenerate formula or are gated
-  appropriately).
+- `r2c-internal-project-depends-on` principals continue to parse successfully
+  without normalization failure by lowering to the degenerate
+  `TreeSitterQuery` atom described below, using the exact placeholder query
+  `(__NONEXISTENT_NODE__) @_dependency_check`.
 
 Observable completion evidence:
 
@@ -225,6 +226,8 @@ pub struct Decorated<T> {
 
 Legacy configuration keys mapped to Canonical Formula types:
 
+Table: Legacy configuration keys mapped to Canonical Formula types
+
 | Legacy                                   | Canonical                           |
 | ---------------------------------------- | ----------------------------------- |
 | `pattern: "..."` (string)                | `Formula::Atom(Atom::Pattern(...))` |
@@ -238,6 +241,8 @@ Legacy configuration keys mapped to Canonical Formula types:
 | `semgrep-internal-pattern-anywhere: ...` | `Formula::Anywhere(Box<...>)`       |
 
 v2 `match` keys mapped to Canonical Formula types:
+
+Table: v2 `match` keys mapped to Canonical Formula types
 
 | v2 (`match`)                         | Canonical                           |
 | ------------------------------------ | ----------------------------------- |
