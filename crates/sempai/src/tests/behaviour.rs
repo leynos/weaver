@@ -107,6 +107,16 @@ fn assert_diagnostic_code<T: std::fmt::Debug>(
     );
 }
 
+fn first_compiled_plan(world: &TestWorld) -> &QueryPlan {
+    let plans = world
+        .compile_result
+        .as_ref()
+        .expect("compile result should be set")
+        .as_ref()
+        .expect("expected successful compilation");
+    plans.first().expect("expected at least one query plan")
+}
+
 // ---------------------------------------------------------------------------
 // Then steps
 // ---------------------------------------------------------------------------
@@ -160,14 +170,30 @@ fn then_compilation_succeeds_with_plans(world: &mut TestWorld, count: usize) {
 
 #[then("the first query plan has rule id {id}")]
 fn then_first_plan_rule_id(world: &mut TestWorld, id: QuotedString) {
-    let plans = world
-        .compile_result
-        .as_ref()
-        .expect("compile result should be set")
-        .as_ref()
-        .expect("expected successful compilation");
-    let first = plans.first().expect("expected at least one query plan");
+    let first = first_compiled_plan(world);
     assert_eq!(first.rule_id(), id.as_str());
+}
+
+#[then("the first query plan formula is pattern atom {text}")]
+fn then_first_plan_formula_is_pattern_atom(world: &mut TestWorld, text: QuotedString) {
+    let first = first_compiled_plan(world);
+    assert!(
+        matches!(&first.formula().node, Formula::Atom(Atom::Pattern(pattern)) if pattern.text == text.as_str()),
+        "expected first query plan formula to be Pattern({:?}), got {:?}",
+        text.as_str(),
+        first.formula().node
+    );
+}
+
+#[then("the first query plan formula is Tree-sitter query atom {query}")]
+fn then_first_plan_formula_is_tree_sitter_query_atom(world: &mut TestWorld, query: QuotedString) {
+    let first = first_compiled_plan(world);
+    assert!(
+        matches!(&first.formula().node, Formula::Atom(Atom::TreeSitterQuery(atom)) if atom.query == query.as_str()),
+        "expected first query plan formula to be TreeSitterQuery({:?}), got {:?}",
+        query.as_str(),
+        first.formula().node
+    );
 }
 
 #[then("execution fails with code {code}")]

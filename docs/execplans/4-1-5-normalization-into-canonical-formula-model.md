@@ -5,7 +5,8 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETED - shipped canonical formula normalization, semantic
+validation, and `compile_yaml` query-plan construction.
 
 ## Purpose / big picture
 
@@ -29,8 +30,8 @@ Observable user-facing behaviour after implementation:
   `E_SEMPAI_INVALID_NOT_IN_OR` or `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND`
   diagnostics with accurate `primary_span` locations.
 - `r2c-internal-project-depends-on` principals continue to parse successfully
-  without normalization failure by lowering to the degenerate
-  `TreeSitterQuery` atom described below, using the exact placeholder query
+  without normalization failure by lowering to the degenerate `TreeSitterQuery`
+  atom described below, using the exact placeholder query
   `(__NONEXISTENT_NODE__) @_dependency_check`.
 
 Observable completion evidence:
@@ -137,31 +138,44 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-5-make-nixie.log
 
 ## Progress
 
-- [ ] Stage A: Research and specification (no code changes).
-- [ ] Stage B: Define `Formula`, `Atom`, `Decorated`, `WhereClause` types in
+- [x] Stage A: Research and specification (no code changes).
+- [x] Stage B: Define `Formula`, `Atom`, `Decorated`, `WhereClause` types in
       `sempai_core`.
-- [ ] Stage C: Implement normalization functions `normalize_legacy` and
+- [x] Stage C: Implement normalization functions `normalize_legacy` and
       `normalize_match`.
-- [ ] Stage D: Implement semantic validation (`InvalidNotInOr`,
+- [x] Stage D: Implement semantic validation (`InvalidNotInOr`,
       `MissingPositiveTermInAnd`).
-- [ ] Stage E: Wire normalization into `Engine::compile_yaml` and produce real
+- [x] Stage E: Wire normalization into `Engine::compile_yaml` and produce real
       `QueryPlan` values.
-- [ ] Stage F: Add unit tests, BDD scenarios, and paired legacy/v2 fixture
+- [x] Stage F: Add unit tests, BDD scenarios, and paired legacy/v2 fixture
       coverage.
-- [ ] Stage G: Update documentation, roadmap, and user's guide.
-- [ ] Stage H: Run all quality gates and finalize.
+- [x] Stage G: Update documentation, roadmap, and user's guide.
+- [x] Stage H: Run all quality gates and finalize.
+
+Completed note: this ExecPlan is archived as shipped. Later execution semantics
+for `TreeSitterQuery` matching and dependency rules are tracked by downstream
+milestones.
 
 ## Surprises & discoveries
 
-(None yet.)
+- `r2c-internal-project-depends-on` has no source-code formula body, so the
+  shipped path lowers it to a degenerate, non-matchable `TreeSitterQuery` atom
+  instead of inventing a speculative dependency atom.
 
 ## Decision log
 
-(None yet.)
+- Use `serde_json::Value` inside `WhereClause` so normalization preserves
+  constraints losslessly while later milestones decide how each clause is
+  interpreted.
+- Make `normalize_search_principal` infallible because all supported search
+  principals can be lowered into a canonical placeholder or formula shape.
 
 ## Outcomes & retrospective
 
-(To be completed after implementation.)
+Implemented. `sempai::Engine::compile_yaml` now returns query plans for valid
+search rules, with normalized formula payloads available through
+`QueryPlan::formula()`. Semantic validation rejects unsupported formula shapes
+with stable `E_SEMPAI_*` diagnostics before plan construction.
 
 ## Context and orientation
 
@@ -244,17 +258,17 @@ v2 `match` keys mapped to Canonical Formula types:
 
 Table: v2 `match` keys mapped to Canonical Formula types
 
-| v2 (`match`)                         | Canonical                           |
-| ------------------------------------ | ----------------------------------- |
-| `"..."` (string shorthand)           | `Formula::Atom(Atom::Pattern(...))` |
-| `pattern: "..."`                     | `Formula::Atom(Atom::Pattern(...))` |
-| `regex: "..."`                       | `Formula::Atom(Atom::Regex(...))`   |
-| `all: [...]`                         | `Formula::And([...])`               |
-| `any: [...]`                         | `Formula::Or([...])`                |
-| `not: ...`                           | `Formula::Not(Box<...>)`            |
-| `inside: ...`                        | `Formula::Inside(Box<...>)`         |
-| `anywhere: ...`                      | `Formula::Anywhere(Box<...>)`       |
-| `Decorated { where, as, fix, .. }`   | `Decorated<Formula>` wrapper[^1]    |
+| v2 (`match`)                       | Canonical                           |
+| ---------------------------------- | ----------------------------------- |
+| `"..."` (string shorthand)         | `Formula::Atom(Atom::Pattern(...))` |
+| `pattern: "..."`                   | `Formula::Atom(Atom::Pattern(...))` |
+| `regex: "..."`                     | `Formula::Atom(Atom::Regex(...))`   |
+| `all: [...]`                       | `Formula::And([...])`               |
+| `any: [...]`                       | `Formula::Or([...])`                |
+| `not: ...`                         | `Formula::Not(Box<...>)`            |
+| `inside: ...`                      | `Formula::Inside(Box<...>)`         |
+| `anywhere: ...`                    | `Formula::Anywhere(Box<...>)`       |
+| `Decorated { where, as, fix, .. }` | `Decorated<Formula>` wrapper[^1]    |
 
 [^1]: The canonical `Decorated<Formula>` exposes the fields `where_clauses`,
     `as_name`, `fix`, and `span: Option<SourceSpan>` in addition to the inner
