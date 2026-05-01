@@ -223,7 +223,7 @@ pub struct Decorated<T> {
 }
 ```
 
-Legacy-to-canonical mapping:
+Legacy configuration keys mapped to Canonical Formula types:
 
 | Legacy                                   | Canonical                           |
 | ---------------------------------------- | ----------------------------------- |
@@ -237,7 +237,7 @@ Legacy-to-canonical mapping:
 | `pattern-not-regex: "..."`               | `Formula::Not(Atom(Regex(...)))`    |
 | `semgrep-internal-pattern-anywhere: ...` | `Formula::Anywhere(Box<...>)`       |
 
-v2-to-canonical mapping:
+v2 `match` keys mapped to Canonical Formula types:
 
 | v2 (`match`)                         | Canonical                           |
 | ------------------------------------ | ----------------------------------- |
@@ -249,9 +249,9 @@ v2-to-canonical mapping:
 | `not: ...`                           | `Formula::Not(Box<...>)`            |
 | `inside: ...`                        | `Formula::Inside(Box<...>)`         |
 | `anywhere: ...`                      | `Formula::Anywhere(Box<...>)`       |
-| `Decorated { where, as, fix, .. }`   | `Decorated<Formula>` wrapper[^d]    |
+| `Decorated { where, as, fix, .. }`   | `Decorated<Formula>` wrapper[^1]    |
 
-[^d]: The canonical `Decorated<Formula>` exposes the fields `where_clauses`,
+[^1]: The canonical `Decorated<Formula>` exposes the fields `where_clauses`,
     `as_name`, `fix`, and `span: Option<SourceSpan>` in addition to the inner
     `node`.
 

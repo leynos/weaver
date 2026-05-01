@@ -313,8 +313,8 @@ fn v2_decorated_preserves_where_as_and_fix_metadata() {
 
     // The core node should be the normalized pattern atom.
     assert!(matches!(
-        decorated.node,
-        Formula::Atom(Atom::Pattern(ref pat)) if pat.text == "foo($X)"
+        &decorated.node,
+        Formula::Atom(Atom::Pattern(pat)) if pat.text == "foo($X)"
     ));
 
     // Metadata should be preserved on the Decorated wrapper.
