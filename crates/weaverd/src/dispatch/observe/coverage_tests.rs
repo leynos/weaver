@@ -98,7 +98,8 @@ fn stable_card_order_produces_deterministic_results(
     let request = make_request(&["--uri", &uri, "--position", "4:8"]);
 
     let (status_a, payload_a) = dispatch_payload(&request, &mut backends)?;
-    let (status_b, payload_b) = dispatch_payload(&request, &mut backends)?;
+    let (mut fresh_backends, _fresh_backend_dir) = super::backends_fixture()?;
+    let (status_b, payload_b) = dispatch_payload(&request, &mut fresh_backends)?;
 
     assert_success_response(status_a, &payload_a);
     assert_success_response(status_b, &payload_b);
