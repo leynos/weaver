@@ -14,8 +14,8 @@
 //! # Example
 //!
 //! ```ignore
-//! use sempai::semantic_check::validate_formula;
-//! use sempai_core::formula::{Formula, Decorated};
+//! use crate::semantic_check::validate_formula;
+//! use sempai_core::formula::{Decorated, Formula};
 //!
 //! let formula = /* ... */;
 //! validate_formula(&formula)?;
@@ -38,6 +38,7 @@ pub(crate) const MAX_FORMULA_DEPTH: usize = 1000;
 ///
 /// - `E_SEMPAI_INVALID_NOT_IN_OR`: Or branch contains a Not formula
 /// - `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND`: And formula has no positive terms
+/// - `E_SEMPAI_SCHEMA_INVALID`: formula nesting exceeds the maximum safe depth
 #[tracing::instrument(level = "debug", skip_all)]
 pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
     let result = validate_formula_inner(formula);
