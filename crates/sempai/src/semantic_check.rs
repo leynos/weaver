@@ -51,23 +51,13 @@ pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), Diagn
 }
 
 fn validate_formula_inner(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
-    let mut max_depth = 0;
     let analysis = analyze_formula_with_depth(
         formula,
         AnalysisScope {
             depth: 1,
             fallback_span: formula.span.as_ref(),
         },
-        &mut max_depth,
-    );
-    if max_depth > MAX_FORMULA_DEPTH {
-        return Err(DiagnosticReport::validation_error(
-            DiagnosticCode::ESempaiSchemaInvalid,
-            format!("formula nesting depth exceeds limit of {MAX_FORMULA_DEPTH}: {max_depth}"),
-            formula.span.clone(),
-            vec![],
-        ));
-    }
+    )?;
     if let Some(diagnostic) = analysis.invalid_not_in_or {
         return Err(DiagnosticReport::validation_error(
             DiagnosticCode::ESempaiInvalidNotInOr,
@@ -123,17 +113,15 @@ fn analyze_not_arm(
     inner: &Decorated<Formula>,
     scope: AnalysisScope<'_>,
     formula_span: Option<&SourceSpan>,
-    max_depth: &mut usize,
-) -> FormulaAnalysis {
+) -> Result<FormulaAnalysis, DiagnosticReport> {
     let mut analysis = analyze_formula_with_depth(
         inner,
         scope.child_with_fallback(formula_span.or(scope.fallback_span)),
-        max_depth,
-    );
+    )?;
     analysis.contains_not = true;
     analysis.has_positive_term = false;
     analysis.first_negation_span = formula_span.cloned().or(analysis.first_negation_span);
-    analysis
+    Ok(analysis)
 }
 
 /// Analyses an `Inside` or `Anywhere` node (no negation tracking).
@@ -141,15 +129,13 @@ fn analyze_inside_anywhere_arm(
     inner: &Decorated<Formula>,
     scope: AnalysisScope<'_>,
     formula_span: Option<&SourceSpan>,
-    max_depth: &mut usize,
-) -> FormulaAnalysis {
+) -> Result<FormulaAnalysis, DiagnosticReport> {
     let mut analysis = analyze_formula_with_depth(
         inner,
         scope.child_with_fallback(formula_span.or(scope.fallback_span)),
-        max_depth,
-    );
+    )?;
     analysis.has_positive_term = false;
-    analysis
+    Ok(analysis)
 }
 
 /// Analyses a conjunction (`And`) node and attaches a
@@ -158,13 +144,11 @@ fn analyze_and_arm(
     formula: &Decorated<Formula>,
     branches: &[Decorated<Formula>],
     scope: AnalysisScope<'_>,
-    max_depth: &mut usize,
-) -> FormulaAnalysis {
+) -> Result<FormulaAnalysis, DiagnosticReport> {
     let mut analysis = analyze_branches(
         branches,
         scope.child_with_fallback(formula.span.as_ref().or(scope.fallback_span)),
-        max_depth,
-    );
+    )?;
     if !analysis.has_positive_term {
         analysis.missing_positive_term = Some(DiagnosticSite {
             primary_span: formula
@@ -174,7 +158,7 @@ fn analyze_and_arm(
                 .or_else(|| scope.fallback_span.cloned()),
         });
     }
-    analysis
+    Ok(analysis)
 }
 
 /// Analyses a disjunction (`Or`) node and attaches an `InvalidNotInOr` site
@@ -183,13 +167,12 @@ fn analyze_or_arm(
     formula: &Decorated<Formula>,
     branches: &[Decorated<Formula>],
     scope: AnalysisScope<'_>,
-    max_depth: &mut usize,
-) -> FormulaAnalysis {
+) -> Result<FormulaAnalysis, DiagnosticReport> {
     let mut analysis = FormulaAnalysis::default();
     let child_fallback = formula.span.as_ref().or(scope.fallback_span);
     let child_scope = scope.child_with_fallback(child_fallback);
     for branch in branches {
-        let branch_analysis = analyze_formula_with_depth(branch, child_scope, max_depth);
+        let branch_analysis = analyze_formula_with_depth(branch, child_scope)?;
         if branch_analysis.contains_not && analysis.invalid_not_in_or.is_none() {
             analysis.invalid_not_in_or = Some(DiagnosticSite {
                 primary_span: branch_analysis
@@ -212,37 +195,48 @@ fn analyze_or_arm(
             .missing_positive_term
             .or(branch_analysis.missing_positive_term);
     }
-    analysis
+    Ok(analysis)
 }
 
 fn analyze_formula_with_depth(
     formula: &Decorated<Formula>,
     scope: AnalysisScope<'_>,
-    max_depth: &mut usize,
-) -> FormulaAnalysis {
-    *max_depth = (*max_depth).max(scope.depth);
+) -> Result<FormulaAnalysis, DiagnosticReport> {
+    if scope.depth > MAX_FORMULA_DEPTH {
+        return Err(DiagnosticReport::validation_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            format!(
+                "formula nesting depth exceeds limit of {MAX_FORMULA_DEPTH}: {}",
+                scope.depth
+            ),
+            formula
+                .span
+                .clone()
+                .or_else(|| scope.fallback_span.cloned()),
+            vec![],
+        ));
+    }
     match &formula.node {
-        Formula::Atom(_) => FormulaAnalysis {
+        Formula::Atom(_) => Ok(FormulaAnalysis {
             has_positive_term: true,
             ..FormulaAnalysis::default()
-        },
-        Formula::Not(inner) => analyze_not_arm(inner, scope, formula.span.as_ref(), max_depth),
+        }),
+        Formula::Not(inner) => analyze_not_arm(inner, scope, formula.span.as_ref()),
         Formula::Inside(inner) | Formula::Anywhere(inner) => {
-            analyze_inside_anywhere_arm(inner, scope, formula.span.as_ref(), max_depth)
+            analyze_inside_anywhere_arm(inner, scope, formula.span.as_ref())
         }
-        Formula::And(branches) => analyze_and_arm(formula, branches, scope, max_depth),
-        Formula::Or(branches) => analyze_or_arm(formula, branches, scope, max_depth),
+        Formula::And(branches) => analyze_and_arm(formula, branches, scope),
+        Formula::Or(branches) => analyze_or_arm(formula, branches, scope),
     }
 }
 
 fn analyze_branches(
     branches: &[Decorated<Formula>],
     scope: AnalysisScope<'_>,
-    max_depth: &mut usize,
-) -> FormulaAnalysis {
+) -> Result<FormulaAnalysis, DiagnosticReport> {
     let mut analysis = FormulaAnalysis::default();
     for branch in branches {
-        let branch_analysis = analyze_formula_with_depth(branch, scope, max_depth);
+        let branch_analysis = analyze_formula_with_depth(branch, scope)?;
         analysis.has_positive_term |= branch_analysis.has_positive_term;
         analysis.contains_not |= branch_analysis.contains_not;
         analysis.first_negation_span = analysis
@@ -255,5 +249,5 @@ fn analyze_branches(
             .missing_positive_term
             .or(branch_analysis.missing_positive_term);
     }
-    analysis
+    Ok(analysis)
 }
