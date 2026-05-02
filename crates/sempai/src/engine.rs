@@ -20,7 +20,7 @@ use sempai_yaml::{Rule, RulePrincipal, parse_rule_file};
 use crate::{
     mode_validation::validate_supported_modes,
     normalize::normalize_search_principal,
-    semantic_check::{validate_formula, validate_formula_depth},
+    semantic_check::validate_formula,
 };
 
 /// A compiled query plan for one rule and target language.
@@ -120,7 +120,6 @@ impl Engine {
             .try_fold(Vec::new(), |mut plans, (rule, principal)| {
                 tracing::debug!(rule_id = rule.id(), "normalizing principal");
                 let formula = normalize_search_principal(principal, rule.rule_span());
-                validate_formula_depth(&formula, rule.rule_span())?;
 
                 tracing::debug!(rule_id = rule.id(), "validating normalized formula");
                 validate_formula(&formula)?;

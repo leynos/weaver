@@ -24,7 +24,7 @@ prepares per-language query plans for later execution.
 - Normalization (`crates/sempai/src/normalize.rs`):
   - Legacy syntax: `pattern*`, `patterns`, `pattern-either`,
     `pattern-not`, `pattern-not-inside`, `pattern-not-regex`, and
-    `anywhere`
+    `semgrep-internal-pattern-anywhere`
   - v2 `match` syntax: `pattern`, `regex`, `all`, `any`, `not`, `inside`,
     `anywhere`, and decorated metadata propagation
   - Special handling: `r2c-internal-project-depends-on` lowers to
