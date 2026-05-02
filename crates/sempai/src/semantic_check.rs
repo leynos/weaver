@@ -25,7 +25,7 @@ use sempai_core::{
     DiagnosticCode,
     DiagnosticReport,
     SourceSpan,
-    formula::{Decorated, Formula, WhereClause},
+    formula::{Constraint, Decorated, Formula, WhereClause},
 };
 
 pub(crate) const MAX_FORMULA_DEPTH: usize = 1000;
@@ -240,5 +240,5 @@ fn analyze_branches(
 fn has_match_producing_where_clause(where_clauses: &[WhereClause]) -> bool {
     where_clauses
         .iter()
-        .any(|clause| clause.raw.get("metavariable-pattern").is_some())
+        .any(|clause| matches!(clause.constraint, Constraint::MetavariablePattern { .. }))
 }

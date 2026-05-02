@@ -32,15 +32,13 @@
 //! };
 //! ```
 
-use serde_json::Value;
-
 use crate::SourceSpan;
 
 /// Canonical normalized query formula.
 ///
 /// All legacy and v2 syntaxes are lowered into this shared representation
 /// before semantic validation and plan compilation.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Formula {
     /// A leaf pattern or regex atom.
     Atom(Atom),
@@ -142,7 +140,7 @@ pub struct TreeSitterQueryAtom {
 ///     span: None,
 /// };
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Decorated<T> {
     /// The core formula or atom.
     pub node: T,
@@ -156,23 +154,47 @@ pub struct Decorated<T> {
     pub span: Option<SourceSpan>,
 }
 
-/// An opaque `where` constraint clause preserved for later interpretation.
+/// A normalized `where` constraint.
 ///
-/// Where clauses are stored as raw JSON values during normalization and
-/// are interpreted semantically in later compilation phases.
+/// Known Semgrep constraint shapes are represented structurally. Unknown
+/// constraint shapes are preserved as strings for later interpretation by
+/// adapter or compilation layers.
 ///
 /// # Example
 ///
 /// ```
-/// use sempai_core::formula::WhereClause;
-/// use serde_json::json;
+/// use sempai_core::formula::{Constraint, WhereClause};
 ///
 /// let clause = WhereClause {
-///     raw: json!({"metavariable-regex": {"metavariable": "$X", "regex": "foo.*"}}),
+///     constraint: Constraint::MetavariableRegex {
+///         metavariable: String::from("$X"),
+///         regex: String::from("foo.*"),
+///     },
 /// };
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WhereClause {
-    /// The raw JSON value of the constraint.
-    pub raw: Value,
+    /// The normalized constraint payload.
+    pub constraint: Constraint,
+}
+
+/// A normalized `where` constraint payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Constraint {
+    /// A metavariable must match the given regular expression.
+    MetavariableRegex {
+        /// The metavariable name, including the leading `$`.
+        metavariable: String,
+        /// The regular expression pattern.
+        regex: String,
+    },
+    /// A metavariable must match the given Semgrep pattern.
+    MetavariablePattern {
+        /// The metavariable name, including the leading `$`.
+        metavariable: String,
+        /// The Semgrep pattern text.
+        pattern: String,
+    },
+    /// A currently unmodelled constraint, preserved lossily as JSON text.
+    Other(String),
 }

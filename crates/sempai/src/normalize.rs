@@ -31,7 +31,16 @@
 
 use sempai_core::{
     SourceSpan,
-    formula::{Atom, Decorated, Formula, PatternAtom, RegexAtom, TreeSitterQueryAtom, WhereClause},
+    formula::{
+        Atom,
+        Constraint,
+        Decorated,
+        Formula,
+        PatternAtom,
+        RegexAtom,
+        TreeSitterQueryAtom,
+        WhereClause,
+    },
 };
 use sempai_yaml::{
     LegacyClause,
@@ -41,6 +50,7 @@ use sempai_yaml::{
     ProjectDependsOnPayload,
     SearchQueryPrincipal,
 };
+use serde_json::Value;
 
 trait SearchQueryPrincipalTraceExt {
     fn discriminant_like(&self) -> &'static str;
@@ -256,7 +266,9 @@ fn normalize_legacy_patterns(
                 formulas.push(normalize_legacy(formula, fallback_span.clone()));
             }
             LegacyClause::Constraint(value) => {
-                where_clauses.push(WhereClause { raw: value.clone() });
+                where_clauses.push(WhereClause {
+                    constraint: parse_constraint(value),
+                });
             }
         }
     }
@@ -331,13 +343,39 @@ fn normalize_match(
             let mut normalized = normalize_match(inner_formula, fallback_span);
             normalized.where_clauses = raw_where
                 .iter()
-                .map(|raw| WhereClause { raw: raw.clone() })
+                .map(|raw| WhereClause {
+                    constraint: parse_constraint(raw),
+                })
                 .collect();
             normalized.as_name.clone_from(as_name);
             normalized.fix.clone_from(fix);
             normalized
         }
     }
+}
+
+fn parse_constraint(raw: &Value) -> Constraint {
+    raw.get("metavariable-regex")
+        .and_then(parse_metavariable_regex)
+        .or_else(|| {
+            raw.get("metavariable-pattern")
+                .and_then(parse_metavariable_pattern)
+        })
+        .unwrap_or_else(|| Constraint::Other(raw.to_string()))
+}
+
+fn parse_metavariable_regex(value: &Value) -> Option<Constraint> {
+    Some(Constraint::MetavariableRegex {
+        metavariable: value.get("metavariable")?.as_str()?.to_owned(),
+        regex: value.get("regex")?.as_str()?.to_owned(),
+    })
+}
+
+fn parse_metavariable_pattern(value: &Value) -> Option<Constraint> {
+    Some(Constraint::MetavariablePattern {
+        metavariable: value.get("metavariable")?.as_str()?.to_owned(),
+        pattern: value.get("pattern")?.as_str()?.to_owned(),
+    })
 }
 
 /// Normalizes a dependency principal into a placeholder formula.

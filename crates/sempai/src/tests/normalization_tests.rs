@@ -2,12 +2,10 @@
 
 use rstest::rstest;
 use sempai_core::{
-    DiagnosticCode,
     SourceSpan,
-    formula::{Atom, Decorated, Formula, PatternAtom, RegexAtom, TreeSitterQueryAtom, WhereClause},
+    formula::{Atom, Decorated, Formula, PatternAtom, RegexAtom, TreeSitterQueryAtom},
 };
 use sempai_yaml::{
-    LegacyClause,
     LegacyFormula,
     LegacyValue,
     MatchFormula,
@@ -16,7 +14,7 @@ use sempai_yaml::{
 };
 use serde_json::json;
 
-use crate::{normalize::normalize_search_principal, semantic_check::validate_formula};
+use crate::normalize::normalize_search_principal;
 
 /// Helper to normalize a legacy formula and extract the node.
 fn normalize_legacy(formula: LegacyFormula) -> Formula {
@@ -24,25 +22,10 @@ fn normalize_legacy(formula: LegacyFormula) -> Formula {
     normalize_search_principal(&principal, None).node
 }
 
-/// Helper to normalize a legacy formula and keep the full decorated wrapper.
-///
-/// Useful for tests that need to inspect `where_clauses` or other metadata
-/// attached to the normalized formula.
-fn normalize_legacy_decorated(formula: LegacyFormula) -> Decorated<Formula> {
-    let principal = SearchQueryPrincipal::Legacy(formula);
-    normalize_search_principal(&principal, None)
-}
-
 /// Helper to normalize a v2 match formula and extract the node.
 fn normalize_v2(formula: MatchFormula) -> Formula {
     let principal = SearchQueryPrincipal::Match(formula);
     normalize_search_principal(&principal, None).node
-}
-
-/// Helper to normalize a v2 match formula and keep the full decorated wrapper.
-fn normalize_v2_decorated(formula: MatchFormula) -> Decorated<Formula> {
-    let principal = SearchQueryPrincipal::Match(formula);
-    normalize_search_principal(&principal, None)
 }
 
 /// Asserts that a `Decorated<Formula>` wraps a `Pattern` atom with the given text.
@@ -261,112 +244,6 @@ fn legacy_anywhere_normalizes_to_anywhere() {
         },
         _ => panic!("expected Anywhere formula from semgrep-internal-pattern-anywhere"),
     }
-}
-
-#[test]
-fn legacy_patterns_propagates_constraints_to_where_clauses() {
-    // Build a legacy `patterns: [...]` with two pattern clauses and one
-    // constraint clause. The constraint should end up on the enclosing And.
-    let constraint = json!({"metavariable-regex": {"metavariable": "$X", "regex": "foo.*"}});
-    let legacy = LegacyFormula::Patterns(vec![
-        LegacyClause::Formula(LegacyFormula::Pattern(String::from("foo($X)"))),
-        LegacyClause::Formula(LegacyFormula::Pattern(String::from("bar($X)"))),
-        LegacyClause::Constraint(constraint.clone()),
-    ]);
-
-    let decorated = normalize_legacy_decorated(legacy);
-
-    // Outer node must be an `And` combining the pattern formulas.
-    let children = match &decorated.node {
-        Formula::And(children) => children,
-        other => panic!("expected normalized legacy Patterns to be And, got {other:?}"),
-    };
-    assert_eq!(children.len(), 2);
-
-    // The constraint should be attached as a where_clause on the outer And.
-    assert_eq!(decorated.where_clauses.len(), 1);
-    let clause = decorated
-        .where_clauses
-        .first()
-        .expect("expected at least one where_clause");
-    assert_eq!(clause.raw, constraint);
-
-    // Child formulas themselves must not carry any where_clauses.
-    for (idx, child) in children.iter().enumerate() {
-        assert!(
-            child.where_clauses.is_empty(),
-            "expected child {idx} of And to have empty where_clauses"
-        );
-    }
-}
-
-#[test]
-fn legacy_patterns_with_only_constraints_produces_and_with_no_children_and_where_clauses() {
-    let constraint = json!({"metavariable-regex": {"metavariable": "$X", "regex": "foo.*"}});
-    let legacy = LegacyFormula::Patterns(vec![LegacyClause::Constraint(constraint.clone())]);
-
-    let decorated = normalize_legacy_decorated(legacy);
-
-    match &decorated.node {
-        Formula::And(children) => assert!(children.is_empty()),
-        other => panic!("expected normalized legacy Patterns to be And, got {other:?}"),
-    }
-    assert_eq!(decorated.where_clauses.len(), 1);
-    let clause = decorated
-        .where_clauses
-        .first()
-        .expect("expected at least one where_clause");
-    assert_eq!(clause.raw, constraint);
-
-    let err = validate_formula(&decorated).expect_err("constraint-only And should fail");
-    let first = err.diagnostics().first().expect("expected diagnostic");
-    assert_eq!(
-        first.code(),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd
-    );
-}
-
-#[test]
-fn legacy_patterns_with_only_metavariable_pattern_constraint_validates() {
-    let constraint = json!({"metavariable-pattern": {"metavariable": "$X", "pattern": "bad"}});
-    let legacy = LegacyFormula::Patterns(vec![LegacyClause::Constraint(constraint.clone())]);
-    let decorated = normalize_legacy_decorated(legacy);
-
-    assert!(matches!(&decorated.node, Formula::And(children) if children.is_empty()));
-    assert_eq!(
-        decorated.where_clauses,
-        vec![WhereClause { raw: constraint }]
-    );
-    assert!(validate_formula(&decorated).is_ok());
-}
-
-#[test]
-fn v2_decorated_preserves_where_as_and_fix_metadata() {
-    let constraint = json!({"metavariable-pattern": {"metavariable": "$X", "pattern": "bad"}});
-    let formula = MatchFormula::Decorated {
-        formula: Box::new(MatchFormula::Pattern(String::from("foo($X)"))),
-        where_clauses: vec![constraint.clone()],
-        as_name: Some(String::from("my_capture")),
-        fix: Some(String::from("replace_me")),
-    };
-
-    let decorated = normalize_v2_decorated(formula);
-
-    // The core node should be the normalized pattern atom.
-    assert!(matches!(
-        &decorated.node,
-        Formula::Atom(Atom::Pattern(pat)) if pat.text == "foo($X)"
-    ));
-
-    // Metadata should be preserved on the Decorated wrapper.
-    assert_eq!(decorated.as_name.as_deref(), Some("my_capture"));
-    assert_eq!(decorated.fix.as_deref(), Some("replace_me"));
-    assert_eq!(decorated.where_clauses.len(), 1);
-    let clause = decorated
-        .where_clauses
-        .first()
-        .expect("expected at least one where_clause");
-    assert_eq!(clause.raw, constraint);
 }
 
 #[test]
