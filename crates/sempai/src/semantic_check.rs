@@ -121,6 +121,82 @@ struct DiagnosticSite {
     primary_span: Option<SourceSpan>,
 }
 
+/// Analyses a unary-wrapping formula node (`Not`, `Inside`, or `Anywhere`).
+///
+/// `marks_not` is `true` for `Not`, which sets `contains_not` and records the
+/// negation span, and `false` for `Inside`/`Anywhere`.
+fn analyze_unary(
+    inner: &Decorated<Formula>,
+    formula_span: Option<&SourceSpan>,
+    fallback_span: Option<&SourceSpan>,
+    marks_not: bool,
+) -> FormulaAnalysis {
+    let mut analysis = analyze_formula(inner, formula_span.or(fallback_span));
+    analysis.has_positive_term = false;
+    analysis.contains_not |= marks_not;
+    if marks_not {
+        analysis.first_negation_span = formula_span.cloned().or(analysis.first_negation_span);
+    }
+    analysis
+}
+
+/// Analyses a conjunction (`And`) node and attaches a
+/// `MissingPositiveTermInAnd` site when no positive descendant is found.
+fn analyze_and(
+    formula: &Decorated<Formula>,
+    branches: &[Decorated<Formula>],
+    fallback_span: Option<&SourceSpan>,
+) -> FormulaAnalysis {
+    let mut analysis = analyze_branches(branches, formula.span.as_ref().or(fallback_span));
+    analysis.has_positive_term |= has_match_producing_where_clause(&formula.where_clauses);
+    if !analysis.has_positive_term {
+        analysis.missing_positive_term = Some(DiagnosticSite {
+            primary_span: formula
+                .span
+                .clone()
+                .or_else(|| branches.first().and_then(|branch| branch.span.clone()))
+                .or_else(|| fallback_span.cloned()),
+        });
+    }
+    analysis
+}
+
+/// Analyses a disjunction (`Or`) node and attaches an `InvalidNotInOr` site
+/// the first time a branch that contains a `Not` is found.
+fn analyze_or(
+    formula: &Decorated<Formula>,
+    branches: &[Decorated<Formula>],
+    fallback_span: Option<&SourceSpan>,
+) -> FormulaAnalysis {
+    let mut analysis = FormulaAnalysis::default();
+    let child_fallback = formula.span.as_ref().or(fallback_span);
+    for branch in branches {
+        let branch_analysis = analyze_formula(branch, child_fallback);
+        if branch_analysis.contains_not && analysis.invalid_not_in_or.is_none() {
+            analysis.invalid_not_in_or = Some(DiagnosticSite {
+                primary_span: branch_analysis
+                    .first_negation_span
+                    .clone()
+                    .or_else(|| branch.span.clone())
+                    .or_else(|| child_fallback.cloned()),
+            });
+        } else {
+            analysis.invalid_not_in_or = analysis
+                .invalid_not_in_or
+                .or(branch_analysis.invalid_not_in_or);
+        }
+        analysis.has_positive_term |= branch_analysis.has_positive_term;
+        analysis.contains_not |= branch_analysis.contains_not;
+        analysis.first_negation_span = analysis
+            .first_negation_span
+            .or(branch_analysis.first_negation_span);
+        analysis.missing_positive_term = analysis
+            .missing_positive_term
+            .or(branch_analysis.missing_positive_term);
+    }
+    analysis
+}
+
 fn analyze_formula(
     formula: &Decorated<Formula>,
     fallback_span: Option<&SourceSpan>,
@@ -130,61 +206,12 @@ fn analyze_formula(
             has_positive_term: true,
             ..FormulaAnalysis::default()
         },
-        Formula::Not(inner) => {
-            let mut analysis = analyze_formula(inner, formula.span.as_ref().or(fallback_span));
-            analysis.contains_not = true;
-            analysis.has_positive_term = false;
-            analysis.first_negation_span = formula.span.clone().or(analysis.first_negation_span);
-            analysis
-        }
+        Formula::Not(inner) => analyze_unary(inner, formula.span.as_ref(), fallback_span, true),
         Formula::Inside(inner) | Formula::Anywhere(inner) => {
-            let mut analysis = analyze_formula(inner, formula.span.as_ref().or(fallback_span));
-            analysis.has_positive_term = false;
-            analysis
+            analyze_unary(inner, formula.span.as_ref(), fallback_span, false)
         }
-        Formula::And(branches) => {
-            let mut analysis = analyze_branches(branches, formula.span.as_ref().or(fallback_span));
-            analysis.has_positive_term |= has_match_producing_where_clause(&formula.where_clauses);
-            if !analysis.has_positive_term {
-                analysis.missing_positive_term = Some(DiagnosticSite {
-                    primary_span: formula
-                        .span
-                        .clone()
-                        .or_else(|| branches.first().and_then(|branch| branch.span.clone()))
-                        .or_else(|| fallback_span.cloned()),
-                });
-            }
-            analysis
-        }
-        Formula::Or(branches) => {
-            let mut analysis = FormulaAnalysis::default();
-            let child_fallback = formula.span.as_ref().or(fallback_span);
-            for branch in branches {
-                let branch_analysis = analyze_formula(branch, child_fallback);
-                if branch_analysis.contains_not && analysis.invalid_not_in_or.is_none() {
-                    analysis.invalid_not_in_or = Some(DiagnosticSite {
-                        primary_span: branch_analysis
-                            .first_negation_span
-                            .clone()
-                            .or_else(|| branch.span.clone())
-                            .or_else(|| child_fallback.cloned()),
-                    });
-                } else {
-                    analysis.invalid_not_in_or = analysis
-                        .invalid_not_in_or
-                        .or(branch_analysis.invalid_not_in_or);
-                }
-                analysis.has_positive_term |= branch_analysis.has_positive_term;
-                analysis.contains_not |= branch_analysis.contains_not;
-                analysis.first_negation_span = analysis
-                    .first_negation_span
-                    .or(branch_analysis.first_negation_span);
-                analysis.missing_positive_term = analysis
-                    .missing_positive_term
-                    .or(branch_analysis.missing_positive_term);
-            }
-            analysis
-        }
+        Formula::And(branches) => analyze_and(formula, branches, fallback_span),
+        Formula::Or(branches) => analyze_or(formula, branches, fallback_span),
     }
 }
 
