@@ -8,7 +8,11 @@ expression: redacted_report_json(&report)
       "code": "E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND",
       "message": "conjunction (And/patterns) must contain at least one positive match term",
       "notes": [],
-      "primary_span": "<redacted-span>"
+      "primary_span": {
+        "end": 0,
+        "start": 0,
+        "uri": null
+      }
     }
   ]
 }

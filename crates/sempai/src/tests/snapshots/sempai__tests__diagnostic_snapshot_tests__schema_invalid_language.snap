@@ -8,7 +8,11 @@ expression: redacted_report_json(&report)
       "code": "E_SEMPAI_SCHEMA_INVALID",
       "message": "unsupported language 'cobol': unknown language: cobol",
       "notes": [],
-      "primary_span": "<redacted-span>"
+      "primary_span": {
+        "end": 0,
+        "start": 0,
+        "uri": null
+      }
     }
   ]
 }

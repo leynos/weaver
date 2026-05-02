@@ -88,7 +88,7 @@ fn legacy_patterns_with_only_constraints_produces_and_with_no_children_and_where
 }
 
 #[test]
-fn legacy_patterns_with_only_metavariable_pattern_constraint_validates() {
+fn legacy_patterns_with_only_metavariable_pattern_constraint_fails_validation() {
     let constraint = json!({"metavariable-pattern": {"metavariable": "$X", "pattern": "bad"}});
     let legacy = LegacyFormula::Patterns(vec![LegacyClause::Constraint(constraint)]);
     let decorated = normalize_legacy_decorated(legacy);
@@ -103,7 +103,13 @@ fn legacy_patterns_with_only_metavariable_pattern_constraint_validates() {
             },
         }]
     );
-    assert!(validate_formula(&decorated).is_ok());
+    let err =
+        validate_formula(&decorated).expect_err("constraint-only metavariable-pattern should fail");
+    let first = err.diagnostics().first().expect("expected diagnostic");
+    assert_eq!(
+        first.code(),
+        DiagnosticCode::ESempaiMissingPositiveTermInAnd
+    );
 }
 
 #[test]

@@ -1,6 +1,7 @@
 //! Snapshot tests for Sempai engine diagnostic output.
 
 use insta::assert_snapshot;
+use rstest::rstest;
 
 use crate::{DiagnosticCode, DiagnosticReport, Engine, EngineConfig};
 
@@ -14,12 +15,47 @@ fn redact_diagnostic_spans(diagnostic: &mut serde_json::Value) {
     let Some(object) = diagnostic.as_object_mut() else {
         return;
     };
-    object.insert(
-        String::from("primary_span"),
-        serde_json::json!("<redacted-span>"),
-    );
+    if let Some(primary_span) = object.get_mut("primary_span") {
+        redact_span_value(primary_span);
+    }
     if let Some(suggestions) = object.get_mut("suggestions") {
-        *suggestions = serde_json::json!("<redacted-suggestions>");
+        redact_sensitive_scalars(suggestions);
+    }
+}
+
+fn redact_span_value(value: &mut serde_json::Value) {
+    if value.is_null() {
+        return;
+    }
+    redact_sensitive_scalars(value);
+}
+
+fn redact_sensitive_scalars(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(object) => {
+            for (key, field_value) in object {
+                match key.as_str() {
+                    "start" | "end" | "line_start" | "line_end" | "column_start" | "column_end"
+                    | "byte_start" | "byte_end" => {
+                        *field_value = serde_json::json!(0);
+                    }
+                    "uri" | "file" | "file_name" | "path" => redact_path_value(field_value),
+                    _ => redact_sensitive_scalars(field_value),
+                }
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                redact_sensitive_scalars(item);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn redact_path_value(value: &mut serde_json::Value) {
+    if !value.is_null() {
+        *value = serde_json::json!("<redacted>");
     }
 }
 
@@ -36,9 +72,9 @@ fn redacted_report_json(report: &DiagnosticReport) -> String {
     serde_json::to_string_pretty(&value).expect("stringify diagnostic report")
 }
 
-#[test]
-fn snapshot_invalid_not_in_or() {
-    let yaml = concat!(
+#[rstest]
+#[case::invalid_not_in_or(
+    concat!(
         "rules:\n",
         "  - id: demo.invalid.not.in.or\n",
         "    message: invalid not in or\n",
@@ -47,22 +83,13 @@ fn snapshot_invalid_not_in_or() {
         "    pattern-either:\n",
         "      - pattern: foo($X)\n",
         "      - pattern-not: bar($Y)\n",
-    );
-    let report = compile_yaml_report(yaml);
-    let diagnostic = report.diagnostics().first().expect("should diagnose");
-    assert_eq!(diagnostic.code(), DiagnosticCode::ESempaiInvalidNotInOr);
-    assert!(
-        diagnostic
-            .message()
-            .contains("not allowed inside disjunction")
-    );
-
-    assert_snapshot!("invalid_not_in_or", redacted_report_json(&report));
-}
-
-#[test]
-fn snapshot_missing_positive_term_in_and() {
-    let yaml = concat!(
+    ),
+    DiagnosticCode::ESempaiInvalidNotInOr,
+    "not allowed inside disjunction",
+    "invalid_not_in_or",
+)]
+#[case::missing_positive_term_in_and(
+    concat!(
         "rules:\n",
         "  - id: demo.missing.positive.term.in.and\n",
         "    message: missing positive term in and\n",
@@ -71,39 +98,34 @@ fn snapshot_missing_positive_term_in_and() {
         "    patterns:\n",
         "      - pattern-not: foo($X)\n",
         "      - pattern-inside: bar($Y)\n",
-    );
-    let report = compile_yaml_report(yaml);
-    let diagnostic = report.diagnostics().first().expect("should diagnose");
-    assert_eq!(
-        diagnostic.code(),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd
-    );
-    assert!(
-        diagnostic
-            .message()
-            .contains("must contain at least one positive match term")
-    );
-
-    assert_snapshot!(
-        "missing_positive_term_in_and",
-        redacted_report_json(&report)
-    );
-}
-
-#[test]
-fn snapshot_schema_invalid_language() {
-    let yaml = concat!(
+    ),
+    DiagnosticCode::ESempaiMissingPositiveTermInAnd,
+    "must contain at least one positive match term",
+    "missing_positive_term_in_and",
+)]
+#[case::schema_invalid_language(
+    concat!(
         "rules:\n",
         "  - id: demo.invalid.language\n",
         "    message: invalid language\n",
         "    languages: [cobol]\n",
         "    severity: ERROR\n",
         "    pattern: foo($X)\n",
-    );
+    ),
+    DiagnosticCode::ESempaiSchemaInvalid,
+    "unsupported language",
+    "schema_invalid_language",
+)]
+fn snapshot_diagnostic_report(
+    #[case] yaml: &str,
+    #[case] expected_code: DiagnosticCode,
+    #[case] expected_msg_fragment: &str,
+    #[case] snapshot_name: &str,
+) {
     let report = compile_yaml_report(yaml);
     let diagnostic = report.diagnostics().first().expect("should diagnose");
-    assert_eq!(diagnostic.code(), DiagnosticCode::ESempaiSchemaInvalid);
-    assert!(diagnostic.message().contains("unsupported language"));
+    assert_eq!(diagnostic.code(), expected_code);
+    assert!(diagnostic.message().contains(expected_msg_fragment));
 
-    assert_snapshot!("schema_invalid_language", redacted_report_json(&report));
+    assert_snapshot!(snapshot_name, redacted_report_json(&report));
 }

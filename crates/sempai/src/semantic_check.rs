@@ -25,7 +25,7 @@ use sempai_core::{
     DiagnosticCode,
     DiagnosticReport,
     SourceSpan,
-    formula::{Constraint, Decorated, Formula, WhereClause},
+    formula::{Decorated, Formula},
 };
 
 pub(crate) const MAX_FORMULA_DEPTH: usize = 1000;
@@ -165,7 +165,6 @@ fn analyze_and_arm(
         scope.child_with_fallback(formula.span.as_ref().or(scope.fallback_span)),
         max_depth,
     );
-    analysis.has_positive_term |= has_match_producing_where_clause(&formula.where_clauses);
     if !analysis.has_positive_term {
         analysis.missing_positive_term = Some(DiagnosticSite {
             primary_span: formula
@@ -257,10 +256,4 @@ fn analyze_branches(
             .or(branch_analysis.missing_positive_term);
     }
     analysis
-}
-
-fn has_match_producing_where_clause(where_clauses: &[WhereClause]) -> bool {
-    where_clauses
-        .iter()
-        .any(|clause| matches!(clause.constraint, Constraint::MetavariablePattern { .. }))
 }
