@@ -121,28 +121,33 @@ struct DiagnosticSite {
     primary_span: Option<SourceSpan>,
 }
 
-/// Analyses a unary-wrapping formula node (`Not`, `Inside`, or `Anywhere`).
-///
-/// `marks_not` is `true` for `Not`, which sets `contains_not` and records the
-/// negation span, and `false` for `Inside`/`Anywhere`.
-fn analyze_unary(
+/// Analyses a `Not` node, marking negation and recording the first negation span.
+fn analyze_not_arm(
     inner: &Decorated<Formula>,
     formula_span: Option<&SourceSpan>,
     fallback_span: Option<&SourceSpan>,
-    marks_not: bool,
+) -> FormulaAnalysis {
+    let mut analysis = analyze_formula(inner, formula_span.or(fallback_span));
+    analysis.contains_not = true;
+    analysis.has_positive_term = false;
+    analysis.first_negation_span = formula_span.cloned().or(analysis.first_negation_span);
+    analysis
+}
+
+/// Analyses an `Inside` or `Anywhere` node (no negation tracking).
+fn analyze_inside_anywhere_arm(
+    inner: &Decorated<Formula>,
+    formula_span: Option<&SourceSpan>,
+    fallback_span: Option<&SourceSpan>,
 ) -> FormulaAnalysis {
     let mut analysis = analyze_formula(inner, formula_span.or(fallback_span));
     analysis.has_positive_term = false;
-    analysis.contains_not |= marks_not;
-    if marks_not {
-        analysis.first_negation_span = formula_span.cloned().or(analysis.first_negation_span);
-    }
     analysis
 }
 
 /// Analyses a conjunction (`And`) node and attaches a
 /// `MissingPositiveTermInAnd` site when no positive descendant is found.
-fn analyze_and(
+fn analyze_and_arm(
     formula: &Decorated<Formula>,
     branches: &[Decorated<Formula>],
     fallback_span: Option<&SourceSpan>,
@@ -162,8 +167,8 @@ fn analyze_and(
 }
 
 /// Analyses a disjunction (`Or`) node and attaches an `InvalidNotInOr` site
-/// the first time a branch that contains a `Not` is found.
-fn analyze_or(
+/// the first time a branch containing a `Not` is encountered.
+fn analyze_or_arm(
     formula: &Decorated<Formula>,
     branches: &[Decorated<Formula>],
     fallback_span: Option<&SourceSpan>,
@@ -206,12 +211,12 @@ fn analyze_formula(
             has_positive_term: true,
             ..FormulaAnalysis::default()
         },
-        Formula::Not(inner) => analyze_unary(inner, formula.span.as_ref(), fallback_span, true),
+        Formula::Not(inner) => analyze_not_arm(inner, formula.span.as_ref(), fallback_span),
         Formula::Inside(inner) | Formula::Anywhere(inner) => {
-            analyze_unary(inner, formula.span.as_ref(), fallback_span, false)
+            analyze_inside_anywhere_arm(inner, formula.span.as_ref(), fallback_span)
         }
-        Formula::And(branches) => analyze_and(formula, branches, fallback_span),
-        Formula::Or(branches) => analyze_or(formula, branches, fallback_span),
+        Formula::And(branches) => analyze_and_arm(formula, branches, fallback_span),
+        Formula::Or(branches) => analyze_or_arm(formula, branches, fallback_span),
     }
 }
 
