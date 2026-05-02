@@ -55,17 +55,23 @@ fn make_request(arguments: &[&str]) -> CommandRequest {
 
 fn response_payload(output: Vec<u8>) -> Result<serde_json::Value, String> {
     let response = String::from_utf8(output).map_err(|error| format!("utf8: {error}"))?;
-    let stream_line = response
-        .lines()
-        .next()
-        .ok_or_else(|| "stream line".to_string())?;
-    let envelope: serde_json::Value =
-        serde_json::from_str(stream_line).map_err(|error| format!("envelope: {error}"))?;
-    let data = envelope
-        .get("data")
-        .and_then(|value| value.as_str())
-        .ok_or_else(|| "stdout data".to_string())?;
-    serde_json::from_str(data).map_err(|error| format!("payload: {error}"))
+    let mut stdout_data = None;
+    for line in response.lines() {
+        let envelope: serde_json::Value =
+            serde_json::from_str(line).map_err(|error| format!("envelope: {error}"))?;
+        if envelope.get("stream").and_then(|value| value.as_str()) == Some("stdout") {
+            stdout_data = Some(
+                envelope
+                    .get("data")
+                    .and_then(|value| value.as_str())
+                    .ok_or_else(|| "stdout data".to_string())?
+                    .to_owned(),
+            );
+            break;
+        }
+    }
+    let data = stdout_data.ok_or_else(|| "no stdout envelope".to_string())?;
+    serde_json::from_str(&data).map_err(|error| format!("payload: {error}"))
 }
 fn detail_value(detail: DetailLevel) -> &'static str {
     match detail {
