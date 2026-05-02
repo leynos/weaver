@@ -42,22 +42,115 @@ use sempai_yaml::{
     SearchQueryPrincipal,
 };
 
+trait SearchQueryPrincipalTraceExt {
+    fn discriminant_like(&self) -> &'static str;
+}
+
+impl SearchQueryPrincipalTraceExt for SearchQueryPrincipal {
+    fn discriminant_like(&self) -> &'static str {
+        match self {
+            Self::Legacy(_) => "legacy",
+            Self::Match(_) => "match",
+            Self::ProjectDependsOn(_) => "project_depends_on",
+        }
+    }
+}
+
 /// Normalizes a parsed search principal into the canonical formula model.
 ///
 /// Normalization is currently infallible: every supported principal shape has
 /// a well-defined canonical mapping. If a future mapping needs to signal a
 /// structural error, switch this function's return type to
 /// `Result<Decorated<Formula>, DiagnosticReport>` at that point.
+#[tracing::instrument(
+    level = "debug",
+    skip_all,
+    fields(kind = ?principal.discriminant_like(), has_span = rule_span.is_some())
+)]
 pub(crate) fn normalize_search_principal(
     principal: &SearchQueryPrincipal,
     rule_span: Option<&SourceSpan>,
 ) -> Decorated<Formula> {
     match principal {
-        SearchQueryPrincipal::Legacy(formula) => normalize_legacy(formula, rule_span.cloned()),
-        SearchQueryPrincipal::Match(formula) => normalize_match(formula, rule_span.cloned()),
+        SearchQueryPrincipal::Legacy(formula) => {
+            tracing::trace!(
+                pattern_len = legacy_pattern_len(formula),
+                branch_count = legacy_branch_count(formula),
+                "normalizing legacy principal"
+            );
+            normalize_legacy(formula, rule_span.cloned())
+        }
+        SearchQueryPrincipal::Match(formula) => {
+            tracing::trace!(
+                pattern_len = match_pattern_len(formula),
+                branch_count = match_branch_count(formula),
+                "normalizing match principal"
+            );
+            normalize_match(formula, rule_span.cloned())
+        }
         SearchQueryPrincipal::ProjectDependsOn(payload) => {
+            tracing::trace!(
+                namespace = payload.namespace(),
+                package = payload.package(),
+                "normalizing project dependency principal"
+            );
             normalize_dependency_principal(payload, rule_span.cloned())
         }
+    }
+}
+
+fn legacy_pattern_len(formula: &LegacyFormula) -> Option<usize> {
+    match formula {
+        LegacyFormula::Pattern(text)
+        | LegacyFormula::PatternRegex(text)
+        | LegacyFormula::PatternNotRegex(text) => Some(text.len()),
+        LegacyFormula::PatternNot(value)
+        | LegacyFormula::PatternInside(value)
+        | LegacyFormula::PatternNotInside(value)
+        | LegacyFormula::Anywhere(value) => legacy_value_pattern_len(value),
+        LegacyFormula::Patterns(_) | LegacyFormula::PatternEither(_) => None,
+    }
+}
+
+fn legacy_value_pattern_len(value: &LegacyValue) -> Option<usize> {
+    match value {
+        LegacyValue::String(text) => Some(text.len()),
+        LegacyValue::Formula(formula) => legacy_pattern_len(formula),
+    }
+}
+
+const fn legacy_branch_count(formula: &LegacyFormula) -> Option<usize> {
+    match formula {
+        LegacyFormula::Patterns(clauses) => Some(clauses.len()),
+        LegacyFormula::PatternEither(branches) => Some(branches.len()),
+        _ => None,
+    }
+}
+
+fn match_pattern_len(formula: &MatchFormula) -> Option<usize> {
+    match formula {
+        MatchFormula::Pattern(text)
+        | MatchFormula::PatternObject(text)
+        | MatchFormula::Regex(text) => Some(text.len()),
+        MatchFormula::Not(inner) | MatchFormula::Inside(inner) | MatchFormula::Anywhere(inner) => {
+            match_pattern_len(inner)
+        }
+        MatchFormula::Decorated {
+            formula: inner_formula,
+            ..
+        } => match_pattern_len(inner_formula),
+        MatchFormula::All(_) | MatchFormula::Any(_) => None,
+    }
+}
+
+fn match_branch_count(formula: &MatchFormula) -> Option<usize> {
+    match formula {
+        MatchFormula::All(branches) | MatchFormula::Any(branches) => Some(branches.len()),
+        MatchFormula::Decorated {
+            formula: inner_formula,
+            ..
+        } => match_branch_count(inner_formula),
+        _ => None,
     }
 }
 
@@ -80,6 +173,7 @@ fn bare(node: Formula, span: Option<SourceSpan>) -> Decorated<Formula> {
 }
 
 /// Normalizes a legacy formula into canonical form.
+#[tracing::instrument(level = "trace", skip_all)]
 fn normalize_legacy(
     formula: &LegacyFormula,
     fallback_span: Option<SourceSpan>,
@@ -201,6 +295,7 @@ fn normalize_branches(
 }
 
 /// Normalizes a v2 match formula into canonical form.
+#[tracing::instrument(level = "trace", skip_all)]
 fn normalize_match(
     formula: &MatchFormula,
     fallback_span: Option<SourceSpan>,

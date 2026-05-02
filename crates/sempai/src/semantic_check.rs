@@ -35,10 +35,16 @@ use sempai_core::{
 ///
 /// - `E_SEMPAI_INVALID_NOT_IN_OR`: Or branch contains a Not formula
 /// - `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND`: And formula has no positive terms
+#[tracing::instrument(level = "debug", skip_all)]
 pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
-    check_no_not_in_or(&formula.node, formula.span.as_ref())?;
-    check_positive_term_in_and(&formula.node, formula.span.as_ref())?;
-    Ok(())
+    let result = check_no_not_in_or(&formula.node, formula.span.as_ref())
+        .and_then(|()| check_positive_term_in_and(&formula.node, formula.span.as_ref()));
+    if let Err(report) = &result
+        && let Some(diagnostic) = report.diagnostics().first()
+    {
+        tracing::warn!(code = ?diagnostic.code(), "semantic validation failed");
+    }
+    result
 }
 
 /// Checks that no `Or` branch contains a `Not` formula.
