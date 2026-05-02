@@ -123,9 +123,13 @@ fn snapshot_diagnostic_report(
     #[case] snapshot_name: &str,
 ) {
     let report = compile_yaml_report(yaml);
-    let diagnostic = report.diagnostics().first().expect("should diagnose");
-    assert_eq!(diagnostic.code(), expected_code);
-    assert!(diagnostic.message().contains(expected_msg_fragment));
+    let first = report
+        .diagnostics()
+        .first()
+        .expect("should diagnose")
+        .clone();
+    assert_eq!(first.code(), expected_code);
+    assert!(first.message().contains(expected_msg_fragment));
 
     assert_snapshot!(snapshot_name, redacted_report_json(&report));
 }
