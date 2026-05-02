@@ -178,3 +178,44 @@ fn single_symbol_file_returns_one_card_with_empty_frontier(
 
     Ok(())
 }
+
+#[rstest]
+fn discovery_cap_marks_spillover_truncated_when_card_budget_remains(
+    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
+) -> Result<(), String> {
+    use super::MAX_SAME_FILE_DISCOVERY_POSITIONS;
+
+    let (mut backends, temp_dir) = backends_fixture?;
+    let source = (0..=MAX_SAME_FILE_DISCOVERY_POSITIONS)
+        .map(|index| format!("fn item_{index}() {{}}\n"))
+        .collect::<String>();
+    let path = write_source(&temp_dir, "large.rs", &source).map_err(|error| error.to_string())?;
+    let uri = Url::from_file_path(&path)
+        .map_err(|()| "file uri".to_string())?
+        .to_string();
+    let request = make_request(&[
+        "--uri",
+        &uri,
+        "--position",
+        "1:4",
+        "--max-cards",
+        "300",
+        "--entry-detail",
+        detail_value(DetailLevel::Structure),
+        "--node-detail",
+        detail_value(DetailLevel::Structure),
+    ]);
+
+    let (status, payload) = dispatch_payload(&request, &mut backends)?;
+
+    assert_success_response(status, &payload);
+    assert_eq!(payload["spillover"]["truncated"], true);
+    assert_eq!(
+        payload["spillover"]["frontier"]
+            .as_array()
+            .expect("frontier array")
+            .len(),
+        0
+    );
+    Ok(())
+}

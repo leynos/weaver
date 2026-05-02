@@ -116,6 +116,17 @@ fn assert_spillover_truncated_with_frontier(payload: &serde_json::Value) {
         None => panic!("frontier array"),
     };
     assert!(!frontier.is_empty(), "expected non-empty frontier");
+    for (index, entry) in frontier.iter().enumerate() {
+        assert!(
+            entry["symbol_id"].as_str().is_some_and(|s| !s.is_empty()),
+            "frontier entry {index} should have a non-empty symbol_id"
+        );
+        assert_eq!(
+            entry["depth"],
+            serde_json::json!(1),
+            "frontier entry {index} depth should be 1"
+        );
+    }
 }
 
 fn assert_refusal(status: i32, payload: &serde_json::Value, reason: &str) {
@@ -224,42 +235,6 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
     Ok(())
 }
 
-#[rstest]
-fn discovery_cap_marks_spillover_truncated_when_card_budget_remains(
-    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
-) -> Result<(), String> {
-    let (mut backends, temp_dir) = backends_fixture?;
-    let source = (0..=MAX_SAME_FILE_DISCOVERY_POSITIONS)
-        .map(|index| format!("fn item_{index}() {{}}\n"))
-        .collect::<String>();
-    let path = write_source(&temp_dir, "large.rs", &source).map_err(|error| error.to_string())?;
-    let uri = Url::from_file_path(&path).expect("file uri").to_string();
-    let request = make_request(&[
-        "--uri",
-        &uri,
-        "--position",
-        "1:4",
-        "--max-cards",
-        "300",
-        "--entry-detail",
-        detail_value(DetailLevel::Structure),
-        "--node-detail",
-        detail_value(DetailLevel::Structure),
-    ]);
-
-    let (status, payload) = dispatch_payload(&request, &mut backends)?;
-
-    assert_success_response(status, &payload);
-    assert_eq!(payload["spillover"]["truncated"], true);
-    assert_eq!(
-        payload["spillover"]["frontier"]
-            .as_array()
-            .expect("frontier array")
-            .len(),
-        0
-    );
-    Ok(())
-}
 mod coverage_tests;
 struct RefusalCase<'a> {
     filename: &'a str,
@@ -340,6 +315,10 @@ fn structured_refusal_cases(
 #[case(
     &["--uri", "https://example.com/main.rs", "--position", "1:1"],
     "expected a file URI"
+)]
+#[case(
+    &["--uri", "file:///src/main.rs", "--position", "1:1", "--max-cards", "0"],
+    "--max-cards must be >= 1"
 )]
 #[case(&["--uri", "file://%zz", "--position", "1:1"], "invalid URI")]
 fn invalid_arguments_return_dispatch_error(
