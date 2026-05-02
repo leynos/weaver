@@ -10,7 +10,7 @@ use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use super::{MAX_SAME_FILE_DISCOVERY_POSITIONS, first_non_whitespace_column, handle};
 use crate::{
     backends::FusionBackends,
-    dispatch::{errors::DispatchError, request::CommandRequest, response::ResponseWriter},
+    dispatch::{request::CommandRequest, response::ResponseWriter},
     semantic_provider::SemanticBackendProvider,
 };
 #[fixture]
@@ -191,12 +191,37 @@ fn valid_request_returns_success_and_echoed_constraints(
     ]);
 
     let (status, payload) = dispatch_payload(&request, &mut backends)?;
+    let (second_status, second_payload) = dispatch_payload(&request, &mut backends)?;
 
     assert_success_response(status, &payload);
+    assert_success_response(second_status, &second_payload);
     assert_default_graph_slice_shape(&payload);
+    assert_eq!(payload["constraints"]["entry_detail"], "structure");
+    assert_eq!(payload["constraints"]["node_detail"], "semantic");
     assert_eq!(payload["spillover"]["truncated"], false);
     assert_eq!(payload["cards"][0]["symbol"]["ref"]["name"], "increment");
-    assert!(payload["cards"].as_array().expect("cards array").len() >= 2);
+    let symbol_ids: Vec<&str> = payload["cards"]
+        .as_array()
+        .expect("cards array")
+        .iter()
+        .map(|card| {
+            card["symbol"]["symbol_id"]
+                .as_str()
+                .expect("symbol_id should be a string")
+        })
+        .collect();
+    let second_symbol_ids: Vec<&str> = second_payload["cards"]
+        .as_array()
+        .expect("cards array")
+        .iter()
+        .map(|card| {
+            card["symbol"]["symbol_id"]
+                .as_str()
+                .expect("symbol_id should be a string")
+        })
+        .collect();
+    assert!(symbol_ids.len() >= 2);
+    assert_eq!(symbol_ids, second_symbol_ids);
     Ok(())
 }
 
@@ -234,13 +259,42 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
     ]);
 
     let (status, payload) = dispatch_payload(&request, &mut backends)?;
+    let (second_status, second_payload) = dispatch_payload(&request, &mut backends)?;
 
     assert_success_response(status, &payload);
-    assert_eq!(payload["cards"].as_array().expect("cards array").len(), 1);
+    assert_success_response(second_status, &second_payload);
+    assert_eq!(payload["cards"][0]["symbol"]["ref"]["name"], "build");
+    let kept_symbol_id = payload["cards"][0]["symbol"]["symbol_id"]
+        .as_str()
+        .expect("kept symbol_id should be a string");
+    let frontier_ids: Vec<&str> = payload["spillover"]["frontier"]
+        .as_array()
+        .expect("frontier array")
+        .iter()
+        .map(|entry| {
+            entry["symbol_id"]
+                .as_str()
+                .expect("frontier symbol_id should be a string")
+        })
+        .collect();
+    let second_frontier_ids: Vec<&str> = second_payload["spillover"]["frontier"]
+        .as_array()
+        .expect("frontier array")
+        .iter()
+        .map(|entry| {
+            entry["symbol_id"]
+                .as_str()
+                .expect("frontier symbol_id should be a string")
+        })
+        .collect();
+    assert!(!frontier_ids.contains(&kept_symbol_id));
+    assert_eq!(frontier_ids, second_frontier_ids);
     assert_spillover_truncated_with_frontier(&payload);
     Ok(())
 }
 
+#[path = "argument_tests.rs"]
+mod argument_tests;
 #[path = "coverage_tests.rs"]
 mod coverage_tests;
 struct RefusalCase<'a> {
@@ -311,70 +365,6 @@ fn structured_refusal_cases(
             expected_message,
         },
     )
-}
-
-#[rstest]
-#[case(&["--position", "10:5"], "missing required argument: --uri")]
-#[case(
-    &["--uri", "file:///src/main.rs", "--position", "bad"],
-    "invalid argument value for --position"
-)]
-#[case(
-    &["--uri", "https://example.com/main.rs", "--position", "1:1"],
-    "expected a file URI"
-)]
-#[case(
-    &["--uri", "file:///src/main.rs", "--position", "1:1", "--max-cards", "0"],
-    "--max-cards must be >= 1"
-)]
-#[case(&["--uri", "file://%zz", "--position", "1:1"], "invalid URI")]
-fn invalid_arguments_return_dispatch_error(
-    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
-    #[case] arguments: &[&str],
-    #[case] expected_substring: &str,
-) -> Result<(), String> {
-    let (mut backends, _temp_dir) = backends_fixture?;
-    let request = make_request(arguments);
-    let mut buffer = Vec::new();
-    let mut writer = ResponseWriter::new(&mut buffer);
-    let result = handle(&request, &mut writer, &mut backends);
-    match result {
-        Ok(_) => panic!("expected invalid arguments error, dispatch succeeded"),
-        Err(error) => match error {
-            DispatchError::InvalidArguments { message } => {
-                assert!(
-                    message.contains(expected_substring),
-                    "expected invalid-arguments message to contain {expected_substring:?}, got: \
-                     {message}"
-                );
-            }
-            _ => panic!("expected invalid arguments error"),
-        },
-    }
-    Ok(())
-}
-
-#[rstest]
-fn missing_source_file_returns_invalid_arguments(
-    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
-) -> Result<(), String> {
-    let (mut backends, temp_dir) = backends_fixture?;
-    let path = temp_dir.path().join("missing.rs");
-    let uri = Url::from_file_path(&path).expect("file uri").to_string();
-    let request = make_request(&["--uri", &uri, "--position", "1:1"]);
-    let mut buffer = Vec::new();
-    let mut writer = ResponseWriter::new(&mut buffer);
-    match handle(&request, &mut writer, &mut backends) {
-        Ok(_) => panic!("expected invalid arguments error, dispatch succeeded"),
-        Err(error) => match error {
-            DispatchError::InvalidArguments { message } => {
-                assert!(message.contains("unable to read source file"));
-                assert!(message.contains("missing.rs"));
-            }
-            _ => panic!("expected invalid arguments error"),
-        },
-    }
-    Ok(())
 }
 
 #[test]
