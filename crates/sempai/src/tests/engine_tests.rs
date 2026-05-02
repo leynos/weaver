@@ -1,6 +1,6 @@
 //! Tests for the `Engine` and `QueryPlan` types.
 
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 
 use rstest::rstest;
 use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom, TreeSitterQueryAtom};
@@ -70,6 +70,17 @@ fn dummy_formula() -> Decorated<Formula> {
         fix: None,
         span: None,
     }
+}
+
+fn assert_pattern_formula(formula: &Decorated<Formula>, expected_text: &str) {
+    assert!(
+        matches!(
+            &formula.node,
+            Formula::Atom(Atom::Pattern(pattern)) if pattern.text == expected_text
+        ),
+        "expected Pattern atom with text \"{expected_text}\", got {:?}",
+        formula.node
+    );
 }
 
 #[test]
@@ -143,13 +154,64 @@ fn compile_yaml_plan_formula_matches_normalization() {
     let plans = engine.compile_yaml(yaml).expect("should compile");
     let plan = plans.first().expect("should have one plan");
     let formula = plan.formula();
-    assert!(
-        matches!(
-            &formula.node,
-            Formula::Atom(Atom::Pattern(p)) if p.text == "foo($X)"
-        ),
-        "expected Pattern atom with text \"foo($X)\", got {:?}",
-        formula.node
+    assert_pattern_formula(formula, "foo($X)");
+}
+
+#[test]
+fn compile_yaml_multiple_languages_yields_multiple_plans() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.multi\n",
+        "    message: multi language\n",
+        "    languages: [rust, python]\n",
+        "    severity: ERROR\n",
+        "    pattern: foo($X)\n",
+    );
+
+    let plans = compile_yaml_text(yaml).expect("should compile");
+
+    assert_eq!(plans.len(), 2);
+    let languages = plans.iter().map(QueryPlan::language).collect::<Vec<_>>();
+    assert!(languages.contains(&Language::Rust));
+    assert!(languages.contains(&Language::Python));
+    for plan in &plans {
+        assert_eq!(plan.rule_id(), "demo.multi");
+        assert_pattern_formula(plan.formula(), "foo($X)");
+    }
+}
+
+#[test]
+fn compile_yaml_multiple_rules_return_expected_plans() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.first\n",
+        "    message: first rule\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    pattern: foo($X)\n",
+        "  - id: demo.second\n",
+        "    message: second rule\n",
+        "    languages: [rust]\n",
+        "    severity: WARNING\n",
+        "    pattern: bar($Y)\n",
+    );
+
+    let plans = compile_yaml_text(yaml).expect("should compile");
+
+    assert_eq!(plans.len(), 2);
+    let mut seen = BTreeSet::new();
+    for plan in &plans {
+        assert_eq!(plan.language(), Language::Rust);
+        seen.insert(plan.rule_id().to_owned());
+        match plan.rule_id() {
+            "demo.first" => assert_pattern_formula(plan.formula(), "foo($X)"),
+            "demo.second" => assert_pattern_formula(plan.formula(), "bar($Y)"),
+            other => panic!("unexpected rule id {other}"),
+        }
+    }
+    assert_eq!(
+        seen,
+        BTreeSet::from([String::from("demo.first"), String::from("demo.second")])
     );
 }
 

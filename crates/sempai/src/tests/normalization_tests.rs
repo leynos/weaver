@@ -2,6 +2,7 @@
 
 use rstest::rstest;
 use sempai_core::{
+    DiagnosticCode,
     SourceSpan,
     formula::{Atom, Decorated, Formula, PatternAtom, RegexAtom, TreeSitterQueryAtom},
 };
@@ -15,7 +16,7 @@ use sempai_yaml::{
 };
 use serde_json::json;
 
-use crate::normalize::normalize_search_principal;
+use crate::{normalize::normalize_search_principal, semantic_check::validate_formula};
 
 /// Helper to normalize a legacy formula and extract the node.
 fn normalize_legacy(formula: LegacyFormula) -> Formula {
@@ -297,6 +298,32 @@ fn legacy_patterns_propagates_constraints_to_where_clauses() {
             "expected child {idx} of And to have empty where_clauses"
         );
     }
+}
+
+#[test]
+fn legacy_patterns_with_only_constraints_produces_and_with_no_children_and_where_clauses() {
+    let constraint = json!({"metavariable-regex": {"metavariable": "$X", "regex": "foo.*"}});
+    let legacy = LegacyFormula::Patterns(vec![LegacyClause::Constraint(constraint.clone())]);
+
+    let decorated = normalize_legacy_decorated(legacy);
+
+    match &decorated.node {
+        Formula::And(children) => assert!(children.is_empty()),
+        other => panic!("expected normalized legacy Patterns to be And, got {other:?}"),
+    }
+    assert_eq!(decorated.where_clauses.len(), 1);
+    let clause = decorated
+        .where_clauses
+        .first()
+        .expect("expected at least one where_clause");
+    assert_eq!(clause.raw, constraint);
+
+    let err = validate_formula(&decorated).expect_err("constraint-only And should fail");
+    let first = err.diagnostics().first().expect("expected diagnostic");
+    assert_eq!(
+        first.code(),
+        DiagnosticCode::ESempaiMissingPositiveTermInAnd
+    );
 }
 
 #[test]
