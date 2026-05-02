@@ -170,7 +170,7 @@ fn analyze_and_arm(
             primary_span: formula
                 .span
                 .clone()
-                .or_else(|| branches.first().and_then(|branch| branch.span.clone()))
+                .or_else(|| branches.iter().find_map(|branch| branch.span.clone()))
                 .or_else(|| scope.fallback_span.cloned()),
         });
     }

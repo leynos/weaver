@@ -182,6 +182,23 @@ fn missing_positive_term_in_and_uses_first_child_span_when_node_span_none() {
 }
 
 #[test]
+fn missing_positive_term_in_and_uses_first_available_child_span() {
+    let later_child_span = SourceSpan::new(35, 45, None);
+    let formula = make_and(vec![
+        make_inside(make_pattern("foo")),
+        with_span(make_not(make_pattern("bar")), later_child_span.clone()),
+    ]);
+
+    let first = first_validation_diagnostic(&formula);
+
+    assert_eq!(
+        first.code(),
+        DiagnosticCode::ESempaiMissingPositiveTermInAnd
+    );
+    assert_eq!(first.primary_span(), Some(&later_child_span));
+}
+
+#[test]
 fn invalid_not_in_or_prefers_branch_span() {
     let branch_span = SourceSpan::new(50, 60, None);
     let branch_span_formula = make_or(vec![

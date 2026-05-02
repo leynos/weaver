@@ -80,6 +80,27 @@ fn extract_or_branches(f: Formula) -> Vec<Decorated<Formula>> {
     }
 }
 
+fn extract_not_inner(f: Formula) -> Box<Decorated<Formula>> {
+    match f {
+        Formula::Not(inner) => inner,
+        other => panic!("expected Not formula, got {other:?}"),
+    }
+}
+
+fn extract_inside_inner(f: Formula) -> Box<Decorated<Formula>> {
+    match f {
+        Formula::Inside(inner) => inner,
+        other => panic!("expected Inside formula, got {other:?}"),
+    }
+}
+
+fn extract_anywhere_inner(f: Formula) -> Box<Decorated<Formula>> {
+    match f {
+        Formula::Anywhere(inner) => inner,
+        other => panic!("expected Anywhere formula, got {other:?}"),
+    }
+}
+
 #[rstest]
 #[case::pattern(
     LegacyFormula::Pattern(String::from("foo($X)")),
@@ -179,37 +200,30 @@ fn v2_branch_formula_normalizes_with_correct_branches(
     assert_two_pattern_branches(&branches, "foo", "bar");
 }
 
-#[test]
-fn v2_not_normalizes_to_not_with_inner_pattern() {
-    let result = normalize_v2(MatchFormula::Not(Box::new(MatchFormula::Pattern(
-        String::from("baz"),
-    ))));
-    match result {
-        Formula::Not(inner) => assert_wraps_pattern_atom(&inner, "baz"),
-        other => panic!("expected Not formula, got {other:?}"),
-    }
-}
-
-#[test]
-fn v2_inside_normalizes_to_inside_with_inner_pattern() {
-    let result = normalize_v2(MatchFormula::Inside(Box::new(MatchFormula::Pattern(
-        String::from("class X:"),
-    ))));
-    match result {
-        Formula::Inside(inner) => assert_wraps_pattern_atom(&inner, "class X:"),
-        other => panic!("expected Inside formula, got {other:?}"),
-    }
-}
-
-#[test]
-fn v2_anywhere_normalizes_to_anywhere_with_inner_pattern() {
-    let result = normalize_v2(MatchFormula::Anywhere(Box::new(MatchFormula::Pattern(
-        String::from("unsafe"),
-    ))));
-    match result {
-        Formula::Anywhere(inner) => assert_wraps_pattern_atom(&inner, "unsafe"),
-        other => panic!("expected Anywhere formula, got {other:?}"),
-    }
+#[rstest]
+#[case::not(
+    MatchFormula::Not(Box::new(MatchFormula::Pattern(String::from("baz")))),
+    extract_not_inner as fn(Formula) -> Box<Decorated<Formula>>,
+    "baz",
+)]
+#[case::inside(
+    MatchFormula::Inside(Box::new(MatchFormula::Pattern(String::from("class X:")))),
+    extract_inside_inner as fn(Formula) -> Box<Decorated<Formula>>,
+    "class X:",
+)]
+#[case::anywhere(
+    MatchFormula::Anywhere(Box::new(MatchFormula::Pattern(String::from("unsafe")))),
+    extract_anywhere_inner as fn(Formula) -> Box<Decorated<Formula>>,
+    "unsafe",
+)]
+fn v2_unary_wrapper_normalizes_to_inner_pattern(
+    #[case] input: MatchFormula,
+    #[case] extract: fn(Formula) -> Box<Decorated<Formula>>,
+    #[case] expected_text: &str,
+) {
+    let result = normalize_v2(input);
+    let inner = extract(result);
+    assert_wraps_pattern_atom(&inner, expected_text);
 }
 
 #[test]

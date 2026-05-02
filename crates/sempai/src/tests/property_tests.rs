@@ -219,7 +219,9 @@ proptest! {
             .span
             .clone()
             .or_else(|| match &formula.node {
-                Formula::And(branches) => branches.first().and_then(|branch| branch.span.clone()),
+                Formula::And(branches) => branches
+                    .iter()
+                    .find_map(|branch| branch.span.clone()),
                 _ => None,
             });
 
