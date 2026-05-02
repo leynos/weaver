@@ -117,11 +117,19 @@ fn stable_card_order_produces_deterministic_results(
 
     let ids_a: Vec<_> = cards_a
         .iter()
-        .filter_map(|card| card["symbol"]["symbol_id"].as_str())
+        .map(|card| {
+            card["symbol"]["symbol_id"]
+                .as_str()
+                .expect("card should include symbol.symbol_id")
+        })
         .collect();
     let ids_b: Vec<_> = cards_b
         .iter()
-        .filter_map(|card| card["symbol"]["symbol_id"].as_str())
+        .map(|card| {
+            card["symbol"]["symbol_id"]
+                .as_str()
+                .expect("card should include symbol.symbol_id")
+        })
         .collect();
 
     assert_eq!(
