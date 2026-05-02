@@ -7,16 +7,29 @@ use sempai_core::{
 use sempai_yaml::{LegacyClause, LegacyFormula, MatchFormula, SearchQueryPrincipal};
 use serde_json::json;
 
-use crate::{normalize::normalize_search_principal, semantic_check::validate_formula};
+use crate::{
+    Engine,
+    EngineConfig,
+    normalize::normalize_search_principal,
+    semantic_check::validate_formula,
+};
 
 fn normalize_legacy_decorated(formula: LegacyFormula) -> Decorated<Formula> {
     let principal = SearchQueryPrincipal::Legacy(formula);
-    normalize_search_principal(&principal, None)
+    normalize_search_principal(&principal, None).expect("legacy formula should normalize")
 }
 
 fn normalize_v2_decorated(formula: MatchFormula) -> Decorated<Formula> {
     let principal = SearchQueryPrincipal::Match(formula);
-    normalize_search_principal(&principal, None)
+    normalize_search_principal(&principal, None).expect("v2 formula should normalize")
+}
+
+fn first_diagnostic_code(report: &sempai_core::DiagnosticReport) -> DiagnosticCode {
+    report
+        .diagnostics()
+        .first()
+        .expect("expected diagnostic")
+        .code()
 }
 
 #[test]
@@ -112,6 +125,63 @@ fn legacy_patterns_with_unknown_constraint_preserves_other_constraint_text() {
         }
         other => panic!("expected unknown constraint to map to Other, got {other:?}"),
     }
+}
+
+#[test]
+fn legacy_patterns_with_malformed_known_constraint_fails_normalization() {
+    let constraint = json!({"metavariable-regex": {"metavariable": "$X"}});
+    let principal =
+        SearchQueryPrincipal::Legacy(LegacyFormula::Patterns(vec![LegacyClause::Constraint(
+            constraint,
+        )]));
+
+    let report =
+        normalize_search_principal(&principal, None).expect_err("known malformed constraint fails");
+
+    assert_eq!(
+        first_diagnostic_code(&report),
+        DiagnosticCode::ESempaiSchemaInvalid
+    );
+    assert!(
+        report
+            .diagnostics()
+            .first()
+            .expect("expected diagnostic")
+            .message()
+            .contains("expected {metavariable, regex} string fields")
+    );
+}
+
+#[test]
+fn compile_yaml_reports_schema_invalid_for_malformed_where_clause() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.invalid.where\n",
+        "    message: invalid where\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    patterns:\n",
+        "      - pattern: foo($X)\n",
+        "      - metavariable-regex:\n",
+        "          metavariable: $X\n",
+    );
+
+    let report = Engine::new(EngineConfig::default())
+        .compile_yaml(yaml)
+        .expect_err("malformed known constraint should fail");
+
+    assert_eq!(
+        first_diagnostic_code(&report),
+        DiagnosticCode::ESempaiSchemaInvalid
+    );
+    assert!(
+        report
+            .diagnostics()
+            .first()
+            .expect("expected diagnostic")
+            .message()
+            .contains("invalid where-clause")
+    );
 }
 
 #[test]

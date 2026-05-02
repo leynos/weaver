@@ -119,7 +119,7 @@ impl Engine {
             })
             .try_fold(Vec::new(), |mut plans, (rule, principal)| {
                 tracing::debug!(rule_id = rule.id(), "normalizing principal");
-                let formula = normalize_search_principal(principal, rule.rule_span());
+                let formula = normalize_search_principal(principal, rule.rule_span())?;
 
                 tracing::debug!(rule_id = rule.id(), "validating normalized formula");
                 validate_formula(&formula)?;

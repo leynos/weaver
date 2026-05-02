@@ -19,13 +19,17 @@ use crate::normalize::normalize_search_principal;
 /// Helper to normalize a legacy formula and extract the node.
 fn normalize_legacy(formula: LegacyFormula) -> Formula {
     let principal = SearchQueryPrincipal::Legacy(formula);
-    normalize_search_principal(&principal, None).node
+    normalize_search_principal(&principal, None)
+        .expect("legacy formula should normalize")
+        .node
 }
 
 /// Helper to normalize a v2 match formula and extract the node.
 fn normalize_v2(formula: MatchFormula) -> Formula {
     let principal = SearchQueryPrincipal::Match(formula);
-    normalize_search_principal(&principal, None).node
+    normalize_search_principal(&principal, None)
+        .expect("v2 formula should normalize")
+        .node
 }
 
 /// Asserts that a `Decorated<Formula>` wraps a `Pattern` atom with the given text.
@@ -250,7 +254,8 @@ fn legacy_anywhere_normalizes_to_anywhere() {
 fn span_propagates_from_search_principal_to_decorated() {
     let span = SourceSpan::new(5, 42, Some(String::from("file:///rule.yaml")));
     let principal = SearchQueryPrincipal::Match(MatchFormula::Pattern(String::from("foo($X)")));
-    let normalized = normalize_search_principal(&principal, Some(&span));
+    let normalized =
+        normalize_search_principal(&principal, Some(&span)).expect("formula should normalize");
 
     assert_eq!(normalized.span, Some(span));
 }
@@ -264,7 +269,8 @@ fn project_depends_on_propagates_span_to_placeholder_formula() {
     }))
     .expect("valid project dependency payload");
     let principal = SearchQueryPrincipal::ProjectDependsOn(payload);
-    let normalized = normalize_search_principal(&principal, Some(&span));
+    let normalized =
+        normalize_search_principal(&principal, Some(&span)).expect("formula should normalize");
 
     assert_eq!(normalized.span, Some(span));
     assert_eq!(

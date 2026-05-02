@@ -30,17 +30,9 @@
 //! - `anywhere: ...` → `Formula::Anywhere(Box<...>)`
 
 use sempai_core::{
+    DiagnosticReport,
     SourceSpan,
-    formula::{
-        Atom,
-        Constraint,
-        Decorated,
-        Formula,
-        PatternAtom,
-        RegexAtom,
-        TreeSitterQueryAtom,
-        WhereClause,
-    },
+    formula::{Atom, Decorated, Formula, PatternAtom, RegexAtom, TreeSitterQueryAtom, WhereClause},
 };
 use sempai_yaml::{
     LegacyClause,
@@ -50,7 +42,8 @@ use sempai_yaml::{
     ProjectDependsOnPayload,
     SearchQueryPrincipal,
 };
-use serde_json::Value;
+
+use crate::normalize_constraints::parse_constraint;
 
 trait SearchQueryPrincipalTraceExt {
     fn discriminant_like(&self) -> &'static str;
@@ -68,10 +61,10 @@ impl SearchQueryPrincipalTraceExt for SearchQueryPrincipal {
 
 /// Normalizes a parsed search principal into the canonical formula model.
 ///
-/// Normalization is currently infallible: every supported principal shape has
-/// a well-defined canonical mapping. If a future mapping needs to signal a
-/// structural error, switch this function's return type to
-/// `Result<Decorated<Formula>, DiagnosticReport>` at that point.
+/// # Errors
+///
+/// Returns a schema diagnostic when a recognised `where` clause shape is
+/// malformed.
 #[tracing::instrument(
     level = "debug",
     skip_all,
@@ -80,7 +73,7 @@ impl SearchQueryPrincipalTraceExt for SearchQueryPrincipal {
 pub(crate) fn normalize_search_principal(
     principal: &SearchQueryPrincipal,
     rule_span: Option<&SourceSpan>,
-) -> Decorated<Formula> {
+) -> Result<Decorated<Formula>, DiagnosticReport> {
     match principal {
         SearchQueryPrincipal::Legacy(formula) => {
             tracing::trace!(
@@ -104,7 +97,7 @@ pub(crate) fn normalize_search_principal(
                 package = payload.package(),
                 "normalizing project dependency principal"
             );
-            normalize_dependency_principal(payload, rule_span)
+            Ok(normalize_dependency_principal(payload, rule_span))
         }
     }
 }
@@ -183,38 +176,38 @@ fn bare(node: Formula, span: Option<&SourceSpan>) -> Decorated<Formula> {
 fn normalize_legacy(
     formula: &LegacyFormula,
     fallback_span: Option<&SourceSpan>,
-) -> Decorated<Formula> {
+) -> Result<Decorated<Formula>, DiagnosticReport> {
     match formula {
-        LegacyFormula::Pattern(text) => bare(
+        LegacyFormula::Pattern(text) => Ok(bare(
             Formula::Atom(Atom::Pattern(PatternAtom { text: text.clone() })),
             fallback_span,
-        ),
-        LegacyFormula::PatternRegex(pattern) => bare(
+        )),
+        LegacyFormula::PatternRegex(pattern) => Ok(bare(
             Formula::Atom(Atom::Regex(RegexAtom {
                 pattern: pattern.clone(),
             })),
             fallback_span,
-        ),
+        )),
         LegacyFormula::Patterns(clauses) => normalize_legacy_patterns(clauses, fallback_span),
         LegacyFormula::PatternEither(branches) => {
             let normalized_branches = branches
                 .iter()
                 .map(|branch| normalize_legacy(branch, fallback_span))
-                .collect();
-            bare(Formula::Or(normalized_branches), fallback_span)
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(bare(Formula::Or(normalized_branches), fallback_span))
         }
         LegacyFormula::PatternNot(value) => {
-            let inner = normalize_legacy_value(value, fallback_span);
-            bare(Formula::Not(Box::new(inner)), fallback_span)
+            let inner = normalize_legacy_value(value, fallback_span)?;
+            Ok(bare(Formula::Not(Box::new(inner)), fallback_span))
         }
         LegacyFormula::PatternInside(value) => {
-            let inner = normalize_legacy_value(value, fallback_span);
-            bare(Formula::Inside(Box::new(inner)), fallback_span)
+            let inner = normalize_legacy_value(value, fallback_span)?;
+            Ok(bare(Formula::Inside(Box::new(inner)), fallback_span))
         }
         LegacyFormula::PatternNotInside(value) => {
-            let inner = normalize_legacy_value(value, fallback_span);
+            let inner = normalize_legacy_value(value, fallback_span)?;
             let inside = bare(Formula::Inside(Box::new(inner)), fallback_span);
-            bare(Formula::Not(Box::new(inside)), fallback_span)
+            Ok(bare(Formula::Not(Box::new(inside)), fallback_span))
         }
         LegacyFormula::PatternNotRegex(pattern) => {
             let regex_atom = bare(
@@ -223,11 +216,11 @@ fn normalize_legacy(
                 })),
                 fallback_span,
             );
-            bare(Formula::Not(Box::new(regex_atom)), fallback_span)
+            Ok(bare(Formula::Not(Box::new(regex_atom)), fallback_span))
         }
         LegacyFormula::Anywhere(value) => {
-            let inner = normalize_legacy_value(value, fallback_span);
-            bare(Formula::Anywhere(Box::new(inner)), fallback_span)
+            let inner = normalize_legacy_value(value, fallback_span)?;
+            Ok(bare(Formula::Anywhere(Box::new(inner)), fallback_span))
         }
     }
 }
@@ -236,12 +229,12 @@ fn normalize_legacy(
 fn normalize_legacy_value(
     value: &LegacyValue,
     fallback_span: Option<&SourceSpan>,
-) -> Decorated<Formula> {
+) -> Result<Decorated<Formula>, DiagnosticReport> {
     match value {
-        LegacyValue::String(text) => bare(
+        LegacyValue::String(text) => Ok(bare(
             Formula::Atom(Atom::Pattern(PatternAtom { text: text.clone() })),
             fallback_span,
-        ),
+        )),
         LegacyValue::Formula(formula) => normalize_legacy(formula, fallback_span),
     }
 }
@@ -252,30 +245,30 @@ fn normalize_legacy_value(
 fn normalize_legacy_patterns(
     clauses: &[LegacyClause],
     fallback_span: Option<&SourceSpan>,
-) -> Decorated<Formula> {
+) -> Result<Decorated<Formula>, DiagnosticReport> {
     let mut formulas = Vec::new();
     let mut where_clauses = Vec::new();
 
     for clause in clauses {
         match clause {
             LegacyClause::Formula(formula) => {
-                formulas.push(normalize_legacy(formula, fallback_span));
+                formulas.push(normalize_legacy(formula, fallback_span)?);
             }
             LegacyClause::Constraint(value) => {
                 where_clauses.push(WhereClause {
-                    constraint: parse_constraint(value),
+                    constraint: parse_constraint(value, fallback_span)?,
                 });
             }
         }
     }
 
-    Decorated {
+    Ok(Decorated {
         node: Formula::And(formulas),
         where_clauses,
         as_name: None,
         fix: None,
         span: fallback_span.cloned(),
-    }
+    })
 }
 
 /// Normalizes a unary v2 match formula (Not, Inside, Anywhere).
@@ -283,19 +276,19 @@ fn normalize_unary<F>(
     inner: &MatchFormula,
     fallback_span: Option<&SourceSpan>,
     wrap: F,
-) -> Decorated<Formula>
+) -> Result<Decorated<Formula>, DiagnosticReport>
 where
     F: FnOnce(Box<Decorated<Formula>>) -> Formula,
 {
-    let child = normalize_match(inner, fallback_span);
-    bare(wrap(Box::new(child)), fallback_span)
+    let child = normalize_match(inner, fallback_span)?;
+    Ok(bare(wrap(Box::new(child)), fallback_span))
 }
 
 /// Normalizes a list of v2 match formula branches (All, Any).
 fn normalize_branches(
     branches: &[MatchFormula],
     fallback_span: Option<&SourceSpan>,
-) -> Vec<Decorated<Formula>> {
+) -> Result<Vec<Decorated<Formula>>, DiagnosticReport> {
     branches
         .iter()
         .map(|b| normalize_match(b, fallback_span))
@@ -307,26 +300,26 @@ fn normalize_branches(
 fn normalize_match(
     formula: &MatchFormula,
     fallback_span: Option<&SourceSpan>,
-) -> Decorated<Formula> {
+) -> Result<Decorated<Formula>, DiagnosticReport> {
     match formula {
-        MatchFormula::Pattern(text) | MatchFormula::PatternObject(text) => bare(
+        MatchFormula::Pattern(text) | MatchFormula::PatternObject(text) => Ok(bare(
             Formula::Atom(Atom::Pattern(PatternAtom { text: text.clone() })),
             fallback_span,
-        ),
-        MatchFormula::Regex(pattern) => bare(
+        )),
+        MatchFormula::Regex(pattern) => Ok(bare(
             Formula::Atom(Atom::Regex(RegexAtom {
                 pattern: pattern.clone(),
             })),
             fallback_span,
-        ),
-        MatchFormula::All(branches) => bare(
-            Formula::And(normalize_branches(branches, fallback_span)),
+        )),
+        MatchFormula::All(branches) => Ok(bare(
+            Formula::And(normalize_branches(branches, fallback_span)?),
             fallback_span,
-        ),
-        MatchFormula::Any(branches) => bare(
-            Formula::Or(normalize_branches(branches, fallback_span)),
+        )),
+        MatchFormula::Any(branches) => Ok(bare(
+            Formula::Or(normalize_branches(branches, fallback_span)?),
             fallback_span,
-        ),
+        )),
         MatchFormula::Not(inner) => normalize_unary(inner, fallback_span, Formula::Not),
         MatchFormula::Inside(inner) => normalize_unary(inner, fallback_span, Formula::Inside),
         MatchFormula::Anywhere(inner) => normalize_unary(inner, fallback_span, Formula::Anywhere),
@@ -336,42 +329,20 @@ fn normalize_match(
             as_name,
             fix,
         } => {
-            let mut normalized = normalize_match(inner_formula, fallback_span);
+            let mut normalized = normalize_match(inner_formula, fallback_span)?;
             normalized.where_clauses = raw_where
                 .iter()
-                .map(|raw| WhereClause {
-                    constraint: parse_constraint(raw),
+                .map(|raw| {
+                    Ok(WhereClause {
+                        constraint: parse_constraint(raw, fallback_span)?,
+                    })
                 })
-                .collect();
+                .collect::<Result<Vec<_>, _>>()?;
             normalized.as_name.clone_from(as_name);
             normalized.fix.clone_from(fix);
-            normalized
+            Ok(normalized)
         }
     }
-}
-
-fn parse_constraint(raw: &Value) -> Constraint {
-    raw.get("metavariable-regex")
-        .and_then(parse_metavariable_regex)
-        .or_else(|| {
-            raw.get("metavariable-pattern")
-                .and_then(parse_metavariable_pattern)
-        })
-        .unwrap_or_else(|| Constraint::Other(raw.to_string()))
-}
-
-fn parse_metavariable_regex(value: &Value) -> Option<Constraint> {
-    Some(Constraint::MetavariableRegex {
-        metavariable: value.get("metavariable")?.as_str()?.to_owned(),
-        regex: value.get("regex")?.as_str()?.to_owned(),
-    })
-}
-
-fn parse_metavariable_pattern(value: &Value) -> Option<Constraint> {
-    Some(Constraint::MetavariablePattern {
-        metavariable: value.get("metavariable")?.as_str()?.to_owned(),
-        pattern: value.get("pattern")?.as_str()?.to_owned(),
-    })
 }
 
 /// Normalizes a dependency principal into a placeholder formula.
