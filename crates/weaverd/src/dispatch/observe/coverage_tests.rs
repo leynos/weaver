@@ -61,11 +61,10 @@ fn enrichment_applies_lsp_provenance_when_detail_is_semantic() -> Result<(), Str
     assert_success_response(status, &payload);
 
     // The entry card provenance must include lsp_hover after semantic enrichment.
-    let entry_card = payload
-        .get("cards")
-        .and_then(|value| value.as_array())
-        .and_then(|cards| cards.first())
-        .expect("payload should contain at least one card");
+    let cards = payload["cards"]
+        .as_array()
+        .expect("cards should be an array");
+    let entry_card = cards.first().expect("cards should include an entry card");
     let provenance_sources = entry_card["provenance"]["sources"]
         .as_array()
         .expect("provenance.sources should be an array");
@@ -74,7 +73,7 @@ fn enrichment_applies_lsp_provenance_when_detail_is_semantic() -> Result<(), Str
         .map(|value| {
             value
                 .as_str()
-                .expect("provenance_sources entries should be strings")
+                .expect("provenance.sources must contain only strings")
         })
         .collect();
     assert!(

@@ -235,6 +235,7 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
     Ok(())
 }
 
+#[path = "coverage_tests.rs"]
 mod coverage_tests;
 struct RefusalCase<'a> {
     filename: &'a str,
