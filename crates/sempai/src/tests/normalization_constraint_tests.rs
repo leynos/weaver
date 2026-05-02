@@ -216,6 +216,38 @@ fn compile_yaml_reports_schema_invalid_for_malformed_where_clause() {
 }
 
 #[test]
+fn compile_yaml_reports_schema_invalid_for_malformed_metavariable_pattern_where_clause() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.invalid.pattern.where\n",
+        "    message: invalid metavariable pattern\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    patterns:\n",
+        "      - pattern: foo($X)\n",
+        "      - metavariable-pattern:\n",
+        "          pattern: x\n",
+    );
+
+    let report = Engine::new(EngineConfig::default())
+        .compile_yaml(yaml)
+        .expect_err("malformed known constraint should fail");
+
+    assert_eq!(
+        first_diagnostic_code(&report),
+        DiagnosticCode::ESempaiSchemaInvalid
+    );
+    assert!(
+        report
+            .diagnostics()
+            .first()
+            .expect("expected diagnostic")
+            .message()
+            .contains("expected {metavariable, pattern} string fields")
+    );
+}
+
+#[test]
 fn v2_decorated_preserves_where_as_and_fix_metadata() {
     let constraint = json!({"metavariable-pattern": {"metavariable": "$X", "pattern": "bad"}});
     let formula = MatchFormula::Decorated {

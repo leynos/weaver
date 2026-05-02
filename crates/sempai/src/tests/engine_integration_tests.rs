@@ -35,16 +35,16 @@ fn compile_yaml_decorated_metadata_reaches_queryplan() {
         "        - metavariable-pattern:\n",
         "            metavariable: $X\n",
         "            pattern: bad\n",
-        "      as: cap\n",
-        "      fix: fixme\n",
+        "      as: my_capture\n",
+        "      fix: replace_me\n",
     );
 
     let plans = compile_yaml(yaml);
     let formula = plans.first().expect("should have one plan").formula();
 
     assert_pattern_formula(formula, "foo($X)");
-    assert_eq!(formula.as_name.as_deref(), Some("cap"));
-    assert_eq!(formula.fix.as_deref(), Some("fixme"));
+    assert_eq!(formula.as_name.as_deref(), Some("my_capture"));
+    assert_eq!(formula.fix.as_deref(), Some("replace_me"));
     assert_eq!(
         formula.where_clauses.first().map(|c| &c.constraint),
         Some(&Constraint::MetavariablePattern {
@@ -52,6 +52,7 @@ fn compile_yaml_decorated_metadata_reaches_queryplan() {
             pattern: String::from("bad"),
         })
     );
+    assert!(formula.span.is_some());
 }
 
 #[test]

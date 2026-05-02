@@ -35,6 +35,40 @@ fn assert_empty_metadata(formula: &Decorated<Formula>) {
     assert!(formula.fix.is_none());
 }
 
+fn assert_empty_metadata_with_span(formula: &Decorated<Formula>, expected_span: &SourceSpan) {
+    assert_eq!(formula.span.as_ref(), Some(expected_span));
+    assert_empty_metadata(formula);
+}
+
+fn decorated_match_formula(formula: MatchFormula) -> SearchQueryPrincipal {
+    SearchQueryPrincipal::Match(MatchFormula::Decorated {
+        formula: Box::new(formula),
+        where_clauses: vec![json!({
+            "metavariable-pattern": {
+                "metavariable": "$X",
+                "pattern": "bad",
+            },
+        })],
+        as_name: Some(String::from("cap")),
+        fix: Some(String::from("fixme")),
+    })
+}
+
+fn assert_decorated_metadata(formula: &Decorated<Formula>, expected_span: &SourceSpan) {
+    assert_eq!(formula.span.as_ref(), Some(expected_span));
+    assert_eq!(formula.as_name.as_deref(), Some("cap"));
+    assert_eq!(formula.fix.as_deref(), Some("fixme"));
+    assert_eq!(
+        formula.where_clauses,
+        vec![WhereClause {
+            constraint: Constraint::MetavariablePattern {
+                metavariable: String::from("$X"),
+                pattern: String::from("bad"),
+            },
+        }]
+    );
+}
+
 fn assert_span_recursive(formula: &Decorated<Formula>, expected_span: &SourceSpan) {
     assert_eq!(formula.span.as_ref(), Some(expected_span));
     match &formula.node {
@@ -47,6 +81,112 @@ fn assert_span_recursive(formula: &Decorated<Formula>, expected_span: &SourceSpa
                 assert_span_recursive(branch, expected_span);
             }
         }
+    }
+}
+
+#[test]
+fn v2_decorated_over_all_preserves_metadata_and_spans() {
+    let span = SourceSpan::new(12, 99, Some(String::from("file:///rule.yaml")));
+    let principal = decorated_match_formula(MatchFormula::All(vec![
+        MatchFormula::Pattern(String::from("a")),
+        MatchFormula::Pattern(String::from("b")),
+    ]));
+
+    let decorated =
+        normalize_search_principal(&principal, Some(&span)).expect("formula should normalize");
+
+    assert_decorated_metadata(&decorated, &span);
+    match &decorated.node {
+        Formula::And(children) => {
+            assert_two_pattern_branches(children, "a", "b");
+            for child in children {
+                assert_empty_metadata_with_span(child, &span);
+            }
+        }
+        other => panic!("expected And formula, got {other:?}"),
+    }
+}
+
+#[test]
+fn v2_decorated_over_any_preserves_metadata_and_spans() {
+    let span = SourceSpan::new(13, 100, Some(String::from("file:///rule.yaml")));
+    let principal = decorated_match_formula(MatchFormula::Any(vec![
+        MatchFormula::Pattern(String::from("a")),
+        MatchFormula::Pattern(String::from("b")),
+    ]));
+
+    let decorated =
+        normalize_search_principal(&principal, Some(&span)).expect("formula should normalize");
+
+    assert_decorated_metadata(&decorated, &span);
+    match &decorated.node {
+        Formula::Or(children) => {
+            assert_two_pattern_branches(children, "a", "b");
+            for child in children {
+                assert_empty_metadata_with_span(child, &span);
+            }
+        }
+        other => panic!("expected Or formula, got {other:?}"),
+    }
+}
+
+#[test]
+fn v2_decorated_over_not_preserves_metadata_and_spans() {
+    let span = SourceSpan::new(14, 101, Some(String::from("file:///rule.yaml")));
+    let principal = decorated_match_formula(MatchFormula::Not(Box::new(MatchFormula::Pattern(
+        String::from("x"),
+    ))));
+
+    let decorated =
+        normalize_search_principal(&principal, Some(&span)).expect("formula should normalize");
+
+    assert_decorated_metadata(&decorated, &span);
+    match &decorated.node {
+        Formula::Not(inner) => {
+            assert_empty_metadata_with_span(inner, &span);
+            assert_wraps_pattern_atom(inner, "x");
+        }
+        other => panic!("expected Not formula, got {other:?}"),
+    }
+}
+
+#[test]
+fn v2_decorated_over_inside_preserves_metadata_and_spans() {
+    let span = SourceSpan::new(15, 102, Some(String::from("file:///rule.yaml")));
+    let principal = decorated_match_formula(MatchFormula::Inside(Box::new(MatchFormula::Pattern(
+        String::from("x"),
+    ))));
+
+    let decorated =
+        normalize_search_principal(&principal, Some(&span)).expect("formula should normalize");
+
+    assert_decorated_metadata(&decorated, &span);
+    match &decorated.node {
+        Formula::Inside(inner) => {
+            assert_empty_metadata_with_span(inner, &span);
+            assert_wraps_pattern_atom(inner, "x");
+        }
+        other => panic!("expected Inside formula, got {other:?}"),
+    }
+}
+
+#[test]
+fn v2_decorated_over_anywhere_preserves_metadata_and_spans() {
+    let span = SourceSpan::new(16, 103, Some(String::from("file:///rule.yaml")));
+    let principal = decorated_match_formula(MatchFormula::Anywhere(Box::new(
+        MatchFormula::Pattern(String::from("x")),
+    )));
+
+    let decorated =
+        normalize_search_principal(&principal, Some(&span)).expect("formula should normalize");
+
+    assert_decorated_metadata(&decorated, &span);
+    match &decorated.node {
+        Formula::Anywhere(inner) => {
+            assert_empty_metadata_with_span(inner, &span);
+            assert_wraps_pattern_atom(inner, "x");
+        }
+        other => panic!("expected Anywhere formula, got {other:?}"),
     }
 }
 
