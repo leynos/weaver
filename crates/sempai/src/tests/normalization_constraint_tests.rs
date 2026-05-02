@@ -1,11 +1,12 @@
 //! Tests for normalized constraint metadata.
 
+use rstest::rstest;
 use sempai_core::{
     DiagnosticCode,
     formula::{Atom, Constraint, Decorated, Formula, WhereClause},
 };
 use sempai_yaml::{LegacyClause, LegacyFormula, MatchFormula, SearchQueryPrincipal};
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::{
     Engine,
@@ -30,6 +31,47 @@ fn first_diagnostic_code(report: &sempai_core::DiagnosticReport) -> DiagnosticCo
         .first()
         .expect("expected diagnostic")
         .code()
+}
+
+fn make_legacy_patterns_with_constraints(
+    constraints: impl IntoIterator<Item = Value>,
+) -> LegacyFormula {
+    LegacyFormula::Patterns(
+        constraints
+            .into_iter()
+            .map(LegacyClause::Constraint)
+            .collect(),
+    )
+}
+
+fn assert_schema_invalid_normalization(constraint: Value, expected_message: &str) {
+    let principal =
+        SearchQueryPrincipal::Legacy(make_legacy_patterns_with_constraints([constraint]));
+
+    let report =
+        normalize_search_principal(&principal, None).expect_err("known malformed constraint fails");
+
+    assert_eq!(
+        first_diagnostic_code(&report),
+        DiagnosticCode::ESempaiSchemaInvalid
+    );
+    assert!(
+        report
+            .diagnostics()
+            .first()
+            .expect("expected diagnostic")
+            .message()
+            .contains(expected_message)
+    );
+}
+
+fn assert_missing_positive_term_in_and_for_decorated(decorated: &Decorated<Formula>) {
+    let err = validate_formula(decorated).expect_err("constraint-only And should fail");
+    let first = err.diagnostics().first().expect("expected diagnostic");
+    assert_eq!(
+        first.code(),
+        DiagnosticCode::ESempaiMissingPositiveTermInAnd
+    );
 }
 
 #[test]
@@ -66,7 +108,7 @@ fn legacy_patterns_propagates_constraints_to_where_clauses() {
 #[test]
 fn legacy_patterns_with_only_constraints_produces_and_with_no_children_and_where_clauses() {
     let constraint = json!({"metavariable-regex": {"metavariable": "$X", "regex": "foo.*"}});
-    let legacy = LegacyFormula::Patterns(vec![LegacyClause::Constraint(constraint)]);
+    let legacy = make_legacy_patterns_with_constraints([constraint]);
 
     let decorated = normalize_legacy_decorated(legacy);
 
@@ -79,18 +121,13 @@ fn legacy_patterns_with_only_constraints_produces_and_with_no_children_and_where
         })
     );
 
-    let err = validate_formula(&decorated).expect_err("constraint-only And should fail");
-    let first = err.diagnostics().first().expect("expected diagnostic");
-    assert_eq!(
-        first.code(),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd
-    );
+    assert_missing_positive_term_in_and_for_decorated(&decorated);
 }
 
 #[test]
 fn legacy_patterns_with_only_metavariable_pattern_constraint_fails_validation() {
     let constraint = json!({"metavariable-pattern": {"metavariable": "$X", "pattern": "bad"}});
-    let legacy = LegacyFormula::Patterns(vec![LegacyClause::Constraint(constraint)]);
+    let legacy = make_legacy_patterns_with_constraints([constraint]);
     let decorated = normalize_legacy_decorated(legacy);
 
     assert!(matches!(&decorated.node, Formula::And(children) if children.is_empty()));
@@ -103,13 +140,7 @@ fn legacy_patterns_with_only_metavariable_pattern_constraint_fails_validation() 
             },
         }]
     );
-    let err =
-        validate_formula(&decorated).expect_err("constraint-only metavariable-pattern should fail");
-    let first = err.diagnostics().first().expect("expected diagnostic");
-    assert_eq!(
-        first.code(),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd
-    );
+    assert_missing_positive_term_in_and_for_decorated(&decorated);
 }
 
 #[test]
@@ -133,54 +164,20 @@ fn legacy_patterns_with_unknown_constraint_preserves_other_constraint_text() {
     }
 }
 
-#[test]
-fn legacy_patterns_with_malformed_known_constraint_fails_normalization() {
-    let constraint = json!({"metavariable-regex": {"metavariable": "$X"}});
-    let principal =
-        SearchQueryPrincipal::Legacy(LegacyFormula::Patterns(vec![LegacyClause::Constraint(
-            constraint,
-        )]));
-
-    let report =
-        normalize_search_principal(&principal, None).expect_err("known malformed constraint fails");
-
-    assert_eq!(
-        first_diagnostic_code(&report),
-        DiagnosticCode::ESempaiSchemaInvalid
-    );
-    assert!(
-        report
-            .diagnostics()
-            .first()
-            .expect("expected diagnostic")
-            .message()
-            .contains("expected {metavariable, regex} string fields")
-    );
-}
-
-#[test]
-fn legacy_patterns_with_malformed_metavariable_pattern_fails_normalization() {
-    let constraint = json!({"metavariable-pattern": {"pattern": "x"}});
-    let principal =
-        SearchQueryPrincipal::Legacy(LegacyFormula::Patterns(vec![LegacyClause::Constraint(
-            constraint,
-        )]));
-
-    let report =
-        normalize_search_principal(&principal, None).expect_err("known malformed constraint fails");
-
-    assert_eq!(
-        first_diagnostic_code(&report),
-        DiagnosticCode::ESempaiSchemaInvalid
-    );
-    assert!(
-        report
-            .diagnostics()
-            .first()
-            .expect("expected diagnostic")
-            .message()
-            .contains("expected {metavariable, pattern} string fields")
-    );
+#[rstest]
+#[case::metavariable_regex(
+    json!({"metavariable-regex": {"metavariable": "$X"}}),
+    "expected {metavariable, regex} string fields",
+)]
+#[case::metavariable_pattern(
+    json!({"metavariable-pattern": {"pattern": "x"}}),
+    "expected {metavariable, pattern} string fields",
+)]
+fn legacy_patterns_with_malformed_known_constraint_fails_normalization(
+    #[case] constraint: Value,
+    #[case] expected_message: &str,
+) {
+    assert_schema_invalid_normalization(constraint, expected_message);
 }
 
 #[test]
