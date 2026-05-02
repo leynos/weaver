@@ -40,8 +40,7 @@ pub(crate) const MAX_FORMULA_DEPTH: usize = 1000;
 /// - `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND`: And formula has no positive terms
 #[tracing::instrument(level = "debug", skip_all)]
 pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
-    let result = validate_formula_depth(formula, formula.span.as_ref())
-        .and_then(|()| validate_formula_single_pass(formula));
+    let result = validate_formula_inner(formula);
     if let Err(report) = &result
         && let Some(diagnostic) = report.diagnostics().first()
     {
@@ -50,42 +49,24 @@ pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), Diagn
     result
 }
 
-pub(crate) fn validate_formula_depth(
-    formula: &Decorated<Formula>,
-    fallback_span: Option<&SourceSpan>,
-) -> Result<(), DiagnosticReport> {
-    let depth = formula_depth(formula);
-    if depth > MAX_FORMULA_DEPTH {
+fn validate_formula_inner(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
+    let mut max_depth = 0;
+    let analysis = analyze_formula_with_depth(
+        formula,
+        AnalysisScope {
+            depth: 1,
+            fallback_span: formula.span.as_ref(),
+        },
+        &mut max_depth,
+    );
+    if max_depth > MAX_FORMULA_DEPTH {
         return Err(DiagnosticReport::validation_error(
             DiagnosticCode::ESempaiSchemaInvalid,
-            format!("formula nesting depth exceeds limit of {MAX_FORMULA_DEPTH}: {depth}"),
-            fallback_span.cloned(),
+            format!("formula nesting depth exceeds limit of {MAX_FORMULA_DEPTH}: {max_depth}"),
+            formula.span.clone(),
             vec![],
         ));
     }
-    Ok(())
-}
-
-pub(crate) fn formula_depth(formula: &Decorated<Formula>) -> usize {
-    let mut max_depth = 0;
-    let mut stack = vec![(formula, 1)];
-    while let Some((current, depth)) = stack.pop() {
-        max_depth = max_depth.max(depth);
-        match &current.node {
-            Formula::Atom(_) => {}
-            Formula::Not(inner) | Formula::Inside(inner) | Formula::Anywhere(inner) => {
-                stack.push((inner, depth + 1));
-            }
-            Formula::And(branches) | Formula::Or(branches) => {
-                stack.extend(branches.iter().map(|branch| (branch, depth + 1)));
-            }
-        }
-    }
-    max_depth
-}
-
-fn validate_formula_single_pass(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
-    let analysis = analyze_formula(formula, formula.span.as_ref());
     if let Some(diagnostic) = analysis.invalid_not_in_or {
         return Err(DiagnosticReport::validation_error(
             DiagnosticCode::ESempaiInvalidNotInOr,
@@ -121,13 +102,33 @@ struct DiagnosticSite {
     primary_span: Option<SourceSpan>,
 }
 
+#[derive(Clone, Copy)]
+struct AnalysisScope<'a> {
+    depth: usize,
+    fallback_span: Option<&'a SourceSpan>,
+}
+
+impl<'a> AnalysisScope<'a> {
+    const fn child_with_fallback(self, fallback_span: Option<&'a SourceSpan>) -> Self {
+        Self {
+            depth: self.depth + 1,
+            fallback_span,
+        }
+    }
+}
+
 /// Analyses a `Not` node, marking negation and recording the first negation span.
 fn analyze_not_arm(
     inner: &Decorated<Formula>,
+    scope: AnalysisScope<'_>,
     formula_span: Option<&SourceSpan>,
-    fallback_span: Option<&SourceSpan>,
+    max_depth: &mut usize,
 ) -> FormulaAnalysis {
-    let mut analysis = analyze_formula(inner, formula_span.or(fallback_span));
+    let mut analysis = analyze_formula_with_depth(
+        inner,
+        scope.child_with_fallback(formula_span.or(scope.fallback_span)),
+        max_depth,
+    );
     analysis.contains_not = true;
     analysis.has_positive_term = false;
     analysis.first_negation_span = formula_span.cloned().or(analysis.first_negation_span);
@@ -137,10 +138,15 @@ fn analyze_not_arm(
 /// Analyses an `Inside` or `Anywhere` node (no negation tracking).
 fn analyze_inside_anywhere_arm(
     inner: &Decorated<Formula>,
+    scope: AnalysisScope<'_>,
     formula_span: Option<&SourceSpan>,
-    fallback_span: Option<&SourceSpan>,
+    max_depth: &mut usize,
 ) -> FormulaAnalysis {
-    let mut analysis = analyze_formula(inner, formula_span.or(fallback_span));
+    let mut analysis = analyze_formula_with_depth(
+        inner,
+        scope.child_with_fallback(formula_span.or(scope.fallback_span)),
+        max_depth,
+    );
     analysis.has_positive_term = false;
     analysis
 }
@@ -150,9 +156,14 @@ fn analyze_inside_anywhere_arm(
 fn analyze_and_arm(
     formula: &Decorated<Formula>,
     branches: &[Decorated<Formula>],
-    fallback_span: Option<&SourceSpan>,
+    scope: AnalysisScope<'_>,
+    max_depth: &mut usize,
 ) -> FormulaAnalysis {
-    let mut analysis = analyze_branches(branches, formula.span.as_ref().or(fallback_span));
+    let mut analysis = analyze_branches(
+        branches,
+        scope.child_with_fallback(formula.span.as_ref().or(scope.fallback_span)),
+        max_depth,
+    );
     analysis.has_positive_term |= has_match_producing_where_clause(&formula.where_clauses);
     if !analysis.has_positive_term {
         analysis.missing_positive_term = Some(DiagnosticSite {
@@ -160,7 +171,7 @@ fn analyze_and_arm(
                 .span
                 .clone()
                 .or_else(|| branches.first().and_then(|branch| branch.span.clone()))
-                .or_else(|| fallback_span.cloned()),
+                .or_else(|| scope.fallback_span.cloned()),
         });
     }
     analysis
@@ -171,12 +182,14 @@ fn analyze_and_arm(
 fn analyze_or_arm(
     formula: &Decorated<Formula>,
     branches: &[Decorated<Formula>],
-    fallback_span: Option<&SourceSpan>,
+    scope: AnalysisScope<'_>,
+    max_depth: &mut usize,
 ) -> FormulaAnalysis {
     let mut analysis = FormulaAnalysis::default();
-    let child_fallback = formula.span.as_ref().or(fallback_span);
+    let child_fallback = formula.span.as_ref().or(scope.fallback_span);
+    let child_scope = scope.child_with_fallback(child_fallback);
     for branch in branches {
-        let branch_analysis = analyze_formula(branch, child_fallback);
+        let branch_analysis = analyze_formula_with_depth(branch, child_scope, max_depth);
         if branch_analysis.contains_not && analysis.invalid_not_in_or.is_none() {
             analysis.invalid_not_in_or = Some(DiagnosticSite {
                 primary_span: branch_analysis
@@ -202,31 +215,34 @@ fn analyze_or_arm(
     analysis
 }
 
-fn analyze_formula(
+fn analyze_formula_with_depth(
     formula: &Decorated<Formula>,
-    fallback_span: Option<&SourceSpan>,
+    scope: AnalysisScope<'_>,
+    max_depth: &mut usize,
 ) -> FormulaAnalysis {
+    *max_depth = (*max_depth).max(scope.depth);
     match &formula.node {
         Formula::Atom(_) => FormulaAnalysis {
             has_positive_term: true,
             ..FormulaAnalysis::default()
         },
-        Formula::Not(inner) => analyze_not_arm(inner, formula.span.as_ref(), fallback_span),
+        Formula::Not(inner) => analyze_not_arm(inner, scope, formula.span.as_ref(), max_depth),
         Formula::Inside(inner) | Formula::Anywhere(inner) => {
-            analyze_inside_anywhere_arm(inner, formula.span.as_ref(), fallback_span)
+            analyze_inside_anywhere_arm(inner, scope, formula.span.as_ref(), max_depth)
         }
-        Formula::And(branches) => analyze_and_arm(formula, branches, fallback_span),
-        Formula::Or(branches) => analyze_or_arm(formula, branches, fallback_span),
+        Formula::And(branches) => analyze_and_arm(formula, branches, scope, max_depth),
+        Formula::Or(branches) => analyze_or_arm(formula, branches, scope, max_depth),
     }
 }
 
 fn analyze_branches(
     branches: &[Decorated<Formula>],
-    fallback_span: Option<&SourceSpan>,
+    scope: AnalysisScope<'_>,
+    max_depth: &mut usize,
 ) -> FormulaAnalysis {
     let mut analysis = FormulaAnalysis::default();
     for branch in branches {
-        let branch_analysis = analyze_formula(branch, fallback_span);
+        let branch_analysis = analyze_formula_with_depth(branch, scope, max_depth);
         analysis.has_positive_term |= branch_analysis.has_positive_term;
         analysis.contains_not |= branch_analysis.contains_not;
         analysis.first_negation_span = analysis

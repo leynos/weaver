@@ -14,7 +14,7 @@ use crate::{
     EngineLimits,
     Language,
     engine::QueryPlan,
-    semantic_check::{MAX_FORMULA_DEPTH, validate_formula_depth},
+    semantic_check::{MAX_FORMULA_DEPTH, validate_formula},
 };
 
 fn default_engine() -> Engine { Engine::new(EngineConfig::default()) }
@@ -232,10 +232,10 @@ fn compile_yaml_multiple_rules_return_expected_plans() {
 
 #[test]
 fn compile_yaml_rejects_formula_nesting_beyond_depth_limit() {
-    assert!(validate_formula_depth(&deeply_nested_formula(MAX_FORMULA_DEPTH), None).is_ok());
+    assert!(validate_formula(&deeply_nested_formula(MAX_FORMULA_DEPTH)).is_ok());
 
     let formula = deeply_nested_formula(MAX_FORMULA_DEPTH + 1);
-    let report = validate_formula_depth(&formula, None).expect_err("depth limit should fail");
+    let report = validate_formula(&formula).expect_err("depth limit should fail");
     let diagnostic = report
         .diagnostics()
         .first()
