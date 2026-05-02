@@ -153,6 +153,31 @@ fn legacy_patterns_with_malformed_known_constraint_fails_normalization() {
 }
 
 #[test]
+fn legacy_patterns_with_malformed_metavariable_pattern_fails_normalization() {
+    let constraint = json!({"metavariable-pattern": {"pattern": "x"}});
+    let principal =
+        SearchQueryPrincipal::Legacy(LegacyFormula::Patterns(vec![LegacyClause::Constraint(
+            constraint,
+        )]));
+
+    let report =
+        normalize_search_principal(&principal, None).expect_err("known malformed constraint fails");
+
+    assert_eq!(
+        first_diagnostic_code(&report),
+        DiagnosticCode::ESempaiSchemaInvalid
+    );
+    assert!(
+        report
+            .diagnostics()
+            .first()
+            .expect("expected diagnostic")
+            .message()
+            .contains("expected {metavariable, pattern} string fields")
+    );
+}
+
+#[test]
 fn compile_yaml_reports_schema_invalid_for_malformed_where_clause() {
     let yaml = concat!(
         "rules:\n",
