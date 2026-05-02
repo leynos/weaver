@@ -25,7 +25,7 @@ use sempai_core::{
     DiagnosticCode,
     DiagnosticReport,
     SourceSpan,
-    formula::{Decorated, Formula},
+    formula::{Decorated, Formula, WhereClause},
 };
 
 pub(crate) const MAX_FORMULA_DEPTH: usize = 1000;
@@ -40,13 +40,30 @@ pub(crate) const MAX_FORMULA_DEPTH: usize = 1000;
 /// - `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND`: And formula has no positive terms
 #[tracing::instrument(level = "debug", skip_all)]
 pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
-    let result = validate_formula_single_pass(formula);
+    let result = validate_formula_depth(formula, formula.span.as_ref())
+        .and_then(|()| validate_formula_single_pass(formula));
     if let Err(report) = &result
         && let Some(diagnostic) = report.diagnostics().first()
     {
         tracing::warn!(code = ?diagnostic.code(), "semantic validation failed");
     }
     result
+}
+
+pub(crate) fn validate_formula_depth(
+    formula: &Decorated<Formula>,
+    fallback_span: Option<&SourceSpan>,
+) -> Result<(), DiagnosticReport> {
+    let depth = formula_depth(formula);
+    if depth > MAX_FORMULA_DEPTH {
+        return Err(DiagnosticReport::validation_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            format!("formula nesting depth exceeds limit of {MAX_FORMULA_DEPTH}: {depth}"),
+            fallback_span.cloned(),
+            vec![],
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) fn formula_depth(formula: &Decorated<Formula>) -> usize {
@@ -94,6 +111,7 @@ fn validate_formula_single_pass(formula: &Decorated<Formula>) -> Result<(), Diag
 struct FormulaAnalysis {
     has_positive_term: bool,
     contains_not: bool,
+    first_negation_span: Option<SourceSpan>,
     invalid_not_in_or: Option<DiagnosticSite>,
     missing_positive_term: Option<DiagnosticSite>,
 }
@@ -116,6 +134,7 @@ fn analyze_formula(
             let mut analysis = analyze_formula(inner, formula.span.as_ref().or(fallback_span));
             analysis.contains_not = true;
             analysis.has_positive_term = false;
+            analysis.first_negation_span = formula.span.clone().or(analysis.first_negation_span);
             analysis
         }
         Formula::Inside(inner) | Formula::Anywhere(inner) => {
@@ -125,6 +144,7 @@ fn analyze_formula(
         }
         Formula::And(branches) => {
             let mut analysis = analyze_branches(branches, formula.span.as_ref().or(fallback_span));
+            analysis.has_positive_term |= has_match_producing_where_clause(&formula.where_clauses);
             if !analysis.has_positive_term {
                 analysis.missing_positive_term = Some(DiagnosticSite {
                     primary_span: formula
@@ -143,7 +163,11 @@ fn analyze_formula(
                 let branch_analysis = analyze_formula(branch, child_fallback);
                 if branch_analysis.contains_not && analysis.invalid_not_in_or.is_none() {
                     analysis.invalid_not_in_or = Some(DiagnosticSite {
-                        primary_span: branch.span.clone().or_else(|| child_fallback.cloned()),
+                        primary_span: branch_analysis
+                            .first_negation_span
+                            .clone()
+                            .or_else(|| branch.span.clone())
+                            .or_else(|| child_fallback.cloned()),
                     });
                 } else {
                     analysis.invalid_not_in_or = analysis
@@ -152,6 +176,9 @@ fn analyze_formula(
                 }
                 analysis.has_positive_term |= branch_analysis.has_positive_term;
                 analysis.contains_not |= branch_analysis.contains_not;
+                analysis.first_negation_span = analysis
+                    .first_negation_span
+                    .or(branch_analysis.first_negation_span);
                 analysis.missing_positive_term = analysis
                     .missing_positive_term
                     .or(branch_analysis.missing_positive_term);
@@ -170,6 +197,9 @@ fn analyze_branches(
         let branch_analysis = analyze_formula(branch, fallback_span);
         analysis.has_positive_term |= branch_analysis.has_positive_term;
         analysis.contains_not |= branch_analysis.contains_not;
+        analysis.first_negation_span = analysis
+            .first_negation_span
+            .or(branch_analysis.first_negation_span);
         analysis.invalid_not_in_or = analysis
             .invalid_not_in_or
             .or(branch_analysis.invalid_not_in_or);
@@ -178,4 +208,10 @@ fn analyze_branches(
             .or(branch_analysis.missing_positive_term);
     }
     analysis
+}
+
+fn has_match_producing_where_clause(where_clauses: &[WhereClause]) -> bool {
+    where_clauses
+        .iter()
+        .any(|clause| clause.raw.get("metavariable-pattern").is_some())
 }

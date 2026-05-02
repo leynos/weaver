@@ -13,8 +13,8 @@ use crate::{
     EngineConfig,
     EngineLimits,
     Language,
-    engine::{QueryPlan, validate_formula_depth},
-    semantic_check::MAX_FORMULA_DEPTH,
+    engine::QueryPlan,
+    semantic_check::{MAX_FORMULA_DEPTH, validate_formula_depth},
 };
 
 fn default_engine() -> Engine { Engine::new(EngineConfig::default()) }
@@ -75,7 +75,7 @@ fn dummy_formula() -> Decorated<Formula> {
 
 fn deeply_nested_formula(depth: usize) -> Decorated<Formula> {
     let mut formula = dummy_formula();
-    for _ in 0..depth {
+    for _ in 1..depth {
         formula = Decorated {
             node: Formula::Inside(Box::new(formula)),
             where_clauses: vec![],
@@ -232,7 +232,9 @@ fn compile_yaml_multiple_rules_return_expected_plans() {
 
 #[test]
 fn compile_yaml_rejects_formula_nesting_beyond_depth_limit() {
-    let formula = deeply_nested_formula(MAX_FORMULA_DEPTH);
+    assert!(validate_formula_depth(&deeply_nested_formula(MAX_FORMULA_DEPTH), None).is_ok());
+
+    let formula = deeply_nested_formula(MAX_FORMULA_DEPTH + 1);
     let report = validate_formula_depth(&formula, None).expect_err("depth limit should fail");
     let diagnostic = report
         .diagnostics()

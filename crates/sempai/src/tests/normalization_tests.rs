@@ -4,7 +4,7 @@ use rstest::rstest;
 use sempai_core::{
     DiagnosticCode,
     SourceSpan,
-    formula::{Atom, Decorated, Formula, PatternAtom, RegexAtom, TreeSitterQueryAtom},
+    formula::{Atom, Decorated, Formula, PatternAtom, RegexAtom, TreeSitterQueryAtom, WhereClause},
 };
 use sempai_yaml::{
     LegacyClause,
@@ -324,6 +324,20 @@ fn legacy_patterns_with_only_constraints_produces_and_with_no_children_and_where
         first.code(),
         DiagnosticCode::ESempaiMissingPositiveTermInAnd
     );
+}
+
+#[test]
+fn legacy_patterns_with_only_metavariable_pattern_constraint_validates() {
+    let constraint = json!({"metavariable-pattern": {"metavariable": "$X", "pattern": "bad"}});
+    let legacy = LegacyFormula::Patterns(vec![LegacyClause::Constraint(constraint.clone())]);
+    let decorated = normalize_legacy_decorated(legacy);
+
+    assert!(matches!(&decorated.node, Formula::And(children) if children.is_empty()));
+    assert_eq!(
+        decorated.where_clauses,
+        vec![WhereClause { raw: constraint }]
+    );
+    assert!(validate_formula(&decorated).is_ok());
 }
 
 #[test]

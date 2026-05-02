@@ -219,6 +219,24 @@ fn invalid_not_in_or_prefers_branch_span() {
 }
 
 #[test]
+fn invalid_not_in_or_prefers_nested_not_span_over_fallback() {
+    let not_span = SourceSpan::new(90, 100, None);
+    let fallback_span = SourceSpan::new(110, 120, None);
+    let formula = with_span(
+        make_or(vec![make_inside(with_span(
+            make_not(make_pattern("bad")),
+            not_span.clone(),
+        ))]),
+        fallback_span,
+    );
+
+    let diagnostic = first_validation_diagnostic(&formula);
+
+    assert_eq!(diagnostic.code(), DiagnosticCode::ESempaiInvalidNotInOr);
+    assert_eq!(diagnostic.primary_span(), Some(&not_span));
+}
+
+#[test]
 fn deeply_nested_or_with_negation_anywhere_fails() {
     let nested_and = make_and(vec![
         make_inside(make_pattern("x")),

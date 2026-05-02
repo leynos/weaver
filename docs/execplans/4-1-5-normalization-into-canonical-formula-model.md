@@ -353,11 +353,14 @@ Add a new module `crates/sempai/src/semantic_check.rs` (< 200 lines) with:
 - `pub(crate) fn validate_formula(formula: &Decorated<Formula>)
   -> Result<(), DiagnosticReport>`
 - Internal checks:
-  - `check_no_not_in_or(formula)` — walks `Or` branches and rejects any
-    that are `Formula::Not`.  Emits `E_SEMPAI_INVALID_NOT_IN_OR`.
-  - `check_positive_term_in_and(formula)` — walks `And` branches and
-    ensures at least one is a positive term (not `Not`, `Inside`, or
-    `Anywhere`).  Emits `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND`.
+  - `check_no_not_in_or(formula)` — walks every `Or` branch subtree and
+    rejects any branch whose subtree contains a `Formula::Not`. Emits
+    `E_SEMPAI_INVALID_NOT_IN_OR`.
+  - `check_positive_term_in_and(formula)` — walks `And` branches and treats
+    `And`/`Or` as positive only when they contain at least one positive
+    descendant term, meaning a descendant that is not `Not`, `Inside`, or
+    `Anywhere`. Emits `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND` when no positive
+    descendant exists.
 
 Both checks must be recursive: they apply to nested sub-formulas as well.
 

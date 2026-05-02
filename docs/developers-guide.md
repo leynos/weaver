@@ -11,6 +11,10 @@ The workspace targets `ortho_config` v0.8.0 and Rust 1.88.
 
 ## Sempai overview
 
+Sempai is Weaver's Semgrep-compatible query engine facade. It parses rule
+YAML, normalizes supported search syntax into a canonical formula model, and
+prepares per-language query plans for later execution.
+
 ## Sempai query pipeline (milestone 4.1.5)
 
 - Canonical model (`sempai_core::formula`):
