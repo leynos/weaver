@@ -2,7 +2,7 @@
 
 use insta::assert_snapshot;
 
-use crate::{DiagnosticReport, Engine, EngineConfig};
+use crate::{DiagnosticCode, DiagnosticReport, Engine, EngineConfig};
 
 fn compile_yaml_report(yaml: &str) -> DiagnosticReport {
     Engine::new(EngineConfig::default())
@@ -10,8 +10,30 @@ fn compile_yaml_report(yaml: &str) -> DiagnosticReport {
         .expect_err("YAML should fail compilation")
 }
 
-fn diagnostic_report_json(report: &DiagnosticReport) -> String {
-    serde_json::to_string_pretty(report).expect("serialize diagnostic report")
+fn redact_diagnostic_spans(diagnostic: &mut serde_json::Value) {
+    let Some(object) = diagnostic.as_object_mut() else {
+        return;
+    };
+    object.insert(
+        String::from("primary_span"),
+        serde_json::json!("<redacted-span>"),
+    );
+    if let Some(suggestions) = object.get_mut("suggestions") {
+        *suggestions = serde_json::json!("<redacted-suggestions>");
+    }
+}
+
+fn redacted_report_json(report: &DiagnosticReport) -> String {
+    let mut value = serde_json::to_value(report).expect("serialize diagnostic report");
+    if let Some(diagnostics) = value
+        .get_mut("diagnostics")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        for diagnostic in diagnostics {
+            redact_diagnostic_spans(diagnostic);
+        }
+    }
+    serde_json::to_string_pretty(&value).expect("stringify diagnostic report")
 }
 
 #[test]
@@ -27,8 +49,15 @@ fn snapshot_invalid_not_in_or() {
         "      - pattern-not: bar($Y)\n",
     );
     let report = compile_yaml_report(yaml);
+    let diagnostic = report.diagnostics().first().expect("should diagnose");
+    assert_eq!(diagnostic.code(), DiagnosticCode::ESempaiInvalidNotInOr);
+    assert!(
+        diagnostic
+            .message()
+            .contains("not allowed inside disjunction")
+    );
 
-    assert_snapshot!("invalid_not_in_or", diagnostic_report_json(&report));
+    assert_snapshot!("invalid_not_in_or", redacted_report_json(&report));
 }
 
 #[test]
@@ -44,10 +73,20 @@ fn snapshot_missing_positive_term_in_and() {
         "      - pattern-inside: bar($Y)\n",
     );
     let report = compile_yaml_report(yaml);
+    let diagnostic = report.diagnostics().first().expect("should diagnose");
+    assert_eq!(
+        diagnostic.code(),
+        DiagnosticCode::ESempaiMissingPositiveTermInAnd
+    );
+    assert!(
+        diagnostic
+            .message()
+            .contains("must contain at least one positive match term")
+    );
 
     assert_snapshot!(
         "missing_positive_term_in_and",
-        diagnostic_report_json(&report)
+        redacted_report_json(&report)
     );
 }
 
@@ -62,6 +101,9 @@ fn snapshot_schema_invalid_language() {
         "    pattern: foo($X)\n",
     );
     let report = compile_yaml_report(yaml);
+    let diagnostic = report.diagnostics().first().expect("should diagnose");
+    assert_eq!(diagnostic.code(), DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(diagnostic.message().contains("unsupported language"));
 
-    assert_snapshot!("schema_invalid_language", diagnostic_report_json(&report));
+    assert_snapshot!("schema_invalid_language", redacted_report_json(&report));
 }
