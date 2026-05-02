@@ -9,7 +9,7 @@ use sempai_core::{
 
 use crate::semantic_check::validate_formula;
 
-const MAX_DEPTH: u32 = 4;
+const MAX_DEPTH: u32 = 5;
 const MAX_SIZE: u32 = 32;
 const MAX_BRANCHES: u32 = 3;
 
@@ -25,7 +25,8 @@ fn decorated(node: Formula, span: Option<SourceSpan>) -> Decorated<Formula> {
 
 fn span_strategy() -> impl Strategy<Value = Option<SourceSpan>> {
     prop_oneof![
-        Just(None),
+        7 => Just(None),
+        3 =>
         (0_u32..100, 1_u32..20).prop_map(|(start, len)| {
             Some(SourceSpan::new(start, start.saturating_add(len), None))
         }),
@@ -199,13 +200,13 @@ fn first_diagnostic_code(formula: &Decorated<Formula>) -> DiagnosticCode {
 
 proptest! {
     #![proptest_config(ProptestConfig {
-        cases: 32,
+        cases: 64,
         max_shrink_iters: 128,
         ..ProptestConfig::default()
     })]
 
     #[test]
-    fn prop_invalid_not_in_or_rejected(formula in or_with_not_descendant()) {
+    fn prop_or_branch_containing_negation_is_rejected(formula in or_with_not_descendant()) {
         prop_assert_eq!(
             first_diagnostic_code(&formula),
             DiagnosticCode::ESempaiInvalidNotInOr
@@ -213,7 +214,7 @@ proptest! {
     }
 
     #[test]
-    fn prop_missing_positive_in_and_rejected(formula in and_without_positive_descendant()) {
+    fn prop_and_with_no_positive_term_is_rejected(formula in and_without_positive_descendant()) {
         let expected_span = formula
             .span
             .clone()
@@ -230,7 +231,7 @@ proptest! {
     }
 
     #[test]
-    fn prop_valid_positive_tree_ok(formula in positive_tree()) {
+    fn prop_valid_tree_with_positive_in_every_and_is_ok(formula in positive_tree()) {
         prop_assert!(validate_formula(&formula).is_ok());
     }
 }
