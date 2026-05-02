@@ -260,7 +260,7 @@ fn discovery_cap_marks_spillover_truncated_when_card_budget_remains(
     );
     Ok(())
 }
-
+mod coverage_tests;
 struct RefusalCase<'a> {
     filename: &'a str,
     content: &'a str,
