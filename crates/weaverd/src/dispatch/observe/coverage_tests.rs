@@ -4,6 +4,7 @@ use rstest::rstest;
 use tempfile::TempDir;
 use url::Url;
 use weaver_cards::DetailLevel;
+use weaver_lsp_host::{Language, ServerCapabilitySet};
 
 use super::{
     FusionBackends,
@@ -15,12 +16,19 @@ use super::{
     make_request,
     write_source,
 };
+use crate::dispatch::observe::test_support::{
+    StubLanguageServer,
+    markdown_hover,
+    semantic_backends_with_server,
+};
 
 #[rstest]
-fn enrichment_applies_lsp_provenance_when_detail_is_semantic(
-    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
-) -> Result<(), String> {
-    let (mut backends, temp_dir) = backends_fixture?;
+fn enrichment_applies_lsp_provenance_when_detail_is_semantic() -> Result<(), String> {
+    let (server, _hover_params) = StubLanguageServer::with_hover(
+        ServerCapabilitySet::new(false, false, false).with_hover(true),
+        markdown_hover("```rust\nfn increment(&mut self)\n```"),
+    );
+    let (mut backends, temp_dir) = semantic_backends_with_server(Language::Rust, server)?;
     let path = write_source(
         &temp_dir,
         "enrich.rs",
@@ -42,6 +50,8 @@ fn enrichment_applies_lsp_provenance_when_detail_is_semantic(
         &uri,
         "--position",
         "4:8",
+        "--entry-detail",
+        detail_value(DetailLevel::Semantic),
         "--node-detail",
         detail_value(DetailLevel::Semantic),
     ]);
@@ -59,11 +69,9 @@ fn enrichment_applies_lsp_provenance_when_detail_is_semantic(
         .filter_map(|value| value.as_str())
         .collect();
     assert!(
-        source_names
-            .iter()
-            .any(|&source| source == "lsp_hover" || source == "tree_sitter"),
-        "entry card provenance should include lsp_hover or tree_sitter after semantic enrichment, \
-         got: {source_names:?}"
+        source_names.contains(&"lsp_hover"),
+        "entry card provenance should include lsp_hover after semantic enrichment, got: \
+         {source_names:?}"
     );
     assert!(
         !source_names.contains(&"tree_sitter_degraded_semantic"),
@@ -107,17 +115,17 @@ fn stable_card_order_produces_deterministic_results(
     let cards_a = payload_a["cards"].as_array().expect("cards array");
     let cards_b = payload_b["cards"].as_array().expect("cards array");
 
-    let names_a: Vec<_> = cards_a
+    let ids_a: Vec<_> = cards_a
         .iter()
-        .filter_map(|card| card["symbol"]["ref"]["name"].as_str())
+        .filter_map(|card| card["symbol"]["symbol_id"].as_str())
         .collect();
-    let names_b: Vec<_> = cards_b
+    let ids_b: Vec<_> = cards_b
         .iter()
-        .filter_map(|card| card["symbol"]["ref"]["name"].as_str())
+        .filter_map(|card| card["symbol"]["symbol_id"].as_str())
         .collect();
 
     assert_eq!(
-        names_a, names_b,
+        ids_a, ids_b,
         "card order must be deterministic across repeated requests"
     );
 
