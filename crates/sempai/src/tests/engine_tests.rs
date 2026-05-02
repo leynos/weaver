@@ -13,7 +13,8 @@ use crate::{
     EngineConfig,
     EngineLimits,
     Language,
-    engine::QueryPlan,
+    engine::{QueryPlan, validate_formula_depth},
+    semantic_check::MAX_FORMULA_DEPTH,
 };
 
 fn default_engine() -> Engine { Engine::new(EngineConfig::default()) }
@@ -70,6 +71,20 @@ fn dummy_formula() -> Decorated<Formula> {
         fix: None,
         span: None,
     }
+}
+
+fn deeply_nested_formula(depth: usize) -> Decorated<Formula> {
+    let mut formula = dummy_formula();
+    for _ in 0..depth {
+        formula = Decorated {
+            node: Formula::Inside(Box::new(formula)),
+            where_clauses: vec![],
+            as_name: None,
+            fix: None,
+            span: None,
+        };
+    }
+    formula
 }
 
 fn assert_pattern_formula(formula: &Decorated<Formula>, expected_text: &str) {
@@ -212,6 +227,25 @@ fn compile_yaml_multiple_rules_return_expected_plans() {
     assert_eq!(
         seen,
         BTreeSet::from([String::from("demo.first"), String::from("demo.second")])
+    );
+}
+
+#[test]
+fn compile_yaml_rejects_formula_nesting_beyond_depth_limit() {
+    let formula = deeply_nested_formula(MAX_FORMULA_DEPTH);
+    let report = validate_formula_depth(&formula, None).expect_err("depth limit should fail");
+    let diagnostic = report
+        .diagnostics()
+        .first()
+        .expect("should have diagnostic");
+
+    assert_eq!(diagnostic.code(), DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(
+        diagnostic
+            .message()
+            .contains("formula nesting depth exceeds limit"),
+        "unexpected diagnostic message: {}",
+        diagnostic.message()
     );
 }
 

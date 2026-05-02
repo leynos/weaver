@@ -20,7 +20,7 @@ use sempai_yaml::{Rule, RulePrincipal, parse_rule_file};
 use crate::{
     mode_validation::validate_supported_modes,
     normalize::normalize_search_principal,
-    semantic_check::validate_formula,
+    semantic_check::{MAX_FORMULA_DEPTH, formula_depth, validate_formula},
 };
 
 /// A compiled query plan for one rule and target language.
@@ -120,6 +120,7 @@ impl Engine {
             .try_fold(Vec::new(), |mut plans, (rule, principal)| {
                 tracing::debug!(rule_id = rule.id(), "normalizing principal");
                 let formula = normalize_search_principal(principal, rule.rule_span());
+                validate_formula_depth(&formula, rule.rule_span())?;
 
                 tracing::debug!(rule_id = rule.id(), "validating normalized formula");
                 validate_formula(&formula)?;
@@ -164,6 +165,22 @@ impl Engine {
     ) -> Result<Vec<Match>, DiagnosticReport> {
         Err(DiagnosticReport::not_implemented("execute"))
     }
+}
+
+pub(crate) fn validate_formula_depth(
+    formula: &Decorated<Formula>,
+    rule_span: Option<&sempai_core::SourceSpan>,
+) -> Result<(), DiagnosticReport> {
+    let depth = formula_depth(formula);
+    if depth > MAX_FORMULA_DEPTH {
+        return Err(DiagnosticReport::validation_error(
+            DiagnosticCode::ESempaiSchemaInvalid,
+            format!("formula nesting depth exceeds limit of {MAX_FORMULA_DEPTH}: {depth}"),
+            rule_span.cloned(),
+            vec![],
+        ));
+    }
+    Ok(())
 }
 
 /// Compiles query plans for a single rule's languages.

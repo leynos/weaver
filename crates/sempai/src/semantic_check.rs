@@ -24,8 +24,11 @@
 use sempai_core::{
     DiagnosticCode,
     DiagnosticReport,
+    SourceSpan,
     formula::{Decorated, Formula},
 };
+
+pub(crate) const MAX_FORMULA_DEPTH: usize = 1000;
 
 /// Validates semantic constraints on a normalized formula.
 ///
@@ -37,8 +40,7 @@ use sempai_core::{
 /// - `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND`: And formula has no positive terms
 #[tracing::instrument(level = "debug", skip_all)]
 pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
-    let result = check_no_not_in_or(&formula.node, formula.span.as_ref())
-        .and_then(|()| check_positive_term_in_and(&formula.node, formula.span.as_ref()));
+    let result = validate_formula_single_pass(formula);
     if let Err(report) = &result
         && let Some(diagnostic) = report.diagnostics().first()
     {
@@ -47,135 +49,133 @@ pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), Diagn
     result
 }
 
-/// Checks that no `Or` branch contains a `Not` formula.
-fn check_no_not_in_or(
-    formula: &Formula,
-    span: Option<&sempai_core::SourceSpan>,
-) -> Result<(), DiagnosticReport> {
-    match formula {
+pub(crate) fn formula_depth(formula: &Decorated<Formula>) -> usize {
+    let mut max_depth = 0;
+    let mut stack = vec![(formula, 1)];
+    while let Some((current, depth)) = stack.pop() {
+        max_depth = max_depth.max(depth);
+        match &current.node {
+            Formula::Atom(_) => {}
+            Formula::Not(inner) | Formula::Inside(inner) | Formula::Anywhere(inner) => {
+                stack.push((inner, depth + 1));
+            }
+            Formula::And(branches) | Formula::Or(branches) => {
+                stack.extend(branches.iter().map(|branch| (branch, depth + 1)));
+            }
+        }
+    }
+    max_depth
+}
+
+fn validate_formula_single_pass(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
+    let analysis = analyze_formula(formula, formula.span.as_ref());
+    if let Some(diagnostic) = analysis.invalid_not_in_or {
+        return Err(DiagnosticReport::validation_error(
+            DiagnosticCode::ESempaiInvalidNotInOr,
+            String::from("negated terms are not allowed inside disjunction (Or/pattern-either)"),
+            diagnostic.primary_span,
+            vec![],
+        ));
+    }
+    if let Some(diagnostic) = analysis.missing_positive_term {
+        return Err(DiagnosticReport::validation_error(
+            DiagnosticCode::ESempaiMissingPositiveTermInAnd,
+            String::from(
+                "conjunction (And/patterns) must contain at least one positive match term",
+            ),
+            diagnostic.primary_span,
+            vec![],
+        ));
+    }
+    Ok(())
+}
+
+#[derive(Debug, Default)]
+struct FormulaAnalysis {
+    has_positive_term: bool,
+    contains_not: bool,
+    invalid_not_in_or: Option<DiagnosticSite>,
+    missing_positive_term: Option<DiagnosticSite>,
+}
+
+#[derive(Debug)]
+struct DiagnosticSite {
+    primary_span: Option<SourceSpan>,
+}
+
+fn analyze_formula(
+    formula: &Decorated<Formula>,
+    fallback_span: Option<&SourceSpan>,
+) -> FormulaAnalysis {
+    match &formula.node {
+        Formula::Atom(_) => FormulaAnalysis {
+            has_positive_term: true,
+            ..FormulaAnalysis::default()
+        },
+        Formula::Not(inner) => {
+            let mut analysis = analyze_formula(inner, formula.span.as_ref().or(fallback_span));
+            analysis.contains_not = true;
+            analysis.has_positive_term = false;
+            analysis
+        }
+        Formula::Inside(inner) | Formula::Anywhere(inner) => {
+            let mut analysis = analyze_formula(inner, formula.span.as_ref().or(fallback_span));
+            analysis.has_positive_term = false;
+            analysis
+        }
+        Formula::And(branches) => {
+            let mut analysis = analyze_branches(branches, formula.span.as_ref().or(fallback_span));
+            if !analysis.has_positive_term {
+                analysis.missing_positive_term = Some(DiagnosticSite {
+                    primary_span: formula
+                        .span
+                        .clone()
+                        .or_else(|| branches.first().and_then(|branch| branch.span.clone()))
+                        .or_else(|| fallback_span.cloned()),
+                });
+            }
+            analysis
+        }
         Formula::Or(branches) => {
+            let mut analysis = FormulaAnalysis::default();
+            let child_fallback = formula.span.as_ref().or(fallback_span);
             for branch in branches {
-                if branch_contains_not(&branch.node) {
-                    return Err(DiagnosticReport::validation_error(
-                        DiagnosticCode::ESempaiInvalidNotInOr,
-                        String::from(
-                            "negated terms are not allowed inside disjunction (Or/pattern-either)",
-                        ),
-                        branch.span.clone().or_else(|| span.cloned()),
-                        vec![],
-                    ));
+                let branch_analysis = analyze_formula(branch, child_fallback);
+                if branch_analysis.contains_not && analysis.invalid_not_in_or.is_none() {
+                    analysis.invalid_not_in_or = Some(DiagnosticSite {
+                        primary_span: branch.span.clone().or_else(|| child_fallback.cloned()),
+                    });
+                } else {
+                    analysis.invalid_not_in_or = analysis
+                        .invalid_not_in_or
+                        .or(branch_analysis.invalid_not_in_or);
                 }
-                // Recursively check nested formulas
-                check_no_not_in_or(&branch.node, branch.span.as_ref().or(span))?;
+                analysis.has_positive_term |= branch_analysis.has_positive_term;
+                analysis.contains_not |= branch_analysis.contains_not;
+                analysis.missing_positive_term = analysis
+                    .missing_positive_term
+                    .or(branch_analysis.missing_positive_term);
             }
-            Ok(())
+            analysis
         }
-        Formula::And(branches) => {
-            for branch in branches {
-                check_no_not_in_or(&branch.node, branch.span.as_ref().or(span))?;
-            }
-            Ok(())
-        }
-        Formula::Not(inner) | Formula::Inside(inner) | Formula::Anywhere(inner) => {
-            check_no_not_in_or(&inner.node, inner.span.as_ref().or(span))
-        }
-        Formula::Atom(_) => Ok(()),
     }
 }
 
-/// Returns true when a formula subtree contains a negation.
-fn branch_contains_not(formula: &Formula) -> bool {
-    match formula {
-        Formula::Not(_) => true,
-        Formula::And(branches) | Formula::Or(branches) => branches
-            .iter()
-            .any(|branch| branch_contains_not(&branch.node)),
-        Formula::Inside(inner) | Formula::Anywhere(inner) => branch_contains_not(&inner.node),
-        Formula::Atom(_) => false,
+fn analyze_branches(
+    branches: &[Decorated<Formula>],
+    fallback_span: Option<&SourceSpan>,
+) -> FormulaAnalysis {
+    let mut analysis = FormulaAnalysis::default();
+    for branch in branches {
+        let branch_analysis = analyze_formula(branch, fallback_span);
+        analysis.has_positive_term |= branch_analysis.has_positive_term;
+        analysis.contains_not |= branch_analysis.contains_not;
+        analysis.invalid_not_in_or = analysis
+            .invalid_not_in_or
+            .or(branch_analysis.invalid_not_in_or);
+        analysis.missing_positive_term = analysis
+            .missing_positive_term
+            .or(branch_analysis.missing_positive_term);
     }
-}
-
-/// Checks that every `And` formula has at least one positive term.
-///
-/// A positive term is a match-producing formula: `Atom`, or `And`/`Or` when
-/// they contain a positive descendant. Constraint-only formulas (`Not`,
-/// `Inside`, `Anywhere`) are not positive.
-fn check_positive_term_in_and(
-    formula: &Formula,
-    span: Option<&sempai_core::SourceSpan>,
-) -> Result<(), DiagnosticReport> {
-    check_positive_term_in_and_with_spans(formula, span, span)
-}
-
-fn check_positive_term_in_and_with_spans(
-    formula: &Formula,
-    node_span: Option<&sempai_core::SourceSpan>,
-    fallback_span: Option<&sempai_core::SourceSpan>,
-) -> Result<(), DiagnosticReport> {
-    match formula {
-        Formula::And(branches) => {
-            let has_positive = branches.iter().any(|branch| is_positive_term(&branch.node));
-            if !has_positive {
-                let error_span = node_span
-                    .cloned()
-                    .or_else(|| branches.first().and_then(|branch| branch.span.clone()))
-                    .or_else(|| fallback_span.cloned());
-                return Err(DiagnosticReport::validation_error(
-                    DiagnosticCode::ESempaiMissingPositiveTermInAnd,
-                    String::from(
-                        "conjunction (And/patterns) must contain at least one positive match term",
-                    ),
-                    error_span,
-                    vec![],
-                ));
-            }
-            // Recursively check nested formulas
-            for branch in branches {
-                check_positive_term_in_and_with_spans(
-                    &branch.node,
-                    branch.span.as_ref(),
-                    node_span.or(fallback_span),
-                )?;
-            }
-            Ok(())
-        }
-        Formula::Or(branches) => {
-            for branch in branches {
-                check_positive_term_in_and_with_spans(
-                    &branch.node,
-                    branch.span.as_ref(),
-                    node_span.or(fallback_span),
-                )?;
-            }
-            Ok(())
-        }
-        Formula::Not(inner) | Formula::Inside(inner) | Formula::Anywhere(inner) => {
-            check_positive_term_in_and_with_spans(
-                &inner.node,
-                inner.span.as_ref(),
-                node_span.or(fallback_span),
-            )
-        }
-        Formula::Atom(_) => Ok(()),
-    }
-}
-
-/// Returns true if the formula is a positive match-producing term.
-///
-/// A term is positive when it ultimately produces a match location.  An `Atom`
-/// is always positive; `Not`, `Inside`, and `Anywhere` are purely
-/// constraint-style and never positive on their own. And/Or are positive only
-/// when at least one of their descendants is itself positive —
-/// otherwise the combinator bottoms out in constraint-only terms and cannot
-/// anchor matches.  This prevents shapes like `And[Or[Inside[Atom]]]` from
-/// sneaking past `MissingPositiveTermInAnd` on the basis of the outer shape
-/// alone.
-fn is_positive_term(formula: &Formula) -> bool {
-    match formula {
-        Formula::Atom(_) => true,
-        Formula::And(branches) | Formula::Or(branches) => {
-            branches.iter().any(|b| is_positive_term(&b.node))
-        }
-        Formula::Not(_) | Formula::Inside(_) | Formula::Anywhere(_) => false,
-    }
+    analysis
 }
