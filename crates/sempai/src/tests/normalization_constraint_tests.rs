@@ -3,7 +3,7 @@
 use rstest::rstest;
 use sempai_core::{
     DiagnosticCode,
-    formula::{Atom, Constraint, Decorated, Formula, WhereClause},
+    formula::{Atom, Constraint, Decorated, Formula},
 };
 use sempai_yaml::{LegacyClause, LegacyFormula, MatchFormula, SearchQueryPrincipal};
 use serde_json::{Value, json};
@@ -33,9 +33,7 @@ fn first_diagnostic_code(report: &sempai_core::DiagnosticReport) -> DiagnosticCo
         .code()
 }
 
-fn make_legacy_patterns_with_constraints(
-    constraints: impl IntoIterator<Item = Value>,
-) -> LegacyFormula {
+fn make_legacy_patterns_with_constraints<const N: usize>(constraints: [Value; N]) -> LegacyFormula {
     LegacyFormula::Patterns(
         constraints
             .into_iter()
@@ -124,40 +122,32 @@ fn legacy_patterns_propagates_constraints_to_where_clauses() {
     }
 }
 
-#[test]
-fn legacy_patterns_with_only_constraints_produces_and_with_no_children_and_where_clauses() {
-    let constraint = json!({"metavariable-regex": {"metavariable": "$X", "regex": "foo.*"}});
-    let legacy = make_legacy_patterns_with_constraints([constraint]);
-
+#[rstest]
+#[case::metavariable_regex(
+    json!({"metavariable-regex": {"metavariable": "$X", "regex": "foo.*"}}),
+    Constraint::MetavariableRegex {
+        metavariable: String::from("$X"),
+        regex: String::from("foo.*"),
+    },
+)]
+#[case::metavariable_pattern(
+    json!({"metavariable-pattern": {"metavariable": "$X", "pattern": "bad"}}),
+    Constraint::MetavariablePattern {
+        metavariable: String::from("$X"),
+        pattern: String::from("bad"),
+    },
+)]
+fn constraint_only_patterns_normalize_to_and_and_fail_validation(
+    #[case] raw_constraint: Value,
+    #[case] expected: Constraint,
+) {
+    let legacy = make_legacy_patterns_with_constraints([raw_constraint]);
     let decorated = normalize_legacy_decorated(legacy);
 
     assert!(matches!(&decorated.node, Formula::And(children) if children.is_empty()));
     assert_eq!(
         decorated.where_clauses.first().map(|c| &c.constraint),
-        Some(&Constraint::MetavariableRegex {
-            metavariable: String::from("$X"),
-            regex: String::from("foo.*"),
-        })
-    );
-
-    assert_missing_positive_term_in_and_for_decorated(&decorated);
-}
-
-#[test]
-fn legacy_patterns_with_only_metavariable_pattern_constraint_fails_validation() {
-    let constraint = json!({"metavariable-pattern": {"metavariable": "$X", "pattern": "bad"}});
-    let legacy = make_legacy_patterns_with_constraints([constraint]);
-    let decorated = normalize_legacy_decorated(legacy);
-
-    assert!(matches!(&decorated.node, Formula::And(children) if children.is_empty()));
-    assert_eq!(
-        decorated.where_clauses,
-        vec![WhereClause {
-            constraint: Constraint::MetavariablePattern {
-                metavariable: String::from("$X"),
-                pattern: String::from("bad"),
-            },
-        }]
+        Some(&expected),
     );
     assert_missing_positive_term_in_and_for_decorated(&decorated);
 }

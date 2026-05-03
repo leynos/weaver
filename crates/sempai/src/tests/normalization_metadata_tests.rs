@@ -183,20 +183,10 @@ fn v2_decorated_over_unary_preserves_metadata_and_spans(
 
 #[test]
 fn v2_decorated_over_all_wraps_preserves_metadata() {
-    let principal = SearchQueryPrincipal::Match(MatchFormula::Decorated {
-        formula: Box::new(MatchFormula::All(vec![
-            MatchFormula::Pattern(String::from("a")),
-            MatchFormula::Pattern(String::from("b")),
-        ])),
-        where_clauses: vec![json!({
-            "metavariable-pattern": {
-                "metavariable": "$X",
-                "pattern": "bad",
-            },
-        })],
-        as_name: Some(String::from("cap")),
-        fix: Some(String::from("fixme")),
-    });
+    let principal = decorated_match_formula(MatchFormula::All(vec![
+        MatchFormula::Pattern(String::from("a")),
+        MatchFormula::Pattern(String::from("b")),
+    ]));
 
     let decorated =
         normalize_search_principal(&principal, None).expect("decorated formula should normalize");
@@ -212,14 +202,10 @@ fn v2_decorated_over_all_wraps_preserves_metadata() {
             },
         }]
     );
-    match &decorated.node {
-        Formula::And(children) => {
-            assert_two_pattern_branches(children, "a", "b");
-            for child in children {
-                assert_empty_metadata(child);
-            }
-        }
-        other => panic!("expected decorated All to normalize to And, got {other:?}"),
+    let children = extract_and_branches(&decorated.node);
+    assert_two_pattern_branches(children, "a", "b");
+    for child in children {
+        assert_empty_metadata(child);
     }
 }
 

@@ -1,5 +1,6 @@
 //! Tests for semantic formula validation.
 
+use rstest::rstest;
 use sempai_core::{
     DiagnosticCode,
     SourceSpan,
@@ -91,6 +92,39 @@ fn make_inside(inner: Decorated<Formula>) -> Decorated<Formula> {
     }
 }
 
+fn sp(uri: &str, start: usize, end: usize) -> SourceSpan {
+    let uri_opt = if uri.is_empty() {
+        None
+    } else {
+        Some(uri.to_owned())
+    };
+    SourceSpan::new(
+        u32::try_from(start).expect("span start fits u32"),
+        u32::try_from(end).expect("span end fits u32"),
+        uri_opt,
+    )
+}
+
+fn build_constraint_only_and(
+    node_span: Option<SourceSpan>,
+    children: Vec<Decorated<Formula>>,
+) -> Decorated<Formula> {
+    let formula = make_and(children);
+    match node_span {
+        Some(span) => with_span(formula, span),
+        None => formula,
+    }
+}
+
+fn assert_missing_positive_primary_span(formula: &Decorated<Formula>, expected: &SourceSpan) {
+    let first = first_validation_diagnostic(formula);
+    assert_eq!(
+        first.code(),
+        DiagnosticCode::ESempaiMissingPositiveTermInAnd
+    );
+    assert_eq!(first.primary_span(), Some(expected));
+}
+
 #[test]
 fn single_positive_atom_passes_validation() {
     assert!(validate_formula(&make_pattern("foo")).is_ok());
@@ -143,59 +177,38 @@ fn nested_or_in_and_with_not_fails() {
     assert_invalid_not_in_or(&formula);
 }
 
-#[test]
-fn missing_positive_term_in_and_prefers_node_span() {
-    let node_span = SourceSpan::new(10, 20, None);
-    let child_span = SourceSpan::new(30, 40, None);
-    let formula = with_span(
-        make_and(vec![with_span(
-            make_inside(make_pattern("bar")),
-            child_span,
-        )]),
-        node_span.clone(),
-    );
-
-    let first = first_validation_diagnostic(&formula);
-
-    assert_eq!(
-        first.code(),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd
-    );
-    assert_eq!(first.primary_span(), Some(&node_span));
-}
-
-#[test]
-fn missing_positive_term_in_and_uses_first_child_span_when_node_span_none() {
-    let child_span = SourceSpan::new(30, 40, None);
-    let formula = make_and(vec![with_span(
+#[rstest]
+#[case::prefers_node_span(
+    Some(sp("", 10, 20)),
+    vec![with_span(
         make_inside(make_pattern("bar")),
-        child_span.clone(),
-    )]);
-
-    let first = first_validation_diagnostic(&formula);
-
-    assert_eq!(
-        first.code(),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd
-    );
-    assert_eq!(first.primary_span(), Some(&child_span));
-}
-
-#[test]
-fn missing_positive_term_in_and_uses_first_available_child_span() {
-    let later_child_span = SourceSpan::new(35, 45, None);
-    let formula = make_and(vec![
+        sp("", 30, 40),
+    )],
+    sp("", 10, 20),
+)]
+#[case::uses_first_child_span_when_node_span_none(
+    None,
+    vec![with_span(
+        make_inside(make_pattern("bar")),
+        sp("", 30, 40),
+    )],
+    sp("", 30, 40),
+)]
+#[case::uses_first_available_child_span(
+    None,
+    vec![
         make_inside(make_pattern("foo")),
-        with_span(make_not(make_pattern("bar")), later_child_span.clone()),
-    ]);
-
-    let first = first_validation_diagnostic(&formula);
-
-    assert_eq!(
-        first.code(),
-        DiagnosticCode::ESempaiMissingPositiveTermInAnd
-    );
-    assert_eq!(first.primary_span(), Some(&later_child_span));
+        with_span(make_not(make_pattern("bar")), sp("", 35, 45)),
+    ],
+    sp("", 35, 45),
+)]
+fn missing_positive_term_in_and_primary_span_selection(
+    #[case] node_span: Option<SourceSpan>,
+    #[case] children: Vec<Decorated<Formula>>,
+    #[case] expected_primary: SourceSpan,
+) {
+    let formula = build_constraint_only_and(node_span, children);
+    assert_missing_positive_primary_span(&formula, &expected_primary);
 }
 
 #[test]
