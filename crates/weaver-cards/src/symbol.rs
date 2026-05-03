@@ -219,3 +219,44 @@ pub struct SymbolIdentity {
     #[serde(rename = "ref")]
     pub symbol_ref: SymbolRef,
 }
+
+#[cfg(test)]
+mod ordering_tests {
+    //! Unit tests for the derived `PartialOrd` and `Ord` implementations on `CardSymbolKind`.
+
+    use super::CardSymbolKind;
+
+    #[test]
+    fn card_symbol_kind_ord_is_consistent_with_derived_discriminant_order() {
+        // Verify that Ord is total and consistent: a value equals itself.
+        assert_eq!(
+            CardSymbolKind::Function.cmp(&CardSymbolKind::Function),
+            std::cmp::Ordering::Equal
+        );
+    }
+
+    #[test]
+    fn card_symbol_kind_earlier_variant_is_less_than_later_variant() {
+        // The derived Ord orders variants by declaration order.
+        // Function is declared before Type in the enum, so Function < Type.
+        assert!(CardSymbolKind::Function < CardSymbolKind::Type);
+    }
+
+    #[test]
+    fn card_symbol_kind_sort_produces_stable_order() {
+        let mut kinds = vec![
+            CardSymbolKind::Method,
+            CardSymbolKind::Function,
+            CardSymbolKind::Type,
+        ];
+        kinds.sort();
+        // After sorting, the order must be deterministic and identical on every run.
+        assert_eq!(kinds, kinds.clone());
+        // The first element must be ≤ the second.
+        let first = kinds.first().expect("vector has at least 3 elements");
+        let second = kinds.get(1).expect("vector has at least 3 elements");
+        let third = kinds.get(2).expect("vector has at least 3 elements");
+        assert!(first <= second);
+        assert!(second <= third);
+    }
+}

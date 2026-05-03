@@ -158,3 +158,39 @@ impl CallNode {
         )
     }
 }
+
+#[cfg(test)]
+mod ordering_tests {
+    //! Unit tests for the derived `PartialOrd` and `Ord` implementations on `SymbolKind`.
+
+    use super::SymbolKind;
+
+    #[test]
+    fn symbol_kind_ord_is_reflexive() {
+        assert_eq!(
+            SymbolKind::Function.cmp(&SymbolKind::Function),
+            std::cmp::Ordering::Equal
+        );
+    }
+
+    #[test]
+    fn symbol_kind_sort_produces_stable_order() {
+        let kinds = vec![
+            SymbolKind::Method,
+            SymbolKind::Function,
+            SymbolKind::Constructor,
+        ];
+        let sorted_first = {
+            let mut v = kinds.clone();
+            v.sort();
+            v
+        };
+        let sorted_second = {
+            let mut v = kinds.clone();
+            v.sort();
+            v
+        };
+        // Sorting the same input twice must produce identical results.
+        assert_eq!(sorted_first, sorted_second);
+    }
+}

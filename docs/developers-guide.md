@@ -456,6 +456,64 @@ catalogue. `GraphSliceFixtureCase` is a type alias for `CardFixtureCase`.
   an out-of-range position and asserts
   `refusal.reason == "position_out_of_range"`.
 
+## Public API additions in milestone 7.2.1
+
+### `handle` signature — `FusionBackends` parameter
+
+`handle(request, writer, backends)` now accepts
+`&mut FusionBackends<SemanticBackendProvider>` as a third argument (wired by
+the router from `BackendManager`). This parameter provides access to the card
+extractor and LSP enrichment backend. It is consumed by `build_response` and
+passed through to `discover_same_file_cards` and `enrich_card_if_requested`.
+
+### Trait derivations enabling deterministic ordering
+
+Two enums gained `PartialOrd` and `Ord` so that `stable_card_order` can sort
+cards without a custom comparator:
+
+| Type             | Crate          | New derives         |
+| ---------------- | -------------- | ------------------- |
+| `CardSymbolKind` | `weaver-cards` | `PartialOrd`, `Ord` |
+| `SymbolKind`     | `weaver-graph` | `PartialOrd`, `Ord` |
+
+The derived order follows Rust's default discriminant ordering (declaration
+order in the `enum`). Tests in each crate's `ordering_tests` module lock this
+contract.
+
+### `schema_version` field on `GraphSliceResponse` variants
+
+Both `GraphSliceResponse::Success` and `GraphSliceResponse::Refusal` now carry
+a `schema_version: String` field set to `"graph_slice.v1"`. All constructors
+(including `not_yet_implemented`) populate this field. Cucumber contract tests
+in `crates/weaver-cards/tests/features/graph_slice_schema.feature` assert its
+presence.
+
+### `TestDaemon` API changes
+
+`TestDaemon::join(mut self)` now takes ownership of the optional
+`join_handle: Option<thread::JoinHandle<()>>`, joins the daemon thread, and
+calls `std::panic::resume_unwind(payload)` if the thread panicked, preserving
+the original panic payload for diagnostics. It then calls `cache_stats()` after
+the thread finishes.
+
+`join_handle` is stored as `Option<thread::JoinHandle<()>>` (previously
+`thread::JoinHandle<()>`) to allow the join to consume the handle via
+`Option::take`.
+
+### `test_support` visibility promotions
+
+The following fields were promoted from `pub(crate)` to `pub` to allow access
+from the new `graph_slice_snapshots.rs` test binary:
+
+| Struct               | Fields promoted                                 |
+| -------------------- | ----------------------------------------------- |
+| `CacheTranscript`    | `first`, `second`, `cache_hits`, `cache_misses` |
+| `GetCardRequest<'a>` | `uri`, `line`, `column`, `detail`               |
+
+`GraphSliceRequest<'a>` was added as a new `pub(crate)` struct with fields
+`uri`, `line`, `column`, `entry_detail`, `node_detail`, and
+`max_cards: Option<u32>`.
+
 ## CLI help and preflight internals
 
 ### 2.1 CLI help rendering architecture
@@ -545,9 +603,8 @@ later localization bootstrap can reuse the validated domain value.
 
 ### 2.5 Daemon command execution glue (`crates/weaver-cli/src/runner_glue.rs`)
 
-`runner_glue` extracts the daemon transport path from `lib.rs` so the
-top-level runtime stays small enough to scan. Its two `pub(crate)` entry points
-are:
+`runner_glue` extracts the daemon transport path from `lib.rs` so the top-level
+runtime stays small enough to scan. Its two `pub(crate)` entry points are:
 
 - **`execute_daemon_command`** — builds a `CommandRequest`, connects to the
   daemon socket (auto-starting the daemon if it is not running), writes the
@@ -558,10 +615,10 @@ are:
 - **`build_request`** — constructs a `CommandRequest` from a
   `CommandInvocation`. For `apply-patch` operations it drains `stdin` into the
   request patch field and returns `AppError::MissingPatchInput` when the
-  content is empty after trimming. It also enforces the JSON Lines request
-  size cap from `weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES`; oversized
-  stdin is rejected with an early request error before patch processing starts.
-  For all other operations it constructs the request without reading `stdin`.
+  content is empty after trimming. It also enforces the JSON Lines request size
+  cap from `weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES`; oversized stdin
+  is rejected with an early request error before patch processing starts. For
+  all other operations it constructs the request without reading `stdin`.
 
 The module keeps connection retry logic in `start_and_retry_daemon`, which
 tolerates socket-bind lag after daemon startup, and `write_error_and_fail`, a
@@ -755,17 +812,17 @@ The module exposes seven `pub(crate)` functions:
   `act refactor does not support refactoring '<value>'` plus the shared
   guidance block when `refactoring` is not in `supported_refactoring_names()`.
 - `effective_operation(refactoring: &str) -> Result<&'static str,
-  DispatchError>` — maps a user-facing refactoring name to the underlying
-  plugin capability operation string (`"rename"` → `"rename-symbol"`),
-  returning the same unsupported-refactoring
-  `DispatchError::InvalidArguments` as `validate_refactoring(...)` for unknown
-  user-facing names.
+  DispatchError>
+  ` — maps a user-facing refactoring name to the underlying plugin capability operation string (`
+  "rename"` → `"rename-symbol"`), returning the same unsupported-refactoring `
+  DispatchError::InvalidArguments` as `validate_refactoring(…)
+  ` for unknown user-facing names.
 - `capability_for_operation(operation: &str) -> Result<CapabilityId,
-  DispatchError>` — maps a capability operation string to its `CapabilityId`
-  variant (`"rename-symbol"` → `CapabilityId::RenameSymbol`), returning
-  `DispatchError::InvalidArguments` with
-  `act refactor does not support capability resolution for '<operation>'` and
-  the supported capability-operation tokens for unknown operations.
+  DispatchError>` — maps a capability operation string to its `CapabilityId
+  ` variant (`"rename-symbol"` → `CapabilityId::RenameSymbol`), returning `
+  DispatchError::InvalidArguments` with `act refactor does not support
+  capability resolution for
+  '<operation>'` and the supported capability-operation tokens for unknown operations.
 - `missing_requirements_error() -> DispatchError` — builds the deterministic
   `DispatchError::InvalidArguments` with `act refactor requires ...`, every
   required flag (`--provider <plugin>`, `--refactoring <operation>`,

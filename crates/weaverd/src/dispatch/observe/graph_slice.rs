@@ -75,6 +75,15 @@ pub fn handle<W: Write>(
     writer.write_stdout(json)?;
     Ok(DispatchResult::with_status(status))
 }
+/// Orchestrates the full graph-slice response for a validated `file://` URI.
+///
+/// **Execution order:** extracts the entry card, optionally enriches it via LSP, discovers
+/// sibling symbols via [`discover_same_file_cards`], applies the card budget via
+/// [`apply_card_budget`], enriches surviving sibling cards, and returns a
+/// [`GraphSliceResponse::Success`].
+///
+/// **Error contract:** returns `Ok(GraphSliceResponse::Refusal { … })` for client-attributable
+/// extraction errors; returns `Err(DispatchError)` only for unexpected internal failures.
 fn build_response(
     request: &GraphSliceRequest,
     path: &Path,
@@ -301,6 +310,14 @@ fn apply_card_budget(
     (cards, spillover)
 }
 /// Applies LSP semantic enrichment to `card` when `detail` is at least `Semantic`.
+///
+/// Enrichment is **best-effort**: if the LSP backend is unavailable or returns
+/// no hover information, the card is left unchanged and the function returns
+/// normally. Callers must not rely on enrichment having occurred; use the
+/// card's `provenance.sources` field to confirm which providers contributed.
+///
+/// On successful enrichment, `normalize_lsp_provenance` is called to remove
+/// degraded tree-sitter entries and ensure `lsp_hover` appears in sources.
 fn enrich_card_if_requested(
     card: &mut SymbolCard,
     detail: DetailLevel,

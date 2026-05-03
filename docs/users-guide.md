@@ -149,9 +149,10 @@ target file locally, and returns a Tree-sitter-backed symbol card for supported
 Rust, Python, and TypeScript files. `graph-slice` accepts the same location
 arguments plus traversal, detail, and budget options, and returns a stable
 same-file graph-slice envelope. Missing or malformed arguments return
-structured error messages with exit status 1. Operations outside the implemented
-`observe` subcommands, and outside the implemented `act` and `verify` flows, may
-return "not yet implemented" responses while backend wiring is being completed.
+structured error messages with exit status 1. Operations outside the
+implemented `observe` subcommands, and outside the implemented `act` and
+`verify` flows, may return "not yet implemented" responses while backend wiring
+is being completed.
 
 The health snapshot is a single-line JSON document describing the current
 state, enabling operators and automation to poll readiness without speaking the
