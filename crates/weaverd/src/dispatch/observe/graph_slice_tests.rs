@@ -262,6 +262,11 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
     let (second_status, second_payload) = dispatch_payload(&request, &mut backends)?;
 
     assert_success_response(status, &payload);
+    assert_eq!(payload["cards"].as_array().expect("cards array").len(), 1);
+    assert_eq!(
+        payload["constraints"]["budget"]["max_cards"],
+        serde_json::json!(1)
+    );
     assert_success_response(second_status, &second_payload);
     assert_eq!(payload["cards"][0]["symbol"]["ref"]["name"], "build");
     let kept_symbol_id = payload["cards"][0]["symbol"]["symbol_id"]
