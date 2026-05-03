@@ -107,6 +107,7 @@ fn legacy_patterns_propagates_constraints_to_where_clauses() {
         other => panic!("expected normalized legacy Patterns to be And, got {other:?}"),
     };
     assert_eq!(children.len(), 2);
+    assert_eq!(decorated.where_clauses.len(), 1);
     assert_eq!(
         decorated.where_clauses.first().map(|c| &c.constraint),
         Some(&Constraint::MetavariableRegex {
@@ -145,6 +146,7 @@ fn constraint_only_patterns_normalize_to_and_and_fail_validation(
     let decorated = normalize_legacy_decorated(legacy);
 
     assert!(matches!(&decorated.node, Formula::And(children) if children.is_empty()));
+    assert_eq!(decorated.where_clauses.len(), 1);
     assert_eq!(
         decorated.where_clauses.first().map(|c| &c.constraint),
         Some(&expected),
@@ -159,6 +161,7 @@ fn legacy_patterns_with_unknown_constraint_preserves_other_constraint_text() {
     let legacy = LegacyFormula::Patterns(vec![LegacyClause::Constraint(constraint)]);
     let decorated = normalize_legacy_decorated(legacy);
 
+    assert_eq!(decorated.where_clauses.len(), 1);
     match &decorated
         .where_clauses
         .first()
@@ -243,6 +246,7 @@ fn v2_decorated_preserves_where_as_and_fix_metadata() {
     ));
     assert_eq!(decorated.as_name.as_deref(), Some("my_capture"));
     assert_eq!(decorated.fix.as_deref(), Some("replace_me"));
+    assert_eq!(decorated.where_clauses.len(), 1);
     assert_eq!(
         decorated.where_clauses.first().map(|c| &c.constraint),
         Some(&Constraint::MetavariablePattern {

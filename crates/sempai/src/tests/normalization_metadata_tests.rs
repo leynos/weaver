@@ -191,6 +191,7 @@ fn v2_decorated_over_all_wraps_preserves_metadata() {
     let decorated =
         normalize_search_principal(&principal, None).expect("decorated formula should normalize");
 
+    assert!(decorated.span.is_none());
     assert_eq!(decorated.as_name.as_deref(), Some("cap"));
     assert_eq!(decorated.fix.as_deref(), Some("fixme"));
     assert_eq!(
@@ -205,6 +206,7 @@ fn v2_decorated_over_all_wraps_preserves_metadata() {
     let children = extract_and_branches(&decorated.node);
     assert_two_pattern_branches(children, "a", "b");
     for child in children {
+        assert!(child.span.is_none());
         assert_empty_metadata(child);
     }
 }
