@@ -178,7 +178,9 @@ fn valid_request_returns_success_and_echoed_constraints(
         ),
     )
     .map_err(|error| error.to_string())?;
-    let uri = Url::from_file_path(&path).expect("file uri").to_string();
+    let uri = Url::from_file_path(&path)
+        .map_err(|()| "file uri".to_string())?
+        .to_string();
     let request = make_request(&[
         "--uri",
         &uri,
@@ -244,7 +246,9 @@ fn max_cards_budget_truncates_same_file_symbol_inventory(
         ),
     )
     .map_err(|error| error.to_string())?;
-    let uri = Url::from_file_path(&path).expect("file uri").to_string();
+    let uri = Url::from_file_path(&path)
+        .map_err(|()| "file uri".to_string())?
+        .to_string();
     let request = make_request(&[
         "--uri",
         &uri,
