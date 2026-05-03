@@ -74,6 +74,25 @@ fn assert_missing_positive_term_in_and_for_decorated(decorated: &Decorated<Formu
     );
 }
 
+fn assert_compile_yaml_schema_invalid(yaml: &str, expected_message: &str) {
+    let report = Engine::new(EngineConfig::default())
+        .compile_yaml(yaml)
+        .expect_err("malformed known constraint should fail");
+
+    assert_eq!(
+        first_diagnostic_code(&report),
+        DiagnosticCode::ESempaiSchemaInvalid
+    );
+    assert!(
+        report
+            .diagnostics()
+            .first()
+            .expect("expected diagnostic")
+            .message()
+            .contains(expected_message)
+    );
+}
+
 #[test]
 fn legacy_patterns_propagates_constraints_to_where_clauses() {
     let constraint = json!({"metavariable-regex": {"metavariable": "$X", "regex": "foo.*"}});
@@ -180,9 +199,9 @@ fn legacy_patterns_with_malformed_known_constraint_fails_normalization(
     assert_schema_invalid_normalization(constraint, expected_message);
 }
 
-#[test]
-fn compile_yaml_reports_schema_invalid_for_malformed_where_clause() {
-    let yaml = concat!(
+#[rstest]
+#[case::metavariable_regex(
+    concat!(
         "rules:\n",
         "  - id: demo.invalid.where\n",
         "    message: invalid where\n",
@@ -192,29 +211,11 @@ fn compile_yaml_reports_schema_invalid_for_malformed_where_clause() {
         "      - pattern: foo($X)\n",
         "      - metavariable-regex:\n",
         "          metavariable: $X\n",
-    );
-
-    let report = Engine::new(EngineConfig::default())
-        .compile_yaml(yaml)
-        .expect_err("malformed known constraint should fail");
-
-    assert_eq!(
-        first_diagnostic_code(&report),
-        DiagnosticCode::ESempaiSchemaInvalid
-    );
-    assert!(
-        report
-            .diagnostics()
-            .first()
-            .expect("expected diagnostic")
-            .message()
-            .contains("invalid where-clause")
-    );
-}
-
-#[test]
-fn compile_yaml_reports_schema_invalid_for_malformed_metavariable_pattern_where_clause() {
-    let yaml = concat!(
+    ),
+    "invalid where-clause",
+)]
+#[case::metavariable_pattern(
+    concat!(
         "rules:\n",
         "  - id: demo.invalid.pattern.where\n",
         "    message: invalid metavariable pattern\n",
@@ -224,24 +225,14 @@ fn compile_yaml_reports_schema_invalid_for_malformed_metavariable_pattern_where_
         "      - pattern: foo($X)\n",
         "      - metavariable-pattern:\n",
         "          pattern: x\n",
-    );
-
-    let report = Engine::new(EngineConfig::default())
-        .compile_yaml(yaml)
-        .expect_err("malformed known constraint should fail");
-
-    assert_eq!(
-        first_diagnostic_code(&report),
-        DiagnosticCode::ESempaiSchemaInvalid
-    );
-    assert!(
-        report
-            .diagnostics()
-            .first()
-            .expect("expected diagnostic")
-            .message()
-            .contains("expected {metavariable, pattern} string fields")
-    );
+    ),
+    "expected {metavariable, pattern} string fields",
+)]
+fn compile_yaml_reports_schema_invalid_for_malformed_where_clause(
+    #[case] yaml: &str,
+    #[case] expected_message: &str,
+) {
+    assert_compile_yaml_schema_invalid(yaml, expected_message);
 }
 
 #[test]
