@@ -618,7 +618,7 @@ runtime stays small enough to scan. Its two `pub(crate)` entry points are:
   content is empty after trimming. It also enforces the JSON Lines request size
   cap from `weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES`; oversized stdin
   is rejected with an early request error before patch processing starts. For
-  all other operations it constructs the request without reading `stdin`.
+  all other operations, it constructs the request without reading `stdin`.
 
 The module keeps connection retry logic in `start_and_retry_daemon`, which
 tolerates socket-bind lag after daemon startup, and `write_error_and_fail`, a

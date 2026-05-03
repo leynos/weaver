@@ -244,18 +244,22 @@ mod ordering_tests {
 
     #[test]
     fn card_symbol_kind_sort_produces_stable_order() {
-        let mut kinds = vec![
+        let mut kinds_a = vec![
             CardSymbolKind::Method,
             CardSymbolKind::Function,
             CardSymbolKind::Type,
         ];
-        kinds.sort();
-        // After sorting, the order must be deterministic and identical on every run.
-        assert_eq!(kinds, kinds.clone());
-        // The first element must be ≤ the second.
-        let first = kinds.first().expect("vector has at least 3 elements");
-        let second = kinds.get(1).expect("vector has at least 3 elements");
-        let third = kinds.get(2).expect("vector has at least 3 elements");
+        let mut kinds_b = vec![
+            CardSymbolKind::Method,
+            CardSymbolKind::Function,
+            CardSymbolKind::Type,
+        ];
+        kinds_a.sort();
+        kinds_b.sort();
+        assert_eq!(kinds_a, kinds_b);
+        let first = kinds_a.first().expect("vector has at least 3 elements");
+        let second = kinds_a.get(1).expect("vector has at least 3 elements");
+        let third = kinds_a.get(2).expect("vector has at least 3 elements");
         assert!(first <= second);
         assert!(second <= third);
     }

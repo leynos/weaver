@@ -249,16 +249,16 @@ The recommended `Makefile` additions are:
 .PHONY: kani kani-full verus formal formal-pr formal-nightly
 
 kani: ## Run Kani smoke harnesses
- cargo kani -p weaverd --harness verify_transaction_lock_order_smoke
- cargo kani -p weaverd --harness verify_apply_patch_path_guardrails_smoke
- cargo kani -p weaver-plugins --harness verify_capability_resolution_smoke
+	cargo kani -p weaverd --harness verify_transaction_lock_order_smoke
+	cargo kani -p weaverd --harness verify_apply_patch_path_guardrails_smoke
+	cargo kani -p weaver-plugins --harness verify_capability_resolution_smoke
 
 kani-full: ## Run all Kani harnesses
- cargo kani -p weaverd
- cargo kani -p weaver-plugins
+	cargo kani -p weaverd
+	cargo kani -p weaver-plugins
 
 verus: ## Run Verus proofs
- VERUS_BIN="$(VERUS_BIN)" scripts/run-verus.sh
+	VERUS_BIN="$(VERUS_BIN)" scripts/run-verus.sh
 
 formal-pr: kani
 

@@ -837,7 +837,7 @@ When the operation cannot produce a slice, the status is `"refusal"`:
   "schema_version": "graph_slice.v1",
   "refusal": {
     "reason": "unsupported_language",
-    "message": "observe graph-slice: unsupported language for '/workspace/notes.txt'"
+    "message": "observe graph-slice: unsupported language for 'notes.txt'"
   }
 }
 ```
