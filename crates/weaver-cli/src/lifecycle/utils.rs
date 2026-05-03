@@ -72,7 +72,12 @@ pub(crate) fn try_auto_start_daemon<E: Write>(
 ) -> Result<(), LifecycleError> {
     writeln!(stderr, "Waiting for daemon start...").map_err(LifecycleError::Io)?;
     let paths = prepare_runtime(context)?;
-    let mut child = spawn_daemon(context.config_arguments, context.daemon_binary)?;
+    let runtime_dir = paths.runtime_dir().to_path_buf();
+    let mut child = spawn_daemon(
+        context.config_arguments,
+        context.daemon_binary,
+        runtime_dir.as_path(),
+    )?;
     let started_at = SystemTime::now();
     wait_for_ready(&paths, &mut child, started_at, AUTO_START_TIMEOUT)?;
     Ok(())

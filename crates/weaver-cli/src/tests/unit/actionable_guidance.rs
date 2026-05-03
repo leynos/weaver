@@ -142,6 +142,7 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
     let error = LifecycleError::LaunchDaemon {
         binary: "/tmp/tools/custom-weaverd".into(),
         source: io::Error::new(io::ErrorKind::NotFound, "missing"),
+        runtime_dir: "/tmp/tools".into(),
     };
 
     let mut buf = Vec::new();
@@ -167,6 +168,7 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
 #[case(
     LifecycleError::StartupFailed {
         exit_status: Some(17),
+        runtime_dir: "/tmp/test/runtime".into(),
     },
     StartupGuidanceExpectation {
         problem: "daemon exited before reporting ready (status: Some(17))",

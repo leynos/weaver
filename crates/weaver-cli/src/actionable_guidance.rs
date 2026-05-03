@@ -242,7 +242,7 @@ pub(crate) fn write_startup_guidance<W: Write>(
             let next_command = launch_binary_check_command(binary);
             (problem, alternatives, next_command)
         }
-        LifecycleError::StartupFailed { exit_status } => {
+        LifecycleError::StartupFailed { exit_status, .. } => {
             let problem = format!("daemon exited before reporting ready (status: {exit_status:?})");
             let alternatives = vec![
                 "The daemon started but failed to become ready.".to_string(),

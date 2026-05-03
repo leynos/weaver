@@ -109,7 +109,7 @@ where
     let config = loader.load()?;
     config.daemon_socket().prepare_filesystem()?;
     let runtime_paths = RuntimePaths::from_config(&config)?;
-    let mut guard = ProcessGuard::acquire(runtime_paths)?;
+    let mut guard = ProcessGuard::acquire(runtime_paths.clone())?;
     let workspace_root =
         env::current_dir().map_err(|source| LaunchError::WorkspaceRoot { source })?;
     if matches!(mode, LaunchMode::Background) {
@@ -130,10 +130,14 @@ where
     let backends = Arc::new(Mutex::new(daemon.into_backends()));
     let backend_manager = BackendManager::new(backends);
     let handler = Arc::new(
-        DispatchConnectionHandler::new(backend_manager, workspace_root).map_err(|error| {
-            LaunchError::WorkspaceRoot {
-                source: io::Error::new(io::ErrorKind::InvalidInput, error.to_string()),
-            }
+        DispatchConnectionHandler::new(
+            backend_manager,
+            workspace_root,
+            config.daemon_socket().to_string(),
+            runtime_paths.runtime_dir().to_path_buf(),
+        )
+        .map_err(|error| LaunchError::WorkspaceRoot {
+            source: io::Error::new(io::ErrorKind::InvalidInput, error.to_string()),
         })?,
     );
 

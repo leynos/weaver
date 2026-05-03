@@ -93,8 +93,14 @@ impl TestDaemon {
         let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
         let backend_manager = BackendManager::new(Arc::clone(&backends));
         let workspace_root = required_result(std::env::current_dir(), "workspace root");
+        let endpoint = format!("tcp://{address}");
         let handler = Arc::new(required_result(
-            DispatchConnectionHandler::new(backend_manager.clone(), workspace_root),
+            DispatchConnectionHandler::new(
+                backend_manager.clone(),
+                workspace_root,
+                endpoint,
+                std::env::temp_dir(),
+            ),
             "absolute workspace root",
         ));
 
@@ -342,9 +348,9 @@ fn required_result<T, E: std::fmt::Display>(result: Result<T, E>, context: &str)
     }
 }
 
-const _: usize = std::mem::size_of::<CacheTranscript>();
-const _: usize = std::mem::size_of::<GetCardRequest<'static>>();
-const _: usize = std::mem::size_of::<GraphSliceRequest<'static>>();
-const _: fn(&TestDaemon, GetCardRequest<'static>) -> Transcript = run_get_card;
-const _: fn(&TestDaemon, GraphSliceRequest<'static>) -> Transcript = run_graph_slice;
+const _: fn(&str, &str) = assert_named_snapshot;
+const _: fn(&str, &str) = assert_named_snapshot;
+const _: fn(&str, &str) = assert_named_snapshot;
+const _: fn(&str, &str) = assert_named_snapshot;
+const _: fn(&str, &str) = assert_named_snapshot;
 const _: fn(&str, &str) = assert_named_snapshot;
