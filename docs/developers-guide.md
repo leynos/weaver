@@ -812,11 +812,11 @@ The module exposes seven `pub(crate)` functions:
   `act refactor does not support refactoring '<value>'` plus the shared
   guidance block when `refactoring` is not in `supported_refactoring_names()`.
 - `effective_operation(refactoring: &str) -> Result<&'static str,
-  DispatchError>
-  ` — maps a user-facing refactoring name to the underlying plugin capability operation string (`
-  "rename"` → `"rename-symbol"`), returning the same unsupported-refactoring `
-  DispatchError::InvalidArguments` as `validate_refactoring(…)
-  ` for unknown user-facing names.
+  DispatchError>` — maps a user-facing refactoring name to the underlying
+  plugin capability operation string (`"rename"` → `"rename-symbol"`),
+  returning the same unsupported-refactoring
+  `DispatchError::InvalidArguments` as `validate_refactoring(…)` for unknown
+  user-facing names.
 - `capability_for_operation(operation: &str) -> Result<CapabilityId,
   DispatchError>` — maps a capability operation string to its `CapabilityId
   ` variant (`"rename-symbol"` → `CapabilityId::RenameSymbol`), returning `
