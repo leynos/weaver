@@ -901,7 +901,9 @@ budget. For roadmap item 7.2.1, Weaver builds a deterministic same-file slice:
 the entry card plus additional same-file symbol cards that fit within
 `budget.max_cards`. The `edges` array is therefore currently empty in runtime
 responses, while the stable schema already reserves the typed edge shape for
-later milestones.
+later milestones. The `--max-edges` CLI flag is accepted for forward
+compatibility but has no runtime effect in 7.2.1; only `budget.max_cards`
+limits the number of cards produced.
 
 When traversal exceeds the budget, `spillover.truncated` is `true` and
 `spillover.frontier` lists candidate same-file symbols that were discovered but

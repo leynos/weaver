@@ -476,6 +476,8 @@ cards without a custom comparator:
 | `CardSymbolKind` | `weaver-cards` | `PartialOrd`, `Ord` |
 | `SymbolKind`     | `weaver-graph` | `PartialOrd`, `Ord` |
 
+*Table: New derive traits for `CardSymbolKind` and `SymbolKind`*
+
 The derived order follows Rust's default discriminant ordering (declaration
 order in the `enum`). Tests in each crate's `ordering_tests` module lock this
 contract.
@@ -509,6 +511,8 @@ from the new `graph_slice_snapshots.rs` test binary:
 | -------------------- | ----------------------------------------------- |
 | `CacheTranscript`    | `first`, `second`, `cache_hits`, `cache_misses` |
 | `GetCardRequest<'a>` | `uri`, `line`, `column`, `detail`               |
+
+*Table: Visibility promotions in `test_support`*
 
 `GraphSliceRequest<'a>` was added as a new `pub(crate)` struct with fields
 `uri`, `line`, `column`, `entry_detail`, `node_detail`, and
@@ -818,11 +822,12 @@ The module exposes seven `pub(crate)` functions:
   `DispatchError::InvalidArguments` as `validate_refactoring(…)` for unknown
   user-facing names.
 - `capability_for_operation(operation: &str) -> Result<CapabilityId,
-  DispatchError>` — maps a capability operation string to its `CapabilityId
-  ` variant (`"rename-symbol"` → `CapabilityId::RenameSymbol`), returning `
-  DispatchError::InvalidArguments` with `act refactor does not support
-  capability resolution for
-  '<operation>'` and the supported capability-operation tokens for unknown operations.
+  DispatchError>` — maps a capability operation string to its
+  `CapabilityId` variant (`"rename-symbol"` →
+  `CapabilityId::RenameSymbol`), returning
+  `DispatchError::InvalidArguments` with `act refactor does not support
+  capability resolution for '<operation>'` and the supported
+  capability-operation tokens for unknown operations.
 - `missing_requirements_error() -> DispatchError` — builds the deterministic
   `DispatchError::InvalidArguments` with `act refactor requires ...`, every
   required flag (`--provider <plugin>`, `--refactoring <operation>`,
