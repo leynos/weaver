@@ -1,5 +1,6 @@
 //! Tests for normalized `Decorated` metadata and span propagation.
 
+use rstest::rstest;
 use sempai_core::{
     SourceSpan,
     formula::{Atom, Constraint, Decorated, Formula, WhereClause},
@@ -54,6 +55,46 @@ fn decorated_match_formula(formula: MatchFormula) -> SearchQueryPrincipal {
     })
 }
 
+fn normalize_decorated_with(formula: MatchFormula, span: &SourceSpan) -> Decorated<Formula> {
+    let principal = decorated_match_formula(formula);
+    normalize_search_principal(&principal, Some(span)).expect("formula should normalize")
+}
+
+fn extract_and_branches(formula: &Formula) -> &[Decorated<Formula>] {
+    match formula {
+        Formula::And(branches) => branches,
+        other => panic!("expected And formula, got {other:?}"),
+    }
+}
+
+fn extract_or_branches(formula: &Formula) -> &[Decorated<Formula>] {
+    match formula {
+        Formula::Or(branches) => branches,
+        other => panic!("expected Or formula, got {other:?}"),
+    }
+}
+
+fn extract_not_inner(formula: &Formula) -> &Decorated<Formula> {
+    match formula {
+        Formula::Not(inner) => inner,
+        other => panic!("expected Not formula, got {other:?}"),
+    }
+}
+
+fn extract_inside_inner(formula: &Formula) -> &Decorated<Formula> {
+    match formula {
+        Formula::Inside(inner) => inner,
+        other => panic!("expected Inside formula, got {other:?}"),
+    }
+}
+
+fn extract_anywhere_inner(formula: &Formula) -> &Decorated<Formula> {
+    match formula {
+        Formula::Anywhere(inner) => inner,
+        other => panic!("expected Anywhere formula, got {other:?}"),
+    }
+}
+
 fn assert_decorated_metadata(formula: &Decorated<Formula>, expected_span: &SourceSpan) {
     assert_eq!(formula.span.as_ref(), Some(expected_span));
     assert_eq!(formula.as_name.as_deref(), Some("cap"));
@@ -84,110 +125,60 @@ fn assert_span_recursive(formula: &Decorated<Formula>, expected_span: &SourceSpa
     }
 }
 
-#[test]
-fn v2_decorated_over_all_preserves_metadata_and_spans() {
+#[rstest]
+#[case::all(
+    MatchFormula::All(vec![
+        MatchFormula::Pattern(String::from("a")),
+        MatchFormula::Pattern(String::from("b")),
+    ]),
+    extract_and_branches as fn(&Formula) -> &[Decorated<Formula>],
+)]
+#[case::any(
+    MatchFormula::Any(vec![
+        MatchFormula::Pattern(String::from("a")),
+        MatchFormula::Pattern(String::from("b")),
+    ]),
+    extract_or_branches as fn(&Formula) -> &[Decorated<Formula>],
+)]
+fn v2_decorated_over_branches_preserves_metadata_and_spans(
+    #[case] formula: MatchFormula,
+    #[case] extract: fn(&Formula) -> &[Decorated<Formula>],
+) {
     let span = SourceSpan::new(12, 99, Some(String::from("file:///rule.yaml")));
-    let principal = decorated_match_formula(MatchFormula::All(vec![
-        MatchFormula::Pattern(String::from("a")),
-        MatchFormula::Pattern(String::from("b")),
-    ]));
-
-    let decorated =
-        normalize_search_principal(&principal, Some(&span)).expect("formula should normalize");
+    let decorated = normalize_decorated_with(formula, &span);
 
     assert_decorated_metadata(&decorated, &span);
-    match &decorated.node {
-        Formula::And(children) => {
-            assert_two_pattern_branches(children, "a", "b");
-            for child in children {
-                assert_empty_metadata_with_span(child, &span);
-            }
-        }
-        other => panic!("expected And formula, got {other:?}"),
+    let children = extract(&decorated.node);
+    assert_two_pattern_branches(children, "a", "b");
+    for child in children {
+        assert_empty_metadata_with_span(child, &span);
     }
 }
 
-#[test]
-fn v2_decorated_over_any_preserves_metadata_and_spans() {
-    let span = SourceSpan::new(13, 100, Some(String::from("file:///rule.yaml")));
-    let principal = decorated_match_formula(MatchFormula::Any(vec![
-        MatchFormula::Pattern(String::from("a")),
-        MatchFormula::Pattern(String::from("b")),
-    ]));
-
-    let decorated =
-        normalize_search_principal(&principal, Some(&span)).expect("formula should normalize");
-
-    assert_decorated_metadata(&decorated, &span);
-    match &decorated.node {
-        Formula::Or(children) => {
-            assert_two_pattern_branches(children, "a", "b");
-            for child in children {
-                assert_empty_metadata_with_span(child, &span);
-            }
-        }
-        other => panic!("expected Or formula, got {other:?}"),
-    }
-}
-
-#[test]
-fn v2_decorated_over_not_preserves_metadata_and_spans() {
+#[rstest]
+#[case::not(
+    MatchFormula::Not(Box::new(MatchFormula::Pattern(String::from("x")))),
+    extract_not_inner as fn(&Formula) -> &Decorated<Formula>,
+)]
+#[case::inside(
+    MatchFormula::Inside(Box::new(MatchFormula::Pattern(String::from("x")))),
+    extract_inside_inner as fn(&Formula) -> &Decorated<Formula>,
+)]
+#[case::anywhere(
+    MatchFormula::Anywhere(Box::new(MatchFormula::Pattern(String::from("x")))),
+    extract_anywhere_inner as fn(&Formula) -> &Decorated<Formula>,
+)]
+fn v2_decorated_over_unary_preserves_metadata_and_spans(
+    #[case] formula: MatchFormula,
+    #[case] extract: fn(&Formula) -> &Decorated<Formula>,
+) {
     let span = SourceSpan::new(14, 101, Some(String::from("file:///rule.yaml")));
-    let principal = decorated_match_formula(MatchFormula::Not(Box::new(MatchFormula::Pattern(
-        String::from("x"),
-    ))));
-
-    let decorated =
-        normalize_search_principal(&principal, Some(&span)).expect("formula should normalize");
+    let decorated = normalize_decorated_with(formula, &span);
 
     assert_decorated_metadata(&decorated, &span);
-    match &decorated.node {
-        Formula::Not(inner) => {
-            assert_empty_metadata_with_span(inner, &span);
-            assert_wraps_pattern_atom(inner, "x");
-        }
-        other => panic!("expected Not formula, got {other:?}"),
-    }
-}
-
-#[test]
-fn v2_decorated_over_inside_preserves_metadata_and_spans() {
-    let span = SourceSpan::new(15, 102, Some(String::from("file:///rule.yaml")));
-    let principal = decorated_match_formula(MatchFormula::Inside(Box::new(MatchFormula::Pattern(
-        String::from("x"),
-    ))));
-
-    let decorated =
-        normalize_search_principal(&principal, Some(&span)).expect("formula should normalize");
-
-    assert_decorated_metadata(&decorated, &span);
-    match &decorated.node {
-        Formula::Inside(inner) => {
-            assert_empty_metadata_with_span(inner, &span);
-            assert_wraps_pattern_atom(inner, "x");
-        }
-        other => panic!("expected Inside formula, got {other:?}"),
-    }
-}
-
-#[test]
-fn v2_decorated_over_anywhere_preserves_metadata_and_spans() {
-    let span = SourceSpan::new(16, 103, Some(String::from("file:///rule.yaml")));
-    let principal = decorated_match_formula(MatchFormula::Anywhere(Box::new(
-        MatchFormula::Pattern(String::from("x")),
-    )));
-
-    let decorated =
-        normalize_search_principal(&principal, Some(&span)).expect("formula should normalize");
-
-    assert_decorated_metadata(&decorated, &span);
-    match &decorated.node {
-        Formula::Anywhere(inner) => {
-            assert_empty_metadata_with_span(inner, &span);
-            assert_wraps_pattern_atom(inner, "x");
-        }
-        other => panic!("expected Anywhere formula, got {other:?}"),
-    }
+    let inner = extract(&decorated.node);
+    assert_empty_metadata_with_span(inner, &span);
+    assert_wraps_pattern_atom(inner, "x");
 }
 
 #[test]
