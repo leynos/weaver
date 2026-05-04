@@ -37,6 +37,10 @@
 
 mod engine;
 mod mode_validation;
+mod normalize;
+mod normalize_constraints;
+mod normalize_trace;
+mod semantic_check;
 
 // Re-export all stable types from sempai_core.
 pub use engine::{Engine, QueryPlan};

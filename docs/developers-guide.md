@@ -9,6 +9,35 @@ need but operators do not. For user-facing behaviour see the
 
 The workspace targets `ortho_config` v0.8.0 and Rust 1.88.
 
+## Sempai overview
+
+Sempai is Weaver's Semgrep-compatible query engine facade. It parses rule
+YAML, normalizes supported search syntax into a canonical formula model, and
+prepares per-language query plans for later execution.
+
+## Sempai query pipeline (milestone 4.1.5)
+
+- Canonical model (`sempai_core::formula`):
+  - `Formula` enum: `Atom`, `Not`, `Inside`, `Anywhere`, `And`, `Or`
+  - `Atom` enum: `Pattern`, `Regex`, `TreeSitterQuery`
+  - `Decorated<T>` wrapper: `where_clauses`, `as_name`, `fix`, `span`
+- Normalization (`crates/sempai/src/normalize.rs`):
+  - Legacy syntax: `pattern*`, `patterns`, `pattern-either`,
+    `pattern-not`, `pattern-not-inside`, `pattern-not-regex`, and
+    `semgrep-internal-pattern-anywhere`
+  - v2 `match` syntax: `pattern`, `regex`, `all`, `any`, `not`, `inside`,
+    `anywhere`, and decorated metadata propagation
+  - Special handling: `r2c-internal-project-depends-on` lowers to
+    `(__NONEXISTENT_NODE__) @_dependency_check`
+- Semantic validation (`crates/sempai/src/semantic_check.rs`):
+  - `InvalidNotInOr`
+  - `MissingPositiveTermInAnd`
+  - Span precedence rules: node span -> first child -> fallback
+- Engine wiring (`crates/sempai/src/engine.rs`):
+  - Parse -> validate modes -> normalize -> validate semantics -> compile
+    per-language `QueryPlan`
+  - `QueryPlan::formula()` exposure for tests and integration
+
 ## Configuration framework internals
 
 ### `ortho_config` v0.8.0 integration

@@ -14,17 +14,19 @@ Feature: Sempai engine facade behaviour
     When YAML "rules:\n  - message: detect foo\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n" is compiled
     Then compilation fails with code "E_SEMPAI_SCHEMA_INVALID"
 
-  Scenario: Engine compile_yaml keeps a post-parse placeholder for valid YAML
+  Scenario: Engine compile_yaml returns query plans for valid YAML
     Given an engine with default configuration
     When YAML "rules:\n  - id: demo.rule\n    message: detect foo\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n" is compiled
-    Then compilation fails with code "NOT_IMPLEMENTED"
-    And the first diagnostic message contains "normalization"
+    Then compilation succeeds with 1 query plan
+    And the first query plan has rule id "demo.rule"
+    And the first query plan formula is pattern atom "foo($X)"
 
-  Scenario: Engine compile_yaml keeps the placeholder for dependency search rules
+  Scenario: Engine compile_yaml returns a query plan for dependency search rules
     Given an engine with default configuration
     When YAML "rules:\n  - id: demo.depends\n    message: detect vulnerable dependency\n    languages: [python]\n    severity: WARNING\n    r2c-internal-project-depends-on:\n      namespace: pypi\n      package: requests\n" is compiled
-    Then compilation fails with code "NOT_IMPLEMENTED"
-    And the first diagnostic message contains "normalization"
+    Then compilation succeeds with 1 query plan
+    And the first query plan has rule id "demo.depends"
+    And the first query plan formula is Tree-sitter query atom "(__NONEXISTENT_NODE__) @_dependency_check"
 
   Scenario: Engine compile_yaml rejects extract mode during execution gating
     Given an engine with default configuration

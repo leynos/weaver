@@ -1,0 +1,18 @@
+---
+source: crates/sempai/src/tests/diagnostic_snapshot_tests.rs
+expression: redacted_report_json(&report)
+---
+{
+  "diagnostics": [
+    {
+      "code": "E_SEMPAI_INVALID_NOT_IN_OR",
+      "message": "negated terms are not allowed inside disjunction (Or/pattern-either)",
+      "notes": [],
+      "primary_span": {
+        "end": 0,
+        "start": 0,
+        "uri": null
+      }
+    }
+  ]
+}

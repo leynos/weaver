@@ -7,8 +7,12 @@ rust-version.workspace = true
 [dependencies]
 sempai_core = { path = "../sempai-core" }
 sempai_yaml = { path = "../sempai-yaml" }
+serde_json = { workspace = true }
+tracing = "0.1"
 
 [dev-dependencies]
+insta = "1"
+proptest = "1.5"
 sempai_core = { path = "../sempai-core", features = ["test-support"] }
 rstest = { workspace = true }
 rstest-bdd = { workspace = true }

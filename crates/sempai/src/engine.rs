@@ -5,51 +5,43 @@
 //! Compilation and execution are separate phases, allowing a compiled
 //! [`QueryPlan`] to be reused across multiple source files.
 
-use sempai_core::{DiagnosticReport, EngineConfig, Language, Match};
-use sempai_yaml::parse_rule_file;
+use std::sync::Arc;
 
-use crate::mode_validation::validate_supported_modes;
+use sempai_core::{
+    DiagnosticCode,
+    DiagnosticReport,
+    EngineConfig,
+    Language,
+    Match,
+    formula::{Decorated, Formula},
+};
+use sempai_yaml::{Rule, RulePrincipal, parse_rule_file};
 
-/// A compiled query plan for one rule and one language.
-///
-/// Query plans are produced by [`Engine::compile_yaml`] or
-/// [`Engine::compile_dsl`] and can be executed against source snapshots
-/// via [`Engine::execute`].
-///
-/// # Example
-///
-/// ```
-/// use sempai::{Engine, EngineConfig, Language};
-///
-/// let engine = Engine::new(EngineConfig::default());
-/// // compile_dsl currently returns an error (not yet implemented)
-/// let result = engine.compile_dsl("rule-1", Language::Rust, "pattern(\"fn $F\")");
-/// assert!(result.is_err());
-/// ```
-#[derive(Debug, Clone)]
+use crate::{
+    mode_validation::validate_supported_modes,
+    normalize::normalize_search_principal,
+    semantic_check::validate_formula,
+};
+
+/// A compiled query plan for one rule and target language.
+#[derive(Debug)]
 pub struct QueryPlan {
     rule_id: String,
     language: Language,
-    /// Placeholder for the internal plan representation.  Will be replaced
-    /// by `sempai_core::PlanNode` once the normalization layer is built.
-    _plan: (),
+    /// The normalized canonical formula.
+    formula: Arc<Decorated<Formula>>,
 }
 
 impl QueryPlan {
-    /// Creates a new query plan (crate-internal).
-    // FIXME: remove `#[cfg(test)]` when `compile_yaml` / `compile_dsl` produce
-    // real plans — https://github.com/leynos/weaver/issues/67
-    #[cfg(test)]
-    #[must_use]
-    #[expect(
-        clippy::missing_const_for_fn,
-        reason = "heap types cannot be used in const contexts"
-    )]
-    pub(crate) fn new(rule_id: String, language: Language) -> Self {
+    pub(crate) const fn new(
+        rule_id: String,
+        language: Language,
+        formula: Arc<Decorated<Formula>>,
+    ) -> Self {
         Self {
             rule_id,
             language,
-            _plan: (),
+            formula,
         }
     }
 
@@ -60,6 +52,10 @@ impl QueryPlan {
     /// Returns the target language.
     #[must_use]
     pub const fn language(&self) -> Language { self.language }
+
+    /// Returns the normalized canonical formula.
+    #[must_use]
+    pub fn formula(&self) -> &Decorated<Formula> { self.formula.as_ref() }
 }
 
 /// Compiles and executes Semgrep-compatible queries on Tree-sitter syntax
@@ -76,9 +72,16 @@ impl QueryPlan {
 /// use sempai::{Engine, EngineConfig};
 ///
 /// let engine = Engine::new(EngineConfig::default());
-/// let result = engine.compile_yaml("rules: []");
-/// // Malformed YAML and schema errors now surface parser diagnostics.
-/// assert!(result.is_err());
+/// // Valid YAML with rules compiles successfully
+/// let result = engine.compile_yaml(
+///     "rules:\n  - id: test\n    message: test\n    languages: [rust]\n    severity: ERROR\n    \
+///      pattern: foo\n",
+/// );
+/// assert!(result.is_ok());
+///
+/// // Malformed YAML returns a parser diagnostic
+/// let bad_result = engine.compile_yaml("{ invalid yaml");
+/// assert!(bad_result.is_err());
 /// ```
 #[derive(Debug)]
 pub struct Engine {
@@ -98,16 +101,38 @@ impl Engine {
     ///
     /// # Errors
     ///
-    /// Returns a diagnostic report if parsing or validation fails.
-    ///
-    /// Successful YAML parsing still stops at the post-parse placeholder until
-    /// rule normalization is implemented.
+    /// Returns a diagnostic report if parsing, normalization, or validation fails.
+    #[tracing::instrument(level = "info", skip_all, fields(rules = tracing::field::Empty))]
     pub fn compile_yaml(&self, yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
         let file = parse_rule_file(yaml, None)?;
+        tracing::Span::current().record("rules", file.rules().len());
         validate_supported_modes(&file)?;
-        Err(DiagnosticReport::not_implemented(
-            "compile_yaml query-plan normalization",
-        ))
+
+        file.rules()
+            .iter()
+            .filter_map(|rule| {
+                if let RulePrincipal::Search(principal) = rule.principal() {
+                    Some((rule, principal))
+                } else {
+                    None
+                }
+            })
+            .try_fold(Vec::new(), |mut plans, (rule, principal)| {
+                tracing::debug!(rule_id = rule.id(), "normalizing principal");
+                let formula = normalize_search_principal(principal, rule.rule_span())?;
+
+                tracing::debug!(rule_id = rule.id(), "validating normalized formula");
+                validate_formula(&formula)?;
+
+                tracing::debug!(
+                    rule_id = rule.id(),
+                    languages = ?rule.languages(),
+                    "compiling rule plans"
+                );
+                let rule_plans = compile_rule_plans(rule, formula)?;
+                plans.extend(rule_plans);
+                Ok(plans)
+            })
     }
 
     /// Compiles a one-liner query DSL expression into a query plan.
@@ -139,4 +164,36 @@ impl Engine {
     ) -> Result<Vec<Match>, DiagnosticReport> {
         Err(DiagnosticReport::not_implemented("execute"))
     }
+}
+
+/// Compiles query plans for a single rule's languages.
+fn compile_rule_plans(
+    rule: &Rule,
+    formula: Decorated<Formula>,
+) -> Result<Vec<QueryPlan>, DiagnosticReport> {
+    let shared_formula = Arc::new(formula);
+    rule.languages()
+        .iter()
+        .map(|lang_str| {
+            let _span = tracing::debug_span!(
+                "compile_rule_plan",
+                rule_id = rule.id(),
+                language = lang_str.as_str()
+            )
+            .entered();
+            let language = lang_str.parse::<Language>().map_err(|e| {
+                DiagnosticReport::validation_error(
+                    DiagnosticCode::ESempaiSchemaInvalid,
+                    format!("unsupported language '{lang_str}': {e}"),
+                    rule.rule_span().cloned(),
+                    vec![],
+                )
+            })?;
+            Ok(QueryPlan::new(
+                rule.id().to_owned(),
+                language,
+                Arc::clone(&shared_formula),
+            ))
+        })
+        .collect()
 }

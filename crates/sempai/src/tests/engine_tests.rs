@@ -1,6 +1,9 @@
 //! Tests for the `Engine` and `QueryPlan` types.
 
+use std::{collections::BTreeSet, sync::Arc};
+
 use rstest::rstest;
+use sempai_core::formula::{Atom, Decorated, Formula, PatternAtom, TreeSitterQueryAtom};
 
 use crate::{
     Diagnostic,
@@ -11,6 +14,7 @@ use crate::{
     EngineLimits,
     Language,
     engine::QueryPlan,
+    semantic_check::{MAX_FORMULA_DEPTH, validate_formula},
 };
 
 fn default_engine() -> Engine { Engine::new(EngineConfig::default()) }
@@ -57,6 +61,43 @@ fn first_diagnostic_of_err<T>(result: Result<T, DiagnosticReport>) -> (Diagnosti
     (first.code(), first.clone())
 }
 
+fn dummy_formula() -> Decorated<Formula> {
+    Decorated {
+        node: Formula::Atom(Atom::Pattern(PatternAtom {
+            text: String::from("dummy"),
+        })),
+        where_clauses: vec![],
+        as_name: None,
+        fix: None,
+        span: None,
+    }
+}
+
+fn deeply_nested_formula(depth: usize) -> Decorated<Formula> {
+    let mut formula = dummy_formula();
+    for _ in 1..depth {
+        formula = Decorated {
+            node: Formula::Inside(Box::new(formula)),
+            where_clauses: vec![],
+            as_name: None,
+            fix: None,
+            span: None,
+        };
+    }
+    formula
+}
+
+fn assert_pattern_formula(formula: &Decorated<Formula>, expected_text: &str) {
+    assert!(
+        matches!(
+            &formula.node,
+            Formula::Atom(Atom::Pattern(pattern)) if pattern.text == expected_text
+        ),
+        "expected Pattern atom with text \"{expected_text}\", got {:?}",
+        formula.node
+    );
+}
+
 #[test]
 fn engine_new_with_default_config() {
     let engine = Engine::new(EngineConfig::default());
@@ -69,6 +110,176 @@ fn engine_new_with_custom_config() {
     let config = EngineConfig::new(limits, true);
     let engine = Engine::new(config);
     assert!(engine.config().enable_hcl());
+}
+
+#[rstest]
+#[case::legacy_pattern(
+    "rules:\n  - id: demo.rule\n    message: oops\n    languages: [rust]\n    severity: ERROR\n    pattern: foo($X)\n",
+    "demo.rule",
+    Language::Rust,
+    Formula::Atom(Atom::Pattern(PatternAtom {
+        text: String::from("foo($X)"),
+    })),
+)]
+#[case::project_depends_on(
+    concat!(
+        "rules:\n",
+        "  - id: demo.depends\n",
+        "    message: detect vulnerable dependency\n",
+        "    languages: [python]\n",
+        "    severity: WARNING\n",
+        "    r2c-internal-project-depends-on:\n",
+        "      namespace: pypi\n",
+        "      package: requests\n",
+    ),
+    "demo.depends",
+    Language::Python,
+    Formula::Atom(Atom::TreeSitterQuery(TreeSitterQueryAtom {
+        query: String::from("(__NONEXISTENT_NODE__) @_dependency_check"),
+    })),
+)]
+fn compile_yaml_normalizes_and_returns_query_plans(
+    #[case] yaml: &str,
+    #[case] expected_rule_id: &str,
+    #[case] expected_language: Language,
+    #[case] expected_formula: Formula,
+) {
+    let engine = default_engine();
+    let plans = engine
+        .compile_yaml(yaml)
+        .expect("should successfully compile");
+    assert_eq!(plans.len(), 1);
+    let plan = plans.first().expect("should have first plan");
+    assert_eq!(plan.rule_id(), expected_rule_id);
+    assert_eq!(plan.language(), expected_language);
+    assert_eq!(&plan.formula().node, &expected_formula);
+}
+
+#[test]
+fn compile_yaml_plan_formula_matches_normalization() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.formula.check\n",
+        "    message: check formula\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    pattern: foo($X)\n",
+    );
+    let engine = default_engine();
+    let plans = engine.compile_yaml(yaml).expect("should compile");
+    let plan = plans.first().expect("should have one plan");
+    let formula = plan.formula();
+    assert_pattern_formula(formula, "foo($X)");
+}
+
+#[test]
+fn compile_yaml_multiple_languages_yields_multiple_plans() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.multi\n",
+        "    message: multi language\n",
+        "    languages: [rust, python]\n",
+        "    severity: ERROR\n",
+        "    pattern: foo($X)\n",
+    );
+
+    let plans = compile_yaml_text(yaml).expect("should compile");
+
+    assert_eq!(plans.len(), 2);
+    let languages = plans.iter().map(QueryPlan::language).collect::<Vec<_>>();
+    assert!(languages.contains(&Language::Rust));
+    assert!(languages.contains(&Language::Python));
+    for plan in &plans {
+        assert_eq!(plan.rule_id(), "demo.multi");
+        assert_pattern_formula(plan.formula(), "foo($X)");
+    }
+}
+
+#[test]
+fn compile_yaml_multiple_rules_return_expected_plans() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.first\n",
+        "    message: first rule\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    pattern: foo($X)\n",
+        "  - id: demo.second\n",
+        "    message: second rule\n",
+        "    languages: [rust]\n",
+        "    severity: WARNING\n",
+        "    pattern: bar($Y)\n",
+    );
+
+    let plans = compile_yaml_text(yaml).expect("should compile");
+
+    assert_eq!(plans.len(), 2);
+    let mut seen = BTreeSet::new();
+    for plan in &plans {
+        assert_eq!(plan.language(), Language::Rust);
+        seen.insert(plan.rule_id().to_owned());
+        match plan.rule_id() {
+            "demo.first" => assert_pattern_formula(plan.formula(), "foo($X)"),
+            "demo.second" => assert_pattern_formula(plan.formula(), "bar($Y)"),
+            other => panic!("unexpected rule id {other}"),
+        }
+    }
+    assert_eq!(
+        seen,
+        BTreeSet::from([String::from("demo.first"), String::from("demo.second")])
+    );
+}
+
+#[test]
+fn compile_yaml_rejects_formula_nesting_beyond_depth_limit() {
+    assert!(validate_formula(&deeply_nested_formula(MAX_FORMULA_DEPTH)).is_ok());
+
+    let formula = deeply_nested_formula(MAX_FORMULA_DEPTH + 1);
+    let report = validate_formula(&formula).expect_err("depth limit should fail");
+    let diagnostic = report
+        .diagnostics()
+        .first()
+        .expect("should have diagnostic");
+
+    assert_eq!(diagnostic.code(), DiagnosticCode::ESempaiSchemaInvalid);
+    assert!(
+        diagnostic
+            .message()
+            .contains("formula nesting depth exceeds limit"),
+        "unexpected diagnostic message: {}",
+        diagnostic.message()
+    );
+}
+
+#[rstest]
+#[case::invalid_not_in_or(
+    concat!(
+        "rules:\n",
+        "  - id: demo.invalid.not.in.or\n",
+        "    message: invalid not in or\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    pattern-either:\n",
+        "      - pattern: foo($X)\n",
+        "      - pattern-not: bar($Y)\n",
+    ),
+    DiagnosticCode::ESempaiInvalidNotInOr,
+)]
+#[case::missing_positive_term_in_and(
+    concat!(
+        "rules:\n",
+        "  - id: demo.missing.positive.term.in.and\n",
+        "    message: missing positive term in and\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    patterns:\n",
+        "      - pattern-not: foo($X)\n",
+        "      - pattern-inside: bar($Y)\n",
+    ),
+    DiagnosticCode::ESempaiMissingPositiveTermInAnd,
+)]
+fn compile_yaml_returns_semantic_error(#[case] yaml: &str, #[case] expected_code: DiagnosticCode) {
+    assert_compile_yaml_semantic_error(yaml, expected_code);
 }
 
 #[rstest]
@@ -90,15 +301,6 @@ fn engine_new_with_custom_config() {
         check_message: None,
     }
 )]
-#[case(
-    SingleRuleDiagnosticCase {
-        rule_id: Some("demo.rule"),
-        yaml_body: "pattern: foo($X)",
-        expected_code: DiagnosticCode::NotImplemented,
-        check_primary_span: false,
-        check_message: Some("normalization"),
-    }
-)]
 fn compile_yaml_returns_expected_diagnostic_for_single_rule_cases(
     #[case] case: SingleRuleDiagnosticCase,
 ) {
@@ -110,24 +312,6 @@ fn compile_yaml_returns_expected_diagnostic_for_single_rule_cases(
     if let Some(expected_message) = case.check_message {
         assert!(diag.message().contains(expected_message));
     }
-}
-
-#[test]
-fn compile_yaml_returns_not_implemented_for_project_depends_on_search_rule() {
-    let engine = default_engine();
-    let result = engine.compile_yaml(concat!(
-        "rules:\n",
-        "  - id: demo.depends\n",
-        "    message: detect vulnerable dependency\n",
-        "    languages: [python]\n",
-        "    severity: WARNING\n",
-        "    r2c-internal-project-depends-on:\n",
-        "      namespace: pypi\n",
-        "      package: requests\n",
-    ));
-    let (code, diag) = first_diagnostic_of_err(result);
-    assert_eq!(code, DiagnosticCode::NotImplemented);
-    assert!(diag.message().contains("normalization"));
 }
 
 fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str) {
@@ -142,6 +326,13 @@ fn assert_compile_yaml_unsupported_mode(yaml: &str, expected_mode_fragment: &str
         diag.message(),
     );
     assert!(diag.primary_span().is_some());
+}
+
+fn assert_compile_yaml_semantic_error(yaml: &str, expected_code: DiagnosticCode) {
+    let engine = default_engine();
+    let result = engine.compile_yaml(yaml);
+    let (code, _diag) = first_diagnostic_of_err(result);
+    assert_eq!(code, expected_code);
 }
 
 #[test]
@@ -190,7 +381,11 @@ fn compile_dsl_returns_not_implemented() {
 #[test]
 fn execute_returns_not_implemented() {
     let engine = default_engine();
-    let plan = QueryPlan::new(String::from("test-rule"), Language::Rust);
+    let plan = QueryPlan::new(
+        String::from("test-rule"),
+        Language::Rust,
+        Arc::new(dummy_formula()),
+    );
     let result = engine.execute(&plan, "file:///test.rs", "fn main() {}");
     let (code, diag) = first_diagnostic_of_err(result);
     assert_eq!(code, DiagnosticCode::NotImplemented);

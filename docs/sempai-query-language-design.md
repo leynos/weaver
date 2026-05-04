@@ -419,19 +419,21 @@ Search mode rules require:
   - `pattern-either`
   - `pattern-regex`
   - `match`
-  - `r2c-internal-project-depends-on` (parsed but ignored by Sempai).[^1]
+  - `r2c-internal-project-depends-on` (normalized to a degenerate
+    Tree-sitter query atom for now).[^1]
 
-Implementation note (2026-03-29): `sempai_yaml` now preserves
-`r2c-internal-project-depends-on` as an opaque search principal so the parser
-accepts Semgrep-compatible dependency rules without inventing execution
-semantics early.
-
-Implementation note (2026-03-29): `sempai::Engine::compile_yaml` now applies a
-mode-aware validation pass after parsing. Search rules continue to the
-deliberate `NOT_IMPLEMENTED` normalization placeholder, while `extract`,
-`taint`, `join`, and forward-compatible unknown modes fail deterministically
-with `E_SEMPAI_UNSUPPORTED_MODE`. The first unsupported rule in source order is
-reported, and its `primary_span` prefers the `mode` field span before falling
+Implementation note (2026-04-11): `sempai::Engine::compile_yaml` now parses
+YAML rules, applies mode-aware validation, and lowers valid search rules
+through canonical `Formula` normalization in `crates/sempai/src/normalize.rs`.
+Legacy (`pattern*`) and v2 (`match`) syntaxes lower into the shared
+`sempai_core::formula::Formula` enum, while `r2c-internal-project-depends-on`
+is preserved as an opaque search principal and normalizes to a degenerate
+Tree-sitter query atom that cannot match real code. Semantic checks for
+`E_SEMPAI_INVALID_NOT_IN_OR` and `E_SEMPAI_MISSING_POSITIVE_TERM_IN_AND` live
+in `crates/sempai/src/semantic_check.rs`. `WhereClause` values are stored as
+opaque `serde_json::Value` values and interpreted later. `extract`, `taint`,
+`join`, and forward-compatible unknown modes still fail deterministically with
+`E_SEMPAI_UNSUPPORTED_MODE`, preferring the `mode` field span before falling
 back to the enclosing rule span.
 
 Extract mode rules require legacy query keys, not `match`.[^1]
