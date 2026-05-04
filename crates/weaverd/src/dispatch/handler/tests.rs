@@ -3,12 +3,12 @@
 use std::{
     io::{BufRead, BufReader, Write},
     net::{SocketAddr, TcpListener, TcpStream},
-    path::{Path, PathBuf},
     sync::{Arc, Mutex},
     thread::{self, JoinHandle},
 };
 
 use rstest::{fixture, rstest};
+use tempfile::TempDir;
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES;
@@ -25,8 +25,13 @@ use crate::{
 
 #[fixture]
 fn backend_manager() -> BackendManager {
+    let temp_dir = match TempDir::new() {
+        Ok(temp_dir) => temp_dir,
+        Err(error) => panic!("temporary directory: {error}"),
+    };
+    let socket_path = temp_dir.path().join("socket.sock");
     let config = Config {
-        daemon_socket: SocketEndpoint::unix("/tmp/weaverd-test/socket.sock"),
+        daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().into_owned()),
         ..Config::default()
     };
     let provider =
@@ -39,6 +44,7 @@ fn backend_manager() -> BackendManager {
 struct HandlerTestHarness {
     client: TcpStream,
     server_handle: JoinHandle<()>,
+    _temp_dir: TempDir,
 }
 
 impl HandlerTestHarness {
@@ -88,8 +94,14 @@ fn create_listener() -> (TcpListener, SocketAddr) {
 
 #[fixture]
 fn harness(backend_manager: BackendManager) -> HandlerTestHarness {
+    let temp_dir = match TempDir::new() {
+        Ok(temp_dir) => temp_dir,
+        Err(error) => panic!("temporary directory: {error}"),
+    };
     let (listener, addr) = create_listener();
-    let workspace_root = PathBuf::from("/tmp/weaverd-test-workspace");
+    let workspace_root = temp_dir.path().join("weaverd-test-workspace");
+    let endpoint = temp_dir.path().join("weaverd-test/socket.sock");
+    let runtime_dir = temp_dir.path().to_path_buf();
 
     let server_handle = thread::spawn(move || {
         let (stream, _) = match listener.accept() {
@@ -99,8 +111,8 @@ fn harness(backend_manager: BackendManager) -> HandlerTestHarness {
         match DispatchConnectionHandler::new(
             backend_manager,
             workspace_root,
-            "/tmp/weaverd-test/socket.sock",
-            Path::new("/tmp").to_path_buf(),
+            endpoint.to_string_lossy().into_owned(),
+            runtime_dir,
         ) {
             Ok(handler) => handler,
             Err(error) => panic!("absolute workspace root: {error}"),
@@ -115,6 +127,7 @@ fn harness(backend_manager: BackendManager) -> HandlerTestHarness {
     HandlerTestHarness {
         client,
         server_handle,
+        _temp_dir: temp_dir,
     }
 }
 
@@ -199,10 +212,12 @@ fn handler_emits_known_operations_for_unknown_operation(mut harness: HandlerTest
 
 #[test]
 fn serialize_structured_dispatch_event_omits_sensitive_fields() {
+    let temp_dir = std::env::temp_dir();
+    let endpoint = temp_dir.join("weaverd.sock");
     let event = StructuredDispatchEvent::new(
         "dispatching_request",
-        "/tmp/weaverd.sock",
-        Path::new("/var/lib/weaverd"),
+        endpoint.to_string_lossy().to_string(),
+        &temp_dir,
         StructuredEventMetadata::new("observe", "get-card").with_size(42),
     );
     let value = serialize_structured_event(&event);
@@ -219,20 +234,27 @@ fn serialize_structured_dispatch_event_omits_sensitive_fields() {
     assert_eq!(value["size"], 42);
     assert_eq!(
         value.get("runtime_dir"),
-        Some(&serde_json::json!("/var/lib/weaverd"))
+        Some(&serde_json::json!(temp_dir.to_string_lossy().to_string()))
     );
     assert_eq!(
         value.get("weaverd.health"),
-        Some(&serde_json::json!("/var/lib/weaverd/weaverd.health"))
+        Some(&serde_json::json!(
+            temp_dir
+                .join("weaverd.health")
+                .to_string_lossy()
+                .to_string()
+        ))
     );
 }
 
 #[test]
 fn emit_structured_event_returns_payload_without_sensitive_request_data() {
+    let temp_dir = std::env::temp_dir();
+    let endpoint = temp_dir.join("weaverd.sock");
     let mut event = StructuredDispatchEvent::new(
         "request_too_large",
-        "/tmp/weaverd.sock",
-        Path::new("/var/lib/weaverd"),
+        endpoint.to_string_lossy().to_string(),
+        &temp_dir,
         StructuredEventMetadata::new("observe", "apply-patch")
             .with_size(JSONL_REQUEST_MAX_LINE_BYTES + 1)
             .with_max_size(JSONL_REQUEST_MAX_LINE_BYTES),
@@ -259,13 +281,16 @@ fn emit_structured_event_returns_payload_without_sensitive_request_data() {
 
 #[test]
 fn request_too_large_serialization_maps_to_request_too_large_event() {
+    let temp_dir = std::env::temp_dir();
+    let endpoint = temp_dir.join("weaverd.sock");
+    let endpoint = endpoint.to_string_lossy().into_owned();
     let event = read_error_event(
         &DispatchError::request_too_large(
             JSONL_REQUEST_MAX_LINE_BYTES + 1,
             JSONL_REQUEST_MAX_LINE_BYTES,
         ),
-        "/tmp/weaverd.sock",
-        Path::new("/tmp"),
+        &endpoint,
+        &temp_dir,
     );
     let value = serialize_structured_event(&event);
 

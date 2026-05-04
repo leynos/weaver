@@ -173,7 +173,7 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
     StartupGuidanceExpectation {
         problem: "daemon exited before reporting ready (status: Some(17))",
         alternatives: "The daemon started but failed to become ready.",
-        socket_hint: None,
+        socket_hint: Some("  - Check health snapshot at /tmp/test/runtime/weaverd.health"),
     }
 )]
 #[case(

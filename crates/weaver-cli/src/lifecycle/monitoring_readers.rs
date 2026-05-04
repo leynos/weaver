@@ -89,7 +89,7 @@ define_reader! {
     ///
     /// Returns:
     /// * `Ok(Some(snapshot))` when parsed successfully.
-    /// * `Ok(None)` when the file is absent.
+    /// * `Ok(None)` when the file is absent or empty.
     /// * `Err(ReadHealth)` if I/O fails.
     /// * `Err(ParseHealth)` if JSON is invalid.
     pub(crate) fn read_health(

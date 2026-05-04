@@ -242,14 +242,19 @@ pub(crate) fn write_startup_guidance<W: Write>(
             let next_command = launch_binary_check_command(binary);
             (problem, alternatives, next_command)
         }
-        LifecycleError::StartupFailed { exit_status, .. } => {
+        LifecycleError::StartupFailed {
+            exit_status,
+            runtime_dir,
+            ..
+        } => {
             let problem = format!("daemon exited before reporting ready (status: {exit_status:?})");
+            let health_path = runtime_dir.join("weaverd.health");
             let alternatives = vec![
                 "The daemon started but failed to become ready.".to_string(),
                 String::new(),
                 "Valid alternatives:".to_string(),
                 "  - Check the daemon logs for errors".to_string(),
-                startup_socket_hint(None),
+                startup_socket_hint(Some(health_path.as_path())),
                 startup_output_hint().to_string(),
             ];
             let next_command = startup_retry_command();
