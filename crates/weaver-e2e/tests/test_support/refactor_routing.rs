@@ -339,9 +339,12 @@ fn validate_refactor_request<'a>(arguments: &'a [&'a str]) -> ValidatedRefactorR
     let Some((line, column)) = position.split_once(':') else {
         panic!("refactor snapshot requests must include --position <LINE:COL>");
     };
+    let parsed_line = line.parse::<u32>().ok();
+    let parsed_column = column.parse::<u32>().ok();
     assert!(
-        line.parse::<u32>().is_ok() && column.parse::<u32>().is_ok(),
-        "refactor snapshot requests must include numeric --position <LINE:COL>"
+        parsed_line.is_some_and(|value| value >= 1)
+            && parsed_column.is_some_and(|value| value >= 1),
+        "refactor snapshot requests must include one-indexed --position <LINE:COL>"
     );
 
     ValidatedRefactorRequest {

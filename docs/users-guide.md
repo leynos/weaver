@@ -1144,7 +1144,7 @@ When required flags are missing, `act refactor` returns one deterministic
 actionable error instead of failing one flag at a time:
 
 ```text
-invalid arguments: act refactor requires --provider <plugin>, --refactoring <operation>, and --file <path>
+invalid arguments: act refactor requires --provider <plugin>, --refactoring <operation>, --file <path>, and --position <line:col>
 
 Valid alternatives:
   - Providers: rope, rust-analyzer
