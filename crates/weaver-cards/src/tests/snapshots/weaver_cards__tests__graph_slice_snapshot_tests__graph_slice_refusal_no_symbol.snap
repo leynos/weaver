@@ -4,6 +4,7 @@ expression: json
 ---
 {
   "status": "refusal",
+  "schema_version": "graph_slice.v1",
   "refusal": {
     "reason": "no_symbol_at_position",
     "message": "no symbol found at the requested position"

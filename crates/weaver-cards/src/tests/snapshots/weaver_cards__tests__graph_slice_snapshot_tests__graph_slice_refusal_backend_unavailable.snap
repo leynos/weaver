@@ -4,6 +4,7 @@ expression: json
 ---
 {
   "status": "refusal",
+  "schema_version": "graph_slice.v1",
   "refusal": {
     "reason": "backend_unavailable",
     "message": "the required backend is not available"

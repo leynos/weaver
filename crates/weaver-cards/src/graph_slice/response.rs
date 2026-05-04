@@ -286,6 +286,8 @@ pub struct SliceRefusal {
 pub enum GraphSliceResponse {
     /// A graph slice was successfully constructed.
     Success {
+        /// Stable response schema version.
+        schema_version: String,
         /// Schema version for forward compatibility.
         slice_version: u32,
         /// Entry symbol reference.
@@ -301,6 +303,8 @@ pub enum GraphSliceResponse {
     },
     /// A graph slice could not be constructed.
     Refusal {
+        /// Stable response schema version.
+        schema_version: String,
         /// Structured refusal with reason and message.
         refusal: SliceRefusal,
     },
@@ -312,6 +316,7 @@ impl GraphSliceResponse {
     #[must_use]
     pub fn not_yet_implemented() -> Self {
         Self::Refusal {
+            schema_version: String::from("graph_slice.v1"),
             refusal: SliceRefusal {
                 reason: SliceRefusalReason::NotYetImplemented,
                 message: String::from(concat!(

@@ -1,10 +1,39 @@
 //! Unit tests for the `observe graph-slice` dispatch handler.
+use std::{fs, path::PathBuf};
 
-use rstest::rstest;
+use rstest::{fixture, rstest};
+use tempfile::TempDir;
+use url::Url;
+use weaver_cards::{DEFAULT_CACHE_CAPACITY, DetailLevel};
+use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
-use super::handle;
-use crate::dispatch::{request::CommandRequest, response::ResponseWriter};
-
+use super::{MAX_SAME_FILE_DISCOVERY_POSITIONS, first_non_whitespace_column, handle};
+use crate::{
+    backends::FusionBackends,
+    dispatch::{request::CommandRequest, response::ResponseWriter},
+    semantic_provider::SemanticBackendProvider,
+};
+#[fixture]
+fn backends_fixture() -> Result<(FusionBackends<SemanticBackendProvider>, TempDir), String> {
+    let dir = TempDir::new().map_err(|error| format!("create temp dir: {error}"))?;
+    let socket_path = dir
+        .path()
+        .join("socket.sock")
+        .to_string_lossy()
+        .into_owned();
+    let config = Config {
+        daemon_socket: SocketEndpoint::unix(socket_path),
+        ..Config::default()
+    };
+    let provider =
+        SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
+    Ok((FusionBackends::new(config, provider), dir))
+}
+fn write_source(temp_dir: &TempDir, name: &str, content: &str) -> Result<PathBuf, std::io::Error> {
+    let path = temp_dir.path().join(name);
+    fs::write(&path, content)?;
+    Ok(path)
+}
 fn make_request(arguments: &[&str]) -> CommandRequest {
     let args_json: Vec<String> = arguments
         .iter()
@@ -24,67 +53,333 @@ fn make_request(arguments: &[&str]) -> CommandRequest {
     }
 }
 
-fn dispatch_graph_slice(arguments: &[&str]) -> (i32, String) {
-    let request = make_request(arguments);
-    let mut buffer = Vec::new();
-    let mut writer = ResponseWriter::new(&mut buffer);
-    let result = match handle(&request, &mut writer) {
-        Ok(result) => result,
-        Err(error) => panic!("dispatch succeeds: {error}"),
-    };
-    let output = match String::from_utf8(buffer) {
-        Ok(output) => output,
-        Err(error) => panic!("valid UTF-8: {error}"),
-    };
-    (result.status, output)
-}
-
-fn parse_stdout_data(line: &str) -> Option<String> {
-    let envelope = serde_json::from_str::<serde_json::Value>(line).ok()?;
-    if envelope.get("stream").and_then(|v| v.as_str()) != Some("stdout") {
-        return None;
+fn response_payload(output: Vec<u8>) -> Result<serde_json::Value, String> {
+    let response = String::from_utf8(output).map_err(|error| format!("utf8: {error}"))?;
+    let mut stdout_data = None;
+    for line in response.lines() {
+        let envelope: serde_json::Value =
+            serde_json::from_str(line).map_err(|error| format!("envelope: {error}"))?;
+        if envelope.get("stream").and_then(|value| value.as_str()) == Some("stdout") {
+            stdout_data = Some(
+                envelope
+                    .get("data")
+                    .and_then(|value| value.as_str())
+                    .ok_or_else(|| "stdout data".to_string())?
+                    .to_owned(),
+            );
+            break;
+        }
     }
-    envelope
-        .get("data")
-        .and_then(|v| v.as_str())
-        .map(String::from)
+    let data = stdout_data.ok_or_else(|| "no stdout envelope".to_string())?;
+    serde_json::from_str(&data).map_err(|error| format!("payload: {error}"))
+}
+fn detail_value(detail: DetailLevel) -> &'static str {
+    match detail {
+        DetailLevel::Minimal => "minimal",
+        DetailLevel::Signature => "signature",
+        DetailLevel::Structure => "structure",
+        DetailLevel::Semantic => "semantic",
+        DetailLevel::Full => "full",
+        _ => "full",
+    }
+}
+fn dispatch_payload(
+    request: &CommandRequest,
+    backends: &mut FusionBackends<SemanticBackendProvider>,
+) -> Result<(i32, serde_json::Value), String> {
+    let mut output = Vec::new();
+    let mut writer = ResponseWriter::new(&mut output);
+    let result = match handle(request, &mut writer, backends) {
+        Ok(result) => result,
+        Err(error) => return Err(format!("dispatch fails: {error}")),
+    };
+    response_payload(output).map(|payload| (result.status, payload))
+}
+fn assert_success_response(status: i32, payload: &serde_json::Value) {
+    assert_eq!(status, 0, "expected success exit status");
+    assert_eq!(
+        payload["status"], "success",
+        "expected success payload status"
+    );
+    assert_eq!(payload["schema_version"], "graph_slice.v1");
 }
 
-/// Extracts the stdout payload from the JSONL stream envelope.
-///
-/// The `ResponseWriter` wraps output in `{"stream":"stdout","data":"…"}`
-/// envelopes. This helper extracts just the data content.
-fn extract_stdout(raw: &str) -> String {
-    raw.lines()
-        .find_map(parse_stdout_data)
-        .unwrap_or_else(|| String::from(raw))
+fn assert_default_graph_slice_shape(payload: &serde_json::Value) {
+    assert_eq!(payload["constraints"]["direction"], "both");
+    assert_eq!(
+        payload["constraints"]["budget"]["max_cards"],
+        serde_json::json!(30)
+    );
+    assert_eq!(payload["edges"], serde_json::json!([]));
+}
+fn assert_spillover_truncated_with_frontier(payload: &serde_json::Value) {
+    assert_eq!(
+        payload["spillover"]["truncated"], true,
+        "expected truncated"
+    );
+    let frontier = match payload["spillover"]["frontier"].as_array() {
+        Some(frontier) => frontier,
+        None => panic!("frontier array"),
+    };
+    assert!(!frontier.is_empty(), "expected non-empty frontier");
+    for (index, entry) in frontier.iter().enumerate() {
+        assert!(
+            entry["symbol_id"].as_str().is_some_and(|s| !s.is_empty()),
+            "frontier entry {index} should have a non-empty symbol_id"
+        );
+        assert_eq!(
+            entry["depth"],
+            serde_json::json!(1),
+            "frontier entry {index} depth should be 1"
+        );
+    }
 }
 
-#[test]
-fn valid_request_returns_not_yet_implemented_refusal() {
-    let (status, output) =
-        dispatch_graph_slice(&["--uri", "file:///src/main.rs", "--position", "10:5"]);
+fn assert_refusal(status: i32, payload: &serde_json::Value, reason: &str) {
+    let expected_status = match reason {
+        "unsupported_language" => 10,
+        "no_symbol_at_position" => 11,
+        "position_out_of_range" => 12,
+        "not_yet_implemented" => 13,
+        "backend_unavailable" => 14,
+        other => panic!("unknown refusal reason {other}"),
+    };
+    assert_eq!(status, expected_status);
+    assert_eq!(payload["status"], "refusal");
+    assert_eq!(payload["schema_version"], "graph_slice.v1");
+    assert_eq!(payload["refusal"]["reason"], reason);
+}
 
-    assert_eq!(status, 1);
-    let parsed: serde_json::Value =
-        serde_json::from_str(&extract_stdout(&output)).expect("valid JSON");
-    assert_eq!(
-        parsed.get("status").and_then(|v| v.as_str()),
-        Some("refusal")
-    );
-    assert_eq!(
-        parsed.pointer("/refusal/reason").and_then(|v| v.as_str()),
-        Some("not_yet_implemented")
-    );
+fn assert_refusal_with_message(
+    status: i32,
+    payload: &serde_json::Value,
+    reason: &str,
+    message: &str,
+) {
+    assert_refusal(status, payload, reason);
+    assert_eq!(payload["refusal"]["message"], message);
 }
 
 #[rstest]
-#[case(&["--position", "10:5"])]
-#[case(&["--uri", "file:///src/main.rs", "--position", "bad"])]
-fn invalid_arguments_return_dispatch_error(#[case] arguments: &[&str]) {
-    let request = make_request(arguments);
-    let mut buffer = Vec::new();
-    let mut writer = ResponseWriter::new(&mut buffer);
-    let result = handle(&request, &mut writer);
-    assert!(result.is_err());
+fn valid_request_returns_success_and_echoed_constraints(
+    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
+) -> Result<(), String> {
+    let (mut backends, temp_dir) = backends_fixture?;
+    let path = write_source(
+        &temp_dir,
+        "slice.rs",
+        concat!(
+            "struct Counter(u32);\n\n",
+            "impl Counter {\n",
+            "    fn increment(&mut self) {\n",
+            "        self.0 += 1;\n",
+            "    }\n",
+            "}\n"
+        ),
+    )
+    .map_err(|error| error.to_string())?;
+    let uri = Url::from_file_path(&path)
+        .map_err(|()| "file uri".to_string())?
+        .to_string();
+    let request = make_request(&[
+        "--uri",
+        &uri,
+        "--position",
+        "4:8",
+        "--entry-detail",
+        detail_value(DetailLevel::Structure),
+        "--node-detail",
+        detail_value(DetailLevel::Semantic),
+    ]);
+
+    let (status, payload) = dispatch_payload(&request, &mut backends)?;
+    let (second_status, second_payload) = dispatch_payload(&request, &mut backends)?;
+
+    assert_success_response(status, &payload);
+    assert_success_response(second_status, &second_payload);
+    assert_default_graph_slice_shape(&payload);
+    assert_eq!(payload["constraints"]["entry_detail"], "structure");
+    assert_eq!(payload["constraints"]["node_detail"], "semantic");
+    assert_eq!(payload["spillover"]["truncated"], false);
+    assert_eq!(payload["cards"][0]["symbol"]["ref"]["name"], "increment");
+    let symbol_ids: Vec<&str> = payload["cards"]
+        .as_array()
+        .expect("cards array")
+        .iter()
+        .map(|card| {
+            card["symbol"]["symbol_id"]
+                .as_str()
+                .expect("symbol_id should be a string")
+        })
+        .collect();
+    let second_symbol_ids: Vec<&str> = second_payload["cards"]
+        .as_array()
+        .expect("cards array")
+        .iter()
+        .map(|card| {
+            card["symbol"]["symbol_id"]
+                .as_str()
+                .expect("symbol_id should be a string")
+        })
+        .collect();
+    assert!(symbol_ids.len() >= 2);
+    assert_eq!(symbol_ids, second_symbol_ids);
+    Ok(())
+}
+
+#[rstest]
+fn max_cards_budget_truncates_same_file_symbol_inventory(
+    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
+) -> Result<(), String> {
+    let (mut backends, temp_dir) = backends_fixture?;
+    let path = write_source(
+        &temp_dir,
+        "slice.py",
+        concat!(
+            "class Factory:\n",
+            "    @classmethod\n",
+            "    def build(cls) -> \"Factory\":\n",
+            "        return cls()\n\n",
+            "    @staticmethod\n",
+            "    def version() -> str:\n",
+            "        return \"1.0\"\n"
+        ),
+    )
+    .map_err(|error| error.to_string())?;
+    let uri = Url::from_file_path(&path)
+        .map_err(|()| "file uri".to_string())?
+        .to_string();
+    let request = make_request(&[
+        "--uri",
+        &uri,
+        "--position",
+        "3:9",
+        "--max-cards",
+        "1",
+        "--entry-detail",
+        detail_value(DetailLevel::Semantic),
+        "--node-detail",
+        detail_value(DetailLevel::Semantic),
+    ]);
+
+    let (status, payload) = dispatch_payload(&request, &mut backends)?;
+    let (second_status, second_payload) = dispatch_payload(&request, &mut backends)?;
+
+    assert_success_response(status, &payload);
+    assert_eq!(payload["cards"].as_array().expect("cards array").len(), 1);
+    assert_eq!(
+        payload["constraints"]["budget"]["max_cards"],
+        serde_json::json!(1)
+    );
+    assert_success_response(second_status, &second_payload);
+    assert_eq!(payload["cards"][0]["symbol"]["ref"]["name"], "build");
+    let kept_symbol_id = payload["cards"][0]["symbol"]["symbol_id"]
+        .as_str()
+        .expect("kept symbol_id should be a string");
+    let frontier_ids: Vec<&str> = payload["spillover"]["frontier"]
+        .as_array()
+        .expect("frontier array")
+        .iter()
+        .map(|entry| {
+            entry["symbol_id"]
+                .as_str()
+                .expect("frontier symbol_id should be a string")
+        })
+        .collect();
+    let second_frontier_ids: Vec<&str> = second_payload["spillover"]["frontier"]
+        .as_array()
+        .expect("frontier array")
+        .iter()
+        .map(|entry| {
+            entry["symbol_id"]
+                .as_str()
+                .expect("frontier symbol_id should be a string")
+        })
+        .collect();
+    assert!(!frontier_ids.contains(&kept_symbol_id));
+    assert_eq!(frontier_ids, second_frontier_ids);
+    assert_spillover_truncated_with_frontier(&payload);
+    Ok(())
+}
+
+#[path = "argument_tests.rs"]
+mod argument_tests;
+#[path = "coverage_tests.rs"]
+mod coverage_tests;
+struct RefusalCase<'a> {
+    filename: &'a str,
+    content: &'a str,
+    position: &'a str,
+    expected_reason: &'a str,
+    expected_message: Option<&'a str>,
+}
+
+fn assert_structured_refusal(
+    backends: &mut FusionBackends<SemanticBackendProvider>,
+    temp_dir: &TempDir,
+    case: &RefusalCase<'_>,
+) -> Result<(), String> {
+    let path =
+        write_source(temp_dir, case.filename, case.content).map_err(|error| error.to_string())?;
+    let uri = Url::from_file_path(&path)
+        .map_err(|()| "file uri".to_string())?
+        .to_string();
+    let request = make_request(&["--uri", &uri, "--position", case.position]);
+
+    let (status, payload) = dispatch_payload(&request, backends)?;
+
+    match case.expected_message {
+        Some(message) => {
+            assert_refusal_with_message(status, &payload, case.expected_reason, message);
+        }
+        None => assert_refusal(status, &payload, case.expected_reason),
+    }
+    Ok(())
+}
+
+#[rstest]
+#[case(("notes.txt", "plain text\n", "1:1", "unsupported_language", None))]
+#[case(
+    (
+        "main.rs",
+        "fn main() {}\n \n",
+        "2:1",
+        "no_symbol_at_position",
+        Some("observe graph-slice: no symbol found at 2:1"),
+    )
+)]
+#[case(
+    (
+        "main.rs",
+        "fn main() {}\n",
+        "10:1",
+        "position_out_of_range",
+        Some("observe graph-slice: position 10:1 is outside the bounds of the file"),
+    )
+)]
+fn structured_refusal_cases(
+    backends_fixture: Result<(FusionBackends<SemanticBackendProvider>, TempDir), String>,
+    #[case] case: (&str, &str, &str, &str, Option<&str>),
+) -> Result<(), String> {
+    let (mut backends, temp_dir) = backends_fixture?;
+    let (filename, content, position, expected_reason, expected_message) = case;
+    assert_structured_refusal(
+        &mut backends,
+        &temp_dir,
+        &RefusalCase {
+            filename,
+            content,
+            position,
+            expected_reason,
+            expected_message,
+        },
+    )
+}
+
+#[test]
+fn first_non_whitespace_column_uses_character_offsets() {
+    assert_eq!(
+        first_non_whitespace_column("\u{2003}\u{2003}fn main() {}"),
+        Some(3)
+    );
 }

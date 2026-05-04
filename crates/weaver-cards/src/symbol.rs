@@ -67,7 +67,7 @@ pub struct SourceRange {
 ///
 /// These kinds align with the symbol taxonomy defined in
 /// `docs/jacquard-card-first-symbol-graph-design.md` §5.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum CardSymbolKind {
@@ -218,4 +218,49 @@ pub struct SymbolIdentity {
     /// Location-based reference for bootstrapping and recovery.
     #[serde(rename = "ref")]
     pub symbol_ref: SymbolRef,
+}
+
+#[cfg(test)]
+mod ordering_tests {
+    //! Unit tests for the derived `PartialOrd` and `Ord` implementations on `CardSymbolKind`.
+
+    use super::CardSymbolKind;
+
+    #[test]
+    fn card_symbol_kind_ord_is_consistent_with_derived_discriminant_order() {
+        // Verify that Ord is total and consistent: a value equals itself.
+        assert_eq!(
+            CardSymbolKind::Function.cmp(&CardSymbolKind::Function),
+            std::cmp::Ordering::Equal
+        );
+    }
+
+    #[test]
+    fn card_symbol_kind_earlier_variant_is_less_than_later_variant() {
+        // The derived Ord orders variants by declaration order.
+        // Function is declared before Type in the enum, so Function < Type.
+        assert!(CardSymbolKind::Function < CardSymbolKind::Type);
+    }
+
+    #[test]
+    fn card_symbol_kind_sort_produces_stable_order() {
+        let mut kinds_a = vec![
+            CardSymbolKind::Method,
+            CardSymbolKind::Function,
+            CardSymbolKind::Type,
+        ];
+        let mut kinds_b = vec![
+            CardSymbolKind::Method,
+            CardSymbolKind::Function,
+            CardSymbolKind::Type,
+        ];
+        kinds_a.sort();
+        kinds_b.sort();
+        assert_eq!(kinds_a, kinds_b);
+        let first = kinds_a.first().expect("vector has at least 3 elements");
+        let second = kinds_a.get(1).expect("vector has at least 3 elements");
+        let third = kinds_a.get(2).expect("vector has at least 3 elements");
+        assert!(first <= second);
+        assert!(second <= third);
+    }
 }

@@ -295,8 +295,8 @@ Edge types follow the baseline SDL vocabulary: `call`, `import`, `config`.[^1]
 
 Edge object:
 
-Edges include a `resolution` field to capture whether the match used a full
-symbol table, a partial table, or an LSP-provided identifier.
+Edges include a `resolution_scope` field to capture whether the match used a
+full symbol table, a partial table, or an LSP-provided identifier.
 
 ```json
 {
@@ -306,7 +306,7 @@ symbol table, a partial table, or an LSP-provided identifier.
   "to": "sym_…",
   "confidence": 0.92,
   "direction": "out",
-  "resolution": "full_symbol_table",
+  "resolution_scope": "full_symbol_table",
   "provenance": {
     "source": "lsp_call_hierarchy",
     "details": { "call_site": { "uri": "file:///…", "line": 123, "column": 8 } }
@@ -323,7 +323,7 @@ modes or dynamic languages), `to` becomes an external node reference:
   "from": "sym_…",
   "to_external": { "language": "python", "name": "requests.get" },
   "confidence": 0.35,
-  "resolution": "partial_symbol_table",
+  "resolution_scope": "partial_symbol_table",
   "provenance": { "source": "tree_sitter_heuristic" }
 }
 ```
@@ -345,9 +345,9 @@ Tree-sitter-derived graphs use a default two-pass pipeline:
 2. Extract references and resolve them into edges using the symbol table.
 
 When `snapshots_on_demand` loads only a subset of files, the symbol table is
-partial by design. Edge records must carry `resolution` alongside `confidence`
-to distinguish `full_symbol_table`, `partial_symbol_table`, and `lsp`
-resolution so clients can treat missing edges as uncertainty rather than
+partial by design. Edge records must carry `resolution_scope` alongside
+`confidence` to distinguish `full_symbol_table`, `partial_symbol_table`, and
+`lsp` resolution, so clients can treat missing edges as uncertainty rather than
 silence.
 
 ## Tree-sitter extraction
@@ -508,8 +508,8 @@ A later iteration can plug in model-specific tokenizers if required.
 When history queries load only a subset of files, slices must explicitly carry
 partiality. The slice builder should:
 
-- Preserve edges with `resolution = partial_symbol_table` rather than dropping
-  them outright.
+- Preserve edges with `resolution_scope = partial_symbol_table` rather than
+  dropping them outright.
 - Surface provenance and confidence for unresolved edges so consumers can
   widen the scope or fall back to alternative resolution.
 
@@ -738,7 +738,7 @@ Given two slices `G_t` and `G_{t+1}` and a symbol mapping `M`:
 - Edge delta:
 
   - compare edges after remapping endpoints via `M`
-  - track changes in `confidence`, `provenance.source`, `resolution`, and
+  - track changes in `confidence`, `provenance.source`, `resolution_scope`, and
     call-site ranges
 
 ### Normalization rules
@@ -831,9 +831,19 @@ Response:
 
 ```json
 {
+  "status": "success",
+  "schema_version": "graph_slice.v1",
   "slice_version": 1,
   "entry": { "symbol_id": "sym_…" },
-  "constraints": { "depth": 2, "max_cards": 30, "max_estimated_tokens": 4000 },
+  "constraints": {
+    "depth": 2,
+    "direction": "both",
+    "edge_types": ["call", "import", "config"],
+    "min_confidence": 0.5,
+    "budget": { "max_cards": 30, "max_edges": 200, "max_estimated_tokens": 4000 },
+    "entry_detail": "structure",
+    "node_detail": "minimal"
+  },
   "cards": [ /* SymbolCard objects (possibly minimal) */ ],
   "edges": [ /* typed edges */ ],
   "spillover": {
@@ -842,6 +852,15 @@ Response:
   }
 }
 ```
+
+For roadmap item 7.2.1, the shipped runtime uses this stable response shape to
+return a deterministic same-file slice: the entry card plus any same-file
+symbol cards that fit within `budget.max_cards`, with `spillover` populated
+when additional local symbols are excluded. The stable edge schema is already
+locked, even though runtime edges are deferred to later milestones. Every edge
+will carry a `resolution_scope` set to one of `full_symbol_table`,
+`partial_symbol_table`, or `lsp`, but the runtime may legitimately emit an
+empty `edges` array until those milestones land.
 
 ### `observe graph-history`
 

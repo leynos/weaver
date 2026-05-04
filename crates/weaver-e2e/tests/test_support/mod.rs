@@ -32,38 +32,54 @@ use crate::{fixture_io::write_fixture_path, weaver_binary::weaver_binary_path};
 const ACCEPT_TIMEOUT: Duration = Duration::from_secs(10);
 const ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
+/// Captured stdout and stderr from a single CLI invocation.
 #[derive(Debug, Serialize)]
 pub(crate) struct Transcript {
     command: String,
-    status: i32,
-    stdout: String,
+    pub(crate) status: i32,
+    pub(crate) stdout: String,
     stderr: String,
 }
 
+/// Paired transcripts from a two-request caching sequence.
 #[derive(Debug, Serialize)]
 pub(crate) struct CacheTranscript {
-    pub(crate) first: Transcript,
-    pub(crate) second: Transcript,
-    pub(crate) cache_hits: u64,
-    pub(crate) cache_misses: u64,
+    pub first: Transcript,
+    pub second: Transcript,
+    pub cache_hits: u64,
+    pub cache_misses: u64,
 }
 
+/// Input parameters for a single `observe get-card` CLI invocation in tests.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct GetCardRequest<'a> {
-    pub(crate) uri: &'a str,
-    pub(crate) line: u32,
-    pub(crate) column: u32,
-    pub(crate) detail: &'a str,
+    pub uri: &'a str,
+    pub line: u32,
+    pub column: u32,
+    pub detail: &'a str,
 }
 
-#[derive(Debug)]
+/// Input parameters for a single `observe graph-slice` CLI invocation in tests.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct GraphSliceRequest<'a> {
+    pub uri: &'a str,
+    pub line: u32,
+    pub column: u32,
+    pub entry_detail: &'a str,
+    pub node_detail: &'a str,
+    pub max_cards: Option<u32>,
+}
+
+/// In-process test daemon accepting a bounded number of requests over a loopback socket.
 pub(crate) struct TestDaemon {
     address: SocketAddr,
     backend_manager: BackendManager,
-    join_handle: thread::JoinHandle<()>,
+    join_handle: Option<thread::JoinHandle<()>>,
 }
 
 impl TestDaemon {
+    /// Starts the daemon, binding to an ephemeral loopback port and awaiting `expected_requests`
+    /// connections.
     pub(crate) fn start(expected_requests: usize) -> Self {
         let _ = weaver_binary_path();
         let listener = required_result(TcpListener::bind(("127.0.0.1", 0)), "bind test listener");
@@ -89,12 +105,13 @@ impl TestDaemon {
         Self {
             address,
             backend_manager,
-            join_handle,
+            join_handle: Some(join_handle),
         }
     }
 
     fn endpoint(&self) -> String { format!("tcp://{}", self.address) }
 
+    /// Returns the daemon's current card-cache statistics.
     pub(crate) fn cache_stats(&self) -> weaver_cards::CacheStats {
         let stats = self
             .backend_manager
@@ -103,14 +120,20 @@ impl TestDaemon {
         required_result(stats, "cache stats should be available")
     }
 
-    pub(crate) fn join(self) {
-        assert!(
-            self.join_handle.join().is_ok(),
-            "daemon thread should not panic"
+    /// Waits for the daemon thread to finish and asserts all expected requests were served.
+    pub(crate) fn join(mut self) {
+        let join_handle = required_result(
+            self.join_handle.take().ok_or("daemon join handle missing"),
+            "daemon join handle",
         );
+        if let Err(panic_payload) = join_handle.join() {
+            std::panic::resume_unwind(panic_payload);
+        }
+        let _ = self.cache_stats();
     }
 }
 
+/// Writes a card fixture file into `temp_dir` and returns its `file://` URI string.
 pub(crate) fn fixture_uri(temp_dir: &TempDir, case: CardFixtureCase) -> String {
     let path = required_result(
         write_fixture_path(temp_dir, case.file_name, case.source),
@@ -120,6 +143,7 @@ pub(crate) fn fixture_uri(temp_dir: &TempDir, case: CardFixtureCase) -> String {
     required_result(uri, "fixture path to URI").to_string()
 }
 
+/// Executes `weaver observe get-card` via the test daemon and returns a `Transcript`.
 pub(crate) fn run_get_card(daemon: &TestDaemon, request: GetCardRequest<'_>) -> Transcript {
     let command = format!(
         "weaver --daemon-socket tcp://<daemon-endpoint> --output json observe get-card --uri \
@@ -146,6 +170,46 @@ pub(crate) fn run_get_card(daemon: &TestDaemon, request: GetCardRequest<'_>) -> 
     output_to_transcript(command, &output)
 }
 
+/// Executes `weaver observe graph-slice` via the test daemon and returns a `Transcript`.
+pub(crate) fn run_graph_slice(daemon: &TestDaemon, request: GraphSliceRequest<'_>) -> Transcript {
+    let mut command = format!(
+        concat!(
+            "weaver --daemon-socket tcp://<daemon-endpoint> --output json ",
+            "observe graph-slice --uri <uri> --position {}:{} ",
+            "--entry-detail {} --node-detail {}"
+        ),
+        request.line, request.column, request.entry_detail, request.node_detail
+    );
+    let mut cli_args = vec![
+        String::from("--daemon-socket"),
+        daemon.endpoint(),
+        String::from("--output"),
+        String::from("json"),
+        String::from("observe"),
+        String::from("graph-slice"),
+        String::from("--uri"),
+        String::from(request.uri),
+        String::from("--position"),
+        format!("{}:{}", request.line, request.column),
+        String::from("--entry-detail"),
+        String::from(request.entry_detail),
+        String::from("--node-detail"),
+        String::from(request.node_detail),
+    ];
+    if let Some(max_cards) = request.max_cards {
+        command.push_str(" --max-cards ");
+        command.push_str(&max_cards.to_string());
+        cli_args.push(String::from("--max-cards"));
+        cli_args.push(max_cards.to_string());
+    }
+
+    let output = required_result(
+        Command::new(weaver_binary_path()).args(&cli_args).output(),
+        "CLI should execute",
+    );
+    output_to_transcript(command, &output)
+}
+/// Asserts an insta snapshot stored under `tests/snapshots/<name>.snap`.
 pub(crate) fn assert_named_snapshot(name: &str, content: &str) {
     let mut settings = insta::Settings::clone_current();
     settings.set_snapshot_path(Path::new(concat!(
@@ -277,3 +341,10 @@ fn required_result<T, E: std::fmt::Display>(result: Result<T, E>, context: &str)
         Err(error) => panic!("{context}: {error}"),
     }
 }
+
+const _: usize = std::mem::size_of::<CacheTranscript>();
+const _: usize = std::mem::size_of::<GetCardRequest<'static>>();
+const _: usize = std::mem::size_of::<GraphSliceRequest<'static>>();
+const _: fn(&TestDaemon, GetCardRequest<'static>) -> Transcript = run_get_card;
+const _: fn(&TestDaemon, GraphSliceRequest<'static>) -> Transcript = run_graph_slice;
+const _: fn(&str, &str) = assert_named_snapshot;

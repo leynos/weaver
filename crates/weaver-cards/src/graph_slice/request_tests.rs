@@ -132,6 +132,11 @@ fn normalizes_edge_types(#[case] input: &str, #[case] expected: &[SliceEdgeType]
       "--depth", "abc"],
     "non-negative integer"
 )]
+#[case::zero_max_cards(
+    &["--uri", "file:///main.rs", "--position", "1:1",
+      "--max-cards", "0"],
+    "--max-cards must be >= 1"
+)]
 #[case::bad_direction(
     &["--uri", "file:///main.rs", "--position", "1:1",
       "--direction", "left"],

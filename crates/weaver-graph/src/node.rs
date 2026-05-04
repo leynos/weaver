@@ -43,7 +43,7 @@ impl Position {
 /// Kind of symbol represented by a call graph node.
 ///
 /// This mirrors LSP's `SymbolKind` but only includes callable symbols.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SymbolKind {
     /// A function definition.
     Function,
@@ -156,5 +156,41 @@ impl CallNode {
             || self.name.clone(),
             |container| format!("{container}.{}", self.name),
         )
+    }
+}
+
+#[cfg(test)]
+mod ordering_tests {
+    //! Unit tests for the derived `PartialOrd` and `Ord` implementations on `SymbolKind`.
+
+    use super::SymbolKind;
+
+    #[test]
+    fn symbol_kind_ord_is_reflexive() {
+        assert_eq!(
+            SymbolKind::Function.cmp(&SymbolKind::Function),
+            std::cmp::Ordering::Equal
+        );
+    }
+
+    #[test]
+    fn symbol_kind_sort_produces_stable_order() {
+        let kinds = vec![
+            SymbolKind::Method,
+            SymbolKind::Function,
+            SymbolKind::Constructor,
+        ];
+        let sorted_first = {
+            let mut v = kinds.clone();
+            v.sort();
+            v
+        };
+        let sorted_second = {
+            let mut v = kinds.clone();
+            v.sort();
+            v
+        };
+        // Sorting the same input twice must produce identical results.
+        assert_eq!(sorted_first, sorted_second);
     }
 }

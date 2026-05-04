@@ -4,6 +4,7 @@ expression: json
 ---
 {
   "status": "refusal",
+  "schema_version": "graph_slice.v1",
   "refusal": {
     "reason": "position_out_of_range",
     "message": "position is outside the file bounds"

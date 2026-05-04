@@ -247,7 +247,16 @@ impl RequestBuilder {
     where
         I: Iterator<Item = &'a String>,
     {
-        self.apply_u32_budget_flag(iter, Flag::MaxCards, SliceBudget::with_max_cards)
+        let raw = require_arg_value(iter, Flag::MaxCards)?;
+        let value = parse_u32(raw)?;
+        if value == 0 {
+            return Err(GraphSliceError::InvalidValue {
+                flag: Flag::MaxCards.into(),
+                message: String::from("--max-cards must be >= 1"),
+            });
+        }
+        self.budget = self.budget.with_max_cards(value);
+        Ok(())
     }
 
     fn apply_max_edges_flag<'a, I>(&mut self, iter: &mut I) -> Result<(), GraphSliceError>

@@ -140,16 +140,19 @@ structure and rejects malformed input with structured error messages. Domain
 routing supports `observe`, `act`, and `verify` commands. Unknown domains or
 operations return structured errors with exit status 1.
 
-The `observe get-definition` and `observe get-card` operations are fully
-implemented. `get-definition` accepts `--uri` and `--position`, infers the
-language from the file extension, initializes the appropriate language server,
-and returns definition locations as JSON. `get-card` accepts the same location
-arguments plus `--detail`, reads the target file locally, and returns a
-Tree-sitter-backed symbol card for supported Rust, Python, and TypeScript
-files. Missing or malformed arguments return structured error messages with
-exit status 1. Other operations within the `observe`, `act`, and `verify`
-domains still return "not yet implemented" responses while backend wiring is
-being completed.
+The `observe get-definition`, `observe get-card`, and `observe graph-slice`
+operations are fully implemented. `get-definition` accepts `--uri` and
+`--position`, infers the language from the file extension, initializes the
+appropriate language server, and returns definition locations as JSON.
+`get-card` accepts the same location arguments plus `--detail`, reads the
+target file locally, and returns a Tree-sitter-backed symbol card for supported
+Rust, Python, and TypeScript files. `graph-slice` accepts the same location
+arguments plus traversal, detail, and budget options, and returns a stable
+same-file graph-slice envelope. Missing or malformed arguments return
+structured error messages with exit status 1. Operations outside the
+implemented `observe` subcommands, and outside the implemented `act` and
+`verify` flows, may return "not yet implemented" responses while backend wiring
+is being completed.
 
 The health snapshot is a single-line JSON document describing the current
 state, enabling operators and automation to poll readiness without speaking the
@@ -315,6 +318,7 @@ Domains and operations:
   observe — Query code structure and relationships
     get-definition    find-references    grep
     diagnostics       call-hierarchy    get-card
+    graph-slice
 
   act — Perform code modifications
     rename-symbol     apply-edits        apply-patch
@@ -326,6 +330,12 @@ Domains and operations:
 
 This catalogue is built into the binary and does not require a running daemon
 or configuration file.
+
+The graph-slice operation uses this syntax:
+
+```sh
+weaver observe graph-slice --uri <URI> --position <LINE:COL> [OPTIONS]
+```
 
 `weaver daemon start --help` exposes the same six configuration flags in its
 own `Options:` section. As with the top-level command, the help surface is
@@ -350,9 +360,16 @@ Available operations:
   diagnostics
   call-hierarchy
   get-card
+  graph-slice
 
 Next command:
   weaver observe get-definition --help
+```
+
+The listed `graph-slice` operation accepts:
+
+```sh
+weaver observe graph-slice --uri <URI> --position <LINE:COL> [OPTIONS]
 ```
 
 Unknown domains list the canonical domains instead of printing the operation
@@ -402,9 +419,16 @@ Available operations:
   diagnostics
   call-hierarchy
   get-card
+  graph-slice
 
 Next command:
   weaver observe get-definition --help
+```
+
+The `graph-slice` alternative in this list maps to:
+
+```sh
+weaver observe graph-slice --uri <URI> --position <LINE:COL> [OPTIONS]
 ```
 
 JSON output forwards the daemon payload unchanged:
@@ -422,7 +446,8 @@ JSON output forwards the daemon payload unchanged:
       "grep",
       "diagnostics",
       "call-hierarchy",
-      "get-card"
+      "get-card",
+      "graph-slice"
     ]
   }
 }
@@ -518,6 +543,7 @@ operations:
 
 - `observe.get-definition`
 - `observe.get-card-hover`
+- `observe.graph-slice`
 - `observe.find-references`
 - `observe.call-hierarchy`
 - `verify.diagnostics`
@@ -808,9 +834,10 @@ When the operation cannot produce a slice, the status is `"refusal"`:
 ```json
 {
   "status": "refusal",
+  "schema_version": "graph_slice.v1",
   "refusal": {
-    "reason": "not_yet_implemented",
-    "message": "observe graph-slice: graph-slice traversal is not yet implemented"
+    "reason": "unsupported_language",
+    "message": "observe graph-slice: unsupported language for 'notes.txt'"
   }
 }
 ```
@@ -821,6 +848,7 @@ spillover metadata:
 ```json
 {
   "status": "success",
+  "schema_version": "graph_slice.v1",
   "slice_version": 1,
   "entry": { "symbol_id": "sym_abc123" },
   "constraints": {
@@ -859,27 +887,7 @@ spillover metadata:
       }
     }
   ],
-  "edges": [
-    {
-      "edge_version": 1,
-      "type": "call",
-      "from": "sym_abc123",
-      "to": "sym_def456",
-      "confidence": 0.92,
-      "direction": "out",
-      "resolution_scope": "full_symbol_table",
-      "provenance": {
-        "source": "lsp_call_hierarchy",
-        "details": {
-          "call_site": {
-            "uri": "file:///src/main.rs",
-            "line": 15,
-            "column": 8
-          }
-        }
-      }
-    }
-  ],
+  "edges": [],
   "spillover": {
     "truncated": false,
     "frontier": []
@@ -889,16 +897,26 @@ spillover metadata:
 
 The `constraints` object reflects the applied request parameters after defaults
 are resolved. The `cards` array contains the extracted symbol cards within the
-budget. The `edges` array describes the relationships between cards. Each edge
-carries a `resolution_scope` that is either `full_symbol_table`,
-`partial_symbol_table`, or `lsp`, indicating how the target was resolved.
+budget. For roadmap item 7.2.1, Weaver builds a deterministic same-file slice:
+the entry card plus additional same-file symbol cards that fit within
+`budget.max_cards`. The `edges` array is therefore currently empty in runtime
+responses, while the stable schema already reserves the typed edge shape for
+later milestones. The `--max-edges` CLI flag is accepted for forward
+compatibility but has no runtime effect in 7.2.1; only `budget.max_cards`
+limits the number of cards produced.
 
-When the traversal exceeds the budget, `spillover.truncated` is `true` and
-`spillover.frontier` lists candidate nodes that were reached but excluded.
+When traversal exceeds the budget, `spillover.truncated` is `true` and
+`spillover.frontier` lists candidate same-file symbols that were discovered but
+excluded. `spillover.truncated` may also be `true` while `spillover.frontier`
+is empty when the discovery cap, rather than excluded cards, caused truncation.
+The `discovery_cap_marks_spillover_truncated_when_card_budget_remains` test is
+the canonical behaviour: `spillover.frontier` is populated only for discovered
+candidate symbols excluded from the response, not for symbols that discovery
+limits prevented Weaver from enumerating.
 
-Note: `observe graph-slice` is not yet fully implemented. The daemon currently
-returns a structured `not_yet_implemented` refusal. The request parsing, schema
-types, and response contract are stable and locked by snapshot tests.
+The stable edge schema is already locked even though runtime edges are deferred
+to later milestones. When present, every edge will carry a `resolution_scope`
+of `full_symbol_table`, `partial_symbol_table`, or `lsp`.
 
 #### observe grep
 

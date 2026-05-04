@@ -1,0 +1,9 @@
+---
+source: crates/weaver-e2e/tests/test_support/mod.rs
+---
+{
+  "command": "weaver --daemon-socket tcp://<daemon-endpoint> --output json observe graph-slice --uri <uri> --position 10000:1 --entry-detail semantic --node-detail semantic",
+  "status": 12,
+  "stdout": "{\n  \"refusal\": {\n    \"message\": \"observe graph-slice: position 10000:1 is outside the bounds of the file\",\n    \"reason\": \"position_out_of_range\"\n  },\n  \"schema_version\": \"graph_slice.v1\",\n  \"status\": \"refusal\"\n}",
+  "stderr": ""
+}
