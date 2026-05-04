@@ -348,9 +348,53 @@ fn required_result<T, E: std::fmt::Display>(result: Result<T, E>, context: &str)
     }
 }
 
-const _: fn(&str, &str) = assert_named_snapshot;
-const _: fn(&str, &str) = assert_named_snapshot;
-const _: fn(&str, &str) = assert_named_snapshot;
-const _: fn(&str, &str) = assert_named_snapshot;
-const _: fn(&str, &str) = assert_named_snapshot;
-const _: fn(&str, &str) = assert_named_snapshot;
+#[cfg(test)]
+mod test_support_type_usage {
+    //! Ensures support helpers are referenced in compilation for strict lint profiles.
+    use super::*;
+
+    #[test]
+    fn test_build_reference_support_items() {
+        let cache_transcript = CacheTranscript {
+            first: Transcript {
+                command: String::from("<command>"),
+                status: 0,
+                stdout: String::new(),
+                stderr: String::new(),
+            },
+            second: Transcript {
+                command: String::from("<command>"),
+                status: 0,
+                stdout: String::new(),
+                stderr: String::new(),
+            },
+            cache_hits: 0,
+            cache_misses: 0,
+        };
+        let get_card_request = GetCardRequest {
+            uri: "file:///tmp/example",
+            line: 0,
+            column: 0,
+            detail: "semantic",
+        };
+        let graph_slice_request = GraphSliceRequest {
+            uri: "file:///tmp/example",
+            line: 0,
+            column: 0,
+            entry_detail: "semantic",
+            node_detail: "semantic",
+            max_cards: None,
+        };
+        let run_get_card_fn: for<'a> fn(&'a TestDaemon, GetCardRequest<'a>) -> Transcript =
+            run_get_card;
+        let run_graph_slice_fn: for<'a> fn(&'a TestDaemon, GraphSliceRequest<'a>) -> Transcript =
+            run_graph_slice;
+        let _ = (
+            cache_transcript,
+            get_card_request,
+            graph_slice_request,
+            run_get_card_fn,
+            run_graph_slice_fn,
+        );
+    }
+}
