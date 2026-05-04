@@ -46,6 +46,21 @@ impl StructuredEventMetadata {
         self.max_size = Some(max_size);
         self
     }
+
+    pub(super) fn extend_payload(&self, payload: &mut serde_json::Map<String, serde_json::Value>) {
+        if let Some(domain) = &self.domain {
+            payload.insert("domain".into(), json!(domain));
+        }
+        if let Some(operation) = &self.operation {
+            payload.insert("operation".into(), json!(operation));
+        }
+        if let Some(size) = self.size {
+            payload.insert("size".into(), json!(size));
+        }
+        if let Some(max_size) = self.max_size {
+            payload.insert("max_size".into(), json!(max_size));
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -131,32 +146,18 @@ pub(super) fn serialize_structured_event(event: &StructuredDispatchEvent) -> Val
         ),
     );
 
-    if let Some(domain) = &event.metadata.domain {
-        payload.insert("domain".into(), json!(domain));
-    }
-    if let Some(operation) = &event.metadata.operation {
-        payload.insert("operation".into(), json!(operation));
-    }
-    if let Some(size) = event.metadata.size {
-        payload.insert("size".into(), json!(size));
-    }
-    if let Some(max_size) = event.metadata.max_size {
-        payload.insert("max_size".into(), json!(max_size));
-    }
-    if let Some(redacted) = redacted(&event.patch) {
-        payload.insert("patch".into(), redacted);
-    }
-    if let Some(redacted) = redacted(&event.body) {
-        payload.insert("body".into(), redacted);
-    }
-    if let Some(redacted) = redacted(&event.source) {
-        payload.insert("source".into(), redacted);
-    }
-    if let Some(redacted) = redacted(&event.env) {
-        payload.insert("env".into(), redacted);
-    }
-    if let Some(redacted) = redacted(&event.full_payload) {
-        payload.insert("fullPayload".into(), redacted);
+    event.metadata.extend_payload(&mut payload);
+    let redacted_fields: &[(&str, &Option<String>)] = &[
+        ("patch", &event.patch),
+        ("body", &event.body),
+        ("source", &event.source),
+        ("env", &event.env),
+        ("fullPayload", &event.full_payload),
+    ];
+    for (key, value) in redacted_fields {
+        if let Some(redacted) = redacted(value) {
+            payload.insert((*key).into(), redacted);
+        }
     }
 
     Value::Object(payload)
