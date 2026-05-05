@@ -238,7 +238,12 @@ impl DispatchConnectionHandler {
             true,
         );
         tracing::warn!(target: DISPATCH_TARGET, %error, "request dispatch failed");
-        self.write_dispatch_error_to_writer(context, writer, &error);
+        self.write_error_response(
+            context,
+            writer,
+            &error,
+            "failed to write dispatch error response",
+        );
     }
 
     fn write_route_error<W: std::io::Write>(
@@ -253,15 +258,25 @@ impl DispatchConnectionHandler {
             true,
         );
         tracing::warn!(target: DISPATCH_TARGET, %error, "dispatch infrastructure error");
-        self.write_infra_error_to_writer(context, writer, &error);
+        self.write_error_response(
+            context,
+            writer,
+            &error,
+            "failed to write infrastructure error response",
+        );
         self.write_exit_status(context, error.exit_status(), writer);
     }
 
-    fn write_dispatch_error_to_writer<W: std::io::Write>(
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "keeps the shared write path explicit at both semantic call sites"
+    )]
+    fn write_error_response<W: std::io::Write>(
         &self,
         context: &RouteContext<'_>,
         writer: &mut ResponseWriter<W>,
         response_error: &DispatchError,
+        failure_message: &str,
     ) {
         if let Err(transport_error) = writer.write_error(response_error) {
             tracing::warn!(
@@ -272,27 +287,7 @@ impl DispatchConnectionHandler {
                 request_size = context.request_size,
                 response_error = %response_error,
                 transport_error = %transport_error,
-                "failed to write dispatch error response"
-            );
-        }
-    }
-
-    fn write_infra_error_to_writer<W: std::io::Write>(
-        &self,
-        context: &RouteContext<'_>,
-        writer: &mut ResponseWriter<W>,
-        response_error: &DispatchError,
-    ) {
-        if let Err(transport_error) = writer.write_error(response_error) {
-            tracing::warn!(
-                target: DISPATCH_TARGET,
-                endpoint = %self.endpoint,
-                domain = context.request.domain(),
-                operation = context.request.operation(),
-                request_size = context.request_size,
-                response_error = %response_error,
-                transport_error = %transport_error,
-                "failed to write infrastructure error response"
+                "{}", failure_message
             );
         }
     }
