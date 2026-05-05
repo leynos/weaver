@@ -99,15 +99,6 @@ impl DispatchConnectionHandler {
         self.route_request(request, request_bytes.len(), &mut writer);
     }
 
-    fn emit_structured_dispatch_event(
-        &self,
-        event: &StructuredDispatchEvent,
-        message: &str,
-        is_error: bool,
-    ) {
-        emit_structured_event(event, message, is_error);
-    }
-
     fn read_request(
         &self,
         stream: &mut ConnectionStream,
@@ -123,7 +114,7 @@ impl DispatchConnectionHandler {
             }
             Err(error) => {
                 let event = read_error_event(&error, &self.endpoint, self.runtime_dir.as_path());
-                self.emit_structured_dispatch_event(&event, read_error_message(&error), true);
+                emit_structured_event(&event, read_error_message(&error), true);
                 tracing::warn!(target: DISPATCH_TARGET, %error, "failed to read request");
                 return Err(ReadRequestError::BadRequest(error));
             }
@@ -138,11 +129,7 @@ impl DispatchConnectionHandler {
                     self.runtime_dir.as_path(),
                     StructuredEventMetadata::none().with_size(request_bytes.len()),
                 );
-                self.emit_structured_dispatch_event(
-                    &event,
-                    "request rejected: malformed JSON",
-                    true,
-                );
+                emit_structured_event(&event, "request rejected: malformed JSON", true);
                 tracing::warn!(target: DISPATCH_TARGET, %error, "malformed request");
                 return Err(ReadRequestError::BadRequest(error));
             }
@@ -156,7 +143,7 @@ impl DispatchConnectionHandler {
                 StructuredEventMetadata::new(request.domain(), request.operation())
                     .with_size(request_bytes.len()),
             );
-            self.emit_structured_dispatch_event(&event, "request rejected: invalid request", true);
+            emit_structured_event(&event, "request rejected: invalid request", true);
             tracing::warn!(target: DISPATCH_TARGET, %error, "invalid request");
             return Err(ReadRequestError::BadRequest(error));
         }
