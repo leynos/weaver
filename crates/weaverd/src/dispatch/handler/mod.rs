@@ -171,12 +171,7 @@ impl DispatchConnectionHandler {
                     true,
                 );
                 tracing::warn!(target: DISPATCH_TARGET, %error, "request dispatch failed");
-                self.write_error_response(
-                    &context,
-                    writer,
-                    &error,
-                    "failed to write dispatch error response",
-                );
+                self.write_error_response(&context, writer, &error);
             }
             Err(error) => {
                 emit_structured_event(
@@ -185,12 +180,7 @@ impl DispatchConnectionHandler {
                     true,
                 );
                 tracing::warn!(target: DISPATCH_TARGET, %error, "dispatch infrastructure error");
-                self.write_error_response(
-                    &context,
-                    writer,
-                    &error,
-                    "failed to write infrastructure error response",
-                );
+                self.write_error_response(&context, writer, &error);
                 self.write_exit_status(&context, error.exit_status(), writer);
             }
         }
@@ -236,16 +226,11 @@ impl DispatchConnectionHandler {
         }
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "keeps the shared write path explicit at both semantic call sites"
-    )]
     fn write_error_response<W: std::io::Write>(
         &self,
         context: &RouteContext<'_>,
         writer: &mut ResponseWriter<W>,
         response_error: &DispatchError,
-        failure_message: &str,
     ) {
         if let Err(transport_error) = writer.write_error(response_error) {
             tracing::warn!(
@@ -256,7 +241,7 @@ impl DispatchConnectionHandler {
                 request_size = context.request_size,
                 response_error = %response_error,
                 transport_error = %transport_error,
-                "{}", failure_message
+                "failed to write error response"
             );
         }
     }
