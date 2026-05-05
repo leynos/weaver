@@ -160,15 +160,38 @@ impl DispatchConnectionHandler {
         let route_result = self
             .backends
             .with_backends(|backends| self.router.route(&request, writer, backends));
-        let request_context = Self::request_context(&request, request_size);
+        let context = Self::request_context(&request, request_size);
 
         match route_result {
-            Ok(Ok(result)) => self.write_exit_status(&request_context, result.status, writer),
+            Ok(Ok(result)) => self.write_exit_status(&context, result.status, writer),
             Ok(Err(error)) => {
-                self.write_dispatch_error(&request_context, writer, error);
+                emit_structured_event(
+                    &self.with_metadata(&context, "dispatch_failed"),
+                    "request dispatch failed",
+                    true,
+                );
+                tracing::warn!(target: DISPATCH_TARGET, %error, "request dispatch failed");
+                self.write_error_response(
+                    &context,
+                    writer,
+                    &error,
+                    "failed to write dispatch error response",
+                );
             }
             Err(error) => {
-                self.write_route_error(&request_context, writer, error);
+                emit_structured_event(
+                    &self.with_metadata(&context, "dispatch_infra_error"),
+                    "dispatch infrastructure error",
+                    true,
+                );
+                tracing::warn!(target: DISPATCH_TARGET, %error, "dispatch infrastructure error");
+                self.write_error_response(
+                    &context,
+                    writer,
+                    &error,
+                    "failed to write infrastructure error response",
+                );
+                self.write_exit_status(&context, error.exit_status(), writer);
             }
         }
     }
@@ -211,47 +234,6 @@ impl DispatchConnectionHandler {
                 "failed to write exit"
             );
         }
-    }
-
-    fn write_dispatch_error<W: std::io::Write>(
-        &self,
-        context: &RouteContext<'_>,
-        writer: &mut ResponseWriter<W>,
-        error: DispatchError,
-    ) {
-        emit_structured_event(
-            &self.with_metadata(context, "dispatch_failed"),
-            "request dispatch failed",
-            true,
-        );
-        tracing::warn!(target: DISPATCH_TARGET, %error, "request dispatch failed");
-        self.write_error_response(
-            context,
-            writer,
-            &error,
-            "failed to write dispatch error response",
-        );
-    }
-
-    fn write_route_error<W: std::io::Write>(
-        &self,
-        context: &RouteContext<'_>,
-        writer: &mut ResponseWriter<W>,
-        error: DispatchError,
-    ) {
-        emit_structured_event(
-            &self.with_metadata(context, "dispatch_infra_error"),
-            "dispatch infrastructure error",
-            true,
-        );
-        tracing::warn!(target: DISPATCH_TARGET, %error, "dispatch infrastructure error");
-        self.write_error_response(
-            context,
-            writer,
-            &error,
-            "failed to write infrastructure error response",
-        );
-        self.write_exit_status(context, error.exit_status(), writer);
     }
 
     #[expect(
