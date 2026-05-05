@@ -109,7 +109,7 @@ where
     let config = loader.load()?;
     config.daemon_socket().prepare_filesystem()?;
     let runtime_paths = RuntimePaths::from_config(&config)?;
-    let mut guard = ProcessGuard::acquire(runtime_paths.clone())?;
+    let mut guard = ProcessGuard::acquire(runtime_paths)?;
     let workspace_root =
         env::current_dir().map_err(|source| LaunchError::WorkspaceRoot { source })?;
     if matches!(mode, LaunchMode::Background) {
@@ -134,7 +134,7 @@ where
             backend_manager,
             workspace_root,
             config.daemon_socket().to_string(),
-            runtime_paths.runtime_dir().to_path_buf(),
+            guard.paths().runtime_dir().to_path_buf(),
         )
         .map_err(|error| LaunchError::WorkspaceRoot {
             source: io::Error::new(io::ErrorKind::InvalidInput, error.to_string()),
