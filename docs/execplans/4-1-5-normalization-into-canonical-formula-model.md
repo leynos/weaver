@@ -573,12 +573,10 @@ Formula::And([
 
 ## Interfaces and dependencies
 
-
 ## Practice documentation
 
 The following project guidance documents are relevant to this milestone.
 Implementors should consult them for conventions, patterns, and constraints.
-
 
 ### Testing
 
@@ -601,7 +599,6 @@ Implementors should consult them for conventions, patterns, and constraints.
   setup lines, and `no_run` annotations. All new public types and
   functions require Rustdoc examples.
 
-
 ### Design and architecture
 
 - [docs/sempai-query-language-design.md](../sempai-query-language-design.md)
@@ -619,7 +616,6 @@ Implementors should consult them for conventions, patterns, and constraints.
   — legacy-to-v2 equivalence table. Paired test fixtures should
   mirror the equivalences documented here.
 
-
 ### Code quality
 
 - [docs/complexity-antipatterns-and-refactoring-strategies.md](../complexity-antipatterns-and-refactoring-strategies.md)
@@ -630,7 +626,6 @@ Implementors should consult them for conventions, patterns, and constraints.
 - [AGENTS.md](../../AGENTS.md) — code style, 400-line file limit,
   en-GB spelling, commit gating (`make check-fmt`, `make lint`,
   `make test`), module-level `//!` comments, and Rustdoc requirements.
-
 
 ### Configuration
 
