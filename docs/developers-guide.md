@@ -11,9 +11,9 @@ The workspace targets `ortho_config` v0.8.0 and Rust 1.88.
 
 ## Sempai overview
 
-Sempai is Weaver's Semgrep-compatible query engine facade. It parses rule
-YAML, normalizes supported search syntax into a canonical formula model, and
-prepares per-language query plans for later execution.
+Sempai is Weaver's Semgrep-compatible query engine facade. It parses rule YAML,
+normalizes supported search syntax into a canonical formula model, and prepares
+per-language query plans for later execution.
 
 ## Sempai query pipeline (milestone 4.1.5)
 
@@ -826,7 +826,9 @@ of `act refactor`. It is a non-test module consumed by both the
 argument-parsing layer and the test suite to keep validation, guidance text,
 and supported-value lists in one place.
 
-The module exposes seven `pub(crate)` functions:
+The module exposes seven `pub(crate)` functions. The exact signatures live in
+Rustdoc; this section records each helper's contract so the Markdown remains
+readable after automated wrapping:
 
 - `supported_provider_names() -> &'static [&'static str]` — returns the
   canonical slice of accepted provider names (e.g. `rope`, `rust-analyzer`),
@@ -844,19 +846,16 @@ The module exposes seven `pub(crate)` functions:
   and returns `DispatchError::InvalidArguments` with
   `act refactor does not support refactoring '<value>'` plus the shared
   guidance block when `refactoring` is not in `supported_refactoring_names()`.
-- `effective_operation(refactoring: &str) -> Result<&'static str,
-  DispatchError>` — maps a user-facing refactoring name to the underlying
-  plugin capability operation string (`"rename"` → `"rename-symbol"`),
-  returning the same unsupported-refactoring
+- `effective_operation(...)` — maps a user-facing refactoring name to the
+  underlying plugin capability operation string (`"rename"` →
+  `"rename-symbol"`), returning the same unsupported-refactoring
   `DispatchError::InvalidArguments` as `validate_refactoring(…)` for unknown
   user-facing names.
-- `capability_for_operation(operation: &str) -> Result<CapabilityId,
-  DispatchError>` — maps a capability operation string to its
-  `CapabilityId` variant (`"rename-symbol"` →
-  `CapabilityId::RenameSymbol`), returning
-  `DispatchError::InvalidArguments` with `act refactor does not support
-  capability resolution for '<operation>'` and the supported
-  capability-operation tokens for unknown operations.
+- `capability_for_operation(...)` — maps a capability operation string to its
+  `CapabilityId` variant (`"rename-symbol"` → `CapabilityId::RenameSymbol`),
+  returning `DispatchError::InvalidArguments` with
+  `act refactor does not support capability resolution for '<operation>'` and
+  the supported capability-operation tokens for unknown operations.
 - `missing_requirements_error() -> DispatchError` — builds the deterministic
   `DispatchError::InvalidArguments` with `act refactor requires ...`, every
   required flag (`--provider <plugin>`, `--refactoring <operation>`,
