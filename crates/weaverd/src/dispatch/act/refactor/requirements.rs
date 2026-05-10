@@ -205,6 +205,7 @@ mod tests {
             "--provider <plugin>",
             "--refactoring <operation>",
             "--file <path>",
+            "--position <line:col>",
         ] {
             assert!(
                 message.contains(required),

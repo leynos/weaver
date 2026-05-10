@@ -769,7 +769,8 @@ produce capability-resolution payloads:
 
 - `request_arguments(&serde_json::Value)` — extracts the daemon request's flat
   CLI-style argument vector, for example a list containing `--refactoring`,
-  `rename`, `--file`, `src/main.py`, `new_name=renamed_symbol`, and `offset=4`.
+  `rename`, `--file`, `src/main.py`, `--position`, `1:5`, and
+  `new_name=renamed_symbol`.
 - `argument_value(arguments, "--file")` — returns the value paired with a flag
   from that flat argument vector, normalizing access to values such as
   `Some("src/main.py")`.

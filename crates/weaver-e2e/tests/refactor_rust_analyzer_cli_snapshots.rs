@@ -57,9 +57,10 @@ fn run_refactor_snapshot(snapshot_name: &str, display_command: &str, extra_args:
 #[case(
     "refactor_automatic_rust_routing",
     "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
-     --refactoring rename --file src/main.rs --position 1:4 new_name=renamed_name",
+     --provider rust-analyzer --refactoring rename --file src/main.rs --position 1:4 new_name=renamed_name",
     &[
         "act", "refactor",
+        "--provider", "rust-analyzer",
         "--refactoring", "rename",
         "--file", "src/main.rs",
         "--position", "1:4",

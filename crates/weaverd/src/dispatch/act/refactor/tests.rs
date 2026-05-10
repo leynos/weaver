@@ -300,6 +300,8 @@ fn handle_returns_error_for_unsupported_refactoring(socket_dir: TempDir) {
         String::from("extract-method"),
         String::from("--file"),
         String::from("notes.py"),
+        String::from("--position"),
+        String::from("1:1"),
     ]);
     let socket_path = socket_dir.path().join("socket.sock");
     let mut backends = build_backends(&socket_path);
