@@ -101,6 +101,29 @@ per-language query plans for later execution.
     per-language `QueryPlan`
   - `QueryPlan::formula()` exposure for tests and integration
 
+## Sempai query pipeline (prototype archive milestone 4.1.5)
+
+- Canonical model (`sempai_core::formula`):
+  - `Formula` enum: `Atom`, `Not`, `Inside`, `Anywhere`, `And`, `Or`
+  - `Atom` enum: `Pattern`, `Regex`, `TreeSitterQuery`
+  - `Decorated<T>` wrapper: `where_clauses`, `as_name`, `fix`, `span`
+- Normalization (`crates/sempai/src/normalize.rs`):
+  - Legacy syntax: `pattern*`, `patterns`, `pattern-either`,
+    `pattern-not`, `pattern-not-inside`, `pattern-not-regex`, and
+    `semgrep-internal-pattern-anywhere`
+  - v2 `match` syntax: `pattern`, `regex`, `all`, `any`, `not`, `inside`,
+    `anywhere`, and decorated metadata propagation
+  - Special handling: `r2c-internal-project-depends-on` lowers to
+    `(__NONEXISTENT_NODE__) @_dependency_check`
+- Semantic validation (`crates/sempai/src/semantic_check.rs`):
+  - `InvalidNotInOr`
+  - `MissingPositiveTermInAnd`
+  - Span precedence rules: node span -> first child -> fallback
+- Engine wiring (`crates/sempai/src/engine.rs`):
+  - Parse -> validate modes -> normalize -> validate semantics -> compile
+    per-language `QueryPlan`
+  - `QueryPlan::formula()` exposure for tests and integration
+
 ## Configuration framework internals
 
 ### `ortho_config` v0.8.0 integration
@@ -552,6 +575,8 @@ catalogue. `GraphSliceFixtureCase` is a type alias for `CardFixtureCase`.
 
 ## Public API additions in prototype archive milestone 7.2.1
 
+## Public API additions in prototype archive milestone 7.2.1
+
 ### `handle` signature — `FusionBackends` parameter
 
 `handle(request, writer, backends)` now accepts
@@ -794,7 +819,8 @@ produce capability-resolution payloads:
 
 - `request_arguments(&serde_json::Value)` — extracts the daemon request's flat
   CLI-style argument vector, for example a list containing `--refactoring`,
-  `rename`, `--file`, `src/main.py`, `new_name=renamed_symbol`, and `offset=4`.
+  `rename`, `--file`, `src/main.py`, `--position`, `1:5`, and
+  `new_name=renamed_symbol`.
 - `argument_value(arguments, "--file")` — returns the value paired with a flag
   from that flat argument vector, normalizing access to values such as
   `Some("src/main.py")`.

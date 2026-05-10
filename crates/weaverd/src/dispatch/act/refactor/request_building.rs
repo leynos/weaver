@@ -201,10 +201,46 @@ fn apply_rename_symbol_mapping(
         return Ok(());
     }
     if let Some(offset_val) = plugin_args.remove("offset") {
-        plugin_args.insert(String::from("position"), offset_val);
-        return Ok(());
+        if offset_val.is_string() || offset_val.is_number() {
+            plugin_args.insert(String::from("position"), offset_val);
+            return Ok(());
+        }
+
+        return Err(DispatchError::invalid_arguments(
+            "refactor rename deprecated offset= must be a numeric or string byte offset",
+        ));
     }
     Err(DispatchError::invalid_arguments(
         "refactor rename requires --position LINE:COL",
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for request-building internals.
+
+    use serde_json::Value;
+
+    use super::*;
+
+    #[test]
+    fn apply_rename_symbol_mapping_rejects_non_string_or_numeric_offset() {
+        let mut plugin_args = HashMap::from([
+            (String::from("offset"), Value::Bool(false)),
+            (
+                String::from("new_name"),
+                Value::String(String::from("woven")),
+            ),
+        ]);
+        let err =
+            apply_rename_symbol_mapping(&mut plugin_args, Path::new("/tmp"), "hello world", None)
+                .expect_err("offset must be rejected when not numeric");
+
+        assert!(matches!(err, DispatchError::InvalidArguments { .. }));
+        let invalid_arguments = match err {
+            DispatchError::InvalidArguments { message } => message,
+            _ => unreachable!(),
+        };
+        assert!(invalid_arguments.contains("must be a numeric or string byte offset"));
+    }
 }

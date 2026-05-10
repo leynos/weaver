@@ -24,9 +24,8 @@ fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
     let daemon = FakeDaemon::start(1, "renamed_symbol").expect("fake daemon should start");
     let endpoint = daemon.endpoint();
 
-    let provider_fragment = provider
-        .map(|p| format!("--provider {p} "))
-        .unwrap_or_default();
+    let effective_provider = provider.unwrap_or("rope");
+    let provider_fragment = format!("--provider {effective_provider} ");
     let command_string = format!(
         "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
          {provider_fragment}--refactoring rename --file src/main.py --position 1:5 \
@@ -41,10 +40,8 @@ fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
         "act".into(),
         "refactor".into(),
     ];
-    if let Some(p) = provider {
-        args.push("--provider".into());
-        args.push(p.into());
-    }
+    args.push("--provider".into());
+    args.push(effective_provider.into());
     args.extend([
         "--refactoring".into(),
         "rename".into(),
