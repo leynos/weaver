@@ -27,6 +27,11 @@ and see one coherent product direction:
   for humans at a terminal.
 - `--json` gives agents and scripts a stable, non-localized, parseable
   protocol surface.
+- Weaver consumes reusable command-contract, documentation IR, agent-context,
+  policy, profile, delivery, feedback, and execution-ledger contracts from
+  OrthoConfig where that work exists or is already planned. Weaver only owns
+  the application-specific semantic editing, capability routing, provider
+  orchestration, safety, and user-facing resource grammar.
 - Public commands are resource-first and community-consistent, not prototype
   `observe` / `act` / `verify` domains.
 - Capability is the public abstraction. Rope, rust-analyzer, Language Server
@@ -54,6 +59,16 @@ teams a sequenced build plan.
 - Do not expose provider names as the normal user workflow. Users ask Weaver
   for semantic work through resources and capabilities; providers appear in
   provenance, diagnostics, `--verbose` output, policy, and expert overrides.
+- Do not duplicate work already planned in OrthoConfig. The revised Weaver
+  design and roadmap must cite OrthoConfig roadmap tasks as dependencies for
+  reusable command-contract machinery, and must keep Weaver's build tasks
+  scoped to application-specific behaviour.
+- Do not delete existing planned or historically completed Weaver roadmap work
+  just because the UI redesign changes the public grammar. Preserve completed
+  entries as historical foundation, re-home still-relevant planned work under
+  the new command surface, and only remove or supersede items when the redesign
+  makes them irrelevant to future functionality. Any removal must include a
+  short rationale in the roadmap.
 - Keep protocol identifiers stable and non-localized. Localize prose, help,
   human headings, examples, and recovery guidance, but not JSON field names,
   schema versions, error codes, enum values, capability IDs, or exit classes.
@@ -87,6 +102,12 @@ teams a sequenced build plan.
 - Roadmap: if the new roadmap cannot be sequenced so the command-surface reset
   lands before further Sempai, plugin, or graph command growth, stop and
   present the dependency conflict.
+- OrthoConfig: if a planned Weaver task appears to implement generic
+  functionality already assigned to OrthoConfig, stop and convert it into a
+  dependency, temporary adapter, or explicit divergence decision.
+- Roadmap history: if the revised roadmap would delete completed Weaver work,
+  or planned work that remains relevant after the UI redesign, stop and record
+  a preservation, migration, or supersession plan before editing.
 - Dependencies: if executing this documentation plan appears to require a new
   crate or external dependency immediately, stop and separate documentation
   planning from product implementation.
@@ -120,6 +141,18 @@ teams a sequenced build plan.
   Mitigation: keep the first reset phase foundational, then frame later phases
   as vertical slices that deliver usable resource commands end to end.
 
+- Risk: Weaver may duplicate OrthoConfig's planned generic CLI contract work,
+  creating two divergent schema and policy systems. Severity: high. Likelihood:
+  medium. Mitigation: make OrthoConfig task dependencies explicit in ADR 007,
+  `docs/weaver-design.md`, and `docs/roadmap.md`; define only Weaver-owned
+  adapters and semantic capability metadata locally.
+
+- Risk: the roadmap rewrite may erase useful historical or planned Weaver work
+  while replacing the UI grammar. Severity: high. Likelihood: medium.
+  Mitigation: preserve completed work as historical foundation, migrate
+  relevant future work into the new phase structure, and mark superseded work
+  with rationale instead of silently deleting it.
+
 - Risk: `agent-context`, skills, jobs, profiles, delivery, and feedback could
   be documented as isolated conveniences instead of parts of the agent-native
   product shape. Severity: medium. Likelihood: medium. Mitigation: describe
@@ -145,6 +178,12 @@ teams a sequenced build plan.
       documentation contradictions and supporting design material.
 - [x] (2026-05-09) Drafted this ExecPlan.
 - [x] (2026-05-09) Ran the plan-only gates: `make fmt`,
+      `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
+      `make test`.
+- [x] (2026-05-11) Fetched the OrthoConfig roadmap and amended this plan so the
+      Weaver design and roadmap rewrite depends on OrthoConfig tasks rather
+      than duplicating reusable command-contract work.
+- [x] (2026-05-11) Ran the amendment gates: `make fmt`,
       `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
       `make test`.
 - [ ] Obtain explicit approval before executing the planned documentation
@@ -184,6 +223,16 @@ teams a sequenced build plan.
   `docs/developers-guide.md`. The plan-only change includes a narrow wording
   cleanup there so the repository documentation gate can pass.
 
+- Discovery: the active OrthoConfig roadmap already plans reusable
+  agent-native CLI infrastructure for downstream consumers including Weaver:
+  whole-CLI introspection, compact agent-context generation, downstream
+  `context --json` naming, skill manifest validation, vocabulary policy, dual
+  renderer metadata, JSON stream contracts, exit-code metadata, bounded-list
+  metadata, generic capability and provenance metadata, profile contracts,
+  delivery and feedback contracts, and execution-ledger contracts. Weaver's
+  plan must consume or depend on those tasks instead of reimplementing them as
+  local generic framework work.
+
 ## Decision Log
 
 - Decision: treat "scorched earth" as removal of accidental public grammar,
@@ -211,9 +260,12 @@ teams a sequenced build plan.
   Date: 2026-05-09.
 
 - Decision: replace root `--capabilities` with explicit introspection
-  resources. Rationale: `weaver agent-context --json` should describe the full
+  resources. Rationale: the agent-context payload should describe the full
   command and workflow surface, while `weaver capabilities list --json` can
-  describe runtime capability availability. Date: 2026-05-09.
+  describe runtime capability availability. The public context command name
+  should follow OrthoConfig roadmap task 6.2.3, which prefers
+  `<tool> context --json` before first release. Date: 2026-05-09. Updated:
+  2026-05-11.
 
 - Decision: keep capability-based perceptor and actuator plugins as a core
   design pillar. Rationale: the user asked whether this still fits; the answer
@@ -226,6 +278,22 @@ teams a sequenced build plan.
   the task is to encode the final decisions from that conversation into a
   repository plan rather than to perform new web research. Date: 2026-05-09.
 
+- Decision: make OrthoConfig the dependency for reusable command-contract
+  infrastructure and make Weaver the owner of semantic editing behaviour.
+  Rationale: the OrthoConfig roadmap explicitly assigns reusable documentation
+  IR, whole-CLI introspection, agent-context schema, policy linting, renderer
+  metadata, profile, delivery, feedback, and execution ledger contracts to
+  OrthoConfig, while naming Weaver as a downstream consumer. Weaver should not
+  fork that generic machinery unless a dependency is unavailable and an ADR
+  records the temporary adapter or divergence. Date: 2026-05-11.
+
+- Decision: preserve existing Weaver roadmap history during the redesign.
+  Rationale: the user explicitly required that existing planned work and
+  historical completed work not be deleted unless no longer relevant to future
+  functionality after the UI redesign. Completed safety, atomic-edit,
+  capability-routing, card, graph, and help work should be retained as
+  foundation or migrated into the new command grammar. Date: 2026-05-11.
+
 ## Context and orientation
 
 The files most likely to be edited when this plan is approved are:
@@ -234,7 +302,8 @@ The files most likely to be edited when this plan is approved are:
   reset decision.
 - `docs/weaver-design.md`, the primary architecture and product rationale.
 - `docs/roadmap.md`, the implementation sequence that must be reordered around
-  the command-surface reset.
+  the command-surface reset while preserving relevant completed and planned
+  work.
 - `docs/ui-gap-analysis.md`, the gap inventory that should become an
   agent-native and human-friendly audit rather than a historical prototype
   issue list.
@@ -242,7 +311,8 @@ The files most likely to be edited when this plan is approved are:
 - `docs/developers-guide.md`, the contributor-facing contract guidance.
 - `docs/repository-layout.md`, the ownership map for any planned
   command-surface, agent-context, skill, profile, job, delivery, and feedback
-  components.
+  components, including which pieces are OrthoConfig dependencies and which
+  pieces are Weaver-owned adapters.
 - `docs/contents.md`, the documentation index.
 - `README.md`, the public summary that must stop contradicting implemented
   safety and workspace status.
@@ -264,6 +334,20 @@ The current source material to preserve includes these existing decisions:
 - `docs/roadmap.md` already contains completed safety, atomic-edit,
   capability-routing, and card/graph groundwork that should be reused rather
   than redesigned.
+- OrthoConfig roadmap task 5.2.3 records the consumer boundary: OrthoConfig
+  owns reusable command-contract machinery, while Weaver owns semantic code
+  editing and execution.
+- OrthoConfig roadmap tasks 6.1 and 6.2 own recursive subcommand metadata,
+  compact agent-context output, and downstream context-command naming.
+- OrthoConfig roadmap task 6.3 owns reusable skill manifest metadata and
+  validation against real command paths and flags.
+- OrthoConfig roadmap tasks 7.1 and 7.2 own reusable vocabulary policy,
+  behavioural semantics, dual-renderer metadata, JSON mode stream contracts,
+  exit-code metadata, bounded-list metadata, and generic capability/provenance
+  metadata.
+- OrthoConfig roadmap tasks 9.1, 9.2, and 9.3 own reusable profile, delivery,
+  feedback, and execution-ledger contracts. Weaver owns the semantic contents,
+  storage policy choices, and safety integration for those surfaces.
 
 ## Product rationale to encode
 
@@ -305,6 +389,7 @@ weaver graph-slices get --uri file:///src/main.rs --position 10:5
 weaver symbols rename --uri file:///src/main.rs --position 10:5 --new-name run
 weaver symbols move --uri file:///src/main.rs --position 10:5 --to src/runner.rs
 weaver patches apply --file changes.patch --dry-run
+weaver context --json
 weaver jobs list --json
 weaver profiles list --json
 weaver feedback create "the enum error did not list valid values"
@@ -405,10 +490,27 @@ internals ahead of time.
 Create `docs/adr-007-agent-native-command-surface.md`.
 
 The ADR must decide that Weaver's 0.1.0 command surface is generated from one
-schema-backed command contract. That contract feeds CLI parsing, human help,
-localized text, manpage input, shell completions, daemon routing metadata,
-`agent-context`, capability metadata, skill validation, docs snippets, JSON
-schemas, vocabulary linting, and future Model Context Protocol (MCP) wrappers.
+schema-backed command contract. The ADR must state that Weaver depends on
+OrthoConfig for reusable command-contract, documentation IR, agent-context,
+policy, profile, delivery, feedback, and execution-ledger contracts wherever
+the OrthoConfig roadmap provides them. Weaver's local contract layer feeds CLI
+parsing, daemon routing metadata, semantic capability mapping, provider
+selection, safety policy, docs snippets, JSON schemas, and tests for
+Weaver-owned behaviour.
+
+The ADR must include an explicit dependency table:
+
+- OrthoConfig 5.2.3 for downstream consumer boundaries.
+- OrthoConfig 6.1 for recursive command metadata.
+- OrthoConfig 6.2 for compact agent-context output and public
+  `weaver context --json` naming.
+- OrthoConfig 6.3 for skill manifest metadata and validation.
+- OrthoConfig 7.1 for vocabulary policy.
+- OrthoConfig 7.2 for renderer, JSON stream, exit-code, bounded-list, and
+  generic capability/provenance metadata.
+- OrthoConfig 9.1 for profile contracts and redaction metadata.
+- OrthoConfig 9.2 for delivery and feedback contracts.
+- OrthoConfig 9.3 for execution-ledger contracts.
 
 The ADR must explicitly preserve human usability. It should say that the
 default command path is human-readable and localized, while `--json` is the
@@ -427,11 +529,18 @@ The ADR must burn down these prototype surfaces for the 0.1.0 target:
 - unbounded list output,
 - provider-specific public commands.
 
+The ADR must also state that the redesign preserves existing Weaver roadmap
+history. Completed work remains as foundation, relevant planned work is
+migrated under the new public grammar, and removed items must be marked
+superseded with rationale.
+
 Success criteria:
 
 - ADR 007 defines the dual-renderer command contract.
 - ADR 007 defines capability, perceptor, actuator, and provider.
 - ADR 007 links ADR 001, ADR 004, and ADR 006 as supporting decisions.
+- ADR 007 links the OrthoConfig roadmap tasks that Weaver depends on and does
+  not claim ownership of those reusable contracts.
 - ADR 007 contains no compatibility promise for the prototype grammar.
 
 ### Milestone 2: Rewrite the design around the new command contract
@@ -450,17 +559,20 @@ current-state or migration note.
 
 Add a section named `Agent-native command surface`. It must specify:
 
-- `weaver-command-surface` as the planned schema/source-of-truth component,
-  or another clearly named equivalent if maintainers choose differently.
-- The fields captured by the schema: command path, resource, verb, capability
-  ID, mutability class, async class, flags, flag types, enum values, defaults,
-  examples, output schemas, error schemas, profile fields, delivery support,
-  help message IDs, accessibility metadata, and skill references.
-- Generated or validated outputs: clap definitions, router metadata, localized
-  help, manpages, shell completions, docs snippets, `agent-context`, skill
-  manifests, JSON Schema fixtures, vocabulary linting, and tests.
-- The mechanical rule that adding or renaming a command requires one schema
-  change and CI fails on drift.
+- OrthoConfig as the owner of reusable documentation IR, agent-context, policy,
+  renderer, profile, delivery, feedback, and execution-ledger contracts.
+- A Weaver-owned command-surface adapter only for application-specific
+  semantics: resource path, verb, capability ID, mutability class, async class,
+  provider selection policy, safety class, transaction behaviour, examples,
+  output schemas, error schemas, and skill references.
+- Generated or validated outputs: clap definitions, daemon router metadata,
+  localized help, manpages, shell completions, docs snippets, `context --json`
+  agent-context payloads, skill manifests, JSON Schema fixtures, vocabulary
+  linting, and tests.
+- The mechanical rule that adding or renaming a Weaver command requires one
+  application schema or OrthoConfig metadata change, and CI fails on drift.
+- The fallback rule that any local generic command-contract code is temporary
+  unless ADR 007 records why an OrthoConfig dependency cannot satisfy it.
 
 Add sibling sections named `Human renderer contract` and
 `Machine renderer contract`.
@@ -489,16 +601,20 @@ The machine renderer contract must require:
 Add a section named `Structured introspection and skills`. It must define:
 
 ```sh
-weaver agent-context --json
+weaver context --json
 weaver capabilities list --json
 weaver skill-path
 ```
 
-`agent-context` returns CLI version, schema version, commands, flags, enum
-values, output schemas, error taxonomy, installed capabilities, provider
-summaries, profiles, jobs, delivery schemes, feedback state, and skill paths.
-`capabilities list` returns runtime capability availability. `skill-path`
-returns the directory containing workflow `SKILL.md` manifests.
+`context --json` returns the OrthoConfig-shaped agent-context payload: CLI
+version, schema version, commands, flags, enum values, output schemas, error
+taxonomy, installed capabilities, provider summaries, profiles, jobs, delivery
+schemes, feedback state, and skill paths. The design must call out its
+dependency on OrthoConfig 6.2.3 for public command naming and must not add a
+public `agent-context` alias before 0.1.0 unless ADR 007 records the reason.
+`capabilities list` returns Weaver runtime capability availability.
+`skill-path` returns the directory containing workflow `SKILL.md` manifests,
+with validation delegated to OrthoConfig 6.3 where possible.
 
 Add a section named `Agent state and recoverable workflows`. It must define:
 
@@ -512,6 +628,11 @@ Add a section named `Agent state and recoverable workflows`. It must define:
   `built-in defaults < config files < selected profile < environment < flags`,
 - profile secrecy rules that expose names and metadata but not secrets.
 
+This section must explicitly depend on OrthoConfig 9.1 for profile contract and
+redaction metadata, and OrthoConfig 9.3 for reusable execution-ledger metadata.
+Weaver owns the job record contents, workspace safety integration, idempotency
+semantics, storage path choice, and public `jobs` command behaviour.
+
 Add a section named `Two-way I/O`. It must define:
 
 - `--deliver stdout`,
@@ -521,7 +642,12 @@ Add a section named `Two-way I/O`. It must define:
 - `weaver feedback create|list|send`,
 - local JSONL feedback by default,
 - optional upstream feedback only when configured,
-- feedback availability in `agent-context`.
+- feedback availability in the `context --json` agent-context payload.
+
+This section must explicitly depend on OrthoConfig 9.2 for reusable delivery
+target parsing and feedback storage contracts. Weaver owns the semantic
+payloads, safety checks, webhook payload shape, and how delivered artefacts
+relate to code-edit transactions.
 
 Add a section named `Capability-routed perceptors and actuators`. It must
 generalize ADR 001, ADR 004, and ADR 006:
@@ -546,7 +672,36 @@ Success criteria:
 
 Update `docs/roadmap.md` using the roadmap skill conventions. The roadmap
 should keep completed historical entries where useful, but the forward plan
-must be reordered around the reset.
+must be reordered around the reset. The rewrite must not delete existing
+planned work or completed historical work unless the UI redesign makes that
+work irrelevant to future functionality. When work is superseded, the roadmap
+must say what superseded it and why.
+
+Before adding new Weaver tasks, add a dependency section named something like:
+
+```plaintext
+External reusable CLI-contract dependencies
+```
+
+That section must cite the OrthoConfig roadmap tasks Weaver depends on:
+
+- 5.2.3 for the Weaver/Netsuke downstream boundary.
+- 6.1 for recursive subcommand metadata.
+- 6.2.1 and 6.2.2 for compact agent-context generation and schema stability.
+- 6.2.3 for the public `weaver context --json` naming convention.
+- 6.3 for skill manifest metadata and validation.
+- 7.1 for canonical vocabulary policy.
+- 7.2.1 through 7.2.7 for non-interactive, mutation, renderer, JSON stream,
+  exit-code, bounded-list, and capability/provenance metadata.
+- 8.1 for the `cargo-orthohelp` reference CLI proving `--json` and
+  enumerating errors.
+- 9.1 for profile contracts and redaction metadata.
+- 9.2 for delivery and feedback contracts.
+- 9.3 for execution-ledger contracts.
+
+Each dependent Weaver task must say whether it is blocked by the OrthoConfig
+task, can proceed with a local adapter, or can proceed because the OrthoConfig
+contract is only needed for later validation.
 
 The first new forward phase should be foundational:
 
@@ -565,20 +720,26 @@ surface instead of repeatedly redesigning command grammar.
 This phase must contain review-sized tasks for:
 
 - ADR 007 acceptance,
-- `weaver-command-surface` schema design,
-- vocabulary linting,
+- OrthoConfig dependency mapping and adapter policy,
+- Weaver semantic command-surface adapter design,
+- vocabulary linting via OrthoConfig policy where available,
 - resource-first command mapping,
 - dual renderers,
 - universal `--json`,
 - stable exit-code taxonomy,
 - enumerating errors,
 - bounded list responses,
-- `agent-context`,
+- `context --json` agent-context payload,
 - capability introspection,
 - skill manifests,
 - manpage and completion generation,
 - schema-to-router, schema-to-help, schema-to-docs, and schema-to-tests drift
   gates.
+
+Tasks in this foundational phase must distinguish reusable OrthoConfig work
+from Weaver work. For example, Weaver may configure or consume vocabulary
+policy and renderer metadata, but it should not implement a second generic
+policy engine unless ADR 007 records a temporary adapter with a removal path.
 
 The next phase should deliver a useful vertical slice under the new grammar,
 not another layer. Candidate phase:
@@ -618,6 +779,12 @@ contracts.
 
 Success criteria:
 
+- The roadmap contains an explicit OrthoConfig dependency section.
+- Tasks that overlap OrthoConfig roadmap work are rewritten as dependencies,
+  adapters, or deliberate divergence decisions.
+- Existing completed Weaver work remains visible as historical foundation.
+- Existing planned Weaver work that still matters is migrated under the new
+  command grammar instead of deleted.
 - Later Sempai, plugin, and graph tasks depend on the command-surface reset.
 - No future task asks implementers to add new public `observe` / `act` /
   `verify` commands.
@@ -649,12 +816,20 @@ Cover these audit rows:
 - accessible human rendering,
 - capability-routed provider abstraction.
 
+Each row must include an `OrthoConfig dependency` column. Rows whose reusable
+metadata or linting belongs to OrthoConfig should cite the task number instead
+of assigning generic implementation work to Weaver. Rows whose behaviour is
+Weaver-owned should say what semantic, safety, or provider orchestration work
+remains local.
+
 Success criteria:
 
 - The file no longer treats `list-plugins` or root `--capabilities` as the
   primary target.
-- It points to `agent-context`, `capabilities list`, and capability-routed
+- It points to `context --json`, `capabilities list`, and capability-routed
   public resources instead.
+- It identifies which gaps are closed by consuming OrthoConfig work and which
+  gaps require Weaver implementation.
 - It names prototype surfaces to remove and the acceptance tests that prevent
   drift from returning.
 
@@ -677,7 +852,7 @@ The guide should describe the 0.1.0 target command model, including:
 - profiles,
 - delivery,
 - feedback,
-- `agent-context`,
+- `context --json`,
 - capability introspection,
 - provider provenance,
 - provider override as advanced policy only.
@@ -689,7 +864,7 @@ Update `docs/developers-guide.md`.
 
 The developer guide should explain how contributors add or rename commands:
 
-1. edit the command-surface schema,
+1. edit the OrthoConfig-backed command metadata or Weaver semantic adapter,
 2. declare or reuse a capability,
 3. provide human message IDs and examples,
 4. provide JSON success and error schemas,
@@ -708,9 +883,10 @@ Update `docs/repository-layout.md`.
 
 Add planned components for:
 
-- command-surface schema,
-- renderer generation,
-- `agent-context`,
+- OrthoConfig-backed command metadata integration,
+- Weaver semantic command-surface adapter,
+- renderer generation through OrthoConfig contracts where available,
+- `context --json` agent-context payload,
 - skills,
 - job ledger,
 - profiles,
@@ -729,6 +905,8 @@ Success criteria:
   not the ordinary workflow.
 - README, users guide, design, roadmap, and repository layout agree on what is
   implemented, planned, and target 0.1.0 behaviour.
+- Repository layout distinguishes OrthoConfig-owned reusable contracts from
+  Weaver-owned semantic adapters, safety integration, and provider routing.
 
 ### Milestone 6: Add drift gates to the documentation plan
 
@@ -736,31 +914,26 @@ The planned docs must require future CI gates that make the principles
 mechanical rather than advisory. The design and roadmap should call for gates
 covering:
 
-- schema-to-clap consistency,
-- schema-to-router consistency,
-- schema-to-doc-snippet consistency,
-- schema-to-manpage and completion consistency,
-- banned vocabulary,
-- universal `--json` support for data commands,
-- stdout/stderr separation,
-- stable exit-code taxonomy,
-- enum errors that enumerate valid values,
-- bounded list responses,
-- mutation idempotency declarations,
-- destructive command `--force` declarations,
-- async `--wait` and jobs declarations,
-- profile-field declarations,
-- delivery-scheme declarations,
-- feedback state in `agent-context`,
-- provider provenance in JSON,
-- skill manifests that mention only real commands and flags,
-- generated tool-description token budgets for future MCP surfaces.
+- OrthoConfig-provided policy gates for metadata, vocabulary, renderer
+  contracts, JSON stream contracts, exit-code taxonomy, bounded-list metadata,
+  profile fields, delivery schemes, feedback state, skill manifests, and
+  generic capability/provenance metadata.
+- Weaver-owned gates for semantic capability mapping, provider routing,
+  safety class declarations, transaction and idempotency behaviour,
+  schema-to-router consistency, generated docs snippets, runtime
+  `capabilities list`, provider provenance in JSON, and command examples that
+  use the resource-first public grammar.
+- A temporary-adapter gate that fails if Weaver keeps local generic
+  command-contract code after the corresponding OrthoConfig dependency is
+  available.
 
 Success criteria:
 
 - `docs/roadmap.md` has review-sized implementation tasks for the gates.
 - `docs/weaver-design.md` states which invariants are enforced at schema build
   time rather than by manual review.
+- The planned gates do not duplicate OrthoConfig checks except as temporary
+  adapters with removal criteria.
 
 ## Implementation procedure for the document overhaul
 
