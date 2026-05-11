@@ -9,7 +9,7 @@ Status: DRAFT
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root. It plans a documentation and roadmap overhaul only. It does
-not authorise the product implementation until the plan is approved.
+not authorize the product implementation until the plan is approved.
 
 ## Purpose / big picture
 

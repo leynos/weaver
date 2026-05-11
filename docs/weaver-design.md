@@ -173,7 +173,7 @@ classDiagram
         -HashMap~Language, Session~ sessions
         +new(overrides: CapabilityMatrix) LspHost
         +register_language(language: Language, server: Box~LanguageServer~) Result~(), LspHostError~
-        +initialise(language: Language) Result~CapabilitySummary, LspHostError~
+        +initialize(language: Language) Result~CapabilitySummary, LspHostError~
         +capabilities(language: Language) Option~CapabilitySummary~
         +goto_definition(language: Language, params: GotoDefinitionParams) Result~GotoDefinitionResponse, LspHostError~
         +references(language: Language, params: ReferenceParams) Result~Vec~Location~, LspHostError~
@@ -207,7 +207,7 @@ classDiagram
 
     class LanguageServer {
         <<interface>>
-        +initialise() Result~ServerCapabilitySet, LanguageServerError~
+        +initialize() Result~ServerCapabilitySet, LanguageServerError~
         +goto_definition(params: GotoDefinitionParams) Result~GotoDefinitionResponse, LanguageServerError~
         +references(params: ReferenceParams) Result~Vec~Location~, LanguageServerError~
         +diagnostics(uri: Uri) Result~Vec~Diagnostic~, LanguageServerError~
@@ -318,7 +318,7 @@ classDiagram
     LspHostError --> CapabilitySource : references
     LspHostError --> HostOperation : references
     LspHostError --> LanguageServerError : wraps
-    LanguageServerError --> ServerCapabilitySet : produced by initialise
+    LanguageServerError --> ServerCapabilitySet : produced by initialize
     ServerCapabilitySet --> CapabilityKind : describes support for
     Language --> LanguageParseError : parse failure
     CapabilityMatrix ..> Language : keyed by
@@ -1772,7 +1772,7 @@ routes the notifications to the appropriate server.
 
 - Document sync notifications are routed through `LspHost` without capability
   gating because they are required to prepare diagnostics at real URIs.
-- `LspHost` always initialises the server before invoking `did_open`,
+- `LspHost` always initializes the server before invoking `did_open`,
   `did_change`, or `did_close`, so document sync behaves consistently with the
   request methods.
 - Failures in document sync map to `HostOperation::DidOpen`, `DidChange`, or

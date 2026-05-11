@@ -284,7 +284,7 @@ impl SemanticBackendProvider {
         }
     }
 
-    /// Returns access to the LSP host, if initialised.
+    /// Returns access to the LSP host, if initialized.
     pub fn lsp_host(&self) -> Arc<Mutex<Option<LspHost>>> {
         Arc::clone(&self.lsp_host)
     }
@@ -359,10 +359,10 @@ pub fn handle<W: Write>(
     let mut lsp_guard = lsp_host_arc.lock()
         .map_err(|_| DispatchError::lsp_host(language, "lock poisoned"))?;
     let lsp_host = lsp_guard.as_mut()
-        .ok_or_else(|| DispatchError::lsp_host(language, "host not initialised"))?;
+        .ok_or_else(|| DispatchError::lsp_host(language, "host not initialized"))?;
 
-    // 4. Ensure language is initialised
-    lsp_host.initialise(language)
+    // 4. Ensure language is initialized
+    lsp_host.initialize(language)
         .map_err(|e| DispatchError::lsp_host_from(language, e))?;
 
     // 5. Call goto_definition

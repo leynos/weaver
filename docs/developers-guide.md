@@ -827,7 +827,7 @@ argument-parsing layer and the test suite to keep validation, guidance text,
 and supported-value lists in one place.
 
 The module exposes seven `pub(crate)` functions. The exact signatures live in
-Rustdoc; this section records each helper's contract so the Markdown remains
+Rustdoc; this section records each helper's contract, so the Markdown remains
 readable after automated wrapping:
 
 - `supported_provider_names() -> &'static [&'static str]` — returns the

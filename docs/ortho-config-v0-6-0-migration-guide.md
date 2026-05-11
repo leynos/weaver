@@ -89,7 +89,7 @@ Once the imports are adjusted, prune redundant dependencies from each
 
 ## 3. Adopt declarative configuration discovery
 
-A new `#[ortho_config(discovery(...))]` attribute enables customised discovery
+A new `#[ortho_config(discovery(...))]` attribute enables customized discovery
 without bespoke builders for every CLI entry point.[^discovery-attr] This
 attribute mirrors the builder capabilities: specify the config file name,
 dotfile name, project-level override, the generated `--config` flag, and the

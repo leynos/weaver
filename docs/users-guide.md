@@ -1377,7 +1377,7 @@ structured error is returned to the caller.
 
 ## Language server capability detection
 
-The `weaver-lsp-host` crate initialises the LSP servers for Rust, Python, and
+The `weaver-lsp-host` crate initializes the LSP servers for Rust, Python, and
 TypeScript and records which core requests each server advertises:
 `textDocument/definition`, `textDocument/references`, diagnostics, and call
 hierarchy (`textDocument/prepareCallHierarchy` plus incoming/outgoing calls).
@@ -1409,7 +1409,7 @@ required tooling before retrying. Example:
 failed to spawn rust language server: command 'rust-analyzer' not found
 ```
 
-Language servers are initialised lazily when the first operation for that
+Language servers are initialized lazily when the first operation for that
 language is requested. The daemon sends the LSP `initialize` handshake followed
 by `initialized`, then routes subsequent requests through the established
 session.
@@ -1483,7 +1483,7 @@ Tree-sitter parsers for Rust, Python, and TypeScript. When validating a file,
 the lock parses the content and inspects the resulting syntax tree for ERROR
 nodes. Files containing structural errors—such as unbalanced braces, missing
 semicolons, or malformed declarations—are rejected before the semantic lock
-runs. Files with extensions not recognised by any configured parser are skipped
+runs. Files with extensions not recognized by any configured parser are skipped
 (pass through) to avoid blocking edits to configuration files, documentation,
 or other non-code artefacts.
 
