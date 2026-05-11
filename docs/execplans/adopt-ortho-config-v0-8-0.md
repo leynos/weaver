@@ -55,7 +55,7 @@ Observable success after implementation:
    Derive-adjacent imports and examples should prefer the `ortho_config::...`
    re-exports.
 5. Preserve the existing localization behaviour in
-   `crates/weaver-cli/src/localizer.rs`. The Fluent-backed localiser and
+   `crates/weaver-cli/src/localizer.rs`. The Fluent-backed localizer and
    English fallbacks must keep working after the dependency bump.
 6. Treat the `orthohelp` metadata flow as conditional. The current
    repository generates CLI man pages via build scripts, but the audit found no
@@ -161,7 +161,7 @@ Observable success after implementation:
 - `crates/weaver-config/src/lib.rs` is the primary derive site. It uses
   `#[derive(OrthoConfig)]` with a `#[ortho_config(discovery(...))]` attribute
   and does not alias the runtime crate.
-- The CLI localiser in `crates/weaver-cli/src/localizer.rs` uses
+- The CLI localizer in `crates/weaver-cli/src/localizer.rs` uses
   `FluentLocalizer`, `Localizer`, and `NoOpLocalizer` from `ortho_config`
   directly. This is the main non-config API surface exercised by the dependency
   today.
@@ -231,7 +231,7 @@ The code impact was deliberately small. No aliasing, `SelectedSubcommandMerge`,
 `cli_default_as_absent`, or `orthohelp` wiring was needed in Weaver. The only
 code changes beyond manifests were the four toolchain-driven lint fixes noted
 above. Behaviourally, the configuration contract for `weaver-config::Config`
-and the CLI localiser remained unchanged.
+and the CLI localizer remained unchanged.
 
 Documentation now matches the upgraded state. The repository gained
 `docs/ortho-config-v0-8-0-migration-guide.md`, the local

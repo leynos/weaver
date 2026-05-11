@@ -266,7 +266,7 @@ This approach prevents accidental capture of similarly named types in scope.
 Module path computation must use RA `experimental/parentModule` recursion
 rather than filesystem heuristics.
 
-Destination materialisation rules:
+Destination materialization rules:
 
 - create destination module file when missing and policy allows creation,
 - insert `mod` declaration in the correct parent module file,

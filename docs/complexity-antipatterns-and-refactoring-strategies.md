@@ -95,7 +95,7 @@ Cognitive Complexity is incremented based on three main rules 8:
 3. **Shorthand Discount:** Structures that allow multiple statements to be read
    as a single unit (e.g., a well-named method call) do not incur the same
    penalties as the raw statements they encapsulate. Method calls are generally
-   "free" in terms of cognitive complexity, as a well-chosen name summarises
+   "free" in terms of cognitive complexity, as a well-chosen name summarizes
    the underlying logic, allowing readers to grasp the high-level view before
    diving into details. However, recursive calls do increment the score.8
 

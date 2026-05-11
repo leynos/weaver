@@ -24,7 +24,7 @@ Before this migration, the workspace state was:
 - `crates/weaver-config/src/lib.rs` was the primary derive site, using
   `#[derive(OrthoConfig)]` with a declarative `#[ortho_config(discovery(...))]`
   attribute.
-- `crates/weaver-cli/src/localizer.rs` consumed the localisation APIs added in
+- `crates/weaver-cli/src/localizer.rs` consumed the localization APIs added in
   v0.7.0 (`FluentLocalizer`, `Localizer`, and `NoOpLocalizer`).
 - The repository still described the configuration stack as
   `ortho-config` v0.6.0 in several docs.

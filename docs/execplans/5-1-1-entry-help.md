@@ -759,7 +759,7 @@ All three must pass with zero exit code.
 All commands run from the workspace root `/home/user/project`.
 
 The concrete steps mirror the Plan of Work stages A through F. See the Plan of
-Work for full code listings; this section summarises the edits and commands.
+Work for full code listings; this section summarizes the edits and commands.
 
 ### Stage A: Upgrade ortho-config
 

@@ -184,7 +184,7 @@ engine focused on feature extraction.
 The facade crate `sempai` is the only semver-stable entrypoint. Internal crates
 may evolve, but the facade must preserve:
 
-- Type names and serialisation formats of public structs.
+- Type names and serialization formats of public structs.
 - Behaviour of core methods within documented constraints.
 - Backwards compatibility of the one-liner DSL within a minor release line.
 
@@ -376,8 +376,8 @@ The one-liner Pratt binding powers must follow the provided table.[^3]
 ### YAML parser stack
 
 - `saphyr` parses YAML into a value model with location info.
-- `serde-saphyr` deserialises to Rust structs.
-- A custom deserialisation layer handles:
+- `serde-saphyr` deserializes to Rust structs.
+- A custom deserialization layer handles:
 
   - Union shapes (string vs object).
   - Forward-compatible unknown keys on the rule object
@@ -1069,7 +1069,7 @@ using the guidance in the Rust parser testing document.[^6]
 - Lexer unit tests (`logos`) using `rstest` tables.[^6]
 - DSL precedence tests using a small operator matrix, mirroring the Semgrep
   binding power table.[^3]
-- YAML deserialisation tests using minimal schema-aligned rule objects.[^1]
+- YAML deserialization tests using minimal schema-aligned rule objects.[^1]
 
 ### Snapshot tests
 
@@ -1133,7 +1133,7 @@ mirrored into `sempai_fixtures` as local test inputs.[^7]
 
 - [ ] 1.2.1. Implement rule file parsing via `saphyr` and `serde-saphyr`.
 
-  - Success criteria: schema-aligned deserialisation for rule metadata and
+  - Success criteria: schema-aligned deserialization for rule metadata and
     query keys.[^1]
 - [ ] 1.2.2. Implement legacy and v2 parsing paths and normalization.
 
@@ -1142,7 +1142,7 @@ mirrored into `sempai_fixtures` as local test inputs.[^7]
 
 ### 1.3. One-liner DSL
 
-- [ ] 1.3.1. Implement `logos` tokeniser and Chumsky Pratt parser.
+- [ ] 1.3.1. Implement `logos` tokenizer and Chumsky Pratt parser.
 
   - Success criteria: precedence tests match the Semgrep binding power
     table.[^3]

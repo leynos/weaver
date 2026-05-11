@@ -270,5 +270,5 @@ and backs the format-specific branch of `parse_config_by_format`.
 [^hello-world-yaml]: Behavioural tests in `hello_world` create YAML fixtures,
 load them through `ortho_config::load_config_file`, and assert strict parsing
 behaviour.【F:examples/hello_world/src/cli/tests/overrides.rs†L125-L155】
-[^changelog]: The Unreleased changelog summarises the v0.6.0 additions and
+[^changelog]: The Unreleased changelog summarizes the v0.6.0 additions and
 behaviour changes discussed in this guide.【F:CHANGELOG.md†L6-L26】

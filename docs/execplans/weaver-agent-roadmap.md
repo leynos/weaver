@@ -209,6 +209,16 @@ teams a sequenced build plan.
 - [x] (2026-05-11) Ran Milestone 1 gates: `make fmt`,
       `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
       `make test`.
+- [x] (2026-05-11) Ran `coderabbit review --agent --base-commit HEAD~1
+      --type committed` for the ADR 007 milestone; CodeRabbit completed with
+      zero findings.
+- [x] (2026-05-11) Started Milestone 2 by rewriting the design document's
+      executive summary, Weaver philosophy, client-daemon command surface,
+      selector pipeline, renderer, introspection, state, two-way I/O, and
+      capability-provider sections around ADR 007.
+- [x] (2026-05-11) Ran the Milestone 2 design-surface gates: `make fmt`,
+      `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
+      `make test`.
 - [ ] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [ ] Run documentation and repository gates.
@@ -253,6 +263,12 @@ teams a sequenced build plan.
   delivery and feedback contracts, and execution-ledger contracts. Weaver's
   plan must consume or depend on those tasks instead of reimplementing them as
   local generic framework work.
+
+- Discovery: `coderabbit review --agent` against the entire branch cannot run
+  because the existing PR diff contains 402 files, above CodeRabbit's 300-file
+  limit. Milestone validation should use
+  `coderabbit review --agent --base-commit HEAD~1 --type committed` or another
+  narrow comparison until the branch diff is small enough for whole-PR review.
 
 ## Decision Log
 

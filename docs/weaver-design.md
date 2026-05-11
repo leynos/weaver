@@ -3,21 +3,24 @@
 ## Executive Summary
 
 This document presents the fourth-generation design and strategic roadmap for
-`Weaver`, a semantics-aware command-line tool engineered for AI coding agents.
-Moving beyond the initial proof-of-concept, this design solidifies `Weaver` as
-a high-performance, secure, and composable tool built entirely in Rust. Its
-core mission is to provide a robust, agent-friendly interface for understanding
-and modifying codebases by orchestrating semantic operations across a wide
-array of programming languages.
+`Weaver`, a human-friendly, agent-native semantic command-line tool. Moving
+beyond the initial proof-of-concept, this design solidifies `Weaver` as a
+high-performance, secure, and composable tool built entirely in Rust. Its core
+mission is to provide a robust interface for understanding and modifying
+codebases by orchestrating semantic operations across a wide array of
+programming languages while keeping humans, scripts, and agents on one command
+contract.
 
 The architectural philosophy of `Weaver` represents a deliberate departure from
 monolithic, integrated solutions like the Serena Model Context Protocol Server.
 Instead, `Weaver` is conceived as a suite of composable UNIX-style primitives.
-It leverages JSON Lines (JSONL) as its native protocol for input and output,
-ensuring seamless integration with the rich ecosystem of existing command-line
-utilities such as `jq`, `find`, and `xargs`. This approach treats semantic
-operations not as features within a closed application, but as fundamental
-verbs in the developer's shell.
+It keeps JSON Lines (JSONL) as the internal daemon and provider transport,
+while the public `weaver` command exposes two first-class renderers from one
+schema-backed command contract. The default renderer is localized and readable
+for humans at a terminal. The `--json` renderer is stable, non-localized, and
+parseable for agents and scripts. This approach treats semantic operations not
+as features within a closed application, but as fundamental resources in the
+developer's shell.
 
 The system's intelligence is derived from a layered "Semantic Fusion Engine"
 that integrates data from three distinct sources: the Language Server Protocol
@@ -41,11 +44,11 @@ This document provides a comprehensive survey of the existing tooling and
 academic literature that informs these design decisions. It details the refined
 system architecture, presents a technical deep dive into each core component,
 outlines the strategy for security and sandboxing, and describes advanced
-capabilities tailored for AI agents, such as capability-aware orchestration and
-project onboarding via Retrieval-Augmented Generation (RAG). The report
-culminates in a revised, phased development roadmap that prioritizes safety,
-incremental value delivery, and the progressive enhancement of the tool's
-intelligence.
+capabilities tailored for agents, such as capability-aware orchestration,
+structured introspection, selector pipelines, and project onboarding via
+Retrieval-Augmented Generation (RAG). The report culminates in a revised,
+phased development roadmap that prioritizes safety, incremental value delivery,
+and the progressive enhancement of the tool's intelligence.
 
 ## 1. Vision and Strategic Positioning
 
@@ -67,35 +70,44 @@ be locked away within monolithic applications or proprietary protocols.
 Instead, they must be exposed as fundamental, composable primitives, accessible
 directly from the command line.
 
-The choice of JSON Lines (JSONL) as the native communication protocol is the
-modern embodiment of this philosophy for structured data. Just as traditional
-UNIX tools operate on streams of plain text, `Weaver` operates on streams of
-structured JSON objects. This decision ensures immediate and universal
-interoperability with a vast ecosystem of existing tools. An AI agent, or a
-human user, can pipe the output of a `weaver` command directly into powerful
-utilities like `jq` for filtering and transformation, `find` for file system
-operations, and `xargs` for batch processing.^3^ This creates a powerful,
-flexible, and extensible environment for scripting complex software engineering
-tasks.
+The public command contract is the modern embodiment of this philosophy for
+structured data. Just as traditional UNIX tools operate on streams of plain
+text, `Weaver` operates on resources that can be rendered for humans by default
+or as structured JSON with `--json`. This decision ensures immediate and
+universal interoperability with a vast ecosystem of existing tools. An AI
+agent, or a human user, can pipe selector records from a `weaver` command
+directly into utilities like `jq` for filtering and transformation, `less` for
+inspection, and `xargs` for batch processing.^3^
 
-Within this paradigm, `Weaver` introduces a new vocabulary of semantic verbs to
-the developer's shell. Commands are grouped into intuitive categories:
+Within this paradigm, `Weaver` adopts resource-first command names and
+community-consistent verbs. The 0.1.0 target grammar uses examples such as:
 
-- **`observe`**: Commands for querying the state of the codebase (e.g.,
-    `observe get-definition`, `observe find-references`, `observe grep`).
+```sh
+weaver definitions get --uri file:///src/main.rs --position 10:5
+weaver references list --uri file:///src/main.rs --position 10:5
+weaver diagnostics list --workspace .
+weaver symbols list --query 'fn $name(...)'
+weaver symbols rename --query 'fn process_request(...)' --new-name run_request
+weaver symbols rename --uri file:///src/main.rs --position 10:5 --new-name run
+weaver patches apply --file changes.patch --dry-run
+weaver context --json
+```
 
-- **`act`**: Commands for modifying the codebase (e.g., `act rename-symbol`,
-    `act apply-edits`, `act apply-patch`, `act refactor`).
+The historical `observe` / `act` / `verify` domain grammar is useful prototype
+evidence, but it is superseded by ADR 007 for the 0.1.0 target. The future
+public surface describes resources, selectors, and capabilities directly.
+Observe-style resource commands emit selector records that act-style mutation
+commands can consume directly or after ordinary UNIX filtering:
 
-- **`verify`**: Commands for checking the integrity of the codebase (e.g.,
-    `verify diagnostics`).
+```sh
+weaver symbols list --query 'fn $name(...)' --json \
+  | jq 'select(.name | startswith("old_"))' \
+  | weaver symbols rename --from-stdin --replace-prefix old_ --with-prefix new_
+```
 
-These commands are designed to be chained together, allowing agents to
-construct sophisticated workflows. For example, an agent could find all
-implementations of an interface, refactor each one, and then verify that no new
-errors were introduced, all through a series of piped commands. This approach
-transforms code semantics from a feature into a fundamental, scriptable
-building block of the development environment.
+Sempai one-liner queries are a first-class selector form, peer to position
+references. This keeps code semantics a scriptable building block without
+forcing callers through provider-specific commands or hidden session state.
 
 ### 1.2. Architectural Counterpoint: A Comparative Analysis of Weaver and Serena
 
@@ -341,8 +353,17 @@ near-instantaneous response times for subsequent commands, amortizing the
 initial cost over the entire development session.
 
 Crucially, this client-daemon model is implemented in a way that remains
-faithful to the UNIX pipe-and-filter paradigm. The `weaver` client's sole
-responsibilities are to:
+faithful to the UNIX pipe-and-filter paradigm. The 0.1.0 target separates the
+public command contract from the internal daemon transport:
+
+- the public `weaver` CLI parses resource-first commands, selectors, and flags;
+- default CLI output is localized human output;
+- `--json` emits stable operation result schemas on stdout and structured
+  error schemas on stderr;
+- JSONL remains the internal request and response transport between the CLI,
+  daemon, and providers.
+
+At the transport boundary, the `weaver` client's responsibilities are to:
 
 1. Parse command-line arguments and flags using the `clap` library.
 
@@ -361,19 +382,217 @@ more JSONL objects---representing either successful results or structured
 errors---to its standard output.
 
 This design ensures that while a daemon is used for performance, the
-public-facing *interface* is indistinguishable from any other standard
-command-line tool. A user or script could bypass the `weaver` client entirely
-and interact with the daemon directly. For example:
+public-facing *interface* behaves like a standard command-line tool. Internal
+debugging tools may still interact with the daemon transport directly. For
+example:
 
 ```sh
 echo '{"command": "observe", "subcommand": "get-definition"}' | weaverd
 ```
 
-This strict adherence to the standard streams protocol preserves the tool's
-composability and ensures it remains a well-behaved citizen of the shell
-environment.^1^
+That transport envelope is not the 0.1.0 public CLI contract. It is a
+current-state diagnostic example of the daemon protocol. Public documentation
+and examples should prefer resource-first `weaver` commands and `--json`
+operation result schemas.
 
-#### 2.1.1. JSONL command envelope and capability probe
+#### 2.1.1. Agent-native command surface
+
+ADR 007 defines the 0.1.0 command surface as a generated or validated contract
+with two first-class renderers. Weaver depends on OrthoConfig for reusable
+documentation intermediate representation, agent-context, policy, renderer,
+profile, delivery, feedback, and execution-ledger contracts where the
+OrthoConfig roadmap provides them. Weaver owns the semantic adapter that maps
+application resources to capabilities, providers, safety classes, transaction
+semantics, selectors, examples, output schemas, and error schemas.
+
+The semantic adapter records, at minimum:
+
+- resource path and canonical verb,
+- capability ID,
+- selector forms accepted by the command,
+- whether structured stdin is accepted,
+- mutability and async class,
+- pagination and bounded-output behaviour,
+- profile and delivery participation,
+- provider selection policy,
+- safety and transaction behaviour,
+- human message identifiers and examples,
+- JSON success and error schemas,
+- skill manifest references.
+
+Generated or validated outputs include clap definitions, daemon router
+metadata, localized help, manpages, shell completions, documentation snippets,
+`weaver context --json`, skill manifests, JSON Schema fixtures, vocabulary
+linting, and tests. Adding or renaming a public command requires one semantic
+adapter or OrthoConfig metadata change. CI must fail when router metadata,
+help, docs, tests, or `context --json` drift.
+
+Local generic command-contract code is temporary by default. If Weaver must
+ship a local adapter before the corresponding OrthoConfig dependency is
+available, the roadmap task must state the dependency, the temporary scope, and
+the removal condition.
+
+#### 2.1.2. Selector and pipeline contract
+
+Selectors are first-class inputs. A selector is any stable way to identify one
+symbol or a collection of symbols. The initial selector forms are Sempai
+one-liner queries, position references, and structured selector streams.
+
+Sempai one-liner queries use a canonical flag such as
+`--query <sempai-one-liner>`. They are not a secondary search feature; they are
+a peer to `--uri` plus `--position`. Any symbol-consuming command must state
+which selector forms it accepts and what happens for zero, one, and many
+matches.
+
+Observe-style resource commands must emit selector records that downstream
+act-style commands can consume either directly or after ordinary UNIX
+filtering. For example:
+
+```sh
+weaver symbols list --query 'fn $name(...)' --json \
+  | weaver symbols rename --from-stdin --suffix _renamed
+
+weaver symbols list --query 'fn $name(...)' --json \
+  | jq 'select(.name | startswith("old_"))' \
+  | weaver symbols rename --from-stdin --replace-prefix old_ --with-prefix new_
+
+weaver symbols rename --query 'fn process_request(...)' --new-name run_request
+
+weaver symbols rename \
+  --uri file:///src/main.rs \
+  --position 10:5 \
+  --new-name run_request
+
+weaver symbols list --query 'class $name' --json | less
+```
+
+Selector records must preserve enough provenance for safe mutation: source URI,
+range or point, resolved symbol identity when available, query provenance,
+provider provenance, workspace root, and capability compatibility. This lets a
+filtered observe stream remain a trustworthy act input.
+
+#### 2.1.3. Human and machine renderer contracts
+
+The default renderer is for humans. It emits localized, readable output with
+stable headings, examples, recovery guidance, terminal-width-aware layouts, and
+accessible plain-output fallbacks. Human output must not convey meaning by
+colour alone. ANSI styling, spinners, and pagers are disabled outside terminal
+contexts unless explicitly forced. Progress and diagnostics go to stderr.
+Primary command results go to stdout.
+
+Human rendering flags are:
+
+```plaintext
+--plain
+--color auto|always|never
+--no-pager
+--width <columns>
+--locale <tag>
+```
+
+The machine renderer is selected with `--json`. Every data-returning command
+accepts it. In JSON mode, success writes only the operation result to stdout.
+Failure writes a structured error object to stderr and exits with a stable
+non-zero exit class. Field names, enum values, schema versions, error codes,
+capability IDs, and exit classes are protocol identifiers and are not
+localized. Agents must not need localized prose to decide the next action.
+
+The 0.1.0 target does not use root `--output auto|human|json` or
+operation-local `--format` as public machine-output controls. The canonical
+machine switch is `--json`.
+
+#### 2.1.4. Structured introspection and skills
+
+Weaver exposes three introspection layers:
+
+```sh
+weaver --help
+weaver context --json
+weaver skill-path
+```
+
+Human help remains localized and accessible. `weaver context --json` returns
+the OrthoConfig-shaped agent-context payload: CLI version, schema version,
+commands, flags, enum values, output schemas, error taxonomy, installed
+capabilities, provider summaries, profiles, jobs, delivery schemes, feedback
+state, and skill paths. The public command name follows the OrthoConfig 6.2.3
+downstream naming convention. Weaver must not add a public `agent-context`
+alias before 0.1.0 unless a later ADR records the reason.
+
+Runtime capability availability is exposed separately:
+
+```sh
+weaver capabilities list --json
+```
+
+`weaver skill-path` prints the directory containing workflow `SKILL.md`
+manifests. Skill manifest metadata and validation should be delegated to
+OrthoConfig 6.3 where possible.
+
+#### 2.1.5. Agent state and recoverable workflows
+
+The public contract includes durable state surfaces for workflows that cannot
+be represented as one stateless call:
+
+```sh
+weaver jobs list --json
+weaver jobs get <job-id> --json
+weaver jobs prune --older-than 7d
+weaver profiles save <name>
+weaver profiles list --json
+weaver profiles show <name> --json
+weaver profiles delete <name> --force
+```
+
+Async-submitting commands support `--wait` and write recoverable records to a
+durable XDG state job ledger. Mutations and async submissions accept
+idempotency keys. Retrying the same request with the same idempotency key
+returns the existing in-flight or completed job instead of duplicating work.
+
+Profiles are named bundles of durable configuration. The precedence order is:
+
+```plaintext
+built-in defaults < config files < selected profile < environment < flags
+```
+
+Profiles appear in `weaver context --json` by name and metadata only. Secrets
+must remain redacted or represented as secret references. Weaver depends on
+OrthoConfig 9.1 for profile contracts and redaction metadata, and on
+OrthoConfig 9.3 for reusable execution-ledger metadata. Weaver owns the
+semantic job record contents, workspace safety integration, idempotency
+semantics, storage path choice, and public `jobs` behaviour.
+
+#### 2.1.6. Two-way I/O
+
+Weaver supports delivery sinks for artefacts that need to land somewhere other
+than stdout:
+
+```plaintext
+--deliver stdout
+--deliver file:<path>
+--deliver webhook:<url>
+```
+
+File delivery writes atomically. Webhook delivery surfaces the HTTP status and
+does not retry forever. Unknown schemes return structured refusals that
+enumerate valid schemes.
+
+Feedback is the reverse channel:
+
+```sh
+weaver feedback create "the enum error did not list valid values"
+weaver feedback list --json
+weaver feedback send --force
+```
+
+Feedback writes local JSONL by default. Upstream submission is optional and
+only enabled when explicitly configured. Feedback availability appears in
+`weaver context --json`. Weaver depends on OrthoConfig 9.2 for reusable
+delivery target parsing and feedback storage contracts. Weaver owns the
+semantic payloads, safety checks, webhook payload shape, and how delivered
+artefacts relate to code-edit transactions.
+
+#### 2.1.7. Current JSONL envelope and capability probe
 
 The initial CLI implementation serializes every invocation into a single JSONL
 object. The object contains a `command` descriptor comprising the command
@@ -407,11 +626,10 @@ reader abandons the session after ten consecutive blank lines and treats the
 absence of a terminating `exit` message as a failure. This ensures operators do
 not mistake a partial or stalled response for a successful execution.
 
-The capability probe specified in the roadmap is exposed as
-`weaver --capabilities`. The command loads the shared configuration, renders
-the negotiated capability matrix as pretty-printed JSON, and exits without
-contacting the daemon. This keeps the probe side effect free and allows agents
-to cache the matrix easily.
+The prototype capability probe is exposed as `weaver --capabilities`. ADR 007
+supersedes that root flag for the 0.1.0 target. Runtime capability availability
+moves to `weaver capabilities list --json`, while full command and workflow
+introspection moves to `weaver context --json`.
 
 Known-domain invocations that omit the operation (for example,
 `weaver observe`) are also handled entirely on the client side. The CLI now
@@ -452,9 +670,11 @@ structured stderr payload inside the existing JSONL `stream` envelope:
 }
 ```
 
-The CLI preserves that payload unchanged in `--output json` mode. In
-`--output human` mode it renders the payload into an actionable guidance block
-following the unified three-part error template (roadmap 2.3.3):
+The current CLI preserves that payload unchanged in prototype `--output json`
+mode. The 0.1.0 machine renderer will instead use universal `--json` and
+structured error JSON on stderr. Human mode renders the payload into an
+actionable guidance block following the unified three-part error template
+(roadmap 2.3.3):
 
 ```plaintext
 error: unknown operation 'nonexistent' for domain 'observe'
@@ -477,7 +697,7 @@ paths. The CLI does not consult its own discoverability catalogue for unknown
 operations, preventing drift between client help text and daemon dispatch
 authority.
 
-#### 2.1.2. Lifecycle orchestration
+#### 2.1.8. Lifecycle orchestration
 
 Operators now control the daemon lifecycle directly through the CLI via
 `weaver daemon start`, `weaver daemon stop`, and `weaver daemon status`. These
@@ -502,14 +722,14 @@ Because lifecycle commands operate exclusively on shared filesystem artefacts
 they remain side-effect free with respect to the JSONL transport and can be
 used safely from automation tooling.
 
-#### 2.1.3. Automatic daemon startup
+#### 2.1.9. Automatic daemon startup
 
 When a domain command is invoked and the daemon is not running, the CLI
 automatically attempts to start the daemon rather than failing immediately.
 This removes friction for operators who expect commands to "just work" without
 explicit daemon management. The CLI prints "Waiting for daemon start…" to
 stderr while waiting, and uses a 30-second timeout to allow sufficient time for
-daemon initialisation. If the daemon fails to start, the CLI reports the
+daemon initialization. If the daemon fails to start, the CLI reports the
 failure and exits; if it starts successfully, the original command proceeds.
 
 The following sequence diagram illustrates the auto-start flow within
@@ -601,7 +821,7 @@ This consistent structure—error statement, alternatives block, and next
 command—applies across all Level 10 failure paths including bare invocation,
 unknown domains, unknown operations, and startup failures.
 
-#### 2.1.4. Human-readable output and code context blocks
+#### 2.1.10. Current human-readable output and code context blocks
 
 Weaver continues to treat JSONL as the canonical, machine-readable transport,
 but the CLI may emit human-readable output when the daemon streams plain text
@@ -613,11 +833,12 @@ output. This applies to any response containing `Location`, `Range`, or
 hierarchy edges, structural matches, rewrite results, and verification failures
 surfaced by the safety harness.
 
-The CLI exposes an `--output` flag with `auto`, `human`, and `json` values.
-`auto` selects `human` when stdout is a terminal (TTY) and `json` when output
-is redirected, ensuring pipelines remain stable while still providing rich
-context for interactive use. The human renderer follows `miette`-style ASCII
-output even when a direct `miette` dependency is not used.
+The current prototype CLI exposes an `--output` flag with `auto`, `human`, and
+`json` values. ADR 007 supersedes that public target. The 0.1.0 design keeps
+the human context-block requirement but replaces `--output json` with universal
+`--json`, `--plain`, `--color`, `--no-pager`, and `--width` controls. The human
+renderer follows `miette`-style ASCII output even when a direct `miette`
+dependency is not used.
 
 Context blocks are required because line-and-column tuples alone are
 insufficient for fast triage. The renderer should show a labelled header with
@@ -644,7 +865,7 @@ error: Undefined variable `new_function_name`
    |           ^^^^^^^^^^^^^^^^^ not found in this scope
 ```
 
-#### 2.1.5. Localized help and reference surfaces
+#### 2.1.11. Localized help and reference surfaces
 
 Weaver's human-facing text should be localized without changing the JSONL
 protocol or daemon routing semantics. The daemon continues to emit stable
@@ -1078,17 +1299,17 @@ modularity, and maintainability. Based on the expanded technical analysis, the
 original structure is refined to better isolate complex functionalities and
 elevate the importance of key components.
 
-| Crate             | Purpose and Key Responsibilities                                                                                                                                                                                                                                |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `weaver-common`   | Defines core serializable types (using `serde`) and structured error enums (using `thiserror`). This includes critical types like `CapabilityError` and the request/response objects for the JSONL protocol.                                                    |
-| `weaver-config`   | Manages hierarchical configuration using `ortho-config`. Defines the crucial **Language Capability Matrix**, allowing users to override or supplement the capabilities reported by LSP servers, thus hardening the system against buggy servers.                |
-| `weaver-cli`      | The thin client executable (`weaver`). Uses `clap` for argument parsing and is responsible for serializing commands into JSONL and communicating with the `weaverd` daemon. Includes the `--capabilities` command for agent-side planning.                      |
-| `weaverd`         | The main daemon executable. Acts as the central orchestrator and **broker process**. Manages the project registry, hosts the analysis backends, dispatches commands to the appropriate crates, and implements the "Double-Lock" verification logic.             |
-| `weaver-lsp-host` | Manages the lifecycle of external LSP servers. Handles initialization, capability detection, request/response multiplexing, and enforces back-pressure on overloaded servers. Contains logic for language-specific workarounds.                                 |
-| `weaver-syntax`   | The Tree-sitter powered syntax layer. Implements the `ast-grep` and `srgn`-inspired engine for structural search (`observe grep`) and rewriting (`act apply-rewrite`). Provides the "Syntactic Lock" for the safety harness and context-aware code slicing.     |
-| `weaver-sandbox`  | A new, dedicated crate encapsulating all security and sandboxing logic. It is responsible for creating and managing the restrictive environments in which all external tools (LSPs, plugins) are executed, using OS primitives like namespaces and seccomp-bpf. |
-| `weaver-graph`    | Implements the relational intelligence layer. Orchestrates multiple providers (LSP, static analysis plugins, dynamic profilers) to generate and fuse call graphs and other relational models of the codebase.                                                   |
-| `weaver-plugins`  | Implements the plugin management and execution framework. Defines the IPC protocol between `weaverd` (as the broker) and sandboxed plugins, and manages the lifecycle of specialist tools.                                                                      |
+| Crate             | Purpose and Key Responsibilities                                                                                                                                                                                                                                                                            |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `weaver-common`   | Defines core serializable types (using `serde`) and structured error enums (using `thiserror`). This includes critical types like `CapabilityError` and the request/response objects for the JSONL protocol.                                                                                                |
+| `weaver-config`   | Manages hierarchical configuration using `ortho-config`. Defines the crucial **Language Capability Matrix**, allowing users to override or supplement the capabilities reported by LSP servers, thus hardening the system against buggy servers.                                                            |
+| `weaver-cli`      | The thin client executable (`weaver`). Uses `clap` for argument parsing and is responsible for serializing commands into JSONL and communicating with the `weaverd` daemon. The 0.1.0 target consumes the command-surface adapter for `context --json`, `capabilities list`, human rendering, and `--json`. |
+| `weaverd`         | The main daemon executable. Acts as the central orchestrator and **broker process**. Manages the project registry, hosts the analysis backends, dispatches commands to the appropriate crates, and implements the "Double-Lock" verification logic.                                                         |
+| `weaver-lsp-host` | Manages the lifecycle of external LSP servers. Handles initialization, capability detection, request/response multiplexing, and enforces back-pressure on overloaded servers. Contains logic for language-specific workarounds.                                                                             |
+| `weaver-syntax`   | The Tree-sitter powered syntax layer. Implements the `ast-grep` and `srgn`-inspired engine for structural search and rewriting behind resource-first commands such as `symbols list` and `patches apply`. Provides the "Syntactic Lock" for the safety harness and context-aware code slicing.              |
+| `weaver-sandbox`  | A new, dedicated crate encapsulating all security and sandboxing logic. It is responsible for creating and managing the restrictive environments in which all external tools (LSPs, plugins) are executed, using OS primitives like namespaces and seccomp-bpf.                                             |
+| `weaver-graph`    | Implements the relational intelligence layer. Orchestrates multiple providers (LSP, static analysis plugins, dynamic profilers) to generate and fuse call graphs and other relational models of the codebase.                                                                                               |
+| `weaver-plugins`  | Implements the plugin management and execution framework. Defines the IPC protocol between `weaverd` (as the broker) and sandboxed plugins, and manages the lifecycle of specialist tools.                                                                                                                  |
 
 #### 2.3.1. Configuration contract
 
@@ -1163,8 +1384,10 @@ a feature on when a server under-reports its support. Inputs are normalized by
 lowercasing identifiers and trimming surrounding whitespace, while duplicate
 entries are resolved by honouring the last directive supplied for a given
 language and capability pair. These directives merge with the daemon's runtime
-discovery to produce the negotiated capability surface exposed by
-`weaver --capabilities`.
+discovery to produce the negotiated capability surface. The prototype surface
+exposes that matrix through `weaver --capabilities`; the 0.1.0 target exposes
+runtime availability through `weaver capabilities list --json` and broader
+command introspection through `weaver context --json`.
 
 #### 2.3.2. Daemon bootstrap decisions
 
@@ -1214,7 +1437,7 @@ A `SystemShutdownSignal` built on `signal-hook` listens for `SIGTERM`,
 `SIGINT`, `SIGQUIT`, and `SIGHUP`, logging the event and giving the runtime a
 ten-second budget to shut down gracefully. Developers can opt into a foreground
 mode for debugging by setting the `WEAVER_FOREGROUND` environment variable,
-which bypasses daemonisation while preserving the same PID/lock/health
+which bypasses daemonization while preserving the same PID/lock/health
 choreography.
 
 ```mermaid
@@ -1254,7 +1477,7 @@ backend starts lazily via `ensure_backend`, keeping the process lightweight
 until a command requires a specific capability. The supervisor records whether
 a backend has already started and surfaces errors using a dedicated
 `BackendStartupError`. Behavioural tests exercise both successful and failing
-paths, ensuring that lazy initialisation and error propagation behave as
+paths, ensuring that lazy initialization and error propagation behave as
 designed.
 
 ## 3. Core Components: A Technical Deep Dive
@@ -1340,27 +1563,25 @@ several critical functions within the
 `Weaver` architecture.
 
 The design of this crate is heavily inspired by the capabilities of modern,
-Tree-sitter-based command-line tools like `ast-grep` and `srgn`. The
-`observe grep` command, Weaver's primary structural search tool, will emulate
-the intuitive pattern language of `ast-grep`. Instead of complex regular
-expressions, users and agents can provide code-like patterns with metavariables
-(e.g., `console.log($ARG)`) to find and capture specific abstract syntax tree
-(AST) nodes.^13^ This approach is more readable, less error-prone, and far more
-powerful than text-based searching, as it understands concepts like scope,
-nesting, and language grammar.
+Tree-sitter-based command-line tools like `ast-grep` and `srgn`. In the 0.1.0
+target, structural search is exposed through resource-first commands such as
+`weaver symbols list --query 'fn $name(...)'`. Instead of complex regular
+expressions, users and agents can provide code-like Sempai one-liners or
+patterns with metavariables (for example, `console.log($ARG)`) to find and
+capture specific abstract syntax tree (AST) nodes.^13^ This approach is more
+readable, less error-prone, and far more powerful than text-based searching, as
+it understands concepts like scope, nesting, and language grammar.
 
-Similarly, the `act apply-rewrite` command will draw inspiration from the
-rewriting capabilities of these tools. `srgn`, for example, demonstrates the
-power of combining Tree-sitter queries for precise scoping with a set of
-actions like `delete` or `replace`.^21^ Weaver will adopt this model, allowing
-an agent to perform large-scale, structurally-aware refactoring. For example,
-an agent could convert all instances of a legacy function call to a new format
-across an entire codebase with a single, precise command.
+Similarly, patch and rewrite commands draw inspiration from the rewriting
+capabilities of these tools. `srgn`, for example, demonstrates the power of
+combining Tree-sitter queries for precise scoping with a set of actions like
+`delete` or `replace`.^21^ Weaver adopts this model behind capability-routed
+commands such as `symbols rename`, `symbols move`, and `patches apply`.
 
 The key responsibilities of the `weaver-syntax` crate are:
 
-1. **High-Precision Search and Analysis:** Powering the `observe grep` command
-    for structural queries and providing the raw data for advanced analysis,
+1. **High-Precision Search and Analysis:** Powering structural resource
+    commands and providing the raw data for advanced analysis,
     such as identifying all function definitions or generating a preliminary
     call graph based on call expressions.^12^
 
@@ -1378,10 +1599,11 @@ The key responsibilities of the `weaver-syntax` crate are:
 
 4. **LSP Fallback Mechanism:** When an LSP server does not support a specific
     semantic operation (e.g., `rename`), the syntactic layer provides a robust
-    fallback. The agent can be instructed to use `observe grep` to find all
-    textual occurrences within the correct syntactic scope (e.g., not inside
-    comments or strings) and then use `act apply-edits` to perform a safe,
-    syntactic replacement.
+    fallback. The agent can be instructed to use
+    `weaver symbols list --query ... --json` to find all textual occurrences
+    within the correct syntactic scope (for example, not inside comments or
+    strings) and then use `weaver patches apply --dry-run` before committing a
+    safe syntactic replacement.
 
 ### 3.3. Relational Insight: A Pragmatic Approach to Call Graph Generation
 
@@ -1461,42 +1683,47 @@ best-in-class, specialized tools developed by language experts. This allows
 `Weaver` to provide a unified, safe, and consistent interface while leveraging
 the deep capabilities of the broader open-source ecosystem.
 
-Plugins are categorized based on their function, primarily as "sensors"
-(providing data to the intelligence engine) or "actuators" (performing actions
-on the codebase). The Python tooling landscape provides an excellent case study
-for this model:
+Plugins are categorized by the capability contract they implement. A perceptor
+is a read-only provider that observes the codebase and returns facts,
+diagnostics, cards, graph slices, matches, selector records, or provenance. An
+actuator is a mutation-planning provider that returns proposed edits, diffs,
+patches, plans, or workspace changes. Actuators never commit directly; the
+daemon broker owns provider selection, idempotency, jobs, safety verification,
+and final rendering. The Python tooling landscape provides an excellent case
+study for this model:
 
-- **`jedi` as a Sensor Plugin:** `jedi` is a powerful static analysis library
-    with a primary focus on autocompletion, goto definition, and finding
-    references.^29^ While there is some overlap with LSP functionality,
+- **`jedi` as a perceptor provider:** `jedi` is a powerful static analysis
+    library with a primary focus on autocompletion, goto definition, and
+    finding references.^29^ While there is some overlap with LSP
+    functionality,
 
     `jedi` can often provide supplementary or alternative analysis. It can be
     integrated as a sensor plugin, offering another data stream to the Semantic
     Fusion Engine, which can be particularly useful for cross-validation or
     when an LSP server is unavailable.
 
-- **`rope` as an Actuator Plugin:** `rope` is a dedicated and mature Python
+- **`rope` as an actuator provider:** `rope` is a dedicated and mature Python
     refactoring library, recognized as being more powerful and comprehensive
     for refactoring tasks than `jedi`.^31^ It supports a wide range of complex
     operations, such as "Extract Method," "Change Signature," and "Move
     Method".^33^
 
-    `rope` will be integrated as a primary actuator plugin for Python, callable
-    via a command like
-    `weaver act refactor --provider rope --refactoring rename --file src/main.py
-    offset=123 new_name=new_function_name`. More advanced rope operations
-    remain future work, but the shipped `act refactor` contract uses the
-    canonical `--provider`, `--refactoring`, and `--file` flags plus trailing
-    `KEY=VALUE` arguments. This allows an agent to perform sophisticated,
-    language-aware refactorings through the standard `Weaver` interface.
+    `rope` remains a primary actuator provider for Python. In the 0.1.0 target
+    the ordinary public command is capability-first, for example
+    `weaver symbols rename --uri file:///src/main.py --position 10:5
+    --new-name new_function_name` or `weaver symbols rename --query
+    'def old_name(…)' --new-name new_name`. The prototype `act refactor
+    --provider rope --refactoring rename` workflow remains current
+    implementation evidence, but it is not the future public grammar. Provider
+    names appear in provenance, diagnostics, `--verbose` output, JSON, and
+    expert policy overrides.
 
-This model extends to other domains as well. Tools like `srgn` and `ast-grep`,
-which excel at high-speed, structural search and rewrite operations, can be
-integrated as "precision editing" actuators.^13^ This gives agents a spectrum
-of tools to choose from, ranging from fast, syntactic transformations to
-slower, fully semantic-aware refactorings, all orchestrated and secured by the
-
-`weaverd` daemon.
+This model extends to other domains as well. Tools like `srgn`, `ast-grep`,
+Sempai, rust-analyzer, and Tree-sitter can provide perceptor or actuator
+capabilities behind stable Weaver commands.^13^ This gives agents and humans a
+spectrum of semantic operations without asking them to learn provider-specific
+incantations. Provider choice remains deterministic, inspectable, and secured
+by the `weaverd` daemon.
 
 #### 4.1.1. Implementation decisions (Phase 3.1.1)
 
@@ -1515,7 +1742,7 @@ during the initial implementation:
   request body as `FilePayload` objects (path + full text content). This avoids
   requiring the sandboxed plugin to have filesystem access and is consistent
   with how `act apply-patch` passes patch content. File descriptor passing can
-  be added as a future optimisation.
+  be added as a future optimization.
 
 - **Plugin trait with process-based implementation.** A `PluginExecutor` trait
   defines the execution contract. `SandboxExecutor` provides the concrete
@@ -1611,28 +1838,31 @@ following decisions govern this rollout:
 ### 4.2. The "Double-Lock" Safety Harness: Ensuring Syntactic and Semantic Integrity
 
 The "Double-Lock" safety harness is the single most critical feature for
-ensuring the safety and reliability of AI agent-driven code modifications. It
+ensuring the safety and reliability of agent-driven code modifications. It
 addresses the fundamental problem that powerful external tools, while
 effective, can sometimes produce incorrect results or have unintended side
-effects. The harness wraps every action from an actuator plugin in a
+effects. The harness wraps every action from an actuator provider in a
 verifiable, atomic transaction, guaranteeing that no change is committed to the
 filesystem unless it is proven to be both syntactically and semantically sound.
 
-The workflow for any modification command (e.g., `act refactor`) is as follows:
+The workflow for any modification command (for example, `symbols rename`) is as
+follows:
 
 1. **Agent Request:** An agent issues a command such as:
 
     ```sh
-    weaver act refactor --provider rope --refactoring rename \
-      --file src/main.py \
-      offset=123 \
-      new_name=new_function_name
+    weaver symbols rename \
+      --uri file:///src/main.py \
+      --position 10:5 \
+      --new-name new_function_name
     ```
 
-2. **Sandboxed Execution:** The `weaverd` daemon invokes the specified plugin
-    (`rope`) within the secure, resource-limited sandbox (detailed in Section
-    5). The plugin is provided with the necessary context (e.g., file contents,
-    arguments) via its standard input.
+2. **Capability routing and sandboxed execution:** The `weaverd` daemon maps
+    the command to a capability such as `symbol.rename`, resolves an eligible
+    provider such as `rope`, and invokes that provider within the secure,
+    resource-limited sandbox (detailed in Section 5). The provider is supplied
+    with the necessary context, such as file contents and arguments, via its
+    standard input.
 
 3. **Diff Capture:** The plugin executes the refactoring logic and, instead of
     writing directly to the filesystem, it outputs a set of proposed changes
@@ -2044,7 +2274,7 @@ other `act` commands. The parsed patch is applied to in-memory buffers, then:
   to ensure they remain syntactically valid. If the parser is unavailable or a
   timeout elapses, the command fails fast with a structured backend-unavailable
   error.
-- **Semantic Lock (LSP)**: The modified content is synchronised to the LSP
+- **Semantic Lock (LSP)**: The modified content is synchronized to the LSP
   server and diagnostics are checked for newly introduced errors. If the LSP
   backend is unavailable or times out, the command fails fast without falling
   back to a weaker validation mode.
@@ -2294,13 +2524,13 @@ classDiagram
     RuntimeHelpers --> BirdcageSandbox : preflight for spawn
 ```
 
-## 6. Advanced Capabilities for AI Agents
+## 6. Advanced Capabilities for Agents
 
-Beyond core observation and action primitives, `Weaver` is designed with
-specific features to enhance the planning and execution capabilities of
-sophisticated AI agents. These features address the practical realities of the
-software development toolchain and leverage modern AI techniques to provide
-agents with superior context.
+Beyond core semantic resources, `Weaver` is designed with specific features to
+enhance the planning and execution capabilities of sophisticated agents while
+remaining useful to humans and scripts. These features address the practical
+realities of the software development toolchain and provide superior context
+without giving up local command-line composability.
 
 ### 6.1. Capability-Aware Orchestration and Graceful Degradation
 
@@ -2310,26 +2540,27 @@ An AI agent that assumes uniform capabilities will be brittle and ineffective.
 `Weaver` addresses this head-on with its capability-aware orchestration layer.
 
 On startup, `weaverd` performs a capability-discovery process. It queries each
-configured LSP server for its `ServerCapabilities` and combines this
-information with the user-defined override matrix from `weaver-config`.^10^
-This fused data is stored in a Capability Registry. Before planning a complex
-sequence of actions, an agent can query this registry via
-
-`weaver --capabilities` to get a definitive, JSONL-formatted list of supported
-features for the target language. This allows the agent to tailor its strategy
-to the known strengths and weaknesses of the available tooling.
+configured LSP server and plugin provider for its declared support, combines
+that information with the user-defined override matrix from `weaver-config`,
+and stores the fused data in a capability registry.^10^ Before planning a
+complex sequence of actions, an agent can query the full command surface via
+`weaver context --json` and the runtime capability availability via
+`weaver capabilities list --json`. This allows the agent to tailor its strategy
+to the known strengths and weaknesses of the available tooling without parsing
+localized prose or provider-specific help text.
 
 When an agent requests an operation that is not supported, `weaverd` does not
 simply fail. It returns a structured `MissingCapability` error that is
 machine-readable and actionable. Critically, this error response can include a
 suggested fallback strategy. For example:
 
-- **Request:** `act rename-symbol` for Swift, where LSP rename support is
-    known to be limited.
+- **Request:** `weaver symbols rename` for Swift, where rename support is known
+    to be limited.
 
 - **Response:** `{"status": "error", "type": "MissingCapability", "details":
-    {"language": "swift", "feature": "rename"}, "suggestion": "Use 'observe
-    grep' to find occurrences and 'act apply-edits' for syntactic
+    {"language": "swift", "feature": "symbol.rename"}, "suggestion": "Use
+    'weaver symbols list --query … --json' to find occurrences and
+    'weaver patches apply --dry-run' for syntactic
     replacement."}`
 
 This mechanism for graceful degradation transforms failures from dead ends into
