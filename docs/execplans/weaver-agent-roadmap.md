@@ -34,6 +34,13 @@ and see one coherent product direction:
   orchestration, safety, and user-facing resource grammar.
 - Public commands are resource-first and community-consistent, not prototype
   `observe` / `act` / `verify` domains.
+- Sempai one-liner queries are a first-class selector syntax for referencing
+  one symbol or a collection of symbols anywhere a command accepts a symbol
+  reference.
+- Observe and act commands are composable: an observe command can emit bounded
+  structured selector results, those results can be filtered with ordinary UNIX
+  tools, and an act command can consume either the filtered stream or a direct
+  Sempai one-liner.
 - Capability is the public abstraction. Rope, rust-analyzer, Language Server
   Protocol (LSP) servers, Tree-sitter, Sempai, and future helpers are provider
   implementations behind stable perceptor and actuator capabilities.
@@ -75,6 +82,10 @@ teams a sequenced build plan.
 - Preserve the existing safety principles. All actuator output still flows
   through Weaver-owned transaction, sandbox, Double-Lock, atomic-write,
   idempotency, and rollback semantics.
+- Preserve UNIX composability as a product requirement. The redesigned public
+  grammar must support direct selectors, streamed selector input, filtering,
+  paging, and JSON mode without forcing agents or humans through hidden session
+  state.
 - Keep the docs self-consistent. Any new ADR, roadmap phase, crate/module
   name, command name, or storage path must be reflected in `docs/contents.md`,
   `docs/repository-layout.md`, `docs/users-guide.md`, `README.md`, and related
@@ -186,6 +197,10 @@ teams a sequenced build plan.
 - [x] (2026-05-11) Ran the amendment gates: `make fmt`,
       `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
       `make test`.
+- [x] (2026-05-11) Added first-class Sempai one-liner selector and
+      observe/filter/act pipeline requirements, then reran `make fmt`,
+      `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
+      `make test`.
 - [ ] Obtain explicit approval before executing the planned documentation
       overhaul.
 - [ ] Execute the documentation overhaul milestone by milestone, updating this
@@ -272,6 +287,12 @@ teams a sequenced build plan.
   is yes, provided capability is public and providers remain implementation
   details behind deterministic routing, refusal diagnostics, provenance, and
   expert policy overrides. Date: 2026-05-09.
+
+- Decision: make Sempai one-liner queries a first-class selector form.
+  Rationale: the user clarified that one-liners must reference a symbol or
+  collection of symbols directly, and must compose with observe/filter/act
+  pipelines as well as direct act commands. Position references remain a peer
+  selector form, not the only first-class path. Date: 2026-05-11.
 
 - Decision: do not use Firecrawl for the initial plan draft. Rationale: the
   full conversation and the target repository docs are available locally, and
@@ -386,8 +407,13 @@ weaver references list --uri file:///src/main.rs --position 10:5
 weaver diagnostics list --workspace .
 weaver cards get --uri file:///src/main.rs --position 10:5
 weaver graph-slices get --uri file:///src/main.rs --position 10:5
+weaver symbols list --query 'fn $name(...)'
+weaver symbols rename --query 'fn process_request(...)' --new-name run_request
 weaver symbols rename --uri file:///src/main.rs --position 10:5 --new-name run
 weaver symbols move --uri file:///src/main.rs --position 10:5 --to src/runner.rs
+weaver symbols list --query 'fn $name(...)' --json \
+  | jq 'select(.name | test("_old$"))' \
+  | weaver symbols rename --from-stdin --suffix ""
 weaver patches apply --file changes.patch --dry-run
 weaver context --json
 weaver jobs list --json
@@ -430,6 +456,47 @@ The canonical machine switch is:
 All data-returning commands accept `--json`. In JSON mode, success writes only
 the operation result to stdout. Failure writes a structured error object to
 stderr and exits with a stable non-zero exit class.
+
+## Selector and pipeline model
+
+The planned design must define selectors as first-class inputs. A selector is
+any stable way to identify one symbol or a collection of symbols. The initial
+selector forms are:
+
+- Sempai one-liner queries, passed with a canonical flag such as
+  `--query <sempai-one-liner>`.
+- Position references, passed with `--uri` and `--position`.
+- Structured selector streams, read from stdin when `--from-stdin` or an
+  equivalent explicit stream flag is present.
+
+Sempai one-liners are not a secondary search feature. They are a peer to
+position references. Any command that acts on one or more symbols must state
+which selector forms it accepts and how it handles zero, one, and many matches.
+
+Observe commands must be able to emit selector records that act commands can
+consume without bespoke glue. The roadmap and design should preserve these
+composition shapes:
+
+```sh
+weaver symbols list --query 'fn $name(...)' --json \
+  | jq 'select(.name | startswith("old_"))' \
+  | weaver symbols rename --from-stdin --replace-prefix old_ --with-prefix new_
+
+weaver symbols rename --query 'fn process_request(...)' --new-name run_request
+
+weaver symbols rename \
+  --uri file:///src/main.rs \
+  --position 10:5 \
+  --new-name run_request
+
+weaver symbols list --query 'class $name' --json | less
+```
+
+The exact command and flag names may change during design review, but the
+capabilities may not collapse back to a position-only model. This requirement
+is about the interaction contract: observe results are useful downstream act
+inputs, act commands can resolve direct query selectors, and ordinary UNIX
+filters can sit between them.
 
 ## Capability and plugin model
 
@@ -563,8 +630,9 @@ Add a section named `Agent-native command surface`. It must specify:
   renderer, profile, delivery, feedback, and execution-ledger contracts.
 - A Weaver-owned command-surface adapter only for application-specific
   semantics: resource path, verb, capability ID, mutability class, async class,
-  provider selection policy, safety class, transaction behaviour, examples,
-  output schemas, error schemas, and skill references.
+  selector forms, stream input support, provider selection policy, safety
+  class, transaction behaviour, examples, output schemas, error schemas, and
+  skill references.
 - Generated or validated outputs: clap definitions, daemon router metadata,
   localized help, manpages, shell completions, docs snippets, `context --json`
   agent-context payloads, skill manifests, JSON Schema fixtures, vocabulary
@@ -573,6 +641,19 @@ Add a section named `Agent-native command surface`. It must specify:
   application schema or OrthoConfig metadata change, and CI fails on drift.
 - The fallback rule that any local generic command-contract code is temporary
   unless ADR 007 records why an OrthoConfig dependency cannot satisfy it.
+
+Add a section named `Selector and pipeline contract`. It must define:
+
+- Sempai one-liner selectors for one symbol or a symbol collection,
+- position-reference selectors for editor-style point operations,
+- structured selector streams for observe-to-act composition,
+- explicit stdin consumption through `--from-stdin` or the final canonical
+  equivalent,
+- JSON selector record schemas that preserve enough provenance for safe
+  mutation,
+- zero, one, and many match semantics for every selector-consuming command,
+- the invariant that observe command output can feed compatible act commands
+  after ordinary UNIX filtering.
 
 Add sibling sections named `Human renderer contract` and
 `Machine renderer contract`.
@@ -656,6 +737,10 @@ generalize ADR 001, ADR 004, and ADR 006:
 - provider manifests declare capability support,
 - perceptors are read-only,
 - actuators produce proposed edits and never commit directly,
+- perceptors that return symbol collections produce selector records suitable
+  for downstream actuator input,
+- actuators may accept Sempai one-liner selectors directly when their
+  capability supports query resolution,
 - the broker owns routing, safety, idempotency, jobs, and final rendering,
 - provider provenance is available for debugging without making provider names
   the normal command surface.
@@ -730,6 +815,8 @@ This phase must contain review-sized tasks for:
 - enumerating errors,
 - bounded list responses,
 - `context --json` agent-context payload,
+- Sempai one-liner selector support,
+- observe-to-act pipeline composition,
 - capability introspection,
 - skill manifests,
 - manpage and completion generation,
@@ -750,6 +837,9 @@ Resource command slice: definitions, references, diagnostics, and cards
 
 This phase should prove that existing LSP, Tree-sitter, and cards work can be
 re-exposed through the new generated surface with both human and JSON output.
+It should also prove that Sempai one-liner selectors can produce symbol
+collections that flow through `symbols list` or another observe-style resource
+command into ordinary UNIX filters.
 
 The following phase should deliver safe mutation under the new grammar:
 
@@ -760,7 +850,9 @@ Capability-routed mutation slice: symbols and patches
 This phase should include `symbols rename`, `symbols move` or
 `symbols extract`, `patches apply`, `--dry-run`, `--force`, idempotency,
 transaction IDs, provider provenance, Double-Lock integration, and structured
-refusals.
+refusals. It must include direct act commands using both Sempai one-liner
+selectors and position references, plus at least one observe-to-act pipeline
+where structured selector records are filtered before mutation.
 
 Then add phases for:
 
@@ -788,6 +880,10 @@ Success criteria:
 - Later Sempai, plugin, and graph tasks depend on the command-surface reset.
 - No future task asks implementers to add new public `observe` / `act` /
   `verify` commands.
+- Sempai one-liner queries are accepted as first-class symbol selectors in the
+  planned command surface.
+- Observe-style resource commands and act-style mutation commands have an
+  explicit structured pipeline contract.
 - The roadmap explains the product-forward rationale for the chosen shape,
   not only the mechanics.
 
@@ -814,7 +910,9 @@ Cover these audit rows:
 - two-way I/O,
 - localized human help,
 - accessible human rendering,
-- capability-routed provider abstraction.
+- capability-routed provider abstraction,
+- Sempai one-liner selectors,
+- observe/filter/act pipeline composition.
 
 Each row must include an `OrthoConfig dependency` column. Rows whose reusable
 metadata or linting belongs to OrthoConfig should cite the task number instead
@@ -843,6 +941,9 @@ The guide should describe the 0.1.0 target command model, including:
 - `--json`,
 - `--plain`,
 - resource-first commands,
+- Sempai one-liner selectors,
+- position-reference selectors,
+- observe-to-act pipelines through JSON selector streams,
 - non-interactive execution,
 - `--interactive` as explicit opt-in,
 - `--dry-run`,
