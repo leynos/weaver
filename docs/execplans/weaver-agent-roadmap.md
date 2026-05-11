@@ -423,10 +423,12 @@ weaver feedback create "the enum error did not list valid values"
 ```
 
 Canonical verbs are `get`, `list`, `create`, `update`, `delete`, `apply`,
-`run`, `prune`, `save`, `show`, and `rename`. Banned or non-canonical public
-forms include `info`, `ls`, `--skip-confirmations`, operation-local
-`--format=json`, root `--output json`, and provider-named commands such as
-`weaver rope rename`.
+`run`, `prune`, `save`, `show`, `rename`, `move`, and `send`. The final
+vocabulary policy must include every verb used by target examples and planned
+resource commands, or must change those examples before the policy lands.
+Banned or non-canonical public forms include `info`, `ls`,
+`--skip-confirmations`, operation-local `--format=json`, root `--output json`,
+and provider-named commands such as `weaver rope rename`.
 
 The design should permit standard ancestral flags where the convention is
 strong:
