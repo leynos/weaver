@@ -38,9 +38,10 @@ and see one coherent product direction:
   one symbol or a collection of symbols anywhere a command accepts a symbol
   reference.
 - Observe and act commands are composable: an observe command can emit bounded
-  structured selector results, those results can be filtered with ordinary UNIX
-  tools, and an act command can consume either the filtered stream or a direct
-  Sempai one-liner.
+  structured selector results, those results can flow directly into an act
+  command or be filtered with ordinary UNIX tools first, and an act command can
+  consume either the direct stream, the filtered stream, or a direct Sempai
+  one-liner.
 - Capability is the public abstraction. Rope, rust-analyzer, Language Server
   Protocol (LSP) servers, Tree-sitter, Sempai, and future helpers are provider
   implementations behind stable perceptor and actuator capabilities.
@@ -479,6 +480,9 @@ composition shapes:
 
 ```sh
 weaver symbols list --query 'fn $name(...)' --json \
+  | weaver symbols rename --from-stdin --suffix _renamed
+
+weaver symbols list --query 'fn $name(...)' --json \
   | jq 'select(.name | startswith("old_"))' \
   | weaver symbols rename --from-stdin --replace-prefix old_ --with-prefix new_
 
@@ -496,7 +500,7 @@ The exact command and flag names may change during design review, but the
 capabilities may not collapse back to a position-only model. This requirement
 is about the interaction contract: observe results are useful downstream act
 inputs, act commands can resolve direct query selectors, and ordinary UNIX
-filters can sit between them.
+filters may sit between them when the caller wants narrowing or transformation.
 
 ## Capability and plugin model
 
@@ -653,7 +657,7 @@ Add a section named `Selector and pipeline contract`. It must define:
   mutation,
 - zero, one, and many match semantics for every selector-consuming command,
 - the invariant that observe command output can feed compatible act commands
-  after ordinary UNIX filtering.
+  either directly or after ordinary UNIX filtering.
 
 Add sibling sections named `Human renderer contract` and
 `Machine renderer contract`.
@@ -852,7 +856,8 @@ This phase should include `symbols rename`, `symbols move` or
 transaction IDs, provider provenance, Double-Lock integration, and structured
 refusals. It must include direct act commands using both Sempai one-liner
 selectors and position references, plus at least one observe-to-act pipeline
-where structured selector records are filtered before mutation.
+where structured selector records flow directly into mutation and one where
+they are filtered before mutation.
 
 Then add phases for:
 
