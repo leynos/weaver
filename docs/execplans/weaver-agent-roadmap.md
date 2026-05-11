@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: IN PROGRESS
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root. It plans a documentation and roadmap overhaul only. It does
@@ -202,8 +202,13 @@ teams a sequenced build plan.
       observe/filter/act pipeline requirements, then reran `make fmt`,
       `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
       `make test`.
-- [ ] Obtain explicit approval before executing the planned documentation
-      overhaul.
+- [x] (2026-05-11) Treated the active implementation instruction as approval
+      to begin executing the documentation overhaul.
+- [x] (2026-05-11) Completed Milestone 1 by adding ADR 007 and indexing it in
+      `docs/contents.md`.
+- [x] (2026-05-11) Ran Milestone 1 gates: `make fmt`,
+      `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
+      `make test`.
 - [ ] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [ ] Run documentation and repository gates.
@@ -315,6 +320,11 @@ teams a sequenced build plan.
   functionality after the UI redesign. Completed safety, atomic-edit,
   capability-routing, card, graph, and help work should be retained as
   foundation or migrated into the new command grammar. Date: 2026-05-11.
+
+- Decision: start execution on this branch from the existing ExecPlan.
+  Rationale: the active implementation instruction explicitly asks to proceed
+  with the planned functionality and keep the ExecPlan current, which satisfies
+  the plan's approval gate for this workstream. Date: 2026-05-11.
 
 ## Context and orientation
 
