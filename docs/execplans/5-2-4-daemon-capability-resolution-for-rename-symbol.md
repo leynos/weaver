@@ -1,5 +1,9 @@
 # Implement daemon capability resolution for `rename-symbol`
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -46,8 +50,9 @@ Observable success for the eventual implementation:
 - Human-readable mode does not degrade into raw JSON noise; any new structured
   routing payload is either rendered cleanly by the command-line interface
   (CLI) or otherwise surfaced in a deliberate, documented form.
-- `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-  reflect the shipped behaviour once implementation is complete.
+- `docs/weaver-design.md`, `docs/users-guide.md`, and
+  `docs/archive/prototype-roadmap.md` reflect the shipped behaviour once
+  implementation is complete.
 
 ## Constraints
 
@@ -248,7 +253,7 @@ The likely files touched by implementation are:
 - `crates/weaver-cli/src/output/models.rs`
 - `docs/weaver-design.md`
 - `docs/users-guide.md`
-- `docs/roadmap.md`
+- `docs/archive/prototype-roadmap.md`
 
 ## Implementation plan
 
@@ -400,7 +405,7 @@ Once the implementation and tests are green, update the docs in the same change:
   Explain that `rename` routing is now language-aware, describe whether
   `--provider` is optional or override-only, show at least one provider-less
   example, and document the structured rationale visible in JSON mode.
-- `docs/roadmap.md`
+- `docs/archive/prototype-roadmap.md`
   Mark 5.2.4 as done only after all tests and gates pass.
 
 ## Validation

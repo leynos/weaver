@@ -1,5 +1,9 @@
 # Phase 1: JSON Lines (JSONL) Request Dispatch Loop
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 ## Goal
 
 Implement the JSONL request dispatch loop in `weaverd` that reads
@@ -211,7 +215,7 @@ handling:
 
 ### Step 11: Mark roadmap entry as done
 
-Update `docs/roadmap.md`, changing:
+Update `docs/archive/prototype-roadmap.md`, changing:
 
 ```markdown
 - [ ] Implement the JSONL request dispatch loop...
@@ -248,7 +252,7 @@ make test 2>&1 | tee /tmp/test.log
 | `crates/weaverd/src/tests/dispatch_behaviour.rs`        | Created                                  |
 | `crates/weaverd/src/tests/mod.rs`                       | Modified (add `mod dispatch_behaviour;`) |
 | `docs/users-guide.md`                                   | Modified (update daemon description)     |
-| `docs/roadmap.md`                                       | Modified (mark entry done)               |
+| `docs/archive/prototype-roadmap.md`                     | Modified (mark entry done)               |
 | `docs/execplans/phase-1-jsonl-request-dispatch-loop.md` | Created                                  |
 
 ## Dependencies

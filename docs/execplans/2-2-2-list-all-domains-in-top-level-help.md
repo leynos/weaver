@@ -1,5 +1,9 @@
 # 2.2.2 List all domains and operations in top-level help output
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -42,7 +46,7 @@ Domains and operations:
 ```
 
 This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
-`docs/roadmap.md`.
+`docs/archive/prototype-roadmap.md`.
 
 ## Constraints
 
@@ -235,7 +239,7 @@ _Table: Key files referenced in this plan._
 | `crates/weaver-cli/build.rs`                          | 70    | Manpage generation (includes cli.rs)     |
 | `crates/weaverd/src/dispatch/router.rs`               | 264   | Authoritative domain/operation lists     |
 | `docs/users-guide.md`                                 | 889   | Operator documentation                   |
-| `docs/roadmap.md`                                     | 771   | Roadmap checkboxes                       |
+| `docs/archive/prototype-roadmap.md`                   | 771   | Roadmap checkboxes                       |
 
 ### Localization pattern
 
@@ -338,7 +342,7 @@ Run `make test` and confirm all new tests pass.
 After the "Bare invocation" subsection, add a "Top-level help" subsection
 describing the new `--help` output with the domains-and-operations catalogue.
 
-**D2. Mark roadmap task 2.2.2 as done in `docs/roadmap.md`.**
+**D2. Mark roadmap task 2.2.2 as done in `docs/archive/prototype-roadmap.md`.**
 
 Change the three `[ ]` checkboxes for task 2.2.2 to `[x]`.
 
@@ -388,7 +392,7 @@ All commands run from the workspace root `/home/user/project`.
 ### Stage D
 
 1. Edit `docs/users-guide.md` — add "Top-level help" subsection.
-2. Edit `docs/roadmap.md` — mark 2.2.2 as done.
+2. Edit `docs/archive/prototype-roadmap.md` — mark 2.2.2 as done.
 3. Run `make fmt`.
 
 ### Stage E
@@ -467,7 +471,7 @@ _Table: Summary of modified files._
 | `crates/weaver-cli/src/tests/unit/after_help.rs`             | New: unit tests for after-help                  |
 | `crates/weaver-cli/tests/main_entry.rs`                      | Add integration test for `--help`               |
 | `docs/users-guide.md`                                        | Add "Top-level help" subsection                 |
-| `docs/roadmap.md`                                            | Mark 2.2.2 checkboxes as done                   |
+| `docs/archive/prototype-roadmap.md`                          | Mark 2.2.2 checkboxes as done                   |
 | `docs/execplans/2-2-2-list-all-domains-in-top-level-help.md` | This ExecPlan                                   |
 
 Total: 9 files (within 15-file tolerance).

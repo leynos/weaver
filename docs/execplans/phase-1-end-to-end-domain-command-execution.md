@@ -1,5 +1,9 @@
 # ExecPlan: End-to-End Domain Command Execution
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 ## Summary
 
 Wire End-to-End (E2E) domain command execution from command-line interface
@@ -65,7 +69,7 @@ ______________________________________________________________________
 | `crates/weaverd/tests/features/daemon_dispatch.feature` | BDD scenarios                |
 | `crates/weaverd/src/tests/dispatch_behaviour.rs`        | Step definitions             |
 | [users guide](../users-guide.md)                        | Documentation updates        |
-| `docs/roadmap.md`                                       | Mark task complete           |
+| `docs/archive/prototype-roadmap.md`                     | Mark task complete           |
 
 ______________________________________________________________________
 
@@ -576,7 +580,7 @@ fully implemented. Update the `observe get-definition` command reference with:
 - Response format (JSON array of locations written to stdout stream)
 - Error handling for missing arguments and unsupported languages
 
-**File:** `docs/roadmap.md`
+**File:** `docs/archive/prototype-roadmap.md`
 
 Mark the task as complete:
 

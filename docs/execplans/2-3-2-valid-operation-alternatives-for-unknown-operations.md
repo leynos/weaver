@@ -1,5 +1,9 @@
 # 2.3.2 Include valid operation alternatives for unknown operations
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -149,7 +153,7 @@ the UI gap analysis.[^3][^4]
 
 ## Progress
 
-- [x] (2026-03-28 00:00Z) Read `docs/roadmap.md`,
+- [x] (2026-03-28 00:00Z) Read `docs/archive/prototype-roadmap.md`,
       `docs/ui-gap-analysis.md`, `docs/weaver-design.md`,
       `docs/users-guide.md`, and the referenced testing guides.
 - [x] (2026-03-28 00:10Z) Confirmed the live daemon path:
@@ -174,9 +178,9 @@ the UI gap analysis.[^3][^4]
       `UnknownOperation` payloads and confirmed the new `rstest-bdd` scenarios
       pass for both daemon and CLI.
 - [x] (2026-03-29 12:45Z) Stage D: updated `docs/weaver-design.md`,
-      `docs/users-guide.md`, and `docs/roadmap.md` to describe the shipped
-      daemon-routed `UnknownOperation` contract and marked roadmap item
-      `2.3.2` done.
+      `docs/users-guide.md`, and `docs/archive/prototype-roadmap.md` to
+      describe the shipped daemon-routed `UnknownOperation` contract and marked
+      roadmap item `2.3.2` done.
 - [x] (2026-03-29 12:59Z) Stage E: ran `make fmt`,
       `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
       `make test` successfully after fixing one daemon unit assertion to parse
@@ -247,8 +251,8 @@ Target outcome at completion:
    `Available operations:` block from the structured daemon payload.
 4. The daemon and CLI behavioural suites exercise the new path with
    `rstest-bdd` using the existing harnesses.
-5. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-   reflect the shipped behaviour.
+5. `docs/weaver-design.md`, `docs/users-guide.md`, and
+   `docs/archive/prototype-roadmap.md` reflect the shipped behaviour.
 6. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
@@ -301,7 +305,7 @@ The change spans two crates and three documentation files.
   payload, not the CLI catalogue, is the source of truth for alternatives.
 - `docs/users-guide.md`
   Must show the new operator-visible human and JSON behaviour.
-- `docs/roadmap.md`
+- `docs/archive/prototype-roadmap.md`
   Must mark `2.3.2` done once the implementation and all gates are complete.
 
 ## Implementation plan
@@ -423,7 +427,7 @@ that the returned operations list comes from the daemon router and may include
 implemented and not-yet-implemented operations alike.
 
 After code, tests, and docs are complete, mark roadmap item `2.3.2` done in
-`docs/roadmap.md`.
+`docs/archive/prototype-roadmap.md`.
 
 ### Stage E - run the full gates and capture evidence
 
@@ -471,12 +475,12 @@ This work is complete only when all of the following are true:
 4. `--output json` forwards the structured payload unchanged.
 5. Unit tests and `rstest-bdd` behavioural tests pass for both daemon and CLI
    paths.
-6. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md` are
-   updated.
+6. `docs/weaver-design.md`, `docs/users-guide.md`, and
+   `docs/archive/prototype-roadmap.md` are updated.
 7. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
-[^1]: `docs/roadmap.md` item `2.3.2`.
+[^1]: `docs/archive/prototype-roadmap.md` item `2.3.2`.
 [^2]: `docs/ui-gap-analysis.md` Level 4.
 [^3]: `docs/ui-gap-analysis.md#level-4--unknown-operation-weaver-observe-nonexistent`.
 [^4]: `docs/ui-gap-analysis.md#level-10--error-messages-and-exit-codes`.

@@ -1,5 +1,9 @@
 # 2.3.1 Validate domains client-side before daemon startup
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -132,7 +136,8 @@ Both commands exit non-zero and do not print `Waiting for daemon start...`.
 
 ## Progress
 
-- [x] (2026-03-22 00:00Z) Read `docs/roadmap.md`, `docs/ui-gap-analysis.md`,
+- [x] (2026-03-22 00:00Z) Read `docs/archive/prototype-roadmap.md`,
+      `docs/ui-gap-analysis.md`,
       `docs/weaver-design.md`, the relevant testing guides, and the prior
       `2.2.4` ExecPlan.
 - [x] (2026-03-22 00:00Z) Confirmed the current runtime path in
@@ -157,8 +162,8 @@ Both commands exit non-zero and do not print `Waiting for daemon start...`.
       edit-distance suggestions, and renamed the sentinel to
       `PreflightGuidance`.
 - [x] (2026-03-22 14:10Z) Stage C: updated `docs/weaver-design.md`,
-      `docs/users-guide.md`, and `docs/roadmap.md` to reflect the shipped
-      behaviour.
+      `docs/users-guide.md`, and `docs/archive/prototype-roadmap.md` to
+      reflect the shipped behaviour.
 - [x] (2026-03-22 14:20Z) Stage D: ran `make fmt`, `make markdownlint`,
       `make nixie`, `make check-fmt`, `make lint`, and `make test` with logged
       output.
@@ -232,8 +237,8 @@ Target outcome at completion:
    roadmap `2.2.4`.
 6. Unit tests, integration tests, and `rstest-bdd` scenarios cover happy,
    unhappy, and edge cases.
-7. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-   reflect the final behaviour.
+7. `docs/weaver-design.md`, `docs/users-guide.md`, and
+   `docs/archive/prototype-roadmap.md` reflect the final behaviour.
 8. `make check-fmt`, `make lint`, and `make test` pass, along with the
    Markdown gates required by `AGENTS.md`.
 
@@ -403,7 +408,7 @@ Update the design and operator docs once the code and tests are stable.
   Replace the current statement that unknown domains print the built-in
   domain-operation catalogue. Include one concrete example showing the new
   `Valid domains:` line and, if retained, the `Did you mean` hint.
-- `docs/roadmap.md`
+- `docs/archive/prototype-roadmap.md`
   Mark item `2.3.1` complete only after the implementation and all gates pass.
 
 Go/no-go:
@@ -434,6 +439,6 @@ Expected evidence:
 
 ## References
 
-[^roadmap]: [docs/roadmap.md](../roadmap.md)
+[^roadmap]: [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md)
 [^level3]: [docs/ui-gap-analysis.md Level 3](../ui-gap-analysis.md#level-3--unknown-domain-weaver-bogus-something)
 [^level10]: [docs/ui-gap-analysis.md Level 10](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes)

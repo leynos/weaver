@@ -1,5 +1,9 @@
 # 7.1.2 Implement Tree-sitter symbol card extraction for `observe get-card`
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -66,7 +70,8 @@ Observable behaviour after implementation:
    must remain named `world`.
 8. Documentation changes are part of scope:
    `docs/jacquard-card-first-symbol-graph-design.md`, `docs/users-guide.md`,
-   and `docs/roadmap.md` must be updated before the work is considered complete.
+   and `docs/archive/prototype-roadmap.md` must be updated before the work is
+   considered complete.
 9. `docs/users-guide.md` must explain any new user-visible behaviour,
    especially successful `get-card` responses, refusal cases, and the fact that
    `semantic` / `full` requests still degrade to Tree-sitter-only sections in
@@ -423,8 +428,8 @@ language in the `observe get-card` section with:
 - refusal cases,
 - the meaning of detail levels in the Tree-sitter-first phase.
 
-Only after the feature, tests, and docs are complete should `docs/roadmap.md`
-mark item 7.1.2 as done.
+Only after the feature, tests, and docs are complete should
+`docs/archive/prototype-roadmap.md` mark item 7.1.2 as done.
 
 ## Validation
 

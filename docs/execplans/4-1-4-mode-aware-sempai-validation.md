@@ -1,5 +1,9 @@
 # 4.1.4 Implement mode-aware Sempai validation and execution gating
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -87,8 +91,9 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log
   [docs/sempai-query-language-design.md](../sempai-query-language-design.md).
 - Update [docs/users-guide.md](../users-guide.md) with the user-visible change
   in `compile_yaml(...)` behaviour by mode.
-- Mark roadmap item 4.1.4 done in [docs/roadmap.md](../roadmap.md) only after
-  all tests and quality gates pass.
+- Mark roadmap item 4.1.4 done in
+  [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md) only
+  after all tests and quality gates pass.
 
 ## Tolerances
 
@@ -252,7 +257,7 @@ Target outcome at completion:
    parser validation and engine validation.
 7. `docs/users-guide.md` explains the mode-specific `compile_yaml(...)`
    behaviour users now see.
-8. `docs/roadmap.md` marks 4.1.4 done.
+8. `docs/archive/prototype-roadmap.md` marks 4.1.4 done.
 9. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
@@ -295,7 +300,7 @@ Current files that matter for this milestone:
 - [crates/sempai-core/src/diagnostic.rs](../../crates/sempai-core/src/diagnostic.rs)
 - [docs/sempai-query-language-design.md](../sempai-query-language-design.md)
 - [docs/users-guide.md](../users-guide.md)
-- [docs/roadmap.md](../roadmap.md)
+- [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md)
 
 Current behaviour to preserve or intentionally change:
 
@@ -410,7 +415,7 @@ Once the implementation is stable, synchronize the living documentation.
   - explain that `compile_yaml(...)` now distinguishes supported search rules
     from parse-only unsupported modes
   - show which diagnostic codes users should expect
-- Update [docs/roadmap.md](../roadmap.md):
+- Update [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md):
   - mark 4.1.4 done only after every required gate passes
 
 Go/no-go:

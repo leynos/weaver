@@ -267,6 +267,11 @@ teams a sequenced build plan.
       `62c9464`, ran `coderabbit review --agent --base-commit HEAD~1 --type
       committed` with zero findings, and pushed `feat/weaver-agent-roadmap` to
       `https://github.com/leynos/weaver.git`.
+- [x] (2026-05-13) Split the preserved prototype roadmap ledger into
+      `docs/archive/prototype-roadmap.md`, kept historical task numbers
+      `1` through `11`, renumbered the live forward roadmap as phases `12`
+      through `20`, and repointed historical ExecPlans and roadmap references
+      to the archive.
 - [x] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [x] Run documentation and repository gates.
@@ -1191,8 +1196,10 @@ command-contract work inside Weaver.
 
 Existing completed and planned Weaver roadmap work was not erased. Completed
 safety, atomic edit, capability-routing, card, graph, help, and configuration
-work is preserved as historical foundation, while relevant future work is
-migrated under the ADR 007 command grammar or marked superseded with rationale.
+work is preserved in `docs/archive/prototype-roadmap.md` as historical
+foundation. Relevant future work is migrated under the ADR 007 command grammar
+in live roadmap phases `12` through `20`, while historical ExecPlans keep their
+original archive task numbers.
 
 All final gates passed:
 

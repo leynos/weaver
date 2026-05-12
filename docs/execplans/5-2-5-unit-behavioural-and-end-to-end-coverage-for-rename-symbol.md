@@ -1,5 +1,9 @@
 # Add unit, behavioural, and end-to-end coverage for `rename-symbol`
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -39,7 +43,7 @@ After this change:
   explicitly in the behavioural and end-to-end tests.
 - `docs/users-guide.md` is reviewed and updated if any observable behaviour
   changes surface during testing.
-- `docs/roadmap.md` marks 5.2.5 as done.
+- `docs/archive/prototype-roadmap.md` marks 5.2.5 as done.
 
 Observable success: running `make test` passes with the new tests included, and
 the shared contract fixtures produce identical pass/fail verdicts for both
@@ -211,8 +215,8 @@ plugins.
   failure paths.
 - Extended end-to-end snapshot coverage so the CLI now records automatic
   routing and structured mismatch refusals for both built-in rename flows.
-- Updated `docs/users-guide.md` and `docs/roadmap.md` so the documented state
-  matches the implemented coverage milestone.
+- Updated `docs/users-guide.md` and `docs/archive/prototype-roadmap.md` so the
+  documented state matches the implemented coverage milestone.
 
 ## Context and orientation
 
@@ -302,7 +306,7 @@ The `weaver-e2e` crate contains CLI ergonomics snapshot tests:
 
 - `docs/users-guide.md`: documents `act refactor` syntax, parameter
   semantics, routing rationale, and plugin inventory.
-- `docs/roadmap.md`: section 5.2.5 is marked done.
+- `docs/archive/prototype-roadmap.md`: section 5.2.5 is marked done.
 
 ## Plan of work
 
@@ -517,8 +521,8 @@ the Decision Log that the user's guide was reviewed and found current.
 
 #### 5b: Mark roadmap 5.2.5 as done
 
-In `docs/roadmap.md`, find roadmap item `5.2.5` and change its checkbox from
-`- [ ]` to `- [x]`.
+In `docs/archive/prototype-roadmap.md`, find roadmap item `5.2.5` and change
+its checkbox from `- [ ]` to `- [x]`.
 
 #### 5c: Final validation
 
@@ -544,8 +548,8 @@ Quality criteria (what "done" means):
   end-to-end (e2e) snapshot tests pass.
 - Lint/typecheck: `make check-fmt` and `make lint` both pass.
 - Documentation: `make markdownlint` and `make nixie` pass.
-  `docs/users-guide.md` is reviewed and current. `docs/roadmap.md` marks 5.2.5
-  as done.
+  `docs/users-guide.md` is reviewed and current.
+  `docs/archive/prototype-roadmap.md` marks 5.2.5 as done.
 - Rollback guarantees: every refusal and failure path is asserted to produce
   no filesystem-modifying output (no `PluginOutput::Diff` on failure, no
   apply-patch invocation on refusal).
@@ -613,7 +617,7 @@ Modified files:
 - `crates/weaver-e2e/tests/refactor_rope_cli_snapshots.rs`
 - `crates/weaver-e2e/tests/refactor_rust_analyzer_cli_snapshots.rs`
 - `docs/users-guide.md` (review; update only if needed)
-- `docs/roadmap.md` (mark 5.2.5 as done)
+- `docs/archive/prototype-roadmap.md` (mark 5.2.5 as done)
 
 ## Interfaces and dependencies
 

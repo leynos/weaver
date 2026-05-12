@@ -1,5 +1,9 @@
 # Deliver act apply-patch sub-command
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
 `Outcomes & Retrospective` must be kept up to date as work proceeds.
@@ -35,7 +39,8 @@ writes.
   400 lines; extract helpers where needed per
   `docs/complexity-antipatterns-and-refactoring-strategies.md`.
 - Documentation updates are required in `docs/weaver-design.md`,
-  `docs/users-guide.md`, and the Phase 2 roadmap entry in `docs/roadmap.md`.
+  `docs/users-guide.md`, and the Phase 2 roadmap entry in
+  `docs/archive/prototype-roadmap.md`.
 - Run `make check-fmt`, `make lint`, and `make test` and ensure they pass.
 - Use en-GB-oxendict spelling in prose and comments.
 
@@ -184,7 +189,7 @@ traversal attempt, syntactic lock failure, semantic lock failure).
 Stage G (docs and roadmap): update `docs/weaver-design.md` with decisions made
 (request schema, error envelope, request size limit), update
 `docs/users-guide.md` with CLI usage and behaviour changes, and mark the
-apply-patch entry as done in `docs/roadmap.md`.
+apply-patch entry as done in `docs/archive/prototype-roadmap.md`.
 
 Stage H (quality gates): run `make check-fmt`, `make lint`, `make test`,
 `make markdownlint`, `make fmt`, and `make nixie` as required, using `tee` and
@@ -225,7 +230,7 @@ The feature is complete when:
   filesystem untouched.
 - Unit tests and rstest-bdd scenarios cover happy and unhappy paths.
 - `docs/weaver-design.md` and `docs/users-guide.md` reflect the new command
-  behaviour, and `docs/roadmap.md` marks the entry as done.
+  behaviour, and `docs/archive/prototype-roadmap.md` marks the entry as done.
 - `make check-fmt`, `make lint`, `make test`, `make markdownlint`, `make fmt`,
   and `make nixie` succeed.
 
@@ -246,7 +251,7 @@ Expected artifacts include:
   `crates/weaver-cli/tests/golden/`.
 - A new apply-patch handler module under `crates/weaverd/src/dispatch/act/`.
 - Updated docs in `docs/weaver-design.md`, `docs/users-guide.md`, and
-  `docs/roadmap.md`.
+  `docs/archive/prototype-roadmap.md`.
 
 ## Interfaces and dependencies
 

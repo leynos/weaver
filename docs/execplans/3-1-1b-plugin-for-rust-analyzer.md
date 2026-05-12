@@ -1,5 +1,9 @@
 # Implement the rust-analyzer actuator plugin
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This Execution Plan (ExecPlan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -34,8 +38,8 @@ Observable success:
   failures return structured failures and leave files unchanged.
 - Unit, behavioural (`rstest-bdd` v0.5.0), and end-to-end tests cover happy,
   unhappy, and edge cases.
-- `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-  reflect shipped behaviour.
+- `docs/weaver-design.md`, `docs/users-guide.md`, and
+  `docs/archive/prototype-roadmap.md` reflect shipped behaviour.
 - `make check-fmt`, `make lint`, and `make test` succeed.
 
 ## Constraints
@@ -119,6 +123,6 @@ Observable success:
   `WEAVER_RUST_ANALYZER_PLUGIN_PATH`, and timeout `60s`.
 - Added plugin unit tests, `rstest-bdd` behavioural tests, and e2e CLI
   snapshot coverage for actuator isolation and observe→jq→act pipelines.
-- Updated `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-  to capture behaviour and design decisions.
+- Updated `docs/weaver-design.md`, `docs/users-guide.md`, and
+  `docs/archive/prototype-roadmap.md` to capture behaviour and design decisions.
 - Full quality gates passed before completion.

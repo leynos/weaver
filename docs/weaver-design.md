@@ -674,7 +674,7 @@ The current CLI preserves that payload unchanged in prototype `--output json`
 mode. The 0.1.0 machine renderer will instead use universal `--json` and
 structured error JSON on stderr. Human mode renders the payload into an
 actionable guidance block following the unified three-part error template
-(roadmap 2.3.3):
+(prototype archive roadmap 2.3.3):
 
 ```plaintext
 error: unknown operation 'nonexistent' for domain 'observe'
@@ -791,7 +791,8 @@ ensures the CLI only attempts auto-start when the daemon genuinely isn't
 running, rather than masking configuration errors or network issues.
 
 When auto-start fails, the CLI renders the failure using the unified three-part
-error template (roadmap 2.3.3). For a missing `weaverd` binary:
+error template (prototype archive roadmap 2.3.3). For a missing `weaverd`
+binary:
 
 ```plaintext
 error: failed to spawn weaverd binary 'weaverd'
@@ -1371,11 +1372,11 @@ protocol or plugin execution environment. Invalid locale identifiers are
 reported as configuration errors instead of silently falling back, preserving
 the fail-fast behaviour expected from the rest of the config loader.
 
-For roadmap item `3.2.1`, `locale` ships as a validated `weaver-config` newtype
-that accepts only well-formed BCP 47 identifiers and defaults to `en-US`. The
-later bootstrap-localizer work in roadmap `3.3.1` remains responsible for
-honouring that setting before clap-only help and parse-error surfaces are
-constructed.
+For prototype archive roadmap item `3.2.1`, `locale` ships as a validated
+`weaver-config` newtype that accepts only well-formed BCP 47 identifiers and
+defaults to `en-US`. The later bootstrap-localizer work in prototype archive
+roadmap `3.3.1` remains responsible for honouring that setting before clap-only
+help and parse-error surfaces are constructed.
 
 The capability override matrix is expressed as a sequence of directives using
 the syntax `language:capability=directive`. The directive may be `allow`,

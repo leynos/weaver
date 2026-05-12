@@ -1,5 +1,9 @@
 # Update weaver-plugin-rust-analyzer manifest and handshake for `rename-symbol`
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -51,8 +55,8 @@ Observable success for this roadmap item:
   class is known.
 - Unit tests and `rstest-bdd` v0.5.0 behaviour-driven development (BDD) tests
   cover happy paths, unhappy paths, and edge cases for the contract migration.
-- `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-  reflect the shipped behaviour.
+- `docs/weaver-design.md`, `docs/users-guide.md`, and
+  `docs/archive/prototype-roadmap.md` reflect the shipped behaviour.
 - `make fmt`, `make markdownlint`, `make check-fmt`, `make lint`, and
   `make test` all pass.
 
@@ -145,7 +149,7 @@ Observable success for this roadmap item:
 - [x] (2026-03-07) Updated daemon manifest registration and request-capture
   tests proving Rust rename requests are capability-routed.
 - [x] (2026-03-07) Updated `docs/weaver-design.md`, `docs/users-guide.md`,
-  and `docs/roadmap.md`.
+  and `docs/archive/prototype-roadmap.md`.
 - [x] (2026-03-07) Ran `make fmt`, `make markdownlint`, `make check-fmt`,
   `make lint`, and `make test`, each via `tee` with `set -o pipefail`.
 
@@ -235,7 +239,7 @@ Files materially changed:
 - `crates/weaver-cli/src/tests/unit/auto_start.rs`
 - `docs/weaver-design.md`
 - `docs/users-guide.md`
-- `docs/roadmap.md`
+- `docs/archive/prototype-roadmap.md`
 
 Validation results:
 
@@ -380,7 +384,7 @@ clear that both built-in rename providers now implement the same internal
 contract while the CLI remains `--refactoring rename`.
 
 After implementation passes the gates, mark roadmap item 5.2.3 as done in
-`docs/roadmap.md`.
+`docs/archive/prototype-roadmap.md`.
 
 ### Stage 5: run the quality gates and capture evidence
 

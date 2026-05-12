@@ -1,5 +1,9 @@
 # 7.1.3 Implement optional LSP enrichment for `observe get-card`
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -114,7 +118,8 @@ Observable behaviour after implementation:
   path is naturally exercised since no real language servers are registered.
   The `behaviour.rs` BDD test in `weaver-lsp-host` needed `hover: None` added
   to `sample_responses()` and `.with_hover(true)` added to `all_caps`.
-- [x] (2026-03-15) Stage F: Updated `docs/roadmap.md` (ticked 7.1.3
+- [x] (2026-03-15) Stage F: Updated `docs/archive/prototype-roadmap.md` (ticked
+      7.1.3
   checkboxes) and `docs/users-guide.md` (documented enrichment and degradation
   behaviour).
 - [x] (2026-03-15) Stage G: `make check-fmt`, `make lint`, and
@@ -440,7 +445,7 @@ E2E concern for a future milestone.
 
 ### Stage F: Documentation
 
-**F1. Update `docs/roadmap.md`** — tick the 7.1.3 checkboxes.
+**F1. Update `docs/archive/prototype-roadmap.md`** — tick the 7.1.3 checkboxes.
 
 **F2. Update `docs/users-guide.md`** — document that `--detail semantic` now
 attempts LSP enrichment and explain the degradation behaviour.

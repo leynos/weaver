@@ -1,5 +1,9 @@
 # Implement the first actuator plugin for `rope`
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This Execution Plan (ExecPlan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -29,8 +33,8 @@ Observable success:
   and lock failures return structured failures and leave files unchanged.
 - Unit, behavioural, and end-to-end tests cover happy paths, unhappy paths,
   and edge cases.
-- `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-  reflect the shipped behaviour.
+- `docs/weaver-design.md`, `docs/users-guide.md`, and
+  `docs/archive/prototype-roadmap.md` reflect the shipped behaviour.
 - `make check-fmt`, `make lint`, and `make test` succeed.
 
 ## Constraints
@@ -151,8 +155,9 @@ Observable success:
   `assert_cmd` and `insta` for:
   - isolated `act refactor` invocation;
   - pipeline invocation chaining `observe` output through `jq`.
-- Updated `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-  to reflect shipped behaviour and configuration.
+- Updated `docs/weaver-design.md`, `docs/users-guide.md`, and
+  `docs/archive/prototype-roadmap.md` to reflect shipped behaviour and
+  configuration.
 - Full repository quality gates passed after implementation and documentation
   updates.
 
@@ -168,7 +173,8 @@ Relevant existing components:
 - `crates/weaverd/src/dispatch/act/apply_patch/mod.rs` contains the existing
   patch parser + transaction flow that already enforces Double-Lock semantics.
 - `crates/weaverd/src/process/launch.rs` constructs the dispatch runtime.
-- `docs/roadmap.md` Phase 3 still marks rope plugin as incomplete.
+- `docs/archive/prototype-roadmap.md` Phase 3 still marks rope plugin as
+  incomplete.
 - `docs/users-guide.md` currently documents `act refactor` as not yet wired
   end-to-end.
 
@@ -308,7 +314,8 @@ Update docs to match shipped behaviour:
   runtime bootstrap, and diff-to-Double-Lock path.
 - `docs/users-guide.md`: remove "not yet available" note for `act refactor`
   and document rope-supported operations, arguments, and failure modes.
-- `docs/roadmap.md`: mark the rope plugin checklist item as done.
+- `docs/archive/prototype-roadmap.md`: mark the rope plugin checklist item as
+  done.
 
 ### Stage G: full quality gates
 
@@ -360,7 +367,7 @@ The feature is accepted when all items below are true:
     invocation.
 - `docs/weaver-design.md` records the decisions made by this implementation.
 - `docs/users-guide.md` documents user-visible behaviour and configuration.
-- `docs/roadmap.md` marks rope plugin entry as done.
+- `docs/archive/prototype-roadmap.md` marks rope plugin entry as done.
 - `make check-fmt`, `make lint`, and `make test` pass.
 
 ## Idempotence and recovery
@@ -382,7 +389,8 @@ Expected artifacts:
 - New behavioural feature files and step definitions for rope plugin and
   `act refactor`
 - Updated docs:
-  `docs/weaver-design.md`, `docs/users-guide.md`, `docs/roadmap.md`
+  `docs/weaver-design.md`, `docs/users-guide.md`,
+  `docs/archive/prototype-roadmap.md`
 
 ## Interfaces and dependencies
 

@@ -1,5 +1,9 @@
 # 5.1.1 Show short help on bare invocation (Fluent-localized)
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -40,7 +44,7 @@ This addresses the P0 gap identified in the
 [UI gap analysis Level 0](../ui-gap-analysis.md#level-0--bare-invocation-weaver)
  and
 [Level 10d](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes), and
-satisfies roadmap task 5.1.1 in `../roadmap.md`.
+satisfies roadmap task 5.1.1 in `../archive/prototype-roadmap.md`.
 
 ## Constraints
 
@@ -299,7 +303,7 @@ _Table 1: Key files involved in this change and their purpose._
 | `crates/weaver-cli/src/tests/behaviour.rs`            | 340   | BDD step definitions               |
 | `crates/weaver-cli/src/tests/support/mod.rs`          | 323   | Test world/helpers                 |
 | `crates/weaver-cli/tests/features/weaver_cli.feature` | 77    | BDD scenarios                      |
-| `docs/roadmap.md`                                     | 424   | Roadmap checkboxes                 |
+| `docs/archive/prototype-roadmap.md`                   | 424   | Roadmap checkboxes                 |
 | `docs/users-guide.md`                                 | 837   | User documentation                 |
 
 ### Test infrastructure
@@ -735,7 +739,7 @@ Add a heading `### Bare invocation` describing the new behaviour.  Include a
 configuration file or a running daemon.  See the actual `docs/users-guide.md`
 change for the rendered version.
 
-**E2. Mark roadmap task 5.1.1 as done in `docs/roadmap.md`.**
+**E2. Mark roadmap task 5.1.1 as done in `docs/archive/prototype-roadmap.md`.**
 
 Change the three `[ ]` checkboxes for task 5.1.1 to `[x]`.
 
@@ -797,7 +801,7 @@ Work for full code listings; this section summarizes the edits and commands.
 ### Stage E: Documentation
 
 1. Add "Bare invocation" subsection to `docs/users-guide.md`.
-2. Mark 5.1.1 as done in `docs/roadmap.md`.
+2. Mark 5.1.1 as done in `docs/archive/prototype-roadmap.md`.
 3. Run `make fmt && make markdownlint`.
 
 ### Stage F: Final validation
@@ -901,4 +905,4 @@ _Table 2: Files modified and their changes._
 | `crates/weaver-cli/src/tests/support/mod.rs`          | Pass `NoOpLocalizer`                                      |
 | `crates/weaver-cli/tests/features/weaver_cli.feature` | Add BDD scenario                                          |
 | `docs/users-guide.md`                                 | Add "Bare invocation" subsection                          |
-| `docs/roadmap.md`                                     | Mark 5.1.1 checkboxes as done                             |
+| `docs/archive/prototype-roadmap.md`                   | Mark 5.1.1 checkboxes as done                             |

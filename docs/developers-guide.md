@@ -54,7 +54,7 @@ Sempai is Weaver's Semgrep-compatible query engine facade. It parses rule YAML,
 normalizes supported search syntax into a canonical formula model, and prepares
 per-language query plans for later execution.
 
-## Sempai query pipeline (milestone 4.1.5)
+## Sempai query pipeline (prototype archive milestone 4.1.5)
 
 - Canonical model (`sempai_core::formula`):
   - `Formula` enum: `Atom`, `Not`, `Inside`, `Anywhere`, `And`, `Or`
@@ -524,7 +524,7 @@ catalogue. `GraphSliceFixtureCase` is a type alias for `CardFixtureCase`.
   an out-of-range position and asserts
   `refusal.reason == "position_out_of_range"`.
 
-## Public API additions in milestone 7.2.1
+## Public API additions in prototype archive milestone 7.2.1
 
 ### `handle` signature — `FusionBackends` parameter
 
@@ -667,11 +667,13 @@ The built-in default is `en-US`. That value is part of the current shared
 configuration contract and is available from files, environment variables, and
 CLI configuration flags like any other config field.
 
-Full CLI localization bootstrap is intentionally deferred to roadmap item
-`3.3.1`. In particular, Weaver does not yet resolve the final locale and use it
-to construct the `Localizer` before clap parse errors are formatted. The
-current `Locale` type exists so the configuration contract is real now and the
-later localization bootstrap can reuse the validated domain value.
+Full CLI localization bootstrap was historically deferred to prototype archive
+roadmap item `3.3.1`; the forward command-surface reset carries localized
+renderer work in roadmap item `13.3.1`. Weaver does not yet resolve the final
+locale and use it to construct the `Localizer` before clap parse errors are
+formatted. The current `Locale` type exists so the configuration contract is
+real now and the later localization bootstrap can reuse the validated domain
+value.
 
 ### 2.5 Daemon command execution glue (`crates/weaver-cli/src/runner_glue.rs`)
 

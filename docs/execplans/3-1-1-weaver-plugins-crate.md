@@ -1,5 +1,9 @@
 # Implement the `weaver-plugins` crate with secure broker-plugin inter-process communication (IPC)
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan is a living document. The sections Constraints, Tolerances,
 Risks, Progress, Surprises & Discoveries, Decision Log, and Outcomes &
 Retrospective must be kept up to date as work proceeds.
@@ -334,7 +338,8 @@ Wire the plugin system into the `weaverd` dispatch layer:
    - The `act refactor` command syntax.
    - How plugin output is validated through the Double-Lock harness.
 
-3. Mark the first Phase 3 roadmap entry as done in `docs/roadmap.md`.
+3. Mark the first Phase 3 roadmap entry as done in
+   `docs/archive/prototype-roadmap.md`.
 
 ### Stage F: Final verification
 
@@ -449,8 +454,8 @@ Add `weaver-plugins` dependency to `crates/weaverd/Cargo.toml`. Create the
 
 ### Step 7: Update documentation
 
-Edit `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`.
-Verify:
+Edit `docs/weaver-design.md`, `docs/users-guide.md`, and
+`docs/archive/prototype-roadmap.md`. Verify:
 
     make check-fmt
 
@@ -474,8 +479,8 @@ Quality criteria (what "done" means):
 - Lint: `make lint` passes with zero warnings.
 - Format: `make check-fmt` reports no formatting violations.
 - Documentation: `docs/weaver-design.md` contains implementation decisions.
-  `docs/users-guide.md` documents the plugin system. `docs/roadmap.md` marks
-  the entry as done.
+  `docs/users-guide.md` documents the plugin system.
+  `docs/archive/prototype-roadmap.md` marks the entry as done.
 
 Quality method (how we check):
 

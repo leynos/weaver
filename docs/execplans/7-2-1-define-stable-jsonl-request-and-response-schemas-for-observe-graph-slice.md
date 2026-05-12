@@ -1,5 +1,9 @@
 # 7.2.1 Define stable JSON Lines (JSONL) request and response schemas for `observe graph-slice`
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -40,7 +44,8 @@ Observable behaviour after implementation:
    documentation gates `make markdownlint` and `make nixie` also exit `0`
    because this task changes Markdown.
 
-This plan covers roadmap item 7.2.1 in [docs/roadmap.md](../roadmap.md).
+This plan covers roadmap item 7.2.1 in
+[docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md).
 
 ## Constraints
 
@@ -74,8 +79,8 @@ This plan covers roadmap item 7.2.1 in [docs/roadmap.md](../roadmap.md).
 8. Documentation updates are part of the feature:
    [docs/jacquard-card-first-symbol-graph-design.md](../jacquard-card-first-symbol-graph-design.md),
    [docs/users-guide.md](../users-guide.md), and
-   [docs/roadmap.md](../roadmap.md) must all be updated before the work is
-   complete.
+   [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md) must
+   all be updated before the work is complete.
 9. The roadmap checkbox for 7.2.1 must not be marked done until all code,
    tests, e2e snapshots, documentation, and validation gates pass.
 
@@ -538,7 +543,7 @@ Update the user guide with:
 5. how semantic detail interacts with cards embedded in the slice.
 
 Only after code, tests, and docs all match should the roadmap entry be checked
-off in [docs/roadmap.md](../roadmap.md).
+off in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md).
 
 ### Stage G: Run the full validation and commit gates
 

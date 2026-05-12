@@ -1,13 +1,17 @@
 # ExecPlan: Process-Based Language Server Adapters
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 ## Metadata
 
-| Field             | Value                                |
-| ----------------- | ------------------------------------ |
-| **Status**        | Complete                             |
-| **Created**       | 2026-01-21                           |
-| **Target**        | Phase 1 Minimum Viable Product (MVP) |
-| **Roadmap Entry** | `docs/roadmap.md` line 79-87         |
+| Field             | Value                                          |
+| ----------------- | ---------------------------------------------- |
+| **Status**        | Complete                                       |
+| **Created**       | 2026-01-21                                     |
+| **Target**        | Phase 1 Minimum Viable Product (MVP)           |
+| **Roadmap Entry** | `docs/archive/prototype-roadmap.md` line 79-87 |
 
 ## Big Picture
 
@@ -149,7 +153,7 @@ ______________________________________________________________________
 
 ### Task 13: Mark roadmap entry complete
 
-**File:** `docs/roadmap.md`
+**File:** `docs/archive/prototype-roadmap.md`
 
 **Verification:** Roadmap reflects completion
 

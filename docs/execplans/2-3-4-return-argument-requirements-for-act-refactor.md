@@ -1,5 +1,9 @@
 # 2.3.4 Return complete argument requirements for `act refactor`
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -43,8 +47,8 @@ This work is successful when the following are all true:
 4. Unit tests and `rstest-bdd` behavioural tests cover the happy path, the
    missing-arguments failure path, and edge cases such as partially supplied
    flags and unsupported values.
-5. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-   reflect the final operator contract.
+5. `docs/weaver-design.md`, `docs/users-guide.md`, and
+   `docs/archive/prototype-roadmap.md` reflect the final operator contract.
 
 ## Constraints
 
@@ -140,7 +144,8 @@ This work is successful when the following are all true:
 
 ## Progress
 
-- [x] (2026-04-10) Read `docs/roadmap.md`, `docs/ui-gap-analysis.md`,
+- [x] (2026-04-10) Read `docs/archive/prototype-roadmap.md`,
+      `docs/ui-gap-analysis.md`,
   `docs/weaver-design.md`, `docs/users-guide.md`, and the referenced testing
   guidance.
 - [x] (2026-04-10) Confirmed that
@@ -159,7 +164,7 @@ This work is successful when the following are all true:
 - [x] Stage C: update `act refactor` parsing and routing so the new
   requirements are enforced consistently.
 - [x] Stage D: update `docs/weaver-design.md`, `docs/users-guide.md`, and
-  `docs/roadmap.md`.
+  `docs/archive/prototype-roadmap.md`.
 - [x] Stage E: run the full Markdown and Rust validation gates sequentially.
 
 ## Surprises & Discoveries
@@ -223,8 +228,9 @@ Target outcome at completion:
 5. `rstest-bdd` scenarios cover the happy path and the new unhappy-path
    validation behaviour.
 6. Any end-to-end CLI assertion added for the operator-visible output passes.
-7. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-   accurately describe the shipped behaviour.
+7. `docs/weaver-design.md`, `docs/users-guide.md`, and
+   `docs/archive/prototype-roadmap.md` accurately describe the shipped
+   behaviour.
 8. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
@@ -343,7 +349,7 @@ exactly which flags are required, which provider names are valid today, and
 which refactorings the MVP supports today.
 
 After the feature ships and all gates pass, mark roadmap item `2.3.4` as done
-in `docs/roadmap.md`.
+in `docs/archive/prototype-roadmap.md`.
 
 ### Stage E: validate end to end
 

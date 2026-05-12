@@ -1,5 +1,9 @@
 # Deliver the weaver-graph call hierarchy provider
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan is a living document. The sections `Progress`,
 `Surprises & discoveries`, `Decision log`, and `Outcomes & retrospective` must
 be kept up to date as work proceeds.
@@ -45,12 +49,12 @@ Not started yet.
 
 ## Context and orientation
 
-The Phase 2 roadmap item lives in `docs/roadmap.md` and calls for creating the
-`weaver-graph` crate with an LSP-backed provider. The design context for call
-graphs is documented in `docs/weaver-design.md` (see the call graph and
-provider strategy section). The call hierarchy capability is part of the LSP
-surface in `crates/weaver-lsp-host`, while user-facing behaviour is documented
-in `docs/users-guide.md` under `observe call-hierarchy`.
+The Phase 2 roadmap item lives in `docs/archive/prototype-roadmap.md` and calls
+for creating the `weaver-graph` crate with an LSP-backed provider. The design
+context for call graphs is documented in `docs/weaver-design.md` (see the call
+graph and provider strategy section). The call hierarchy capability is part of
+the LSP surface in `crates/weaver-lsp-host`, while user-facing behaviour is
+documented in `docs/users-guide.md` under `observe call-hierarchy`.
 
 Key files and modules to understand or edit:
 
@@ -61,8 +65,8 @@ Key files and modules to understand or edit:
   call hierarchy support and capability negotiation.
 - `crates/weaver-graph/tests` for behavioural tests and
   `crates/weaver-graph/src/tests.rs` (or `src/tests/`) for unit tests.
-- `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md` for
-  documentation updates.
+- `docs/weaver-design.md`, `docs/users-guide.md`, and
+  `docs/archive/prototype-roadmap.md` for documentation updates.
 
 Definitions used in this plan:
 
@@ -106,7 +110,7 @@ Update documentation to reflect the implemented behaviour. In
 provider strategy, including provenance on edges. In `docs/users-guide.md`,
 confirm the `observe call-hierarchy` output schema matches the implemented
 graph (nodes and edges, and any fields such as source or confidence). Finally,
-mark the Phase 2 roadmap item as done in `docs/roadmap.md`.
+mark the Phase 2 roadmap item as done in `docs/archive/prototype-roadmap.md`.
 
 ## Concrete steps
 
@@ -154,7 +158,7 @@ are safe to re-run.
 
    - `docs/weaver-design.md`
    - `docs/users-guide.md`
-   - `docs/roadmap.md`
+   - `docs/archive/prototype-roadmap.md`
 
 7. Format and validate documentation (required after doc changes):
 

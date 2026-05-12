@@ -8,12 +8,13 @@ review-sized execution units with explicit dependencies and observable success
 criteria.
 
 The current forward plan is the source of truth for future work. The historical
-ledger at the end preserves completed foundation work and prior planned work so
-that it is not lost during the 0.1.0 command-surface reset. Historical entries
-that mention `observe`, `act`, or `verify` are retained as provenance, not as
-the future public grammar.
+ledger in [`docs/archive/prototype-roadmap.md`](archive/prototype-roadmap.md)
+preserves completed foundation work and prior planned work so that it is not
+lost during the 0.1.0 command-surface reset. Historical entries that mention
+`observe`, `act`, or `verify` are retained as provenance, not as the future
+public grammar.
 
-## 0. External reusable CLI-contract dependencies
+## 12. External reusable CLI-contract dependencies
 
 Idea: if Weaver consumes generic command-contract machinery from OrthoConfig
 instead of rebuilding it locally, Weaver can focus on semantic code
@@ -25,53 +26,53 @@ The dependency source is the OrthoConfig roadmap at
 command-contract implementation must either depend on the relevant OrthoConfig
 task or record a deliberate divergence in ADR 007.
 
-### 0.1. Track reusable dependency contracts
+### 12.1. Track reusable dependency contracts
 
 This step answers which command-contract pieces Weaver must consume from
 OrthoConfig and which ones Weaver may temporarily adapt while the shared
 contracts mature.
 
-- [ ] 0.1.1. Track the downstream consumer boundary.
+- [ ] 12.1.1. Track the downstream consumer boundary.
   - Depends on OrthoConfig 5.2.3.
   - Weaver dependency mode: blocked for final generic ownership decisions;
     local adapters may proceed when ADR 007 names the removal path.
   - Success: every Weaver command-contract task says whether it consumes
     OrthoConfig, wraps it, or intentionally diverges.
-- [ ] 0.1.2. Consume recursive command metadata.
+- [ ] 12.1.2. Consume recursive command metadata.
   - Depends on OrthoConfig 6.1.1 and 6.1.2.
   - Weaver dependency mode: local schema adapters may proceed, but generated
     help, manpage, completion, and context output must converge on the
     OrthoConfig recursive metadata shape.
-- [ ] 0.1.3. Consume compact agent-context output and naming.
+- [ ] 12.1.3. Consume compact agent-context output and naming.
   - Depends on OrthoConfig 6.2.1, 6.2.2, and 6.2.3.
   - Weaver dependency mode: `weaver context --json` is blocked on the naming
     convention for final acceptance; a local payload fixture may proceed for
     Weaver-specific capability fields.
-- [ ] 0.1.4. Consume skill manifest metadata and validation.
+- [ ] 12.1.4. Consume skill manifest metadata and validation.
   - Depends on OrthoConfig 6.3.1 and 6.3.2.
   - Weaver dependency mode: skill prose may be drafted locally, but validation
     must use OrthoConfig metadata when available.
-- [ ] 0.1.5. Consume canonical vocabulary policy.
+- [ ] 12.1.5. Consume canonical vocabulary policy.
   - Depends on OrthoConfig 7.1.1 through 7.1.3.
   - Weaver dependency mode: vocabulary linting is blocked for final CI gates;
     Weaver may maintain a temporary banned-name list for early migration.
-- [ ] 0.1.6. Consume behavioural metadata for agent-native commands.
+- [ ] 12.1.6. Consume behavioural metadata for agent-native commands.
   - Depends on OrthoConfig 7.2.1 through 7.2.7.
   - Weaver dependency mode: renderer, JSON, exit-code, bounded-list, mutation,
     non-interactive, capability, and provenance metadata should be configured
     or extended in Weaver, not reimplemented as another generic framework.
-- [ ] 0.1.7. Use `cargo-orthohelp` as the reference CLI for command contracts.
+- [ ] 12.1.7. Use `cargo-orthohelp` as the reference CLI for command contracts.
   - Depends on OrthoConfig 8.1.1 and 8.1.2.
   - Weaver dependency mode: this is a validation dependency; Weaver can build
     its own commands earlier, but must compare `--json` and enumerating-error
     behaviour against the reference CLI before 0.1.0.
-- [ ] 0.1.8. Consume compounding primitive contracts.
+- [ ] 12.1.8. Consume compounding primitive contracts.
   - Depends on OrthoConfig 9.1.1 through 9.3.3.
   - Weaver dependency mode: profile, delivery, feedback, and execution-ledger
     command semantics are Weaver-owned; reusable parsing, redaction, metadata,
     and ledger vocabulary come from OrthoConfig where available.
 
-## 1. Human-friendly, agent-native 0.1.0 command-surface reset
+## 13. Human-friendly, agent-native 0.1.0 command-surface reset
 
 Idea: if Weaver settles the generated command contract before more capabilities
 land, later Sempai, plugin, graph, and workflow slices can converge on one
@@ -81,19 +82,19 @@ This foundational phase retires the prototype public grammar for the 0.1.0
 target while preserving human usability, localization, accessibility, and the
 UNIX pipeline model.
 
-### 1.1. Ratify the reset boundary and adapter policy
+### 13.1. Ratify the reset boundary and adapter policy
 
 This step answers which contracts Weaver owns and which ones OrthoConfig owns.
 The outcome informs every command, renderer, and drift gate that follows. See
 `docs/adr-007-agent-native-command-surface.md` and `docs/weaver-design.md` §2.1.
 
-- [x] 1.1.1. Record the agent-native command-surface reset as ADR 007.
-  - Requires 0.1.
+- [x] 13.1.1. Record the agent-native command-surface reset as ADR 007.
+  - Requires 12.1.
   - Success: ADR 007 defines the dual renderer contract, capability routing,
     OrthoConfig dependencies, and the lack of compatibility promise for the
     prototype grammar.
-- [ ] 1.1.2. Implement the Weaver command-surface adapter design.
-  - Requires 1.1.1 and depends on OrthoConfig 5.2.3, 6.1, and 7.2.7.
+- [ ] 13.1.2. Implement the Weaver command-surface adapter design.
+  - Requires 13.1.1 and depends on OrthoConfig 5.2.3, 6.1, and 7.2.7.
   - Model resource path, verb, capability ID, mutability class, async class,
     selector forms, stream input support, provider policy, safety class,
     transaction behaviour, examples, output schemas, error schemas, and skill
@@ -101,89 +102,89 @@ The outcome informs every command, renderer, and drift gate that follows. See
   - Success: adding or renaming one Weaver command requires one adapter change
     and exposes enough metadata for router, help, docs, tests, and context
     fixtures.
-- [ ] 1.1.3. Define the temporary-adapter removal policy.
-  - Requires 1.1.2.
+- [ ] 13.1.3. Define the temporary-adapter removal policy.
+  - Requires 13.1.2.
   - Success: every local generic command-contract helper names the OrthoConfig
     task expected to replace it or records a permanent divergence in ADR 007.
 
-### 1.2. Enforce community vocabulary and resource-first commands
+### 13.2. Enforce community vocabulary and resource-first commands
 
 This step answers whether humans and agents can infer commands from common CLI
 knowledge rather than Weaver-only vocabulary. See ADR 007 and
 `docs/weaver-design.md` §§1.1 and 2.1.1.
 
-- [ ] 1.2.1. Map prototype domains to resource-first command paths.
-  - Requires 1.1.2.
+- [ ] 13.2.1. Map prototype domains to resource-first command paths.
+  - Requires 13.1.2.
   - Map definitions, references, diagnostics, cards, graph slices, symbols,
     patches, capabilities, context, jobs, profiles, and feedback.
   - Success: no current forward task requires adding a new public `observe`,
     `act`, or `verify` command.
-- [ ] 1.2.2. Configure vocabulary linting.
-  - Requires 1.2.1 and depends on OrthoConfig 7.1.1 through 7.1.3.
+- [ ] 13.2.2. Configure vocabulary linting.
+  - Requires 13.2.1 and depends on OrthoConfig 7.1.1 through 7.1.3.
   - Include canonical verbs such as `get`, `list`, `create`, `update`,
     `delete`, `apply`, `run`, `prune`, `save`, `show`, `rename`, `move`, and
     `send`.
   - Success: CI rejects off-policy verbs and flags unless ADR 007 explicitly
     grandfathers them as current-state compatibility.
-- [ ] 1.2.3. Migrate command examples in design and user-facing docs.
-  - Requires 1.2.1.
+- [ ] 13.2.3. Migrate command examples in design and user-facing docs.
+  - Requires 13.2.1.
   - Success: examples prefer `weaver definitions get`, `weaver references
     list`, `weaver diagnostics list`, `weaver symbols list`, `weaver symbols
     rename`, `weaver patches apply`, and `weaver context --json`.
 
-### 1.3. Deliver dual renderers and bounded machine contracts
+### 13.3. Deliver dual renderers and bounded machine contracts
 
 This step answers whether one command contract can serve accessible humans and
 reliable agents without forking command behaviour. See `docs/weaver-design.md`
 §§2.1.3 and 2.1.4.
 
-- [ ] 1.3.1. Implement the human renderer contract.
-  - Requires 1.1.2 and depends on OrthoConfig 7.2.2.
+- [ ] 13.3.1. Implement the human renderer contract.
+  - Requires 13.1.2 and depends on OrthoConfig 7.2.2.
   - Include localized default output, `--plain`, `--color`, `--no-pager`,
     `--width`, TTY-sensitive progress, table headings, narrow-width labelled
     blocks, and ASCII fallbacks.
   - Success: human output does not rely on colour alone and never emits pager
     or spinner control flow in non-terminal contexts.
-- [ ] 1.3.2. Implement universal `--json` and structured error output.
-  - Requires 1.3.1 and depends on OrthoConfig 7.2.3 through 7.2.5 and 8.1.
+- [ ] 13.3.2. Implement universal `--json` and structured error output.
+  - Requires 13.3.1 and depends on OrthoConfig 7.2.3 through 7.2.5 and 8.1.
   - Remove root `--output auto|human|json` and operation-local `--format` from
     the 0.1.0 target.
   - Success: success JSON is parseable on stdout, failure JSON is parseable on
     stderr, field names and error codes are non-localized, and exit classes are
     stable.
-- [ ] 1.3.3. Implement enumerating errors and bounded list responses.
-  - Requires 1.3.2 and depends on OrthoConfig 7.2.6 and 8.1.2.
+- [ ] 13.3.3. Implement enumerating errors and bounded list responses.
+  - Requires 13.3.2 and depends on OrthoConfig 7.2.6 and 8.1.2.
   - Success: enum, registry, capability, profile, provider, delivery, and job
     validation errors list valid values; list-style commands expose bounded
     defaults, `--limit`, cursors, truncation markers, and narrowing hints.
 
-### 1.4. Generate introspection, references, and drift gates
+### 13.4. Generate introspection, references, and drift gates
 
 This step answers whether the command contract can stay synchronized as the
 surface grows. See `docs/weaver-design.md` §2.1.4 and ADR 007.
 
-- [ ] 1.4.1. Implement `weaver context --json`.
-  - Requires 1.1.2 and depends on OrthoConfig 6.2.1 through 6.2.3.
+- [ ] 13.4.1. Implement `weaver context --json`.
+  - Requires 13.1.2 and depends on OrthoConfig 6.2.1 through 6.2.3.
   - Success: context output includes schema version, commands, flags, enum
     values, output schemas, error taxonomy, capabilities, provider summaries,
     profiles, jobs, delivery schemes, feedback state, and skill paths.
-- [ ] 1.4.2. Implement `weaver capabilities list --json`.
-  - Requires 1.4.1.
+- [ ] 13.4.2. Implement `weaver capabilities list --json`.
+  - Requires 13.4.1.
   - Success: runtime capability availability is separated from full command
     context and includes deterministic provider selection rationale.
-- [ ] 1.4.3. Implement `weaver skill-path` and initial skill manifests.
-  - Requires 1.4.1 and depends on OrthoConfig 6.3.
+- [ ] 13.4.3. Implement `weaver skill-path` and initial skill manifests.
+  - Requires 13.4.1 and depends on OrthoConfig 6.3.
   - Success: skills teach workflows rather than command catalogues, and
     validation fails when a skill mentions unknown commands or flags.
-- [ ] 1.4.4. Add generated artefact and drift gates.
-  - Requires steps 1.1-1.4.
+- [ ] 13.4.4. Add generated artefact and drift gates.
+  - Requires steps 13.1-13.4.
   - Generate or validate clap definitions, daemon router metadata, localized
     help, manpages, shell completions, docs snippets, JSON schema fixtures,
     vocabulary linting, and tests.
   - Success: CI fails when schema, router, help, docs, localization, context,
     skill manifests, or test fixtures drift.
 
-## 2. Resource command slice: definitions, references, diagnostics, and cards
+## 14. Resource command slice: definitions, references, diagnostics, and cards
 
 Idea: if existing LSP, Tree-sitter, and card foundations can be re-exposed
 through the new generated surface, Weaver proves the reset without waiting for
@@ -193,66 +194,66 @@ This slice migrates useful read-only commands first. It gives humans and agents
 immediate value while validating selectors, renderers, and capability
 introspection end to end.
 
-### 2.1. Re-expose LSP perceptors through resource commands
+### 14.1. Re-expose LSP perceptors through resource commands
 
 This step answers whether existing semantic backends fit the resource-first
 surface without provider-specific commands. See `docs/weaver-design.md` §§2.2,
 3.1, and 6.1.
 
-- [ ] 2.1.1. Implement `weaver definitions get`.
-  - Requires phase 1.
+- [ ] 14.1.1. Implement `weaver definitions get`.
+  - Requires phase 13.
   - Success: position references return localized human output by default and
     stable JSON under `--json`, with provider provenance in machine output.
-- [ ] 2.1.2. Implement `weaver references list`.
-  - Requires 2.1.1.
+- [ ] 14.1.2. Implement `weaver references list`.
+  - Requires 14.1.1.
   - Success: list output is bounded, cursor-aware, and suitable for downstream
     selector processing.
-- [ ] 2.1.3. Implement `weaver diagnostics list`.
-  - Requires 2.1.1.
+- [ ] 14.1.3. Implement `weaver diagnostics list`.
+  - Requires 14.1.1.
   - Success: diagnostics preserve source ranges, severity, provider
     provenance, and actionable error classes in both renderer modes.
 
-### 2.2. Re-expose card and graph-slice context
+### 14.2. Re-expose card and graph-slice context
 
 This step answers whether Jacquard-style cards and graph slices can become
 first-class resource commands while preserving existing completed work. See
 `docs/jacquard-card-first-symbol-graph-design.md` and `docs/weaver-design.md`
 §3.3.
 
-- [ ] 2.2.1. Implement `weaver cards get`.
-  - Requires 2.1.1 and historical work 7.1.1 through 7.1.4 in the ledger.
+- [ ] 14.2.1. Implement `weaver cards get`.
+  - Requires 14.1.1 and historical archive work 7.1.1 through 7.1.4.
   - Success: the command accepts position references and Sempai selectors where
     unambiguous, and returns stable card JSON with bounded enrichment.
-- [ ] 2.2.2. Implement `weaver graph-slices get`.
-  - Requires 2.2.1 and historical work 7.2.1.
+- [ ] 14.2.2. Implement `weaver graph-slices get`.
+  - Requires 14.2.1 and historical archive work 7.2.1.
   - Success: graph traversal exposes explicit budgets, truncation markers,
     provenance, and guidance for narrowing.
-- [ ] 2.2.3. Add combinatorial read-command E2E coverage.
-  - Requires steps 2.1-2.2.
+- [ ] 14.2.3. Add combinatorial read-command E2E coverage.
+  - Requires steps 14.1-14.2.
   - Success: the suite covers human output, `--json`, `--plain`, bounded
     output, invalid enum errors, missing capabilities, and provider
     unavailable cases across the resource read commands.
 
-### 2.3. Make Sempai one-liners first-class selectors
+### 14.3. Make Sempai one-liners first-class selectors
 
 This step answers whether the future Sempai DSL can select one symbol or a
 collection of symbols before full Sempai execution is complete. See
 `docs/sempai-query-language-design.md` and `docs/weaver-design.md` §2.1.2.
 
-- [ ] 2.3.1. Add selector record schemas for Sempai one-liners.
-  - Requires 1.4.4 and historical work 4.1.1 through 4.1.5.
+- [ ] 14.3.1. Add selector record schemas for Sempai one-liners.
+  - Requires 13.4.4 and historical archive work 4.1.1 through 4.1.5.
   - Success: selector records carry identity, range, language, query, capture,
     confidence, and provider provenance needed for safe downstream mutation.
-- [ ] 2.3.2. Implement `weaver symbols list --query`.
-  - Requires 2.3.1.
+- [ ] 14.3.2. Implement `weaver symbols list --query`.
+  - Requires 14.3.1.
   - Success: `weaver symbols list --query 'fn $name(...)' --json` emits a
     bounded selector stream that ordinary UNIX filters can process.
-- [ ] 2.3.3. Add selector stream compatibility checks.
-  - Requires 2.3.2.
+- [ ] 14.3.3. Add selector stream compatibility checks.
+  - Requires 14.3.2.
   - Success: commands consuming selector streams reject incompatible records
     with enumerating, structured errors rather than guessing.
 
-## 3. Capability-routed mutation slice: symbols and patches
+## 15. Capability-routed mutation slice: symbols and patches
 
 Idea: if symbol and patch mutations can run through one resource-first,
 capability-routed transaction path, Weaver proves that agent-native commands do
@@ -262,68 +263,68 @@ This slice migrates the implemented patch and rename foundations under the new
 grammar, then adds direct selector-based mutation and observe-to-act
 composition.
 
-### 3.1. Migrate patches and rename under the new grammar
+### 15.1. Migrate patches and rename under the new grammar
 
 This step answers whether existing safety-harness and actuator work can be
 reused without exposing provider-first commands. See `docs/weaver-design.md`
 §§4.1-4.3 and ADR 001.
 
-- [ ] 3.1.1. Implement `weaver patches apply`.
-  - Requires phase 1 and historical work 6.1.1 through 6.1.4.
+- [ ] 15.1.1. Implement `weaver patches apply`.
+  - Requires phase 13 and historical archive work 6.1.1 through 6.1.4.
   - Success: `patches apply` preserves Double-Lock verification, atomic
     transactions, `--dry-run`, structured safety results, and universal
     `--json`.
-- [ ] 3.1.2. Implement `weaver symbols rename` for position references.
-  - Requires 3.1.1 and historical work 5.2.1 through 5.2.5.
+- [ ] 15.1.2. Implement `weaver symbols rename` for position references.
+  - Requires 15.1.1 and historical archive work 5.2.1 through 5.2.5.
   - Success: provider routing remains capability-first, mutation results
     include transaction ID, affected paths, provider provenance, and safety
     outcome.
-- [ ] 3.1.3. Implement `weaver symbols move` or `weaver symbols extract`.
-  - Requires 3.1.2 and historical planned work 5.3 and 5.4.
+- [ ] 15.1.3. Implement `weaver symbols move` or `weaver symbols extract`.
+  - Requires 15.1.2 and historical archive work 5.3 and 5.4.
   - Success: the public verb is canonical, the internal capability captures
     the richer operation, and no provider-specific command is required.
 
-### 3.2. Prove selector-driven mutation and pipeline composition
+### 15.2. Prove selector-driven mutation and pipeline composition
 
 This step answers whether observe-style resource commands and act-style
 mutation commands compose through structured streams. See
 `docs/weaver-design.md` §2.1.2.
 
-- [ ] 3.2.1. Add direct Sempai selector support to symbol mutations.
-  - Requires 2.3.2 and 3.1.2.
+- [ ] 15.2.1. Add direct Sempai selector support to symbol mutations.
+  - Requires 14.3.2 and 15.1.2.
   - Success: `weaver symbols rename --query ...` handles zero, one, and many
     matches deterministically and requires explicit policy for ambiguous
     mutation.
-- [ ] 3.2.2. Add `--from-stdin` selector stream consumption.
-  - Requires 2.3.3 and 3.1.2.
+- [ ] 15.2.2. Add `--from-stdin` selector stream consumption.
+  - Requires 14.3.3 and 15.1.2.
   - Success: `weaver symbols list --query … --json | weaver symbols rename
     --from-stdin …` works without hidden state.
-- [ ] 3.2.3. Add filtered pipeline E2E coverage.
-  - Requires 3.2.2.
+- [ ] 15.2.3. Add filtered pipeline E2E coverage.
+  - Requires 15.2.2.
   - Success: at least one scenario pipes selector records through `jq` before
     mutation, and one scenario pipes observe-style output into a pager or other
     UNIX consumer without mutation.
 
-### 3.3. Harden mutation boundaries for retries and destructive operations
+### 15.3. Harden mutation boundaries for retries and destructive operations
 
 This step answers whether agents can retry safely and humans can preview
 consequential changes. See `docs/weaver-design.md` §§2.1.5 and 4.2.
 
-- [ ] 3.3.1. Add idempotency keys and mutation transaction IDs.
-  - Requires 3.1.1 and depends on OrthoConfig 7.2.1.
+- [ ] 15.3.1. Add idempotency keys and mutation transaction IDs.
+  - Requires 15.1.1 and depends on OrthoConfig 7.2.1.
   - Success: repeated equivalent mutation submissions return the existing
     transaction or refusal rather than duplicating work.
-- [ ] 3.3.2. Standardize `--dry-run` and `--force`.
-  - Requires 3.3.1 and depends on OrthoConfig 7.2.1.
+- [ ] 15.3.2. Standardize `--dry-run` and `--force`.
+  - Requires 15.3.1 and depends on OrthoConfig 7.2.1.
   - Success: all mutating commands declare preview and destructive-operation
     policy in the command-surface metadata.
-- [ ] 3.3.3. Add mutation combinatorial E2E coverage.
-  - Requires steps 3.1-3.3.
+- [ ] 15.3.3. Add mutation combinatorial E2E coverage.
+  - Requires steps 15.1-15.3.
   - Success: coverage combines selector forms, `--json`, `--dry-run`,
     idempotency, provider failures, syntactic failures, semantic failures, and
     rollback assertions.
 
-## 4. Async execution, profiles, delivery, and feedback
+## 16. Async execution, profiles, delivery, and feedback
 
 Idea: if Weaver gives agents durable identity, recoverable execution, and
 structured artefact routing, long-running workflows collapse into fewer
@@ -332,61 +333,61 @@ reliable turns without becoming hostile to humans.
 This phase adds compounding primitives after the core read and mutation loops
 are stable.
 
-### 4.1. Add durable jobs and `--wait`
+### 16.1. Add durable jobs and `--wait`
 
 This step answers whether async work can survive process loss and retry without
 duplicate submissions. See `docs/weaver-design.md` §2.1.5.
 
-- [ ] 4.1.1. Implement the Weaver job ledger.
-  - Requires 3.3.1 and depends on OrthoConfig 9.3.
+- [ ] 16.1.1. Implement the Weaver job ledger.
+  - Requires 15.3.1 and depends on OrthoConfig 9.3.
   - Success: XDG state stores job ID, command path, idempotency key, workspace,
     request hash, status, progress, timestamps, result pointer, and exit class.
-- [ ] 4.1.2. Implement `weaver jobs list|get|prune`.
-  - Requires 4.1.1.
+- [ ] 16.1.2. Implement `weaver jobs list|get|prune`.
+  - Requires 16.1.1.
   - Success: job lists are bounded, job lookup is structured, and prune is
     explicit and safe.
-- [ ] 4.1.3. Add `--wait` to async-submitting commands.
-  - Requires 4.1.2.
+- [ ] 16.1.3. Add `--wait` to async-submitting commands.
+  - Requires 16.1.2.
   - Success: submit-poll-collect workflows support backoff, jitter, timeout,
     cancellation, and ledger recovery.
 
-### 4.2. Add profiles and persistent identity
+### 16.2. Add profiles and persistent identity
 
 This step answers whether repeated agent and human workflows can share durable
 configuration without leaking secrets. See `docs/weaver-design.md` §2.1.5.
 
-- [ ] 4.2.1. Implement profile storage and redaction.
-  - Requires 1.4.1 and depends on OrthoConfig 9.1.
+- [ ] 16.2.1. Implement profile storage and redaction.
+  - Requires 13.4.1 and depends on OrthoConfig 9.1.
   - Success: profile names and metadata appear in `context --json`, while
     secret values remain redacted or represented as references.
-- [ ] 4.2.2. Implement `weaver profiles save|list|show|delete`.
-  - Requires 4.2.1.
+- [ ] 16.2.2. Implement `weaver profiles save|list|show|delete`.
+  - Requires 16.2.1.
   - Success: profile precedence is
     `built-in defaults < config files < selected profile < environment < flags`.
-- [ ] 4.2.3. Add root `--profile <name>`.
-  - Requires 4.2.2.
+- [ ] 16.2.3. Add root `--profile <name>`.
+  - Requires 16.2.2.
   - Success: explicit flags override profile values and invalid profile names
     enumerate available profiles.
 
-### 4.3. Add two-way I/O
+### 16.3. Add two-way I/O
 
 This step answers whether generated artefacts and friction reports can land
 where users and agents need them. See `docs/weaver-design.md` §2.1.6.
 
-- [ ] 4.3.1. Implement `--deliver stdout|file:<path>|webhook:<url>`.
-  - Requires 1.3.2 and depends on OrthoConfig 9.2.1.
+- [ ] 16.3.1. Implement `--deliver stdout|file:<path>|webhook:<url>`.
+  - Requires 13.3.2 and depends on OrthoConfig 9.2.1.
   - Success: file delivery is atomic, webhook delivery reports HTTP status,
     and unknown schemes enumerate valid schemes.
-- [ ] 4.3.2. Implement `weaver feedback create|list|send`.
-  - Requires 4.3.1 and depends on OrthoConfig 9.2.2.
+- [ ] 16.3.2. Implement `weaver feedback create|list|send`.
+  - Requires 16.3.1 and depends on OrthoConfig 9.2.2.
   - Success: local feedback writes JSONL by default, upstream send is optional
     and configured, and feedback availability appears in `context --json`.
-- [ ] 4.3.3. Add delivery and feedback E2E coverage.
-  - Requires 4.3.1 and 4.3.2.
+- [ ] 16.3.3. Add delivery and feedback E2E coverage.
+  - Requires 16.3.1 and 16.3.2.
   - Success: tests cover stdout, atomic file, webhook success, webhook failure,
     unknown delivery schemes, local feedback, and configured upstream send.
 
-## 5. Sempai and graph intelligence under the new grammar
+## 17. Sempai and graph intelligence under the new grammar
 
 Idea: if Sempai and graph expansion land after selectors and resource commands
 are stable, they strengthen the same user workflows instead of creating a
@@ -395,47 +396,47 @@ parallel query subsystem.
 This phase migrates the existing Sempai and Jacquard plans under `symbols`,
 `cards`, and `graph-slices`.
 
-### 5.1. Finish the Sempai execution engine
+### 17.1. Finish the Sempai execution engine
 
 This step answers whether the query language can execute with stable
 diagnostics and bounded behaviour. See `docs/sempai-query-language-design.md`.
 
-- [ ] 5.1.1. Implement the one-liner lexer, parser, and recovery path.
-  - Requires historical work 4.1.1 through 4.1.5.
+- [ ] 17.1.1. Implement the one-liner lexer, parser, and recovery path.
+  - Requires historical archive work 4.1.1 through 4.1.5.
   - Success: valid one-liners compile to canonical formula form, malformed
     input produces stable `E_SEMPAI_*` diagnostics, and recovery preserves
     partial anchors where safe.
-- [ ] 5.1.2. Implement the Tree-sitter backend.
-  - Requires 5.1.1 and historical planned work 4.2.
+- [ ] 17.1.2. Implement the Tree-sitter backend.
+  - Requires 17.1.1 and historical archive work 4.2.
   - Success: Rust, Python, and TypeScript profiles support Semgrep-compatible
     pattern matching, metavariable unification, ellipsis, constraints, focus,
     and bounded execution controls.
-- [ ] 5.1.3. Route Sempai execution through resource commands.
-  - Requires 2.3.2 and 5.1.2.
+- [ ] 17.1.3. Route Sempai execution through resource commands.
+  - Requires 14.3.2 and 17.1.2.
   - Success: query execution feeds `symbols list`, cards, and graph workflows
     without adding a future public `observe query` command.
 
-### 5.2. Complete graph-slice and history workflows
+### 17.2. Complete graph-slice and history workflows
 
 This step answers whether cards and graph slices can give agents compact,
 bounded context across code structure and history. See
 `docs/jacquard-card-first-symbol-graph-design.md`.
 
-- [ ] 5.2.1. Complete graph-slice extraction and traversal.
-  - Requires 2.2.2 and historical planned work 7.2.2 through 7.2.5.
+- [ ] 17.2.1. Complete graph-slice extraction and traversal.
+  - Requires 14.2.2 and historical archive work 7.2.2 through 7.2.5.
   - Success: Tree-sitter inventory, LSP call edges, import/config edges, and
     budgeted traversal produce bounded graph-slice JSON and useful human
     summaries.
-- [ ] 5.2.2. Implement graph history and risk deltas.
-  - Requires 5.2.1 and historical planned work 7.3.
+- [ ] 17.2.2. Implement graph history and risk deltas.
+  - Requires 17.2.1 and historical archive work 7.3.
   - Success: history mode reconstructs slices per commit, reports normalized
     deltas, and keeps defaults safe for large repositories.
-- [ ] 5.2.3. Implement probabilistic identity matching.
-  - Requires 5.2.2 and historical planned work 7.4.
+- [ ] 17.2.3. Implement probabilistic identity matching.
+  - Requires 17.2.2 and historical archive work 7.4.
   - Success: matching emits reason codes, duplicate-name guardrails, calibrated
     confidence, and assignment decisions suitable for agents to inspect.
 
-## 6. Plugin ecosystem behind capability contracts
+## 18. Plugin ecosystem behind capability contracts
 
 Idea: if Weaver keeps providers behind capability contracts, it can add
 specialist tools without forcing users or agents to learn backend-specific
@@ -444,45 +445,45 @@ commands.
 This phase expands perceptors and actuators after the resource and mutation
 contracts have proven the routing model.
 
-### 6.1. Normalize existing and planned actuator capabilities
+### 18.1. Normalize existing and planned actuator capabilities
 
 This step answers whether Rope, rust-analyzer, and later actuators can share
 one public contract. See ADR 001, ADR 004, and ADR 006.
 
-- [ ] 6.1.1. Publish capability migration notes for `symbol.rename`.
-  - Requires historical work 5.2.1 through 5.2.5.
+- [ ] 18.1.1. Publish capability migration notes for `symbol.rename`.
+  - Requires historical archive work 5.2.1 through 5.2.5.
   - Success: docs explain provider provenance, refusal semantics, and the
     resource-first replacement for provider-required refactor commands.
-- [ ] 6.1.2. Migrate extrication work to `symbol.move` or `symbol.extract`.
-  - Requires 3.1.3 and historical planned work 5.3 and 5.4.
+- [ ] 18.1.2. Migrate extrication work to `symbol.move` or `symbol.extract`.
+  - Requires 15.1.3 and historical archive work 5.3 and 5.4.
   - Success: public commands use canonical verbs while internal capabilities
     retain enough detail for Rope and rust-analyzer implementations.
-- [ ] 6.1.3. Add additional actuator providers behind manifests.
-  - Requires 6.1.2 and historical planned work 5.5.
+- [ ] 18.1.3. Add additional actuator providers behind manifests.
+  - Requires 18.1.2 and historical archive work 5.5.
   - Success: srgn or equivalent tools declare capability support without
     adding provider-specific public commands.
 
-### 6.2. Add specialist perceptors and capability discoverability
+### 18.2. Add specialist perceptors and capability discoverability
 
 This step answers whether read-only specialist providers improve results while
 remaining transparent to ordinary users. See `docs/weaver-design.md` §4.1.
 
-- [ ] 6.2.1. Deliver the first specialist perceptor provider.
-  - Requires 2.1.3 and historical planned work 5.6.
+- [ ] 18.2.1. Deliver the first specialist perceptor provider.
+  - Requires 14.1.3 and historical archive work 5.6.
   - Success: the provider enriches definitions, references, diagnostics,
     cards, or symbol matches through capability routing, not through a public
     provider command.
-- [ ] 6.2.2. Wire provider summaries into `capabilities list` and
+- [ ] 18.2.2. Wire provider summaries into `capabilities list` and
       `context --json`.
-  - Requires 1.4.2 and depends on OrthoConfig 7.2.7.
+  - Requires 13.4.2 and depends on OrthoConfig 7.2.7.
   - Success: agents can discover availability, selected provider, and refusal
     reasons without parsing backend-specific help.
-- [ ] 6.2.3. Refine graceful degradation guidance.
-  - Requires 6.2.2 and historical planned work 5.8.
+- [ ] 18.2.3. Refine graceful degradation guidance.
+  - Requires 18.2.2 and historical archive work 5.8.
   - Success: unsupported capability errors suggest resource-first fallback
     workflows and enumerate valid alternatives.
 
-## 7. Formal verification and safety hardening
+## 19. Formal verification and safety hardening
 
 Idea: if formal checks attach to the safety and routing kernels after their
 public contracts settle, Weaver can prove the invariants that matter without
@@ -491,1685 +492,84 @@ freezing prototype interfaces.
 This phase preserves the existing formal-verification plan while tying it to
 the new command contract and mutation slices.
 
-### 7.1. Establish verifier tooling and proof contracts
+### 19.1. Establish verifier tooling and proof contracts
 
 This step answers which invariants are proved and which external-tool
 behaviours remain trusted. See `docs/formal-verification-methods-in-weaver.md`.
 
-- [ ] 7.1.1. Add pinned Kani and Verus tooling.
-  - Requires phase 3.
-  - Migrates historical planned work 8.1.
+- [ ] 19.1.1. Add pinned Kani and Verus tooling.
+  - Requires phase 15.
+  - Migrates historical archive work 8.1.
   - Success: verifier installs are reproducible and normal Rust workflows are
     unaffected unless a formal target is invoked.
-- [ ] 7.1.2. Publish transaction, semantic-lock, and trust-boundary contracts.
-  - Requires 7.1.1.
-  - Migrates historical planned work 8.2.
+- [ ] 19.1.2. Publish transaction, semantic-lock, and trust-boundary contracts.
+  - Requires 19.1.1.
+  - Migrates historical archive work 8.2.
   - Success: docs distinguish verified orchestration from trusted providers,
     language servers, parsers, and filesystems.
 
-### 7.2. Verify the highest-risk owned kernels
+### 19.2. Verify the highest-risk owned kernels
 
 This step answers whether Weaver's own write and routing decisions satisfy the
 documented invariants. See `docs/weaver-design.md` §§4.2-4.3.
 
-- [ ] 7.2.1. Add Kani checks for transactions and patch matching.
-  - Requires 7.1.2 and migrates historical planned work 8.3.
+- [ ] 19.2.1. Add Kani checks for transactions and patch matching.
+  - Requires 19.1.2 and migrates historical archive work 8.3.
   - Success: smoke harnesses prove commit gating, rollback bookkeeping,
     bounded path guardrails, and whole-command abort on unmatched patch blocks.
-- [ ] 7.2.2. Add Kani and property checks for capability routing.
-  - Requires 6.2.2 and 7.1.2.
-  - Migrates historical planned work 8.4.
+- [ ] 19.2.2. Add Kani and property checks for capability routing.
+  - Requires 18.2.2 and 19.1.2.
+  - Migrates historical archive work 8.4.
   - Success: selected providers satisfy language and capability predicates,
     and refusal is deterministic over bounded routing tables.
-- [ ] 7.2.3. Add proof-only Verus kernels where they reduce long-term risk.
-  - Requires 7.2.1 and 7.2.2.
-  - Migrates historical planned work 8.5 and 8.6.
+- [ ] 19.2.3. Add proof-only Verus kernels where they reduce long-term risk.
+  - Requires 19.2.1 and 19.1.2.
+  - Migrates historical archive work 8.5 and 8.6.
   - Success: proof modules remain outside the production API and prove only
     stable abstractions that will survive the 0.1.0 command reset.
 
-## 8. Deferred extensions after the core 0.1.0 promise
+## 20. Deferred extensions after the core 0.1.0 promise
 
 Idea: if the core CLI contract is already trustworthy and boring to operate,
 the project can evaluate broader extensions on product value instead of letting
 them destabilize the main release.
 
-### 8.1. Re-evaluate onboarding and interactive workflows
+### 20.1. Re-evaluate onboarding and interactive workflows
 
 This step keeps useful agent workflow ideas without letting them bypass the
 non-interactive contract. See `docs/weaver-design.md` §6.2.
 
-- [ ] 8.1.1. Recast project onboarding under resource-first commands.
-  - Requires phases 2 and 5.
-  - Migrates historical planned work 6.2.1.
+- [ ] 20.1.1. Recast project onboarding under resource-first commands.
+  - Requires phases 14 and 17.
+  - Migrates historical archive work 6.2.1.
   - Success: onboarding consumes cards, graph slices, diagnostics, and
     dependency data without adding a parallel public command grammar.
-- [ ] 8.1.2. Design explicit interactive review workflows.
-  - Requires phase 3.
-  - Migrates historical planned work 6.2.2.
+- [ ] 20.1.2. Design explicit interactive review workflows.
+  - Requires phase 15.
+  - Migrates historical archive work 6.2.2.
   - Success: interaction is opt-in via `--interactive` or a dedicated review
     command and fails fast when stdin is not a terminal.
 
-### 8.2. Evaluate MCP, SDK, and runtime explorer generation
+### 20.2. Evaluate MCP, SDK, and runtime explorer generation
 
 This step defers generated integrations until the CLI contract they would wrap
 is stable. See ADR 007 and OrthoConfig 10.1.
 
-- [ ] 8.2.1. Decide whether to generate MCP descriptions from
+- [ ] 20.2.1. Decide whether to generate MCP descriptions from
       `context --json`.
-  - Requires phase 1 and depends on OrthoConfig 10.1.1.
+  - Requires phase 13 and depends on OrthoConfig 10.1.1.
   - Success: the decision compares generated MCP descriptions against the
     command-surface token budget and records whether the feature belongs in
     Weaver 0.1.x.
-- [ ] 8.2.2. Decide whether SDK or OpenAPI-shaped runtime explorers are in
+- [ ] 20.2.2. Decide whether SDK or OpenAPI-shaped runtime explorers are in
       scope.
-  - Requires 8.2.1 and depends on OrthoConfig 10.1.2.
+  - Requires 20.2.1 and depends on OrthoConfig 10.1.2.
   - Success: any accepted explorer uses the same command metadata and does not
     become a second source of truth.
 
-## 99. Historical roadmap ledger
-
-The entries below are preserved from the pre-ADR-007 roadmap so completed
-foundation work and still-relevant planned work remain visible. They are not
-the current forward build order. Unchecked entries are migrated into the
-current roadmap above when still relevant; entries using the prototype
-`observe`, `act`, or `verify` grammar must be implemented under the
-resource-first command contract instead.
-
-### 1. Foundation & tooling (complete)
-
-#### 1.1. Establish foundation and documentation baseline
-
-- [x] 1.1.1. Set up the project workspace, Continuous Integration and
-      Continuous Deployment (CI/CD) pipeline, and core
-      dependencies.
-- [x] 1.1.2. Normalize parser and Semgrep documentation style and navigation,
-      including
-      `docs/contents.md` and `docs/repository-layout.md`, as delivered in
-      `docs/execplans/sempai-design.md`.
-
-### 2. Core MVP & safety harness foundation
-
-*Goal: Establish the core client/daemon architecture, basic LSP integration,
-and the foundational security and verification mechanisms. The MVP must be safe
-for write operations from day one.*
-
-#### 2.1. Deliver CLI and daemon foundation
-
-*Outcome: Ship a pair of crates (`weaver-cli`, `weaverd`) that honour the
-design contract in `docs/weaver-design.md` and expose the lifecycle expected by
-`docs/documentation-style-guide.md`.*
-
-- [x] 2.1.1. Define the shared configuration schema for `weaver-cli` and
-      `weaverd`
-      in `weaver-config`, using `ortho-config` to merge config files,
-      environment overrides, and CLI flags for daemon sockets, logging, and the
-      capability matrix defaults.
-      - Acceptance criteria: Schema documented in crate docs, integration tests
-        demonstrate precedence order (file < env < CLI), and default sockets
-        align with the design doc.
-- [x] 2.1.2. Implement the `weaver-cli` executable as the thin JSON Lines
-      (JSONL)
-      client that
-      initializes configuration via `ortho-config`, exposes the
-      `--capabilities` probe, and streams requests to a running daemon over
-      standard IO.
-      - Acceptance criteria: CLI command surface mirrors the design table,
-        capability probe outputs the negotiated matrix, and JSONL framing is
-        validated with golden tests.
-- [x] 2.1.3. Implement the `weaverd` daemon bootstrap that consumes the shared
-      configuration, starts the Semantic Fusion backends lazily, and supervises
-      them with structured logging and error reporting.
-      - Acceptance criteria: Bootstrap performs health reporting hooks,
-        backends start only on demand, and failures propagate as structured
-        events.
-- [x] 2.1.4. Implement robust daemonization and process management for
-      `weaverd`,
-      including backgrounding with `daemonize-me`, PID/lock file handling,
-      health checks, and graceful shutdown on signals.
-      - Acceptance criteria: Background start creates PID and lock files,
-        duplicate starts fail fast, and signal handling shuts down within the
-        timeout budget.
-- [x] 2.1.5. Provide lifecycle commands in `weaver-cli` (for example,
-      `daemon start`,
-      `daemon stop`, `daemon status`) that manage the daemon process, verify
-      socket availability, and surface actionable errors when start-up fails.
-      - Acceptance criteria: Lifecycle commands call into shared helper logic,
-        refuse to start when sockets are bound, and emit recovery guidance for
-        the operator.
-
-- [x] 2.1.6. Implement the socket listener in `weaverd` to accept client
-      connections
-      on the configured Unix domain socket (or TCP socket on non-Unix
-      platforms).
-      - Acceptance criteria: Daemon binds to the socket path from configuration,
-        accepts concurrent connections, and gracefully handles connection errors
-        without crashing the daemon.
-
-- [x] 2.1.7. Implement the JSONL request dispatch loop in `weaverd` that reads
-      `CommandRequest` messages from connected clients, routes them to the
-      appropriate domain handler, and streams `CommandResponse` messages back.
-      - Acceptance criteria: Request parsing rejects malformed JSONL with
-        structured errors, domain routing covers `observe` and `act` commands,
-        and responses include the terminal `exit` message with appropriate
-        status codes.
-
-- [x] 2.1.8. Wire end-to-end domain command execution from CLI through daemon to
-      backend, starting with `observe get-definition` as the first complete
-      path.
-      - Acceptance criteria: `weaver observe get-definition` with a running
-        daemon returns LSP definition results, errors propagate with structured
-        messages, and the CLI exits with the daemon-provided status code.
-
-- [x] 2.1.9. Deliver the `weaver-lsp-host` crate with language-server
-    initialization, capability detection, and core Language Server Protocol
-    (LSP) operations for Rust, Python, and TypeScript.
-  - Acceptance criteria: `weaver-lsp-host` initializes and advertises
-    capabilities for all three languages; definition, references, and
-    diagnostics requests return structured success responses on valid inputs;
-    unsupported or pre-initialization requests return deterministic errors; and
-    integration tests cover one success case and one failure case per feature.
-
-- [x] 2.1.10. Implement process-based language server adapters for
-      `weaver-lsp-host`.
-    The `LspHost` currently requires external callers to register
-    `LanguageServer` implementations via `register_language()`. This step adds
-    concrete adapters that spawn real language server processes (e.g.,
-    `rust-analyzer`, `pyrefly`, `tsgo`).
-  - Acceptance criteria: `SemanticBackendProvider::start_backend()` registers
-    adapters for configured languages, adapters spawn server processes and
-    communicate via stdio, server shutdown is handled gracefully on daemon
-    stop, and missing server binaries produce clear diagnostic errors.
-
-- [x] 2.1.11. Add human-readable output rendering for commands that return code
-    locations or diagnostics, using `miette` or a compatible renderer to
-    show context blocks.
-  - Acceptance criteria: Definition, reference, diagnostics, and safety
-    harness failure outputs include file headers, line-numbered source
-    context, and caret spans in human-readable mode; JSONL output remains
-    unchanged; missing source content falls back to path-and-range with a
-    clear explanation.
-
-- [x] 2.1.12. Deliver the initial `weaver-sandbox` crate with enforced process
-    isolation for external tool execution.
-  - Acceptance criteria: Linux sandboxing enforces namespaces and seccomp-bpf
-    policies via `birdcage`; platform support matrix is documented for Linux
-    and non-Linux behaviour; forbidden syscalls and filesystem escapes are
-    rejected in tests; and sandbox validation tests run under `make test`.
-
-- [x] 2.1.13. Implement the full "Double-Lock" safety harness logic in
-      `weaverd`.
-    This is a critical, non-negotiable feature for the MVP. All `act` commands
-    must pass through this verification layer before committing to the
-    filesystem.
-  - Acceptance criteria: Edit transactions pass through syntactic and semantic
-    lock validation before commit, failures leave the filesystem untouched,
-    and behaviour-driven development (BDD) scenarios cover success, syntactic
-    failure, semantic failure, and backend unavailable error paths.
-
-- [x] 2.1.14. Implement atomic edits to ensure that multi-file changes either
-      succeed
-    or fail as a single transaction.
-  - Acceptance criteria: Two-phase commit with prepare (temp files) and commit
-    (atomic renames) phases, rollback restores original content on partial
-    failure, and new file creation properly tracks file existence for
-    rollback.
-
-#### 2.2. Deliver baseline command-line interface (CLI) discoverability
-
-*Outcome: Ship baseline guidance in the MVP so first-use command discovery
-does* *not require source inspection or external runbooks.*
-
-- [x] 2.2.1. Show short help when `weaver` is invoked without arguments.
-      See
-      [Level 0](ui-gap-analysis.md#level-0--bare-invocation-weaver)
-      and
-      [Level 10](ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
-      (10d).
-  - [x] Replace bare missing-domain output with short help and a clear next
-        step.
-  - [x] Acceptance criteria: `weaver` with no arguments exits non-zero, prints
-        a `Usage:` line, lists the three valid domains (`observe`, `act`,
-        `verify`), and includes exactly one pointer to `weaver --help`.
-- [x] 2.2.2. List all domains and operations in top-level help output.
-      See
-      [Gap 1a](ui-gap-analysis.md#gap-1a--domains-not-enumerated)
-      and
-      [Gap 1b](ui-gap-analysis.md#gap-1b--operations-not-enumerated).
-  - [x] Add an `after_help` catalogue covering `observe`, `act`, and `verify`
-        operations.
-  - [x] Acceptance criteria: `weaver --help` lists all three domains and every
-        CLI-supported operation for each domain, and completes without daemon
-        startup or socket access.
-- [x] 2.2.3. Add top-level version output and long-form CLI description.
-      See
-      [Gap 1d](ui-gap-analysis.md#gap-1d--no---version-flag)
-      and
-      [Gap 1e](ui-gap-analysis.md#gap-1e--no-long-description-or-after-help-text).
-  - [x] Enable clap-provided `--version` and `-V` support.
-  - [x] Add a `long_about` quick-start block aligned with the
-        [user's guide](users-guide.md).
-  - [x] Acceptance criteria: `weaver --version` and `weaver -V` both exit 0
-        and emit the same version string, and `weaver --help` includes at
-        least one runnable quick-start command example, and `make check-fmt`,
-        `make markdownlint`, `make fmt`, `make lint`, and `make test` pass.
-- [x] 2.2.4. Provide contextual guidance when a domain is supplied without an
-      operation. See
-      [Level 2](ui-gap-analysis.md#level-2--domain-without-operation-weaver-observe)
-      and
-      [Level 10](ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
-      (10e).
-  - [x] Print available operations for the provided domain and a follow-up help
-        command.
-  - [x] Acceptance criteria: `weaver <domain>` without an operation exits
-        non-zero, lists all operations registered for that domain, and includes
-        one concrete `weaver <domain> <operation> --help` hint.
-
-#### 2.3. Enrich validation and actionable error responses
-
-*Outcome: Ensure MVP error paths fail fast with deterministic, actionable*
-*operator guidance before daemon startup and during command routing.*
-
-- [x] 2.3.1. Validate domains client-side before daemon startup.
-      See
-      [Level 3](ui-gap-analysis.md#level-3--unknown-domain-weaver-bogus-something)
-      and
-      [Level 10](ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
-      (10b).
-  - [x] Reject unknown domains with a valid-domain list.
-  - [x] Add edit-distance suggestions for close typos.
-  - [x] Acceptance criteria: invalid domains fail before daemon spawn, return
-        all three valid domains in the error body, and include a single
-        "did you mean" suggestion only when exactly one valid domain is within
-        edit distance 2.
-- [x] 2.3.2. Include valid operation alternatives for unknown operations.
-      See
-      [Level 4](ui-gap-analysis.md#level-4--unknown-operation-weaver-observe-nonexistent)
-      and
-      [Level 10](ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
-      (10c).
-  - [x] Extend daemon and CLI error payloads to include known operations for
-        the domain.
-  - [x] Acceptance criteria: unknown-operation errors in both JSON and
-        human-readable output include the full known-operation set for the
-        domain, with a count equal to the router's `known_operations` length.
-- [x] 2.3.3. Standardize actionable guidance in startup and routing errors.
-      See
-      [Level 10](ui-gap-analysis.md#level-10--error-messages-and-exit-codes)
-      (10a-10e).
-  - [x] Apply a single error template: problem statement, valid alternatives,
-        and explicit next command.
-  - [x] Add startup failure guidance for `WEAVERD_BIN` and installation checks.
-  - [x] Acceptance criteria: each Level 10 path (10a through 10e) renders the
-        same three-part template (error, alternatives, next command), and
-        preserves stable non-zero exit-code semantics.
-- [x] 2.3.4. Return complete argument requirements for `act refactor`.
-      See
-      [Gap 5b](ui-gap-analysis.md#gap-5b--act-refactor-without-arguments).
-  - [x] List all required flags, valid provider names, and known refactoring
-        operations.
-  - [x] Acceptance criteria: `weaver act refactor` without arguments reports
-        all three required flags (`--provider`, `--refactoring`, `--file`) in
-        one response, plus at least one valid provider and refactoring value.
-
-### 3. Syntactic & relational intelligence
-
-*Goal: Add the Tree-sitter and call graph layers to provide deeper structural*
-*and relational understanding of code, and pair this with operation-level and*
-*localized help for dependable day-to-day operation.*
-
-#### 3.1. Deliver syntax and graph foundations
-
-- [x] 3.1.1. Create the `weaver-syntax` crate and implement the structural
-      search
-    engine for `observe grep` and `act apply-rewrite`, drawing inspiration from
-    ast-grep's pattern language.
-  - Acceptance criteria: `observe grep` and `act apply-rewrite` both execute
-    through `weaver-syntax`; structural queries return deterministic spans and
-    rewrites for Rust, Python, and TypeScript fixtures; invalid query syntax
-    returns structured parse diagnostics; and snapshot tests cover success and
-    failure paths.
-
-- [x] 3.1.2. Integrate the "Syntactic Lock" from `weaver-syntax` into the
-    "Double-Lock" harness.
-  - Acceptance criteria: all `act` write paths invoke syntactic verification
-    before commit; lock failures prevent on-disk writes; diagnostics include
-    file path and source location; and behaviour tests cover pass/fail paths.
-
-- [x] 3.1.3. Extend the `LanguageServer` trait with document sync methods
-    (`did_open`, `did_change`, `did_close`) to enable semantic validation
-    of modified content at real file paths without writing to disk.
-  - Acceptance criteria: trait implementations expose `did_open`,
-    `did_change`, and `did_close`; semantic validation paths use in-memory
-    document sync instead of disk writes; and integration tests verify
-    diagnostics for open-change-close sequences.
-
-- [x] 3.1.4. Create the `weaver-graph` crate and implement the LSP Provider for
-      call
-    graph generation, using the `textDocument/callHierarchy` request as the
-    initial data source.
-  - Acceptance criteria: call hierarchy provider returns incoming and outgoing
-    edges via `textDocument/callHierarchy`; responses include stable node IDs,
-    spans, and relationship direction; provider errors are surfaced as
-    structured diagnostics; and end-to-end tests validate graph output.
-
-#### 3.2. Expose configuration and operation-level help surfaces
-
-*Outcome: Make configuration and operation help directly discoverable from the*
-*CLI without requiring external documentation lookup.*
-
-- [x] 3.2.1. Surface configuration flags in clap help output.
-      Shipped: `locale` is now part of the shared configuration contract and is
-      visible as `--locale`, `WEAVER_LOCALE`, and the `locale` config-file key.
-      See
-      [Gap 1c](ui-gap-analysis.md#gap-1c--configuration-flags-invisible)
-      and
-      [Level 6](ui-gap-analysis.md#level-6--configuration-flags-invisible-in-help).
-      See
-      [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces)
-      and
-      [weaver design §2.3.1](weaver-design.md#231-configuration-contract).
-  - [x] Register `--config-path`, `--daemon-socket`, `--log-filter`,
-        `--log-format`, `--capability-overrides`, and `--locale` as visible
-        global flags.
-  - [x] Acceptance criteria: all six flags appear in both `weaver --help` and
-        `weaver daemon start --help`, and existing precedence tests
-        (file < env < CLI) continue to pass.
-- [ ] 3.2.2. Extend `daemon start` help with config and environment guidance.
-      See
-      [Level 8](ui-gap-analysis.md#level-8--daemon-subcommand-help).
-  - [ ] Document `WEAVERD_BIN` and `WEAVER_FOREGROUND` in `long_about` or
-        `after_help`.
-  - [ ] Acceptance criteria: `weaver daemon start --help` documents both
-        environment variables and includes at least one startup example using
-        an override.
-- [ ] 3.2.3. Re-enable and extend the `help` subcommand.
-      See
-      [Gap 1f](ui-gap-analysis.md#gap-1f--help-subcommand-disabled)
-      and
-      [Level 12](ui-gap-analysis.md#level-12--weaver-help-subcommand).
-  - [ ] Remove `disable_help_subcommand = true`.
-  - [ ] Support topic help for domains and operations (`weaver help <topic>`).
-  - [ ] Acceptance criteria: `weaver help`, `weaver help observe`, and
-        `weaver help act refactor` all exit 0 and return topic-specific help
-        with no fallback to generic top-level output.
-- [ ] 3.2.4. Deliver operation-level help for required arguments.
-      Requires 3.2.3. See
-      [Gap 5a](ui-gap-analysis.md#gap-5a--observe-get-definition-without-arguments).
-  - [ ] Implement nested clap subcommands, or an equivalent schema-backed help
-        pipeline, so `weaver <domain> <operation> --help` is operation-specific.
-  - [ ] Acceptance criteria: every exposed operation supports
-        `weaver <domain> <operation> --help` and each help screen includes
-        required flags, argument types, and at least one concrete invocation.
-- [x] 3.2.5. Document ortho-config v0.8.0 behaviour in 3.2 guidance. See
-      [ortho-config v0.8.0 migration guide](ortho-config-v0-8-0-migration-guide.md).
-  - [x] Document the new dependency-graph model used by configuration loading
-        and precedence resolution.
-  - [x] Document fail-fast discovery behaviour when configuration files exist
-        but are invalid.
-  - [x] Document YAML 1.2 parsing semantics via `SaphyrYaml`, including known
-        compatibility warnings.
-  - [x] Update internal runbooks and user-facing documentation to reflect
-        `ortho-config` v0.8.0 operational behaviour.
-  - [x] Validate documentation quality gates and docs tests after updates.
-  - [x] Acceptance criteria: migration guide, runbooks, and user docs are
-        updated with explicit sections for dependency graph, fail-fast
-        discovery, and YAML 1.2 semantics; and `make markdownlint`,
-        `make fmt`, `make nixie`, and documentation tests pass.
-- [ ] 3.2.6. Adopt `cargo orthohelp` for CI man page generation and retire the
-      existing `clap_mangen` infrastructure.
-      See
-      [ortho-config user's guide: Generating IR with cargo-orthohelp](ortho-config-users-guide.md#generating-ir-with-cargo-orthohelp)
-      and
-      [ortho-config user's guide: Generating man pages](ortho-config-users-guide.md#generating-man-pages).
-      See
-      [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces).
-  - [ ] Add `[package.metadata.ortho_config]` wiring for the Weaver CLI root
-        type and supported locales so `cargo orthohelp` can resolve schema and
-        Fluent metadata without a bespoke bridge.
-  - [ ] Replace the existing `clap_mangen`-based build/CI manpage generation
-        path with `cargo orthohelp --format man --locale en-US`, preserving the
-        current `en-US` packaging contract while leaving multi-locale emission
-        to roadmap item `5.7.3`.
-  - [ ] Validate that CI artefacts still land in the expected output paths and
-        that no manual post-processing is required after the switch.
-  - [ ] Acceptance criteria: CI generates the shipped `en-US` manpage via
-        `cargo orthohelp`, the `clap_mangen` infrastructure is removed, and the
-        resulting roff output still includes the full shared configuration
-        contract introduced in `3.2.1`.
-
-#### 3.3. Deliver localized CLI and reference outputs
-
-*Outcome: Let operators choose a locale once and receive consistent Fluent-*
-*backed help, error text, and generated reference artefacts across Weaver.*
-
-- [ ] 3.3.1. Apply resolved locale during CLI bootstrap.
-      See
-      [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces)
-      and
-      [weaver design §2.3.1](weaver-design.md#231-configuration-contract).
-  - [ ] Add a pre-config bootstrap pass that honours `--locale` and
-        `WEAVER_LOCALE` before consulting `LC_ALL`, `LC_MESSAGES`, and `LANG`,
-        then rebuild the localizer if the resolved config locale differs.
-  - [ ] Acceptance criteria: `weaver --help` and other pre-config clap display
-        paths honour `--locale` and `WEAVER_LOCALE` immediately; malformed
-        `--locale` and `WEAVER_LOCALE` values fail fast; malformed ambient
-        `LC_*` or `LANG` values warn and fall back; file-backed locale settings
-        continue to apply after full config loading; and `en-US` remains the
-        guaranteed fallback.
-- [ ] 3.3.2. Localize clap help and parse errors through `ortho_config`.
-      Requires 3.3.1. See
-      [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces).
-  - [ ] Drive clap help with `Cli::command().localize(&localizer)` and route
-        parse failures through `localize_clap_error_with_command`.
-  - [ ] Move bare-invocation help, lifecycle guidance, and other manual
-        operator text to Fluent message IDs with argument-aware rendering.
-  - [ ] Acceptance criteria: bare invocation, `weaver --help`, and common clap
-        validation failures render translated copy for supported locales
-        without changing existing exit-code semantics.
-- [ ] 3.3.3. Centralize the localized command and operation catalogue.
-      Requires 2.2.4 and 3.3.2. See
-      [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces).
-  - [ ] Replace duplicated domain and operation tables with one structured
-        catalogue shared by the router, contextual-help renderer, and test
-        fixtures.
-  - [ ] Store message IDs, examples, and operation descriptions in that
-        catalogue instead of hard-coded padded English strings.
-  - [ ] Acceptance criteria: top-level help, domain-without-operation
-        guidance, and `weaver help <topic>` all read from the same catalogue,
-        and adding a new operation requires one metadata change rather than
-        parallel edits in help, tests, and routing.
-- [ ] 3.3.4. Generate localized reference artefacts from ortho-config
-      metadata. Requires 3.2.4 and 3.3.2. See
-      [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces).
-  - [ ] Add stable documentation IDs to config-backed fields and expose
-        `OrthoConfigDocs` metadata for the generated help schema.
-  - [ ] Add `[package.metadata.ortho_config]` wiring and `cargo orthohelp`
-        generation for at least `en-US` and one secondary locale.
-  - [ ] Acceptance criteria: localized intermediate representation (IR) files
-        are generated per locale, `en-US` manpage packaging remains intact,
-        and artefact validation proves the generated help text matches the
-        runtime Fluent catalogue.
-
-### 4. Query language infrastructure (Sempai)
-
-*Goal: Deliver the Semgrep-compatible query language stack as a standalone
-phase* *with explicit parser, backend, and Weaver-integration milestones.*
-
-#### 4.1. Deliver Sempai core infrastructure
-
-*Outcome: Implement the Sempai front-end and normalization architecture from*
-*`docs/sempai-query-language-design.md`, including YAML parsing, one-liner*
-*domain-specific language (DSL) parsing, semantic validation, and stable*
-*diagnostic contracts.*
-
-- [x] 4.1.1. Scaffold `sempai_core` and `sempai` with stable public types and
-      facade entrypoints.
-  - Acceptance criteria: public API documentation builds for `sempai`, and
-    stable types cover language, span, match, capture, and diagnostics models.
-- [x] 4.1.2. Define structured diagnostics with stable `E_SEMPAI_*` error
-      codes and report schema.
-  - Acceptance criteria: diagnostics include code, message, primary span, and
-    notes, and JSON snapshots remain stable across parser and validator paths.
-- [x] 4.1.3. Implement YAML rule parsing via `saphyr` and `serde-saphyr` with
-      schema-aligned rule models.
-  - Acceptance criteria: rule metadata and query principals parse from
-    Semgrep-compatible YAML forms, and parse failures emit structured
-    diagnostics.
-- [x] 4.1.4. Implement mode-aware validation for `search`, `extract`, `taint`,
-      and `join`, with execution gating to supported modes.
-  - Acceptance criteria: unsupported execution modes return deterministic
-    `UnsupportedMode` diagnostics, and search mode validation enforces required
-    key combinations.
-- [x] 4.1.5. Implement legacy and v2 normalization into one canonical
-      `Formula` model with semantic constraint checks. Requires 4.1.3.
-  - Acceptance criteria: paired legacy and v2 fixtures normalize to equivalent
-    formulas, and semantic invalid states emit deterministic rule diagnostics.
-- [ ] 4.1.6. Implement `logos` tokenization and Chumsky Pratt parsing for the
-      one-liner DSL with Semgrep precedence mapping.
-  - Acceptance criteria: precedence tests match documented binding order, and
-    parser output round-trips for supported DSL forms.
-- [ ] 4.1.7. Implement DSL error recovery with delimiter anchors and partial
-      abstract syntax tree (AST) emission for best-effort diagnostics. Requires
-      4.1.6.
-  - Acceptance criteria: malformed DSL inputs produce partial parse output and
-    labelled diagnostics without parser panics.
-
-#### 4.2. Deliver Sempai Tree-sitter backend
-
-*Outcome: Implement the Tree-sitter-backed Sempai execution engine with*
-*Semgrep-token rewriting, pattern intermediate representation (IR), formula*
-*evaluation, and bounded matching semantics across supported languages.*
-
-- [ ] 4.2.1. Implement language profiles and wrapper registry for Rust, Python,
-      TypeScript, and Go, with optional HashiCorp Configuration Language (HCL)
-      support.
-  - Acceptance criteria: Rust, Python, TypeScript, and Go profiles each define
-    wrapper templates, list-shape mappings, and rewrite boundaries; optional
-    HCL profile loads only when the feature flag is enabled; profile selection
-    failures return deterministic diagnostics; and fixtures validate all profile
-    registrations.
-- [ ] 4.2.2. Implement Semgrep-token rewrite logic with language-safe boundaries
-      for metavariables, ellipsis, and deep ellipsis.
-  - Acceptance criteria: rewrite logic avoids substitutions in unsafe lexical
-    regions and produces deterministic placeholder mappings.
-- [ ] 4.2.3. Compile rewritten snippets into `PatNode`-based pattern IR with
-      span traceability.
-  - Acceptance criteria: compiled IR snapshots are stable, and wrapper/root
-    extraction metadata is preserved for diagnostics.
-- [ ] 4.2.4. Implement node-kind matching and metavariable unification over
-      Tree-sitter syntax trees.
-  - Acceptance criteria: repeated metavariables unify across compatible nodes,
-    and mismatches fail deterministically.
-- [ ] 4.2.5. Implement list-context ellipsis and ellipsis-variable matching
-      using bounded dynamic programming.
-  - Acceptance criteria: list-context fixtures pass across supported languages,
-    and runtime avoids exponential backtracking.
-- [ ] 4.2.6. Implement deep-ellipsis matching with bounded traversal controls.
-  - Acceptance criteria: deep matching respects configured node limits and
-    returns bounded, deterministic results.
-- [ ] 4.2.7. Compile normalized formulas into plan nodes with explicit anchor
-      and constraint separation. Requires 4.1.5.
-  - Acceptance criteria: conjunction plans enforce positive-term requirements,
-    and compiled plan shapes remain snapshot-stable.
-- [ ] 4.2.8. Implement conjunction, disjunction, and negative-constraint
-      execution semantics.
-  - Acceptance criteria: `not`, `inside`, and `anywhere` semantics align with
-    documented behaviour and pass regression fixtures.
-- [ ] 4.2.9. Implement metavariable `where`-clause constraint evaluation with
-      supported and unsupported outcomes.
-  - Acceptance criteria: supported constraints execute deterministically, and
-    unsupported constraints return stable diagnostic codes.
-- [ ] 4.2.10. Implement focus selection plus `as` and `fix` projection
-      behaviour in emitted matches.
-  - Acceptance criteria: focus and capture projection follow documented
-    precedence, and `fix` is surfaced as metadata without direct application.
-- [ ] 4.2.11. Implement Tree-sitter query escape hatch with capture-name
-      mapping into Semgrep-style capture keys.
-  - Acceptance criteria: raw Tree-sitter queries emit normalized captures and
-    focus behaviour consistent with Sempai match output contracts.
-- [ ] 4.2.12. Add execution safety controls for match caps, capture text caps,
-      deep-search bounds, and bounded alternation.
-  - Acceptance criteria: safety limits are configurable, deterministic, and
-    enforced across execution paths.
-
-#### 4.3. Deliver Sempai Weaver integration and readiness
-
-*Outcome: Integrate Sempai into Weaver observe flows with stable command and*
-*JSON Lines (JSONL) contracts, cache integration, diagnostics conformance, and*
-*release gates for default enablement.*
-
-- [ ] 4.3.1. Add Sempai execution routing in `weaverd` for `observe.query`.
-      Requires 4.2.12.
-  - Acceptance criteria: daemon execution paths compile and execute Sempai
-    plans for supported languages and return structured match streams.
-- [ ] 4.3.2. Add `weaver observe query` command surface with `--lang`, `--uri`,
-      and `--rule-file|--rule|--q` inputs. Requires 4.3.1.
-  - Acceptance criteria: CLI validates input combinations and supports YAML and
-    one-liner query workflows with stable error messaging.
-- [ ] 4.3.3. Define stable JSONL request and response schemas for Sempai query
-      operations, with snapshot coverage. Requires 4.3.2.
-  - Acceptance criteria: schema fixtures lock field names and payload shapes,
-    and streaming output remains deterministic.
-- [ ] 4.3.4. Integrate parse-cache adapter keyed by URI, language, and
-      revision, aligned with daemon document lifecycle.
-  - Acceptance criteria: cache keys use URI, language, and revision values;
-    repeated queries against unchanged revisions hit cache in integration tests;
-    revision changes invalidate cached parses deterministically; and cache
-    misses and invalidations preserve semantic correctness.
-- [ ] 4.3.5. Implement actuation handoff contract using focus-first selection
-      with span fallback and optional capture targeting. Requires 4.3.3.
-  - Acceptance criteria: downstream `act` commands can consume Sempai output
-    deterministically for target selection.
-- [ ] 4.3.6. Add diagnostics conformance suites for YAML, DSL, semantic,
-      compilation, and execution error categories.
-  - Acceptance criteria: each diagnostic category is covered by deterministic
-    snapshots and stable `E_SEMPAI_*` error codes.
-- [ ] 4.3.7. Add layered quality suites (unit, snapshot, corpus, property, and
-      fuzz) for parser and execution behaviour.
-  - Acceptance criteria: suites run under repository gates and include
-    representative language corpora and malformed-input coverage.
-- [ ] 4.3.8. Publish compatibility boundaries for supported operators, modes,
-      constraints, and escape-hatch behaviour in user-facing docs.
-  - Acceptance criteria: documentation clearly distinguishes supported,
-    unsupported, and parse-only behaviours with stable terminology.
-- [ ] 4.3.9. Define release gates for enabling Sempai by default, including
-      crash-free requirements, diagnostics parity, and documentation parity.
-  - Acceptance criteria: release checklist is codified in CI policy and blocks
-    default enablement when thresholds are not met.
-
-### 5. Plugin ecosystem & specialist tools
-
-*Goal: Build capability-driven plugin architecture in a dependency-first
-order:* *stabilize existing `rename-symbol` implementations, then extend to
-new* *capabilities and specialist providers.*
-
-#### 5.1. Establish plugin platform foundation
-
-- [x] 5.1.1. Design and implement the `weaver-plugins` crate, including the
-      secure
-    IPC protocol between the `weaverd` broker and sandboxed plugin processes.
-    *(Phase 5.1.1 — see `docs/execplans/3-1-1-weaver-plugins-crate.md`)*
-  - Acceptance criteria: plugin broker and sandboxed plugin process establish
-    authenticated IPC sessions; request and response envelopes validate against
-    crate-level schemas; protocol errors return deterministic failure codes; and
-    behaviour tests cover handshake success, schema rejection, and timeout
-    cases.
-
-#### 5.2. Migrate existing actuator plugins to `rename-symbol` capability
-
-*Outcome: Bring the existing Python and Rust actuator plugins into the new*
-*plugin architecture as first-class implementations of the `rename-symbol`*
-*capability, with deterministic routing and compatibility guarantees.*
-
-- [x] 5.2.1. Define the `rename-symbol` capability contract for actuator
-      plugins, including request schema, response schema, and refusal
-      diagnostics. Requires 5.1.1.
-  - Acceptance criteria: capability contract is versioned, broker validation
-    enforces schema shape, and refusal diagnostics use stable reason codes.
-- [x] 5.2.2. Update `weaver-plugin-rope` manifest and runtime handshake to
-      declare and serve `rename-symbol` through the capability interface.
-      Requires 5.2.1.
-  - Acceptance criteria: plugin advertises `rename-symbol` in capability probes,
-    request payloads conform to schema, and response payloads conform to schema.
-    Legacy provider routing is not required for Python rename flows.
-- [x] 5.2.3. Update `weaver-plugin-rust-analyzer` manifest and runtime
-      handshake to declare and serve `rename-symbol` through the capability
-      interface. Requires 5.2.1.
-  - Acceptance criteria: plugin advertises `rename-symbol` in capability probes,
-    request payloads conform to schema, and response payloads conform to schema.
-    Rust rename flows are capability-routed.
-- [x] 5.2.4. Implement daemon capability resolution for `rename-symbol` so
-      plugin selection is language-aware and policy-driven. Requires 5.2.2 and
-      5.2.3.
-  - Acceptance criteria: routing selects the correct plugin per language,
-    fallback and refusal paths are deterministic, and routing decisions include
-    machine-readable rationale.
-- [x] 5.2.5. Add unit, behavioural, and end-to-end coverage for Python and Rust
-      `rename-symbol` under the new capability architecture. Requires 5.2.4.
-  - Acceptance criteria: tests cover success paths, refusal paths, and rollback
-    guarantees, and both plugins pass shared contract fixtures.
-- [ ] 5.2.6. Publish migration notes for `rename-symbol` capability routing and
-      deprecate legacy provider-specific command paths. Requires 5.2.5.
-  - Acceptance criteria: docs and CLI guidance identify capability-based
-    behaviour as the default path, and deprecation messaging is stable.
-
-#### 5.3. Deliver capability-first `act extricate`
-
-*Outcome: Implement the cross-language `extricate-symbol` capability model,*
-*command contract, and plugin-selection foundation defined in*
-*`docs/adr-001-plugin-capability-model-and-act-extricate.md`, including
-initial* *Python delivery and shared failure semantics.*
-
-- [ ] 5.3.1. Add capability ID scaffolding and resolver policy for actuator
-    capabilities (`rename-symbol`, `extricate-symbol`, `extract-method`,
-    `replace-body`, `extract-predicate`). Requires 5.2.4.
-  - Acceptance criteria: capability IDs are strongly typed in daemon routing,
-    and resolution output includes language, selected provider, and policy
-    rationale.
-- [ ] 5.3.2. Extend plugin manifest schema and broker loading to support
-      capability
-    declarations and capability-aware selection.
-  - Acceptance criteria: manifest validation enforces capability fields, and
-    provider selection respects language plus capability compatibility.
-- [ ] 5.3.3. Add the `weaver act extricate --uri --position --to` command
-      contract and
-    wire capability discovery output for `extricate-symbol`.
-  - Acceptance criteria: CLI request shape is stable across providers, and
-    capability probe output reports extrication support by language.
-- [ ] 5.3.4. Extend the Rope plugin with `extricate-symbol` support for Python.
-  - Acceptance criteria: plugin returns unified diffs through existing patch
-    application flow and preserves symbol semantics for supported Python shapes.
-- [ ] 5.3.5. Extend plugin and daemon failure schemas with deterministic refusal
-    diagnostics and hard rollback guarantees.
-  - Acceptance criteria: refusal paths emit structured `PluginDiagnostic`
-    payloads, include stable error codes, and leave the filesystem unchanged.
-- [ ] 5.3.6. Add unit, behavioural, and end-to-end coverage for capability
-    resolution and Python extrication baseline paths.
-  - Acceptance criteria: tests assert capability negotiation, refusal behaviour,
-    incomplete payload failures, and deterministic patch output.
-
-#### 5.4. Deliver Rust `extricate-symbol` actuator
-
-*Outcome: Implement Rust `extricate-symbol` as a standalone actuator programme*
-*in line with `docs/rust-extricate-actuator-plugin-technical-design.md`, with*
-*safe orchestration, deterministic repair loops, and release-grade validation.*
-
-- [ ] 5.4.1. Define Rust extrication orchestration contracts and transaction
-      boundaries in `weaverd`, including capability ownership and stage
-      interfaces. Requires 5.3.3.
-  - Acceptance criteria: stage boundaries are explicit, rollback semantics are
-    codified per stage, and orchestration contracts are covered by unit tests.
-- [ ] 5.4.2. Implement Rust symbol planning pipeline using rust-analyzer
-      definition, references, and call-site discovery for move planning.
-      Requires 5.4.1.
-  - Acceptance criteria: planner identifies extraction scope deterministically,
-    and unsupported symbol shapes emit structured diagnostics.
-- [ ] 5.4.3. Implement staged Rust transformation execution via
-      `weaver-plugin-rust-analyzer`, including extraction edits, path updates,
-      and patch bundling. Requires 5.4.2.
-  - Acceptance criteria: staged execution emits unified diffs, preserves
-    deterministic operation order, and reports stage-level failures.
-- [ ] 5.4.4. Implement import and module-graph repair loops, including ambiguous
-      import handling and code-action follow-up passes. Requires 5.4.3.
-  - Acceptance criteria: common import breakages are auto-repaired, ambiguous
-    repairs return deterministic refusal diagnostics, and no partial writes are
-    committed.
-- [ ] 5.4.5. Integrate semantic verification and rollback enforcement for Rust
-      extrication transactions before commit. Requires 5.4.4 and 5.3.5.
-  - Acceptance criteria: semantic lock failures abort the transaction, rollback
-    is complete across all touched files, and diagnostics identify failed
-    verification stage.
-- [ ] 5.4.6. Add Rust-specific unit, behavioural, and end-to-end coverage for
-      extrication scenarios, including nested module moves, trait impl updates,
-      and macro-adjacent boundaries. Requires 5.4.5.
-  - Acceptance criteria: tests assert meaning-preservation probes, module graph
-    updates, rollback guarantees, and deterministic failure semantics.
-- [ ] 5.4.7. Publish Rust `extricate-symbol` compatibility boundaries and
-      operator guidance in docs and capability probe output. Requires 5.4.6.
-  - Acceptance criteria: docs and capability surfaces use stable terminology for
-    supported, partial, and unsupported Rust shapes.
-
-#### 5.5. Deliver additional actuator plugins
-
-*Outcome: Extend actuator coverage beyond `rename-symbol` and*
-*`extricate-symbol` with precision syntactic editing support.*
-
-- [ ] 5.5.1. Deliver the `srgn` actuator plugin to provide high-performance,
-      precision syntactic editing via capability-routed patch generation.
-  - Acceptance criteria: plugin declares capability metadata in its manifest,
-    emits deterministic unified diffs for supported edit operations, rejects
-    unsupported inputs with structured diagnostics, and passes unit plus
-    integration coverage through the plugin broker.
-
-#### 5.6. Deliver first specialist sensor plugin
-
-- [ ] 5.6.1. Deliver the `jedi` specialist sensor plugin to provide
-      supplementary Python static-analysis signals through the plugin broker.
-  - Acceptance criteria: plugin loads through `weaver-plugins`, returns
-    deterministic Python analysis payloads for supported files, rejects
-    unsupported languages with structured diagnostics, and integration tests
-    verify success and refusal paths.
-
-#### 5.7. Deliver plugin and capability discoverability coverage
-
-*Outcome: Provide discoverability for plugin inventory and runtime capability*
-*negotiation directly from CLI help and introspection commands.*
-
-- [ ] 5.7.1. Add plugin introspection commands.
-      See
-      [Gap 1g](ui-gap-analysis.md#gap-1g--plugin-listing-absent)
-      and
-      [Level 7](ui-gap-analysis.md#level-7--plugin-discoverability).
-  - [ ] Implement `weaver list-plugins` with `--kind` and `--language`
-        filters.
-  - [ ] Show plugin name, kind, language support, version, and timeout data.
-  - [ ] Acceptance criteria: users can discover valid `act refactor`
-        providers from CLI output alone, and table output includes the five
-        fields `NAME`, `KIND`, `LANGUAGES`, `VERSION`, and `TIMEOUT`.
-- [ ] 5.7.2. Wire plugin introspection into refactor guidance paths.
-      Requires 5.7.1. See
-      [Gap 5b](ui-gap-analysis.md#gap-5b--act-refactor-without-arguments)
-      and
-      [Level 7](ui-gap-analysis.md#level-7--plugin-discoverability).
-  - [ ] Reference `weaver list-plugins` in refactor-related help and errors.
-  - [ ] Acceptance criteria: every provider-related error points users to a
-        discoverability command by including the exact string
-        `weaver list-plugins`.
-- [ ] 5.7.3. Regenerate and validate localized manpages from the schema-backed
-      help model. Requires 2.2.2, 3.2.1, 3.2.3, and 3.3.4. See
-      [Level 11](ui-gap-analysis.md#level-11--manpage).
-      See
-      [weaver design §2.1.5](weaver-design.md#215-localized-help-and-reference-surfaces).
-  - [ ] Verify that domain listings, operation listings, global config flags,
-        locale-aware help text, and help-topic content render in troff output.
-  - [ ] Acceptance criteria: generated manpages include all updated help
-        surfaces with no manual post-processing, ship `en-US` by default, and
-        can be emitted for additional supported locales including all six
-        global config flags.
-
-Capability probe discoverability tasks:
-
-- [ ] 5.7.4. Clarify current `--capabilities` output semantics.
-      See
-      [Level 9](ui-gap-analysis.md#level-9----capabilities-output).
-  - [ ] Annotate output and help text that current data represents overrides
-        unless runtime capability data is merged.
-  - [ ] Acceptance criteria: users can distinguish override configuration from
-        runtime-negotiated capability support via an explicit output marker and
-        matching help-text note.
-- [ ] 5.7.5. Merge runtime capability negotiation into the capabilities probe.
-      Requires daemon capability query support. See
-      [Level 9](ui-gap-analysis.md#level-9----capabilities-output).
-  - [ ] Query daemon-supported capabilities and combine them with configured
-        overrides into one matrix.
-  - [ ] Acceptance criteria: `weaver --capabilities` returns a complete matrix
-        for each configured language and operation, and includes source labels
-        for runtime capability versus override values.
-
-#### 5.8. Refine graceful degradation guidance
-
-- [ ] 5.8.1. Refine the graceful degradation logic to suggest specific
-      plugin-based
-    solutions when core LSP features are missing.
-  - Acceptance criteria: missing core LSP features produce actionable fallback
-    suggestions naming compatible plugins; suggestions include command hints and
-    capability rationale; unavailable plugin paths return deterministic
-    diagnostics; and regression tests cover at least three degradation
-    scenarios.
-
-#### 5.9. Deliver static analysis provider integration
-
-- [ ] 5.9.1. Implement the Static Analysis Provider for `weaver-graph` (for
-      example, wrapping PyCG) as the first major graph plugin.
-  - Acceptance criteria: provider ingests static-analysis call graphs into
-    `weaver-graph` with stable node and edge schemas; unsupported languages
-    return structured diagnostics; and integration tests validate successful
-    ingestion and refusal paths.
-
-### 6. Agent workflows & advanced support
-
-*Goal: Deliver advanced agent-facing workflows after core query and plugin*
-*infrastructure is in place, with explicit dependencies on earlier phases.*
-
-#### 6.1. Deliver `act apply-patch` command
-
-*Outcome: Provide a safety-locked patch application path that mirrors the*
-*`apply_patch` semantics for agents and integrates with the Double-Lock
-harness.*
-
-- [x] 6.1.1. Add JSONL request/response types and a `weaver act apply-patch`
-      command
-    that reads the patch stream from standard input (STDIN) and forwards it to
-    the daemon.
-  - Acceptance criteria: CLI streams raw patch input, returns non-zero exit
-    codes on failure, and surfaces structured errors.
-- [x] 6.1.2. Implement the patch parser and matcher in `weaverd` to support
-      modify,
-    create, and delete operations, including fuzzy matching, line-ending
-    normalization, and path traversal checks.
-  - Acceptance criteria: patch application is atomic per command, missing
-    hunks are rejected, and parent directories are created for new files.
-- [x] 6.1.3. Integrate apply-patch with the safety harness using syntactic and
-    semantic locks, ensuring no on-disk writes on lock failure.
-  - Acceptance criteria: Tree-sitter validates modified/new files, LSP
-    diagnostics are compared against the pre-edit baseline, and failures
-    leave the filesystem untouched.
-- [x] 6.1.4. Add unit, BDD, and end-to-end tests covering create/modify/delete
-      and
-    failure paths (missing hunk, invalid header, traversal attempt).
-  - Acceptance criteria: tests pass under `make test` and error messaging is
-    asserted for each failure mode.
-
-#### 6.2. Deliver advanced agent workflow foundations
-
-*Outcome: Add onboarding and interactive orchestration paths that build on*
-*completed command discoverability and plugin-capability infrastructure.*
-*Prerequisites: complete 2.2 and 2.3 for CLI help baselines, and complete 5.2*
-*and 5.7 for capability routing plus discoverability surfaces.*
-
-- [ ] 6.2.1. Deliver the `onboard-project` command that orchestrates existing
-      Weaver components to generate a deterministic `PROJECT.dna` summary
-      artefact.
-  - Acceptance criteria: command ingests repository metadata and analysis
-    outputs into one `PROJECT.dna` file; output schema is versioned and stable;
-    reruns on unchanged inputs produce byte-identical output; and failure paths
-    emit structured diagnostics with actionable remediation hints.
-
-- [ ] 6.2.2. Deliver a hybrid interactive mode (`--interactive`) that presents
-      lock-failure diffs and diagnostics for explicit human approval or
-      rejection before write operations continue.
-  - Acceptance criteria: interactive mode displays proposed diff plus syntactic
-    and semantic lock diagnostics; approval resumes execution and rejection
-    aborts without filesystem changes; timeout or non-interactive environments
-    fail closed; and behaviour tests cover approve, reject, and timeout flows.
-
-- [ ] 6.2.3. Deliver the Dynamic Analysis Ingestion provider for
-      `weaver-graph` to consume and merge profiling data from tools such as
-      `gprof` and `callgrind`.
-  - Acceptance criteria: provider ingests at least `gprof` and `callgrind`
-    traces into a normalized graph schema; merge logic preserves source
-    identity and call-edge attribution; malformed trace inputs return structured
-    ingestion diagnostics; and integration tests validate multi-source merges.
-
-### 7. Cards-first symbol context (Jacquard)
-
-*Goal: Deliver small, structured “symbol cards” and bounded symbol graph slices
-as first-class `observe` operations, then extend them to deterministic,
-budgeted history diffs over recent commits. This phase operationalizes the
-design in
-[`jacquard-card-first-symbol-graph-design.md`](jacquard-card-first-symbol-graph-design.md)
- within Weaver’s existing Semantic Fusion architecture.*
-
-#### 7.1. Deliver `observe get-card` (Tree-sitter first)
-
-*Outcome: Provide a deterministic, cacheable symbol card payload that defaults
-to Tree-sitter extraction and optionally enriches via LSP when available. See
-`docs/jacquard-card-first-symbol-graph-design.md` §9.1-§9.3 and §10.1-§10.3.*
-
-- [x] 7.1.1. Define stable JSONL request and response schemas for
-      `observe get-card`, including versioning, provenance fields, and
-      progressive detail levels. Requires 2.1.7 and 3.1.1.
-  - [x] Include attachment bundling and interstitial payloads in the schema
-        (doc comments, decorators, import blocks, and bundle rules).
-  - [x] Add schema fixtures and snapshot coverage for success and refusal
-        payloads.
-  - [x] Acceptance criteria: schema fixtures lock field names and payload
-        shapes, including attachments and interstitials; responses include
-        provenance for non-trivial fields; and the default output is stable
-        (byte-identical) for unchanged inputs.
-- [x] 7.1.2. Implement Tree-sitter symbol card extraction for the initial
-      supported languages (Rust, Python, and TypeScript). Requires 3.1.1.
-  - [x] Add an entity/interstitial region pass and attach interstitials to the
-        relevant cards (file/module or interstitial cards).
-  - [x] Bundle doc comments and decorator/annotation blocks onto symbol cards
-        using deterministic backwards-scanning rules.
-  - [x] Enforce nested entity filtering so locals/closures do not enter the
-        entity table by default.
-  - [x] Acceptance criteria: unit tests cover at least three symbol kinds per
-        language; extracted ranges are deterministic; comment/decorator
-        bundling is stable under whitespace edits; nested locals never appear
-        as entities; and whitespace-only edits do not change `SymbolId`
-        fingerprints.
-- [x] 7.1.3. Implement optional LSP enrichment for `observe get-card` when
-      `--detail semantic` (or higher) is requested. Requires 2.1.9 and 3.1.3.
-  - [x] Enrich cards with hover/type and deprecation metadata where supported.
-  - [x] Acceptance criteria: enrichment is gated by capability negotiation; LSP
-        unavailability degrades to the Tree-sitter-only card with explicit
-        provenance; and integration tests cover both enriched and degraded
-        behaviour.
-- [x] 7.1.4. Add cache integration for card extraction keyed by URI, language,
-      and document revision. Requires 7.1.2.
-  - [x] Reuse Tree-sitter parser registries and cache extracted entity tables
-        with an LRU (Least Recently Used) policy keyed by repo, ref, file path,
-        and blob hash.
-  - [x] Avoid unnecessary string cloning in card and region extraction; prefer
-        borrowing or interning for hot paths.
-  - [x] Acceptance criteria: repeated `get-card` requests for unchanged
-        revisions hit cache in integration tests; revision changes invalidate
-        deterministically; and cache misses preserve correctness.
-
-#### 7.2. Deliver `observe graph-slice` (budgeted traversal)
-
-*Outcome: Return a bounded subgraph rooted at an entry symbol, with typed edges
-(`call`, `import`, and `config`) and explicit budget constraints. See
-`docs/jacquard-card-first-symbol-graph-design.md` §12.1-§12.3.*
-
-- [x] 7.2.1. Define stable JSONL request and response schemas for
-      `observe graph-slice`, including budgets, spillover metadata, and
-      provenance for edges. Requires 2.1.7.
-  - [x] Acceptance criteria: schema fixtures lock `budget` semantics and
-    default values; responses are deterministic for a fixed repo revision; and
-    spillover metadata is present when traversal is truncated; and edges carry
-    resolution scope (`full_symbol_table`, `partial_symbol_table`, or `lsp`).
-- [ ] 7.2.2. Implement a two-pass Tree-sitter extraction pipeline that builds a
-      symbol table before resolving edges.
-  - [ ] Acceptance criteria: edge extraction uses a full or partial symbol
-    table and marks resolution scope on each edge; unresolved references are
-    preserved as external nodes with explicit confidence.
-- [ ] 7.2.3. Implement call-edge slice expansion using the existing LSP call
-      hierarchy provider via `weaver-graph`. Requires 3.1.4 and 2.1.9.
-  - [ ] Acceptance criteria: `call` edges include explicit provenance; depth
-    limits are enforced; and end-to-end tests validate a depth-2 traversal on a
-    fixture repository.
-- [ ] 7.2.4. Implement baseline `import` and `config` edge extraction using
-      Tree-sitter interstitial passes and per-language queries. Requires 3.1.1.
-  - [ ] Acceptance criteria: extracted edges include confidence values and
-    provenance; edge extraction is bounded by the slice budget; and at least
-    one test per language asserts both `import` and `config` edge behaviour.
-- [ ] 7.2.5. Implement budgeted traversal using a priority-queue expansion
-      strategy with explicit `max_cards`, `max_edges`, and
-      `max_estimated_tokens` enforcement.
-  - [ ] Acceptance criteria: traversal never exceeds configured caps; rejection
-    reasons are emitted when `--debug` is enabled; and behaviour-driven
-    development (BDD) tests cover fan-out explosion and budget truncation
-    cases.
-
-#### 7.3. Deliver `observe graph-history` in `snapshots_on_demand` mode
-
-*Outcome: Diff a slice over the last N commits without requiring a working tree
-checkout, producing deterministic output suitable for caching and regression
-tests. See `docs/jacquard-card-first-symbol-graph-design.md` §13.1-§13.2 and
-§22.*
-
-- [ ] 7.3.1. Implement git-backed blob loading for historical revisions without
-      checkout, scoped to only the files required by the slice budget.
-  - [ ] Add explicit operational limits for blob size, parse time per file,
-        total files per commit, and partial-parse thresholds, with fallback
-        reasons recorded in the output (`timeout`, `blob_too_large`,
-        `partial_parse`, `unsupported_grammar`).
-  - [ ] Acceptance criteria: history queries never invoke `git checkout`;
-    missing blobs return structured diagnostics; and the file loader is covered
-    by unit tests for typical path and revision scenarios.
-- [ ] 7.3.2. Implement slice reconstruction per commit with explicit data
-      quality metadata and partial symbol table resolution. Requires 7.2.5.
-  - [ ] Acceptance criteria: `--commits 5` returns a stable set of commits and
-    per-commit slice payloads with `quality.resolution_scope` and
-    `quality.fallbacks`; delta payloads include added/removed/changed nodes and
-    edges; and BDD tests validate output against a curated git fixture
-    repository.
-- [ ] 7.3.3. Implement delta computation normalization and change taxonomy
-      classification for nodes and edges.
-  - [ ] Treat import blocks and decorators as commutative sets for deltas, and
-        persist normalized representations alongside raw text.
-  - [ ] Acceptance criteria: import/decorator reordering is classified as
-        `text` change; taxonomy output includes confidence; and fixtures cover
-        comment-only and signature-only edits.
-- [ ] 7.3.4. Implement semantic risk warnings on history deltas for
-      dependency/dependent changes in the slice neighbourhood.
-  - [ ] Expose `--warning-depth` to widen the dependency neighbourhood scanned
-        for warnings.
-  - [ ] Acceptance criteria: warnings include edge paths and confidence;
-    `text`-only deltas emit lower-risk warnings; and curated fixtures validate
-    both warning types.
-- [ ] 7.3.5. Implement history-mode gating and safe defaults, with LSP
-      enrichment disabled by default for history queries.
-  - [ ] Acceptance criteria: default mode uses Tree-sitter-only extraction for
-    historical commits; enabling enrichment is explicit and documented; and
-    degraded behaviour is made visible via provenance fields.
-
-#### 7.4. Deliver probabilistic matching and “reason codes”
-
-*Outcome: Map symbols across commits probabilistically when identifiers drift,
-exposing confidence and alternates rather than hiding ambiguity. See
-`docs/jacquard-card-first-symbol-graph-design.md` §14.1-§14.8.*
-
-- [ ] 7.4.1. Implement phase 1 stable-identity matching (type, name, container,
-      file hint), with explicit confidence output.
-  - [ ] Acceptance criteria: match outputs include the winning phase and
-    confidence; non-matching candidates are rejected rather than forced; and
-    fixtures include rename/move cases that must not match in phase 1.
-- [ ] 7.4.2. Implement phase 2 body-hash matching for rename detection.
-      Requires 7.4.1.
-  - [ ] Acceptance criteria: match outputs include the winning phase and
-    confidence; low-confidence matches are rejected rather than forced; and
-    fixtures cover rename scenarios with unchanged bodies.
-- [ ] 7.4.3. Implement phase 3 structural-hash matching on AST-normalized
-      shapes. Requires 7.4.2.
-  - [ ] Acceptance criteria: match outputs include the winning phase and
-    confidence; low-confidence matches are rejected rather than forced; and
-    fixtures cover move scenarios with formatting-only edits.
-- [ ] 7.4.4. Implement phase 4 fuzzy similarity matching (token overlap and
-      shingles). Requires 7.4.3.
-  - [ ] Acceptance criteria: match outputs include the winning phase and
-    confidence; low-confidence matches are rejected rather than forced; and
-    fixtures cover rename and move scenarios with minor body edits.
-- [ ] 7.4.5. Implement phase 5 graph refinement and global assignment
-      refinement. Requires 7.4.4.
-  - [ ] Acceptance criteria: match outputs include the winning phase and
-    confidence; low-confidence matches are rejected rather than forced; and
-    fixtures cover rename/move scenarios resolved by neighbourhood evidence.
-- [ ] 7.4.6. Implement feature extraction for cross-commit matching using
-      signature, AST-shape, docstring fingerprints, attachments, and
-      neighbourhood sketches.
-  - [ ] Acceptance criteria: feature extraction is deterministic for identical
-    inputs; unit tests cover feature stability under whitespace-only edits and
-    alpha-renaming of locals; and failures emit structured diagnostics.
-- [ ] 7.4.7. Implement candidate generation and scoring with calibrated
-      probabilities, emitting top-K alternates and “reason codes”. Requires
-      7.4.6.
-  - [ ] Acceptance criteria: response payloads always include `best_match` plus
-    alternates up to the requested cap; reason codes are stable enumerations;
-    and debug output surfaces the top contributing features.
-- [ ] 7.4.8. Implement duplicate-name guardrails (`max_duplicates`) that force
-      ambiguous mappings or fallback matching when homonyms explode.
-  - [ ] Acceptance criteria: `--max-duplicates` returns explicit “ambiguous
-    mapping” responses; observability counters capture guardrail triggers; and
-    fixtures with same-name functions avoid false renames.
-- [ ] 7.4.9. Implement assignment across the slice using a solver that avoids
-      mapping multiple sources to one target unless explicitly enabled.
-  - [ ] Acceptance criteria: property tests prevent illegal many-to-one
-    mappings by default; a feature flag enables split/merge experimentation;
-    and deterministic test fixtures cover rename and move scenarios.
-
-#### 7.5. Optional ledger cache and richer edge types
-
-*Outcome: Add a persisted ledger keyed by commit hash for faster history
-queries and broader edge coverage once `snapshots_on_demand` is proven
-reliable. This step is intentionally staged behind the on-demand
-implementation. See `docs/jacquard-card-first-symbol-graph-design.md` §13.2 and
-§18.1-§18.2.*
-
-- [ ] 7.5.1. Define a versioned on-disk ledger format for cards, edges, and
-      deltas keyed by commit hash. Requires 7.3.2.
-  - [ ] Acceptance criteria: format is forward-compatible via explicit version
-    fields; corruption is detected with checksums; and schema changes are gated
-    behind migrations.
-- [ ] 7.5.2. Implement incremental ledger population and invalidation rules.
-  - [ ] Acceptance criteria: ledger writes are atomic; invalidation occurs when
-    inputs change; and performance benchmarks show a measurable improvement for
-    repeated history queries.
-
-### 8. Formal verification and proof tooling
-
-*Goal: Add bounded formal verification checks for Weaver-owned transactional,*
-*patching, routing, and guardrail invariants without replacing the existing*
-*test stack. See `docs/formal-verification-methods-in-weaver.md`.*
-
-#### 8.1. Establish formal verification tooling
-
-*Outcome: Add pinned verifier installation, explicit make targets, and staged*
-*Continuous Integration (CI) entry points for Kani and Verus.*
-
-- [ ] 8.1.1. Add pinned verifier version files and install scripts for Kani and
-      Verus. See `docs/formal-verification-methods-in-weaver.md`
-      "Repository layout and tooling".
-  - [ ] Add `tools/kani/VERSION`.
-  - [ ] Add `tools/verus/VERSION` and `tools/verus/SHA256SUMS`.
-  - [ ] Add `scripts/install-kani.sh`, `scripts/install-verus.sh`, and
-        `scripts/run-verus.sh`.
-  - [ ] Acceptance criteria: local installs are reproducible from pinned
-        versions, scripts fail fast on version or checksum mismatch, and the
-        normal Rust toolchain workflow remains unchanged unless a formal target
-        is invoked.
-- [ ] 8.1.2. Add explicit `make kani`, `make kani-full`, `make verus`,
-      `make formal-pr`, and `make formal-nightly` targets. Requires 8.1.1.
-  - [ ] Keep the Kani smoke harness list explicit rather than scan-based.
-  - [ ] Keep Verus execution outside Cargo through `scripts/run-verus.sh`.
-  - [ ] Acceptance criteria: `make kani` runs only smoke harnesses,
-        `make kani-full` runs all checked-in Kani harnesses, `make verus`
-        executes the proof entrypoint, and the new targets are documented in
-        the `Makefile`.
-- [ ] 8.1.3. Add staged CI jobs for formal verification. Requires 8.1.2.
-  - [ ] Add `kani-smoke` to pull-request validation after the first smoke
-        harnesses land.
-  - [ ] Add `verus-proofs` as manual or nightly validation first, then promote
-        only if the proof set remains stable.
-  - [ ] Acceptance criteria: the existing `build-test` job remains intact,
-        formal jobs install their own tools, and slow proof suites are isolated
-        from the default pull-request path.
-
-#### 8.2. Clarify proof contracts before gating
-
-*Outcome: Define the exact assurances that Kani and Verus are expected to*
-*prove, including filesystem assumptions and trust boundaries.*
-
-- [ ] 8.2.1. Publish the transaction atomicity contract for the Double-Lock
-      path. See `docs/formal-verification-methods-in-weaver.md`
-      "Atomicity contract".
-  - [ ] State the filesystem assumptions that define "all changes applied or
-        original state restored".
-  - [ ] State catastrophic failure conditions that are outside the verified
-        model.
-  - [ ] Acceptance criteria: the design document and user's guide describe the
-        same atomicity promise using one shared contract.
-- [ ] 8.2.2. Define the semantic-lock contract precisely. Requires 8.2.1. See
-      `docs/formal-verification-methods-in-weaver.md`
-      "Semantic-lock contract".
-  - [ ] Specify severity handling, provider normalization, baseline scope, and
-        backend-unavailable semantics.
-  - [ ] Acceptance criteria: implementation docs, CLI behaviour, and future
-        proof harnesses can refer to one explicit semantic-lock definition
-        without relying on inferred behaviour.
-- [ ] 8.2.3. Document the formal-verification trust boundary. Requires 8.2.2.
-      See `docs/formal-verification-methods-in-weaver.md` "Trust boundary".
-  - [ ] Separate verified orchestration invariants from trusted external-tool
-        assumptions.
-  - [ ] Acceptance criteria: docs name the verified kernel, list unverified
-        dependencies explicitly, and avoid claiming semantic correctness for
-        third-party tools.
-
-#### 8.3. Add Kani checks for the transaction and patch kernels
-
-*Outcome: Add bounded model-checking coverage for the highest-risk write path*
-*that Weaver owns directly.*
-
-- [ ] 8.3.1. Add Kani smoke harnesses for Double-Lock transaction ordering in
-      `crates/weaverd/src/safety_harness/`. Requires 8.1.2 and 8.2.1.
-  - [ ] Prove commit is reachable only when both locks pass.
-  - [ ] Prove lock-failure and backend-unavailable states are non-committing.
-  - [ ] Acceptance criteria: `make kani` executes transaction smoke harnesses,
-        and counterexamples are reproducible through the documented target.
-- [ ] 8.3.2. Add Kani smoke harnesses for rollback bookkeeping and bounded file
-      traces in `crates/weaverd/src/safety_harness/`. Requires 8.3.1.
-  - [ ] Cover bounded create, modify, and delete combinations.
-  - [ ] Cover commit-phase failure that restores the pre-state under the
-        documented assumptions.
-  - [ ] Acceptance criteria: harnesses assert file-set preservation and
-        rollback restoration over bounded traces.
-- [ ] 8.3.3. Add Kani smoke harnesses for `act apply-patch` matching and path
-      guardrails in `crates/weaverd/src/dispatch/act/apply_patch/`.
-      Requires 8.3.1 and 6.1.4.
-  - [ ] Cover cursor monotonicity for ordered `SEARCH`/`REPLACE` blocks.
-  - [ ] Cover whole-command abort on unmatched blocks.
-  - [ ] Cover path normalization rejecting absolute and parent-escape paths.
-  - [ ] Acceptance criteria: `make kani` includes apply-patch smoke harnesses,
-        and the checked properties map directly to the documented patch
-        contract.
-- [ ] 8.3.4. Promote larger transaction and patch harnesses to `make kani-full`
-      once the smoke harnesses are stable. Requires 8.3.2 and 8.3.3.
-  - [ ] Expand touched-file counts and mixed-operation sequences.
-  - [ ] Keep smoke and full harnesses separate.
-  - [ ] Acceptance criteria: `make kani-full` exercises larger bounded traces
-        than the pull-request smoke set, and scheduled runs record stable pass
-        or fail outcomes.
-
-#### 8.4. Add Kani checks for capability routing and refusal semantics
-
-*Outcome: Verify bounded capability-selection invariants in the plugin control*
-*plane before expanding proof coverage elsewhere.*
-
-- [ ] 8.4.1. Add Kani smoke harnesses for capability-resolution soundness in
-      `crates/weaver-plugins/src/`. Requires 8.1.2, 5.3.2, and 8.2.3.
-  - [ ] Prove the selected provider satisfies the requested language and
-        capability.
-  - [ ] Prove refusal is deterministic when no compatible provider exists.
-  - [ ] Acceptance criteria: `make kani` runs capability-routing smoke
-        harnesses, and refusal semantics are asserted over bounded routing
-        tables.
-- [ ] 8.4.2. Add property-based tests for refusal-code stability, path-policy
-      helpers, and bounded routing tables. Requires 8.4.1.
-  - [ ] Acceptance criteria: generated tests complement the Kani harnesses by
-        exploring larger input spaces without widening the verified kernel
-        claims.
-
-#### 8.5. Add a proof-only Verus kernel
-
-*Outcome: Prove the smallest stable invariants in proof-only modules outside*
-*the main Cargo build.*
-
-- [ ] 8.5.1. Add a proof-only Verus workspace under `verus/` with
-      `weaver_proofs.rs` as the entrypoint. Requires 8.1.2 and 8.2.3.
-  - [ ] Add `transaction_kernel.rs`, `capability_routing.rs`, and
-        `apply_patch_paths.rs`.
-  - [ ] Acceptance criteria: `make verus` executes the proof entrypoint, and
-        the proof modules use proof-specific types rather than widening the
-        production API.
-- [ ] 8.5.2. Prove transaction-gating and rollback-restoration lemmas over a
-      modelled workspace state. Requires 8.5.1 and 8.2.1.
-  - [ ] Acceptance criteria: proofs establish that commit requires both locks
-        and that documented rollback restoration holds under the chosen model
-        assumptions.
-- [ ] 8.5.3. Prove capability-resolution soundness over an abstract resolver.
-      Requires 8.5.1 and 8.2.3.
-  - [ ] Acceptance criteria: proofs establish that successful resolution
-        satisfies language, capability, and policy predicates, and that refusal
-        occurs instead of silent fallback when no provider qualifies.
-
-#### 8.6. Extend formal verification coverage after later roadmap features land
-
-*Outcome: Expand proof coverage only when the underlying contracts and kernels*
-*are implemented and stable.*
-
-- [ ] 8.6.1. Add Kani harnesses for graph-slice budget enforcement after 7.2.5
-      lands. Requires 7.2.5 and 8.3.4.
-  - [ ] Acceptance criteria: bounded graph harnesses prove counters do not
-        exceed accepted-card, edge, and token-budget caps on small graphs.
-- [ ] 8.6.2. Add Kani harnesses for duplicate-name guardrails and assignment
-      injectivity after 7.4.8 and 7.4.9 land. Requires 7.4.8, 7.4.9, and
-      8.3.4.
-  - [ ] Acceptance criteria: bounded matching harnesses prove injective
-        assignments by default and prove many-to-one assignments remain gated
-        behind explicit split or merge modes.
-- [ ] 8.6.3. Add Kani harnesses for Sempai semantic constraints only after the
-      planned parser and backend crates exist. Requires 4.2 and 4.3.
-  - [ ] Acceptance criteria: formal checks cover deterministic matcher and
-        normalization kernels without trying to verify external parser or
-        runtime dependencies wholesale.
-
-*Prerequisites note: Phases 9–11 depend on tasks from earlier phases (e.g.
-"Requires 4.1.5" or "Requires 7.2.3"). Each prerequisite uses the dotted-number
-identifier from its parent phase above — search this document for the number to
-locate the full task description and its own dependency chain.*
-
-### 9. Vertical slice (Sempai → Jacquard → one-hop traversal)
-
-*Goal: Cut one thin, end-to-end path from a Sempai query through canonical
-symbol resolution to a JacquardCard with one navigable relation, proving the
-core Weaver loop in an agent-consumable CLI surface. The definition of done is:
-an agent sends a symbol-ish query to Sempai, receives a canonical JacquardCard
-over the CLI, then follows one returned relation to a second card, with no
-interactive prompts.[^1][^2][^3]*
-
-#### 9.1. Deliver minimal Sempai `search` execution (YAML only)
-
-*Outcome: Execute a minimal positive-anchor Semgrep-compatible `search` query
-from a YAML rule file, returning deterministic match spans for one language.
-This deliberately limits scope to YAML input (not the one-liner DSL), a single
-`pattern` or `match.pattern` principal, and no conjunctions, negation, ellipsis
-families, or `where` clauses.[^1]*
-
-- [ ] 9.1.1. Implement minimal positive-anchor normalization into
-      a canonical `Formula::Atom(Pattern)` form for `pattern` and
-      `match.pattern` principals. Requires 4.1.5.
-  - [ ] Acceptance criteria: paired legacy `pattern` and v2
-        `match.pattern` fixtures normalize to equivalent
-        `Formula::Atom` values; unsupported operators (`patterns`,
-        `pattern-either`, `pattern-not`, `inside`, `where`) return
-        deterministic `E_SEMPAI_*` diagnostics; and no ellipsis,
-        deep-ellipsis, or conjunction forms are accepted.
-- [ ] 9.1.2. Implement token rewriting and pattern intermediate
-      representation (IR) compilation for a single language (Rust
-      or Python). Requires 9.1.1 and 4.2.1.
-  - [ ] Acceptance criteria: rewritten snippets compile into
-        `PatNode`-based IR with span traceability; metavariables
-        `$X` and `$_` are supported; ellipsis and deep-ellipsis
-        forms are rejected with structured diagnostics; and
-        snapshot tests lock IR shapes for positive-anchor patterns.
-- [ ] 9.1.3. Implement node-kind matching and metavariable
-      unification over Tree-sitter syntax trees for the chosen
-      first language. Requires 9.1.2 and 4.2.4.
-  - [ ] Acceptance criteria: repeated metavariables unify across
-        compatible nodes; mismatches fail deterministically; and
-        end-to-end match output includes `uri`, `span`, and
-        default `focus` fields.
-- [ ] 9.1.4. Add Sempai execution routing in `weaverd` for
-      `observe query` limited to the minimal `search` subset.
-      Requires 9.1.3.
-  - [ ] Acceptance criteria: daemon routes `observe.query`
-        requests through the minimal Sempai pipeline; responses
-        are deterministic JSONL match streams with `uri`, `span`,
-        and `focus`; unsupported query forms return structured
-        diagnostics without daemon failure.
-- [ ] 9.1.5. Add `weaver observe query --lang --uri --rule-file`
-      command surface for the minimal `search` subset.
-      Requires 9.1.4.
-  - [ ] Acceptance criteria: CLI validates input combinations;
-        `--rule-file` accepts YAML rule files; `--rule` accepts
-        inline YAML; `--q` is explicitly absent from this step;
-        and stable error messaging covers missing file,
-        unsupported mode, and parse failure paths.
-
-#### 9.2. Deliver symbol-first card retrieval
-
-*Outcome: Allow agents to retrieve a JacquardCard by symbol name or
-qualified-name selector, without requiring a line-and-column position. This
-bridges the gap between Sempai match output and the existing position-based
-`observe get-card` path.[^2]*
-
-- [ ] 9.2.1. Add a `--symbol` selector to `observe get-card` that
-      accepts symbol names, qualified names, and path-qualified
-      names. Requires 7.1.2.
-  - [ ] Acceptance criteria: `weaver observe get-card --uri <URI>
-        --symbol <NAME>` resolves a symbol by name within the
-        file's entity table and returns the same
-        `GetCardResponse` envelope as the position-based path;
-        ambiguous matches return a structured refusal listing
-        candidates with positions; and the position-based
-        `--position` path remains unchanged.
-- [ ] 9.2.2. Add path-qualified disambiguation for `--symbol`
-      selectors. Requires 9.2.1.
-  - [ ] Acceptance criteria: selectors of the form `path:Symbol`
-        and `path:Parent.Symbol` filter the entity table by file
-        path pattern before name matching; and disambiguation
-        tests cover multi-file workspaces with identically named
-        symbols.
-- [ ] 9.2.3. Wire Sempai match output into symbol-first card
-      retrieval so `observe query` results can feed
-      `observe get-card` without manual position extraction.
-      Requires 9.1.5 and 9.2.1.
-  - [ ] Acceptance criteria: a Sempai match span resolves to a
-        card via both the `--position` and `--symbol` paths; an
-        end-to-end test demonstrates the query-to-card loop for
-        a single fixture using `--symbol`; and the test asserts
-        that the `GetCardResponse` envelope is identical
-        regardless of which selector path is used.
-
-#### 9.3. Deliver one-hop relation traversal
-
-*Outcome: Include exactly one navigable relation type in card output so that an
-agent can follow a returned `symbol_id` back into the same command path. This
-is the thinnest useful slice of JacquardWeave.[^2]*
-
-- [ ] 9.3.1. Add a `relations` field to `SymbolCard` containing a
-      small ranked list of related `SymbolRef` values for one
-      relation type (references, containment, or
-      callers/callees). Requires 7.1.2 and 3.1.4.
-  - [ ] Acceptance criteria: the chosen relation type is populated
-        from the existing LSP or Tree-sitter substrate; related
-        items are stable `SymbolRef` values that can be fed back
-        into `observe get-card --position`; the `relations` field
-        is absent (not empty) when no relations are found; and
-        schema fixtures lock the new field shape.
-- [ ] 9.3.2. Implement the query-to-card-to-relation loop as a
-      documented agent workflow. Requires 9.2.3 and 9.3.1.
-  - [ ] Acceptance criteria: an end-to-end test demonstrates the
-        full loop (query → resolve → card → related symbol →
-        second card) using CLI commands; the workflow is documented
-        in the user's guide[^5]; and no interactive prompts are
-        required at any step.
-
-### 10. Leta parity for supported languages
-
-*Goal: Ship the high-frequency semantic navigation verbs that an agent needs
-every few minutes, bringing Weaver's public CLI surface to parity with
-[Leta](https://github.com/andreasjansson/leta) for Rust, Python, and
-TypeScript. This phase prioritizes the everyday agent navigation loop — find,
-show, trace, search, rename — over exotic analysis. Each operation must honour
-Weaver's existing JSONL envelope, exit-code contract, and human-readable
-rendering conventions.[^3][^4][^5]*
-
-#### 10.1. Deliver `observe find-references` end-to-end
-
-*Outcome: Expose LSP `textDocument/references` as a stable, end-to-end CLI
-operation with human-readable and JSONL output. The underlying LSP substrate
-already supports references in `weaver-lsp-host`.[^5]*
-
-- [ ] 10.1.1. Wire `observe find-references` daemon dispatch to
-      the existing `LspHost::references()` method, returning
-      structured location arrays. Requires 2.1.8 and 2.1.9.
-  - [ ] Acceptance criteria: `weaver observe find-references
-        --uri <URI> --position <LINE:COL>` returns a JSONL
-        response containing an array of reference locations; empty
-        results return an empty array (not an error); unsupported
-        languages return a structured diagnostic; and
-        human-readable output renders context blocks with line
-        numbers.
-- [ ] 10.1.2. Add unit, behavioural, and end-to-end coverage for
-      `observe find-references`. Requires 10.1.1.
-  - [ ] Acceptance criteria: tests cover success paths (single
-        and multiple references), empty-result paths,
-        unsupported-language refusal, and pre-initialization error
-        paths for Rust, Python, and TypeScript fixtures.
-
-#### 10.2. Deliver symbol-first `observe show`
-
-*Outcome: Provide a `show` equivalent that accepts a symbol-ish selector and
-returns the full definition body, mirroring Leta's `show` command. This builds
-on the symbol-first card retrieval from 9.2 and the existing `observe get-card`
-infrastructure.[^2]*
-
-- [ ] 10.2.1. Add an `observe show` command that accepts
-      `--symbol` (or positional symbol name), resolves it via the
-      entity table, and returns the full symbol body with
-      surrounding context. Requires 9.2.1.
-  - [ ] Acceptance criteria: `weaver observe show <SYMBOL>
-        --uri <URI>` returns the complete symbol definition
-        including doc comments and decorators; `--context <N>`
-        adds surrounding lines; human-readable output includes
-        file path, line numbers, and syntax-highlighted source;
-        JSONL output includes `uri`, `range`, `source_text`, and
-        `symbol` identity fields; and ambiguous symbols return a
-        structured disambiguation response.
-- [ ] 10.2.2. Add qualified-name and path-filter support for
-      `observe show`. Requires 10.2.1 and 9.2.2.
-  - [ ] Acceptance criteria: selectors of the form
-        `Parent.Symbol`, `path:Symbol`, and `path:Parent.Symbol`
-        resolve correctly; and tests cover disambiguation across
-        multiple files with identically named symbols.
-
-#### 10.3. Deliver `observe call-hierarchy` end-to-end
-
-*Outcome: Expose the existing `weaver-graph` call hierarchy provider as a
-stable CLI operation with configurable direction and depth. The internal
-`CallGraph` provider is complete.[^5][^2]*
-
-- [ ] 10.3.1. Wire `observe call-hierarchy` daemon dispatch to
-      the existing `weaver-graph` call hierarchy provider with
-      `--direction` and `--max-depth` flags. Requires 2.1.8,
-      2.1.9, and 3.1.4.
-  - [ ] Acceptance criteria: `weaver observe call-hierarchy
-        --uri <URI> --position <LINE:COL>` returns a JSONL
-        response containing `nodes` and `edges` arrays;
-        `--direction` supports `incoming`, `outgoing`, and `both`;
-        `--max-depth` limits traversal; provenance and call-site
-        positions are included on edges; and human-readable output
-        renders a tree view.
-- [ ] 10.3.2. Add unit, behavioural, and end-to-end coverage for
-      `observe call-hierarchy`. Requires 10.3.1.
-  - [ ] Acceptance criteria: tests cover outgoing calls, incoming
-        calls, bidirectional traversal, depth limiting, empty
-        results, and unsupported-language refusal for Rust,
-        Python, and TypeScript fixtures.
-
-#### 10.4. Deliver `observe grep` end-to-end
-
-*Outcome: Expose the existing `weaver-syntax` structural search engine as a
-stable CLI operation for semantic symbol search with kind filtering. The
-underlying engine is complete.[^3]*
-
-- [ ] 10.4.1. Wire `observe grep` daemon dispatch to
-      `weaver-syntax` with `--pattern`, `--kind`, `--uri`, and
-      `--lang` flags. Requires 2.1.8 and 3.1.1.
-  - [ ] Acceptance criteria: `weaver observe grep --pattern
-        <PATTERN> --lang <LANG>` returns a JSONL response
-        containing match locations with symbol kind, name, and
-        span; `--kind` filters by symbol kind; `--uri` scopes to
-        a specific file; human-readable output renders matches
-        with file path, line number, kind, and name; and invalid
-        patterns return structured parse diagnostics.
-- [ ] 10.4.2. Add unit, behavioural, and end-to-end coverage for
-      `observe grep`. Requires 10.4.1.
-  - [ ] Acceptance criteria: tests cover pattern matching, kind
-        filtering, file scoping, invalid pattern diagnostics, and
-        empty-result paths for Rust, Python, and TypeScript
-        fixtures.
-
-#### 10.5. Deliver `act rename-symbol` end-to-end
-
-*Outcome: Expose the existing capability-routed `rename-symbol` plugins as a
-stable, end-to-end CLI operation with safety-harness integration. The
-capability contract and plugin implementations are in place (5.2.1–5.2.4).[^6]*
-
-- [ ] 10.5.1. Wire `act rename-symbol` as a first-class CLI
-      command with `--uri`, `--position`, and `--new-name` flags,
-      routing through capability-based plugin selection.
-      Requires 5.2.4.
-  - [ ] Acceptance criteria: `weaver act rename-symbol --uri <URI>
-        --position <LINE:COL> --new-name <NAME>` applies a
-        workspace-wide rename through the Double-Lock safety
-        harness; JSONL output includes the list of modified files
-        and applied edits; human-readable output shows a unified
-        diff; refusal paths (unsupported language, symbol not
-        found) return structured diagnostics; and the filesystem
-        is unchanged on lock failure.
-- [ ] 10.5.2. Add unit, behavioural, and end-to-end coverage for
-      `act rename-symbol`. Requires 10.5.1 and 5.2.5.
-  - [ ] Acceptance criteria: tests cover successful rename for
-        Python and Rust, refusal paths, rollback guarantees, and
-        safety-harness integration.
-
-### 11. Weaver unique selling proposition (USP): composable agent-grade CLI primitives
-
-*Goal: Deliver the capabilities that make Weaver more than a Leta clone. Where
-Phase 10 reaches parity, this phase delivers Weaver's USP: budgeted graph-slice
-traversal, card-driven exploration, deterministic CLI contracts for agent tool
-loops, and the safety harness that makes write operations trustworthy. These
-are the features that justify choosing Weaver over a thinner LSP
-wrapper.[^3][^2][^7]*
-
-#### 11.1. Deliver `observe graph-slice` traversal
-
-*Outcome: Wire the budgeted graph traversal from 7.2.5 into a stable CLI
-command with the full flag set from the design document. This is the first
-Weaver-specific differentiator beyond Leta's `graph` command. Requires the
-schema work from 7.2.1.[^2]*
-
-- [ ] 11.1.1. Wire `observe graph-slice` as a stable CLI command
-      consuming the traversal engine from 7.2.5, the schema from
-      7.2.1, and the call-edge provider from 7.2.3.
-      Requires 7.2.1, 7.2.3, and 7.2.5.
-  - [ ] Acceptance criteria: `weaver observe graph-slice
-        --uri <URI> --position <LINE:COL>` returns a JSONL
-        response containing `cards`, `edges`, and `spillover`
-        fields; all budget flags (`--max-cards`, `--max-edges`,
-        `--max-estimated-tokens`, `--depth`, `--direction`,
-        `--edge-types`, `--min-confidence`, `--entry-detail`,
-        `--node-detail`) are exposed; human-readable output
-        renders a tree with depth markers; and exit-code semantics
-        distinguish success from truncation.
-
-#### 11.2. Deliver card-driven traversal workflow
-
-*Outcome: Enable agents to navigate from one symbol card to related symbols
-through structured relation data, completing the "postcard to loom" loop.[^2]*
-
-- [ ] 11.2.1. Extend the `relations` field from 9.3.1 to support
-      multiple relation types (references, containment, and
-      callers/callees). Requires 9.3.1.
-  - [ ] Acceptance criteria: cards include relations from all
-        available providers; each relation carries a `type` field
-        and a ranked list of `SymbolRef` values; relation types
-        are explicitly enumerated in the schema; and empty
-        relation types are omitted rather than included as empty
-        arrays.
-- [ ] 11.2.2. Add dependency and dependent fan metrics to
-      `full`-detail cards. Requires 11.2.1 and 7.1.3.
-  - [ ] Acceptance criteria: `--detail full` cards include
-        `fan_in` and `fan_out` counts sourced from
-        `weaver-graph`; provenance marks the data source (`lsp`,
-        `tree_sitter`, or `static_analysis`); and metrics are
-        absent (not zero) when the underlying provider is
-        unavailable.
-
-#### 11.3. Deliver agent-grade CLI contract hardening
-
-*Outcome: Harden the CLI surface so that Weaver behaves as a reliable primitive
-for agent tool loops (Codex CLI, Claude Code, and similar). The contract must
-be deterministic, non-interactive, and machine-readable.[^3]*
-
-- [ ] 11.3.1. Enforce deterministic stdout/stderr separation
-      across all `observe` and `act` commands.
-  - [ ] Acceptance criteria: `stdout` contains only the result
-        payload (JSONL or human-readable); `stderr` carries logs,
-        progress, and diagnostics; no command writes diagnostic
-        text to `stdout`; and regression tests assert separation
-        for every implemented command.
-- [ ] 11.3.2. Add explicit `schema_version` to all JSONL response
-      envelopes.
-  - [ ] Acceptance criteria: every JSONL response includes a
-        top-level `schema_version` field; version values are
-        stable across patch releases; and snapshot tests lock the
-        version for each response type.
-- [ ] 11.3.3. Standardize exit codes across all commands to
-      distinguish `resolved`, `ambiguous`, `not_found`, and
-      `backend_unavailable`.
-  - [ ] Acceptance criteria: exit-code semantics are documented
-        in the user's guide[^5]; every command uses the shared
-        exit-code enumeration; and BDD tests assert each exit
-        code for at least one command.
-- [ ] 11.3.4. Ensure compact output by default with opt-in
-      expansion for all `observe` commands.
-  - [ ] Acceptance criteria: default output stays within a
-        configurable token budget; `--detail` or `--expand` flags
-        opt into richer output; and agents can rely on bounded
-        response sizes without explicit truncation.
-
-#### 11.4. Deliver safety-harness integration as a visible differentiator
-
-*Outcome: Surface the Double-Lock safety harness as a visible, documented
-feature that agents and operators can rely on for trustworthy write operations.
-This is a key Weaver differentiator.[^7][^8]*
-
-- [ ] 11.4.1. Add structured safety-harness result metadata to
-      all `act` command JSONL responses. Requires 2.1.13.
-  - [ ] Acceptance criteria: every `act` response includes a
-        `safety_harness` field reporting syntactic-lock and
-        semantic-lock outcomes; lock failures include diagnostic
-        spans and reasons; and the field is present even on
-        success (reporting `passed`).
-- [ ] 11.4.2. Document the safety-harness contract for agent
-      consumption in the user's guide[^5]. Requires 11.4.1.
-  - [ ] Acceptance criteria: the user's guide includes a
-        dedicated section explaining the Double-Lock model, what
-        agents can rely on, and how to interpret lock-failure
-        diagnostics; and the section references the formal
-        verification design document for deeper guarantees.
-
-[^1]: [`sempai-query-language-design.md`](sempai-query-language-design.md)
-[^2]: [`jacquard-card-first-symbol-graph-design.md`](jacquard-card-first-symbol-graph-design.md)
-[^3]: [`weaver-design.md`](weaver-design.md)
-[^4]: [`ui-gap-analysis.md`](ui-gap-analysis.md)
-[^5]: [`users-guide.md`](users-guide.md)
-[^6]: [`adr-001-plugin-capability-model-and-act-extricate.md`](adr-001-plugin-capability-model-and-act-extricate.md)
-[^7]: [`weaver-design.md`](weaver-design.md) §5.1 and §6.1
-[^8]: [`formal-verification-methods-in-weaver.md`](formal-verification-methods-in-weaver.md)
+## Archive
+
+Historical prototype roadmap entries live in
+[`docs/archive/prototype-roadmap.md`](archive/prototype-roadmap.md). Those
+entries keep numbers `1` through `11`; this live roadmap reserves numbers `12`
+through `20` for the forward ADR 007 build sequence.

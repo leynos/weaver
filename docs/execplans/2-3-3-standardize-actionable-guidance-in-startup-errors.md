@@ -1,5 +1,9 @@
 # 2.3.3 Standardize actionable guidance in startup and routing errors
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -49,8 +53,8 @@ This work is successful when the following are all true:
 3. stable non-zero exit behaviour does not change;
 4. unit tests and `rstest-bdd` scenarios cover the happy path, unhappy paths,
    and edge cases;
-5. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-   reflect the shipped behaviour.
+5. `docs/weaver-design.md`, `docs/users-guide.md`, and
+   `docs/archive/prototype-roadmap.md` reflect the shipped behaviour.
 
 ## Constraints
 
@@ -147,7 +151,8 @@ This work is successful when the following are all true:
 
 ## Progress
 
-- [x] (2026-04-07) Read `docs/roadmap.md`, `docs/ui-gap-analysis.md`,
+- [x] (2026-04-07) Read `docs/archive/prototype-roadmap.md`,
+      `docs/ui-gap-analysis.md`,
   `docs/weaver-design.md`, `docs/users-guide.md`, and the referenced testing
   guidance.
 - [x] (2026-04-07) Confirmed the current Level 10 implementation split across
@@ -168,7 +173,7 @@ This work is successful when the following are all true:
   failures through the same formatter while preserving existing exit codes and
   daemon payload semantics.
 - [x] Stage D: update `docs/weaver-design.md`, `docs/users-guide.md`, and
-  `docs/roadmap.md`.
+  `docs/archive/prototype-roadmap.md`.
 - [x] Stage E: run the full Markdown and Rust validation gates sequentially.
 
 ## Surprises & Discoveries
@@ -231,8 +236,9 @@ Target outcome at completion:
 6. The feature is covered by unit tests and `rstest-bdd` scenarios, and the
    final repository state passes `make fmt`, `make markdownlint`, `make nixie`,
    `make check-fmt`, `make lint`, and `make test`.
-7. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
-   accurately describe the shipped behaviour.
+7. `docs/weaver-design.md`, `docs/users-guide.md`, and
+   `docs/archive/prototype-roadmap.md` accurately describe the shipped
+   behaviour.
 
 Retrospective notes will be added after implementation.
 
@@ -288,7 +294,7 @@ The documentation surfaces that must be updated after implementation are:
 
 - `docs/weaver-design.md` (CLI preflight and startup guidance policy)
 - `docs/users-guide.md` (operator-visible examples)
-- `docs/roadmap.md` (mark `2.3.3` done)
+- `docs/archive/prototype-roadmap.md` (mark `2.3.3` done)
 
 ## Plan of work
 
@@ -436,8 +442,8 @@ outputs for:
 - daemon auto-start or explicit start failure caused by a missing `weaverd`
   binary.
 
-Update `docs/roadmap.md` only after the code and all documentation are final,
-and only when the validation gates are green.
+Update `docs/archive/prototype-roadmap.md` only after the code and all
+documentation are final, and only when the validation gates are green.
 
 ### Stage E: run the full validation suite and capture evidence
 
@@ -608,7 +614,7 @@ The likely touched source files are:
 - `crates/weaver-cli/tests/features/weaver_cli.feature`
 - `docs/weaver-design.md`
 - `docs/users-guide.md`
-- `docs/roadmap.md`
+- `docs/archive/prototype-roadmap.md`
 
 ## Revision note
 

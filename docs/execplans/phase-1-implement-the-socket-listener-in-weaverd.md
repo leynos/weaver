@@ -1,5 +1,9 @@
 # Implement the weaverd socket listener (Phase 1)
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This execution plan (ExecPlan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -138,7 +142,7 @@ Key files likely to change or be referenced:
 - `crates/weaver-cli/src/transport.rs` (client transport expectations).
 - `docs/weaver-design.md` and `docs/users-guide.md` (design and user-facing
   behaviour).
-- `docs/roadmap.md` (Phase 1 socket listener entry).
+- `docs/archive/prototype-roadmap.md` (Phase 1 socket listener entry).
 
 ## Plan of Work
 
@@ -208,7 +212,8 @@ are safe to re-run.
    - `docs/weaver-design.md` to record the listener strategy and error
      handling decisions.
    - `docs/users-guide.md` to describe any user-visible behaviour changes.
-   - `docs/roadmap.md` to mark the socket listener item as done.
+   - `docs/archive/prototype-roadmap.md` to mark the socket listener item as
+     done.
 
 8. Format and validate documentation if any docs changed:
 

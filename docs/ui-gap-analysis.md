@@ -42,7 +42,7 @@ reset:
   documentation and workflows.
 
 These are not separate defects to fix one by one under the old grammar. They
-are acceptance evidence for the command-surface reset in roadmap phase 1.
+are acceptance evidence for the command-surface reset in roadmap phase 13.
 
 ## Principle gap matrix
 
@@ -58,7 +58,7 @@ Target contract: no command prompts unless `--interactive` or a review command
 is used; non-TTY paths fail fast; destructive operations require `--force`;
 mutating commands declare `--dry-run` and idempotency policy.
 
-Roadmap owner: `roadmap.md` 1.3, 3.2, 3.3, and 4.1.
+Roadmap owner: `roadmap.md` 13.3, 15.2, 15.3, and 16.1.
 
 ### Structured, parseable output
 
@@ -72,7 +72,7 @@ Target contract: every data-returning command accepts `--json`; success JSON
 goes to stdout; structured error JSON goes to stderr; protocol identifiers are
 non-localized.
 
-Roadmap owner: `roadmap.md` 1.3.2.
+Roadmap owner: `roadmap.md` 13.3.2.
 
 ### Errors that teach and enumerate
 
@@ -86,7 +86,7 @@ Target contract: every enum-shaped rejection includes the invalid value, valid
 values, source registry, stable error code, exit class, and a working next
 command.
 
-Roadmap owner: `roadmap.md` 1.3.3.
+Roadmap owner: `roadmap.md` 13.3.3.
 
 ### Safe retries and mutation boundaries
 
@@ -101,7 +101,7 @@ Target contract: actuator output is always planned, verified, committed
 atomically, and reported with transaction metadata; retries reuse idempotency
 keys or safe natural keys.
 
-Roadmap owner: `roadmap.md` 3.2 and 3.3.
+Roadmap owner: `roadmap.md` 15.2 and 15.3.
 
 ### Bounded responses
 
@@ -114,7 +114,7 @@ collection command or future tool description.
 Target contract: lists expose `--limit`, cursor or continuation state,
 truncation markers, budget metadata, and narrowing hints.
 
-Roadmap owner: `roadmap.md` 1.3.3 and 2.2.
+Roadmap owner: `roadmap.md` 13.3.3 and 14.2.
 
 ### Cross-CLI vocabulary consistency
 
@@ -127,7 +127,7 @@ Target contract: resource-first commands use canonical verbs including `get`,
 `list`, `create`, `update`, `delete`, `apply`, `run`, `prune`, `save`, `show`,
 `rename`, `move`, and `send`; CI rejects off-policy names.
 
-Roadmap owner: `roadmap.md` 1.2.
+Roadmap owner: `roadmap.md` 13.2.
 
 ### Three-layer introspection
 
@@ -141,7 +141,7 @@ Target contract: human help, structured `context --json`,
 `capabilities list --json`, and `skill-path` all derive from or validate
 against the same command contract.
 
-Roadmap owner: `roadmap.md` 1.4.
+Roadmap owner: `roadmap.md` 13.4.
 
 ### Async-aware execution
 
@@ -155,7 +155,7 @@ Target contract: async-submit commands support `--wait`; `weaver jobs list`,
 `weaver jobs get`, and `weaver jobs prune` expose a durable ledger and retry
 recovery.
 
-Roadmap owner: `roadmap.md` 4.1.
+Roadmap owner: `roadmap.md` 16.1.
 
 ### Persistent identity through profiles
 
@@ -169,7 +169,7 @@ Target contract: `weaver profiles save`, `weaver profiles list`,
 `weaver profiles show`, `weaver profiles delete`, and root `--profile` provide
 named agent and human identities with redaction and explicit precedence.
 
-Roadmap owner: `roadmap.md` 4.2.
+Roadmap owner: `roadmap.md` 16.2.
 
 ### Two-way I/O
 
@@ -184,7 +184,7 @@ Target contract: `--deliver stdout`, `--deliver file:<path>`, and
 `weaver feedback list`, and `weaver feedback send` record local and optional
 upstream friction reports.
 
-Roadmap owner: `roadmap.md` 4.3 and 4.4.
+Roadmap owner: `roadmap.md` 16.3.
 
 ## Human-interface gaps
 
@@ -206,7 +206,7 @@ contract must supply:
   `--interactive` or a dedicated review command and must fail fast without a
   terminal.
 
-These gaps are primarily owned by `roadmap.md` 1.3.1. They depend on
+These gaps are primarily owned by `roadmap.md` 13.3.1. They depend on
 OrthoConfig behavioural metadata, but the human layouts and recovery text are
 Weaver-owned because they must explain semantic code work.
 
@@ -231,7 +231,7 @@ agent-native by construction. The missing pieces are:
 - delivery sinks for artefacts; and
 - feedback commands for reporting friction.
 
-These gaps are distributed across roadmap phases 1 through 4. They are not a
+These gaps are distributed across roadmap phases 13 through 16. They are not a
 request to duplicate OrthoConfig. The reusable metadata, naming, renderer,
 profile, delivery, feedback, and ledger contracts remain explicit dependencies
 on OrthoConfig; Weaver owns the semantic editing and safety integration.
@@ -259,8 +259,8 @@ require `--provider` by default are out of contract. Provider IDs remain useful
 in JSON provenance, verbose diagnostics, policy, profiles, and expert
 overrides. They are not the everyday grammar.
 
-Roadmap phase 6 owns this migration behind the command-surface adapter defined
-in phase 1.
+Roadmap phase 18 owns this migration behind the command-surface adapter defined
+in phase 13.
 
 ## Selector and pipeline gaps
 
@@ -291,7 +291,7 @@ filter that preserves compatible selector records. Act commands that consume
 selectors must state zero-match, one-match, and many-match behaviour. Selector
 records must preserve enough provenance for safe mutation and auditability.
 
-Roadmap phases 2, 3, and 5 own the vertical slices that make these examples
+Roadmap phases 14, 15, and 17 own the vertical slices that make these examples
 real.
 
 ## Historical prototype findings
