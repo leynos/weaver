@@ -230,6 +230,9 @@ teams a sequenced build plan.
       `6de701f`, ran `coderabbit review --agent --base-commit HEAD~1 --type
       committed` with zero findings, and pushed `feat/weaver-agent-roadmap` to
       `https://github.com/leynos/weaver.git`.
+- [x] (2026-05-12) Closed the remaining Milestone 2 ambiguity by marking
+      `act apply-patch` and the old design-roadmap section as current or
+      historical context superseded by ADR 007 for the 0.1.0 public grammar.
 - [ ] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [ ] Run documentation and repository gates.

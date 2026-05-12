@@ -2008,7 +2008,12 @@ routes the notifications to the appropriate server.
 - Failures in document sync map to `HostOperation::DidOpen`, `DidChange`, or
   `DidClose` for clearer error reporting in the safety harness.
 
-### 4.3. The `act apply-patch` command: safety-locked patch application
+### 4.3. The current `act apply-patch` command and target patch surface
+
+This section records the implemented prototype patch path and the safety
+properties it proves. ADR 007 supersedes the public `act apply-patch` spelling
+for the 0.1.0 target; the future resource-first surface is
+`weaver patches apply`, backed by the same safety-locked transaction model.
 
 `act apply-patch` provides a deterministic, command-line interface (CLI)-first
 way to apply structured patches while still benefiting from Weaver's
@@ -2615,12 +2620,19 @@ high-level "map" of the codebase, enabling it to formulate more effective plans
 and identify the specific files and symbols it needs to examine in more detail
 using other `weaver` commands.
 
-## 7. Development Roadmap (v4)
+## 7. Historical Development Roadmap Context (v4)
 
-The development of `Weaver` will proceed in a series of phased milestones. This
-revised roadmap prioritizes the establishment of core safety features early in
-the development cycle and structures the implementation of advanced features in
-a logical, incremental progression.
+This section records the roadmap context that preceded ADR 007. It remains
+useful as history and as evidence for completed foundation work, but
+`docs/roadmap.md` and ADR 007 supersede any future public command grammar here.
+Prototype names such as `observe`, `act`, and `verify` in this section should
+be read as historical planning language until they are migrated under the
+resource-first 0.1.0 command contract.
+
+The historical plan organized `Weaver` in a series of phased milestones. It
+prioritized the establishment of core safety features early in the development
+cycle and structured the implementation of advanced features in a logical,
+incremental progression.
 
 ### Phase 0: Foundation & Tooling (Complete)
 
