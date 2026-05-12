@@ -253,6 +253,10 @@ teams a sequenced build plan.
       `docs/repository-layout.md` so the public summary and planned-component
       ownership reflect the current workspace, completed safety foundation,
       ADR 007, the resource-first reset, and OrthoConfig dependency boundaries.
+- [x] (2026-05-12) Completed Milestone 5 by adding contributor-facing guidance
+      to `docs/developers-guide.md` for adding or renaming public commands
+      through OrthoConfig-backed metadata, Weaver semantic adapters,
+      capability IDs, renderer schemas, introspection, skills, and drift gates.
 - [ ] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [ ] Run documentation and repository gates.

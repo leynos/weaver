@@ -9,6 +9,45 @@ need but operators do not. For user-facing behaviour see the
 
 The workspace targets `ortho_config` v0.8.0 and Rust 1.88.
 
+## Adding or renaming public commands
+
+ADR 007 makes the 0.1.0 public command surface resource-first and generated
+from OrthoConfig-backed command metadata plus Weaver-owned semantic adapters.
+Do not add new public command grammar by hand in `clap`, daemon routing, manual
+pages, help text, and docs independently.
+
+When adding or renaming a public command:
+
+1. Update the OrthoConfig-backed command metadata or the Weaver semantic
+   command-surface adapter, depending on whether the change is reusable
+   command-contract machinery or Weaver-specific semantic behaviour.
+2. Declare the capability ID the command exposes, or reuse an existing
+   capability such as `definition.get`, `references.list`, `diagnostics.list`,
+   `symbol.rename`, `symbol.move`, or `patch.apply`.
+3. Provide localized human message IDs, copy-pasteable examples, and the human
+   renderer layout hints needed for default output, `--plain`, colour control,
+   and terminal-width fallbacks.
+4. Provide JSON success and error schemas. Protocol identifiers, field names,
+   schema versions, enum values, capability IDs, and exit classes are stable
+   and non-localized.
+5. Declare selector support, mutability, async behaviour, pagination bounds,
+   profile interaction, delivery support, and feedback exposure.
+6. Update or regenerate documentation snippets, `context --json`
+   introspection, skill-manifest references, manpage inputs, shell completions,
+   and tests from the same metadata.
+7. Run the drift, vocabulary, renderer, JSON, bounded-output, capability, and
+   example gates before merging the command change.
+
+Provider names are not the ordinary public workflow. Commands should expose
+semantic resources and capabilities, while Rope, rust-analyzer, Sempai,
+Tree-sitter, Language Server Protocol (LSP) servers, and built-in helpers stay
+behind deterministic provider routing. Provider names may appear in provenance,
+diagnostics, `--verbose` output, policy, and expert overrides.
+
+Sections below that document `observe`, `act`, `verify`, or `act refactor`
+describe the current prototype implementation. They are useful for maintaining
+shipped code, but they do not define the 0.1.0 public command contract.
+
 ## Sempai overview
 
 Sempai is Weaver's Semgrep-compatible query engine facade. It parses rule YAML,
