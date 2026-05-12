@@ -219,6 +219,17 @@ teams a sequenced build plan.
 - [x] (2026-05-11) Ran the Milestone 2 design-surface gates: `make fmt`,
       `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
       `make test`.
+- [x] (2026-05-12) Verified the review comments about `authorize`, helper
+      punctuation, and remaining clear Oxford spelling issues against current
+      docs. The named findings were already fixed; clear prose spelling issues
+      were corrected, while a URL, a string literal, and code identifiers were
+      left unchanged.
+- [x] (2026-05-12) Ran review-fix gates: `make fmt`, `make markdownlint`,
+      `make nixie`, `make check-fmt`, `make lint`, and `make test`.
+- [x] (2026-05-12) Committed the review-fix/design-surface batch as
+      `6de701f`, ran `coderabbit review --agent --base-commit HEAD~1 --type
+      committed` with zero findings, and pushed `feat/weaver-agent-roadmap` to
+      `https://github.com/leynos/weaver.git`.
 - [ ] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [ ] Run documentation and repository gates.
