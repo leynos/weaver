@@ -233,6 +233,13 @@ teams a sequenced build plan.
 - [x] (2026-05-12) Closed the remaining Milestone 2 ambiguity by marking
       `act apply-patch` and the old design-roadmap section as current or
       historical context superseded by ADR 007 for the 0.1.0 public grammar.
+- [x] (2026-05-12) Completed Milestone 3 by rewriting `docs/roadmap.md`
+      around the 0.1.0 command-surface reset, explicit OrthoConfig
+      dependencies, resource-first command slices, selector-driven mutation,
+      capability-routed plugins, and a preserved historical roadmap ledger.
+- [x] (2026-05-12) Ran the Milestone 3 roadmap gates: `make fmt`,
+      `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
+      `make test`.
 - [ ] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [ ] Run documentation and repository gates.
@@ -283,6 +290,11 @@ teams a sequenced build plan.
   limit. Milestone validation should use
   `coderabbit review --agent --base-commit HEAD~1 --type committed` or another
   narrow comparison until the branch diff is small enough for whole-PR review.
+
+- Discovery: the fetched OrthoConfig roadmap confirms the dependency numbers
+  used by the Weaver roadmap rewrite: 5.2.3, 6.1.1, 6.1.2, 6.2.1 through 6.2.3,
+  6.3.1, 6.3.2, 7.1.1 through 7.1.3, 7.2.1 through 7.2.7, 8.1.1, 8.1.2, and
+  9.1.1 through 9.3.3.
 
 ## Decision Log
 
