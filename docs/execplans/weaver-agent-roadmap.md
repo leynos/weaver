@@ -249,6 +249,10 @@ teams a sequenced build plan.
       command-surface section to `docs/users-guide.md` and labelling the
       remaining `observe` / `act` / `verify` command reference as the current
       prototype implementation rather than the future public grammar.
+- [x] (2026-05-12) Continued Milestone 5 by updating `README.md` and
+      `docs/repository-layout.md` so the public summary and planned-component
+      ownership reflect the current workspace, completed safety foundation,
+      ADR 007, the resource-first reset, and OrthoConfig dependency boundaries.
 - [ ] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [ ] Run documentation and repository gates.

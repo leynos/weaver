@@ -10,6 +10,9 @@ are defined in
 [sempai-query-language-design.md](sempai-query-language-design.md).
 Documentation conventions are defined in
 [documentation-style-guide.md](documentation-style-guide.md) and `AGENTS.md`.
+ADR 007 defines the pre-0.1.0 command-surface reset and the boundary between
+Weaver-owned semantic code-editing behaviour and reusable command-contract
+machinery that Weaver consumes from OrthoConfig.
 
 ## Layout goals
 
@@ -92,21 +95,27 @@ _Table 2: Implemented shared directories and their roles._
 ## Planned components
 
 Planned components are listed in `docs/roadmap.md` and are not yet fully
-implemented in this repository snapshot.
+implemented in this repository snapshot. The 0.1.0 command-surface reset means
+planned public commands should use the resource-first grammar from ADR 007 even
+when older designs mention `observe`, `act`, or `verify`.
 
-| Planned component                                                          | Intended location                                                        | Roadmap reference                                    |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------- |
-| Rust `extricate-symbol` actuator flow                                      | `crates/weaver-plugin-rust-analyzer/` and `crates/weaverd/`              | Proposed in Rust extricate actuator technical design |
-| Rust extricate plugin overlay and Rust Analyzer (RA) orchestration modules | `crates/weaver-plugin-rust-analyzer/src/lsp/` and related plugin modules | Proposed in Rust extricate actuator technical design |
-| Plugin capability metadata for extrication                                 | `crates/weaver-plugins/src/manifest/mod.rs`                              | Proposed in Rust extricate actuator technical design |
-| Sempai YAML, DSL, and Tree-sitter backend crates                           | `crates/sempai-yaml/`, `crates/sempai-dsl/`, and `crates/sempai-ts/`     | Proposed in Sempai query language technical design   |
-| Sempai integration command surface (`observe`)                             | `crates/weaver-cli/` and `crates/weaverd/`                               | Proposed in Sempai query language technical design   |
-| `srgn` specialist plugin                                                   | `crates/weaver-plugin-srgn/` (expected new crate)                        | Phase 3, specialist actuator plugins                 |
-| `jedi` specialist plugin                                                   | `crates/weaver-plugin-jedi/` (expected new crate)                        | Phase 3, specialist sensor plugins                   |
-| Static analysis provider for `weaver-graph`                                | `crates/weaver-graph/` provider modules                                  | Phase 3, static analysis provider                    |
-| `onboard-project` command flow                                             | `crates/weaver-cli/` and `crates/weaverd/` command handlers              | Phase 4, advanced agent support                      |
-| Interactive review mode for lock failures                                  | `crates/weaver-cli/` plus daemon confirmation interfaces                 | Phase 4, human-in-the-loop mode                      |
-| Dynamic analysis ingestion provider                                        | `crates/weaver-graph/` provider modules                                  | Phase 4, dynamic analysis ingestion                  |
+| Planned component                                                          | Intended location                                                          | Roadmap reference                                     |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Weaver command-surface adapter for semantic code-editing metadata          | `crates/weaver-cli/`, `crates/weaverd/`, and Weaver-owned metadata modules | Roadmap 1.1; depends on OrthoConfig 5.2.3, 6.1, 7.2.7 |
+| Resource-first command handlers and examples                               | `crates/weaver-cli/`, `crates/weaverd/`, and `docs/`                       | Roadmap 1.2 through 3.4                               |
+| Human and machine renderer integration                                     | `crates/weaver-cli/` and shared output modules                             | Roadmap 1.3; depends on OrthoConfig 7.2 and 8.1       |
+| Structured context, capability, and skill surfaces                         | `crates/weaver-cli/`, `crates/weaverd/`, and future skill manifests        | Roadmap 1.4; depends on OrthoConfig 6.2 and 6.3       |
+| Sempai YAML, DSL, and Tree-sitter backend crates                           | `crates/sempai-yaml/`, `crates/sempai-dsl/`, and `crates/sempai-ts/`       | Roadmap 5 and Sempai query language technical design  |
+| Sempai selector integration in resource commands                           | `crates/weaver-cli/`, `crates/weaverd/`, and Sempai crates                 | Roadmap 2.3, 3.1, and 5                               |
+| Rust `symbol.move` or `symbol.extract` actuator flow                       | `crates/weaver-plugin-rust-analyzer/` and `crates/weaverd/`                | Roadmap 3.1 and 6.2                                   |
+| Rust extricate plugin overlay and Rust Analyzer (RA) orchestration modules | `crates/weaver-plugin-rust-analyzer/src/lsp/` and related plugin modules   | Proposed in Rust extricate actuator technical design  |
+| Plugin capability metadata for symbol movement and extraction              | `crates/weaver-plugins/src/manifest/mod.rs`                                | Roadmap 6.1 and 6.2                                   |
+| `srgn` specialist plugin                                                   | `crates/weaver-plugin-srgn/` (expected new crate)                          | Roadmap 6.3                                           |
+| `jedi` specialist plugin                                                   | `crates/weaver-plugin-jedi/` (expected new crate)                          | Roadmap 6.3                                           |
+| Static analysis provider for `weaver-graph`                                | `crates/weaver-graph/` provider modules                                    | Roadmap 5.3 and historical graph phases               |
+| Jobs, profiles, delivery, and feedback command support                     | `crates/weaver-cli/`, `crates/weaverd/`, and state/config modules          | Roadmap 4; depends on OrthoConfig 9.1 through 9.3     |
+| Onboarding and explicit interactive review flows                           | `crates/weaver-cli/` and `crates/weaverd/` command handlers                | Roadmap 8.1                                           |
+| Dynamic analysis ingestion provider                                        | `crates/weaver-graph/` provider modules                                    | Historical advanced agent-support phases              |
 
 _Table 3: Planned components and their expected repository placement._
 
