@@ -245,6 +245,10 @@ teams a sequenced build plan.
       matrix that maps current prototype evidence to ADR 007, the new design,
       the reordered roadmap, OrthoConfig dependencies, selector composition,
       and capability-routed provider gaps.
+- [x] (2026-05-12) Started Milestone 5 by adding a 0.1.0 target
+      command-surface section to `docs/users-guide.md` and labelling the
+      remaining `observe` / `act` / `verify` command reference as the current
+      prototype implementation rather than the future public grammar.
 - [ ] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [ ] Run documentation and repository gates.

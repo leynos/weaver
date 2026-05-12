@@ -1,9 +1,54 @@
 # Weaver user's guide
 
-This guide summarizes the behaviour exposed to operators by the initial CLI and
-daemon foundation. Configuration is currently the primary focus because both
-binaries share the same loading pipeline and rely on the `weaver-config` crate
-to merge settings from files, environment variables, and command-line arguments.
+This guide summarizes the behaviour exposed to operators by the current
+pre-0.1.0 CLI and daemon foundation. Configuration is currently the primary
+focus because both binaries share the same loading pipeline and rely on the
+`weaver-config` crate to merge settings from files, environment variables, and
+command-line arguments.
+
+## 0.1.0 command-surface target
+
+Weaver is pre-0.1.0, so the current public command grammar is not a
+compatibility promise. [ADR 007](adr-007-agent-native-command-surface.md) and
+the [roadmap](roadmap.md) reset the future public interface around a
+human-friendly, agent-native command contract.
+
+The 0.1.0 target keeps the human terminal experience first-class while making
+agent usage reliable:
+
+- default output remains localized, readable, and accessible for humans;
+- `--json` is the canonical machine-readable output switch;
+- resource-first commands replace the prototype `observe`, `act`, and
+  `verify` domain grammar;
+- Sempai one-liner queries are first-class selectors alongside file-position
+  selectors;
+- observe-style commands can emit structured selector records that act-style
+  commands consume directly or after ordinary UNIX filtering;
+- capabilities are public, while providers such as Rope and rust-analyzer are
+  implementation details surfaced through provenance, diagnostics, policy, and
+  expert overrides; and
+- reusable command metadata, renderer metadata, profile, delivery, feedback,
+  skill, and execution-ledger contracts depend on OrthoConfig where the
+  OrthoConfig roadmap already owns the generic machinery.
+
+Representative target commands look like this:
+
+```sh
+weaver definitions get --uri file:///src/main.rs --position 10:5
+weaver references list --uri file:///src/main.rs --position 10:5 --json
+weaver symbols list --query 'fn $name(...)' --json \
+  | jq 'select(.name | startswith("old_"))' \
+  | weaver symbols rename --from-stdin --replace-prefix old_ --with-prefix new_
+weaver symbols rename --query 'fn process_request(...)' --new-name run_request
+weaver patches apply --file changes.patch --dry-run
+weaver context --json
+weaver capabilities list --json
+```
+
+The command reference below records the current prototype implementation. It is
+useful for operating this branch today, but future roadmap work should follow
+the target contract above unless a later ADR explicitly changes the 0.1.0
+surface.
 
 ## Configuration layering
 
@@ -261,12 +306,14 @@ Next command:
   WEAVER_FOREGROUND=1 weaver daemon start
 ```
 
-## Command reference
+## Current prototype command reference
 
 `weaver` exposes three command families: the `--capabilities` probe, daemon
 lifecycle commands, and domain operations (`observe`, `act`, `verify`). Domain
 commands are sent to the daemon as JSONL; any arguments after the operation are
-forwarded verbatim without CLI validation.
+forwarded verbatim without CLI validation. This section describes the current
+implementation only; the 0.1.0 target command surface is resource-first and is
+summarized at the start of this guide.
 
 ### Bare invocation
 
