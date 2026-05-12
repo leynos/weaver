@@ -240,6 +240,11 @@ teams a sequenced build plan.
 - [x] (2026-05-12) Ran the Milestone 3 roadmap gates: `make fmt`,
       `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
       `make test`.
+- [x] (2026-05-12) Completed Milestone 4 by replacing
+      `docs/ui-gap-analysis.md` with an agent-native, human-friendly gap
+      matrix that maps current prototype evidence to ADR 007, the new design,
+      the reordered roadmap, OrthoConfig dependencies, selector composition,
+      and capability-routed provider gaps.
 - [ ] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [ ] Run documentation and repository gates.
@@ -295,6 +300,13 @@ teams a sequenced build plan.
   used by the Weaver roadmap rewrite: 5.2.3, 6.1.1, 6.1.2, 6.2.1 through 6.2.3,
   6.3.1, 6.3.2, 7.1.1 through 7.1.3, 7.2.1 through 7.2.7, 8.1.1, 8.1.2, and
   9.1.1 through 9.3.3.
+
+- Discovery: the previous `docs/ui-gap-analysis.md` remained accurate as
+  current-state evidence, but its recommended remedies would have preserved too
+  much of the superseded `observe` / `act` / `verify` grammar if followed
+  literally. The revised gap analysis must therefore retain those observations
+  as historical evidence while pointing implementation at ADR 007 and the new
+  roadmap phases.
 
 ## Decision Log
 

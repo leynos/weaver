@@ -1,532 +1,345 @@
-# Weaver command-line interface (CLI) user-interface gap analysis
+# Weaver command-interface gap analysis
 
-This document records a comprehensive audit of the `weaver` CLI's
-discoverability and help surfaces, identifies concrete gaps, and proposes
-remedies for each. The guiding principle is that **a user must never feel at a
-loss as to what to do next**: every level of the command hierarchy must
-advertise the available subcommands, domains, operations, plugins, and
-parameters so that the tool is self-documenting.
+This document audits the gap between Weaver's current pre-0.1.0 command-line
+interface and the target human-friendly, agent-native command contract defined
+by [ADR 007](adr-007-agent-native-command-surface.md), the
+[design document](weaver-design.md), and the [roadmap](roadmap.md).
 
-## Methodology
+The previous version of this document focused on discoverability defects in the
+prototype `observe` / `act` / `verify` grammar. Those findings remain useful
+evidence of why the reset is necessary, but the future target is no longer to
+polish that prototype grammar. The target is one generated command contract
+with two first-class renderers:
 
-The analysis was conducted by:
+- a localized, accessible, human-friendly default renderer; and
+- a stable `--json` renderer for agents, scripts, and UNIX pipelines.
 
-1. Reading every help surface the binary exposes today (`--help`, `-h`,
-   `help`, bare invocation, per-subcommand help).
-2. Tracing the clap definition in
-   [`crates/weaver-cli/src/cli.rs`](../crates/weaver-cli/src/cli.rs) and the
-   domain router in
-   [`crates/weaverd/src/dispatch/router.rs`](../crates/weaverd/src/dispatch/router.rs).
-3. Exercising error paths for unknown domains, unknown operations,
-   missing arguments, and missing operations.
-4. Reviewing the plugin registry, the daemon dispatch table, and the
-   output-rendering pipeline.
-5. Cross-referencing against the user's guide
-   ([`docs/users-guide.md`](users-guide.md)) and the generated manual page.
+The audit below therefore treats legacy command names, root `--output`,
+operation-local `--format`, root `--capabilities`, provider-first mutation
+commands, and hand-maintained catalogues as current-state evidence rather than
+future contract details.
 
-The sections below are ordered from the outermost user interaction (bare
-invocation) inward to the deepest (individual operation arguments).
+## Current evidence
 
-______________________________________________________________________
+The prototype interface still exposes several concrete gaps that motivated the
+reset:
 
-## Level 0 — bare invocation (`weaver`)
+- `crates/weaver-cli/src/cli.rs` still models the public command as positional
+  `DOMAIN`, `OPERATION`, and trailing `ARG` tokens. That keeps operation-level
+  help and validation out of the schema that clap can render.
+- The top-level command still has `disable_help_subcommand = true`, so
+  `weaver help` is not a normal help entrypoint.
+- The top-level machine-output control is `--output auto|human|json`, while
+  the target contract requires one canonical `--json` switch.
+- Some operation documentation still references operation-local formatting
+  flags or provider-first workflows, both of which are superseded by ADR 007.
+- Unknown-domain, unknown-operation, missing-argument, and missing-provider
+  paths have improved in recent roadmap work, but the current surface does not
+  yet provide universal enum enumeration, stable exit classes, or structured
+  failure JSON for every command.
+- Plugin and capability information exists in the implementation and ADRs, but
+  ordinary users still encounter provider concepts too early in some current
+  documentation and workflows.
 
-Running `weaver` with no arguments currently produces:
+These are not separate defects to fix one by one under the old grammar. They
+are acceptance evidence for the command-surface reset in roadmap phase 1.
 
-```plaintext
-the command domain must be provided
+## Principle gap matrix
+
+### Non-interactive by default
+
+Current status: most implemented commands are scriptable, and the safety
+harness avoids implicit commits.
+
+Shortfall: future interactive review work could accidentally add prompts, and
+destructive and mutating semantics are not yet declared in one command schema.
+
+Target contract: no command prompts unless `--interactive` or a review command
+is used; non-TTY paths fail fast; destructive operations require `--force`;
+mutating commands declare `--dry-run` and idempotency policy.
+
+Roadmap owner: `roadmap.md` 1.3, 3.2, 3.3, and 4.1.
+
+### Structured, parseable output
+
+Current status: Weaver uses JSONL internally and exposes root `--output json`.
+
+Shortfall: `--output json` is not the target community convention; JSON mode is
+not universal, operation-local `--format` exists in older docs, and
+stdout/stderr/error schema rules are not yet universal.
+
+Target contract: every data-returning command accepts `--json`; success JSON
+goes to stdout; structured error JSON goes to stderr; protocol identifiers are
+non-localized.
+
+Roadmap owner: `roadmap.md` 1.3.2.
+
+### Errors that teach and enumerate
+
+Current status: ADR 004 and prior roadmap work define stable routing refusals
+and better alternatives for some errors.
+
+Shortfall: enumeration is not universal across enums, registries, providers,
+profiles, jobs, delivery schemes, selector forms, and capability IDs.
+
+Target contract: every enum-shaped rejection includes the invalid value, valid
+values, source registry, stable error code, exit class, and a working next
+command.
+
+Roadmap owner: `roadmap.md` 1.3.3.
+
+### Safe retries and mutation boundaries
+
+Current status: Double-Lock, syntactic verification, atomic edits, and
+capability-routed mutation work are substantial foundations.
+
+Shortfall: mutations do not yet share one target contract for idempotency keys,
+transaction IDs, retry matching, dry-run coverage, and selector-stream
+provenance.
+
+Target contract: actuator output is always planned, verified, committed
+atomically, and reported with transaction metadata; retries reuse idempotency
+keys or safe natural keys.
+
+Roadmap owner: `roadmap.md` 3.2 and 3.3.
+
+### Bounded responses
+
+Current status: graph-slice work already has explicit budgets such as card and
+edge limits.
+
+Shortfall: bounded output is not yet a command-surface invariant for every
+collection command or future tool description.
+
+Target contract: lists expose `--limit`, cursor or continuation state,
+truncation markers, budget metadata, and narrowing hints.
+
+Roadmap owner: `roadmap.md` 1.3.3 and 2.2.
+
+### Cross-CLI vocabulary consistency
+
+Current status: current docs and code still mix prototype domains, provider
+terms, and older flags.
+
+Shortfall: canonical verbs and banned names are not yet enforced mechanically.
+
+Target contract: resource-first commands use canonical verbs including `get`,
+`list`, `create`, `update`, `delete`, `apply`, `run`, `prune`, `save`, `show`,
+`rename`, `move`, and `send`; CI rejects off-policy names.
+
+Roadmap owner: `roadmap.md` 1.2.
+
+### Three-layer introspection
+
+Current status: help and generated manpage work exist, and prior roadmap
+entries improved help.
+
+Shortfall: the target `weaver context --json`, capability availability command,
+and workflow skills are missing.
+
+Target contract: human help, structured `context --json`,
+`capabilities list --json`, and `skill-path` all derive from or validate
+against the same command contract.
+
+Roadmap owner: `roadmap.md` 1.4.
+
+### Async-aware execution
+
+Current status: ADR 006 defines broker-owned plugin execution, but it
+deliberately keeps one-shot JSONL execution narrow.
+
+Shortfall: no public `--wait` contract or durable jobs ledger exists for
+recoverable long-running workflows.
+
+Target contract: async-submit commands support `--wait`; `weaver jobs list`,
+`weaver jobs get`, and `weaver jobs prune` expose a durable ledger and retry
+recovery.
+
+Roadmap owner: `roadmap.md` 4.1.
+
+### Persistent identity through profiles
+
+Current status: Weaver has layered configuration, including config files,
+environment, and flags.
+
+Shortfall: named profiles are not yet a first-class command-surface state
+primitive or exposed through context metadata.
+
+Target contract: `weaver profiles save`, `weaver profiles list`,
+`weaver profiles show`, `weaver profiles delete`, and root `--profile` provide
+named agent and human identities with redaction and explicit precedence.
+
+Roadmap owner: `roadmap.md` 4.2.
+
+### Two-way I/O
+
+Current status: Weaver has stdout/stderr discipline and internal JSONL
+transport.
+
+Shortfall: artifact delivery sinks and agent feedback are not yet first-class,
+discoverable, or schema-backed.
+
+Target contract: `--deliver stdout`, `--deliver file:<path>`, and
+`--deliver webhook:<url>` handle artefact routing; `weaver feedback create`,
+`weaver feedback list`, and `weaver feedback send` record local and optional
+upstream friction reports.
+
+Roadmap owner: `roadmap.md` 4.3 and 4.4.
+
+## Human-interface gaps
+
+The reset must not turn Weaver into an agent-only appliance. The current
+prototype still lacks several human-facing guarantees that the target command
+contract must supply:
+
+- Default output must remain readable and localized. Humans should not need
+  `jq` for ordinary success or failure paths.
+- Help must be available through `weaver --help`, `weaver help`, command-level
+  help, generated manpages, shell completions, and copy-pasteable examples.
+- `--plain`, `--color auto|always|never`, `--no-pager`, `--width`, and
+  `--locale` must be stable human-renderer controls rather than alternate
+  protocol shapes.
+- Human output must not rely on colour alone. Tables need headings, narrow
+  terminals need labelled-block fallbacks, Unicode decoration needs ASCII
+  fallbacks, and progress belongs on stderr only when stderr is a terminal.
+- Interactive review remains valuable, but it must be explicit through
+  `--interactive` or a dedicated review command and must fail fast without a
+  terminal.
+
+These gaps are primarily owned by `roadmap.md` 1.3.1. They depend on
+OrthoConfig behavioural metadata, but the human layouts and recovery text are
+Weaver-owned because they must explain semantic code work.
+
+## Agent-interface gaps
+
+The current interface is agent-friendly in important ways, especially its JSONL
+foundations, daemon model, safety harness, and capability ADRs. It is not yet
+agent-native by construction. The missing pieces are:
+
+- one canonical `--json` switch instead of root `--output json`;
+- stable success and failure schemas for every public command;
+- stable exit-code classes;
+- bounded collection defaults and continuation metadata;
+- structured selector records that can flow from observe-style commands into
+  act-style commands;
+- Sempai one-liner selectors as peers of `--uri` plus `--position`;
+- `weaver context --json` for whole-command introspection;
+- `weaver capabilities list --json` for runtime capability availability;
+- workflow skills discoverable through `weaver skill-path`;
+- recoverable job state for long-running workflows;
+- named profiles for repeated agent identity;
+- delivery sinks for artefacts; and
+- feedback commands for reporting friction.
+
+These gaps are distributed across roadmap phases 1 through 4. They are not a
+request to duplicate OrthoConfig. The reusable metadata, naming, renderer,
+profile, delivery, feedback, and ledger contracts remain explicit dependencies
+on OrthoConfig; Weaver owns the semantic editing and safety integration.
+
+## Capability and provider gaps
+
+Weaver's existing ADRs already point in the correct direction:
+
+- ADR 001 says user intent is represented by stable capability IDs and provider
+  selection is internal.
+- ADR 004 requires deterministic routing and stable refusal diagnostics.
+- ADR 006 keeps plugin execution broker-owned and prevents plugins from owning
+  final commit behaviour.
+
+The gap is that the ordinary public surface and some current documentation
+still leak provider-first thinking. The target command surface must present
+capabilities as the public abstraction:
+
+```sh
+weaver symbols rename --uri file:///src/lib.rs --position 42:9 --new-name run
 ```
 
-Exit code 1. No further guidance.
+Provider-specific commands such as `weaver rope rename` or workflows that
+require `--provider` by default are out of contract. Provider IDs remain useful
+in JSON provenance, verbose diagnostics, policy, profiles, and expert
+overrides. They are not the everyday grammar.
 
-A newcomer receives only a terse error message. There is no hint that `--help`
-is available, no listing of domains, no mention of `daemon`, and no pointer to
-documentation. The message does not explain what a "domain" is.
+Roadmap phase 6 owns this migration behind the command-surface adapter defined
+in phase 1.
 
-**Recommended remedy.** When neither a domain nor a structured subcommand is
-supplied, emit the short help text (`-h` form) automatically instead of an
-unadorned error string. This is the behaviour users expect from every
-mainstream CLI tool.
+## Selector and pipeline gaps
 
-*Alternative:* print a purpose-built "getting started" block that lists
-domains, the `daemon` subcommand, and the `--help` flag.
+Sempai one-liner queries must be first-class selectors, not a search-only side
+feature. Position references and selector streams are peer selector forms. The
+target interactions include:
 
-______________________________________________________________________
+```sh
+weaver symbols list --query 'fn $name(...)' --json \
+  | weaver symbols rename --from-stdin --suffix _renamed
 
-## Level 1 — top-level help (`weaver --help` / `weaver -h`)
+weaver symbols list --query 'fn $name(...)' --json \
+  | jq 'select(.name | startswith("old_"))' \
+  | weaver symbols rename --from-stdin --replace-prefix old_ --with-prefix new_
 
-Running `weaver --help` currently produces:
+weaver symbols rename --query 'fn process_request(...)' --new-name run_request
 
-```plaintext
-Command-line interface for the Weaver semantic code tool
+weaver symbols rename \
+  --uri file:///src/main.rs \
+  --position 10:5 \
+  --new-name run_request
 
-Usage: weaver [OPTIONS] [DOMAIN] [OPERATION] [ARG]...
-
-Commands:
-  daemon  Runs daemon lifecycle commands
-
-Arguments:
-  [DOMAIN]     The command domain (for example `observe`)
-  [OPERATION]  The command operation (for example `get-definition`)
-  [ARG]...     Additional arguments passed to the daemon
-
-Options:
-      --capabilities     Prints the negotiated capability matrix …
-      --output <OUTPUT>  Controls how daemon output is rendered …
-  -h, --help             Print help
+weaver symbols list --query 'class $name' --json | less
 ```
 
-### Gap 1a — domains not enumerated
-
-The help text gives one example (`observe`) but never lists all three domains
-(`observe`, `act`, `verify`). The user must already know the domain names or
-consult external documentation.
-
-**Remedy.** Add a `long_about` or `after_help` block to `Cli` that lists all
-three domains with a one-line description for each.
-
-### Gap 1b — operations not enumerated
-
-Only `get-definition` appears as a parenthetical example. The user cannot
-discover that `find-references`, `apply-patch`, `refactor`, etc. exist.
-
-**Recommended remedy.** Include the full operation list per domain in the same
-after-help block used for gap 1a.
-
-*Alternative:* add a `weaver list-operations` introspection command.
-
-### Gap 1c — configuration flags invisible
-
-The five `ortho-config` flags (`--config-path`, `--daemon-socket`,
-`--log-filter`, `--log-format`, `--capability-overrides`) are stripped before
-clap parses and therefore never appear in help output. See
-[Level 6](#level-6--configuration-flags-invisible-in-help) for the full
-analysis and remedy.
-
-### Gap 1d — no `--version` flag
-
-The `Cli` struct does not derive or declare a version. Running
-`weaver --version` produces:
-
-```plaintext
-error: unexpected argument '--version' found
-```
-
-Standard CLI expectation violated; packaging and bug-reporting workflows are
-harder.
-
-**Remedy.** Add `version` to the `#[command(...)]` attribute on `Cli` so clap
-auto-generates `--version` / `-V`.
-
-### Gap 1e — no long description or after-help text
-
-There is no `about`, `long_about`, or `after_help` on the top-level `Cli`
-struct that would describe Weaver's purpose, architecture, or give a
-quick-start example.
-
-**Remedy.** Add `about` and `long_about` attributes describing Weaver's purpose
-and a one-line quick-start example.
-
-### Gap 1f — `help` subcommand disabled
-
-`disable_help_subcommand = true` means `weaver help` is parsed as
-`DOMAIN = "help"`, which fails with "the command operation must be provided".
-Users accustomed to `<tool> help <topic>` patterns get a confusing error.
-
-**Recommended remedy.** Re-enable the `help` subcommand (remove
-`disable_help_subcommand = true`).
-
-*Alternative:* intercept the `help` domain token in the CLI and print
-contextual help.
-
-### Gap 1g — plugin listing absent
-
-There is no mechanism to list registered plugins (actuators, sensors), their
-supported languages, or their available refactoring operations. Users must
-guess provider names (e.g. `rope`, `rust-analyzer`) or read the source.
-
-**Remedy.** Add a `weaver list-plugins` (or `weaver plugins`) introspection
-subcommand. It should query the daemon (or a static registry) and print plugin
-name, kind, languages, and version.
-
-______________________________________________________________________
-
-## Level 2 — domain without operation (`weaver observe`)
-
-Running `weaver observe`, `weaver act`, or `weaver verify` without an operation
-currently produces:
-
-```plaintext
-the command operation must be provided
-```
-
-Exit code 1. No further guidance.
-
-The user has correctly identified a domain but receives no indication of which
-operations exist within it. The error is generated client-side in
-[`command.rs`](../crates/weaver-cli/src/command.rs)
-(`AppError::MissingOperation`) before any daemon communication occurs, so the
-daemon's knowledge of valid operations is not surfaced.
-
-**Recommended remedy.** When a domain is provided without an operation, emit a
-contextual help block listing the valid operations for that domain. The
-recommended approach is a hard-coded table in the CLI mirroring the daemon's
-`DomainRoutingContext::known_operations`, since this avoids a daemon
-round-trip. The message should follow the pattern:
-
-```plaintext
-error: operation required for domain 'observe'
-
-Available operations:
-  get-definition   Retrieve the definition location for a symbol
-  find-references  Find all references to a symbol
-  grep             Structural pattern search
-  diagnostics      Retrieve compiler diagnostics
-  call-hierarchy   Show the call graph for a symbol
-
-Run 'weaver observe <operation> --help' for operation details.
-```
-
-______________________________________________________________________
-
-## Level 3 — unknown domain (`weaver bogus something`)
-
-The CLI sends the request to the daemon (or attempts auto-start). If the daemon
-is not running, the user sees:
-
-```plaintext
-Waiting for daemon start...
-failed to spawn weaverd binary '"weaverd"': No such file or directory
-```
-
-If the daemon is running, it returns:
-
-```plaintext
-unknown domain: bogus
-```
-
-The unknown-domain error does not suggest valid domains. A typo (e.g. `observe`
-vs `obsrve`) produces an opaque rejection with no "did you mean?" hint.
-Additionally, the error is only available at the daemon layer — the CLI could
-validate the domain before attempting a daemon connection or auto-start.
-
-**Recommended remedy.** Validate the domain client-side before connecting to
-the daemon and include the list of valid domains in the error output:
-
-```plaintext
-error: unknown domain 'obsrve'
-
-Valid domains: observe, act, verify
-```
-
-This avoids unnecessary auto-start attempts for clearly invalid input.
-
-*Alternative:* additionally apply edit-distance matching to suggest the closest
-valid domain (e.g. "did you mean 'observe'?").
-
-______________________________________________________________________
-
-## Level 4 — unknown operation (`weaver observe nonexistent`)
-
-When the daemon is running, it returns:
-
-```plaintext
-unknown operation 'nonexistent' for domain 'observe'
-```
-
-Exit code 1. The error does not list valid operations for the domain. The
-daemon has all the information needed (it holds the `known_operations` arrays)
-but does not include it in the error response.
-
-**Remedy.** Extend the `DispatchError::UnknownOperation` path to include the
-known operations list:
-
-```plaintext
-error: unknown operation 'get-def' for domain 'observe'
-
-Available operations: get-definition, find-references, grep,
-diagnostics, call-hierarchy
-```
-
-______________________________________________________________________
-
-## Level 5 — operation without required arguments
-
-### Gap 5a — `observe get-definition` without arguments
-
-Running `weaver observe get-definition` (without `--uri` and `--position`)
-attempts a daemon connection or auto-start. If the daemon is available, it
-returns:
-
-```plaintext
-observe get-definition requires --uri and --position arguments
-```
-
-Two sub-problems exist:
-
-- **No client-side pre-validation.** The CLI does not know what
-  arguments each operation needs, so it cannot catch missing parameters before
-  contacting the daemon.
-- **No `--help` at operation level.** Running
-  `weaver observe get-definition --help` prints the *top-level* help because
-  `--help` is consumed by clap before the trailing arguments reach the daemon.
-  The user has no way to discover operation parameters from the CLI.
-
-**Recommended remedy.** Model each domain as a clap subcommand containing its
-own subcommands (one per operation). This gives full clap-generated help at
-every level — including `weaver observe get-definition --help` — and is the
-most thorough approach, though it requires significant restructuring of
-[`cli.rs`](../crates/weaver-cli/src/cli.rs).
-
-*Alternatives (lighter-weight):*
-
-- **Daemon-side `--help` interception.** When the daemon receives an
-  operation with `--help` in the arguments, respond with a help payload instead
-  of executing the operation.
-- **Introspection subcommand.** A `weaver help observe get-definition`
-  command that queries the daemon (or a static schema) and prints the expected
-  arguments, types, and examples.
-
-### Gap 5b — `act refactor` without arguments
-
-Running `weaver act refactor` (without flags) produces:
-
-```plaintext
-act refactor requires --provider <plugin-name>
-```
-
-The error identifies the first missing flag but not the full set of required
-flags (`--provider`, `--refactoring`, `--file`), nor does it list valid
-providers or refactoring operations.
-
-**Remedy.** Return a comprehensive error listing all required parameters, valid
-provider names, and valid refactoring operations:
-
-```plaintext
-error: act refactor requires the following arguments:
-
-  --provider <PLUGIN>        Registered plugin name (rope, rust-analyzer)
-  --refactoring <OPERATION>  Refactoring to perform (rename)
-  --file <PATH>              Workspace-relative file path
-
-  KEY=VALUE...               Extra arguments forwarded to the plugin
-
-Run 'weaver list-plugins' to see registered plugins.
-```
-
-______________________________________________________________________
-
-## Level 6 — configuration flags invisible in help
-
-The five configuration flags (`--config-path`, `--daemon-socket`,
-`--log-filter`, `--log-format`, `--capability-overrides`) are consumed by
-`split_config_arguments` before the remaining tokens reach clap. They work
-correctly at runtime, but are completely absent from all help output.
-
-An operator who runs `weaver --help` to discover how to connect to a
-non-default daemon socket finds no relevant flag listed. The flags are
-documented only in [`docs/users-guide.md`](users-guide.md) and the source code.
-
-**Recommended remedy.** Register the five flags as clap arguments on `Cli` so
-they appear in `--help`. They do not need to participate in clap's parsing
-pipeline (they can be `global = true, hide = false` arguments that are read by
-the config splitter), but they must be visible in the help output.
-
-*Alternative:* document them in an `after_help` block if registering them as
-clap arguments would conflict with the `ortho-config` loader.
-
-______________________________________________________________________
-
-## Level 7 — plugin discoverability
-
-There is no command to list plugins. The user must know the provider name
-(`rope`, `rust-analyzer`) from the documentation or source code. There is no
-way to discover which plugins are registered, which languages each plugin
-supports, which refactoring operations a plugin offers, or the version of each
-plugin.
-
-The plugin registry (`PluginRegistry`) has the application programming
-interface (API) surface to answer all of these queries (`find_by_kind`,
-`find_for_language`, `find_actuator_for_language`), but this information is not
-exposed through the CLI.
-
-**Remedy.** Add one or more introspection commands:
-
-```plaintext
-weaver list-plugins               List all registered plugins
-weaver list-plugins --kind actuator   Filter by kind
-weaver list-plugins --language python  Filter by language
-```
-
-Example output:
-
-```plaintext
-NAME             KIND      LANGUAGES  VERSION  TIMEOUT
-rope             actuator  python     0.1.0    30s
-rust-analyzer    actuator  rust       0.1.0    60s
-```
-
-**Recommended implementation:** add a new top-level clap subcommand
-`list-plugins` alongside `daemon` that constructs the same static registry the
-daemon uses and queries it locally (no daemon round-trip required).
-
-*Alternative:* implement `list-plugins` as a daemon operation, so the output
-always reflects the live registry.
-
-______________________________________________________________________
-
-## Level 8 — `daemon` subcommand help
-
-`weaver daemon --help` is adequate — it lists `start`, `stop`, and `status`
-with one-line descriptions.
-
-`weaver daemon start --help` shows only `Usage: weaver daemon start` and the
-`-h` / `--help` option. It does not mention the configuration flags that affect
-startup (`--daemon-socket`, `--log-filter`, `--config-path`), nor does it
-describe the `WEAVERD_BIN` or `WEAVER_FOREGROUND` environment variable
-overrides.
-
-**Remedy.** Once configuration flags are surfaced in help (level 6 remedy),
-they will naturally appear in the `daemon start` help if marked as
-`global = true`. Additionally, mention `WEAVERD_BIN` and `WEAVER_FOREGROUND` in
-the `long_about` or `after_help` text for `daemon start`.
-
-______________________________________________________________________
-
-## Level 9 — `--capabilities` output
-
-`weaver --capabilities` prints a JavaScript Object Notation (JSON) document
-showing capability overrides. When no overrides are configured, it prints:
-
-```json
-{
-  "languages": {}
-}
-```
-
-The capabilities probe shows overrides only, not the full negotiated matrix. A
-user cannot determine which operations are actually available for which
-languages without starting a daemon and exercising each operation.
-
-**Remedy (lower priority).** Consider extending the capabilities probe to merge
-the server-reported capabilities with the overrides, producing a complete
-available-capabilities matrix. This requires daemon interaction and is a larger
-change, so it may be deferred. At minimum, the current output should include a
-note explaining that the matrix shows overrides only and that actual capability
-negotiation occurs at runtime.
-
-______________________________________________________________________
-
-## Level 10 — error messages and exit codes
-
-| #   | Scenario                             | Current message                                                         | Missing guidance                                                |
-| --- | ------------------------------------ | ----------------------------------------------------------------------- | --------------------------------------------------------------- |
-| 10a | Daemon not running, auto-start fails | `failed to spawn weaverd binary '"weaverd"': No such file or directory` | Does not suggest installing `weaverd` or setting `WEAVERD_BIN`. |
-| 10b | Unknown domain (daemon)              | `unknown domain: bogus`                                                 | Does not list valid domains.                                    |
-| 10c | Unknown operation (daemon)           | `unknown operation 'x' for domain 'y'`                                  | Does not list valid operations.                                 |
-| 10d | Missing domain                       | `the command domain must be provided`                                   | Does not list domains or point to `--help`.                     |
-| 10e | Missing operation                    | `the command operation must be provided`                                | Does not list operations or point to domain help.               |
-
-**Remedy.** Each error message should include actionable next steps. A
-consistent pattern would be:
-
-```plaintext
-error: <what went wrong>
-
-<list of valid alternatives or required arguments>
-
-Run 'weaver --help' for more information.
-```
-
-______________________________________________________________________
-
-## Level 11 — manpage
-
-A manual page is auto-generated via `clap_mangen` during the build. It reflects
-the same clap-derived content that `--help` shows.
-
-Because the manpage is generated from the same clap model that lacks domain
-enumeration, operation listing, configuration flags, and per-operation help,
-the manpage inherits all the same deficiencies.
-
-**Remedy.** Fixing the clap model (levels 1–6 above) will automatically improve
-the manpage. No separate manpage-specific work is required beyond ensuring
-`after_help` content renders correctly in troff.
-
-______________________________________________________________________
-
-## Level 12 — `weaver help` subcommand
-
-`weaver help` is parsed as `DOMAIN = "help"` because
-`disable_help_subcommand = true` is set. This produces:
-
-```plaintext
-the command operation must be provided
-```
-
-The `help` subcommand is a universal CLI convention. Disabling it creates a
-trap for users who reflexively type `weaver help`.
-
-**Recommended remedy.** Re-enable the help subcommand by removing
-`disable_help_subcommand = true`.
-
-*Alternative (enhanced):* extend the re-enabled subcommand to support
-topic-based help:
-
-```plaintext
-weaver help                 Show general help
-weaver help observe         List operations in the observe domain
-weaver help act refactor    Show act refactor parameter reference
-weaver help plugins         List registered plugins
-```
-
-______________________________________________________________________
-
-## Summary of gaps and priority
-
-| Priority | Level | Gap summary                                  | Effort         |
-| -------- | ----- | -------------------------------------------- | -------------- |
-| P0       | 0     | Bare invocation gives no guidance            | Small          |
-| P0       | 1a    | Domains not listed in help                   | Small          |
-| P0       | 1b    | Operations not listed in help                | Small          |
-| P0       | 2     | Missing operation gives no alternatives      | Small          |
-| P0       | 1d    | No `--version` flag                          | Trivial        |
-| P1       | 1c    | Config flags invisible in help               | Medium         |
-| P1       | 3     | Unknown domain gives no suggestions          | Small          |
-| P1       | 4     | Unknown operation gives no suggestions       | Small          |
-| P1       | 5a    | No operation-level help                      | Medium–Large   |
-| P1       | 5b    | Refactor error lists only first missing flag | Small          |
-| P1       | 10    | Error messages lack actionable guidance      | Medium         |
-| P1       | 12    | `weaver help` broken                         | Small          |
-| P2       | 1e    | No long description or after-help            | Small          |
-| P2       | 1f    | `help` subcommand disabled                   | Small          |
-| P2       | 7     | No plugin listing command                    | Medium         |
-| P2       | 8     | Daemon start help lacks config/env detail    | Small          |
-| P3       | 9     | Capabilities probe shows overrides only      | Medium         |
-
-______________________________________________________________________
-
-## Recommended implementation order
-
-1. **Quick wins (P0):** Add `version` to `Cli`. List domains and
-   operations in `after_help`. Improve bare-invocation and missing-operation
-   error messages. These changes touch only
-   [`cli.rs`](../crates/weaver-cli/src/cli.rs), [`command.rs`](../crates/weaver-cli/src/command.rs),
-    and [`errors.rs`](../crates/weaver-cli/src/errors.rs).
-
-2. **Error message enrichment (P1):** Add valid-alternative listings
-   to unknown-domain and unknown-operation errors in both the CLI and the
-   daemon router. Surface all required arguments in `act refactor` errors.
-
-3. **Configuration flag visibility (P1):** Register the five config
-   flags as clap arguments (even if parsing remains in `ortho-config`) so they
-   appear in help output.
-
-4. **Help subcommand and operation-level help (P1–P2):** Re-enable
-   the help subcommand and implement topic-based help. Optionally restructure
-   the clap model to use nested subcommands for full per-operation `--help`.
-
-5. **Plugin introspection (P2):** Add a `list-plugins` command.
-
-6. **Capability matrix enrichment (P3):** Extend `--capabilities` to
-   merge runtime capabilities.
+The optional filter in an observe-to-act pipeline may be any ordinary UNIX
+filter that preserves compatible selector records. Act commands that consume
+selectors must state zero-match, one-match, and many-match behaviour. Selector
+records must preserve enough provenance for safe mutation and auditability.
+
+Roadmap phases 2, 3, and 5 own the vertical slices that make these examples
+real.
+
+## Historical prototype findings
+
+The following older findings are retained as historical evidence. They should
+not be implemented literally if doing so would preserve the superseded public
+grammar:
+
+- Bare `weaver` produced only `the command domain must be provided`.
+- Top-level help listed `DOMAIN`, `OPERATION`, and `ARG` placeholders rather
+  than a resource command tree.
+- Domains and operations were not enumerated in generated help.
+- `weaver help` was disabled by clap configuration.
+- Configuration flags were stripped before clap and therefore invisible in
+  help.
+- Missing operations, unknown domains, and unknown operations did not
+  universally enumerate alternatives.
+- `act refactor` errors exposed provider-first workflow details.
+- Plugin listing was absent.
+- Root `--capabilities` reported overrides rather than the full runtime
+  capability picture.
+
+ADR 007 and `roadmap.md` supersede the specific remedies that would merely
+patch those behaviours in place. The durable remedies are generated command
+metadata, resource-first commands, human and machine renderers, structured
+introspection, capability-routed providers, and drift gates.
+
+## Acceptance checklist
+
+The gap analysis is resolved when the following checks have concrete evidence:
+
+- The command-surface adapter can generate or validate public commands, help,
+  docs snippets, router metadata, schemas, and tests from one source.
+- `weaver --help`, `weaver help`, generated manpages, and completions expose
+  the same command tree.
+- Every data-returning command accepts `--json`.
+- JSON success and JSON failure outputs are parseable and non-localized where
+  protocol stability requires it.
+- Every enum-shaped validation error enumerates valid values.
+- Every collection command has bounded defaults and narrowing hints.
+- Every mutating command declares selector forms, dry-run support, idempotency,
+  safety policy, and transaction metadata.
+- `weaver context --json`, `weaver capabilities list --json`, and
+  `weaver skill-path` exist and are validated against the command contract.
+- Profiles, jobs, delivery, and feedback are discoverable through context
+  metadata and have redaction rules where needed.
+- Provider IDs appear in provenance and expert policy, not as required normal
+  workflow syntax.
+- Roadmap tasks that depend on reusable command-contract work cite the
+  relevant OrthoConfig task instead of recreating generic infrastructure in
+  Weaver.
