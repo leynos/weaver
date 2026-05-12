@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root. It plans a documentation and roadmap overhaul only. It does
@@ -257,10 +257,20 @@ teams a sequenced build plan.
       to `docs/developers-guide.md` for adding or renaming public commands
       through OrthoConfig-backed metadata, Weaver semantic adapters,
       capability IDs, renderer schemas, introspection, skills, and drift gates.
-- [ ] Execute the documentation overhaul milestone by milestone, updating this
+- [x] (2026-05-12) Completed the documentation overhaul milestone by milestone,
+      with each completed milestone committed, gated, CodeRabbit-reviewed, and
+      pushed before proceeding.
+- [x] (2026-05-12) Ran documentation and repository gates for the final
+      developer-guide milestone: `make fmt`, `make markdownlint`,
+      `make nixie`, `make check-fmt`, `make lint`, and `make test`.
+- [x] (2026-05-12) Committed the final developer-guide milestone as
+      `62c9464`, ran `coderabbit review --agent --base-commit HEAD~1 --type
+      committed` with zero findings, and pushed `feat/weaver-agent-roadmap` to
+      `https://github.com/leynos/weaver.git`.
+- [x] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
-- [ ] Run documentation and repository gates.
-- [ ] Commit the completed overhaul after all required gates pass.
+- [x] Run documentation and repository gates.
+- [x] Commit the completed overhaul after all required gates pass.
 
 ## Surprises & Discoveries
 
@@ -1166,5 +1176,33 @@ record the blocker and log path before committing.
 
 ## Outcomes & Retrospective
 
-Not yet executed. This section must be filled in after the documentation
-overhaul is approved and completed.
+The documentation overhaul is complete. The branch now records Weaver's
+human-friendly, agent-native 0.1.0 command-surface reset in ADR 007,
+`docs/weaver-design.md`, `docs/roadmap.md`, `docs/ui-gap-analysis.md`,
+`docs/users-guide.md`, `docs/developers-guide.md`, `README.md`,
+`docs/repository-layout.md`, and `docs/contents.md`.
+
+The completed plan preserves the human interface, replaces prototype grammar
+with a resource-first target contract, makes Sempai one-liner selectors
+first-class, keeps observe-style resource output and act-style mutation input
+composable, retains capability-routed perceptor and actuator plugins, and
+states explicit OrthoConfig dependencies instead of duplicating reusable
+command-contract work inside Weaver.
+
+Existing completed and planned Weaver roadmap work was not erased. Completed
+safety, atomic edit, capability-routing, card, graph, help, and configuration
+work is preserved as historical foundation, while relevant future work is
+migrated under the ADR 007 command grammar or marked superseded with rationale.
+
+All final gates passed:
+
+- `make fmt`
+- `make markdownlint`
+- `make nixie`
+- `make check-fmt`
+- `make lint`
+- `make test`
+- `coderabbit review --agent --base-commit HEAD~1 --type committed`
+
+The full test gate reported 1364 nextest tests passed with 4 skipped, and the
+workspace doctests passed.
