@@ -79,10 +79,10 @@ product plan, but any still-useful behaviour has been re-expressed elsewhere.
 | 6.1          | Foundation and migrated             | Completed patch application is re-surfaced as `patches apply` in 16.1.                                                              |
 | 6.2          | Migrated and partly deferred        | Onboarding and explicit interaction move to 19.2; dynamic-analysis ingestion is validated or deferred by 19.2.3.                    |
 | 7.1          | Foundation and migrated             | Completed card schemas, extraction, enrichment, and cache work moves to `cards get` in 14.2.                                        |
-| 7.2          | Foundation and migrated             | Completed graph-slice schema is retained; traversal and edge work moves to 17.1.                                                    |
-| 7.3          | Migrated                            | Graph history moves to 17.2 after bounded graph slices prove value.                                                                 |
-| 7.4          | Migrated                            | Probabilistic matching moves to 17.3 and remains conditional on history needs.                                                      |
-| 7.5          | Deferred decision                   | Ledger caching is reconsidered only after 17.2.3 supplies performance evidence.                                                     |
+| 7.2          | Foundation and migrated             | Completed graph-slice schema is retained; traversal, edge extraction, and budget work move to 17.1.                                 |
+| 7.3          | Migrated                            | Graph history, checkout-free blob loading, deltas, warnings, and safe defaults move to 17.2.                                        |
+| 7.4          | Migrated                            | Probabilistic matching phases, reason codes, duplicate guardrails, and injective assignment move to 17.3.                           |
+| 7.5          | Migrated conditionally              | Ledger cache validation, format, population, and invalidation move to 17.4 behind the on-demand history evidence gate.              |
 | 8.1          | Migrated                            | Formal tooling setup moves to 19.3 after safety-critical command paths exist.                                                       |
 | 8.2          | Migrated                            | Proof contracts and trust boundary move to 19.3.                                                                                    |
 | 8.3          | Migrated                            | Transaction and patch Kani checks move to 19.3.                                                                                     |

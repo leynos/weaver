@@ -113,6 +113,7 @@ when older designs mention `observe`, `act`, or `verify`.
 | `srgn` specialist plugin                                                   | `crates/weaver-plugin-srgn/` (expected new crate)                          | Roadmap 18.1                                              |
 | `jedi` specialist plugin                                                   | `crates/weaver-plugin-jedi/` (expected new crate)                          | Roadmap 18.1                                              |
 | Static analysis provider for `weaver-graph`                                | `crates/weaver-graph/` provider modules                                    | Roadmap 17.1 through 17.3                                 |
+| Graph history ledger cache                                                 | `crates/weaver-graph/` and state modules                                   | Roadmap 17.4                                              |
 | Jobs, profiles, delivery, and feedback command support                     | `crates/weaver-cli/`, `crates/weaverd/`, and state/config modules          | Roadmap 19.1; depends on OrthoConfig 9.1 through 9.3      |
 | Onboarding and explicit interactive review flows                           | `crates/weaver-cli/` and `crates/weaverd/` command handlers                | Roadmap 19.2                                              |
 | Dynamic analysis ingestion provider                                        | `crates/weaver-graph/` provider modules                                    | Roadmap 19.2 and 20.2                                     |

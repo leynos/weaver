@@ -301,6 +301,9 @@ teams a sequenced build plan.
 - [x] (2026-05-13) Corrected the Sempai roadmap migration to preserve archive
       work 4.2.1 through 4.2.12 and 4.3.1 through 4.3.9 at task fidelity under
       live steps 15.2, 15.3, and 15.4.
+- [x] (2026-05-14) Corrected the Jacquard roadmap migration to preserve archive
+      work 7.2.2 through 7.2.5, 7.3.1 through 7.3.5, 7.4.1 through 7.4.9, and
+      7.5.1 through 7.5.2 at task fidelity under live steps 17.1 through 17.4.
 - [x] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [x] Run documentation and repository gates.
@@ -489,6 +492,16 @@ teams a sequenced build plan.
   Tree-sitter query escape hatches, parse caching, diagnostics conformance,
   quality suites, and release gates are distinct risks and deserve distinct
   review-sized roadmap tasks. Date: 2026-05-13.
+
+- Decision: preserve Jacquard graph, history, probabilistic matching, and
+  ledger-cache work at the original archive task fidelity instead of
+  compressing 7.2 through 7.5 into broad impact-slice tasks. Rationale:
+  two-pass symbol-table extraction, call-edge expansion, import and config
+  edges, budgeted traversal, checkout-free history loading, delta
+  normalization, risk warnings, safe history defaults, matching phases, feature
+  extraction, calibrated reason codes, duplicate-name guardrails, injective
+  assignment, and ledger invalidation are distinct risks and deserve distinct
+  review-sized roadmap tasks. Date: 2026-05-14.
 
 ## Context and orientation
 

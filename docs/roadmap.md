@@ -603,69 +603,172 @@ beyond point queries into decision support without overwhelming agent context.
 
 This phase validates richer graph work only after the read and mutation loops
 exist. It migrates archive work from graph-slice traversal, graph-history,
-probabilistic matching, static-analysis provider integration, optional ledger
-cache, and card-driven traversal.
+probabilistic matching, static-analysis provider integration, conditional
+ledger caching, and card-driven traversal.
 
 ### 17.1. Prove graph slices add useful context beyond cards
 
 This step answers whether graph traversal gives enough extra value to justify
-its complexity. It migrates prototype archive work 7.2.2 through 7.2.5, 11.1.1,
-and 11.2.2. See `docs/jacquard-card-first-symbol-graph-design.md` §§12-13.
+its complexity. It preserves the completed prototype archive schema work 7.2.1
+and migrates prototype archive work 7.2.2 through 7.2.5, 11.1.1, and 11.2.2.
+See `docs/jacquard-card-first-symbol-graph-design.md` §12.1 through §12.3.
 
-- [ ] 17.1.1. Implement `weaver graph-slices get` with Tree-sitter inventory
-      and LSP call edges.
-  - Requires 14.2.3.
-  - Success: graph slices include bounded cards, typed edges, provenance,
-    truncation markers, and useful human summaries.
-- [ ] 17.1.2. Add import, config, dependency, and dependent edge extraction.
-  - Requires 17.1.1 and reuses prototype archive work 5.9.1.
-  - Success: static-analysis and graph providers enrich slices without adding
-    provider-specific public commands.
-- [ ] 17.1.3. Implement budgeted priority traversal and graph-slice E2E
-      coverage.
-  - Requires 17.1.2.
-  - Success: tests prove edge, card, depth, and token budgets across mixed
-    edge types; truncated responses include narrowing hints.
+- [ ] 17.1.1. Implement a two-pass Tree-sitter extraction pipeline for graph
+      slices.
+  - Requires 14.2.3 and uses completed prototype archive work 7.2.1.
+  - Success: edge extraction builds a full or partial symbol table before
+    resolving edges, every edge carries resolution scope
+    (`full_symbol_table`, `partial_symbol_table`, or `lsp`), and unresolved
+    references are preserved as external nodes with explicit confidence.
+- [ ] 17.1.2. Implement call-edge slice expansion through `weaver-graph`.
+  - Requires 17.1.1.
+  - Success: `call` edges use the existing LSP call hierarchy provider,
+    include explicit provenance, enforce depth limits, and have end-to-end
+    coverage for a depth-2 traversal on a fixture repository.
+- [ ] 17.1.3. Implement baseline `import` and `config` edge extraction.
+  - Requires 17.1.1.
+  - Success: Tree-sitter interstitial passes and per-language queries emit
+    bounded `import` and `config` edges with confidence values, provenance,
+    and at least one test per supported language.
+- [ ] 17.1.4. Add dependency and dependent edge enrichment without leaking
+      provider-specific commands.
+  - Requires 17.1.3 and reuses prototype archive work 5.9.1.
+  - Success: static-analysis and graph providers enrich slices with
+    dependency and dependent edges through capability routing, preserve
+    provenance, and degrade visibly when a provider is unavailable.
+- [ ] 17.1.5. Implement budgeted priority traversal and graph-slice command
+      integration.
+  - Requires 17.1.2, 17.1.3, and 17.1.4.
+  - Success: `weaver graph-slices get` consumes the completed schema from
+    prototype archive work 7.2.1, never exceeds explicit `max_cards`,
+    `max_edges`, or `max_estimated_tokens` caps, emits debug rejection reasons
+    when requested, and includes behaviour-driven tests for fan-out explosions
+    and budget truncation.
 
 ### 17.2. Prove history mode before investing in probabilistic matching
 
 This step answers whether historical graph reconstruction is stable enough to
 support change-risk narratives. It migrates prototype archive work 7.3.1
-through 7.3.5. See `docs/jacquard-card-first-symbol-graph-design.md` §§16-17.
+through 7.3.5. See `docs/jacquard-card-first-symbol-graph-design.md` §13.1,
+§13.2, and §22.
 
-- [ ] 17.2.1. Implement git-backed graph-slice reconstruction per commit.
-  - Requires 17.1.3.
-  - Success: history mode loads blobs without mutating the worktree, reports
-    explicit data quality, and keeps defaults safe for large repositories.
-- [ ] 17.2.2. Implement normalized graph delta computation and risk warnings.
+- [ ] 17.2.1. Implement git-backed blob loading for historical revisions
+      without checkout.
+  - Requires 17.1.5.
+  - Success: history queries never invoke `git checkout`, load only files
+    required by the slice budget, enforce blob size, parse-time, file-count,
+    and partial-parse limits, and record fallback reasons such as `timeout`,
+    `blob_too_large`, `partial_parse`, and `unsupported_grammar`.
+- [ ] 17.2.2. Implement slice reconstruction per commit with data-quality
+      metadata.
   - Requires 17.2.1.
-  - Success: added, removed, changed, moved, and uncertain nodes or edges have
-    stable reason codes and useful human summaries.
-- [ ] 17.2.3. Decide whether a versioned graph ledger belongs in core.
-  - Requires 17.2.2 and migrates prototype archive work 7.5.1 through 7.5.2.
-  - Success: the decision either adds cache population and invalidation to the
-    core plan or defers it with measured performance evidence.
+  - Success: `--commits 5` returns a stable set of commits and per-commit
+    slice payloads with `quality.resolution_scope` and `quality.fallbacks`;
+    delta payloads include added, removed, and changed nodes and edges; and
+    curated git fixtures cover deterministic output.
+- [ ] 17.2.3. Implement delta normalization and change taxonomy
+      classification.
+  - Requires 17.2.2.
+  - Success: import blocks and decorators are treated as commutative sets for
+    deltas, normalized representations are persisted alongside raw text,
+    import or decorator reordering is classified as `text` change, taxonomy
+    output includes confidence, and fixtures cover comment-only and
+    signature-only edits.
+- [ ] 17.2.4. Implement semantic risk warnings on history deltas.
+  - Requires 17.2.3.
+  - Success: `--warning-depth` widens the dependency neighbourhood scanned for
+    warnings, warnings include edge paths and confidence, `text`-only deltas
+    emit lower-risk warnings, and curated fixtures validate dependency and
+    dependent warning types.
+- [ ] 17.2.5. Implement history-mode gating and safe defaults.
+  - Requires 17.2.4.
+  - Success: default history mode uses Tree-sitter-only extraction for
+    historical commits, LSP enrichment is disabled unless explicitly enabled
+    and documented, and degraded behaviour is visible through provenance
+    fields.
 
 ### 17.3. Prove probabilistic matching only where history needs it
 
 This step answers whether fuzzy matching improves history explanations enough
 to carry its complexity. It migrates prototype archive work 7.4.1 through 7.4.9
-and 8.6.2. See `docs/jacquard-card-first-symbol-graph-design.md` §§14-15.
+and 8.6.2. See `docs/jacquard-card-first-symbol-graph-design.md` §14.1 through
+§14.8.
 
-- [ ] 17.3.1. Implement stable-identity, body-hash, and structural-hash
-      matching phases.
-  - Requires 17.2.2.
-  - Success: exact and structural matches produce reason codes and reject
-    duplicate-name ambiguity by default.
-- [ ] 17.3.2. Prototype fuzzy similarity and graph-refinement matching.
+- [ ] 17.3.1. Implement phase 1 stable-identity matching.
+  - Requires 17.2.5.
+  - Success: matching uses type, name, container, and file hints; outputs
+    include winning phase and confidence; non-matching candidates are rejected;
+    and fixtures include rename and move cases that must not match in phase 1.
+- [ ] 17.3.2. Implement phase 2 body-hash matching for rename detection.
   - Requires 17.3.1.
-  - Success: fuzzy matches improve fixture accuracy without exceeding bounded
-    candidate or token budgets; otherwise the fuzzy phase is disabled by
-    default.
-- [ ] 17.3.3. Add assignment guardrails and matching E2E coverage.
+  - Success: unchanged-body renames match with explicit phase and confidence,
+    low-confidence matches are rejected rather than forced, and fixtures cover
+    rename scenarios with unchanged bodies.
+- [ ] 17.3.3. Implement phase 3 structural-hash matching on normalized AST
+      shapes.
   - Requires 17.3.2.
-  - Success: assignments are injective by default, split/merge modes are
-    explicit, and confidence scores are calibrated against fixture evidence.
+  - Success: formatting-only moves match through structural evidence, outputs
+    include phase and confidence, and low-confidence matches remain rejected.
+- [ ] 17.3.4. Implement phase 4 fuzzy similarity matching.
+  - Requires 17.3.3.
+  - Success: token-overlap and shingle matching improves rename and move
+    fixtures with minor body edits without exceeding bounded candidate or token
+    budgets, and low-confidence matches remain rejected.
+- [ ] 17.3.5. Implement phase 5 graph refinement and global assignment
+      refinement.
+  - Requires 17.3.4.
+  - Success: neighbourhood evidence resolves supported rename and move
+    scenarios, outputs include phase and confidence, and low-confidence matches
+    remain rejected.
+- [ ] 17.3.6. Implement deterministic feature extraction for cross-commit
+      matching.
+  - Requires 17.3.5.
+  - Success: feature extraction covers signature, AST-shape, docstring
+    fingerprints, attachments, and neighbourhood sketches; identical inputs
+    produce identical features; unit tests cover whitespace-only edits and
+    alpha-renaming of locals; and failures emit structured diagnostics.
+- [ ] 17.3.7. Implement candidate generation and calibrated scoring with reason
+      codes.
+  - Requires 17.3.6.
+  - Success: response payloads always include `best_match` plus top-K
+    alternates up to the requested cap, reason codes are stable enumerations,
+    and debug output surfaces the top contributing features.
+- [ ] 17.3.8. Implement duplicate-name guardrails.
+  - Requires 17.3.7.
+  - Success: `--max-duplicates` forces explicit ambiguous-mapping responses or
+    fallback matching when homonyms explode, observability counters capture
+    guardrail triggers, and same-name fixtures avoid false renames.
+- [ ] 17.3.9. Implement injective assignment across the slice.
+  - Requires 17.3.8.
+  - Success: the solver avoids mapping multiple sources to one target unless
+    explicitly enabled, property tests prevent illegal many-to-one mappings by
+    default, a feature flag gates split or merge experimentation, and
+    deterministic fixtures cover rename and move scenarios.
+
+### 17.4. Prove the optional graph ledger after on-demand history
+
+This step answers whether persisted graph history caching is necessary after
+`snapshots_on_demand` history is measured. It migrates prototype archive work
+7.5.1 through 7.5.2. See `docs/jacquard-card-first-symbol-graph-design.md`
+§13.2, §18.1, and §18.2.
+
+- [ ] 17.4.1. Validate whether a persisted graph ledger belongs in the core
+      product.
+  - Requires 17.2.5.
+  - Success: the decision compares repeated history-query performance against
+    the on-demand baseline and either accepts a core ledger with measured
+    evidence or defers it without weakening history-mode correctness.
+- [ ] 17.4.2. Define a versioned on-disk ledger format for cards, edges, and
+      deltas.
+  - Requires 17.4.1 accepting a core ledger.
+  - Success: the ledger is keyed by commit hash, includes explicit version
+    fields, detects corruption with checksums, and gates schema changes behind
+    migrations.
+- [ ] 17.4.3. Implement incremental ledger population and invalidation rules.
+  - Requires 17.4.2.
+  - Success: ledger writes are atomic, invalidation occurs when inputs change,
+    and performance benchmarks show a measurable improvement for repeated
+    history queries.
 
 ## 18. Provider ecosystem slice
 
@@ -748,7 +851,7 @@ turns without making human usage worse. It migrates the product intent of ADR
     `built-in defaults < config files < selected profile < environment < flags`.
 - [ ] 19.1.2. Implement durable job ledger support for long-running graph,
       history, and mutation commands.
-  - Requires 16.1.2 and 17.2.1 and depends on OrthoConfig 9.3.
+  - Requires 16.1.2 and 17.2.5 and depends on OrthoConfig 9.3.
   - Success: job records store command path, idempotency key, workspace,
     request hash, status, progress, timestamps, result pointer, and exit class.
 - [ ] 19.1.3. Implement `--wait`, `jobs list|get|prune`, and delivery sinks on
@@ -778,7 +881,7 @@ through 6.2.3. See `docs/weaver-design.md` §§5-6.
   - Success: interaction is available through `--interactive` or a dedicated
     review command and fails fast when stdin is not a terminal.
 - [ ] 19.2.3. Decide whether dynamic-analysis ingestion belongs in core.
-  - Requires 17.1.2 and 19.2.1.
+  - Requires 17.1.4 and 19.2.1.
   - Success: runtime traces either enrich graph slices with provenance and
     bounded trust semantics or move to deferred extensions with rationale.
 
@@ -800,7 +903,7 @@ Weaver-owned invariants. It migrates prototype archive work 8.1.1 through
     language servers, parsers, operating systems, and filesystems.
 - [ ] 19.3.3. Add Kani checks for transaction, patch, routing, and bounded
       graph kernels.
-  - Requires 19.3.2 and 17.1.3.
+  - Requires 19.3.2 and 17.1.5.
   - Success: smoke harnesses cover commit gating, rollback bookkeeping,
     bounded path guardrails, whole-command abort on unmatched patch blocks,
     selected-provider predicates, refusal determinism, and graph budgets.
@@ -852,10 +955,11 @@ new design rather than quiet re-entry into the core roadmap.
   - Requires 19.2.3.
   - Success: runtime trace ingestion either has bounded trust semantics and a
     graph integration point or remains out of the core product.
-- [ ] 20.2.3. Reassess optional graph ledger caching.
-  - Requires 17.2.3.
-  - Success: cache work resumes only if measured repository-scale performance
-    makes it necessary for the core workflows.
+- [ ] 20.2.3. Reassess graph ledger extensions beyond the core cache.
+  - Requires 17.4.3.
+  - Success: further cache work resumes only if measured repository-scale
+    performance shows the core ledger is insufficient for the supported
+    history workflows.
 
 ## Archive
 
