@@ -14,7 +14,7 @@ use crate::{
     CliCommand,
     DefinitionsAction,
     cli::DefinitionGetArgs,
-    command_surface::{CommandSurfaceRecord, find_read_only_command},
+    command_surface::{CommandSurfaceRecord, DEFINITIONS_GET, find_read_only_command},
 };
 
 #[derive(Debug, PartialEq, Eq)]
@@ -58,12 +58,13 @@ impl CommandInvocation {
             CliCommand::Definitions {
                 action: DefinitionsAction::Get(args),
             } => {
-                let record = find_read_only_command(&["definitions"], "get").ok_or_else(|| {
-                    AppError::MissingCommandSurfaceRecord {
-                        resource: String::from("definitions"),
-                        verb: String::from("get"),
-                    }
-                })?;
+                let adapter_record = &DEFINITIONS_GET;
+                let record =
+                    find_read_only_command(adapter_record.resource_path, adapter_record.verb)
+                        .ok_or_else(|| AppError::MissingCommandSurfaceRecord {
+                            resource: adapter_record.resource_path.join(" "),
+                            verb: String::from(adapter_record.verb),
+                        })?;
                 Ok(definition_get_invocation(record, args))
             }
             CliCommand::Daemon { .. } => Err(AppError::MissingDomain),
