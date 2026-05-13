@@ -261,10 +261,10 @@ Idea: if Sempai one-liners can select symbols and immediately feed cards plus
 one-hop graph context, Weaver proves that query language work pays off as a
 composable product loop rather than as a standalone parser layer.
 
-This phase deliberately validates the narrowest useful Sempai workflow before
-building the full Semgrep-compatible backend. It migrates archive work from
-Sempai DSL parsing, Tree-sitter execution, query routing, symbol-first cards,
-and the Sempai-to-Jacquard vertical slice.
+This phase validates Sempai as a selector engine without reducing the original
+backend and integration scope to a vague parser task. It migrates archive work
+from Sempai DSL parsing, Tree-sitter execution, query routing, symbol-first
+cards, and the Sempai-to-Jacquard vertical slice.
 
 ### 15.1. Prove a minimal one-liner selector with honest diagnostics
 
@@ -285,45 +285,148 @@ without overbuilding the full query engine. It migrates prototype archive work
     confidence, and provider provenance needed for safe downstream context or
     mutation.
 
-### 15.2. Prove Tree-sitter execution on the smallest useful language set
+### 15.2. Prove the Sempai Tree-sitter backend
 
 This step answers whether Semgrep-style matching can run accurately enough on
-real syntax before the full operator matrix lands. It migrates prototype
-archive work 4.2.1 through 4.2.12 and 9.1.2 through 9.1.3. See
-`docs/sempai-query-language-design.md` §§7-12.
+real syntax with bounded execution semantics. It preserves prototype archive
+work 4.2.1 through 4.2.12 instead of compressing the backend into a single
+"matching" task. See `docs/sempai-query-language-design.md` §§7-12.
 
-- [ ] 15.2.1. Implement language profiles and snippet wrapping for Rust and
-      Python.
+- [ ] 15.2.1. Implement language profiles and wrapper registry for Rust,
+      Python, TypeScript, and Go, with optional HashiCorp Configuration
+      Language (HCL) support.
   - Requires 15.1.2.
-  - Success: the profiles support safe snippet parsing, wrapper provenance,
-    and clear refusal for unsupported languages.
-- [ ] 15.2.2. Implement node-kind matching, metavariable unification, and
-      bounded ellipsis for the pilot profiles.
+  - Success: Rust, Python, TypeScript, and Go profiles each define wrapper
+    templates, list-shape mappings, and rewrite boundaries; optional HCL loads
+    only behind its feature flag; profile selection failures return
+    deterministic diagnostics; and fixtures validate all profile
+    registrations.
+- [ ] 15.2.2. Implement Semgrep-token rewrite logic with language-safe
+      boundaries for metavariables, ellipsis, and deep ellipsis.
   - Requires 15.2.1.
-  - Success: positive-pattern fixtures match expected symbols, execution caps
-    prevent runaway matches, and unsupported operators enumerate alternatives.
-- [ ] 15.2.3. Decide whether TypeScript joins the first Sempai slice.
+  - Success: rewrite logic avoids substitutions in unsafe lexical regions and
+    produces deterministic placeholder mappings.
+- [ ] 15.2.3. Compile rewritten snippets into `PatNode`-based pattern
+      intermediate representation (IR) with span traceability.
   - Requires 15.2.2.
-  - Success: TypeScript either passes the same selector fixtures or is deferred
-    with a documented blocker and fallback behaviour.
+  - Success: compiled IR snapshots are stable, and wrapper/root extraction
+    metadata is preserved for diagnostics.
+- [ ] 15.2.4. Implement node-kind matching and metavariable unification over
+      Tree-sitter syntax trees.
+  - Requires 15.2.3.
+  - Success: repeated metavariables unify across compatible nodes, mismatches
+    fail deterministically, and the first-language vertical fixtures from
+    archive work 9.1.2 through 9.1.3 pass through the same matcher.
+- [ ] 15.2.5. Implement list-context ellipsis and ellipsis-variable matching
+      using bounded dynamic programming.
+  - Requires 15.2.4.
+  - Success: list-context fixtures pass across supported languages, and runtime
+    avoids exponential backtracking.
+- [ ] 15.2.6. Implement deep-ellipsis matching with bounded traversal controls.
+  - Requires 15.2.5.
+  - Success: deep matching respects configured node limits and returns bounded,
+    deterministic results.
+- [ ] 15.2.7. Compile normalized formulas into plan nodes with explicit anchor
+      and constraint separation.
+  - Requires 15.1.2, 15.2.4, and completed archive work 4.1.5.
+  - Success: conjunction plans enforce positive-term requirements, and
+    compiled plan shapes remain snapshot-stable.
+- [ ] 15.2.8. Implement conjunction, disjunction, and negative-constraint
+      execution semantics.
+  - Requires 15.2.7.
+  - Success: `not`, `inside`, and `anywhere` semantics align with documented
+    behaviour and pass regression fixtures.
+- [ ] 15.2.9. Implement metavariable `where`-clause constraint evaluation with
+      supported and unsupported outcomes.
+  - Requires 15.2.8.
+  - Success: supported constraints execute deterministically, and unsupported
+    constraints return stable diagnostic codes.
+- [ ] 15.2.10. Implement focus selection plus `as` and `fix` projection
+      behaviour in emitted matches.
+  - Requires 15.2.9.
+  - Success: focus and capture projection follow documented precedence, and
+    `fix` is surfaced as metadata without direct application.
+- [ ] 15.2.11. Implement Tree-sitter query escape hatch with capture-name
+      mapping into Semgrep-style capture keys.
+  - Requires 15.2.10.
+  - Success: raw Tree-sitter queries emit normalized captures and focus
+    behaviour consistent with Sempai match output contracts.
+- [ ] 15.2.12. Add execution safety controls for match caps, capture text caps,
+      deep-search bounds, and bounded alternation.
+  - Requires 15.2.11.
+  - Success: safety limits are configurable, deterministic, and enforced
+    across execution paths.
 
-### 15.3. Prove query output composes with context commands
+### 15.3. Prove Sempai Weaver integration and readiness
+
+This step answers whether the backend can be exposed through Weaver's
+resource-first command surface with stable schemas, cache behaviour,
+diagnostics, quality gates, and default-enablement rules. It preserves
+prototype archive work 4.3.1 through 4.3.9 under the new public command shape.
+See `docs/weaver-design.md` §2.1.2.
+
+- [ ] 15.3.1. Add Sempai execution routing in `weaverd` for selector-backed
+      `symbols list`.
+  - Requires 15.2.12.
+  - Success: daemon execution paths compile and execute Sempai plans for
+    supported languages and return structured match streams.
+- [ ] 15.3.2. Add `weaver symbols list --query` with `--lang`, `--uri`, and
+      `--rule-file|--rule|--query` inputs.
+  - Requires 15.3.1 and 14.2.1.
+  - Success: the CLI validates input combinations and supports YAML rule files,
+    inline YAML rules, and one-liner query workflows with stable error
+    messaging. `weaver observe query` remains archive provenance only.
+- [ ] 15.3.3. Define stable JSONL request and response schemas for Sempai query
+      operations, with snapshot coverage.
+  - Requires 15.3.2.
+  - Success: schema fixtures lock field names and payload shapes, and streaming
+    output remains deterministic.
+- [ ] 15.3.4. Integrate parse-cache adapter keyed by URI, language, and
+      revision, aligned with daemon document lifecycle.
+  - Requires 15.3.3.
+  - Success: repeated queries against unchanged revisions hit cache in
+    integration tests, revision changes invalidate cached parses
+    deterministically, and cache misses or invalidations preserve semantic
+    correctness.
+- [ ] 15.3.5. Implement actuation handoff contract using focus-first selection
+      with span fallback and optional capture targeting.
+  - Requires 15.3.3.
+  - Success: downstream mutation commands can consume Sempai output
+    deterministically for target selection without hidden state.
+- [ ] 15.3.6. Add diagnostics conformance suites for YAML, domain-specific
+      language (DSL), semantic, compilation, and execution error categories.
+  - Requires 15.3.3.
+  - Success: each diagnostic category is covered by deterministic snapshots and
+    stable `E_SEMPAI_*` error codes.
+- [ ] 15.3.7. Add layered quality suites for parser and execution behaviour.
+  - Requires 15.3.6.
+  - Success: unit, snapshot, corpus, property, and fuzz suites run under
+    repository gates and include representative language corpora plus
+    malformed-input coverage.
+- [ ] 15.3.8. Publish compatibility boundaries for supported operators, modes,
+      constraints, and escape-hatch behaviour.
+  - Requires 15.3.7.
+  - Success: user-facing docs distinguish supported, unsupported, and
+    parse-only behaviours with stable terminology.
+- [ ] 15.3.9. Define release gates for enabling Sempai by default.
+  - Requires 15.3.8.
+  - Success: crash-free requirements, diagnostics parity, and documentation
+    parity are codified in CI policy and block default enablement when
+    thresholds are not met.
+
+### 15.4. Prove query output composes with context commands
 
 This step answers whether one-liner selectors can feed product commands rather
-than remaining search output. It migrates prototype archive work 4.3.1 through
-4.3.9, 9.1.4 through 9.3.2, and 11.2.1. See `docs/weaver-design.md` §2.1.2.
+than remaining search output. It migrates prototype archive work 9.1.4 through
+9.3.2 and 11.2.1. See `docs/weaver-design.md` §2.1.2.
 
-- [ ] 15.3.1. Implement `weaver symbols list --query`.
-  - Requires 15.2.2 and 14.2.1.
-  - Success: `symbols list --query 'fn $name(...)' --json` emits bounded
-    selector records that ordinary UNIX filters can preserve.
-- [ ] 15.3.2. Allow `cards get` and one-hop relation summaries to consume
+- [ ] 15.4.1. Allow `cards get` and one-hop relation summaries to consume
       Sempai selectors.
-  - Requires 15.3.1 and 14.2.3.
+  - Requires 15.3.5 and 14.2.3.
   - Success: one query-to-card-to-relation workflow works in one command and
     in a pipeline, with deterministic zero-, one-, and many-match behaviour.
-- [ ] 15.3.3. Add Sempai selector conformance and pipeline E2E coverage.
-  - Requires 15.3.2.
+- [ ] 15.4.2. Add Sempai selector conformance and pipeline E2E coverage.
+  - Requires 15.4.1.
   - Success: suites cover YAML-backed and one-liner selectors, malformed query
     recovery, `jq` filtering, pager consumption, bounded output, and invalid
     selector-stream rejection.
@@ -376,12 +479,12 @@ through 5.2.6, 10.5.1 through 10.5.2, and 4.3.5. See ADR 001 and ADR 004.
     include transaction ID, affected paths, provider provenance, and safety
     outcome.
 - [ ] 16.2.2. Add direct Sempai selector support to `symbols rename`.
-  - Requires 15.3.1 and 16.2.1.
+  - Requires 15.3.5 and 16.2.1.
   - Success: `symbols rename --query ...` handles zero, one, and many matches
     deterministically and requires explicit policy for ambiguous mutation.
 - [ ] 16.2.3. Add `--from-stdin` selector stream consumption to mutation
       commands.
-  - Requires 15.3.3 and 16.2.2.
+  - Requires 15.3.3, 15.3.5, and 16.2.2.
   - Success: `weaver symbols list --query … --json | jq … | weaver symbols
     rename --from-stdin …` works without hidden state.
 - [ ] 16.2.4. Add rename and selector-mutation combinatorial E2E coverage.

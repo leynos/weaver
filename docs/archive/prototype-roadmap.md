@@ -66,7 +66,7 @@ product plan, but any still-useful behaviour has been re-expressed elsewhere.
 | 3.3          | Migrated                            | Locale bootstrap, localized help, catalogues, and generated references move to 13.2 and 13.3.                                       |
 | 4.1          | Foundation and migrated             | Completed Sempai facade and YAML normalization remain foundation; one-liner parser and recovery move to 15.1.                       |
 | 4.2          | Migrated                            | Tree-sitter profiles, rewriting, matching, formula execution, and safety controls move to 15.2.                                     |
-| 4.3          | Migrated, renamed                   | `observe query` becomes `symbols list --query` and selector-stream integration in 15.3.                                             |
+| 4.3          | Migrated, renamed                   | `observe query` becomes `symbols list --query` in 15.3, with selector-stream and context composition in 15.4.                       |
 | 5.1          | Foundation                          | Plugin platform foundation remains provider infrastructure for phases 16 and 18.                                                    |
 | 5.2          | Foundation and migrated             | Completed rename capability work supports 16.2; migration notes and capability discoverability move to 18.2.                        |
 | 5.3          | Migrated, renamed                   | `act extricate` becomes `weaver symbols move` backed by `extricate-symbol` in 16.3; `extract-method` remains a separate capability. |

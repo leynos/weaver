@@ -298,6 +298,9 @@ teams a sequenced build plan.
       `extricate-symbol` with `extract-method` and expanded the compressed
       symbol-relocation slice back into separate Python and Rust extrication
       workstreams.
+- [x] (2026-05-13) Corrected the Sempai roadmap migration to preserve archive
+      work 4.2.1 through 4.2.12 and 4.3.1 through 4.3.9 at task fidelity under
+      live steps 15.2, 15.3, and 15.4.
 - [x] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [x] Run documentation and repository gates.
@@ -478,6 +481,14 @@ teams a sequenced build plan.
   tasks for capability scaffolding, Python extrication, and Rust orchestration;
   compressing that into a single viability task hid real risk and made the
   public grammar ambiguous. Date: 2026-05-13.
+
+- Decision: preserve Sempai backend and Weaver integration work at the original
+  archive task fidelity instead of compressing 4.2 and 4.3 into broad selector
+  tasks. Rationale: language profiles, Semgrep rewriting, `PatNode` IR, formula
+  execution, ellipsis families, `where` constraints, focus projection, raw
+  Tree-sitter query escape hatches, parse caching, diagnostics conformance,
+  quality suites, and release gates are distinct risks and deserve distinct
+  review-sized roadmap tasks. Date: 2026-05-13.
 
 ## Context and orientation
 
