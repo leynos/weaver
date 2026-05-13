@@ -1719,6 +1719,12 @@ study for this model:
     names appear in provenance, diagnostics, `--verbose` output, JSON, and
     expert policy overrides.
 
+    The `extricate-symbol` capability maps to the public command
+    `weaver symbols move`: it relocates a selected symbol to another module or
+    file while preserving behaviour. It must not be conflated with Rope's
+    "Extract Method" operation. `extract-method` remains a distinct future
+    capability for turning a selected code region into a new callable.
+
 This model extends to other domains as well. Tools like `srgn`, `ast-grep`,
 Sempai, rust-analyzer, and Tree-sitter can provide perceptor or actuator
 capabilities behind stable Weaver commands.^13^ This gives agents and humans a

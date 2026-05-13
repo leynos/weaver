@@ -294,6 +294,10 @@ teams a sequenced build plan.
       item `13.1.3` by adding an ADR 007 removal table for each local
       command-surface helper and mirroring the OrthoConfig replacement tasks in
       `crates/weaver-cli/src/command_surface.rs`.
+- [x] (2026-05-13) Corrected the live roadmap to stop conflating
+      `extricate-symbol` with `extract-method` and expanded the compressed
+      symbol-relocation slice back into separate Python and Rust extrication
+      workstreams.
 - [x] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [x] Run documentation and repository gates.
@@ -467,6 +471,13 @@ teams a sequenced build plan.
   policy must be visible at the maintenance point so future implementers do not
   treat `command_surface.rs` as permanent generic infrastructure. Date:
   2026-05-13.
+
+- Decision: treat `extricate-symbol` as symbol relocation exposed publicly as
+  `weaver symbols move`, and keep `extract-method` as a separate future
+  capability. Rationale: archived work 5.3 and 5.4 contained thirteen concrete
+  tasks for capability scaffolding, Python extrication, and Rust orchestration;
+  compressing that into a single viability task hid real risk and made the
+  public grammar ambiguous. Date: 2026-05-13.
 
 ## Context and orientation
 
@@ -1005,13 +1016,14 @@ The following phase should deliver safe mutation under the new grammar:
 Capability-routed mutation slice: symbols and patches
 ```
 
-This phase should include `symbols rename`, `symbols move` or
-`symbols extract`, `patches apply`, `--dry-run`, `--force`, idempotency,
+This phase should include `symbols rename`, `symbols move` for
+`extricate-symbol`, `patches apply`, `--dry-run`, `--force`, idempotency,
 transaction IDs, provider provenance, Double-Lock integration, and structured
 refusals. It must include direct act commands using both Sempai one-liner
 selectors and position references, plus at least one observe-to-act pipeline
 where structured selector records flow directly into mutation and one where
-they are filtered before mutation.
+they are filtered before mutation. `extract-method` is a separate future
+capability and must not be treated as completed by `symbols move`.
 
 Then add phases for:
 
@@ -1118,7 +1130,8 @@ The guide should describe the 0.1.0 target command model, including:
 - provider override as advanced policy only.
 
 Remove ordinary examples that require `--provider`. Replace `act refactor`
-examples with `symbols rename` and `symbols move` or `symbols extract`.
+examples with `symbols rename` and `symbols move`; keep any future
+`extract-method` examples under their own capability and command decision.
 
 Update `docs/developers-guide.md`.
 

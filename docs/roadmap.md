@@ -330,13 +330,17 @@ than remaining search output. It migrates prototype archive work 4.3.1 through
 
 ## 16. Safe change loop slice
 
-Idea: if the same selector records can drive safe patches, renames, and
-extract-or-move refactors through capability-routed actuators, Weaver proves
-that agent-native composition does not weaken the Double-Lock safety model.
+Idea: if the same selector records can drive safe patches, renames, and symbol
+relocation through capability-routed actuators, Weaver proves that agent-native
+composition does not weaken the Double-Lock safety model.
 
 This phase validates the first end-to-end observe-to-act loop. It migrates
-archive work from apply-patch, rename-symbol, extrication, selector handoff,
-mutation metadata, and visible safety-harness reporting.
+archive work from apply-patch, rename-symbol, `extricate-symbol`, selector
+handoff, mutation metadata, and visible safety-harness reporting. In this
+roadmap, `extricate-symbol` means moving a selected symbol to another module or
+file while preserving meaning. It is distinct from `extract-method`, which
+extracts a selected code region into a new callable and is not compressed into
+the symbol-relocation tasks below.
 
 ### 16.1. Prove patch application under the new command contract
 
@@ -386,32 +390,107 @@ through 5.2.6, 10.5.1 through 10.5.2, and 4.3.5. See ADR 001 and ADR 004.
     idempotency, provider failures, syntactic failures, semantic failures, and
     rollback assertions.
 
-### 16.3. Decide whether move/extract is viable for the core product
+### 16.3. Prove the `extricate-symbol` contract with Python first
 
-This step answers whether extrication is a dependable product differentiator or
-an attractive but unstable refactor. It migrates prototype archive work 5.3.1
-through 5.4.7 under canonical public verbs. See
+This step answers whether symbol relocation can be expressed as one stable
+capability and public command before Weaver invests in Rust-specific
+orchestration. It migrates prototype archive work 5.3.1 through 5.3.6 under the
+canonical public command `weaver symbols move`. See ADR 001 and ADR 004.
+`extract-method`, `replace-body`, and `extract-predicate` may be declared as
+distinct capability IDs, but this step does not implement those operations.
+
+- [ ] 16.3.1. Add capability ID scaffolding and resolver policy for actuator
+      capabilities.
+  - Requires 16.2.1.
+  - Success: `rename-symbol`, `extricate-symbol`, `extract-method`,
+    `replace-body`, and `extract-predicate` are distinct typed capability IDs;
+    resolver output includes language, selected provider, and policy rationale;
+    no task treats `extract-method` as an alias for `extricate-symbol`.
+- [ ] 16.3.2. Extend plugin manifests and broker loading for capability-aware
+      selection.
+  - Requires 16.3.1.
+  - Success: manifest validation enforces capability fields, and provider
+    selection respects language plus capability compatibility without exposing
+    provider-specific commands.
+- [ ] 16.3.3. Add the `weaver symbols move --uri --position --to` command
+      contract and discovery output for `extricate-symbol`.
+  - Requires 13.3.2, 16.3.2, and depends on OrthoConfig 7.2.7.
+  - Success: CLI request shape is stable across providers, `context --json`
+    and `capabilities list --json` report support by language, and the public
+    verb remains `move` while the internal capability remains
+    `extricate-symbol`.
+- [ ] 16.3.4. Extend the Rope plugin with narrow Python `extricate-symbol`
+      support.
+  - Requires 16.3.3.
+  - Success: Rope returns unified diffs through the existing patch application
+    flow for supported Python symbol moves and emits structured refusals for
+    unsupported symbol shapes.
+- [ ] 16.3.5. Extend plugin and daemon failure schemas with deterministic
+      refusal diagnostics and rollback guarantees for extrication.
+  - Requires 16.1.3 and 16.3.4.
+  - Success: refusal paths emit structured diagnostics, include stable reason
+    codes, enumerate valid alternatives where possible, and leave the
+    filesystem unchanged.
+- [ ] 16.3.6. Add unit, behavioural, and end-to-end coverage for capability
+      resolution and Python extrication baseline paths.
+  - Requires 16.3.5.
+  - Success: tests assert capability negotiation, refusal behaviour,
+    incomplete payload failures, deterministic patch output, rollback, and
+    `--json` plus human-renderer behaviour.
+
+### 16.4. Prove Rust `extricate-symbol` with explicit orchestration gates
+
+This step answers whether Rust symbol relocation is realistic without reducing
+the safety bar or hiding complexity inside a single "move" task. It migrates
+prototype archive work 5.4.1 through 5.4.7. See
 `docs/rust-extricate-actuator-plugin-technical-design.md`.
 
-- [ ] 16.3.1. Implement the `symbol.move` or `symbol.extract` capability
-      contract and refusal vocabulary.
-  - Requires 16.2.1.
-  - Success: the public command uses canonical verbs while the internal
-    capability captures transaction, import-repair, and provider constraints.
-- [ ] 16.3.2. Prototype Python symbol extraction through Rope.
-  - Requires 16.3.1.
-  - Success: a narrow class of Python moves either commits safely through the
-    Double-Lock path or records refusal reasons that invalidate the approach.
-- [ ] 16.3.3. Prototype Rust symbol movement through rust-analyzer.
-  - Requires 16.3.1.
-  - Success: a narrow class of Rust moves either commits safely with
-    import/module repair or records compatibility limits that defer the
-    feature.
-- [ ] 16.3.4. Decide whether move/extract graduates from the core roadmap.
-  - Requires 16.3.2 and 16.3.3.
-  - Success: the roadmap records one of three outcomes: graduate both
-    languages, graduate one language with clear limits, or defer the capability
-    out of the 0.1.0 core.
+- [ ] 16.4.1. Define Rust extrication orchestration contracts and transaction
+      boundaries in `weaverd`.
+  - Requires 16.3.3.
+  - Success: stage boundaries, capability ownership, rollback semantics, and
+    daemon/plugin responsibilities are explicit and covered by unit tests.
+- [ ] 16.4.2. Implement the Rust symbol planning pipeline using
+      rust-analyzer definition, references, and call-site discovery.
+  - Requires 16.4.1.
+  - Success: the planner identifies relocation scope deterministically, records
+    required file payloads, and returns structured diagnostics for unsupported
+    symbol shapes.
+- [ ] 16.4.3. Implement staged Rust transformation execution through the
+      rust-analyzer actuator path.
+  - Requires 16.4.2.
+  - Success: staged execution emits unified diffs, preserves deterministic
+    operation order, reports stage-level failures, and makes the prototype
+    viability of Rust extrication visible before repair hardening begins.
+- [ ] 16.4.4. Implement import and module-graph repair loops.
+  - Requires 16.4.3.
+  - Success: common import breakages are auto-repaired, ambiguous repairs
+    return deterministic refusal diagnostics, and no partial writes are
+    committed.
+- [ ] 16.4.5. Integrate semantic verification and rollback enforcement for
+      Rust extrication transactions.
+  - Requires 16.3.5 and 16.4.4.
+  - Success: semantic lock failures abort the transaction, rollback is complete
+    across all touched files, and diagnostics identify the failed verification
+    stage.
+- [ ] 16.4.6. Add Rust-specific unit, behavioural, and end-to-end coverage for
+      extrication scenarios.
+  - Requires 16.4.5.
+  - Success: coverage includes nested module moves, trait implementation
+    updates, macro-adjacent boundaries, module graph updates, rollback
+    guarantees, and deterministic failure semantics.
+- [ ] 16.4.7. Publish Rust `extricate-symbol` compatibility boundaries and
+      operator guidance.
+  - Requires 16.4.6.
+  - Success: docs, human output, and capability surfaces use stable terminology
+    for supported, partial, and unsupported Rust shapes.
+- [ ] 16.4.8. Decide whether `extricate-symbol` graduates from the core
+      roadmap.
+  - Requires 16.3.6 and 16.4.7.
+  - Success: the roadmap records one of three outcomes: graduate Python and
+    Rust, graduate one language with clear limits, or defer the capability out
+    of the 0.1.0 core. `extract-method` is assessed separately and cannot be
+    marked complete by this decision.
 
 ## 17. Impact and history slice
 
@@ -531,8 +610,8 @@ prototype archive work 5.7.1 through 5.7.5 and 5.2.6. See
   - Success: agents can discover availability, selected provider, refusal
     reasons, and profile-driven policy without parsing backend-specific help.
 - [ ] 18.2.2. Publish capability migration notes for `symbol.rename` and
-      move/extract decisions.
-  - Requires 16.3.4.
+      `extricate-symbol` decisions.
+  - Requires 16.4.8.
   - Success: docs explain provider provenance, refusal semantics, resource
     command replacements, and any deferred provider-specific limits.
 - [ ] 18.2.3. Add provider-matrix E2E coverage.
@@ -660,10 +739,12 @@ OrthoConfig 10.1.
 This step answers whether experiments invalidated by earlier slices deserve a
 new design rather than quiet re-entry into the core roadmap.
 
-- [ ] 20.2.1. Reassess deferred move/extract language support.
-  - Requires 16.3.4.
+- [ ] 20.2.1. Reassess deferred `extricate-symbol` language support and
+      `extract-method` experiments.
+  - Requires 16.4.8.
   - Success: unsupported languages or symbol kinds either gain new provider
-    evidence or remain explicitly out of scope.
+    evidence, `extract-method` gains its own evidence-backed slice, or both
+    remain explicitly out of scope.
 - [ ] 20.2.2. Reassess deferred dynamic-analysis ingestion.
   - Requires 19.2.3.
   - Success: runtime trace ingestion either has bounded trust semantics and a

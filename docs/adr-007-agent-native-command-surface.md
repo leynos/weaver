@@ -95,6 +95,12 @@ Canonical verbs include `get`, `list`, `create`, `update`, `delete`, `apply`,
 policy must include every verb used by target examples and planned resource
 commands before vocabulary linting is enabled.
 
+In this public grammar, `weaver symbols move` is the resource-first form of the
+internal `extricate-symbol` capability: it moves a selected symbol to another
+module or file while preserving meaning. It is not an alias for
+`extract-method`, which extracts a selected code region into a new callable and
+must remain a separate capability and roadmap slice if it graduates later.
+
 ## OrthoConfig dependencies
 
 Weaver will not implement a second generic command-contract framework unless a
