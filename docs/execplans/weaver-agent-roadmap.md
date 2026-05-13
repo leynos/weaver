@@ -597,7 +597,7 @@ weaver feedback create "the enum error did not list valid values"
 ```
 
 Canonical verbs are `get`, `list`, `create`, `update`, `delete`, `apply`,
-`run`, `prune`, `save`, `show`, `rename`, `move`, and `send`. The final
+`move`, `rename`, `run`, `prune`, `save`, `send`, and `show`. The final
 vocabulary policy must include every verb used by target examples and planned
 resource commands, or must change those examples before the policy lands.
 Banned or non-canonical public forms include `info`, `ls`,
