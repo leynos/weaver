@@ -12,6 +12,41 @@ roadmap under resource-first command names. Prototype `observe`, `act`, and
 `verify` spellings are not future public grammar unless a live roadmap task
 explicitly reintroduces them.
 
+## 2026-05-13 assessment
+
+The archive has been assessed against the current product plan in
+[`../roadmap.md`](../roadmap.md). Completed tasks remain historical foundation
+and implementation evidence. Unchecked tasks that still serve the product have
+been migrated into live phases `12` through `20`, where they are sequenced as
+vertical slices that validate or invalidate product hypotheses.
+
+The live roadmap carries these relevant archive themes forward:
+
+- command discoverability, localization, manpages, context output, skills, and
+  drift prevention in phase `13`;
+- Language Server Protocol (LSP) reads, diagnostics, cards, and compact
+  same-symbol context in phase `14`;
+- Sempai one-liner parsing, Tree-sitter execution, selector records, and
+  selector-to-card composition in phase `15`;
+- patch application, idempotent transactions, selector-fed mutation,
+  capability-routed rename, and move/extract validation in phase `16`;
+- graph slices, historical graph reconstruction, probabilistic matching, graph
+  budgets, and optional ledger-cache decisions in phase `17`;
+- specialist perceptor and actuator providers, capability manifests, provider
+  state, and graceful degradation in phase `18`;
+- profiles, jobs, delivery, feedback, onboarding, explicit interaction,
+  dynamic-analysis decisions, and formal assurance in phase `19`; and
+- MCP, explorer, deferred provider, dynamic-analysis, and cache experiments in
+  phase `20`.
+
+Superseded prototype guidance is not active backlog. This includes the public
+`observe` / `act` / `verify` command grammar, root `--output`, operation-local
+`--format`, provider-first public commands, and root `--capabilities` as the
+main introspection contract. Their product intent has moved to resource-first
+commands, canonical `--json`, `weaver context --json`,
+`weaver capabilities list --json`, capability-routed providers, and selector
+pipelines in the live roadmap.
+
 ## 1. Foundation & tooling (complete)
 
 ### 1.1. Establish foundation and documentation baseline

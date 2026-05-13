@@ -272,6 +272,13 @@ teams a sequenced build plan.
       `1` through `11`, renumbered the live forward roadmap as phases `12`
       through `20`, and repointed historical ExecPlans and roadmap references
       to the archive.
+- [x] (2026-05-13) Reassessed archive relevance against the current product
+      plan, marked the archive-assessment step complete, and recast
+      `docs/roadmap.md` as a fail-fast vertical-slice roadmap for the complete
+      product rather than a layer-by-layer infrastructure build.
+- [x] (2026-05-13) Updated the archive assessment note, repository layout
+      references, gap-analysis roadmap owners, and developer-guide roadmap
+      pointer to match the new live phase numbering.
 - [x] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [x] Run documentation and repository gates.
@@ -334,6 +341,12 @@ teams a sequenced build plan.
   literally. The revised gap analysis must therefore retain those observations
   as historical evidence while pointing implementation at ADR 007 and the new
   roadmap phases.
+
+- Discovery: the archived roadmap work maps more cleanly to product loops than
+  to implementation layers. LSP reads, Sempai selectors, selector-fed
+  mutations, graph impact, provider ecosystem, and workflow state each form a
+  falsifiable slice that can validate or invalidate the design before the next
+  investment.
 
 ## Decision Log
 
@@ -406,6 +419,19 @@ teams a sequenced build plan.
   Rationale: the active implementation instruction explicitly asks to proceed
   with the planned functionality and keep the ExecPlan current, which satisfies
   the plan's approval gate for this workstream. Date: 2026-05-11.
+
+- Decision: treat the archive as provenance and implementation evidence, not
+  a competing backlog. Rationale: the live roadmap now carries every relevant
+  unfinished product intent under resource-first, hypothesis-driven phases,
+  while superseded prototype spellings and provider-first workflows remain in
+  the archive only as historical context. Date: 2026-05-13.
+
+- Decision: keep one cohesive command-contract proving slice, then organize
+  the rest of the roadmap as vertical product validations. Rationale: the
+  OrthoConfig boundary and dual-renderer contract are unavoidable foundation,
+  but LSP reads, Sempai selectors, safe changes, graph impact, providers, and
+  agent workflow state can each fail fast against observable user workflows.
+  Date: 2026-05-13.
 
 ## Context and orientation
 

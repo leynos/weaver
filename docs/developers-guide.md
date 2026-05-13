@@ -669,7 +669,7 @@ CLI configuration flags like any other config field.
 
 Full CLI localization bootstrap was historically deferred to prototype archive
 roadmap item `3.3.1`; the forward command-surface reset carries localized
-renderer work in roadmap item `13.3.1`. Weaver does not yet resolve the final
+renderer work in roadmap item `13.2.1`. Weaver does not yet resolve the final
 locale and use it to construct the `Localizer` before clap parse errors are
 formatted. The current `Locale` type exists so the configuration contract is
 real now and the later localization bootstrap can reuse the validated domain
