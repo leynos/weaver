@@ -1,6 +1,6 @@
 # 5.1.1 Show short help on bare invocation (Fluent-localized)
 
-> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> Historical note: This ExecPlan targets a prototype roadmap item now preserved
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
