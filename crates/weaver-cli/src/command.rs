@@ -125,12 +125,8 @@ impl CommandInvocation {
 impl CommandRequest {
     pub(crate) fn with_patch(invocation: CommandInvocation, patch: String) -> Self {
         Self {
-            command: CommandDescriptor {
-                domain: invocation.domain,
-                operation: invocation.operation,
-            },
-            arguments: invocation.arguments,
             patch: Some(patch),
+            ..Self::from(invocation)
         }
     }
 
