@@ -96,8 +96,9 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-5-make-nixie.log
 ## Tolerances (exception triggers)
 
 - Scope: if implementation requires more than 18 net file touches outside the
-  `crates/sempai*` directories and the three required docs (`roadmap.md`,
-  `users-guide.md`, `sempai-query-language-design.md`), stop and escalate.
+  `crates/sempai*` directories and the three required docs
+  (`docs/archive/prototype-roadmap.md`, `users-guide.md`,
+  `sempai-query-language-design.md`), stop and escalate.
 - Interface: if normalization requires a breaking change to the public
   signature of `sempai::Engine::compile_yaml` (beyond replacing the
   `NOT_IMPLEMENTED` stub with a real return), stop and escalate.
