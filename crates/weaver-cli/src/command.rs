@@ -8,9 +8,16 @@ use std::io::Write;
 
 use serde::Serialize;
 
-use crate::{AppError, Cli};
+use crate::{
+    AppError,
+    Cli,
+    CliCommand,
+    DefinitionsAction,
+    cli::DefinitionGetArgs,
+    command_surface::{CommandSurfaceRecord, find_read_only_command},
+};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct CommandInvocation {
     pub(crate) domain: String,
     pub(crate) operation: String,
@@ -21,6 +28,10 @@ impl TryFrom<Cli> for CommandInvocation {
     type Error = AppError;
 
     fn try_from(cli: Cli) -> Result<Self, Self::Error> {
+        if let Some(command) = cli.command {
+            return Self::try_from_structured_command(command);
+        }
+
         let domain = cli.domain.ok_or(AppError::MissingDomain)?.trim().to_owned();
         let operation = cli
             .operation
@@ -38,6 +49,41 @@ impl TryFrom<Cli> for CommandInvocation {
             operation,
             arguments: cli.arguments,
         })
+    }
+}
+
+impl CommandInvocation {
+    fn try_from_structured_command(command: CliCommand) -> Result<Self, AppError> {
+        match command {
+            CliCommand::Definitions {
+                action: DefinitionsAction::Get(args),
+            } => {
+                let record = find_read_only_command(&["definitions"], "get").ok_or_else(|| {
+                    AppError::MissingCommandSurfaceRecord {
+                        resource: String::from("definitions"),
+                        verb: String::from("get"),
+                    }
+                })?;
+                Ok(definition_get_invocation(record, args))
+            }
+            CliCommand::Daemon { .. } => Err(AppError::MissingDomain),
+        }
+    }
+}
+
+fn definition_get_invocation(
+    record: &CommandSurfaceRecord,
+    args: DefinitionGetArgs,
+) -> CommandInvocation {
+    CommandInvocation {
+        domain: record.daemon_domain.to_string(),
+        operation: record.daemon_operation.to_string(),
+        arguments: vec![
+            String::from("--uri"),
+            args.uri,
+            String::from("--position"),
+            args.position,
+        ],
     }
 }
 

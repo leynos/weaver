@@ -47,6 +47,61 @@ commands, canonical `--json`, `weaver context --json`,
 `weaver capabilities list --json`, capability-routed providers, and selector
 pipelines in the live roadmap.
 
+### Relevance matrix
+
+The table below records the archive assessment at step level. "Foundation"
+means completed work remains implementation evidence. "Migrated" means the
+unfinished product intent is active in `docs/roadmap.md`. "Superseded" means
+the historical spelling or implementation path is not part of the current
+product plan, but any still-useful behaviour has been re-expressed elsewhere.
+
+| Archive step | Disposition                         | Live destination or reason                                                                                                   |
+| ------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 1.1          | Foundation                          | Repository and documentation baseline retained as product history.                                                           |
+| 2.1          | Foundation                          | Daemon, JSONL transport, LSP host, sandbox, Double-Lock, and atomic-edit work underpins phases 13, 14, 16, and 19.           |
+| 2.2          | Foundation, then superseded grammar | Discoverability lessons carry into phase 13; public `observe` / `act` / `verify` examples are provenance only.               |
+| 2.3          | Foundation, then superseded grammar | Enumerating errors carry into 13.2 and 13.3; `act refactor` wording is replaced by capability-routed resource commands.      |
+| 3.1          | Foundation                          | Syntax, syntactic-lock, document-sync, and graph crates feed phases 14, 15, 16, and 17.                                      |
+| 3.2          | Migrated                            | Help, command metadata, and manpage work moves to 13.2 and 13.3, with OrthoConfig dependencies instead of local duplication. |
+| 3.3          | Migrated                            | Locale bootstrap, localized help, catalogues, and generated references move to 13.2 and 13.3.                                |
+| 4.1          | Foundation and migrated             | Completed Sempai facade and YAML normalization remain foundation; one-liner parser and recovery move to 15.1.                |
+| 4.2          | Migrated                            | Tree-sitter profiles, rewriting, matching, formula execution, and safety controls move to 15.2.                              |
+| 4.3          | Migrated, renamed                   | `observe query` becomes `symbols list --query` and selector-stream integration in 15.3.                                      |
+| 5.1          | Foundation                          | Plugin platform foundation remains provider infrastructure for phases 16 and 18.                                             |
+| 5.2          | Foundation and migrated             | Completed rename capability work supports 16.2; migration notes and capability discoverability move to 18.2.                 |
+| 5.3          | Migrated, renamed                   | `act extricate` becomes the `symbol.move` or `symbol.extract` validation slice in 16.3.                                      |
+| 5.4          | Migrated, renamed                   | Rust extrication work moves to the move/extract viability decision in 16.3.                                                  |
+| 5.5          | Migrated                            | `srgn` becomes an optional provider experiment in 18.1.                                                                      |
+| 5.6          | Migrated                            | `jedi` becomes the first specialist perceptor experiment in 18.1.                                                            |
+| 5.7          | Migrated                            | Plugin introspection and capability probe work becomes `capabilities list` and `context --json` in 13.3 and 18.2.            |
+| 5.8          | Migrated                            | Graceful degradation guidance moves to provider failure handling in 18.1 and 18.2.                                           |
+| 5.9          | Migrated                            | Static-analysis graph edges move to 17.1.                                                                                    |
+| 6.1          | Foundation and migrated             | Completed patch application is re-surfaced as `patches apply` in 16.1.                                                       |
+| 6.2          | Migrated and partly deferred        | Onboarding and explicit interaction move to 19.2; dynamic-analysis ingestion is validated or deferred by 19.2.3.             |
+| 7.1          | Foundation and migrated             | Completed card schemas, extraction, enrichment, and cache work moves to `cards get` in 14.2.                                 |
+| 7.2          | Foundation and migrated             | Completed graph-slice schema is retained; traversal and edge work moves to 17.1.                                             |
+| 7.3          | Migrated                            | Graph history moves to 17.2 after bounded graph slices prove value.                                                          |
+| 7.4          | Migrated                            | Probabilistic matching moves to 17.3 and remains conditional on history needs.                                               |
+| 7.5          | Deferred decision                   | Ledger caching is reconsidered only after 17.2.3 supplies performance evidence.                                              |
+| 8.1          | Migrated                            | Formal tooling setup moves to 19.3 after safety-critical command paths exist.                                                |
+| 8.2          | Migrated                            | Proof contracts and trust boundary move to 19.3.                                                                             |
+| 8.3          | Migrated                            | Transaction and patch Kani checks move to 19.3.                                                                              |
+| 8.4          | Migrated                            | Capability-routing checks move to 19.3.                                                                                      |
+| 8.5          | Migrated                            | Proof-only Verus kernels move to 19.3 after stable abstractions exist.                                                       |
+| 8.6          | Migrated, conditional               | Later graph, matching, and Sempai checks are folded into 19.3 only after their product slices survive.                       |
+| 9.1          | Migrated, narrowed                  | Minimal Sempai execution is recast as one-liner selector validation in 15.1 and 15.2.                                        |
+| 9.2          | Migrated, renamed                   | Symbol-first card retrieval becomes selector-aware `cards get` in 14.2 and 15.3.                                             |
+| 9.3          | Migrated                            | One-hop relation traversal moves to card summaries and selector-to-context workflows in 14.2 and 15.3.                       |
+| 10.1         | Migrated, renamed                   | `observe find-references` becomes `references list` in 14.1.                                                                 |
+| 10.2         | Migrated, renamed                   | `observe show` becomes selector-aware `cards get` and relation summaries in 14.2 and 15.3.                                   |
+| 10.3         | Migrated, renamed                   | `observe call-hierarchy` becomes bounded graph slices and card relation summaries in 14.2 and 17.1.                          |
+| 10.4         | Migrated, conditional               | `observe grep` becomes a `symbols list --pattern` decision in 14.3, or folds into Sempai selectors.                          |
+| 10.5         | Migrated, renamed                   | `act rename-symbol` becomes `symbols rename` in 16.2.                                                                        |
+| 11.1         | Migrated, renamed                   | `observe graph-slice` becomes `graph-slices get` in 17.1.                                                                    |
+| 11.2         | Migrated                            | Card-driven traversal becomes one-hop cards plus graph-slice expansion in 14.2 and 17.1.                                     |
+| 11.3         | Migrated                            | Agent-grade stdout/stderr, schema, exit-code, and compact-output contracts move to 13.2 and 13.3.                            |
+| 11.4         | Migrated                            | Visible safety-harness metadata moves to `patches apply`, mutation metadata, and user documentation in 16.1.                 |
+
 ## 1. Foundation & tooling (complete)
 
 ### 1.1. Establish foundation and documentation baseline

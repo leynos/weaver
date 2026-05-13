@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: COMPLETE
+Status: IMPLEMENTATION FOLLOW-UP IN PROGRESS
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root. It plans a documentation and roadmap overhaul only. It does
@@ -279,6 +279,17 @@ teams a sequenced build plan.
 - [x] (2026-05-13) Updated the archive assessment note, repository layout
       references, gap-analysis roadmap owners, and developer-guide roadmap
       pointer to match the new live phase numbering.
+- [x] (2026-05-13) Began implementation follow-up from the live roadmap by
+      targeting roadmap item `13.1.2`, the smallest command-surface adapter
+      slice after the documentation reset.
+- [x] (2026-05-13) Implemented a temporary Weaver-owned read-only
+      command-surface adapter for `definitions get`, with sibling metadata for
+      `references list`, and mapped the resource-first CLI command to the
+      existing `observe get-definition` daemon operation.
+- [x] (2026-05-13) Reassessed the archived prototype roadmap at step level and
+      added an archive relevance matrix showing which historical work is
+      foundation, migrated live scope, conditional validation work, or
+      superseded prototype grammar.
 - [x] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [x] Run documentation and repository gates.
@@ -432,6 +443,20 @@ teams a sequenced build plan.
   but LSP reads, Sempai selectors, safe changes, graph impact, providers, and
   agent workflow state can each fail fast against observable user workflows.
   Date: 2026-05-13.
+
+- Decision: implement `13.1.2` as a CLI-side adapter over the existing daemon
+  protocol instead of changing the daemon router first. Rationale: this proves
+  the resource-first public grammar and metadata shape while reusing the
+  already shipped `observe get-definition` handler; later tasks can replace the
+  legacy daemon operation name after the command contract stabilizes. Date:
+  2026-05-13.
+
+- Decision: keep the archived prototype roadmap in place but add a step-level
+  relevance matrix instead of moving every historical task body back into the
+  live roadmap. Rationale: the live roadmap already re-expresses relevant work
+  as vertical validation slices under current command names, while the matrix
+  makes the migration auditable and keeps superseded prototype spellings from
+  re-entering the implementation backlog. Date: 2026-05-13.
 
 ## Context and orientation
 

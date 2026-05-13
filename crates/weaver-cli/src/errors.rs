@@ -16,6 +16,8 @@ pub(crate) enum AppError {
     MissingDomain,
     #[error("the command operation must be provided")]
     MissingOperation,
+    #[error("command-surface record missing for {resource} {verb}")]
+    MissingCommandSurfaceRecord { resource: String, verb: String },
     #[error("failed to emit bare help: {0}")]
     EmitBareHelp(io::Error),
     #[error("failed to emit clap help: {0}")]

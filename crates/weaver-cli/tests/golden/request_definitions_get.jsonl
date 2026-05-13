@@ -1,0 +1,1 @@
+{"command":{"domain":"observe","operation":"get-definition"},"arguments":["--uri","file:///src/main.rs","--position","10:5"]}

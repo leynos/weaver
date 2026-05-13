@@ -16,6 +16,14 @@ archive work has been moved into this live roadmap under resource-first command
 names; prototype `observe`, `act`, and `verify` spellings are not future public
 grammar unless a live task explicitly reintroduces them.
 
+The plan is intentionally validation-led. Each phase after the dependency
+boundary is a product hypothesis that can fail: the result may graduate,
+narrow, or defer a design rather than forcing every archived idea into the core
+release. The archive remains useful evidence, but the live sequence favours
+vertical slices such as "read a symbol", "select with Sempai and compose with
+cards", "mutate from the same selectors", and "explain impact" over building
+one horizontal layer at a time.
+
 ## 12. Dependency boundaries and archive assessment
 
 Idea: if Weaver consumes reusable command-contract machinery from OrthoConfig
@@ -65,6 +73,8 @@ either hidden scope or a competing implementation plan.
 - [x] 12.2.1. Classify archive tasks as shipped foundation, migrated product
       scope, or superseded prototype grammar.
   - See `docs/archive/prototype-roadmap.md`.
+  - The archive relevance matrix maps each archived step to a live destination
+    or a supersession reason.
   - Success: every unchecked archive step has a live roadmap destination or an
     explicit reason it is no longer active implementation guidance.
 - [x] 12.2.2. Preserve completed prototype foundation as implementation
@@ -103,7 +113,7 @@ OrthoConfig command contracts without duplicating them. See ADR 007 and
   - Success: ADR 007 defines the dual renderer contract, capability routing,
     OrthoConfig dependencies, and lack of compatibility promise for the
     prototype grammar.
-- [ ] 13.1.2. Implement the Weaver command-surface adapter for one read-only
+- [x] 13.1.2. Implement the Weaver command-surface adapter for one read-only
       command family.
   - Requires 13.1.1 and depends on OrthoConfig 5.2.3, 6.1, and 7.2.7.
   - Start with `definitions get` plus the metadata needed to add

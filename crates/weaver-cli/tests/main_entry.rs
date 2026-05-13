@@ -143,7 +143,7 @@ fn help_flag_exits_successfully_with_quick_start() {
         .assert()
         .success()
         .stdout(contains("Quick start:"))
-        .stdout(contains("weaver observe get-definition"));
+        .stdout(contains("weaver definitions get"));
 }
 
 #[test]
