@@ -5,6 +5,14 @@
 //! CLI policy out of this module; it only records Weaver resource paths,
 //! capabilities, selector forms, and the legacy daemon operation used during
 //! the 0.1.0 command reset.
+//!
+//! Removal policy: replace `CommandSurfaceRecord` with OrthoConfig 6.1
+//! recursive command metadata and OrthoConfig 7.2.7 generic
+//! capability/provenance metadata once those contracts can carry the
+//! Weaver-specific fields below. Replace the read-only catalogue and lookup
+//! helpers with the OrthoConfig 6.1 generated command registry, and use
+//! OrthoConfig 6.2/6.3 output for context and skill surfaces. ADR 007 records
+//! the same policy for reviewers.
 
 /// A public selector form accepted by a command-surface record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,6 +43,9 @@ pub(crate) enum ProviderPolicy {
 }
 
 /// Metadata for one resource-first command.
+///
+/// Temporary adapter: replaced by OrthoConfig 6.1 command metadata plus
+/// OrthoConfig 7.2.7 capability/provenance metadata.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct CommandSurfaceRecord {
     pub(crate) resource_path: &'static [&'static str],
@@ -90,9 +101,15 @@ pub(crate) const REFERENCES_LIST: CommandSurfaceRecord = CommandSurfaceRecord {
 };
 
 /// Pilot read-only records owned by the local adapter.
+///
+/// Temporary adapter: replaced by generated OrthoConfig 6.1 metadata once the
+/// same records can feed routing, context, and skills.
 pub(crate) const READ_ONLY_COMMANDS: &[CommandSurfaceRecord] = &[DEFINITIONS_GET, REFERENCES_LIST];
 
 /// Finds a read-only resource command by canonical path and verb.
+///
+/// Temporary adapter: replaced by the OrthoConfig 6.1 generated command
+/// registry lookup.
 pub(crate) fn find_read_only_command(
     resource_path: &[&str],
     verb: &str,

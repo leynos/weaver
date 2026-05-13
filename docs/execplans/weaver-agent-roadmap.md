@@ -290,6 +290,10 @@ teams a sequenced build plan.
       added an archive relevance matrix showing which historical work is
       foundation, migrated live scope, conditional validation work, or
       superseded prototype grammar.
+- [x] (2026-05-13) Defined the temporary-adapter removal policy for roadmap
+      item `13.1.3` by adding an ADR 007 removal table for each local
+      command-surface helper and mirroring the OrthoConfig replacement tasks in
+      `crates/weaver-cli/src/command_surface.rs`.
 - [x] Execute the documentation overhaul milestone by milestone, updating this
       plan as discoveries occur.
 - [x] Run documentation and repository gates.
@@ -457,6 +461,12 @@ teams a sequenced build plan.
   as vertical validation slices under current command names, while the matrix
   makes the migration auditable and keeps superseded prototype spellings from
   re-entering the implementation backlog. Date: 2026-05-13.
+
+- Decision: record temporary adapter retirement in both ADR 007 and the code
+  comments on the local helpers. Rationale: `13.1.3` is a policy task, but the
+  policy must be visible at the maintenance point so future implementers do not
+  treat `command_surface.rs` as permanent generic infrastructure. Date:
+  2026-05-13.
 
 ## Context and orientation
 

@@ -120,6 +120,26 @@ slice, Weaver may add a narrow local adapter. The adapter must be documented as
 temporary, covered by tests, and removed or replaced once the upstream
 OrthoConfig contract is available.
 
+## Temporary adapter removal policy
+
+Temporary Weaver adapters are allowed only as vertical-slice scaffolding. Each
+adapter must name the OrthoConfig task that replaces it, keep its scope limited
+to Weaver-owned semantic metadata, and have tests that prove the temporary
+shape is stable enough to migrate.
+
+The first local adapter is `crates/weaver-cli/src/command_surface.rs`. Its
+removal policy is:
+
+| Local helper             | Replacement dependency          | Removal gate                                                                                                                                                                                                                                                                                   |
+| ------------------------ | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CommandSurfaceRecord`   | OrthoConfig 6.1 and 7.2.7       | Replace with OrthoConfig recursive command metadata plus generic capability/provenance metadata once those records can express Weaver resource paths, capability IDs, selector forms, output schemas, error schemas, mutability, async class, provider policy, examples, and skill references. |
+| `READ_ONLY_COMMANDS`     | OrthoConfig 6.1, 6.2.1, and 6.3 | Replace with generated command metadata once the same source can drive runtime routing, `weaver context --json`, and skill validation for the pilot read command family.                                                                                                                       |
+| `find_read_only_command` | OrthoConfig 6.1                 | Replace with the generated command registry lookup once structured command parsing and daemon routing can resolve `definitions get` and `references list` without a Weaver-specific array scan.                                                                                                |
+
+Any local helper that survives after those OrthoConfig tasks are available must
+record a permanent divergence in this ADR before it can remain in the
+implementation.
+
 ## Human renderer contract
 
 The default renderer is for humans. It emits localized, readable output with

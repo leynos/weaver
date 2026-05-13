@@ -121,7 +121,7 @@ OrthoConfig command contracts without duplicating them. See ADR 007 and
   - Success: resource path, verb, capability ID, selector forms, output
     schemas, error schemas, mutability, provider policy, examples, and skill
     references all flow from one adapter record.
-- [ ] 13.1.3. Define the temporary-adapter removal policy.
+- [x] 13.1.3. Define the temporary-adapter removal policy.
   - Requires 13.1.2.
   - Success: every local generic helper names the OrthoConfig task expected to
     replace it or records a permanent divergence in ADR 007.
