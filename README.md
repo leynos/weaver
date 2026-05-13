@@ -66,7 +66,7 @@ Here's the quickest path to your first Weaver command:
 weaver daemon start
 
 # Query a symbol definition
-weaver observe get-definition --uri file:///path/to/main.rs --position 42:17
+weaver definitions get --uri file:///path/to/main.rs --position 42:17
 
 # Check daemon status
 weaver daemon status
