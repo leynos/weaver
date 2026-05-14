@@ -26,6 +26,11 @@ also excludes concurrency-heavy Rust patterns, which further supports keeping
 the initial proof effort inside bounded, deterministic control-plane logic
 rather than the daemon's general async orchestration.[^6]
 
+The forward roadmap now reserves task numbers `12` through `20` for the ADR 007
+command-surface build. Older Weaver roadmap references in this document, such
+as `6.1.4`, `7.2.5`, or `8.3.4`, point to the prototype roadmap archive unless
+they are part of the local formal-verification rollout checklist below.
+
 ## Current state
 
 Weaver is already a Cargo workspace. The root `Cargo.toml` enumerates workspace
@@ -338,7 +343,7 @@ That layering keeps the assurance story honest and maintainable.
           documented target.
   - [ ] 2.0.2. Add `#[cfg(kani)]` harnesses in
         `crates/weaverd/src/dispatch/act/apply_patch/`. Requires 2.0.1 and
-        6.1.4.
+        prototype archive 6.1.4.
     - [ ] Cover cursor monotonicity for ordered `SEARCH`/`REPLACE` blocks.
     - [ ] Cover whole-command abort on unmatched blocks.
     - [ ] Cover path normalization rejecting absolute and parent-escape
@@ -347,7 +352,8 @@ That layering keeps the assurance story honest and maintainable.
           smoke harnesses, and the checked properties map directly to the
           documented patch contract.
   - [ ] 2.0.3. Add `#[cfg(kani)]` harnesses in `crates/weaver-plugins/src/`
-        for capability resolution. Requires 1.0.2, 1.0.3, and 5.3.2.
+        for capability resolution. Requires 1.0.2, 1.0.3, and prototype
+        archive 5.3.2.
     - [ ] Prove the selected provider satisfies the requested language and
           capability.
     - [ ] Prove refusal is deterministic when no compatible provider exists.
@@ -409,16 +415,16 @@ That layering keeps the assurance story honest and maintainable.
           least one lemma for each invariant class.
 
 - [ ] 5.0. Phase 5: later expansion
-  - [ ] 5.0.1. Add Kani harnesses for graph-slice budgets after `7.2.5` lands.
-        Requires 7.2.5 and 2.0.4.
+  - [ ] 5.0.1. Add Kani harnesses for graph-slice budgets after prototype
+        archive `7.2.5` lands. Requires prototype archive 7.2.5 and 2.0.4.
     - [ ] Prove counters do not exceed accepted-card, edge, and token-budget
           caps on small graphs.
     - [ ] Acceptance criteria: smoke and full harnesses cover graph budgets
           separately from transaction suites, and the resulting checks run in
           `kani-full` rather than `kani`.
   - [ ] 5.0.2. Add Kani harnesses for `max_duplicates` and assignment
-        injectivity after `7.4.8` and `7.4.9` land. Requires 7.4.8, 7.4.9, and
-        2.0.4.
+        injectivity after prototype archive `7.4.8` and `7.4.9` land.
+        Requires prototype archive 7.4.8, prototype archive 7.4.9, and 2.0.4.
     - [ ] Prove injective assignments by default and many-to-one only under
           explicit split/merge modes.
     - [ ] Acceptance criteria: bounded matching harnesses exist for
@@ -453,8 +459,9 @@ current contracts can support.
   <https://github.com/leynos/weaver/blob/main/docs/weaver-design.md>
 [^2]: Weaver user's guide, two-phase verification:
   <https://github.com/leynos/weaver/blob/main/docs/users-guide.md>
-[^3]: Weaver roadmap, safety harness and atomic transaction tasks:
-  <https://github.com/leynos/weaver/blob/main/docs/roadmap.md>
+[^3]: Weaver prototype roadmap archive, safety harness and atomic transaction
+  tasks:
+  <https://github.com/leynos/weaver/blob/main/docs/archive/prototype-roadmap.md>
 [^4]: Weaver design document, testing conventions and behavioural tests:
   <https://github.com/leynos/weaver/blob/main/docs/weaver-design.md>
 [^5]: Weaver design document, `act apply-patch` and plugin orchestration:
@@ -477,11 +484,12 @@ current contracts can support.
   <https://verus-lang.github.io/verus/guide/>
 [^14]: Verus installation instructions:
   <https://github.com/verus-lang/verus/blob/main/INSTALL.md>
-[^15]: Weaver roadmap, `act apply-patch` requirements:
-  <https://github.com/leynos/weaver/blob/main/docs/roadmap.md>
-[^16]: Weaver roadmap and design document, plugin routing and refusal
-  diagnostics: <https://github.com/leynos/weaver/blob/main/docs/roadmap.md>
-[^17]: Weaver roadmap, graph-slice budget tasks:
-  <https://github.com/leynos/weaver/blob/main/docs/roadmap.md>
-[^18]: Weaver roadmap, matching guardrail tasks:
-  <https://github.com/leynos/weaver/blob/main/docs/roadmap.md>
+[^15]: Weaver prototype roadmap archive, `act apply-patch` requirements:
+  <https://github.com/leynos/weaver/blob/main/docs/archive/prototype-roadmap.md>
+[^16]: Weaver prototype roadmap archive and design document, plugin routing and
+  refusal diagnostics:
+  <https://github.com/leynos/weaver/blob/main/docs/archive/prototype-roadmap.md>
+[^17]: Weaver prototype roadmap archive, graph-slice budget tasks:
+  <https://github.com/leynos/weaver/blob/main/docs/archive/prototype-roadmap.md>
+[^18]: Weaver prototype roadmap archive, matching guardrail tasks:
+  <https://github.com/leynos/weaver/blob/main/docs/archive/prototype-roadmap.md>

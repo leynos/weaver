@@ -82,7 +82,7 @@ Weaver integration code should live in `weaverd` (backend execution) and
 ## System overview
 
 For screen readers: the following diagram shows the flow from rule input (YAML
-or one-liner domain-specific language (DSL)) to a normalised query plan and
+or one-liner domain-specific language (DSL)) to a normalized query plan and
 execution against a Tree-sitter parse tree, producing matches and captures.
 
 ```mermaid
@@ -184,7 +184,7 @@ engine focused on feature extraction.
 The facade crate `sempai` is the only semver-stable entrypoint. Internal crates
 may evolve, but the facade must preserve:
 
-- Type names and serialisation formats of public structs.
+- Type names and serialization formats of public structs.
 - Behaviour of core methods within documented constraints.
 - Backwards compatibility of the one-liner DSL within a minor release line.
 
@@ -376,8 +376,8 @@ The one-liner Pratt binding powers must follow the provided table.[^3]
 ### YAML parser stack
 
 - `saphyr` parses YAML into a value model with location info.
-- `serde-saphyr` deserialises to Rust structs.
-- A custom deserialisation layer handles:
+- `serde-saphyr` deserializes to Rust structs.
+- A custom deserialization layer handles:
 
   - Union shapes (string vs object).
   - Forward-compatible unknown keys on the rule object
@@ -457,7 +457,7 @@ but the shorter form is acceptable given local scope.
 ### Syntax overview
 
 The DSL provides a compact expression form for interactive usage and for CLI
-flags. It maps directly to the normalised formula model.
+flags. It maps directly to the normalized formula model.
 
 Atoms:
 
@@ -505,7 +505,7 @@ operator tables.[^5]
 
 ### Error recovery
 
-Error recovery must prioritise interactive usability:
+Error recovery must prioritize interactive usability:
 
 - Token stream parsing with accurate spans.[^4]
 - Recovery anchors on delimiters `)`, `}`, and `,`.[^4]
@@ -663,7 +663,7 @@ to language-defined leaf kinds (identifiers, literals).
 `MetaVar` binds the target node to a name. Subsequent occurrences must unify:
 
 - Kind equality is enforced if the original binding is kind-specific.
-- Textual equality is enforced by default using the source slice normalised for
+- Textual equality is enforced by default using the source slice normalized for
   whitespace.
 - Span equality is not required across occurrences.
 
@@ -770,7 +770,7 @@ Conjunction execution proceeds:
 Disjunction is union of branch results:
 
 - Each branch is evaluated independently.
-- Duplicates are deduplicated by `(span, captures)` after normalising capture
+- Duplicates are deduplicated by `(span, captures)` after normalizing capture
   ordering.
 
 ### Negative constraints
@@ -782,7 +782,7 @@ Negative constraints require careful scoping to avoid surprising results:
 - `pattern-not-inside` semantics filter anchor matches if anchor span is within
   a negative context match.
 
-Both forms are present in the legacy schema.[^1] The normalised form must
+Both forms are present in the legacy schema.[^1] The normalized form must
 preserve the distinction.
 
 ## Where clauses, focus, and actuation
@@ -1069,7 +1069,7 @@ using the guidance in the Rust parser testing document.[^6]
 - Lexer unit tests (`logos`) using `rstest` tables.[^6]
 - DSL precedence tests using a small operator matrix, mirroring the Semgrep
   binding power table.[^3]
-- YAML deserialisation tests using minimal schema-aligned rule objects.[^1]
+- YAML deserialization tests using minimal schema-aligned rule objects.[^1]
 
 ### Snapshot tests
 
@@ -1133,16 +1133,16 @@ mirrored into `sempai_fixtures` as local test inputs.[^7]
 
 - [ ] 1.2.1. Implement rule file parsing via `saphyr` and `serde-saphyr`.
 
-  - Success criteria: schema-aligned deserialisation for rule metadata and
+  - Success criteria: schema-aligned deserialization for rule metadata and
     query keys.[^1]
 - [ ] 1.2.2. Implement legacy and v2 parsing paths and normalization.
 
-  - Success criteria: normalised formula output snapshots for paired legacy/v2
+  - Success criteria: normalized formula output snapshots for paired legacy/v2
     examples.[^2][^3]
 
 ### 1.3. One-liner DSL
 
-- [ ] 1.3.1. Implement `logos` tokeniser and Chumsky Pratt parser.
+- [ ] 1.3.1. Implement `logos` tokenizer and Chumsky Pratt parser.
 
   - Success criteria: precedence tests match the Semgrep binding power
     table.[^3]

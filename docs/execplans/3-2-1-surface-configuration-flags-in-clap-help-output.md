@@ -1,5 +1,9 @@
 # Surface configuration flags in clap help output
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -169,7 +173,7 @@ intended order without adding another configuration parser.
 
 ## Progress
 
-- [x] (2026-04-10 00:00Z) Read `docs/roadmap.md`[^1],
+- [x] (2026-04-10 00:00Z) Read `docs/archive/prototype-roadmap.md`[^1],
       `docs/ui-gap-analysis.md`[^2], `docs/weaver-design.md`[^3],
       `docs/users-guide.md`[^4], and the referenced testing guides.
 - [x] (2026-04-10 00:10Z) Confirmed the live implementation seam:
@@ -204,7 +208,7 @@ intended order without adding another configuration parser.
       `crates/weaver-cli/src/lib.rs` under 400 lines while rendering help from
       an augmented clap command only when clap itself requests help.
 - [x] (2026-04-11 01:20Z) Stage D: updated `crates/weaver-cli/build.rs`,
-      `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`,
+      `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/archive/prototype-roadmap.md`,
       then passed `make fmt`, `make markdownlint`, `make nixie`,
       `make check-fmt`, `make lint`, and `make test`.
 
@@ -272,7 +276,7 @@ Target outcome at completion:
 5. Unit tests, integration tests, and `rstest-bdd` scenarios cover happy
    paths, unhappy paths, and the relevant ordering and precedence edge cases.
 6. `docs/weaver-design.md`[^3], `docs/users-guide.md`[^4], and
-   `docs/roadmap.md`[^1] reflect the shipped behaviour.
+   `docs/archive/prototype-roadmap.md`[^1] reflect the shipped behaviour.
 7. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
@@ -451,7 +455,7 @@ should restate that the flags must appear before the command domain or
 structured subcommand to take effect.
 
 Only after the implementation, tests, and docs are complete should
-`docs/roadmap.md`[^1] mark `3.2.1` as done.
+`docs/archive/prototype-roadmap.md`[^1] mark `3.2.1` as done.
 
 ## Validation
 
@@ -491,7 +495,8 @@ set -o pipefail; make lint 2>&1 | tee /tmp/3-2-1-make-lint.log
 set -o pipefail; make test 2>&1 | tee /tmp/3-2-1-make-test.log
 ```
 
-[^1]: `docs/roadmap.md` records roadmap item `3.2.1`, its shipped status, and
+[^1]: `docs/archive/prototype-roadmap.md` records roadmap item `3.2.1`, its
+      shipped status, and
     the later locale-bootstrap scope.
 [^2]: `docs/ui-gap-analysis.md` records the discovery gap that made
     configuration flags hard to find from the CLI help surface.

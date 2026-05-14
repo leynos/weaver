@@ -391,6 +391,7 @@ mod actionable_guidance;
 mod after_help;
 mod auto_start;
 mod bare_invocation;
+mod command_surface;
 mod discoverability;
 mod help_output;
 mod missing_operation_guidance;

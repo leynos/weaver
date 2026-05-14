@@ -1,5 +1,9 @@
 # Adopt `ortho-config` v0.8.0 across Weaver
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -55,7 +59,7 @@ Observable success after implementation:
    Derive-adjacent imports and examples should prefer the `ortho_config::...`
    re-exports.
 5. Preserve the existing localization behaviour in
-   `crates/weaver-cli/src/localizer.rs`. The Fluent-backed localiser and
+   `crates/weaver-cli/src/localizer.rs`. The Fluent-backed localizer and
    English fallbacks must keep working after the dependency bump.
 6. Treat the `orthohelp` metadata flow as conditional. The current
    repository generates CLI man pages via build scripts, but the audit found no
@@ -110,7 +114,8 @@ Observable success after implementation:
   medium. Likelihood: certain. Mitigation: update active operator/developer
   docs (`README.md`, `docs/users-guide.md`, `docs/weaver-design.md`,
   `docs/ortho-config-users-guide.md`, `docs/contents.md`, and
-  `docs/roadmap.md`) while leaving historical execplans untouched.
+  `docs/archive/prototype-roadmap.md`) while leaving historical execplans
+  untouched.
 
 - Risk: `weaver-config/src/lib.rs` wraps derive-generated loaders and
   currently carries `#[allow(unfulfilled_lint_expectations)]` around
@@ -161,7 +166,7 @@ Observable success after implementation:
 - `crates/weaver-config/src/lib.rs` is the primary derive site. It uses
   `#[derive(OrthoConfig)]` with a `#[ortho_config(discovery(...))]` attribute
   and does not alias the runtime crate.
-- The CLI localiser in `crates/weaver-cli/src/localizer.rs` uses
+- The CLI localizer in `crates/weaver-cli/src/localizer.rs` uses
   `FluentLocalizer`, `Localizer`, and `NoOpLocalizer` from `ortho_config`
   directly. This is the main non-config API surface exercised by the dependency
   today.
@@ -231,7 +236,7 @@ The code impact was deliberately small. No aliasing, `SelectedSubcommandMerge`,
 `cli_default_as_absent`, or `orthohelp` wiring was needed in Weaver. The only
 code changes beyond manifests were the four toolchain-driven lint fixes noted
 above. Behaviourally, the configuration contract for `weaver-config::Config`
-and the CLI localiser remained unchanged.
+and the CLI localizer remained unchanged.
 
 Documentation now matches the upgraded state. The repository gained
 `docs/ortho-config-v0-8-0-migration-guide.md`, the local
@@ -263,9 +268,10 @@ The upgrade is concentrated in a small set of files.
   point because it forwards CLI flags into `Config::load_from_iter`.
 - `./README.md`,
   `docs/users-guide.md`, `docs/weaver-design.md`,
-  `docs/ortho-config-users-guide.md`, `docs/contents.md`, and `docs/roadmap.md`
-  all describe the current configuration story and will become stale if the
-  migration lands without documentation updates.
+  `docs/ortho-config-users-guide.md`, `docs/contents.md`, and
+  `docs/archive/prototype-roadmap.md` all describe the current configuration
+  story and will become stale if the migration lands without documentation
+  updates.
 
 The current implementation does not appear to use the migration-note edge
 cases. There is no alias for the `ortho_config` crate, no direct
@@ -397,7 +403,7 @@ The code change is small; the documentation clean-up is not optional.
    story accurately. These files should say that Weaver now uses `ortho-config`
    v0.8.0 and Rust 1.88+, and they should not imply that YAML is part of
    Weaver's runtime config path unless it truly is.
-5. Update `docs/roadmap.md` item 3.2.5 so it points at
+5. Update `docs/archive/prototype-roadmap.md` item 3.2.5 so it points at
    the v0.8.0 guide and no longer asks for already-completed v0.6.0
    documentation work.
 6. Update `./README.md` so the build requirements say

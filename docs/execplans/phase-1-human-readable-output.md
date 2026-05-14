@@ -1,5 +1,9 @@
 # Phase 1: Human-Readable Output Rendering
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 ## Goal
 
 Implement human-readable rendering for command outputs that contain code
@@ -115,7 +119,8 @@ crates/weaver-cli/src/
 
 ### Step 10: Mark roadmap entry done
 
-- Update `docs/roadmap.md` to mark the human-readable output item complete.
+- Update `docs/archive/prototype-roadmap.md` to mark the human-readable output
+  item complete.
 
 ### Step 11: Run quality gates
 
@@ -146,7 +151,7 @@ updates, per `AGENTS.md`.
 | `crates/weaver-e2e/tests/`                                   | Extend for human-readable output validation |
 | `docs/weaver-design.md`                                      | Record design decisions                     |
 | `docs/users-guide.md`                                        | Document output format changes              |
-| `docs/roadmap.md`                                            | Mark entry done                             |
+| `docs/archive/prototype-roadmap.md`                          | Mark entry done                             |
 | `docs/execplans/phase-1-human-readable-output.md`            | Create                                      |
 
 ## Dependencies

@@ -1,5 +1,9 @@
 # Add top-level version output and long-form command-line interface (CLI) description
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -414,8 +418,8 @@ run.
 
 ### Stage H: Mark roadmap done
 
-**`docs/roadmap.md`** — Change lines 168-178: replace `[ ]` with `[x]` on all
-four items (the parent 2.2.3 and its three sub-items).
+**`docs/archive/prototype-roadmap.md`** — Change lines 168-178: replace `[ ]`
+with `[x]` on all four items (the parent 2.2.3 and its three sub-items).
 
 ## Concrete steps
 
@@ -514,7 +518,7 @@ Existing reusable code:
 | `tests/features/weaver_cli_version.feature` | New file                                   | 0            | ~20         |
 | `tests/main_entry.rs`                       | Add version/help integration tests         | 54           | ~79         |
 | `docs/users-guide.md`                       | Add version section, update help section   | ~999         | ~1015       |
-| `docs/roadmap.md`                           | Mark 2.2.3 done                            | ---          | ---         |
+| `docs/archive/prototype-roadmap.md`         | Mark 2.2.3 done                            | ---          | ---         |
 
 All paths are relative to `crates/weaver-cli/` except `docs/` which is relative
 to workspace root.

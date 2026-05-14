@@ -24,6 +24,13 @@
   orchestration
   strategy](adr-006-plugin-execution-and-orchestration-strategy.md)
   - Decision record for one-shot JSONL execution and broker-owned orchestration.
+- [Architectural decision record (ADR) 007: Agent-native command
+  surface](adr-007-agent-native-command-surface.md)
+  - Decision record for the human-friendly, agent-native 0.1.0 command
+    contract and OrthoConfig dependency boundary.
+- [Archived prototype roadmap](archive/prototype-roadmap.md)
+  - Historical completed and superseded roadmap tasks from the pre-ADR-007
+    command grammar, preserving task numbers `1` through `11`.
 - [Building an error-recovering parser with Chumsky](building-an-error-recovering-parser-with-chumsky.md)
   - Practical parser-construction guidance for resilient parsing workflows.
 - [Code complexity guide](complexity-antipatterns-and-refactoring-strategies.md)

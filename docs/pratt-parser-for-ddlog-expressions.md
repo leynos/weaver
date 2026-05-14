@@ -538,7 +538,7 @@ re-parses the stored text into structured `Expr` values. Assignment literals
 are surfaced via `body_terms()` as `RuleBodyTerm::Assignment`, which stores a
 dedicated `Pattern` AST node rather than raw pattern text. Downstream analyses
 can therefore reason about rule bodies without rebuilding bespoke parsers or
-retokenising the source.
+retokenizing the source.
 
 ### 5.4.1 Atom adornments (`'` and `-<N>`)
 

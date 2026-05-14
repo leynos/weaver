@@ -1,5 +1,9 @@
 # Execution Plan: Integrate Syntactic Lock into Double-Lock Harness
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 **Status**: Complete **Phase**: 2 - Syntactic & Relational Intelligence **Last
 Updated**: 2025-12-16
 
@@ -147,7 +151,7 @@ BDD tests.
 | `crates/weaverd/src/safety_harness/mod.rs`                    | Complete | Public export      |
 | `crates/weaverd/src/tests/safety_harness_behaviour.rs`        | Complete | BDD world & steps  |
 | `crates/weaverd/tests/features/safety_harness.feature`        | Complete | BDD scenarios      |
-| `docs/roadmap.md`                                             | Complete | Mark complete      |
+| `docs/archive/prototype-roadmap.md`                           | Complete | Mark complete      |
 | `docs/users-guide.md`                                         | Complete | Verify accuracy    |
 
 ## Test Coverage

@@ -9,13 +9,52 @@ need but operators do not. For user-facing behaviour see the
 
 The workspace targets `ortho_config` v0.8.0 and Rust 1.88.
 
+## Adding or renaming public commands
+
+ADR 007 makes the 0.1.0 public command surface resource-first and generated
+from OrthoConfig-backed command metadata plus Weaver-owned semantic adapters.
+Do not add new public command grammar by hand in `clap`, daemon routing, manual
+pages, help text, and docs independently.
+
+When adding or renaming a public command:
+
+1. Update the OrthoConfig-backed command metadata or the Weaver semantic
+   command-surface adapter, depending on whether the change is reusable
+   command-contract machinery or Weaver-specific semantic behaviour.
+2. Declare the capability ID the command exposes, or reuse an existing
+   capability such as `definition.get`, `references.list`, `diagnostics.list`,
+   `symbol.rename`, `symbol.move`, or `patch.apply`.
+3. Provide localized human message IDs, copy-pasteable examples, and the human
+   renderer layout hints needed for default output, `--plain`, colour control,
+   and terminal-width fallbacks.
+4. Provide JSON success and error schemas. Protocol identifiers, field names,
+   schema versions, enum values, capability IDs, and exit classes are stable
+   and non-localized.
+5. Declare selector support, mutability, async behaviour, pagination bounds,
+   profile interaction, delivery support, and feedback exposure.
+6. Update or regenerate documentation snippets, `context --json`
+   introspection, skill-manifest references, manpage inputs, shell completions,
+   and tests from the same metadata.
+7. Run the drift, vocabulary, renderer, JSON, bounded-output, capability, and
+   example gates before merging the command change.
+
+Provider names are not the ordinary public workflow. Commands should expose
+semantic resources and capabilities, while Rope, rust-analyzer, Sempai,
+Tree-sitter, Language Server Protocol (LSP) servers, and built-in helpers stay
+behind deterministic provider routing. Provider names may appear in provenance,
+diagnostics, `--verbose` output, policy, and expert overrides.
+
+Sections below that document `observe`, `act`, `verify`, or `act refactor`
+describe the current prototype implementation. They are useful for maintaining
+shipped code, but they do not define the 0.1.0 public command contract.
+
 ## Sempai overview
 
-Sempai is Weaver's Semgrep-compatible query engine facade. It parses rule
-YAML, normalizes supported search syntax into a canonical formula model, and
-prepares per-language query plans for later execution.
+Sempai is Weaver's Semgrep-compatible query engine facade. It parses rule YAML,
+normalizes supported search syntax into a canonical formula model, and prepares
+per-language query plans for later execution.
 
-## Sempai query pipeline (milestone 4.1.5)
+## Sempai query pipeline (prototype archive milestone 4.1.5)
 
 - Canonical model (`sempai_core::formula`):
   - `Formula` enum: `Atom`, `Not`, `Inside`, `Anywhere`, `And`, `Or`
@@ -485,7 +524,7 @@ catalogue. `GraphSliceFixtureCase` is a type alias for `CardFixtureCase`.
   an out-of-range position and asserts
   `refusal.reason == "position_out_of_range"`.
 
-## Public API additions in milestone 7.2.1
+## Public API additions in prototype archive milestone 7.2.1
 
 ### `handle` signature — `FusionBackends` parameter
 
@@ -628,11 +667,13 @@ The built-in default is `en-US`. That value is part of the current shared
 configuration contract and is available from files, environment variables, and
 CLI configuration flags like any other config field.
 
-Full CLI localization bootstrap is intentionally deferred to roadmap item
-`3.3.1`. In particular, Weaver does not yet resolve the final locale and use it
-to construct the `Localizer` before clap parse errors are formatted. The
-current `Locale` type exists so the configuration contract is real now and the
-later localization bootstrap can reuse the validated domain value.
+Full CLI localization bootstrap was historically deferred to prototype archive
+roadmap item `3.3.1`; the forward command-surface reset carries localized
+renderer work in roadmap item `13.2.1`. Weaver does not yet resolve the final
+locale and use it to construct the `Localizer` before clap parse errors are
+formatted. The current `Locale` type exists, so the configuration contract is
+real now, and the later localization bootstrap can reuse the validated domain
+value.
 
 ### 2.5 Daemon command execution glue (`crates/weaver-cli/src/runner_glue.rs`)
 
@@ -826,7 +867,9 @@ of `act refactor`. It is a non-test module consumed by both the
 argument-parsing layer and the test suite to keep validation, guidance text,
 and supported-value lists in one place.
 
-The module exposes seven `pub(crate)` functions:
+The module exposes seven `pub(crate)` functions. The exact signatures live in
+Rustdoc; this section records each helper's contract, so the Markdown remains
+readable after automated wrapping:
 
 - `supported_provider_names() -> &'static [&'static str]` — returns the
   canonical slice of accepted provider names (e.g. `rope`, `rust-analyzer`),
@@ -844,19 +887,16 @@ The module exposes seven `pub(crate)` functions:
   and returns `DispatchError::InvalidArguments` with
   `act refactor does not support refactoring '<value>'` plus the shared
   guidance block when `refactoring` is not in `supported_refactoring_names()`.
-- `effective_operation(refactoring: &str) -> Result<&'static str,
-  DispatchError>` — maps a user-facing refactoring name to the underlying
-  plugin capability operation string (`"rename"` → `"rename-symbol"`),
-  returning the same unsupported-refactoring
+- `effective_operation(...)` — maps a user-facing refactoring name to the
+  underlying plugin capability operation string (`"rename"` →
+  `"rename-symbol"`), returning the same unsupported-refactoring
   `DispatchError::InvalidArguments` as `validate_refactoring(…)` for unknown
   user-facing names.
-- `capability_for_operation(operation: &str) -> Result<CapabilityId,
-  DispatchError>` — maps a capability operation string to its
-  `CapabilityId` variant (`"rename-symbol"` →
-  `CapabilityId::RenameSymbol`), returning
-  `DispatchError::InvalidArguments` with `act refactor does not support
-  capability resolution for '<operation>'` and the supported
-  capability-operation tokens for unknown operations.
+- `capability_for_operation(...)` — maps a capability operation string to its
+  `CapabilityId` variant (`"rename-symbol"` → `CapabilityId::RenameSymbol`),
+  returning `DispatchError::InvalidArguments` with
+  `act refactor does not support capability resolution for '<operation>'` and
+  the supported capability-operation tokens for unknown operations.
 - `missing_requirements_error() -> DispatchError` — builds the deterministic
   `DispatchError::InvalidArguments` with `act refactor requires ...`, every
   required flag (`--provider <plugin>`, `--refactoring <operation>`,

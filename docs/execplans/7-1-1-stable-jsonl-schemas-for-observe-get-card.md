@@ -1,5 +1,9 @@
 # 7.1.1 Define stable JSON Lines (JSONL) request and response schemas for `observe get-card`
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -50,9 +54,10 @@ Specifically:
    JSON payload that tells the caller exactly why no card was produced.
 6. `docs/users-guide.md` is updated with `observe get-card` command
    documentation including syntax, arguments, and response format.
-7. Roadmap item 7.1.1 in `docs/roadmap.md` is marked complete.
+7. Roadmap item 7.1.1 in `docs/archive/prototype-roadmap.md` is marked complete.
 
-This satisfies roadmap task 7.1.1 from `docs/roadmap.md`[^1] and closes #75.
+This satisfies roadmap task 7.1.1 from `docs/archive/prototype-roadmap.md`[^1]
+and closes #75.
 
 ## Constraints
 
@@ -142,7 +147,7 @@ This satisfies roadmap task 7.1.1 from `docs/roadmap.md`[^1] and closes #75.
 - [x] Stage G: Wire `weaverd` dispatch — add `"get-card"` to known
   operations, add `get_card` handler module returning structured refusal.
 - [x] Stage H: Update documentation (`docs/users-guide.md`,
-  `docs/repository-layout.md`, `docs/roadmap.md`).
+  `docs/repository-layout.md`, `docs/archive/prototype-roadmap.md`).
 - [x] Stage I: Final validation and commit gating.
 
 ## Surprises & discoveries
@@ -623,7 +628,7 @@ Add an `#### observe get-card` section after the existing
 
 Add `weaver-cards/` to the crate listing in the `crates/` tree (line 31-45).
 
-**Modify: `docs/roadmap.md`**
+**Modify: `docs/archive/prototype-roadmap.md`**
 
 Mark 7.1.1 as complete: change `- [ ]` to `- [x]` on lines 788-795 (the main
 task and both sub-tasks).
@@ -733,7 +738,7 @@ Quality criteria (what "done" means):
 - Provenance: every non-trivial field section includes a `source` field.
 - User guide: `docs/users-guide.md` documents the `observe get-card`
   command.
-- Roadmap: 7.1.1 is marked complete in `docs/roadmap.md`.
+- Roadmap: 7.1.1 is marked complete in `docs/archive/prototype-roadmap.md`.
 
 Quality method (how checks are performed):
 
@@ -926,7 +931,7 @@ Modified files (8):
 3. `crates/weaverd/src/dispatch/router.rs` — add known op and match arm
 4. `crates/weaverd/src/dispatch/observe/mod.rs` — add module declaration
 5. `crates/weaverd/src/dispatch/router/tests.rs` — extend helper
-6. `docs/roadmap.md` — mark 7.1.1 complete
+6. `docs/archive/prototype-roadmap.md` — mark 7.1.1 complete
 7. `docs/repository-layout.md` — add crate listing
 8. `docs/users-guide.md` — add `observe get-card` documentation
 
@@ -950,4 +955,4 @@ snapshot outputs from the 25-file tolerance count.
 - `crates/weaverd/src/dispatch/router/tests.rs` — existing router test
   structure to extend
 
-[^1]: `docs/roadmap.md`, lines 788–795
+[^1]: `docs/archive/prototype-roadmap.md`, lines 788–795

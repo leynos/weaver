@@ -1,9 +1,54 @@
 # Weaver user's guide
 
-This guide summarizes the behaviour exposed to operators by the initial CLI and
-daemon foundation. Configuration is currently the primary focus because both
-binaries share the same loading pipeline and rely on the `weaver-config` crate
-to merge settings from files, environment variables, and command-line arguments.
+This guide summarizes the behaviour exposed to operators by the current
+pre-0.1.0 CLI and daemon foundation. Configuration is currently the primary
+focus because both binaries share the same loading pipeline and rely on the
+`weaver-config` crate to merge settings from files, environment variables, and
+command-line arguments.
+
+## 0.1.0 command-surface target
+
+Weaver is pre-0.1.0, so the current public command grammar is not a
+compatibility promise. [ADR 007](adr-007-agent-native-command-surface.md) and
+the [roadmap](roadmap.md) reset the future public interface around a
+human-friendly, agent-native command contract.
+
+The 0.1.0 target keeps the human terminal experience first-class while making
+agent usage reliable:
+
+- default output remains localized, readable, and accessible for humans;
+- `--json` is the canonical machine-readable output switch;
+- resource-first commands replace the prototype `observe`, `act`, and
+  `verify` domain grammar;
+- Sempai one-liner queries are first-class selectors alongside file-position
+  selectors;
+- observe-style commands can emit structured selector records that act-style
+  commands consume directly or after ordinary UNIX filtering;
+- capabilities are public, while providers such as Rope and rust-analyzer are
+  implementation details surfaced through provenance, diagnostics, policy, and
+  expert overrides; and
+- reusable command metadata, renderer metadata, profile, delivery, feedback,
+  skill, and execution-ledger contracts depend on OrthoConfig where the
+  OrthoConfig roadmap already owns the generic machinery.
+
+Representative target commands look like this:
+
+```sh
+weaver definitions get --uri file:///src/main.rs --position 10:5
+weaver references list --uri file:///src/main.rs --position 10:5 --json
+weaver symbols list --query 'fn $name(...)' --json \
+  | jq 'select(.name | startswith("old_"))' \
+  | weaver symbols rename --from-stdin --replace-prefix old_ --with-prefix new_
+weaver symbols rename --query 'fn process_request(...)' --new-name run_request
+weaver patches apply --file changes.patch --dry-run
+weaver context --json
+weaver capabilities list --json
+```
+
+The command reference below records the current prototype implementation. It is
+useful for operating this branch today, but future roadmap work should follow
+the target contract above unless a later ADR explicitly changes the 0.1.0
+surface.
 
 ## Configuration layering
 
@@ -261,12 +306,14 @@ Next command:
   WEAVER_FOREGROUND=1 weaver daemon start
 ```
 
-## Command reference
+## Current prototype command reference
 
 `weaver` exposes three command families: the `--capabilities` probe, daemon
 lifecycle commands, and domain operations (`observe`, `act`, `verify`). Domain
 commands are sent to the daemon as JSONL; any arguments after the operation are
-forwarded verbatim without CLI validation.
+forwarded verbatim without CLI validation. This section describes the current
+implementation only; the 0.1.0 target command surface is resource-first and is
+summarized at the start of this guide.
 
 ### Bare invocation
 
@@ -897,11 +944,11 @@ spillover metadata:
 
 The `constraints` object reflects the applied request parameters after defaults
 are resolved. The `cards` array contains the extracted symbol cards within the
-budget. For roadmap item 7.2.1, Weaver builds a deterministic same-file slice:
-the entry card plus additional same-file symbol cards that fit within
-`budget.max_cards`. The `edges` array is therefore currently empty in runtime
-responses, while the stable schema already reserves the typed edge shape for
-later milestones. The `--max-edges` CLI flag is accepted for forward
+budget. For prototype archive roadmap item 7.2.1, Weaver builds a deterministic
+same-file slice: the entry card plus additional same-file symbol cards that fit
+within `budget.max_cards`. The `edges` array is therefore currently empty in
+runtime responses, while the stable schema already reserves the typed edge
+shape for later milestones. The `--max-edges` CLI flag is accepted for forward
 compatibility but has no runtime effect in 7.2.1; only `budget.max_cards`
 limits the number of cards produced.
 
@@ -1377,7 +1424,7 @@ structured error is returned to the caller.
 
 ## Language server capability detection
 
-The `weaver-lsp-host` crate initialises the LSP servers for Rust, Python, and
+The `weaver-lsp-host` crate initializes the LSP servers for Rust, Python, and
 TypeScript and records which core requests each server advertises:
 `textDocument/definition`, `textDocument/references`, diagnostics, and call
 hierarchy (`textDocument/prepareCallHierarchy` plus incoming/outgoing calls).
@@ -1409,7 +1456,7 @@ required tooling before retrying. Example:
 failed to spawn rust language server: command 'rust-analyzer' not found
 ```
 
-Language servers are initialised lazily when the first operation for that
+Language servers are initialized lazily when the first operation for that
 language is requested. The daemon sends the LSP `initialize` handshake followed
 by `initialized`, then routes subsequent requests through the established
 session.
@@ -1483,7 +1530,7 @@ Tree-sitter parsers for Rust, Python, and TypeScript. When validating a file,
 the lock parses the content and inspects the resulting syntax tree for ERROR
 nodes. Files containing structural errors—such as unbalanced braces, missing
 semicolons, or malformed declarations—are rejected before the semantic lock
-runs. Files with extensions not recognised by any configured parser are skipped
+runs. Files with extensions not recognized by any configured parser are skipped
 (pass through) to avoid blocking edits to configuration files, documentation,
 or other non-code artefacts.
 

@@ -8,6 +8,14 @@ Feature: Weaver CLI behaviour
     And stderr is "daemon complains"
     And the CLI exits with code 17
 
+  Scenario: Streaming a resource-first definition request to the daemon
+    Given a running fake daemon
+    When the operator runs "definitions get --uri file:///src/main.rs --position 10:5"
+    Then the daemon receives "request_definitions_get.jsonl"
+    And stdout is "daemon says hello"
+    And stderr is "daemon complains"
+    And the CLI exits with code 17
+
   Scenario: Streaming an apply-patch request with stdin
     Given a running fake daemon
     And patch input is available

@@ -17,6 +17,7 @@ use ortho_config::Localizer;
 mod actionable_guidance;
 mod cli;
 mod command;
+mod command_surface;
 mod config;
 mod daemon_output;
 mod discoverability;
@@ -44,10 +45,12 @@ pub const SHARED_CONFIG_HELP_FLAGS: &[&str] = &[
 ];
 
 pub use cli::OutputFormat;
-pub(crate) use cli::{Cli, CliCommand, DaemonAction};
+pub(crate) use cli::{Cli, CliCommand, DaemonAction, DefinitionsAction};
 #[cfg(test)]
 pub(crate) use command::CommandDescriptor;
 pub(crate) use command::{CommandInvocation, CommandRequest};
+#[cfg(test)]
+pub(crate) use command_surface::READ_ONLY_COMMANDS;
 use config::prepare_cli_arguments;
 pub(crate) use config::{ConfigLoader, OrthoConfigLoader, split_config_arguments};
 #[cfg(test)]

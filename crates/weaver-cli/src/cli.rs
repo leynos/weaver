@@ -3,7 +3,7 @@
 //! This module defines the command-line interface structure used by
 //! both the runtime parser and the build script for manpage generation.
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 
 /// Output format selection for domain command responses.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
@@ -34,7 +34,7 @@ pub enum OutputFormat {
         "\n",
         "Quick start:\n",
         "\n",
-        "  weaver observe get-definition \\\n",
+        "  weaver definitions get \\\n",
         "    --uri file:///src/main.rs --position 10:5\n",
         "  weaver act apply-patch < changes.patch\n",
         "  weaver daemon status\n",
@@ -87,12 +87,36 @@ pub(crate) struct Cli {
 /// Structured subcommands for the Weaver CLI.
 #[derive(Subcommand, Debug, Clone)]
 pub(crate) enum CliCommand {
+    /// Query symbol definitions.
+    Definitions {
+        /// The definition operation to perform.
+        #[command(subcommand)]
+        action: DefinitionsAction,
+    },
     /// Runs daemon lifecycle commands.
     Daemon {
         /// The lifecycle action to perform.
         #[command(subcommand)]
         action: DaemonAction,
     },
+}
+
+/// Resource-first definition commands.
+#[derive(Subcommand, Debug, Clone)]
+pub(crate) enum DefinitionsAction {
+    /// Returns the definition location for a source position.
+    Get(DefinitionGetArgs),
+}
+
+/// Arguments for `weaver definitions get`.
+#[derive(Args, Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DefinitionGetArgs {
+    /// The document URI containing the reference position.
+    #[arg(long)]
+    pub(crate) uri: String,
+    /// The 1-indexed line:column position to resolve.
+    #[arg(long)]
+    pub(crate) position: String,
 }
 
 /// Daemon lifecycle actions.

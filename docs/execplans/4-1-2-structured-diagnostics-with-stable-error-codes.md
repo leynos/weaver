@@ -1,5 +1,9 @@
 # 4.1.2 Define structured diagnostics with stable `E_SEMPAI_*` error codes and report schema
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -15,7 +19,8 @@ semantic validation logic. Every emitted diagnostic payload will include:
 `code`, `message`, `primary_span`, and `notes`, with stable `E_SEMPAI_*` codes
 and snapshot-locked JSON output.
 
-This directly fulfills roadmap item 4.1.2 in [docs/roadmap.md](../roadmap.md):
+This directly fulfills roadmap item 4.1.2 in
+[docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md):
 
 - Define structured diagnostics with stable `E_SEMPAI_*` error codes and
   report schema.
@@ -55,7 +60,8 @@ make nixie        # exits 0
 - Update documentation:
   - `docs/sempai-query-language-design.md` for design decisions.
   - `docs/users-guide.md` for user-visible diagnostic contract changes.
-  - `docs/roadmap.md` mark 4.1.2 done when implementation is complete.
+  - `docs/archive/prototype-roadmap.md` mark 4.1.2 done when implementation is
+    complete.
 - Run all required quality gates before completion.
 
 ## Tolerances (exception triggers)
@@ -183,7 +189,7 @@ Primary files for this work:
 - [crates/sempai-core/tests/features/sempai_core.feature](../../crates/sempai-core/tests/features/sempai_core.feature)
 - [docs/sempai-query-language-design.md](../sempai-query-language-design.md)
 - [docs/users-guide.md](../users-guide.md)
-- [docs/roadmap.md](../roadmap.md)
+- [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md)
 
 ## Plan of work
 
@@ -255,7 +261,7 @@ Update docs once implementation is stable:
 - `docs/users-guide.md`:
   - Document the diagnostic schema users can rely on.
   - Clarify code semantics and parser/validator applicability.
-- `docs/roadmap.md`:
+- `docs/archive/prototype-roadmap.md`:
   - Mark 4.1.2 as done only after all tests and gates pass.
 
 Go/no-go:

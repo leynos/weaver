@@ -1,6 +1,6 @@
 # Weaver
 
-A semantics-aware command-line tool for AI coding agents.
+A human-friendly, agent-native semantic command-line tool.
 
 Weaver is your AI agent's best friend when it comes to understanding and
 modifying code. We believe the shell should speak the language of semantics—not
@@ -11,8 +11,8 @@ to your terminal.
 
 Weaver is a Rust-based CLI tool that provides semantic operations on codebases
 through a simple, composable interface. It follows the UNIX philosophy: small,
-focused tools that communicate via JSON Lines (JSONL) and play nicely with your
-existing shell utilities like `jq`, `xargs`, and `find`.
+focused tools that communicate clearly and play nicely with existing shell
+utilities like `jq`, `xargs`, and `find`.
 
 Under the bonnet, Weaver runs a daemon (`weaverd`) that orchestrates language
 servers, syntax analysers, and specialised plugins—all sandboxed for
@@ -22,22 +22,26 @@ tricky rename, Weaver gives you the semantic primitives you need.
 
 ## Status
 
-Weaver is in active early development (v0.1.0). We've completed the core
-foundation—the CLI/daemon architecture, LSP integration for Rust, Python, and
-TypeScript, and the security sandbox—but there's more to come. Check out our
-[roadmap](docs/roadmap.md) to see what we're working on next.
+Weaver is in active early development before the first v0.1.0 release. The
+repository already contains the CLI/daemon architecture, shared configuration,
+Language Server Protocol (LSP) hosting, Tree-sitter syntax support, graph and
+card foundations, plugin infrastructure, sandboxing, and write-operation safety
+harness work. The public command surface is now being reset around
+[ADR 007](docs/adr-007-agent-native-command-surface.md), which makes the 0.1.0
+target human-friendly and agent-native without preserving compatibility with
+the prototype `observe` / `act` / `verify` grammar.
 
-> **Note:** The "Double-Lock" safety harness for write operations is still under
-> development. We recommend caution when using `act` commands until this is
-> complete.
+Check the [roadmap](docs/roadmap.md) for the current build sequence and the
+[user's guide](docs/users-guide.md) for the split between current prototype
+commands and the 0.1.0 target contract.
 
 ## Key features
 
-- **Semantic operations as shell verbs** — Commands like
-  `observe get-definition` and `act rename-symbol` bring IDE-level intelligence
-  to your terminal.
-- **JSONL-native protocol** — Every request and response is a JSON object,
-  making integration with other tools trivial.
+- **Semantic operations as shell verbs** — Current prototype commands expose
+  code intelligence today; the 0.1.0 target moves to resource-first commands
+  such as `definitions get`, `references list`, and `symbols rename`.
+- **Agent-native output contracts** — The target surface keeps readable human
+  defaults while making `--json` the stable machine-readable path.
 - **Multi-layer fusion** — Combines Language Server Protocol (LSP), Tree-sitter
   parsing, and call graph analysis for comprehensive code understanding.
 - **Zero-trust sandboxing** — External tools run in isolated environments using
@@ -47,15 +51,11 @@ TypeScript, and the security sandbox—but there's more to come. Check out our
 
 ## Components
 
-Weaver is organised as a Cargo workspace with five crates:
-
-| Crate             | Description                                                      |
-| ----------------- | ---------------------------------------------------------------- |
-| `weaver-cli`      | Thin CLI client that serialises commands into JSONL              |
-| `weaverd`         | Daemon broker that orchestrates backends and verifies operations |
-| `weaver-config`   | Shared configuration management via `ortho-config`               |
-| `weaver-lsp-host` | Language Server Protocol host with capability detection          |
-| `weaver-sandbox`  | Security sandbox wrapper around `birdcage`                       |
+Weaver is organized as a Cargo workspace with dedicated crates for the CLI,
+daemon, configuration, LSP hosting, syntax parsing, graph support, cards,
+plugins, sandboxing, Sempai query planning, build utilities, and end-to-end
+tests. See [the repository layout](docs/repository-layout.md) for the current
+crate map and planned component ownership.
 
 ## Getting started
 
@@ -66,7 +66,7 @@ Here's the quickest path to your first Weaver command:
 weaver daemon start
 
 # Query a symbol definition
-weaver observe get-definition --uri file:///path/to/main.rs --position 42:17
+weaver definitions get --uri file:///path/to/main.rs --position 42:17
 
 # Check daemon status
 weaver daemon status

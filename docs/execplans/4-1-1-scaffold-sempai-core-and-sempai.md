@@ -1,5 +1,9 @@
 # 4.1.1 Scaffold `sempai_core` and `sempai` with stable public types and facade entrypoints
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -30,7 +34,8 @@ make test         # exits 0, including all new sempai_core and sempai tests
 cargo doc -p sempai --no-deps   # exits 0 with zero warnings
 ```
 
-This satisfies roadmap task 4.1.1 from `docs/roadmap.md` (lines 347-350).
+This satisfies roadmap task 4.1.1 from `docs/archive/prototype-roadmap.md`
+(lines 347-350).
 
 ## Constraints
 
@@ -176,7 +181,7 @@ All acceptance criteria met:
    `rstest-bdd` v0.5.0 with happy and unhappy path scenarios.
 4. `make check-fmt`, `make lint`, and `make test` all exit 0.
 5. `docs/users-guide.md` updated with Sempai query engine section.
-6. Roadmap task 4.1.1 marked as done in `docs/roadmap.md`.
+6. Roadmap task 4.1.1 marked as done in `docs/archive/prototype-roadmap.md`.
 
 Net new files: 28 (two crates with source, tests, and features). No existing
 crate APIs were modified.
@@ -523,8 +528,8 @@ documenting the existence of the `sempai` and `sempai_core` crates, the
 available public types, and a note that engine methods are stubbed pending
 backend implementation.
 
-**F2.** Mark roadmap task 4.1.1 as done in `docs/roadmap.md` (line 347): change
-`- [ ] 4.1.1.` to `- [x] 4.1.1.`.
+**F2.** Mark roadmap task 4.1.1 as done in `docs/archive/prototype-roadmap.md`
+(line 347): change `- [ ] 4.1.1.` to `- [x] 4.1.1.`.
 
 **F3.** Record design decisions taken in the design document
 `docs/sempai-query-language-design.md` if any type definitions diverge from the
@@ -613,7 +618,7 @@ All commands run from the workspace root.
 
 ### Stage F
 
-1. Update `docs/users-guide.md`, `docs/roadmap.md`.
+1. Update `docs/users-guide.md`, `docs/archive/prototype-roadmap.md`.
 
 2. Run `make fmt`.
 
@@ -864,5 +869,5 @@ Summary of files added or modified in this change.
 | `crates/sempai/src/tests/behaviour.rs`                    | New    |
 | `crates/sempai/tests/features/sempai_engine.feature`      | New    |
 | `docs/users-guide.md`                                     | Edit   |
-| `docs/roadmap.md`                                         | Edit   |
+| `docs/archive/prototype-roadmap.md`                       | Edit   |
 | `docs/execplans/4-1-1-scaffold-sempai-core-and-sempai.md` | New    |

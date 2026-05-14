@@ -95,7 +95,7 @@ Cognitive Complexity is incremented based on three main rules 8:
 3. **Shorthand Discount:** Structures that allow multiple statements to be read
    as a single unit (e.g., a well-named method call) do not incur the same
    penalties as the raw statements they encapsulate. Method calls are generally
-   "free" in terms of cognitive complexity, as a well-chosen name summarises
+   "free" in terms of cognitive complexity, as a well-chosen name summarizes
    the underlying logic, allowing readers to grasp the high-level view before
    diving into details. However, recursive calls do increment the score.8
 
@@ -418,7 +418,7 @@ CQRS is an architectural pattern that segregates operations that modify state
 and should represent specific business intentions (e.g.,
 
 `BookHotelRoomCommand` rather than `SetReservationStatusCommand`).18 Queries
-never alter data and return Data Transfer Objects (DTOs) optimised for display
+never alter data and return Data Transfer Objects (DTOs) optimized for display
 needs.18
 
 While CQRS operates at a higher architectural level than a single Bumpy Road

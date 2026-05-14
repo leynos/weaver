@@ -1,5 +1,9 @@
 # 2.2.4 Provide contextual guidance when a domain is supplied without an operation
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -353,7 +357,7 @@ Include one sample output block and make clear that the command is a
 discoverability aid, not a daemon request.
 
 When the implementation and validation are complete, mark roadmap item 2.2.4
-done in `docs/roadmap.md`.
+done in `docs/archive/prototype-roadmap.md`.
 
 ### Stage E: validate end to end
 
@@ -388,8 +392,8 @@ The implementation is complete only when all of the following are true:
    auto-start.
 5. `weaver bogus` is unchanged by this task and remains reserved for roadmap
    2.3.1.
-6. `docs/weaver-design.md`, `docs/users-guide.md`, and `docs/roadmap.md` are
-   updated.
+6. `docs/weaver-design.md`, `docs/users-guide.md`, and
+   `docs/archive/prototype-roadmap.md` are updated.
 7. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all succeed.
 

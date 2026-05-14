@@ -1,5 +1,9 @@
 # Update weaver-plugin-rope manifest and runtime handshake for rename-symbol
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -135,7 +139,7 @@ Observable behaviour after this change:
 - [x] (2026-03-05) Add weaverd contract conformance test in
   `src/dispatch/act/refactor/tests.rs`.
 - [x] (2026-03-05) Update `docs/users-guide.md`.
-- [x] (2026-03-05) Mark `docs/roadmap.md` entry 5.2.2 as done.
+- [x] (2026-03-05) Mark `docs/archive/prototype-roadmap.md` entry 5.2.2 as done.
 - [x] (2026-03-05) Run `make check-fmt`, `make lint`, `make test` — all pass
   (152 tests, 0 failures).
 
@@ -202,7 +206,7 @@ lines), `crates/weaver-plugin-rope/src/tests/mod.rs`,
 `crates/weaver-plugin-rope/src/tests/behaviour.rs`,
 `crates/weaver-plugin-rope/tests/features/rope_plugin.feature`,
 `crates/weaverd/src/dispatch/act/refactor/tests.rs`, `docs/users-guide.md`,
-`docs/roadmap.md`, and this ExecPlan
+`docs/archive/prototype-roadmap.md`, and this ExecPlan
 (`docs/execplans/5-2-2-update-weaver-plugin-rope-manifest.md`).
 
 Lessons: Always derive `Debug` on error types that might be used with
@@ -374,7 +378,7 @@ Validation: `cargo test -p weaverd` passes.
    `"rename-symbol"` internally. Update the parameter table to note that
    `offset` is mapped to `position` in the plugin protocol. Add a note that the
    rope plugin now declares the `rename-symbol` capability.
-2. Mark `docs/roadmap.md` entry 5.2.2 as done (`[x]`).
+2. Mark `docs/archive/prototype-roadmap.md` entry 5.2.2 as done (`[x]`).
 3. Run `make fmt` to format all changed files.
 4. Run `make markdownlint` to validate Markdown.
 

@@ -1,5 +1,9 @@
 # 4.1.3 Implement YAML rule parsing via `saphyr` and `serde-saphyr`
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -77,8 +81,9 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-3-make-nixie.log
   [docs/sempai-query-language-design.md](../sempai-query-language-design.md).
 - Update [docs/users-guide.md](../users-guide.md) for any user-visible
   behaviour changes, including any change to `compile_yaml` failure semantics.
-- Mark roadmap item 4.1.3 done in [docs/roadmap.md](../roadmap.md) only after
-  the code, tests, and documentation all pass their gates.
+- Mark roadmap item 4.1.3 done in
+  [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md) only
+  after the code, tests, and documentation all pass their gates.
 
 ## Tolerances (exception triggers)
 
@@ -227,7 +232,7 @@ Target outcome at completion:
    during implementation.
 6. `docs/users-guide.md` explains any changed user-visible behaviour,
    especially `compile_yaml` failure semantics.
-7. `docs/roadmap.md` marks 4.1.3 done.
+7. `docs/archive/prototype-roadmap.md` marks 4.1.3 done.
 8. `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
    `make lint`, and `make test` all pass.
 
@@ -260,7 +265,7 @@ Relevant current files:
 - [docs/sempai-query-language-design.md](../sempai-query-language-design.md)
 - [docs/semgrep-language-reference/semgrep-rule-schema.yaml](../semgrep-language-reference/semgrep-rule-schema.yaml)
 - [docs/users-guide.md](../users-guide.md)
-- [docs/roadmap.md](../roadmap.md)
+- [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md)
 
 The design document's planned crate map adds `crates/sempai-yaml` as the YAML
 front-end. This milestone should create that crate and keep the public surface
@@ -395,7 +400,7 @@ Update documentation after the parser behaviour is stable:
 - `docs/users-guide.md`
   - explain the current `compile_yaml` behaviour and what errors users should
     expect from malformed or structurally invalid YAML.
-- `docs/roadmap.md`
+- `docs/archive/prototype-roadmap.md`
   - mark 4.1.3 done only after all tests and gates pass.
 
 Then run the full gate sequence with `tee` logs.
@@ -488,7 +493,7 @@ Acceptance is satisfied when all of the following are true:
   paths for the new parser crate and the `sempai` facade behaviour.
 - `docs/sempai-query-language-design.md` records the parser decisions taken.
 - `docs/users-guide.md` reflects any changed user-visible behaviour.
-- `docs/roadmap.md` marks 4.1.3 done.
+- `docs/archive/prototype-roadmap.md` marks 4.1.3 done.
 - `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`,
   `make lint`, and `make test` all succeed.
 

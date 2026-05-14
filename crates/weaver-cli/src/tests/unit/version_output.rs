@@ -102,7 +102,7 @@ fn help_output_contains_quick_start_example() {
         "help output missing quick-start block"
     );
     assert!(
-        stdout.contains("weaver observe get-definition"),
+        stdout.contains("weaver definitions get"),
         "help output missing runnable example"
     );
 }

@@ -1,5 +1,9 @@
 # 4.1.5 Implement normalization into canonical Formula model
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -86,13 +90,15 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-5-make-nixie.log
 - Record design decisions in
   `docs/sempai-query-language-design.md`.
 - Update `docs/users-guide.md` with any user-visible behaviour change.
-- Mark roadmap item 4.1.5 done in `docs/roadmap.md` only after all gates pass.
+- Mark roadmap item 4.1.5 done in `docs/archive/prototype-roadmap.md` only
+  after all gates pass.
 
 ## Tolerances (exception triggers)
 
 - Scope: if implementation requires more than 18 net file touches outside the
-  `crates/sempai*` directories and the three required docs (`roadmap.md`,
-  `users-guide.md`, `sempai-query-language-design.md`), stop and escalate.
+  `crates/sempai*` directories and the three required docs
+  (`docs/archive/prototype-roadmap.md`, `users-guide.md`,
+  `sempai-query-language-design.md`), stop and escalate.
 - Interface: if normalization requires a breaking change to the public
   signature of `sempai::Engine::compile_yaml` (beyond replacing the
   `NOT_IMPLEMENTED` stub with a real return), stop and escalate.
@@ -425,7 +431,7 @@ Go/no-go: `cargo test -p sempai_core`, `cargo test -p sempai` both pass.
 2. `docs/users-guide.md` — update the Sempai section to reflect that
    `compile_yaml` now returns compiled plans for valid search rules instead of
    `NOT_IMPLEMENTED`.
-3. `docs/roadmap.md` — mark item 4.1.5 as `[x]` done.
+3. `docs/archive/prototype-roadmap.md` — mark item 4.1.5 as `[x]` done.
 
 Go/no-go: `make markdownlint`, `make fmt`, and `make nixie` pass.
 

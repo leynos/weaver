@@ -1,5 +1,9 @@
 # 7.1.4 Cache integration for card extraction keyed by URI
 
+> Historical note: this ExecPlan targets a prototype roadmap item now preserved
+> in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
+> dotted task references are archive numbers unless explicitly stated otherwise.
+
 This ExecPlan (execution plan) is a living document. The sections
 `Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
@@ -572,8 +576,8 @@ considerations" section (lines 953–965), add a note recording:
 
 ### Stage L: Mark roadmap and run full validation
 
-1. In `docs/roadmap.md`, change the `[ ]` checkboxes for 7.1.4 and its sub-items
-   to `[x]`.
+1. In `docs/archive/prototype-roadmap.md`, change the `[ ]` checkboxes for
+   7.1.4 and its sub-items to `[x]`.
 2. Run the full validation suite:
 
 ```sh
