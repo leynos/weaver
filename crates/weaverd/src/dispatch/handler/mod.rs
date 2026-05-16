@@ -68,7 +68,7 @@ impl DispatchConnectionHandler {
     }
 
     fn dispatch(&self, mut stream: ConnectionStream) {
-        let (request_bytes, request) = match self.read_request(&mut stream) {
+        let (request_bytes, request) = match self.receive_request(&mut stream) {
             Ok(request) => request,
             Err(ReadRequestError::ClientDisconnected) => return,
             Err(ReadRequestError::BadRequest(error)) => {
@@ -99,7 +99,7 @@ impl DispatchConnectionHandler {
         self.route_request(request, request_bytes.len(), &mut writer);
     }
 
-    fn read_request(
+    fn receive_request(
         &self,
         stream: &mut ConnectionStream,
     ) -> Result<(Vec<u8>, CommandRequest), ReadRequestError> {
