@@ -235,10 +235,18 @@ pub(crate) fn write_startup_guidance<W: Write>(
     error: &LifecycleError,
 ) -> io::Result<()> {
     let (problem, alternatives, next_command) = match error {
-        LifecycleError::LaunchDaemon { binary, .. } => {
+        LifecycleError::LaunchDaemon {
+            binary,
+            runtime_dir,
+            ..
+        } => {
             let binary_str = binary.to_string_lossy();
             let problem = format!("failed to spawn daemon binary '{binary_str}'");
-            let alternatives = launch_binary_alternatives(binary);
+            let mut alternatives = launch_binary_alternatives(binary);
+            alternatives.push(format!(
+                "  - Inspect runtime artefacts under {}",
+                runtime_dir.display()
+            ));
             let next_command = launch_binary_check_command(binary);
             (problem, alternatives, next_command)
         }

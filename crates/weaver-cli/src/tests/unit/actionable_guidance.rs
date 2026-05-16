@@ -162,6 +162,10 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
         "Verify custom-weaverd exists and is executable",
         expected_next_command,
     );
+    assert!(
+        output.contains("  - Inspect runtime artefacts under /tmp/tools"),
+        "runtime artefact hint not found in output:\n{output}"
+    );
 }
 
 #[rstest]
