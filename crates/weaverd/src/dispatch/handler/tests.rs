@@ -248,6 +248,57 @@ fn serialize_structured_dispatch_event_omits_sensitive_fields() {
 }
 
 #[test]
+fn serialize_dispatching_request_event_snapshot() {
+    let event = StructuredDispatchEvent::new(
+        "dispatching_request",
+        "tcp://127.0.0.1:9779",
+        std::path::Path::new("/run/user/1000/weaver"),
+        StructuredEventMetadata::new("observe", "get-card").with_size(128),
+    );
+    insta::with_settings!({
+        redactions => vec![
+            (".endpoint", "[endpoint]".into()),
+            (".runtime_dir", "[runtime_dir]".into()),
+            ("[\"weaverd.health\"]", "[health_path]".into()),
+        ]
+    }, {
+        insta::assert_json_snapshot!(
+            serde_json::from_str::<serde_json::Value>(
+                &format_structured_event(&event)
+            ).expect("structured event should serialize as JSON")
+        );
+    });
+}
+
+#[test]
+fn serialize_request_too_large_event_snapshot() {
+    let mut event = StructuredDispatchEvent::new(
+        "request_too_large",
+        "tcp://127.0.0.1:9779",
+        std::path::Path::new("/run/user/1000/weaver"),
+        StructuredEventMetadata::none()
+            .with_size(2048)
+            .with_max_size(1024),
+    );
+    event.patch = Some("--- a/foo.rs\n+++ b/foo.rs".to_string());
+    event.body = Some("some body".to_string());
+    event.env = Some("SECRET=value".to_string());
+    insta::with_settings!({
+        redactions => vec![
+            (".endpoint", "[endpoint]".into()),
+            (".runtime_dir", "[runtime_dir]".into()),
+            ("[\"weaverd.health\"]", "[health_path]".into()),
+        ]
+    }, {
+        insta::assert_json_snapshot!(
+            serde_json::from_str::<serde_json::Value>(
+                &format_structured_event(&event)
+            ).expect("structured event should serialize as JSON")
+        );
+    });
+}
+
+#[test]
 fn emit_structured_event_returns_payload_without_sensitive_request_data() {
     let temp_dir = std::env::temp_dir();
     let endpoint = temp_dir.join("weaverd.sock");
