@@ -19,6 +19,7 @@ use crate::{
             HealthSnapshot,
             ProcessMonitorContext,
             check_health_snapshot,
+            read_health,
             read_pid,
             snapshot_is_recent,
             snapshot_matches_process,
@@ -51,6 +52,57 @@ fn read_pid_parses_integer(temp_paths: (TempDir, RuntimePaths)) {
     assert_eq!(
         read_pid(&dir, "weaverd.pid", paths.pid_path()).unwrap(),
         Some(42)
+    );
+}
+
+#[rstest]
+fn read_health_handles_missing_file(temp_paths: (TempDir, RuntimePaths)) {
+    let (_dir, paths) = temp_paths;
+    let dir = open_test_dir(&paths).expect("open test dir");
+    assert_eq!(
+        read_health(&dir, "weaverd.health", paths.health_path()).unwrap(),
+        None
+    );
+}
+
+#[rstest]
+fn read_health_handles_empty_file(temp_paths: (TempDir, RuntimePaths)) {
+    let (_dir, paths) = temp_paths;
+    write_test_file(paths.health_path(), b"   \n").expect("write empty health");
+    let dir = open_test_dir(&paths).expect("open test dir");
+    assert_eq!(
+        read_health(&dir, "weaverd.health", paths.health_path()).unwrap(),
+        None
+    );
+}
+
+#[rstest]
+fn read_health_parses_valid_json(temp_paths: (TempDir, RuntimePaths)) {
+    let (_dir, paths) = temp_paths;
+    write_test_file(
+        paths.health_path(),
+        b"{\"status\":\"ready\",\"pid\":42,\"timestamp\":100}\n",
+    )
+    .expect("write health snapshot");
+    let dir = open_test_dir(&paths).expect("open test dir");
+    let snapshot = read_health(&dir, "weaverd.health", paths.health_path())
+        .expect("read health")
+        .expect("snapshot present");
+    assert_eq!(snapshot.status, DaemonStatus::Ready);
+    assert_eq!(snapshot.pid, 42);
+    assert_eq!(snapshot.timestamp, 100);
+}
+
+#[rstest]
+fn read_health_returns_parse_error_for_invalid_json(temp_paths: (TempDir, RuntimePaths)) {
+    let (_dir, paths) = temp_paths;
+    write_test_file(paths.health_path(), b"not-json\n").expect("write bad health");
+    let dir = open_test_dir(&paths).expect("open test dir");
+    let err =
+        read_health(&dir, "weaverd.health", paths.health_path()).expect_err("expected parse error");
+    assert!(
+        matches!(err, LifecycleError::ParseHealth { .. }),
+        "expected ParseHealth, got: {err:?}"
     );
 }
 
