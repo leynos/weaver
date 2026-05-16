@@ -292,14 +292,16 @@ Next command:
   command -v weaverd || echo 'weaverd not found in PATH'
 ```
 
-For other startup failures, the CLI suggests running in the foreground to see
-startup output:
+For other startup failures, the CLI suggests checking daemon logs, shows the
+`weaverd.health` path when available, and suggests running in the foreground to
+see startup output:
 
 ```text
 error: daemon exited before reporting ready (status: Some(1))
 
 Valid alternatives:
   - Check the daemon logs for errors
+  - Check health snapshot at /run/user/1000/weaver/weaverd.health
   - Run with WEAVER_FOREGROUND=1 to see startup output
 
 Next command:
