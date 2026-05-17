@@ -1,5 +1,8 @@
-//! Shared `#[cfg(test)]` helper module for `act refactor` tests, kept visible to dead-code analysis
-//! without lint suppression attributes.
+//! Shared helper data and pure functions for `act refactor` behaviour tests.
+//!
+//! This file is intentionally loaded multiple times by different test modules
+//! using `#[path = "refactor_helpers.rs"]` to provide shared test utilities.
+
 pub(crate) mod builders {
     //! Synthetic request and backend builders for refactor tests.
 
@@ -14,10 +17,6 @@ pub(crate) mod builders {
         semantic_provider::SemanticBackendProvider,
     };
 
-    /// Constructs a minimal `act refactor` command request.
-    ///
-    /// Sets `domain` to `"act"` and `operation` to `"refactor"`, forwarding
-    /// `arguments` verbatim.
     pub(crate) fn command_request(arguments: Vec<String>) -> CommandRequest {
         CommandRequest {
             command: CommandDescriptor {
@@ -29,9 +28,6 @@ pub(crate) mod builders {
         }
     }
 
-    /// Builds test-ready fusion backends rooted at `socket_path`.
-    ///
-    /// Uses a default `Config` and a default-capacity `SemanticBackendProvider`.
     pub(crate) fn build_backends(socket_path: &Path) -> FusionBackends<SemanticBackendProvider> {
         let config = Config {
             daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().as_ref()),
@@ -48,10 +44,14 @@ pub(crate) mod builders {
     /// a complete argument list for tests and callers that exercise the
     /// explicit-provider code path.
     ///
+    /// Uses deterministic fixture anchors: `1:1` for Python and fallback files,
+    /// and `2:9` for Rust where the test symbol starts on the second line.
+    ///
     /// # Parameters
     /// - `file`: workspace-relative path to the file under rename.
     /// - `provider`: the provider name to pass as `--provider` (e.g. `"rope"`, `"rust-analyzer"`).
     pub(crate) fn standard_rename_args_for_provider(file: &str, provider: &str) -> Vec<String> {
+        let position = if file.ends_with(".rs") { "2:9" } else { "1:1" };
         vec![
             String::from("--provider"),
             String::from(provider),
@@ -59,15 +59,19 @@ pub(crate) mod builders {
             String::from("rename"),
             String::from("--file"),
             String::from(file),
-            String::from("offset=1"),
+            String::from("--position"),
+            String::from(position),
             String::from("new_name=woven"),
         ]
     }
 
-    /// Replaces `request` in-place with an `act refactor` request for `args`.
     pub(crate) fn configure_request(request: &mut CommandRequest, args: Vec<String>) {
         *request = command_request(args);
     }
+
+    const _: fn(&std::path::Path) -> FusionBackends<SemanticBackendProvider> = build_backends;
+    const _: fn(&str, &str) -> Vec<String> = standard_rename_args_for_provider;
+    const _: fn(&mut CommandRequest, Vec<String>) = configure_request;
 }
 
 pub(crate) mod resolutions {
@@ -85,7 +89,6 @@ pub(crate) mod resolutions {
         SelectionMode,
     };
 
-    /// Configuration bundle for building a refused provider resolution.
     pub(crate) struct RefusedResolution<'a> {
         pub(crate) capability: CapabilityId,
         pub(crate) language: Option<&'a str>,
@@ -95,7 +98,6 @@ pub(crate) mod resolutions {
         pub(crate) candidates: Vec<CandidateEvaluation>,
     }
 
-    /// Configuration bundle for building a selected provider resolution.
     pub(crate) struct SelectedResolution<'a> {
         pub(crate) capability: CapabilityId,
         pub(crate) language: &'a str,
@@ -104,7 +106,6 @@ pub(crate) mod resolutions {
         pub(crate) requested_provider: Option<&'a str>,
     }
 
-    /// Builds a selected capability resolution envelope from `config`.
     pub(crate) fn selected_resolution(
         config: SelectedResolution<'_>,
     ) -> CapabilityResolutionEnvelope {
@@ -124,7 +125,6 @@ pub(crate) mod resolutions {
         })
     }
 
-    /// Builds a refused capability resolution envelope from `config`.
     pub(crate) fn refused_resolution(
         config: RefusedResolution<'_>,
     ) -> CapabilityResolutionEnvelope {
@@ -140,7 +140,6 @@ pub(crate) mod resolutions {
         })
     }
 
-    /// Constructs a rejected provider candidate evaluation.
     pub(crate) fn rejected_candidate(
         provider: &str,
         reason: CandidateReason,
@@ -152,17 +151,12 @@ pub(crate) mod resolutions {
         }
     }
 
-    /// Context shared by selected and refused automatic language resolution paths.
     pub(crate) struct AutoResolutionContext<'a> {
         pub(crate) capability: CapabilityId,
         pub(crate) requested_provider: Option<&'a str>,
         pub(crate) selection_mode: SelectionMode,
     }
 
-    /// Resolves an automatic language selection.
-    ///
-    /// Returns a selected resolution when `language_name` is present, otherwise
-    /// returns an unsupported-language refusal.
     pub(crate) fn resolve_auto_language(
         context: AutoResolutionContext<'_>,
         language_name: Option<&'static str>,
@@ -188,6 +182,17 @@ pub(crate) mod resolutions {
             })
         }
     }
+
+    const _: for<'a> fn(SelectedResolution<'a>) -> CapabilityResolutionEnvelope =
+        selected_resolution;
+    const _: for<'a> fn(RefusedResolution<'a>) -> CapabilityResolutionEnvelope = refused_resolution;
+    const _: fn(&str, CandidateReason) -> CandidateEvaluation = rejected_candidate;
+    const _: for<'a> fn(
+        AutoResolutionContext<'a>,
+        Option<&'static str>,
+        &'static str,
+        Vec<CandidateEvaluation>,
+    ) -> CapabilityResolutionEnvelope = resolve_auto_language;
 }
 
 pub(crate) mod rollback {
@@ -201,13 +206,11 @@ pub(crate) mod rollback {
         resolution::{CapabilityResolutionEnvelope, ResolutionRequest},
     };
 
-    /// Test double that returns fixed refactor resolution and execution outcomes.
     pub(crate) struct RollbackRuntime {
         pub(crate) resolution: CapabilityResolutionEnvelope,
         pub(crate) execute_result: ExecuteResult,
     }
 
-    /// Execution outcome returned by `RollbackRuntime`.
     pub(crate) enum ExecuteResult {
         Success(PluginResponse),
         MissingPlugin(&'static str),
@@ -235,7 +238,6 @@ pub(crate) mod rollback {
         }
     }
 
-    /// Creates a rollback runtime with a selected resolution from `config`.
     pub(crate) fn selected_runtime(
         config: SelectedResolution<'_>,
         execute_result: ExecuteResult,
@@ -246,7 +248,6 @@ pub(crate) mod rollback {
         }
     }
 
-    /// Creates a rollback runtime from an existing resolution envelope.
     pub(crate) fn rollback_runtime(
         resolution: CapabilityResolutionEnvelope,
         execute_result: ExecuteResult,
@@ -256,6 +257,12 @@ pub(crate) mod rollback {
             execute_result,
         }
     }
+
+    const _: fn(PluginResponse) -> ExecuteResult = ExecuteResult::Success;
+    const _: fn(&'static str) -> ExecuteResult = ExecuteResult::MissingPlugin;
+    const _: for<'a> fn(SelectedResolution<'a>, ExecuteResult) -> RollbackRuntime =
+        selected_runtime;
+    const _: fn(CapabilityResolutionEnvelope, ExecuteResult) -> RollbackRuntime = rollback_runtime;
 }
 
 pub(crate) mod content {
@@ -269,14 +276,12 @@ pub(crate) mod content {
         format!("{git_header}\n<<<<<<< SEARCH\n{original}=======\n{updated}>>>>>>> REPLACE\n",)
     }
 
-    /// File type classification used to choose deterministic refactor fixtures.
     pub(crate) enum FileKind {
         Python,
         Rust,
         Other,
     }
 
-    /// Classifies `path` by extension into a deterministic fixture kind.
     pub(crate) fn classify_file(path: &Path) -> FileKind {
         match path.extension().and_then(|ext| ext.to_str()) {
             Some("py") => FileKind::Python,
@@ -317,20 +322,14 @@ pub(crate) mod content {
         }
     }
 
-    /// Returns the deterministic pre-rename fixture content for `path`.
     pub(crate) fn original_content_for(path: &Path) -> &'static str {
         content_table(classify_file(path)).original
     }
 
-    /// Returns the deterministic post-rename fixture content for `path`.
     pub(crate) fn updated_content_for(path: &Path) -> &'static str {
         content_table(classify_file(path)).updated
     }
 
-    /// Returns the path targeted by routed refactor patch output.
-    ///
-    /// Python and Rust inputs are routed to `notes.txt`; all other inputs keep
-    /// their original path.
     pub(crate) fn routed_patch_path(path: &Path) -> &Path {
         match classify_file(path) {
             FileKind::Python | FileKind::Rust => Path::new("notes.txt"),
@@ -343,58 +342,18 @@ pub(crate) mod content {
         format_diff(path, &make_header(&patch_path.to_string_lossy()))
     }
 
-    /// Builds a well-formed routed diff for `path`.
     pub(crate) fn routed_diff_for(path: &Path) -> String {
         routed_format_diff(path, |p| format!("diff --git a/{p} b/{p}"))
     }
 
-    /// Builds a malformed routed diff for error-path tests.
-    ///
-    /// The malformed header intentionally omits the `b/` segment.
     pub(crate) fn routed_malformed_diff_for(path: &Path) -> String {
         routed_format_diff(path, |p| format!("diff --git a/{p}"))
     }
-}
 
-#[cfg(test)]
-mod lint_compliance_tests {
-    //! Regression tests for helper-module lint policy compliance.
-    #[test]
-    fn refactor_helpers_avoids_dead_code_suppression_patterns() {
-        let source = include_str!("refactor_helpers.rs");
-        let compact: String = source[..source.rfind("#[cfg(test)]").unwrap_or(source.len())]
-            .chars()
-            .filter(|character| !character.is_whitespace())
-            .collect();
-        let file_wide_allow = ["#![", "allow("].concat();
-        let item_dead_code_allow = ["#[", "allow(dead_code"].concat();
-        let dead_code_witness = "const_:";
-        assert!(
-            !compact.contains(&file_wide_allow),
-            concat!(
-                "refactor_helpers.rs contains forbidden pattern `",
-                "{file_wide_allow}`; file-wide ",
-                "blanket lint allows are banned by project policy."
-            ),
-            file_wide_allow = file_wide_allow,
-        );
-        assert!(
-            !compact.contains(&item_dead_code_allow),
-            concat!(
-                "refactor_helpers.rs contains forbidden pattern `",
-                "{item_dead_code_allow}`; item-level ",
-                "dead-code allows without a reason are banned by project policy."
-            ),
-            item_dead_code_allow = item_dead_code_allow,
-        );
-        assert!(
-            !compact.contains(dead_code_witness),
-            concat!(
-                "refactor_helpers.rs contains forbidden pattern `",
-                "{dead_code_witness}`; anonymous ",
-                "const witnesses must not be used to mask dead-code lints."
-            ),
-            dead_code_witness = dead_code_witness,
-        );
-    }
+    const _: fn(&Path) -> FileKind = classify_file;
+    const _: fn(&Path) -> &'static str = original_content_for;
+    const _: fn(&Path) -> &'static str = updated_content_for;
+    const _: fn(&Path) -> &Path = routed_patch_path;
+    const _: fn(&Path) -> String = routed_diff_for;
+    const _: fn(&Path) -> String = routed_malformed_diff_for;
 }

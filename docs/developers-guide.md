@@ -54,7 +54,6 @@ Sempai is Weaver's Semgrep-compatible query engine facade. It parses rule YAML,
 normalizes supported search syntax into a canonical formula model, and prepares
 per-language query plans for later execution.
 
-
 ## Sempai query pipeline (prototype archive milestone 4.1.5)
 
 - Canonical model (`sempai_core::formula`):
@@ -929,11 +928,9 @@ readable after automated wrapping:
   `DispatchError::InvalidArguments` with `act refactor requires ...`, every
   required flag (`--provider <plugin>`, `--refactoring <operation>`,
   `--file <path>`, `--position <line:col>`), valid provider and refactoring
-  values, and a next-command
-  example derived from the first supported provider/refactoring or the
-  `<plugin>` / `<operation>` placeholders. Called by the argument-builder when
-  one or more required flags are absent.
-
+  values, and a next-command example derived from the first supported
+  provider/refactoring or the `<plugin>` / `<operation>` placeholders. Called
+  by the argument-builder when one or more required flags are absent.
 
 ## Act-refactor position parsing and byte-offset conversion
 
@@ -955,18 +952,17 @@ conversion for human source positions.
 `LINE:COL` values. Both components are one-indexed, and zero values are
 rejected before request construction continues.
 
-`line_col_to_byte_offset(content: &str, line: u32, column: u32) ->
-Result<usize, DispatchError>` converts a one-indexed line and Unicode
-character column into a UTF-8 byte offset. It iterates source text with
-`split_inclusive('\n')`, strips LF and CRLF endings via `trim_line_ending`,
-and walks `char_indices` so non-ASCII characters resolve to the correct byte
-boundary.
+`line_col_to_byte_offset` has the signature
+`(content: &str, line: u32, column: u32) -> Result<usize, DispatchError>`. It
+converts a one-indexed line and Unicode character column into a UTF-8 byte
+offset. It iterates source text with `split_inclusive('\n')`, strips LF and
+CRLF endings via `trim_line_ending`, and walks `char_indices` so non-ASCII
+characters resolve to the correct byte boundary.
 
 The conversion accepts the column-past-end sentinel used by editor-style
 positions. A column equal to `visible_line.chars().count() + 1` maps to
 `visible_line.len()`, which is the byte offset immediately after the visible
 line content and before any line ending.
-
 
 ### `arguments` (`weaverd/src/dispatch/act/refactor/arguments.rs`)
 
