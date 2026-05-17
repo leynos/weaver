@@ -111,24 +111,43 @@ fn position_out_of_range(line: u32, column: u32, file_path: Option<&Path>) -> Di
 }
 
 fn increment_position_parse_error(value: &str, error: &DispatchError) {
-    let count = POSITION_PARSE_ERROR_COUNT
-        .fetch_add(1, Ordering::Relaxed)
-        .saturating_add(1);
-    tracing::debug!(
-        counter = "position_parse_error",
-        count,
-        position = value,
-        error = %error,
-        "incremented position parse error counter"
+    increment_error_counter(
+        &POSITION_PARSE_ERROR_COUNT,
+        "position_parse_error",
+        Some(value),
+        error,
     );
 }
 
 fn increment_position_conversion_error(error: &DispatchError) {
-    let count = POSITION_CONVERSION_ERROR_COUNT
-        .fetch_add(1, Ordering::Relaxed)
-        .saturating_add(1);
+    increment_error_counter(
+        &POSITION_CONVERSION_ERROR_COUNT,
+        "position_conversion_error",
+        None,
+        error,
+    );
+}
+
+fn increment_error_counter(
+    counter: &AtomicU64,
+    counter_name: &str,
+    position_value: Option<&str>,
+    error: &DispatchError,
+) {
+    let count = counter.fetch_add(1, Ordering::Relaxed).saturating_add(1);
+    if let Some(position) = position_value {
+        tracing::debug!(
+            counter = counter_name,
+            count,
+            position,
+            error = %error,
+            "incremented position parse error counter"
+        );
+        return;
+    }
+
     tracing::debug!(
-        counter = "position_conversion_error",
+        counter = counter_name,
         count,
         error = %error,
         "incremented position conversion error counter"
