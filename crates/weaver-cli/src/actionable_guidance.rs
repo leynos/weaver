@@ -171,6 +171,58 @@ fn startup_socket_hint(path: Option<&Path>) -> String {
     }
 }
 
+fn launch_daemon_guidance(binary: &OsStr, runtime_dir: &Path) -> ActionableGuidance {
+    let binary_str = binary.to_string_lossy();
+    let problem = format!("failed to spawn daemon binary '{binary_str}'");
+    let mut alternatives = launch_binary_alternatives(binary);
+    alternatives.push(format!(
+        "  - Inspect runtime artefacts under {}",
+        runtime_dir.display()
+    ));
+    let next_command = launch_binary_check_command(binary);
+    ActionableGuidance::new(problem, alternatives, next_command)
+}
+
+fn startup_failed_guidance(exit_status: Option<i32>, runtime_dir: &Path) -> ActionableGuidance {
+    let problem = format!("daemon exited before reporting ready (status: {exit_status:?})");
+    let health_path = runtime_dir.join("weaverd.health");
+    let alternatives = vec![
+        "The daemon started but failed to become ready.".to_string(),
+        String::new(),
+        "Valid alternatives:".to_string(),
+        "  - Check the daemon logs for errors".to_string(),
+        startup_socket_hint(Some(health_path.as_path())),
+        startup_output_hint().to_string(),
+    ];
+    ActionableGuidance::new(problem, alternatives, startup_retry_command())
+}
+
+fn startup_timeout_guidance(health_path: &Path) -> ActionableGuidance {
+    let problem = "timed out waiting for daemon to become ready".to_string();
+    let alternatives = vec![
+        "The daemon did not report ready within the timeout period.".to_string(),
+        String::new(),
+        "Valid alternatives:".to_string(),
+        "  - Check if the daemon is stuck or slow to start".to_string(),
+        startup_socket_hint(Some(health_path)),
+        startup_output_hint().to_string(),
+    ];
+    ActionableGuidance::new(problem, alternatives, startup_retry_command())
+}
+
+fn startup_aborted_guidance(path: &Path) -> ActionableGuidance {
+    let problem = "daemon reported 'stopping' before reaching ready".to_string();
+    let alternatives = vec![
+        "The daemon started but shut down before becoming ready.".to_string(),
+        String::new(),
+        "Valid alternatives:".to_string(),
+        "  - Check the health snapshot for shutdown reason".to_string(),
+        startup_socket_hint(Some(path)),
+        startup_output_hint().to_string(),
+    ];
+    ActionableGuidance::new(problem, alternatives, startup_retry_command())
+}
+
 /// Writes actionable guidance to the given writer using the three-part template.
 ///
 /// # Errors
@@ -234,75 +286,28 @@ pub(crate) fn write_startup_guidance<W: Write>(
     writer: &mut W,
     error: &LifecycleError,
 ) -> io::Result<()> {
-    let (problem, alternatives, next_command) = match error {
+    let guidance = match error {
         LifecycleError::LaunchDaemon {
             binary,
             runtime_dir,
             ..
-        } => {
-            let binary_str = binary.to_string_lossy();
-            let problem = format!("failed to spawn daemon binary '{binary_str}'");
-            let mut alternatives = launch_binary_alternatives(binary);
-            alternatives.push(format!(
-                "  - Inspect runtime artefacts under {}",
-                runtime_dir.display()
-            ));
-            let next_command = launch_binary_check_command(binary);
-            (problem, alternatives, next_command)
-        }
+        } => launch_daemon_guidance(binary, runtime_dir),
         LifecycleError::StartupFailed {
             exit_status,
             runtime_dir,
             ..
-        } => {
-            let problem = format!("daemon exited before reporting ready (status: {exit_status:?})");
-            let health_path = runtime_dir.join("weaverd.health");
-            let alternatives = vec![
-                "The daemon started but failed to become ready.".to_string(),
-                String::new(),
-                "Valid alternatives:".to_string(),
-                "  - Check the daemon logs for errors".to_string(),
-                startup_socket_hint(Some(health_path.as_path())),
-                startup_output_hint().to_string(),
-            ];
-            let next_command = startup_retry_command();
-            (problem, alternatives, next_command.to_string())
-        }
-        LifecycleError::StartupTimeout { health_path, .. } => {
-            let problem = "timed out waiting for daemon to become ready".to_string();
-            let alternatives = vec![
-                "The daemon did not report ready within the timeout period.".to_string(),
-                String::new(),
-                "Valid alternatives:".to_string(),
-                "  - Check if the daemon is stuck or slow to start".to_string(),
-                startup_socket_hint(Some(health_path)),
-                startup_output_hint().to_string(),
-            ];
-            let next_command = startup_retry_command();
-            (problem, alternatives, next_command.to_string())
-        }
-        LifecycleError::StartupAborted { path } => {
-            let problem = "daemon reported 'stopping' before reaching ready".to_string();
-            let alternatives = vec![
-                "The daemon started but shut down before becoming ready.".to_string(),
-                String::new(),
-                "Valid alternatives:".to_string(),
-                "  - Check the health snapshot for shutdown reason".to_string(),
-                startup_socket_hint(Some(path)),
-                startup_output_hint().to_string(),
-            ];
-            let next_command = startup_retry_command();
-            (problem, alternatives, next_command.to_string())
-        }
-        // For other lifecycle errors, fall back to the Display representation
+        } => startup_failed_guidance(*exit_status, runtime_dir),
+        LifecycleError::StartupTimeout { health_path, .. } => startup_timeout_guidance(health_path),
+        LifecycleError::StartupAborted { path } => startup_aborted_guidance(path),
         other => {
             let problem = strip_error_prefix(&other.to_string()).to_string();
-            let alternatives = vec!["See error details above.".to_string()];
-            let next_command = "weaver daemon status";
-            (problem, alternatives, next_command.to_string())
+            ActionableGuidance::new(
+                problem,
+                vec!["See error details above.".to_string()],
+                "weaver daemon status",
+            )
         }
     };
 
-    let guidance = ActionableGuidance::new(problem, alternatives, next_command);
     write_actionable_guidance(writer, &guidance)
 }
