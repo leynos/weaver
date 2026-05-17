@@ -60,7 +60,8 @@ fn read_health_handles_missing_file(temp_paths: (TempDir, RuntimePaths)) {
     let (_dir, paths) = temp_paths;
     let dir = open_test_dir(&paths).expect("open test dir");
     assert_eq!(
-        read_health(&dir, "weaverd.health", paths.health_path()).unwrap(),
+        read_health(&dir, "weaverd.health", paths.health_path())
+            .expect("failed to read weaverd.health in test"),
         None
     );
 }
@@ -71,7 +72,8 @@ fn read_health_handles_empty_file(temp_paths: (TempDir, RuntimePaths)) {
     write_test_file(paths.health_path(), b"   \n").expect("write empty health");
     let dir = open_test_dir(&paths).expect("open test dir");
     assert_eq!(
-        read_health(&dir, "weaverd.health", paths.health_path()).unwrap(),
+        read_health(&dir, "weaverd.health", paths.health_path())
+            .expect("failed to read weaverd.health in test"),
         None
     );
 }

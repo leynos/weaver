@@ -923,7 +923,7 @@ monitoring owns the runtime files that explain daemon readiness.
 - `reader.rs` owns bounded JSONL reading. It reads from `ConnectionStream`,
   retries interrupted reads, preserves partial requests at EOF, and rejects
   lines above `JSONL_REQUEST_MAX_LINE_BYTES`.
-- `structured_event.rs` owns structured dispatch event serialisation and
+- `structured_event.rs` owns structured dispatch event serialization and
   emission. It builds JSON payloads, redacts request bodies, and sends events
   through tracing.
 
@@ -943,8 +943,7 @@ monitoring owns the runtime files that explain daemon readiness.
 The connection flow is:
 
 1. `handle` delegates to the synchronous dispatch path.
-2. The receive-request path (`receive_request` in design discussion, implemented
-   by `read_request`) reads bytes, parses `CommandRequest`, validates the
+2. `receive_request` reads bytes, parses `CommandRequest`, validates the
    command, and emits rejection events for read, parse, and validation failures.
 3. Valid requests emit a `dispatching_request` event with domain, operation,
    endpoint, runtime directory, and request size metadata.
