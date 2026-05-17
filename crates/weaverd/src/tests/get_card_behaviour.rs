@@ -36,9 +36,15 @@ fn test_handler() -> Arc<DispatchConnectionHandler> {
     let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
     let backend_manager = BackendManager::new(backends);
     let workspace_root = std::env::current_dir().expect("workspace root");
+    let runtime_dir = std::env::temp_dir();
     Arc::new(
-        DispatchConnectionHandler::new(backend_manager, workspace_root)
-            .expect("absolute workspace root"),
+        DispatchConnectionHandler::new(
+            backend_manager,
+            workspace_root,
+            "/tmp/weaver-bdd-get-card/socket.sock",
+            runtime_dir,
+        )
+        .expect("absolute workspace root"),
     )
 }
 

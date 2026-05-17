@@ -36,6 +36,7 @@ tempfile.workspace = true
 
 [dev-dependencies]
 derive_more = { version = "1.0", features = ["as_ref", "deref"] }
+insta = { workspace = true, features = ["json", "redactions"] }
 mockall.workspace = true
 rstest.workspace = true
 rstest-bdd.workspace = true

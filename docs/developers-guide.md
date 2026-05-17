@@ -904,3 +904,140 @@ readable after automated wrapping:
   example derived from the first supported provider/refactoring or the
   `<plugin>` / `<operation>` placeholders. Called by the argument-builder when
   one or more required flags are absent.
+
+## Dispatch lifecycle observability internals
+
+This section documents the dispatch and startup-observability helpers added for
+daemon request handling and CLI lifecycle guidance. The pieces are intentionally
+small: dispatch owns request telemetry at the daemon boundary, while lifecycle
+monitoring owns the runtime files that explain daemon readiness.
+
+### `DispatchConnectionHandler` (`weaverd/src/dispatch/handler/`)
+
+`crates/weaverd/src/dispatch/handler/` is split into three modules:
+
+- `mod.rs` owns orchestration. It implements `DispatchConnectionHandler`,
+  wires the transport `ConnectionHandler` trait, reads one JSONL request,
+  validates it, routes it through `DomainRouter`, and writes response or exit
+  records.
+- `reader.rs` owns bounded JSONL reading. It reads from `ConnectionStream`,
+  retries interrupted reads, preserves partial requests at EOF, and rejects
+  lines above `JSONL_REQUEST_MAX_LINE_BYTES`.
+- `structured_event.rs` owns structured dispatch event serialization and
+  emission. It builds JSON payloads, redacts request bodies, and sends events
+  through tracing.
+
+`DispatchConnectionHandler::new` takes four constructor arguments:
+
+- `backends: BackendManager` gives routed commands access to shared daemon
+  backends.
+- `workspace_root: PathBuf` is passed into `DomainRouter::new` so request
+  routing can resolve workspace-relative operations consistently.
+- `endpoint: impl Into<String>` records the socket or TCP endpoint handling
+  the request. Structured dispatch events include this value for operator
+  correlation.
+- `runtime_dir: PathBuf` records the daemon runtime directory. Structured
+  dispatch events derive the `weaverd.health` health-snapshot path from it, so
+  logs and CLI guidance point at the same runtime artefacts.
+
+The connection flow is:
+
+1. `handle` delegates to the synchronous dispatch path.
+2. `receive_request` reads bytes, parses `CommandRequest`, validates the
+   command, and emits rejection events for read, parse, and validation failures.
+3. Valid requests emit a `dispatching_request` event with domain, operation,
+   endpoint, runtime directory, and request size metadata.
+4. `route_request` calls `DomainRouter::route` through `BackendManager` and
+   writes either the domain result status or a structured error response.
+
+Event emission stays in the receive-request path because the handler still has
+the raw request size, endpoint, runtime directory, and failure classification
+at that point. Extracting emission away from that boundary would either pass a
+large context object through parse and validation helpers, or lose the
+distinction between client disconnects, read failures, malformed JSON, invalid
+commands, and oversized requests.
+
+### Structured dispatch events
+
+`StructuredEventMetadata` carries optional domain, operation, size, and
+maximum-size fields for structured dispatch logs. Its constructors and builder
+methods keep event construction explicit:
+
+- `none()` creates metadata with no domain or operation, used when the request
+  was not parseable enough to identify a command.
+- `new(domain, operation)` records the command target for routed or validated
+  requests.
+- `with_size(size)` records the observed request size.
+- `with_max_size(max_size)` records the configured upper bound for size
+  failures.
+- `extend_payload(payload)` appends whichever metadata fields are present to a
+  JSON object.
+
+`StructuredDispatchEvent` contains the event name, endpoint, runtime directory,
+metadata, and five optional sensitive request fields:
+
+- `patch`
+- `body`
+- `source`
+- `env`
+- `full_payload`
+
+`serialize_structured_event` always includes `event`, `endpoint`,
+`runtime_dir`, and the derived `weaverd.health` path, then extends the payload
+with metadata. If any sensitive field is present, the serializer writes the
+field with the `"<redacted>"` marker rather than the original content. That
+keeps structured logs useful for diagnosing dispatch failures without exposing
+patch contents, request bodies, source text, environment values, or complete
+payloads.
+
+`emit_structured_event` formats the event as JSON and logs it to
+`DISPATCH_TARGET`. It uses `tracing::error!` when `is_error` is true and
+`tracing::info!` otherwise. Both paths include the event name, human message,
+and serialized payload under the same target so downstream tracing filters can
+collect dispatch telemetry consistently.
+
+### `monitoring_readers` (`weaver-cli/src/lifecycle/monitoring_readers.rs`)
+
+`monitoring_readers` centralizes runtime-file reads for daemon lifecycle
+monitoring. It exists so health and PID files share the same missing-file,
+empty-file, read-error, and parse-error semantics.
+
+The `define_reader!` macro generates concrete typed readers from a small
+contract: the return type, the `LifecycleError` variant for I/O failures, the
+variant for parse failures, and the parser expression. The generated reader
+trims file content, treats empty content as absent, and maps parse failures to
+the configured semantic lifecycle error.
+
+`read_optional_file` reads a file from the already-open runtime directory. It
+returns `Ok(None)` for `NotFound`, because missing runtime files are expected
+during daemon startup and shutdown. Other I/O errors are returned for the
+caller to classify.
+
+`read_and_parse` combines optional-file reading with parse handling. It maps
+read errors through the caller-provided read-error constructor and delegates
+non-empty content to the caller-provided parse closure.
+
+The concrete readers have these return semantics:
+
+- `read_health` returns `Ok(Some(HealthSnapshot))` when `weaverd.health` is
+  present and valid JSON, `Ok(None)` when the file is missing or empty,
+  `Err(LifecycleError::ReadHealth { .. })` when reading fails, and
+  `Err(LifecycleError::ParseHealth { .. })` when JSON parsing fails.
+- `read_pid` returns `Ok(Some(u32))` when the PID file is present and contains
+  a valid integer, `Ok(None)` when it is missing or empty,
+  `Err(LifecycleError::ReadPid { .. })` when reading fails, and
+  `Err(LifecycleError::ParsePid { .. })` when integer parsing fails.
+
+### `runtime_dir` in lifecycle errors
+
+`LifecycleError::LaunchDaemon` and `LifecycleError::StartupFailed` both carry
+`runtime_dir: PathBuf`. The CLI keeps this path with the error because startup
+guidance is produced after the lower-level lifecycle operation has already
+failed. Carrying the runtime directory in the error lets actionable guidance
+derive the same `weaverd.health` path that monitoring uses and surface runtime
+artefact inspection as a next diagnostic step.
+
+For launch failures, guidance can tell the operator where to inspect runtime
+artefacts even when the daemon process never starts. For startup failures,
+guidance derives `runtime_dir.join("weaverd.health")` and points directly at
+the health snapshot that should explain why readiness was not reached.
