@@ -41,9 +41,10 @@ impl RefactorArgsBuilder {
         let Some(file) = self.file else {
             return Err(missing_requirements_error());
         };
-        let Some(position) = self.position else {
+        let position = self.position;
+        if position.is_none() && !has_deprecated_offset_argument(&self.extra) {
             return Err(missing_requirements_error());
-        };
+        }
         let invalid_extra_arguments: Vec<&str> = self
             .extra
             .iter()
@@ -71,7 +72,7 @@ impl RefactorArgsBuilder {
             provider,
             refactoring,
             file,
-            position: Some(position),
+            position,
             extra: self.extra,
         })
     }
@@ -153,6 +154,12 @@ fn is_valid_extra_argument(argument: &str) -> bool {
         return false;
     };
     !key.is_empty()
+}
+
+fn has_deprecated_offset_argument(arguments: &[String]) -> bool {
+    arguments
+        .iter()
+        .any(|argument| argument.starts_with("offset="))
 }
 
 #[cfg(test)]
