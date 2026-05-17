@@ -134,6 +134,17 @@ impl<W: Write> ResponseWriter<W> {
         Ok(())
     }
 
+    /// Writes pre-serialized daemon response bytes and flushes the stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing or flushing fails.
+    pub(crate) fn write_buffered(&mut self, response: &[u8]) -> Result<(), DispatchError> {
+        self.writer.write_all(response)?;
+        self.writer.flush()?;
+        Ok(())
+    }
+
     /// Writes an error message to stderr followed by an exit message.
     ///
     /// For `DispatchError::UnknownOperation`, this emits a structured JSON

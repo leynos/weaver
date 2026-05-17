@@ -287,6 +287,7 @@ error: failed to spawn weaverd binary 'weaverd'
 Valid alternatives:
   - Verify weaverd is installed and in your PATH
   - Set WEAVERD_BIN to the full path to the weaverd binary
+  - Inspect runtime artefacts under /run/user/1000/weaver
 
 Next command:
   command -v weaverd || echo 'weaverd not found in PATH'

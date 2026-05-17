@@ -157,13 +157,19 @@ impl DispatchConnectionHandler {
         request_size: usize,
         writer: &mut ResponseWriter<W>,
     ) {
-        let route_result = self
-            .backends
-            .with_backends(|backends| self.router.route(&request, writer, backends));
+        let mut response = Vec::new();
+        let route_result = self.backends.with_backends(|backends| {
+            let mut buffered_writer = ResponseWriter::new(&mut response);
+            self.router.route(&request, &mut buffered_writer, backends)
+        });
         let context = Self::request_context(&request, request_size);
 
         match route_result {
-            Ok(Ok(result)) => self.write_exit_status(&context, result.status, writer),
+            Ok(Ok(result)) => {
+                if self.write_buffered_response(&context, writer, &response) {
+                    self.write_exit_status(&context, result.status, writer);
+                }
+            }
             Ok(Err(error)) => {
                 emit_structured_event(
                     &self.with_metadata(&context, "dispatch_failed"),
@@ -184,6 +190,27 @@ impl DispatchConnectionHandler {
                 self.write_exit_status(&context, error.exit_status(), writer);
             }
         }
+    }
+
+    fn write_buffered_response<W: std::io::Write>(
+        &self,
+        context: &RouteContext<'_>,
+        writer: &mut ResponseWriter<W>,
+        response: &[u8],
+    ) -> bool {
+        if let Err(transport_error) = writer.write_buffered(response) {
+            tracing::warn!(
+                target: DISPATCH_TARGET,
+                endpoint = %self.endpoint,
+                domain = context.request.domain(),
+                operation = context.request.operation(),
+                request_size = context.request_size,
+                transport_error = %transport_error,
+                "failed to write routed response"
+            );
+            return false;
+        }
+        true
     }
 
     fn request_context(request: &CommandRequest, request_size: usize) -> RouteContext<'_> {

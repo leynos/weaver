@@ -9,10 +9,14 @@ use std::{
 use rstest::rstest;
 use weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES;
 
+#[path = "read_error_event_tests.rs"]
+mod read_error_event_tests;
+#[path = "receive_request_tests.rs"]
+mod receive_request_tests;
 #[path = "tests_helpers.rs"]
 mod tests_helpers;
 
-use tests_helpers::{HandlerTestHarness, harness};
+use tests_helpers::{HandlerTestHarness, capture_events, harness};
 
 use super::{
     structured_event::{format_structured_event, serialize_structured_event},
@@ -236,7 +240,32 @@ fn emit_structured_event_returns_payload_without_sensitive_request_data() {
     assert_eq!(value["env"], serde_json::json!("<redacted>"));
     assert_eq!(value["fullPayload"], serde_json::json!("<redacted>"));
     assert_eq!(value["domain"], serde_json::json!("observe"));
-    emit_structured_event(&event, "request_too_large rejection", true);
+    let events = capture_events(|| {
+        emit_structured_event(&event, "request_too_large rejection", true);
+    });
+    let emitted = events
+        .iter()
+        .find(|event| {
+            event
+                .fields
+                .get("event")
+                .is_some_and(|value| value == "request_too_large")
+        })
+        .expect("structured event should be emitted");
+
+    assert_eq!(emitted.level, tracing::Level::ERROR);
+    assert_eq!(emitted.target, DISPATCH_TARGET);
+    assert_eq!(
+        emitted.fields.get("message").map(String::as_str),
+        Some("request_too_large rejection")
+    );
+    let emitted_payload = emitted
+        .fields
+        .get("payload")
+        .expect("structured event should include payload");
+    let emitted_value = serde_json::from_str::<serde_json::Value>(emitted_payload)
+        .expect("emitted payload should be JSON");
+    assert_eq!(emitted_value["patch"], serde_json::json!("<redacted>"));
 }
 
 #[test]

@@ -1,6 +1,7 @@
 //! Shared helpers for dispatch handler tests.
 
 use std::{
+    collections::BTreeMap,
     io::{BufRead, BufReader, Write},
     net::{SocketAddr, TcpListener, TcpStream},
     sync::{Arc, Mutex},
@@ -9,6 +10,18 @@ use std::{
 
 use rstest::fixture;
 use tempfile::TempDir;
+use tracing::{
+    Event,
+    Level,
+    Subscriber,
+    field::{Field, Visit},
+};
+use tracing_subscriber::{
+    Layer,
+    layer::Context,
+    prelude::*,
+    registry::{LookupSpan, Registry},
+};
 use weaver_cards::DEFAULT_CACHE_CAPACITY;
 use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
@@ -75,6 +88,64 @@ pub(crate) fn create_listener() -> Result<(TcpListener, SocketAddr), String> {
         .local_addr()
         .map_err(|error| format!("addr: {error}"))?;
     Ok((listener, addr))
+}
+
+#[derive(Debug)]
+pub(crate) struct CapturedEvent {
+    pub(crate) level: Level,
+    pub(crate) target: String,
+    pub(crate) fields: BTreeMap<String, String>,
+}
+
+#[derive(Debug)]
+struct RecordingLayer {
+    events: Arc<Mutex<Vec<CapturedEvent>>>,
+}
+
+#[derive(Default)]
+struct FieldVisitor {
+    fields: BTreeMap<String, String>,
+}
+
+impl Visit for FieldVisitor {
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        self.fields
+            .insert(field.name().to_string(), format!("{value:?}"));
+    }
+
+    fn record_str(&mut self, field: &Field, value: &str) {
+        self.fields
+            .insert(field.name().to_string(), value.to_string());
+    }
+}
+
+impl<S> Layer<S> for RecordingLayer
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+{
+    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+        let mut visitor = FieldVisitor::default();
+        event.record(&mut visitor);
+        if let Ok(mut events) = self.events.lock() {
+            events.push(CapturedEvent {
+                level: *event.metadata().level(),
+                target: event.metadata().target().to_string(),
+                fields: visitor.fields,
+            });
+        }
+    }
+}
+
+pub(crate) fn capture_events(action: impl FnOnce()) -> Vec<CapturedEvent> {
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let subscriber = Registry::default().with(RecordingLayer {
+        events: Arc::clone(&events),
+    });
+    tracing::subscriber::with_default(subscriber, action);
+    let mut events = events
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    events.drain(..).collect()
 }
 
 #[fixture]
