@@ -56,20 +56,16 @@ fn read_pid_parses_integer(temp_paths: (TempDir, RuntimePaths)) {
 }
 
 #[rstest]
-fn read_health_handles_missing_file(temp_paths: (TempDir, RuntimePaths)) {
+#[case::missing_file(None)]
+#[case::whitespace_only(Some(b"   \n" as &[u8]))]
+fn read_health_returns_none_when_absent_or_empty(
+    temp_paths: (TempDir, RuntimePaths),
+    #[case] content: Option<&[u8]>,
+) {
     let (_dir, paths) = temp_paths;
-    let dir = open_test_dir(&paths).expect("open test dir");
-    assert_eq!(
-        read_health(&dir, "weaverd.health", paths.health_path())
-            .expect("failed to read weaverd.health in test"),
-        None
-    );
-}
-
-#[rstest]
-fn read_health_handles_empty_file(temp_paths: (TempDir, RuntimePaths)) {
-    let (_dir, paths) = temp_paths;
-    write_test_file(paths.health_path(), b"   \n").expect("write empty health");
+    if let Some(bytes) = content {
+        write_test_file(paths.health_path(), bytes).expect("write test file");
+    }
     let dir = open_test_dir(&paths).expect("open test dir");
     assert_eq!(
         read_health(&dir, "weaverd.health", paths.health_path())
