@@ -161,6 +161,15 @@ fn load_file_contents(path: &Path) -> Result<String, DispatchError> {
     })
 }
 
+#[tracing::instrument(
+    level = "debug",
+    skip(plugin_args, file_content),
+    fields(
+        capability = ?CapabilityId::RenameSymbol,
+        file_path = %file.display(),
+        input_form = rename_symbol_input_form(plugin_args, position),
+    )
+)]
 fn apply_rename_symbol_mapping(
     plugin_args: &mut HashMap<String, serde_json::Value>,
     file: &Path,
@@ -181,19 +190,22 @@ fn apply_rename_symbol_mapping(
         ),
     );
     if position.is_some() && plugin_args.contains_key("offset") {
-        return Err(DispatchError::invalid_arguments(
+        return Err(invalid_rename_arguments(
+            file,
             "refactor rename must not supply both '--position' and deprecated 'offset='",
         ));
     }
     if plugin_args.contains_key("position") {
-        return Err(DispatchError::invalid_arguments(
+        return Err(invalid_rename_arguments(
+            file,
             "refactor rename must use '--position LINE:COL'; trailing 'position=' is reserved for \
              the internal plugin contract",
         ));
     }
     if let Some(position) = position {
-        let (line, column) = parse_line_col(position)?;
-        let offset = line_col_to_byte_offset(file_content, line, column)?;
+        let (line, column) =
+            parse_line_col(position).map_err(|error| add_file_context(file, error))?;
+        let offset = line_col_to_byte_offset(file_content, line, column, Some(file))?;
         plugin_args.insert(
             String::from("position"),
             serde_json::Value::String(offset.to_string()),
@@ -201,18 +213,47 @@ fn apply_rename_symbol_mapping(
         return Ok(());
     }
     if let Some(offset_val) = plugin_args.remove("offset") {
+        tracing::warn!(
+            file_path = %file.display(),
+            "using deprecated offset= for rename position"
+        );
         if offset_val.is_string() || offset_val.is_number() {
             plugin_args.insert(String::from("position"), offset_val);
             return Ok(());
         }
 
-        return Err(DispatchError::invalid_arguments(
+        return Err(invalid_rename_arguments(
+            file,
             "refactor rename deprecated offset= must be a numeric or string byte offset",
         ));
     }
-    Err(DispatchError::invalid_arguments(
+    Err(invalid_rename_arguments(
+        file,
         "refactor rename requires --position LINE:COL",
     ))
+}
+
+fn rename_symbol_input_form(
+    plugin_args: &HashMap<String, serde_json::Value>,
+    position: Option<&str>,
+) -> &'static str {
+    match (position.is_some(), plugin_args.contains_key("offset")) {
+        (true, true) => "position_and_deprecated_offset",
+        (true, false) => "--position",
+        (false, true) => "deprecated_offset",
+        (false, false) => "missing",
+    }
+}
+
+fn invalid_rename_arguments(file: &Path, message: &str) -> DispatchError {
+    DispatchError::invalid_arguments(format!("{message} for '{}'", file.display()))
+}
+
+fn add_file_context(file: &Path, error: DispatchError) -> DispatchError {
+    match error {
+        DispatchError::InvalidArguments { message } => invalid_rename_arguments(file, &message),
+        other => other,
+    }
 }
 
 #[cfg(test)]
@@ -242,5 +283,6 @@ mod tests {
             _ => unreachable!(),
         };
         assert!(invalid_arguments.contains("must be a numeric or string byte offset"));
+        assert!(invalid_arguments.contains("/tmp"));
     }
 }
