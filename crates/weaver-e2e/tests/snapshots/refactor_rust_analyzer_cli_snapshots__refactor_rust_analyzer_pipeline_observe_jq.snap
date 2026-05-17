@@ -26,8 +26,9 @@ Transcript {
                 String("rename"),
                 String("--file"),
                 String("src/main.rs"),
+                String("--position"),
+                String("1:4"),
                 String("new_name=renamed_name"),
-                String("offset=3"),
             ],
             "command": Object {
                 "domain": String("act"),

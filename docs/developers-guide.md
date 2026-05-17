@@ -768,7 +768,8 @@ produce capability-resolution payloads:
 
 - `request_arguments(&serde_json::Value)` — extracts the daemon request's flat
   CLI-style argument vector, for example a list containing `--refactoring`,
-  `rename`, `--file`, `src/main.py`, `new_name=renamed_symbol`, and `offset=4`.
+  `rename`, `--file`, `src/main.py`, `--position`, `1:5`, and
+  `new_name=renamed_symbol`.
 - `argument_value(arguments, "--file")` — returns the value paired with a flag
   from that flat argument vector, normalizing access to values such as
   `Some("src/main.py")`.
@@ -900,7 +901,77 @@ readable after automated wrapping:
 - `missing_requirements_error() -> DispatchError` — builds the deterministic
   `DispatchError::InvalidArguments` with `act refactor requires ...`, every
   required flag (`--provider <plugin>`, `--refactoring <operation>`,
-  `--file <path>`), valid provider and refactoring values, and a next-command
-  example derived from the first supported provider/refactoring or the
-  `<plugin>` / `<operation>` placeholders. Called by the argument-builder when
-  one or more required flags are absent.
+  `--file <path>`, `--position <line:col>`), valid provider and refactoring
+  values, and a next-command example derived from the first supported
+  provider/refactoring or the `<plugin>` / `<operation>` placeholders. Called
+  by the argument-builder when one or more required flags are absent.
+
+## Act-refactor position parsing and byte-offset conversion
+
+The daemon-side `act refactor` implementation accepts user-facing source
+positions and converts them into the internal plugin contract shape before
+dispatch. The E2E daemon harness mirrors the command argument shape documented
+in the earlier
+`Request-routing helpers (weaver-e2e/tests/test_support/refactor_routing.rs)`
+section; the production conversion path lives in the daemon modules described
+below.
+
+### `positions` (`weaverd/src/dispatch/act/refactor/positions.rs`)
+
+`crates/weaverd/src/dispatch/act/refactor/positions.rs` owns parsing and
+conversion for human source positions.
+
+`parse_line_col(value: &str) -> Result<(u32, u32), DispatchError>` accepts
+`LINE:COL` values. Both components are one-indexed, and zero values are
+rejected before request construction continues.
+
+`line_col_to_byte_offset` has the signature
+`(content: &str, line: u32, column: u32) -> Result<usize, DispatchError>`. It
+converts a one-indexed line and Unicode character column into a UTF-8 byte
+offset. It iterates source text with `split_inclusive('\n')`, strips LF and
+CRLF endings via `trim_line_ending`, and walks `char_indices` so non-ASCII
+characters resolve to the correct byte boundary.
+
+The conversion accepts the column-past-end sentinel used by editor-style
+positions. A column equal to `visible_line.chars().count() + 1` maps to
+`visible_line.len()`, which is the byte offset immediately after the visible
+line content and before any line ending.
+
+### `arguments` (`weaverd/src/dispatch/act/refactor/arguments.rs`)
+
+`RefactorArgs` carries the optional `position: Option<String>` field alongside
+`provider`, `refactoring`, `file`, and trailing `KEY=VALUE` arguments. The
+internal `RefactorArgsBuilder` has the matching `position: Option<String>`
+field so parsing can validate the flag while preserving the original value for
+later conversion.
+
+The `--position` flag path runs through `parse_position_flag`. That helper
+consumes the flag value, delegates to `parse_line_col` for early validation,
+and then stores the validated string as-is on `RefactorArgs`. The byte-offset
+conversion happens later, after request building has loaded the target file
+content.
+
+### `request_building` (`weaverd/src/dispatch/act/refactor/request_building.rs`)
+
+`CapabilityMappingContext` carries the data needed to translate user-facing
+arguments into the plugin contract: `capability`, `file_path`, `file_content`,
+and `position`. `file_content` is deliberately part of the context because
+`LINE:COL` cannot be converted to a byte offset without the target source text.
+
+`apply_capability_argument_mapping` dispatches by `context.capability`.
+Currently only `CapabilityId::RenameSymbol` has a mapping; other capabilities
+leave plugin arguments unchanged.
+
+`apply_rename_symbol_mapping` applies the rename-specific argument rules in a
+fixed order:
+
+1. Reject the request when both `--position` and deprecated `offset=` are
+   present.
+2. Reject the request when `position` already exists in `plugin_args`, because
+   trailing `position=` is reserved for the internal plugin contract.
+3. When `--position` is present, parse `LINE:COL` and convert it to a byte
+   offset with `line_col_to_byte_offset`.
+4. When only the deprecated form is present, consume `offset=` from
+   `plugin_args` and forward it as the plugin-contract `position` value.
+5. Return an invalid-arguments error when neither `--position` nor `offset=`
+   is available.

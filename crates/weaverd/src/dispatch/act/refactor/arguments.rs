@@ -3,7 +3,10 @@
 //! This module keeps CLI-token parsing separate from routing and plugin
 //! execution so the handler can stay within the repository's file-size limit.
 
-use super::requirements::{missing_requirements_error, validate_provider, validate_refactoring};
+use super::{
+    positions::parse_line_col,
+    requirements::{missing_requirements_error, validate_provider, validate_refactoring},
+};
 use crate::dispatch::errors::DispatchError;
 
 /// Parsed `act refactor` arguments.
@@ -12,6 +15,7 @@ pub(crate) struct RefactorArgs {
     pub(crate) provider: String,
     pub(crate) refactoring: String,
     pub(crate) file: String,
+    pub(crate) position: Option<String>,
     pub(crate) extra: Vec<String>,
 }
 
@@ -21,6 +25,7 @@ struct RefactorArgsBuilder {
     provider: Option<String>,
     refactoring: Option<String>,
     file: Option<String>,
+    position: Option<String>,
     extra: Vec<String>,
 }
 
@@ -36,6 +41,10 @@ impl RefactorArgsBuilder {
         let Some(file) = self.file else {
             return Err(missing_requirements_error());
         };
+        let position = self.position;
+        if position.is_none() && !has_deprecated_offset_argument(&self.extra) {
+            return Err(missing_requirements_error());
+        }
         let invalid_extra_arguments: Vec<&str> = self
             .extra
             .iter()
@@ -51,7 +60,8 @@ impl RefactorArgsBuilder {
             return Err(DispatchError::invalid_arguments(format!(
                 "act refactor only accepts trailing KEY=VALUE arguments; invalid trailing \
                  arguments: {offending_tokens}. Use only --provider <plugin>, --refactoring \
-                 <operation>, --file <path>, and trailing KEY=VALUE arguments"
+                 <operation>, --file <path>, --position <line:col>, and trailing KEY=VALUE \
+                 arguments"
             )));
         }
 
@@ -62,6 +72,7 @@ impl RefactorArgsBuilder {
             provider,
             refactoring,
             file,
+            position,
             extra: self.extra,
         })
     }
@@ -92,7 +103,7 @@ fn apply_flag<'a>(
     builder: &mut RefactorArgsBuilder,
 ) -> Result<(), DispatchError> {
     match arg {
-        "--provider" | "--refactoring" | "--file" if !builder.extra.is_empty() => {
+        "--provider" | "--refactoring" | "--file" | "--position" if !builder.extra.is_empty() => {
             return Err(DispatchError::invalid_arguments(format!(
                 "act refactor only accepts trailing KEY=VALUE arguments after all flags; \
                  interleaved KEY=VALUE arguments cannot appear before flag '{arg}'"
@@ -101,9 +112,25 @@ fn apply_flag<'a>(
         "--provider" => builder.provider = Some(parse_flag_value(arg, iter)?),
         "--refactoring" => builder.refactoring = Some(parse_flag_value(arg, iter)?),
         "--file" => builder.file = Some(parse_flag_value(arg, iter)?),
+        "--position" => {
+            let position = parse_position_flag(arg, iter)?;
+            builder.position = Some(position);
+            if let Some(position) = builder.position.as_deref() {
+                tracing::debug!(position, "stored valid act refactor position flag");
+            }
+        }
         other => builder.extra.push(other.to_owned()),
     }
     Ok(())
+}
+
+fn parse_position_flag<'a>(
+    flag: &str,
+    iter: &mut impl Iterator<Item = &'a String>,
+) -> Result<String, DispatchError> {
+    let value = parse_flag_value(flag, iter)?;
+    parse_line_col(&value)?;
+    Ok(value)
 }
 
 fn parse_flag_value<'a>(
@@ -127,6 +154,12 @@ fn is_valid_extra_argument(argument: &str) -> bool {
         return false;
     };
     !key.is_empty()
+}
+
+fn has_deprecated_offset_argument(arguments: &[String]) -> bool {
+    arguments
+        .iter()
+        .any(|argument| argument.starts_with("offset="))
 }
 
 #[cfg(test)]
@@ -187,6 +220,8 @@ mod tests {
             String::from("rename"),
             String::from("--file"),
             String::from("src/main.py"),
+            String::from("--position"),
+            String::from("1:1"),
         ],
         vec!["does not support provider 'missing-provider'", "Providers: rope, rust-analyzer"],
     )]
@@ -198,6 +233,8 @@ mod tests {
             String::from("extract-method"),
             String::from("--file"),
             String::from("src/main.py"),
+            String::from("--position"),
+            String::from("1:1"),
         ],
         vec!["does not support refactoring 'extract-method'", "Refactorings: rename"],
     )]
@@ -209,6 +246,8 @@ mod tests {
             String::from("rename"),
             String::from("--file"),
             String::from("src/main.py"),
+            String::from("--position"),
+            String::from("1:1"),
             String::from("--bogus"),
         ],
         vec!["invalid trailing arguments: '--bogus'", "trailing KEY=VALUE arguments"],
@@ -221,6 +260,8 @@ mod tests {
             String::from("rename"),
             String::from("--file"),
             String::from("src/main.py"),
+            String::from("--position"),
+            String::from("1:1"),
             String::from("offset"),
             String::from("=woven"),
             String::from("new_name"),
@@ -239,6 +280,44 @@ mod tests {
         ],
         vec!["interleaved KEY=VALUE arguments", "before flag '--refactoring'"],
     )]
+    #[case::missing_position_value(
+        vec![
+            String::from("--provider"),
+            String::from("rope"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("src/main.py"),
+            String::from("--position"),
+        ],
+        vec!["--position requires a value"],
+    )]
+    #[case::invalid_position_format(
+        vec![
+            String::from("--provider"),
+            String::from("rope"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("src/main.py"),
+            String::from("--position"),
+            String::from("1"),
+        ],
+        vec!["position must be LINE:COL"],
+    )]
+    #[case::zero_position_column(
+        vec![
+            String::from("--provider"),
+            String::from("rope"),
+            String::from("--refactoring"),
+            String::from("rename"),
+            String::from("--file"),
+            String::from("src/main.py"),
+            String::from("--position"),
+            String::from("1:0"),
+        ],
+        vec!["column number must be >= 1"],
+    )]
     fn invalid_arguments_are_rejected(
         #[case] args: Vec<String>,
         #[case] expected_substrings: Vec<&str>,
@@ -255,12 +334,15 @@ mod tests {
             String::from("rename"),
             String::from("--file"),
             String::from("src/main.py"),
+            String::from("--position"),
+            String::from("1:5"),
         ];
 
         let parsed = parse_refactor_args(&args).expect("parse succeeds");
         assert_eq!(parsed.provider, "rope");
         assert_eq!(parsed.refactoring, "rename");
         assert_eq!(parsed.file, "src/main.py");
+        assert_eq!(parsed.position.as_deref(), Some("1:5"));
     }
 
     #[rstest]
@@ -283,6 +365,14 @@ mod tests {
         String::from("--refactoring"),
         String::from("rename"),
     ])]
+    #[case::missing_position(vec![
+        String::from("--provider"),
+        String::from("rope"),
+        String::from("--refactoring"),
+        String::from("rename"),
+        String::from("--file"),
+        String::from("src/main.py"),
+    ])]
     fn missing_required_flags_report_full_contract(#[case] args: Vec<String>) {
         let message =
             invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
@@ -291,6 +381,7 @@ mod tests {
             "--provider <plugin>",
             "--refactoring <operation>",
             "--file <path>",
+            "--position <line:col>",
         ] {
             assert!(
                 message.contains(required),

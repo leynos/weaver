@@ -24,13 +24,12 @@ fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
     let daemon = FakeDaemon::start(1, "renamed_symbol").expect("fake daemon should start");
     let endpoint = daemon.endpoint();
 
-    let provider_fragment = provider
-        .map(|p| format!("--provider {p} "))
-        .unwrap_or_default();
+    let effective_provider = provider.unwrap_or("rope");
+    let provider_fragment = format!("--provider {effective_provider} ");
     let command_string = format!(
         "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
-         {provider_fragment}--refactoring rename --file src/main.py new_name=renamed_symbol \
-         offset=4"
+         {provider_fragment}--refactoring rename --file src/main.py --position 1:5 \
+         new_name=renamed_symbol"
     );
 
     let mut args: Vec<String> = vec![
@@ -41,17 +40,16 @@ fn run_rename_refactor_snapshot(snapshot_name: &str, provider: Option<&str>) {
         "act".into(),
         "refactor".into(),
     ];
-    if let Some(p) = provider {
-        args.push("--provider".into());
-        args.push(p.into());
-    }
+    args.push("--provider".into());
+    args.push(effective_provider.into());
     args.extend([
         "--refactoring".into(),
         "rename".into(),
         "--file".into(),
         "src/main.py".into(),
+        "--position".into(),
+        "1:5".into(),
         "new_name=renamed_symbol".into(),
-        "offset=4".into(),
     ]);
 
     let mut command = Command::new(weaver_binary_path());
@@ -95,7 +93,8 @@ fn refactor_pipeline_with_observe_and_jq_snapshot() {
         "observe get-definition --symbol old_symbol ",
         "| jq -r '.[0].symbol' ",
         "| xargs -I{} \"$WEAVER_BIN\" --daemon-socket \"$WEAVER_ENDPOINT\" --output json ",
-        "act refactor --provider rope --refactoring rename --file src/main.py new_name={} offset=4"
+        "act refactor --provider rope --refactoring rename --file src/main.py --position 1:5 \
+         new_name={}"
     );
 
     let output = Command::new("bash")

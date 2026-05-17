@@ -12,8 +12,9 @@ const REQUIRED_FLAGS: &[&str] = &[
     "--provider <plugin>",
     "--refactoring <operation>",
     "--file <path>",
+    "--position <line:col>",
 ];
-const NEXT_COMMAND_SUFFIX: &str = "--file path/to/file.py offset=1 new_name=renamed_symbol";
+const NEXT_COMMAND_SUFFIX: &str = "--file path/to/file.py --position 1:1 new_name=renamed_symbol";
 
 struct SupportedRefactoring {
     user_facing: &'static str,
@@ -204,6 +205,7 @@ mod tests {
             "--provider <plugin>",
             "--refactoring <operation>",
             "--file <path>",
+            "--position <line:col>",
         ] {
             assert!(
                 message.contains(required),
