@@ -290,21 +290,26 @@ fn handler_rejects_missing_position(socket_dir: Result<TempDir, String>) -> Resu
 }
 
 #[rstest]
-fn handler_rejects_deprecated_offset_without_position(
+fn handler_accepts_deprecated_offset_without_position(
     socket_dir: Result<TempDir, String>,
 ) -> Result<(), String> {
     let socket_dir = socket_dir?;
-    let error = dispatch_inspecting_rename(RenameDispatch {
+    let (plugin_request, _, response_stream) = dispatch_inspecting_rename(RenameDispatch {
         file: "notes.py",
         provider: "rope",
         language: "python",
         position: None,
         extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
         socket_dir: &socket_dir,
-    })
-    .expect_err("rename request should require --position before mapping offset=");
+    })?;
 
-    assert!(error.contains("--position <line:col>"));
+    let args = plugin_request.arguments();
+    assert_eq!(
+        args.get("position").and_then(|value| value.as_str()),
+        Some("4")
+    );
+    assert!(!args.contains_key("offset"));
+    assert!(response_stream.contains("Warning: 'offset=' is deprecated"));
     Ok(())
 }
 
