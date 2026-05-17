@@ -1,188 +1,96 @@
 //! Unit tests for command dispatch and request handling.
 
 use std::{
-    io::{BufRead, BufReader, Write},
-    net::{SocketAddr, TcpListener, TcpStream},
-    sync::{Arc, Mutex},
-    thread::{self, JoinHandle},
+    io::Write,
+    net::{TcpListener, TcpStream},
+    thread,
 };
 
-use rstest::{fixture, rstest};
-use tempfile::TempDir;
-use weaver_cards::DEFAULT_CACHE_CAPACITY;
-use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
+use rstest::rstest;
 use weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES;
+
+#[path = "tests_helpers.rs"]
+mod tests_helpers;
+
+use tests_helpers::{HandlerTestHarness, harness};
 
 use super::{
     structured_event::{format_structured_event, serialize_structured_event},
     *,
 };
-use crate::{
-    backends::FusionBackends,
-    dispatch::{UNKNOWN_OPERATION_TYPE, parse_stderr_json_payload},
-    semantic_provider::SemanticBackendProvider,
-};
-
-#[fixture]
-fn backend_manager() -> BackendManager {
-    let temp_dir = match TempDir::new() {
-        Ok(temp_dir) => temp_dir,
-        Err(error) => panic!("temporary directory: {error}"),
-    };
-    let socket_path = temp_dir.path().join("socket.sock");
-    let config = Config {
-        daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().into_owned()),
-        ..Config::default()
-    };
-    let provider =
-        SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
-    let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
-    BackendManager::new(backends)
-}
-
-/// Test fixture providing a TCP server/client pair for dispatch handler testing.
-struct HandlerTestHarness {
-    client: TcpStream,
-    server_handle: JoinHandle<()>,
-    _temp_dir: TempDir,
-}
-
-impl HandlerTestHarness {
-    /// Sends request bytes and retrieves all response lines.
-    fn send_and_collect(&mut self, request: &[u8]) -> Vec<String> {
-        if let Err(error) = self.client.write_all(request) {
-            panic!("write request: {error}");
-        }
-        if let Err(error) = self.client.flush() {
-            panic!("flush: {error}");
-        }
-
-        let mut reader = BufReader::new(&mut self.client);
-        let mut lines = Vec::new();
-        let mut line = String::new();
-        while match reader.read_line(&mut line) {
-            Ok(bytes_read) => bytes_read,
-            Err(error) => panic!("read: {error}"),
-        } > 0
-        {
-            lines.push(line.clone());
-            line.clear();
-        }
-        lines
-    }
-
-    /// Waits for the server thread to complete.
-    fn join(self) {
-        if let Err(error) = self.server_handle.join() {
-            panic!("server join: {error:?}");
-        }
-    }
-}
-
-/// Creates a TCP listener and returns the listener and its address.
-fn create_listener() -> (TcpListener, SocketAddr) {
-    let listener = match TcpListener::bind(("127.0.0.1", 0)) {
-        Ok(listener) => listener,
-        Err(error) => panic!("bind: {error}"),
-    };
-    let addr = match listener.local_addr() {
-        Ok(addr) => addr,
-        Err(error) => panic!("addr: {error}"),
-    };
-    (listener, addr)
-}
-
-#[fixture]
-fn harness(backend_manager: BackendManager) -> HandlerTestHarness {
-    let temp_dir = match TempDir::new() {
-        Ok(temp_dir) => temp_dir,
-        Err(error) => panic!("temporary directory: {error}"),
-    };
-    let (listener, addr) = create_listener();
-    let workspace_root = temp_dir.path().join("weaverd-test-workspace");
-    let endpoint = temp_dir.path().join("weaverd-test/socket.sock");
-    let runtime_dir = temp_dir.path().to_path_buf();
-
-    let server_handle = thread::spawn(move || {
-        let (stream, _) = match listener.accept() {
-            Ok(stream) => stream,
-            Err(error) => panic!("accept: {error}"),
-        };
-        match DispatchConnectionHandler::new(
-            backend_manager,
-            workspace_root,
-            endpoint.to_string_lossy().into_owned(),
-            runtime_dir,
-        ) {
-            Ok(handler) => handler,
-            Err(error) => panic!("absolute workspace root: {error}"),
-        }
-        .handle(ConnectionStream::Tcp(stream));
-    });
-
-    let client = match TcpStream::connect(addr) {
-        Ok(client) => client,
-        Err(error) => panic!("connect: {error}"),
-    };
-    HandlerTestHarness {
-        client,
-        server_handle,
-        _temp_dir: temp_dir,
-    }
-}
+use crate::dispatch::{UNKNOWN_OPERATION_TYPE, parse_stderr_json_payload};
 
 #[rstest]
-fn handler_responds_to_get_definition_without_args(mut harness: HandlerTestHarness) {
+fn handler_responds_to_get_definition_without_args(
+    harness: Result<HandlerTestHarness, String>,
+) -> Result<(), String> {
+    let mut harness = harness?;
     let lines = harness.send_and_collect(
         b"{\"command\":{\"domain\":\"observe\",\"operation\":\"get-definition\"}}\n",
-    );
+    )?;
 
     // Should have error about missing arguments and exit message.
     assert!(lines.iter().any(|l| l.contains("invalid arguments")));
     assert!(lines.iter().any(|l| l.contains(r#""kind":"exit""#)));
 
-    harness.join();
+    harness.join()?;
+    Ok(())
 }
 
 #[rstest]
-fn handler_rejects_malformed_json(mut harness: HandlerTestHarness) {
-    let lines = harness.send_and_collect(b"not valid json\n");
+fn handler_rejects_malformed_json(
+    harness: Result<HandlerTestHarness, String>,
+) -> Result<(), String> {
+    let mut harness = harness?;
+    let lines = harness.send_and_collect(b"not valid json\n")?;
 
     // Should have error message.
     assert!(lines.iter().any(|l| l.contains("error:")));
     assert!(lines.iter().any(|l| l.contains(r#""status":1"#)));
 
-    harness.join();
+    harness.join()?;
+    Ok(())
 }
 
 #[rstest]
-fn handler_rejects_unknown_domain(mut harness: HandlerTestHarness) {
-    let lines =
-        harness.send_and_collect(b"{\"command\":{\"domain\":\"bogus\",\"operation\":\"test\"}}\n");
+fn handler_rejects_unknown_domain(
+    harness: Result<HandlerTestHarness, String>,
+) -> Result<(), String> {
+    let mut harness = harness?;
+    let lines = harness
+        .send_and_collect(b"{\"command\":{\"domain\":\"bogus\",\"operation\":\"test\"}}\n")?;
 
     assert!(lines.iter().any(|l| l.contains("unknown domain")));
     assert!(lines.iter().any(|l| l.contains(r#""status":1"#)));
 
-    harness.join();
+    harness.join()?;
+    Ok(())
 }
 
 #[rstest]
-fn handler_responds_to_not_implemented_operation(mut harness: HandlerTestHarness) {
+fn handler_responds_to_not_implemented_operation(
+    harness: Result<HandlerTestHarness, String>,
+) -> Result<(), String> {
+    let mut harness = harness?;
     let lines = harness.send_and_collect(
         b"{\"command\":{\"domain\":\"observe\",\"operation\":\"find-references\"}}\n",
-    );
+    )?;
 
     // find-references is not yet implemented.
     assert!(lines.iter().any(|l| l.contains("not yet implemented")));
     assert!(lines.iter().any(|l| l.contains(r#""kind":"exit""#)));
 
-    harness.join();
+    harness.join()?;
+    Ok(())
 }
 
 #[rstest]
-fn handler_emits_known_operations_for_unknown_operation(mut harness: HandlerTestHarness) {
+fn handler_emits_known_operations_for_unknown_operation(
+    harness: Result<HandlerTestHarness, String>,
+) -> Result<(), String> {
+    let mut harness = harness?;
     let lines = harness
-        .send_and_collect(b"{\"command\":{\"domain\":\"observe\",\"operation\":\"bogus\"}}\n");
+        .send_and_collect(b"{\"command\":{\"domain\":\"observe\",\"operation\":\"bogus\"}}\n")?;
 
     let payload = lines
         .iter()
@@ -207,7 +115,8 @@ fn handler_emits_known_operations_for_unknown_operation(mut harness: HandlerTest
     );
     assert!(lines.iter().any(|line| line.contains(r#""status":1"#)));
 
-    harness.join();
+    harness.join()?;
+    Ok(())
 }
 
 #[test]
