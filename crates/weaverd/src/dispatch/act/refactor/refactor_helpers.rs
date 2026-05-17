@@ -44,10 +44,14 @@ pub(crate) mod builders {
     /// a complete argument list for tests and callers that exercise the
     /// explicit-provider code path.
     ///
+    /// Uses deterministic fixture anchors: `1:1` for Python and fallback files,
+    /// and `2:9` for Rust where the test symbol starts on the second line.
+    ///
     /// # Parameters
     /// - `file`: workspace-relative path to the file under rename.
     /// - `provider`: the provider name to pass as `--provider` (e.g. `"rope"`, `"rust-analyzer"`).
     pub(crate) fn standard_rename_args_for_provider(file: &str, provider: &str) -> Vec<String> {
+        let position = if file.ends_with(".rs") { "2:9" } else { "1:1" };
         vec![
             String::from("--provider"),
             String::from(provider),
@@ -56,7 +60,7 @@ pub(crate) mod builders {
             String::from("--file"),
             String::from(file),
             String::from("--position"),
-            String::from("1:1"),
+            String::from(position),
             String::from("new_name=woven"),
         ]
     }

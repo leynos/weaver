@@ -285,28 +285,26 @@ fn handler_rejects_missing_position(socket_dir: Result<TempDir, String>) -> Resu
     })
     .expect_err("rename request should require --position");
 
-    assert!(error.contains("requires --position LINE:COL"));
+    assert!(error.contains("--position <line:col>"));
     Ok(())
 }
 
 #[rstest]
-fn handler_accepts_deprecated_offset(socket_dir: Result<TempDir, String>) -> Result<(), String> {
+fn handler_rejects_deprecated_offset_without_position(
+    socket_dir: Result<TempDir, String>,
+) -> Result<(), String> {
     let socket_dir = socket_dir?;
-    let (plugin_request, _file_path, response_stream) =
-        dispatch_inspecting_rename(RenameDispatch {
-            file: "notes.py",
-            provider: "rope",
-            language: "python",
-            position: None,
-            extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
-            socket_dir: &socket_dir,
-        })?;
-    let args = plugin_request.arguments();
-    assert_eq!(
-        args.get("position").and_then(|value| value.as_str()),
-        Some("4")
-    );
-    assert!(response_stream.contains("Warning: 'offset=' is deprecated"));
+    let error = dispatch_inspecting_rename(RenameDispatch {
+        file: "notes.py",
+        provider: "rope",
+        language: "python",
+        position: None,
+        extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
+        socket_dir: &socket_dir,
+    })
+    .expect_err("rename request should require --position before mapping offset=");
+
+    assert!(error.contains("--position <line:col>"));
     Ok(())
 }
 

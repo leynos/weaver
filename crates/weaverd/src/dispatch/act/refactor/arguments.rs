@@ -41,6 +41,9 @@ impl RefactorArgsBuilder {
         let Some(file) = self.file else {
             return Err(missing_requirements_error());
         };
+        let Some(position) = self.position else {
+            return Err(missing_requirements_error());
+        };
         let invalid_extra_arguments: Vec<&str> = self
             .extra
             .iter()
@@ -56,7 +59,8 @@ impl RefactorArgsBuilder {
             return Err(DispatchError::invalid_arguments(format!(
                 "act refactor only accepts trailing KEY=VALUE arguments; invalid trailing \
                  arguments: {offending_tokens}. Use only --provider <plugin>, --refactoring \
-                 <operation>, --file <path>, and trailing KEY=VALUE arguments"
+                 <operation>, --file <path>, --position <line:col>, and trailing KEY=VALUE \
+                 arguments"
             )));
         }
 
@@ -67,7 +71,7 @@ impl RefactorArgsBuilder {
             provider,
             refactoring,
             file,
-            position: self.position,
+            position: Some(position),
             extra: self.extra,
         })
     }
@@ -209,6 +213,8 @@ mod tests {
             String::from("rename"),
             String::from("--file"),
             String::from("src/main.py"),
+            String::from("--position"),
+            String::from("1:1"),
         ],
         vec!["does not support provider 'missing-provider'", "Providers: rope, rust-analyzer"],
     )]
@@ -220,6 +226,8 @@ mod tests {
             String::from("extract-method"),
             String::from("--file"),
             String::from("src/main.py"),
+            String::from("--position"),
+            String::from("1:1"),
         ],
         vec!["does not support refactoring 'extract-method'", "Refactorings: rename"],
     )]
@@ -231,6 +239,8 @@ mod tests {
             String::from("rename"),
             String::from("--file"),
             String::from("src/main.py"),
+            String::from("--position"),
+            String::from("1:1"),
             String::from("--bogus"),
         ],
         vec!["invalid trailing arguments: '--bogus'", "trailing KEY=VALUE arguments"],
@@ -243,6 +253,8 @@ mod tests {
             String::from("rename"),
             String::from("--file"),
             String::from("src/main.py"),
+            String::from("--position"),
+            String::from("1:1"),
             String::from("offset"),
             String::from("=woven"),
             String::from("new_name"),
@@ -346,6 +358,14 @@ mod tests {
         String::from("--refactoring"),
         String::from("rename"),
     ])]
+    #[case::missing_position(vec![
+        String::from("--provider"),
+        String::from("rope"),
+        String::from("--refactoring"),
+        String::from("rename"),
+        String::from("--file"),
+        String::from("src/main.py"),
+    ])]
     fn missing_required_flags_report_full_contract(#[case] args: Vec<String>) {
         let message =
             invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
@@ -354,6 +374,7 @@ mod tests {
             "--provider <plugin>",
             "--refactoring <operation>",
             "--file <path>",
+            "--position <line:col>",
         ] {
             assert!(
                 message.contains(required),
