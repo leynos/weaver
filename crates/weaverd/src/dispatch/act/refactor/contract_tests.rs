@@ -8,20 +8,12 @@ use url::Url;
 use weaver_plugins::{CapabilityId, PluginError, PluginOutput, PluginRequest, PluginResponse};
 use weaver_test_macros::allow_fixture_expansion_lints;
 
-#[expect(
-    clippy::duplicate_mod,
-    reason = "Shared test helpers loaded by multiple test modules"
-)]
-#[path = "refactor_helpers.rs"]
-mod refactor_helpers;
-
-use refactor_helpers::builders::{build_backends, command_request};
-
 use crate::dispatch::act::refactor::{
     RefactorContext,
     RefactorPluginRuntime,
     ResponseWriter,
     handle,
+    refactor_helpers::builders::{build_backends, command_request},
     resolution::{
         CandidateEvaluation,
         CapabilityResolutionDetails,

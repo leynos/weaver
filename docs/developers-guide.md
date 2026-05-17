@@ -806,6 +806,32 @@ let payload = automatic_resolution_payload(std::path::Path::new(file));
 re-exported at the top-level so sibling test modules can import a compact test
 API instead of reaching into several implementation details.
 
+#### Sharing strategy and lint compliance
+
+The original sharing strategy had each test file use
+`#[path = "refactor_helpers.rs"]` to re-include the helper source. That made
+Rust compile the same file as a separate anonymous module in each test binary
+context. Helpers used by another test file, but not by the current one, then
+looked unused to the compiler and produced dead-code warnings.
+
+That shape required either a blanket `#![allow(dead_code)]` or per-item
+`#[expect(dead_code)]` witnesses to keep the build green. Both approaches are
+forbidden by the project lint policy: lint suppressions must not hide stale
+helper boundaries, and this helper module should not need any suppression
+attributes.
+
+The current approach declares `refactor_helpers` as a proper `#[cfg(test)]`
+module in the parent `mod.rs` / `lib.rs` module tree. It is compiled once, and
+sibling test files import it through
+`use crate::dispatch::act::refactor::refactor_helpers::...`. Because every test
+sees the same named module, cross-test helper usage is visible in one compiled
+module and the dead-code false positives disappear without suppression
+attributes.
+
+Future shared test-helper modules must follow the same rule: add the helper as
+a named `#[cfg(test)] mod` in the parent module, and never re-include it with
+`#[path]`.
+
 The inline modules are:
 
 - `builders` — request and backend constructors such as `command_request(...)`,
