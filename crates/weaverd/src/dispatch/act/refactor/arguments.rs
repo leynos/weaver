@@ -107,7 +107,13 @@ fn apply_flag<'a>(
         "--provider" => builder.provider = Some(parse_flag_value(arg, iter)?),
         "--refactoring" => builder.refactoring = Some(parse_flag_value(arg, iter)?),
         "--file" => builder.file = Some(parse_flag_value(arg, iter)?),
-        "--position" => builder.position = Some(parse_position_flag(arg, iter)?),
+        "--position" => {
+            let position = parse_position_flag(arg, iter)?;
+            builder.position = Some(position);
+            if let Some(position) = builder.position.as_deref() {
+                tracing::debug!(position, "stored valid act refactor position flag");
+            }
+        }
         other => builder.extra.push(other.to_owned()),
     }
     Ok(())

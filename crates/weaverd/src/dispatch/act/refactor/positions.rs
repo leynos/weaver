@@ -3,10 +3,24 @@
 //! The CLI accepts human-facing `LINE:COL` positions, while current rename
 //! actuators still consume UTF-8 byte offsets inside the shared plugin request.
 
+use std::{
+    path::Path,
+    sync::atomic::{AtomicU64, Ordering},
+};
+
 use crate::dispatch::errors::DispatchError;
+
+static POSITION_PARSE_ERROR_COUNT: AtomicU64 = AtomicU64::new(0);
+static POSITION_CONVERSION_ERROR_COUNT: AtomicU64 = AtomicU64::new(0);
 
 /// Parses a one-indexed `LINE:COL` value.
 pub(super) fn parse_line_col(value: &str) -> Result<(u32, u32), DispatchError> {
+    parse_line_col_inner(value).inspect_err(|error| {
+        increment_position_parse_error(value, error);
+    })
+}
+
+fn parse_line_col_inner(value: &str) -> Result<(u32, u32), DispatchError> {
     let (line_str, column_str) = value.split_once(':').ok_or_else(|| {
         DispatchError::invalid_arguments(format!("position must be LINE:COL, got: {value}"))
     })?;
@@ -31,24 +45,28 @@ pub(super) fn parse_line_col(value: &str) -> Result<(u32, u32), DispatchError> {
 }
 
 /// Converts a one-indexed line and Unicode-character column into a byte offset.
+#[tracing::instrument(level = "debug", skip(content), fields(content_len = content.len()))]
 pub(super) fn line_col_to_byte_offset(
     content: &str,
     line: u32,
     column: u32,
+    file_path: Option<&Path>,
 ) -> Result<usize, DispatchError> {
     let Some((line_start, target_line)) = line_entry(content, line) else {
-        return Err(position_out_of_range(line, column));
+        return Err(conversion_out_of_range(line, column, file_path));
     };
     let visible_line = trim_line_ending(target_line);
     if column as usize > visible_line.chars().count().saturating_add(1) {
-        return Err(position_out_of_range(line, column));
+        return Err(conversion_out_of_range(line, column, file_path));
     }
 
     let column_offset = visible_line
         .char_indices()
         .nth((column - 1) as usize)
         .map_or(visible_line.len(), |(offset, _)| offset);
-    Ok(line_start.saturating_add(column_offset))
+    let offset = line_start.saturating_add(column_offset);
+    tracing::debug!("resolved position {line}:{column} to byte offset {offset}");
+    Ok(offset)
 }
 
 fn line_entry(source: &str, target_line: u32) -> Option<(usize, &str)> {
@@ -69,10 +87,58 @@ fn trim_line_ending(line: &str) -> &str {
         .unwrap_or(without_newline)
 }
 
-fn position_out_of_range(line: u32, column: u32) -> DispatchError {
+fn conversion_out_of_range(line: u32, column: u32, file_path: Option<&Path>) -> DispatchError {
+    let error = position_out_of_range(line, column, file_path);
+    increment_position_conversion_error(&error);
+    let file_path = display_file_path(file_path);
+    tracing::warn!(
+        line,
+        column,
+        file_path = %file_path,
+        error = %error,
+        "position is out of range for the target file"
+    );
+    error
+}
+
+fn position_out_of_range(line: u32, column: u32, file_path: Option<&Path>) -> DispatchError {
+    let file_context = file_path
+        .map(|path| format!(" '{}'", path.display()))
+        .unwrap_or_default();
     DispatchError::invalid_arguments(format!(
-        "position {line}:{column} is out of range for the target file"
+        "position {line}:{column} is out of range for the target file{file_context}"
     ))
+}
+
+fn increment_position_parse_error(value: &str, error: &DispatchError) {
+    let count = POSITION_PARSE_ERROR_COUNT
+        .fetch_add(1, Ordering::Relaxed)
+        .saturating_add(1);
+    tracing::debug!(
+        counter = "position_parse_error",
+        count,
+        position = value,
+        error = %error,
+        "incremented position parse error counter"
+    );
+}
+
+fn increment_position_conversion_error(error: &DispatchError) {
+    let count = POSITION_CONVERSION_ERROR_COUNT
+        .fetch_add(1, Ordering::Relaxed)
+        .saturating_add(1);
+    tracing::debug!(
+        counter = "position_conversion_error",
+        count,
+        error = %error,
+        "incremented position conversion error counter"
+    );
+}
+
+fn display_file_path(file_path: Option<&Path>) -> String {
+    file_path
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|| String::from("<unknown>"))
 }
 
 #[cfg(test)]
@@ -127,7 +193,7 @@ mod tests {
         #[case] expected: usize,
     ) {
         assert_eq!(
-            line_col_to_byte_offset(content, line, column).expect("position converts"),
+            line_col_to_byte_offset(content, line, column, None).expect("position converts"),
             expected
         );
     }
@@ -142,7 +208,7 @@ mod tests {
         #[case] column: u32,
     ) {
         let message = invalid_arguments_message(
-            line_col_to_byte_offset(content, line, column).expect_err("position should fail"),
+            line_col_to_byte_offset(content, line, column, None).expect_err("position should fail"),
         );
 
         assert!(message.contains("out of range"), "{message}");
@@ -206,7 +272,7 @@ mod tests {
                 let line = (actual_line_index + 1) as u32;
                 let column = (column_index % column_count + 1) as u32;
 
-                let offset = line_col_to_byte_offset(&content, line, column)
+                let offset = line_col_to_byte_offset(&content, line, column, None)
                     .expect("generated position is valid");
 
                 prop_assert!(content.is_char_boundary(offset));
@@ -220,7 +286,7 @@ mod tests {
                 let mut previous = 0usize;
 
                 for column in 1..=(line.len() + 1) {
-                    let offset = line_col_to_byte_offset(&content, 1, column as u32)
+                    let offset = line_col_to_byte_offset(&content, 1, column as u32, None)
                         .expect("column is valid for generated line");
                     prop_assert!(offset >= previous);
                     previous = offset;
@@ -236,7 +302,7 @@ mod tests {
                 let line_count = content.split_inclusive('\n').count() as u32;
                 let line = line_count.saturating_add(extra_line);
 
-                prop_assert!(line_col_to_byte_offset(&content, line, column).is_err());
+                prop_assert!(line_col_to_byte_offset(&content, line, column, None).is_err());
             }
 
             #[test]
@@ -252,9 +318,9 @@ mod tests {
                 let lf_content = format!("{}\n", lines.join("\n"));
                 let crlf_content = format!("{}\r\n", lines.join("\r\n"));
 
-                let lf_offset = line_col_to_byte_offset(&lf_content, line, column)
+                let lf_offset = line_col_to_byte_offset(&lf_content, line, column, None)
                     .expect("LF position is valid");
-                let crlf_offset = line_col_to_byte_offset(&crlf_content, line, column)
+                let crlf_offset = line_col_to_byte_offset(&crlf_content, line, column, None)
                     .expect("CRLF position is valid");
 
                 prop_assert_eq!(
@@ -269,7 +335,7 @@ mod tests {
                 line in any::<u32>(),
                 column in any::<u32>(),
             ) {
-                let _ = line_col_to_byte_offset(&content, line, column);
+                let _ = line_col_to_byte_offset(&content, line, column, None);
             }
 
             #[test]
