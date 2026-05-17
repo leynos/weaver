@@ -147,4 +147,141 @@ mod tests {
 
         assert!(message.contains("out of range"), "{message}");
     }
+
+    mod property_tests {
+        //! Property tests for source position parsing and conversion.
+
+        use proptest::{collection::vec, prelude::*};
+
+        use super::{line_col_to_byte_offset, parse_line_col};
+
+        fn ascii_line_strategy() -> impl Strategy<Value = String> {
+            vec(0x20u8..=0x7eu8, 0..=128)
+                .prop_map(|bytes| bytes.into_iter().map(char::from).collect())
+        }
+
+        fn ascii_lines_strategy() -> impl Strategy<Value = Vec<String>> {
+            vec(ascii_line_strategy(), 1..=16)
+        }
+
+        fn newline_terminated_content_strategy() -> impl Strategy<Value = String> {
+            ascii_lines_strategy().prop_map(|lines| {
+                let mut content = lines.join("\n");
+                content.push('\n');
+                content
+            })
+        }
+
+        fn unicode_line_strategy() -> impl Strategy<Value = String> {
+            vec(any::<char>(), 0..=128).prop_map(|chars| chars.into_iter().collect())
+        }
+
+        fn unicode_content_strategy() -> impl Strategy<Value = String> {
+            vec(unicode_line_strategy(), 1..=8).prop_map(|lines| {
+                let mut content = lines.join("\n");
+                content.push('\n');
+                content
+            })
+        }
+
+        fn line_start(content: &str, line: u32) -> usize {
+            content
+                .split_inclusive('\n')
+                .take(line.saturating_sub(1) as usize)
+                .map(str::len)
+                .sum()
+        }
+
+        proptest! {
+            #[test]
+            fn line_col_to_byte_offset_returns_char_boundary_for_valid_ascii_positions(
+                content in newline_terminated_content_strategy(),
+                line_index in 0usize..16,
+                column_index in 0usize..129,
+            ) {
+                let lines: Vec<&str> = content.split_inclusive('\n').collect();
+                let actual_line_index = line_index % lines.len();
+                let visible_line = lines[actual_line_index].trim_end_matches('\n');
+                let column_count = visible_line.chars().count() + 1;
+                let line = (actual_line_index + 1) as u32;
+                let column = (column_index % column_count + 1) as u32;
+
+                let offset = line_col_to_byte_offset(&content, line, column)
+                    .expect("generated position is valid");
+
+                prop_assert!(content.is_char_boundary(offset));
+            }
+
+            #[test]
+            fn line_col_to_byte_offset_is_monotonic_across_ascii_columns(
+                line in ascii_line_strategy(),
+            ) {
+                let content = format!("{line}\n");
+                let mut previous = 0usize;
+
+                for column in 1..=(line.len() + 1) {
+                    let offset = line_col_to_byte_offset(&content, 1, column as u32)
+                        .expect("column is valid for generated line");
+                    prop_assert!(offset >= previous);
+                    previous = offset;
+                }
+            }
+
+            #[test]
+            fn line_col_to_byte_offset_rejects_lines_past_terminated_content(
+                content in newline_terminated_content_strategy(),
+                extra_line in 1u32..=1024,
+                column in 1u32..=1024,
+            ) {
+                let line_count = content.split_inclusive('\n').count() as u32;
+                let line = line_count.saturating_add(extra_line);
+
+                prop_assert!(line_col_to_byte_offset(&content, line, column).is_err());
+            }
+
+            #[test]
+            fn line_col_to_byte_offset_has_crlf_lf_parity_relative_to_line_start(
+                lines in ascii_lines_strategy(),
+                line_index in 0usize..16,
+                column_index in 0usize..129,
+            ) {
+                let actual_line_index = line_index % lines.len();
+                let line = (actual_line_index + 1) as u32;
+                let visible_line = &lines[actual_line_index];
+                let column = (column_index % (visible_line.len() + 1) + 1) as u32;
+                let lf_content = format!("{}\n", lines.join("\n"));
+                let crlf_content = format!("{}\r\n", lines.join("\r\n"));
+
+                let lf_offset = line_col_to_byte_offset(&lf_content, line, column)
+                    .expect("LF position is valid");
+                let crlf_offset = line_col_to_byte_offset(&crlf_content, line, column)
+                    .expect("CRLF position is valid");
+
+                prop_assert_eq!(
+                    lf_offset - line_start(&lf_content, line),
+                    crlf_offset - line_start(&crlf_content, line),
+                );
+            }
+
+            #[test]
+            fn line_col_to_byte_offset_never_panics_for_unicode_content(
+                content in unicode_content_strategy(),
+                line in any::<u32>(),
+                column in any::<u32>(),
+            ) {
+                let _ = line_col_to_byte_offset(&content, line, column);
+            }
+
+            #[test]
+            fn parse_line_col_round_trips_positive_values(
+                line in 1u32..=9999,
+                column in 1u32..=9999,
+            ) {
+                let value = format!("{line}:{column}");
+
+                let parsed = parse_line_col(&value).expect("generated position parses");
+                prop_assert_eq!(parsed, (line, column));
+            }
+        }
+    }
 }
