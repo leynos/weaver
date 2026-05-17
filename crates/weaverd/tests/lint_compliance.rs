@@ -14,7 +14,10 @@ fn contains_forbidden_pattern(source: &str, pattern: &str) -> bool {
 }
 
 fn normalize_whitespace(value: &str) -> String {
-    value.split_whitespace().collect::<Vec<_>>().join(" ")
+    value
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .collect()
 }
 
 #[test]
