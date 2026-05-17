@@ -24,6 +24,10 @@ pub(crate) mod builders {
         semantic_provider::SemanticBackendProvider,
     };
 
+    /// Constructs a minimal `act refactor` command request.
+    ///
+    /// Sets `domain` to `"act"` and `operation` to `"refactor"`, forwarding
+    /// `arguments` verbatim.
     pub(crate) fn command_request(arguments: Vec<String>) -> CommandRequest {
         CommandRequest {
             command: CommandDescriptor {
@@ -35,6 +39,9 @@ pub(crate) mod builders {
         }
     }
 
+    /// Builds test-ready fusion backends rooted at `socket_path`.
+    ///
+    /// Uses a default `Config` and a default-capacity `SemanticBackendProvider`.
     pub(crate) fn build_backends(socket_path: &Path) -> FusionBackends<SemanticBackendProvider> {
         let config = Config {
             daemon_socket: SocketEndpoint::unix(socket_path.to_string_lossy().as_ref()),
@@ -67,6 +74,7 @@ pub(crate) mod builders {
         ]
     }
 
+    /// Replaces `request` in-place with an `act refactor` request for `args`.
     pub(crate) fn configure_request(request: &mut CommandRequest, args: Vec<String>) {
         *request = command_request(args);
     }
@@ -87,6 +95,7 @@ pub(crate) mod resolutions {
         SelectionMode,
     };
 
+    /// Configuration bundle for building a refused provider resolution.
     pub(crate) struct RefusedResolution<'a> {
         pub(crate) capability: CapabilityId,
         pub(crate) language: Option<&'a str>,
@@ -96,6 +105,7 @@ pub(crate) mod resolutions {
         pub(crate) candidates: Vec<CandidateEvaluation>,
     }
 
+    /// Configuration bundle for building a selected provider resolution.
     pub(crate) struct SelectedResolution<'a> {
         pub(crate) capability: CapabilityId,
         pub(crate) language: &'a str,
@@ -104,6 +114,7 @@ pub(crate) mod resolutions {
         pub(crate) requested_provider: Option<&'a str>,
     }
 
+    /// Builds a selected capability resolution envelope from `config`.
     pub(crate) fn selected_resolution(
         config: SelectedResolution<'_>,
     ) -> CapabilityResolutionEnvelope {
@@ -123,6 +134,7 @@ pub(crate) mod resolutions {
         })
     }
 
+    /// Builds a refused capability resolution envelope from `config`.
     pub(crate) fn refused_resolution(
         config: RefusedResolution<'_>,
     ) -> CapabilityResolutionEnvelope {
@@ -138,6 +150,7 @@ pub(crate) mod resolutions {
         })
     }
 
+    /// Constructs a rejected provider candidate evaluation.
     pub(crate) fn rejected_candidate(
         provider: &str,
         reason: CandidateReason,
@@ -149,12 +162,17 @@ pub(crate) mod resolutions {
         }
     }
 
+    /// Context shared by selected and refused automatic language resolution paths.
     pub(crate) struct AutoResolutionContext<'a> {
         pub(crate) capability: CapabilityId,
         pub(crate) requested_provider: Option<&'a str>,
         pub(crate) selection_mode: SelectionMode,
     }
 
+    /// Resolves an automatic language selection.
+    ///
+    /// Returns a selected resolution when `language_name` is present, otherwise
+    /// returns an unsupported-language refusal.
     pub(crate) fn resolve_auto_language(
         context: AutoResolutionContext<'_>,
         language_name: Option<&'static str>,
@@ -193,11 +211,13 @@ pub(crate) mod rollback {
         resolution::{CapabilityResolutionEnvelope, ResolutionRequest},
     };
 
+    /// Test double that returns fixed refactor resolution and execution outcomes.
     pub(crate) struct RollbackRuntime {
         pub(crate) resolution: CapabilityResolutionEnvelope,
         pub(crate) execute_result: ExecuteResult,
     }
 
+    /// Execution outcome returned by `RollbackRuntime`.
     pub(crate) enum ExecuteResult {
         Success(PluginResponse),
         MissingPlugin(&'static str),
@@ -225,6 +245,7 @@ pub(crate) mod rollback {
         }
     }
 
+    /// Creates a rollback runtime with a selected resolution from `config`.
     pub(crate) fn selected_runtime(
         config: SelectedResolution<'_>,
         execute_result: ExecuteResult,
@@ -235,6 +256,7 @@ pub(crate) mod rollback {
         }
     }
 
+    /// Creates a rollback runtime from an existing resolution envelope.
     pub(crate) fn rollback_runtime(
         resolution: CapabilityResolutionEnvelope,
         execute_result: ExecuteResult,
@@ -257,12 +279,14 @@ pub(crate) mod content {
         format!("{git_header}\n<<<<<<< SEARCH\n{original}=======\n{updated}>>>>>>> REPLACE\n",)
     }
 
+    /// File type classification used to choose deterministic refactor fixtures.
     pub(crate) enum FileKind {
         Python,
         Rust,
         Other,
     }
 
+    /// Classifies `path` by extension into a deterministic fixture kind.
     pub(crate) fn classify_file(path: &Path) -> FileKind {
         match path.extension().and_then(|ext| ext.to_str()) {
             Some("py") => FileKind::Python,
@@ -303,14 +327,20 @@ pub(crate) mod content {
         }
     }
 
+    /// Returns the deterministic pre-rename fixture content for `path`.
     pub(crate) fn original_content_for(path: &Path) -> &'static str {
         content_table(classify_file(path)).original
     }
 
+    /// Returns the deterministic post-rename fixture content for `path`.
     pub(crate) fn updated_content_for(path: &Path) -> &'static str {
         content_table(classify_file(path)).updated
     }
 
+    /// Returns the path targeted by routed refactor patch output.
+    ///
+    /// Python and Rust inputs are routed to `notes.txt`; all other inputs keep
+    /// their original path.
     pub(crate) fn routed_patch_path(path: &Path) -> &Path {
         match classify_file(path) {
             FileKind::Python | FileKind::Rust => Path::new("notes.txt"),
@@ -323,10 +353,14 @@ pub(crate) mod content {
         format_diff(path, &make_header(&patch_path.to_string_lossy()))
     }
 
+    /// Builds a well-formed routed diff for `path`.
     pub(crate) fn routed_diff_for(path: &Path) -> String {
         routed_format_diff(path, |p| format!("diff --git a/{p} b/{p}"))
     }
 
+    /// Builds a malformed routed diff for error-path tests.
+    ///
+    /// The malformed header intentionally omits the `b/` segment.
     pub(crate) fn routed_malformed_diff_for(path: &Path) -> String {
         routed_format_diff(path, |p| format!("diff --git a/{p}"))
     }

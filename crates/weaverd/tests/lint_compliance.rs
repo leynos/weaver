@@ -9,10 +9,12 @@
 
 const HELPER_SRC: &str = include_str!("../src/dispatch/act/refactor/refactor_helpers.rs");
 
+/// Returns whether `source` contains `pattern` after stripping whitespace.
 fn contains_forbidden_pattern(source: &str, pattern: &str) -> bool {
     normalize_whitespace(source).contains(&normalize_whitespace(pattern))
 }
 
+/// Strips all Unicode whitespace characters from `value`.
 fn normalize_whitespace(value: &str) -> String {
     value
         .chars()
