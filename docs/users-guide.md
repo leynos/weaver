@@ -1100,7 +1100,13 @@ For the built-in actuators, `rename` requires `--position <LINE:COL>` and
 `new_name=<IDENTIFIER>`. `weaverd` requires all four top-level flags in one
 request and rejects incomplete invocations before plugin resolution, file I/O,
 or backend startup. The legacy `offset=<BYTE_OFFSET>` form is accepted only as
-a deprecated compatibility path and will be removed in a future release.
+a deprecated compatibility path and will be removed in a future release. When
+`offset=` is supplied without `--position`, `weaverd` writes the following
+warning to stderr before processing the request:
+
+```text
+Warning: 'offset=' is deprecated; use '--position LINE:COL' instead.
+```
 
 ### Parameter semantics and valid values
 
