@@ -4,6 +4,7 @@
 //! execution so the handler can stay within the repository's file-size limit.
 
 use super::{
+    metrics::PositionMetrics,
     positions::{LineCol, parse_line_col},
     requirements::{missing_requirements_error, validate_provider, validate_refactoring},
 };
@@ -89,12 +90,15 @@ impl RefactorArgsBuilder {
 ///
 /// Returns [`DispatchError::InvalidArguments`] when a required flag is missing
 /// or a flag that expects a following value does not receive one.
-pub(crate) fn parse_refactor_args(arguments: &[String]) -> Result<RefactorArgs, DispatchError> {
+pub(crate) fn parse_refactor_args(
+    arguments: &[String],
+    metrics: &dyn PositionMetrics,
+) -> Result<RefactorArgs, DispatchError> {
     let mut builder = RefactorArgsBuilder::default();
     let mut iter = arguments.iter();
 
     while let Some(arg) = iter.next() {
-        apply_flag(arg, &mut iter, &mut builder)?;
+        apply_flag(arg, &mut iter, &mut builder, metrics)?;
     }
 
     builder.build()
@@ -106,6 +110,7 @@ fn apply_flag<'a>(
     arg: &str,
     iter: &mut impl Iterator<Item = &'a String>,
     builder: &mut RefactorArgsBuilder,
+    metrics: &dyn PositionMetrics,
 ) -> Result<(), DispatchError> {
     match arg {
         "--provider" | "--refactoring" | "--file" | "--position" if !builder.extra.is_empty() => {
@@ -118,7 +123,7 @@ fn apply_flag<'a>(
         "--refactoring" => builder.refactoring = Some(parse_flag_value(arg, iter)?),
         "--file" => builder.file = Some(parse_flag_value(arg, iter)?),
         "--position" => {
-            let position = parse_position_flag(arg, iter)?;
+            let position = parse_position_flag(arg, iter, metrics)?;
             builder.position = Some(position);
         }
         other => builder.extra.push(other.to_owned()),
@@ -129,9 +134,12 @@ fn apply_flag<'a>(
 fn parse_position_flag<'a>(
     flag: &str,
     iter: &mut impl Iterator<Item = &'a String>,
+    metrics: &dyn PositionMetrics,
 ) -> Result<LineCol, DispatchError> {
     let value = parse_flag_value(flag, iter)?;
-    let position = parse_line_col(&value)?;
+    let position = parse_line_col(&value).inspect_err(|_error| {
+        metrics.increment_parse_error();
+    })?;
     tracing::debug!(position = value, "stored valid act refactor position flag");
     Ok(position)
 }
@@ -172,7 +180,7 @@ mod tests {
     use rstest::rstest;
 
     use super::{LineCol, parse_refactor_args};
-    use crate::dispatch::errors::DispatchError;
+    use crate::dispatch::{act::refactor::metrics::NullPositionMetrics, errors::DispatchError};
 
     fn invalid_arguments_message(error: DispatchError) -> String {
         match error {
@@ -181,10 +189,14 @@ mod tests {
         }
     }
 
+    fn args(tokens: &[&str]) -> Vec<String> { tokens.iter().copied().map(String::from).collect() }
+
     #[track_caller]
     fn assert_invalid_args_contains(args: Vec<String>, expected_substrings: &[&str]) {
-        let message =
-            invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
+        let metrics = NullPositionMetrics;
+        let message = invalid_arguments_message(
+            parse_refactor_args(&args, &metrics).expect_err("parse should fail"),
+        );
         for expected in expected_substrings {
             assert!(
                 message.contains(expected),
@@ -330,18 +342,19 @@ mod tests {
 
     #[test]
     fn parses_complete_argument_set() {
-        let args = vec![
-            String::from("--provider"),
-            String::from("rope"),
-            String::from("--refactoring"),
-            String::from("rename"),
-            String::from("--file"),
-            String::from("src/main.py"),
-            String::from("--position"),
-            String::from("1:5"),
-        ];
+        let args = args(&[
+            "--provider",
+            "rope",
+            "--refactoring",
+            "rename",
+            "--file",
+            "src/main.py",
+            "--position",
+            "1:5",
+        ]);
 
-        let parsed = parse_refactor_args(&args).expect("parse succeeds");
+        let metrics = NullPositionMetrics;
+        let parsed = parse_refactor_args(&args, &metrics).expect("parse succeeds");
         assert_eq!(parsed.provider, "rope");
         assert_eq!(parsed.refactoring, "rename");
         assert_eq!(parsed.file, "src/main.py");
@@ -350,35 +363,22 @@ mod tests {
 
     #[rstest]
     #[case::no_arguments(Vec::new())]
-    #[case::missing_provider(vec![
-        String::from("--refactoring"),
-        String::from("rename"),
-        String::from("--file"),
-        String::from("src/main.py"),
-    ])]
-    #[case::missing_refactoring(vec![
-        String::from("--provider"),
-        String::from("rope"),
-        String::from("--file"),
-        String::from("src/main.py"),
-    ])]
-    #[case::missing_file(vec![
-        String::from("--provider"),
-        String::from("rope"),
-        String::from("--refactoring"),
-        String::from("rename"),
-    ])]
-    #[case::missing_position(vec![
-        String::from("--provider"),
-        String::from("rope"),
-        String::from("--refactoring"),
-        String::from("rename"),
-        String::from("--file"),
-        String::from("src/main.py"),
-    ])]
+    #[case::missing_provider(args(&["--refactoring", "rename", "--file", "src/main.py"]))]
+    #[case::missing_refactoring(args(&["--provider", "rope", "--file", "src/main.py"]))]
+    #[case::missing_file(args(&["--provider", "rope", "--refactoring", "rename"]))]
+    #[case::missing_position(args(&[
+        "--provider",
+        "rope",
+        "--refactoring",
+        "rename",
+        "--file",
+        "src/main.py",
+    ]))]
     fn missing_required_flags_report_full_contract(#[case] args: Vec<String>) {
-        let message =
-            invalid_arguments_message(parse_refactor_args(&args).expect_err("parse should fail"));
+        let metrics = NullPositionMetrics;
+        let message = invalid_arguments_message(
+            parse_refactor_args(&args, &metrics).expect_err("parse should fail"),
+        );
 
         for required in [
             "--provider <plugin>",

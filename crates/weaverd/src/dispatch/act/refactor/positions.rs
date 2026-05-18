@@ -3,15 +3,9 @@
 //! The CLI accepts human-facing `LINE:COL` positions, while current rename
 //! actuators still consume UTF-8 byte offsets inside the shared plugin request.
 
-use std::{
-    path::Path,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::path::Path;
 
 use crate::dispatch::errors::DispatchError;
-
-static POSITION_PARSE_ERROR_COUNT: AtomicU64 = AtomicU64::new(0);
-static POSITION_CONVERSION_ERROR_COUNT: AtomicU64 = AtomicU64::new(0);
 
 /// A validated, one-indexed line and Unicode-character column.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,12 +16,6 @@ pub(super) struct LineCol {
 
 /// Parses a one-indexed `LINE:COL` value.
 pub(super) fn parse_line_col(value: &str) -> Result<LineCol, DispatchError> {
-    parse_line_col_inner(value).inspect_err(|error| {
-        increment_position_parse_error(value, error);
-    })
-}
-
-fn parse_line_col_inner(value: &str) -> Result<LineCol, DispatchError> {
     let (line_str, column_str) = value.split_once(':').ok_or_else(|| {
         DispatchError::invalid_arguments(format!("position must be LINE:COL, got: {value}"))
     })?;
@@ -95,17 +83,7 @@ fn trim_line_ending(line: &str) -> &str {
 }
 
 fn conversion_out_of_range(line: u32, column: u32, file_path: Option<&Path>) -> DispatchError {
-    let error = position_out_of_range(line, column, file_path);
-    increment_position_conversion_error(&error);
-    let file_path = display_file_path(file_path);
-    tracing::warn!(
-        line,
-        column,
-        file_path = %file_path,
-        error = %error,
-        "position is out of range for the target file"
-    );
-    error
+    position_out_of_range(line, column, file_path)
 }
 
 fn position_out_of_range(line: u32, column: u32, file_path: Option<&Path>) -> DispatchError {
@@ -115,56 +93,6 @@ fn position_out_of_range(line: u32, column: u32, file_path: Option<&Path>) -> Di
     DispatchError::invalid_arguments(format!(
         "position {line}:{column} is out of range for the target file{file_context}"
     ))
-}
-
-fn increment_position_parse_error(value: &str, error: &DispatchError) {
-    increment_error_counter(
-        &POSITION_PARSE_ERROR_COUNT,
-        "position_parse_error",
-        Some(value),
-        error,
-    );
-}
-
-fn increment_position_conversion_error(error: &DispatchError) {
-    increment_error_counter(
-        &POSITION_CONVERSION_ERROR_COUNT,
-        "position_conversion_error",
-        None,
-        error,
-    );
-}
-
-fn increment_error_counter(
-    counter: &AtomicU64,
-    counter_name: &str,
-    position_value: Option<&str>,
-    error: &DispatchError,
-) {
-    let count = counter.fetch_add(1, Ordering::Relaxed).saturating_add(1);
-    if let Some(position) = position_value {
-        tracing::debug!(
-            counter = counter_name,
-            count,
-            position,
-            error = %error,
-            "incremented position parse error counter"
-        );
-        return;
-    }
-
-    tracing::debug!(
-        counter = counter_name,
-        count,
-        error = %error,
-        "incremented position conversion error counter"
-    );
-}
-
-fn display_file_path(file_path: Option<&Path>) -> String {
-    file_path
-        .map(|path| path.display().to_string())
-        .unwrap_or_else(|| String::from("<unknown>"))
 }
 
 #[cfg(test)]
@@ -238,6 +166,90 @@ mod tests {
         );
 
         assert!(message.contains("out of range"), "{message}");
+    }
+
+    mod counter_tests {
+        //! Counter tests for command-side position metrics.
+
+        use std::cell::Cell;
+
+        use super::super::{DispatchError, LineCol, line_col_to_byte_offset, parse_line_col};
+        use crate::dispatch::act::refactor::metrics::PositionMetrics;
+
+        #[derive(Default)]
+        struct CountingPositionMetrics {
+            parse_errors: Cell<u64>,
+            conversion_errors: Cell<u64>,
+        }
+
+        impl PositionMetrics for CountingPositionMetrics {
+            fn increment_parse_error(&self) {
+                self.parse_errors
+                    .set(self.parse_errors.get().saturating_add(1));
+            }
+
+            fn increment_conversion_error(&self) {
+                self.conversion_errors
+                    .set(self.conversion_errors.get().saturating_add(1));
+            }
+        }
+
+        fn parse_with_metrics(
+            value: &str,
+            metrics: &dyn PositionMetrics,
+        ) -> Result<LineCol, DispatchError> {
+            parse_line_col(value).inspect_err(|_error| {
+                metrics.increment_parse_error();
+            })
+        }
+
+        fn convert_with_metrics(
+            content: &str,
+            line: u32,
+            column: u32,
+            metrics: &dyn PositionMetrics,
+        ) -> Result<usize, DispatchError> {
+            line_col_to_byte_offset(content, line, column, None).inspect_err(|_error| {
+                metrics.increment_conversion_error();
+            })
+        }
+
+        #[test]
+        fn parse_success_does_not_increment_parse_counter() {
+            let metrics = CountingPositionMetrics::default();
+
+            let _ = parse_with_metrics("1:1", &metrics).expect("position parses");
+
+            assert_eq!(metrics.parse_errors.get(), 0);
+        }
+
+        #[test]
+        fn parse_failure_increments_parse_counter_once() {
+            let metrics = CountingPositionMetrics::default();
+
+            let _ = parse_with_metrics("1", &metrics).expect_err("position should fail");
+
+            assert_eq!(metrics.parse_errors.get(), 1);
+        }
+
+        #[test]
+        fn conversion_success_does_not_increment_conversion_counter() {
+            let metrics = CountingPositionMetrics::default();
+
+            let _ = convert_with_metrics("hello\n", 1, 1, &metrics).expect("position converts");
+
+            assert_eq!(metrics.conversion_errors.get(), 0);
+        }
+
+        #[test]
+        fn conversion_failure_increments_conversion_counter_once() {
+            let metrics = CountingPositionMetrics::default();
+
+            let _ =
+                convert_with_metrics("hello\n", 2, 1, &metrics).expect_err("position should fail");
+
+            assert_eq!(metrics.conversion_errors.get(), 1);
+        }
     }
 
     mod property_tests {

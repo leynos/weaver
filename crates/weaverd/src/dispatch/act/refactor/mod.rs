@@ -13,6 +13,7 @@ use std::{io::Write, path::Path, sync::Arc};
 
 use arguments::parse_refactor_args;
 use manifests::{rope_manifest, rust_analyzer_manifest};
+use metrics::AtomicPositionMetrics;
 use plugin_paths::{
     ROPE_PLUGIN_PATH_ENV,
     RUST_ANALYZER_PLUGIN_PATH_ENV,
@@ -46,6 +47,7 @@ use crate::{
 mod arguments;
 mod candidates;
 mod manifests;
+mod metrics;
 mod plugin_paths;
 #[cfg(test)]
 pub(super) mod refactor_helpers;
@@ -227,7 +229,8 @@ pub fn handle<W: Write>(
     writer: &mut ResponseWriter<W>,
     mut context: RefactorContext<'_>,
 ) -> Result<DispatchResult, DispatchError> {
-    let args = parse_refactor_args(&request.arguments)?;
+    let metrics = AtomicPositionMetrics;
+    let args = parse_refactor_args(&request.arguments, &metrics)?;
 
     debug!(
         target: DISPATCH_TARGET,
@@ -238,7 +241,7 @@ pub fn handle<W: Write>(
     );
 
     let (plugin_request, capability, file_path) =
-        prepare_plugin_request(context.workspace_root, &args)?;
+        prepare_plugin_request(context.workspace_root, &args, &metrics)?;
     write_deprecated_offset_warning(&args, writer)?;
     let resolution_params = ResolutionParams {
         runtime: context.runtime,

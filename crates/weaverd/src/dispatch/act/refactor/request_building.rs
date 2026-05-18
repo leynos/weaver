@@ -10,6 +10,7 @@ use weaver_plugins::{PluginRequest, capability::CapabilityId, protocol::FilePayl
 
 use super::{
     arguments,
+    metrics::PositionMetrics,
     positions::{LineCol, line_col_to_byte_offset},
     requirements::{
         capability_for_operation,
@@ -28,6 +29,7 @@ struct CapabilityMappingContext<'a> {
     file_path: &'a Path,
     file_content: &'a str,
     position: Option<LineCol>,
+    metrics: &'a dyn PositionMetrics,
 }
 
 /// Resolves the target file, reads its content, builds the [`PluginRequest`],
@@ -35,6 +37,7 @@ struct CapabilityMappingContext<'a> {
 pub(super) fn prepare_plugin_request(
     workspace_root: &Path,
     args: &arguments::RefactorArgs,
+    metrics: &dyn PositionMetrics,
 ) -> Result<(PluginRequest, CapabilityId, PathBuf), DispatchError> {
     let canonical_workspace = workspace_root.canonicalize().map_err(|error| {
         DispatchError::invalid_arguments(format!(
@@ -54,6 +57,7 @@ pub(super) fn prepare_plugin_request(
             file_path: &resolved_file.path,
             file_content: &file_content,
             position: args.position,
+            metrics,
         },
     )?;
     plugin_args.insert(
@@ -107,12 +111,7 @@ fn apply_capability_argument_mapping(
     context: CapabilityMappingContext<'_>,
 ) -> Result<(), DispatchError> {
     if context.capability == CapabilityId::RenameSymbol {
-        return apply_rename_symbol_mapping(
-            plugin_args,
-            context.file_path,
-            context.file_content,
-            context.position,
-        );
+        return apply_rename_symbol_mapping(plugin_args, context);
     }
     Ok(())
 }
@@ -163,19 +162,18 @@ fn load_file_contents(path: &Path) -> Result<String, DispatchError> {
 
 #[tracing::instrument(
     level = "debug",
-    skip(plugin_args, file_content),
+    skip(plugin_args, context),
     fields(
         capability = ?CapabilityId::RenameSymbol,
-        file_path = %file.display(),
-        input_form = rename_symbol_input_form(plugin_args, position),
+        file_path = %context.file_path.display(),
+        input_form = rename_symbol_input_form(plugin_args, context.position),
     )
 )]
 fn apply_rename_symbol_mapping(
     plugin_args: &mut HashMap<String, serde_json::Value>,
-    file: &Path,
-    file_content: &str,
-    position: Option<LineCol>,
+    context: CapabilityMappingContext<'_>,
 ) -> Result<(), DispatchError> {
+    let file = context.file_path;
     plugin_args.insert(
         String::from("uri"),
         serde_json::Value::String(
@@ -196,9 +194,17 @@ fn apply_rename_symbol_mapping(
              the internal plugin contract",
         ));
     }
-    if let Some(position) = position {
-        let offset =
-            line_col_to_byte_offset(file_content, position.line, position.column, Some(file))?;
+    if let Some(position) = context.position {
+        let offset = line_col_to_byte_offset(
+            context.file_content,
+            position.line,
+            position.column,
+            Some(file),
+        )
+        .inspect_err(|error| {
+            context.metrics.increment_conversion_error();
+            warn_position_conversion_error(file, position, error);
+        })?;
         plugin_args.insert(
             String::from("position"),
             serde_json::Value::String(offset.to_string()),
@@ -242,6 +248,16 @@ fn invalid_rename_arguments(file: &Path, message: &str) -> DispatchError {
     DispatchError::invalid_arguments(format!("{message} for '{}'", file.display()))
 }
 
+fn warn_position_conversion_error(file: &Path, position: LineCol, error: &DispatchError) {
+    tracing::warn!(
+        line = position.line,
+        column = position.column,
+        file_path = %file.display(),
+        error = %error,
+        "position is out of range for the target file"
+    );
+}
+
 #[cfg(test)]
 mod tests {
     //! Unit tests for request-building internals.
@@ -259,9 +275,17 @@ mod tests {
                 Value::String(String::from("woven")),
             ),
         ]);
-        let err =
-            apply_rename_symbol_mapping(&mut plugin_args, Path::new("/tmp"), "hello world", None)
-                .expect_err("offset must be rejected when not numeric");
+        let err = apply_rename_symbol_mapping(
+            &mut plugin_args,
+            CapabilityMappingContext {
+                capability: CapabilityId::RenameSymbol,
+                file_path: Path::new("/tmp"),
+                file_content: "hello world",
+                position: None,
+                metrics: &crate::dispatch::act::refactor::metrics::NullPositionMetrics,
+            },
+        )
+        .expect_err("offset must be rejected when not numeric");
 
         assert!(matches!(err, DispatchError::InvalidArguments { .. }));
         let invalid_arguments = match err {
