@@ -1,4 +1,9 @@
-//! Helpers for reading and parsing daemon runtime files.
+//! Helpers for reading and parsing daemon runtime files used by
+//! [`crate::lifecycle::monitoring`].
+//!
+//! This module keeps the small health and PID readers separate from the
+//! polling and readiness flow so the file-loading rules, parse errors, and
+//! missing-file handling stay close to the lifecycle code that consumes them.
 
 use std::{io, path::Path};
 

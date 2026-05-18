@@ -1,4 +1,8 @@
-//! Shared helpers for dispatch handler tests.
+//! Shared fixtures and tracing helpers for dispatch handler tests.
+//!
+//! Use these fixtures with `#[rstest]` to create an isolated backend manager,
+//! a connected TCP client/server harness, and a tracing capture layer for
+//! assertions against dispatch logging behaviour.
 
 use std::{
     collections::BTreeMap,
@@ -28,6 +32,16 @@ use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use super::*;
 use crate::{backends::FusionBackends, semantic_provider::SemanticBackendProvider};
 
+/// Builds an isolated backend manager for dispatch handler tests.
+///
+/// Use this fixture as the input to [`harness`] when a test needs a fully
+/// initialized handler environment.
+///
+/// # Examples
+///
+/// ```ignore
+/// let backend_manager = backend_manager().expect("backend manager");
+/// ```
 #[fixture]
 pub(crate) fn backend_manager() -> Result<BackendManager, String> {
     let temp_dir = TempDir::new().map_err(|error| format!("temporary directory: {error}"))?;
@@ -42,7 +56,19 @@ pub(crate) fn backend_manager() -> Result<BackendManager, String> {
     Ok(BackendManager::new(backends))
 }
 
-/// Test fixture providing a TCP server/client pair for dispatch handler testing.
+/// Connected dispatch handler harness used by tests.
+///
+/// # Examples
+///
+/// ```ignore
+/// #[rstest]
+/// fn handles_a_request(
+///     harness: Result<HandlerTestHarness, String>,
+/// ) {
+///     let mut harness = harness.expect("harness");
+///     let _ = harness.send_and_collect(b"{}\n");
+/// }
+/// ```
 pub(crate) struct HandlerTestHarness {
     client: TcpStream,
     server_handle: JoinHandle<Result<(), String>>,
@@ -90,6 +116,7 @@ pub(crate) fn create_listener() -> Result<(TcpListener, SocketAddr), String> {
     Ok((listener, addr))
 }
 
+/// Captured tracing event recorded during a dispatch handler test.
 #[derive(Debug)]
 pub(crate) struct CapturedEvent {
     pub(crate) level: Level,
@@ -136,6 +163,19 @@ where
     }
 }
 
+/// Runs `action` under a subscriber that records all emitted tracing events.
+///
+/// Use this helper when asserting on structured dispatch logging without
+/// wiring a bespoke subscriber in each test.
+///
+/// # Examples
+///
+/// ```ignore
+/// let events = capture_events(|| {
+///     tracing::info!(target: "dispatch", event = "ready", "structured dispatch event");
+/// });
+/// assert_eq!(events.len(), 1);
+/// ```
 pub(crate) fn capture_events(action: impl FnOnce()) -> Vec<CapturedEvent> {
     let events = Arc::new(Mutex::new(Vec::new()));
     let subscriber = Registry::default().with(RecordingLayer {
@@ -148,6 +188,11 @@ pub(crate) fn capture_events(action: impl FnOnce()) -> Vec<CapturedEvent> {
     events.drain(..).collect()
 }
 
+/// Creates a connected dispatch handler harness with a temporary workspace.
+///
+/// The returned harness owns the temporary directory for the listener,
+/// workspace root, and runtime socket path so tests can interact with the
+/// handler over a real TCP connection.
 #[fixture]
 pub(crate) fn harness(
     backend_manager: Result<BackendManager, String>,

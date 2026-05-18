@@ -1,4 +1,9 @@
 //! Bounded request-line readers used by the dispatch handler.
+//!
+//! The handler uses this module to read one JSONL request line at a time while
+//! enforcing `JSONL_REQUEST_MAX_LINE_BYTES`. Oversized requests are mapped to
+//! `DispatchError::RequestTooLarge` so the caller can emit the size-specific
+//! log message and response path.
 
 use std::io::{self, Read};
 
@@ -9,9 +14,10 @@ use crate::{dispatch::errors::DispatchError, transport::ConnectionStream};
 /// Reads a bounded JSONL request line from the stream.
 ///
 /// Returns `Ok(None)` if the client disconnects without sending data.
-/// Returns `Ok(Some(bytes))` when a complete line (or EOF with partial data)
-/// is received. Returns an error if reading fails or the request exceeds the
-/// maximum size.
+/// Returns `Ok(Some(bytes))` when a complete line is received, or when EOF
+/// arrives after partial data has already been buffered. Returns
+/// `DispatchError::RequestTooLarge` once the buffered request body crosses
+/// `JSONL_REQUEST_MAX_LINE_BYTES`, before a newline is seen.
 pub(super) fn read_request_line(
     stream: &mut ConnectionStream,
 ) -> Result<Option<Vec<u8>>, DispatchError> {
@@ -29,6 +35,10 @@ pub(super) fn read_request_line(
     }
 }
 
+/// Selects the log message associated with a request-read failure.
+///
+/// `DispatchError::RequestTooLarge` uses the size-specific rejection text so
+/// handler logs distinguish over-limit requests from generic I/O failures.
 pub(super) fn read_error_message(error: &DispatchError) -> &'static str {
     if matches!(error, DispatchError::RequestTooLarge { .. }) {
         "request rejected: size exceeded"

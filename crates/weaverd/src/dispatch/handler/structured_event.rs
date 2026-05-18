@@ -1,4 +1,8 @@
-//! Structured event metadata and serialisation for dispatch logging.
+//! Structured event metadata and serialization for dispatch logging.
+//!
+//! The dispatch handler uses these helpers to build tracing payloads for
+//! request failures and other notable states. Sensitive request data is
+//! redacted before serialization so the emitted logs remain safe to forward.
 
 use std::path::Path;
 
@@ -10,6 +14,7 @@ use crate::dispatch::{errors::DispatchError, router::DISPATCH_TARGET};
 const REDACTION_MARKER: &str = "<redacted>";
 const HEALTH_SNAPSHOT_NAME: &str = "weaverd.health";
 
+/// Metadata fields attached to a structured dispatch event.
 #[derive(Debug)]
 pub(super) struct StructuredEventMetadata {
     domain: Option<String>,
@@ -63,6 +68,7 @@ impl StructuredEventMetadata {
     }
 }
 
+/// Structured event payload assembled by the dispatch handler.
 #[derive(Debug)]
 pub(super) struct StructuredDispatchEvent {
     event: &'static str,
@@ -97,6 +103,7 @@ impl StructuredDispatchEvent {
     }
 }
 
+/// Maps a dispatch error to the structured event shape used by the handler.
 pub(super) fn read_error_event(
     error: &DispatchError,
     endpoint: &str,
@@ -126,7 +133,11 @@ fn redacted(value: &Option<String>) -> Option<Value> {
         .map(|_| Value::String(REDACTION_MARKER.to_owned()))
 }
 
-/// Serialises a structured event into JSON with sensitive fields redacted.
+/// Serializes a structured event into JSON with sensitive fields redacted.
+///
+/// The handler stores request bodies, patches, source text, environment
+/// snapshots, and full payloads behind a stable redaction marker instead of
+/// logging the raw values.
 pub(super) fn serialize_structured_event(event: &StructuredDispatchEvent) -> Value {
     let mut payload = Map::<String, Value>::new();
     payload.insert("event".into(), json!(event.event));
@@ -167,6 +178,10 @@ pub(super) fn format_structured_event(event: &StructuredDispatchEvent) -> String
     serialize_structured_event(event).to_string()
 }
 
+/// Emits the structured dispatch event through tracing on the dispatch target.
+///
+/// The handler uses `info!` for normal structured events and `error!` for
+/// failure paths so downstream consumers can distinguish severity.
 pub(super) fn emit_structured_event(
     event: &StructuredDispatchEvent,
     message: &str,

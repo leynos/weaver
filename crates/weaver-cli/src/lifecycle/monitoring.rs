@@ -1,4 +1,8 @@
 //! Daemon health monitoring utilities.
+//!
+//! The polling loop and readiness checks live here, while the sibling
+//! [`monitoring_readers`] module owns the file readers for the health snapshot
+//! and PID files written into the runtime directory.
 
 use std::{
     process::Child,
