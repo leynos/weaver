@@ -34,6 +34,7 @@ use crate::{backends::FusionBackends, semantic_provider::SemanticBackendProvider
 
 static CAPTURED_EVENTS: OnceLock<Arc<Mutex<Vec<CapturedEvent>>>> = OnceLock::new();
 static CAPTURE_WINDOW_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
+static RECORDING_SUBSCRIBER_INSTALLED: OnceLock<()> = OnceLock::new();
 
 /// Backend manager test fixture that keeps socket paths alive.
 pub(crate) struct BackendManagerFixture {
@@ -227,10 +228,14 @@ fn clear_events(events: &Arc<Mutex<Vec<CapturedEvent>>>) {
 }
 
 fn install_recording_subscriber(events: &Arc<Mutex<Vec<CapturedEvent>>>) {
-    let subscriber = Registry::default().with(RecordingLayer {
-        events: Arc::clone(events),
+    RECORDING_SUBSCRIBER_INSTALLED.get_or_init(|| {
+        let subscriber = Registry::default().with(RecordingLayer {
+            events: Arc::clone(events),
+        });
+        if let Err(error) = tracing::subscriber::set_global_default(subscriber) {
+            panic!("failed to set global tracing subscriber: {error}");
+        }
     });
-    tracing::subscriber::set_global_default(subscriber).ok();
 }
 
 /// Creates a connected dispatch handler harness with a temporary workspace.
