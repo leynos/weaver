@@ -142,6 +142,7 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
     let error = LifecycleError::LaunchDaemon {
         binary: "/tmp/tools/custom-weaverd".into(),
         source: io::Error::new(io::ErrorKind::NotFound, "missing"),
+        runtime_dir: "/tmp/tools".into(),
     };
 
     let mut buf = Vec::new();
@@ -161,17 +162,22 @@ fn launch_daemon_guidance_uses_configured_binary_name() {
         "Verify custom-weaverd exists and is executable",
         expected_next_command,
     );
+    assert!(
+        output.contains("  - Inspect runtime artefacts under /tmp/tools"),
+        "runtime artefact hint not found in output:\n{output}"
+    );
 }
 
 #[rstest]
 #[case(
     LifecycleError::StartupFailed {
         exit_status: Some(17),
+        runtime_dir: "/tmp/test/runtime".into(),
     },
     StartupGuidanceExpectation {
         problem: "daemon exited before reporting ready (status: Some(17))",
         alternatives: "The daemon started but failed to become ready.",
-        socket_hint: None,
+        socket_hint: Some("  - Check health snapshot at /tmp/test/runtime/weaverd.health"),
     }
 )]
 #[case(

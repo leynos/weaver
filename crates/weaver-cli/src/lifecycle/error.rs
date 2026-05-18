@@ -35,14 +35,33 @@ pub enum LifecycleError {
         #[source]
         source: io::Error,
     },
-    #[error("failed to spawn weaverd binary '{binary:?}': {source}")]
+    #[error(
+        "{}",
+        format_args!(
+            concat!(
+                "failed to spawn weaverd binary '{binary:?}': {source}; runtime_dir: {runtime_dir:?}"
+            ),
+            binary = binary,
+            source = source,
+            runtime_dir = runtime_dir
+        )
+    )]
     LaunchDaemon {
         binary: OsString,
         #[source]
         source: io::Error,
+        runtime_dir: PathBuf,
     },
-    #[error("daemon exited before reporting ready (status: {exit_status:?})")]
-    StartupFailed { exit_status: Option<i32> },
+    #[error(
+        "{}",
+        format_args!(
+            "daemon exited before reporting ready (status: {exit_status:?}); runtime_dir: {runtime_dir:?}"
+        )
+    )]
+    StartupFailed {
+        exit_status: Option<i32>,
+        runtime_dir: PathBuf,
+    },
     #[error("daemon reported 'stopping' before reaching ready; check health snapshot at {path:?}")]
     StartupAborted { path: PathBuf },
     #[error("timed out waiting for ready snapshot in {timeout:?} at {health_path:?}")]

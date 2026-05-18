@@ -130,10 +130,14 @@ where
     let backends = Arc::new(Mutex::new(daemon.into_backends()));
     let backend_manager = BackendManager::new(backends);
     let handler = Arc::new(
-        DispatchConnectionHandler::new(backend_manager, workspace_root).map_err(|error| {
-            LaunchError::WorkspaceRoot {
-                source: io::Error::new(io::ErrorKind::InvalidInput, error.to_string()),
-            }
+        DispatchConnectionHandler::new(
+            backend_manager,
+            workspace_root,
+            config.daemon_socket().to_string(),
+            guard.paths().runtime_dir().to_path_buf(),
+        )
+        .map_err(|error| LaunchError::WorkspaceRoot {
+            source: io::Error::new(io::ErrorKind::InvalidInput, error.to_string()),
         })?,
     );
 

@@ -18,6 +18,7 @@ use super::error::LifecycleError;
 pub(super) fn spawn_daemon(
     config_arguments: &[OsString],
     binary_override: Option<&OsStr>,
+    runtime_dir: &std::path::Path,
 ) -> Result<Child, LifecycleError> {
     let binary = resolve_daemon_binary(binary_override);
     let mut command = Command::new(&binary);
@@ -31,7 +32,11 @@ pub(super) fn spawn_daemon(
     command.stdout(Stdio::inherit()).stderr(Stdio::inherit());
     command
         .spawn()
-        .map_err(|source| LifecycleError::LaunchDaemon { binary, source })
+        .map_err(|source| LifecycleError::LaunchDaemon {
+            binary,
+            source,
+            runtime_dir: runtime_dir.to_path_buf(),
+        })
 }
 
 fn resolve_daemon_binary(binary_override: Option<&OsStr>) -> OsString {
@@ -45,16 +50,27 @@ fn resolve_daemon_binary(binary_override: Option<&OsStr>) -> OsString {
 mod tests {
     //! Unit tests for daemon spawning and binary resolution.
 
+    use std::path::PathBuf;
+
     use super::*;
 
     #[test]
     fn spawn_daemon_uses_binary_override() {
-        let result = spawn_daemon(&[], Some(OsStr::new("/test/custom/weaverd")));
+        let result = spawn_daemon(
+            &[],
+            Some(OsStr::new("/test/custom/weaverd")),
+            std::path::Path::new("/tmp"),
+        );
         assert!(result.is_err());
         let error = result.unwrap_err();
         match error {
-            LifecycleError::LaunchDaemon { binary, .. } => {
+            LifecycleError::LaunchDaemon {
+                binary,
+                runtime_dir,
+                ..
+            } => {
                 assert_eq!(binary, OsString::from("/test/custom/weaverd"));
+                assert_eq!(runtime_dir, PathBuf::from("/tmp"));
             }
             other => panic!("expected LaunchDaemon, got: {other:?}"),
         }

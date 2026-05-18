@@ -47,6 +47,12 @@
 - [`execplans/`](execplans/)
   - Living execution plans used to scope, implement, and verify discrete
     deliverables.
+- [`rfcs/`](rfcs/)
+  - Requests for comments covering proposed design contracts before
+    implementation.
+- [RFC 0001: Local daemon observability](rfcs/0001-o11y.md)
+  - Proposed observability contract for the single-user `weaverd` daemon and
+    its `weaver` CLI partner.
 - [Ortho-config user's guide](ortho-config-users-guide.md)
   - Operational guide for configuration layering and ortho-config usage.
 - [Ortho-config v0.8.0 migration guide](ortho-config-v0-8-0-migration-guide.md)

@@ -1,0 +1,324 @@
+//! Unit tests for command dispatch and request handling.
+
+use std::{
+    io::Write,
+    net::{TcpListener, TcpStream},
+    thread,
+};
+
+use rstest::rstest;
+use weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES;
+
+#[path = "read_error_event_tests.rs"]
+mod read_error_event_tests;
+#[path = "receive_request_tests.rs"]
+mod receive_request_tests;
+#[path = "tests_helpers.rs"]
+mod tests_helpers;
+
+use tests_helpers::{HandlerTestHarness, capture_events, harness};
+
+use super::{
+    structured_event::{format_structured_event, serialize_structured_event},
+    *,
+};
+use crate::dispatch::{UNKNOWN_OPERATION_TYPE, parse_stderr_json_payload};
+
+#[rstest]
+fn handler_responds_to_get_definition_without_args(
+    harness: Result<HandlerTestHarness, String>,
+) -> Result<(), String> {
+    let mut harness = harness?;
+    let lines = harness.send_and_collect(
+        b"{\"command\":{\"domain\":\"observe\",\"operation\":\"get-definition\"}}\n",
+    )?;
+
+    // Should have error about missing arguments and exit message.
+    assert!(lines.iter().any(|l| l.contains("invalid arguments")));
+    assert!(lines.iter().any(|l| l.contains(r#""kind":"exit""#)));
+
+    harness.join()?;
+    Ok(())
+}
+
+#[rstest]
+fn handler_rejects_malformed_json(
+    harness: Result<HandlerTestHarness, String>,
+) -> Result<(), String> {
+    let mut harness = harness?;
+    let lines = harness.send_and_collect(b"not valid json\n")?;
+
+    // Should have error message.
+    assert!(lines.iter().any(|l| l.contains("error:")));
+    assert!(lines.iter().any(|l| l.contains(r#""status":1"#)));
+
+    harness.join()?;
+    Ok(())
+}
+
+#[rstest]
+fn handler_rejects_unknown_domain(
+    harness: Result<HandlerTestHarness, String>,
+) -> Result<(), String> {
+    let mut harness = harness?;
+    let lines = harness
+        .send_and_collect(b"{\"command\":{\"domain\":\"bogus\",\"operation\":\"test\"}}\n")?;
+
+    assert!(lines.iter().any(|l| l.contains("unknown domain")));
+    assert!(lines.iter().any(|l| l.contains(r#""status":1"#)));
+
+    harness.join()?;
+    Ok(())
+}
+
+#[rstest]
+fn handler_responds_to_not_implemented_operation(
+    harness: Result<HandlerTestHarness, String>,
+) -> Result<(), String> {
+    let mut harness = harness?;
+    let lines = harness.send_and_collect(
+        b"{\"command\":{\"domain\":\"observe\",\"operation\":\"find-references\"}}\n",
+    )?;
+
+    // find-references is not yet implemented.
+    assert!(lines.iter().any(|l| l.contains("not yet implemented")));
+    assert!(lines.iter().any(|l| l.contains(r#""kind":"exit""#)));
+
+    harness.join()?;
+    Ok(())
+}
+
+#[rstest]
+fn handler_emits_known_operations_for_unknown_operation(
+    harness: Result<HandlerTestHarness, String>,
+) -> Result<(), String> {
+    let mut harness = harness?;
+    let lines = harness
+        .send_and_collect(b"{\"command\":{\"domain\":\"observe\",\"operation\":\"bogus\"}}\n")?;
+
+    let payload = lines
+        .iter()
+        .find_map(|line| parse_stderr_json_payload::<serde_json::Value>(line))
+        .expect("unknown-operation payload should be present");
+
+    assert_eq!(payload["status"], "error");
+    assert_eq!(payload["type"], UNKNOWN_OPERATION_TYPE);
+    assert_eq!(payload["details"]["domain"], "observe");
+    assert_eq!(payload["details"]["operation"], "bogus");
+    assert_eq!(
+        payload["details"]["known_operations"],
+        serde_json::json!([
+            "get-definition",
+            "find-references",
+            "grep",
+            "diagnostics",
+            "call-hierarchy",
+            "get-card",
+            "graph-slice"
+        ])
+    );
+    assert!(lines.iter().any(|line| line.contains(r#""status":1"#)));
+
+    harness.join()?;
+    Ok(())
+}
+
+#[test]
+fn serialize_structured_dispatch_event_omits_sensitive_fields() {
+    let temp_dir = std::env::temp_dir();
+    let endpoint = temp_dir.join("weaverd.sock");
+    let event = StructuredDispatchEvent::new(
+        "dispatching_request",
+        endpoint.to_string_lossy().to_string(),
+        &temp_dir,
+        StructuredEventMetadata::new("observe", "get-card").with_size(42),
+    );
+    let value = serialize_structured_event(&event);
+
+    assert_eq!(
+        value.get("event").and_then(serde_json::Value::as_str),
+        Some("dispatching_request")
+    );
+    assert!(value.get("patch").is_none());
+    assert!(value.get("body").is_none());
+    assert!(value.get("source").is_none());
+    assert!(value.get("env").is_none());
+    assert!(value.get("fullPayload").is_none());
+    assert_eq!(value["size"], 42);
+    assert_eq!(
+        value.get("runtime_dir"),
+        Some(&serde_json::json!(temp_dir.to_string_lossy().to_string()))
+    );
+    assert_eq!(
+        value.get("weaverd.health"),
+        Some(&serde_json::json!(
+            temp_dir
+                .join("weaverd.health")
+                .to_string_lossy()
+                .to_string()
+        ))
+    );
+}
+
+#[test]
+fn serialize_dispatching_request_event_snapshot() {
+    let event = StructuredDispatchEvent::new(
+        "dispatching_request",
+        "tcp://127.0.0.1:9779",
+        std::path::Path::new("/run/user/1000/weaver"),
+        StructuredEventMetadata::new("observe", "get-card").with_size(128),
+    );
+    insta::with_settings!({
+        redactions => vec![
+            (".endpoint", "[endpoint]".into()),
+            (".runtime_dir", "[runtime_dir]".into()),
+            ("[\"weaverd.health\"]", "[health_path]".into()),
+        ]
+    }, {
+        insta::assert_json_snapshot!(
+            serde_json::from_str::<serde_json::Value>(
+                &format_structured_event(&event)
+            ).expect("structured event should serialize as JSON")
+        );
+    });
+}
+
+#[test]
+fn serialize_request_too_large_event_snapshot() {
+    let mut event = StructuredDispatchEvent::new(
+        "request_too_large",
+        "tcp://127.0.0.1:9779",
+        std::path::Path::new("/run/user/1000/weaver"),
+        StructuredEventMetadata::none()
+            .with_size(2048)
+            .with_max_size(1024),
+    );
+    event.patch = Some("--- a/foo.rs\n+++ b/foo.rs".to_string());
+    event.body = Some("some body".to_string());
+    event.source = Some("fn main() {}".to_string());
+    event.env = Some("SECRET=value".to_string());
+    event.full_payload = Some("{\"command\":\"redacted\"}".to_string());
+    insta::with_settings!({
+        redactions => vec![
+            (".endpoint", "[endpoint]".into()),
+            (".runtime_dir", "[runtime_dir]".into()),
+            ("[\"weaverd.health\"]", "[health_path]".into()),
+        ]
+    }, {
+        insta::assert_json_snapshot!(
+            serde_json::from_str::<serde_json::Value>(
+                &format_structured_event(&event)
+            ).expect("structured event should serialize as JSON")
+        );
+    });
+}
+
+#[test]
+fn emit_structured_event_returns_payload_without_sensitive_request_data() {
+    let temp_dir = std::env::temp_dir();
+    let endpoint = temp_dir.join("weaverd.sock");
+    let mut event = StructuredDispatchEvent::new(
+        "request_too_large",
+        endpoint.to_string_lossy().to_string(),
+        &temp_dir,
+        StructuredEventMetadata::new("observe", "apply-patch")
+            .with_size(JSONL_REQUEST_MAX_LINE_BYTES + 1)
+            .with_max_size(JSONL_REQUEST_MAX_LINE_BYTES),
+    );
+    event.patch = Some("sensitive patch".to_string());
+    event.body = Some("sensitive body".to_string());
+    event.source = Some("sensitive source".to_string());
+    event.env = Some("PATH=secret".to_string());
+    event.full_payload = Some("full json payload".to_string());
+    let payload = format_structured_event(&event);
+    let value = serde_json::from_str::<serde_json::Value>(&payload)
+        .expect("valid structured event payload");
+
+    assert_eq!(value["size"], JSONL_REQUEST_MAX_LINE_BYTES + 1);
+    assert_eq!(value["max_size"], JSONL_REQUEST_MAX_LINE_BYTES);
+    assert_eq!(value["patch"], serde_json::json!("<redacted>"));
+    assert_eq!(value["body"], serde_json::json!("<redacted>"));
+    assert_eq!(value["source"], serde_json::json!("<redacted>"));
+    assert_eq!(value["env"], serde_json::json!("<redacted>"));
+    assert_eq!(value["fullPayload"], serde_json::json!("<redacted>"));
+    assert_eq!(value["domain"], serde_json::json!("observe"));
+    let events = capture_events(|| {
+        emit_structured_event(&event, "request_too_large rejection", true);
+    });
+    let emitted = events
+        .iter()
+        .find(|event| {
+            event
+                .fields
+                .get("event")
+                .is_some_and(|value| value == "request_too_large")
+        })
+        .expect("structured event should be emitted");
+
+    assert_eq!(emitted.level, tracing::Level::ERROR);
+    assert_eq!(emitted.target, DISPATCH_TARGET);
+    assert_eq!(
+        emitted.fields.get("message").map(String::as_str),
+        Some("request_too_large rejection")
+    );
+    let emitted_payload = emitted
+        .fields
+        .get("payload")
+        .expect("structured event should include payload");
+    let emitted_value = serde_json::from_str::<serde_json::Value>(emitted_payload)
+        .expect("emitted payload should be JSON");
+    assert_eq!(emitted_value["patch"], serde_json::json!("<redacted>"));
+}
+
+#[test]
+fn request_too_large_serialization_maps_to_request_too_large_event() {
+    let temp_dir = std::env::temp_dir();
+    let endpoint = temp_dir.join("weaverd.sock");
+    let endpoint = endpoint.to_string_lossy().into_owned();
+    let event = read_error_event(
+        &DispatchError::request_too_large(
+            JSONL_REQUEST_MAX_LINE_BYTES + 1,
+            JSONL_REQUEST_MAX_LINE_BYTES,
+        ),
+        &endpoint,
+        &temp_dir,
+    );
+    let value = serialize_structured_event(&event);
+
+    assert_eq!(
+        value.get("event").and_then(serde_json::Value::as_str),
+        Some("request_too_large")
+    );
+    assert_eq!(value["size"], JSONL_REQUEST_MAX_LINE_BYTES + 1);
+    assert_eq!(value["max_size"], JSONL_REQUEST_MAX_LINE_BYTES);
+}
+
+#[test]
+fn read_request_line_returns_request_too_large_for_large_payload() {
+    let max_plus_one = JSONL_REQUEST_MAX_LINE_BYTES + 1;
+    let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind listener");
+    let addr = listener.local_addr().expect("listener addr");
+
+    let payload = vec![b'a'; max_plus_one];
+    let sender = thread::spawn(move || {
+        let mut stream = TcpStream::connect(addr).expect("connect sender");
+        stream.write_all(&payload).expect("write request");
+        stream.flush().expect("flush sender");
+    });
+
+    let (stream, _) = listener.accept().expect("accept");
+    let mut connection_stream = ConnectionStream::Tcp(stream);
+    let error =
+        read_request_line(&mut connection_stream).expect_err("expected request too large error");
+
+    assert!(matches!(error, DispatchError::RequestTooLarge { .. }));
+    assert_eq!(
+        match error {
+            DispatchError::RequestTooLarge { size, .. } => size,
+            _ => 0,
+        },
+        max_plus_one
+    );
+
+    sender.join().expect("join sender");
+}

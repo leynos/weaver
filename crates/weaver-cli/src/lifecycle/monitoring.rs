@@ -1,8 +1,10 @@
 //! Daemon health monitoring utilities.
+//!
+//! The polling loop and readiness checks live here, while the sibling
+//! [`monitoring_readers`] module owns the file readers for the health snapshot
+//! and PID files written into the runtime directory.
 
 use std::{
-    io,
-    path::Path,
     process::Child,
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -11,6 +13,9 @@ use std::{
 use cap_std::fs::Dir;
 use weaver_config::RuntimePaths;
 
+#[path = "monitoring_readers.rs"]
+mod monitoring_readers;
+pub(crate) use self::monitoring_readers::{read_health, read_pid};
 use super::{error::LifecycleError, utils::open_runtime_dir};
 
 /// Filename for the daemon's PID file within the runtime directory.
@@ -79,92 +84,6 @@ pub(crate) enum HealthCheckOutcome {
     Continue,
 }
 
-/// Reads a file from the runtime directory, treating `NotFound` as `Ok(None)`.
-///
-/// This encapsulates the common pattern where a missing file is a valid state
-/// (e.g., during daemon startup before health or PID files are written) rather
-/// than an error. Other I/O errors are propagated.
-fn read_optional_file(dir: &Dir, filename: &str) -> Result<Option<String>, io::Error> {
-    match dir.read_to_string(filename) {
-        Ok(content) => Ok(Some(content)),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(error),
-    }
-}
-
-/// Reads and parses an optional runtime file with customizable error handling.
-///
-/// Combines file reading with parsing, handling the common pattern of:
-/// 1. Read file (returning `Ok(None)` if not found)
-/// 2. Map I/O errors using the provided `read_error` constructor
-/// 3. Parse content using the provided `parse` function
-///
-/// # Parse Function Contract
-///
-/// The `parse` closure should return:
-/// - `Ok(Some(value))` when content is valid and successfully parsed
-/// - `Ok(None)` when content is empty or indicates absence (e.g., empty PID file)
-/// - `Err(...)` when content is malformed and cannot be parsed
-fn read_and_parse<T, R, P>(
-    dir: &Dir,
-    filename: &str,
-    read_error: R,
-    parse: P,
-) -> Result<Option<T>, LifecycleError>
-where
-    R: FnOnce(io::Error) -> LifecycleError,
-    P: FnOnce(&str) -> Result<Option<T>, LifecycleError>,
-{
-    let Some(content) = read_optional_file(dir, filename).map_err(read_error)? else {
-        return Ok(None);
-    };
-    parse(&content)
-}
-
-/// Macro to define a runtime file reader with custom parsing logic.
-macro_rules! define_reader {
-    (
-        $(#[$attr:meta])*
-        $vis:vis fn $name:ident(
-            dir: &Dir,
-            filename: &str,
-            full_path: &Path,
-        ) -> Result<Option<$ret_ty:ty>, LifecycleError> {
-            read_error: $read_variant:ident,
-            parse_error: $parse_variant:ident,
-            parse: $parse_expr:expr
-        }
-    ) => {
-        $(#[$attr])*
-        $vis fn $name(
-            dir: &Dir,
-            filename: &str,
-            full_path: &Path,
-        ) -> Result<Option<$ret_ty>, LifecycleError> {
-            read_and_parse(
-                dir,
-                filename,
-                |source| LifecycleError::$read_variant {
-                    path: full_path.to_path_buf(),
-                    source,
-                },
-                |content| {
-                    let trimmed = content.trim();
-                    if trimmed.is_empty() {
-                        return Ok(None);
-                    }
-                    $parse_expr(trimmed)
-                        .map(Some)
-                        .map_err(|source| LifecycleError::$parse_variant {
-                            path: full_path.to_path_buf(),
-                            source,
-                        })
-                },
-            )
-        }
-    };
-}
-
 /// Waits for the daemon to report ready status within the given timeout.
 ///
 /// Monitors the health snapshot file and child process status, returning when
@@ -208,7 +127,7 @@ pub(super) fn wait_for_ready(
     // PID check and rely solely on the timestamp to identify fresh snapshots.
     let mut daemonized = false;
     while deadline.is_none_or(|d| Instant::now() < d) {
-        poll_spawned_child(child, &mut daemonized)?;
+        poll_spawned_child(child, paths.runtime_dir(), &mut daemonized)?;
         let monitor = ProcessMonitorContext {
             started_at,
             expected_pid,
@@ -227,7 +146,11 @@ pub(super) fn wait_for_ready(
     })
 }
 
-fn poll_spawned_child(child: &mut Child, daemonized: &mut bool) -> Result<(), LifecycleError> {
+fn poll_spawned_child(
+    child: &mut Child,
+    runtime_dir: &std::path::Path,
+    daemonized: &mut bool,
+) -> Result<(), LifecycleError> {
     if *daemonized {
         return Ok(());
     }
@@ -242,6 +165,7 @@ fn poll_spawned_child(child: &mut Child, daemonized: &mut bool) -> Result<(), Li
     if !status.success() {
         return Err(LifecycleError::StartupFailed {
             exit_status: status.code(),
+            runtime_dir: runtime_dir.to_path_buf(),
         });
     }
     *daemonized = true;
@@ -264,44 +188,6 @@ fn next_poll_interval(deadline: Option<Instant>) -> Duration {
         Some(limit) => limit
             .checked_duration_since(Instant::now())
             .map_or(Duration::ZERO, |remaining| remaining.min(POLL_INTERVAL)),
-    }
-}
-
-define_reader! {
-    /// Reads and parses the daemon health snapshot from the runtime directory.
-    ///
-    /// Returns:
-    /// * `Ok(Some(snapshot))` - Health snapshot was successfully read and parsed.
-    /// * `Ok(None)` - Health file does not exist.
-    /// * `Err(ReadHealth)` - I/O error reading the file.
-    /// * `Err(ParseHealth)` - File exists but contains invalid JSON.
-    pub(super) fn read_health(
-        dir: &Dir,
-        filename: &str,
-        full_path: &Path,
-    ) -> Result<Option<HealthSnapshot>, LifecycleError> {
-        read_error: ReadHealth,
-        parse_error: ParseHealth,
-        parse: serde_json::from_str
-    }
-}
-
-define_reader! {
-    /// Reads and parses the daemon PID from the runtime directory.
-    ///
-    /// Returns:
-    /// * `Ok(Some(pid))` - PID was successfully read and parsed.
-    /// * `Ok(None)` - PID file does not exist or is empty.
-    /// * `Err(ReadPid)` - I/O error reading the file.
-    /// * `Err(ParsePid)` - File exists but does not contain a valid integer.
-    pub(super) fn read_pid(
-        dir: &Dir,
-        filename: &str,
-        full_path: &Path,
-    ) -> Result<Option<u32>, LifecycleError> {
-        read_error: ReadPid,
-        parse_error: ParsePid,
-        parse: |s: &str| s.parse::<u32>()
     }
 }
 

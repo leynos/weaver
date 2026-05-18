@@ -1,0 +1,17 @@
+---
+source: crates/weaverd/src/dispatch/handler/tests.rs
+expression: "serde_json::from_str::<serde_json::Value>(&format_structured_event(&event)).expect(\"structured event should serialize as JSON\")"
+---
+{
+  "body": "<redacted>",
+  "endpoint": "[endpoint]",
+  "env": "<redacted>",
+  "event": "request_too_large",
+  "fullPayload": "<redacted>",
+  "max_size": 1024,
+  "patch": "<redacted>",
+  "runtime_dir": "[runtime_dir]",
+  "size": 2048,
+  "source": "<redacted>",
+  "weaverd.health": "[health_path]"
+}

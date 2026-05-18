@@ -93,8 +93,14 @@ impl TestDaemon {
         let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
         let backend_manager = BackendManager::new(Arc::clone(&backends));
         let workspace_root = required_result(std::env::current_dir(), "workspace root");
+        let endpoint = format!("tcp://{address}");
         let handler = Arc::new(required_result(
-            DispatchConnectionHandler::new(backend_manager.clone(), workspace_root),
+            DispatchConnectionHandler::new(
+                backend_manager.clone(),
+                workspace_root,
+                endpoint,
+                std::env::temp_dir(),
+            ),
             "absolute workspace root",
         ));
 
@@ -342,9 +348,53 @@ fn required_result<T, E: std::fmt::Display>(result: Result<T, E>, context: &str)
     }
 }
 
-const _: usize = std::mem::size_of::<CacheTranscript>();
-const _: usize = std::mem::size_of::<GetCardRequest<'static>>();
-const _: usize = std::mem::size_of::<GraphSliceRequest<'static>>();
-const _: fn(&TestDaemon, GetCardRequest<'static>) -> Transcript = run_get_card;
-const _: fn(&TestDaemon, GraphSliceRequest<'static>) -> Transcript = run_graph_slice;
-const _: fn(&str, &str) = assert_named_snapshot;
+#[cfg(test)]
+mod test_support_type_usage {
+    //! Ensures support helpers are referenced in compilation for strict lint profiles.
+    use super::*;
+
+    #[test]
+    fn test_build_reference_support_items() {
+        let cache_transcript = CacheTranscript {
+            first: Transcript {
+                command: String::from("<command>"),
+                status: 0,
+                stdout: String::new(),
+                stderr: String::new(),
+            },
+            second: Transcript {
+                command: String::from("<command>"),
+                status: 0,
+                stdout: String::new(),
+                stderr: String::new(),
+            },
+            cache_hits: 0,
+            cache_misses: 0,
+        };
+        let get_card_request = GetCardRequest {
+            uri: "file:///tmp/example",
+            line: 0,
+            column: 0,
+            detail: "semantic",
+        };
+        let graph_slice_request = GraphSliceRequest {
+            uri: "file:///tmp/example",
+            line: 0,
+            column: 0,
+            entry_detail: "semantic",
+            node_detail: "semantic",
+            max_cards: None,
+        };
+        let run_get_card_fn: for<'a> fn(&'a TestDaemon, GetCardRequest<'a>) -> Transcript =
+            run_get_card;
+        let run_graph_slice_fn: for<'a> fn(&'a TestDaemon, GraphSliceRequest<'a>) -> Transcript =
+            run_graph_slice;
+        let _ = (
+            cache_transcript,
+            get_card_request,
+            graph_slice_request,
+            run_get_card_fn,
+            run_graph_slice_fn,
+        );
+    }
+}
