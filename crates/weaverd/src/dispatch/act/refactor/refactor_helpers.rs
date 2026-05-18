@@ -369,28 +369,30 @@ pub(crate) mod content {
 #[cfg(test)]
 mod lint_compliance_tests {
     //! Regression tests for helper-module lint policy compliance.
-
-    fn refactor_helpers_source() -> &'static str { include_str!("refactor_helpers.rs") }
-
     #[test]
     fn refactor_helpers_avoids_dead_code_suppression_patterns() {
-        let source = refactor_helpers_source();
+        let compact: String = include_str!("refactor_helpers.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap_or("")
+            .chars()
+            .filter(|character| !character.is_whitespace())
+            .collect();
         let file_wide_allow = ["#![", "allow("].concat();
         let item_dead_code_allow = ["#[", "allow(dead_code"].concat();
-        let dead_code_witness = ["const", " _:"].concat();
-
+        let dead_code_witness = "const_:";
         assert!(
-            !source.contains(&file_wide_allow),
+            !compact.contains(&file_wide_allow),
             "refactor_helpers.rs contains forbidden pattern `{file_wide_allow}`; file-wide \
              blanket lint allows are banned by project policy.",
         );
         assert!(
-            !source.contains(&item_dead_code_allow),
+            !compact.contains(&item_dead_code_allow),
             "refactor_helpers.rs contains forbidden pattern `{item_dead_code_allow}`; item-level \
              dead-code allows without a reason are banned by project policy.",
         );
         assert!(
-            !source.contains(&dead_code_witness),
+            !compact.contains(dead_code_witness),
             "refactor_helpers.rs contains forbidden pattern `{dead_code_witness}`; anonymous \
              const witnesses must not be used to mask dead-code lints.",
         );
