@@ -208,7 +208,7 @@ fn install_recording_subscriber(events: &Arc<Mutex<Vec<CapturedEvent>>>) {
     let subscriber = Registry::default().with(RecordingLayer {
         events: Arc::clone(events),
     });
-    let _ = tracing::subscriber::set_global_default(subscriber);
+    tracing::subscriber::set_global_default(subscriber).ok();
 }
 
 /// Creates a connected dispatch handler harness with a temporary workspace.
