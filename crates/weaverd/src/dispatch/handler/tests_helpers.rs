@@ -33,6 +33,18 @@ use super::*;
 use crate::{backends::FusionBackends, semantic_provider::SemanticBackendProvider};
 
 static CAPTURED_EVENTS: OnceLock<Arc<Mutex<Vec<CapturedEvent>>>> = OnceLock::new();
+static CAPTURE_WINDOW_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
+
+/// Backend manager test fixture that keeps socket paths alive.
+pub(crate) struct BackendManagerFixture {
+    manager: BackendManager,
+    _temp_dir: TempDir,
+}
+
+impl BackendManagerFixture {
+    /// Returns the backend manager used by a dispatch handler test.
+    pub(crate) fn manager(&self) -> BackendManager { self.manager.clone() }
+}
 
 /// Builds an isolated backend manager for dispatch handler tests.
 ///
@@ -45,7 +57,7 @@ static CAPTURED_EVENTS: OnceLock<Arc<Mutex<Vec<CapturedEvent>>>> = OnceLock::new
 /// let backend_manager = backend_manager().expect("backend manager");
 /// ```
 #[fixture]
-pub(crate) fn backend_manager() -> Result<BackendManager, String> {
+pub(crate) fn backend_manager() -> Result<BackendManagerFixture, String> {
     let temp_dir = TempDir::new().map_err(|error| format!("temporary directory: {error}"))?;
     let socket_path = temp_dir.path().join("socket.sock");
     let config = Config {
@@ -55,7 +67,10 @@ pub(crate) fn backend_manager() -> Result<BackendManager, String> {
     let provider =
         SemanticBackendProvider::new(CapabilityMatrix::default(), DEFAULT_CACHE_CAPACITY);
     let backends = Arc::new(Mutex::new(FusionBackends::new(config, provider)));
-    Ok(BackendManager::new(backends))
+    Ok(BackendManagerFixture {
+        manager: BackendManager::new(backends),
+        _temp_dir: temp_dir,
+    })
 }
 
 /// Connected dispatch handler harness used by tests.
@@ -181,6 +196,9 @@ where
 /// assert_eq!(events.len(), 1);
 /// ```
 pub(crate) fn capture_events(action: impl FnOnce()) -> Vec<CapturedEvent> {
+    let _capture_window = capture_window_mutex()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let events = captured_events();
     clear_events(&events);
     install_recording_subscriber(&events);
@@ -195,6 +213,10 @@ fn captured_events() -> Arc<Mutex<Vec<CapturedEvent>>> {
     CAPTURED_EVENTS
         .get_or_init(|| Arc::new(Mutex::new(Vec::new())))
         .clone()
+}
+
+fn capture_window_mutex() -> &'static Mutex<()> {
+    CAPTURE_WINDOW_MUTEX.get_or_init(|| Mutex::new(()))
 }
 
 fn clear_events(events: &Arc<Mutex<Vec<CapturedEvent>>>) {
@@ -218,9 +240,9 @@ fn install_recording_subscriber(events: &Arc<Mutex<Vec<CapturedEvent>>>) {
 /// handler over a real TCP connection.
 #[fixture]
 pub(crate) fn harness(
-    backend_manager: Result<BackendManager, String>,
+    backend_manager: Result<BackendManagerFixture, String>,
 ) -> Result<HandlerTestHarness, String> {
-    let backend_manager = backend_manager?;
+    let backend_manager = backend_manager?.manager();
     let temp_dir = TempDir::new().map_err(|error| format!("temporary directory: {error}"))?;
     let (listener, addr) = create_listener()?;
     let workspace_root = temp_dir.path().join("weaverd-test-workspace");

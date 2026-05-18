@@ -22,7 +22,7 @@ fn receive_request_handler() -> Result<(DispatchConnectionHandler, tempfile::Tem
     let workspace_root = temp_dir.path().join("workspace");
     let endpoint = temp_dir.path().join("weaverd-test/socket.sock");
     let handler = DispatchConnectionHandler::new(
-        backend_manager()?,
+        backend_manager()?.manager(),
         workspace_root,
         endpoint.to_string_lossy().into_owned(),
         temp_dir.path().to_path_buf(),
