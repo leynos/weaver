@@ -2,11 +2,20 @@
 
 use std::{io::Write, net::TcpStream, thread};
 
+use rstest::rstest;
+
 use super::{
     tests_helpers::{backend_manager, create_listener},
     *,
 };
 use crate::transport::ConnectionStream;
+
+#[derive(Debug, Clone, Copy)]
+enum ExpectedDispatchError {
+    MalformedJsonl,
+    InvalidStructure,
+    RequestTooLarge,
+}
 
 fn receive_request_handler() -> Result<(DispatchConnectionHandler, tempfile::TempDir), String> {
     let temp_dir = tempfile::TempDir::new().map_err(|error| format!("temp dir: {error}"))?;
@@ -63,48 +72,42 @@ fn receive_request_accepts_valid_request() -> Result<(), String> {
     Ok(())
 }
 
-#[test]
-fn receive_request_rejects_malformed_json() -> Result<(), String> {
+#[rstest]
+#[case::malformed_json(b"not-json\n".to_vec(), ExpectedDispatchError::MalformedJsonl)]
+#[case::invalid_request(
+    b"{\"command\":{\"domain\":\"observe\",\"operation\":\"\"}}\n".to_vec(),
+    ExpectedDispatchError::InvalidStructure
+)]
+#[case::oversized_request(
+    vec![b'a'; weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES + 1],
+    ExpectedDispatchError::RequestTooLarge
+)]
+fn receive_request_rejects_bad_requests(
+    #[case] payload: Vec<u8>,
+    #[case] expected: ExpectedDispatchError,
+) -> Result<(), String> {
     let (handler, _temp_dir) = receive_request_handler()?;
-    let result = receive_request_from_bytes(&handler, b"not-json\n")?;
+    let result = receive_request_from_bytes(&handler, &payload)?;
 
-    assert!(matches!(
-        result,
-        Err(ReadRequestError::BadRequest(
-            DispatchError::MalformedJsonl { .. }
-        ))
-    ));
-    Ok(())
-}
-
-#[test]
-fn receive_request_rejects_invalid_request() -> Result<(), String> {
-    let (handler, _temp_dir) = receive_request_handler()?;
-    let result = receive_request_from_bytes(
-        &handler,
-        b"{\"command\":{\"domain\":\"observe\",\"operation\":\"\"}}\n",
-    )?;
-
-    assert!(matches!(
-        result,
-        Err(ReadRequestError::BadRequest(
-            DispatchError::InvalidStructure { .. }
-        ))
-    ));
-    Ok(())
-}
-
-#[test]
-fn receive_request_rejects_oversized_request() -> Result<(), String> {
-    let (handler, _temp_dir) = receive_request_handler()?;
-    let request = vec![b'a'; weaver_daemon_types::JSONL_REQUEST_MAX_LINE_BYTES + 1];
-    let result = receive_request_from_bytes(&handler, &request)?;
-
-    assert!(matches!(
-        result,
-        Err(ReadRequestError::BadRequest(
-            DispatchError::RequestTooLarge { .. }
-        ))
-    ));
+    match expected {
+        ExpectedDispatchError::MalformedJsonl => assert!(matches!(
+            result,
+            Err(ReadRequestError::BadRequest(
+                DispatchError::MalformedJsonl { .. }
+            ))
+        )),
+        ExpectedDispatchError::InvalidStructure => assert!(matches!(
+            result,
+            Err(ReadRequestError::BadRequest(
+                DispatchError::InvalidStructure { .. }
+            ))
+        )),
+        ExpectedDispatchError::RequestTooLarge => assert!(matches!(
+            result,
+            Err(ReadRequestError::BadRequest(
+                DispatchError::RequestTooLarge { .. }
+            ))
+        )),
+    }
     Ok(())
 }

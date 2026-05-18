@@ -287,7 +287,7 @@ error: failed to spawn weaverd binary 'weaverd'
 Valid alternatives:
   - Verify weaverd is installed and in your PATH
   - Set WEAVERD_BIN to the full path to the weaverd binary
-  - Inspect runtime artefacts under /run/user/1000/weaver
+  - Inspect runtime artefacts under $XDG_RUNTIME_DIR/weaver
 
 Next command:
   command -v weaverd || echo 'weaverd not found in PATH'
@@ -302,7 +302,7 @@ error: daemon exited before reporting ready (status: Some(1))
 
 Valid alternatives:
   - Check the daemon logs for errors
-  - Check health snapshot at /run/user/1000/weaver/weaverd.health
+  - Check health snapshot at $XDG_RUNTIME_DIR/weaver/weaverd.health
   - Run with WEAVER_FOREGROUND=1 to see startup output
 
 Next command:

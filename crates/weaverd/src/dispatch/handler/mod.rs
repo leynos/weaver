@@ -187,7 +187,6 @@ impl DispatchConnectionHandler {
                 );
                 tracing::warn!(target: DISPATCH_TARGET, %error, "dispatch infrastructure error");
                 self.write_error_response(&context, writer, &error);
-                self.write_exit_status(&context, error.exit_status(), writer);
             }
         }
     }
