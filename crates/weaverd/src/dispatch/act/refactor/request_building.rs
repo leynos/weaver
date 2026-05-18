@@ -10,7 +10,7 @@ use weaver_plugins::{PluginRequest, capability::CapabilityId, protocol::FilePayl
 
 use super::{
     arguments,
-    positions::{line_col_to_byte_offset, parse_line_col},
+    positions::{LineCol, line_col_to_byte_offset},
     requirements::{
         capability_for_operation,
         effective_operation as supported_effective_operation,
@@ -27,7 +27,7 @@ struct CapabilityMappingContext<'a> {
     capability: CapabilityId,
     file_path: &'a Path,
     file_content: &'a str,
-    position: Option<&'a str>,
+    position: Option<LineCol>,
 }
 
 /// Resolves the target file, reads its content, builds the [`PluginRequest`],
@@ -53,7 +53,7 @@ pub(super) fn prepare_plugin_request(
             capability,
             file_path: &resolved_file.path,
             file_content: &file_content,
-            position: args.position.as_deref(),
+            position: args.position,
         },
     )?;
     plugin_args.insert(
@@ -174,7 +174,7 @@ fn apply_rename_symbol_mapping(
     plugin_args: &mut HashMap<String, serde_json::Value>,
     file: &Path,
     file_content: &str,
-    position: Option<&str>,
+    position: Option<LineCol>,
 ) -> Result<(), DispatchError> {
     plugin_args.insert(
         String::from("uri"),
@@ -189,12 +189,6 @@ fn apply_rename_symbol_mapping(
                 .to_string(),
         ),
     );
-    if position.is_some() && plugin_args.contains_key("offset") {
-        return Err(invalid_rename_arguments(
-            file,
-            "refactor rename must not supply both '--position' and deprecated 'offset='",
-        ));
-    }
     if plugin_args.contains_key("position") {
         return Err(invalid_rename_arguments(
             file,
@@ -203,9 +197,8 @@ fn apply_rename_symbol_mapping(
         ));
     }
     if let Some(position) = position {
-        let (line, column) =
-            parse_line_col(position).map_err(|error| add_file_context(file, error))?;
-        let offset = line_col_to_byte_offset(file_content, line, column, Some(file))?;
+        let offset =
+            line_col_to_byte_offset(file_content, position.line, position.column, Some(file))?;
         plugin_args.insert(
             String::from("position"),
             serde_json::Value::String(offset.to_string()),
@@ -235,7 +228,7 @@ fn apply_rename_symbol_mapping(
 
 fn rename_symbol_input_form(
     plugin_args: &HashMap<String, serde_json::Value>,
-    position: Option<&str>,
+    position: Option<LineCol>,
 ) -> &'static str {
     match (position.is_some(), plugin_args.contains_key("offset")) {
         (true, true) => "position_and_deprecated_offset",
@@ -247,13 +240,6 @@ fn rename_symbol_input_form(
 
 fn invalid_rename_arguments(file: &Path, message: &str) -> DispatchError {
     DispatchError::invalid_arguments(format!("{message} for '{}'", file.display()))
-}
-
-fn add_file_context(file: &Path, error: DispatchError) -> DispatchError {
-    match error {
-        DispatchError::InvalidArguments { message } => invalid_rename_arguments(file, &message),
-        other => other,
-    }
 }
 
 #[cfg(test)]

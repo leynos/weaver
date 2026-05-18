@@ -948,7 +948,9 @@ below.
 `crates/weaverd/src/dispatch/act/refactor/positions.rs` owns parsing and
 conversion for human source positions.
 
-`parse_line_col(value: &str) -> Result<(u32, u32), DispatchError>` accepts
+`LineCol` is the validated domain type for one-indexed line and
+Unicode-character column values.
+`parse_line_col(value: &str) -> Result<LineCol, DispatchError>` accepts
 `LINE:COL` values. Both components are one-indexed, and zero values are
 rejected before request construction continues.
 
@@ -966,18 +968,18 @@ line content and before any line ending.
 
 ### `arguments` (`weaverd/src/dispatch/act/refactor/arguments.rs`)
 
-`RefactorArgs` carries the optional `position: Option<String>` field alongside
+`RefactorArgs` carries the optional `position: Option<LineCol>` field alongside
 `provider`, `refactoring`, `file`, and trailing `KEY=VALUE` arguments. The
-internal `RefactorArgsBuilder` has the matching `position: Option<String>`
-field so parsing can validate the flag while preserving the original value for
-later conversion.
+internal `RefactorArgsBuilder` has the matching `position: Option<LineCol>`
+field so parsing stores the validated domain value instead of preserving a raw
+string for later reparsing.
 
 The `--position` flag path runs through `parse_position_flag`. That helper
 consumes the flag value, delegates to `parse_line_col` for early validation,
-and then stores the validated string as-is on `RefactorArgs`. The byte-offset
-conversion happens later, after request building has loaded the target file
-content.
-
+and then stores the validated `LineCol` on `RefactorArgs`. The builder also
+rejects requests that provide both `--position` and deprecated trailing
+`offset=` before request building begins. The byte-offset conversion happens
+later, after request building has loaded the target file content.
 
 ### `request_building` (`weaverd/src/dispatch/act/refactor/request_building.rs`)
 
@@ -993,15 +995,13 @@ leave plugin arguments unchanged.
 `apply_rename_symbol_mapping` applies the rename-specific argument rules in a
 fixed order:
 
-1. Reject the request when both `--position` and deprecated `offset=` are
-   present.
-2. Reject the request when `position` already exists in `plugin_args`, because
+1. Reject the request when `position` already exists in `plugin_args`, because
    trailing `position=` is reserved for the internal plugin contract.
-3. When `--position` is present, parse `LINE:COL` and convert it to a byte
-   offset with `line_col_to_byte_offset`.
-4. When only the deprecated form is present, consume `offset=` from
+2. When `--position` is present, convert the parsed `LineCol` to a byte offset
+   with `line_col_to_byte_offset`.
+3. When only the deprecated form is present, consume `offset=` from
    `plugin_args` and forward it as the plugin-contract `position` value.
-5. Return an invalid-arguments error when neither `--position` nor `offset=`
+4. Return an invalid-arguments error when neither `--position` nor `offset=`
    is available.
 ## Dispatch lifecycle observability internals
 

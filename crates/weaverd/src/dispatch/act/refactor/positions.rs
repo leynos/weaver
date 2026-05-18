@@ -13,14 +13,21 @@ use crate::dispatch::errors::DispatchError;
 static POSITION_PARSE_ERROR_COUNT: AtomicU64 = AtomicU64::new(0);
 static POSITION_CONVERSION_ERROR_COUNT: AtomicU64 = AtomicU64::new(0);
 
+/// A validated, one-indexed line and Unicode-character column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct LineCol {
+    pub line: u32,
+    pub column: u32,
+}
+
 /// Parses a one-indexed `LINE:COL` value.
-pub(super) fn parse_line_col(value: &str) -> Result<(u32, u32), DispatchError> {
+pub(super) fn parse_line_col(value: &str) -> Result<LineCol, DispatchError> {
     parse_line_col_inner(value).inspect_err(|error| {
         increment_position_parse_error(value, error);
     })
 }
 
-fn parse_line_col_inner(value: &str) -> Result<(u32, u32), DispatchError> {
+fn parse_line_col_inner(value: &str) -> Result<LineCol, DispatchError> {
     let (line_str, column_str) = value.split_once(':').ok_or_else(|| {
         DispatchError::invalid_arguments(format!("position must be LINE:COL, got: {value}"))
     })?;
@@ -41,7 +48,7 @@ fn parse_line_col_inner(value: &str) -> Result<(u32, u32), DispatchError> {
         ));
     }
 
-    Ok((line, column))
+    Ok(LineCol { line, column })
 }
 
 /// Converts a one-indexed line and Unicode-character column into a byte offset.
@@ -166,7 +173,7 @@ mod tests {
 
     use rstest::rstest;
 
-    use super::{line_col_to_byte_offset, parse_line_col};
+    use super::{LineCol, line_col_to_byte_offset, parse_line_col};
     use crate::dispatch::errors::DispatchError;
 
     fn invalid_arguments_message(error: DispatchError) -> String {
@@ -177,9 +184,9 @@ mod tests {
     }
 
     #[rstest]
-    #[case::start("1:1", (1, 1))]
-    #[case::middle("12:34", (12, 34))]
-    fn parse_line_col_accepts_valid_values(#[case] value: &str, #[case] expected: (u32, u32)) {
+    #[case::start("1:1", LineCol { line: 1, column: 1 })]
+    #[case::middle("12:34", LineCol { line: 12, column: 34 })]
+    fn parse_line_col_accepts_valid_values(#[case] value: &str, #[case] expected: LineCol) {
         assert_eq!(parse_line_col(value).expect("position parses"), expected);
     }
 
@@ -238,7 +245,7 @@ mod tests {
 
         use proptest::{collection::vec, prelude::*};
 
-        use super::{line_col_to_byte_offset, parse_line_col};
+        use super::{LineCol, line_col_to_byte_offset, parse_line_col};
 
         fn ascii_line_strategy() -> impl Strategy<Value = String> {
             vec(0x20u8..=0x7eu8, 0..=128)
@@ -365,7 +372,7 @@ mod tests {
                 let value = format!("{line}:{column}");
 
                 let parsed = parse_line_col(&value).expect("generated position parses");
-                prop_assert_eq!(parsed, (line, column));
+                prop_assert_eq!(parsed, LineCol { line, column });
             }
         }
     }

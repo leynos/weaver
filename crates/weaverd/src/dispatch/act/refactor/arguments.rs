@@ -4,7 +4,7 @@
 //! execution so the handler can stay within the repository's file-size limit.
 
 use super::{
-    positions::parse_line_col,
+    positions::{LineCol, parse_line_col},
     requirements::{missing_requirements_error, validate_provider, validate_refactoring},
 };
 use crate::dispatch::errors::DispatchError;
@@ -15,7 +15,7 @@ pub(crate) struct RefactorArgs {
     pub(crate) provider: String,
     pub(crate) refactoring: String,
     pub(crate) file: String,
-    pub(crate) position: Option<String>,
+    pub(crate) position: Option<LineCol>,
     pub(crate) extra: Vec<String>,
 }
 
@@ -25,7 +25,7 @@ struct RefactorArgsBuilder {
     provider: Option<String>,
     refactoring: Option<String>,
     file: Option<String>,
-    position: Option<String>,
+    position: Option<LineCol>,
     extra: Vec<String>,
 }
 
@@ -44,6 +44,11 @@ impl RefactorArgsBuilder {
         let position = self.position;
         if position.is_none() && !has_deprecated_offset_argument(&self.extra) {
             return Err(missing_requirements_error());
+        }
+        if position.is_some() && has_deprecated_offset_argument(&self.extra) {
+            return Err(DispatchError::invalid_arguments(
+                "refactor rename must not supply both '--position' and deprecated 'offset='",
+            ));
         }
         let invalid_extra_arguments: Vec<&str> = self
             .extra
@@ -115,9 +120,6 @@ fn apply_flag<'a>(
         "--position" => {
             let position = parse_position_flag(arg, iter)?;
             builder.position = Some(position);
-            if let Some(position) = builder.position.as_deref() {
-                tracing::debug!(position, "stored valid act refactor position flag");
-            }
         }
         other => builder.extra.push(other.to_owned()),
     }
@@ -127,10 +129,11 @@ fn apply_flag<'a>(
 fn parse_position_flag<'a>(
     flag: &str,
     iter: &mut impl Iterator<Item = &'a String>,
-) -> Result<String, DispatchError> {
+) -> Result<LineCol, DispatchError> {
     let value = parse_flag_value(flag, iter)?;
-    parse_line_col(&value)?;
-    Ok(value)
+    let position = parse_line_col(&value)?;
+    tracing::debug!(position = value, "stored valid act refactor position flag");
+    Ok(position)
 }
 
 fn parse_flag_value<'a>(
@@ -168,7 +171,7 @@ mod tests {
 
     use rstest::rstest;
 
-    use super::parse_refactor_args;
+    use super::{LineCol, parse_refactor_args};
     use crate::dispatch::errors::DispatchError;
 
     fn invalid_arguments_message(error: DispatchError) -> String {
@@ -342,7 +345,7 @@ mod tests {
         assert_eq!(parsed.provider, "rope");
         assert_eq!(parsed.refactoring, "rename");
         assert_eq!(parsed.file, "src/main.py");
-        assert_eq!(parsed.position.as_deref(), Some("1:5"));
+        assert_eq!(parsed.position, Some(LineCol { line: 1, column: 5 }));
     }
 
     #[rstest]
