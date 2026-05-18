@@ -8,7 +8,7 @@ use std::{
     collections::BTreeMap,
     io::{BufRead, BufReader, Write},
     net::{SocketAddr, TcpListener, TcpStream},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, OnceLock},
     thread::{self, JoinHandle},
 };
 
@@ -31,6 +31,8 @@ use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
 use super::*;
 use crate::{backends::FusionBackends, semantic_provider::SemanticBackendProvider};
+
+static CAPTURED_EVENTS: OnceLock<Arc<Mutex<Vec<CapturedEvent>>>> = OnceLock::new();
 
 /// Builds an isolated backend manager for dispatch handler tests.
 ///
@@ -163,10 +165,12 @@ where
     }
 }
 
-/// Runs `action` under a subscriber that records all emitted tracing events.
+/// Runs `action` while recording all emitted tracing events.
 ///
-/// Use this helper when asserting on structured dispatch logging without
-/// wiring a bespoke subscriber in each test.
+/// Use this helper when asserting on structured dispatch logging without wiring
+/// a bespoke subscriber in each test. The recording layer is installed as the
+/// process-wide test subscriber, so events emitted by the server thread spawned
+/// by [`harness`] are captured as well as events emitted on the calling thread.
 ///
 /// # Examples
 ///
@@ -177,15 +181,34 @@ where
 /// assert_eq!(events.len(), 1);
 /// ```
 pub(crate) fn capture_events(action: impl FnOnce()) -> Vec<CapturedEvent> {
-    let events = Arc::new(Mutex::new(Vec::new()));
-    let subscriber = Registry::default().with(RecordingLayer {
-        events: Arc::clone(&events),
-    });
-    tracing::subscriber::with_default(subscriber, action);
+    let events = captured_events();
+    clear_events(&events);
+    install_recording_subscriber(&events);
+    action();
     let mut events = events
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     events.drain(..).collect()
+}
+
+fn captured_events() -> Arc<Mutex<Vec<CapturedEvent>>> {
+    CAPTURED_EVENTS
+        .get_or_init(|| Arc::new(Mutex::new(Vec::new())))
+        .clone()
+}
+
+fn clear_events(events: &Arc<Mutex<Vec<CapturedEvent>>>) {
+    events
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clear();
+}
+
+fn install_recording_subscriber(events: &Arc<Mutex<Vec<CapturedEvent>>>) {
+    let subscriber = Registry::default().with(RecordingLayer {
+        events: Arc::clone(events),
+    });
+    let _ = tracing::subscriber::set_global_default(subscriber);
 }
 
 /// Creates a connected dispatch handler harness with a temporary workspace.

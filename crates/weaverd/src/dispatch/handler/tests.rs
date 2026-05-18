@@ -195,7 +195,9 @@ fn serialize_request_too_large_event_snapshot() {
     );
     event.patch = Some("--- a/foo.rs\n+++ b/foo.rs".to_string());
     event.body = Some("some body".to_string());
+    event.source = Some("fn main() {}".to_string());
     event.env = Some("SECRET=value".to_string());
+    event.full_payload = Some("{\"command\":\"redacted\"}".to_string());
     insta::with_settings!({
         redactions => vec![
             (".endpoint", "[endpoint]".into()),
