@@ -60,7 +60,8 @@ impl RefactorArgsBuilder {
         let Some(file) = self.file else {
             return Err(missing_requirements_error());
         };
-        validate_position_contract(self.position, &self.extra)?;
+        let position = self.position;
+        validate_position_contract(position, &self.extra)?;
         validate_trailing_extra_arguments(&self.extra)?;
         validate_provider(&provider)?;
         validate_refactoring(&refactoring)?;
@@ -68,7 +69,7 @@ impl RefactorArgsBuilder {
             provider,
             refactoring,
             file,
-            position: self.position,
+            position,
             extra: self.extra,
         })
     }
@@ -88,15 +89,15 @@ fn validate_position_contract(
     Ok(())
 }
 fn validate_trailing_extra_arguments(extra: &[String]) -> Result<(), DispatchError> {
-    let invalid: Vec<&str> = extra
+    let invalid_extra_arguments: Vec<&str> = extra
         .iter()
         .map(String::as_str)
         .filter(|argument| !is_valid_extra_argument(argument))
         .collect();
-    if invalid.is_empty() {
+    if invalid_extra_arguments.is_empty() {
         return Ok(());
     }
-    let offending_tokens = invalid
+    let offending_tokens = invalid_extra_arguments
         .iter()
         .map(|token| format!("'{token}'"))
         .collect::<Vec<_>>()
@@ -362,7 +363,6 @@ mod tests {
         assert_eq!(parsed.file, "src/main.py");
         assert_eq!(parsed.position, Some(LineCol { line: 1, column: 5 }));
     }
-
     #[rstest]
     #[case::no_arguments(Vec::new())]
     #[case::missing_provider(args(&["--refactoring", "rename", "--file", "src/main.py"]))]
