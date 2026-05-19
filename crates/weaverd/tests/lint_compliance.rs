@@ -11,6 +11,7 @@ use rstest::rstest;
 
 const HELPER_SRC: &str = include_str!("../src/dispatch/act/refactor/refactor_helpers.rs");
 
+/// Returns `refactor_helpers.rs` without its in-file lint compliance tests.
 fn refactor_helpers_source() -> &'static str {
     &HELPER_SRC[..HELPER_SRC.rfind("#[cfg(test)]").unwrap_or(HELPER_SRC.len())]
 }
