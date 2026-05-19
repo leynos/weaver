@@ -942,7 +942,6 @@ in the earlier
 section; the production conversion path lives in the daemon modules described
 below.
 
-
 ### `positions` (`weaverd/src/dispatch/act/refactor/positions.rs`)
 
 `crates/weaverd/src/dispatch/act/refactor/positions.rs` owns parsing and
@@ -1003,6 +1002,7 @@ fixed order:
    `plugin_args` and forward it as the plugin-contract `position` value.
 4. Return an invalid-arguments error when neither `--position` nor `offset=`
    is available.
+
 ## Dispatch lifecycle observability internals
 
 This section documents the dispatch and startup-observability helpers added for
