@@ -60,45 +60,52 @@ impl RefactorArgsBuilder {
         let Some(file) = self.file else {
             return Err(missing_requirements_error());
         };
-        let position = self.position;
-        if position.is_none() && !has_deprecated_offset_argument(&self.extra) {
-            return Err(missing_requirements_error());
-        }
-        if position.is_some() && has_deprecated_offset_argument(&self.extra) {
-            return Err(DispatchError::invalid_arguments(
-                "refactor rename must not supply both '--position' and deprecated 'offset='",
-            ));
-        }
-        let invalid_extra_arguments: Vec<&str> = self
-            .extra
-            .iter()
-            .map(String::as_str)
-            .filter(|extra| !is_valid_extra_argument(extra))
-            .collect();
-        if !invalid_extra_arguments.is_empty() {
-            let offending_tokens = invalid_extra_arguments
-                .iter()
-                .map(|token| format!("'{token}'"))
-                .collect::<Vec<_>>()
-                .join(", ");
-            return Err(DispatchError::invalid_arguments(format!(
-                "act refactor only accepts trailing KEY=VALUE arguments; invalid trailing \
-                 arguments: {offending_tokens}. Use only --provider <plugin>, --refactoring \
-                 <operation>, --file <path>, --position <line:col>, and trailing KEY=VALUE \
-                 arguments"
-            )));
-        }
-
+        validate_position_contract(self.position, &self.extra)?;
+        validate_trailing_extra_arguments(&self.extra)?;
         validate_provider(&provider)?;
         validate_refactoring(&refactoring)?;
         Ok(RefactorArgs {
             provider,
             refactoring,
             file,
-            position,
+            position: self.position,
             extra: self.extra,
         })
     }
+}
+fn validate_position_contract(
+    position: Option<LineCol>,
+    extra: &[String],
+) -> Result<(), DispatchError> {
+    if position.is_none() && !has_deprecated_offset_argument(extra) {
+        return Err(missing_requirements_error());
+    }
+    if position.is_some() && has_deprecated_offset_argument(extra) {
+        return Err(DispatchError::invalid_arguments(
+            "refactor rename must not supply both '--position' and deprecated 'offset='",
+        ));
+    }
+    Ok(())
+}
+fn validate_trailing_extra_arguments(extra: &[String]) -> Result<(), DispatchError> {
+    let invalid: Vec<&str> = extra
+        .iter()
+        .map(String::as_str)
+        .filter(|argument| !is_valid_extra_argument(argument))
+        .collect();
+    if invalid.is_empty() {
+        return Ok(());
+    }
+    let offending_tokens = invalid
+        .iter()
+        .map(|token| format!("'{token}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    Err(DispatchError::invalid_arguments(format!(
+        "act refactor only accepts trailing KEY=VALUE arguments; invalid trailing arguments: \
+         {offending_tokens}. Use only --provider <plugin>, --refactoring <operation>, --file \
+         <path>, --position <line:col>, and trailing KEY=VALUE arguments"
+    )))
 }
 pub(crate) fn parse_refactor_args(
     arguments: &[String],
@@ -164,7 +171,6 @@ fn is_valid_extra_argument(argument: &str) -> bool {
     if argument.starts_with("--") {
         return false;
     }
-
     let Some((key, _value)) = argument.split_once('=') else {
         return false;
     };
@@ -178,7 +184,6 @@ fn has_deprecated_offset_argument(arguments: &[String]) -> bool {
 #[cfg(test)]
 mod tests {
     //! Unit tests for act refactor argument parsing.
-
     use rstest::rstest;
 
     use super::{LineCol, parse_refactor_args};
@@ -337,7 +342,6 @@ mod tests {
     ) {
         assert_invalid_args_contains(args, &expected_substrings);
     }
-
     #[test]
     fn parses_complete_argument_set() {
         let args = args(&[
