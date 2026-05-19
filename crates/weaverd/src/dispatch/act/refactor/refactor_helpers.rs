@@ -1,15 +1,5 @@
-//! Shared `#[cfg(test)]` helper module for `act refactor` tests.
-//!
-//! Sibling test modules such as `tests.rs`, `contract_tests.rs`,
-//! `rollback_tests.rs`, and `behaviour.rs` import these helpers with
-//! `use crate::dispatch::act::refactor::refactor_helpers::...`.
-//!
-//! The parent `act::refactor` module declares this file once under
-//! `#[cfg(test)]`, so the `weaverd` test build compiles it once as a named
-//! module. That single compiled shape keeps cross-test helper usage visible to
-//! Rust's dead-code analysis, so no dead-code suppression attributes are
-//! required.
-
+//! Shared `#[cfg(test)]` helper module for `act refactor` tests, kept visible to dead-code analysis
+//! without lint suppression attributes.
 pub(crate) mod builders {
     //! Synthetic request and backend builders for refactor tests.
 
@@ -371,10 +361,8 @@ mod lint_compliance_tests {
     //! Regression tests for helper-module lint policy compliance.
     #[test]
     fn refactor_helpers_avoids_dead_code_suppression_patterns() {
-        let compact: String = include_str!("refactor_helpers.rs")
-            .split("#[cfg(test)]")
-            .next()
-            .unwrap_or("")
+        let source = include_str!("refactor_helpers.rs");
+        let compact: String = source[..source.rfind("#[cfg(test)]").unwrap_or(source.len())]
             .chars()
             .filter(|character| !character.is_whitespace())
             .collect();
@@ -383,18 +371,30 @@ mod lint_compliance_tests {
         let dead_code_witness = "const_:";
         assert!(
             !compact.contains(&file_wide_allow),
-            "refactor_helpers.rs contains forbidden pattern `{file_wide_allow}`; file-wide \
-             blanket lint allows are banned by project policy.",
+            concat!(
+                "refactor_helpers.rs contains forbidden pattern `",
+                "{file_wide_allow}`; file-wide ",
+                "blanket lint allows are banned by project policy."
+            ),
+            file_wide_allow = file_wide_allow,
         );
         assert!(
             !compact.contains(&item_dead_code_allow),
-            "refactor_helpers.rs contains forbidden pattern `{item_dead_code_allow}`; item-level \
-             dead-code allows without a reason are banned by project policy.",
+            concat!(
+                "refactor_helpers.rs contains forbidden pattern `",
+                "{item_dead_code_allow}`; item-level ",
+                "dead-code allows without a reason are banned by project policy."
+            ),
+            item_dead_code_allow = item_dead_code_allow,
         );
         assert!(
             !compact.contains(dead_code_witness),
-            "refactor_helpers.rs contains forbidden pattern `{dead_code_witness}`; anonymous \
-             const witnesses must not be used to mask dead-code lints.",
+            concat!(
+                "refactor_helpers.rs contains forbidden pattern `",
+                "{dead_code_witness}`; anonymous ",
+                "const witnesses must not be used to mask dead-code lints."
+            ),
+            dead_code_witness = dead_code_witness,
         );
     }
 }

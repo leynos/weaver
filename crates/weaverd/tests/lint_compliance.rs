@@ -10,7 +10,7 @@
 const HELPER_SRC: &str = include_str!("../src/dispatch/act/refactor/refactor_helpers.rs");
 
 fn refactor_helpers_source() -> &'static str {
-    HELPER_SRC.split("#[cfg(test)]").next().unwrap_or("")
+    &HELPER_SRC[..HELPER_SRC.rfind("#[cfg(test)]").unwrap_or(HELPER_SRC.len())]
 }
 
 /// Returns whether `source` contains `pattern` after stripping whitespace.
@@ -46,18 +46,30 @@ fn refactor_helpers_avoids_dead_code_suppression_patterns() {
 
     assert!(
         !compact.contains(&file_wide_allow),
-        "refactor_helpers.rs contains forbidden pattern `{file_wide_allow}`; file-wide blanket \
-         lint allows are banned by project policy.",
+        concat!(
+            "refactor_helpers.rs contains forbidden pattern `",
+            "{file_wide_allow}`; file-wide ",
+            "blanket lint allows are banned by project policy."
+        ),
+        file_wide_allow = file_wide_allow,
     );
     assert!(
         !compact.contains(&item_dead_code_allow),
-        "refactor_helpers.rs contains forbidden pattern `{item_dead_code_allow}`; item-level \
-         dead-code allows without a reason are banned by project policy.",
+        concat!(
+            "refactor_helpers.rs contains forbidden pattern `",
+            "{item_dead_code_allow}`; item-level ",
+            "dead-code allows without a reason are banned by project policy."
+        ),
+        item_dead_code_allow = item_dead_code_allow,
     );
     assert!(
         !compact.contains(dead_code_witness),
-        "refactor_helpers.rs contains forbidden pattern `{dead_code_witness}`; anonymous const \
-         witnesses must not be used to mask dead-code lints.",
+        concat!(
+            "refactor_helpers.rs contains forbidden pattern `",
+            "{dead_code_witness}`; anonymous const ",
+            "witnesses must not be used to mask dead-code lints."
+        ),
+        dead_code_witness = dead_code_witness,
     );
 }
 
