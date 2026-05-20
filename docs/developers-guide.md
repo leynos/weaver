@@ -965,6 +965,23 @@ positions. A column equal to `visible_line.chars().count() + 1` maps to
 `visible_line.len()`, which is the byte offset immediately after the visible
 line content and before any line ending.
 
+
+### `metrics` (`weaverd/src/dispatch/act/refactor/metrics.rs`)
+
+`crates/weaverd/src/dispatch/act/refactor/metrics.rs` defines
+`PositionMetrics`, the trait used to record parse and conversion failures.
+`AtomicPositionMetrics` is the production implementation; it uses private,
+process-local `AtomicU64` counters. `NullPositionMetrics` is the test-only
+no-op implementation.
+
+`parse_refactor_args` receives metrics and increments the parse-error counter
+when `parse_position_flag` rejects a value. `prepare_plugin_request` threads
+the same metrics into rename mapping and increments the conversion-error
+counter when `line_col_to_byte_offset` fails.
+
+These counters are not exported. Exporter integration remains governed by RFC
+0001 and issue `#122`.
+
 ### `arguments` (`weaverd/src/dispatch/act/refactor/arguments.rs`)
 
 `RefactorArgs` carries the optional `position: Option<LineCol>` field alongside
