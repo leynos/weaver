@@ -4,7 +4,6 @@
 
 use std::{
     collections::BTreeMap,
-    fs,
     io::Write,
     path::{Path, PathBuf},
 };
@@ -31,6 +30,7 @@ use crate::{
     backends::FusionBackends,
     dispatch::{
         errors::DispatchError,
+        filesystem,
         request::CommandRequest,
         response::ResponseWriter,
         router::DispatchResult,
@@ -61,12 +61,6 @@ pub fn handle<W: Write>(
     let parsed_uri = Url::parse(slice_request.uri())
         .map_err(|error| DispatchError::invalid_arguments(format!("invalid URI: {error}")))?;
     let path = resolve_file_path(&parsed_uri)?;
-    let path = fs::canonicalize(&path).map_err(|error| {
-        DispatchError::invalid_arguments(format!(
-            "unable to read source file '{}': {error}",
-            display_filename(&path)
-        ))
-    })?;
     let source = read_slice_source(&path)?;
     let response = build_response(&slice_request, &path, &source, backends)?;
 
@@ -358,7 +352,7 @@ fn resolve_file_path(uri: &Url) -> Result<PathBuf, DispatchError> {
 }
 /// Reads the source file at `path`, mapping IO failures to invalid-arguments errors.
 fn read_slice_source(path: &Path) -> Result<String, DispatchError> {
-    fs::read_to_string(path).map_err(|error| {
+    filesystem::read_to_string(path).map_err(|error| {
         DispatchError::invalid_arguments(format!(
             "unable to read source file '{}': {error}",
             display_filename(path)

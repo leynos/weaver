@@ -9,12 +9,14 @@ mod parser;
 mod payloads;
 mod semantic_lock;
 mod types;
+mod workspace;
 
 use std::{
     io::Write,
     path::{Path, PathBuf},
 };
 
+use cap_std::fs::Dir;
 use tracing::debug;
 
 pub(crate) use self::errors::ApplyPatchError;
@@ -24,6 +26,7 @@ use self::{
     payloads::{ApplyPatchSummary, GenericErrorEnvelope, VerificationErrorEnvelope},
     semantic_lock::LspSemanticLockAdapter,
     types::{FileContent, FilePath, PatchOperation, PatchText, SearchReplaceBlock},
+    workspace::{ValidatedPath, path_exists, read_patch_target, resolve_path},
 };
 use crate::{
     backends::{BackendKind, FusionBackends},
@@ -120,14 +123,20 @@ impl<'a> ApplyPatchExecutor<'a> {
     }
 
     pub(crate) fn execute(&self, patch: &str) -> Result<ApplyPatchSummary, ApplyPatchFailure> {
+        let workspace_dir =
+            Dir::open_ambient_dir(&self.workspace_root, cap_std::ambient_authority()).map_err(
+                |error| ApplyPatchFailure::Io(format!("failed to open workspace: {error}")),
+            )?;
         let patch = PatchText::new(patch);
         let operations = parse_patch(&patch).map_err(map_patch_error)?;
-        let changes = self.build_changes(&operations).map_err(map_patch_error)?;
+        let changes = self
+            .build_changes(&workspace_dir, &operations)
+            .map_err(map_patch_error)?;
 
         let mut transaction = ContentTransaction::new(self.syntactic_lock, self.semantic_lock);
         transaction.add_changes(changes.iter().cloned());
 
-        match transaction.execute() {
+        match transaction.execute(&workspace_dir, &self.workspace_root) {
             Ok(TransactionOutcome::Committed { files_modified }) => {
                 let files_deleted = changes
                     .iter()
@@ -166,18 +175,19 @@ impl<'a> ApplyPatchExecutor<'a> {
 
     fn build_changes(
         &self,
+        workspace_dir: &Dir,
         operations: &[PatchOperation],
     ) -> Result<Vec<ContentChange>, ApplyPatchError> {
         let mut changes = Vec::new();
         for operation in operations {
             let change = match operation {
                 PatchOperation::Modify { path, blocks } => {
-                    self.build_modify_change(path, blocks)?
+                    self.build_modify_change(workspace_dir, path, blocks)?
                 }
                 PatchOperation::Create { path, content } => {
-                    self.build_create_change(path, content)?
+                    self.build_create_change(workspace_dir, path, content)?
                 }
-                PatchOperation::Delete { path } => self.build_delete_change(path)?,
+                PatchOperation::Delete { path } => self.build_delete_change(workspace_dir, path)?,
             };
             changes.push(change);
         }
@@ -186,53 +196,70 @@ impl<'a> ApplyPatchExecutor<'a> {
 
     fn build_modify_change(
         &self,
+        workspace_dir: &Dir,
         path: &FilePath,
         blocks: &[SearchReplaceBlock],
     ) -> Result<ContentChange, ApplyPatchError> {
-        let resolved = self.resolve_and_validate(path)?;
-        let original = read_patch_target(&resolved, path)?;
+        let resolved = self.resolve_and_validate(workspace_dir, path)?;
+        let original = read_patch_target(workspace_dir, &resolved.relative, path)?;
         let original = FileContent::new(original);
         let modified = apply_search_replace(path, &original, blocks)?;
-        Ok(ContentChange::write(resolved, modified.into_string()))
+        Ok(ContentChange::write(
+            resolved.absolute,
+            modified.into_string(),
+        ))
     }
 
     fn build_create_change(
         &self,
+        workspace_dir: &Dir,
         path: &FilePath,
         content: &FileContent,
     ) -> Result<ContentChange, ApplyPatchError> {
-        self.build_validated_change(path, ChangeKind::Create(content.clone()))
+        self.build_validated_change(workspace_dir, path, ChangeKind::Create(content.clone()))
     }
 
-    fn build_delete_change(&self, path: &FilePath) -> Result<ContentChange, ApplyPatchError> {
-        self.build_validated_change(path, ChangeKind::Delete)
+    fn build_delete_change(
+        &self,
+        workspace_dir: &Dir,
+        path: &FilePath,
+    ) -> Result<ContentChange, ApplyPatchError> {
+        self.build_validated_change(workspace_dir, path, ChangeKind::Delete)
     }
 
     /// Resolves and validates a patch path within the workspace.
-    fn resolve_and_validate(&self, path: &FilePath) -> Result<PathBuf, ApplyPatchError> {
-        resolve_path(&self.workspace_root, path)
+    fn resolve_and_validate(
+        &self,
+        workspace_dir: &Dir,
+        path: &FilePath,
+    ) -> Result<ValidatedPath, ApplyPatchError> {
+        resolve_path(workspace_dir, &self.workspace_root, path)
     }
 
     /// Builds a validated content change after checking existence constraints.
     fn build_validated_change(
         &self,
+        workspace_dir: &Dir,
         path: &FilePath,
         kind: ChangeKind,
     ) -> Result<ContentChange, ApplyPatchError> {
-        let resolved = self.resolve_and_validate(path)?;
+        let resolved = self.resolve_and_validate(workspace_dir, path)?;
 
         match kind {
             ChangeKind::Create(content) => {
-                if resolved.exists() {
+                if path_exists(workspace_dir, &resolved.relative, path)? {
                     return Err(ApplyPatchError::FileAlreadyExists { path: path.clone() });
                 }
-                Ok(ContentChange::write(resolved, content.into_string()))
+                Ok(ContentChange::write(
+                    resolved.absolute,
+                    content.into_string(),
+                ))
             }
             ChangeKind::Delete => {
-                if !resolved.exists() {
+                if !path_exists(workspace_dir, &resolved.relative, path)? {
                     return Err(ApplyPatchError::DeleteMissing { path: path.clone() });
                 }
-                Ok(ContentChange::delete(resolved))
+                Ok(ContentChange::delete(resolved.absolute))
             }
         }
     }
@@ -266,75 +293,6 @@ fn map_patch_error(error: ApplyPatchError) -> ApplyPatchFailure {
         error @ ApplyPatchError::Io { .. } => ApplyPatchFailure::Io(error.to_string()),
         other => ApplyPatchFailure::Patch(other),
     }
-}
-
-/// Validates that a path component is safe (not a symlink).
-fn validate_path_component(
-    resolved: &Path,
-    original_path: &FilePath,
-) -> Result<(), ApplyPatchError> {
-    match std::fs::symlink_metadata(resolved) {
-        Ok(metadata) if metadata.file_type().is_symlink() => Err(ApplyPatchError::InvalidPath {
-            path: original_path.clone(),
-            reason: String::from("symlink traversal is not allowed"),
-        }),
-        Ok(_) => Ok(()),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(err) => Err(ApplyPatchError::InvalidPath {
-            path: original_path.clone(),
-            reason: format!("failed to inspect path component: {err}"),
-        }),
-    }
-}
-
-fn resolve_path(workspace_root: &Path, path: &FilePath) -> Result<PathBuf, ApplyPatchError> {
-    if path.as_str().trim().is_empty() {
-        return Err(ApplyPatchError::InvalidPath {
-            path: path.clone(),
-            reason: String::from("path is empty"),
-        });
-    }
-    let candidate = Path::new(path.as_str());
-    if candidate.is_absolute() {
-        return Err(ApplyPatchError::InvalidPath {
-            path: path.clone(),
-            reason: String::from("absolute paths are not allowed"),
-        });
-    }
-    let mut resolved = workspace_root.to_path_buf();
-    for component in candidate.components() {
-        match component {
-            std::path::Component::ParentDir | std::path::Component::Prefix(_) => {
-                return Err(ApplyPatchError::InvalidPath {
-                    path: path.clone(),
-                    reason: String::from("path traversal is not allowed"),
-                });
-            }
-            std::path::Component::Normal(part) => {
-                resolved.push(part);
-                validate_path_component(&resolved, path)?;
-            }
-            std::path::Component::CurDir => {}
-            std::path::Component::RootDir => {
-                return Err(ApplyPatchError::InvalidPath {
-                    path: path.clone(),
-                    reason: String::from("absolute paths are not allowed"),
-                });
-            }
-        }
-    }
-    Ok(resolved)
-}
-
-fn read_patch_target(resolved: &Path, path: &FilePath) -> Result<String, ApplyPatchError> {
-    std::fs::read_to_string(resolved).map_err(|err| match err.kind() {
-        std::io::ErrorKind::NotFound => ApplyPatchError::FileNotFound { path: path.clone() },
-        _ => ApplyPatchError::Io {
-            path: path.clone(),
-            kind: err.kind(),
-            message: err.to_string(),
-        },
-    })
 }
 
 /// Generic helper to write serializable error payloads to stderr.

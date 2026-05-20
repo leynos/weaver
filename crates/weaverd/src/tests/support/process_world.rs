@@ -2,7 +2,6 @@
 
 use std::{
     cell::RefCell,
-    fs,
     path::PathBuf,
     sync::{
         Arc,
@@ -26,7 +25,7 @@ use crate::{
         shutdown::{ShutdownError, ShutdownSignal},
         test_support,
     },
-    tests::support::{FailingConfigLoader, RecordingHealthReporter, TestConfigLoader},
+    tests::support::{FailingConfigLoader, RecordingHealthReporter, TestConfigLoader, fs},
 };
 
 pub const WAIT_TIMEOUT: Duration = Duration::from_secs(2);
@@ -223,7 +222,7 @@ impl ProcessTestWorld {
                 .any(|status| status == expected)
     }
 
-    pub fn lock_exists(&self) -> bool { self.lock_path().exists() }
+    pub fn lock_exists(&self) -> bool { fs::exists(self.lock_path()).expect("check lock file") }
 
     pub fn daemonizer_calls(&self) -> usize { self.daemonizer.calls() }
 

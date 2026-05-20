@@ -1,6 +1,6 @@
 //! Behavioural tests for the apply-patch command.
 
-use std::{cell::RefCell, fs, path::PathBuf};
+use std::{cell::RefCell, path::PathBuf};
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
@@ -10,6 +10,7 @@ use weaver_test_macros::allow_fixture_expansion_lints;
 use crate::{
     dispatch::act::apply_patch::{ApplyPatchError, ApplyPatchExecutor, ApplyPatchFailure},
     safety_harness::{ConfigurableSemanticLock, ConfigurableSyntacticLock, VerificationFailure},
+    tests::support::fs as test_fs,
 };
 
 const DEFAULT_SOURCE: &str = "fn main() {\n    println!(\"Old Message\");\n}\n";
@@ -84,16 +85,18 @@ impl ApplyPatchWorld {
     fn create_file(&self, relative: &str, content: &str) {
         let path = self.path(relative);
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).expect("create parent dirs");
+            test_fs::create_dir_all(parent).expect("create parent dirs");
         }
-        fs::write(&path, content).expect("write file");
+        test_fs::write(&path, content).expect("write file");
     }
 
     fn read_file(&self, relative: &str) -> String {
-        fs::read_to_string(self.path(relative)).expect("read file")
+        test_fs::read_to_string(self.path(relative)).expect("read file")
     }
 
-    fn file_exists(&self, relative: &str) -> bool { self.path(relative).exists() }
+    fn file_exists(&self, relative: &str) -> bool {
+        test_fs::exists(self.path(relative)).expect("check file existence")
+    }
 
     fn path(&self, relative: &str) -> PathBuf { self.temp_dir.path().join(relative) }
 

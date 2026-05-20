@@ -9,5 +9,5 @@ mod process_behaviour;
 mod safety_harness_behaviour;
 mod safety_harness_types;
 mod socket_behaviour;
-mod support;
+pub(crate) mod support;
 mod unit;

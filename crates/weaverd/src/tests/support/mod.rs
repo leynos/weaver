@@ -2,6 +2,7 @@
 
 mod backend_provider;
 mod config_loader;
+pub mod fs;
 mod process_world;
 mod reporter;
 mod world;

@@ -35,6 +35,7 @@ use super::{
     resolution::*,
     *,
 };
+use crate::tests::support::fs as test_fs;
 
 #[derive(Clone, Copy, Default)]
 enum RuntimeMode {
@@ -202,7 +203,7 @@ impl RefactorWorld {
     }
 
     fn write_file(&self, relative: &str, content: &str) -> Result<(), String> {
-        std::fs::write(self.path(relative), content).map_err(|e| format!("write file: {e}"))
+        test_fs::write(self.path(relative), content).map_err(|e| format!("write file: {e}"))
     }
 
     fn prepare_routed_fixture(&self, target_file: &str) -> Result<(), String> {
@@ -217,7 +218,7 @@ impl RefactorWorld {
     }
 
     fn read_file(&self, relative: &str) -> Result<String, String> {
-        std::fs::read_to_string(self.path(relative)).map_err(|e| format!("read file: {e}"))
+        test_fs::read_to_string(self.path(relative)).map_err(|e| format!("read file: {e}"))
     }
 
     fn execute(&mut self) -> Result<(), String> {

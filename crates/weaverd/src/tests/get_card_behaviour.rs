@@ -3,7 +3,6 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
-    fs,
     io::{BufRead, BufReader, Write},
     net::{SocketAddr, TcpStream},
     path::PathBuf,
@@ -22,6 +21,7 @@ use crate::{
     backends::FusionBackends,
     dispatch::{BackendManager, DispatchConnectionHandler},
     semantic_provider::SemanticBackendProvider,
+    tests::support::fs as test_fs,
     transport::{ListenerHandle, SocketListener},
 };
 
@@ -94,7 +94,7 @@ impl GetCardWorld {
 
     fn write_fixture(&mut self, key: &str, name: &str, source: &str) {
         let path = self.temp_dir.path().join(name);
-        fs::write(&path, source).expect("write fixture");
+        test_fs::write(&path, source).expect("write fixture");
         let uri = Url::from_file_path(&path).expect("file uri").to_string();
         self.paths.insert(String::from(key), path);
         self.uris.insert(String::from(key), uri);
@@ -150,7 +150,7 @@ impl GetCardWorld {
 
     fn rewrite_fixture(&mut self, key: &str, source: &str) {
         let path = self.paths.get(key).expect("fixture path");
-        fs::write(path, source).expect("rewrite fixture");
+        test_fs::write(path, source).expect("rewrite fixture");
     }
 
     fn latest_stdout_contains(&self, needle: &str) -> bool { self.stdout_contains(needle) }

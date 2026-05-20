@@ -1,6 +1,6 @@
 //! Tests for edit and content transaction management.
 
-use std::{fs, path::PathBuf};
+use std::path::{Path, PathBuf};
 
 use rstest::rstest;
 use tempfile::TempDir;
@@ -30,11 +30,8 @@ fn failure_scenario_builder() -> TransactionTestBuilder {
 }
 
 /// Asserts that the file at the given path contains "hello world".
-fn assert_file_unchanged(path: &PathBuf) {
-    let content = match fs::read_to_string(path) {
-        Ok(content) => content,
-        Err(error) => panic!("read file: {error}"),
-    };
+fn assert_file_unchanged(path: &Path) {
+    let content = read_file(path);
     assert_eq!(content, "hello world");
 }
 
@@ -91,6 +88,30 @@ struct TransactionTestBuilder {
     dir: TempDir,
     files: Vec<(PathBuf, String)>,
     edits: Vec<FileEdit>,
+}
+
+fn open_workspace_dir(path: &std::path::Path) -> cap_std::fs::Dir {
+    match cap_std::fs::Dir::open_ambient_dir(path, cap_std::ambient_authority()) {
+        Ok(dir) => dir,
+        Err(error) => panic!("open workspace dir: {error}"),
+    }
+}
+
+fn read_file(path: &std::path::Path) -> String {
+    let parent = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+    let filename = path.file_name().unwrap_or_default();
+    let dir = open_workspace_dir(parent);
+    match dir.read_to_string(filename) {
+        Ok(content) => content,
+        Err(error) => panic!("read file: {error}"),
+    }
+}
+
+fn file_exists(path: &std::path::Path) -> bool {
+    let parent = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+    let filename = path.file_name().unwrap_or_default();
+    let dir = open_workspace_dir(parent);
+    dir.metadata(filename).is_ok()
 }
 
 impl TransactionTestBuilder {
@@ -167,7 +188,8 @@ impl TransactionTestBuilder {
         for edit in self.edits {
             transaction.add_edit(edit);
         }
-        let outcome = transaction.execute();
+        let workspace_dir = open_workspace_dir(self.dir.path());
+        let outcome = transaction.execute(&workspace_dir, self.dir.path());
         (outcome, paths, self.dir)
     }
 }
@@ -177,8 +199,12 @@ fn empty_transaction_returns_no_changes() {
     let syntactic = ConfigurableSyntacticLock::passing();
     let semantic = ConfigurableSemanticLock::passing();
     let transaction = EditTransaction::new(&syntactic, &semantic);
+    let dir = TempDir::new().expect("create temp dir");
+    let workspace_dir = open_workspace_dir(dir.path());
 
-    let outcome = transaction.execute().expect("should succeed");
+    let outcome = transaction
+        .execute(&workspace_dir, dir.path())
+        .expect("should succeed");
     assert!(matches!(outcome, TransactionOutcome::NoChanges));
 }
 
@@ -197,7 +223,7 @@ fn successful_transaction_commits_changes() {
     assert!(outcome.committed());
     assert_eq!(outcome.files_modified(), Some(1));
 
-    let content = fs::read_to_string(&paths[0]).expect("read file");
+    let content = read_file(&paths[0]);
     assert_eq!(content, "greetings world");
 }
 
@@ -260,7 +286,7 @@ fn handles_new_file_creation() {
         .with_insert_edit(0, "new content");
 
     // Path doesn't exist yet
-    assert!(!builder.file_path(0).exists());
+    assert!(!file_exists(builder.file_path(0)));
 
     let syntactic = ConfigurableSyntacticLock::passing();
     let semantic = ConfigurableSemanticLock::passing();
@@ -270,7 +296,7 @@ fn handles_new_file_creation() {
 
     assert!(outcome.committed());
 
-    let content = fs::read_to_string(&paths[0]).expect("read file");
+    let content = read_file(&paths[0]);
     assert_eq!(content, "new content");
 }
 
@@ -303,9 +329,12 @@ fn handles_multiple_files() {
     let mut transaction = EditTransaction::new(&syntactic, &semantic);
     transaction.add_edits([edit1, edit2]);
 
-    let outcome = transaction.execute().expect("should succeed");
+    let workspace_dir = open_workspace_dir(dir.path());
+    let outcome = transaction
+        .execute(&workspace_dir, dir.path())
+        .expect("should succeed");
     assert_eq!(outcome.files_modified(), Some(2));
 
-    assert_eq!(fs::read_to_string(&path1).expect("read"), "AAA");
-    assert_eq!(fs::read_to_string(&path2).expect("read"), "BBB");
+    assert_eq!(read_file(&path1), "AAA");
+    assert_eq!(read_file(&path2), "BBB");
 }

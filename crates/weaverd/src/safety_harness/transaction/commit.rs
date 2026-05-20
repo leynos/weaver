@@ -1,14 +1,18 @@
 //! Commit helpers for applying verified changes.
 
 use std::{
-    fs,
-    io::Write as IoWrite,
+    io::{self, Write as IoWrite},
     path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
+use cap_std::fs::{Dir, OpenOptions};
 use tracing::warn;
 
-use super::super::{error::SafetyHarnessError, verification::VerificationContext};
+use super::{
+    super::{error::SafetyHarnessError, verification::VerificationContext},
+    relative_workspace_path,
+};
 
 /// Planned file deletion with rollback context.
 ///
@@ -26,7 +30,7 @@ pub(super) struct DeletePlan {
 #[derive(Debug)]
 struct PreparedFile {
     path: PathBuf,
-    temp_file: tempfile::NamedTempFile,
+    temp_path: PathBuf,
     original: String,
     existed: bool,
 }
@@ -37,6 +41,20 @@ struct CommittedFile {
     path: PathBuf,
     original: String,
     existed: bool,
+}
+
+/// Capability and content context required to commit a transaction.
+pub(super) struct CommitPlan<'a> {
+    /// Workspace capability used for every file operation.
+    pub(super) dir: &'a Dir,
+    /// Absolute workspace root used to derive capability-relative paths.
+    pub(super) workspace_root: &'a Path,
+    /// Verified original and modified file contents.
+    pub(super) context: &'a VerificationContext,
+    /// Paths whose modified content should be written.
+    pub(super) paths: &'a [PathBuf],
+    /// Files to delete after writes are committed.
+    pub(super) deletions: &'a [DeletePlan],
 }
 
 /// Writes all modified content to the filesystem using two-phase commit.
@@ -53,51 +71,50 @@ struct CommittedFile {
 ///
 /// Rollback is best-effort: if a catastrophic failure occurs during rollback
 /// (e.g., disk removed), some files may remain in an inconsistent state.
-pub(super) fn commit_changes_with_deletes(
-    context: &VerificationContext,
-    paths: &[PathBuf],
-    deletions: &[DeletePlan],
-) -> Result<(), SafetyHarnessError> {
+pub(super) fn commit_changes_with_deletes(plan: CommitPlan<'_>) -> Result<(), SafetyHarnessError> {
     // Phase 1: Prepare all files (write to temps)
     let mut prepared: Vec<PreparedFile> = Vec::new();
 
-    for path in paths {
-        let content = context
+    for path in plan.paths {
+        let content = plan
+            .context
             .modified(path)
             .ok_or_else(|| SafetyHarnessError::ModifiedContentMissing { path: path.clone() })?;
 
-        let original = context
+        let original = plan
+            .context
             .original(path)
             .cloned()
             .ok_or_else(|| SafetyHarnessError::OriginalContentMissing { path: path.clone() })?;
-        let existed = path.exists();
-        let temp_file = prepare_file(path, content)?;
+        let existed = file_exists(plan.dir, plan.workspace_root, path)?;
+        let temp_path = prepare_file(plan.dir, plan.workspace_root, path, content)?;
         prepared.push(PreparedFile {
             path: path.clone(),
-            temp_file,
+            temp_path,
             original,
             existed,
         });
     }
     // Phase 2: Commit all files (atomic renames)
-    let committed = persist_prepared_files(prepared)?;
-    apply_deletions(deletions, &committed)?;
+    let committed = persist_prepared_files(plan.dir, plan.workspace_root, prepared)?;
+    apply_deletions(plan.dir, plan.workspace_root, plan.deletions, &committed)?;
     Ok(())
 }
 
 /// Persists prepared temp files, rolling back if any commit fails.
 fn persist_prepared_files(
+    dir: &Dir,
+    workspace_root: &Path,
     prepared: Vec<PreparedFile>,
 ) -> Result<Vec<CommittedFile>, SafetyHarnessError> {
     let mut committed: Vec<CommittedFile> = Vec::new();
 
     for prepared_file in prepared {
-        if let Err(err) = prepared_file.temp_file.persist(&prepared_file.path) {
-            rollback_writes(&committed);
-            return Err(SafetyHarnessError::file_write(
-                prepared_file.path,
-                err.error,
-            ));
+        let relative = relative_workspace_path(&prepared_file.path, workspace_root)
+            .map_err(|err| SafetyHarnessError::file_write(prepared_file.path.clone(), err))?;
+        if let Err(err) = dir.rename(&prepared_file.temp_path, dir, relative) {
+            rollback_writes(dir, workspace_root, &committed);
+            return Err(SafetyHarnessError::file_write(prepared_file.path, err));
         }
         committed.push(CommittedFile {
             path: prepared_file.path,
@@ -111,14 +128,18 @@ fn persist_prepared_files(
 
 /// Removes files slated for deletion, rolling back changes on failure.
 fn apply_deletions(
+    dir: &Dir,
+    workspace_root: &Path,
     deletions: &[DeletePlan],
     committed: &[CommittedFile],
 ) -> Result<(), SafetyHarnessError> {
     let mut deleted: Vec<&DeletePlan> = Vec::new();
 
     for deletion in deletions {
-        if let Err(err) = fs::remove_file(&deletion.path) {
-            rollback_deletes_and_writes(&deleted, committed);
+        let relative = relative_workspace_path(&deletion.path, workspace_root)
+            .map_err(|err| SafetyHarnessError::file_delete(deletion.path.clone(), err))?;
+        if let Err(err) = dir.remove_file(relative) {
+            rollback_deletes_and_writes(dir, workspace_root, &deleted, committed);
             return Err(SafetyHarnessError::file_delete(deletion.path.clone(), err));
         }
         deleted.push(deletion);
@@ -132,32 +153,56 @@ fn apply_deletions(
 /// The temp file is created in the same directory as the target to ensure
 /// atomic rename is possible (same filesystem). Parent directories are
 /// created if they don't exist.
-fn prepare_file(path: &Path, content: &str) -> Result<tempfile::NamedTempFile, SafetyHarnessError> {
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+fn prepare_file(
+    dir: &Dir,
+    workspace_root: &Path,
+    path: &Path,
+    content: &str,
+) -> Result<PathBuf, SafetyHarnessError> {
+    let relative = relative_workspace_path(path, workspace_root)
+        .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
+    let parent = relative.parent().unwrap_or_else(|| Path::new("."));
 
     // Create parent directories if they don't exist (for nested new files)
-    fs::create_dir_all(parent)
-        .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
+    if parent != Path::new("") && parent != Path::new(".") {
+        dir.create_dir_all(parent)
+            .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
+    }
 
-    let mut temp_file = tempfile::NamedTempFile::new_in(parent)
-        .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
+    for attempt in 0..16 {
+        let temp_path = unique_temp_path(relative, attempt)
+            .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
+        match write_temp_file(dir, temp_path.as_path(), content) {
+            Ok(()) => return Ok(temp_path),
+            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(err) => {
+                let _ = dir.remove_file(temp_path.as_path());
+                return Err(SafetyHarnessError::file_write(path.to_path_buf(), err));
+            }
+        }
+    }
 
-    temp_file
-        .write_all(content.as_bytes())
-        .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
-
-    Ok(temp_file)
+    Err(SafetyHarnessError::file_write(
+        path.to_path_buf(),
+        io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "could not create a unique transaction temporary file",
+        ),
+    ))
 }
 
 /// Rolls back committed files to their original content.
 ///
 /// This is a best-effort operation: if restoration fails for any file,
 /// we continue attempting to restore the remaining files.
-fn rollback_writes(committed: &[CommittedFile]) {
+fn rollback_writes(dir: &Dir, workspace_root: &Path, committed: &[CommittedFile]) {
     for committed_file in committed {
+        let Ok(relative) = relative_workspace_path(&committed_file.path, workspace_root) else {
+            continue;
+        };
         if !committed_file.existed {
             // File was newly created, remove it
-            if let Err(err) = std::fs::remove_file(&committed_file.path) {
+            if let Err(err) = dir.remove_file(relative) {
                 warn!(
                     path = %committed_file.path.display(),
                     error = %err,
@@ -166,7 +211,7 @@ fn rollback_writes(committed: &[CommittedFile]) {
             }
         } else {
             // Restore original content (best effort)
-            if let Err(err) = std::fs::write(&committed_file.path, &committed_file.original) {
+            if let Err(err) = dir.write(relative, &committed_file.original) {
                 warn!(
                     path = %committed_file.path.display(),
                     error = %err,
@@ -178,9 +223,17 @@ fn rollback_writes(committed: &[CommittedFile]) {
 }
 
 /// Restores deleted files before rolling back committed writes.
-fn rollback_deletes_and_writes(deleted: &[&DeletePlan], committed: &[CommittedFile]) {
+fn rollback_deletes_and_writes(
+    dir: &Dir,
+    workspace_root: &Path,
+    deleted: &[&DeletePlan],
+    committed: &[CommittedFile],
+) {
     for deletion in deleted {
-        if let Err(err) = std::fs::write(&deletion.path, &deletion.original) {
+        let Ok(relative) = relative_workspace_path(&deletion.path, workspace_root) else {
+            continue;
+        };
+        if let Err(err) = dir.write(relative, &deletion.original) {
             warn!(
                 path = %deletion.path.display(),
                 error = %err,
@@ -188,5 +241,42 @@ fn rollback_deletes_and_writes(deleted: &[&DeletePlan], committed: &[CommittedFi
             );
         }
     }
-    rollback_writes(committed);
+    rollback_writes(dir, workspace_root, committed);
+}
+
+fn file_exists(dir: &Dir, workspace_root: &Path, path: &Path) -> Result<bool, SafetyHarnessError> {
+    let relative = relative_workspace_path(path, workspace_root)
+        .map_err(|err| SafetyHarnessError::file_write(path.to_path_buf(), err))?;
+    match dir.metadata(relative) {
+        Ok(_) => Ok(true),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(err) => Err(SafetyHarnessError::file_write(path.to_path_buf(), err)),
+    }
+}
+
+fn write_temp_file(dir: &Dir, temp_path: &Path, content: &str) -> io::Result<()> {
+    let mut file = dir.open_with(temp_path, OpenOptions::new().write(true).create_new(true))?;
+    file.write_all(content.as_bytes())?;
+    file.sync_all()?;
+    Ok(())
+}
+
+fn unique_temp_path(relative: &Path, attempt: u8) -> io::Result<PathBuf> {
+    let parent = relative.parent().unwrap_or_else(|| Path::new("."));
+    let name = relative.file_name().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidInput, "target path has no file name")
+    })?;
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(io::Error::other)?
+        .as_nanos();
+    let mut temp_path = parent.to_path_buf();
+    temp_path.push(format!(
+        ".{}.{}.{}.{}.tmp",
+        name.to_string_lossy(),
+        std::process::id(),
+        unique,
+        attempt
+    ));
+    Ok(temp_path)
 }

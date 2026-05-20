@@ -30,6 +30,7 @@
 pub mod act;
 mod backend_manager;
 mod errors;
+mod filesystem;
 mod handler;
 pub mod observe;
 mod request;

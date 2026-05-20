@@ -5,24 +5,27 @@ use tempfile::TempDir;
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 use weaver_test_macros::allow_fixture_expansion_lints;
 
-use crate::dispatch::act::refactor::{
-    DispatchError,
-    RefactorContext,
-    RefactorPluginRuntime,
-    ResponseWriter,
-    default_runtime,
-    handle,
-    refactor_helpers::builders::{build_backends, command_request},
-    resolution::{
-        CandidateEvaluation,
-        CapabilityResolutionDetails,
-        CapabilityResolutionEnvelope,
-        ResolutionOutcome,
-        ResolutionRequest,
-        SelectionMode,
+use crate::{
+    dispatch::act::refactor::{
+        DispatchError,
+        RefactorContext,
+        RefactorPluginRuntime,
+        ResponseWriter,
+        default_runtime,
+        handle,
+        refactor_helpers::builders::{build_backends, command_request},
+        resolution::{
+            CandidateEvaluation,
+            CapabilityResolutionDetails,
+            CapabilityResolutionEnvelope,
+            ResolutionOutcome,
+            ResolutionRequest,
+            SelectionMode,
+        },
+        resolve_rope_plugin_path,
+        resolve_rust_analyzer_plugin_path,
     },
-    resolve_rope_plugin_path,
-    resolve_rust_analyzer_plugin_path,
+    tests::support::fs as test_fs,
 };
 
 enum MockRuntimeResult {
@@ -89,7 +92,7 @@ fn run_rename_handle(
         Ok(workspace) => workspace,
         Err(error) => panic!("workspace: {error}"),
     };
-    if let Err(error) = std::fs::write(workspace.path().join(file), "hello\n") {
+    if let Err(error) = test_fs::write(workspace.path().join(file), "hello\n") {
         panic!("write: {error}");
     }
 
@@ -166,7 +169,7 @@ fn handle_non_diff_output_returns_status_one(
     socket_dir: TempDir,
 ) {
     let workspace = TempDir::new().expect("workspace");
-    std::fs::write(workspace.path().join("notes.py"), "hello\n").expect("write");
+    test_fs::write(workspace.path().join("notes.py"), "hello\n").expect("write");
 
     let request = command_request(vec![
         String::from("--provider"),
@@ -206,7 +209,7 @@ fn handle_diff_output_applies_patch_through_apply_patch_pipeline(socket_dir: Tem
     let workspace = TempDir::new().expect("workspace");
     let relative_file = String::from("notes.txt");
     let file_path = workspace.path().join(&relative_file);
-    std::fs::write(&file_path, "hello world\n").expect("write");
+    test_fs::write(&file_path, "hello world\n").expect("write");
 
     let diff = concat!(
         "diff --git a/notes.txt b/notes.txt\n",
@@ -247,7 +250,7 @@ fn handle_diff_output_applies_patch_through_apply_patch_pipeline(socket_dir: Tem
     .expect("dispatch result");
 
     assert_eq!(result.status, 0);
-    let updated = std::fs::read_to_string(workspace.path().join(relative_file)).expect("read");
+    let updated = test_fs::read_to_string(workspace.path().join(relative_file)).expect("read");
     assert_eq!(updated, "hello woven\n");
     let stderr = String::from_utf8(output).expect("stderr utf8");
     assert!(stderr.contains("CapabilityResolution"));

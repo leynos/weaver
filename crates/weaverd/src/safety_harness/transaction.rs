@@ -14,12 +14,11 @@ mod test_support;
 #[cfg(test)]
 mod tests;
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
-use self::commit::{DeletePlan, commit_changes_with_deletes};
+use cap_std::fs::Dir;
+
+use self::commit::{CommitPlan, DeletePlan, commit_changes_with_deletes};
 use super::{
     edit::FileEdit,
     error::{SafetyHarnessError, VerificationFailure},
@@ -124,7 +123,11 @@ impl<'a> ContentTransaction<'a> {
     /// Returns an error when:
     /// - A file cannot be read or written.
     /// - The semantic backend is unavailable.
-    pub fn execute(self) -> Result<TransactionOutcome, SafetyHarnessError> {
+    pub fn execute(
+        self,
+        workspace_dir: &Dir,
+        workspace_root: &Path,
+    ) -> Result<TransactionOutcome, SafetyHarnessError> {
         let ContentTransaction {
             changes,
             syntactic_lock,
@@ -142,13 +145,13 @@ impl<'a> ContentTransaction<'a> {
             match change {
                 ContentChange::Write { path, content } => {
                     // Allow create operations by treating missing files as empty content.
-                    let original = read_file(&path)?;
+                    let original = read_file(workspace_dir, workspace_root, &path)?;
                     context.add_original(path.clone(), original);
                     context.add_modified(path.clone(), content);
                     paths_to_write.push(path);
                 }
                 ContentChange::Delete { path } => {
-                    let original = read_existing_file(&path)?;
+                    let original = read_existing_file(workspace_dir, workspace_root, &path)?;
                     deletions.push(DeletePlan { path, original });
                 }
             }
@@ -158,6 +161,8 @@ impl<'a> ContentTransaction<'a> {
             context: &context,
             paths_to_write: &paths_to_write,
             deletions: &deletions,
+            workspace_dir,
+            workspace_root,
             syntactic_lock,
             semantic_lock,
         })
@@ -212,7 +217,11 @@ impl<'a> EditTransaction<'a> {
     /// - A file cannot be read or written.
     /// - Edits cannot be applied to the in-memory buffer.
     /// - The semantic backend is unavailable.
-    pub fn execute(self) -> Result<TransactionOutcome, SafetyHarnessError> {
+    pub fn execute(
+        self,
+        workspace_dir: &Dir,
+        workspace_root: &Path,
+    ) -> Result<TransactionOutcome, SafetyHarnessError> {
         if self.file_edits.is_empty() {
             return Ok(TransactionOutcome::NoChanges);
         }
@@ -223,7 +232,7 @@ impl<'a> EditTransaction<'a> {
 
         for file_edit in &self.file_edits {
             let path = file_edit.path();
-            let original = read_file(path)?;
+            let original = read_file(workspace_dir, workspace_root, path)?;
 
             // Step 2: Apply edits to produce modified content
             let modified = apply_edits(&original, file_edit)?;
@@ -237,6 +246,8 @@ impl<'a> EditTransaction<'a> {
             context: &context,
             paths_to_write: &paths_to_write,
             deletions: &[],
+            workspace_dir,
+            workspace_root,
             syntactic_lock: self.syntactic_lock,
             semantic_lock: self.semantic_lock,
         })
@@ -244,8 +255,10 @@ impl<'a> EditTransaction<'a> {
 }
 
 /// Reads file content or creates an empty file entry for new files.
-fn read_file(path: &std::path::Path) -> Result<String, SafetyHarnessError> {
-    match fs::read_to_string(path) {
+fn read_file(dir: &Dir, workspace_root: &Path, path: &Path) -> Result<String, SafetyHarnessError> {
+    let relative = relative_workspace_path(path, workspace_root)
+        .map_err(|err| SafetyHarnessError::file_read(path.to_path_buf(), err))?;
+    match dir.read_to_string(relative) {
         Ok(content) => Ok(content),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
             // New file creation: start with empty content
@@ -256,8 +269,15 @@ fn read_file(path: &std::path::Path) -> Result<String, SafetyHarnessError> {
 }
 
 /// Reads file content, returning an error if the file does not exist.
-fn read_existing_file(path: &std::path::Path) -> Result<String, SafetyHarnessError> {
-    fs::read_to_string(path).map_err(|err| SafetyHarnessError::file_read(path.to_path_buf(), err))
+fn read_existing_file(
+    dir: &Dir,
+    workspace_root: &Path,
+    path: &Path,
+) -> Result<String, SafetyHarnessError> {
+    let relative = relative_workspace_path(path, workspace_root)
+        .map_err(|err| SafetyHarnessError::file_read(path.to_path_buf(), err))?;
+    dir.read_to_string(relative)
+        .map_err(|err| SafetyHarnessError::file_read(path.to_path_buf(), err))
 }
 
 /// Executes the Double-Lock validation pipeline and commits changes on success.
@@ -274,11 +294,13 @@ fn execute_with_locks(
         return Ok(TransactionOutcome::SemanticLockFailed { failures });
     }
 
-    commit_changes_with_deletes(
-        execution.context,
-        execution.paths_to_write,
-        execution.deletions,
-    )?;
+    commit_changes_with_deletes(CommitPlan {
+        dir: execution.workspace_dir,
+        workspace_root: execution.workspace_root,
+        context: execution.context,
+        paths: execution.paths_to_write,
+        deletions: execution.deletions,
+    })?;
 
     Ok(TransactionOutcome::Committed {
         files_modified: execution.paths_to_write.len() + execution.deletions.len(),
@@ -293,6 +315,24 @@ struct TransactionExecution<'a> {
     context: &'a VerificationContext,
     paths_to_write: &'a [PathBuf],
     deletions: &'a [DeletePlan],
+    workspace_dir: &'a Dir,
+    workspace_root: &'a Path,
     syntactic_lock: &'a dyn SyntacticLock,
     semantic_lock: &'a dyn SemanticLock,
+}
+
+pub(super) fn relative_workspace_path<'a>(
+    path: &'a Path,
+    workspace_root: &Path,
+) -> Result<&'a Path, std::io::Error> {
+    path.strip_prefix(workspace_root).map_err(|error| {
+        std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            format!(
+                "path '{}' is outside workspace '{}': {error}",
+                path.display(),
+                workspace_root.display()
+            ),
+        )
+    })
 }

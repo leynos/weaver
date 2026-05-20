@@ -9,7 +9,10 @@ use super::refactor_helpers::{
     resolutions::{RefusedResolution, SelectedResolution, refused_resolution},
     rollback::{ExecuteResult, RollbackRuntime, rollback_runtime, selected_runtime},
 };
-use crate::dispatch::act::refactor::{RefactorContext, ResponseWriter, handle};
+use crate::{
+    dispatch::act::refactor::{RefactorContext, ResponseWriter, handle},
+    tests::support::fs as test_fs,
+};
 
 struct RollbackOutcome {
     status: i32,
@@ -48,7 +51,7 @@ fn run_failure_case(runtime: RollbackRuntime) -> Result<RollbackOutcome, String>
     let workspace = TempDir::new().map_err(|e| format!("workspace: {e}"))?;
     let file = "notes.py";
     let file_path = workspace.path().join(file);
-    std::fs::write(&file_path, original_content_for(file_path.as_path()))
+    test_fs::write(&file_path, original_content_for(file_path.as_path()))
         .map_err(|e| format!("write file: {e}"))?;
 
     let request = command_request(standard_rename_args_for_provider(file, "rope"));
@@ -71,7 +74,7 @@ fn run_failure_case(runtime: RollbackRuntime) -> Result<RollbackOutcome, String>
     Ok(RollbackOutcome {
         status: result.status,
         stderr: String::from_utf8(output).map_err(|e| format!("stderr utf8: {e}"))?,
-        content: std::fs::read_to_string(&file_path).map_err(|e| format!("read file: {e}"))?,
+        content: test_fs::read_to_string(&file_path).map_err(|e| format!("read file: {e}"))?,
     })
 }
 

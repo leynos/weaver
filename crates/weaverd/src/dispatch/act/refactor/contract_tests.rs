@@ -8,21 +8,24 @@ use url::Url;
 use weaver_plugins::{CapabilityId, PluginError, PluginOutput, PluginRequest, PluginResponse};
 use weaver_test_macros::allow_fixture_expansion_lints;
 
-use crate::dispatch::act::refactor::{
-    RefactorContext,
-    RefactorPluginRuntime,
-    ResponseWriter,
-    handle,
-    refactor_helpers::builders::{build_backends, command_request},
-    resolution::{
-        CandidateEvaluation,
-        CapabilityResolutionDetails,
-        CapabilityResolutionEnvelope,
-        ResolutionOutcome,
-        ResolutionRequest,
-        SelectionMode,
+use crate::{
+    dispatch::act::refactor::{
+        RefactorContext,
+        RefactorPluginRuntime,
+        ResponseWriter,
+        handle,
+        refactor_helpers::builders::{build_backends, command_request},
+        resolution::{
+            CandidateEvaluation,
+            CapabilityResolutionDetails,
+            CapabilityResolutionEnvelope,
+            ResolutionOutcome,
+            ResolutionRequest,
+            SelectionMode,
+        },
+        rust_analyzer_manifest,
     },
-    rust_analyzer_manifest,
+    tests::support::fs as test_fs,
 };
 
 struct InspectingRuntime {
@@ -115,7 +118,7 @@ fn dispatch_inspecting_rename(
 ) -> Result<(PluginRequest, PathBuf), String> {
     let workspace = TempDir::new().map_err(|e| format!("workspace: {e}"))?;
     let file_path = workspace.path().join(config.file);
-    std::fs::write(&file_path, "hello world\n").map_err(|e| format!("write: {e}"))?;
+    test_fs::write(&file_path, "hello world\n").map_err(|e| format!("write: {e}"))?;
     let runtime = InspectingRuntime {
         captured: Mutex::new(None),
         response: PluginResponse::success(PluginOutput::Diff {

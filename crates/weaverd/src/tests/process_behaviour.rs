@@ -1,6 +1,6 @@
 //! Behavioural tests covering daemon process supervision and lifecycle files.
 
-use std::{cell::RefCell, fs};
+use std::cell::RefCell;
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
@@ -8,7 +8,7 @@ use weaver_test_macros::allow_fixture_expansion_lints;
 
 use crate::{
     process::{LaunchError, LaunchMode},
-    tests::support::{ProcessTestWorld, snapshot_status},
+    tests::support::{ProcessTestWorld, fs as test_fs, snapshot_status},
 };
 
 #[allow_fixture_expansion_lints]
@@ -87,7 +87,7 @@ fn then_lock_file_exists(world: &RefCell<ProcessTestWorld>) {
     world
         .borrow()
         .wait_for_condition(
-            |state| state.lock_path().exists(),
+            |state| test_fs::exists(state.lock_path()).expect("check lock file"),
             "lock file to be written",
         )
         .expect("lock file should exist whilst daemon is running");
@@ -98,12 +98,15 @@ fn then_pid_file_exists(world: &RefCell<ProcessTestWorld>) {
     {
         let world_ref = world.borrow();
         world_ref
-            .wait_for_condition(|state| state.pid_path().exists(), "pid file to be written")
+            .wait_for_condition(
+                |state| test_fs::exists(state.pid_path()).expect("check pid file"),
+                "pid file to be written",
+            )
             .expect("pid file should be written");
     }
     let world = world.borrow();
     let path = world.pid_path();
-    let content = fs::read_to_string(&path).expect("pid file should be readable");
+    let content = test_fs::read_to_string(&path).expect("pid file should be readable");
     let pid: u32 = content
         .trim()
         .parse()
@@ -156,15 +159,15 @@ fn then_health_stopping(world: &RefCell<ProcessTestWorld>) {
 fn then_runtime_removed(world: &RefCell<ProcessTestWorld>) {
     let world = world.borrow();
     assert!(
-        !world.lock_path().exists(),
+        !test_fs::exists(world.lock_path()).expect("check lock file"),
         "lock file should be removed after shutdown",
     );
     assert!(
-        !world.pid_path().exists(),
+        !test_fs::exists(world.pid_path()).expect("check pid file"),
         "pid file should be removed after shutdown",
     );
     assert!(
-        !world.health_path().exists(),
+        !test_fs::exists(world.health_path()).expect("check health file"),
         "health file should be removed after shutdown",
     );
 }

@@ -15,7 +15,7 @@ use super::{
         effective_operation as supported_effective_operation,
     },
 };
-use crate::dispatch::errors::DispatchError;
+use crate::dispatch::{errors::DispatchError, filesystem};
 
 struct ResolvedFile {
     path: PathBuf,
@@ -136,7 +136,7 @@ fn resolve_file(workspace_root: &Path, file: &str) -> Result<ResolvedFile, Dispa
 }
 
 fn load_file_contents(path: &Path) -> Result<String, DispatchError> {
-    std::fs::read_to_string(path).map_err(|error| {
+    filesystem::read_to_string(path).map_err(|error| {
         DispatchError::invalid_arguments(format!("cannot read file '{}': {error}", path.display()))
     })
 }

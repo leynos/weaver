@@ -1,7 +1,5 @@
 //! Unit tests for `observe::get_card`.
 
-use std::fs;
-
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use url::Url;
@@ -22,6 +20,7 @@ use crate::{
         request::CommandRequest,
     },
     semantic_provider::SemanticBackendProvider,
+    tests::support::fs as test_fs,
 };
 
 #[path = "get_card_semantic_tests.rs"]
@@ -73,7 +72,7 @@ struct RefusalCase<'a> {
 
 fn write_source(temp_dir: &TempDir, file: SourceFile<'_>) -> PathBuf {
     let path = temp_dir.path().join(file.name);
-    if let Err(error) = fs::write(&path, file.content) {
+    if let Err(error) = test_fs::write(&path, file.content) {
         panic!("write source: {error}");
     }
     path
@@ -348,7 +347,7 @@ fn handle_invalidates_stale_revisions_when_file_changes(
     let request = make_request(&uri, 1, 4, DetailLevel::Structure);
 
     let (_, first_payload) = dispatch_payload(&request, &mut backends);
-    fs::write(&path, "fn welcome() -> usize {\n    2\n}\n").expect("rewrite source");
+    test_fs::write(&path, "fn welcome() -> usize {\n    2\n}\n").expect("rewrite source");
     let (_, second_payload) = dispatch_payload(&request, &mut backends);
     let extractor = backends.provider().card_extractor();
     let stats = extractor.cache_stats();

@@ -4,7 +4,7 @@
 //! backed card extraction to `weaver-cards`, and optionally enriches the card
 //! with LSP hover data when `--detail semantic` or higher is requested.
 
-use std::{fs, io::Write, path::PathBuf};
+use std::{io::Write, path::PathBuf};
 
 use url::Url;
 use weaver_cards::{
@@ -22,6 +22,7 @@ use crate::{
     backends::FusionBackends,
     dispatch::{
         errors::DispatchError,
+        filesystem,
         request::CommandRequest,
         response::ResponseWriter,
         router::DispatchResult,
@@ -47,7 +48,7 @@ pub fn handle<W: Write>(
         DispatchError::invalid_arguments(format!("invalid URI '{}': {error}", card_request.uri))
     })?;
     let path = resolve_file_path(&parsed_uri)?;
-    let source = fs::read_to_string(&path)?;
+    let source = filesystem::read_to_string(&path)?;
     let extractor = backends.provider().card_extractor();
 
     let response = match extractor.extract_shared(CardExtractionInput {

@@ -1,15 +1,12 @@
 //! Unix-socket helpers for the daemon listener.
 
 use std::{
-    fs,
     io,
-    os::unix::{
-        fs::FileTypeExt,
-        net::{UnixListener, UnixStream},
-    },
-    path::Path,
+    os::unix::net::{UnixListener, UnixStream},
+    path::{Path, PathBuf},
 };
 
+use cap_std::fs::{Dir, FileTypeExt};
 use tracing::warn;
 use weaver_config::SocketEndpoint;
 
@@ -24,18 +21,21 @@ pub(super) fn bind_unix(path: &Path) -> Result<UnixListener, ListenerError> {
 }
 
 fn ensure_bindable_unix_path(path: &Path) -> Result<(), ListenerError> {
-    if !path.exists() {
+    let (dir, filename) = socket_parent_dir(path)?;
+    if !socket_path_exists(&dir, &filename, path)? {
         return Ok(());
     }
-    ensure_unix_socket_file(path)?;
-    remove_stale_unix_socket(path)
+    ensure_unix_socket_file(&dir, &filename, path)?;
+    remove_stale_unix_socket(&dir, &filename, path)
 }
 
-fn ensure_unix_socket_file(path: &Path) -> Result<(), ListenerError> {
-    let metadata = fs::symlink_metadata(path).map_err(|source| ListenerError::UnixMetadata {
-        path: path.display().to_string(),
-        source,
-    })?;
+fn ensure_unix_socket_file(dir: &Dir, filename: &Path, path: &Path) -> Result<(), ListenerError> {
+    let metadata =
+        dir.symlink_metadata(filename)
+            .map_err(|source| ListenerError::UnixMetadata {
+                path: path.display().to_string(),
+                source,
+            })?;
     if metadata.file_type().is_socket() {
         Ok(())
     } else {
@@ -45,16 +45,17 @@ fn ensure_unix_socket_file(path: &Path) -> Result<(), ListenerError> {
     }
 }
 
-fn remove_stale_unix_socket(path: &Path) -> Result<(), ListenerError> {
+fn remove_stale_unix_socket(dir: &Dir, filename: &Path, path: &Path) -> Result<(), ListenerError> {
     match UnixStream::connect(path) {
         Ok(_stream) => Err(ListenerError::UnixInUse {
             path: path.display().to_string(),
         }),
         Err(error) if stale_unix_socket_error(&error) => {
-            fs::remove_file(path).map_err(|source| ListenerError::UnixCleanup {
-                path: path.display().to_string(),
-                source,
-            })?;
+            dir.remove_file(filename)
+                .map_err(|source| ListenerError::UnixCleanup {
+                    path: path.display().to_string(),
+                    source,
+                })?;
             Ok(())
         }
         Err(error) => Err(ListenerError::UnixConnect {
@@ -75,7 +76,10 @@ pub(super) fn cleanup_unix_socket(endpoint: &SocketEndpoint) {
     let SocketEndpoint::Unix { path } = endpoint else {
         return;
     };
-    if let Err(error) = fs::remove_file(path.as_std_path())
+    let Ok((dir, filename)) = socket_parent_dir(path.as_std_path()) else {
+        return;
+    };
+    if let Err(error) = dir.remove_file(filename)
         && error.kind() != io::ErrorKind::NotFound
     {
         warn!(
@@ -84,5 +88,36 @@ pub(super) fn cleanup_unix_socket(endpoint: &SocketEndpoint) {
             path = %path,
             "failed to remove unix socket file"
         );
+    }
+}
+
+fn socket_parent_dir(path: &Path) -> Result<(Dir, PathBuf), ListenerError> {
+    let parent = path.parent().ok_or_else(|| ListenerError::UnixMetadata {
+        path: path.display().to_string(),
+        source: io::Error::new(io::ErrorKind::InvalidInput, "socket path has no parent"),
+    })?;
+    let filename = path
+        .file_name()
+        .ok_or_else(|| ListenerError::UnixMetadata {
+            path: path.display().to_string(),
+            source: io::Error::new(io::ErrorKind::InvalidInput, "socket path has no file name"),
+        })?;
+    let dir = Dir::open_ambient_dir(parent, cap_std::ambient_authority()).map_err(|source| {
+        ListenerError::UnixMetadata {
+            path: path.display().to_string(),
+            source,
+        }
+    })?;
+    Ok((dir, PathBuf::from(filename)))
+}
+
+fn socket_path_exists(dir: &Dir, filename: &Path, path: &Path) -> Result<bool, ListenerError> {
+    match dir.metadata(filename) {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(source) => Err(ListenerError::UnixMetadata {
+            path: path.display().to_string(),
+            source,
+        }),
     }
 }
