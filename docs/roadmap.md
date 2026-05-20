@@ -187,34 +187,22 @@ This step answers whether local users and automation can diagnose daemon
 startup, request, transport, and lifecycle failures without adding a metrics
 endpoint or distributed tracing backend. It converts RFC 0001 into bounded
 local signals that support later read, mutation, and workflow slices. See
-`docs/rfcs/0001-o11y.md`.
+`docs/rfcs/0001-o11y.md` §§"Observability primitives", "Failure modes that
+warrant actionable signals", "Delivery mechanisms", and "Acceptance criteria".
 
 - [ ] 13.4.1. Define canonical daemon event names and structured fields.
   - Requires 13.2.2 and 13.2.3.
-  - See `docs/rfcs/0001-o11y.md` §§"Observability primitives" and
-    "Acceptance criteria".
-  - Success: lifecycle, request acceptance, request rejection, dispatch
-    completion, and listener-failure events have stable names; required fields
-    cover lifecycle state, endpoint or runtime path, command domain and
-    operation, request size and limit, timeout or retry state, and error kind
-    plus display message.
+  - Success: lifecycle, request, dispatch, and listener events have stable
+    names and the minimum diagnostic fields required by RFC 0001.
 - [ ] 13.4.2. Emit bounded structured events for daemon lifecycle and
       transport paths.
   - Requires 13.4.1.
-  - See `docs/rfcs/0001-o11y.md` §§"Structured daemon events" and "Failure
-    modes that warrant actionable signals".
-  - Success: startup, readiness, shutdown, dispatch boundaries,
-    `RequestTooLarge`, listener saturation, read timeout, socket retry, and
-    socket timeout paths emit deterministic `tracing` fields without patch
-    bodies, source snippets, environment variables, or full JSONL payloads.
+  - Success: lifecycle, dispatch, request rejection, socket, and listener
+    paths emit deterministic `tracing` fields without sensitive payload data.
 - [ ] 13.4.3. Unify CLI guidance for pre-daemon and transport failures.
   - Requires 13.4.2 and 13.3.2.
-  - See `docs/rfcs/0001-o11y.md` §§"CLI actionable guidance" and "Failure
-    modes that warrant actionable signals".
-  - Success: daemon auto-start failures, abnormal startup exits, missing
-    runtime artefacts, starting-but-not-ready sockets, owned sockets, and
-    connection timeouts all report what failed, the relevant evidence path or
-    endpoint, and the next useful command or foreground-debug action.
+  - Success: pre-daemon and transport failures report what failed, the relevant
+    evidence path or endpoint, and the next useful operator action.
 - [ ] 13.4.4. Make request-size rejections diagnosable on both sides of the
       daemon boundary.
   - Requires 13.4.2.
@@ -225,20 +213,13 @@ local signals that support later read, mutation, and workflow slices. See
 - [ ] 13.4.5. Bound `weaverd.health` retention and stale-state handling.
   - Requires 13.4.2.
   - See `docs/rfcs/0001-o11y.md` §"Health snapshot".
-  - Success: health persistence has a fixed event or byte cap, a recent-state
-    retention window, deterministic rotation or truncation, and consumer
-    semantics that treat out-of-window data as stale while preserving
-    `weaver daemon status` as the current-state command.
+  - Success: health persistence is bounded, rotates deterministically, and
+    treats out-of-window data as stale.
 - [ ] 13.4.6. Cover RFC 0001 failure modes in documentation and regression
       tests.
   - Requires 13.4.2 through 13.4.5.
-  - See `docs/rfcs/0001-o11y.md` §§"Delivery mechanisms" and "Acceptance
-    criteria".
-  - Success: tests and docs cover daemon auto-start distinctions,
-    request-size failures, socket connection timeout classes, abnormal daemon
-    exit, inconsistent lock/PID/health/socket artefacts, listener read
-    timeouts, and a foreground debug recipe using `--log-filter` and
-    `--log-format json`.
+  - Success: tests and docs cover the RFC 0001 failure taxonomy and foreground
+    debug recipe.
 
 ## 14. Code-reading loop slice
 
@@ -1026,46 +1007,38 @@ This step answers whether optional observability surfaces have earned a new
 design after the local-first RFC 0001 contract exists. It keeps metrics,
 distributed tracing, retained diagnostics, and status expansion out of the core
 promise until their privacy, retention, endpoint, and command-latency costs are
-explicit.
+explicit. See `docs/rfcs/0001-o11y.md` §§"Open questions", "Local request
+correlation", "Deferred path: status subcommand expansion", "Option D:
+Dedicated diagnostics artefact", "Deferred path: optional metrics endpoint",
+and "Options considered".
 
 - [ ] 20.3.1. Decide whether CLI pre-daemon diagnostics need a minimal
       `tracing` subscriber.
   - Requires 13.4.6.
-  - See `docs/rfcs/0001-o11y.md` §"Open questions".
   - Success: the decision either keeps pre-daemon diagnostics as explicit
     stderr guidance or defines a local subscriber contract without adding a
     remote telemetry surface.
 - [ ] 20.3.2. Decide whether to add a local `request_id` to the CLI-to-daemon
       JSONL schema.
   - Requires 13.4.6.
-  - See `docs/rfcs/0001-o11y.md` §§"Local request correlation" and "Open
-    questions".
   - Success: the decision either accepts a bounded local correlation field with
     schema and privacy rules or records why structured event fields are enough.
 - [ ] 20.3.3. Decide whether `weaver daemon status --json` belongs in the
       command contract.
   - Requires 13.4.6 and 13.3.1.
-  - See `docs/rfcs/0001-o11y.md` §§"Deferred path: status subcommand
-    expansion" and "Open questions".
   - Success: the outcome is recorded as a bounded status-schema extension, a
     deliberate reliance on `weaverd.health` for machine-readable state, or a
     deferral with rationale.
 - [ ] 20.3.4. Decide whether abnormal exits need a dedicated bounded
       diagnostics artefact.
   - Requires 13.4.6.
-  - See `docs/rfcs/0001-o11y.md` §§"Option D: Dedicated diagnostics artefact"
-    and "Open questions".
   - Success: the decision either specifies a separate retained diagnostics
     artefact with privacy, retention, cleanup, and rotation rules or keeps
     foreground logs as the supported debug path.
 - [ ] 20.3.5. Reconfirm the metrics endpoint and distributed tracing boundary.
   - Requires 20.3.2 and 20.3.4.
-  - See `docs/rfcs/0001-o11y.md` §§"Deferred path: optional metrics endpoint"
-    and "Options considered".
-  - Success: any metrics exporter, Prometheus/OpenMetrics endpoint,
-    OpenTelemetry or W3C Trace Context propagation, dashboard, or remote
-    aggregation proposal requires a follow-up RFC and an explicit local-only
-    binding, feature-flag, privacy, and latency assessment.
+  - Success: any metrics, tracing, dashboard, or aggregation surface requires a
+    follow-up RFC with local-binding, feature-flag, privacy, and latency rules.
 
 ## Archive
 
