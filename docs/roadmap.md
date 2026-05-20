@@ -1033,7 +1033,7 @@ and "Options considered".
       diagnostics artefact.
   - Requires 13.4.6.
   - Success: the decision either specifies a separate retained diagnostics
-    artefact with privacy, retention, cleanup, and rotation rules or keeps
+    artefact with privacy, retention, cleanup rules, and rotation rules or keeps
     foreground logs as the supported debug path.
 - [ ] 20.3.5. Reconfirm the metrics endpoint and distributed tracing boundary.
   - Requires 20.3.2 and 20.3.4.
