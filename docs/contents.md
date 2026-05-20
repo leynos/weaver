@@ -91,6 +91,9 @@
   - End-user guide for Weaver configuration, daemon lifecycle, and commands.
 - [Weaver design document](weaver-design.md)
   - System architecture, safety model, and phased delivery rationale.
+- [Weaver `act refactor` rename position migration guide](weaver-act-refactor-rename-position-migration-guide.md)
+  - Migration notes for moving `act refactor` rename from `offset=` to
+    `--position LINE:COL`.
 - [Weaver LSP host v0.1.0 migration guide](weaver-lsp-host-v0-1-0-migration-guide.md)
   - Migration details for Language Server Protocol (LSP) host capability and
     API changes.
