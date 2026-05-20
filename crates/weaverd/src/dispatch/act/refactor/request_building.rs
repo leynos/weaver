@@ -222,15 +222,27 @@ fn apply_rename_symbol_mapping(
             file_path = %file.display(),
             "using deprecated offset= for rename position"
         );
-        if offset_val.is_string() || offset_val.is_number() {
-            plugin_args.insert(String::from("position"), offset_val);
-            return Ok(());
-        }
-
-        return Err(invalid_rename_arguments(
-            file,
-            "refactor rename deprecated offset= must be a numeric or string byte offset",
-        ));
+        let offset = match offset_val {
+            serde_json::Value::String(value) => value.trim().to_owned(),
+            serde_json::Value::Number(value) => value.to_string(),
+            _ => {
+                return Err(invalid_rename_arguments(
+                    file,
+                    "refactor rename deprecated offset= must be a numeric or string byte offset",
+                ));
+            }
+        };
+        let offset = offset.parse::<usize>().map_err(|_error| {
+            invalid_rename_arguments(
+                file,
+                "refactor rename deprecated offset= must be a numeric or string byte offset",
+            )
+        })?;
+        plugin_args.insert(
+            String::from("position"),
+            serde_json::Value::String(offset.to_string()),
+        );
+        return Ok(());
     }
     Err(invalid_rename_arguments(
         file,
@@ -272,6 +284,69 @@ mod tests {
 
     use super::*;
 
+    fn rename_mapping_context<'a>() -> CapabilityMappingContext<'a> {
+        CapabilityMappingContext {
+            capability: CapabilityId::RenameSymbol,
+            file_path: Path::new("/tmp"),
+            file_content: "hello world",
+            position: None,
+            metrics: &crate::dispatch::act::refactor::metrics::NullPositionMetrics,
+        }
+    }
+
+    #[test]
+    fn apply_rename_symbol_mapping_normalizes_deprecated_string_offset() {
+        let mut plugin_args =
+            HashMap::from([(String::from("offset"), Value::String(String::from(" 004 ")))]);
+
+        apply_rename_symbol_mapping(&mut plugin_args, rename_mapping_context())
+            .expect("offset should map to position");
+
+        assert_eq!(
+            plugin_args.get("position").and_then(Value::as_str),
+            Some("4")
+        );
+        assert!(!plugin_args.contains_key("offset"));
+    }
+
+    #[test]
+    fn apply_rename_symbol_mapping_normalizes_deprecated_numeric_offset() {
+        let mut plugin_args = HashMap::from([(
+            String::from("offset"),
+            Value::Number(serde_json::Number::from(4)),
+        )]);
+
+        apply_rename_symbol_mapping(&mut plugin_args, rename_mapping_context())
+            .expect("offset should map to position");
+
+        assert_eq!(
+            plugin_args.get("position").and_then(Value::as_str),
+            Some("4")
+        );
+    }
+
+    #[test]
+    fn apply_rename_symbol_mapping_rejects_negative_deprecated_offset() {
+        let mut plugin_args =
+            HashMap::from([(String::from("offset"), Value::String(String::from("-1")))]);
+
+        let err = apply_rename_symbol_mapping(&mut plugin_args, rename_mapping_context())
+            .expect_err("negative offset must be rejected");
+
+        assert_invalid_offset_error(err);
+    }
+
+    #[test]
+    fn apply_rename_symbol_mapping_rejects_non_numeric_deprecated_offset() {
+        let mut plugin_args =
+            HashMap::from([(String::from("offset"), Value::String(String::from("abc")))]);
+
+        let err = apply_rename_symbol_mapping(&mut plugin_args, rename_mapping_context())
+            .expect_err("non-numeric offset must be rejected");
+
+        assert_invalid_offset_error(err);
+    }
+
     #[test]
     fn apply_rename_symbol_mapping_rejects_non_string_or_numeric_offset() {
         let mut plugin_args = HashMap::from([
@@ -281,18 +356,13 @@ mod tests {
                 Value::String(String::from("woven")),
             ),
         ]);
-        let err = apply_rename_symbol_mapping(
-            &mut plugin_args,
-            CapabilityMappingContext {
-                capability: CapabilityId::RenameSymbol,
-                file_path: Path::new("/tmp"),
-                file_content: "hello world",
-                position: None,
-                metrics: &crate::dispatch::act::refactor::metrics::NullPositionMetrics,
-            },
-        )
-        .expect_err("offset must be rejected when not numeric");
+        let err = apply_rename_symbol_mapping(&mut plugin_args, rename_mapping_context())
+            .expect_err("offset must be rejected when not numeric");
 
+        assert_invalid_offset_error(err);
+    }
+
+    fn assert_invalid_offset_error(err: DispatchError) {
         assert!(matches!(err, DispatchError::InvalidArguments { .. }));
         let invalid_arguments = match err {
             DispatchError::InvalidArguments { message } => message,
