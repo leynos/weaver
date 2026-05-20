@@ -1,4 +1,10 @@
-//! Builds plugin requests for `act refactor`.
+//! Builds plugin requests for `act refactor` by resolving and loading the
+//! target file, constructing the request payload, and applying
+//! capability-specific argument mapping through `CapabilityMappingContext`.
+//!
+//! Position-aware mapping converts line and column pairs to provider byte
+//! offsets via `positions.rs`, and any conversion failures are reported
+//! through `PositionMetrics`.
 
 use std::{
     collections::HashMap,

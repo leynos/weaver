@@ -25,8 +25,8 @@ becomes:
 weaver act refactor --provider rope --refactoring rename --file src/lib.rs --position 12:9 new_name=renamed
 ```
 
-If you already have a line and column from the editor or source view, pass it
-directly with `--position`. The values are one-indexed.
+When a line and column are available from editor or source context, pass them
+with `--position`. Values are one-indexed.
 
 ## Notes
 
