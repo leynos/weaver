@@ -78,10 +78,17 @@ fn reset_test_counters() {
 #[cfg(test)]
 mod tests {
     //! Unit tests for position metrics implementations.
+    //!
+    //! Tests that read or mutate the global AtomicU64 counters must be
+    //! annotated with `#[serial]` to prevent data races when the test suite is
+    //! executed with the default multi-threaded test runner.
+
+    use serial_test::serial;
 
     use super::{AtomicPositionMetrics, PositionMetrics, reset_test_counters, test_counter_values};
 
     #[test]
+    #[serial]
     fn atomic_metrics_increment_each_counter() {
         reset_test_counters();
         let metrics = AtomicPositionMetrics;

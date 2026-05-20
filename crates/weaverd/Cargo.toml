@@ -42,6 +42,7 @@ proptest = { workspace = true }
 rstest.workspace = true
 rstest-bdd.workspace = true
 rstest-bdd-macros.workspace = true
+serial_test = { workspace = true }
 weaver-test-macros = { path = "../weaver-test-macros" }
 
 [build-dependencies]
