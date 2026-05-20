@@ -106,6 +106,7 @@ impl Engine {
     pub fn compile_yaml(&self, yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
         let file = parse_rule_file(yaml, None)?;
         tracing::Span::current().record("rules", file.rules().len());
+        tracing::debug!(rules = file.rules().len(), "yaml parsed successfully");
         validate_supported_modes(&file)?;
 
         file.rules()
@@ -120,6 +121,7 @@ impl Engine {
             .try_fold(Vec::new(), |mut plans, (rule, principal)| {
                 tracing::debug!(rule_id = rule.id(), "normalizing principal");
                 let formula = normalize_search_principal(principal, rule.rule_span())?;
+                tracing::debug!(rule_id = rule.id(), "principal normalized");
 
                 tracing::debug!(rule_id = rule.id(), "validating normalized formula");
                 validate_formula(&formula)?;
@@ -189,11 +191,10 @@ fn compile_rule_plans(
                     vec![],
                 )
             })?;
-            Ok(QueryPlan::new(
-                rule.id().to_owned(),
-                language,
-                Arc::clone(&shared_formula),
-            ))
+            let query_plan =
+                QueryPlan::new(rule.id().to_owned(), language, Arc::clone(&shared_formula));
+            tracing::debug!(rule_id = rule.id(), %language, "query plan created");
+            Ok(query_plan)
         })
         .collect()
 }

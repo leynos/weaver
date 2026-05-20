@@ -10,3 +10,4 @@ mod normalization_tests;
 mod property_tests;
 mod reexport_tests;
 mod semantic_validation_tests;
+mod tracing_tests;
