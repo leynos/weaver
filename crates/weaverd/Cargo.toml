@@ -13,6 +13,7 @@ path = "src/main.rs"
 test-support = []
 
 [dependencies]
+cap-std = { workspace = true }
 daemonize-me = "2.0.2"
 dirs = "5.0"
 lsp-types.workspace = true

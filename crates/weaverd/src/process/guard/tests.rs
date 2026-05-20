@@ -25,6 +25,11 @@ fn build_paths() -> Result<(TempDir, RuntimePaths), String> {
     Ok((dir, paths))
 }
 
+fn open_runtime_dir(paths: &RuntimePaths) -> Result<cap_std::fs::Dir, String> {
+    cap_std::fs::Dir::open_ambient_dir(paths.runtime_dir(), cap_std::ambient_authority())
+        .map_err(|error| format!("failed to open runtime directory: {error}"))
+}
+
 #[fixture]
 fn seeded_runtime_paths(#[default("0\n")] pid: &str) -> Result<(TempDir, RuntimePaths), String> {
     let (dir, paths) = build_paths()?;
@@ -41,7 +46,8 @@ fn setup_guard_with_health(
     state: HealthState,
 ) -> Result<ProcessGuard, String> {
     test_support::clear_health_events(paths.health_path())?;
-    let mut guard = ProcessGuard::acquire(paths.clone())
+    let runtime_dir = open_runtime_dir(paths)?;
+    let mut guard = ProcessGuard::acquire(runtime_dir, paths.clone())
         .map_err(|error| format!("lock should be acquired: {error}"))?;
     let pid = std::process::id();
     guard
@@ -58,7 +64,8 @@ fn missing_pid_file_refuses_reacquire() -> Result<(), String> {
     let (_dir, paths) = build_paths()?;
     fs::write(paths.lock_path(), b"")
         .map_err(|error| format!("failed to seed lock file: {error}"))?;
-    match ProcessGuard::acquire(paths.clone()) {
+    let runtime_dir = open_runtime_dir(&paths)?;
+    match ProcessGuard::acquire(runtime_dir, paths.clone()) {
         Err(LaunchError::StartupInProgress { .. }) => {
             assert!(
                 paths.lock_path().exists(),
@@ -92,7 +99,8 @@ fn stale_pid_is_reclaimed(
             .map_err(|error| format!("failed to seed health file: {error}"))?;
     }
 
-    let mut guard = ProcessGuard::acquire(paths.clone())
+    let runtime_dir = open_runtime_dir(&paths)?;
+    let mut guard = ProcessGuard::acquire(runtime_dir, paths.clone())
         .map_err(|error| format!("stale runtime should be reclaimed: {error}"))?;
     if write_health {
         assert!(
@@ -114,7 +122,8 @@ fn existing_pid_rejects_launch() -> Result<(), String> {
     let pid = std::process::id();
     fs::write(paths.pid_path(), format!("{pid}\n"))
         .map_err(|error| format!("failed to seed pid file: {error}"))?;
-    match ProcessGuard::acquire(paths) {
+    let runtime_dir = open_runtime_dir(&paths)?;
+    match ProcessGuard::acquire(runtime_dir, paths) {
         Err(LaunchError::AlreadyRunning { pid: recorded }) => {
             assert_eq!(recorded, pid, "pid should match recorded process");
             Ok(())

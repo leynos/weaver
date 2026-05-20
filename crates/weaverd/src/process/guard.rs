@@ -6,12 +6,14 @@ use std::{
     sync::{Mutex, OnceLock},
 };
 use std::{
-    fs::{self, File, OpenOptions},
     io,
     path::Path,
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[cfg(unix)]
+use cap_std::fs::OpenOptionsExt;
+use cap_std::fs::{Dir, File, OpenOptions};
 use nix::{errno::Errno, sys::signal::kill, unistd::Pid};
 use serde::Serialize;
 use tracing::{info, warn};
@@ -25,15 +27,17 @@ static HEALTH_EVENTS: OnceLock<Mutex<HashMap<PathBuf, Vec<&'static str>>>> = Onc
 #[derive(Debug)]
 pub(super) struct ProcessGuard {
     paths: RuntimePaths,
+    runtime_dir: Dir,
     _lock: File,
     pid: Option<u32>,
 }
 
 impl ProcessGuard {
-    pub(super) fn acquire(paths: RuntimePaths) -> Result<Self, LaunchError> {
-        let lock = acquire_lock(&paths)?;
+    pub(super) fn acquire(runtime_dir: Dir, paths: RuntimePaths) -> Result<Self, LaunchError> {
+        let lock = acquire_lock(&runtime_dir, &paths)?;
         Ok(Self {
             paths,
+            runtime_dir,
             _lock: lock,
             pid: None,
         })
@@ -42,7 +46,12 @@ impl ProcessGuard {
     pub(super) fn write_pid(&mut self, pid: u32) -> Result<(), LaunchError> {
         let path = self.paths.pid_path();
         let payload = format!("{pid}\n");
-        atomic_write(path, payload.as_bytes()).map_err(|source| LaunchError::PidWrite {
+        atomic_write(
+            &self.runtime_dir,
+            runtime_filename(path)?,
+            payload.as_bytes(),
+        )
+        .map_err(|source| LaunchError::PidWrite {
             path: path.to_path_buf(),
             source,
         })?;
@@ -62,9 +71,11 @@ impl ProcessGuard {
         let snapshot = HealthSnapshot::new(status, pid)?;
         let mut payload = serde_json::to_vec(&snapshot)?;
         payload.push(b'\n');
-        atomic_write(path, &payload).map_err(|source| LaunchError::HealthWrite {
-            path: path.to_path_buf(),
-            source,
+        atomic_write(&self.runtime_dir, runtime_filename(path)?, &payload).map_err(|source| {
+            LaunchError::HealthWrite {
+                path: path.to_path_buf(),
+                source,
+            }
         })?;
         #[cfg(test)]
         {
@@ -94,7 +105,7 @@ impl ProcessGuard {
             self.paths.pid_path(),
             self.paths.health_path(),
         ] {
-            remove_runtime_file(path);
+            remove_runtime_file(&self.runtime_dir, path);
         }
     }
 }
@@ -103,8 +114,16 @@ impl Drop for ProcessGuard {
     fn drop(&mut self) { self.cleanup(); }
 }
 
-fn remove_runtime_file(path: &Path) {
-    match fs::remove_file(path) {
+fn remove_runtime_file(dir: &Dir, path: &Path) {
+    let Ok(filename) = runtime_filename(path) else {
+        warn!(
+            target: PROCESS_TARGET,
+            file = %path.display(),
+            "failed to resolve runtime artefact filename",
+        );
+        return;
+    };
+    match dir.remove_file(filename) {
         Ok(()) => {}
         Err(error) if error.kind() == io::ErrorKind::NotFound => {}
         Err(error) => warn!(
@@ -154,15 +173,15 @@ impl<'a> HealthSnapshot<'a> {
     }
 }
 
-fn acquire_lock(paths: &RuntimePaths) -> Result<File, LaunchError> {
+fn acquire_lock(dir: &Dir, paths: &RuntimePaths) -> Result<File, LaunchError> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
     {
-        use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
-    match options.open(paths.lock_path()) {
+    let filename = runtime_filename(paths.lock_path())?;
+    match dir.open_with(filename, &options) {
         Ok(file) => {
             info!(
                 target: PROCESS_TARGET,
@@ -171,7 +190,9 @@ fn acquire_lock(paths: &RuntimePaths) -> Result<File, LaunchError> {
             );
             Ok(file)
         }
-        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => handle_existing_lock(paths),
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+            handle_existing_lock(dir, paths)
+        }
         Err(source) => Err(LaunchError::LockCreate {
             path: paths.lock_path().to_path_buf(),
             source,
@@ -179,8 +200,8 @@ fn acquire_lock(paths: &RuntimePaths) -> Result<File, LaunchError> {
     }
 }
 
-fn handle_existing_lock(paths: &RuntimePaths) -> Result<File, LaunchError> {
-    if !paths.pid_path().exists() {
+fn handle_existing_lock(dir: &Dir, paths: &RuntimePaths) -> Result<File, LaunchError> {
+    if !runtime_file_exists(dir, paths.pid_path())? {
         info!(
             target: PROCESS_TARGET,
             lock = %paths.lock_path().display(),
@@ -192,7 +213,7 @@ fn handle_existing_lock(paths: &RuntimePaths) -> Result<File, LaunchError> {
         });
     }
 
-    match read_pid(paths.pid_path()) {
+    match read_pid(dir, paths.pid_path()) {
         Some(0) => {
             warn!(
                 target: PROCESS_TARGET,
@@ -224,19 +245,19 @@ fn handle_existing_lock(paths: &RuntimePaths) -> Result<File, LaunchError> {
         }
     }
 
-    remove_file(paths.lock_path())?;
-    remove_file(paths.pid_path())?;
-    remove_file(paths.health_path())?;
-    acquire_lock(paths)
+    remove_file(dir, paths.lock_path())?;
+    remove_file(dir, paths.pid_path())?;
+    remove_file(dir, paths.health_path())?;
+    acquire_lock(dir, paths)
 }
 
-fn read_pid(path: &Path) -> Option<u32> {
-    let content = fs::read_to_string(path).ok()?;
+fn read_pid(dir: &Dir, path: &Path) -> Option<u32> {
+    let content = dir.read_to_string(runtime_filename(path).ok()?).ok()?;
     content.trim().parse::<u32>().ok()
 }
 
-fn remove_file(path: &Path) -> Result<(), LaunchError> {
-    match fs::remove_file(path) {
+fn remove_file(dir: &Dir, path: &Path) -> Result<(), LaunchError> {
+    match dir.remove_file(runtime_filename(path)?) {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
         Err(source) => Err(LaunchError::Cleanup {
@@ -244,6 +265,29 @@ fn remove_file(path: &Path) -> Result<(), LaunchError> {
             source,
         }),
     }
+}
+
+fn runtime_file_exists(dir: &Dir, path: &Path) -> Result<bool, LaunchError> {
+    match dir.metadata(runtime_filename(path)?) {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(source) => Err(LaunchError::Cleanup {
+            path: path.to_path_buf(),
+            source,
+        }),
+    }
+}
+
+fn runtime_filename(path: &Path) -> Result<&Path, LaunchError> {
+    path.file_name()
+        .map(Path::new)
+        .ok_or_else(|| LaunchError::Cleanup {
+            path: path.to_path_buf(),
+            source: io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "runtime artefact path has no file name",
+            ),
+        })
 }
 
 fn check_process(pid: u32) -> Result<bool, LaunchError> {
