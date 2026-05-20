@@ -1,4 +1,9 @@
 //! Constraint parsing for canonical formula normalization.
+//!
+//! This module is the serialization boundary for rule `where` clauses. It
+//! accepts raw YAML-backed JSON values from the parser and lowers them into
+//! `sempai_core` domain constraints. Core formula types must stay independent
+//! of YAML, JSON, and other transport formats.
 
 use sempai_core::{DiagnosticCode, DiagnosticReport, SourceSpan, formula::Constraint};
 use serde_json::Value;

@@ -10,6 +10,11 @@
 //!   disjunction contexts are structurally invalid.
 //! - **`MissingPositiveTermInAnd`**: `And` branches must contain at least one positive
 //!   match-producing term (not `Not`, `Inside`, or `Anywhere`).
+//! - **Depth limit**: formula nesting must stay within [`MAX_FORMULA_DEPTH`].
+//!
+//! Constraint payloads attached to `where` clauses have their own validation
+//! stage. [`validate_formula`] checks the shape of the formula tree only; use
+//! [`validate_constraints`] for constraint payload semantics.
 //!
 //! # Example
 //!
@@ -25,12 +30,17 @@ use sempai_core::{
     DiagnosticCode,
     DiagnosticReport,
     SourceSpan,
-    formula::{Decorated, Formula},
+    formula::{Constraint, Decorated, Formula},
 };
 
 pub(crate) const MAX_FORMULA_DEPTH: usize = 1000;
 
-/// Validates semantic constraints on a normalized formula.
+/// Validates structural semantic constraints on a normalized formula.
+///
+/// This function validates the formula tree shape only. It does not validate
+/// `where` clause payload semantics such as whether a metavariable regular
+/// expression compiles; those checks belong in [`validate_constraints`] or the
+/// execution layer when the required matcher context is available.
 ///
 /// # Errors
 ///
@@ -48,6 +58,46 @@ pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), Diagn
         tracing::warn!(code = ?diagnostic.code(), "semantic validation failed");
     }
     result
+}
+
+/// Validates semantic constraints attached to formula `where` clauses.
+///
+/// The current domain model normalizes known constraint shapes before this
+/// point, but execution-time matcher context is still required for semantic
+/// checks such as regex compilation and pattern compatibility. This hook walks
+/// every decorated formula node so those checks can be added without changing
+/// the engine pipeline.
+///
+/// # Errors
+///
+/// Currently returns `Ok(())`. Future validation should return a diagnostic
+/// report when a normalized constraint payload is semantically invalid.
+#[tracing::instrument(level = "debug", skip_all)]
+pub(crate) fn validate_constraints(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
+    validate_constraints_inner(formula)
+}
+
+fn validate_constraints_inner(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
+    for clause in &formula.where_clauses {
+        match &clause.constraint {
+            Constraint::MetavariableRegex { .. }
+            | Constraint::MetavariablePattern { .. }
+            | Constraint::Other(_) => {}
+        }
+    }
+
+    match &formula.node {
+        Formula::Atom(_) => Ok(()),
+        Formula::Not(inner) | Formula::Inside(inner) | Formula::Anywhere(inner) => {
+            validate_constraints_inner(inner)
+        }
+        Formula::And(branches) | Formula::Or(branches) => {
+            for branch in branches {
+                validate_constraints_inner(branch)?;
+            }
+            Ok(())
+        }
+    }
 }
 
 fn validate_formula_inner(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
