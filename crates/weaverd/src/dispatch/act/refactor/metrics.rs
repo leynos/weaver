@@ -79,29 +79,18 @@ fn reset_test_counters() {
 mod tests {
     //! Unit tests for position metrics implementations.
 
-    use super::{
-        AtomicPositionMetrics, PositionMetrics, reset_test_counters, test_counter_values,
-    };
+    use super::{AtomicPositionMetrics, PositionMetrics, reset_test_counters, test_counter_values};
 
     #[test]
-    fn atomic_metrics_increment_parse_counter() {
+    fn atomic_metrics_increment_each_counter() {
         reset_test_counters();
         let metrics = AtomicPositionMetrics;
 
         metrics.increment_parse_error();
-
         assert_eq!(test_counter_values(), (1, 0));
-        reset_test_counters();
-    }
-
-    #[test]
-    fn atomic_metrics_increment_conversion_counter() {
-        reset_test_counters();
-        let metrics = AtomicPositionMetrics;
 
         metrics.increment_conversion_error();
-
-        assert_eq!(test_counter_values(), (0, 1));
+        assert_eq!(test_counter_values(), (1, 1));
         reset_test_counters();
     }
 }

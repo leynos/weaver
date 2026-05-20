@@ -135,9 +135,11 @@ mod tests {
     #[case::ascii_start("hello\n", 1, 1, 0)]
     #[case::ascii_middle("hello\n", 1, 5, 4)]
     #[case::ascii_end("hello\n", 1, 6, 5)]
+    #[case::eof_without_trailing_newline("hello", 1, 6, 5)]
     #[case::second_line("hello\nworld\n", 2, 2, 7)]
     #[case::multibyte_middle("héllo\n", 1, 3, 3)]
     #[case::multibyte_end("héllo\n", 1, 6, 6)]
+    #[case::multibyte_eof_without_trailing_newline("héllo", 1, 6, 6)]
     #[case::empty_line("hello\n\nworld\n", 2, 1, 6)]
     #[case::crlf_line("hello\r\nworld\r\n", 2, 1, 7)]
     fn line_col_to_byte_offset_accepts_valid_positions(

@@ -1108,6 +1108,10 @@ warning to stderr before processing the request:
 Warning: 'offset=' is deprecated; use '--position LINE:COL' instead.
 ```
 
+See the
+[rename position migration guide](weaver-act-refactor-rename-position-migration-guide.md)
+for upgrade examples.
+
 ### Parameter semantics and valid values
 
 The `act refactor` handler requires `--provider`, `--refactoring`, `--file`,
