@@ -187,8 +187,10 @@ This step answers whether local users and automation can diagnose daemon
 startup, request, transport, and lifecycle failures without adding a metrics
 endpoint or distributed tracing backend. It converts RFC 0001 into bounded
 local signals that support later read, mutation, and workflow slices. See
-`docs/rfcs/0001-o11y.md` §§"Observability primitives", "Failure modes that
-warrant actionable signals", "Delivery mechanisms", and "Acceptance criteria".
+RFC 0001 §§[Observability primitives](rfcs/0001-o11y.md#observability-primitives),
+[Failure modes that warrant actionable signals](rfcs/0001-o11y.md#failure-modes-that-warrant-actionable-signals),
+[Delivery mechanisms](rfcs/0001-o11y.md#delivery-mechanisms), and
+[Acceptance criteria](rfcs/0001-o11y.md#acceptance-criteria).
 
 - [ ] 13.4.1. Define canonical daemon event names and structured fields.
   - Requires 13.2.2 and 13.2.3.
@@ -206,18 +208,18 @@ warrant actionable signals", "Delivery mechanisms", and "Acceptance criteria".
 - [ ] 13.4.4. Make request-size rejections diagnosable on both sides of the
       daemon boundary.
   - Requires 13.4.2.
-  - See `docs/rfcs/0001-o11y.md` §"RequestTooLarge rejection".
+  - See RFC 0001 §[RequestTooLarge rejection](rfcs/0001-o11y.md#requesttoolarge-rejection).
   - Success: CLI-side and daemon-side size failures include the observed
     request size, `JSONL_REQUEST_MAX_LINE_BYTES`, the affected command where
     known, and user guidance to reduce or split the payload.
 - [ ] 13.4.5. Bound `weaverd.health` retention and stale-state handling.
   - Requires 13.4.2.
-  - See `docs/rfcs/0001-o11y.md` §"Health snapshot".
+  - See RFC 0001 §[Health snapshot](rfcs/0001-o11y.md#health-snapshot).
   - Success: health persistence is bounded, rotates deterministically, and
     treats out-of-window data as stale.
 - [ ] 13.4.6. Cover RFC 0001 failure modes in documentation and regression
       tests.
-  - Requires 13.4.2 through 13.4.5.
+  - Requires completion of 13.4.2 through 13.4.5.
   - Success: tests and docs cover the RFC 0001 failure taxonomy and foreground
     debug recipe.
 
@@ -1007,10 +1009,12 @@ This step answers whether optional observability surfaces have earned a new
 design after the local-first RFC 0001 contract exists. It keeps metrics,
 distributed tracing, retained diagnostics, and status expansion out of the core
 promise until their privacy, retention, endpoint, and command-latency costs are
-explicit. See `docs/rfcs/0001-o11y.md` §§"Open questions", "Local request
-correlation", "Deferred path: status subcommand expansion", "Option D:
-Dedicated diagnostics artefact", "Deferred path: optional metrics endpoint",
-and "Options considered".
+explicit. See RFC 0001 §§[Open questions](rfcs/0001-o11y.md#open-questions),
+[Local request correlation](rfcs/0001-o11y.md#local-request-correlation),
+[Deferred path: status subcommand expansion](rfcs/0001-o11y.md#deferred-path-status-subcommand-expansion),
+[Option D: Dedicated diagnostics artefact](rfcs/0001-o11y.md#option-d-dedicated-diagnostics-artefact),
+[Deferred path: optional metrics endpoint](rfcs/0001-o11y.md#deferred-path-optional-metrics-endpoint),
+and [Options considered](rfcs/0001-o11y.md#options-considered).
 
 - [ ] 20.3.1. Decide whether CLI pre-daemon diagnostics need a minimal
       `tracing` subscriber.
@@ -1036,7 +1040,7 @@ and "Options considered".
     artefact with privacy, retention, cleanup rules, and rotation rules or keeps
     foreground logs as the supported debug path.
 - [ ] 20.3.5. Reconfirm the metrics endpoint and distributed tracing boundary.
-  - Requires 20.3.2 and 20.3.4.
+  - Requires completion of 20.3.2 and 20.3.4.
   - Success: any metrics, tracing, dashboard, or aggregation surface requires a
     follow-up RFC with local-binding, feature-flag, privacy, and latency rules.
 
