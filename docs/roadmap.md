@@ -1037,8 +1037,8 @@ and [Options considered](rfcs/0001-o11y.md#options-considered).
       diagnostics artefact.
   - Requires 13.4.6.
   - Success: the decision either specifies a separate retained diagnostics
-    artefact with privacy, retention, cleanup rules, and rotation rules or keeps
-    foreground logs as the supported debug path.
+    artefact with privacy, retention, cleanup procedures, and rotation rules or
+    keeps foreground logs as the supported debug path.
 - [ ] 20.3.5. Reconfirm the metrics endpoint and distributed tracing boundary.
   - Requires completion of 20.3.2 and 20.3.4.
   - Success: any metrics, tracing, dashboard, or aggregation surface requires a
