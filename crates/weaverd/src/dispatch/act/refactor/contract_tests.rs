@@ -1,4 +1,13 @@
-//! Unit tests for the `rename-symbol` request mapping contract.
+//! Contract tests for the `rename-symbol` request mapping.
+//!
+//! These cases verify that `act refactor` translates operator input into the
+//! plugin request shape expected by rename-capable backends, including URI,
+//! position, and trailing argument handling.
+//!
+//! Keep this module focused on request-construction stability. Broader handler
+//! outcomes, capability resolution, rollback behaviour, and lower-level
+//! argument parsing are covered by the sibling `tests`, `resolution_tests`,
+//! `rollback_tests`, and other refactor test modules.
 
 use std::{path::PathBuf, sync::Mutex};
 

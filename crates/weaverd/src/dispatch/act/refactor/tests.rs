@@ -1,4 +1,13 @@
-//! Unit tests for the `act refactor` handler.
+//! Behavioural tests for the `act refactor` handler.
+//!
+//! These cases exercise the end-to-end dispatch path: argument validation,
+//! capability resolution, plugin execution, diff application, and error
+//! reporting.
+//!
+//! Keep this module focused on observable handler behaviour. Request-mapping
+//! contracts are covered by `contract_tests`, while resolution-specific and
+//! rollback-specific scenarios live in the sibling `resolution_tests` and
+//! `rollback_tests` modules.
 
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
