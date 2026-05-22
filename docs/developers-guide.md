@@ -979,8 +979,8 @@ when `parse_position_flag` rejects a value. `prepare_plugin_request` threads
 the same metrics into rename mapping and increments the conversion-error
 counter when `line_col_to_byte_offset` fails.
 
-These counters are not exported. Exporter integration remains governed by RFC
-0001 and issue `#122`.
+Crate-visible accessors expose the current process-local counts. Exporter
+integration remains pending RFC 0001 and issue `#122`.
 
 ### `arguments` (`weaverd/src/dispatch/act/refactor/arguments.rs`)
 
