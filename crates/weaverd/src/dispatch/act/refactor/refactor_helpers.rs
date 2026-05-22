@@ -11,6 +11,7 @@ pub(crate) mod builders {
     use weaver_cards::DEFAULT_CACHE_CAPACITY;
     use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 
+    use super::content::{FileKind, classify_file};
     use crate::{
         backends::FusionBackends,
         dispatch::request::{CommandDescriptor, CommandRequest},
@@ -44,7 +45,10 @@ pub(crate) mod builders {
     /// fallback files, and `2:9` for Rust where the fixture symbol starts on
     /// the second line.
     pub(crate) fn standard_rename_args_for_provider(file: &str, provider: &str) -> Vec<String> {
-        let position = if file.ends_with(".rs") { "2:9" } else { "1:1" };
+        let position = match classify_file(Path::new(file)) {
+            FileKind::Rust => "2:9",
+            _ => "1:1",
+        };
         vec![
             String::from("--provider"),
             String::from(provider),
