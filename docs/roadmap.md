@@ -189,8 +189,10 @@ endpoint or distributed tracing backend. It converts RFC 0001 into bounded
 local signals that support later read, mutation, and workflow slices. See
 RFC 0001 §§[Observability primitives](rfcs/0001-o11y.md#observability-primitives),
 [Failure modes that warrant actionable signals](rfcs/0001-o11y.md#failure-modes-that-warrant-actionable-signals),
-[Delivery mechanisms](rfcs/0001-o11y.md#delivery-mechanisms), and
-[Acceptance criteria](rfcs/0001-o11y.md#acceptance-criteria).
+[Delivery mechanisms](rfcs/0001-o11y.md#delivery-mechanisms),
+[RequestTooLarge rejection](rfcs/0001-o11y.md#requesttoolarge-rejection),
+[Health snapshot](rfcs/0001-o11y.md#health-snapshot), and [Acceptance
+criteria](rfcs/0001-o11y.md#acceptance-criteria).
 
 - [ ] 13.4.1. Define canonical daemon event names and structured fields.
   - Requires 13.2.2 and 13.2.3.
@@ -208,13 +210,11 @@ RFC 0001 §§[Observability primitives](rfcs/0001-o11y.md#observability-primitiv
 - [ ] 13.4.4. Make request-size rejections diagnosable on both sides of the
       daemon boundary.
   - Requires 13.4.2.
-  - See RFC 0001 §[RequestTooLarge rejection](rfcs/0001-o11y.md#requesttoolarge-rejection).
   - Success: CLI-side and daemon-side size failures include the observed
     request size, `JSONL_REQUEST_MAX_LINE_BYTES`, the affected command where
     known, and user guidance to reduce or split the payload.
 - [ ] 13.4.5. Bound `weaverd.health` retention and stale-state handling.
   - Requires 13.4.2.
-  - See RFC 0001 §[Health snapshot](rfcs/0001-o11y.md#health-snapshot).
   - Success: health persistence is bounded, rotates deterministically, and
     treats out-of-window data as stale.
 - [ ] 13.4.6. Cover RFC 0001 failure modes in documentation and regression
@@ -1019,30 +1019,32 @@ and [Options considered](rfcs/0001-o11y.md#options-considered).
 - [ ] 20.3.1. Decide whether CLI pre-daemon diagnostics need a minimal
       `tracing` subscriber.
   - Requires 13.4.6.
-  - Success: the decision either keeps pre-daemon diagnostics as explicit
-    stderr guidance or defines a local subscriber contract without adding a
-    remote telemetry surface.
+  - Success: an ADR records either explicit stderr guidance for pre-daemon
+    diagnostics or a local subscriber contract without a remote telemetry
+    surface.
 - [ ] 20.3.2. Decide whether to add a local `request_id` to the CLI-to-daemon
       JSONL schema.
   - Requires 13.4.6.
-  - Success: the decision either accepts a bounded local correlation field with
-    schema and privacy rules or records why structured event fields are enough.
+  - Success: an RFC 0001 update either accepts a bounded local correlation
+    field with schema and privacy rules or records why structured event fields
+    are enough.
 - [ ] 20.3.3. Decide whether `weaver daemon status --json` belongs in the
       command contract.
   - Requires 13.4.6 and 13.3.1.
-  - Success: the outcome is recorded as a bounded status-schema extension, a
+  - Success: a roadmap note records a bounded status-schema extension,
     deliberate reliance on `weaverd.health` for machine-readable state, or a
     deferral with rationale.
 - [ ] 20.3.4. Decide whether abnormal exits need a dedicated bounded
       diagnostics artefact.
   - Requires 13.4.6.
-  - Success: the decision either specifies a separate retained diagnostics
+  - Success: an ADR either specifies a separate retained diagnostics
     artefact with privacy, retention, cleanup procedures, and rotation rules or
     keeps foreground logs as the supported debug path.
 - [ ] 20.3.5. Reconfirm the metrics endpoint and distributed tracing boundary.
   - Requires completion of 20.3.2 and 20.3.4.
-  - Success: any metrics, tracing, dashboard, or aggregation surface requires a
-    follow-up RFC with local-binding, feature-flag, privacy, and latency rules.
+  - Success: an RFC 0001 update records that any metrics, tracing, dashboard,
+    or aggregation surface requires a follow-up RFC with local-binding,
+    feature-flag, privacy, and latency rules.
 
 ## Archive
 
