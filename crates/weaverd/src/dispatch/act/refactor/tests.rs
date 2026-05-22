@@ -1,15 +1,9 @@
 //! Behavioural tests for the `act refactor` handler.
-//!
-//! These cases exercise the end-to-end dispatch path: argument validation,
-//! capability resolution, plugin execution, diff application, and error
-//! reporting.
-//!
-//! Keep this module focused on observable handler behaviour. Request-mapping
-//! contracts are covered by `contract_tests`, while resolution-specific and
-//! rollback-specific scenarios live in the sibling `resolution_tests` and
-//! `rollback_tests` modules.
+//! Exercises validation, plugin execution, error reporting, and sibling coverage boundaries.
+//! Contract, resolution, and rollback cases stay in sibling modules.
 
 use rstest::{fixture, rstest};
+use serial_test::serial;
 use tempfile::TempDir;
 use weaver_plugins::{PluginError, PluginOutput, PluginRequest, PluginResponse};
 use weaver_test_macros::allow_fixture_expansion_lints;
@@ -164,6 +158,9 @@ fn automatic_selection(provider: &str, language: &str) -> CapabilityResolutionEn
 }
 
 #[rstest]
+// FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
+// replaced with an encapsulated metrics actor or registry.
+#[serial]
 fn handle_runtime_error_returns_status_one(socket_dir: TempDir) {
     let (status, stderr) = run_rename_handle(
         &socket_dir,
@@ -180,6 +177,9 @@ fn handle_runtime_error_returns_status_one(socket_dir: TempDir) {
 #[rstest]
 #[case::analysis(PluginOutput::Analysis { data: serde_json::json!({"k": "v"}) })]
 #[case::empty(PluginOutput::Empty)]
+// FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
+// replaced with an encapsulated metrics actor or registry.
+#[serial]
 fn handle_non_diff_output_returns_status_one(
     #[case] output_variant: PluginOutput,
     socket_dir: TempDir,
@@ -223,6 +223,9 @@ fn handle_non_diff_output_returns_status_one(
 }
 
 #[rstest]
+// FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
+// replaced with an encapsulated metrics actor or registry.
+#[serial]
 fn handle_diff_output_applies_patch_through_apply_patch_pipeline(socket_dir: TempDir) {
     let workspace = TempDir::new().expect("workspace");
     let relative_file = String::from("notes.txt");
@@ -300,6 +303,9 @@ fn default_runtime_returns_shared_trait_object() {
 }
 
 #[rstest]
+// FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
+// replaced with an encapsulated metrics actor or registry.
+#[serial]
 fn handle_returns_error_for_unsupported_refactoring(socket_dir: TempDir) {
     let workspace = TempDir::new().expect("workspace");
     let request = command_request(vec![
@@ -338,6 +344,9 @@ fn handle_returns_error_for_unsupported_refactoring(socket_dir: TempDir) {
 }
 
 #[rstest]
+// FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
+// replaced with an encapsulated metrics actor or registry.
+#[serial]
 fn handle_exits_with_error_when_resolution_fails(socket_dir: TempDir) {
     let (status, stderr) = run_rename_handle(
         &socket_dir,
@@ -354,6 +363,9 @@ fn handle_exits_with_error_when_resolution_fails(socket_dir: TempDir) {
 }
 
 #[rstest]
+// FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
+// replaced with an encapsulated metrics actor or registry.
+#[serial]
 fn handle_exits_with_error_when_resolution_refused_with_provider(socket_dir: TempDir) {
     use crate::dispatch::act::refactor::resolution::RefusalReason::UnsupportedLanguage;
 

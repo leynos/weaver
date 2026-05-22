@@ -82,6 +82,8 @@ mod tests {
     //! Tests that read or mutate the global AtomicU64 counters must be
     //! annotated with `#[serial]` to prevent data races when the test suite is
     //! executed with the default multi-threaded test runner.
+    //! FIXME(`#148`): remove `#[serial]` once global statics are replaced with
+    //! an encapsulated metrics actor or registry.
 
     use serial_test::serial;
 

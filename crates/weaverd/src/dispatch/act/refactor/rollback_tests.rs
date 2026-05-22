@@ -1,5 +1,6 @@
 //! Rollback-oriented tests for `act refactor` failure paths.
 
+use serial_test::serial;
 use tempfile::TempDir;
 use weaver_plugins::{PluginOutput, PluginResponse};
 
@@ -85,6 +86,9 @@ fn assert_rollback_invariants(outcome: &RollbackOutcome, stderr_fragment: &str) 
 }
 
 #[test]
+// FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
+// replaced with an encapsulated metrics actor or registry.
+#[serial]
 fn refused_resolution_leaves_target_file_unchanged() -> Result<(), String> {
     let outcome = run_failure_case(refused_runtime())?;
     assert_rollback_invariants(&outcome, "unsupported_language");
@@ -92,6 +96,9 @@ fn refused_resolution_leaves_target_file_unchanged() -> Result<(), String> {
 }
 
 #[test]
+// FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
+// replaced with an encapsulated metrics actor or registry.
+#[serial]
 fn plugin_runtime_error_leaves_target_file_unchanged() -> Result<(), String> {
     let outcome = run_failure_case(rope_python_runtime(ExecuteResult::MissingPlugin("rope")))?;
     assert_rollback_invariants(&outcome, "act refactor failed");
@@ -99,6 +106,9 @@ fn plugin_runtime_error_leaves_target_file_unchanged() -> Result<(), String> {
 }
 
 #[test]
+// FIXME(`#148`): `#[serial]` required until global AtomicU64 metrics statics are
+// replaced with an encapsulated metrics actor or registry.
+#[serial]
 fn successful_non_diff_response_leaves_target_file_unchanged() -> Result<(), String> {
     let outcome = run_failure_case(rope_python_runtime(ExecuteResult::Success(
         PluginResponse::success(PluginOutput::Analysis {
