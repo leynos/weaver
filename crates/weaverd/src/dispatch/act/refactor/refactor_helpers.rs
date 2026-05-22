@@ -38,18 +38,11 @@ pub(crate) mod builders {
         FusionBackends::new(config, provider)
     }
 
-    /// Builds a rename command argument vector with an explicit provider selection.
+    /// Builds a rename command argument vector with explicit provider selection.
     ///
-    /// Prepends `--provider <provider>` to the standard rename arguments, producing
-    /// a complete argument list for tests and callers that exercise the
-    /// explicit-provider code path.
-    ///
-    /// Uses deterministic fixture anchors: `1:1` for Python and fallback files,
-    /// and `2:9` for Rust where the test symbol starts on the second line.
-    ///
-    /// # Parameters
-    /// - `file`: workspace-relative path to the file under rename.
-    /// - `provider`: the provider name to pass as `--provider` (e.g. `"rope"`, `"rust-analyzer"`).
+    /// Includes deterministic `--position` anchors: `1:1` for Python and
+    /// fallback files, and `2:9` for Rust where the fixture symbol starts on
+    /// the second line.
     pub(crate) fn standard_rename_args_for_provider(file: &str, provider: &str) -> Vec<String> {
         let position = if file.ends_with(".rs") { "2:9" } else { "1:1" };
         vec![
