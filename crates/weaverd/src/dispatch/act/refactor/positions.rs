@@ -15,6 +15,7 @@ pub(super) struct LineCol {
 }
 
 /// Parses a one-indexed `LINE:COL` value.
+#[tracing::instrument(level = "debug", fields(position = %value))]
 pub(super) fn parse_line_col(value: &str) -> Result<LineCol, DispatchError> {
     let (line_str, column_str) = value.split_once(':').ok_or_else(|| {
         DispatchError::invalid_arguments(format!("position must be LINE:COL, got: {value}"))
@@ -40,19 +41,26 @@ pub(super) fn parse_line_col(value: &str) -> Result<LineCol, DispatchError> {
 }
 
 /// Converts a one-indexed line and Unicode-character column into a byte offset.
-#[tracing::instrument(level = "debug", skip(content), fields(content_len = content.len()))]
+#[tracing::instrument(
+    level = "debug",
+    skip(content),
+    fields(content_len = content.len(), line, column, file_path = tracing::field::Empty)
+)]
 pub(super) fn line_col_to_byte_offset(
     content: &str,
     line: u32,
     column: u32,
     file_path: Option<&Path>,
 ) -> Result<usize, DispatchError> {
+    if let Some(file_path) = file_path {
+        tracing::Span::current().record("file_path", tracing::field::display(file_path.display()));
+    }
     let Some((line_start, target_line)) = line_entry(content, line) else {
-        return Err(conversion_out_of_range(line, column, file_path));
+        return Err(position_out_of_range(line, column, file_path));
     };
     let visible_line = trim_line_ending(target_line);
     if column as usize > visible_line.chars().count().saturating_add(1) {
-        return Err(conversion_out_of_range(line, column, file_path));
+        return Err(position_out_of_range(line, column, file_path));
     }
 
     let column_offset = visible_line
@@ -80,10 +88,6 @@ fn trim_line_ending(line: &str) -> &str {
     without_newline
         .strip_suffix('\r')
         .unwrap_or(without_newline)
-}
-
-fn conversion_out_of_range(line: u32, column: u32, file_path: Option<&Path>) -> DispatchError {
-    position_out_of_range(line, column, file_path)
 }
 
 fn position_out_of_range(line: u32, column: u32, file_path: Option<&Path>) -> DispatchError {

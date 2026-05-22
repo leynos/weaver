@@ -14,6 +14,7 @@ use std::{io::Write, path::Path, sync::Arc};
 use arguments::parse_refactor_args;
 use manifests::{rope_manifest, rust_analyzer_manifest};
 use metrics::AtomicPositionMetrics;
+pub(crate) use metrics::{position_conversion_error_count, position_parse_error_count};
 use plugin_paths::{
     ROPE_PLUGIN_PATH_ENV,
     RUST_ANALYZER_PLUGIN_PATH_ENV,
@@ -230,6 +231,12 @@ pub fn handle<W: Write>(
     mut context: RefactorContext<'_>,
 ) -> Result<DispatchResult, DispatchError> {
     let metrics = AtomicPositionMetrics;
+    debug!(
+        target: DISPATCH_TARGET,
+        position_parse_error_count = position_parse_error_count(),
+        position_conversion_error_count = position_conversion_error_count(),
+        "act refactor position metrics snapshot"
+    );
     let args = parse_refactor_args(&request.arguments, &metrics)?;
 
     debug!(

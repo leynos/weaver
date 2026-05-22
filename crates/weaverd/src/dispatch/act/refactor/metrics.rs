@@ -40,6 +40,18 @@ impl PositionMetrics for AtomicPositionMetrics {
     }
 }
 
+/// Returns the number of rejected `--position LINE:COL` values observed by
+/// this process.
+pub(crate) fn position_parse_error_count() -> u64 {
+    POSITION_PARSE_ERROR_COUNT.load(Ordering::Relaxed)
+}
+
+/// Returns the number of failed line/column to byte-offset conversions
+/// observed by this process.
+pub(crate) fn position_conversion_error_count() -> u64 {
+    POSITION_CONVERSION_ERROR_COUNT.load(Ordering::Relaxed)
+}
+
 /// No-op position metrics for pure unit tests.
 #[cfg(test)]
 #[derive(Debug, Default, Clone, Copy)]
@@ -64,8 +76,8 @@ fn increment_error_counter(counter: &AtomicU64, counter_name: &str) {
 #[cfg(test)]
 fn test_counter_values() -> (u64, u64) {
     (
-        POSITION_PARSE_ERROR_COUNT.load(Ordering::Relaxed),
-        POSITION_CONVERSION_ERROR_COUNT.load(Ordering::Relaxed),
+        position_parse_error_count(),
+        position_conversion_error_count(),
     )
 }
 
