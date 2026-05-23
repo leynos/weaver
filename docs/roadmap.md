@@ -3,11 +3,11 @@
 This roadmap translates `docs/weaver-design.md`,
 `docs/adr-007-agent-native-command-surface.md`,
 `docs/sempai-query-language-design.md`,
-`docs/jacquard-card-first-symbol-graph-design.md`, and the existing ADR set
-into an outcome-oriented delivery sequence. It does not promise dates. Phases
-carry testable product ideas, steps validate or falsify those ideas, and tasks
-are review-sized execution units with explicit dependencies and observable
-success criteria.
+`docs/jacquard-card-first-symbol-graph-design.md`, `docs/rfcs/0001-o11y.md`,
+and the existing ADR set into an outcome-oriented delivery sequence. It does
+not promise dates. Phases carry testable product ideas, steps validate or
+falsify those ideas, and tasks are review-sized execution units with explicit
+dependencies and observable success criteria.
 
 The current forward plan is the source of truth for future work. The historical
 ledger in [`docs/archive/prototype-roadmap.md`](archive/prototype-roadmap.md)
@@ -180,6 +180,48 @@ archive work 3.2.3 through 3.2.6, 5.7.1 through 5.7.5, and 11.3.2. See
   - Success: CI rejects schema, router, help, docs, localization, context,
     skill, vocabulary, stdout/stderr, and JSON-schema drift for the pilot
     command family.
+
+### 13.4. Prove the local daemon observability contract
+
+This step answers whether local users and automation can diagnose daemon
+startup, request, transport, and lifecycle failures without adding a metrics
+endpoint or distributed tracing backend. It converts RFC 0001 into bounded
+local signals that support later read, mutation, and workflow slices. See
+RFC 0001 §§[Observability primitives](rfcs/0001-o11y.md#observability-primitives),
+[Failure modes that warrant actionable signals](rfcs/0001-o11y.md#failure-modes-that-warrant-actionable-signals),
+[Delivery mechanisms](rfcs/0001-o11y.md#delivery-mechanisms),
+[RequestTooLarge rejection](rfcs/0001-o11y.md#requesttoolarge-rejection),
+[Health snapshot](rfcs/0001-o11y.md#health-snapshot), and [Acceptance
+criteria](rfcs/0001-o11y.md#acceptance-criteria).
+
+- [ ] 13.4.1. Define canonical daemon event names and structured fields.
+  - Requires 13.2.2 and 13.2.3.
+  - Success: lifecycle, request, dispatch, and listener events have stable
+    names and the minimum diagnostic fields required by RFC 0001.
+- [ ] 13.4.2. Emit bounded structured events for daemon lifecycle and
+      transport paths.
+  - Requires 13.4.1.
+  - Success: lifecycle, dispatch, request rejection, socket, and listener
+    paths emit deterministic `tracing` fields without sensitive payload data.
+- [ ] 13.4.3. Unify CLI guidance for pre-daemon and transport failures.
+  - Requires 13.4.2 and 13.3.2.
+  - Success: pre-daemon and transport failures report what failed, the relevant
+    evidence path or endpoint, and the next useful operator action.
+- [ ] 13.4.4. Make request-size rejections diagnosable on both sides of the
+      daemon boundary.
+  - Requires 13.4.2.
+  - Success: CLI-side and daemon-side size failures include the observed
+    request size, `JSONL_REQUEST_MAX_LINE_BYTES`, the affected command where
+    known, and user guidance to reduce or split the payload.
+- [ ] 13.4.5. Bound `weaverd.health` retention and stale-state handling.
+  - Requires 13.4.2.
+  - Success: health persistence is bounded, rotates deterministically, and
+    treats out-of-window data as stale.
+- [ ] 13.4.6. Cover RFC 0001 failure modes in documentation and regression
+      tests.
+  - Requires completion of 13.4.2 through 13.4.5.
+  - Success: tests and docs cover the RFC 0001 failure taxonomy and foreground
+    debug recipe.
 
 ## 14. Code-reading loop slice
 
@@ -960,6 +1002,49 @@ new design rather than quiet re-entry into the core roadmap.
   - Success: further cache work resumes only if measured repository-scale
     performance shows the core ledger is insufficient for the supported
     history workflows.
+
+### 20.3. Evaluate deferred observability expansions
+
+This step answers whether optional observability surfaces have earned a new
+design after the local-first RFC 0001 contract exists. It keeps metrics,
+distributed tracing, retained diagnostics, and status expansion out of the core
+promise until their privacy, retention, endpoint, and command-latency costs are
+explicit. See RFC 0001 §§[Open questions](rfcs/0001-o11y.md#open-questions),
+[Local request correlation](rfcs/0001-o11y.md#local-request-correlation),
+[Deferred path: status subcommand expansion](rfcs/0001-o11y.md#deferred-path-status-subcommand-expansion),
+[Option D: Dedicated diagnostics artefact](rfcs/0001-o11y.md#option-d-dedicated-diagnostics-artefact),
+[Deferred path: optional metrics endpoint](rfcs/0001-o11y.md#deferred-path-optional-metrics-endpoint),
+and [Options considered](rfcs/0001-o11y.md#options-considered).
+
+- [ ] 20.3.1. Decide whether CLI pre-daemon diagnostics need a minimal
+      `tracing` subscriber.
+  - Requires 13.4.6.
+  - Success: an ADR records either explicit stderr guidance for pre-daemon
+    diagnostics or a local subscriber contract without a remote telemetry
+    surface.
+- [ ] 20.3.2. Decide whether to add a local `request_id` to the CLI-to-daemon
+      JSONL schema.
+  - Requires 13.4.6.
+  - Success: an RFC 0001 update either accepts a bounded local correlation
+    field with schema and privacy rules or records why structured event fields
+    are enough.
+- [ ] 20.3.3. Decide whether `weaver daemon status --json` belongs in the
+      command contract.
+  - Requires 13.4.6 and 13.3.1.
+  - Success: a roadmap note records a bounded status-schema extension,
+    deliberate reliance on `weaverd.health` for machine-readable state, or a
+    deferral with rationale.
+- [ ] 20.3.4. Decide whether abnormal exits need a dedicated bounded
+      diagnostics artefact.
+  - Requires 13.4.6.
+  - Success: an ADR either specifies a separate retained diagnostics
+    artefact with privacy, retention, cleanup procedures, and rotation rules or
+    keeps foreground logs as the supported debug path.
+- [ ] 20.3.5. Reconfirm the metrics endpoint and distributed tracing boundary.
+  - Requires completion of 20.3.2 and 20.3.4.
+  - Success: an RFC 0001 update records that any metrics, tracing, dashboard,
+    or aggregation surface requires a follow-up RFC with local-binding,
+    feature-flag, privacy, and latency rules.
 
 ## Archive
 
