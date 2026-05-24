@@ -965,7 +965,6 @@ positions. A column equal to `visible_line.chars().count() + 1` maps to
 `visible_line.len()`, which is the byte offset immediately after the visible
 line content and before any line ending.
 
-
 ### `metrics` (`weaverd/src/dispatch/act/refactor/metrics.rs`)
 
 `crates/weaverd/src/dispatch/act/refactor/metrics.rs` defines
