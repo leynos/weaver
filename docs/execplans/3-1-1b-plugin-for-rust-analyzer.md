@@ -24,7 +24,7 @@ for Rust refactoring. After this work, the following command executes a
 sandboxed rust-analyzer-backed plugin:
 
 ```sh
-weaver act refactor --provider rust-analyzer --refactoring rename --file src/main.rs offset=42 new_name=better_name
+weaver act refactor --provider rust-analyzer --refactoring rename --file src/main.rs --position 10:5 new_name=better_name
 ```
 
 The command receives a unified diff and applies it through the existing
@@ -117,7 +117,8 @@ Observable success:
 ## Outcomes & Retrospective
 
 - Added `weaver-plugin-rust-analyzer` as the second actuator plugin with
-  `rename` support (`offset`, `new_name`) and structured failure diagnostics.
+  `rename` support (`--position`, `new_name`) and structured failure
+  diagnostics.
 - Registered rust-analyzer provider in `weaverd` with language `rust`, default
   executable `/usr/bin/weaver-plugin-rust-analyzer`, override via
   `WEAVER_RUST_ANALYZER_PLUGIN_PATH`, and timeout `60s`.

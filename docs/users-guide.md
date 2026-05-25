@@ -1073,7 +1073,7 @@ Double-Lock safety harness before any filesystem change is committed.
 Syntax:
 
 ```sh
-weaver act refactor --provider <PLUGIN> --refactoring <OP> --file <PATH> [KEY=VALUE...]
+weaver act refactor --provider <PLUGIN> --refactoring <OP> --file <PATH> --position <LINE:COL> [KEY=VALUE...]
 ```
 
 Arguments:
@@ -1085,6 +1085,7 @@ Table: act refactor command-line flags
 | `--provider`    | Required provider name for the registered plugin. Built-in values are `rope` for Python rename flows and `rust-analyzer` for Rust rename flows. |
 | `--refactoring` | Refactoring operation to request (currently `rename`). The handler maps `rename` to the `rename-symbol` capability contract internally.         |
 | `--file`        | Path to the target file (relative to workspace root).                                                                                           |
+| `--position`    | 1-indexed `LINE:COL` position of the symbol used as the rename anchor.                                                                          |
 | `KEY=VALUE`     | Extra key-value arguments forwarded to the plugin.                                                                                              |
 
 The plugin receives the file content in-band as part of the JSONL request and
@@ -1095,35 +1096,49 @@ output is refused as a failure: Weaver exits with status `1`, prints
 `act refactor failed: plugin succeeded but did not return diff output`, and
 leaves the filesystem unchanged.
 
-For the built-in actuators, `rename` requires `offset=<BYTE_OFFSET>` and
-`new_name=<IDENTIFIER>` in the trailing `KEY=VALUE` arguments. `weaverd`
-requires all three top-level flags in one request and rejects incomplete
-invocations before plugin resolution, file I/O, or backend startup.
+For the built-in actuators, `rename` requires `--position <LINE:COL>` and
+`new_name=<IDENTIFIER>`. `weaverd` requires all four top-level flags in one
+request and rejects incomplete invocations before plugin resolution, file I/O,
+or backend startup. The legacy `offset=<BYTE_OFFSET>` form is accepted only as
+a deprecated compatibility path and will be removed in a future release. When
+`offset=` is supplied without `--position`, `weaverd` writes the following
+warning to stderr before processing the request:
+
+```text
+Warning: 'offset=' is deprecated; use '--position LINE:COL' instead.
+```
+
+See the
+[rename position migration guide](weaver-act-refactor-rename-position-migration-guide.md)
+for upgrade examples.
 
 ### Parameter semantics and valid values
 
-The `act refactor` handler requires `--provider`, `--refactoring`, and
-`--file`, then forwards any additional `KEY=VALUE` pairs to the selected plugin.
+The `act refactor` handler requires `--provider`, `--refactoring`, `--file`,
+and `--position`, then forwards any additional `KEY=VALUE` pairs to the
+selected plugin.
 
 Table: act refactor parameter semantics and validation
 
-| Parameter       | Meaning                                                                                                                                                | Valid values                                                                             | Failure conditions                                                                                               |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `--provider`    | Provider to use for the refactoring request.                                                                                                           | Registered actuator name such as `rope` or `rust-analyzer`.                              | Missing flag, missing value, or unknown provider name causes failure.                                            |
-| `--refactoring` | Refactoring operation requested from the plugin. The handler maps `rename` to the `rename-symbol` capability contract before forwarding to the plugin. | Currently only `rename` is implemented by built-in `rope` and `rust-analyzer` plugins.   | Missing flag, missing value, or unsupported operation name (for example `extract_method`) causes failure.        |
-| `--file`        | Target file to load and refactor.                                                                                                                      | Workspace-relative path to an existing readable file (for example `src/main.py`).        | Missing flag, missing value, absolute paths, parent traversal (`..`), or unreadable/missing files cause failure. |
-| `new_name`      | New symbol name used by `rename`.                                                                                                                      | Non-empty string value.                                                                  | Missing key, non-string value, or empty/whitespace-only value causes failure.                                    |
-| `offset`        | UTF-8 byte offset of the symbol occurrence used as rename anchor. The handler maps `offset` to the contract `position` field internally.               | Non-negative integer, provided as a number or numeric string (for example `4` or `"4"`). | Missing key, non-numeric value, or negative value causes failure.                                                |
+| Parameter       | Meaning                                                                                                                                                | Valid values                                                                           | Failure conditions                                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `--provider`    | Provider to use for the refactoring request.                                                                                                           | Registered actuator name such as `rope` or `rust-analyzer`.                            | Missing flag, missing value, or unknown provider name causes failure.                                            |
+| `--refactoring` | Refactoring operation requested from the plugin. The handler maps `rename` to the `rename-symbol` capability contract before forwarding to the plugin. | Currently only `rename` is implemented by built-in `rope` and `rust-analyzer` plugins. | Missing flag, missing value, or unsupported operation name (for example `extract_method`) causes failure.        |
+| `--file`        | Target file to load and refactor.                                                                                                                      | Workspace-relative path to an existing readable file (for example `src/main.py`).      | Missing flag, missing value, absolute paths, parent traversal (`..`), or unreadable/missing files cause failure. |
+| `--position`    | Symbol occurrence used as the rename anchor.                                                                                                           | 1-indexed `LINE:COL` value, counting Unicode characters for the column.                | Missing flag, malformed value, zero line or column, or a position outside the file causes failure.               |
+| `new_name`      | New symbol name used by `rename`.                                                                                                                      | Non-empty string value.                                                                | Missing key, non-string value, or empty/whitespace-only value causes failure.                                    |
+| `offset`        | Deprecated compatibility spelling for older rename invocations.                                                                                        | Non-negative UTF-8 byte offset. Prefer `--position`.                                   | Cannot be combined with `--position`; malformed values are rejected by the daemon before plugin execution.       |
 
-For `offset`, count bytes from the start of the file (`0`-based), not line and
-column pairs. This matters when multibyte UTF-8 characters appear before the
-target symbol.
+The daemon converts `--position` to any provider-specific offset required by
+the current built-in plugins. Byte offsets are an internal compatibility
+detail, not the canonical command interface.
 
 ### Expected behaviour of the worked examples
 
 Both examples follow the same execution pipeline:
 
-1. `weaverd` parses `--provider`, `--refactoring`, and `--file`.
+1. `weaverd` parses `--provider`, `--refactoring`, `--file`, and
+   `--position`.
 2. It validates that `--provider` is a known actuator name and that
    `--refactoring` is a supported user-facing operation.
 3. It maps `rename` to `rename-symbol`, infers the target language from the
@@ -1142,14 +1157,14 @@ When required flags are missing, `act refactor` returns one deterministic
 actionable error instead of failing one flag at a time:
 
 ```text
-invalid arguments: act refactor requires --provider <plugin>, --refactoring <operation>, and --file <path>
+invalid arguments: act refactor requires --provider <plugin>, --refactoring <operation>, --file <path>, and --position <line:col>
 
 Valid alternatives:
   - Providers: rope, rust-analyzer
   - Refactorings: rename
 
 Next command:
-  weaver act refactor --provider rope --refactoring rename --file path/to/file.py offset=1 new_name=renamed_symbol
+  weaver act refactor --provider rope --refactoring rename --file path/to/file.py --position 1:1 new_name=renamed_symbol
 ```
 
 When validation fails, parameters are invalid, or the plugin reports an error,
@@ -1167,8 +1182,8 @@ Worked examples:
     --provider rope \
     --refactoring rename \
     --file src/main.py \
-    new_name=renamed_symbol \
-    offset=4
+    --position 1:5 \
+    new_name=renamed_symbol
   ```
 
   Example routing rationale emitted before the final success payload:
@@ -1213,8 +1228,8 @@ Worked examples:
     --provider rust-analyzer \
     --refactoring rename \
     --file src/main.rs \
-    new_name=renamed_name \
-    offset=3
+    --position 1:4 \
+    new_name=renamed_name
   ```
 
   Example final result:
@@ -1355,11 +1370,11 @@ response checks therefore stay aligned across Python and Rust rename flows.
 
 Table: Required fields for `rename-symbol` requests.
 
-| Field      | Type   | Description                                      |
-| ---------- | ------ | ------------------------------------------------ |
-| `uri`      | string | File URI of the symbol to rename.                |
-| `position` | string | Position of the symbol as a UTF-8 byte offset.   |
-| `new_name` | string | The new name for the symbol (must be non-empty). |
+| Field      | Type   | Description                                                                                                                                             |
+| ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `uri`      | string | File URI of the symbol to rename.                                                                                                                       |
+| `position` | string | Internal position value used by the daemon-to-plugin request. The current built-in plugins receive a UTF-8 byte offset converted from CLI `--position`. |
+| `new_name` | string | The new name for the symbol (must be non-empty).                                                                                                        |
 
 Successful responses must contain a `Diff` output with a unified diff patch. If
 a plugin reports success with any other output shape, Weaver refuses the

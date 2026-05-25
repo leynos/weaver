@@ -1,4 +1,13 @@
-//! Unit tests for the `rename-symbol` request mapping contract.
+//! Contract tests for the `rename-symbol` request mapping.
+//!
+//! These cases verify that `act refactor` translates operator input into the
+//! plugin request shape expected by rename-capable backends, including URI,
+//! position, and trailing argument handling.
+//!
+//! Keep this module focused on request-construction stability. Broader handler
+//! outcomes, capability resolution, rollback behaviour, and lower-level
+//! argument parsing are covered by the sibling `tests`, `resolution_tests`,
+//! `rollback_tests`, and other refactor test modules.
 
 use std::{path::PathBuf, sync::Mutex};
 
@@ -90,6 +99,7 @@ struct RenameDispatch<'a> {
     file: &'a str,
     provider: &'static str,
     language: &'static str,
+    position: Option<&'a str>,
     extra_args: Vec<String>,
     socket_dir: &'a TempDir,
 }
@@ -103,6 +113,7 @@ struct RenameContractCase {
     file: &'static str,
     provider: &'static str,
     language: &'static str,
+    position_argument: Option<&'static str>,
     extra_args: Vec<String>,
     position: Option<&'static str>,
     new_name: Option<&'static str>,
@@ -112,7 +123,7 @@ struct RenameContractCase {
 /// `PluginRequest` for inspection.
 fn dispatch_inspecting_rename(
     config: RenameDispatch<'_>,
-) -> Result<(PluginRequest, PathBuf), String> {
+) -> Result<(PluginRequest, PathBuf, String), String> {
     let workspace = TempDir::new().map_err(|e| format!("workspace: {e}"))?;
     let file_path = workspace.path().join(config.file);
     std::fs::write(&file_path, "hello world\n").map_err(|e| format!("write: {e}"))?;
@@ -132,6 +143,10 @@ fn dispatch_inspecting_rename(
         String::from("--file"),
         String::from(config.file),
     ];
+    if let Some(position) = config.position {
+        args.push(String::from("--position"));
+        args.push(position.to_owned());
+    }
     args.extend(config.extra_args);
     let request = command_request(args);
     let socket_path = config.socket_dir.path().join("socket.sock");
@@ -154,14 +169,15 @@ fn dispatch_inspecting_rename(
         .into_inner()
         .map_err(|error| format!("captured request lock poisoned: {error}"))?
         .ok_or_else(|| String::from("request should be captured"))?;
-    Ok((captured, file_path))
+    let response_stream = String::from_utf8(output).map_err(|e| format!("response utf8: {e}"))?;
+    Ok((captured, file_path, response_stream))
 }
 
 fn assert_rename_request(
     config: RenameDispatch<'_>,
     expectation: RenameExpectation<'_>,
 ) -> Result<(PluginRequest, PathBuf), String> {
-    let (plugin_request, file_path) = dispatch_inspecting_rename(config)?;
+    let (plugin_request, file_path, _response_stream) = dispatch_inspecting_rename(config)?;
     let expected_uri = Url::from_file_path(&file_path)
         .map_err(|()| format!("failed to build URI for '{}'", file_path.display()))?
         .to_string();
@@ -190,7 +206,8 @@ fn assert_rename_request(
     file: "notes.py",
     provider: "rope",
     language: "python",
-    extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
+    position_argument: Some("1:5"),
+    extra_args: vec![String::from("new_name=woven")],
     position: Some("4"),
     new_name: Some("woven"),
 })]
@@ -198,35 +215,20 @@ fn assert_rename_request(
     file: "notes.py",
     provider: "rope",
     language: "python",
+    position_argument: Some("1:5"),
     extra_args: vec![
         String::from("uri=stale_value"),
-        String::from("offset=4"),
         String::from("new_name=woven"),
     ],
     position: Some("4"),
     new_name: Some("woven"),
 })]
 #[case(RenameContractCase {
-    file: "notes.py",
-    provider: "rope",
-    language: "python",
-    extra_args: vec![String::from("new_name=woven")],
-    position: None,
-    new_name: Some("woven"),
-})]
-#[case(RenameContractCase {
-    file: "notes.py",
-    provider: "rope",
-    language: "python",
-    extra_args: vec![String::from("new_name=woven"), String::from("position=5")],
-    position: Some("5"),
-    new_name: Some("woven"),
-})]
-#[case(RenameContractCase {
     file: "notes.rs",
     provider: "rust-analyzer",
     language: "rust",
-    extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
+    position_argument: Some("1:5"),
+    extra_args: vec![String::from("new_name=woven")],
     position: Some("4"),
     new_name: Some("woven"),
 })]
@@ -240,6 +242,7 @@ fn handler_rename_contract_parametrised(
             file: case.file,
             provider: case.provider,
             language: case.language,
+            position: case.position_argument,
             extra_args: case.extra_args,
             socket_dir: &socket_dir,
         },
@@ -260,16 +263,54 @@ fn handler_rejects_conflicting_offset_and_position(
         file: "notes.py",
         provider: "rope",
         language: "python",
-        extra_args: vec![
-            String::from("offset=4"),
-            String::from("position=5"),
-            String::from("new_name=woven"),
-        ],
+        position: Some("1:5"),
+        extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
         socket_dir: &socket_dir,
     })
     .expect_err("rename request should reject conflicting offset and position");
 
-    assert!(error.contains("must not supply both 'offset' and 'position'"));
+    assert!(error.contains("must not supply both '--position' and deprecated 'offset='"));
+    Ok(())
+}
+
+#[rstest]
+fn handler_rejects_missing_position(socket_dir: Result<TempDir, String>) -> Result<(), String> {
+    let socket_dir = socket_dir?;
+    let error = dispatch_inspecting_rename(RenameDispatch {
+        file: "notes.py",
+        provider: "rope",
+        language: "python",
+        position: None,
+        extra_args: vec![String::from("new_name=woven")],
+        socket_dir: &socket_dir,
+    })
+    .expect_err("rename request should require --position");
+
+    assert!(error.contains("--position <line:col>"));
+    Ok(())
+}
+
+#[rstest]
+fn handler_accepts_deprecated_offset_without_position(
+    socket_dir: Result<TempDir, String>,
+) -> Result<(), String> {
+    let socket_dir = socket_dir?;
+    let (plugin_request, _, response_stream) = dispatch_inspecting_rename(RenameDispatch {
+        file: "notes.py",
+        provider: "rope",
+        language: "python",
+        position: None,
+        extra_args: vec![String::from("offset=4"), String::from("new_name=woven")],
+        socket_dir: &socket_dir,
+    })?;
+
+    let args = plugin_request.arguments();
+    assert_eq!(
+        args.get("position").and_then(|value| value.as_str()),
+        Some("4")
+    );
+    assert!(!args.contains_key("offset"));
+    assert!(response_stream.contains("Warning: 'offset=' is deprecated"));
     Ok(())
 }
 

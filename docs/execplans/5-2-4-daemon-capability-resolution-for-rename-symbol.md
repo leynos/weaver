@@ -60,7 +60,7 @@ Observable success for the eventual implementation:
   `crates/weaver-plugins/src/capability/` is already complete. This roadmap
   item resolves providers in the daemon; it must not redefine the contract
   schema introduced by 5.2.1.
-- Keep the CLI command shape stable. `--refactoring rename`, `offset`, and
+- Keep the CLI command shape stable. `--refactoring rename`, `--position`, and
   `new_name` remain the operator-facing inputs. `--provider` may become
   optional, but it must not be removed in 5.2.4 because 5.2.6 is the roadmap
   item that deprecates legacy provider-specific paths.
@@ -165,8 +165,8 @@ Observable success for the eventual implementation:
 
 - Discovery: `crates/weaverd/src/dispatch/act/refactor/mod.rs` already maps the
   CLI-facing `rename` request to the internal `rename-symbol` operation and
-  rewrites `offset` to `position`. The missing work in 5.2.4 is provider
-  resolution, not capability-contract translation.
+  rewrites CLI `--position` to plugin `position`. The missing work in 5.2.4 is
+  provider resolution, not capability-contract translation.
 
 - Discovery: the daemon runtime seam is currently
   `RefactorPluginRuntime::execute(&self, provider, request)`. Because it

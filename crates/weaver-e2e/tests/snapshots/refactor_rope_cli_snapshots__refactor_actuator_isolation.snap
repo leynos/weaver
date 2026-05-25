@@ -3,7 +3,7 @@ source: crates/weaver-e2e/tests/refactor_rope_cli_snapshots.rs
 expression: transcript
 ---
 Transcript {
-    command: "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider rope --refactoring rename --file src/main.py new_name=renamed_symbol offset=4",
+    command: "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor --provider rope --refactoring rename --file src/main.py --position 1:5 new_name=renamed_symbol",
     status: 0,
     stdout: "{\"files_deleted\":0,\"files_written\":1,\"status\":\"ok\"}",
     stderr: "",
@@ -16,8 +16,9 @@ Transcript {
                 String("rename"),
                 String("--file"),
                 String("src/main.py"),
+                String("--position"),
+                String("1:5"),
                 String("new_name=renamed_symbol"),
-                String("offset=4"),
             ],
             "command": Object {
                 "domain": String("act"),

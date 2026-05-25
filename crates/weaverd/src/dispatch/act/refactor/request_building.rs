@@ -1,4 +1,10 @@
-//! Builds plugin requests for `act refactor`.
+//! Builds plugin requests for `act refactor` by resolving and loading the
+//! target file, constructing the request payload, and applying
+//! capability-specific argument mapping through `CapabilityMappingContext`.
+//!
+//! Position-aware mapping converts line and column pairs to provider byte
+//! offsets via `positions.rs`, and any conversion failures are reported
+//! through `PositionMetrics`.
 
 use std::{
     collections::HashMap,
@@ -10,6 +16,8 @@ use weaver_plugins::{PluginRequest, capability::CapabilityId, protocol::FilePayl
 
 use super::{
     arguments,
+    metrics::PositionMetrics,
+    positions::{LineCol, line_col_to_byte_offset},
     requirements::{
         capability_for_operation,
         effective_operation as supported_effective_operation,
@@ -22,11 +30,20 @@ struct ResolvedFile {
     relative_path: PathBuf,
 }
 
+struct CapabilityMappingContext<'a> {
+    capability: CapabilityId,
+    file_path: &'a Path,
+    file_content: &'a str,
+    position: Option<LineCol>,
+    metrics: &'a dyn PositionMetrics,
+}
+
 /// Resolves the target file, reads its content, builds the [`PluginRequest`],
 /// and maps the refactoring operation to the corresponding [`CapabilityId`].
 pub(super) fn prepare_plugin_request(
     workspace_root: &Path,
     args: &arguments::RefactorArgs,
+    metrics: &dyn PositionMetrics,
 ) -> Result<(PluginRequest, CapabilityId, PathBuf), DispatchError> {
     let canonical_workspace = workspace_root.canonicalize().map_err(|error| {
         DispatchError::invalid_arguments(format!(
@@ -38,12 +55,21 @@ pub(super) fn prepare_plugin_request(
     let mut plugin_args = build_plugin_args(args)?;
     let effective_operation = supported_effective_operation(&args.refactoring)?;
     let capability = capability_for_operation(effective_operation)?;
-    apply_capability_argument_mapping(&mut plugin_args, capability, &resolved_file.path)?;
+    let file_content = load_file_contents(&resolved_file.path)?;
+    apply_capability_argument_mapping(
+        &mut plugin_args,
+        CapabilityMappingContext {
+            capability,
+            file_path: &resolved_file.path,
+            file_content: &file_content,
+            position: args.position,
+            metrics,
+        },
+    )?;
     plugin_args.insert(
         String::from("refactoring"),
         serde_json::Value::String(String::from(effective_operation)),
     );
-    let file_content = load_file_contents(&resolved_file.path)?;
     let plugin_request = PluginRequest::with_arguments(
         effective_operation,
         vec![FilePayload::new(resolved_file.relative_path, file_content)],
@@ -88,11 +114,10 @@ fn build_plugin_args(
 
 fn apply_capability_argument_mapping(
     plugin_args: &mut HashMap<String, serde_json::Value>,
-    capability: CapabilityId,
-    file_path: &Path,
+    context: CapabilityMappingContext<'_>,
 ) -> Result<(), DispatchError> {
-    if capability == CapabilityId::RenameSymbol {
-        return apply_rename_symbol_mapping(plugin_args, file_path);
+    if context.capability == CapabilityId::RenameSymbol {
+        return apply_rename_symbol_mapping(plugin_args, context);
     }
     Ok(())
 }
@@ -141,10 +166,20 @@ fn load_file_contents(path: &Path) -> Result<String, DispatchError> {
     })
 }
 
+#[tracing::instrument(
+    level = "debug",
+    skip(plugin_args, context),
+    fields(
+        capability = ?CapabilityId::RenameSymbol,
+        file_path = %context.file_path.display(),
+        input_form = rename_symbol_input_form(plugin_args, context.position),
+    )
+)]
 fn apply_rename_symbol_mapping(
     plugin_args: &mut HashMap<String, serde_json::Value>,
-    file: &Path,
+    context: CapabilityMappingContext<'_>,
 ) -> Result<(), DispatchError> {
+    let file = context.file_path;
     plugin_args.insert(
         String::from("uri"),
         serde_json::Value::String(
@@ -158,13 +193,182 @@ fn apply_rename_symbol_mapping(
                 .to_string(),
         ),
     );
-    if let Some(offset_val) = plugin_args.remove("offset") {
-        if plugin_args.contains_key("position") {
-            return Err(DispatchError::invalid_arguments(
-                "refactor extra arguments must not supply both 'offset' and 'position'",
-            ));
-        }
-        plugin_args.insert(String::from("position"), offset_val);
+    if plugin_args.contains_key("position") {
+        return Err(invalid_rename_arguments(
+            file,
+            "refactor rename must use '--position LINE:COL'; trailing 'position=' is reserved for \
+             the internal plugin contract",
+        ));
     }
-    Ok(())
+    if let Some(position) = context.position {
+        let offset = line_col_to_byte_offset(
+            context.file_content,
+            position.line,
+            position.column,
+            Some(file),
+        )
+        .inspect_err(|error| {
+            context.metrics.increment_conversion_error();
+            warn_position_conversion_error(file, position, error);
+        })?;
+        plugin_args.insert(
+            String::from("position"),
+            serde_json::Value::String(offset.to_string()),
+        );
+        return Ok(());
+    }
+    if let Some(offset_val) = plugin_args.remove("offset") {
+        tracing::warn!(
+            file_path = %file.display(),
+            "using deprecated offset= for rename position"
+        );
+        let offset = match offset_val {
+            serde_json::Value::String(value) => value.trim().to_owned(),
+            serde_json::Value::Number(value) => value.to_string(),
+            _ => {
+                return Err(invalid_rename_arguments(
+                    file,
+                    "refactor rename deprecated offset= must be a numeric or string byte offset",
+                ));
+            }
+        };
+        let offset = offset.parse::<usize>().map_err(|_error| {
+            invalid_rename_arguments(
+                file,
+                "refactor rename deprecated offset= must be a numeric or string byte offset",
+            )
+        })?;
+        plugin_args.insert(
+            String::from("position"),
+            serde_json::Value::String(offset.to_string()),
+        );
+        return Ok(());
+    }
+    Err(invalid_rename_arguments(
+        file,
+        "refactor rename requires --position LINE:COL",
+    ))
+}
+
+fn rename_symbol_input_form(
+    plugin_args: &HashMap<String, serde_json::Value>,
+    position: Option<LineCol>,
+) -> &'static str {
+    match (position.is_some(), plugin_args.contains_key("offset")) {
+        (true, true) => "position_and_deprecated_offset",
+        (true, false) => "--position",
+        (false, true) => "deprecated_offset",
+        (false, false) => "missing",
+    }
+}
+
+fn invalid_rename_arguments(file: &Path, message: &str) -> DispatchError {
+    DispatchError::invalid_arguments(format!("{message} for '{}'", file.display()))
+}
+
+fn warn_position_conversion_error(file: &Path, position: LineCol, error: &DispatchError) {
+    tracing::warn!(
+        line = position.line,
+        column = position.column,
+        file_path = %file.display(),
+        error = %error,
+        "position is out of range for the target file"
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for request-building internals.
+
+    use serde_json::Value;
+
+    use super::*;
+
+    fn rename_mapping_context<'a>() -> CapabilityMappingContext<'a> {
+        CapabilityMappingContext {
+            capability: CapabilityId::RenameSymbol,
+            file_path: Path::new("/tmp"),
+            file_content: "hello world",
+            position: None,
+            metrics: &crate::dispatch::act::refactor::metrics::NullPositionMetrics,
+        }
+    }
+
+    #[test]
+    fn apply_rename_symbol_mapping_normalizes_deprecated_string_offset() {
+        let mut plugin_args =
+            HashMap::from([(String::from("offset"), Value::String(String::from(" 004 ")))]);
+
+        apply_rename_symbol_mapping(&mut plugin_args, rename_mapping_context())
+            .expect("offset should map to position");
+
+        assert_eq!(
+            plugin_args.get("position").and_then(Value::as_str),
+            Some("4")
+        );
+        assert!(!plugin_args.contains_key("offset"));
+    }
+
+    #[test]
+    fn apply_rename_symbol_mapping_normalizes_deprecated_numeric_offset() {
+        let mut plugin_args = HashMap::from([(
+            String::from("offset"),
+            Value::Number(serde_json::Number::from(4)),
+        )]);
+
+        apply_rename_symbol_mapping(&mut plugin_args, rename_mapping_context())
+            .expect("offset should map to position");
+
+        assert_eq!(
+            plugin_args.get("position").and_then(Value::as_str),
+            Some("4")
+        );
+    }
+
+    #[test]
+    fn apply_rename_symbol_mapping_rejects_negative_deprecated_offset() {
+        let mut plugin_args =
+            HashMap::from([(String::from("offset"), Value::String(String::from("-1")))]);
+
+        let err = apply_rename_symbol_mapping(&mut plugin_args, rename_mapping_context())
+            .expect_err("negative offset must be rejected");
+
+        assert_invalid_offset_error(err);
+    }
+
+    #[test]
+    fn apply_rename_symbol_mapping_rejects_non_numeric_deprecated_offset() {
+        let mut plugin_args =
+            HashMap::from([(String::from("offset"), Value::String(String::from("abc")))]);
+
+        let err = apply_rename_symbol_mapping(&mut plugin_args, rename_mapping_context())
+            .expect_err("non-numeric offset must be rejected");
+
+        assert_invalid_offset_error(err);
+    }
+
+    #[test]
+    fn apply_rename_symbol_mapping_rejects_non_string_or_numeric_offset() {
+        let mut plugin_args = HashMap::from([
+            (String::from("offset"), Value::Bool(false)),
+            (
+                String::from("new_name"),
+                Value::String(String::from("woven")),
+            ),
+        ]);
+        let err = apply_rename_symbol_mapping(&mut plugin_args, rename_mapping_context())
+            .expect_err("offset must be rejected when not numeric");
+
+        assert_invalid_offset_error(err);
+    }
+
+    fn assert_invalid_offset_error(err: DispatchError) {
+        assert!(matches!(err, DispatchError::InvalidArguments { .. }));
+        let invalid_arguments = match err {
+            DispatchError::InvalidArguments { message } => message,
+            _ => unreachable!(),
+        };
+        assert!(invalid_arguments.contains("must be a numeric or string byte offset"));
+        assert!(invalid_arguments.contains("/tmp"));
+    }
 }

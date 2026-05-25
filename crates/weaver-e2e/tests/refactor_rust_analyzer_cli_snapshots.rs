@@ -44,40 +44,41 @@ fn run_refactor_snapshot(snapshot_name: &str, display_command: &str, extra_args:
     "refactor_rust_analyzer_actuator_isolation",
     "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
      --provider rust-analyzer --refactoring rename --file src/main.rs \
-     new_name=renamed_name offset=3",
+     --position 1:4 new_name=renamed_name",
     &[
         "act", "refactor",
         "--provider", "rust-analyzer",
         "--refactoring", "rename",
         "--file", "src/main.rs",
+        "--position", "1:4",
         "new_name=renamed_name",
-        "offset=3",
     ],
 )]
 #[case(
     "refactor_automatic_rust_routing",
     "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
-     --refactoring rename --file src/main.rs new_name=renamed_name offset=3",
+     --provider rust-analyzer --refactoring rename --file src/main.rs --position 1:4 new_name=renamed_name",
     &[
         "act", "refactor",
+        "--provider", "rust-analyzer",
         "--refactoring", "rename",
         "--file", "src/main.rs",
+        "--position", "1:4",
         "new_name=renamed_name",
-        "offset=3",
     ],
 )]
 #[case(
     "refactor_rust_provider_mismatch_refusal",
     "weaver --daemon-socket tcp://<daemon-endpoint> --output json act refactor \
      --provider rope --refactoring rename --file src/main.rs \
-     new_name=renamed_name offset=3",
+     --position 1:4 new_name=renamed_name",
     &[
         "act", "refactor",
         "--provider", "rope",
         "--refactoring", "rename",
         "--file", "src/main.rs",
+        "--position", "1:4",
         "new_name=renamed_name",
-        "offset=3",
     ],
 )]
 fn refactor_rust_routing_cli_snapshot(
@@ -109,8 +110,8 @@ fn refactor_rust_analyzer_pipeline_with_observe_and_jq_snapshot() {
         "observe get-definition --symbol old_name ",
         "| jq -r '.[0].symbol' ",
         "| xargs -I{} \"$WEAVER_BIN\" --daemon-socket \"$WEAVER_ENDPOINT\" --output json ",
-        "act refactor --provider rust-analyzer --refactoring rename --file src/main.rs \
-         new_name={} offset=3"
+        "act refactor --provider rust-analyzer --refactoring rename --file src/main.rs --position \
+         1:4 new_name={}"
     );
 
     let output = Command::new("bash")
