@@ -59,8 +59,3 @@ pub(crate) fn rollback_runtime(
         execute_result,
     }
 }
-
-const _: fn(PluginResponse) -> ExecuteResult = ExecuteResult::Success;
-const _: fn(&'static str) -> ExecuteResult = ExecuteResult::MissingPlugin;
-const _: for<'a> fn(SelectedResolution<'a>, ExecuteResult) -> RollbackRuntime = selected_runtime;
-const _: fn(CapabilityResolutionEnvelope, ExecuteResult) -> RollbackRuntime = rollback_runtime;

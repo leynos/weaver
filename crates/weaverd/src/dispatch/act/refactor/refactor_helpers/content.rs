@@ -81,10 +81,3 @@ pub(crate) fn routed_diff_for(path: &Path) -> String {
 pub(crate) fn routed_malformed_diff_for(path: &Path) -> String {
     routed_format_diff(path, |p| format!("diff --git a/{p}"))
 }
-
-const _: fn(&Path) -> FileKind = classify_file;
-const _: fn(&Path) -> &'static str = original_content_for;
-const _: fn(&Path) -> &'static str = updated_content_for;
-const _: fn(&Path) -> &Path = routed_patch_path;
-const _: fn(&Path) -> String = routed_diff_for;
-const _: fn(&Path) -> String = routed_malformed_diff_for;

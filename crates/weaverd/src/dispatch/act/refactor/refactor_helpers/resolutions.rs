@@ -98,13 +98,3 @@ pub(crate) fn resolve_auto_language(
         })
     }
 }
-
-const _: for<'a> fn(SelectedResolution<'a>) -> CapabilityResolutionEnvelope = selected_resolution;
-const _: for<'a> fn(RefusedResolution<'a>) -> CapabilityResolutionEnvelope = refused_resolution;
-const _: fn(&str, CandidateReason) -> CandidateEvaluation = rejected_candidate;
-const _: for<'a> fn(
-    AutoResolutionContext<'a>,
-    Option<&'static str>,
-    &'static str,
-    Vec<CandidateEvaluation>,
-) -> CapabilityResolutionEnvelope = resolve_auto_language;

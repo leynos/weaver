@@ -59,7 +59,3 @@ pub(crate) fn standard_rename_args_for_provider(file: &str, provider: &str) -> V
 pub(crate) fn configure_request(request: &mut CommandRequest, args: Vec<String>) {
     *request = command_request(args);
 }
-
-const _: fn(&std::path::Path) -> FusionBackends<SemanticBackendProvider> = build_backends;
-const _: fn(&str, &str) -> Vec<String> = standard_rename_args_for_provider;
-const _: fn(&mut CommandRequest, Vec<String>) = configure_request;
