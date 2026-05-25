@@ -256,10 +256,18 @@ fn read_pid(dir: &Dir, path: &Path) -> Option<u32> {
     content.trim().parse::<u32>().ok()
 }
 
-fn remove_file(dir: &Dir, path: &Path) -> Result<(), LaunchError> {
-    match dir.remove_file(runtime_filename(path)?) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+fn with_runtime_file<T, F>(
+    dir: &Dir,
+    path: &Path,
+    not_found_value: T,
+    op: F,
+) -> Result<T, LaunchError>
+where
+    F: FnOnce(&Dir, &Path) -> io::Result<T>,
+{
+    match op(dir, runtime_filename(path)?) {
+        Ok(value) => Ok(value),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(not_found_value),
         Err(source) => Err(LaunchError::Cleanup {
             path: path.to_path_buf(),
             source,
@@ -267,15 +275,12 @@ fn remove_file(dir: &Dir, path: &Path) -> Result<(), LaunchError> {
     }
 }
 
+fn remove_file(dir: &Dir, path: &Path) -> Result<(), LaunchError> {
+    with_runtime_file(dir, path, (), |d, name| d.remove_file(name))
+}
+
 fn runtime_file_exists(dir: &Dir, path: &Path) -> Result<bool, LaunchError> {
-    match dir.metadata(runtime_filename(path)?) {
-        Ok(_) => Ok(true),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
-        Err(source) => Err(LaunchError::Cleanup {
-            path: path.to_path_buf(),
-            source,
-        }),
-    }
+    with_runtime_file(dir, path, false, |d, name| d.metadata(name).map(|_| true))
 }
 
 fn runtime_filename(path: &Path) -> Result<&Path, LaunchError> {
