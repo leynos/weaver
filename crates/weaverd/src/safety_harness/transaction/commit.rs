@@ -108,12 +108,15 @@ fn persist_prepared_files(
     prepared: Vec<PreparedFile>,
 ) -> Result<Vec<CommittedFile>, SafetyHarnessError> {
     let mut committed: Vec<CommittedFile> = Vec::new();
+    let mut prepared_iter = prepared.into_iter();
 
-    for prepared_file in prepared {
+    while let Some(prepared_file) = prepared_iter.next() {
         let relative = relative_workspace_path(&prepared_file.path, workspace_root)
             .map_err(|err| SafetyHarnessError::file_write(prepared_file.path.clone(), err))?;
         if let Err(err) = dir.rename(&prepared_file.temp_path, dir, relative) {
             rollback_writes(dir, workspace_root, &committed);
+            cleanup_temp_file(dir, &prepared_file.temp_path);
+            cleanup_prepared_temp_files(dir, prepared_iter.as_slice());
             return Err(SafetyHarnessError::file_write(prepared_file.path, err));
         }
         committed.push(CommittedFile {
@@ -124,6 +127,24 @@ fn persist_prepared_files(
     }
 
     Ok(committed)
+}
+
+fn cleanup_prepared_temp_files(dir: &Dir, prepared: &[PreparedFile]) {
+    for prepared_file in prepared {
+        cleanup_temp_file(dir, &prepared_file.temp_path);
+    }
+}
+
+fn cleanup_temp_file(dir: &Dir, temp_path: &Path) {
+    if let Err(err) = dir.remove_file(temp_path)
+        && err.kind() != io::ErrorKind::NotFound
+    {
+        warn!(
+            path = %temp_path.display(),
+            error = %err,
+            "failed to remove transaction temporary file",
+        );
+    }
 }
 
 /// Removes files slated for deletion, rolling back changes on failure.
@@ -279,4 +300,59 @@ fn unique_temp_path(relative: &Path, attempt: u8) -> io::Result<PathBuf> {
         attempt
     ));
     Ok(temp_path)
+}
+
+#[cfg(test)]
+mod tests {
+    //! Tests for transaction commit cleanup helpers.
+
+    use cap_std::ambient_authority;
+
+    use super::*;
+
+    fn prepared_file(path: &str, temp_path: &str) -> PreparedFile {
+        PreparedFile {
+            path: PathBuf::from(path),
+            temp_path: PathBuf::from(temp_path),
+            original: String::new(),
+            existed: false,
+        }
+    }
+
+    #[test]
+    fn cleanup_prepared_temp_files_removes_existing_temps() {
+        let tempdir = tempfile::tempdir().expect("create temporary directory");
+        let dir = Dir::open_ambient_dir(tempdir.path(), ambient_authority())
+            .expect("open temporary directory capability");
+        let prepared = [
+            prepared_file("first.txt", ".first.tmp"),
+            prepared_file("second.txt", ".second.tmp"),
+        ];
+
+        dir.write(".first.tmp", "first")
+            .expect("write first temporary file");
+        dir.write(".second.tmp", "second")
+            .expect("write second temporary file");
+
+        cleanup_prepared_temp_files(&dir, &prepared);
+
+        assert!(matches!(
+            dir.metadata(".first.tmp"),
+            Err(err) if err.kind() == io::ErrorKind::NotFound
+        ));
+        assert!(matches!(
+            dir.metadata(".second.tmp"),
+            Err(err) if err.kind() == io::ErrorKind::NotFound
+        ));
+    }
+
+    #[test]
+    fn cleanup_prepared_temp_files_ignores_missing_temps() {
+        let tempdir = tempfile::tempdir().expect("create temporary directory");
+        let dir = Dir::open_ambient_dir(tempdir.path(), ambient_authority())
+            .expect("open temporary directory capability");
+        let prepared = [prepared_file("missing.txt", ".missing.tmp")];
+
+        cleanup_prepared_temp_files(&dir, &prepared);
+    }
 }
