@@ -315,8 +315,19 @@ mod tests {
     //! Tests for transaction commit cleanup helpers.
 
     use cap_std::ambient_authority;
+    use rstest::{fixture, rstest};
+    use tempfile::TempDir;
 
     use super::*;
+
+    #[fixture]
+    fn workspace_dir() -> Result<(TempDir, Dir), String> {
+        let tempdir =
+            tempfile::tempdir().map_err(|e| format!("create temporary directory: {e}"))?;
+        let dir = Dir::open_ambient_dir(tempdir.path(), ambient_authority())
+            .map_err(|e| format!("open temporary directory capability: {e}"))?;
+        Ok((tempdir, dir))
+    }
 
     fn prepared_file(path: &str, temp_path: &str) -> PreparedFile {
         PreparedFile {
@@ -327,20 +338,25 @@ mod tests {
         }
     }
 
-    #[test]
-    fn cleanup_prepared_temp_files_removes_existing_temps() {
-        let tempdir = tempfile::tempdir().expect("create temporary directory");
-        let dir = Dir::open_ambient_dir(tempdir.path(), ambient_authority())
-            .expect("open temporary directory capability");
+    #[rstest]
+    #[case::seeded(true)]
+    #[case::missing(false)]
+    fn cleanup_prepared_temp_files_handles_seeded_and_missing_temps(
+        #[case] seed_temps: bool,
+        workspace_dir: Result<(TempDir, Dir), String>,
+    ) -> Result<(), String> {
+        let (_tempdir, dir) = workspace_dir?;
         let prepared = [
             prepared_file("first.txt", ".first.tmp"),
             prepared_file("second.txt", ".second.tmp"),
         ];
 
-        dir.write(".first.tmp", "first")
-            .expect("write first temporary file");
-        dir.write(".second.tmp", "second")
-            .expect("write second temporary file");
+        if seed_temps {
+            dir.write(".first.tmp", "first")
+                .map_err(|e| format!("write first temporary file: {e}"))?;
+            dir.write(".second.tmp", "second")
+                .map_err(|e| format!("write second temporary file: {e}"))?;
+        }
 
         cleanup_prepared_temp_files(&dir, &prepared);
 
@@ -352,15 +368,6 @@ mod tests {
             dir.metadata(".second.tmp"),
             Err(err) if err.kind() == io::ErrorKind::NotFound
         ));
-    }
-
-    #[test]
-    fn cleanup_prepared_temp_files_ignores_missing_temps() {
-        let tempdir = tempfile::tempdir().expect("create temporary directory");
-        let dir = Dir::open_ambient_dir(tempdir.path(), ambient_authority())
-            .expect("open temporary directory capability");
-        let prepared = [prepared_file("missing.txt", ".missing.tmp")];
-
-        cleanup_prepared_temp_files(&dir, &prepared);
+        Ok(())
     }
 }
