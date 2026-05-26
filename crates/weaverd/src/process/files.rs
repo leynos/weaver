@@ -29,7 +29,7 @@ pub(super) fn atomic_write(dir: &Dir, filename: &Path, contents: &[u8]) -> io::R
             Ok(()) => return persist_temp_file(dir, temp_name.as_path(), filename),
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
             Err(error) => {
-                let _ = dir.remove_file(temp_name.as_path());
+                dir.remove_file(temp_name.as_path()).ok();
                 return Err(error);
             }
         }
@@ -57,7 +57,7 @@ fn write_temp_file(dir: &Dir, temp_name: &Path, contents: &[u8]) -> io::Result<(
 fn persist_temp_file(dir: &Dir, temp_name: &Path, filename: &Path) -> io::Result<()> {
     let write_result = dir.rename(temp_name, dir, filename);
     if write_result.is_err() {
-        let _ = dir.remove_file(temp_name);
+        dir.remove_file(temp_name).ok();
     }
     write_result
 }
@@ -73,8 +73,7 @@ fn unique_temp_name(filename: &Path, attempt: u8) -> io::Result<PathBuf> {
         .duration_since(UNIX_EPOCH)
         .map_err(io::Error::other)?
         .as_nanos();
-    let mut temp_name = PathBuf::from(".");
-    temp_name.push(format!(
+    let temp_name = PathBuf::from(format!(
         ".{}.{}.{}.{}.tmp",
         name.to_string_lossy(),
         std::process::id(),

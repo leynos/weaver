@@ -51,11 +51,14 @@ fn remove_stale_unix_socket(dir: &Dir, filename: &Path, path: &Path) -> Result<(
             path: path.display().to_string(),
         }),
         Err(error) if stale_unix_socket_error(&error) => {
-            dir.remove_file(filename)
-                .map_err(|source| ListenerError::UnixCleanup {
+            if let Err(source) = dir.remove_file(filename)
+                && source.kind() != io::ErrorKind::NotFound
+            {
+                return Err(ListenerError::UnixCleanup {
                     path: path.display().to_string(),
                     source,
-                })?;
+                });
+            }
             Ok(())
         }
         Err(error) => Err(ListenerError::UnixConnect {
@@ -112,7 +115,7 @@ fn socket_parent_dir(path: &Path) -> Result<(Dir, PathBuf), ListenerError> {
 }
 
 fn socket_path_exists(dir: &Dir, filename: &Path, path: &Path) -> Result<bool, ListenerError> {
-    match dir.metadata(filename) {
+    match dir.symlink_metadata(filename) {
         Ok(_) => Ok(true),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
         Err(source) => Err(ListenerError::UnixMetadata {

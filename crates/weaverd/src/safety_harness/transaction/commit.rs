@@ -102,6 +102,12 @@ pub(super) fn commit_changes_with_deletes(plan: CommitPlan<'_>) -> Result<(), Sa
 }
 
 /// Persists prepared temp files, rolling back if any commit fails.
+///
+/// Paths have already been validated by apply-patch before reaching this
+/// commit phase. cap-std keeps operations relative to the workspace capability,
+/// but `rename` and `remove_file` still resolve the final path at operation
+/// time. Concurrent hostile mutation of the workspace namespace is outside the
+/// transaction threat model.
 fn persist_prepared_files(
     dir: &Dir,
     workspace_root: &Path,
@@ -287,15 +293,17 @@ fn unique_temp_path(relative: &Path, attempt: u8) -> io::Result<PathBuf> {
     let name = relative.file_name().ok_or_else(|| {
         io::Error::new(io::ErrorKind::InvalidInput, "target path has no file name")
     })?;
+    let thread_id = std::thread::current().id();
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(io::Error::other)?
         .as_nanos();
     let mut temp_path = parent.to_path_buf();
     temp_path.push(format!(
-        ".{}.{}.{}.{}.tmp",
+        ".{}.{}.{:?}.{}.{}.tmp",
         name.to_string_lossy(),
         std::process::id(),
+        thread_id,
         unique,
         attempt
     ));

@@ -12,6 +12,14 @@ pub(super) struct ValidatedPath {
 }
 
 /// Resolves and validates a patch path within the workspace.
+///
+/// Validation rejects symlink components before the transaction is built. The
+/// later read and commit operations still address paths by name through the
+/// workspace [`Dir`], so a malicious process that can concurrently rewrite the
+/// workspace tree could swap a checked component before use. The daemon treats
+/// the workspace as trusted during an apply-patch transaction; hardening beyond
+/// that threat model requires descriptor-relative path walking for every
+/// operation.
 pub(super) fn resolve_path(
     workspace_dir: &Dir,
     workspace_root: &Path,
