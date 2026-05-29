@@ -31,7 +31,12 @@ pub(crate) fn file_exists(path: &Path) -> Result<bool, String> {
     let filename = path
         .file_name()
         .ok_or_else(|| String::from("path has no file name"))?;
-    Ok(open_workspace_dir(parent)?.metadata(filename).is_ok())
+    let dir = open_workspace_dir(parent)?;
+    match dir.metadata(filename) {
+        Ok(_) => Ok(true),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(err) => Err(format!("file_exists metadata error: {err}")),
+    }
 }
 
 /// Creates a temporary file with the given content.
