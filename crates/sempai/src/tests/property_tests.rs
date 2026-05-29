@@ -156,19 +156,32 @@ fn tree_with_not() -> BoxedStrategy<Decorated<Formula>> {
         .boxed()
 }
 
-fn or_with_not_descendant() -> BoxedStrategy<Decorated<Formula>> {
+fn nary_with_required_branch<S, R, W>(
+    sibling: S,
+    required: R,
+    wrap: W,
+) -> BoxedStrategy<Decorated<Formula>>
+where
+    S: Strategy<Value = Decorated<Formula>> + Clone + 'static,
+    R: Strategy<Value = Decorated<Formula>> + 'static,
+    W: Fn(Vec<Decorated<Formula>>) -> Formula + Send + Sync + Clone + 'static,
+{
     (
-        vec(formula_tree(), 0..=2),
-        tree_with_not(),
-        vec(formula_tree(), 0..=2),
+        vec(sibling.clone(), 0..=2),
+        required,
+        vec(sibling, 0..=2),
         span_strategy(),
     )
-        .prop_map(|(mut before, not_branch, after, span)| {
-            before.push(not_branch);
+        .prop_map(move |(mut before, required_branch, after, span)| {
+            before.push(required_branch);
             before.extend(after);
-            decorated(Formula::Or(before), span)
+            decorated(wrap(before), span)
         })
         .boxed()
+}
+
+fn or_with_not_descendant() -> BoxedStrategy<Decorated<Formula>> {
+    nary_with_required_branch(formula_tree(), tree_with_not(), Formula::Or)
 }
 
 fn atomless_tree_without_not_in_or() -> BoxedStrategy<Decorated<Formula>> {
@@ -193,18 +206,11 @@ fn atomless_tree_without_not_in_or() -> BoxedStrategy<Decorated<Formula>> {
 }
 
 fn and_without_positive_descendant() -> BoxedStrategy<Decorated<Formula>> {
-    (
-        vec(atomless_tree_without_not_in_or(), 0..=2),
+    nary_with_required_branch(
+        atomless_tree_without_not_in_or(),
         deep_atomless(MIN_PROPERTY_DEPTH - 1),
-        vec(atomless_tree_without_not_in_or(), 0..=2),
-        span_strategy(),
+        Formula::And,
     )
-        .prop_map(|(mut before, required, after, span)| {
-            before.push(required);
-            before.extend(after);
-            decorated(Formula::And(before), span)
-        })
-        .boxed()
 }
 
 fn valid_no_not_tree() -> BoxedStrategy<Decorated<Formula>> {
