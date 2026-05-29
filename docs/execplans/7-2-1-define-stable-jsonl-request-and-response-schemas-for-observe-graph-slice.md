@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -26,9 +25,9 @@ constraints, and any spillover that was excluded when the traversal truncated.
 Observable behaviour after implementation:
 
 1. `weaver observe graph-slice --uri <Uniform Resource Identifier (URI)>
-   --position
-   <LINE:COL>` parses into a typed request with explicit default values for `
-   depth`, `direction`, `edge_types`, `min_confidence`, `budget.max_cards`, `
+   --position <LINE:COL>
+   ` parses into a typed request with explicit default values for `depth`, `
+   direction`, `edge_types`, `min_confidence`, `budget.max_cards`, `
    budget.max_edges`, `budget.max_estimated_tokens`, `entry_detail`, and `
    node_detail`.
 2. Stable JSON snapshots lock at least one successful slice, one
@@ -78,9 +77,9 @@ This plan covers roadmap item 7.2.1 in
    must use `assert_cmd` and `insta`.
 8. Documentation updates are part of the feature:
    [docs/jacquard-card-first-symbol-graph-design.md](../jacquard-card-first-symbol-graph-design.md),
-   [docs/users-guide.md](../users-guide.md), and
-   [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md) must
-   all be updated before the work is complete.
+   [docs/users-guide.md](../users-guide.md),
+   and [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md)
+   must all be updated before the work is complete.
 9. The roadmap checkbox for 7.2.1 must not be marked done until all code,
    tests, e2e snapshots, documentation, and validation gates pass.
 
@@ -166,7 +165,7 @@ This plan covers roadmap item 7.2.1 in
 - There is no `observe graph-slice` implementation yet anywhere in the
   codebase. The current observe router in
   [crates/weaverd/src/dispatch/router.rs](../../crates/weaverd/src/dispatch/router.rs)
-   only recognizes `get-definition`, `find-references`, `grep`, `diagnostics`,
+  only recognizes `get-definition`, `find-references`, `grep`, `diagnostics`,
   `call-hierarchy`, and `get-card`.
 - `crates/weaver-cards/` already matches the stable-contract pattern used
   for `observe get-card`: request parsing, serde schema types, snapshot tests,
@@ -198,8 +197,8 @@ This plan covers roadmap item 7.2.1 in
 - The local Markdown formatter toolchain in this runner is partially broken:
   `fd` is unavailable and `/root/.local/bin/mdtablefix` is an empty,
   non-executable file. `make fmt` still completed successfully by using a
-  temporary PATH shim and then relying on `make markdownlint`, `make nixie`,
-  and `make check-fmt` to verify the resulting tree.
+  temporary PATH shim and then relying on `make markdownlint`, `make nixie`, and
+  `make check-fmt` to verify the resulting tree.
 - Review follow-up found one contract hole that the original milestone left
   open: the parser accepted `--max-cards 0` even though the runtime always
   returned at least the entry card. The fix now enforces `max_cards >= 1` at
@@ -239,7 +238,7 @@ This plan covers roadmap item 7.2.1 in
   card/slice surfaces aligned.
 - Decision: record all of these schema decisions back into
   [docs/jacquard-card-first-symbol-graph-design.md](../jacquard-card-first-symbol-graph-design.md)
-   during implementation, so the design stays authoritative.
+  during implementation, so the design stays authoritative.
 - Decision: implement a deterministic same-file schema exercise in the daemon
   for 7.2.1 instead of keeping the operation refusal-only. Rationale: this
   delivers real success responses and budget-driven truncation for the stable
@@ -450,7 +449,7 @@ Expected files:
   [crates/weaverd/src/dispatch/observe/graph_slice.rs](../../crates/weaverd/src/dispatch/observe/graph_slice.rs)
 - CLI discoverability surfaces in
   [crates/weaver-cli/src/discoverability.rs](../../crates/weaver-cli/src/discoverability.rs)
-   and any related help/localization files
+  and any related help/localization files
 
 This milestone should keep the runtime narrow:
 
@@ -498,7 +497,7 @@ Expected files:
   [crates/weaver-e2e/tests/test_support/mod.rs](../../crates/weaver-e2e/tests/test_support/mod.rs)
 - a dedicated
   [crates/weaver-e2e/src/graph_slice_fixtures/](../../crates/weaver-e2e/src/graph_slice_fixtures/)
-   module tree for graph-shaped workspaces
+  module tree for graph-shaped workspaces
 
 The e2e suite must cover:
 
