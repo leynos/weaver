@@ -26,10 +26,10 @@ Observable behaviour after implementation:
 
 1. `weaver observe graph-slice --uri <Uniform Resource Identifier (URI)>
    --position <LINE:COL>
-   ` parses into a typed request with explicit default values for `depth`, `
-   direction`, `edge_types`, `min_confidence`, `budget.max_cards`, `
-   budget.max_edges`, `budget.max_estimated_tokens`, `entry_detail`, and `
-   node_detail`.
+   ` parses into a typed request with explicit default values for `depth`,
+   `direction`, `edge_types`, `min_confidence`, `budget.max_cards`,
+   `budget.max_edges`, `budget.max_estimated_tokens`, `entry_detail`,
+   and `node_detail`.
 2. Stable JSON snapshots lock at least one successful slice, one
    truncated slice with spillover metadata, and one structured refusal.
 3. Every serialized edge reports its resolution scope as exactly one of
