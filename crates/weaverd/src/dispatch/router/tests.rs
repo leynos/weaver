@@ -10,7 +10,7 @@ use weaver_config::{CapabilityMatrix, Config, SocketEndpoint};
 use weaver_test_macros::allow_fixture_expansion_lints;
 
 use super::*;
-use crate::dispatch::request::CommandRequest;
+use crate::{dispatch::request::CommandRequest, tests::support::fs as test_fs};
 
 fn make_request(domain: &str, operation: &str) -> CommandRequest {
     let json = format!(
@@ -177,7 +177,7 @@ fn get_card_returns_structured_refusal(mut backends: FusionBackends<SemanticBack
     let router = build_router();
     let temp_dir = TempDir::new().expect("temp dir");
     let path = temp_dir.path().join("empty.py");
-    std::fs::write(&path, "").expect("write fixture");
+    test_fs::write(&path, "").expect("write fixture");
     let uri = Url::from_file_path(&path).expect("file uri").to_string();
     let json = format!(
         concat!(

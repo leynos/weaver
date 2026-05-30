@@ -3410,6 +3410,7 @@ name = "weaverd"
 version = "0.1.0"
 dependencies = [
  "camino",
+ "cap-std 4.0.2",
  "daemonize-me",
  "derive_more 1.0.0",
  "dirs 5.0.1",

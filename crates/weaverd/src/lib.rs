@@ -30,6 +30,7 @@
 
 mod backends;
 mod bootstrap;
+mod cap_fs;
 mod dispatch;
 mod health;
 mod process;

@@ -109,7 +109,14 @@ where
     let config = loader.load()?;
     config.daemon_socket().prepare_filesystem()?;
     let runtime_paths = RuntimePaths::from_config(&config)?;
-    let mut guard = ProcessGuard::acquire(runtime_paths)?;
+    let runtime_dir =
+        super::files::open_runtime_dir(runtime_paths.runtime_dir()).map_err(|source| {
+            LaunchError::RuntimeDirectory {
+                path: runtime_paths.runtime_dir().to_path_buf(),
+                source,
+            }
+        })?;
+    let mut guard = ProcessGuard::acquire(runtime_dir, runtime_paths)?;
     let workspace_root =
         env::current_dir().map_err(|source| LaunchError::WorkspaceRoot { source })?;
     if matches!(mode, LaunchMode::Background) {

@@ -1,6 +1,6 @@
 //! Behavioural tests for the Double-Lock safety harness.
 
-use std::{cell::RefCell, collections::HashMap, fs, io::Write, path::PathBuf};
+use std::{cell::RefCell, collections::HashMap, path::PathBuf};
 
 use rstest::fixture;
 use rstest_bdd_macros::{given, scenario, then, when};
@@ -8,20 +8,23 @@ use tempfile::TempDir;
 use weaver_test_macros::allow_fixture_expansion_lints;
 
 use super::safety_harness_types::{DiagnosticMessage, FileContent, FileName, TextPattern};
-use crate::safety_harness::{
-    ConfigurableSemanticLock,
-    ConfigurableSyntacticLock,
-    EditTransaction,
-    FileEdit,
-    Position,
-    SafetyHarnessError,
-    SyntacticLock,
-    SyntacticLockResult,
-    TextEdit,
-    TransactionOutcome,
-    TreeSitterSyntacticLockAdapter,
-    VerificationContext,
-    VerificationFailure,
+use crate::{
+    safety_harness::{
+        ConfigurableSemanticLock,
+        ConfigurableSyntacticLock,
+        EditTransaction,
+        FileEdit,
+        Position,
+        SafetyHarnessError,
+        SyntacticLock,
+        SyntacticLockResult,
+        TextEdit,
+        TransactionOutcome,
+        TreeSitterSyntacticLockAdapter,
+        VerificationContext,
+        VerificationFailure,
+    },
+    tests::support::fs as test_fs,
 };
 
 /// Syntactic lock variant for BDD test scenarios.
@@ -74,8 +77,7 @@ impl SafetyHarnessWorld {
     /// Creates a file with the given content.
     fn create_file(&mut self, name: &FileName, content: &FileContent) {
         let path = name.to_path(self.temp_dir.path());
-        let mut file = fs::File::create(&path).expect("create file");
-        file.write_all(content.as_bytes()).expect("write content");
+        test_fs::write(&path, content.as_bytes()).expect("write content");
         let name_str = name.as_str().to_string();
         self.files.insert(name_str.clone(), path);
         self.original_content
@@ -104,14 +106,14 @@ impl SafetyHarnessWorld {
     /// Reads the current content of a file.
     fn read_file(&self, name: &FileName) -> String {
         let path = self.file_path(name);
-        fs::read_to_string(&path).expect("read file")
+        test_fs::read_to_string(&path).expect("read file")
     }
 
     /// Adds an edit that replaces text.
     fn add_replacement_edit(&mut self, name: &FileName, old: &TextPattern, new: &TextPattern) {
         let path = self.file_path(name);
-        let content = if path.exists() {
-            fs::read_to_string(&path).expect("read file")
+        let content = if test_fs::exists(&path).expect("check file existence") {
+            test_fs::read_to_string(&path).expect("read file")
         } else {
             String::new()
         };
@@ -148,7 +150,10 @@ impl SafetyHarnessWorld {
         for edit in self.pending_edits.drain(..) {
             transaction.add_edit(edit);
         }
-        self.outcome = Some(transaction.execute());
+        let workspace_dir =
+            cap_std::fs::Dir::open_ambient_dir(self.temp_dir.path(), cap_std::ambient_authority())
+                .expect("open workspace dir");
+        self.outcome = Some(transaction.execute(&workspace_dir, self.temp_dir.path()));
     }
 
     /// Returns the transaction outcome.
@@ -171,7 +176,10 @@ fn given_source_file(world: &RefCell<SafetyHarnessWorld>, name: FileName, conten
 #[given("no existing file {name}")]
 fn given_no_file(world: &RefCell<SafetyHarnessWorld>, name: FileName) {
     let path = world.borrow().file_path(&name);
-    assert!(!path.exists(), "file should not exist: {path:?}");
+    assert!(
+        !test_fs::exists(&path).expect("check file existence"),
+        "file should not exist: {path:?}"
+    );
 }
 
 #[given("a syntactic lock that passes")]

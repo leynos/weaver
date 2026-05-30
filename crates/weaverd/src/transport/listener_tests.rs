@@ -14,6 +14,7 @@ use weaver_config::SocketEndpoint;
 use weaver_test_macros::allow_fixture_expansion_lints;
 
 use super::{ConnectionHandler, CountingHandler, ListenerError, listener::SocketListener};
+use crate::tests::support::fs as test_fs;
 
 #[derive(Clone)]
 struct CountingFixture {
@@ -80,7 +81,8 @@ fn unix_listener_cleans_stale_socket_files(
     {
         let _stale = std::os::unix::net::UnixListener::bind(&path).expect("bind stale listener");
     }
-    assert!(path.exists(), "stale socket should remain");
+    let exists = test_fs::exists(&path).map_err(|e| format!("check stale socket: {e}"))?;
+    assert!(exists, "stale socket should remain");
 
     let endpoint = SocketEndpoint::unix(path.to_str().expect("utf8 path").to_string());
     let listener = SocketListener::bind(&endpoint).expect("bind new listener");
@@ -91,10 +93,8 @@ fn unix_listener_cleans_stale_socket_files(
 
     handle.shutdown();
     handle.join().expect("join listener");
-    assert!(
-        !path.exists(),
-        "listener should remove unix socket on shutdown"
-    );
+    let exists = test_fs::exists(&path).map_err(|e| format!("check unix socket: {e}"))?;
+    assert!(!exists, "listener should remove unix socket on shutdown");
     Ok(())
 }
 

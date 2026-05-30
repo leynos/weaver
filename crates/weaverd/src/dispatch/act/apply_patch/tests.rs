@@ -19,7 +19,14 @@ fn temp_dir() -> Result<TempDir, String> {
 #[rstest]
 fn resolve_path_rejects_parent_dir(temp_dir: Result<TempDir, String>) -> Result<(), String> {
     let temp_dir = temp_dir?;
-    let result = resolve_path(temp_dir.path(), &FilePath::new("../escape.txt"));
+    let workspace_dir =
+        cap_std::fs::Dir::open_ambient_dir(temp_dir.path(), cap_std::ambient_authority())
+            .map_err(|error| format!("open workspace dir: {error}"))?;
+    let result = resolve_path(
+        &workspace_dir,
+        temp_dir.path(),
+        &FilePath::new("../escape.txt"),
+    );
     assert!(result.is_err(), "parent traversal should fail");
     Ok(())
 }

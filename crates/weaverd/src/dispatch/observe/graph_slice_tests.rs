@@ -1,5 +1,5 @@
 //! Unit tests for the `observe graph-slice` dispatch handler.
-use std::{fs, path::PathBuf};
+use std::path::PathBuf;
 
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
@@ -12,6 +12,7 @@ use crate::{
     backends::FusionBackends,
     dispatch::{request::CommandRequest, response::ResponseWriter},
     semantic_provider::SemanticBackendProvider,
+    tests::support::fs as test_fs,
 };
 #[fixture]
 fn backends_fixture() -> Result<(FusionBackends<SemanticBackendProvider>, TempDir), String> {
@@ -31,7 +32,7 @@ fn backends_fixture() -> Result<(FusionBackends<SemanticBackendProvider>, TempDi
 }
 fn write_source(temp_dir: &TempDir, name: &str, content: &str) -> Result<PathBuf, std::io::Error> {
     let path = temp_dir.path().join(name);
-    fs::write(&path, content)?;
+    test_fs::write(&path, content)?;
     Ok(path)
 }
 fn make_request(arguments: &[&str]) -> CommandRequest {

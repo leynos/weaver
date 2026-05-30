@@ -1,7 +1,5 @@
 //! Unit tests for process guard health checking.
 
-use std::fs;
-
 use rstest::{fixture, rstest};
 use tempfile::TempDir;
 use weaver_config::{Config, SocketEndpoint};
@@ -25,13 +23,40 @@ fn build_paths() -> Result<(TempDir, RuntimePaths), String> {
     Ok((dir, paths))
 }
 
+fn open_runtime_dir(paths: &RuntimePaths) -> Result<cap_std::fs::Dir, String> {
+    cap_std::fs::Dir::open_ambient_dir(paths.runtime_dir(), cap_std::ambient_authority())
+        .map_err(|error| format!("failed to open runtime directory: {error}"))
+}
+
+fn write_runtime_file(
+    paths: &RuntimePaths,
+    filename: &str,
+    content: impl AsRef<[u8]>,
+) -> Result<(), String> {
+    open_runtime_dir(paths)?
+        .write(filename, content)
+        .map_err(|error| format!("failed to write {filename}: {error}"))
+}
+
+fn read_runtime_file(paths: &RuntimePaths, filename: &str) -> Result<String, String> {
+    open_runtime_dir(paths)?
+        .read_to_string(filename)
+        .map_err(|error| format!("failed to read {filename}: {error}"))
+}
+
+fn runtime_file_exists(paths: &RuntimePaths, filename: &str) -> Result<bool, String> {
+    match open_runtime_dir(paths)?.metadata(filename) {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(format!("failed to inspect {filename}: {error}")),
+    }
+}
+
 #[fixture]
 fn seeded_runtime_paths(#[default("0\n")] pid: &str) -> Result<(TempDir, RuntimePaths), String> {
     let (dir, paths) = build_paths()?;
-    fs::write(paths.lock_path(), b"")
-        .map_err(|error| format!("failed to seed lock file: {error}"))?;
-    fs::write(paths.pid_path(), pid)
-        .map_err(|error| format!("failed to seed pid file: {error}"))?;
+    write_runtime_file(&paths, "weaverd.lock", b"")?;
+    write_runtime_file(&paths, "weaverd.pid", pid)?;
     Ok((dir, paths))
 }
 
@@ -41,7 +66,8 @@ fn setup_guard_with_health(
     state: HealthState,
 ) -> Result<ProcessGuard, String> {
     test_support::clear_health_events(paths.health_path())?;
-    let mut guard = ProcessGuard::acquire(paths.clone())
+    let runtime_dir = open_runtime_dir(paths)?;
+    let mut guard = ProcessGuard::acquire(runtime_dir, paths.clone())
         .map_err(|error| format!("lock should be acquired: {error}"))?;
     let pid = std::process::id();
     guard
@@ -56,12 +82,12 @@ fn setup_guard_with_health(
 #[test]
 fn missing_pid_file_refuses_reacquire() -> Result<(), String> {
     let (_dir, paths) = build_paths()?;
-    fs::write(paths.lock_path(), b"")
-        .map_err(|error| format!("failed to seed lock file: {error}"))?;
-    match ProcessGuard::acquire(paths.clone()) {
+    write_runtime_file(&paths, "weaverd.lock", b"")?;
+    let runtime_dir = open_runtime_dir(&paths)?;
+    match ProcessGuard::acquire(runtime_dir, paths.clone()) {
         Err(LaunchError::StartupInProgress { .. }) => {
             assert!(
-                paths.lock_path().exists(),
+                runtime_file_exists(&paths, "weaverd.lock")?,
                 "lock should remain whilst startup is in progress",
             );
             Ok(())
@@ -79,8 +105,7 @@ fn stale_pid_is_reclaimed(
     #[with(pid)] seeded_runtime_paths: Result<(TempDir, RuntimePaths), String>,
 ) -> Result<(), String> {
     let (_dir, paths) = seeded_runtime_paths?;
-    let seeded_pid = fs::read_to_string(paths.pid_path())
-        .map_err(|error| format!("failed to read seeded pid file: {error}"))?;
+    let seeded_pid = read_runtime_file(&paths, "weaverd.pid")?;
     if seeded_pid != pid {
         return Err(format!(
             "unexpected seeded pid content: expected {:?}, got {:?}",
@@ -88,15 +113,15 @@ fn stale_pid_is_reclaimed(
         ));
     }
     if write_health {
-        fs::write(paths.health_path(), b"stale")
-            .map_err(|error| format!("failed to seed health file: {error}"))?;
+        write_runtime_file(&paths, "weaverd.health", b"stale")?;
     }
 
-    let mut guard = ProcessGuard::acquire(paths.clone())
+    let runtime_dir = open_runtime_dir(&paths)?;
+    let mut guard = ProcessGuard::acquire(runtime_dir, paths.clone())
         .map_err(|error| format!("stale runtime should be reclaimed: {error}"))?;
     if write_health {
         assert!(
-            !paths.health_path().exists(),
+            !runtime_file_exists(&paths, "weaverd.health")?,
             "stale health file should be removed before reacquiring",
         );
     }
@@ -109,12 +134,11 @@ fn stale_pid_is_reclaimed(
 #[test]
 fn existing_pid_rejects_launch() -> Result<(), String> {
     let (_dir, paths) = build_paths()?;
-    fs::write(paths.lock_path(), b"")
-        .map_err(|error| format!("failed to seed lock file: {error}"))?;
+    write_runtime_file(&paths, "weaverd.lock", b"")?;
     let pid = std::process::id();
-    fs::write(paths.pid_path(), format!("{pid}\n"))
-        .map_err(|error| format!("failed to seed pid file: {error}"))?;
-    match ProcessGuard::acquire(paths) {
+    write_runtime_file(&paths, "weaverd.pid", format!("{pid}\n"))?;
+    let runtime_dir = open_runtime_dir(&paths)?;
+    match ProcessGuard::acquire(runtime_dir, paths) {
         Err(LaunchError::AlreadyRunning { pid: recorded }) => {
             assert_eq!(recorded, pid, "pid should match recorded process");
             Ok(())
@@ -127,8 +151,7 @@ fn existing_pid_rejects_launch() -> Result<(), String> {
 fn health_snapshot_is_written_with_newline() -> Result<(), String> {
     let (_dir, paths) = build_paths()?;
     let _guard = setup_guard_with_health(&paths, HealthState::Ready)?;
-    let content = fs::read_to_string(paths.health_path())
-        .map_err(|error| format!("health file should be readable: {error}"))?;
+    let content = read_runtime_file(&paths, "weaverd.health")?;
     assert!(
         content.ends_with('\n'),
         "health snapshot should end with newline"
