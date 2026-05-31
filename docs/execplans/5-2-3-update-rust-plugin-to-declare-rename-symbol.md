@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -267,12 +266,11 @@ The current implementation is split across two main areas.
 `crates/weaver-plugin-rust-analyzer/` is the one-shot actuator plugin. It reads
 one `PluginRequest` from stdin, executes a rename through the
 `RustAnalyzerAdapter` trait, and writes one `PluginResponse` to stdout. Today
-it still matches only `request.operation() == "rename"` and parses
-`position`/`new_name` from the request arguments. That behaviour lives
-primarily in `crates/weaver-plugin-rust-analyzer/src/lib.rs`, with unit
-coverage in `crates/weaver-plugin-rust-analyzer/src/tests/mod.rs` and
-behavioural coverage in
-`crates/weaver-plugin-rust-analyzer/src/tests/behaviour.rs` plus
+it still matches only `request.operation() == "rename"` and parses `position`/
+`new_name` from the request arguments. That behaviour lives primarily in
+`crates/weaver-plugin-rust-analyzer/src/lib.rs`, with unit coverage in
+`crates/weaver-plugin-rust-analyzer/src/tests/mod.rs` and behavioural coverage
+in `crates/weaver-plugin-rust-analyzer/src/tests/behaviour.rs` plus
 `crates/weaver-plugin-rust-analyzer/tests/features/rust_analyzer_plugin.feature`.
 
 `crates/weaverd/src/dispatch/act/refactor/mod.rs` is the daemon-side
@@ -313,7 +311,7 @@ contract vocabulary.
 Update the behavioural tests in
 `crates/weaver-plugin-rust-analyzer/src/tests/behaviour.rs` and
 `crates/weaver-plugin-rust-analyzer/tests/features/rust_analyzer_plugin.feature`
- to describe the capability contract explicitly. The scenarios should prove:
+to describe the capability contract explicitly. The scenarios should prove:
 
 1. the plugin accepts a valid `rename-symbol` request and returns diff output;
 2. the plugin rejects missing required arguments with failure diagnostics;

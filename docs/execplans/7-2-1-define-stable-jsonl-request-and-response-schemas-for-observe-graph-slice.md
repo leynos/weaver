@@ -24,11 +24,10 @@ constraints, and any spillover that was excluded when the traversal truncated.
 
 Observable behaviour after implementation:
 
-1. `weaver observe graph-slice --uri <Uniform Resource Identifier (URI)>
-   --position <LINE:COL>` parses into a typed request with explicit default
-   values for `depth`, `direction`, `edge_types`, `min_confidence`,
-   `budget.max_cards`, `budget.max_edges`, `budget.max_estimated_tokens`,
-   `entry_detail`, and `node_detail`.
+1. `weaver observe graph-slice --uri <URI> --position <LINE:COL>` parses into
+   a typed request with explicit default values for `depth`, `direction`,
+   `edge_types`, `min_confidence`, `budget.max_cards`, `budget.max_edges`,
+   `budget.max_estimated_tokens`, `entry_detail`, and `node_detail`.
 2. Stable JSON snapshots lock at least one successful slice, one
    truncated slice with spillover metadata, and one structured refusal.
 3. Every serialized edge reports its resolution scope as exactly one of
@@ -48,9 +47,9 @@ This plan covers roadmap item 7.2.1 in
 ## Constraints
 
 1. The design source of truth is
-   [docs/jacquard-card-first-symbol-graph-design.md](../jacquard-card-first-symbol-graph-design.md),
-    especially the edge model, slice request shape, spillover semantics, and
-   the `observe graph-slice` surface in sections 12.1 through 12.3. The
+   [card-first symbol graph design](../jacquard-card-first-symbol-graph-design.md),
+   especially the edge model, slice request shape, spillover semantics, and the
+   `observe graph-slice` surface in sections 12.1 through 12.3. The
    implementation may clarify ambiguities, but every clarification must be
    recorded back into that design document.
 2. This roadmap item is the schema milestone, not the full traversal
@@ -74,11 +73,11 @@ This plan covers roadmap item 7.2.1 in
    warnings remain denied workspace-wide.
 7. Behaviour tests must use `rstest-bdd` v0.5.0. End-to-end CLI coverage
    must use `assert_cmd` and `insta`.
-8. Documentation updates are part of the feature:
-   [docs/jacquard-card-first-symbol-graph-design.md](../jacquard-card-first-symbol-graph-design.md),
-   [docs/users-guide.md](../users-guide.md),
-   and [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md)
-   must all be updated before the work is complete.
+8. Documentation updates are part of the feature. The following documents must
+   all be updated before the work is complete:
+   - [card-first symbol graph design](../jacquard-card-first-symbol-graph-design.md)
+   - [users' guide](../users-guide.md)
+   - [archived prototype roadmap](../archive/prototype-roadmap.md)
 9. The roadmap checkbox for 7.2.1 must not be marked done until all code,
    tests, e2e snapshots, documentation, and validation gates pass.
 

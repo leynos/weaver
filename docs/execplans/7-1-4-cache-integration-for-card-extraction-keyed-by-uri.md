@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: DONE
 
@@ -308,14 +307,16 @@ to `crates/weaver-cards/Cargo.toml` dependencies (workspace reference).
 
 Create `crates/weaver-cards/src/cache.rs` containing:
 
-1. A `CardCacheKey` struct with fields: `path: PathBuf`, `content_hash: [u8;
-   32]`, `language: SupportedLanguage` (from `weaver-syntax`), `detail:
-   DetailLevel`, `line: u32`, `column: u32`. Implement `Hash` and `Eq`.
+1. A `CardCacheKey` struct with fields: `path: PathBuf`,
+   `content_hash: [u8; 32]`, `language: SupportedLanguage` (from
+   `weaver-syntax`), `detail:` DetailLevel`,`line: u32`,`column: u32
+   `. Implement`Hash` and `Eq
+2. `.
 
-2. A `CardCache` struct wrapping `Mutex<LruCache<CardCacheKey, CachedCard>>`
+3. A `CardCache` struct wrapping `Mutex<LruCache<CardCacheKey, CachedCard>>`
    where `CachedCard` holds the `SymbolCard` and the extraction timestamp.
 
-3. Public methods:
+4. Public methods:
    - `CardCache::new(capacity: usize) -> Self` — creates a cache with the
      given maximum entry count.
    - `CardCache::get(&self, key: &CardCacheKey) -> Option<SymbolCard>` — returns
@@ -328,7 +329,7 @@ Create `crates/weaver-cards/src/cache.rs` containing:
    - `CardCache::len(&self) -> usize` and `CardCache::is_empty(&self) -> bool`
      — cache size introspection.
 
-4. A `content_hash(source: &str) -> [u8; 32]` function using SHA-256 (the
+5. A `content_hash(source: &str) -> [u8; 32]` function using SHA-256 (the
    `sha2` crate is already a dependency of `weaver-cards`).
 
 Export `CardCache`, `CardCacheKey`, and `content_hash` from the crate root.

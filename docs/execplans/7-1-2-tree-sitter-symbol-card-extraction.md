@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -69,8 +68,8 @@ Observable behaviour after implementation:
    the workspace. Fixture matching is by parameter name; the shared BDD fixture
    must remain named `world`.
 8. Documentation changes are part of scope:
-   `docs/jacquard-card-first-symbol-graph-design.md`, `docs/users-guide.md`,
-   and `docs/archive/prototype-roadmap.md` must be updated before the work is
+   `docs/jacquard-card-first-symbol-graph-design.md`, `docs/users-guide.md`, and
+   `docs/archive/prototype-roadmap.md` must be updated before the work is
    considered complete.
 9. `docs/users-guide.md` must explain any new user-visible behaviour,
    especially successful `get-card` responses, refusal cases, and the fact that

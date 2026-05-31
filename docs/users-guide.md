@@ -121,11 +121,11 @@ directive = "force"
 ### Validation and error reporting
 
 Invalid configuration files are treated as fatal. When `--config-path` points
-at a broken file, or when discovery finds a malformed
-`weaver.toml`/`.weaver.toml`, both the CLI and daemon abort with a
-`LoadConfiguration` error that lists every offending path. Remove or fix the
-reported files before retrying. If no configuration files exist at all, the
-loader still falls back to the built-in defaults described below. See the
+at a broken file, or when discovery finds a malformed `weaver.toml`/
+`.weaver.toml`, both the CLI and daemon abort with a `LoadConfiguration` error
+that lists every offending path. Remove or fix the reported files before
+retrying. If no configuration files exist at all, the loader still falls back
+to the built-in defaults described below. See the
 [developer's guide](developers-guide.md) for toolchain baseline and
 configuration framework internals.
 
@@ -194,10 +194,10 @@ target file locally, and returns a Tree-sitter-backed symbol card for supported
 Rust, Python, and TypeScript files. `graph-slice` accepts the same location
 arguments plus traversal, detail, and budget options, and returns a stable
 same-file graph-slice envelope. Missing or malformed arguments return
-structured error messages with exit status 1. Operations outside the
-implemented `observe` subcommands, and outside the implemented `act` and
-`verify` flows, may return "not yet implemented" responses while backend wiring
-is being completed.
+structured error messages with exit status 1. Operations outside the implemented
+`observe` subcommands, and outside the implemented `act` and `verify` flows,
+may return "not yet implemented" responses while backend wiring is being
+completed.
 
 The health snapshot is a single-line JSON document describing the current
 state, enabling operators and automation to poll readiness without speaking the
@@ -387,8 +387,8 @@ The graph-slice operation uses this syntax:
 weaver observe graph-slice --uri <URI> --position <LINE:COL> [OPTIONS]
 ```
 
-`weaver daemon start --help` exposes the same six configuration flags in its
-own `Options:` section. As with the top-level command, the help surface is
+`weaver daemon start --help` exposes the same six configuration flags in its own
+`Options:` section. As with the top-level command, the help surface is
 truthful about the shared config contract, but the flags still need to appear
 before `daemon start` at runtime in order to change behaviour.
 
@@ -965,8 +965,8 @@ candidate symbols excluded from the response, not for symbols that discovery
 limits prevented Weaver from enumerating.
 
 The stable edge schema is already locked even though runtime edges are deferred
-to later milestones. When present, every edge will carry a `resolution_scope`
-of `full_symbol_table`, `partial_symbol_table`, or `lsp`.
+to later milestones. When present, every edge will carry a `resolution_scope` of
+`full_symbol_table`, `partial_symbol_table`, or `lsp`.
 
 #### observe grep
 
@@ -1114,9 +1114,9 @@ for upgrade examples.
 
 ### Parameter semantics and valid values
 
-The `act refactor` handler requires `--provider`, `--refactoring`, `--file`,
-and `--position`, then forwards any additional `KEY=VALUE` pairs to the
-selected plugin.
+The `act refactor` handler requires `--provider`, `--refactoring`, `--file`, and
+`--position`, then forwards any additional `KEY=VALUE` pairs to the selected
+plugin.
 
 Table: act refactor parameter semantics and validation
 
@@ -1579,8 +1579,8 @@ workspace crates:
 - **`sempai_core`** — canonical data model including language identifiers
   (`Language`), source spans (`Span`, `LineCol`), match results (`Match`),
   capture bindings (`CaptureValue`, `CapturedNode`), structured diagnostics
-  (`DiagnosticReport`, `Diagnostic`, `DiagnosticCode`), and engine
-  configuration (`EngineConfig`).
+  (`DiagnosticReport`, `Diagnostic`, `DiagnosticCode`), and engine configuration
+  (`EngineConfig`).
 - **`sempai_yaml`** — Semgrep-compatible YAML parser built on `saphyr` and
   `serde-saphyr`, exposing schema-aligned rule models for legacy and v2 search
   principals plus parser-time handling for extract, join, and taint rules.

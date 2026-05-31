@@ -1,9 +1,8 @@
 # Align archive `3.2.2` daemon-start help with live `13.3.3`
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: DRAFT; ROADMAP-FIT ANALYSIS COMPLETE; DO NOT IMPLEMENT AS A STANDALONE
 `3.2.2` PATCH.
@@ -23,8 +22,8 @@ metadata, generated references, manpages, shell completions, skills, and drift
 prevention into phase `13`, especially task `13.3.3`.
 
 The original standalone plan would add hand-written clap `long_about` text to
-the prototype `weaver daemon start --help` path so it mentions `WEAVERD_BIN`
-and `WEAVER_FOREGROUND`. That remains a real discoverability gap, but it is no
+the prototype `weaver daemon start --help` path so it mentions `WEAVERD_BIN` and
+`WEAVER_FOREGROUND`. That remains a real discoverability gap, but it is no
 longer the best next build unit under the live roadmap. The current framework
 requires generated help from one command metadata source, not another local
 help-text patch that will later be replaced.
@@ -105,9 +104,9 @@ all generated surfaces agree.
 
 A tactical exception is acceptable only if there is an immediate release or
 support need to document `WEAVERD_BIN` and `WEAVER_FOREGROUND` before `13.3.3`.
-In that case, the patch must be explicitly labelled as a temporary adapter
-under `13.1.3`, must name the live task that will remove it, and must not
-expand into broader prototype help polishing.
+In that case, the patch must be explicitly labelled as a temporary adapter under
+`13.1.3`, must name the live task that will remove it, and must not expand
+into broader prototype help polishing.
 
 ## Constraints
 
@@ -116,8 +115,8 @@ expand into broader prototype help polishing.
 - Do not mark archive `3.2.2` complete in `docs/roadmap.md`; the active
   roadmap owner is live task `13.3.3`.
 - Preserve the archive item as provenance in
-  `docs/archive/prototype-roadmap.md`.
-  That archive intentionally keeps numbers `1` through `11`.
+  `docs/archive/prototype-roadmap.md`. That archive intentionally keeps numbers
+  `1` through `11`.
 - Any eventual implementation must use one generated command metadata source
   for help, manpage input, shell completions, skills, and drift checks.
 - Runtime semantics for `WEAVERD_BIN` and `WEAVER_FOREGROUND` must not change.

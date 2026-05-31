@@ -54,9 +54,9 @@ its final location.
 
 ## System context
 
-The current Rust actuator plugin (`crates/weaver-plugin-rust-analyzer`)
-supports `rename` only and returns a unified diff through `PluginOutput::Diff`.
-The plugin protocol already supports multiple file payloads and structured
+The current Rust actuator plugin (`crates/weaver-plugin-rust-analyzer`) supports
+`rename` only and returns a unified diff through `PluginOutput::Diff`. The
+plugin protocol already supports multiple file payloads and structured
 arguments, which provides the substrate for multi-file extrication.
 
 Because plugin execution is sandboxed, the plugin cannot assume unrestricted
@@ -86,7 +86,7 @@ These behaviours directly affect payload and transaction handling:
 
 Authoritative runbook:
 [Migration guide: Weaver adoption of v0.8.0](ortho-config-v0-8-0-migration-guide.md),
- especially sections:
+especially sections:
 
 - [Required migration steps](ortho-config-v0-8-0-migration-guide.md#required-migration-steps)
 - [YAML semantics changed, even though Weaver runtime config is TOML-first](ortho-config-v0-8-0-migration-guide.md#4-yaml-semantics-changed-even-though-weaver-runtime-config-is-toml-first)

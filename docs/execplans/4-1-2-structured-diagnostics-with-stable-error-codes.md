@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -109,9 +108,9 @@ make nixie        # exits 0
   but current contract wording and tests do not yet lock parser-vs-validator
   schema parity via snapshots. Evidence:
   [crates/sempai-core/src/diagnostic.rs](../../crates/sempai-core/src/diagnostic.rs)
-   and
+  and
   [crates/sempai-core/src/tests/diagnostic_tests.rs](../../crates/sempai-core/src/tests/diagnostic_tests.rs).
-   Impact: Work should focus on schema hardening and path parity, not inventing
+  Impact: Work should focus on schema hardening and path parity, not inventing
   a new code set.
 
 - Observation: `rstest-bdd` v0.5.0 is already pinned at workspace level.
@@ -122,7 +121,7 @@ make nixie        # exits 0
   `insta` configuration, while `assert_snapshot!` is available and stable.
   Evidence:
   [crates/sempai-core/src/tests/diagnostic_snapshot_tests.rs](../../crates/sempai-core/src/tests/diagnostic_snapshot_tests.rs).
-   Impact: Snapshot tests should serialize deterministic pretty JSON strings
+  Impact: Snapshot tests should serialize deterministic pretty JSON strings
   and use `assert_snapshot!`.
 
 ## Decision log

@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -53,8 +52,8 @@ Observable behaviour after this change:
 2. **Edition 2024, Rust 1.85+.** The workspace uses `edition = "2024"`.
 3. **Strict Clippy.** Over 60 denied lint categories including `unwrap_used`,
    `expect_used`, `indexing_slicing`, `string_slice`, `missing_docs`,
-   `cognitive_complexity`, and `allow_attributes`. Both `weaver-plugin-rope`
-   and `weaverd` opt into workspace lints. All code must pass
+   `cognitive_complexity`, and `allow_attributes`. Both `weaver-plugin-rope` and
+   `weaverd` opt into workspace lints. All code must pass
    `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
 4. **400-line file limit.** No single source file may exceed 400 lines.
    `crates/weaver-plugin-rope/src/lib.rs` starts at 384 lines (16 lines of
@@ -228,8 +227,8 @@ code analysis and modification. The key crates for this task are:
 - `crates/weaver-plugin-rope/` — The Python rope-backed actuator plugin. A
   standalone binary crate that reads one JSON Lines (JSONL) request from stdin
   and writes one JSONL response to stdout. Baseline-only line counts before
-  implementation were: `src/lib.rs` (384 lines), `src/tests/mod.rs` (224
-  lines), `src/tests/behaviour.rs` (176 lines), and
+  implementation were: `src/lib.rs` (384 lines), `src/tests/mod.rs` (224 lines),
+  `src/tests/behaviour.rs` (176 lines), and
   `tests/features/rope_plugin.feature` (33 lines).
 
 - `crates/weaverd/` — The Weaver daemon. The refactor handler at

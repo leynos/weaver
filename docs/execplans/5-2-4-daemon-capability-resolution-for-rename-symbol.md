@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -231,8 +230,9 @@ The plugin registry already supports the lookups needed for resolution:
 The current missing pieces are:
 
 - There is no language inference step for `act refactor`.
-- There is no policy object that turns `(capability, language, explicit
-  provider?)` into a deterministic provider choice or refusal.
+- There is no policy object that turns
+  `(capability, language, explicit provider?)` into a deterministic provider
+  choice or refusal.
 - There is no structured rationale payload for that decision.
 - The CLI does not yet know how to render such a payload cleanly.
 

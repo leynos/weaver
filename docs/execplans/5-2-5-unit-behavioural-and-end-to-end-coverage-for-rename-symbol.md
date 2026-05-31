@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -189,7 +188,7 @@ plugins.
   existing daemon refactor feature coverage in place. The resulting files are
   `crates/weaver-plugin-rope/tests/features/rename_symbol_contract.feature`,
   `crates/weaver-plugin-rust-analyzer/tests/features/rename_symbol_contract.feature`,
-   and `crates/weaverd/tests/features/refactor.feature`. Rationale: keeps each
+  and `crates/weaverd/tests/features/refactor.feature`. Rationale: keeps each
   feature file focused and within budget while avoiding unnecessary daemon-side
   feature-file churn. Date: 2026-03-24.
 
@@ -403,7 +402,7 @@ scenarios:
 - Rollback: adapter failure produces no diff output.
 
 `crates/weaver-plugin-rust-analyzer/tests/features/rename_symbol_contract.feature`
- with scenarios mirroring the rope feature file above to demonstrate
+with scenarios mirroring the rope feature file above to demonstrate
 cross-plugin parity.
 
 Step definitions for the new feature files live in new behaviour modules

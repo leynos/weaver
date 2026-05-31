@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -111,8 +110,8 @@ Observable success after implementation:
 
 - Risk: The repository still documents `ortho-config` v0.6.0 in multiple
   places, and one completed ExecPlan documents the v0.7.0 upgrade. Severity:
-  medium. Likelihood: certain. Mitigation: update active operator/developer
-  docs (`README.md`, `docs/users-guide.md`, `docs/weaver-design.md`,
+  medium. Likelihood: certain. Mitigation: update active operator/developer docs
+  (`README.md`, `docs/users-guide.md`, `docs/weaver-design.md`,
   `docs/ortho-config-users-guide.md`, `docs/contents.md`, and
   `docs/archive/prototype-roadmap.md`) while leaving historical execplans
   untouched.
@@ -201,7 +200,7 @@ Observable success after implementation:
 - Decision: Replace `docs/ortho-config-users-guide.md` with the upstream
   v0.8.0 guide from
   `https://raw.githubusercontent.com/leynos/ortho-config/refs/tags/v0.8.0/docs/users-guide.md`
-   instead of hand-editing the in-repo copy. Rationale: the user explicitly
+  instead of hand-editing the in-repo copy. Rationale: the user explicitly
   requested the upstream guide as the replacement artefact, and the fetched
   file already captures the v0.8.0 material around layer composition,
   post-merge hooks, localization, and dependency aliasing. Date: 2026-03-07.

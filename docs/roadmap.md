@@ -186,13 +186,15 @@ archive work 3.2.3 through 3.2.6, 5.7.1 through 5.7.5, and 11.3.2. See
 This step answers whether local users and automation can diagnose daemon
 startup, request, transport, and lifecycle failures without adding a metrics
 endpoint or distributed tracing backend. It converts RFC 0001 into bounded
-local signals that support later read, mutation, and workflow slices. See
-RFC 0001 §§[Observability primitives](rfcs/0001-o11y.md#observability-primitives),
-[Failure modes that warrant actionable signals](rfcs/0001-o11y.md#failure-modes-that-warrant-actionable-signals),
-[Delivery mechanisms](rfcs/0001-o11y.md#delivery-mechanisms),
-[RequestTooLarge rejection](rfcs/0001-o11y.md#requesttoolarge-rejection),
-[Health snapshot](rfcs/0001-o11y.md#health-snapshot), and [Acceptance
-criteria](rfcs/0001-o11y.md#acceptance-criteria).
+local signals that support later read, mutation, and workflow slices. See RFC
+0001:
+
+- [Observability primitives](rfcs/0001-o11y.md#observability-primitives)
+- [Failure modes that warrant actionable signals](rfcs/0001-o11y.md#failure-modes-that-warrant-actionable-signals)
+- [Delivery mechanisms](rfcs/0001-o11y.md#delivery-mechanisms)
+- [RequestTooLarge rejection](rfcs/0001-o11y.md#requesttoolarge-rejection)
+- [Health snapshot](rfcs/0001-o11y.md#health-snapshot)
+- [Acceptance criteria](rfcs/0001-o11y.md#acceptance-criteria)
 
 - [ ] 13.4.1. Define canonical daemon event names and structured fields.
   - Requires 13.2.2 and 13.2.3.
@@ -652,8 +654,8 @@ ledger caching, and card-driven traversal.
 
 This step answers whether graph traversal gives enough extra value to justify
 its complexity. It preserves the completed prototype archive schema work 7.2.1
-and migrates prototype archive work 7.2.2 through 7.2.5, 11.1.1, and 11.2.2.
-See `docs/jacquard-card-first-symbol-graph-design.md` §12.1 through §12.3.
+and migrates prototype archive work 7.2.2 through 7.2.5, 11.1.1, and 11.2.2. See
+`docs/jacquard-card-first-symbol-graph-design.md` §12.1 through §12.3.
 
 - [ ] 17.1.1. Implement a two-pass Tree-sitter extraction pipeline for graph
       slices.
@@ -1009,12 +1011,14 @@ This step answers whether optional observability surfaces have earned a new
 design after the local-first RFC 0001 contract exists. It keeps metrics,
 distributed tracing, retained diagnostics, and status expansion out of the core
 promise until their privacy, retention, endpoint, and command-latency costs are
-explicit. See RFC 0001 §§[Open questions](rfcs/0001-o11y.md#open-questions),
-[Local request correlation](rfcs/0001-o11y.md#local-request-correlation),
-[Deferred path: status subcommand expansion](rfcs/0001-o11y.md#deferred-path-status-subcommand-expansion),
-[Option D: Dedicated diagnostics artefact](rfcs/0001-o11y.md#option-d-dedicated-diagnostics-artefact),
-[Deferred path: optional metrics endpoint](rfcs/0001-o11y.md#deferred-path-optional-metrics-endpoint),
-and [Options considered](rfcs/0001-o11y.md#options-considered).
+explicit. See RFC 0001:
+
+- [Open questions](rfcs/0001-o11y.md#open-questions)
+- [Local request correlation](rfcs/0001-o11y.md#local-request-correlation)
+- [status expansion](rfcs/0001-o11y.md#deferred-path-status-subcommand-expansion)
+- [diagnostics artefact](rfcs/0001-o11y.md#option-d-dedicated-diagnostics-artefact)
+- [metrics endpoint](rfcs/0001-o11y.md#deferred-path-optional-metrics-endpoint)
+- [options considered](rfcs/0001-o11y.md#options-considered)
 
 - [ ] 20.3.1. Decide whether CLI pre-daemon diagnostics need a minimal
       `tracing` subscriber.

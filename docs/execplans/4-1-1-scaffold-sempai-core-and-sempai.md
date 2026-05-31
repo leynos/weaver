@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: DONE
 
@@ -368,8 +367,8 @@ lowercase names matching the serde output (e.g. `"rust"`, `"python"`,
 **B2.** Create `crates/sempai-core/src/span.rs` containing `LineCol` and `Span`
 structs with serde derives, `new()` constructors, and accessor methods.
 
-**B3.** Create `crates/sempai-core/src/capture.rs` containing `CapturedNode`
-and `CaptureValue`. `CaptureValue` uses `#[non_exhaustive]` and a serde tagging
+**B3.** Create `crates/sempai-core/src/capture.rs` containing `CapturedNode` and
+`CaptureValue`. `CaptureValue` uses `#[non_exhaustive]` and a serde tagging
 strategy compatible with its tuple variants. Include `new()` and accessor
 methods.
 

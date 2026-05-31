@@ -1,4 +1,8 @@
-# [Contents index](contents.md) - Central index for all documentation files in `docs/`
+# Documentation contents
+
+[Documentation contents](contents.md) is the central index for documentation in
+`docs/`. It groups long-lived reference material by audience and purpose so
+readers can find the source of truth without scanning the whole tree.
 
 - [Architectural decision record (ADR) 001: Plugin capability model and
   `act extricate`](adr-001-plugin-capability-model-and-act-extricate.md)

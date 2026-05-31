@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -363,10 +362,10 @@ Types mapped from the design doc lines 147-170:
 
 Types mapped from design doc lines 176-268:
 
-- `ParamInfo` — `{ name: String, #[serde(rename = "type")] type_annotation:
-  String }`
-- `SignatureInfo` — `{ display: String, params: Vec<ParamInfo>, returns:
-  String }`
+- `ParamInfo` —
+  `{ name: String, #[serde(rename = "type")] type_annotation: String }`
+- `SignatureInfo` —
+  `{ display: String, params: Vec<ParamInfo>, returns: String }`
 - `DocInfo` — `{ docstring: String, summary: String, source: String }`
 - `NormalizedAttachments` — `{ decorators: Vec<String> }`
 - `AttachmentsInfo` —
@@ -379,8 +378,12 @@ Types mapped from design doc lines 176-268:
 - `LocalInfo` — `{ name: String, kind: String, decl_line: u32 }`
 - `BranchInfo` — `{ kind: String, line: u32 }`
 - `StructureInfo` — `{ locals: Vec<LocalInfo>, branches: Vec<BranchInfo> }`
-- `LspInfo` — `{ hover: String, #[serde(rename = "type")] type_info:
-  String, deprecated: bool, source: String }`
+- `LspInfo` —
+
+  ```text
+  { hover: String, #[serde(rename = "type")] type_info: String, deprecated: bool, source: String }
+  ```
+
 - `MetricsInfo` —
 
   ```text
@@ -389,8 +392,8 @@ Types mapped from design doc lines 176-268:
 
   Fan metrics are `Option` because they are only populated at `full` detail
   from the relational graph layer.
-- `DepsInfo` — `{ calls: Vec<String>, imports: Vec<String>, config:
-  Vec<String> }`
+- `DepsInfo` —
+  `{ calls: Vec<String>, imports: Vec<String>, config: Vec<String> }`
 - `ImportInterstitialInfo` —
 
   ```text
@@ -435,8 +438,8 @@ All types derive `Debug, Clone, PartialEq, Eq, Serialize, Deserialize`.
 - `RefusalReason` — `#[non_exhaustive]` enum with
   `#[serde(rename_all = "snake_case")]`: `NoSymbolAtPosition`,
   `UnsupportedLanguage`, `NotYetImplemented`, `BackendUnavailable`
-- `CardRefusal` — `{ reason: RefusalReason, message: String,
-  requested_detail: DetailLevel }`
+- `CardRefusal` —
+  `{ reason: RefusalReason, message: String, requested_detail: DetailLevel }`
 - `GetCardResponse` — `#[serde(tag = "status", rename_all = "snake_case")]
   #[non_exhaustive]` enum: `Success { card: SymbolCard }`, `Refusal {
   refusal: CardRefusal }`
@@ -467,8 +470,8 @@ Fixture builders construct example payloads and snapshot via
 1. `snapshot_minimal_card` — card at `minimal` detail (only `symbol` and
    `provenance` populated; all other fields `None` and absent from JSON).
 2. `snapshot_structure_card` — card at `structure` detail (includes
-   `signature`, `doc`, `structure`, `metrics` without `fan_in`/`fan_out`;
-   `lsp`, `deps`, `etag` absent).
+   `signature`, `doc`, `structure`, `metrics` without `fan_in`/`fan_out`; `lsp`,
+   `deps`, `etag` absent).
 3. `snapshot_full_card` — card at `full` detail with all fields populated.
 4. `snapshot_refusal_not_implemented` — `GetCardResponse::Refusal` with
    `NotYetImplemented` reason.
@@ -617,8 +620,8 @@ Add an `#### observe get-card` section after the existing
 - Syntax:
   `weaver observe get-card --uri <URI> --position <LINE:COL> [--detail <LEVEL>]`
 - Arguments: `--uri` (required), `--position` (required, 1-indexed),
-  `--detail` (optional, one of `minimal`/`signature`/`structure`
-  (default)/`semantic`/`full`)
+  `--detail` (optional, one of `minimal`/`signature`/`structure` (default)/
+  `semantic`/`full`)
 - Response format: JSON object with `"status": "success"` wrapping a card,
   or `"status": "refusal"` wrapping a refusal with `reason` and `message`
 - Note that Tree-sitter extraction is not yet implemented; the operation

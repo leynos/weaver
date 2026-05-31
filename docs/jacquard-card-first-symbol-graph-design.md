@@ -859,8 +859,8 @@ any same-file symbol cards that fit within `budget.max_cards`, with `spillover`
 populated when additional local symbols are excluded. The stable edge schema is
 already locked, even though runtime edges are deferred to later milestones.
 Every edge will carry a `resolution_scope` set to one of `full_symbol_table`,
-`partial_symbol_table`, or `lsp`, but the runtime may legitimately emit an
-empty `edges` array until those milestones land.
+`partial_symbol_table`, or `lsp`, but the runtime may legitimately emit an empty
+`edges` array until those milestones land.
 
 ### `observe graph-history`
 

@@ -497,9 +497,9 @@ non-zero exit class. Field names, enum values, schema versions, error codes,
 capability IDs, and exit classes are protocol identifiers and are not
 localized. Agents must not need localized prose to decide the next action.
 
-The 0.1.0 target does not use root `--output auto|human|json` or
-operation-local `--format` as public machine-output controls. The canonical
-machine switch is `--json`.
+The 0.1.0 target does not use root `--output auto|human|json` or operation-local
+`--format` as public machine-output controls. The canonical machine switch is
+`--json`.
 
 #### 2.1.4. Structured introspection and skills
 
@@ -1336,17 +1336,17 @@ Both the CLI and daemon bubble that error to the user instead of quietly
 falling back to defaults, making misconfigurations immediately visible.
 
 `ortho_config` v0.8.0 also resolves layered and overriding configuration
-sources through its dependency-graph model, so the effective merge order
-remains `defaults < files < environment < CLI` even when multiple discovered
-files and overrides participate in the same load. Later sources shadow earlier
-values without bespoke builder calls, because the generated loader derives the
-full precedence graph from the inline discovery contract. All configuration
-files are parsed according to TOML v1 rules, including explicit `true` and
-`false` booleans, TOML integer, float, and datetime formats, quoted and
-multiline string forms, table and dotted-key merging semantics, and the
-explicit typing rules for arrays and inline tables. TOML does not provide YAML
-anchors or aliases, and it does not perform implicit `yes` or `no` boolean
-conversion, so authored configuration must use TOML's explicit value syntax.
+sources through its dependency-graph model, so the effective merge order remains
+`defaults < files < environment < CLI` even when multiple discovered files and
+overrides participate in the same load. Later sources shadow earlier values
+without bespoke builder calls, because the generated loader derives the full
+precedence graph from the inline discovery contract. All configuration files
+are parsed according to TOML v1 rules, including explicit `true` and `false`
+booleans, TOML integer, float, and datetime formats, quoted and multiline
+string forms, table and dotted-key merging semantics, and the explicit typing
+rules for arrays and inline tables. TOML does not provide YAML anchors or
+aliases, and it does not perform implicit `yes` or `no` boolean conversion, so
+authored configuration must use TOML's explicit value syntax.
 
 The daemon transport defaults to a Unix domain socket placed under
 `$XDG_RUNTIME_DIR/weaver/weaverd.sock`. When the runtime directory is absent,
@@ -1434,12 +1434,11 @@ placeholder handler reads a single JSONL request line, replies with a minimal
 `exit` message, and closes the connection, so CLI clients do not hang while
 waiting for a response.
 
-A `SystemShutdownSignal` built on `signal-hook` listens for `SIGTERM`,
-`SIGINT`, `SIGQUIT`, and `SIGHUP`, logging the event and giving the runtime a
-ten-second budget to shut down gracefully. Developers can opt into a foreground
-mode for debugging by setting the `WEAVER_FOREGROUND` environment variable,
-which bypasses daemonization while preserving the same PID/lock/health
-choreography.
+A `SystemShutdownSignal` built on `signal-hook` listens for `SIGTERM`, `SIGINT`,
+`SIGQUIT`, and `SIGHUP`, logging the event and giving the runtime a ten-second
+budget to shut down gracefully. Developers can opt into a foreground mode for
+debugging by setting the `WEAVER_FOREGROUND` environment variable, which
+bypasses daemonization while preserving the same PID/lock/health choreography.
 
 ```mermaid
 erDiagram
@@ -1943,8 +1942,8 @@ language servers or parsers during development.
 
 **Lock traits**:
 
-- `SyntacticLock::validate(&self, context: &VerificationContext) ->
-  SyntacticLockResult` returns either `Passed` or `Failed { failures }`.
+- `SyntacticLock::validate(&self, context: &VerificationContext) -> SyntacticLockResult`
+  returns either `Passed` or `Failed { failures }`.
 - `SemanticLock::validate(...)` permits the semantic backend to surface
   unavailability errors separately from verification failures.
 
@@ -1960,8 +1959,8 @@ passes until the full LSP diagnostic comparison pipeline is wired through
 
 `ConfigurableSyntacticLock` and `ConfigurableSemanticLock` accept
 pre-determined results, enabling BDD scenarios to exercise pass, fail, and
-backend-unavailable paths without external dependencies. These doubles power
-the `safety_harness.feature` behavioural tests.
+backend-unavailable paths without external dependencies. These doubles power the
+`safety_harness.feature` behavioural tests.
 
 **Atomic commit strategy**:
 
@@ -2839,14 +2838,14 @@ same pin, so the entire stack aligns on stable releases.
 The new `weaver-lsp-host` crate owns the lifecycle of language servers for
 Rust, Python, and TypeScript. Initialisation now records the capabilities the
 server advertises for `textDocument/definition`, `textDocument/references`, and
-diagnostics, and then folds in operator overrides from `weaver-config`.
-Explicit `force` directives enable missing features, while `deny` directives
-block requests even when the server reports support. Core observe/verify calls
-are routed through a small trait so higher layers can inject sandboxed or
-recording implementations without spawning real servers during tests. Requests
-fail fast with structured errors that surface both the language and the reason
-(server missing, override deny, or server error) to callers, keeping the
-capability matrix honest before the daemon adds sandboxing and transport.
+diagnostics, and then folds in operator overrides from `weaver-config`. Explicit
+`force` directives enable missing features, while `deny` directives block
+requests even when the server reports support. Core observe/verify calls are
+routed through a small trait so higher layers can inject sandboxed or recording
+implementations without spawning real servers during tests. Requests fail fast
+with structured errors that surface both the language and the reason (server
+missing, override deny, or server error) to callers, keeping the capability
+matrix honest before the daemon adds sandboxing and transport.
 
 #### 2025-12-03: Upgrade `rstest-bdd` from 0.1.0 to 0.2.0
 

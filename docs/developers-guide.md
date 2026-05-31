@@ -351,8 +351,8 @@ assert_eq!(card.symbol.name, "greet");
 # Ok::<(), weaver_cards::CardExtractionError>(())
 ```
 
-The plain `extract(...)` method remains available for callers that want an
-owned `SymbolCard`, but the daemon and other long-lived services should prefer
+The plain `extract(...)` method remains available for callers that want an owned
+`SymbolCard`, but the daemon and other long-lived services should prefer
 shared resources and `extract_shared(...)` so cache hits do not pay for extra
 deep clones.
 
@@ -450,15 +450,15 @@ sibling discovery:
 sibling list into an included set (up to `max_cards − 1` siblings plus the
 entry card) and a `SliceSpillover` frontier. The `apply_card_budget` branch for
 `max_cards == 0` is only a defensive internal check; the public request parser
-rejects `--max-cards 0` before dispatch, so callers cannot reach the
-zero-budget `SliceSpillover` path through the CLI.
+rejects `--max-cards 0` before dispatch, so callers cannot reach the zero-budget
+`SliceSpillover` path through the CLI.
 
 ### Enrichment ordering
 
 LSP semantic enrichment is applied **after** budget truncation so that only
 cards included in the response pay the enrichment cost. The entry card is
-enriched before discovery; included sibling cards are enriched immediately
-after `apply_card_budget` returns.
+enriched before discovery; included sibling cards are enriched immediately after
+`apply_card_budget` returns.
 
 ### Error mapping
 
@@ -487,8 +487,8 @@ The end-to-end graph-slice test harness lives in
 ### `run_graph_slice`
 
 `run_graph_slice(daemon, request)` invokes the CLI via the test daemon socket
-and returns a `Transcript` containing `stdout` (the JSONL response envelope)
-and `stderr`.
+and returns a `Transcript` containing `stdout` (the JSONL response envelope) and
+`stderr`.
 
 ### `fixture_uri`
 
@@ -552,8 +552,8 @@ contract.
 
 ### `schema_version` field on `GraphSliceResponse` variants
 
-Both `GraphSliceResponse::Success` and `GraphSliceResponse::Refusal` now carry
-a `schema_version: String` field set to `"graph_slice.v1"`. All constructors
+Both `GraphSliceResponse::Success` and `GraphSliceResponse::Refusal` now carry a
+`schema_version: String` field set to `"graph_slice.v1"`. All constructors
 (including `not_yet_implemented`) populate this field. Cucumber contract tests
 in `crates/weaver-cards/tests/features/graph_slice_schema.feature` assert its
 presence.
@@ -884,15 +884,15 @@ let mut backends = build_backends(&socket_path);
 
 That pattern lets a test build a request, inject a deterministic runtime, and
 then call `handle(...)` to assert on exit status, stderr, and any preserved
-workspace content. Tests that need fixture content or diff payloads layer in
-the `content` helpers instead of hand-writing patch strings.
+workspace content. Tests that need fixture content or diff payloads layer in the
+`content` helpers instead of hand-writing patch strings.
 
 ### `requirements` (`weaverd/src/dispatch/act/refactor/requirements.rs`)
 
-`requirements` is the single source of truth for the operator-facing contract
-of `act refactor`. It is a non-test module consumed by both the
-argument-parsing layer and the test suite to keep validation, guidance text,
-and supported-value lists in one place.
+`requirements` is the single source of truth for the operator-facing contract of
+`act refactor`. It is a non-test module consumed by both the argument-parsing
+layer and the test suite to keep validation, guidance text, and supported-value
+lists in one place.
 
 The module exposes seven `pub(crate)` functions. The exact signatures live in
 Rustdoc; this section records each helper's contract, so the Markdown remains
@@ -1022,9 +1022,9 @@ fixed order:
 ## Dispatch lifecycle observability internals
 
 This section documents the dispatch and startup-observability helpers added for
-daemon request handling and CLI lifecycle guidance. The pieces are intentionally
-small: dispatch owns request telemetry at the daemon boundary, while lifecycle
-monitoring owns the runtime files that explain daemon readiness.
+daemon request handling and CLI lifecycle guidance. The pieces are
+intentionally small: dispatch owns request telemetry at the daemon boundary,
+while lifecycle monitoring owns the runtime files that explain daemon readiness.
 
 ### `DispatchConnectionHandler` (`weaverd/src/dispatch/handler/`)
 

@@ -145,18 +145,18 @@ Key references and existing code:
 
 ## Plan of work
 
-Stage A (confirm spec and constraints): re-read the `act apply-patch` section
-in `docs/weaver-design.md`, confirm the accepted patch grammar, and decide how
-to handle the request size limit. Capture any clarifications in the design
-doc's decision log for section 4.3.
+Stage A (confirm spec and constraints): re-read the `act apply-patch` section in
+`docs/weaver-design.md`, confirm the accepted patch grammar, and decide how to
+handle the request size limit. Capture any clarifications in the design doc's
+decision log for section 4.3.
 
 Stage B (CLI and JSONL protocol): extend `CommandRequest` in
-`crates/weaver-cli/src/command.rs` to carry an optional patch payload and
-update `execute_daemon_command` to read STDIN only for `act apply-patch`.
-Update the test harness to inject stdin (likely by adding a reader to
-`IoStreams` or passing a reader into `CliRunner`) so the BDD tests can assert
-the JSONL request contains the expected patch content. Add or update golden
-fixtures under `crates/weaver-cli/tests/golden/`.
+`crates/weaver-cli/src/command.rs` to carry an optional patch payload and update
+`execute_daemon_command` to read STDIN only for `act apply-patch`. Update the
+test harness to inject stdin (likely by adding a reader to `IoStreams` or
+passing a reader into `CliRunner`) so the BDD tests can assert the JSONL
+request contains the expected patch content. Add or update golden fixtures under
+`crates/weaver-cli/tests/golden/`.
 
 Stage C (daemon request parsing and handler wiring): extend
 `crates/weaverd/src/dispatch/request.rs` to deserialize the optional patch
