@@ -309,14 +309,13 @@ Create `crates/weaver-cards/src/cache.rs` containing:
 
 1. A `CardCacheKey` struct with fields: `path: PathBuf`,
    `content_hash: [u8; 32]`, `language: SupportedLanguage` (from
-   `weaver-syntax`), `detail:` DetailLevel`,`line: u32`,`column: u32
-   `. Implement`Hash` and `Eq
-2. `.
+   `weaver-syntax`), `detail: DetailLevel`, `line: u32`, and `column: u32`.
+   Implement `Hash` and `Eq`.
 
-3. A `CardCache` struct wrapping `Mutex<LruCache<CardCacheKey, CachedCard>>`
+2. A `CardCache` struct wrapping `Mutex<LruCache<CardCacheKey, CachedCard>>`
    where `CachedCard` holds the `SymbolCard` and the extraction timestamp.
 
-4. Public methods:
+3. Public methods:
    - `CardCache::new(capacity: usize) -> Self` — creates a cache with the
      given maximum entry count.
    - `CardCache::get(&self, key: &CardCacheKey) -> Option<SymbolCard>` — returns
@@ -329,7 +328,7 @@ Create `crates/weaver-cards/src/cache.rs` containing:
    - `CardCache::len(&self) -> usize` and `CardCache::is_empty(&self) -> bool`
      — cache size introspection.
 
-5. A `content_hash(source: &str) -> [u8; 32]` function using SHA-256 (the
+4. A `content_hash(source: &str) -> [u8; 32]` function using SHA-256 (the
    `sha2` crate is already a dependency of `weaver-cards`).
 
 Export `CardCache`, `CardCacheKey`, and `content_hash` from the crate root.
