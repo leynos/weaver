@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: DONE
 
@@ -308,9 +307,10 @@ to `crates/weaver-cards/Cargo.toml` dependencies (workspace reference).
 
 Create `crates/weaver-cards/src/cache.rs` containing:
 
-1. A `CardCacheKey` struct with fields: `path: PathBuf`, `content_hash: [u8;
-   32]`, `language: SupportedLanguage` (from `weaver-syntax`), `detail:
-   DetailLevel`, `line: u32`, `column: u32`. Implement `Hash` and `Eq`.
+1. A `CardCacheKey` struct with fields: `path: PathBuf`,
+   `content_hash: [u8; 32]`, `language: SupportedLanguage` (from
+   `weaver-syntax`), `detail: DetailLevel`, `line: u32`, and `column: u32`.
+   Implement `Hash` and `Eq`.
 
 2. A `CardCache` struct wrapping `Mutex<LruCache<CardCacheKey, CachedCard>>`
    where `CachedCard` holds the `SymbolCard` and the extraction timestamp.

@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -101,8 +100,8 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-4-make-nixie.log
   `crates/sempai/`, `crates/sempai-yaml/`, and the three required docs, stop
   and escalate.
 - Interface: if satisfying deterministic `UnsupportedMode` diagnostics requires
-  a breaking change to the public signature of `sempai::Engine::compile_yaml`
-  or `sempai_yaml::parse_rule_file`, stop and escalate.
+  a breaking change to the public signature of `sempai::Engine::compile_yaml` or
+  `sempai_yaml::parse_rule_file`, stop and escalate.
 - Model shape: if engine-side diagnostics require source-span data that cannot
   be exposed additively from `sempai_yaml` models, stop and present the least
   disruptive API options before proceeding.

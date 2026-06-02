@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -42,7 +41,7 @@ Run 'weaver --help' for more information.
 
 This addresses the P0 gap identified in the
 [UI gap analysis Level 0](../ui-gap-analysis.md#level-0--bare-invocation-weaver)
- and
+and
 [Level 10d](../ui-gap-analysis.md#level-10--error-messages-and-exit-codes), and
 satisfies roadmap task 5.1.1 in `../archive/prototype-roadmap.md`.
 
@@ -273,15 +272,14 @@ The hello_world example in ortho-config demonstrates the pattern:
 
 1. `.ftl` files under `locales/en-US/messages.ftl`.
 2. Embed via `include_str!("../locales/en-US/messages.ftl")`.
-3. Build: `FluentLocalizer::builder(langid!("en-US"))
-   .with_consumer_resources([APP_FTL]).try_build()?`.
+3. Build:
+   `FluentLocalizer::builder(langid!("en-US")) .with_consumer_resources([APP_FTL]).try_build()?`.
 4. Fall back to `NoOpLocalizer` on error.
 5. Resolve strings via `localizer.message("msg-id", None, "fallback")`.
 
-Fluent message IDs use hyphens (dots are normalized to hyphens by
-ortho-config's `normalize_identifier()`). The embedded en-US catalogue in
-ortho-config already provides `clap-error-*` messages for clap error
-localization.
+Fluent message IDs use hyphens (dots are normalized to hyphens by ortho-config's
+`normalize_identifier()`). The embedded en-US catalogue in ortho-config
+already provides `clap-error-*` messages for clap error localization.
 
 ### Key files involved in this change
 

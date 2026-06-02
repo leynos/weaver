@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: IMPLEMENTED
 
@@ -348,8 +347,8 @@ and failure guidance match the new behaviour. The guide should tell operators
 exactly which flags are required, which provider names are valid today, and
 which refactorings the MVP supports today.
 
-After the feature ships and all gates pass, mark roadmap item `2.3.4` as done
-in `docs/archive/prototype-roadmap.md`.
+After the feature ships and all gates pass, mark roadmap item `2.3.4` as done in
+`docs/archive/prototype-roadmap.md`.
 
 ### Stage E: validate end to end
 

@@ -27,8 +27,8 @@ the initial proof effort inside bounded, deterministic control-plane logic
 rather than the daemon's general async orchestration.[^6]
 
 The forward roadmap now reserves task numbers `12` through `20` for the ADR 007
-command-surface build. Older Weaver roadmap references in this document, such
-as `6.1.4`, `7.2.5`, or `8.3.4`, point to the prototype roadmap archive unless
+command-surface build. Older Weaver roadmap references in this document, such as
+`6.1.4`, `7.2.5`, or `8.3.4`, point to the prototype roadmap archive unless
 they are part of the local formal-verification rollout checklist below.
 
 ## Current state
@@ -47,11 +47,11 @@ begins. The current crate boundaries already fit a narrow verification effort.
 The existing testing stack is also strong enough to support additive formal
 methods rather than replacement. The workspace already uses `assert_cmd`,
 `insta`, `mockall`, `rstest`, and `rstest-bdd`, and the root `Makefile` already
-runs formatting, linting, documentation, and tests across the
-workspace.[^7][^9] The design document also describes configurable syntactic
-and semantic lock doubles for safety-harness tests, and it describes
-`weaver-syntax` as using BDD scenarios and snapshot testing for parser and
-validation output.[^1][^4]
+runs formatting, linting, documentation, and tests across the workspace.[^7]
+[^9] The design document also describes configurable syntactic and semantic
+lock doubles for safety-harness tests, and it describes `weaver-syntax` as
+using BDD scenarios and snapshot testing for parser and validation output.[^1]
+[^4]
 
 The missing pieces are scope and tooling. The top-level `Makefile` currently
 has no `kani`, `kani-full`, or `verus` targets, and the GitHub Actions workflow
@@ -241,8 +241,8 @@ The repository changes for phase 1 should stay small:
             └── kani.rs
 ```
 
-Kani harnesses should live next to the production code they verify, guarded
-with `#[cfg(kani)]`. That avoids widening public APIs purely for proof access.
+Kani harnesses should live next to the production code they verify, guarded with
+`#[cfg(kani)]`. That avoids widening public APIs purely for proof access.
 Verus proofs should live outside Cargo under `verus/` because the verifier has
 its own installation and execution model.[^13][^14]
 

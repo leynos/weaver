@@ -1,7 +1,9 @@
 # Weaver repository layout
 
 This document defines the current repository layout for Weaver and separates
-implemented components from planned components.
+implemented components from planned components. The tree below is an
+authoritative map of the top-level paths and workspace crates in this
+repository snapshot; it omits generated build output under `target/`.
 
 System semantics and architecture are defined in
 [weaver-design.md](weaver-design.md). Implementation sequencing is defined in
@@ -32,9 +34,14 @@ In this document, Language Server Protocol (LSP) and Continuous Integration
 ```plaintext
 /
 ├── crates/
+│   ├── sempai/
+│   ├── sempai-core/
+│   ├── sempai-yaml/
 │   ├── weaver-build-util/
+│   ├── weaver-cards/
 │   ├── weaver-cli/
 │   ├── weaver-config/
+│   ├── weaver-daemon-types/
 │   ├── weaver-e2e/
 │   ├── weaver-graph/
 │   ├── weaver-lsp-host/
@@ -43,17 +50,21 @@ In this document, Language Server Protocol (LSP) and Continuous Integration
 │   ├── weaver-plugins/
 │   ├── weaver-sandbox/
 │   ├── weaver-syntax/
-│   ├── weaverd/
-│   ├── sempai-core/
-│   ├── sempai/
-│   └── weaver-cards/
+│   ├── weaver-test-macros/
+│   └── weaverd/
 ├── docs/
+│   ├── archive/
+│   ├── execplans/
+│   ├── rfcs/
+│   └── semgrep-language-reference/
+├── agent-skill/
 ├── test_expect/
 ├── .github/workflows/
+├── .agents/
+├── .cargo/
 ├── Cargo.toml
 ├── Cargo.lock
 ├── Makefile
-├── rust-toolchain.toml
 ├── LICENSE
 └── README.md
 ```
@@ -67,6 +78,7 @@ In this document, Language Server Protocol (LSP) and Continuous Integration
 | `weaver-cli`                  | CLI entrypoint, command parsing, daemon lifecycle commands, and JSON Lines (JSONL) request streaming | Implemented |
 | `weaverd`                     | Daemon orchestration, command dispatch, and write-operation safety harness                           | Implemented |
 | `weaver-config`               | Shared configuration schema and loading for client and daemon                                        | Implemented |
+| `weaver-daemon-types`         | Shared daemon request, response, and protocol data types                                             | Implemented |
 | `weaver-lsp-host`             | Language server lifecycle, capability detection, and semantic operations                             | Implemented |
 | `weaver-syntax`               | Tree-sitter parsing and structural search or rewrite functionality                                   | Implemented |
 | `weaver-graph`                | Relational graph layer with LSP-backed call hierarchy provider                                       | Implemented |
@@ -76,19 +88,30 @@ In this document, Language Server Protocol (LSP) and Continuous Integration
 | `weaver-plugin-rust-analyzer` | Rust specialist plugin integration                                                                   | Implemented |
 | `weaver-build-util`           | Shared build-time utilities used across crates                                                       | Implemented |
 | `weaver-e2e`                  | End-to-end test support crate and integration scaffolding                                            | Implemented |
+| `weaver-test-macros`          | Shared procedural macros for test ergonomics                                                         | Implemented |
 | `sempai-core`                 | Sempai data model, diagnostics, and planning intermediate representation (IR) types                  | Implemented |
 | `sempai`                      | Sempai facade crate with stable public API, re-exports from `sempai-core`, and stub `Engine`         | Implemented |
+| `sempai-yaml`                 | YAML rule parsing and source mapping for Sempai-compatible rules                                     | Implemented |
 | `weaver-cards`                | Stable JSONL schemas for `observe get-card` symbol card requests and responses                       | Implemented |
 
 _Table 1: Implemented crate boundaries and responsibilities._
 
 ### Implemented shared directories
 
-| Path                 | Purpose                                                                                               | Status      |
-| -------------------- | ----------------------------------------------------------------------------------------------------- | ----------- |
-| `docs/`              | Design docs, architectural decision records (ADRs), roadmap, migration guides, and reference material | Implemented |
-| `test_expect/`       | Golden and expectation artefacts used by test suites                                                  | Implemented |
-| `.github/workflows/` | CI workflows and automation policy                                                                    | Implemented |
+| Path                               | Purpose                                                                                               | Status      |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------- | ----------- |
+| `docs/`                            | Design docs, architectural decision records (ADRs), roadmap, migration guides, and reference material | Implemented |
+| `docs/contents.md`                 | Canonical documentation index                                                                         | Implemented |
+| `docs/repository-layout.md`        | Canonical repository tree and ownership map                                                           | Implemented |
+| `docs/execplans/`                  | Living execution plans for scoped delivery work                                                       | Implemented |
+| `docs/rfcs/`                       | Requests for Comments for proposed design changes                                                     | Implemented |
+| `docs/archive/`                    | Historical reference material that is no longer active guidance                                       | Implemented |
+| `docs/semgrep-language-reference/` | Semgrep-compatible grammar, schema, and examples reference material                                   | Implemented |
+| `agent-skill/weaver/`              | Packaged Weaver agent skill instructions                                                              | Implemented |
+| `test_expect/`                     | Golden and expectation artefacts used by test suites                                                  | Implemented |
+| `.agents/`                         | Agent-local configuration and Model Context Protocol (MCP) support files                              | Implemented |
+| `.cargo/`                          | Cargo configuration for the workspace                                                                 | Implemented |
+| `.github/workflows/`               | Continuous Integration (CI) workflows and automation policy                                           | Implemented |
 
 _Table 2: Implemented shared directories and their roles._
 
@@ -105,7 +128,7 @@ when older designs mention `observe`, `act`, or `verify`.
 | Resource-first command handlers and examples                               | `crates/weaver-cli/`, `crates/weaverd/`, and `docs/`                       | Roadmap 13.2 through 16.3                                 |
 | Human and machine renderer integration                                     | `crates/weaver-cli/` and shared output modules                             | Roadmap 13.2; depends on OrthoConfig 7.2 and 8.1          |
 | Structured context, capability, and skill surfaces                         | `crates/weaver-cli/`, `crates/weaverd/`, and future skill manifests        | Roadmap 13.3 and 18.2; depends on OrthoConfig 6.2 and 6.3 |
-| Sempai YAML, DSL, and Tree-sitter backend crates                           | `crates/sempai-yaml/`, `crates/sempai-dsl/`, and `crates/sempai-ts/`       | Roadmap 15 and Sempai query language technical design     |
+| Sempai DSL and Tree-sitter backend crates                                  | `crates/sempai-dsl/` and `crates/sempai-ts/`                               | Roadmap 15 and Sempai query language technical design     |
 | Sempai selector integration in resource commands                           | `crates/weaver-cli/`, `crates/weaverd/`, and Sempai crates                 | Roadmap 15.3 and 16.2                                     |
 | Rust `symbol.move` or `symbol.extract` actuator flow                       | `crates/weaver-plugin-rust-analyzer/` and `crates/weaverd/`                | Roadmap 16.3 and 20.2                                     |
 | Rust extricate plugin overlay and Rust Analyzer (RA) orchestration modules | `crates/weaver-plugin-rust-analyzer/src/lsp/` and related plugin modules   | Proposed in Rust extricate actuator technical design      |

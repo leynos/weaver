@@ -468,8 +468,8 @@ returns a `ParseResult` for parsed source text.
 The workspace and crate manifests currently depend on Tree-sitter crates
 (`tree-sitter`, `tree-sitter-rust`, `tree-sitter-python`, and
 `tree-sitter-typescript`) and do not include a `chumsky` dependency. Unit tests
-in `crates/weaver-syntax/src/parser.rs` invoke this Tree-sitter-based parser
-via `Parser::new(...).parse(...)` to validate both successful parses and syntax
+in `crates/weaver-syntax/src/parser.rs` invoke this Tree-sitter-based parser via
+`Parser::new(...).parse(...)` to validate both successful parses and syntax
 error detection.
 
 Literal tokens are normalized via a dedicated helper, keeping prefix parsing

@@ -4,10 +4,9 @@
 > in [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md);
 > dotted task references are archive numbers unless explicitly stated otherwise.
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: DONE
 
@@ -24,9 +23,9 @@ enumerated) and
 not enumerated) in the UI gap analysis.
 
 After this change, running `weaver --help` will display a catalogue section
-below the standard clap help output listing all three domains (`observe`,
-`act`, `verify`) with a one-line description each, and every CLI-supported
-operation per domain. The output requires no daemon startup or socket access.
+below the standard clap help output listing all three domains (`observe`, `act`,
+`verify`) with a one-line description each, and every CLI-supported operation
+per domain. The output requires no daemon startup or socket access.
 
 Observable outcome: run `weaver --help` and see, after the standard clap help:
 
@@ -54,9 +53,9 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
 - No code file may exceed 400 lines.
 - The workspace Clippy configuration is strict (pedantic, deny on
   `unwrap_used`, `expect_used`, `print_stdout`, `print_stderr`,
-  `cognitive_complexity`, `missing_docs`, etc.). All new code must comply.
-  Note: `weaver-cli` does NOT opt into workspace lints (no `[lints]` section in
-  its `Cargo.toml`), so `allow_attributes = "deny"` does not apply to it.
+  `cognitive_complexity`, `missing_docs`, etc.). All new code must comply. Note:
+  `weaver-cli` does NOT opt into workspace lints (no `[lints]` section in its
+  `Cargo.toml`), so `allow_attributes = "deny"` does not apply to it.
 - Comments and documentation must use en-GB-oxendict spelling
   ("-ize" / "-yse" / "-our").
 - New functionality requires both unit tests and BDD behavioural tests using
@@ -180,8 +179,8 @@ This satisfies roadmap task 2.2.2 and closes the relevant checkboxes in
   which is the correct way to test `--help`. Date/Author: 2026-03-03
 
 - Decision: Declare `localizer::after_help` as `pub(crate)` (not
-  `#[cfg(test)]`). `after_help::DOMAIN_OPERATIONS` is `pub` and re-exported
-  from `lib.rs` (`pub use localizer::after_help:: DOMAIN_OPERATIONS`) so
+  `#[cfg(test)]`). `after_help::DOMAIN_OPERATIONS` is `pub` and re-exported from
+  `lib.rs` (`pub use localizer::after_help:: DOMAIN_OPERATIONS`) so
   integration tests (`tests/main_entry.rs`) can reference it directly. The
   remaining Fluent `(id, fallback)` constants and `render_after_help()` are
   `#[cfg(test)]`-gated inside a nested `after_help::fluent_entries` submodule.
