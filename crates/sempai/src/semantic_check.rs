@@ -48,7 +48,7 @@ pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), Diagn
         tracing::warn!(code = ?diagnostic.code(), "semantic validation failed");
     }
     if result.is_ok() {
-        tracing::debug!("semantic validation passed");
+        tracing::debug!(span = ?formula.span, "semantic validation passed");
     }
     result
 }

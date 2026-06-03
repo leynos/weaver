@@ -191,10 +191,12 @@ fn compile_rule_plans(
                     vec![],
                 )
             })?;
-            let query_plan =
-                QueryPlan::new(rule.id().to_owned(), language, Arc::clone(&shared_formula));
             tracing::debug!(rule_id = rule.id(), %language, "query plan created");
-            Ok(query_plan)
+            Ok(QueryPlan::new(
+                rule.id().to_owned(),
+                language,
+                Arc::clone(&shared_formula),
+            ))
         })
         .collect()
 }
