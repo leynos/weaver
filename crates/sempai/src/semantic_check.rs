@@ -133,7 +133,7 @@ where
 }
 
 fn validate_formula_inner(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
-    let analysis = analyze_formula_with_depth(
+    let analysis = analyse_formula_with_depth(
         formula,
         AnalysisScope {
             depth: 1,
@@ -191,12 +191,12 @@ impl<'a> AnalysisScope<'a> {
 }
 
 /// Analyses a `Not` node, marking negation and recording the first negation span.
-fn analyze_not_arm(
+fn analyse_not_arm(
     inner: &Decorated<Formula>,
     scope: AnalysisScope<'_>,
     formula_span: Option<&SourceSpan>,
 ) -> Result<FormulaAnalysis, DiagnosticReport> {
-    let mut analysis = analyze_formula_with_depth(
+    let mut analysis = analyse_formula_with_depth(
         inner,
         scope.child_with_fallback(formula_span.or(scope.fallback_span)),
     )?;
@@ -207,12 +207,12 @@ fn analyze_not_arm(
 }
 
 /// Analyses an `Inside` or `Anywhere` node (no negation tracking).
-fn analyze_inside_anywhere_arm(
+fn analyse_inside_anywhere_arm(
     inner: &Decorated<Formula>,
     scope: AnalysisScope<'_>,
     formula_span: Option<&SourceSpan>,
 ) -> Result<FormulaAnalysis, DiagnosticReport> {
-    let mut analysis = analyze_formula_with_depth(
+    let mut analysis = analyse_formula_with_depth(
         inner,
         scope.child_with_fallback(formula_span.or(scope.fallback_span)),
     )?;
@@ -222,12 +222,12 @@ fn analyze_inside_anywhere_arm(
 
 /// Analyses a conjunction (`And`) node and attaches a
 /// `MissingPositiveTermInAnd` site when no positive descendant is found.
-fn analyze_and_arm(
+fn analyse_and_arm(
     formula: &Decorated<Formula>,
     branches: &[Decorated<Formula>],
     scope: AnalysisScope<'_>,
 ) -> Result<FormulaAnalysis, DiagnosticReport> {
-    let mut analysis = analyze_branches(
+    let mut analysis = analyse_branches(
         branches,
         scope.child_with_fallback(formula.span.as_ref().or(scope.fallback_span)),
     )?;
@@ -245,7 +245,7 @@ fn analyze_and_arm(
 
 /// Analyses a disjunction (`Or`) node and attaches an `InvalidNotInOr` site
 /// the first time a branch containing a `Not` is encountered.
-fn analyze_or_arm(
+fn analyse_or_arm(
     formula: &Decorated<Formula>,
     branches: &[Decorated<Formula>],
     scope: AnalysisScope<'_>,
@@ -254,7 +254,7 @@ fn analyze_or_arm(
     let child_fallback = formula.span.as_ref().or(scope.fallback_span);
     let child_scope = scope.child_with_fallback(child_fallback);
     for branch in branches {
-        let branch_analysis = analyze_formula_with_depth(branch, child_scope)?;
+        let branch_analysis = analyse_formula_with_depth(branch, child_scope)?;
         if branch_analysis.contains_not && analysis.invalid_not_in_or.is_none() {
             analysis.invalid_not_in_or = Some(DiagnosticSite {
                 primary_span: branch_analysis
@@ -280,7 +280,7 @@ fn analyze_or_arm(
     Ok(analysis)
 }
 
-fn analyze_formula_with_depth(
+fn analyse_formula_with_depth(
     formula: &Decorated<Formula>,
     scope: AnalysisScope<'_>,
 ) -> Result<FormulaAnalysis, DiagnosticReport> {
@@ -303,22 +303,22 @@ fn analyze_formula_with_depth(
             has_positive_term: true,
             ..FormulaAnalysis::default()
         }),
-        Formula::Not(inner) => analyze_not_arm(inner, scope, formula.span.as_ref()),
+        Formula::Not(inner) => analyse_not_arm(inner, scope, formula.span.as_ref()),
         Formula::Inside(inner) | Formula::Anywhere(inner) => {
-            analyze_inside_anywhere_arm(inner, scope, formula.span.as_ref())
+            analyse_inside_anywhere_arm(inner, scope, formula.span.as_ref())
         }
-        Formula::And(branches) => analyze_and_arm(formula, branches, scope),
-        Formula::Or(branches) => analyze_or_arm(formula, branches, scope),
+        Formula::And(branches) => analyse_and_arm(formula, branches, scope),
+        Formula::Or(branches) => analyse_or_arm(formula, branches, scope),
     }
 }
 
-fn analyze_branches(
+fn analyse_branches(
     branches: &[Decorated<Formula>],
     scope: AnalysisScope<'_>,
 ) -> Result<FormulaAnalysis, DiagnosticReport> {
     let mut analysis = FormulaAnalysis::default();
     for branch in branches {
-        let branch_analysis = analyze_formula_with_depth(branch, scope)?;
+        let branch_analysis = analyse_formula_with_depth(branch, scope)?;
         analysis.has_positive_term |= branch_analysis.has_positive_term;
         analysis.contains_not |= branch_analysis.contains_not;
         analysis.first_negation_span = analysis
