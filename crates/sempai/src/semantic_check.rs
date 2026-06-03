@@ -74,26 +74,58 @@ pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), Diagn
 /// report when a normalized constraint payload is semantically invalid.
 #[tracing::instrument(level = "debug", skip_all)]
 pub(crate) fn validate_constraints(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
-    validate_constraints_inner(formula)
+    walk_formula_tree(formula, |decorated| {
+        for clause in &decorated.where_clauses {
+            let _pending_check = pending_constraint_validation(&clause.constraint);
+        }
+        Ok(())
+    })
 }
 
-fn validate_constraints_inner(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
-    for clause in &formula.where_clauses {
-        match &clause.constraint {
-            Constraint::MetavariableRegex { .. }
-            | Constraint::MetavariablePattern { .. }
-            | Constraint::Other(_) => {}
-        }
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PendingConstraintValidation {
+    /// TODO: Validate regex syntax once diagnostics can point at the normalized
+    /// `where` clause source span.
+    RegexSyntax,
+    /// TODO: Validate pattern compatibility when matcher-language context is
+    /// available in this validation stage.
+    PatternCompatibility,
+    /// TODO: Emit unsupported-constraint diagnostics once unknown constraints
+    /// are no longer intentionally preserved for adapters.
+    UnsupportedConstraint,
+}
 
+const fn pending_constraint_validation(constraint: &Constraint) -> PendingConstraintValidation {
+    match constraint {
+        Constraint::MetavariableRegex { .. } => PendingConstraintValidation::RegexSyntax,
+        Constraint::MetavariablePattern { .. } => PendingConstraintValidation::PatternCompatibility,
+        Constraint::Other(_) => PendingConstraintValidation::UnsupportedConstraint,
+    }
+}
+
+fn walk_formula_tree<F>(formula: &Decorated<Formula>, mut visit: F) -> Result<(), DiagnosticReport>
+where
+    F: FnMut(&Decorated<Formula>) -> Result<(), DiagnosticReport>,
+{
+    walk_formula_tree_inner(formula, &mut visit)
+}
+
+fn walk_formula_tree_inner<F>(
+    formula: &Decorated<Formula>,
+    visit: &mut F,
+) -> Result<(), DiagnosticReport>
+where
+    F: FnMut(&Decorated<Formula>) -> Result<(), DiagnosticReport>,
+{
+    visit(formula)?;
     match &formula.node {
         Formula::Atom(_) => Ok(()),
         Formula::Not(inner) | Formula::Inside(inner) | Formula::Anywhere(inner) => {
-            validate_constraints_inner(inner)
+            walk_formula_tree_inner(inner, visit)
         }
         Formula::And(branches) | Formula::Or(branches) => {
             for branch in branches {
-                validate_constraints_inner(branch)?;
+                walk_formula_tree_inner(branch, visit)?;
             }
             Ok(())
         }
