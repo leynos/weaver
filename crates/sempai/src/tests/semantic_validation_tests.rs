@@ -4,10 +4,14 @@ use rstest::rstest;
 use sempai_core::{
     DiagnosticCode,
     SourceSpan,
-    formula::{Atom, Decorated, Formula, PatternAtom},
+    formula::{Atom, Constraint, Decorated, Formula, PatternAtom, WhereClause},
 };
 
-use crate::semantic_check::validate_formula;
+use crate::semantic_check::{
+    count_constraint_validation_visits,
+    validate_constraints,
+    validate_formula,
+};
 
 fn make_pattern(text: &str) -> Decorated<Formula> {
     Decorated {
@@ -92,6 +96,23 @@ fn make_inside(inner: Decorated<Formula>) -> Decorated<Formula> {
     }
 }
 
+fn make_anywhere(inner: Decorated<Formula>) -> Decorated<Formula> {
+    Decorated {
+        node: Formula::Anywhere(Box::new(inner)),
+        where_clauses: vec![],
+        as_name: None,
+        fix: None,
+        span: None,
+    }
+}
+
+fn with_constraint(mut formula: Decorated<Formula>, name: &str) -> Decorated<Formula> {
+    formula.where_clauses = vec![WhereClause {
+        constraint: Constraint::Other(name.to_owned()),
+    }];
+    formula
+}
+
 fn sp(uri: &str, start: usize, end: usize) -> SourceSpan {
     let uri_opt = if uri.is_empty() {
         None
@@ -153,6 +174,53 @@ fn or_with_nested_not_branch_fails() {
 fn valid_and_with_positive_term_passes() {
     let formula = make_and(vec![make_pattern("foo"), make_not(make_pattern("bar"))]);
     assert!(validate_formula(&formula).is_ok());
+}
+
+#[test]
+fn validate_constraints_counts_single_node_without_where_clauses() {
+    let formula = make_pattern("foo");
+
+    validate_constraints(&formula).expect("constraint validation should pass");
+
+    assert_eq!(
+        count_constraint_validation_visits(&formula)
+            .expect("visit counting should use the constraint walker"),
+        (1, 0)
+    );
+}
+
+#[test]
+fn validate_constraints_visits_nested_nodes_and_where_clauses() {
+    let formula = with_constraint(
+        make_and(vec![
+            with_constraint(
+                make_or(vec![
+                    with_constraint(
+                        make_not(with_constraint(make_pattern("bad"), "not-pattern")),
+                        "not",
+                    ),
+                    with_constraint(make_pattern("ok"), "or-pattern"),
+                ]),
+                "or",
+            ),
+            with_constraint(
+                make_inside(with_constraint(
+                    make_anywhere(with_constraint(make_pattern("ctx"), "anywhere-pattern")),
+                    "anywhere",
+                )),
+                "inside",
+            ),
+        ]),
+        "root",
+    );
+
+    validate_constraints(&formula).expect("constraint validation should pass");
+
+    assert_eq!(
+        count_constraint_validation_visits(&formula)
+            .expect("visit counting should use the constraint walker"),
+        (8, 8)
+    );
 }
 
 #[test]

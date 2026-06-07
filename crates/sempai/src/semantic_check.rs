@@ -72,14 +72,33 @@ pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), Diagn
 ///
 /// Currently returns `Ok(())`. Future validation should return a diagnostic
 /// report when a normalized constraint payload is semantically invalid.
+///
+/// Callers must run [`validate_formula`] first; this walker assumes formula
+/// depth has already been bounded.
 #[tracing::instrument(level = "debug", skip_all)]
 pub(crate) fn validate_constraints(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
     walk_formula_tree(formula, |decorated| {
         for clause in &decorated.where_clauses {
+            // Exhaustiveness guard: adding a `Constraint` variant must classify
+            // its future semantic validation before this stage can compile.
             let _pending_check = pending_constraint_validation(&clause.constraint);
         }
         Ok(())
     })
+}
+
+#[cfg(test)]
+pub(crate) fn count_constraint_validation_visits(
+    formula: &Decorated<Formula>,
+) -> Result<(usize, usize), DiagnosticReport> {
+    let mut node_count = 0;
+    let mut where_clause_count = 0;
+    walk_formula_tree(formula, |decorated| {
+        node_count += 1;
+        where_clause_count += decorated.where_clauses.len();
+        Ok(())
+    })?;
+    Ok((node_count, where_clause_count))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

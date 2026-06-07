@@ -201,5 +201,9 @@ pub enum Constraint {
         pattern: String,
     },
     /// A currently unmodelled constraint, preserved lossily as JSON text.
+    ///
+    /// This is the sole format-aware exception in the core constraint model so
+    /// adapters can retain unknown shapes. New constraint variants must remain
+    /// format-agnostic domain types.
     Other(String),
 }
