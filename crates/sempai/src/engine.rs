@@ -105,8 +105,9 @@ impl Engine {
     #[tracing::instrument(level = "info", skip_all, fields(rules = tracing::field::Empty))]
     pub fn compile_yaml(&self, yaml: &str) -> Result<Vec<QueryPlan>, DiagnosticReport> {
         let file = parse_rule_file(yaml, None)?;
-        tracing::Span::current().record("rules", file.rules().len());
-        tracing::debug!(rules = file.rules().len(), "yaml parsed successfully");
+        let rule_count = file.rules().len();
+        tracing::Span::current().record("rules", rule_count);
+        tracing::debug!(rules = rule_count, "yaml parsed successfully");
         validate_supported_modes(&file)?;
 
         file.rules()
@@ -191,7 +192,7 @@ fn compile_rule_plans(
                     vec![],
                 )
             })?;
-            tracing::debug!(rule_id = rule.id(), %language, "query plan created");
+            tracing::debug!("query plan created");
             Ok(QueryPlan::new(
                 rule.id().to_owned(),
                 language,

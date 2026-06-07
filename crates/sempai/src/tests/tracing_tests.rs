@@ -137,9 +137,10 @@ fn compile_yaml_emits_observable_compile_span() {
             .expect("valid rule should compile");
     });
 
-    assert!(
-        compile_yaml_spans.load(Ordering::Relaxed) >= 1,
-        "expected compile_yaml to create an observable tracing span",
+    assert_eq!(
+        compile_yaml_spans.load(Ordering::Relaxed),
+        1,
+        "expected compile_yaml to create exactly one observable tracing span",
     );
     assert_compile_yaml_debug_events(&debug_events);
 }
@@ -152,42 +153,49 @@ fn assert_compile_yaml_debug_events(debug_events: &Arc<Mutex<Vec<RecordedEvent>>
         &recorded_events,
         "sempai::engine",
         "yaml parsed successfully",
-        &[("rules", "1")],
+        &[("rules", FieldMatcher::Exact("1"))],
     );
     assert_event(
         &recorded_events,
         "sempai::engine",
         "principal normalized",
-        &[("rule_id", "demo.span")],
+        &[("rule_id", FieldMatcher::Exact("demo.span"))],
     );
     assert_event(
         &recorded_events,
         "sempai::semantic_check",
         "semantic validation passed",
-        &[("span", "Some(")],
+        &[("source_span", FieldMatcher::StartsWith("Some("))],
     );
     assert_event(
         &recorded_events,
         "sempai::engine",
         "query plan created",
-        &[("rule_id", "demo.span"), ("language", "rust")],
+        &[],
     );
+}
+
+#[derive(Debug, Clone, Copy)]
+enum FieldMatcher<'a> {
+    Exact(&'a str),
+    StartsWith(&'a str),
 }
 
 fn assert_event(
     debug_events: &[RecordedEvent],
     target: &str,
     message: &str,
-    expected_fields: &[(&str, &str)],
+    expected_fields: &[(&str, FieldMatcher<'_>)],
 ) {
     assert!(
         debug_events.iter().any(|event| {
             event.target == target
                 && event.message() == Some(message)
                 && expected_fields.iter().all(|(field, value)| {
-                    event
-                        .field(field)
-                        .is_some_and(|actual| actual == *value || actual.starts_with(value))
+                    event.field(field).is_some_and(|actual| match value {
+                        FieldMatcher::Exact(expected) => actual == *expected,
+                        FieldMatcher::StartsWith(expected) => actual.starts_with(expected),
+                    })
                 })
         }),
         "expected debug event `{message}` with fields {expected_fields:?}, got {debug_events:?}",
