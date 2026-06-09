@@ -35,6 +35,21 @@ use sempai_core::{
 
 pub(crate) const MAX_FORMULA_DEPTH: usize = 1000;
 
+#[cfg(test)]
+thread_local! {
+    static VALIDATE_CONSTRAINTS_CALL_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn reset_validate_constraints_call_count() {
+    VALIDATE_CONSTRAINTS_CALL_COUNT.with(|count| count.set(0));
+}
+
+#[cfg(test)]
+pub(crate) fn validate_constraints_call_count() -> usize {
+    VALIDATE_CONSTRAINTS_CALL_COUNT.with(std::cell::Cell::get)
+}
+
 /// Validates structural semantic constraints on a normalized formula.
 ///
 /// This function validates the formula tree shape only. It does not validate
@@ -77,11 +92,20 @@ pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), Diagn
 /// depth has already been bounded.
 #[tracing::instrument(level = "debug", skip_all)]
 pub(crate) fn validate_constraints(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
+    #[cfg(test)]
+    VALIDATE_CONSTRAINTS_CALL_COUNT.with(|count| {
+        count.set(count.get().saturating_add(1));
+    });
+
     walk_formula_tree(formula, |decorated| {
         for clause in &decorated.where_clauses {
             // Exhaustiveness guard: adding a `Constraint` variant must classify
             // its future semantic validation before this stage can compile.
-            let _pending_check = pending_constraint_validation(&clause.constraint);
+            #[expect(
+                unused_variables,
+                reason = "exhaustiveness guard; semantic checks pending -- see issue #152"
+            )]
+            let pending_check = pending_constraint_validation(&clause.constraint);
         }
         Ok(())
     })

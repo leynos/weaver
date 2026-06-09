@@ -2,7 +2,11 @@
 
 use sempai_core::formula::{Atom, Constraint, Decorated, Formula};
 
-use crate::{Engine, EngineConfig};
+use crate::{
+    Engine,
+    EngineConfig,
+    semantic_check::{reset_validate_constraints_call_count, validate_constraints_call_count},
+};
 
 fn compile_yaml(yaml: &str) -> Vec<crate::engine::QueryPlan> {
     Engine::new(EngineConfig::default())
@@ -72,4 +76,30 @@ fn compile_yaml_arc_reuse_across_languages() {
     let first = plans.first().expect("expected first plan");
     let second = plans.get(1).expect("expected second plan");
     assert!(std::ptr::eq(first.formula(), second.formula()));
+}
+
+#[test]
+fn compile_yaml_invokes_validate_constraints_for_where_clauses() {
+    let yaml = concat!(
+        "rules:\n",
+        "  - id: demo.constraints.validate\n",
+        "    message: validates constraint stage\n",
+        "    languages: [rust]\n",
+        "    severity: ERROR\n",
+        "    match:\n",
+        "      pattern: foo($X)\n",
+        "      where:\n",
+        "        - metavariable-pattern:\n",
+        "            metavariable: $X\n",
+        "            pattern: $X\n",
+    );
+
+    reset_validate_constraints_call_count();
+
+    let plans = compile_yaml(yaml);
+    assert!(!plans.is_empty());
+    let formula = plans.first().expect("should have one plan").formula();
+
+    assert_eq!(validate_constraints_call_count(), 1);
+    assert!(!formula.where_clauses.is_empty());
 }

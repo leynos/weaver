@@ -77,6 +77,32 @@ per-language query plans for later execution.
     per-language `QueryPlan`
   - `QueryPlan::formula()` exposure for tests and integration
 
+### Constraint boundary and validation passes
+
+`crates/sempai/src/normalize_constraints.rs` is the serialisation boundary for
+rule `where` clauses. It receives raw YAML-backed JSON values from the parser
+and converts them into `sempai_core::formula::Constraint` domain values so that
+core formula types can remain independent of transport formats.
+
+`sempai_core::formula::Constraint` currently has three variants:
+
+- `MetavariableRegex`
+- `MetavariablePattern`
+- `Other(String)`
+
+The `Other` variant is the only format-aware exception. It preserves unknown
+constraint shapes as JSON text so adapters can round-trip unsupported input,
+while any new domain variants are expected to be pure model types without
+serialisation-format concerns.
+
+Engine validation runs in two stages after normalization:
+
+- `validate_formula` checks formula-tree structure and enforces
+  `MAX_FORMULA_DEPTH`.
+- `validate_constraints` walks each decorated formula node to check constraint
+  payload semantics; it is currently a placeholder pending execution-layer
+  context, including issue `#152`.
+
 ## Configuration framework internals
 
 ### `ortho_config` v0.8.0 integration
