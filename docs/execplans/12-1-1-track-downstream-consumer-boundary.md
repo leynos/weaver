@@ -207,7 +207,17 @@ state, not the intended sequence.
       (`All diagrams validated successfully!`). Logs:
       `/tmp/markdownlint-weaver-12-1-1-track-downstream-consumer-boundary.out`
       and `/tmp/nixie-weaver-12-1-1-track-downstream-consumer-boundary.out`.
-- [ ] Stage B: produce the boundary manifest, generator, and matrix doc.
+- [x] 2026-06-14T03:28:00Z: Stage B produced
+      `docs/orthoconfig-consumer-boundary.toml`, generated
+      `docs/orthoconfig-consumer-boundary.md`, added
+      `crates/weaver-docs-gate`, and pinned `ortho_config` to
+      `4339a6f3c61dc4fed86493d99ffb05230bee2a1b`. Validation passed with
+      `cargo build --workspace`, `make fmt`, `make check-fmt`, `make lint`,
+      `make test`, `make markdownlint`, and `make nixie`. The first
+      CodeRabbit pass found one valid generic `OrthoConfig 9.2` reference
+      issue; after fixing the manifest to use `OrthoConfig 9.2.1` and
+      `OrthoConfig 9.2.2`, regenerating the matrix, and rerunning gates, the
+      repeat CodeRabbit review completed with `findings: 0`.
 - [ ] Stage C: cross-link the matrix from ADR 007, the roadmap, and the
       developers' guide.
 - [ ] Stage D: add the referential-integrity test gate and snapshot.
@@ -221,6 +231,26 @@ Recorded as they occur during implementation. Format:
 - Observation: …
   Evidence: …
   Impact: …
+- Observation: `toml` was already present in `Cargo.lock` but was not a
+  workspace dependency.
+  Evidence: repository search showed transitive lockfile entries and no
+  workspace dependency entry before Stage B.
+  Impact: Stage B added `toml = "0.9.12"` to `[workspace.dependencies]` so
+  the private docs-gate crate can use the parser explicitly.
+- Observation: `mdtablefix` rewrites generated Markdown tables and can break
+  rows that contain empty cells.
+  Evidence: the first `make fmt` attempt failed with `MD056` after wrapping
+  empty table cells in `docs/orthoconfig-consumer-boundary.md`.
+  Impact: the renderer now emits formatter-stable aligned tables and displays
+  absent values as `n/a`; the TOML manifest remains the evidence source for
+  genuinely empty fields.
+- Observation: delivery and feedback OrthoConfig references need versioned
+  leaf task identifiers in shared upstream lists.
+  Evidence: `coderabbit review --agent` flagged the `12.1.5` manifest row
+  while later rows already used `OrthoConfig 9.2.1` and
+  `OrthoConfig 9.2.2`.
+  Impact: the manifest now uses the leaf task identifiers consistently before
+  generated matrix publication.
 
 ## Decision log
 

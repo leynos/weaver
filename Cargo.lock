@@ -299,6 +299,7 @@ version = "4.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7281235d6e96d3544ca18bba9049be92f4190f8d923e3caef1b5f66cfa752608"
 dependencies = [
+ "camino",
  "cap-primitives 4.0.2",
  "io-extras 0.19.0",
  "io-lifetimes 3.0.1",
@@ -1462,11 +1463,10 @@ dependencies = [
 [[package]]
 name = "ortho_config"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9314c7a4be184287f3f9a66fcbcec054ac215d4975152df86b7aadeae8d5e019"
+source = "git+https://github.com/leynos/ortho-config.git?rev=4339a6f3c61dc4fed86493d99ffb05230bee2a1b#4339a6f3c61dc4fed86493d99ffb05230bee2a1b"
 dependencies = [
  "camino",
- "cap-std 3.4.5",
+ "cap-std 4.0.2",
  "clap",
  "clap-dispatch",
  "directories",
@@ -1489,8 +1489,7 @@ dependencies = [
 [[package]]
 name = "ortho_config_macros"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3941ab7c592a0b93aadf12ce30e0ef3d01af87b46c8f363d8157dc33273ba83"
+source = "git+https://github.com/leynos/ortho-config.git?rev=4339a6f3c61dc4fed86493d99ffb05230bee2a1b#4339a6f3c61dc4fed86493d99ffb05230bee2a1b"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -3251,6 +3250,17 @@ name = "weaver-daemon-types"
 version = "0.1.0"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "weaver-docs-gate"
+version = "0.1.0"
+dependencies = [
+ "camino",
+ "cap-std 4.0.2",
+ "serde",
+ "thiserror 2.0.18",
+ "toml 0.9.12+spec-1.1.0",
 ]
 
 [[package]]

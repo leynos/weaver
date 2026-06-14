@@ -1,0 +1,622 @@
+schema_version = 1
+
+managed_tasks = [
+  "12.1.1", "12.1.2", "12.1.3", "12.1.4", "12.1.5",
+  "13.1.1", "13.1.2", "13.1.3", "13.2.1", "13.2.2", "13.2.3",
+  "13.3.1", "13.3.2", "13.3.3", "13.3.4",
+  "14.1.1", "14.1.2", "14.1.3", "14.1.4", "14.2.1", "14.2.2",
+  "14.2.3", "14.3.1", "14.3.2",
+  "15.1.1", "15.1.2", "15.3.2", "15.3.3", "15.3.5", "15.3.6",
+  "16.1.1", "16.1.2", "16.1.3", "16.2.1", "16.2.2", "16.2.3",
+  "16.3.3", "16.3.5",
+  "17.1.5", "17.2.2",
+  "18.2.1",
+  "19.1.1", "19.1.2", "19.1.3", "19.1.4", "19.2.2",
+  "20.1.1", "20.1.2", "20.3.3",
+]
+
+[[task]]
+id = "12.1.1"
+gist = "Track the downstream consumer boundary."
+state = "consumes"
+upstream = [{ task = "OrthoConfig 5.2.3 / design §2.1", role = "boundary" }]
+shipped_in = "4339a6f3c61dc4fed86493d99ffb05230bee2a1b"
+removal_gate = ""
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "12.1.2"
+gist = "Consume recursive command metadata."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 6.1", role = "metadata" }]
+shipped_in = ""
+removal_gate = "Replace local recursive command metadata once OrthoConfig 6.1 ships command and subcommand records that can drive help, manpages, completions, and context output."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "12.1.3"
+gist = "Consume compact context and skill metadata."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 6.2", role = "metadata" },
+  { task = "OrthoConfig 6.3", role = "metadata" },
+]
+shipped_in = ""
+removal_gate = "Replace Weaver-local context and skill metadata once OrthoConfig 6.2 and 6.3 ship reusable context and skill shapes that Weaver can extend."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "12.1.4"
+gist = "Consume canonical vocabulary and behavioural metadata."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 7.1", role = "vocabulary" },
+  { task = "OrthoConfig 7.2", role = "renderer" },
+  { task = "OrthoConfig 8.1", role = "renderer" },
+]
+shipped_in = ""
+removal_gate = "Replace Weaver-local vocabulary, renderer, JSON, exit-code, bounded-list, mutation, and provenance checks once OrthoConfig 7.1, 7.2, and 8.1 ship those contracts."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "12.1.5"
+gist = "Consume compounding primitive contracts."
+state = "pending"
+upstream = [
+  { task = "OrthoConfig 9.1", role = "profile" },
+  { task = "OrthoConfig 9.2.1", role = "delivery" },
+  { task = "OrthoConfig 9.2.2", role = "feedback" },
+  { task = "OrthoConfig 9.3", role = "execution_ledger" },
+]
+shipped_in = ""
+removal_gate = ""
+adr_anchor = ""
+next_review_by = "2026-12-31"
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "13.1.1"
+gist = "Record the agent-native command-surface reset as ADR 007."
+state = "divergent"
+upstream = [{ task = "OrthoConfig 5.2.3", role = "boundary" }]
+shipped_in = ""
+removal_gate = ""
+adr_anchor = "decision-outcome"
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "13.1.2"
+gist = "Implement the Weaver command-surface adapter for one read-only command family."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 5.2.3", role = "boundary" },
+  { task = "OrthoConfig 6.1", role = "metadata" },
+  { task = "OrthoConfig 7.2.7", role = "capability_provenance" },
+]
+shipped_in = ""
+removal_gate = "Replace CommandSurfaceRecord once OrthoConfig 6.1 and 7.2.7 ship recursive command and capability/provenance metadata for Weaver resource paths."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "13.1.3"
+gist = "Define the temporary-adapter removal policy."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 6.1", role = "metadata" },
+  { task = "OrthoConfig 7.2.7", role = "capability_provenance" },
+]
+shipped_in = ""
+removal_gate = "Retire local generic helpers once their named OrthoConfig replacements are available, unless ADR 007 records a permanent divergence."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "13.2.1"
+gist = "Implement the localized human renderer for definitions get."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.2", role = "renderer" }]
+shipped_in = ""
+removal_gate = "Replace Weaver-local human renderer metadata once OrthoConfig 7.2.2 ships reusable human-renderer controls and terminal behaviour metadata."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "13.2.2"
+gist = "Implement universal JSON and structured errors for definitions get."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 7.2.3", role = "renderer" },
+  { task = "OrthoConfig 7.2.4", role = "renderer" },
+  { task = "OrthoConfig 7.2.5", role = "renderer" },
+  { task = "OrthoConfig 8.1", role = "renderer" },
+]
+shipped_in = ""
+removal_gate = "Replace Weaver-local JSON, stderr error, and exit-class definitions once OrthoConfig 7.2.3 through 7.2.5 and 8.1 ship stable renderer contracts."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "13.2.3"
+gist = "Implement enumerating errors and bounded responses for the pilot."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.6", role = "renderer" }]
+shipped_in = ""
+removal_gate = "Replace local bounded-list and enumerating-error metadata once OrthoConfig 7.2.6 ships the reusable contract."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "13.3.1"
+gist = "Implement weaver context JSON for the pilot command family."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 6.2", role = "metadata" }]
+shipped_in = ""
+removal_gate = "Replace local context payload metadata once OrthoConfig 6.2 ships compact agent-context generation and schema stability."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "13.3.2"
+gist = "Implement capabilities list JSON from runtime provider state."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.7", role = "capability_provenance" }]
+shipped_in = ""
+removal_gate = "Replace local capability/provenance envelope metadata once OrthoConfig 7.2.7 ships the reusable capability contract."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "13.3.3"
+gist = "Generate help, manpage input, completions, and skill paths."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 6.3", role = "metadata" },
+  { task = "OrthoConfig 8.1", role = "renderer" },
+]
+shipped_in = ""
+removal_gate = "Replace local generated-reference metadata once OrthoConfig 6.3 and 8.1 ship skill and reference-CLI contracts."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "13.3.4"
+gist = "Add command-surface drift gates for the pilot."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 6.1", role = "metadata" },
+  { task = "OrthoConfig 7.1", role = "vocabulary" },
+  { task = "OrthoConfig 8.1", role = "renderer" },
+]
+shipped_in = ""
+removal_gate = "Replace local drift checks for generic command metadata, vocabulary, and renderer surfaces once OrthoConfig ships reusable policy gates."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "14.1.1"
+gist = "Implement weaver definitions get."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 6.1", role = "metadata" },
+  { task = "OrthoConfig 7.2", role = "renderer" },
+]
+shipped_in = ""
+removal_gate = "Replace generic command and renderer metadata for definitions get once OrthoConfig 6.1 and 7.2 can express the resource command."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "14.1.2"
+gist = "Implement weaver references list."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 6.1", role = "metadata" },
+  { task = "OrthoConfig 7.2.6", role = "renderer" },
+]
+shipped_in = ""
+removal_gate = "Replace generic command and bounded-list metadata for references list once OrthoConfig 6.1 and 7.2.6 ship the reusable contracts."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "14.1.3"
+gist = "Implement weaver diagnostics list."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 6.1", role = "metadata" },
+  { task = "OrthoConfig 7.2.5", role = "renderer" },
+]
+shipped_in = ""
+removal_gate = "Replace generic command and structured-error metadata for diagnostics list once OrthoConfig ships the reusable contracts."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "14.1.4"
+gist = "Add combinatorial read-command end-to-end coverage."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 7.2", role = "renderer" },
+  { task = "OrthoConfig 8.1", role = "renderer" },
+]
+shipped_in = ""
+removal_gate = "Retire local generic renderer assertions once OrthoConfig reference-CLI and renderer conformance gates cover the shared contract."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "14.2.1"
+gist = "Implement weaver cards get for position references."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 6.1", role = "metadata" },
+  { task = "OrthoConfig 7.2", role = "renderer" },
+]
+shipped_in = ""
+removal_gate = "Replace generic command, JSON, and human-renderer metadata for cards get once OrthoConfig can express the resource command."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "14.2.2"
+gist = "Add qualified symbol selectors to cards get."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.6", role = "renderer" }]
+shipped_in = ""
+removal_gate = "Replace generic enumerating-error metadata for ambiguous selectors once OrthoConfig 7.2.6 ships the reusable contract."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "14.2.3"
+gist = "Add one-hop relation summaries to cards."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.6", role = "renderer" }]
+shipped_in = ""
+removal_gate = "Replace generic bounded-output metadata for relation summaries once OrthoConfig 7.2.6 ships the reusable contract."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "14.3.1"
+gist = "Prototype symbols list pattern search over weaver-syntax and optional srgn."
+state = "pending"
+upstream = [
+  { task = "OrthoConfig 6.1", role = "metadata" },
+  { task = "OrthoConfig 7.1", role = "vocabulary" },
+]
+shipped_in = ""
+removal_gate = ""
+adr_anchor = ""
+next_review_by = "2026-12-31"
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "14.3.2"
+gist = "Decide whether the static-search pilot graduates."
+state = "pending"
+upstream = [{ task = "OrthoConfig 7.1", role = "vocabulary" }]
+shipped_in = ""
+removal_gate = ""
+adr_anchor = ""
+next_review_by = "2026-12-31"
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "15.1.1"
+gist = "Implement one-liner tokenization and Pratt parsing for positive symbol patterns."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.5", role = "renderer" }]
+shipped_in = ""
+removal_gate = "Replace generic diagnostic envelope and error-class metadata once OrthoConfig structured-error contracts are available."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "15.1.2"
+gist = "Define selector record schemas for one-liner matches."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.7", role = "capability_provenance" }]
+shipped_in = ""
+removal_gate = "Replace generic selector provenance fields once OrthoConfig capability/provenance metadata can carry them."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "15.3.2"
+gist = "Add weaver symbols list query inputs."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 6.1", role = "metadata" },
+  { task = "OrthoConfig 7.2.5", role = "renderer" },
+]
+shipped_in = ""
+removal_gate = "Replace generic command, input-combination, and error metadata once OrthoConfig can express the symbols list query contract."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "15.3.3"
+gist = "Define stable JSONL request and response schemas for Sempai query operations."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.4", role = "renderer" }]
+shipped_in = ""
+removal_gate = "Replace generic machine-renderer field and schema metadata once OrthoConfig 7.2.4 ships the reusable contract."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "15.3.5"
+gist = "Implement actuation handoff contract using focus-first selection."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.7", role = "capability_provenance" }]
+shipped_in = ""
+removal_gate = "Replace generic selector handoff provenance once OrthoConfig capability/provenance metadata can carry downstream mutation inputs."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "15.3.6"
+gist = "Add diagnostics conformance suites for Sempai error categories."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 7.2.5", role = "renderer" },
+  { task = "OrthoConfig 8.1", role = "renderer" },
+]
+shipped_in = ""
+removal_gate = "Replace generic structured-error conformance once OrthoConfig reference-CLI and renderer gates cover the shared error contract."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "16.1.1"
+gist = "Implement weaver patches apply."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 6.1", role = "metadata" },
+  { task = "OrthoConfig 7.2.1", role = "renderer" },
+]
+shipped_in = ""
+removal_gate = "Replace generic mutation command and preview metadata once OrthoConfig 6.1 and 7.2.1 ship reusable mutation contracts."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "16.1.2"
+gist = "Add idempotency keys, transaction IDs, and retry matching."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.1", role = "renderer" }]
+shipped_in = ""
+removal_gate = "Replace generic idempotency and retry metadata once OrthoConfig 7.2.1 ships mutation behavioural metadata."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "16.1.3"
+gist = "Standardize mutation dry-run, force, and safety metadata."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.1", role = "renderer" }]
+shipped_in = ""
+removal_gate = "Replace local mutation flag and safety metadata once OrthoConfig 7.2.1 ships the reusable mutation policy contract."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "16.2.1"
+gist = "Implement weaver symbols rename for position references."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 6.1", role = "metadata" },
+  { task = "OrthoConfig 7.2.7", role = "capability_provenance" },
+]
+shipped_in = ""
+removal_gate = "Replace generic command and capability/provenance metadata once OrthoConfig can express symbols rename."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "16.2.2"
+gist = "Add direct Sempai selector support to symbols rename."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.6", role = "renderer" }]
+shipped_in = ""
+removal_gate = "Replace generic ambiguous-mutation and enumerating-error metadata once OrthoConfig 7.2.6 ships the reusable contract."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "16.2.3"
+gist = "Add from-stdin selector stream consumption to mutation commands."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.4", role = "renderer" }]
+shipped_in = ""
+removal_gate = "Replace generic stream input and JSON renderer metadata once OrthoConfig 7.2.4 ships reusable machine contracts."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "16.3.3"
+gist = "Add symbols move command contract and discovery output."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.7", role = "capability_provenance" }]
+shipped_in = ""
+removal_gate = "Replace generic command discovery and capability/provenance metadata once OrthoConfig 7.2.7 can express symbols move and extricate-symbol."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "16.3.5"
+gist = "Extend refusal diagnostics and rollback guarantees for extrication."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.5", role = "renderer" }]
+shipped_in = ""
+removal_gate = "Replace generic refusal diagnostic and error-code metadata once OrthoConfig structured-error contracts cover the shared surface."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "17.1.5"
+gist = "Implement budgeted traversal and graph-slice command integration."
+state = "wraps"
+upstream = [
+  { task = "OrthoConfig 6.1", role = "metadata" },
+  { task = "OrthoConfig 7.2.6", role = "renderer" },
+]
+shipped_in = ""
+removal_gate = "Replace generic command and bounded-output metadata once OrthoConfig can express graph-slices get."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "17.2.2"
+gist = "Implement slice reconstruction per commit with data-quality metadata."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.4", role = "renderer" }]
+shipped_in = ""
+removal_gate = "Replace generic machine-output field metadata once OrthoConfig renderer contracts cover history slice payloads."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "18.2.1"
+gist = "Wire provider summaries into capabilities list and context JSON."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.7", role = "capability_provenance" }]
+shipped_in = ""
+removal_gate = "Replace local provider summary envelope metadata once OrthoConfig 7.2.7 ships reusable capability/provenance metadata."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "19.1.1"
+gist = "Implement profile storage, redaction, and root profile selection."
+state = "pending"
+upstream = [{ task = "OrthoConfig 9.1", role = "profile" }]
+shipped_in = ""
+removal_gate = ""
+adr_anchor = ""
+next_review_by = "2026-12-31"
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "19.1.2"
+gist = "Implement durable job ledger support."
+state = "pending"
+upstream = [{ task = "OrthoConfig 9.3", role = "execution_ledger" }]
+shipped_in = ""
+removal_gate = ""
+adr_anchor = ""
+next_review_by = "2026-12-31"
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "19.1.3"
+gist = "Implement wait, jobs, and delivery sinks."
+state = "pending"
+upstream = [
+  { task = "OrthoConfig 9.2.1", role = "delivery" },
+  { task = "OrthoConfig 9.3", role = "execution_ledger" },
+]
+shipped_in = ""
+removal_gate = ""
+adr_anchor = ""
+next_review_by = "2026-12-31"
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "19.1.4"
+gist = "Implement feedback create, list, and send."
+state = "pending"
+upstream = [{ task = "OrthoConfig 9.2.2", role = "feedback" }]
+shipped_in = ""
+removal_gate = ""
+adr_anchor = ""
+next_review_by = "2026-12-31"
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "19.2.2"
+gist = "Implement explicit interactive review as an opt-in workflow."
+state = "wraps"
+upstream = [{ task = "OrthoConfig 7.2.1", role = "renderer" }]
+shipped_in = ""
+removal_gate = "Replace generic non-interactive and mutation-policy metadata once OrthoConfig 7.2.1 ships reusable interaction contracts."
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "20.1.1"
+gist = "Decide whether to generate MCP descriptions from context JSON."
+state = "pending"
+upstream = [{ task = "OrthoConfig 10.1.1", role = "metadata" }]
+shipped_in = ""
+removal_gate = ""
+adr_anchor = ""
+next_review_by = "2026-12-31"
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "20.1.2"
+gist = "Decide whether SDK or OpenAPI-shaped runtime explorers are in scope."
+state = "pending"
+upstream = [{ task = "OrthoConfig 10.1.2", role = "metadata" }]
+shipped_in = ""
+removal_gate = ""
+adr_anchor = ""
+next_review_by = "2026-12-31"
+last_reviewed = "2026-06-14"
+
+[[task]]
+id = "20.3.3"
+gist = "Decide whether weaver daemon status JSON belongs in the command contract."
+state = "pending"
+upstream = [{ task = "OrthoConfig 6.2.3", role = "metadata" }]
+shipped_in = ""
+removal_gate = ""
+adr_anchor = ""
+next_review_by = "2026-12-31"
+last_reviewed = "2026-06-14"

@@ -1,0 +1,16 @@
+[package]
+name = "weaver-docs-gate"
+edition.workspace = true
+version.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+cap-std = { workspace = true }
+camino = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
+
+[lints]
+workspace = true
