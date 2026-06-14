@@ -199,8 +199,12 @@ fn push_dash(anchor: &mut String, previous_was_dash: &mut bool) {
     }
 }
 
-fn ensure(condition: bool, message: String) -> TestResult {
-    if condition { Ok(()) } else { Err(message) }
+fn ensure(condition: bool, message: impl Into<String>) -> TestResult {
+    if condition {
+        Ok(())
+    } else {
+        Err(message.into())
+    }
 }
 
 fn ensure_equal<T>(left: &T, right: &T, message: impl Into<String>) -> TestResult
@@ -228,41 +232,48 @@ fn ensure_unique(values: &[&str], label: FieldName) -> TestResult {
     Ok(())
 }
 
+fn validate_field_constraints(
+    task: &BoundaryTask,
+    state: &str,
+    required: (&str, bool),
+    forbidden: &[(&str, bool)],
+) -> TestResult {
+    ensure(
+        required.1,
+        format!("{state} task {} must name {}", task.id, required.0),
+    )?;
+    for &(field, is_some) in forbidden {
+        ensure(
+            !is_some,
+            format!("{state} task {} must not carry {field}", task.id),
+        )?;
+    }
+    Ok(())
+}
+
 fn validate_consumes_evidence(task: &BoundaryTask) -> TestResult {
-    ensure(
-        task.shipped_in.is_some(),
-        format!("consumes task {} must name shipped_in", task.id),
-    )?;
-    ensure(
-        task.removal_gate.is_none(),
-        format!("consumes task {} must not carry removal_gate", task.id),
-    )?;
-    ensure(
-        task.adr_anchor.is_none(),
-        format!("consumes task {} must not carry adr_anchor", task.id),
-    )?;
-    ensure(
-        task.next_review_by.is_none(),
-        format!("consumes task {} must not carry next_review_by", task.id),
+    validate_field_constraints(
+        task,
+        "consumes",
+        ("shipped_in", task.shipped_in.is_some()),
+        &[
+            ("removal_gate", task.removal_gate.is_some()),
+            ("adr_anchor", task.adr_anchor.is_some()),
+            ("next_review_by", task.next_review_by.is_some()),
+        ],
     )
 }
 
 fn validate_wraps_evidence(task: &BoundaryTask) -> TestResult {
-    ensure(
-        task.removal_gate.is_some(),
-        format!("wraps task {} must name a removal gate", task.id),
-    )?;
-    ensure(
-        task.shipped_in.is_none(),
-        format!("wraps task {} must not carry shipped_in", task.id),
-    )?;
-    ensure(
-        task.adr_anchor.is_none(),
-        format!("wraps task {} must not carry adr_anchor", task.id),
-    )?;
-    ensure(
-        task.next_review_by.is_none(),
-        format!("wraps task {} must not carry next_review_by", task.id),
+    validate_field_constraints(
+        task,
+        "wraps",
+        ("removal_gate", task.removal_gate.is_some()),
+        &[
+            ("shipped_in", task.shipped_in.is_some()),
+            ("adr_anchor", task.adr_anchor.is_some()),
+            ("next_review_by", task.next_review_by.is_some()),
+        ],
     )
 }
 
@@ -287,21 +298,15 @@ fn validate_pending_evidence(task: &BoundaryTask) -> TestResult {
 }
 
 fn validate_divergence_evidence(task: &BoundaryTask) -> TestResult {
-    ensure(
-        task.adr_anchor.is_some(),
-        format!("divergent task {} must name an ADR 007 anchor", task.id),
-    )?;
-    ensure(
-        task.shipped_in.is_none(),
-        format!("divergent task {} must not carry shipped_in", task.id),
-    )?;
-    ensure(
-        task.removal_gate.is_none(),
-        format!("divergent task {} must not carry removal_gate", task.id),
-    )?;
-    ensure(
-        task.next_review_by.is_none(),
-        format!("divergent task {} must not carry next_review_by", task.id),
+    validate_field_constraints(
+        task,
+        "divergent",
+        ("adr_anchor", task.adr_anchor.is_some()),
+        &[
+            ("shipped_in", task.shipped_in.is_some()),
+            ("removal_gate", task.removal_gate.is_some()),
+            ("next_review_by", task.next_review_by.is_some()),
+        ],
     )
 }
 
