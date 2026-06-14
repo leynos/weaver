@@ -224,7 +224,16 @@ state, not the intended sequence.
       matrix and the TOML source of truth from Stage A. Validation passed with
       `make fmt`, `make markdownlint`, `make nixie`, and CodeRabbit
       `findings: 0`.
-- [ ] Stage D: add the referential-integrity test gate and snapshot.
+- [x] 2026-06-14T05:36:00Z: Stage D added
+      `crates/weaver-docs-gate/tests/boundary_manifest.rs`, covering
+      manifest registry order, roadmap task references, state-specific
+      evidence fields, ADR 007 divergence anchors, and byte-for-byte matrix
+      regeneration. Validation passed with `cargo test -p weaver-docs-gate`,
+      `make fmt`, `make check-fmt`, `make lint`, `make test`,
+      `make markdownlint`, and `make nixie`. The first CodeRabbit pass found
+      five valid test-diagnostic issues; after refactoring the tests to return
+      `Result<(), String>` with explicit validation errors, the repeat review
+      completed with `findings: 0`.
 - [ ] Stage E: refresh the users' guide, run the full quality gates, and run
       `coderabbit review --agent`.
 
@@ -255,6 +264,14 @@ Recorded as they occur during implementation. Format:
   `OrthoConfig 9.2.2`.
   Impact: the manifest now uses the leaf task identifiers consistently before
   generated matrix publication.
+- Observation: the matrix drift test must compare against the Markdown shape
+  after repository formatting, not only the raw renderer's first draft.
+  Evidence: the first Stage D focused test run passed integrity checks but
+  failed `committed_matrix_matches_manifest_rendering` because the renderer
+  emitted pre-`mdtablefix` paragraph wrapping and a one-character wider final
+  table column.
+  Impact: the renderer now emits the formatter-stable matrix text that is
+  committed, making future manifest or renderer drift deterministic.
 
 ## Decision log
 
