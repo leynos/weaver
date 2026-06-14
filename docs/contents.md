@@ -32,6 +32,10 @@ readers can find the source of truth without scanning the whole tree.
   surface](adr-007-agent-native-command-surface.md)
   - Decision record for the human-friendly, agent-native 0.1.0 command
     contract and OrthoConfig dependency boundary.
+- [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md)
+  - Generated matrix classifying every command-contract roadmap task as an
+    OrthoConfig consumer, temporary wrapper, pending dependency, or deliberate
+    divergence.
 - [Archived prototype roadmap](archive/prototype-roadmap.md)
   - Historical completed and superseded roadmap tasks from the pre-ADR-007
     command grammar, preserving task numbers `1` through `11`.

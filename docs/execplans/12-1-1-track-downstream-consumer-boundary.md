@@ -218,8 +218,12 @@ state, not the intended sequence.
       issue; after fixing the manifest to use `OrthoConfig 9.2.1` and
       `OrthoConfig 9.2.2`, regenerating the matrix, and rerunning gates, the
       repeat CodeRabbit review completed with `findings: 0`.
-- [ ] Stage C: cross-link the matrix from ADR 007, the roadmap, and the
-      developers' guide.
+- [x] 2026-06-14T04:52:00Z: Stage C cross-linked the generated matrix from
+      `docs/contents.md`, `docs/developers-guide.md`, and every
+      manifest-managed roadmap task group. ADR 007 already linked both the
+      matrix and the TOML source of truth from Stage A. Validation passed with
+      `make fmt`, `make markdownlint`, `make nixie`, and CodeRabbit
+      `findings: 0`.
 - [ ] Stage D: add the referential-integrity test gate and snapshot.
 - [ ] Stage E: refresh the users' guide, run the full quality gates, and run
       `coderabbit review --agent`.

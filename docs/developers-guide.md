@@ -16,6 +16,23 @@ from OrthoConfig-backed command metadata plus Weaver-owned semantic adapters.
 Do not add new public command grammar by hand in `clap`, daemon routing, manual
 pages, help text, and docs independently.
 
+The [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md) is
+the source of truth for command-contract roadmap tasks. Before adding,
+renaming, or reclassifying a public command task, update
+`docs/orthoconfig-consumer-boundary.toml` and regenerate
+`docs/orthoconfig-consumer-boundary.md` with:
+
+```sh
+cargo run -p weaver-docs-gate --example render_boundary_matrix -- \
+  docs/orthoconfig-consumer-boundary.toml docs/orthoconfig-consumer-boundary.md
+```
+
+Use `consumes` only when the upstream OrthoConfig contract has shipped and the
+row can name the release or pinned SHA in `shipped_in`. Use `wraps` for a
+temporary Weaver adapter with a concrete removal gate, `pending` for an
+upstream contract that is not decided or shipped yet, and `divergent` only when
+ADR 007 records the deliberate Weaver-owned divergence.
+
 When adding or renaming a public command:
 
 1. Update the OrthoConfig-backed command metadata or the Weaver semantic
