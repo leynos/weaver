@@ -19,6 +19,23 @@ const ROADMAP: &str = "docs/roadmap.md";
 
 type TestResult<T = ()> = Result<T, String>;
 
+#[derive(Clone, Copy)]
+enum FieldName {
+    LastReviewed,
+    NextReviewBy,
+    ManagedTasks,
+}
+
+impl FieldName {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::LastReviewed => "last_reviewed",
+            Self::NextReviewBy => "next_review_by",
+            Self::ManagedTasks => "managed_tasks",
+        }
+    }
+}
+
 #[test]
 fn manifest_registry_matches_rows_and_roadmap_tasks() -> TestResult {
     let manifest = manifest().map_err(|error| format!("load boundary manifest: {error}"))?;
@@ -34,9 +51,10 @@ fn manifest_registry_matches_rows_and_roadmap_tasks() -> TestResult {
         .collect::<Vec<_>>();
 
     ensure_equal(&managed_ids, &row_ids, "managed_tasks must match task rows")?;
-    ensure_unique(&managed_ids, "managed_tasks")?;
+    ensure_unique(&managed_ids, FieldName::ManagedTasks)?;
 
-    let roadmap = read_doc(ROADMAP).map_err(|error| format!("read {ROADMAP}: {error}"))?;
+    let roadmap =
+        read_doc(Utf8Path::new(ROADMAP)).map_err(|error| format!("read {ROADMAP}: {error}"))?;
     let roadmap_ids = roadmap_task_ids(&roadmap);
     for task_id in managed_ids {
         ensure(
@@ -53,7 +71,7 @@ fn boundary_state_rows_have_required_evidence() -> TestResult {
     let manifest = manifest().map_err(|error| format!("load boundary manifest: {error}"))?;
 
     for task in &manifest.tasks {
-        validate_date(&task.last_reviewed, "last_reviewed", task)?;
+        validate_date(&task.last_reviewed, FieldName::LastReviewed, task)?;
         ensure(
             !task.upstream.is_empty(),
             format!("task {} must name at least one upstream reference", task.id),
@@ -73,7 +91,8 @@ fn boundary_state_rows_have_required_evidence() -> TestResult {
 #[test]
 fn divergent_rows_reference_existing_adr_007_anchors() -> TestResult {
     let manifest = manifest().map_err(|error| format!("load boundary manifest: {error}"))?;
-    let adr = read_doc(ADR_007).map_err(|error| format!("read {ADR_007}: {error}"))?;
+    let adr =
+        read_doc(Utf8Path::new(ADR_007)).map_err(|error| format!("read {ADR_007}: {error}"))?;
     let anchors = heading_anchors(&adr);
 
     for task in manifest
@@ -101,7 +120,8 @@ fn divergent_rows_reference_existing_adr_007_anchors() -> TestResult {
 fn committed_matrix_matches_manifest_rendering() -> TestResult {
     let manifest = manifest().map_err(|error| format!("load boundary manifest: {error}"))?;
     let expected = render_matrix(&manifest);
-    let actual = read_doc(MATRIX).map_err(|error| format!("read {MATRIX}: {error}"))?;
+    let actual =
+        read_doc(Utf8Path::new(MATRIX)).map_err(|error| format!("read {MATRIX}: {error}"))?;
 
     ensure_equal(
         &expected,
@@ -111,10 +131,10 @@ fn committed_matrix_matches_manifest_rendering() -> TestResult {
 }
 
 fn manifest() -> TestResult<BoundaryManifest> {
-    load_manifest(&repo_path(MANIFEST)?).map_err(|error| error.to_string())
+    load_manifest(&repo_path(Utf8Path::new(MANIFEST))?).map_err(|error| error.to_string())
 }
 
-fn read_doc(doc_path: &str) -> TestResult<String> {
+fn read_doc(doc_path: &Utf8Path) -> TestResult<String> {
     let resolved_path = repo_path(doc_path)?;
     let parent = resolved_path.parent().unwrap_or_else(|| Utf8Path::new("."));
     let file_name = resolved_path
@@ -126,7 +146,7 @@ fn read_doc(doc_path: &str) -> TestResult<String> {
         .map_err(|error| format!("read {resolved_path}: {error}"))
 }
 
-fn repo_path(path: &str) -> TestResult<Utf8PathBuf> {
+fn repo_path(path: &Utf8Path) -> TestResult<Utf8PathBuf> {
     let crate_dir = Utf8Path::new(env!("CARGO_MANIFEST_DIR"));
     let repo_root = crate_dir
         .parent()
@@ -197,12 +217,12 @@ where
     }
 }
 
-fn ensure_unique(values: &[&str], label: &str) -> TestResult {
+fn ensure_unique(values: &[&str], label: FieldName) -> TestResult {
     let mut seen = BTreeSet::new();
     for value in values {
         ensure(
             seen.insert(*value),
-            format!("{label} contains duplicate value {value}"),
+            format!("{} contains duplicate value {value}", label.as_str()),
         )?;
     }
     Ok(())
@@ -251,7 +271,7 @@ fn validate_pending_evidence(task: &BoundaryTask) -> TestResult {
         .next_review_by
         .as_deref()
         .ok_or_else(|| format!("pending task {} must provide next_review_by", task.id))?;
-    validate_date(next_review_by, "next_review_by", task)?;
+    validate_date(next_review_by, FieldName::NextReviewBy, task)?;
     ensure(
         task.shipped_in.is_none(),
         format!("pending task {} must not carry shipped_in", task.id),
@@ -285,10 +305,14 @@ fn validate_divergence_evidence(task: &BoundaryTask) -> TestResult {
     )
 }
 
-fn validate_date(value: &str, field: &str, task: &BoundaryTask) -> TestResult {
+fn validate_date(value: &str, field: FieldName, task: &BoundaryTask) -> TestResult {
     ensure(
         is_iso_date(value),
-        format!("task {} has invalid {field} date {value:?}", task.id),
+        format!(
+            "task {} has invalid {} date {value:?}",
+            task.id,
+            field.as_str()
+        ),
     )
 }
 
