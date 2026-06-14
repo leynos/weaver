@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: IN PROGRESS
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
@@ -199,7 +199,14 @@ boundary becomes review-only again.
 Each item carries a UTC timestamp once it completes. The list reflects actual
 state, not the intended sequence.
 
-- [ ] Stage A: ratify the boundary vocabulary and matrix shape.
+- [ ] 2026-06-14T02:44:33Z: Execution approved by the user and started on
+      branch `12-1-1-track-downstream-consumer-boundary`.
+- [x] 2026-06-14T02:44:33Z: Stage A ratified the boundary vocabulary and
+      matrix columns in ADR 007. Validation passed with
+      `make markdownlint` (`Summary: 0 error(s)`) and `make nixie`
+      (`All diagrams validated successfully!`). Logs:
+      `/tmp/markdownlint-weaver-12-1-1-track-downstream-consumer-boundary.out`
+      and `/tmp/nixie-weaver-12-1-1-track-downstream-consumer-boundary.out`.
 - [ ] Stage B: produce the boundary manifest, generator, and matrix doc.
 - [ ] Stage C: cross-link the matrix from ADR 007, the roadmap, and the
       developers' guide.
@@ -219,6 +226,17 @@ Recorded as they occur during implementation. Format:
 
 Recorded for any decision that future work must respect.
 
+- Decision: execute this plan despite the document's previous draft status.
+  Rationale: the user explicitly requested implementation of this plan on
+  2026-06-14, satisfying the ExecPlan approval gate. Date/Author:
+  2026-06-14, implementation.
+- Decision: pin `ortho_config` to commit
+  `4339a6f3c61dc4fed86493d99ffb05230bee2a1b` until the project agrees an
+  OrthoConfig v0.9.0 release.
+  Rationale: the user requested a pinned SHA rather than a release version for
+  now; `git ls-remote https://github.com/leynos/ortho-config.git HEAD`
+  resolved that revision for the current upstream main branch. Date/Author:
+  2026-06-14, implementation.
 - Decision: classify boundary state with a closed four-value vocabulary
   (`consumes`, `wraps`, `pending`, `divergent`) rather than free-form prose.
   Rationale: the three-value vocabulary (consumes/wraps/divergent) borrowed
