@@ -31,6 +31,14 @@ agent usage reliable:
   skill, and execution-ledger contracts depend on OrthoConfig where the
   OrthoConfig roadmap already owns the generic machinery.
 
+The [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md)
+tracks which target command-contract tasks already consume OrthoConfig, which
+ones use temporary Weaver wrappers, and which ones are pending upstream
+OrthoConfig contracts. While those pending and wrapper rows remain open, users
+may see Weaver-owned help, output, profile, delivery, feedback, or job-ledger
+behaviour that is expected to converge on the named OrthoConfig contract before
+the 0.1.0 compatibility promise is made.
+
 Representative target commands look like this:
 
 ```sh

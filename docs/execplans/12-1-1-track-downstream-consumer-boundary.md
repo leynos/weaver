@@ -234,8 +234,12 @@ state, not the intended sequence.
       five valid test-diagnostic issues; after refactoring the tests to return
       `Result<(), String>` with explicit validation errors, the repeat review
       completed with `findings: 0`.
-- [ ] Stage E: refresh the users' guide, run the full quality gates, and run
-      `coderabbit review --agent`.
+- [x] 2026-06-14T06:28:00Z: Stage E refreshed
+      `docs/users-guide.md` with the operator-facing boundary note for
+      temporary wrappers and pending OrthoConfig contracts. Validation passed
+      with `make fmt`, `make check-fmt`, `make lint`, `make test`,
+      `make markdownlint`, and `make nixie` before the final CodeRabbit
+      review. Final CodeRabbit completed with `findings: 0`.
 
 ## Surprises & discoveries
 
