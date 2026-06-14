@@ -77,12 +77,7 @@ fn boundary_state_rows_have_required_evidence() -> TestResult {
             format!("task {} must name at least one upstream reference", task.id),
         )?;
 
-        match task.state {
-            BoundaryState::Consumes => validate_consumes_evidence(task),
-            BoundaryState::Wraps => validate_wraps_evidence(task),
-            BoundaryState::Pending => validate_pending_evidence(task),
-            BoundaryState::Divergent => validate_divergence_evidence(task),
-        }?;
+        validate_state_evidence(task)?;
     }
 
     Ok(())
@@ -251,32 +246,6 @@ fn validate_field_constraints(
     Ok(())
 }
 
-fn validate_consumes_evidence(task: &BoundaryTask) -> TestResult {
-    validate_field_constraints(
-        task,
-        "consumes",
-        ("shipped_in", task.shipped_in.is_some()),
-        &[
-            ("removal_gate", task.removal_gate.is_some()),
-            ("adr_anchor", task.adr_anchor.is_some()),
-            ("next_review_by", task.next_review_by.is_some()),
-        ],
-    )
-}
-
-fn validate_wraps_evidence(task: &BoundaryTask) -> TestResult {
-    validate_field_constraints(
-        task,
-        "wraps",
-        ("removal_gate", task.removal_gate.is_some()),
-        &[
-            ("shipped_in", task.shipped_in.is_some()),
-            ("adr_anchor", task.adr_anchor.is_some()),
-            ("next_review_by", task.next_review_by.is_some()),
-        ],
-    )
-}
-
 fn validate_pending_evidence(task: &BoundaryTask) -> TestResult {
     let next_review_by = task
         .next_review_by
@@ -297,17 +266,40 @@ fn validate_pending_evidence(task: &BoundaryTask) -> TestResult {
     )
 }
 
-fn validate_divergence_evidence(task: &BoundaryTask) -> TestResult {
-    validate_field_constraints(
-        task,
-        "divergent",
-        ("adr_anchor", task.adr_anchor.is_some()),
-        &[
+fn validate_state_evidence(task: &BoundaryTask) -> TestResult {
+    match task.state {
+        BoundaryState::Consumes => validate_field_constraints(
+            task,
+            "consumes",
             ("shipped_in", task.shipped_in.is_some()),
+            &[
+                ("removal_gate", task.removal_gate.is_some()),
+                ("adr_anchor", task.adr_anchor.is_some()),
+                ("next_review_by", task.next_review_by.is_some()),
+            ],
+        ),
+        BoundaryState::Wraps => validate_field_constraints(
+            task,
+            "wraps",
             ("removal_gate", task.removal_gate.is_some()),
-            ("next_review_by", task.next_review_by.is_some()),
-        ],
-    )
+            &[
+                ("shipped_in", task.shipped_in.is_some()),
+                ("adr_anchor", task.adr_anchor.is_some()),
+                ("next_review_by", task.next_review_by.is_some()),
+            ],
+        ),
+        BoundaryState::Divergent => validate_field_constraints(
+            task,
+            "divergent",
+            ("adr_anchor", task.adr_anchor.is_some()),
+            &[
+                ("shipped_in", task.shipped_in.is_some()),
+                ("removal_gate", task.removal_gate.is_some()),
+                ("next_review_by", task.next_review_by.is_some()),
+            ],
+        ),
+        BoundaryState::Pending => validate_pending_evidence(task),
+    }
 }
 
 fn validate_date(value: &str, field: FieldName, task: &BoundaryTask) -> TestResult {
