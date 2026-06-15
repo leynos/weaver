@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 This document must be maintained in accordance with `AGENTS.md` at the
 repository root.
@@ -240,6 +240,15 @@ state, not the intended sequence.
       with `make fmt`, `make check-fmt`, `make lint`, `make test`,
       `make markdownlint`, and `make nixie` before the final CodeRabbit
       review. Final CodeRabbit completed with `findings: 0`.
+- [x] 2026-06-15T23:02:41Z: Follow-up code-quality refinements addressed
+      the `crates/weaver-docs-gate/tests/boundary_manifest.rs` biomarker
+      findings without changing the manifest gate's behaviour. The first
+      refactor typed path helper arguments as `&Utf8Path` and field labels
+      as `FieldName`; the second extracted shared optional-field constraint
+      validation; the third consolidated the state-specific wrappers into
+      `validate_state_evidence`. Validation passed after each commit with
+      `cargo test -p weaver-docs-gate`, `make check-fmt`, `make lint`, and
+      `make test`.
 
 ## Surprises & discoveries
 
@@ -276,6 +285,14 @@ Recorded as they occur during implementation. Format:
   table column.
   Impact: the renderer now emits the formatter-stable matrix text that is
   committed, making future manifest or renderer drift deterministic.
+- Observation: the final documentation gate tests were correct but initially
+  too string-heavy and locally repetitive.
+  Evidence: three follow-up commits changed helper signatures from path
+  strings to `&Utf8Path`, introduced the `FieldName` enum for manifest field
+  labels, extracted `validate_field_constraints`, and consolidated the
+  state-specific evidence wrappers into `validate_state_evidence`.
+  Impact: the test file now keeps the same assertions and diagnostics while
+  making the argument roles clearer and reducing duplication markers.
 
 ## Decision log
 
@@ -354,12 +371,38 @@ Recorded for any decision that future work must respect.
   contributors and reviewers. If team capacity proves limiting, the
   lighter alternative remains a viable follow-up. Date/Author: 2026-06-07,
   Logisphere review by Wafflecat; deferred.
+- Decision: keep the boundary gate refactors as test-internal helper changes
+  rather than changing the manifest schema or generated matrix.
+  Rationale: the requested refinements addressed maintainability biomarkers
+  in `crates/weaver-docs-gate/tests/boundary_manifest.rs`; the observable
+  contract remains the TOML manifest, generated Markdown matrix, and
+  referential-integrity assertions. Date/Author: 2026-06-15,
+  implementation.
 
 ## Outcomes & retrospective
 
-Recorded at completion. Includes whether the gate caught a regression in
-practice, how often the manifest needed updates during subsequent tasks, and
-any vocabulary or schema adjustments.
+Roadmap 12.1.1 is complete. The branch added the OrthoConfig consumer
+boundary vocabulary to ADR 007, introduced the TOML boundary manifest and
+generated Markdown matrix, linked the matrix from the roadmap and contributor
+documentation, documented user-facing temporary wrapper and pending-contract
+states, and added the `weaver-docs-gate` parser, renderer, regenerator, and
+integration tests.
+
+The gate already caught useful drift during implementation. CodeRabbit found
+generic `OrthoConfig 9.2` upstream references before publication of the
+matrix, and the matrix rendering test caught formatter-sensitive Markdown
+output before the generated file was committed as stable. Subsequent
+code-quality refinements kept the same behaviour while improving the
+test-helper API and eliminating duplicate state-evidence wrappers.
+
+The final implementation uses a four-state vocabulary: `consumes`, `wraps`,
+`pending`, and `divergent`. The fourth state, `pending`, is an intentional
+schema adjustment from the roadmap's original three-state success wording; it
+prevents undecided upstream contracts from being recorded as either temporary
+wrappers or deliberate divergences. All final gates passed:
+`cargo test -p weaver-docs-gate`, `make check-fmt`, `make lint`, `make test`,
+`make markdownlint`, and `make nixie`. The final CodeRabbit review for the
+main implementation completed with `findings: 0`.
 
 ## Context and orientation
 

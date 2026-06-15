@@ -43,8 +43,15 @@ command-surface and renderer task. See ADR 007 and the OrthoConfig roadmap.
 Boundary classifications for this step are tracked in the
 [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
-- [ ] 12.1.1. Track the downstream consumer boundary.
+- [x] 12.1.1. Track the downstream consumer boundary.
   - Depends on OrthoConfig 5.2.3.
+  - Implemented by ADR 007 boundary vocabulary,
+    `docs/orthoconfig-consumer-boundary.toml`,
+    `docs/orthoconfig-consumer-boundary.md`, and the
+    `weaver-docs-gate` manifest tests.
+  - Follow-up test refactors typed path and field-label helper arguments and
+    consolidated state evidence validation without changing the boundary
+    contract.
   - Success: every command-contract task says whether it consumes OrthoConfig,
     wraps it temporarily, or records a deliberate divergence in ADR 007.
 - [ ] 12.1.2. Consume recursive command metadata.
