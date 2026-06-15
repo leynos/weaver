@@ -10,6 +10,7 @@ cap-std = { workspace = true }
 camino = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+time = { workspace = true }
 toml = { workspace = true }
 
 [lints]

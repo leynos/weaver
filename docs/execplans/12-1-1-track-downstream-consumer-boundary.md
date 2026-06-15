@@ -249,6 +249,12 @@ state, not the intended sequence.
       `validate_state_evidence`. Validation passed after each commit with
       `cargo test -p weaver-docs-gate`, `make check-fmt`, `make lint`, and
       `make test`.
+- [x] 2026-06-15T23:20:03Z: The pending review expiry check now parses
+      `next_review_by` as a calendar date and fails pending rows that are
+      more than 270 days behind the build date. The build date comes from
+      `SOURCE_DATE_EPOCH` when set and from the wall clock otherwise.
+      Validation passed with `cargo test -p weaver-docs-gate`,
+      `make check-fmt`, `make lint`, and `make test`.
 
 ## Surprises & discoveries
 
@@ -293,6 +299,13 @@ Recorded as they occur during implementation. Format:
   state-specific evidence wrappers into `validate_state_evidence`.
   Impact: the test file now keeps the same assertions and diagnostics while
   making the argument roles clearer and reducing duplication markers.
+- Observation: the documented pending review staleness rule was not enforced
+  by the original Stage D test.
+  Evidence: `validate_pending_evidence` checked that `next_review_by` looked
+  like `YYYY-MM-DD` but did not compare it with the build date.
+  Impact: `crates/weaver-docs-gate/tests/support/pending_review_date.rs` now
+  parses the date with the `time` crate and rejects pending reviews more than
+  270 days behind `SOURCE_DATE_EPOCH` or the wall-clock date.
 
 ## Decision log
 
@@ -378,6 +391,12 @@ Recorded for any decision that future work must respect.
   contract remains the TOML manifest, generated Markdown matrix, and
   referential-integrity assertions. Date/Author: 2026-06-15,
   implementation.
+- Decision: use the existing workspace `time` crate for pending review date
+  parsing and build-date comparison.
+  Rationale: manual calendar arithmetic conflicts with the repository's
+  strict integer-division and remainder lints, while `time::Date` and
+  `OffsetDateTime` express the policy directly and keep the gate portable.
+  Date/Author: 2026-06-15, implementation.
 
 ## Outcomes & retrospective
 
@@ -403,6 +422,11 @@ wrappers or deliberate divergences. All final gates passed:
 `cargo test -p weaver-docs-gate`, `make check-fmt`, `make lint`, `make test`,
 `make markdownlint`, and `make nixie`. The final CodeRabbit review for the
 main implementation completed with `findings: 0`.
+
+A post-completion fix closed the documented pending-review expiry gap. Pending
+rows now fail once `next_review_by` is more than 270 days behind the build
+date, using `SOURCE_DATE_EPOCH` for reproducible builds and the wall clock
+otherwise.
 
 ## Context and orientation
 

@@ -1,5 +1,8 @@
 //! Integration tests for the `OrthoConfig` consumer boundary manifest.
 
+#[path = "support/pending_review_date.rs"]
+mod pending_review_date;
+
 use std::collections::BTreeSet;
 
 use camino::{Utf8Path, Utf8PathBuf};
@@ -252,6 +255,7 @@ fn validate_pending_evidence(task: &BoundaryTask) -> TestResult {
         .as_deref()
         .ok_or_else(|| format!("pending task {} must provide next_review_by", task.id))?;
     validate_date(next_review_by, FieldName::NextReviewBy, task)?;
+    pending_review_date::validate_pending_review_date(next_review_by, &task.id)?;
     ensure(
         task.shipped_in.is_none(),
         format!("pending task {} must not carry shipped_in", task.id),
@@ -267,49 +271,48 @@ fn validate_pending_evidence(task: &BoundaryTask) -> TestResult {
 }
 
 fn validate_state_evidence(task: &BoundaryTask) -> TestResult {
-    match task.state {
-        BoundaryState::Consumes => validate_field_constraints(
-            task,
+    let (state, required, forbidden) = match task.state {
+        BoundaryState::Consumes => (
             "consumes",
             ("shipped_in", task.shipped_in.is_some()),
-            &[
+            [
                 ("removal_gate", task.removal_gate.is_some()),
                 ("adr_anchor", task.adr_anchor.is_some()),
                 ("next_review_by", task.next_review_by.is_some()),
             ],
         ),
-        BoundaryState::Wraps => validate_field_constraints(
-            task,
+        BoundaryState::Wraps => (
             "wraps",
             ("removal_gate", task.removal_gate.is_some()),
-            &[
+            [
                 ("shipped_in", task.shipped_in.is_some()),
                 ("adr_anchor", task.adr_anchor.is_some()),
                 ("next_review_by", task.next_review_by.is_some()),
             ],
         ),
-        BoundaryState::Divergent => validate_field_constraints(
-            task,
+        BoundaryState::Divergent => (
             "divergent",
             ("adr_anchor", task.adr_anchor.is_some()),
-            &[
+            [
                 ("shipped_in", task.shipped_in.is_some()),
                 ("removal_gate", task.removal_gate.is_some()),
                 ("next_review_by", task.next_review_by.is_some()),
             ],
         ),
-        BoundaryState::Pending => validate_pending_evidence(task),
-    }
+        BoundaryState::Pending => return validate_pending_evidence(task),
+    };
+    validate_field_constraints(task, state, required, &forbidden)
 }
 
 fn validate_date(value: &str, field: FieldName, task: &BoundaryTask) -> TestResult {
-    ensure(
-        is_iso_date(value),
-        format!(
-            "task {} has invalid {} date {value:?}",
-            task.id,
-            field.as_str()
-        ),
+    ensure(is_iso_date(value), invalid_date_message(value, field, task))
+}
+
+fn invalid_date_message(value: &str, field: FieldName, task: &BoundaryTask) -> String {
+    format!(
+        "task {} has invalid {} date {value:?}",
+        task.id,
+        field.as_str()
     )
 }
 
