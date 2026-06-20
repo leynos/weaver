@@ -6,6 +6,7 @@ use camino::Utf8Path;
 use cap_std::{ambient_authority, fs::Dir};
 use weaver_docs_gate::{load_manifest, render_matrix};
 
+/// Regenerate a boundary matrix from a manifest path and output path.
 fn main() -> Result<(), String> {
     let mut args = env::args().skip(1);
     let manifest_path = args
@@ -24,6 +25,7 @@ fn main() -> Result<(), String> {
     write_output(Utf8Path::new(&output_path), render_matrix(&manifest))
 }
 
+/// Write the regenerated matrix through a capability-oriented directory handle.
 fn write_output(path: &Utf8Path, content: String) -> Result<(), String> {
     let parent = path
         .parent()

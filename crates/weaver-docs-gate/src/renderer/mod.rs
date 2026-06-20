@@ -6,6 +6,7 @@ use crate::{BoundaryManifest, BoundaryState, BoundaryTask};
 
 const NA: &str = "n/a";
 
+/// One fully formatted Markdown table row before padding is applied.
 struct MatrixRow {
     roadmap_task: String,
     gist: String,
@@ -17,6 +18,7 @@ struct MatrixRow {
     last_reviewed: String,
 }
 
+/// Widths for each generated Markdown table column.
 struct ColumnWidths {
     roadmap_task: usize,
     gist: usize,
@@ -29,6 +31,7 @@ struct ColumnWidths {
 }
 
 impl ColumnWidths {
+    /// Compute table widths from headers and escaped row cells.
     fn for_rows(rows: &[MatrixRow]) -> Self {
         let mut widths = Self::headers();
         for row in rows {
@@ -37,6 +40,7 @@ impl ColumnWidths {
         widths
     }
 
+    /// Return the minimum widths required by the header row.
     const fn headers() -> Self {
         Self {
             roadmap_task: 12,
@@ -50,6 +54,7 @@ impl ColumnWidths {
         }
     }
 
+    /// Expand widths so the given row fits without changing table shape.
     fn include(&mut self, row: &MatrixRow) {
         self.roadmap_task = self.roadmap_task.max(cell_width(&row.roadmap_task));
         self.gist = self.gist.max(cell_width(&row.gist));
@@ -118,6 +123,7 @@ pub fn render_matrix(manifest: &BoundaryManifest) -> String {
     rendered
 }
 
+/// Group rendered rows by roadmap phase in deterministic phase order.
 fn grouped_rows(manifest: &BoundaryManifest) -> BTreeMap<&str, Vec<MatrixRow>> {
     let mut phases = BTreeMap::new();
     for task in &manifest.tasks {
@@ -130,6 +136,7 @@ fn grouped_rows(manifest: &BoundaryManifest) -> BTreeMap<&str, Vec<MatrixRow>> {
     phases
 }
 
+/// Append one phase heading and table to the rendered matrix.
 fn push_phase(rendered: &mut String, phase: &str, rows: &[MatrixRow]) {
     let widths = ColumnWidths::for_rows(rows);
 
@@ -144,6 +151,7 @@ fn push_phase(rendered: &mut String, phase: &str, rows: &[MatrixRow]) {
     rendered.push('\n');
 }
 
+/// Append a Markdown table header using the computed column widths.
 fn push_header(rendered: &mut String, widths: &ColumnWidths) {
     push_cells(
         rendered,
@@ -161,6 +169,7 @@ fn push_header(rendered: &mut String, widths: &ColumnWidths) {
     );
 }
 
+/// Append the Markdown separator row for a generated table.
 fn push_separator(rendered: &mut String, widths: &ColumnWidths) {
     push_cells(
         rendered,
@@ -178,10 +187,12 @@ fn push_separator(rendered: &mut String, widths: &ColumnWidths) {
     );
 }
 
+/// Append one data row to a generated table.
 fn push_row(rendered: &mut String, row: &MatrixRow, widths: &ColumnWidths) {
     push_cells(rendered, widths, row);
 }
 
+/// Append all cells for a table row with stable Markdown separators.
 fn push_cells(rendered: &mut String, widths: &ColumnWidths, row: &MatrixRow) {
     rendered.push_str("| ");
     rendered.push_str(&padded(&row.roadmap_task, widths.roadmap_task));
@@ -203,6 +214,7 @@ fn push_cells(rendered: &mut String, widths: &ColumnWidths, row: &MatrixRow) {
 }
 
 impl From<&BoundaryTask> for MatrixRow {
+    /// Convert one manifest task into escaped matrix cell strings.
     fn from(task: &BoundaryTask) -> Self {
         Self {
             roadmap_task: format!("[{}]({})", escape_cell(&task.id), roadmap_anchor(&task.id)),
@@ -217,6 +229,7 @@ impl From<&BoundaryTask> for MatrixRow {
     }
 }
 
+/// Format upstream task references as a comma-separated matrix cell.
 fn upstream_tasks(task: &BoundaryTask) -> String {
     let mut upstream = String::new();
     for reference in &task.upstream {
@@ -228,6 +241,7 @@ fn upstream_tasks(task: &BoundaryTask) -> String {
     optional_cell(Some(&upstream))
 }
 
+/// Format the state-specific removal gate or ADR divergence cell.
 fn gate_or_divergence(task: &BoundaryTask) -> String {
     if let Some(gate) = task.removal_gate.as_deref() {
         return escape_cell(gate);
@@ -239,12 +253,14 @@ fn gate_or_divergence(task: &BoundaryTask) -> String {
     )
 }
 
+/// Format an optional manifest field as either escaped text or `n/a`.
 fn optional_cell(value: Option<&str>) -> String {
     value
         .filter(|inner| !inner.is_empty())
         .map_or_else(|| NA.into(), escape_cell)
 }
 
+/// Return the visible matrix label for a boundary state.
 const fn state_label(state: BoundaryState) -> &'static str {
     match state {
         BoundaryState::Consumes => "✓ consumes",
@@ -254,6 +270,7 @@ const fn state_label(state: BoundaryState) -> &'static str {
     }
 }
 
+/// Return the roadmap section anchor for a task ID.
 fn roadmap_anchor(task_id: &str) -> &'static str {
     match task_id.split('.').next().unwrap_or_default() {
         "12" => "roadmap.md#121-confirm-reusable-contracts-that-weaver-must-not-duplicate",
@@ -269,122 +286,17 @@ fn roadmap_anchor(task_id: &str) -> &'static str {
     }
 }
 
+/// Escape Markdown table metacharacters in a cell value.
 fn escape_cell(value: &str) -> String { value.replace('|', "\\|").replace('\n', "<br>") }
 
+/// Pad a rendered cell to a target display width.
 fn padded(value: &str, width: usize) -> String {
     let padding = width.saturating_sub(cell_width(value));
     format!("{value}{}", " ".repeat(padding))
 }
 
+/// Count the displayed width used by the matrix renderer.
 fn cell_width(value: &str) -> usize { value.chars().count() }
 
 #[cfg(test)]
-mod tests {
-    //! Unit, snapshot, and property coverage for Markdown matrix rendering.
-
-    use proptest::prelude::*;
-
-    use super::*;
-    use crate::{BoundaryManifest, UpstreamRef, UpstreamRole};
-
-    #[test]
-    fn groups_rows_by_phase_without_prefix_collisions() {
-        let manifest = manifest_with_tasks(vec![task("1.1.1"), task("12.1.1")]);
-
-        let rows = grouped_rows(&manifest);
-
-        assert_eq!(rows.get("1").map(Vec::len), Some(1));
-        assert_eq!(rows.get("12").map(Vec::len), Some(1));
-    }
-
-    #[test]
-    fn computes_column_widths_from_escaped_cells() {
-        let rows = vec![MatrixRow {
-            roadmap_task: "[12.1.1](roadmap.md#task)".into(),
-            gist: "contains \\| pipe".into(),
-            state: "✓ consumes".into(),
-            upstream: "upstream contract".into(),
-            shipped_in: "4339a6f3".into(),
-            gate_or_divergence: "n/a".into(),
-            next_review_by: "n/a".into(),
-            last_reviewed: "2026-06-20".into(),
-        }];
-
-        let widths = ColumnWidths::for_rows(&rows);
-
-        assert_eq!(widths.gist, "contains \\| pipe".chars().count());
-        assert_eq!(widths.last_reviewed, "Last reviewed".chars().count());
-    }
-
-    #[test]
-    fn snapshots_rendered_matrix_shape() {
-        let manifest = manifest_with_tasks(vec![task("12.1.1")]);
-
-        insta::assert_snapshot!(render_matrix(&manifest), @r###"
-        # OrthoConfig consumer boundary
-
-        <!-- markdownlint-disable MD013 MD060 -->
-
-        This matrix is generated from `docs/orthoconfig-consumer-boundary.toml`. Do not
-        edit the table by hand; update the manifest and regenerate it with
-        `cargo run -p weaver-docs-gate --example render_boundary_matrix -- docs/orthoconfig-consumer-boundary.toml docs/orthoconfig-consumer-boundary.md`.
-
-        The matrix tracks every live Weaver command-contract roadmap task that consumes
-        OrthoConfig, wraps it temporarily, waits on upstream shape, or deliberately
-        diverges under ADR 007.
-
-        ## Phase 12
-
-        | Roadmap task                                                                       | Gist                | State      | Upstream OrthoConfig task | Shipped in | Removal gate or divergence | Next review by | Last reviewed |
-        | ---------------------------------------------------------------------------------- | ------------------- | ---------- | ------------------------- | ---------- | -------------------------- | -------------- | ------------- |
-        | [12.1.1](roadmap.md#121-confirm-reusable-contracts-that-weaver-must-not-duplicate) | Review \| renderer. | ✓ consumes | renderer-contract         | 4339a6f3   | n/a                        | n/a            | 2026-06-20    |
-        <!-- markdownlint-enable MD013 MD060 -->
-        "###);
-    }
-
-    proptest! {
-        #[test]
-        fn rendered_task_cells_never_emit_raw_table_pipes(
-            gist in "[A-Za-z0-9 |\\n]{0,64}",
-            upstream in "[A-Za-z0-9 |\\n]{0,64}",
-        ) {
-            let mut boundary_task = task("12.1.1");
-            boundary_task.gist = gist;
-            boundary_task.upstream = vec![UpstreamRef {
-                task: upstream,
-                role: UpstreamRole::Renderer,
-            }];
-
-            let rendered = render_matrix(&manifest_with_tasks(vec![boundary_task]));
-            for line in rendered.lines().filter(|line| line.starts_with("| [")) {
-                prop_assert!(line.matches(" | ").count() == 7);
-            }
-        }
-    }
-
-    fn manifest_with_tasks(tasks: Vec<BoundaryTask>) -> BoundaryManifest {
-        let managed_tasks = tasks.iter().map(|task| task.id.clone()).collect();
-        BoundaryManifest {
-            schema_version: 1,
-            managed_tasks,
-            tasks,
-        }
-    }
-
-    fn task(id: &str) -> BoundaryTask {
-        BoundaryTask {
-            id: id.into(),
-            gist: "Review | renderer.".into(),
-            state: BoundaryState::Consumes,
-            upstream: vec![UpstreamRef {
-                task: "renderer-contract".into(),
-                role: UpstreamRole::Renderer,
-            }],
-            shipped_in: Some("4339a6f3".into()),
-            removal_gate: None,
-            adr_anchor: None,
-            next_review_by: None,
-            last_reviewed: "2026-06-20".into(),
-        }
-    }
-}
+mod tests;

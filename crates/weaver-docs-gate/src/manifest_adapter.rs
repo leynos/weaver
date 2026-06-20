@@ -4,6 +4,7 @@ use serde::{Deserialize, Deserializer};
 
 use crate::{BoundaryManifest, BoundaryState, BoundaryTask, UpstreamRef, UpstreamRole};
 
+/// Deserialization shape for the complete TOML manifest.
 #[derive(Debug, Deserialize)]
 pub(super) struct BoundaryManifestDto {
     pub(super) schema_version: u32,
@@ -12,6 +13,7 @@ pub(super) struct BoundaryManifestDto {
     pub(super) tasks: Vec<BoundaryTaskDto>,
 }
 
+/// Deserialization shape for one `[[task]]` TOML row.
 #[derive(Debug, Deserialize)]
 pub(super) struct BoundaryTaskDto {
     pub(super) id: String,
@@ -29,12 +31,14 @@ pub(super) struct BoundaryTaskDto {
     pub(super) last_reviewed: String,
 }
 
+/// Deserialization shape for one `[[task.upstream]]` entry.
 #[derive(Debug, Deserialize)]
 pub(super) struct UpstreamRefDto {
     pub(super) task: String,
     pub(super) role: UpstreamRoleDto,
 }
 
+/// Serde-backed spelling of the public boundary state vocabulary.
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(super) enum BoundaryStateDto {
@@ -44,6 +48,7 @@ pub(super) enum BoundaryStateDto {
     Divergent,
 }
 
+/// Serde-backed spelling of upstream role values in the manifest.
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(super) enum UpstreamRoleDto {
@@ -59,6 +64,7 @@ pub(super) enum UpstreamRoleDto {
 }
 
 impl From<BoundaryManifestDto> for BoundaryManifest {
+    /// Convert adapter-owned TOML data into the public domain manifest.
     fn from(dto: BoundaryManifestDto) -> Self {
         Self {
             schema_version: dto.schema_version,
@@ -69,6 +75,7 @@ impl From<BoundaryManifestDto> for BoundaryManifest {
 }
 
 impl From<BoundaryTaskDto> for BoundaryTask {
+    /// Convert one TOML task row into a public domain task.
     fn from(dto: BoundaryTaskDto) -> Self {
         Self {
             id: dto.id,
@@ -85,6 +92,7 @@ impl From<BoundaryTaskDto> for BoundaryTask {
 }
 
 impl From<UpstreamRefDto> for UpstreamRef {
+    /// Convert one TOML upstream reference into a public domain reference.
     fn from(dto: UpstreamRefDto) -> Self {
         Self {
             task: dto.task,
@@ -94,6 +102,7 @@ impl From<UpstreamRefDto> for UpstreamRef {
 }
 
 impl From<BoundaryStateDto> for BoundaryState {
+    /// Convert the adapter state vocabulary into the public state enum.
     fn from(dto: BoundaryStateDto) -> Self {
         match dto {
             BoundaryStateDto::Consumes => Self::Consumes,
@@ -105,6 +114,7 @@ impl From<BoundaryStateDto> for BoundaryState {
 }
 
 impl From<UpstreamRoleDto> for UpstreamRole {
+    /// Convert the adapter role vocabulary into the public role enum.
     fn from(dto: UpstreamRoleDto) -> Self {
         match dto {
             UpstreamRoleDto::Boundary => Self::Boundary,
@@ -120,6 +130,7 @@ impl From<UpstreamRoleDto> for UpstreamRole {
     }
 }
 
+/// Treat empty TOML strings as absent optional manifest evidence.
 fn empty_string_as_none<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: Deserializer<'de>,

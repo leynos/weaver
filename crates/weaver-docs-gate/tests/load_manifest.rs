@@ -28,6 +28,7 @@ task = "renderer-contract"
 role = "renderer"
 "#;
 
+/// Prove missing manifest files return the not-found variant.
 #[test]
 fn load_manifest_reports_missing_files() -> TestResult {
     let temp = temp_dir()?;
@@ -40,6 +41,7 @@ fn load_manifest_reports_missing_files() -> TestResult {
     })
 }
 
+/// Prove paths without a file name return the invalid-path variant.
 #[test]
 fn load_manifest_reports_invalid_paths() -> TestResult {
     let error = load_manifest(Utf8Path::new("/"))
@@ -51,6 +53,7 @@ fn load_manifest_reports_invalid_paths() -> TestResult {
     })
 }
 
+/// Prove non-file manifest paths return the unreadable variant.
 #[test]
 fn load_manifest_reports_read_errors() -> TestResult {
     let temp = temp_dir()?;
@@ -65,10 +68,11 @@ fn load_manifest_reports_read_errors() -> TestResult {
         .ok_or("directory loaded as manifest")?;
 
     assert_boundary_error(&error, |boundary_error| {
-        matches!(boundary_error, BoundaryError::Read { .. })
+        matches!(boundary_error, BoundaryError::Unreadable { .. })
     })
 }
 
+/// Prove malformed manifest contents return the schema variant.
 #[test]
 fn load_manifest_reports_invalid_toml() -> TestResult {
     let temp = temp_dir()?;
@@ -81,10 +85,11 @@ fn load_manifest_reports_invalid_toml() -> TestResult {
         .ok_or("invalid TOML loaded as manifest")?;
 
     assert_boundary_error(&error, |boundary_error| {
-        matches!(boundary_error, BoundaryError::InvalidToml { .. })
+        matches!(boundary_error, BoundaryError::InvalidSchema { .. })
     })
 }
 
+/// Prove adapter DTOs map manifest values into plain domain types.
 #[test]
 fn load_manifest_maps_toml_dto_to_domain_types() -> TestResult {
     let temp = temp_dir()?;
@@ -111,6 +116,7 @@ fn load_manifest_maps_toml_dto_to_domain_types() -> TestResult {
     Ok(())
 }
 
+/// Prove the checked example binary writes a generated matrix.
 #[test]
 fn render_boundary_matrix_example_writes_output() -> TestResult {
     let temp = temp_dir()?;
@@ -150,6 +156,7 @@ fn render_boundary_matrix_example_writes_output() -> TestResult {
     )
 }
 
+/// Create a UTF-8 temp directory guard for filesystem tests.
 fn temp_dir() -> TestResult<Utf8TempDir> {
     let temp = tempfile::tempdir().map_err(|error| format!("create temp dir: {error}"))?;
     let path = Utf8PathBuf::from_path_buf(temp.path().to_path_buf())
@@ -157,6 +164,7 @@ fn temp_dir() -> TestResult<Utf8TempDir> {
     Ok(Utf8TempDir { _temp: temp, path })
 }
 
+/// Write a file through a capability-oriented directory handle.
 fn write_file(
     dir_path: &Utf8Path,
     file_name: &str,
@@ -167,12 +175,14 @@ fn write_file(
     Ok(dir.write(file_name, content))
 }
 
+/// Read a file through a capability-oriented directory handle.
 fn read_file(dir_path: &Utf8Path, file_name: &str) -> TestResult<Result<String, std::io::Error>> {
     let dir = Dir::open_ambient_dir(dir_path, ambient_authority())
         .map_err(|error| format!("open {dir_path}: {error}"))?;
     Ok(dir.read_to_string(file_name))
 }
 
+/// Resolve the repository root from the test crate directory.
 fn repo_root() -> TestResult<Utf8PathBuf> {
     let crate_dir = Utf8Path::new(env!("CARGO_MANIFEST_DIR"));
     crate_dir
@@ -182,6 +192,7 @@ fn repo_root() -> TestResult<Utf8PathBuf> {
         .ok_or_else(|| format!("cannot resolve repository root from {crate_dir}"))
 }
 
+/// Return an error when a test invariant is false.
 fn ensure(condition: bool, message: impl Into<String>) -> TestResult {
     if condition {
         Ok(())
@@ -190,6 +201,7 @@ fn ensure(condition: bool, message: impl Into<String>) -> TestResult {
     }
 }
 
+/// Return a diff-friendly error when two values differ.
 fn ensure_equal<T>(left: &T, right: &T, message: impl Into<String>) -> TestResult
 where
     T: std::fmt::Debug + PartialEq,
@@ -204,6 +216,7 @@ where
     }
 }
 
+/// Check a boundary error variant while preserving diagnostics on mismatch.
 fn assert_boundary_error(
     error: &BoundaryError,
     predicate: impl FnOnce(&BoundaryError) -> bool,
@@ -215,11 +228,13 @@ fn assert_boundary_error(
     }
 }
 
+/// Temp directory wrapper that exposes a UTF-8 path.
 struct Utf8TempDir {
     _temp: TempDir,
     path: Utf8PathBuf,
 }
 
 impl Utf8TempDir {
+    /// Return the UTF-8 temp directory path.
     fn path(&self) -> &Utf8Path { &self.path }
 }

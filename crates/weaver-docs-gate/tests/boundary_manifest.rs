@@ -30,6 +30,7 @@ enum FieldName {
 }
 
 impl FieldName {
+    /// Return the manifest spelling for a validated field.
     const fn as_str(self) -> &'static str {
         match self {
             Self::LastReviewed => "last_reviewed",
@@ -39,6 +40,7 @@ impl FieldName {
     }
 }
 
+/// Prove the explicit managed-task registry matches rows and roadmap tasks.
 #[test]
 fn manifest_registry_matches_rows_and_roadmap_tasks() -> TestResult {
     let manifest = manifest().map_err(|error| format!("load boundary manifest: {error}"))?;
@@ -69,6 +71,7 @@ fn manifest_registry_matches_rows_and_roadmap_tasks() -> TestResult {
     Ok(())
 }
 
+/// Prove every row carries the evidence required by its state.
 #[test]
 fn boundary_state_rows_have_required_evidence() -> TestResult {
     let manifest = manifest().map_err(|error| format!("load boundary manifest: {error}"))?;
@@ -86,6 +89,7 @@ fn boundary_state_rows_have_required_evidence() -> TestResult {
     Ok(())
 }
 
+/// Prove divergent rows link to existing ADR 007 sections.
 #[test]
 fn divergent_rows_reference_existing_adr_007_anchors() -> TestResult {
     let manifest = manifest().map_err(|error| format!("load boundary manifest: {error}"))?;
@@ -114,6 +118,7 @@ fn divergent_rows_reference_existing_adr_007_anchors() -> TestResult {
     Ok(())
 }
 
+/// Prove the checked-in Markdown matrix is generated from the manifest.
 #[test]
 fn committed_matrix_matches_manifest_rendering() -> TestResult {
     let manifest = manifest().map_err(|error| format!("load boundary manifest: {error}"))?;
@@ -128,10 +133,12 @@ fn committed_matrix_matches_manifest_rendering() -> TestResult {
     )
 }
 
+/// Load the boundary manifest from the repository docs.
 fn manifest() -> TestResult<BoundaryManifest> {
     load_manifest(&repo_path(Utf8Path::new(MANIFEST))?).map_err(|error| error.to_string())
 }
 
+/// Read a repository documentation file as UTF-8 text.
 fn read_doc(doc_path: &Utf8Path) -> TestResult<String> {
     let resolved_path = repo_path(doc_path)?;
     let parent = resolved_path.parent().unwrap_or_else(|| Utf8Path::new("."));
@@ -144,6 +151,7 @@ fn read_doc(doc_path: &Utf8Path) -> TestResult<String> {
         .map_err(|error| format!("read {resolved_path}: {error}"))
 }
 
+/// Resolve a repository-relative path from the test crate directory.
 fn repo_path(path: &Utf8Path) -> TestResult<Utf8PathBuf> {
     let crate_dir = Utf8Path::new(env!("CARGO_MANIFEST_DIR"));
     let repo_root = crate_dir
@@ -153,6 +161,7 @@ fn repo_path(path: &Utf8Path) -> TestResult<Utf8PathBuf> {
     Ok(repo_root.join(path))
 }
 
+/// Extract roadmap task IDs from Markdown task headings.
 fn roadmap_task_ids(roadmap: &str) -> BTreeSet<&str> {
     roadmap
         .lines()
@@ -166,6 +175,7 @@ fn roadmap_task_ids(roadmap: &str) -> BTreeSet<&str> {
         .collect()
 }
 
+/// Extract GitHub-style heading anchors from a Markdown document.
 fn heading_anchors(document: &str) -> BTreeSet<String> {
     document
         .lines()
@@ -174,6 +184,7 @@ fn heading_anchors(document: &str) -> BTreeSet<String> {
         .collect()
 }
 
+/// Convert a heading into the anchor form used by GitHub Markdown.
 fn markdown_anchor(heading: &str) -> String {
     let mut anchor = String::new();
     let mut previous_was_dash = false;
@@ -190,6 +201,7 @@ fn markdown_anchor(heading: &str) -> String {
     anchor.trim_matches('-').to_owned()
 }
 
+/// Append a single collapsed dash while building an anchor.
 fn push_dash(anchor: &mut String, previous_was_dash: &mut bool) {
     if !*previous_was_dash && !anchor.is_empty() {
         anchor.push('-');
@@ -197,6 +209,7 @@ fn push_dash(anchor: &mut String, previous_was_dash: &mut bool) {
     }
 }
 
+/// Return an error when a test invariant is false.
 fn ensure(condition: bool, message: impl Into<String>) -> TestResult {
     if condition {
         Ok(())
@@ -205,6 +218,7 @@ fn ensure(condition: bool, message: impl Into<String>) -> TestResult {
     }
 }
 
+/// Return a diff-friendly error when two values differ.
 fn ensure_equal<T>(left: &T, right: &T, message: impl Into<String>) -> TestResult
 where
     T: std::fmt::Debug + PartialEq,
@@ -219,6 +233,7 @@ where
     }
 }
 
+/// Ensure a manifest field contains no duplicate values.
 fn ensure_unique(values: &[&str], label: FieldName) -> TestResult {
     let mut seen = BTreeSet::new();
     for value in values {
@@ -230,6 +245,7 @@ fn ensure_unique(values: &[&str], label: FieldName) -> TestResult {
     Ok(())
 }
 
+/// Validate required and forbidden evidence fields for one state.
 fn validate_field_constraints(
     task: &BoundaryTask,
     state: &str,
@@ -249,6 +265,7 @@ fn validate_field_constraints(
     Ok(())
 }
 
+/// Validate the additional freshness evidence required for pending rows.
 fn validate_pending_evidence(task: &BoundaryTask) -> TestResult {
     let next_review_by = task
         .next_review_by
@@ -270,6 +287,7 @@ fn validate_pending_evidence(task: &BoundaryTask) -> TestResult {
     )
 }
 
+/// Validate state-specific evidence for one manifest row.
 fn validate_state_evidence(task: &BoundaryTask) -> TestResult {
     let (state, required, forbidden) = match task.state {
         BoundaryState::Consumes => (
@@ -304,10 +322,12 @@ fn validate_state_evidence(task: &BoundaryTask) -> TestResult {
     validate_field_constraints(task, state, required, &forbidden)
 }
 
+/// Validate an ISO-like date field in one manifest row.
 fn validate_date(value: &str, field: FieldName, task: &BoundaryTask) -> TestResult {
     ensure(is_iso_date(value), invalid_date_message(value, field, task))
 }
 
+/// Build a diagnostic for an invalid date field.
 fn invalid_date_message(value: &str, field: FieldName, task: &BoundaryTask) -> String {
     format!(
         "task {} has invalid {} date {value:?}",
@@ -316,6 +336,7 @@ fn invalid_date_message(value: &str, field: FieldName, task: &BoundaryTask) -> S
     )
 }
 
+/// Return whether a value is shaped as an ISO `YYYY-MM-DD` date.
 fn is_iso_date(value: &str) -> bool {
     value.len() == 10
         && value

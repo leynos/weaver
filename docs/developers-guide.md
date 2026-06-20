@@ -60,8 +60,8 @@ leak into the boundary vocabulary:
   `managed_tasks` registry must match the ordered `tasks` rows so new
   command-contract roadmap items fail closed until explicitly classified.
 - `BoundaryError` reports manifest loading failures. Match it when a test or
-  developer tool must distinguish a missing file, invalid path, read failure,
-  or TOML schema error.
+  developer tool must distinguish a missing file, invalid path, unreadable
+  manifest, or invalid boundary schema.
 
 Use `load_manifest(path)` to read `docs/orthoconfig-consumer-boundary.toml`
 into a `BoundaryManifest`. Use `render_matrix(&manifest)` to produce the

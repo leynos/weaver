@@ -189,6 +189,22 @@ pub struct BoundaryManifest {
 }
 
 /// Errors returned while loading the boundary manifest.
+///
+/// # Examples
+/// ```
+/// use camino::Utf8PathBuf;
+/// use weaver_docs_gate::BoundaryError;
+///
+/// let error = BoundaryError::InvalidSchema {
+///     path: Utf8PathBuf::from("docs/orthoconfig-consumer-boundary.toml"),
+///     detail: "missing field `schema_version`".into(),
+/// };
+/// assert!(
+///     error
+///         .to_string()
+///         .contains("invalid boundary manifest schema")
+/// );
+/// ```
 #[derive(Debug, thiserror::Error)]
 pub enum BoundaryError {
     /// The manifest path does not exist.
@@ -197,21 +213,21 @@ pub enum BoundaryError {
     /// The manifest path cannot be opened through a parent directory handle.
     #[error("invalid manifest path: {0}")]
     InvalidPath(Utf8PathBuf),
-    /// The file could not be read.
-    #[error("manifest file could not be read: {path}: {source}")]
-    Read {
+    /// The manifest exists but cannot be read as file contents.
+    #[error("boundary manifest cannot be read: {path}: {detail}")]
+    Unreadable {
         /// Manifest path.
         path: Utf8PathBuf,
-        /// Underlying I/O error.
-        source: Box<io::Error>,
+        /// Stable human-readable read failure detail.
+        detail: String,
     },
-    /// The file is not valid TOML for the boundary schema.
-    #[error("invalid TOML in {path}: {source}")]
-    InvalidToml {
+    /// The manifest contents do not match the boundary manifest schema.
+    #[error("invalid boundary manifest schema in {path}: {detail}")]
+    InvalidSchema {
         /// Manifest path.
         path: Utf8PathBuf,
-        /// TOML parse error.
-        source: Box<toml::de::Error>,
+        /// Stable human-readable schema failure detail.
+        detail: String,
     },
 }
 
@@ -219,8 +235,8 @@ pub enum BoundaryError {
 ///
 /// # Errors
 ///
-/// Returns [`BoundaryError`] when the manifest is missing, unreadable, or not
-/// valid TOML for the boundary schema.
+/// Returns [`BoundaryError`] when the manifest is missing, unreadable, or does
+/// not match the boundary schema.
 ///
 /// # Examples
 /// ```no_run
@@ -237,28 +253,29 @@ pub fn load_manifest(path: &Utf8Path) -> Result<BoundaryManifest, BoundaryError>
         .file_name()
         .ok_or_else(|| BoundaryError::InvalidPath(path.to_path_buf()))?;
     let dir = Dir::open_ambient_dir(parent, ambient_authority())
-        .map_err(|source| read_error(path, source))?;
+        .map_err(|source| read_error(path, &source))?;
 
     let contents = dir
         .read_to_string(file_name)
-        .map_err(|source| read_error(path, source))?;
+        .map_err(|source| read_error(path, &source))?;
     let manifest =
         toml::from_str::<manifest_adapter::BoundaryManifestDto>(&contents).map_err(|source| {
-            BoundaryError::InvalidToml {
+            BoundaryError::InvalidSchema {
                 path: path.to_path_buf(),
-                source: Box::new(source),
+                detail: source.to_string(),
             }
         })?;
     Ok(manifest.into())
 }
 
-fn read_error(path: &Utf8Path, source: io::Error) -> BoundaryError {
+/// Convert filesystem failures into stable manifest loading errors.
+fn read_error(path: &Utf8Path, source: &io::Error) -> BoundaryError {
     if source.kind() == ErrorKind::NotFound {
         BoundaryError::NotFound(path.to_path_buf())
     } else {
-        BoundaryError::Read {
+        BoundaryError::Unreadable {
             path: path.to_path_buf(),
-            source: Box::new(source),
+            detail: source.to_string(),
         }
     }
 }
