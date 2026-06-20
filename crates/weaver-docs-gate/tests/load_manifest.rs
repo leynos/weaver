@@ -1,0 +1,225 @@
+//! Unit-level coverage for loading boundary manifests from disk.
+
+use std::process::Command;
+
+use camino::{Utf8Path, Utf8PathBuf};
+use cap_std::{ambient_authority, fs::Dir};
+use tempfile::TempDir;
+use weaver_docs_gate::{BoundaryError, BoundaryState, load_manifest};
+
+type TestResult<T = ()> = Result<T, String>;
+
+const VALID_MANIFEST: &str = r#"
+schema_version = 1
+managed_tasks = ["12.1.1"]
+
+[[task]]
+id = "12.1.1"
+gist = "Track the downstream consumer boundary."
+state = "consumes"
+shipped_in = "4339a6f3"
+removal_gate = ""
+adr_anchor = ""
+next_review_by = ""
+last_reviewed = "2026-06-20"
+
+[[task.upstream]]
+task = "renderer-contract"
+role = "renderer"
+"#;
+
+#[test]
+fn load_manifest_reports_missing_files() -> TestResult {
+    let temp = temp_dir()?;
+    let missing = temp.path().join("missing.toml");
+
+    let error = load_manifest(&missing).err().ok_or("missing file loaded")?;
+
+    assert_boundary_error(&error, |boundary_error| {
+        matches!(boundary_error, BoundaryError::NotFound(_))
+    })
+}
+
+#[test]
+fn load_manifest_reports_invalid_paths() -> TestResult {
+    let error = load_manifest(Utf8Path::new("/"))
+        .err()
+        .ok_or("root path loaded as manifest")?;
+
+    assert_boundary_error(&error, |boundary_error| {
+        matches!(boundary_error, BoundaryError::InvalidPath(_))
+    })
+}
+
+#[test]
+fn load_manifest_reports_read_errors() -> TestResult {
+    let temp = temp_dir()?;
+    let manifest_dir = temp.path().join("manifest.toml");
+    Dir::open_ambient_dir(temp.path(), ambient_authority())
+        .map_err(|error| format!("open temp dir: {error}"))?
+        .create_dir("manifest.toml")
+        .map_err(|error| format!("create manifest directory: {error}"))?;
+
+    let error = load_manifest(&manifest_dir)
+        .err()
+        .ok_or("directory loaded as manifest")?;
+
+    assert_boundary_error(&error, |boundary_error| {
+        matches!(boundary_error, BoundaryError::Read { .. })
+    })
+}
+
+#[test]
+fn load_manifest_reports_invalid_toml() -> TestResult {
+    let temp = temp_dir()?;
+    let manifest_path = temp.path().join("manifest.toml");
+    write_file(temp.path(), "manifest.toml", "schema_version = ")?
+        .map_err(|error| format!("write invalid manifest: {error}"))?;
+
+    let error = load_manifest(&manifest_path)
+        .err()
+        .ok_or("invalid TOML loaded as manifest")?;
+
+    assert_boundary_error(&error, |boundary_error| {
+        matches!(boundary_error, BoundaryError::InvalidToml { .. })
+    })
+}
+
+#[test]
+fn load_manifest_maps_toml_dto_to_domain_types() -> TestResult {
+    let temp = temp_dir()?;
+    let manifest_path = temp.path().join("manifest.toml");
+    write_file(temp.path(), "manifest.toml", VALID_MANIFEST)?
+        .map_err(|error| format!("write valid manifest: {error}"))?;
+
+    let manifest = load_manifest(&manifest_path).map_err(|error| error.to_string())?;
+
+    ensure_equal(&manifest.schema_version, &1, "schema version should load")?;
+    ensure_equal(
+        &manifest.tasks.first().map(|task| task.state),
+        &Some(BoundaryState::Consumes),
+        "state should map from TOML DTO",
+    )?;
+    ensure_equal(
+        &manifest
+            .tasks
+            .first()
+            .and_then(|task| task.next_review_by.as_ref()),
+        &None,
+        "empty optional strings should map to None",
+    )?;
+    Ok(())
+}
+
+#[test]
+fn render_boundary_matrix_example_writes_output() -> TestResult {
+    let temp = temp_dir()?;
+    let manifest_path = temp.path().join("manifest.toml");
+    let output_path = temp.path().join("matrix.md");
+    write_file(temp.path(), "manifest.toml", VALID_MANIFEST)?
+        .map_err(|error| format!("write valid manifest: {error}"))?;
+
+    let output = Command::new(env!("CARGO"))
+        .args([
+            "run",
+            "-p",
+            "weaver-docs-gate",
+            "--example",
+            "render_boundary_matrix",
+            "--",
+            manifest_path.as_str(),
+            output_path.as_str(),
+        ])
+        .current_dir(repo_root()?)
+        .output()
+        .map_err(|error| format!("run render_boundary_matrix example: {error}"))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "example failed\nstdout: {}\nstderr: {}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    let rendered = read_file(temp.path(), "matrix.md")?
+        .map_err(|error| format!("read rendered matrix: {error}"))?;
+    ensure(
+        rendered.contains("[12.1.1]"),
+        "rendered output should name task",
+    )
+}
+
+fn temp_dir() -> TestResult<Utf8TempDir> {
+    let temp = tempfile::tempdir().map_err(|error| format!("create temp dir: {error}"))?;
+    let path = Utf8PathBuf::from_path_buf(temp.path().to_path_buf())
+        .map_err(|path| format!("temp path is not UTF-8: {}", path.display()))?;
+    Ok(Utf8TempDir { _temp: temp, path })
+}
+
+fn write_file(
+    dir_path: &Utf8Path,
+    file_name: &str,
+    content: &str,
+) -> TestResult<Result<(), std::io::Error>> {
+    let dir = Dir::open_ambient_dir(dir_path, ambient_authority())
+        .map_err(|error| format!("open {dir_path}: {error}"))?;
+    Ok(dir.write(file_name, content))
+}
+
+fn read_file(dir_path: &Utf8Path, file_name: &str) -> TestResult<Result<String, std::io::Error>> {
+    let dir = Dir::open_ambient_dir(dir_path, ambient_authority())
+        .map_err(|error| format!("open {dir_path}: {error}"))?;
+    Ok(dir.read_to_string(file_name))
+}
+
+fn repo_root() -> TestResult<Utf8PathBuf> {
+    let crate_dir = Utf8Path::new(env!("CARGO_MANIFEST_DIR"));
+    crate_dir
+        .parent()
+        .and_then(Utf8Path::parent)
+        .map(Utf8Path::to_path_buf)
+        .ok_or_else(|| format!("cannot resolve repository root from {crate_dir}"))
+}
+
+fn ensure(condition: bool, message: impl Into<String>) -> TestResult {
+    if condition {
+        Ok(())
+    } else {
+        Err(message.into())
+    }
+}
+
+fn ensure_equal<T>(left: &T, right: &T, message: impl Into<String>) -> TestResult
+where
+    T: std::fmt::Debug + PartialEq,
+{
+    if left == right {
+        Ok(())
+    } else {
+        Err(format!(
+            "{}\nleft: {left:?}\nright: {right:?}",
+            message.into()
+        ))
+    }
+}
+
+fn assert_boundary_error(
+    error: &BoundaryError,
+    predicate: impl FnOnce(&BoundaryError) -> bool,
+) -> TestResult {
+    if predicate(error) {
+        Ok(())
+    } else {
+        Err(format!("unexpected boundary error: {error:?}"))
+    }
+}
+
+struct Utf8TempDir {
+    _temp: TempDir,
+    path: Utf8PathBuf,
+}
+
+impl Utf8TempDir {
+    fn path(&self) -> &Utf8Path { &self.path }
+}

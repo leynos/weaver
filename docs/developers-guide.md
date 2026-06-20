@@ -33,6 +33,43 @@ temporary Weaver adapter with a concrete removal gate, `pending` for an
 upstream contract that is not decided or shipped yet, and `divergent` only when
 ADR 007 records the deliberate Weaver-owned divergence.
 
+### `weaver-docs-gate` boundary API
+
+The private `weaver-docs-gate` workspace member owns the generated OrthoConfig
+consumer boundary matrix and the referential-integrity checks that keep
+command-contract roadmap tasks classified. The crate is intentionally a
+developer tool, not a runtime dependency for `weaver` or `weaverd`.
+
+The public library API exposes plain domain types. TOML deserialization is kept
+inside the crate's private adapter layer so manifest framework concerns do not
+leak into the boundary vocabulary:
+
+- `BoundaryState` is the four-state classification vocabulary: `consumes`,
+  `wraps`, `pending`, and `divergent`. Use `as_str()` when diagnostics or
+  generated text need the canonical manifest spelling.
+- `UpstreamRole` names the kind of OrthoConfig contract a Weaver task consumes
+  or waits for, such as `renderer`, `profile`, `delivery`, or
+  `execution_ledger`.
+- `UpstreamRef` pairs an upstream roadmap or design reference with an
+  `UpstreamRole`.
+- `BoundaryTask` is one classified Weaver roadmap task row. Its optional
+  evidence fields are state-specific: `shipped_in` for `consumes`,
+  `removal_gate` for `wraps`, `next_review_by` for `pending`, and `adr_anchor`
+  for `divergent`.
+- `BoundaryManifest` is the complete source-of-truth document. Its
+  `managed_tasks` registry must match the ordered `tasks` rows so new
+  command-contract roadmap items fail closed until explicitly classified.
+- `BoundaryError` reports manifest loading failures. Match it when a test or
+  developer tool must distinguish a missing file, invalid path, read failure,
+  or TOML schema error.
+
+Use `load_manifest(path)` to read `docs/orthoconfig-consumer-boundary.toml`
+into a `BoundaryManifest`. Use `render_matrix(&manifest)` to produce the
+Markdown contents for `docs/orthoconfig-consumer-boundary.md`. The renderer
+escapes table cells, groups rows by roadmap phase, and sizes columns from the
+escaped cell content, so callers should pass domain values rather than
+preformatted Markdown rows.
+
 When adding or renaming a public command:
 
 1. Update the OrthoConfig-backed command metadata or the Weaver semantic

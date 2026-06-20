@@ -4,8 +4,8 @@ use std::io::{self, ErrorKind};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs::Dir};
-use serde::{Deserialize, Deserializer};
 
+mod manifest_adapter;
 mod renderer;
 pub use renderer::render_matrix;
 
@@ -17,8 +17,7 @@ pub use renderer::render_matrix;
 ///
 /// assert_eq!(BoundaryState::Wraps.as_str(), "wraps");
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BoundaryState {
     /// Weaver follows an `OrthoConfig` contract that has shipped.
     Consumes,
@@ -58,8 +57,7 @@ impl BoundaryState {
 ///
 /// assert_eq!(UpstreamRole::Renderer.as_str(), "renderer");
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UpstreamRole {
     /// Consumer-boundary ownership and governance.
     Boundary,
@@ -107,7 +105,18 @@ impl UpstreamRole {
 }
 
 /// A single upstream `OrthoConfig` task reference.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+///
+/// # Examples
+/// ```
+/// use weaver_docs_gate::{UpstreamRef, UpstreamRole};
+///
+/// let upstream = UpstreamRef {
+///     task: "ortho-config:renderer-contract".into(),
+///     role: UpstreamRole::Renderer,
+/// };
+/// assert_eq!(upstream.role.as_str(), "renderer");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpstreamRef {
     /// The upstream roadmap task or stable design section.
     pub task: String,
@@ -116,7 +125,25 @@ pub struct UpstreamRef {
 }
 
 /// One classified Weaver roadmap task.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+///
+/// # Examples
+/// ```
+/// use weaver_docs_gate::{BoundaryState, BoundaryTask};
+///
+/// let task = BoundaryTask {
+///     id: "12.1.1".into(),
+///     gist: "Track the downstream consumer boundary.".into(),
+///     state: BoundaryState::Pending,
+///     upstream: Vec::new(),
+///     shipped_in: None,
+///     removal_gate: None,
+///     adr_anchor: None,
+///     next_review_by: Some("2026-12-31".into()),
+///     last_reviewed: "2026-06-20".into(),
+/// };
+/// assert_eq!(task.state.as_str(), "pending");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BoundaryTask {
     /// Weaver roadmap task ID, such as `13.1.2`.
     pub id: String,
@@ -127,30 +154,37 @@ pub struct BoundaryTask {
     /// Upstream `OrthoConfig` task references.
     pub upstream: Vec<UpstreamRef>,
     /// `OrthoConfig` release tag or pinned SHA for shipped contracts.
-    #[serde(deserialize_with = "empty_string_as_none")]
     pub shipped_in: Option<String>,
     /// Replacement condition for temporary wrappers.
-    #[serde(deserialize_with = "empty_string_as_none")]
     pub removal_gate: Option<String>,
     /// ADR 007 heading slug for deliberate divergences.
-    #[serde(deserialize_with = "empty_string_as_none")]
     pub adr_anchor: Option<String>,
     /// ISO-8601 review date for pending contracts.
-    #[serde(deserialize_with = "empty_string_as_none")]
     pub next_review_by: Option<String>,
     /// ISO-8601 date when the row was last reviewed.
     pub last_reviewed: String,
 }
 
 /// The complete boundary manifest.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+///
+/// # Examples
+/// ```
+/// use weaver_docs_gate::BoundaryManifest;
+///
+/// let manifest = BoundaryManifest {
+///     schema_version: 1,
+///     managed_tasks: Vec::new(),
+///     tasks: Vec::new(),
+/// };
+/// assert!(manifest.tasks.is_empty());
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BoundaryManifest {
     /// Manifest schema version.
     pub schema_version: u32,
     /// Ordered registry of Weaver roadmap task IDs governed by the matrix.
     pub managed_tasks: Vec<String>,
     /// Classified task rows.
-    #[serde(rename = "task")]
     pub tasks: Vec<BoundaryTask>,
 }
 
@@ -208,10 +242,14 @@ pub fn load_manifest(path: &Utf8Path) -> Result<BoundaryManifest, BoundaryError>
     let contents = dir
         .read_to_string(file_name)
         .map_err(|source| read_error(path, source))?;
-    toml::from_str(&contents).map_err(|source| BoundaryError::InvalidToml {
-        path: path.to_path_buf(),
-        source: Box::new(source),
-    })
+    let manifest =
+        toml::from_str::<manifest_adapter::BoundaryManifestDto>(&contents).map_err(|source| {
+            BoundaryError::InvalidToml {
+                path: path.to_path_buf(),
+                source: Box::new(source),
+            }
+        })?;
+    Ok(manifest.into())
 }
 
 fn read_error(path: &Utf8Path, source: io::Error) -> BoundaryError {
@@ -223,12 +261,4 @@ fn read_error(path: &Utf8Path, source: io::Error) -> BoundaryError {
             source: Box::new(source),
         }
     }
-}
-
-fn empty_string_as_none<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let value = String::deserialize(deserializer)?;
-    Ok((!value.is_empty()).then_some(value))
 }
