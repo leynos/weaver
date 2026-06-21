@@ -261,6 +261,12 @@ state, not the intended sequence.
       fixed `MANIFEST_BUILD_DATE` so validation does not depend on
       `SOURCE_DATE_EPOCH` or the wall clock. The same follow-up added inline
       snapshots for stable `BoundaryError` display strings.
+- [x] 2026-06-21T00:00:00Z: Review feedback split manifest parsing from the
+      filesystem adapter. `load_manifest` now accepts a `Read` input,
+      `load_manifest_file` owns capability-oriented path access, module docs
+      describe the parser/adapter/renderer relationships, and proptest
+      coverage now exercises column widths, cell escaping, phase grouping, and
+      date-window ranges.
 
 ## Surprises & discoveries
 
@@ -457,11 +463,11 @@ A novice opening this plan needs the following landmarks before reading the
   does *not* touch it; the boundary gate has nothing to do with build
   scripts.
 - `crates/weaver-docs-gate/` — new workspace member introduced by this
-  plan. It hosts the manifest parser (`load_manifest`), the matrix
-  renderer (`render_matrix`), the `cargo run --example` regenerator,
-  and the `boundary_gate` integration test. It has no runtime
-  consumers; its only role is to make documentation governance
-  testable.
+  plan. It hosts the path-free manifest parser (`load_manifest`), the
+  filesystem adapter (`load_manifest_file`), the matrix renderer
+  (`render_matrix`), the `cargo run --example` regenerator, and the
+  `boundary_gate` integration test. It has no runtime consumers; its
+  only role is to make documentation governance testable.
 - `docs/developers-guide.md` — the long-form contributor guide. A new
   subsection ("Tracking the OrthoConfig consumer boundary") sits next to the
   existing ADR guidance.
@@ -671,7 +677,8 @@ the human-readable matrix from it.
    test fixture in crate form. The crate's `src/lib.rs` exposes:
 
    ```rust
-   pub fn load_manifest(path: &Utf8Path) -> Result<BoundaryManifest, BoundaryError>;
+   pub fn load_manifest(reader: impl Read) -> Result<BoundaryManifest, BoundaryError>;
+   pub fn load_manifest_file(path: &Utf8Path) -> Result<BoundaryManifest, BoundaryFileError>;
    pub fn render_matrix(manifest: &BoundaryManifest) -> String;
    ```
 
@@ -1029,24 +1036,21 @@ pub struct BoundaryManifest {
 
 #[derive(Debug, thiserror::Error)]
 pub enum BoundaryError {
-    #[error("manifest file not found: {0}")]
-    NotFound(camino::Utf8PathBuf),
-    #[error("invalid TOML: {0}")]
-    InvalidToml(String),
-    #[error("invalid manifest row: {0}")]
-    InvalidRow(String),
-    #[error("unknown upstream role: {0}")]
-    UnknownRole(String),
+    #[error("boundary manifest cannot be read: {detail}")]
+    Unreadable { detail: String },
+    #[error("invalid boundary manifest schema: {detail}")]
+    InvalidSchema { detail: String },
 }
 
-pub fn load_manifest(path: &Utf8Path) -> Result<BoundaryManifest, BoundaryError>;
+pub fn load_manifest(reader: impl Read) -> Result<BoundaryManifest, BoundaryError>;
+pub fn load_manifest_file(path: &Utf8Path) -> Result<BoundaryManifest, BoundaryFileError>;
 pub fn render_matrix(manifest: &BoundaryManifest) -> String;
 ```
 
 The renderer takes no global state, accepts a parsed manifest, and
-returns a `String`. The test gate calls `load_manifest` and
-`render_matrix` and compares the rendered output against the committed
-matrix Markdown byte for byte.
+returns a `String`. The test gate reads the manifest file, calls
+`load_manifest` and `render_matrix`, and compares the rendered output
+against the committed matrix Markdown byte for byte.
 
 The integration test depends only on existing workspace dependencies
 (`rstest`, `pretty_assertions`, `googletest`, `toml`, `camino`,

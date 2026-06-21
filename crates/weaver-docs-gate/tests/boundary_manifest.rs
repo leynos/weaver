@@ -137,7 +137,9 @@ fn committed_matrix_matches_manifest_rendering() -> TestResult {
 
 /// Load the boundary manifest from the repository docs.
 fn manifest() -> TestResult<BoundaryManifest> {
-    load_manifest(&repo_path(Utf8Path::new(MANIFEST))?).map_err(|error| error.to_string())
+    let contents =
+        read_doc(Utf8Path::new(MANIFEST)).map_err(|error| format!("read {MANIFEST}: {error}"))?;
+    load_manifest(contents.as_bytes()).map_err(|error| error.to_string())
 }
 
 /// Read a repository documentation file as UTF-8 text.

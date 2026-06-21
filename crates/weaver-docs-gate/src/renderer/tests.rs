@@ -65,6 +65,64 @@ fn snapshots_rendered_matrix_shape() {
 
 proptest! {
     #[test]
+    /// Prove computed widths accommodate every generated escaped cell.
+    fn column_widths_accommodate_all_generated_cells(
+        roadmap_task in "[A-Za-z0-9 .|\\n]{0,32}",
+        gist in "[A-Za-z0-9 .|\\n]{0,64}",
+        upstream in "[A-Za-z0-9 .|\\n]{0,64}",
+        gate_or_divergence in "[A-Za-z0-9 .|\\n]{0,64}",
+    ) {
+        let row = MatrixRow {
+            roadmap_task: escape_cell(&roadmap_task),
+            gist: escape_cell(&gist),
+            state: "✓ consumes".into(),
+            upstream: escape_cell(&upstream),
+            shipped_in: "4339a6f3".into(),
+            gate_or_divergence: escape_cell(&gate_or_divergence),
+            next_review_by: "n/a".into(),
+            last_reviewed: "2026-06-20".into(),
+        };
+
+        let widths = ColumnWidths::for_rows(&[row]);
+
+        prop_assert!(widths.roadmap_task >= cell_width(&escape_cell(&roadmap_task)));
+        prop_assert!(widths.gist >= cell_width(&escape_cell(&gist)));
+        prop_assert!(widths.upstream >= cell_width(&escape_cell(&upstream)));
+        prop_assert!(widths.gate_or_divergence >= cell_width(&escape_cell(&gate_or_divergence)));
+    }
+
+    #[test]
+    /// Prove cell escaping removes raw newlines and unescaped table pipes.
+    fn escaped_cells_do_not_contain_table_breaks(value in "[A-Za-z0-9 .|\\n]{0,128}") {
+        let escaped = escape_cell(&value);
+
+        prop_assert!(!escaped.contains('\n'));
+        prop_assert!(!has_unescaped_pipe(&escaped));
+    }
+
+    #[test]
+    /// Prove arbitrary numeric phase IDs are grouped exactly once.
+    fn phase_grouping_preserves_arbitrary_phase_ids(phases in proptest::collection::vec(1u16..=999, 1..32)) {
+        let tasks = phases
+            .iter()
+            .enumerate()
+            .map(|(index, phase)| task(&format!("{phase}.{index}.1")))
+            .collect::<Vec<_>>();
+        let manifest = manifest_with_tasks(tasks);
+        let rows = grouped_rows(&manifest);
+        let expected = phases
+            .iter()
+            .map(u16::to_string)
+            .collect::<std::collections::BTreeSet<_>>();
+
+        prop_assert_eq!(rows.keys().map(|phase| (*phase).to_owned()).collect::<std::collections::BTreeSet<_>>(), expected);
+        for (phase, grouped) in rows {
+            let prefix = format!("[{phase}.");
+            prop_assert!(grouped.iter().all(|row| row.roadmap_task.starts_with(&prefix)));
+        }
+    }
+
+    #[test]
     /// Prove arbitrary task text cannot add Markdown table columns.
     fn rendered_task_cells_never_emit_raw_table_pipes(
         gist in "[A-Za-z0-9 |\\n]{0,64}",
@@ -82,6 +140,18 @@ proptest! {
             prop_assert!(line.matches(" | ").count() == 7);
         }
     }
+}
+
+/// Return whether a rendered cell contains a pipe not escaped for Markdown.
+fn has_unescaped_pipe(value: &str) -> bool {
+    let mut previous_was_escape = false;
+    for character in value.chars() {
+        if character == '|' && !previous_was_escape {
+            return true;
+        }
+        previous_was_escape = character == '\\' && !previous_was_escape;
+    }
+    false
 }
 
 /// Build a manifest containing the supplied task rows.

@@ -1,6 +1,14 @@
 //! Tooling for the `OrthoConfig` consumer boundary matrix.
+//!
+//! This crate keeps the boundary manifest pipeline in three small pieces:
+//! public domain types live in this root module, `manifest_adapter` owns the
+//! TOML and Serde conversion layer, and `renderer` turns a validated
+//! [`BoundaryManifest`] into the checked-in Markdown matrix. Filesystem access
+//! is intentionally limited to [`load_manifest_file`]; callers that already
+//! have manifest bytes should use [`load_manifest`] so parsing stays independent
+//! of path handling.
 
-use std::io::{self, ErrorKind};
+use std::io::{self, ErrorKind, Read};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs::Dir};
@@ -188,15 +196,13 @@ pub struct BoundaryManifest {
     pub tasks: Vec<BoundaryTask>,
 }
 
-/// Errors returned while loading the boundary manifest.
+/// Errors returned while parsing the boundary manifest.
 ///
 /// # Examples
 /// ```
-/// use camino::Utf8PathBuf;
 /// use weaver_docs_gate::BoundaryError;
 ///
 /// let error = BoundaryError::InvalidSchema {
-///     path: Utf8PathBuf::from("docs/orthoconfig-consumer-boundary.toml"),
 ///     detail: "missing field `schema_version`".into(),
 /// };
 /// assert!(
@@ -207,6 +213,39 @@ pub struct BoundaryManifest {
 /// ```
 #[derive(Debug, thiserror::Error)]
 pub enum BoundaryError {
+    /// Manifest bytes could not be read from the supplied reader.
+    #[error("boundary manifest cannot be read: {detail}")]
+    Unreadable {
+        /// Stable human-readable read failure detail.
+        detail: String,
+    },
+    /// The manifest contents do not match the boundary manifest schema.
+    #[error("invalid boundary manifest schema: {detail}")]
+    InvalidSchema {
+        /// Stable human-readable schema failure detail.
+        detail: String,
+    },
+}
+
+/// Errors returned while loading a boundary manifest from a file.
+///
+/// # Examples
+/// ```
+/// use camino::Utf8PathBuf;
+/// use weaver_docs_gate::BoundaryFileError;
+///
+/// let error = BoundaryFileError::InvalidSchema {
+///     path: Utf8PathBuf::from("docs/orthoconfig-consumer-boundary.toml"),
+///     detail: "missing field `schema_version`".into(),
+/// };
+/// assert!(
+///     error
+///         .to_string()
+///         .contains("invalid boundary manifest schema")
+/// );
+/// ```
+#[derive(Debug, thiserror::Error)]
+pub enum BoundaryFileError {
     /// The manifest path does not exist.
     #[error("manifest file not found: {0}")]
     NotFound(Utf8PathBuf),
@@ -231,37 +270,72 @@ pub enum BoundaryError {
     },
 }
 
+/// Parse the boundary manifest from a byte reader.
+///
+/// # Errors
+///
+/// Returns [`BoundaryError`] when the reader fails or when the bytes do not
+/// match the boundary schema.
+///
+/// # Examples
+/// ```
+/// use weaver_docs_gate::load_manifest;
+///
+/// let manifest = load_manifest(
+///     br#"schema_version = 1
+/// managed_tasks = []
+/// task = []
+/// "#
+///     .as_slice(),
+/// )?;
+/// assert_eq!(manifest.schema_version, 1);
+/// # Ok::<(), weaver_docs_gate::BoundaryError>(())
+/// ```
+pub fn load_manifest(mut reader: impl Read) -> Result<BoundaryManifest, BoundaryError> {
+    let mut contents = String::new();
+    reader
+        .read_to_string(&mut contents)
+        .map_err(|source| BoundaryError::Unreadable {
+            detail: source.to_string(),
+        })?;
+    parse_manifest(&contents)
+}
+
 /// Load the boundary manifest from disk.
 ///
 /// # Errors
 ///
-/// Returns [`BoundaryError`] when the manifest is missing, unreadable, or does
-/// not match the boundary schema.
+/// Returns [`BoundaryFileError`] when the manifest is missing, unreadable, or
+/// does not match the boundary schema.
 ///
 /// # Examples
 /// ```no_run
 /// use camino::Utf8Path;
-/// use weaver_docs_gate::load_manifest;
+/// use weaver_docs_gate::load_manifest_file;
 ///
-/// let manifest = load_manifest(Utf8Path::new("docs/orthoconfig-consumer-boundary.toml"))?;
+/// let manifest = load_manifest_file(Utf8Path::new("docs/orthoconfig-consumer-boundary.toml"))?;
 /// assert_eq!(manifest.schema_version, 1);
-/// # Ok::<(), weaver_docs_gate::BoundaryError>(())
+/// # Ok::<(), weaver_docs_gate::BoundaryFileError>(())
 /// ```
-pub fn load_manifest(path: &Utf8Path) -> Result<BoundaryManifest, BoundaryError> {
+pub fn load_manifest_file(path: &Utf8Path) -> Result<BoundaryManifest, BoundaryFileError> {
     let parent = path.parent().unwrap_or_else(|| Utf8Path::new("."));
     let file_name = path
         .file_name()
-        .ok_or_else(|| BoundaryError::InvalidPath(path.to_path_buf()))?;
+        .ok_or_else(|| BoundaryFileError::InvalidPath(path.to_path_buf()))?;
     let dir = Dir::open_ambient_dir(parent, ambient_authority())
         .map_err(|source| read_error(path, &source))?;
 
     let contents = dir
         .read_to_string(file_name)
         .map_err(|source| read_error(path, &source))?;
+    parse_manifest(&contents).map_err(|error| file_error(path, error))
+}
+
+/// Parse TOML manifest text into the public domain manifest.
+fn parse_manifest(contents: &str) -> Result<BoundaryManifest, BoundaryError> {
     let manifest =
-        toml::from_str::<manifest_adapter::BoundaryManifestDto>(&contents).map_err(|source| {
+        toml::from_str::<manifest_adapter::BoundaryManifestDto>(contents).map_err(|source| {
             BoundaryError::InvalidSchema {
-                path: path.to_path_buf(),
                 detail: source.to_string(),
             }
         })?;
@@ -269,13 +343,27 @@ pub fn load_manifest(path: &Utf8Path) -> Result<BoundaryManifest, BoundaryError>
 }
 
 /// Convert filesystem failures into stable manifest loading errors.
-fn read_error(path: &Utf8Path, source: &io::Error) -> BoundaryError {
+fn read_error(path: &Utf8Path, source: &io::Error) -> BoundaryFileError {
     if source.kind() == ErrorKind::NotFound {
-        BoundaryError::NotFound(path.to_path_buf())
+        BoundaryFileError::NotFound(path.to_path_buf())
     } else {
-        BoundaryError::Unreadable {
+        BoundaryFileError::Unreadable {
             path: path.to_path_buf(),
             detail: source.to_string(),
         }
+    }
+}
+
+/// Attach file context to domain parser errors.
+fn file_error(path: &Utf8Path, error: BoundaryError) -> BoundaryFileError {
+    match error {
+        BoundaryError::Unreadable { detail } => BoundaryFileError::Unreadable {
+            path: path.to_path_buf(),
+            detail,
+        },
+        BoundaryError::InvalidSchema { detail } => BoundaryFileError::InvalidSchema {
+            path: path.to_path_buf(),
+            detail,
+        },
     }
 }

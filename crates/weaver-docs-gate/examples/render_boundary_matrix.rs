@@ -4,7 +4,7 @@ use std::env;
 
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs::Dir};
-use weaver_docs_gate::{load_manifest, render_matrix};
+use weaver_docs_gate::{load_manifest_file, render_matrix};
 
 /// Regenerate a boundary matrix from a manifest path and output path.
 fn main() -> Result<(), String> {
@@ -21,7 +21,7 @@ fn main() -> Result<(), String> {
     }
 
     let manifest =
-        load_manifest(Utf8Path::new(&manifest_path)).map_err(|error| error.to_string())?;
+        load_manifest_file(Utf8Path::new(&manifest_path)).map_err(|error| error.to_string())?;
     write_output(Utf8Path::new(&output_path), render_matrix(&manifest))
 }
 

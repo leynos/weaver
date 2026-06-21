@@ -1,4 +1,11 @@
 //! TOML adapter for the `OrthoConfig` consumer boundary manifest.
+//!
+//! This module is the crate's outbound deserialization adapter. It owns every
+//! Serde derive and TOML spelling detail, then converts those DTOs into the
+//! plain domain structs exported by `lib.rs`. `load_manifest` and
+//! `load_manifest_file` parse text through `BoundaryManifestDto`; the renderer
+//! never sees these adapter types and consumes only the resulting
+//! `BoundaryManifest`.
 
 use serde::{Deserialize, Deserializer};
 

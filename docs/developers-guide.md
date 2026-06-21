@@ -59,16 +59,20 @@ leak into the boundary vocabulary:
 - `BoundaryManifest` is the complete source-of-truth document. Its
   `managed_tasks` registry must match the ordered `tasks` rows so new
   command-contract roadmap items fail closed until explicitly classified.
-- `BoundaryError` reports manifest loading failures. Match it when a test or
-  developer tool must distinguish a missing file, invalid path, unreadable
-  manifest, or invalid boundary schema.
+- `BoundaryError` reports path-free manifest parser failures. Match it when a
+  test or developer tool reads manifest bytes from an in-memory fixture, a
+  network response, or another non-filesystem source.
+- `BoundaryFileError` reports filesystem adapter failures. Match it when a
+  tool must distinguish a missing file, invalid path, unreadable manifest file,
+  or invalid boundary schema with file context.
 
-Use `load_manifest(path)` to read `docs/orthoconfig-consumer-boundary.toml`
-into a `BoundaryManifest`. Use `render_matrix(&manifest)` to produce the
-Markdown contents for `docs/orthoconfig-consumer-boundary.md`. The renderer
-escapes table cells, groups rows by roadmap phase, and sizes columns from the
-escaped cell content, so callers should pass domain values rather than
-preformatted Markdown rows.
+Use `load_manifest(reader)` when the caller already owns manifest bytes. Use
+`load_manifest_file(path)` when a tool needs the crate's capability-oriented
+filesystem adapter to read `docs/orthoconfig-consumer-boundary.toml`. Use
+`render_matrix(&manifest)` to produce the Markdown contents for
+`docs/orthoconfig-consumer-boundary.md`. The renderer escapes table cells,
+groups rows by roadmap phase, and sizes columns from the escaped cell content,
+so callers should pass domain values rather than preformatted Markdown rows.
 
 When adding or renaming a public command:
 

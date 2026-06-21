@@ -1,4 +1,10 @@
 //! Markdown rendering for the `OrthoConfig` consumer boundary matrix.
+//!
+//! The renderer is the final stage of the docs-gate pipeline. It accepts the
+//! domain `BoundaryManifest` produced by `load_manifest` or `load_manifest_file`,
+//! groups its task rows by roadmap phase, escapes Markdown table cells, computes
+//! stable column widths from the escaped data, and returns the full Markdown
+//! document that is committed as `docs/orthoconfig-consumer-boundary.md`.
 
 use std::collections::BTreeMap;
 

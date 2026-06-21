@@ -1,4 +1,10 @@
 //! Pending dependency review-date expiry checks for the boundary manifest gate.
+//!
+//! This support module is compiled only by the boundary manifest integration
+//! test. It keeps the time-window rule isolated from file parsing and document
+//! rendering: callers provide the build date explicitly, and this module only
+//! parses `next_review_by` values and checks them against the 270-day pending
+//! review budget.
 
 use time::{Date, format_description::well_known::Iso8601};
 
@@ -50,9 +56,10 @@ fn is_review_current(review_date: Date, build_date: Date) -> bool {
 mod tests {
     //! Unit tests for pending review age-window comparisons.
 
-    use time::macros::date;
+    use proptest::prelude::*;
+    use time::{Duration, macros::date};
 
-    use super::is_review_current;
+    use super::{PENDING_REVIEW_WINDOW_DAYS, is_review_current, validate_pending_review_date};
 
     /// Prove the review window accepts the exact maximum age.
     #[test]
@@ -70,5 +77,33 @@ mod tests {
             date!(2026 - 01 - 01),
             date!(2026 - 09 - 29)
         ));
+    }
+
+    proptest! {
+        #[test]
+        /// Prove all generated dates inside the review window are accepted.
+        fn review_window_accepts_generated_in_range(age in 0i64..=PENDING_REVIEW_WINDOW_DAYS) {
+            let build_date = date!(2026 - 12 - 31);
+            let review_date = build_date - Duration::days(age);
+
+            prop_assert!(validate_pending_review_date(
+                &review_date.to_string(),
+                "12.1.5",
+                build_date,
+            ).is_ok());
+        }
+
+        #[test]
+        /// Prove generated dates older than the review window are rejected.
+        fn review_window_rejects_generated_stale_dates(age in (PENDING_REVIEW_WINDOW_DAYS + 1)..=720) {
+            let build_date = date!(2026 - 12 - 31);
+            let review_date = build_date - Duration::days(age);
+
+            prop_assert!(validate_pending_review_date(
+                &review_date.to_string(),
+                "12.1.5",
+                build_date,
+            ).is_err());
+        }
     }
 }

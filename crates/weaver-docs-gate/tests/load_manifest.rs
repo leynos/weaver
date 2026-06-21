@@ -1,11 +1,22 @@
-//! Unit-level coverage for loading boundary manifests from disk.
+//! Unit-level coverage for boundary manifest parsing and file loading.
+//!
+//! The tests in this module deliberately exercise both entry points in the
+//! docs-gate crate. `load_manifest` receives in-memory manifest bytes and
+//! proves the path-free parser behaviour; `load_manifest_file` receives UTF-8
+//! paths and proves the filesystem adapter's error mapping.
 
 use std::process::Command;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs::Dir};
 use tempfile::TempDir;
-use weaver_docs_gate::{BoundaryError, BoundaryState, load_manifest};
+use weaver_docs_gate::{
+    BoundaryError,
+    BoundaryFileError,
+    BoundaryState,
+    load_manifest,
+    load_manifest_file,
+};
 
 type TestResult<T = ()> = Result<T, String>;
 
@@ -34,22 +45,24 @@ fn load_manifest_reports_missing_files() -> TestResult {
     let temp = temp_dir()?;
     let missing = temp.path().join("missing.toml");
 
-    let error = load_manifest(&missing).err().ok_or("missing file loaded")?;
+    let error = load_manifest_file(&missing)
+        .err()
+        .ok_or("missing file loaded")?;
 
-    assert_boundary_error(&error, |boundary_error| {
-        matches!(boundary_error, BoundaryError::NotFound(_))
+    assert_boundary_file_error(&error, |boundary_error| {
+        matches!(boundary_error, BoundaryFileError::NotFound(_))
     })
 }
 
 /// Prove paths without a file name return the invalid-path variant.
 #[test]
 fn load_manifest_reports_invalid_paths() -> TestResult {
-    let error = load_manifest(Utf8Path::new("/"))
+    let error = load_manifest_file(Utf8Path::new("/"))
         .err()
         .ok_or("root path loaded as manifest")?;
 
-    assert_boundary_error(&error, |boundary_error| {
-        matches!(boundary_error, BoundaryError::InvalidPath(_))
+    assert_boundary_file_error(&error, |boundary_error| {
+        matches!(boundary_error, BoundaryFileError::InvalidPath(_))
     })
 }
 
@@ -63,24 +76,19 @@ fn load_manifest_reports_read_errors() -> TestResult {
         .create_dir("manifest.toml")
         .map_err(|error| format!("create manifest directory: {error}"))?;
 
-    let error = load_manifest(&manifest_dir)
+    let error = load_manifest_file(&manifest_dir)
         .err()
         .ok_or("directory loaded as manifest")?;
 
-    assert_boundary_error(&error, |boundary_error| {
-        matches!(boundary_error, BoundaryError::Unreadable { .. })
+    assert_boundary_file_error(&error, |boundary_error| {
+        matches!(boundary_error, BoundaryFileError::Unreadable { .. })
     })
 }
 
 /// Prove malformed manifest contents return the schema variant.
 #[test]
 fn load_manifest_reports_invalid_toml() -> TestResult {
-    let temp = temp_dir()?;
-    let manifest_path = temp.path().join("manifest.toml");
-    write_file(temp.path(), "manifest.toml", "schema_version = ")?
-        .map_err(|error| format!("write invalid manifest: {error}"))?;
-
-    let error = load_manifest(&manifest_path)
+    let error = load_manifest(b"schema_version = ".as_slice())
         .err()
         .ok_or("invalid TOML loaded as manifest")?;
 
@@ -89,19 +97,38 @@ fn load_manifest_reports_invalid_toml() -> TestResult {
     })
 }
 
-/// Snapshot the stable display strings for public boundary errors.
+/// Snapshot the stable display strings for public parser errors.
 #[test]
 fn boundary_error_display_messages_are_stable() {
     insta::assert_snapshot!(
-        BoundaryError::NotFound(Utf8PathBuf::from("docs/missing.toml")).to_string(),
+        BoundaryError::Unreadable {
+            detail: "stream closed".into(),
+        }
+        .to_string(),
+        @"boundary manifest cannot be read: stream closed"
+    );
+    insta::assert_snapshot!(
+        BoundaryError::InvalidSchema {
+            detail: "missing field `schema_version`".into(),
+        }
+        .to_string(),
+        @"invalid boundary manifest schema: missing field `schema_version`"
+    );
+}
+
+/// Snapshot the stable display strings for public file-adapter errors.
+#[test]
+fn boundary_file_error_display_messages_are_stable() {
+    insta::assert_snapshot!(
+        BoundaryFileError::NotFound(Utf8PathBuf::from("docs/missing.toml")).to_string(),
         @"manifest file not found: docs/missing.toml"
     );
     insta::assert_snapshot!(
-        BoundaryError::InvalidPath(Utf8PathBuf::from("/")).to_string(),
+        BoundaryFileError::InvalidPath(Utf8PathBuf::from("/")).to_string(),
         @"invalid manifest path: /"
     );
     insta::assert_snapshot!(
-        BoundaryError::Unreadable {
+        BoundaryFileError::Unreadable {
             path: Utf8PathBuf::from("docs/manifest.toml"),
             detail: "permission denied".into(),
         }
@@ -109,7 +136,7 @@ fn boundary_error_display_messages_are_stable() {
         @"boundary manifest cannot be read: docs/manifest.toml: permission denied"
     );
     insta::assert_snapshot!(
-        BoundaryError::InvalidSchema {
+        BoundaryFileError::InvalidSchema {
             path: Utf8PathBuf::from("docs/manifest.toml"),
             detail: "missing field `schema_version`".into(),
         }
@@ -121,12 +148,7 @@ fn boundary_error_display_messages_are_stable() {
 /// Prove adapter DTOs map manifest values into plain domain types.
 #[test]
 fn load_manifest_maps_toml_dto_to_domain_types() -> TestResult {
-    let temp = temp_dir()?;
-    let manifest_path = temp.path().join("manifest.toml");
-    write_file(temp.path(), "manifest.toml", VALID_MANIFEST)?
-        .map_err(|error| format!("write valid manifest: {error}"))?;
-
-    let manifest = load_manifest(&manifest_path).map_err(|error| error.to_string())?;
+    let manifest = load_manifest(VALID_MANIFEST.as_bytes()).map_err(|error| error.to_string())?;
 
     ensure_equal(&manifest.schema_version, &1, "schema version should load")?;
     ensure_equal(
@@ -254,6 +276,18 @@ fn assert_boundary_error(
         Ok(())
     } else {
         Err(format!("unexpected boundary error: {error:?}"))
+    }
+}
+
+/// Check a boundary file error variant while preserving diagnostics on mismatch.
+fn assert_boundary_file_error(
+    error: &BoundaryFileError,
+    predicate: impl FnOnce(&BoundaryFileError) -> bool,
+) -> TestResult {
+    if predicate(error) {
+        Ok(())
+    } else {
+        Err(format!("unexpected boundary file error: {error:?}"))
     }
 }
 
