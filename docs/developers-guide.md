@@ -98,7 +98,17 @@ and `outcome` labels. Libraries must not install a global subscriber or metrics
 recorder; callers that need diagnostics should install those at the application
 or CI harness boundary. Parser and file-adapter errors include the remediation
 step used by the CI gate so local developer tools and test output point at the
-same recovery path.
+same recovery path. The public Rustdoc for both load functions documents these
+observable side effects; downstream callers that require silent parsing should
+isolate calls behind their own adapter and install no subscriber or metrics
+recorder.
+
+The docs-gate test suite also treats the matrix regeneration example as an
+externally observable interface. `tests/load_manifest.rs` covers the example's
+success path and argument/error paths, `tests/support/boundary_properties.rs`
+covers generated date and state/evidence invariants, and
+`tests/compile_time.rs` uses `trybuild` to prove downstream callers can compile
+against the exported API and error trait surface.
 
 When adding or renaming a public command:
 

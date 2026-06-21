@@ -280,6 +280,16 @@ pub enum BoundaryFileError {
 
 /// Parse the boundary manifest from a byte reader.
 ///
+/// # Observability
+///
+/// Emits `tracing` events with target
+/// `weaver_docs_gate::boundary_manifest` when loading starts, succeeds, or
+/// fails. Increments the
+/// `weaver_docs_gate_boundary_manifest_load_total` metrics counter with
+/// `source = "reader"` and an `outcome` label of `success`, `unreadable`, or
+/// `invalid_schema`. The function does not install a tracing subscriber or
+/// metrics recorder.
+///
 /// # Errors
 ///
 /// Returns [`BoundaryError`] when the reader fails or when the bytes do not
@@ -323,6 +333,16 @@ pub fn load_manifest(mut reader: impl Read) -> Result<BoundaryManifest, Boundary
 }
 
 /// Load the boundary manifest from disk.
+///
+/// # Observability
+///
+/// Emits `tracing` events with target
+/// `weaver_docs_gate::boundary_manifest` when loading starts, succeeds, or
+/// fails. Increments the
+/// `weaver_docs_gate_boundary_manifest_load_total` metrics counter with
+/// `source = "file"` and an `outcome` label of `success`, `not_found`,
+/// `invalid_path`, `unreadable`, or `invalid_schema`. The function does not
+/// install a tracing subscriber or metrics recorder.
 ///
 /// # Errors
 ///

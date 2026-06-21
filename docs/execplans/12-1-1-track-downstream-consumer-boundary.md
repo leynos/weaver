@@ -285,6 +285,12 @@ state, not the intended sequence.
       source/outcome labels, and include remediation guidance in generated
       read/schema errors. The renderer test helper no longer uses the flagged
       `task.id.clone()` pattern.
+- [x] 2026-06-22T00:00:00Z: Review feedback made the load-function
+      observability contract explicit in public Rustdoc, added E2E coverage
+      for the `render_boundary_matrix` example's missing-manifest,
+      missing-output, extra-argument, and invalid-output failures, added
+      property coverage for ISO date-shape and state/evidence invariants, and
+      added a `trybuild` compile-time check for downstream public API usage.
 
 ## Surprises & discoveries
 
@@ -500,6 +506,13 @@ schema failures. They increment
 `source` and `outcome` labels and attach the same remediation guidance to
 generated read and schema errors that the CI gate prints for validation
 failures.
+
+The 2026-06-22 review follow-up made that operational contract visible in the
+public API documentation and widened the test boundary. The example binary now
+has error-path coverage for argument and output-path failures, generated
+properties exercise date-shape and state/evidence invariants, and a
+`trybuild` pass test proves the exported domain types, load functions,
+renderer, and error trait implementations remain usable by downstream callers.
 
 ## Context and orientation
 

@@ -55,6 +55,9 @@ Boundary classifications for this step are tracked in the
   - Follow-up observability work added a named CI boundary-manifest gate,
     structured remediation messages, and library trace/metric events for
     manifest load outcomes.
+  - Follow-up review coverage documents those observable load side effects,
+    adds example CLI error-path tests, property tests for date/evidence
+    invariants, and trybuild public API checks.
   - Success: every command-contract task says whether it consumes OrthoConfig,
     wraps it temporarily, or records a deliberate divergence in ADR 007.
 - [ ] 12.1.2. Consume recursive command metadata.

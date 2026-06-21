@@ -5,7 +5,7 @@
 //! proves the path-free parser behaviour; `load_manifest_file` receives UTF-8
 //! paths and proves the filesystem adapter's error mapping.
 
-use std::process::Command;
+use std::process::{Command, Output};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs::Dir};
@@ -170,20 +170,7 @@ fn render_boundary_matrix_example_writes_output() -> TestResult {
     write_file(temp.path(), "manifest.toml", VALID_MANIFEST)?
         .map_err(|error| format!("write valid manifest: {error}"))?;
 
-    let output = Command::new(env!("CARGO"))
-        .args([
-            "run",
-            "-p",
-            "weaver-docs-gate",
-            "--example",
-            "render_boundary_matrix",
-            "--",
-            manifest_path.as_str(),
-            output_path.as_str(),
-        ])
-        .current_dir(repo_root()?)
-        .output()
-        .map_err(|error| format!("run render_boundary_matrix example: {error}"))?;
+    let output = run_render_boundary_matrix(&[manifest_path.as_str(), output_path.as_str()])?;
 
     if !output.status.success() {
         return Err(format!(
@@ -199,6 +186,59 @@ fn render_boundary_matrix_example_writes_output() -> TestResult {
         rendered.contains("[12.1.1]"),
         "rendered output should name task",
     )
+}
+
+/// Prove the example reports a missing manifest path.
+#[test]
+fn render_boundary_matrix_example_reports_missing_manifest() -> TestResult {
+    let temp = temp_dir()?;
+    let manifest_path = temp.path().join("missing.toml");
+    let output_path = temp.path().join("matrix.md");
+
+    let output = run_render_boundary_matrix(&[manifest_path.as_str(), output_path.as_str()])?;
+
+    assert_example_failure(&output, "manifest file not found")
+}
+
+/// Prove the example reports a missing output argument.
+#[test]
+fn render_boundary_matrix_example_reports_missing_output_argument() -> TestResult {
+    let temp = temp_dir()?;
+    let manifest_path = temp.path().join("manifest.toml");
+    write_file(temp.path(), "manifest.toml", VALID_MANIFEST)?
+        .map_err(|error| format!("write valid manifest: {error}"))?;
+
+    let output = run_render_boundary_matrix(&[manifest_path.as_str()])?;
+
+    assert_example_failure(&output, "usage: render_boundary_matrix <manifest> <output>")
+}
+
+/// Prove the example reports unexpected extra arguments.
+#[test]
+fn render_boundary_matrix_example_reports_extra_arguments() -> TestResult {
+    let temp = temp_dir()?;
+    let manifest_path = temp.path().join("manifest.toml");
+    let output_path = temp.path().join("matrix.md");
+    write_file(temp.path(), "manifest.toml", VALID_MANIFEST)?
+        .map_err(|error| format!("write valid manifest: {error}"))?;
+
+    let output =
+        run_render_boundary_matrix(&[manifest_path.as_str(), output_path.as_str(), "extra"])?;
+
+    assert_example_failure(&output, "usage: render_boundary_matrix <manifest> <output>")
+}
+
+/// Prove the example reports an output path that cannot name a file.
+#[test]
+fn render_boundary_matrix_example_reports_invalid_output_path() -> TestResult {
+    let temp = temp_dir()?;
+    let manifest_path = temp.path().join("manifest.toml");
+    write_file(temp.path(), "manifest.toml", VALID_MANIFEST)?
+        .map_err(|error| format!("write valid manifest: {error}"))?;
+
+    let output = run_render_boundary_matrix(&[manifest_path.as_str(), "/"])?;
+
+    assert_example_failure(&output, "invalid output path: /")
 }
 
 /// Create a UTF-8 temp directory guard for filesystem tests.
@@ -225,6 +265,45 @@ fn read_file(dir_path: &Utf8Path, file_name: &str) -> TestResult<Result<String, 
     let dir = Dir::open_ambient_dir(dir_path, ambient_authority())
         .map_err(|error| format!("open {dir_path}: {error}"))?;
     Ok(dir.read_to_string(file_name))
+}
+
+/// Run the documented matrix-rendering example with caller-supplied args.
+fn run_render_boundary_matrix(args: &[&str]) -> TestResult<Output> {
+    Command::new(env!("CARGO"))
+        .args([
+            "run",
+            "-p",
+            "weaver-docs-gate",
+            "--example",
+            "render_boundary_matrix",
+            "--",
+        ])
+        .args(args)
+        .current_dir(repo_root()?)
+        .output()
+        .map_err(|error| format!("run render_boundary_matrix example: {error}"))
+}
+
+/// Check that the example failed and wrote the expected diagnostic.
+fn assert_example_failure(output: &Output, expected_stderr: &str) -> TestResult {
+    ensure(
+        !output.status.success(),
+        "example should exit with failure status",
+    )?;
+    ensure(
+        output.stdout.is_empty(),
+        format!(
+            "example failure should not write stdout\nstdout: {}",
+            String::from_utf8_lossy(&output.stdout),
+        ),
+    )?;
+    ensure(
+        String::from_utf8_lossy(&output.stderr).contains(expected_stderr),
+        format!(
+            "example stderr should contain {expected_stderr:?}\nstderr: {}",
+            String::from_utf8_lossy(&output.stderr),
+        ),
+    )
 }
 
 /// Resolve the repository root from the test crate directory.

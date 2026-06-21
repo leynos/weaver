@@ -1,5 +1,7 @@
 //! Integration tests for the `OrthoConfig` consumer boundary manifest.
 
+#[path = "support/boundary_properties.rs"]
+mod boundary_properties;
 #[path = "support/pending_review_date.rs"]
 mod pending_review_date;
 
