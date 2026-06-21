@@ -322,7 +322,7 @@ pub fn load_manifest(mut reader: impl Read) -> Result<BoundaryManifest, Boundary
         BoundaryError::Unreadable { detail }
     })?;
     parse_manifest(&contents)
-        .inspect(record_load_success)
+        .inspect(|manifest| record_success("reader", None, manifest))
         .inspect_err(|error| {
             record_load_failure(
                 "reader",
@@ -383,7 +383,7 @@ pub fn load_manifest_file(path: &Utf8Path) -> Result<BoundaryManifest, BoundaryF
         record_file_load_failure(path, &file_error);
         file_error
     })?;
-    record_file_load_success(path, &manifest);
+    record_success("file", Some(path), &manifest);
     Ok(manifest)
 }
 
@@ -440,28 +440,26 @@ fn schema_detail(source: &str) -> String {
     format!("{source}; remediation: {MANIFEST_REMEDIATION}")
 }
 
-/// Record a successful manifest parse with low-cardinality labels.
-fn record_load_success(manifest: &BoundaryManifest) {
-    counter!(METRIC_LOAD_TOTAL, "source" => "reader", "outcome" => "success").increment(1);
-    debug!(
-        target: OBSERVABILITY_TARGET,
-        task_count = manifest.tasks.len(),
-        managed_task_count = manifest.managed_tasks.len(),
-        "loaded boundary manifest",
-    );
-}
-
-/// Record a successful file-backed manifest load.
-fn record_file_load_success(path: &Utf8Path, manifest: &BoundaryManifest) {
-    counter!(METRIC_LOAD_TOTAL, "source" => "file", "outcome" => "success").increment(1);
-    debug!(
-        target: OBSERVABILITY_TARGET,
-        source = "file",
-        path = %path,
-        task_count = manifest.tasks.len(),
-        managed_task_count = manifest.managed_tasks.len(),
-        "loaded boundary manifest",
-    );
+fn record_success(source: &'static str, path: Option<&Utf8Path>, manifest: &BoundaryManifest) {
+    counter!(METRIC_LOAD_TOTAL, "source" => source, "outcome" => "success").increment(1);
+    if let Some(manifest_path) = path {
+        debug!(
+            target: OBSERVABILITY_TARGET,
+            source,
+            path = %manifest_path,
+            task_count = manifest.tasks.len(),
+            managed_task_count = manifest.managed_tasks.len(),
+            "loaded boundary manifest",
+        );
+    } else {
+        debug!(
+            target: OBSERVABILITY_TARGET,
+            source,
+            task_count = manifest.tasks.len(),
+            managed_task_count = manifest.managed_tasks.len(),
+            "loaded boundary manifest",
+        );
+    }
 }
 
 /// Record a path-free manifest load failure.
