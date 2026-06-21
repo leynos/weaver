@@ -4,10 +4,18 @@
 //! gate. They keep generated ISO date shapes and state/evidence combinations
 //! separate from filesystem and Markdown rendering concerns.
 
-use proptest::prelude::*;
-use weaver_docs_gate::{BoundaryState, BoundaryTask, UpstreamRef, UpstreamRole};
+use std::collections::BTreeSet;
 
-use super::{is_iso_date, validate_state_evidence};
+use proptest::prelude::*;
+use weaver_docs_gate::{BoundaryManifest, BoundaryState, BoundaryTask, UpstreamRef, UpstreamRole};
+
+use super::{
+    is_iso_date,
+    markdown_anchor,
+    validate_divergent_adr_anchor,
+    validate_manifest_registry,
+    validate_state_evidence,
+};
 
 /// Generated state-specific evidence for one manifest row.
 struct Evidence {
@@ -15,6 +23,15 @@ struct Evidence {
     removal_gate: Option<String>,
     adr_anchor: Option<String>,
     next_review_by: Option<String>,
+}
+
+/// Generated non-evidence fields for one manifest row.
+#[derive(Debug)]
+struct TaskFields {
+    id: String,
+    gist: String,
+    upstream_task: String,
+    last_reviewed: String,
 }
 
 /// Presence flags used to generate and check state evidence.
@@ -42,6 +59,18 @@ impl Evidence {
     }
 }
 
+impl TaskFields {
+    /// Build representative fields for properties that vary only evidence.
+    fn representative() -> Self {
+        Self {
+            id: "12.1.1".into(),
+            gist: "Track the downstream consumer boundary.".into(),
+            upstream_task: "renderer-contract".into(),
+            last_reviewed: "2026-06-20".into(),
+        }
+    }
+}
+
 impl EvidenceFlags {
     /// Return whether the named evidence bit is present.
     const fn has(self, mask: u8) -> bool { self.0 & mask != 0 }
@@ -52,6 +81,18 @@ proptest! {
         failure_persistence: None,
         ..ProptestConfig::default()
     })]
+
+    #[test]
+    /// Prove arbitrary registry IDs must exactly match row IDs and be unique.
+    fn manifest_referential_integrity_matches_generated_task_ids(
+        managed_tasks in proptest::collection::vec(task_id_text(), 0..24),
+        row_ids in proptest::collection::vec(task_id_text(), 0..24),
+    ) {
+        let expected = managed_tasks == row_ids && ids_are_unique(&managed_tasks);
+        let manifest = manifest_with_ids(managed_tasks, row_ids);
+
+        prop_assert_eq!(validate_manifest_registry(&manifest).is_ok(), expected);
+    }
 
     #[test]
     /// Prove formatted calendar dates satisfy the ISO date-shape check.
@@ -82,13 +123,121 @@ proptest! {
     fn state_evidence_constraints_match_boundary_state(
         state in boundary_state(),
         evidence_bits in 0u8..16,
+        fields in task_fields(),
     ) {
         let flags = EvidenceFlags(evidence_bits);
-        let task = task_with_evidence(state, Evidence::from_flags(flags));
+        let task = task_with_evidence(state, Evidence::from_flags(flags), fields);
         let expected = expected_state_evidence(state, flags);
 
         prop_assert_eq!(validate_state_evidence(&task).is_ok(), expected);
     }
+
+    #[test]
+    /// Prove divergent rows are accepted exactly when their ADR anchor exists.
+    fn adr_007_anchor_validation_matches_generated_anchor_sets(
+        anchor in anchor_text(),
+        is_present in any::<bool>(),
+    ) {
+        let mut anchors = BTreeSet::new();
+        if is_present {
+            anchors.insert(anchor.clone());
+        } else {
+            anchors.insert(format!("{anchor}-other"));
+        }
+        let task = task_with_evidence(
+            BoundaryState::Divergent,
+            Evidence {
+                shipped_in: None,
+                removal_gate: None,
+                adr_anchor: Some(anchor),
+                next_review_by: None,
+            },
+            TaskFields::representative(),
+        );
+
+        prop_assert_eq!(
+            validate_divergent_adr_anchor(&task, &anchors).is_ok(),
+            is_present
+        );
+    }
+
+    #[test]
+    /// Prove generated Markdown heading anchors stay GitHub-safe.
+    fn markdown_heading_anchors_have_stable_slug_shape(heading in markdown_heading_text()) {
+        let anchor = markdown_anchor(&heading);
+
+        prop_assert!(!anchor.is_empty());
+        prop_assert!(!anchor.starts_with('-'));
+        prop_assert!(!anchor.ends_with('-'));
+        prop_assert!(!anchor.contains("--"));
+        prop_assert!(anchor
+            .chars()
+            .all(|char| char.is_ascii_lowercase() || char.is_ascii_digit() || char == '-'));
+    }
+}
+
+/// Generate roadmap-like task IDs with enough variation to find registry drift.
+fn task_id_text() -> impl Strategy<Value = String> { "[0-9]{1,3}(\\.[0-9]{1,3}){1,3}" }
+
+/// Generate valid ADR/GitHub anchor slugs.
+fn anchor_text() -> impl Strategy<Value = String> { "[a-z0-9]{1,16}(-[a-z0-9]{1,16}){0,4}" }
+
+/// Generate headings that always yield a non-empty Markdown anchor.
+fn markdown_heading_text() -> impl Strategy<Value = String> {
+    "[A-Za-z0-9][A-Za-z0-9 ._|!:-]{0,64}"
+}
+
+/// Generate arbitrary non-evidence fields for state/evidence rows.
+fn task_fields() -> impl Strategy<Value = TaskFields> {
+    (
+        task_id_text(),
+        "[A-Za-z0-9 .|\\n]{0,64}",
+        "[A-Za-z0-9 .|\\n]{0,64}",
+        iso_date_text(),
+    )
+        .prop_map(|(id, gist, upstream_task, last_reviewed)| TaskFields {
+            id,
+            gist,
+            upstream_task,
+            last_reviewed,
+        })
+}
+
+/// Generate formatted calendar dates for manifest row metadata.
+fn iso_date_text() -> impl Strategy<Value = String> {
+    (0u32..=9999, 1u32..=12, 1u32..=28)
+        .prop_map(|(year, month, day)| format!("{year:04}-{month:02}-{day:02}"))
+}
+
+/// Build a manifest from generated registry IDs and row IDs.
+fn manifest_with_ids(managed_tasks: Vec<String>, row_ids: Vec<String>) -> BoundaryManifest {
+    BoundaryManifest {
+        schema_version: 1,
+        managed_tasks,
+        tasks: row_ids
+            .into_iter()
+            .map(|id| {
+                let mut fields = TaskFields::representative();
+                fields.id = id;
+                task_with_evidence(
+                    BoundaryState::Consumes,
+                    Evidence {
+                        shipped_in: Some("4339a6f3".into()),
+                        removal_gate: None,
+                        adr_anchor: None,
+                        next_review_by: None,
+                    },
+                    fields,
+                )
+            })
+            .collect(),
+    }
+}
+
+/// Return whether generated IDs contain no duplicates.
+fn ids_are_unique(ids: &[String]) -> bool {
+    let mut seen = BTreeSet::new();
+    ids.iter().all(|id| seen.insert(id))
 }
 
 /// Generate strings whose length alone rules out an ISO `YYYY-MM-DD` shape.
@@ -118,21 +267,25 @@ fn boundary_state() -> impl Strategy<Value = BoundaryState> {
     ]
 }
 
-/// Build one task with generated state-specific evidence fields.
-fn task_with_evidence(state: BoundaryState, evidence: Evidence) -> BoundaryTask {
+/// Build one task with generated fields and state-specific evidence.
+fn task_with_evidence(
+    state: BoundaryState,
+    evidence: Evidence,
+    fields: TaskFields,
+) -> BoundaryTask {
     BoundaryTask {
-        id: "12.1.1".into(),
-        gist: "Track the downstream consumer boundary.".into(),
+        id: fields.id,
+        gist: fields.gist,
         state,
         upstream: vec![UpstreamRef {
-            task: "renderer-contract".into(),
+            task: fields.upstream_task,
             role: UpstreamRole::Renderer,
         }],
         shipped_in: evidence.shipped_in,
         removal_gate: evidence.removal_gate,
         adr_anchor: evidence.adr_anchor,
         next_review_by: evidence.next_review_by,
-        last_reviewed: "2026-06-20".into(),
+        last_reviewed: fields.last_reviewed,
     }
 }
 

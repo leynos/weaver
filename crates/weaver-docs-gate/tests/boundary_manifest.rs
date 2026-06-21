@@ -53,24 +53,13 @@ impl FieldName {
 #[test]
 fn manifest_registry_matches_rows_and_roadmap_tasks() -> TestResult {
     let manifest = manifest().map_err(|error| format!("load boundary manifest: {error}"))?;
-    let row_ids = manifest
-        .tasks
-        .iter()
-        .map(|task| task.id.as_str())
-        .collect::<Vec<_>>();
-    let managed_ids = manifest
-        .managed_tasks
-        .iter()
-        .map(String::as_str)
-        .collect::<Vec<_>>();
 
-    ensure_equal(&managed_ids, &row_ids, "managed_tasks must match task rows")?;
-    ensure_unique(&managed_ids, FieldName::ManagedTasks)?;
+    validate_manifest_registry(&manifest)?;
 
     let roadmap =
         read_doc(Utf8Path::new(ROADMAP)).map_err(|error| format!("read {ROADMAP}: {error}"))?;
     let roadmap_ids = roadmap_task_ids(&roadmap);
-    for task_id in managed_ids {
+    for task_id in manifest.managed_tasks.iter().map(String::as_str) {
         ensure(
             roadmap_ids.contains(task_id),
             format!("manifest task {task_id} is missing from {ROADMAP}"),
@@ -117,17 +106,7 @@ fn divergent_rows_reference_existing_adr_007_anchors() -> TestResult {
         .iter()
         .filter(|task| task.state == BoundaryState::Divergent)
     {
-        let anchor = task
-            .adr_anchor
-            .as_deref()
-            .ok_or_else(|| format!("divergent task {} has no ADR anchor", task.id))?;
-        ensure(
-            anchors.contains(anchor),
-            format!(
-                "task {} references missing ADR 007 anchor {anchor}",
-                task.id
-            ),
-        )?;
+        validate_divergent_adr_anchor(task, &anchors)?;
     }
 
     Ok(())
@@ -153,6 +132,38 @@ fn manifest() -> TestResult<BoundaryManifest> {
     let contents =
         read_doc(Utf8Path::new(MANIFEST)).map_err(|error| format!("read {MANIFEST}: {error}"))?;
     load_manifest(contents.as_bytes()).map_err(|error| error.to_string())
+}
+
+/// Validate that the manifest registry and task rows reference each other.
+fn validate_manifest_registry(manifest: &BoundaryManifest) -> TestResult {
+    let row_ids = manifest
+        .tasks
+        .iter()
+        .map(|task| task.id.as_str())
+        .collect::<Vec<_>>();
+    let managed_ids = manifest
+        .managed_tasks
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+
+    ensure_equal(&managed_ids, &row_ids, "managed_tasks must match task rows")?;
+    ensure_unique(&managed_ids, FieldName::ManagedTasks)
+}
+
+/// Validate that a divergent row links to an existing ADR 007 anchor.
+fn validate_divergent_adr_anchor(task: &BoundaryTask, anchors: &BTreeSet<String>) -> TestResult {
+    let anchor = task
+        .adr_anchor
+        .as_deref()
+        .ok_or_else(|| format!("divergent task {} has no ADR anchor", task.id))?;
+    ensure(
+        anchors.contains(anchor),
+        format!(
+            "task {} references missing ADR 007 anchor {anchor}",
+            task.id
+        ),
+    )
 }
 
 /// Read a repository documentation file as UTF-8 text.

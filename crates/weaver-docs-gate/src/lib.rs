@@ -1,21 +1,20 @@
 //! Tooling for the `OrthoConfig` consumer boundary matrix.
 //!
-//! This crate keeps the boundary manifest pipeline in three small pieces:
-//! public domain types live in this root module, `manifest_adapter` owns the
-//! TOML and Serde conversion layer, and `renderer` turns a validated
-//! [`BoundaryManifest`] into the checked-in Markdown matrix. Filesystem access
-//! is intentionally limited to [`load_manifest_file`]; callers that already
-//! have manifest bytes should use [`load_manifest`] so parsing stays independent
-//! of path handling.
+//! This crate keeps the boundary manifest pipeline in two small pieces: public
+//! domain types and TOML deserialization live in this root module, while
+//! `renderer` turns a validated [`BoundaryManifest`] into the checked-in
+//! Markdown matrix. Filesystem access is intentionally limited to
+//! [`load_manifest_file`]; callers that already have manifest bytes should use
+//! [`load_manifest`] so parsing stays independent of path handling.
 
 use std::io::{self, ErrorKind, Read};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs::Dir};
 use metrics::counter;
+use serde::{Deserialize, Deserializer};
 use tracing::{debug, warn};
 
-mod manifest_adapter;
 mod renderer;
 pub use renderer::render_matrix;
 
@@ -33,7 +32,8 @@ const OBSERVABILITY_TARGET: &str = "weaver_docs_gate::boundary_manifest";
 ///
 /// assert_eq!(BoundaryState::Wraps.as_str(), "wraps");
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BoundaryState {
     /// Weaver follows an `OrthoConfig` contract that has shipped.
     Consumes,
@@ -73,7 +73,8 @@ impl BoundaryState {
 ///
 /// assert_eq!(UpstreamRole::Renderer.as_str(), "renderer");
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum UpstreamRole {
     /// Consumer-boundary ownership and governance.
     Boundary,
@@ -132,7 +133,7 @@ impl UpstreamRole {
 /// };
 /// assert_eq!(upstream.role.as_str(), "renderer");
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct UpstreamRef {
     /// The upstream roadmap task or stable design section.
     pub task: String,
@@ -159,7 +160,7 @@ pub struct UpstreamRef {
 /// };
 /// assert_eq!(task.state.as_str(), "pending");
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct BoundaryTask {
     /// Weaver roadmap task ID, such as `13.1.2`.
     pub id: String,
@@ -170,12 +171,16 @@ pub struct BoundaryTask {
     /// Upstream `OrthoConfig` task references.
     pub upstream: Vec<UpstreamRef>,
     /// `OrthoConfig` release tag or pinned SHA for shipped contracts.
+    #[serde(deserialize_with = "empty_string_as_none")]
     pub shipped_in: Option<String>,
     /// Replacement condition for temporary wrappers.
+    #[serde(deserialize_with = "empty_string_as_none")]
     pub removal_gate: Option<String>,
     /// ADR 007 heading slug for deliberate divergences.
+    #[serde(deserialize_with = "empty_string_as_none")]
     pub adr_anchor: Option<String>,
     /// ISO-8601 review date for pending contracts.
+    #[serde(deserialize_with = "empty_string_as_none")]
     pub next_review_by: Option<String>,
     /// ISO-8601 date when the row was last reviewed.
     pub last_reviewed: String,
@@ -194,13 +199,14 @@ pub struct BoundaryTask {
 /// };
 /// assert!(manifest.tasks.is_empty());
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct BoundaryManifest {
     /// Manifest schema version.
     pub schema_version: u32,
     /// Ordered registry of Weaver roadmap task IDs governed by the matrix.
     pub managed_tasks: Vec<String>,
     /// Classified task rows.
+    #[serde(rename = "task")]
     pub tasks: Vec<BoundaryTask>,
 }
 
@@ -389,12 +395,10 @@ pub fn load_manifest_file(path: &Utf8Path) -> Result<BoundaryManifest, BoundaryF
 
 /// Parse TOML manifest text into the public domain manifest.
 fn parse_manifest(contents: &str) -> Result<BoundaryManifest, BoundaryError> {
-    let manifest =
-        toml::from_str::<manifest_adapter::BoundaryManifestDto>(contents).map_err(|source| {
-            let detail = schema_detail(&source.to_string());
-            BoundaryError::InvalidSchema { detail }
-        })?;
-    Ok(manifest.into())
+    toml::from_str::<BoundaryManifest>(contents).map_err(|source| {
+        let detail = schema_detail(&source.to_string());
+        BoundaryError::InvalidSchema { detail }
+    })
 }
 
 /// Convert filesystem failures into stable manifest loading errors.
@@ -438,6 +442,15 @@ fn unreadable_detail(source: &str) -> String {
 /// Add remediation context to schema failures.
 fn schema_detail(source: &str) -> String {
     format!("{source}; remediation: {MANIFEST_REMEDIATION}")
+}
+
+/// Treat empty TOML strings as absent optional manifest evidence.
+fn empty_string_as_none<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    Ok((!value.is_empty()).then_some(value))
 }
 
 fn record_success(source: &'static str, path: Option<&Utf8Path>, manifest: &BoundaryManifest) {

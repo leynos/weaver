@@ -139,16 +139,16 @@ fn boundary_file_error_display_messages_are_stable() {
     );
 }
 
-/// Prove adapter DTOs map manifest values into plain domain types.
+/// Prove TOML values deserialize directly into domain types.
 #[test]
-fn load_manifest_maps_toml_dto_to_domain_types() -> TestResult {
+fn load_manifest_deserializes_toml_into_domain_types() -> TestResult {
     let manifest = load_manifest(VALID_MANIFEST.as_bytes()).map_err(|error| error.to_string())?;
 
     ensure_equal(&manifest.schema_version, &1, "schema version should load")?;
     ensure_equal(
         &manifest.tasks.first().map(|task| task.state),
         &Some(BoundaryState::Consumes),
-        "state should map from TOML DTO",
+        "state should deserialize from TOML",
     )?;
     ensure_equal(
         &manifest

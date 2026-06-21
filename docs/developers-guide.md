@@ -56,9 +56,11 @@ consumer boundary matrix and the referential-integrity checks that keep
 command-contract roadmap tasks classified. The crate is intentionally a
 developer tool, not a runtime dependency for `weaver` or `weaverd`.
 
-The public library API exposes plain domain types. TOML deserialization is kept
-inside the crate's private adapter layer so manifest framework concerns do not
-leak into the boundary vocabulary:
+The public library API exposes the domain types used by the manifest,
+validation gate, and renderer. Those types deserialize directly from TOML with
+the manifest spellings used in `docs/orthoconfig-consumer-boundary.toml`; empty
+optional evidence strings deserialize as absent values so the checked-in
+manifest stays explicit without carrying separate DTO translation code:
 
 - `BoundaryState` is the four-state classification vocabulary: `consumes`,
   `wraps`, `pending`, and `divergent`. Use `as_str()` when diagnostics or
