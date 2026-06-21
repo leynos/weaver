@@ -38,6 +38,7 @@ insta = "1.41"
 lru = "0.12"
 lsp-types = "0.97"
 mockall = "0.14.0"
+metrics = "0.24"
 once_cell = "1.19"
 ortho_config = { git = "https://github.com/leynos/ortho-config.git", rev = "4339a6f3c61dc4fed86493d99ffb05230bee2a1b" }
 predicates = "3.1"

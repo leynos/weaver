@@ -15,8 +15,10 @@ toml = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
+metrics = { workspace = true }
 proptest = { workspace = true }
 tempfile = { workspace = true }
+tracing = { workspace = true }
 
 [lints]
 workspace = true

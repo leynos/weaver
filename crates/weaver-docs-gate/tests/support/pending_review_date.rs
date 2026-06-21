@@ -80,6 +80,11 @@ mod tests {
     }
 
     proptest! {
+        #![proptest_config(ProptestConfig {
+            failure_persistence: None,
+            ..ProptestConfig::default()
+        })]
+
         #[test]
         /// Prove all generated dates inside the review window are accepted.
         fn review_window_accepts_generated_in_range(age in 0i64..=PENDING_REVIEW_WINDOW_DAYS) {

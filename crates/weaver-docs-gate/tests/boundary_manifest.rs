@@ -7,7 +7,9 @@ use std::collections::BTreeSet;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs::Dir};
+use metrics::counter;
 use time::{Date, macros::date};
+use tracing::{debug, warn};
 use weaver_docs_gate::{
     BoundaryManifest,
     BoundaryState,
@@ -21,6 +23,9 @@ const MANIFEST: &str = "docs/orthoconfig-consumer-boundary.toml";
 const MANIFEST_BUILD_DATE: Date = date!(2026 - 06 - 21);
 const MATRIX: &str = "docs/orthoconfig-consumer-boundary.md";
 const ROADMAP: &str = "docs/roadmap.md";
+const REMEDIATE_MANIFEST: &str = "update docs/orthoconfig-consumer-boundary.toml, regenerate \
+                                  docs/orthoconfig-consumer-boundary.md, then rerun cargo test -p \
+                                  weaver-docs-gate";
 
 type TestResult<T = ()> = Result<T, String>;
 
@@ -79,6 +84,12 @@ fn boundary_state_rows_have_required_evidence() -> TestResult {
     let manifest = manifest().map_err(|error| format!("load boundary manifest: {error}"))?;
 
     for task in &manifest.tasks {
+        debug!(
+            target: "weaver_docs_gate::boundary_manifest",
+            task_id = %task.id,
+            state = ?task.state,
+            "validating boundary manifest row",
+        );
         validate_date(&task.last_reviewed, FieldName::LastReviewed, task)?;
         ensure(
             !task.upstream.is_empty(),
@@ -218,7 +229,8 @@ fn ensure(condition: bool, message: impl Into<String>) -> TestResult {
     if condition {
         Ok(())
     } else {
-        Err(message.into())
+        let detail = message.into();
+        Err(gate_failure("invariant_failed", &detail))
     }
 }
 
@@ -230,11 +242,29 @@ where
     if left == right {
         Ok(())
     } else {
-        Err(format!(
-            "{}\nleft: {left:?}\nright: {right:?}",
-            message.into()
-        ))
+        let detail = format!("{}\nleft: {left:?}\nright: {right:?}", message.into());
+        Err(gate_failure("equality_mismatch", &detail))
     }
+}
+
+/// Build the structured failure message emitted by the manifest gate.
+fn gate_failure(code: &'static str, message: &str) -> String {
+    counter!(
+        "weaver_docs_gate_boundary_validation_failures_total",
+        "code" => code,
+    )
+    .increment(1);
+    warn!(
+        target: "weaver_docs_gate::boundary_manifest",
+        code,
+        remediation = REMEDIATE_MANIFEST,
+        message = %message,
+        "boundary manifest validation failed",
+    );
+    format!(
+        "boundary_manifest_gate failure code={code}\nmessage: {message}\nremediation: \
+         {REMEDIATE_MANIFEST}"
+    )
 }
 
 /// Ensure a manifest field contains no duplicate values.

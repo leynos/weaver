@@ -33,6 +33,22 @@ temporary Weaver adapter with a concrete removal gate, `pending` for an
 upstream contract that is not decided or shipped yet, and `divergent` only when
 ADR 007 records the deliberate Weaver-owned divergence.
 
+The CI workflow runs the boundary manifest gate as a named
+`Boundary manifest gate` step before the wider coverage action. A failed
+invariant emits a structured message shaped as:
+
+```text
+boundary_manifest_gate failure code=<stable-code>
+message: <human-readable failure>
+remediation: update docs/orthoconfig-consumer-boundary.toml, regenerate
+docs/orthoconfig-consumer-boundary.md, then rerun cargo test -p weaver-docs-gate
+```
+
+Treat the `remediation` line as the recovery checklist. Update the TOML source
+of truth first, regenerate the Markdown matrix with the command above, and rerun
+`cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture`
+locally when you need the same visible failure output that CI reports.
+
 ### `weaver-docs-gate` boundary API
 
 The private `weaver-docs-gate` workspace member owns the generated OrthoConfig

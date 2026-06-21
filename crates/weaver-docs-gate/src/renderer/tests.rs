@@ -1,4 +1,9 @@
 //! Unit, snapshot, and property coverage for Markdown matrix rendering.
+//!
+//! These tests exercise the private helpers behind `renderer::render_matrix`.
+//! They prove that manifest rows are grouped by roadmap phase, escaped into
+//! Markdown table cells, padded with stable column widths, and rendered into
+//! the generated matrix shape consumed by the integration gate.
 
 use proptest::prelude::*;
 

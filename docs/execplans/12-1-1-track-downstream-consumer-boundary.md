@@ -79,11 +79,14 @@ boundary becomes review-only again.
    decisions (the OrthoConfig `§2.1` consumer-boundary statement and
    OrthoConfig ADR-003 schema ownership) rather than the unshipped bullets of
    5.2.3. The matrix is forward-compatible with 5.2.3 once it lands.
-2. **No new runtime crate dependencies.** Documentation and tests use crates
-   already in the workspace (`camino`, `serde`, `toml`, `rstest`,
-   `pretty_assertions`, `googletest`). The test must compile under
-   `--workspace --all-targets --all-features`. No new workspace member adds
-   a runtime binary; `crates/weaver-docs-gate` exists only to host the
+2. **No new product runtime crate dependencies.** Documentation and tests use
+   workspace dependencies (`camino`, `serde`, `toml`, `rstest`,
+   `pretty_assertions`, `googletest`, `tracing`, and `metrics`). The
+   observability follow-up keeps `metrics` and `tracing` as
+   `weaver-docs-gate` dev-dependencies so `weaver` and `weaverd` do not gain a
+   runtime dependency. The test must compile under
+   `--workspace --all-targets --all-features`. No new workspace member adds a
+   runtime binary; `crates/weaver-docs-gate` exists only to host the
    integration test and the small manifest parser it shares with itself.
 3. **Do not duplicate the OrthoConfig roadmap.** Each matrix row references an
    OrthoConfig task ID, not its content. If OrthoConfig renames a task, the
@@ -267,6 +270,14 @@ state, not the intended sequence.
       describe the parser/adapter/renderer relationships, and proptest
       coverage now exercises column widths, cell escaping, phase grouping, and
       date-window ranges.
+- [x] 2026-06-21T00:00:00Z: Review feedback expanded module-level
+      documentation for renderer tests and the matrix regeneration example.
+      The boundary manifest gate now emits structured failure messages with a
+      stable code, human message, and remediation line, records validation
+      decisions through `tracing`, increments a metrics counter for validation
+      failures, and runs as a named CI step before wider workspace coverage.
+      `docs/developers-guide.md` documents the visible failure format and
+      local rerun command.
 
 ## Surprises & discoveries
 
@@ -318,6 +329,16 @@ Recorded as they occur during implementation. Format:
   Impact: `crates/weaver-docs-gate/tests/support/pending_review_date.rs` now
   parses the date with the `time` crate and rejects pending reviews more than
   270 days behind the explicit build date provided by the manifest gate.
+- Observation: review output needed the boundary gate to be easier to triage
+  in CI.
+  Evidence: the gate was covered by the workspace test suite, but CI did not
+  name the boundary-manifest test separately and failure messages did not
+  carry a stable machine-readable code plus remediation line.
+  Impact: `.github/workflows/ci.yml` now runs
+  `cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture`
+  as `Boundary manifest gate`; gate failures use the
+  `boundary_manifest_gate failure code=...` format documented in
+  `docs/developers-guide.md`.
 
 ## Decision log
 
@@ -409,6 +430,13 @@ Recorded for any decision that future work must respect.
   strict integer-division and remainder lints, while `time::Date` expresses
   the explicit-date policy directly and keeps the gate portable.
   Date/Author: 2026-06-15, implementation.
+- Decision: keep boundary-gate observability local to the docs-gate
+  validation path.
+  Rationale: the gate is a documentation-governance check, not runtime
+  product behaviour. Structured failure strings, `tracing` events, and a
+  metrics counter give CI and local runs inspectable decision points without
+  changing the manifest schema, generated matrix, or public CLI behaviour.
+  Date/Author: 2026-06-21, implementation.
 
 ## Outcomes & retrospective
 
@@ -440,6 +468,13 @@ rows now fail once `next_review_by` is more than 270 days behind the build
 date supplied by the manifest gate. A later review follow-up made that build
 date an explicit parameter so the gate no longer depends on
 `SOURCE_DATE_EPOCH` or the wall clock.
+
+A later review follow-up made the Stage D gate operationally visible. CI now
+runs the boundary manifest integration test as its own named step, and
+validation failures include a stable failure code, a human-readable message,
+and the remediation command sequence. The gate emits `tracing` events at row
+validation decision points and increments
+`weaver_docs_gate_boundary_validation_failures_total` when an invariant fails.
 
 ## Context and orientation
 

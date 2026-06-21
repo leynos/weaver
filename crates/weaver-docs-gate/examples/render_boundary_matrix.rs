@@ -1,4 +1,9 @@
 //! Regenerate the `OrthoConfig` consumer boundary matrix.
+//!
+//! This example is the documented command-line adapter for the crate's public
+//! APIs. It loads `docs/orthoconfig-consumer-boundary.toml` with
+//! `load_manifest_file`, renders the Markdown matrix with `render_matrix`, and
+//! writes the result to the output path supplied by the caller.
 
 use std::env;
 
