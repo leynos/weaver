@@ -278,6 +278,13 @@ state, not the intended sequence.
       failures, and runs as a named CI step before wider workspace coverage.
       `docs/developers-guide.md` documents the visible failure format and
       local rerun command.
+- [x] 2026-06-21T00:00:00Z: Review feedback moved boundary manifest
+      observability into the docs-gate library entry points. `load_manifest`
+      and `load_manifest_file` now emit structured `tracing` events, increment
+      `weaver_docs_gate_boundary_manifest_load_total` with bounded
+      source/outcome labels, and include remediation guidance in generated
+      read/schema errors. The renderer test helper no longer uses the flagged
+      `task.id.clone()` pattern.
 
 ## Surprises & discoveries
 
@@ -339,6 +346,14 @@ Recorded as they occur during implementation. Format:
   as `Boundary manifest gate`; gate failures use the
   `boundary_manifest_gate failure code=...` format documented in
   `docs/developers-guide.md`.
+- Observation: test-only observability did not help callers using the
+  docs-gate parser or filesystem adapter directly.
+  Evidence: review feedback noted that `load_manifest` and
+  `load_manifest_file` had no structured logging or metrics at their read and
+  schema-failure decision points.
+  Impact: those public entry points now record success and failure outcomes
+  through `tracing` and `metrics`, while leaving subscriber and recorder
+  installation to the application or CI harness boundary.
 
 ## Decision log
 
@@ -430,12 +445,13 @@ Recorded for any decision that future work must respect.
   strict integer-division and remainder lints, while `time::Date` expresses
   the explicit-date policy directly and keeps the gate portable.
   Date/Author: 2026-06-15, implementation.
-- Decision: keep boundary-gate observability local to the docs-gate
-  validation path.
-  Rationale: the gate is a documentation-governance check, not runtime
-  product behaviour. Structured failure strings, `tracing` events, and a
-  metrics counter give CI and local runs inspectable decision points without
-  changing the manifest schema, generated matrix, or public CLI behaviour.
+- Decision: keep boundary observability inside the docs-gate crate without
+  installing global telemetry infrastructure.
+  Rationale: the gate is documentation-governance behaviour, but callers also
+  use the parser and filesystem adapter directly. Emitting `tracing` events and
+  `metrics` counters from the library makes failures diagnosable, while
+  deferring subscriber and recorder setup keeps the crate reusable and avoids
+  global side effects.
   Date/Author: 2026-06-21, implementation.
 
 ## Outcomes & retrospective
@@ -475,6 +491,15 @@ validation failures include a stable failure code, a human-readable message,
 and the remediation command sequence. The gate emits `tracing` events at row
 validation decision points and increments
 `weaver_docs_gate_boundary_validation_failures_total` when an invariant fails.
+
+Another review follow-up moved the operational signal into production library
+paths. `load_manifest` and `load_manifest_file` now emit structured events on
+load attempts, successes, read failures, invalid paths, missing files, and
+schema failures. They increment
+`weaver_docs_gate_boundary_manifest_load_total` with low-cardinality
+`source` and `outcome` labels and attach the same remediation guidance to
+generated read and schema errors that the CI gate prints for validation
+failures.
 
 ## Context and orientation
 

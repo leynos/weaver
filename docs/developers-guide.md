@@ -90,6 +90,16 @@ filesystem adapter to read `docs/orthoconfig-consumer-boundary.toml`. Use
 groups rows by roadmap phase, and sizes columns from the escaped cell content,
 so callers should pass domain values rather than preformatted Markdown rows.
 
+`load_manifest` and `load_manifest_file` emit `tracing` events on load
+attempts, successes, and failures using the
+`weaver_docs_gate::boundary_manifest` target. They also increment the
+`weaver_docs_gate_boundary_manifest_load_total` counter with bounded `source`
+and `outcome` labels. Libraries must not install a global subscriber or metrics
+recorder; callers that need diagnostics should install those at the application
+or CI harness boundary. Parser and file-adapter errors include the remediation
+step used by the CI gate so local developer tools and test output point at the
+same recovery path.
+
 When adding or renaming a public command:
 
 1. Update the OrthoConfig-backed command metadata or the Weaver semantic

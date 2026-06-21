@@ -53,8 +53,8 @@ Boundary classifications for this step are tracked in the
     consolidated state evidence validation without changing the boundary
     contract.
   - Follow-up observability work added a named CI boundary-manifest gate,
-    structured remediation messages, and trace/metric events for validation
-    failures.
+    structured remediation messages, and library trace/metric events for
+    manifest load outcomes.
   - Success: every command-contract task says whether it consumes OrthoConfig,
     wraps it temporarily, or records a deliberate divergence in ADR 007.
 - [ ] 12.1.2. Consume recursive command metadata.

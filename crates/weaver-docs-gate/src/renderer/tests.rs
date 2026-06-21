@@ -13,7 +13,7 @@ use crate::{BoundaryManifest, UpstreamRef, UpstreamRole};
 /// Prove numeric phase grouping does not confuse `1.*` with `12.*` tasks.
 #[test]
 fn groups_rows_by_phase_without_prefix_collisions() {
-    let manifest = manifest_with_tasks(vec![task("1.1.1"), task("12.1.1")]);
+    let manifest = manifest_with_task_ids(vec!["1.1.1".into(), "12.1.1".into()]);
 
     let rows = grouped_rows(&manifest);
 
@@ -44,7 +44,7 @@ fn computes_column_widths_from_escaped_cells() {
 /// Pin the stable generated Markdown shape for one representative task.
 #[test]
 fn snapshots_rendered_matrix_shape() {
-    let manifest = manifest_with_tasks(vec![task("12.1.1")]);
+    let manifest = manifest_with_task_ids(vec!["12.1.1".into()]);
 
     insta::assert_snapshot!(render_matrix(&manifest), @r###"
     # OrthoConfig consumer boundary
@@ -108,12 +108,12 @@ proptest! {
     #[test]
     /// Prove arbitrary numeric phase IDs are grouped exactly once.
     fn phase_grouping_preserves_arbitrary_phase_ids(phases in proptest::collection::vec(1u16..=999, 1..32)) {
-        let tasks = phases
+        let task_ids = phases
             .iter()
             .enumerate()
-            .map(|(index, phase)| task(&format!("{phase}.{index}.1")))
+            .map(|(index, phase)| format!("{phase}.{index}.1"))
             .collect::<Vec<_>>();
-        let manifest = manifest_with_tasks(tasks);
+        let manifest = manifest_with_task_ids(task_ids);
         let rows = grouped_rows(&manifest);
         let expected = phases
             .iter()
@@ -140,7 +140,11 @@ proptest! {
             role: UpstreamRole::Renderer,
         }];
 
-        let rendered = render_matrix(&manifest_with_tasks(vec![boundary_task]));
+        let rendered = render_matrix(&BoundaryManifest {
+            schema_version: 1,
+            managed_tasks: vec!["12.1.1".into()],
+            tasks: vec![boundary_task],
+        });
         for line in rendered.lines().filter(|line| line.starts_with("| [")) {
             prop_assert!(line.matches(" | ").count() == 7);
         }
@@ -159,9 +163,15 @@ fn has_unescaped_pipe(value: &str) -> bool {
     false
 }
 
-/// Build a manifest containing the supplied task rows.
-fn manifest_with_tasks(tasks: Vec<BoundaryTask>) -> BoundaryManifest {
-    let managed_tasks = tasks.iter().map(|task| task.id.clone()).collect();
+/// Build a manifest containing representative rows for the supplied task IDs.
+fn manifest_with_task_ids(task_ids: Vec<String>) -> BoundaryManifest {
+    let (managed_tasks, tasks) = task_ids
+        .into_iter()
+        .map(|id| {
+            let boundary_task = task(&id);
+            (id, boundary_task)
+        })
+        .unzip();
     BoundaryManifest {
         schema_version: 1,
         managed_tasks,
