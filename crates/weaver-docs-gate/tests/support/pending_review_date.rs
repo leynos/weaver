@@ -1,6 +1,6 @@
 //! Pending dependency review-date expiry checks for the boundary manifest gate.
 
-use time::{Date, OffsetDateTime, format_description::well_known::Iso8601};
+use time::{Date, format_description::well_known::Iso8601};
 
 const PENDING_REVIEW_WINDOW_DAYS: i64 = 270;
 
@@ -16,9 +16,12 @@ fn ensure(condition: bool, message: impl Into<String>) -> TestResult {
 }
 
 /// Validate that a pending row's review date is not stale.
-pub(crate) fn validate_pending_review_date(value: &str, task_id: &str) -> TestResult {
+pub(crate) fn validate_pending_review_date(
+    value: &str,
+    task_id: &str,
+    build_date: Date,
+) -> TestResult {
     let review_date = parse_review_date(value, task_id)?;
-    let build_date = build_date()?;
     ensure(
         is_review_current(review_date, build_date),
         format!(
@@ -31,20 +34,6 @@ pub(crate) fn validate_pending_review_date(value: &str, task_id: &str) -> TestRe
 /// Parse a pending-review date for one manifest task.
 fn parse_review_date(value: &str, task_id: &str) -> TestResult<Date> {
     Date::parse(value, &Iso8601::DATE).map_err(|_| invalid_date_message(value, task_id))
-}
-
-/// Return the build date used for deterministic staleness checks.
-fn build_date() -> TestResult<Date> {
-    if let Ok(epoch) = std::env::var("SOURCE_DATE_EPOCH") {
-        let seconds = epoch
-            .parse::<i64>()
-            .map_err(|error| format!("SOURCE_DATE_EPOCH must be Unix seconds: {error}"))?;
-        OffsetDateTime::from_unix_timestamp(seconds)
-            .map(OffsetDateTime::date)
-            .map_err(|error| format!("SOURCE_DATE_EPOCH is outside supported range: {error}"))
-    } else {
-        Ok(OffsetDateTime::now_utc().date())
-    }
 }
 
 /// Build a diagnostic for an invalid pending-review date.

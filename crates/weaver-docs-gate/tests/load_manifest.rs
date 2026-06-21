@@ -89,6 +89,35 @@ fn load_manifest_reports_invalid_toml() -> TestResult {
     })
 }
 
+/// Snapshot the stable display strings for public boundary errors.
+#[test]
+fn boundary_error_display_messages_are_stable() {
+    insta::assert_snapshot!(
+        BoundaryError::NotFound(Utf8PathBuf::from("docs/missing.toml")).to_string(),
+        @"manifest file not found: docs/missing.toml"
+    );
+    insta::assert_snapshot!(
+        BoundaryError::InvalidPath(Utf8PathBuf::from("/")).to_string(),
+        @"invalid manifest path: /"
+    );
+    insta::assert_snapshot!(
+        BoundaryError::Unreadable {
+            path: Utf8PathBuf::from("docs/manifest.toml"),
+            detail: "permission denied".into(),
+        }
+        .to_string(),
+        @"boundary manifest cannot be read: docs/manifest.toml: permission denied"
+    );
+    insta::assert_snapshot!(
+        BoundaryError::InvalidSchema {
+            path: Utf8PathBuf::from("docs/manifest.toml"),
+            detail: "missing field `schema_version`".into(),
+        }
+        .to_string(),
+        @"invalid boundary manifest schema in docs/manifest.toml: missing field `schema_version`"
+    );
+}
+
 /// Prove adapter DTOs map manifest values into plain domain types.
 #[test]
 fn load_manifest_maps_toml_dto_to_domain_types() -> TestResult {

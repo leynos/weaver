@@ -7,6 +7,7 @@ use std::collections::BTreeSet;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs::Dir};
+use time::{Date, macros::date};
 use weaver_docs_gate::{
     BoundaryManifest,
     BoundaryState,
@@ -17,6 +18,7 @@ use weaver_docs_gate::{
 
 const ADR_007: &str = "docs/adr-007-agent-native-command-surface.md";
 const MANIFEST: &str = "docs/orthoconfig-consumer-boundary.toml";
+const MANIFEST_BUILD_DATE: Date = date!(2026 - 06 - 21);
 const MATRIX: &str = "docs/orthoconfig-consumer-boundary.md";
 const ROADMAP: &str = "docs/roadmap.md";
 
@@ -272,7 +274,11 @@ fn validate_pending_evidence(task: &BoundaryTask) -> TestResult {
         .as_deref()
         .ok_or_else(|| format!("pending task {} must provide next_review_by", task.id))?;
     validate_date(next_review_by, FieldName::NextReviewBy, task)?;
-    pending_review_date::validate_pending_review_date(next_review_by, &task.id)?;
+    pending_review_date::validate_pending_review_date(
+        next_review_by,
+        &task.id,
+        MANIFEST_BUILD_DATE,
+    )?;
     ensure(
         task.shipped_in.is_none(),
         format!("pending task {} must not carry shipped_in", task.id),

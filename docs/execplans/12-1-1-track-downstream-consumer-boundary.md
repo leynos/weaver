@@ -251,10 +251,16 @@ state, not the intended sequence.
       `make test`.
 - [x] 2026-06-15T23:20:03Z: The pending review expiry check now parses
       `next_review_by` as a calendar date and fails pending rows that are
-      more than 270 days behind the build date. The build date comes from
-      `SOURCE_DATE_EPOCH` when set and from the wall clock otherwise.
+      more than 270 days behind the explicit manifest build date supplied by
+      the test gate.
       Validation passed with `cargo test -p weaver-docs-gate`,
       `make check-fmt`, `make lint`, and `make test`.
+- [x] 2026-06-21T00:00:00Z: Review feedback removed the implicit time source
+      from the pending-review staleness helper. The helper now accepts the
+      build date as a parameter, and the manifest integration test passes a
+      fixed `MANIFEST_BUILD_DATE` so validation does not depend on
+      `SOURCE_DATE_EPOCH` or the wall clock. The same follow-up added inline
+      snapshots for stable `BoundaryError` display strings.
 
 ## Surprises & discoveries
 
@@ -305,7 +311,7 @@ Recorded as they occur during implementation. Format:
   like `YYYY-MM-DD` but did not compare it with the build date.
   Impact: `crates/weaver-docs-gate/tests/support/pending_review_date.rs` now
   parses the date with the `time` crate and rejects pending reviews more than
-  270 days behind `SOURCE_DATE_EPOCH` or the wall-clock date.
+  270 days behind the explicit build date provided by the manifest gate.
 
 ## Decision log
 
@@ -394,8 +400,8 @@ Recorded for any decision that future work must respect.
 - Decision: use the existing workspace `time` crate for pending review date
   parsing and build-date comparison.
   Rationale: manual calendar arithmetic conflicts with the repository's
-  strict integer-division and remainder lints, while `time::Date` and
-  `OffsetDateTime` express the policy directly and keep the gate portable.
+  strict integer-division and remainder lints, while `time::Date` expresses
+  the explicit-date policy directly and keeps the gate portable.
   Date/Author: 2026-06-15, implementation.
 
 ## Outcomes & retrospective
@@ -425,8 +431,9 @@ main implementation completed with `findings: 0`.
 
 A post-completion fix closed the documented pending-review expiry gap. Pending
 rows now fail once `next_review_by` is more than 270 days behind the build
-date, using `SOURCE_DATE_EPOCH` for reproducible builds and the wall clock
-otherwise.
+date supplied by the manifest gate. A later review follow-up made that build
+date an explicit parameter so the gate no longer depends on
+`SOURCE_DATE_EPOCH` or the wall clock.
 
 ## Context and orientation
 
@@ -776,12 +783,12 @@ Stage D enforces the matrix at CI time.
    - **Date formats.** `last_reviewed` and `next_review_by` parse as
      ISO-8601 dates (`YYYY-MM-DD`).
    - **Staleness budget (warn).** When any row's `last_reviewed` is
-     more than 270 days behind the build's `SOURCE_DATE_EPOCH` (or wall
-     clock if the variable is unset), the test prints a warning naming
-     the row but does not fail.
+     more than 270 days behind the explicit build date supplied by the
+     manifest gate, the test prints a warning naming the row but does not
+     fail.
    - **`pending` decay budget (fail).** When a `pending` row's
-     `next_review_by` is more than 270 days *behind* the same
-     reference date, the test fails. This stops `pending` rows from
+     `next_review_by` is more than 270 days *behind* the same explicit
+     build date, the test fails. This stops `pending` rows from
      becoming a parking lot.
    - **Matrix freshness.** The Markdown produced by `render_matrix`
      equals the committed `docs/orthoconfig-consumer-boundary.md`
