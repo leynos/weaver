@@ -49,9 +49,7 @@ fn load_manifest_reports_missing_files() -> TestResult {
         .err()
         .ok_or("missing file loaded")?;
 
-    assert_boundary_file_error(&error, |boundary_error| {
-        matches!(boundary_error, BoundaryFileError::NotFound(_))
-    })
+    assert_error_variant(&error, |e| matches!(e, BoundaryFileError::NotFound(_)))
 }
 
 /// Prove paths without a file name return the invalid-path variant.
@@ -61,9 +59,7 @@ fn load_manifest_reports_invalid_paths() -> TestResult {
         .err()
         .ok_or("root path loaded as manifest")?;
 
-    assert_boundary_file_error(&error, |boundary_error| {
-        matches!(boundary_error, BoundaryFileError::InvalidPath(_))
-    })
+    assert_error_variant(&error, |e| matches!(e, BoundaryFileError::InvalidPath(_)))
 }
 
 /// Prove non-file manifest paths return the unreadable variant.
@@ -80,8 +76,8 @@ fn load_manifest_reports_read_errors() -> TestResult {
         .err()
         .ok_or("directory loaded as manifest")?;
 
-    assert_boundary_file_error(&error, |boundary_error| {
-        matches!(boundary_error, BoundaryFileError::Unreadable { .. })
+    assert_error_variant(&error, |e| {
+        matches!(e, BoundaryFileError::Unreadable { .. })
     })
 }
 
@@ -92,9 +88,7 @@ fn load_manifest_reports_invalid_toml() -> TestResult {
         .err()
         .ok_or("invalid TOML loaded as manifest")?;
 
-    assert_boundary_error(&error, |boundary_error| {
-        matches!(boundary_error, BoundaryError::InvalidSchema { .. })
-    })
+    assert_error_variant(&error, |e| matches!(e, BoundaryError::InvalidSchema { .. }))
 }
 
 /// Snapshot the stable display strings for public parser errors.
@@ -267,27 +261,15 @@ where
     }
 }
 
-/// Check a boundary error variant while preserving diagnostics on mismatch.
-fn assert_boundary_error(
-    error: &BoundaryError,
-    predicate: impl FnOnce(&BoundaryError) -> bool,
-) -> TestResult {
+/// Check an error variant while preserving full debug diagnostics on mismatch.
+fn assert_error_variant<E>(error: &E, predicate: impl FnOnce(&E) -> bool) -> TestResult
+where
+    E: std::fmt::Debug,
+{
     if predicate(error) {
         Ok(())
     } else {
-        Err(format!("unexpected boundary error: {error:?}"))
-    }
-}
-
-/// Check a boundary file error variant while preserving diagnostics on mismatch.
-fn assert_boundary_file_error(
-    error: &BoundaryFileError,
-    predicate: impl FnOnce(&BoundaryFileError) -> bool,
-) -> TestResult {
-    if predicate(error) {
-        Ok(())
-    } else {
-        Err(format!("unexpected boundary file error: {error:?}"))
+        Err(format!("unexpected error variant: {error:?}"))
     }
 }
 
