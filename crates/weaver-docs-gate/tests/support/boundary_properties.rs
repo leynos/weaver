@@ -138,30 +138,11 @@ fn task_with_evidence(state: BoundaryState, evidence: Evidence) -> BoundaryTask 
 
 /// Return whether the generated evidence set is valid for a state.
 const fn expected_state_evidence(state: BoundaryState, flags: EvidenceFlags) -> bool {
-    match state {
-        BoundaryState::Consumes => {
-            flags.has(SHIPPED_IN)
-                && !flags.has(REMOVAL_GATE)
-                && !flags.has(ADR_ANCHOR)
-                && !flags.has(NEXT_REVIEW_BY)
-        }
-        BoundaryState::Wraps => {
-            flags.has(REMOVAL_GATE)
-                && !flags.has(SHIPPED_IN)
-                && !flags.has(ADR_ANCHOR)
-                && !flags.has(NEXT_REVIEW_BY)
-        }
-        BoundaryState::Pending => {
-            flags.has(NEXT_REVIEW_BY)
-                && !flags.has(SHIPPED_IN)
-                && !flags.has(REMOVAL_GATE)
-                && !flags.has(ADR_ANCHOR)
-        }
-        BoundaryState::Divergent => {
-            flags.has(ADR_ANCHOR)
-                && !flags.has(SHIPPED_IN)
-                && !flags.has(REMOVAL_GATE)
-                && !flags.has(NEXT_REVIEW_BY)
-        }
-    }
+    let required = match state {
+        BoundaryState::Consumes => SHIPPED_IN,
+        BoundaryState::Wraps => REMOVAL_GATE,
+        BoundaryState::Pending => NEXT_REVIEW_BY,
+        BoundaryState::Divergent => ADR_ANCHOR,
+    };
+    flags.0 == required
 }
