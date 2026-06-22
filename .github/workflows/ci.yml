@@ -46,6 +46,8 @@ jobs:
         run: uv tool install nixie-cli==1.0.0
       - name: Mermaid lint
         run: make nixie
+      - name: Boundary manifest gate
+        run: cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture
       - name: Install Whitaker
         run: |
           cargo install --locked \

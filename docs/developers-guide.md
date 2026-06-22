@@ -16,6 +16,102 @@ from OrthoConfig-backed command metadata plus Weaver-owned semantic adapters.
 Do not add new public command grammar by hand in `clap`, daemon routing, manual
 pages, help text, and docs independently.
 
+The [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md) is
+the source of truth for command-contract roadmap tasks. Before adding,
+renaming, or reclassifying a public command task, update
+`docs/orthoconfig-consumer-boundary.toml` and regenerate
+`docs/orthoconfig-consumer-boundary.md` with:
+
+```sh
+cargo run -p weaver-docs-gate --example render_boundary_matrix -- \
+  docs/orthoconfig-consumer-boundary.toml docs/orthoconfig-consumer-boundary.md
+```
+
+Use `consumes` only when the upstream OrthoConfig contract has shipped and the
+row can name the release or pinned SHA in `shipped_in`. Use `wraps` for a
+temporary Weaver adapter with a concrete removal gate, `pending` for an
+upstream contract that is not decided or shipped yet, and `divergent` only when
+ADR 007 records the deliberate Weaver-owned divergence.
+
+The CI workflow runs the boundary manifest gate as a named
+`Boundary manifest gate` step before the wider coverage action. A failed
+invariant emits a structured message shaped as:
+
+```text
+boundary_manifest_gate failure code=<stable-code>
+message: <human-readable failure>
+remediation: update docs/orthoconfig-consumer-boundary.toml, regenerate
+docs/orthoconfig-consumer-boundary.md, then rerun cargo test -p weaver-docs-gate
+```
+
+Treat the `remediation` line as the recovery checklist. Update the TOML source
+of truth first, regenerate the Markdown matrix with the command above, and rerun
+`cargo test -p weaver-docs-gate --test boundary_manifest -- --nocapture`
+locally when you need the same visible failure output that CI reports.
+
+### `weaver-docs-gate` boundary API
+
+The private `weaver-docs-gate` workspace member owns the generated OrthoConfig
+consumer boundary matrix and the referential-integrity checks that keep
+command-contract roadmap tasks classified. The crate is intentionally a
+developer tool, not a runtime dependency for `weaver` or `weaverd`.
+
+The public library API exposes the domain types used by the manifest,
+validation gate, and renderer. Those types deserialize directly from TOML with
+the manifest spellings used in `docs/orthoconfig-consumer-boundary.toml`; empty
+optional evidence strings deserialize as absent values so the checked-in
+manifest stays explicit without carrying separate DTO translation code:
+
+- `BoundaryState` is the four-state classification vocabulary: `consumes`,
+  `wraps`, `pending`, and `divergent`. Use `as_str()` when diagnostics or
+  generated text need the canonical manifest spelling.
+- `UpstreamRole` names the kind of OrthoConfig contract a Weaver task consumes
+  or waits for, such as `renderer`, `profile`, `delivery`, or
+  `execution_ledger`.
+- `UpstreamRef` pairs an upstream roadmap or design reference with an
+  `UpstreamRole`.
+- `BoundaryTask` is one classified Weaver roadmap task row. Its optional
+  evidence fields are state-specific: `shipped_in` for `consumes`,
+  `removal_gate` for `wraps`, `next_review_by` for `pending`, and `adr_anchor`
+  for `divergent`.
+- `BoundaryManifest` is the complete source-of-truth document. Its
+  `managed_tasks` registry must match the ordered `tasks` rows so new
+  command-contract roadmap items fail closed until explicitly classified.
+- `BoundaryError` reports path-free manifest parser failures. Match it when a
+  test or developer tool reads manifest bytes from an in-memory fixture, a
+  network response, or another non-filesystem source.
+- `BoundaryFileError` reports filesystem adapter failures. Match it when a
+  tool must distinguish a missing file, invalid path, unreadable manifest file,
+  or invalid boundary schema with file context.
+
+Use `load_manifest(reader)` when the caller already owns manifest bytes. Use
+`load_manifest_file(path)` when a tool needs the crate's capability-oriented
+filesystem adapter to read `docs/orthoconfig-consumer-boundary.toml`. Use
+`render_matrix(&manifest)` to produce the Markdown contents for
+`docs/orthoconfig-consumer-boundary.md`. The renderer escapes table cells,
+groups rows by roadmap phase, and sizes columns from the escaped cell content,
+so callers should pass domain values rather than preformatted Markdown rows.
+
+`load_manifest` and `load_manifest_file` emit `tracing` events on load
+attempts, successes, and failures using the
+`weaver_docs_gate::boundary_manifest` target. They also increment the
+`weaver_docs_gate_boundary_manifest_load_total` counter with bounded `source`
+and `outcome` labels. Libraries must not install a global subscriber or metrics
+recorder; callers that need diagnostics should install those at the application
+or CI harness boundary. Parser and file-adapter errors include the remediation
+step used by the CI gate so local developer tools and test output point at the
+same recovery path. The public Rustdoc for both load functions documents these
+observable side effects; downstream callers that require silent parsing should
+isolate calls behind their own adapter and install no subscriber or metrics
+recorder.
+
+The docs-gate test suite also treats the matrix regeneration example as an
+externally observable interface. `tests/load_manifest.rs` covers the example's
+success path and argument/error paths, `tests/support/boundary_properties.rs`
+covers generated date and state/evidence invariants, and
+`tests/compile_time.rs` uses `trybuild` to prove downstream callers can compile
+against the exported API and error trait surface.
+
 When adding or renaming a public command:
 
 1. Update the OrthoConfig-backed command metadata or the Weaver semantic

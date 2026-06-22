@@ -40,9 +40,24 @@ from rediscovering the same dependency and migration questions.
 This step answers which generic command-contract pieces come from OrthoConfig
 and which temporary Weaver adapters are allowed. Its outcome informs every
 command-surface and renderer task. See ADR 007 and the OrthoConfig roadmap.
+Boundary classifications for this step are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
-- [ ] 12.1.1. Track the downstream consumer boundary.
+- [x] 12.1.1. Track the downstream consumer boundary.
   - Depends on OrthoConfig 5.2.3.
+  - Implemented by ADR 007 boundary vocabulary,
+    `docs/orthoconfig-consumer-boundary.toml`,
+    `docs/orthoconfig-consumer-boundary.md`, and the
+    `weaver-docs-gate` manifest tests.
+  - Follow-up test refactors typed path and field-label helper arguments and
+    consolidated state evidence validation without changing the boundary
+    contract.
+  - Follow-up observability work added a named CI boundary-manifest gate,
+    structured remediation messages, and library trace/metric events for
+    manifest load outcomes.
+  - Follow-up review coverage documents those observable load side effects,
+    adds example CLI error-path tests, property tests for date/evidence
+    invariants, and trybuild public API checks.
   - Success: every command-contract task says whether it consumes OrthoConfig,
     wraps it temporarily, or records a deliberate divergence in ADR 007.
 - [ ] 12.1.2. Consume recursive command metadata.
@@ -106,7 +121,9 @@ introspection, and agent-grade CLI hardening into one acceptance surface.
 
 This step answers whether Weaver-specific semantic metadata can sit on top of
 OrthoConfig command contracts without duplicating them. See ADR 007 and
-`docs/weaver-design.md` §§2.1.1-2.1.4.
+`docs/weaver-design.md` §§2.1.1-2.1.4. Boundary classifications for these tasks
+are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [x] 13.1.1. Record the agent-native command-surface reset as ADR 007.
   - Records the forward OrthoConfig dependency boundary that 12.1 validates.
@@ -131,7 +148,8 @@ OrthoConfig command contracts without duplicating them. See ADR 007 and
 This step answers whether the same command contract can serve humans and agents
 without forking command behaviour. It migrates prototype archive work 3.2.2
 through 3.3.4 and 11.3.1 through 11.3.4. See `docs/weaver-design.md` §§2.1.3,
-2.1.7, 2.1.10, and 2.1.11.
+2.1.7, 2.1.10, and 2.1.11. Boundary classifications for these tasks are tracked
+in the [OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 13.2.1. Implement the localized human renderer for `definitions get`.
   - Requires 13.1.2 and depends on OrthoConfig 7.2.2.
@@ -158,7 +176,9 @@ through 3.3.4 and 11.3.1 through 11.3.4. See `docs/weaver-design.md` §§2.1.3,
 This step answers whether humans and agents can discover the command contract
 from generated surfaces instead of hard-coded catalogues. It migrates prototype
 archive work 3.2.3 through 3.2.6, 5.7.1 through 5.7.5, and 11.3.2. See
-`docs/weaver-design.md` §§2.1.4 and 6.1.
+`docs/weaver-design.md` §§2.1.4 and 6.1. Boundary classifications for these
+tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 13.3.1. Implement `weaver context --json` for the pilot command family.
   - Requires 13.2.3 and depends on OrthoConfig 6.2.1 through 6.2.3.
@@ -242,6 +262,8 @@ cards-first context, same-file graph slices, and agent-grade compact output.
 This step answers whether existing semantic backends fit the resource-first
 surface without provider-specific commands. It migrates prototype archive work
 10.1.1 through 10.3.2. See `docs/weaver-design.md` §§2.2, 3.1, and 6.1.
+Boundary classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 14.1.1. Implement `weaver definitions get`.
   - Requires phase 13.
@@ -266,7 +288,9 @@ surface without provider-specific commands. It migrates prototype archive work
 This step answers whether compact symbol cards are enough to guide a user or
 agent to the next useful read. It migrates prototype archive work 7.1.1 through
 7.1.4, 9.2.1 through 9.2.3, and 10.2.1 through 10.2.2. See
-`docs/jacquard-card-first-symbol-graph-design.md` §§5-11.
+`docs/jacquard-card-first-symbol-graph-design.md` §§5-11. Boundary
+classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 14.2.1. Implement `weaver cards get` for position references.
   - Requires 14.1.1 and reuses prototype archive work 7.1.1 through 7.1.4.
@@ -286,6 +310,8 @@ agent to the next useful read. It migrates prototype archive work 7.1.1 through
 This step answers whether structural grep should graduate now or wait for the
 Sempai selector slice. It migrates the product intent of prototype archive work
 10.4.1 through 10.4.2 and 5.5.1 without forcing provider-specific commands.
+Boundary classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 14.3.1. Prototype `weaver symbols list --pattern` over `weaver-syntax`
       and optional `srgn`.
@@ -315,7 +341,9 @@ cards, and the Sempai-to-Jacquard vertical slice.
 This step answers whether the target one-liner grammar can select real symbols
 without overbuilding the full query engine. It migrates prototype archive work
 4.1.6 through 4.1.7, 4.3.3, and 9.1.1. See
-`docs/sempai-query-language-design.md` §§3-6.
+`docs/sempai-query-language-design.md` §§3-6. Boundary classifications for
+these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 15.1.1. Implement one-liner tokenization and Pratt parsing for positive
       symbol patterns.
@@ -407,7 +435,9 @@ This step answers whether the backend can be exposed through Weaver's
 resource-first command surface with stable schemas, cache behaviour,
 diagnostics, quality gates, and default-enablement rules. It preserves
 prototype archive work 4.3.1 through 4.3.9 under the new public command shape.
-See `docs/weaver-design.md` §2.1.2.
+See `docs/weaver-design.md` §2.1.2. Boundary classifications for these tasks
+are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 15.3.1. Add Sempai execution routing in `weaverd` for selector-backed
       `symbols list`.
@@ -494,6 +524,8 @@ the symbol-relocation tasks below.
 This step answers whether the completed patch and Double-Lock foundations fit
 the resource-first grammar. It migrates prototype archive work 6.1.1 through
 6.1.4 and 11.4.1 through 11.4.2. See `docs/weaver-design.md` §§4.2-4.3.
+Boundary classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 16.1.1. Implement `weaver patches apply`.
   - Requires phase 13 and reuses prototype archive work 6.1.1 through 6.1.4.
@@ -516,6 +548,8 @@ the resource-first grammar. It migrates prototype archive work 6.1.1 through
 This step answers whether provider-hidden actuators can mutate safely from both
 direct references and Sempai streams. It migrates prototype archive work 5.2.1
 through 5.2.6, 10.5.1 through 10.5.2, and 4.3.5. See ADR 001 and ADR 004.
+Boundary classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 16.2.1. Implement `weaver symbols rename` for position references.
   - Requires 16.1.3 and reuses prototype archive work 5.2.1 through 5.2.5.
@@ -656,6 +690,8 @@ This step answers whether graph traversal gives enough extra value to justify
 its complexity. It preserves the completed prototype archive schema work 7.2.1
 and migrates prototype archive work 7.2.2 through 7.2.5, 11.1.1, and 11.2.2. See
 `docs/jacquard-card-first-symbol-graph-design.md` §12.1 through §12.3.
+Boundary classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 17.1.1. Implement a two-pass Tree-sitter extraction pipeline for graph
       slices.
@@ -694,7 +730,8 @@ and migrates prototype archive work 7.2.2 through 7.2.5, 11.1.1, and 11.2.2. See
 This step answers whether historical graph reconstruction is stable enough to
 support change-risk narratives. It migrates prototype archive work 7.3.1
 through 7.3.5. See `docs/jacquard-card-first-symbol-graph-design.md` §13.1,
-§13.2, and §22.
+§13.2, and §22. Boundary classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 17.2.1. Implement git-backed blob loading for historical revisions
       without checkout.
@@ -852,7 +889,9 @@ prototype archive work 5.5.1, 5.6.1, and 5.8.1. See ADR 001, ADR 004, and ADR
 This step answers whether humans and agents can debug provider selection when
 needed without making provider names normal command syntax. It migrates
 prototype archive work 5.7.1 through 5.7.5 and 5.2.6. See
-`docs/weaver-design.md` §6.1.
+`docs/weaver-design.md` §6.1. Boundary classifications for these tasks are
+tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 18.2.1. Wire provider summaries into `capabilities list` and
       `context --json`.
@@ -886,7 +925,9 @@ formal verification, output delivery, feedback, profiles, and jobs.
 This step answers whether profiles, jobs, and delivery reduce repeated agent
 turns without making human usage worse. It migrates the product intent of ADR
 007 compounding primitives and prototype archive work 6.2.1. See
-`docs/weaver-design.md` §§2.1.5-2.1.6.
+`docs/weaver-design.md` §§2.1.5-2.1.6. Boundary classifications for these tasks
+are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 19.1.1. Implement profile storage, redaction, and root `--profile`.
   - Requires 13.3.1 and depends on OrthoConfig 9.1.
@@ -912,7 +953,9 @@ turns without making human usage worse. It migrates the product intent of ADR
 
 This step answers whether richer human workflows can exist without weakening
 the non-interactive agent contract. It migrates prototype archive work 6.2.1
-through 6.2.3. See `docs/weaver-design.md` §§5-6.
+through 6.2.3. See `docs/weaver-design.md` §§5-6. Boundary classifications for
+these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 19.2.1. Recast project onboarding as a composition of resource-first
       commands.
@@ -970,7 +1013,8 @@ the core Weaver promise.
 
 This step answers whether external integration surfaces are wrappers over the
 same command metadata or a distracting second product. See ADR 007 and
-OrthoConfig 10.1.
+OrthoConfig 10.1. Boundary classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md).
 
 - [ ] 20.1.1. Decide whether to generate MCP descriptions from
       `context --json`.
@@ -1011,7 +1055,9 @@ This step answers whether optional observability surfaces have earned a new
 design after the local-first RFC 0001 contract exists. It keeps metrics,
 distributed tracing, retained diagnostics, and status expansion out of the core
 promise until their privacy, retention, endpoint, and command-latency costs are
-explicit. See RFC 0001:
+explicit. Boundary classifications for these tasks are tracked in the
+[OrthoConfig consumer boundary matrix](orthoconfig-consumer-boundary.md). See
+RFC 0001:
 
 - [Open questions](rfcs/0001-o11y.md#open-questions)
 - [Local request correlation](rfcs/0001-o11y.md#local-request-correlation)

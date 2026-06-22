@@ -146,6 +146,50 @@ Any local helper that survives after those OrthoConfig tasks are available must
 record a permanent divergence in this ADR before it can remain in the
 implementation.
 
+## Boundary classification
+
+Every live roadmap task that touches the command contract must be classified in
+the OrthoConfig consumer boundary matrix at
+[`docs/orthoconfig-consumer-boundary.md`](orthoconfig-consumer-boundary.md).
+The machine-readable source of truth is
+[`docs/orthoconfig-consumer-boundary.toml`](orthoconfig-consumer-boundary.toml).
+The matrix complements the dependency table and removal policy above; it does
+not replace either one.
+
+The matrix uses these columns:
+
+- `Roadmap task` links to the Weaver roadmap task being classified.
+- `Gist` summarizes the task in one reviewable sentence.
+- `State` is one of `consumes`, `wraps`, `pending`, or `divergent`.
+- `Upstream OrthoConfig task` names the upstream task IDs the Weaver task
+  depends on.
+- `Shipped in` names the OrthoConfig release tag or pinned commit SHA that
+  landed the contract for `consumes` rows.
+- `Removal gate or divergence` records either the replacement condition for a
+  temporary wrapper or the ADR 007 section that owns a deliberate divergence.
+- `Next review by` records the next review date for unresolved upstream
+  contracts.
+- `Last reviewed` records the last date the row was checked.
+
+The four boundary states have fixed evidence requirements:
+
+- `consumes` means Weaver follows an OrthoConfig contract that has already
+  shipped. The row must name the upstream task and the OrthoConfig release tag
+  or pinned commit SHA in `Shipped in`.
+- `wraps` means Weaver keeps a narrow temporary adapter while waiting for an
+  upstream contract whose shape is already committed. The row must name the
+  upstream task and the removal gate.
+- `pending` means Weaver depends on an upstream contract whose shape has not
+  yet been decided. The row must name the upstream task and a `Next review by`
+  date. This state exists so `wraps` remains reserved for contracts whose
+  upstream shape is already committed.
+- `divergent` means Weaver deliberately keeps a different contract. The row
+  must point to the ADR 007 section that explains the divergence.
+
+The matrix may display the states with symbols for scanning, but the textual
+state is the contract. Reviewers should treat the TOML row as the authority and
+the Markdown matrix as generated documentation.
+
 ## Human renderer contract
 
 The default renderer is for humans. It emits localized, readable output with
