@@ -216,6 +216,8 @@ local signals that support later read, mutation, and workflow slices. See RFC
 - [Health snapshot](rfcs/0001-o11y.md#health-snapshot)
 - [Acceptance criteria](rfcs/0001-o11y.md#acceptance-criteria)
 
+<!-- Separate the reference list above from the task checklist below. -->
+
 - [ ] 13.4.1. Define canonical daemon event names and structured fields.
   - Requires 13.2.2 and 13.2.3.
   - Success: lifecycle, request, dispatch, and listener events have stable
@@ -1066,6 +1068,8 @@ RFC 0001:
 - [metrics endpoint](rfcs/0001-o11y.md#deferred-path-optional-metrics-endpoint)
 - [options considered](rfcs/0001-o11y.md#options-considered)
 
+<!-- Separate the reference list above from the task checklist below. -->
+
 - [ ] 20.3.1. Decide whether CLI pre-daemon diagnostics need a minimal
       `tracing` subscriber.
   - Requires 13.4.6.
@@ -1096,7 +1100,7 @@ RFC 0001:
     or aggregation surface requires a follow-up RFC with local-binding,
     feature-flag, privacy, and latency rules.
 
-## Archive
+**Archive:**
 
 Historical prototype roadmap entries live in
 [`docs/archive/prototype-roadmap.md`](archive/prototype-roadmap.md). Those
