@@ -20,7 +20,7 @@ ortho_config.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 percent-encoding = "2.3.2"
-strum = { version = "0.26.3", features = ["derive"] }
+strum = { version = "0.28.0", features = ["derive"] }
 url = { version = "2.5", features = ["serde"] }
 
 [target.'cfg(unix)'.dependencies]
