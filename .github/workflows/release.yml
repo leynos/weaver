@@ -50,8 +50,8 @@ jobs:
       should_upload_workflow_artifacts: ${{ steps.release_modes.outputs.should-upload-workflow-artifacts }}
       repo_name: ${{ steps.repo_name.outputs.value }}
     steps:
-      - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633
-        # v4.1.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        # v7.0.0
       - id: repo_name
         name: Determine repository name
         run: echo "value=${GITHUB_REPOSITORY#*/}" >>"$GITHUB_OUTPUT"
@@ -129,8 +129,8 @@ jobs:
       - build-freebsd
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633
-        # v4.1.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        # v7.0.0
       - name: Ensure release exists (draft)
         shell: bash
         run: |
