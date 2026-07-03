@@ -912,6 +912,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
+name = "granit-parser"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14668345710c92cb04181d9268407067689327d4b055273e3c4179a0777ee6a1"
+dependencies = [
+ "arraydeque",
+ "smallvec",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2159,17 +2169,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "saphyr-parser-bw"
-version = "0.0.610"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d643f5e972f17219245b82f038c22cd3c74320bb17c6e8f7e8537de268b1bc6"
-dependencies = [
- "arraydeque",
- "smallvec",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "scc"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2268,20 +2267,19 @@ dependencies = [
 
 [[package]]
 name = "serde-saphyr"
-version = "0.0.22"
+version = "0.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "546b4da4f679832602a8f8ab8ddc10b6b1d2e1a13b4f9dddcaee499436fa06ad"
+checksum = "a15e3bc297370dc9c526bcf0986f29167a9286cfaad404f2f572b3074dabe5ec"
 dependencies = [
  "ahash",
  "annotate-snippets",
  "base64",
  "encoding_rs_io",
  "getrandom 0.3.4",
+ "granit-parser",
  "nohash-hasher",
  "num-traits",
- "regex",
- "saphyr-parser-bw",
- "serde",
+ "serde_core",
  "smallvec",
  "zmij",
 ]
