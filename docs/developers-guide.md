@@ -9,6 +9,39 @@ need but operators do not. For user-facing behaviour see the
 
 The workspace targets `ortho_config` v0.8.0 and Rust 1.88.
 
+## Spelling enforcement (en-GB-oxendict)
+
+Markdown documentation is spell-checked against en-GB-oxendict (Oxford)
+spelling by [`typos`](https://github.com/crate-ci/typos). Run the gate locally
+with `make typos`, which runs `typos` over every tracked Markdown file
+(excluding `target/` and `dist/`) using the generated `typos.toml`
+configuration. CI runs the same gate as the `Spelling (en-GB-oxendict)` step in
+the CI workflow, installing the pinned `typos` release through `uv tool run`.
+The version is single-sourced as `TYPOS_VERSION` in the `Makefile`, so the
+Makefile and CI cannot drift apart.
+
+### Regenerating `typos.toml`
+
+`typos.toml` is generated, not hand-edited. The `en-gb` locale corrects
+American spellings (`color` to `colour`) but prefers the `-ise` family over
+Oxford `-ize`. `scripts/generate_typos_config.py` restores Oxford spelling by
+emitting, for each curated stem, an identity entry that accepts the `-ize`
+inflection and an `-ise`-to-`-ize` correction. Regenerate after changing the
+script with `uv run scripts/generate_typos_config.py`.
+
+Extend enforcement by editing the generator, never `typos.toml` directly:
+
+- Add a word stem to `STEMS` to keep its Oxford `-ize` inflections (for
+  example `amort` keeps `amortize`). Stems taking `-yse` (analyse, paralyse)
+  are omitted because the locale already enforces the British form.
+- Add a verbatim-accepted token to `EXTRA_ACCEPTED_WORDS`.
+- Add a proper noun (such as `HashiCorp` or `Rust Analyzer`) or a preserved
+  template heading (such as `## Artifacts and notes`) to `extend-ignore-re` in
+  the generator's `HEADER` when the upstream spelling must be kept.
+
+Inline code spans and fenced code blocks are ignored, so identifiers and API
+names keep their upstream spelling.
+
 ## Adding or renaming public commands
 
 ADR 007 makes the 0.1.0 public command surface resource-first and generated

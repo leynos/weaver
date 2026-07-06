@@ -3,6 +3,9 @@ target/
 .grepai/
 *:Zone.Identifier
 .agents/mcp/context_pack/packs/
+.memdb/
+.uv-cache/
+.uv-tools/
 .*.sw?
 *~
 .*.un~

@@ -309,7 +309,7 @@ A Tree-sitter escape hatch is represented as an atom within the plan (see
 
    - YAML rule file parsing.
    - One-liner DSL parsing.
-2. Normalisation:
+2. Normalization:
 
    - Lower legacy and v2 syntaxes to a shared formula model.[^3]
 3. Validation:
@@ -327,7 +327,7 @@ A Tree-sitter escape hatch is represented as an atom within the plan (see
 
    - Produce `Match` objects with spans, captures, and focus.
 
-### Normalised formula model
+### Normalized formula model
 
 The internal model follows the operator set used in the precedence and guidance
 documents.[^3]
@@ -479,7 +479,7 @@ Decorators:
 The DSL is intentionally minimal and deterministic. The primary objective is
 CLI ergonomics rather than expressive completeness.
 
-### Tokenisation
+### Tokenization
 
 Chumsky should consume a token stream produced by `logos`, not raw characters,
 to simplify spans and diagnostics.[^4]
@@ -1076,7 +1076,7 @@ using the guidance in the Rust parser testing document.[^6]
 Snapshot tests with `insta` should cover:
 
 - DSL parse trees and recovered error diagnostics.[^6]
-- Normalised formula output from both legacy and v2 inputs.
+- Normalized formula output from both legacy and v2 inputs.
 - Pattern IR compilation output (rewrites and wrapper selection).
 
 ### Corpus tests

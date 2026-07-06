@@ -176,7 +176,7 @@ Roadmap owner: `roadmap.md` 19.1.1.
 Current status: Weaver has stdout/stderr discipline and internal JSONL
 transport.
 
-Shortfall: artifact delivery sinks and agent feedback are not yet first-class,
+Shortfall: artefact delivery sinks and agent feedback are not yet first-class,
 discoverable, or schema-backed.
 
 Target contract: `--deliver stdout`, `--deliver file:<path>`, and

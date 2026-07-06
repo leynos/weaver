@@ -1,4 +1,4 @@
-.PHONY: help all clean test test-workflow-contracts build release lint fmt check-fmt markdownlint nixie typecheck install
+.PHONY: help all clean test test-workflow-contracts build release lint fmt check-fmt markdownlint nixie typos typecheck install
 
 TARGET ?= weaver
 USER_CARGO := $(HOME)/.cargo/bin/cargo
@@ -21,6 +21,14 @@ MDLINT ?= $(or $(shell command -v markdownlint-cli2 2>/dev/null),$(wildcard $(US
 NIXIE ?= nixie
 NIXIE_FLAGS ?= --no-sandbox
 WHITAKER ?= $(or $(shell command -v whitaker 2>/dev/null),$(wildcard $(USER_WHITAKER)),whitaker)
+UV ?= $(or $(shell command -v uv 2>/dev/null),$(wildcard $(HOME)/.local/bin/uv),uv)
+# Single source of truth for the typos version so the Makefile and CI cannot
+# drift apart.
+TYPOS_VERSION ?= 1.48.0
+TYPOS ?= $(UV) tool run typos@$(TYPOS_VERSION)
+# Markdown is the spelling-enforced surface; keep the exclusions aligned with
+# typos.toml's extend-exclude.
+MD_FILES_FIND = find . -type f -name '*.md' -not -path './target/*' -not -path './dist/*' -print0
 
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary
@@ -61,6 +69,9 @@ markdownlint: ## Lint Markdown files
 nixie: ## Validate Mermaid diagrams
 	# Use `make nixie NIXIE_FLAGS=` to enable sandboxed mode locally.
 	$(NIXIE) $(NIXIE_FLAGS)
+
+typos: ## Enforce en-GB-oxendict (Oxford) spelling in Markdown
+	$(MD_FILES_FIND) | xargs -0 $(TYPOS) --config typos.toml --force-exclude
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \

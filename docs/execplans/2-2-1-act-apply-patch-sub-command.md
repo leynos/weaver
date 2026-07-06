@@ -243,7 +243,7 @@ patch is safe. If documentation formatting fails, run `make fmt` and
 
 ## Artifacts and notes
 
-Expected artifacts include:
+Expected artefacts include:
 
 - New BDD feature files under `crates/weaver-cli/tests/features/` and
   `crates/weaverd/tests/features/`.

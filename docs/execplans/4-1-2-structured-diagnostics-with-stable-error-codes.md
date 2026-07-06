@@ -18,7 +18,7 @@ semantic validation logic. Every emitted diagnostic payload will include:
 `code`, `message`, `primary_span`, and `notes`, with stable `E_SEMPAI_*` codes
 and snapshot-locked JSON output.
 
-This directly fulfills roadmap item 4.1.2 in
+This directly fulfils roadmap item 4.1.2 in
 [docs/archive/prototype-roadmap.md](../archive/prototype-roadmap.md):
 
 - Define structured diagnostics with stable `E_SEMPAI_*` error codes and

@@ -381,7 +381,7 @@ The feature is accepted when all items below are true:
 
 ## Artifacts and notes
 
-Expected artifacts:
+Expected artefacts:
 
 - New crate: `crates/weaver-plugin-rope/`
 - New/updated refactor runtime wiring in `crates/weaverd/src/dispatch/`

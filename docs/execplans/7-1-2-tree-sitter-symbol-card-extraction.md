@@ -433,7 +433,7 @@ Only after the feature, tests, and docs are complete should
 ## Validation
 
 Run all commands from the repository root, with `set -o pipefail` and `tee` so
-the exit status is preserved and the logs can be inspected afterward.
+the exit status is preserved and the logs can be inspected afterwards.
 
 Documentation-phase validation during implementation:
 
