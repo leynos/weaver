@@ -28,7 +28,7 @@ libc = "0.2"
 [build-dependencies]
 camino = { workspace = true }
 clap = { workspace = true }
-clap_mangen = "0.2"
+clap_mangen = "0.3"
 ortho_config = { workspace = true }
 tracing = { workspace = true }
 weaver-build-util = { path = "../weaver-build-util" }
