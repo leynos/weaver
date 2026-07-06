@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release lint fmt check-fmt markdownlint nixie typecheck install
+.PHONY: help all clean test test-workflow-contracts build release lint fmt check-fmt markdownlint nixie typecheck install
 
 TARGET ?= weaver
 USER_CARGO := $(HOME)/.cargo/bin/cargo
@@ -33,6 +33,9 @@ clean: ## Remove build artifacts
 test: ## Run tests with warnings treated as errors
 	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
 	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) test --doc --workspace --all-features
+
+test-workflow-contracts: ## Validate the mutation-testing caller contract
+	uv run --with 'pytest>=8' --with 'pyyaml>=6' pytest tests/workflow_contracts -q
 
 target/%/$(TARGET): ## Build binary in debug or release mode
 	$(CARGO) build $(BUILD_JOBS) $(if $(filter release,$*),--release) --bin $(TARGET)

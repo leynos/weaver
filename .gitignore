@@ -6,3 +6,4 @@ target/
 .*.sw?
 *~
 .*.un~
+__pycache__/
