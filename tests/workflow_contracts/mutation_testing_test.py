@@ -21,9 +21,9 @@ WORKFLOW_PATH = (
     Path(__file__).resolve().parents[2] / ".github" / "workflows" / "mutation-testing.yml"
 )
 
-#: The merge commit of leynos/shared-actions PR #319, matching the
-#: estate-wide template (leynos/wireframe#572). Bump both together.
-PINNED_SHA = "47aea18960d24f33aedc4782ec6b73e365418313"
+#: The pinned leynos/shared-actions commit; this revision preserves
+#: shard artefacts on timeout. Bump the workflow and this test together.
+PINNED_SHA = "2b09d10192627fd6e1034e7c12625dd266b45503"
 
 EXPECTED_USES = (
     "leynos/shared-actions/.github/workflows/mutation-cargo.yml@" + PINNED_SHA
@@ -32,7 +32,8 @@ EXPECTED_USES = (
 #: The exact caller configuration: the workspace lives under crates/
 #: (no root src/), the end-to-end harness and proc-macro fixture crates
 #: plus the feature-gated test-support modules are noise, and the CI
-#: baseline runs --all-features.
+#: baseline runs --all-features across the whole workspace (so mutants
+#: face the dependent crates' tests too).
 EXPECTED_WITH = {
     "paths": "crates/",
     "exclude-globs": (
@@ -41,7 +42,7 @@ EXPECTED_WITH = {
         "crates/sempai-core/src/test_support.rs,"
         "crates/weaver-plugins/src/capability/test_support.rs"
     ),
-    "extra-args": "--all-features",
+    "extra-args": "--all-features --test-workspace=true",
 }
 
 
