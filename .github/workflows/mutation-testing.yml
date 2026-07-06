@@ -26,7 +26,7 @@ jobs:
     permissions:
       contents: read
       id-token: write # OIDC workflow-source resolution
-    uses: leynos/shared-actions/.github/workflows/mutation-cargo.yml@47aea18960d24f33aedc4782ec6b73e365418313
+    uses: leynos/shared-actions/.github/workflows/mutation-cargo.yml@2b09d10192627fd6e1034e7c12625dd266b45503
     with:
       # All workspace crates live under crates/; there is no root src/.
       paths: "crates/"
@@ -34,6 +34,8 @@ jobs:
       # harness crate, the proc-macro fixture helpers, and the
       # feature-gated test-support modules compiled by --all-features.
       exclude-globs: "crates/weaver-e2e/**,crates/weaver-test-macros/**,crates/sempai-core/src/test_support.rs,crates/weaver-plugins/src/capability/test_support.rs"
-      # Match the CI baseline (make test runs --all-features) so
-      # feature-gated tests run against mutants.
-      extra-args: "--all-features"
+      # Match the CI baseline (make test runs --all-features across the
+      # whole workspace): feature-gated tests run against mutants, and
+      # each crate's mutants face the dependent crates' tests too,
+      # avoiding false survivors in crates covered by siblings.
+      extra-args: "--all-features --test-workspace=true"
