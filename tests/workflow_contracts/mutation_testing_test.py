@@ -21,9 +21,11 @@ WORKFLOW_PATH = (
     Path(__file__).resolve().parents[2] / ".github" / "workflows" / "mutation-testing.yml"
 )
 
-#: The pinned leynos/shared-actions commit; this revision preserves
-#: shard artefacts on timeout. Bump the workflow and this test together.
-PINNED_SHA = "2b09d10192627fd6e1034e7c12625dd266b45503"
+#: The pinned commit of leynos/shared-actions (shared-actions#334, which
+#: adds the `mode: check` coverage gate used by the CodeScene coverage
+#: rollout; the estate keeps a single repo-wide pin). Bump the workflow
+#: and this test together.
+PINNED_SHA = "927edd45ae77be4251a8a18ca9eb5613a2e32cbd"
 
 EXPECTED_USES = (
     "leynos/shared-actions/.github/workflows/mutation-cargo.yml@" + PINNED_SHA
