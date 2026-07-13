@@ -551,8 +551,8 @@ A novice opening this plan needs the following landmarks before reading the
   semantic execution, capability routing, providers, sandboxing, Double-Lock
   safety, edits, jobs, and provider-specific idempotency.
 - OrthoConfig
-  `docs/adr-003-define-schema-ownership-for-agent-native-contracts.md`:
-  defines the three contract crates and the schema-version constants
+  `docs/adr-003-define-schema-ownership-for-agent-native-contracts.md`: defines
+  the three contract crates and the schema-version constants
   (`ORTHO_AGENT_CONTEXT_SCHEMA_VERSION`, `ORTHO_POLICY_REPORT_SCHEMA_VERSION`).
 
 ### Terms of art
