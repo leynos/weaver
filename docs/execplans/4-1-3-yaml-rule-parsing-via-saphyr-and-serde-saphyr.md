@@ -123,7 +123,7 @@ set -o pipefail; make nixie 2>&1 | tee /tmp/4-1-3-make-nixie.log
   on the rule object, while this milestone only models a subset of keys.
   Severity: medium. Likelihood: high. Mitigation: accept and preserve or ignore
   unknown rule-level keys without parse failure, while still rejecting invalid
-  shapes for the modeled keys.
+  shapes for the modelled keys.
 
 - Risk: `Engine::compile_yaml` cannot produce real `QueryPlan` values until the
   normalization layer exists. Severity: medium. Likelihood: high. Mitigation:
@@ -288,7 +288,7 @@ at minimum:
   - Legacy: `pattern`, `pattern-regex`, `patterns`, `pattern-either`.
   - v2: `match` as string or structured object.
 - Pass-through compatibility for rule-level unknown keys that must not break
-  parsing merely because later milestones have not modeled them yet.
+  parsing merely because later milestones have not modelled them yet.
 
 This milestone does not need to produce a canonical `Formula`; that is 4.1.5.
 It does, however, need to preserve enough structure that 4.1.4 and 4.1.5 can

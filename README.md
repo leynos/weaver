@@ -15,7 +15,7 @@ focused tools that communicate clearly and play nicely with existing shell
 utilities like `jq`, `xargs`, and `find`.
 
 Under the bonnet, Weaver runs a daemon (`weaverd`) that orchestrates language
-servers, syntax analysers, and specialised plugins—all sandboxed for
+servers, syntax analysers, and specialized plugins—all sandboxed for
 safety—while the lightweight CLI (`weaver`) lets you issue commands and stream
 results. Whether you're an AI agent planning a refactor or a human debugging a
 tricky rename, Weaver gives you the semantic primitives you need.

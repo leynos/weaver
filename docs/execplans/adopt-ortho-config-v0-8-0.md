@@ -154,7 +154,7 @@ Observable success after implementation:
   upstream v0.8.0 guide.
 - [x] (2026-03-07 10:46 UTC) Run all relevant quality gates and capture the
   command logs.
-- [x] (2026-03-07 10:46 UTC) Summarise the outcome and update this document's
+- [x] (2026-03-07 10:46 UTC) Summarize the outcome and update this document's
   living sections.
 
 ## Surprises & Discoveries
