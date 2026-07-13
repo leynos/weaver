@@ -56,7 +56,7 @@ jobs:
 
       # Build weaver-cli
       - name: Build weaver-cli release binary
-        uses: leynos/shared-actions/.github/actions/rust-build-release@8c8e8a38f1f9a783ba7e25ba2c0f9bfda5bf2cb3
+        uses: leynos/shared-actions/.github/actions/rust-build-release@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
         with:
           target: ${{ inputs.target }}
           bin-name: weaver
@@ -64,7 +64,7 @@ jobs:
 
       # Build weaverd
       - name: Build weaverd release binary
-        uses: leynos/shared-actions/.github/actions/rust-build-release@8c8e8a38f1f9a783ba7e25ba2c0f9bfda5bf2cb3
+        uses: leynos/shared-actions/.github/actions/rust-build-release@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
         with:
           target: ${{ inputs.target }}
           bin-name: weaverd
@@ -73,7 +73,7 @@ jobs:
       # Linux packaging
       - name: Package weaver-cli for Linux
         if: inputs.platform == 'linux'
-        uses: leynos/shared-actions/.github/actions/linux-packages@d400b079fb6a8fa92f7e7b6c57f3d1c92a4b2d54
+        uses: leynos/shared-actions/.github/actions/linux-packages@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
         with:
           project-dir: .
           package-name: weaver-cli
@@ -90,7 +90,7 @@ jobs:
 
       - name: Package weaverd for Linux
         if: inputs.platform == 'linux'
-        uses: leynos/shared-actions/.github/actions/linux-packages@d400b079fb6a8fa92f7e7b6c57f3d1c92a4b2d54
+        uses: leynos/shared-actions/.github/actions/linux-packages@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
         with:
           project-dir: .
           package-name: weaverd
@@ -135,7 +135,7 @@ jobs:
       - name: Stage weaver-cli artefacts for macOS
         if: inputs.platform == 'macos'
         id: stage-weaver-cli
-        uses: leynos/shared-actions/.github/actions/stage-release-artefacts@d400b079fb6a8fa92f7e7b6c57f3d1c92a4b2d54
+        uses: leynos/shared-actions/.github/actions/stage-release-artefacts@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
         with:
           config-file: .github/release-staging.toml
           target: ${{ steps.macos-target.outputs.target }}
@@ -143,7 +143,7 @@ jobs:
       - name: Build weaver-cli macOS installer package
         if: inputs.platform == 'macos'
         id: package-weaver-cli-macos
-        uses: leynos/shared-actions/.github/actions/macos-package@d400b079fb6a8fa92f7e7b6c57f3d1c92a4b2d54
+        uses: leynos/shared-actions/.github/actions/macos-package@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
         with:
           name: weaver-cli
           identifier: ${{ env.MAC_IDENTIFIER }}.cli
@@ -167,7 +167,7 @@ jobs:
       - name: Stage weaverd artefacts for macOS
         if: inputs.platform == 'macos'
         id: stage-weaverd
-        uses: leynos/shared-actions/.github/actions/stage-release-artefacts@d400b079fb6a8fa92f7e7b6c57f3d1c92a4b2d54
+        uses: leynos/shared-actions/.github/actions/stage-release-artefacts@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
         with:
           config-file: .github/release-staging-weaverd.toml
           target: ${{ steps.macos-target.outputs.target }}
@@ -175,7 +175,7 @@ jobs:
       - name: Build weaverd macOS installer package
         if: inputs.platform == 'macos'
         id: package-weaverd-macos
-        uses: leynos/shared-actions/.github/actions/macos-package@d400b079fb6a8fa92f7e7b6c57f3d1c92a4b2d54
+        uses: leynos/shared-actions/.github/actions/macos-package@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
         with:
           name: weaverd
           identifier: ${{ env.MAC_IDENTIFIER }}.daemon
