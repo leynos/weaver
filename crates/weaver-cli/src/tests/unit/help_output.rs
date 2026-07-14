@@ -97,10 +97,9 @@ fn augmented_command_has_expected_arg_structure() {
 
     let cmd = help::command();
     for (long, expected_value_name, expected_action) in expected {
-        let arg = cmd
-            .get_arguments()
-            .find(|a| a.get_long() == Some(*long))
-            .unwrap_or_else(|| panic!("augmented command missing --{long}"));
+        let Some(arg) = cmd.get_arguments().find(|a| a.get_long() == Some(*long)) else {
+            panic!("augmented command missing --{long}");
+        };
 
         assert!(arg.is_global_set(), "arg --{long} must be global");
         assert_eq!(
