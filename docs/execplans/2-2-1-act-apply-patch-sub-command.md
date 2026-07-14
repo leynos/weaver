@@ -241,7 +241,7 @@ transaction must leave the filesystem unchanged, so re-running with a corrected
 patch is safe. If documentation formatting fails, run `make fmt` and
 `make markdownlint` again before re-running the Rust checks.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Expected artefacts include:
 

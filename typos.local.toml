@@ -1,0 +1,38 @@
+# Repository-specific identifiers, quotations and deliberate fixtures.
+
+schema = 1
+
+[oxford]
+stems = []
+
+[words]
+accepted = []
+
+[words.corrections]
+
+[patterns]
+# Preserve complete formal names without accepting their component words broadly.
+ignore = [
+  "\\brust-analyzer\\b",
+  "\\bRust\\s+Analyzer\\b",
+  "\\bHashiCorp\\b",
+  "\\bHashiCorp\\s+Configuration\\s+Language\\b",
+  "\\bGitHub\\s+Flavored\\s+Markdown\\b",
+
+  "(?m)^          ARCHIVE_SUFFIX: \\$\\{\\{ inputs\\.artifact-suffix \\}\\}$",
+  "(?m)^          inputs\\.should-upload-workflow-artifacts &&$",
+  "(?m)^          name: \\$\\{\\{ inputs\\.artifact-name \\}\\}$",
+  "(?m)^        value: \\$\\{\\{ jobs\\.metadata\\.outputs\\.should_upload_workflow_artifacts \\}\\}$",
+  "(?m)^      artifact-name: \\$\\{\\{ needs\\.metadata\\.outputs\\.repo_name \\}\\}-freebsd-amd64$",
+  "(?m)^      artifact-name:$",
+  "(?m)^      artifact-suffix:$",
+  "(?m)^      should-upload-workflow-artifacts: \\$\\{\\{ fromJSON\\(needs\\.metadata\\.outputs\\.should_upload_workflow_artifacts\\) \\}\\}$",
+  "(?m)^      should-upload-workflow-artifacts:$",
+  "(?m)^      should_upload_workflow_artifacts: \\$\\{\\{ steps\\.release_modes\\.outputs\\.should-upload-workflow-artifacts \\}\\}$",
+  "(?m)^      should_upload_workflow_artifacts:$",
+  "\\bartifact-name\\b",
+  "\\bartifact-suffix\\b",
+]
+
+[files]
+exclude = []

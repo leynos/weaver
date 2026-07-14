@@ -379,7 +379,7 @@ The feature is accepted when all items below are true:
 - If markdown checks fail, run `make fmt` and re-run markdown validation before
   repeating Rust gates.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Expected artefacts:
 

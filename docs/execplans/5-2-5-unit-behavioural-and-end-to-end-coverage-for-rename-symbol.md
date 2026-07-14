@@ -582,7 +582,7 @@ updated with `cargo insta review` if the expected output changes. If a step
 fails, fix the issue and re-run from the failing command. No destructive or
 irreversible operations are involved.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Key file paths created or modified by this plan:
 

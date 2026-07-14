@@ -407,7 +407,7 @@ created files in `crates/weaver-plugins/src/capability/` and re-run the stage
 from the beginning. The capability module is additive; no existing files are
 deleted or renamed.
 
-## Artifacts and notes
+## Artefacts and notes
 
 ### Line budget analysis
 

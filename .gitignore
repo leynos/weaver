@@ -4,9 +4,13 @@ target/
 *:Zone.Identifier
 .agents/mcp/context_pack/packs/
 .memdb/
-.uv-cache/
-.uv-tools/
 .*.sw?
 *~
 .*.un~
 __pycache__/
+.coverage
+.pytest_cache/
+.uv-cache/
+.uv-tools/
+.typos-oxendict-base.json
+.typos-oxendict-base.toml

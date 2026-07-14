@@ -341,7 +341,7 @@ Acceptance is satisfied when all are true:
 - If tolerance triggers are hit, stop and record escalation details in
   `Decision Log` before proceeding.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Capture the following during implementation:
 
