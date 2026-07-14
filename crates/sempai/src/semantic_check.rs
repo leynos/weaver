@@ -42,10 +42,13 @@ pub(crate) const MAX_FORMULA_DEPTH: usize = 1000;
 #[tracing::instrument(level = "debug", skip_all)]
 pub(crate) fn validate_formula(formula: &Decorated<Formula>) -> Result<(), DiagnosticReport> {
     let result = validate_formula_inner(formula);
-    if let Err(report) = &result
-        && let Some(diagnostic) = report.diagnostics().first()
-    {
-        tracing::warn!(code = ?diagnostic.code(), "semantic validation failed");
+    match &result {
+        Ok(()) => tracing::debug!(source_span = ?formula.span, "semantic validation passed"),
+        Err(report) => {
+            if let Some(diagnostic) = report.diagnostics().first() {
+                tracing::warn!(code = ?diagnostic.code(), "semantic validation failed");
+            }
+        }
     }
     result
 }
