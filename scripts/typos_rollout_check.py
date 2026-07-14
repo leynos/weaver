@@ -48,23 +48,7 @@ class PhraseFinding:
 
 
 def _tracked(repository: Path) -> tuple[Path, ...]:
-    """Return tracked paths in deterministic order.
-
-    Parameters
-    ----------
-    repository
-        Git repository whose tracked paths should be listed.
-
-    Returns
-    -------
-    tuple[Path, ...]
-        Sorted repository-relative paths.
-
-    Raises
-    ------
-    subprocess.CalledProcessError
-        If Git cannot list the repository's tracked paths.
-    """
+    """Return tracked paths in deterministic order."""
     raw = subprocess.run(
         ["git", "-C", str(repository), "ls-files", "-z"],
         check=True,
@@ -75,45 +59,14 @@ def _tracked(repository: Path) -> tuple[Path, ...]:
 
 
 def _excluded(path: Path, dictionary: rollout.Dictionary) -> bool:
-    """Return whether the spelling policy excludes a tracked path.
-
-    Parameters
-    ----------
-    path
-        Repository-relative path to classify.
-    dictionary
-        Merged spelling policy containing path exclusions.
-
-    Returns
-    -------
-    bool
-        ``True`` when any policy exclusion matches the path.
-    """
+    """Return whether the spelling policy excludes a tracked path."""
     return any(
         item in path.parts or path.match(item) for item in dictionary.excluded_files
     )
 
 
 def _masked(text: str, patterns: tuple[str, ...]) -> str:
-    """Replace ignored spans with position-preserving whitespace.
-
-    Parameters
-    ----------
-    text
-        UTF-8 text to scan.
-    patterns
-        Regular expressions describing ignored spans.
-
-    Returns
-    -------
-    str
-        Text with ignored characters blanked while preserving newlines.
-
-    Raises
-    ------
-    re.error
-        If an ignore pattern is not a valid regular expression.
-    """
+    """Replace ignored spans with position-preserving whitespace."""
 
     def blank(match: re.Match[str]) -> str:
         """Blank a matched span without changing its line positions."""

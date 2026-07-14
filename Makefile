@@ -29,9 +29,10 @@ UV_ENV = UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools
 RUFF_VERSION ?= 0.15.12
 TYPOS_VERSION ?= 1.48.0
 SPELLING_PY_SRCS := scripts/generate_typos_config.py scripts/typos_rollout_check.py scripts/typos_rollout.py \
-	scripts/typos_rollout_cache.py scripts/typos_rollout_http.py \
+	scripts/typos_rollout_cache.py scripts/typos_rollout_http.py scripts/typos_rollout_policy.py \
 	scripts/tests/conftest.py scripts/tests/test_typos_rollout.py scripts/tests/test_typos_rollout_check.py \
 	scripts/tests/test_typos_rollout_policy.py \
+	scripts/tests/test_typos_rollout_semantics.py \
 	scripts/tests/test_typos_rollout_contract.py \
 	scripts/tests/test_typos_rollout_refresh.py \
 	scripts/tests/typos_rollout_test_support.py

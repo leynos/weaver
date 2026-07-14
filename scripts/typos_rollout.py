@@ -7,10 +7,10 @@ import json
 import pathlib
 import tomllib
 import typing as typ
-import urllib.error
 
 import typos_rollout_cache
 import typos_rollout_http
+import typos_rollout_policy
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -25,7 +25,6 @@ _read_metadata = typos_rollout_http._read_metadata
 _remote_is_not_newer = typos_rollout_http._remote_is_not_newer
 _atomic_write = typos_rollout_cache.atomic_write
 SCHEMA_VERSION = 1
-HTTP_NOT_MODIFIED = 304
 SUFFIX_PAIRS = (
     ("isably", "izably"),
     ("ise", "ize"),
@@ -52,6 +51,8 @@ class Dictionary:
         Repository terms accepted exactly as written.
     corrections
         Explicit misspelling-to-correction pairs.
+    phrase_corrections
+        Explicit phrase-to-correction pairs.
     ignore_patterns
         Regular expressions excluded from prose checking.
     excluded_files
@@ -101,13 +102,10 @@ def _string_mapping(
     return typ.cast("cabc.Mapping[str, str]", value)
 
 
-def _dictionary_from_text(text: str) -> Dictionary:
+def _dictionary_from_text(text: str, *, sparse: bool = False) -> Dictionary:
     """Parse and validate shared dictionary text."""
     document = tomllib.loads(text)
-    schema = document.get("schema")
-    if schema != SCHEMA_VERSION:
-        message = f"unsupported dictionary schema {schema!r}"
-        raise ValueError(message)
+    typos_rollout_policy.validate_document(document, sparse=sparse)
     oxford = _table(document, "oxford")
     words = _table(document, "words")
     phrases = _table(document, "phrases")
@@ -133,13 +131,15 @@ def _dictionary_from_text(text: str) -> Dictionary:
     )
 
 
-def load_dictionary(path: pathlib.Path) -> Dictionary:
+def load_dictionary(path: pathlib.Path, *, local_overlay: bool = False) -> Dictionary:
     """Load a validated shared dictionary from *path*.
 
     Parameters
     ----------
     path
         TOML dictionary path.
+    local_overlay
+        Permit omitted fields only for an explicitly local overlay.
 
     Returns
     -------
@@ -153,10 +153,10 @@ def load_dictionary(path: pathlib.Path) -> Dictionary:
 
     Examples
     --------
-    >>> load_dictionary(pathlib.Path("typos.local.toml")).stems
+    >>> load_dictionary(pathlib.Path("typos.local.toml"), local_overlay=True).stems
     ()
     """
-    return _dictionary_from_text(path.read_text(encoding="utf-8"))
+    return _dictionary_from_text(path.read_text(encoding="utf-8"), sparse=local_overlay)
 
 
 def _merge_correction_items(
@@ -196,8 +196,11 @@ def merge_dictionaries(base: Dictionary, local: Dictionary) -> Dictionary:
     Raises
     ------
     ValueError
-        If the overlays prescribe different corrections for one word.
+        If corrections conflict or local exceptions are too broad.
     """
+    typos_rollout_policy.validate_local_exceptions(
+        local.ignore_patterns, local.excluded_files
+    )
     return Dictionary(
         stems=tuple(sorted(set(base.stems) | set(local.stems))),
         accepted=tuple(sorted(set(base.accepted) | set(local.accepted))),
@@ -343,18 +346,6 @@ def write_config(path: pathlib.Path, dictionary: Dictionary) -> None:
 def _validate_dictionary_bytes(content: bytes) -> None:
     """Reject bytes that do not contain a valid shared dictionary."""
     _dictionary_from_text(content.decode())
-
-
-def _http_error_result(
-    cache: pathlib.Path,
-    error: urllib.error.HTTPError,
-) -> RefreshResult:
-    """Preserve the former HTTP-status helper at the compatibility boundary."""
-    return typos_rollout_http._http_error_result(
-        cache,
-        error,
-        _validate_dictionary_bytes,
-    )
 
 
 def refresh_base(

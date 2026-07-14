@@ -15,7 +15,13 @@ SCRIPT_DIRECTORY = Path(__file__).resolve().parents[1]
 def rollout_modules_fixture(
     monkeypatch: pytest.MonkeyPatch,
 ) -> tuple[types.ModuleType, types.ModuleType, types.ModuleType]:
-    """Import the three refresh modules through their runtime paths."""
+    """Import the three refresh modules through their runtime paths.
+
+    Returns
+    -------
+    tuple[types.ModuleType, types.ModuleType, types.ModuleType]
+        Cache, HTTP refresh and rollout modules in dependency order.
+    """
     monkeypatch.syspath_prepend(str(SCRIPT_DIRECTORY))
     names = ("typos_rollout_cache", "typos_rollout_http", "typos_rollout")
     importlib.invalidate_caches()

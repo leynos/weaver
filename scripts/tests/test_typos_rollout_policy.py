@@ -13,7 +13,9 @@ from typos_rollout_test_support import dictionary_text
 if typ.TYPE_CHECKING:
     import types
 
+type RolloutModules = tuple[types.ModuleType, types.ModuleType, types.ModuleType]
 
+# Keep the policy violation out of this test module's own spelling scan.
 PROHIBITED_PHRASE = "hand" + "-written"
 
 
@@ -47,14 +49,17 @@ PROHIBITED_PHRASE = "hand" + "-written"
             id="invalid-word-correction",
         ),
         pytest.param(
-            dictionary_text() + f"\n[phrases.corrections]\n'{PROHIBITED_PHRASE}' = 1\n",
+            dictionary_text().replace(
+                "[phrases.corrections]",
+                f"[phrases.corrections]\n'{PROHIBITED_PHRASE}' = 1",
+            ),
             (TypeError, "phrase corrections must map strings to strings"),
             id="invalid-phrase-correction",
         ),
     ],
 )
 def test_dictionary_validation_rejects_invalid_documents(
-    rollout_modules: tuple[types.ModuleType, types.ModuleType, types.ModuleType],
+    rollout_modules: RolloutModules,
     tmp_path: Path,
     document: str,
     expected: tuple[type[Exception], str],
@@ -70,7 +75,7 @@ def test_dictionary_validation_rejects_invalid_documents(
 
 
 def test_merge_rejects_conflicting_corrections(
-    rollout_modules: tuple[types.ModuleType, types.ModuleType, types.ModuleType],
+    rollout_modules: RolloutModules,
 ) -> None:
     """A local overlay cannot silently weaken shared word or phrase policy."""
     _, _, rollout = rollout_modules
@@ -106,7 +111,7 @@ def test_merge_rejects_conflicting_corrections(
 
 
 def test_merge_sorts_word_and_phrase_corrections(
-    rollout_modules: tuple[types.ModuleType, types.ModuleType, types.ModuleType],
+    rollout_modules: RolloutModules,
 ) -> None:
     """Word and phrase policies retain deterministic key ordering."""
     _, _, rollout = rollout_modules
