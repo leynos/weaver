@@ -537,7 +537,7 @@ the same results.  No destructive filesystem operations are performed.  If a
 stage fails partway through, the previous successful stage's state remains
 intact and the failed stage can be retried.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Key paired fixture example (to be created):
 

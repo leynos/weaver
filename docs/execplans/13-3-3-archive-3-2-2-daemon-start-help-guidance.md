@@ -21,7 +21,7 @@ provenance only. The live roadmap in `docs/roadmap.md` moves help, command
 metadata, generated references, manpages, shell completions, skills, and drift
 prevention into phase `13`, especially task `13.3.3`.
 
-The original standalone plan would add hand-written clap `long_about` text to
+The original standalone plan would add handwritten clap `long_about` text to
 the prototype `weaver daemon start --help` path so it mentions `WEAVERD_BIN` and
 `WEAVER_FOREGROUND`. That remains a real discoverability gap, but it is no
 longer the best next build unit under the live roadmap. The current framework
@@ -85,7 +85,7 @@ to the controlling terminal. That information matters during installation
 failures, debugging, and CI jobs.
 
 The problem is still real, but the proposed mechanism is misaligned with the
-live roadmap. A hand-written `long_about` on `DaemonAction::Start` would add
+live roadmap. A handwritten `long_about` on `DaemonAction::Start` would add
 another source of command help just as phase `13` is trying to converge help,
 localization, manpage generation, completions, skills, context JSON, and drift
 tests on one command contract. It would be useful only as a short-lived patch

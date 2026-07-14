@@ -47,7 +47,9 @@ jobs:
           bun x @puppeteer/browsers browsers install chrome-headless-shell
           mmdc --version
       - name: Install Nixie
-        run: uv tool install nixie-cli==1.0.0
+        run: uv tool install nixie-cli==1.1.0
+      - name: Install Merman CLI
+        run: cargo install merman-cli --version '=0.7.0' --locked
       - name: Mermaid lint
         run: make nixie
       - name: Boundary manifest gate

@@ -5,42 +5,45 @@ configuration framework internals, and implementation details that contributors
 need but operators do not. For user-facing behaviour see the
 [user's guide](users-guide.md).
 
+## Spelling policy
+
+`make spelling` is the canonical en-GB-oxendict gate. It validates the helper,
+regenerates `typos.toml`, rejects tracked configuration drift, runs the phrase
+checker, and then invokes the pinned Typos release over tracked Markdown.
+`make markdownlint` depends on this complete gate. The dependency-only
+compatibility alias `make typos` reaches the same target without duplicating
+its recipe; CI invokes that alias in its sole spelling step. `TYPOS_VERSION` in
+the Makefile is the single version pin used locally and in CI.
+
+The generated `typos.toml` starts from the shared estate dictionary. The
+generator refreshes its untracked local cache only when the authority is newer,
+then applies Weaver's narrow repository policy in `typos.local.toml`. Edit the
+local policy and regenerate the configuration rather than changing generated
+entries by hand or duplicating generally valid vocabulary locally.
+
+When an HTTPS authority is unreachable, the generator may reuse a valid stale
+copy of the untracked shared dictionary cache. Without a valid cache, the
+`spelling-config` stage fails before phrase checking because tracked
+`typos.toml` cannot represent the shared phrase-correction policy. HTTP status
+and local persistence failures also fail the gate.
+
+The shared `[phrases.corrections]` table covers punctuation-separated forms
+that Typos tokenizes as independent valid words. The companion
+`scripts/typos_rollout_check.py` scans tracked UTF-8 text with the merged file
+exclusions and ignore spans, and runs before Typos. Correct genuine maintained
+prose when it reports a phrase. Use inline or fenced code only for literal API,
+identifier, fixture, or quoted-source spelling that must remain unchanged.
+
+`scripts/typos_rollout_http.py` owns spelling-cache freshness, HTTPS transport
+security, and refresh persistence coordination. Only `scripts/typos_rollout.py`
+may compose that helper with dictionary validation; other project code must
+not reuse its infrastructure internals. This boundary keeps the public
+dictionary-rendering API stable while each Python source remains below the
+repository's 400-line limit.
+
 ## Workspace baseline
 
 The workspace targets `ortho_config` v0.8.0 and Rust 1.88.
-
-## Spelling enforcement (en-GB-oxendict)
-
-Markdown documentation is spell-checked against en-GB-oxendict (Oxford)
-spelling by [`typos`](https://github.com/crate-ci/typos). Run the gate locally
-with `make typos`, which runs `typos` over every tracked Markdown file
-(excluding `target/` and `dist/`) using the generated `typos.toml`
-configuration. CI runs the same gate as the `Spelling (en-GB-oxendict)` step in
-the CI workflow, installing the pinned `typos` release through `uv tool run`.
-The version is single-sourced as `TYPOS_VERSION` in the `Makefile`, so the
-Makefile and CI cannot drift apart.
-
-### Regenerating `typos.toml`
-
-`typos.toml` is generated, not hand-edited. The `en-gb` locale corrects
-American spellings (`color` to `colour`) but prefers the `-ise` family over
-Oxford `-ize`. `scripts/generate_typos_config.py` restores Oxford spelling by
-emitting, for each curated stem, an identity entry that accepts the `-ize`
-inflection and an `-ise`-to-`-ize` correction. Regenerate after changing the
-script with `uv run scripts/generate_typos_config.py`.
-
-Extend enforcement by editing the generator, never `typos.toml` directly:
-
-- Add a word stem to `STEMS` to keep its Oxford `-ize` inflections (for
-  example `amort` keeps `amortize`). Stems taking `-yse` (analyse, paralyse)
-  are omitted because the locale already enforces the British form.
-- Add a verbatim-accepted token to `EXTRA_ACCEPTED_WORDS`.
-- Add a proper noun (such as `HashiCorp` or `Rust Analyzer`) or a preserved
-  template heading (such as `## Artifacts and notes`) to `extend-ignore-re` in
-  the generator's `HEADER` when the upstream spelling must be kept.
-
-Inline code spans and fenced code blocks are ignored, so identifiers and API
-names keep their upstream spelling.
 
 ## Adding or renaming public commands
 

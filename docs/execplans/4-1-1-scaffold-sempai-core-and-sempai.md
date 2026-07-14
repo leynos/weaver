@@ -673,7 +673,7 @@ creation steps use `mkdir -p` (no failure on existing directory).
 To roll back entirely: remove `crates/sempai-core/` and `crates/sempai/` from
 the filesystem and their entries from the workspace `members` list.
 
-## Artifacts and notes
+## Artefacts and notes
 
 N/A (to be populated during implementation).
 

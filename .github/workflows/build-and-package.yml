@@ -116,10 +116,10 @@ jobs:
         id: macos-target
         shell: bash
         env:
-          ARTIFACT_SUFFIX: ${{ inputs.artifact-suffix }}
+          ARTEFACT_SUFFIX: ${{ inputs.artifact-suffix }}
         run: |
           set -euo pipefail
-          case "$ARTIFACT_SUFFIX" in
+          case "$ARTEFACT_SUFFIX" in
             macos-arm64)
               echo "target=macos-aarch64" >>"$GITHUB_OUTPUT"
               ;;
@@ -127,7 +127,7 @@ jobs:
               echo "target=macos-x86_64" >>"$GITHUB_OUTPUT"
               ;;
             *)
-              echo "Unsupported artifact suffix: $ARTIFACT_SUFFIX" >&2
+              echo "Unsupported artefact suffix: $ARTEFACT_SUFFIX" >&2
               exit 1
               ;;
           esac

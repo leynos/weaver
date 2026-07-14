@@ -682,7 +682,7 @@ The `lru` dependency addition is idempotent — adding it twice has no effect.
 Cache state is ephemeral (lives only in daemon memory), so restarting the
 daemon clears the cache without side effects.
 
-## Artifacts and notes
+## Artefacts and notes
 
 ### Cache key structure
 

@@ -758,7 +758,7 @@ stage fails partway through, fix the issue and re-run. No destructive
 operations are involved. If insta snapshots need updating after a deliberate
 schema change, run `cargo insta review` to accept the new snapshots.
 
-## Artifacts and notes
+## Artefacts and notes
 
 ### Expected JSON shape: minimal card
 
